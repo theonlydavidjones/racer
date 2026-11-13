@@ -45,13 +45,15 @@ export interface RealRace {
   uncertain: string | null;
   /** the course is drawn from the 2026–27 sheet, the race's own season's sheet unread, and its published distance disagrees */
   sheetUnverified: boolean;
+  /** where the course comes from when the results don't give it (someone who sailed it), in words; or null */
+  courseFrom: string | null;
   /** the results page */
   url: string;
   boats: RealBoat[];
 }
 
 type RawBoat = { sail: string; key: string; boat: string; skipper: string; elapsedS: number | null; place: number | null; code: string | null };
-type RawRace = { raceNo: number; date: string; start: string | null; course: string | null; distanceNm: number | null; sheet?: 'unverified'; url: string; boats: RawBoat[] };
+type RawRace = { raceNo: number; date: string; start: string | null; course: string | null; courseFrom?: string; distanceNm: number | null; sheet?: 'unverified'; url: string; boats: RawBoat[] };
 type RawEvent = { source: string; id: string; name: string; races: RawRace[] };
 
 /**
@@ -60,6 +62,16 @@ type RawEvent = { source: string; id: string; name: string; races: RawRace[] };
  * real fleet (than its median finisher). Measured 13 Nov 2026; tests/realRaces.test.ts checks the list against the planner. On the other
  * races the real fleet takes 0.9–1.5 × the perfect boat's time, as a fleet of real boats does.
  */
+// (Race 1, 1 Nov 2025, may have sailed another course than the one scored: the scored course isn't always the one sailed.
+// The 2026–27 season's race 1, 7 Nov 2026, had a last-minute course change the results don't show at all, the scorer
+// leaving the course blank; the owner, who sailed it, gives it: course 2. That doesn't settle 1 Nov 2025, but a late
+// change is one way its course 3, 6.1 nm and the fleet's 47 minutes could all fail to agree.)
+// (7 Nov 2026 on course 2, the course known, is the sim's own yardstick, and it fails: a perfect boat takes 76 min
+// against the fleet's 51–55 (13 Nov 2026). The tide is right, NOAA's SFB1204 2.2–2.4 kt ebb toward 271°, and the sim
+// has the shore's relief (0.8 kt within 100 m of the Cityfront, 2.4 at the marks 400 m out); but the planner's runs
+// east sail out in the stream (−1.9 kt along the leg) where a crew would hug the shore, and the record's wind fades to
+// 6.5 kt for the second lap. Not flagged "course uncertain": the gap is the sim's to close, not the course's; it's an
+// expected failure in tests/realRaces.test.ts until the planner learns to hug the Cityfront.)
 const UNCERTAIN: Record<string, string> = {
   'GGYC_T008047221-r1': 'Course uncertain: on course 3 as the sheet draws it, a perfect boat in the wind observed at Fort Point (9 kt from 249°) and NOAA\'s ebb takes about 53 min, slower than every real finisher (47–52 min). It would need about 11 kt to make 47. The fleet may have sailed a shorter course, or had more wind than Fort Point recorded, so compare your time with care.'
 };
@@ -85,7 +97,7 @@ export function realRaces(): RealRace[] {
         : null;
       out.push({
         id: `${ev.id}-r${r.raceNo}`, event: ev.name, raceNo: r.raceNo, date: r.date, start: r.start.slice(0, 5),
-        courseId: course.id, courseNo: r.course, distanceNm: nm, doubt, uncertain: UNCERTAIN[`${ev.id}-r${r.raceNo}`] ?? null, sheetUnverified: r.sheet === 'unverified', url: r.url,
+        courseId: course.id, courseNo: r.course, distanceNm: nm, doubt, uncertain: UNCERTAIN[`${ev.id}-r${r.raceNo}`] ?? null, sheetUnverified: r.sheet === 'unverified', courseFrom: r.courseFrom ?? null, url: r.url,
         boats: r.boats.map(b => ({ key: b.key, sail: b.sail, boat: b.boat, skipper: b.skipper, elapsedS: b.elapsedS, place: b.place, code: b.code }))
       });
     }

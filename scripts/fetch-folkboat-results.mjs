@@ -31,6 +31,12 @@ const DISCOVER = process.argv.includes('--discover');
 const JIBESET = 'https://www.jibeset.net';
 /** Races scored on a course whose distance disagrees with the 2026–27 sheet's (src/courses/data); the 2025–26 sheet unread. */
 const SHEET_UNVERIFIED = { 'GGYC_T008047221-r1': 1, 'GGYC_T008047221-r3': 1, 'GGYC_T008047221-r4': 1 };
+/**
+ * Courses the results don't give, from someone who sailed the race (the scorer left "Course: ---"): the course number,
+ * and who says so. Seaweed Soup 2026–27 race 1 (7 Nov 2026): the owner, who sailed it, "it was a last minute course
+ * change. we sailed course #2" (the results sheet: reference/results/seaweed-soup-2026-27-race1-2026-11-07.png).
+ */
+const COURSE_FROM_SAILOR = { 'GGYC_T00227699-r1': { course: '2', by: 'the owner, who sailed it: "it was a last minute course change. we sailed course #2" (the results give no course)' } };
 const RN = 'https://www.regattanetwork.com';
 
 /** Jibeset regattas with a Folkboat fleet (club code, regatta id), found by --discover on 2026-11-11. */
@@ -140,6 +146,7 @@ async function fetchJibesetEvent(ev) {
   }
   // the races whose published distance disagrees with the 2026–27 sheet the sim draws them from (the 2025–26 sheet unread)
   for (const r of races) if (SHEET_UNVERIFIED[`${ev.club}_${ev.rg}-r${r.raceNo}`]) r.sheet = 'unverified';
+  for (const r of races) { const c = COURSE_FROM_SAILOR[`${ev.club}_${ev.rg}-r${r.raceNo}`]; if (c && !r.course) { r.course = c.course; r.courseFrom = c.by; } }
   console.log(`Jibeset ${ev.name}: ${races.length} Folkboat races`);
   return { source: 'jibeset', id: `${ev.club}_${ev.rg}`, name: ev.name, host: ev.host, url: fhUrl, races };
 }

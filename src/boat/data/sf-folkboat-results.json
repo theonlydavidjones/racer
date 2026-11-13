@@ -753,7 +753,7 @@
      "scoring": "Time on Time 550/(650+PHRF)",
      "date": "2026-11-07",
      "start": "13:35:00",
-     "course": null,
+     "course": "2",
      "distanceNm": null,
      "windReported": null,
      "fleetCount": 8,
@@ -881,7 +881,8 @@
        6.7
       ],
       "gapSecPerNm": null
-     }
+     },
+     "courseFrom": "the owner, who sailed it: \"it was a last minute course change. we sailed course #2\" (the results give no course)"
     }
    ]
   },
