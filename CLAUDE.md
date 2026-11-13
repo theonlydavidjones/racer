@@ -59,6 +59,11 @@ npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost race
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
 ```
 
+- perf.test (the owner, 13 Nov 2026): the budget holds. The shared test host is noisy, so a single perf.test failure on
+  code that hasn't changed the step is rerun once; it counts as a regression only if it fails again, or if the change
+  touches the step and measures slower than main back to back.
+- Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
+  (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - Publish by republishing artifact/folkboat-racing-sim.html to the existing artifact
   (https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m), never as a new one.
   Don't pass `capabilities` when publishing: the artifact already declares `db` and `user` (players' saves,
