@@ -882,10 +882,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   const fixed = (l: THREE.Line) => { l.userData.fixed = true; grp.add(l); return l; }; // (never moves: syncRopes lays it once)
   // the turning blocks at the mast's foot, shackled under the stainless horseshoe that arches round the mast's after side
   // (Boat Detail's MAST_RING, from the owner's photos: "the lines from the mast attach to, or thread under" it), each
-  // at its own angle round the arch from dead aft, in the piano's order outward, the sheave hanging below the rod and
+  // at its own angle round the arch from dead aft, in the piano's order outward and spread along it, the sheave hanging below the rod and
   // facing aft so the line turns from the mast to the deck
   const footBlock = (side: number, i: number) => {
-    const t = side * (12 + 14 * i) * Math.PI / 180, rod = horseshoeAt(t);
+    const t = side * (20 + 22 * i) * Math.PI / 180, rod = horseshoeAt(t); // (spread from 20° to 108° round the arch, a block's width and more apart)
     const fb = sheaveBlock(0.016, -0.03); fb.position.copy(rod); grp.add(fb);
     return rod.clone().setY(rod.y - 0.03);
   };
@@ -1435,7 +1435,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
     const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
-    for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.006, at = i % 2 ? top : VANG_FOOT; q.setXYZ(i, at.x + ux * o, at.y, at.z + uz * o); }
+    for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.012, at = i % 2 ? top : VANG_FOOT; q.setXYZ(i, at.x + ux * o, at.y, at.z + uz * o); } // (the four parts a sheave's width apart, so they read as a tackle)
     q.needsUpdate = true; }
   // the Cunninghams' cringles come down with their sails as they're struck (the tack stays put)
   for (const { l, sail } of L2.cringles) {
