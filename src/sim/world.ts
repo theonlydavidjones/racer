@@ -30,8 +30,9 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { berthClear, harborOf, hitsHarbor, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { berthClear, harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
+import { ensignDue } from '../boat/colours';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
@@ -460,7 +461,7 @@ export class World {
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
-      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country) } : {}),
+      ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
       // her outboard, if it's on its transom bracket: tilted up, stopped (boat/motor.ts)
       ...(isUser && spec?.perf.outboard === 'bracket' ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0 } } : {}),
       ai: isUser ? null : (() => {
@@ -796,6 +797,8 @@ export class World {
     }
     this.vessels = this.traffic.vessels(this.trafficT);
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
+    // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour
+    if (this.steps % 30 === 1) for (const b of this.boats) if (b.ensign) { const n = !ensignDue(this.clockUtc, inBasin(b), !b.docked && Math.abs(b.v) > 0.3); if (b.ensignNight !== n) b.ensignNight = n; }
     if (this.steps % 30 === 1) for (const b of this.boats) {
       b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.currentAt(q));
       const wk = this.traffic.wakeAt(b, this.trafficT);

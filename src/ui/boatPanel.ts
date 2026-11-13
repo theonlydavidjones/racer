@@ -274,7 +274,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
 function flagNote(b: BoatSpec): string {
   const club = BURGEES.find(x => x.id === b.club), ens = ENSIGNS.find(x => x.id === ensignFor(b.sails.country));
-  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern.`];
+  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern. Her ensign keeps its hours: up at 0800 and down at sunset, and flown after dark only for entering or leaving harbour.`];
   if (ens && ens.id !== 'us' && ens.id !== 'us-yacht') notes.push('As a visitor on the Bay she flies the US flag as a courtesy flag at the starboard spreader, and her burgee moves to port.');
   notes.push('Flags fly when she\'s cruising; racing boats strike them for a race. Officers\' flags will go with skippers, in the Yacht Club.');
   return notes.join(' ');
