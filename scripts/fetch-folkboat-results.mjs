@@ -27,6 +27,8 @@ const OUT = new URL('../src/boat/data/sf-folkboat-results.json', import.meta.url
 const UA = 'folkboat-racing-sim (personal project)';
 const DISCOVER = process.argv.includes('--discover');
 const JIBESET = 'https://www.jibeset.net';
+/** Races scored on a course whose distance disagrees with the 2026–27 sheet's (src/courses/data); the 2025–26 sheet unread. */
+const SHEET_UNVERIFIED = { 'GGYC_T008047221-r1': 1, 'GGYC_T008047221-r3': 1, 'GGYC_T008047221-r4': 1 };
 const RN = 'https://www.regattanetwork.com';
 
 /** Jibeset regattas with a Folkboat fleet (club code, regatta id), found by --discover on 2026-11-11. */
@@ -134,6 +136,8 @@ async function fetchJibesetEvent(ev) {
     const r = parseJibesetRace(html, url);
     if (r) races.push({ raceNo: n, ...r });
   }
+  // the races whose published distance disagrees with the 2026–27 sheet the sim draws them from (the 2025–26 sheet unread)
+  for (const r of races) if (SHEET_UNVERIFIED[`${ev.club}_${ev.rg}-r${r.raceNo}`]) r.sheet = 'unverified';
   console.log(`Jibeset ${ev.name}: ${races.length} Folkboat races`);
   return { source: 'jibeset', id: `${ev.club}_${ev.rg}`, name: ev.name, host: ev.host, url: fhUrl, races };
 }
@@ -243,10 +247,11 @@ const out = {
       'are hand-entered, so they are kept but not used for speed. A start of 00:00:00 there means not entered (null here).',
     'place is the finishing place among finishers (null for a scoring code). points are as published.',
     'key is the digits of the sail number, to follow one boat across events (sail numbers are typed differently by each scorer).',
-    'Course numbers are on GGYC\'s course sheet (Addendum B), which is the same table in 2025–26 and 2026–27 (Jibeset ' +
-      'DOC=cr for 2025–26, DOC=X0 for 2026–27), so src/courses/data serves both seasons. Where the scorer\'s distance ' +
-      'disagrees with the sheet\'s for the course number (2025–26 races 1 and 4: course 3 given as 6.1 nm, the sheet 3.7; ' +
-      'course 13 as 8.9, the sheet 5.0), one of the two was typed wrong: sim/realRaces.ts says so beside the race.',
+    'Course numbers are on GGYC\'s course sheet (Addendum B). src/courses/data holds the 2026–27 sheet (Jibeset DOC=X0); ' +
+      'the 2025–26 sheet (DOC=cr) is assumed to be the same table but is UNVERIFIED (it could not be read again), and three ' +
+      'of the four 2025–26 races scored with a course disagree with the 2026–27 distances: race 1 course 3, 6.1 nm against ' +
+      '3.7; race 3 course 1, 1.0 against 1.6; race 4 course 13, 8.9 against 5.0; race 5 course 12, 3.4 against 3.4 (agrees). ' +
+      'Those three races carry sheet: "unverified". sim/realRaces.ts says so beside the race.',
     'Distances are the scorer\'s nominal course lengths, not sailed distances.',
     'Regatta Network gives every 2023 SYC Classic race the date 2023-06-11 although the event ran June–October; treat those dates as unsure.',
     'Skippers are as published, tidied to one spelling; a boat can have several skippers over the years.',

@@ -75,5 +75,9 @@ describe('a real race whose course is uncertain', () => {
     }
     expect(realFleetFor('GGYC_T008047221-r1')!.uncertain).toMatch(/Course uncertain/);
     expect(realFleetFor('GGYC_T008047221-r5')!.uncertain).toBe(null);
+    // the course sheet unread for the races whose distance disagrees; the player is warned only where the check fails
+    expect(realRaces().filter(r => r.sheetUnverified).map(r => r.id).sort()).toEqual(['GGYC_T008047221-r1', 'GGYC_T008047221-r4']);
+    expect(realRaces().filter(r => r.uncertain).map(r => r.id)).toEqual(['GGYC_T008047221-r1']);
+    expect(realFleetFor('GGYC_T008047221-r4')!.sheetUnverified).toBe(true);
   });
 });
