@@ -341,7 +341,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     document.fonts?.load(`170px ${NAME_FONT}`).then(() => { draw(); tex.needsUpdate = true; }).catch(() => { /* the fallback script face */ });
     for (const s of [1, -1]) {
-      const geo = sidePatch(uAtZ(1.04), 0.6, 0.045, 0.165, 32, 4); // (just aft of the window, about centred on the cabin's after end and half a metre long, as on Josephine: the owner's side photo)
+      const geo = sidePatch(uAtZ(1.14), 0.6, 0.045, 0.165, 32, 4); // (aft of the window, clear of its frame, a little aft of the cabin's after end and half a metre long, as on Josephine: the owner's side photo)
       if (s < 0) mirrorPatch(geo);
       grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
     }

@@ -439,15 +439,18 @@ function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
 /**
  * The cabin top is a slice of a cone lying on its side, its point toward the bow (the owner, of Josephine): each section
- * across it is a circular arc, and as on a cone the arc's radius goes with the roof's width, so as the trunk narrows
- * forward the arch narrows and lowers with it, in the same proportion. CONE_K is the radius over the half-width (an
- * estimate, set so the arch is about 0.17 m high at the after end, as before).
+ * across it is a circular arc whose radius goes with the roof's width (CONE_K the radius over the half-width), so it
+ * narrows with the trunk forward. How high the arc stands over the sides' top edges grows from nothing at the cabin's
+ * front to about 13 cm halfway aft and stays so: the roof's outline, seen from the side, falls away forward in one long
+ * slope (Josephine's profile photo, the roof's outline measured over the deck at about 147 px/m: 19, 27, 34, 42, 46 and
+ * 51 cm at 0.1, 0.38, 0.65, 1.0, 1.3 and 1.8 m aft of its front; within a few cm, the photo being a little oblique).
  */
 const CONE_K = 1.9;
+const CROWN = fairCurve([[-0.847, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
 export const cabinTopAt = (u: number, x: number) => {
-  const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w);
-  const arch = Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w); // (the arc's height over the side's top edge at x)
-  return cabinTopY(u) + arch * cabinNose(u);
+  const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w), full = r - Math.sqrt(r * r - w * w);
+  const arch = (Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w)) / full; // (0 at the sides' top edges … 1 on the centreline)
+  return cabinTopY(u) + arch * Math.max(0, CROWN(zAt(u)));
 };
 
 /** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
