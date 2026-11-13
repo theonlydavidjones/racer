@@ -517,7 +517,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
   geom.setIndex(M.I); geom.computeVertexNormals();
   const mesh = new THREE.SkinnedMesh(geom, material(M.mats));
   mesh.add(hips); root.add(mesh); mesh.bind(new THREE.Skeleton(bones));
-  mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
+  mesh.castShadow = true; mesh.receiveShadow = true;
   return { root, torso: spine, head, arm: [{ root: sh[0], mid: el[0] }, { root: sh[1], mid: el[1] }], leg: [{ root: hp[0], mid: kn[0] }, { root: hp[1], mid: kn[1] }], scale: s, mesh, tris: M.tris };
 }
 
