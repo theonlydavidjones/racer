@@ -1017,16 +1017,24 @@ export class World {
         const lf = this.lastFoul.get(b.id), lv = this.lastFoulVs.get(b.id);
         const atMark = !!lf && solidGap(lf, lf, touching) - touching.r < ENGAGED;
         const sameIncident = !!lf && this.t - lf.t < TANGLE_MAX && !b.penaltyDir && ((!!lv && lv.vs === lf.vs && !lv.clear) || atMark);
-        if (!sameIncident) {
+        // Rule 43.1: a boat that touches the mark as a consequence of another boat's breach against her is exonerated: under
+        // (a) "compelled" by it (WS Case 28: P's breaches made the mark bounce onto S), and under (b), entitled to mark-room
+        // or room, touching it "as a consequence of an incident with a boat required to give her that room or mark-room"
+        // (Case 95: Freebird, squeezed by Jagga, touched it and was exonerated). The sim's sign of either: a breach against
+        // her within COMPELLED_WINDOW, with the boat that broke it still on her (within ENGAGED)
+        const by = this.fouledAt.get(b.id), byBoat = by ? this.boats.find(o => o.id === by.by) : undefined;
+        const exonerated = !sameIncident && !!by && !!byBoat && this.t - by.t < COMPELLED_WINDOW && hullGap(b, byBoat) < ENGAGED;
+        if (!sameIncident && !exonerated) {
           addPenalty(b, ONE_TURN);
           this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id) });
         }
         if (b.isUser) {
-          if (!sameIncident) this.fouls++;
+          if (!sameIncident && !exonerated) this.fouls++;
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
             ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
+            : exonerated ? `You touched ${touching.name}, forced onto it by ${byBoat!.name}'s foul: no penalty (Rule 43.1).`
             : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a gybe.` });
-        } else if (!sameIncident) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
       }
       b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }

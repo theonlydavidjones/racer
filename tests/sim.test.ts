@@ -366,6 +366,28 @@ describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(
     expect(u.penaltyTotal).toBe(360);
   });
 
+  // (WS Cases 28 and 95: a boat touching the mark because another boat broke a rule against her is exonerated, 43.1(a)/(b))
+  const touchAfterFoul = (otherNear: boolean) => {
+    const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 7);
+    w.t = 30; const u = w.user, o = w.boats[1]; u.started = true; u.ocs = false; u.leg = 0;
+    const m = w.C.marks[0], h = w.wind.from + 180, back = V(w.wind.from), side = V(w.wind.from + 90);
+    Object.assign(u, { x: m.p.x + back.x * 12, y: m.p.y + back.y * 12, h: h % 360, v: 2, desired: h % 360 });
+    const op = otherNear ? { x: u.x + side.x * 9, y: u.y + side.y * 9 } : { x: u.x + side.x * 200, y: u.y + side.y * 200 };
+    Object.assign(o, { ...op, h: h % 360, v: 2, desired: h % 360, started: true, ocs: false, leg: 0 });
+    (w as unknown as { fouledAt: Map<number, unknown> }).fouledAt.set(u.id, { by: o.id, t: w.t }); // o has just fouled her
+    let toasts = '';
+    for (let i = 0; i < 60 * 6; i++) { w.step(DT); (w as unknown as { fouledAt: Map<number, unknown> }).fouledAt.set(u.id, { by: o.id, t: w.t - 1 }); if (!otherNear) { o.x = u.x + side.x * 200; o.y = u.y + side.y * 200; } for (const e of w.drainEvents()) if (e.type === 'toast') toasts += e.msg; }
+    return { u, toasts };
+  };
+  it('touching the mark because another boat, still on her, has just fouled her: no penalty (43.1(a)/(b), WS Cases 28, 95)', () => {
+    const { u, toasts } = touchAfterFoul(true);
+    expect(toasts).toContain('43.1');
+    expect(u.penaltyTotal).toBe(0);
+  });
+  it('but with that boat long gone, the touch is her own: a one-turn penalty', () => {
+    expect(touchAfterFoul(false).u.penaltyTotal).toBe(360);
+  });
+
   it('a mark touch in the same incident as a Part 2 foul costs no extra turn (Rule 44.1(a))', () => {
     const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
     w.t = 30; const u = w.user; u.started = true; u.ocs = false; u.leg = 0;
