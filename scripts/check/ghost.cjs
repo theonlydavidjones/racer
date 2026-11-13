@@ -46,6 +46,8 @@ const out = process.argv[2] || '.';
 
   // 3. Run a past race: the row's Ghost menu, "your best", then Sail it again
   await page.click('#setupBack'); await page.waitForTimeout(600);
+  // (Past races sits in the Race menu, beside Create a race: the setup's back button can land on the start page)
+  if (!await page.isVisible('#bPast')) { await page.click('[data-home="race"]'); await page.waitForTimeout(600); }
   await page.click('#bPast'); await page.waitForTimeout(600);
   const opts = await page.evaluate(() => [...document.querySelectorAll('#pastRows .pastrow')][0]?.querySelector('select[data-ghost]') ? [...document.querySelector('#pastRows .pastrow select[data-ghost]').options].map(o => o.textContent) : null);
   console.log('Ghost menu:', JSON.stringify(opts));
