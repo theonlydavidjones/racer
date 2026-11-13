@@ -1264,3 +1264,7 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 #pastView .pastrows{max-height:none}
 /* Settings is a layer: the screen it opened over (the start page, the pause menu) is put away while it's up, not half-seen */
 body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .panel{visibility:hidden}
+/* The wind angle dial, when it's on: on the right, directly under the inset map, centred on it (the owner, ROADMAP 8b:
+   "on the … side under the inset map", "I meant right side"). The map is 210 px across at the top right. */
+#dial{position:fixed!important;left:auto!important;top:calc(env(safe-area-inset-top,0px) + 76px + 210px + 12px)!important;
+  right:calc(max(16px,env(safe-area-inset-right,0px)) + (210px - 96px) / 2)!important;width:96px!important;height:96px!important}
