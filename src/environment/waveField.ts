@@ -46,6 +46,19 @@ export const waveTime = (t: number) => t + 600;
 
 /** Set component i's direction, and its sin and cos with it. */
 function setDir(f: WaveField, i: number, dir: number): void { f.dir[i] = dir; f.sd[i] = Math.sin(dir * D2R); f.cd[i] = Math.cos(dir * D2R); }
+/** The wind sea's spectrum shares (JONSWAP over each component's band) for one peak period: kept for the last period
+ *  asked, as update() asks every step and the period changes only with the sea. The same numbers, worked out once. */
+let specTp = NaN, specTot = 1;
+const spec = new Float64Array(N_WIND);
+function windSpectrum(tp: number): void {
+  if (tp === specTp) return;
+  let tot = 0;
+  for (let i = 0; i < N_WIND; i++) {
+    const L = WIND_L[i], f = Math.sqrt(G / (2 * Math.PI * L)), f0 = Math.sqrt(G / (2 * Math.PI * (WIND_L[i + 1] ?? L * 1.4))), f1 = Math.sqrt(G / (2 * Math.PI * (WIND_L[i - 1] ?? L / 1.4)));
+    spec[i] = jonswap(f, tp) * (f1 - f0) / 2; tot += spec[i];
+  }
+  specTot = tot || 1; specTp = tp;
+}
 
 export class WaveField {
   /** Per component (wind sea first, then swell): its direction of travel (deg), wavenumber (rad/m), frequency (rad/s), height (m), phase (rad), crest sharpening (Gerstner Q), and 1 for swell. */
@@ -94,9 +107,10 @@ export class WaveField {
   update(s: SeaHere, windFrom: number, dt: number, about: Vec): void {
     const turn = (i: number, dir: number) => {
       if (dir === this.dir[i]) return;
-      const a0 = this.dir[i] * D2R, a1 = dir * D2R;
-      this.phase[i] = (this.phase[i] + this.k[i] * ((Math.sin(a0) - Math.sin(a1)) * about.x + (Math.cos(a0) - Math.cos(a1)) * about.y)) % (2 * Math.PI); // (kept small: float32 in the shader)
-      setDir(this, i, dir);
+      // (the old direction's sine and cosine are the ones setDir kept, sd and cd; the new one's worked out once, for both)
+      const a1 = dir * D2R, s1 = Math.sin(a1), c1 = Math.cos(a1);
+      this.phase[i] = (this.phase[i] + this.k[i] * ((this.sd[i] - s1) * about.x + (this.cd[i] - c1) * about.y)) % (2 * Math.PI); // (kept small: float32 in the shader)
+      this.dir[i] = dir; this.sd[i] = s1; this.cd[i] = c1;
     };
     const travel = windFrom + 180;
     if (Number.isNaN(this.windDir)) this.windDir = travel;
@@ -106,14 +120,9 @@ export class WaveField {
     const hsW = Math.max(0.05, s.hsW), hsS = Math.max(0.05, s.hsS);
     // wind sea: heights shaped by the spectrum, scaled so the sum has the right significant height
     const tp = Math.max(1, s.tpW);
-    let tot = 0; const raw = new Float64Array(N_WIND);
+    windSpectrum(tp);
     for (let i = 0; i < N_WIND; i++) {
-      const L = WIND_L[i], f = Math.sqrt(G / (2 * Math.PI * L)), f0 = Math.sqrt(G / (2 * Math.PI * (WIND_L[i + 1] ?? L * 1.4))), f1 = Math.sqrt(G / (2 * Math.PI * (WIND_L[i - 1] ?? L / 1.4)));
-      raw[i] = jonswap(f, tp) * (f1 - f0) / 2; tot += raw[i];
-    }
-    tot = tot || 1;
-    for (let i = 0; i < N_WIND; i++) {
-      const target = Math.sqrt(2 * raw[i] / tot) * hsW / 4; // Σ a²/2 = (Hs/4)²
+      const target = Math.sqrt(2 * spec[i] / specTot) * hsW / 4; // Σ a²/2 = (Hs/4)²
       this.amp[i] += (target - this.amp[i]) * ease;
       turn(i, this.windDir + WIND_SPREAD[i]);
       this.q[i] = 0.45; // sharpen the crests of the chop (less with more components, so the sum never loops)
