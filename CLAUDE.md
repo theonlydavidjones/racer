@@ -67,6 +67,8 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   touches the step and measures slower than main back to back.
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
+- US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
+  practice, color, favor, meters, harbor, maneuver, center, gray, -ize. New code comments use it too.
 - Publish by republishing artifact/folkboat-racing-sim.html to the existing artifact
   (https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m), never as a new one.
   Don't pass `capabilities` when publishing: the artifact already declares `db` and `user` (players' saves,
