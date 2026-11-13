@@ -1222,3 +1222,6 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .mtools{justify-content:flex-end}
 .mgroup{font:600 11px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px}
 .mgrid + .mgroup{margin-top:20px}
+/* a member's crew ratings: the number always, "auto" by one that follows their Skill (set by hand, plain) */
+.mslider output{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap}
+.mslider .mauto{font:600 9.5px/1 var(--f-inst);font-style:normal;letter-spacing:.1em;text-transform:uppercase;color:#7ee0a5;opacity:.85}

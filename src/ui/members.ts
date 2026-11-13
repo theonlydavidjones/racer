@@ -97,10 +97,13 @@ export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
 export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean): string {
   const yours = m.origin === 'yours', you = m.id === YOU;
   const skillSel = `<select data-m="skill"${yours ? '' : ' disabled'}>${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((m.skill ?? 0.6) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  // each rating follows their Skill until you set it (the owner: say so plainly): the number always shown, "auto" by one
+  // that's following Skill, as the band marks the crew's against your own
   const sliders = CREW_UI.map(([a, l, t]) => {
     const v = attrOf(m, a), own = m.attr?.[a] != null;
-    return `<label class="mslider" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-m="attr" data-a="${a}"${yours ? '' : ' disabled'}><output>${own ? Math.round(v * 100) : 'as skill'}</output></label>`;
+    return `<label class="mslider${own ? ' own' : ''}" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-m="attr" data-a="${a}"${yours ? '' : ' disabled'}><output>${Math.round(v * 100)}${own ? '' : '<i class="mauto">auto</i>'}</output></label>`;
   }).join('');
+  const anyOwn = CREW_UI.some(([a]) => m.attr?.[a] != null);
   const skipperToo = !you && yours ? `<label class="mcheck"><input type="checkbox" data-m="skipper"${m.roles.includes('skipper') ? ' checked' : ''}> Also sails as a skipper</label>` : '';
   const del = you || !yours ? '' : confirmDelete
     ? `<div class="gconfirm">Remove ${esc(m.name)} from the club? <button type="button" class="ghost danger" data-f="mdelYes">Remove</button><button type="button" class="ghost" data-f="mdelNo">Keep</button></div>`
@@ -114,8 +117,9 @@ export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean)
         <label class="mfield"><span>Skill</span>${skillSel}</label>
         <p class="fnote">${berth(m, boats)}</p>${skipperToo}${del}
       </section>
-      <section><h3>${you ? 'As crew, when you crew' : 'As crew'}</h3>${sliders}
-        ${yours ? '<button type="button" class="ghost" data-f="mreset">All as skill</button>' : ''}</section>
+      <section><h3>${you ? 'As crew, when you crew' : 'As crew'}</h3>
+        <p class="fnote">Each rating follows ${you ? 'your' : 'their'} Skill until you set it.</p>${sliders}
+        ${yours && anyOwn ? `<button type="button" class="ghost" data-f="mreset">Reset to ${you ? 'my' : 'their'} Skill</button>` : ''}</section>
       ${m.roles.includes('skipper') && !you ? `<section><h3>As skipper</h3>${SKIPPER_UI.section(m)}</section>` : ''}
     </div>`;
 }
