@@ -876,6 +876,12 @@ Club is the place where crew members are created, configured and assigned to boa
 creates the other skippers and their details. The race setup shows the boat's assigned crew, swappable there, but isn't
 where crew are configured. It's the home of the skipper and crew model's sliders above, and later of Seasons' rankings
 and awards (below), which become attributes of the winning boat and skipper.
+Trophies (owner, 13 November): use the fleet's real perpetuals where they're found (docs/TRADITIONS.md: the Contender's
+Cup, the San Francisco International Cup, and, unconfirmed, the Rick Wolf trophy for the Wednesday series). Elsewhere use
+placeholder names, marked as placeholders in the code (and the doc) so they're never shown as a real trophy's history.
+After each race, the club's evening at the race's level: drinks; drinks and dinner; drinks, dinner and results; drinks,
+dinner, results and awards (owner). The Plastic Classic's committee-boat mark with its lively, cheering crew
+(TRADITIONS item 14).
 
 Also asked for:
 
