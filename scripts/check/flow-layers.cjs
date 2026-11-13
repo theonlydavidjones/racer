@@ -9,6 +9,9 @@
  */
 const { chromium } = require('playwright');
 const out = process.argv[2] || '.';
+// (headless, a frame takes a second or two: the streaks' trails are stepped through 2.5 s of 60 fps frames before a
+// picture, as a real browser draws them)
+const warm = (p, which) => p.evaluate(w => { const h = __hud; for (let i = 0; i < 150; i++) { if (w === 'inset') h.insetStreaks(1 / 60); else h.chartFx(document.getElementById(w === 'plan' ? 'planFx' : 'chartFx'), sim(), 1 / 60, null); } }, which);
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 1400, height: 860 } });
@@ -20,14 +23,14 @@ const out = process.argv[2] || '.';
   // (headless, the 3-D scene is drawn in software and a frame takes seconds: the layers' own JS is what's measured,
   // ms a frame for the streaks and the readout, smoothed, and the colour field's last build)
   const frame = async () => p.evaluate(() => { const h = __hud; return `streaks inset ${h.fxMs.inset.toFixed(2)} chart ${h.fxMs.chart.toFixed(2)} ms/frame; field build inset ${h.flowField.inset.lastMs.toFixed(0)} ms (${h.flowField.inset.lastSamples} samples), chart ${h.flowField.chart.lastMs.toFixed(0)} ms`; });
-  const inset = async name => { await p.waitForTimeout(1500); console.log(name, await frame()); await p.screenshot({ path: `${out}/${name}.png`, clip: { x: 1150, y: 60, width: 250, height: 250 } }); };
+  const inset = async name => { await p.waitForTimeout(1500); console.log(name, await frame()); await warm(p, 'inset'); await p.screenshot({ path: `${out}/${name}.png`, clip: { x: 1150, y: 60, width: 250, height: 250 } }); };
   const chart = async (field, name) => {
     await p.evaluate(() => document.getElementById('map').click()); await p.waitForTimeout(1500);
     await p.evaluate(f => document.querySelector(`#chartField [data-field="${f}"]`).click(), field);
     await p.mouse.move(700, 460); await p.mouse.wheel(0, 400); await p.waitForTimeout(1500);
     await p.mouse.move(520, 380); await p.waitForTimeout(1200);
     console.log(name, await frame());
-    await p.screenshot({ path: `${out}/${name}.png` });
+    await warm(p, 'chart'); await p.screenshot({ path: `${out}/${name}.png` });
     await p.evaluate(() => document.getElementById('bChartPal').click()); await p.waitForTimeout(1200);
     await p.screenshot({ path: `${out}/${name}-dusk.png` });
     await p.evaluate(() => document.getElementById('bChartPal').click());
