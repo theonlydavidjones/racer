@@ -45,6 +45,20 @@ describe('the wind on her with no way on (bare poles)', () => {
     // the wind's from her port side (heading 90 degrees to the right of it): she's set to starboard
     expect(u.sway ?? 0).toBeGreaterThan(0.6 * steady); expect(u.sway ?? 0).toBeLessThan(1.4 * steady);
   });
+  it('left alone with the wind on either beam and no current, she goes to leeward over the ground, never to windward (the owner, leaving a slip, 13 Nov 2026)', () => {
+    for (const side of [90, -90]) {
+      const { w, u } = world(12);
+      u.h = (w.windHere(u, u).from + side + 360) % 360;
+      const x0 = u.x, y0 = u.y; let worst = 0, down = 0;
+      for (let i = 0; i < 60 * 60; i++) {
+        u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT);
+        const from = w.windHere(u, u).from * Math.PI / 180; // (the wind blows toward −(sin, cos) of where it's from)
+        down = -((u.x - x0) * Math.sin(from) + (u.y - y0) * Math.cos(from)); worst = Math.min(worst, down);
+      }
+      expect(worst, `wind ${side > 0 ? 'to port' : 'to starboard'}: never to windward`).toBeGreaterThan(-0.05);
+      expect(down, 'a minute on: well to leeward').toBeGreaterThan(5); // (about 0.4 kt of leeway in 12 kt: some 12 m)
+    }
+  });
   it('never ahead and astern at once: driven astern head to wind, then turned off it and blown ahead, it\'s one motion', () => {
     const { w, u } = world(15);
     for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
