@@ -957,7 +957,7 @@ function mountTactics(host: HTMLElement, compact: boolean, onLeg: (i: number) =>
     tacShownFor = w; tacShown.boats.clear();
     const V = versus(vsInput(w.log!)); if (V) tacShown.boats.add(V.rival);
   }
-  // (a fleet goes by sail numbers, the owner, 13 Nov 2026: the chips say "USA 110 Varnish", the chart's tight spots "USA 110")
+  // (a fleet goes by sail numbers, the owner, 13 Nov 2026: the chips say "USA 122 Varnish", the chart's tight spots "USA 122")
   const boats = w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : `${b.no} ${b.name}`.trim(), short: b.isUser ? 'You' : b.no || b.name, color: b.color }));
   const paint = () => {
     const sc = scores(), me = sc.get(w.user.id), place = me?.rank != null ? `${ordinal(me.rank)} of ${w.boats.length}` : 'Racing';

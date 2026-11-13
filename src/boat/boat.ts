@@ -289,7 +289,7 @@ export interface Paint { /** the sail numbers' and the class insignia's colours,
 export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
   // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom
-  { name: 'You', hull: '#f4f1e8', sail: '#fbfaf5', tag: '#ffb627', no: 'US 110', build: { hull: 'fiberglass', spars: 'aluminium' }, paint: { deck: '#8e9f7c', boot: '#24324f', bottom: '#2a2d33', boatName: 'JOSEPHINE' } },
+  { name: 'You', hull: '#f4f1e8', sail: '#fbfaf5', tag: '#ffb627', no: 'USA 122', build: { hull: 'fiberglass', spars: 'aluminium' }, paint: { deck: '#8e9f7c', boot: '#24324f', bottom: '#2a2d33', boatName: 'JOSEPHINE' } },
   { name: 'Red', hull: '#b3302a', sail: '#f6f2ea', tag: '#ff6a5c', no: 'US 87', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } },
   { name: 'Blue', hull: '#25579e', sail: '#f6f2ea', tag: '#6fa8ff', no: 'US 104', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#2a2d33' } },
   { name: 'Green', hull: '#2b7349', sail: '#f6f2ea', tag: '#58d08a', no: 'US 92', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } },
