@@ -36,7 +36,7 @@ describe('Learn to sail: the lessons\' checks', () => {
     expect(L.step).toBe(0); // (the jib luffing: not yet)
     for (let k = 0; k < 30; k++) L.update(boat({ twa: 54 }), t++, 1);
     expect(L.step).toBe(0); // (54° in 12 kt is a close reach, not close-hauled)
-    for (const twa of [42, 90, 165]) for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa }), t++, 1);
+    for (const twa of [42, 60, 90, 130, 165]) for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa }), t++, 1);
     expect(L.passed).toBe(true);
   });
 
@@ -45,7 +45,7 @@ describe('Learn to sail: the lessons\' checks', () => {
     let t = 0;
     for (let k = 0; k < 20 * 4; k++) L.update(boat({ twa: 42, main: k % 20 === 19 ? 'luffing' : 'good' }), t++, 0.25); // (a quarter-second luff every 5 s)
     expect(L.step).toBe(1);
-    for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa: 90 }), t++, 1);
+    for (const twa of [60, 90, 130]) for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa }), t++, 1);
     for (let k = 0; k < 60; k++) L.update(boat({ twa: 170, eff: 0.85 }), t++, 1);
     expect(L.passed).toBe(false); // (sheets in on a run: the sails stalled, eff 0.85)
   });

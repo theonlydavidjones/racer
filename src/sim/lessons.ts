@@ -5,8 +5,11 @@ import { DrillTracker } from './drill';
 
 /**
  * Learn to sail (the owner's go, 13 Nov 2026; design/learn-to-sail-mockup.png and design/LEARN-TO-SAIL-PLAN.md): lessons
- * on the water for a first-timer, built on US Sailing's Basic Keelboat standard (its skill groups, and its wind range of
- * 5 to 15 knots: https://www.ussailing.org/education/adult/certification-courses-endorsements/basic-keelboat/). Each
+ * on the water for a first-timer, the skills of ASA 101 Keelboat Sailing 1 (the owner's ladder: its standard,
+ * https://americansailing.com/wp-content/uploads/2025/01/Certification-ASA-101-Standards.pdf, checked item by item in
+ * design/ASA-101-CHECK.md), first drawn from US Sailing's Basic Keelboat (5 to 15 knots:
+ * https://www.ussailing.org/education/adult/certification-courses-endorsements/basic-keelboat/; ASA 101: "winds up to
+ * 15 knots"). Each
  * lesson is a few steps; each step has one cue (the only text on the water: it goes in the coach box) and a check the
  * sim makes from the boat itself. The lesson is passed when its last step's check holds.
  *
@@ -15,13 +18,15 @@ import { DrillTracker } from './drill';
  */
 
 export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'gybing' | 'heaveto';
-export const LESSONS: { id: LessonId; no: number; title: string; icon: string; bk: string }[] = [
-  { id: 'tiller', no: 3, title: 'The tiller', icon: '🧭', bk: 'boat control' },
-  { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', bk: 'open water, trim' },
-  { id: 'irons', no: 5, title: 'Stop, go, irons', icon: '🛑', bk: 'confined waters' },
-  { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', bk: 'confined waters' },
-  { id: 'gybing', no: 7, title: 'Gybing', icon: '↪️', bk: 'confined & open' },
-  { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', bk: 'open water' }
+/** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
+ * Sailing's Basic Keelboat). */
+export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
+  { id: 'tiller', no: 3, title: 'The tiller', icon: '🧭', asa: '24, 26, 27' },
+  { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', asa: '22, 28–32' },
+  { id: 'irons', no: 5, title: 'Stop, go, irons', icon: '🛑', asa: '25' },
+  { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', asa: '5, 33' },
+  { id: 'gybing', no: 7, title: 'Gybing', icon: '↪️', asa: '5, 34' },
+  { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' }
 ];
 /** The lessons that start by a buoy (the tiller's, steered for; stop, go and irons', stopped by). */
 export const BUOY_LESSONS: ReadonlySet<LessonId> = new Set(['tiller', 'irons']);
@@ -53,15 +58,20 @@ export const LESSON_MARKS = {
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Sail to the buoy and stop by it: ease both sheets',
-  tacking: 'Tack when you\'re ready (0 of 3)', gybing: 'Bear away to a run, then gybe (0 of 3)', heaveto: 'Heave to: tack, leave the jib aback, tiller to leeward'
+  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', gybing: 'Bear away to a run. "Ready to gybe" … "Gybe-ho" (0 of 3)', heaveto: 'Heave to: tack, leave the jib aback, tiller to leeward'
 };
 
-/** Each point of sail by its true wind angle (deg, either tack): the band a sailor would call by that name. Close-hauled
- * is the boat's own beat angle in this wind and sea (boat/seaway.ts beatFor: about 41° in 12 kt), from a little above it
- * (pinching) to a few degrees below; past that it's a close reach. A run is the wind from astern, 160° to 180°. */
-const POINTS: { key: 'close' | 'beam' | 'run'; band: (b: Boat) => [number, number]; cue: string }[] = [
+/** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
+ * broad reach, run; https://americansailing.com/wp-content/uploads/2025/01/Certification-ASA-101-Standards.pdf), each
+ * by its true wind angle (deg, either tack): the band a sailor would call by that name. Close-hauled is the boat's own
+ * beat angle in this wind and sea (boat/seaway.ts beatFor: about 41° in 12 kt), from a little above it (pinching) to a
+ * few degrees below; a close reach is between that and a beam reach; a broad reach the wind on the quarter; a run the
+ * wind from astern, 160° to 180°. */
+const POINTS: { key: 'close' | 'closeReach' | 'beam' | 'broad' | 'run'; band: (b: Boat) => [number, number]; cue: string }[] = [
   { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 7]; }, cue: 'Close-hauled: trim till both telltales stream' },
-  { key: 'beam', band: () => [75, 105], cue: 'Bear away to a beam reach, and ease to match' },
+  { key: 'closeReach', band: b => [beatFor(b) + 12, 70], cue: 'Bear away a little to a close reach, and ease to match' },
+  { key: 'beam', band: () => [80, 100], cue: 'Bear away to a beam reach: the wind on the side' },
+  { key: 'broad', band: () => [115, 150], cue: 'Bear away to a broad reach: the wind on the quarter' },
   { key: 'run', band: () => [160, 180], cue: 'Bear away to a run: sheets out, wind from astern' }
 ];
 
@@ -159,7 +169,8 @@ export class LessonTracker {
     }
     this.progress = this.good / LESSON_MARKS.turns;
     if (this.good >= LESSON_MARKS.turns) { this.passed = true; return; }
-    this.cue = kind === 'tack' ? `Tack when you're ready (${this.good} of ${LESSON_MARKS.turns})` : `Bear away to a run, then gybe (${this.good} of ${LESSON_MARKS.turns})`;
+    // (the helm's commands, as ASA 101 teaches them, its knowledge 5)
+    this.cue = kind === 'tack' ? `"Ready about" … "Hard alee": tack (${this.good} of ${LESSON_MARKS.turns})` : `Bear away to a run. "Ready to gybe" … "Gybe-ho" (${this.good} of ${LESSON_MARKS.turns})`;
   }
 
   private heaveTo(b: Boat, dt: number): void {
