@@ -684,8 +684,7 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .pastrow .ghost{flex:none}
 .knote:empty{display:none}
 
-/* the map's layers (ui/layers.ts): a small button on the inset map's corner, and the list of switches it opens */
-  width:24px;height:24px;padding:0;display:grid;place-items:center;border-radius:5px;border:1px solid var(--rule);background:var(--pod);color:var(--muted);cursor:pointer}
+/* the map's layers (ui/layers.ts): the full chart's Layers menu */
 .layerpop{position:fixed;z-index:60;min-width:150px;padding:8px 10px;border-radius:6px;border:1px solid var(--rule);background:var(--pod);
   box-shadow:0 6px 18px rgba(0,0,0,.35);font:600 12px/1.2 var(--f-inst)}
 .layerpop[hidden]{display:none}
@@ -1073,7 +1072,7 @@ body.showroom #crewPop{visibility:hidden}
 /* the situation: a strip on top of the Coach card (the UI session, 12 Nov) */
 #trimPanel #situ{position:static;transform:none;width:auto;margin:-8px -10px 4px -10px;border-radius:7px 7px 0 0;box-sizing:border-box;flex-wrap:wrap;gap:4px 8px}
 #trimPanel #situ .msg{font-size:13px}
-/* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
+/* the chart hint is the map's hover text */
 #mapHint{display:none}
 /* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
 #sigPanel #sigText{display:none}
