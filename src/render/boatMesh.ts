@@ -941,8 +941,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02); grp.add(gb);
       cringles.push({ l: upMast([fb, new THREE.Vector3(-0.07, fb.y + 0.1, MAST_AFT_Z + 0.02), new THREE.Vector3(-0.07, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham'), sail: 'main' });
     } else if (key === 'jibCunningham') { // forward outboard of the forehatch (its frame x ±0.29, z −2.04 to −1.46) to the stem's block, clear of the mooring cleat
-      const d = (z: number) => new THREE.Vector3(side * 0.36, 0, z);
-      fixed(line([fb, ...lay(fb, new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12)), ...lay(new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12), d(-1.38)), ...lay(d(-1.38), d(-2.12)), ...lay(d(-2.12), new THREE.Vector3(side * 0.07, 0, stem.z + 0.06)), stem.clone().setX(side * 0.015)], 'jib', 'jibCunningham'));
+      // (a rope lying on the deck: in gentle curves round the hatch, not straight runs with corners, the owner)
+      const plan = new THREE.CatmullRomCurve3([[Math.abs(fb.x), fb.z - 0.02], [0.1, MAST_FRONT_Z - 0.15], [0.24, -1.32], [0.36, -1.75], [0.31, -2.2], [0.07, stem.z + 0.06]].map(([x, z]) => new THREE.Vector3(side * x, 0, z)), false, 'centripetal');
+      const pp = plan.getSpacedPoints(Math.ceil(plan.getLength() / 0.06)), run: THREE.Vector3[] = [];
+      for (let i = 0; i + 1 < pp.length; i++) run.push(...lay(pp[i], pp[i + 1]));
+      fixed(line([fb, ...run, stem.clone().setX(side * 0.015)], 'jib', 'jibCunningham'));
       if (side > 0) cringles.push({ l: line([stem.clone(), FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP)], 'jib', 'jibCunningham'), sail: 'jib' }), grp.add(cringles[cringles.length - 1].l);
     } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
       const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
