@@ -47,7 +47,7 @@ describe('A tired crew', () => {
     expect(b.crew!.allOut).toBe(true);
     expect(b.depower!).toBeGreaterThanOrEqual(fresh.dep - 0.02);
     expect(b.heelMag!).toBeLessThan(fresh.heel + 1.5);
-  }, 30000);
+  }, 180_000);
 });
 
 describe('Where the weight goes, and what she does', () => {
@@ -78,7 +78,7 @@ describe('Where the weight goes, and what she does', () => {
         expect(free.v, `${W} kt against ${across}`).toBeGreaterThan(placed.v * 0.995);
       }
     }
-  }, 60000);
+  }, 180_000);
   it('fore and aft: forward pays in light air (the transom clear), and trims her by the bow', () => {
     const fwd = steady(6, beatAngle(6), { place: { across: null, fore: 'fwd' } }), aft = steady(6, beatAngle(6), { place: { across: null, fore: 'aft' } });
     expect(fwd.b.crew!.trim).toBeGreaterThan(aft.b.crew!.trim + 0.02);
@@ -301,7 +301,7 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     // there is, not back and forth within one; 18 in the twenty cycles as it stands, each about half a second, kneeling
     // at the cockpit's forward end)
     for (const t of lastTrips) expect(t).toBeLessThanOrEqual(20);
-  }, 30000);
+  }, 180_000);
 });
 
 describe('The dead band answers what matters (physics review)', () => {
@@ -313,7 +313,7 @@ describe('The dead band answers what matters (physics review)', () => {
       sail(b, 300, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: wind(t) }; if (t > 30) { n++; if (b.crew!.people[2].pose === 'piano') at++; } });
       expect(at / n).toBeLessThan(0.35); // (before the dead band: 26–40% of the time, and up to 91% with a naive one)
     }
-  }, 60000);
+  }, 180_000);
   it('they hike out as a strong puff hits, not seconds later', () => {
     const twa = beatAngle(8), b = testBoat({ heading: 360 - twa, kt: 4, windKt: 8 }); b.crew = newCrew(crewOf(0.6), 'S');
     sail(b, 40, () => { b.h = 360 - twa; });

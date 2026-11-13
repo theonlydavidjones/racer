@@ -8,7 +8,7 @@ series*, not just a race.
 
 *The mock-up, redrawn after the owner's feedback (13 Nov). It's the Yacht Club's layout (Boats · Members · Season),
 and every boat list shows country and sail number beside the name, since sailors in a fleet go by sail numbers. Boat
-chips each get a colour of their own in a series: a boat's hull colour where it's distinct, otherwise one from a fixed
+chips each get a color of their own in a series: a boat's hull color where it's distinct, otherwise one from a fixed
 palette (FREYA violet, KITTIWAKE pink, yours teal). Your boat's row highlight (amber) stays apart from the palette.
 Each row has a place-by-race sparkline, 1st at the top. The points are real: the
 2025–26 Seaweed Soup Folkboat fleet's published race points (Jibeset, saved in
@@ -101,6 +101,14 @@ summaries only. Until it's settled, the sim's trophy is simply "the series troph
    (https://latitude38.com/lectronic/golden-gate-yc-seaweed-soup-san-francisco). With race 3 abandoned, 2025–26 has no
    throwout. The series' own sailing instructions are still unread (ggyc.com and jibeset refuse this project's fetches).
    A DNF scores starters + 1, as the real series scored them (A5.3); a DNC entries + 1 (A5.2).
-4. **Colours: hull colours, duplicates and all** (the owner: "that's true in life too"). Each sparkline ends in its sail
-   number, and a row's line thickens on hover, so two lines of one colour can be told apart. A faint light edge keeps a
+4. **Colors: hull colors, duplicates and all** (the owner: "that's true in life too"). Each sparkline ends in its sail
+   number, and a row's line thickens on hover, so two lines of one color can be told apart. A faint light edge keeps a
    black or navy hull visible on the dark panel.
+
+## 2026–27, the season under way (13 Nov 2026)
+
+The Season tab opens on 2026–27, and its season picker (inside the tab) goes back to 2025–26. Race 1 is the real one:
+7 Nov 2026, Folkboats starting 13:35, on course 2 (a last-minute change the results don't show, from the owner, who sailed
+it; reference/results/seaweed-soup-2026-27-race1-2026-11-07.png). Later races appear only as they're published: no date is
+invented. The header says how many of the series' five are still to come. The results sheet also settles the ratings:
+every Folkboat on PHRF 252, so time on time is level.

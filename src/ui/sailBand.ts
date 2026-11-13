@@ -152,8 +152,9 @@ const jdial = (side: Side) => {
 };
 
 /** The tab on the band's top edge that says who trims (the owner, 13 Nov 2026: "tab should just say 'Auto-Trim' when its
- * all auto trim, and 'Hand Back' when 1 or more lines are manual"): any line, either jib car or the whisker pole yours. */
-export const trimTab = (u: Boat): 'Auto-Trim' | 'Hand Back' => (LINES.some(k => byHand(u, k)) || u.poleMine ? 'Hand Back' : 'Auto-Trim');
+ * all auto trim, and 'Hand Back' when 1 or more lines are manual"): any line or either jib car yours. (Not the whisker
+ * pole: it's always yours, your call only.) */
+export const trimTab = (u: Boat): 'Auto-Trim' | 'Hand Back' => (LINES.some(k => byHand(u, k)) ? 'Hand Back' : 'Auto-Trim');
 
 export class SailBand {
   readonly el: HTMLElement;
@@ -185,7 +186,7 @@ export class SailBand {
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
     el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
 <span class="sb-tillerslot"></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds); then it's yours until Hand Back."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
@@ -193,7 +194,7 @@ export class SailBand {
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
-<div class="sb-bot">${jdial('P')}${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveller')}</div>${bstay('S')}${jdial('S')}</div>`;
+<div class="sb-bot">${jdial('P')}${bstay('P')}<div class="sb-thwart">${track('mainsheet', 'Mainsheet')}${track('traveller', 'Traveler')}</div>${bstay('S')}${jdial('S')}</div>`;
     parent.appendChild(el);
     el.addEventListener('pointerdown', e => this.down(e));
     el.addEventListener('pointermove', e => this.move(e));
@@ -406,7 +407,7 @@ export class SailBand {
     const all = this.el.querySelector<HTMLElement>('.sb-all')!, word = trimTab(u);
     if (all.textContent !== word) {
       all.textContent = word; all.classList.toggle('mine', word === 'Hand Back');
-      all.dataset.help = word === 'Hand Back' ? 'Hand Back: every line you hold (the amber ones), both jib cars and the whisker pole go back to the crew.' : 'Auto-Trim: the crew trims every line. Work any line, or tap its name, and it\'s yours (its name turns amber).';
+      all.dataset.help = word === 'Hand Back' ? 'Hand Back: every line you hold (the amber ones) and both jib cars go back to the crew. The whisker pole stays your call.' : 'Auto-Trim: the crew trims every line. Work any line, or tap its name, and it\'s yours (its name turns amber).';
     }
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
