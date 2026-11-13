@@ -1119,3 +1119,8 @@ body.showroom #flowPanel{display:none}
 #realRows:not(:empty){margin-bottom:10px}
 #realRows .warn,#resReal .warn{color:#ffb08a}
 #resReal tr.you td{color:var(--accent);font-weight:700}
+/* The flag index sits in the left column, which lets the pointer through to the boat (pointer-events:none); the index
+   itself must take the pointer, or the wheel and a drag go to the view behind it and it never scrolls (the owner). */
+#flagIndex{pointer-events:auto;overscroll-behavior:contain;cursor:grab}
+#flagIndex.drag{cursor:grabbing;-webkit-user-select:none;user-select:none}
+#flagIndex .fi-x{cursor:pointer}
