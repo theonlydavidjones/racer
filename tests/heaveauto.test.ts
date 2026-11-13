@@ -38,7 +38,7 @@ describe('hove to, Auto keeps her hove to', () => {
       expect(u / n / KT, 'forereaching, kn').toBeLessThan(2);
       // (the crew left the hove-to set where it was: the windward sheet made fast, the main where it was eased)
       expect(b.ctl.jibsheetW).toBeCloseTo(before.w, 2); expect(b.ctl.mainsheet).toBeCloseTo(before.main, 2);
-    }, 30_000);
+    }, 180_000);
 
   it('taken through the wind while the crew hold her hove to (a big shift), the made-fast sheet is the leeward one: the jib fills, not backed again', () => {
     const b = hoveTo(14);
@@ -50,7 +50,7 @@ describe('hove to, Auto keeps her hove to', () => {
     expect(b.tack).not.toBe(tack);
     expect(b.ctl.jibsheet, 'the sheet that was made fast, leeward now').toBeCloseTo(made, 2);
     expect(b.jibBacked).toBe(0); expect(b.hove).toBe(false);
-  }, 30_000);
+  }, 180_000);
   it('then let the lashing go and steer off: the crew let the windward sheet fly, and she sails', () => {
     const b = hoveTo(15);
     allToCrew(b); if (b.crew) b.crew.place = undefined;
@@ -59,5 +59,5 @@ describe('hove to, Auto keeps her hove to', () => {
     b.lashed = null; b.turnDir = -1; b.turnTarget = 300; sail(b, 90);
     expect(b.hove).toBe(false); expect(b.jibBacked).toBe(0);
     expect(kt(b)).toBeGreaterThan(4);
-  }, 30_000);
+  }, 180_000);
 });

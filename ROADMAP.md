@@ -188,7 +188,8 @@ What's planned, roughly in order. Done work is described in the README.
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
-   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   remember the conditions it happened in, so the check covers every pose and wind.
 8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
@@ -201,8 +202,8 @@ What's planned, roughly in order. Done work is described in the README.
    float precision far from the origin. Owner's report: cruising, off South Beach (about 6 km southeast of the
    Cityfront, far from the sim's origin), when it started unknown. A second report with a chart screenshot: the boat just inside a breakwater's corner, by a
    channel marked by green lights "9" and "11" (Fl G 2.5s 15ft 4M) and an "Iso G 6s 34ft" light, in 3–5 ft charted
-   water, heading northeast along the shore. Check both the 3D water there and the chart's own moving streaks, which
-   the owner may be describing. Then add one test over every water layer: none moves past a still boat faster
+   water, heading northeast along the shore. Owner's answer: it was the chart's moving streaks, not the 3D water (Charts and
+   Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
 8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
@@ -288,6 +289,16 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The season's flow** (owner, 13 November; clarity; next; 3–5 h; a mock-up to the owner first): "I'm confused about the
+     UX for seasons. I go to the yacht club to pick a season (counterintuitive, since I would think to go to Race), then
+     when I select a season, BAM, I'm in my slip. no clue what's going on." Proposed:
+     1. **Enter from Race:** Race → Season (the Yacht Club's Season tab shows the standings and history too).
+     2. **Choosing a season opens its overview first,** not the water: the calendar (the real regattas, which are done),
+        the next race (date, club, course, the day's real conditions), the standings, and her crew.
+     3. **"Sail the next race"** opens that race's setup, filled in, and the brief.
+     4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
+        signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
+        saying.
    - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
      save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
@@ -865,6 +876,14 @@ Club is the place where crew members are created, configured and assigned to boa
 creates the other skippers and their details. The race setup shows the boat's assigned crew, swappable there, but isn't
 where crew are configured. It's the home of the skipper and crew model's sliders above, and later of Seasons' rankings
 and awards (below), which become attributes of the winning boat and skipper.
+Trophies (owner, 13 November): use the fleet's real perpetuals where they're found (docs/TRADITIONS.md: the Contender's
+Cup, the San Francisco International Cup, and, unconfirmed, the Rick Wolf trophy for the Wednesday series). Elsewhere use
+placeholder names, marked as placeholders in the code (and the doc) so they're never shown as a real trophy's history.
+After each race, the club's evening at the race's level: drinks; drinks and dinner; drinks, dinner and results; drinks,
+dinner, results and awards (owner). The Plastic Classic's committee-boat mark, when it's built (TRADITIONS item 14), as in real life (owner, 13 November:
+"this is a true to life sim"): its crew of adult women flash the fleet as boats round, topless only, nothing sexual,
+in the crew figures' stylized style. Pending the owner: whether it sits behind a mature-content setting, and the
+default. Before any public release, the host club's permission covers it.
 
 Also asked for:
 
