@@ -282,7 +282,7 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   };
   // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
   // the line itself is tested exactly)
-  const visible = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  const visible = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity || !wharfClear(p, q, [a, b])) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   if (visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.
@@ -356,7 +356,31 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
   return path;
 }
 
-/** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid. */
+/**
+ * How far off the Wharf's piers, breakwaters and docks a route keeps (m): her half-length and a few metres for the
+ * helm, so she passes a pier head, or threads Aquatic Park's 57 m entrance, without her hull touching. A route that
+ * only kept off the piers themselves ran her along their faces (the owner: "auto nav failed to navigate around the
+ * seawall").
+ */
+export const WHARF_CLEAR = 10;
+/** Clear of the Wharf's structures by WHARF_CLEAR along a to b, sampled every 4 m, except within that of `free` (where
+ * she is now, or where she's going: a slip or a dock may be closer). */
+function wharfClear(a: Vec, b: Vec, free: Vec[] = []): boolean {
+  const L = dist(a, b); if (!wharfNearest(a, L + WHARF_CLEAR) && !wharfNearest(b, L + WHARF_CLEAR)) return true;
+  const n = Math.max(1, Math.ceil(L / 4));
+  for (let k = 0; k <= n; k++) {
+    const q = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
+    if (free.some(f => dist(q, f) < WHARF_CLEAR + 2)) continue;
+    if (wharfNearest(q, WHARF_CLEAR)) return false;
+  }
+  return true;
+}
+/** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid, keeping
+ * WHARF_CLEAR off them. */
 function escapeWharf(p: Vec): Vec[] {
-  return gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0) ?? [p];
+  const out = (q: Vec) => wharfNearest(q, 150) === null;
+  const blocked = (q: Vec) => onLand(q) || (dist(q, p) > WHARF_CLEAR + 2 && !!wharfNearest(q, WHARF_CLEAR));
+  // (a marina's fairways, 20–30 m between its docks, leave no room for the clearance: there, down the fairway as before)
+  return gridPath(p, p, 10, 700, blocked, (u, v) => landAlong(u, v) === Infinity && wharfClear(u, v, [p]), out, 0)
+    ?? gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, out, 0) ?? [p];
 }

@@ -5,6 +5,7 @@ import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
 import { landAlong } from '../geo/shore';
 import { detour } from '../ai/ai';
+import { routeAround } from '../sim/routing';
 
 /**
  * A tiller pilot, as Folkboat sailors fit one: an electric ram on the tiller, steering to a compass course (Auto), to
@@ -46,6 +47,9 @@ export interface Pilot {
   lastH: number;
   /** Nav: when it last tacked (s), so it doesn't tack and tack again; a detour round land, worked out now and then. */
   lastTackT: number; detour: Vec | null; detourT: number;
+  /** Nav: the next turn on the way by water (sim/routing.ts routeAround: the planner's route round piers, breakwaters
+   * and the shore), when land's in the direct way, and when it was worked out (s); null when the way is clear. */
+  wp: Vec | null; wpT: number;
   /** Nav: the heading it's steering now, for the display. */
   navH: number;
   /** Nav: the tack it has decided to go onto, held until she's round. */
@@ -69,7 +73,7 @@ const AWA_TAU = 2.5;
 export const AUTO_TACK = 100;
 
 export function newPilot(): Pilot {
-  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, navH: 0, goTack: null, lastTack: null, alarm: null };
+  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, wp: null, wpT: -1e9, navH: 0, goTack: null, lastTack: null, alarm: null };
 }
 
 /** Engage in a mode, taking up where she is now: Auto holds her heading, Wind her apparent wind angle. */
@@ -109,6 +113,18 @@ function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
  * or two wide is in the way, however far ahead it is. */
 const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); return landAlong(b, { x: b.x + u.x * d, y: b.y + u.y * d }) <= d; };
 
+/**
+ * The next turn on the way by water to `dest` when land (a pier, a breakwater, the shore) is in the direct way, from
+ * the passage planner's route (sim/routing.ts routeAround, which threads the Wharf's piers on a 10 m grid); null when
+ * the direct way is clear, 20 m either side of her track.
+ */
+function nextTurn(b: Vec, dest: Vec): Vec | null {
+  const L = Math.hypot(dest.x - b.x, dest.y - b.y); if (L < 1) return null;
+  const ux = (dest.x - b.x) / L, uy = (dest.y - b.y) / L;
+  if ([0, -20, 20].every(k => landAlong({ x: b.x - uy * k, y: b.y + ux * k }, { x: dest.x - uy * k, y: dest.y + ux * k }) === Infinity)) return null;
+  const r = routeAround(b, dest, 30);
+  return r.length > 2 ? r[1] : null;
+}
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
 function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   // (the headings: her course is the polar's angle, so she steers her leeway higher than it, physics.ts b.leeway)
@@ -116,9 +132,14 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   const close = (tk: 'S' | 'P') => tk === 'S' ? csS : csP;
   // a tack it has decided on: steer for the new tack's close-hauled course until she's round
   if (p.goTack) { if (b.tack === p.goTack && !b.tacking) p.goTack = null; else return close(p.goTack); }
-  let P = dest;
+  // the way by water, as the navigator plans it: with land in the direct way (a curved pier, a breakwater, a basin's
+  // entrance), steer for the route's next turn, upwind or down, not just the nearest clear heading: a heading search
+  // runs her down onto the outside of Aquatic Park's Municipal Pier and holds her there (the owner: "auto nav failed
+  // to navigate around the seawall"). Worked out again every few seconds, and at once on reaching the turn.
+  if (t - p.wpT > 4 || (p.wp && Math.hypot(p.wp.x - b.x, p.wp.y - b.y) < 20)) { p.wp = nextTurn(b, dest); p.wpT = t; }
+  let P = p.wp ?? dest;
   const bP0 = brg(P.x - b.x, P.y - b.y);
-  if (Math.abs(wrap(from - bP0)) > 50) { // reaching or running: round any land in the way
+  if (!p.wp && Math.abs(wrap(from - bP0)) > 50) { // reaching or running with no route: round any land in the way
     if (t - p.detourT > 2) { p.detour = detour(b, P); p.detourT = t; }
     if (p.detour) P = p.detour;
   } else p.detour = null;
