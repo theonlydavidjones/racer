@@ -730,7 +730,7 @@ const LENSES = [0x303a44, 0x2c3846, 0x3a2e26, 0x26303a];
 /** (Dev switch for now: a warm, dry day. To be driven by the day's real air temperature, rain and sea: environment/weather.ts) */
 export const dress: { warm: boolean | 'all' } = { warm: false }; // ('all': everyone in shorts, for checking the kit)
 /** Shorts in the colours they come in (the owner's photo: maroon), and sneakers: white, or grey and navy. */
-const SHORTS = [0x6a2a32, 0x2a3346, 0xb9a88a, 0x4a4f57, 0x23272e, 0x3f5a3a];
+const SHORTS = [0x6a2a32, 0x6a2a32, 0x7a3a36, 0xb9a88a, 0xa8946e, 0x2a3346, 0x4a4f57, 0x3f5a3a]; // (maroons and khakis the commonest: they stand out from the dark jackets, as in the photo)
 const SNEAKERS: [Mat, Mat][] = [[{ c: 0xe9e8e2, r: 0.6 }, { c: 0xdedcd4, r: 0.85 }], [{ c: 0xe9e8e2, r: 0.6 }, { c: 0x8c6a4a, r: 0.85 }], [{ c: 0x3a3f47, r: 0.6 }, { c: 0xdedcd4, r: 0.85 }], [{ c: 0x1f2c48, r: 0.6 }, { c: 0xe9e8e2, r: 0.85 }]];
 export function kitFor(seed: number, team: number, warm: boolean | 'all' = dress.warm): Kit {
   const jc = hash(seed, 10) < 0.5 ? team : pick(TOPS, seed, 11);
