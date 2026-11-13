@@ -214,6 +214,10 @@ function logOuting(): void {
     // racing called off for the wind: no result, but the outing goes in her logbook
     app.send({ k: 'shown', logged: true });
     stage([{ ...outing(app.S.boat, true), kind: 'race', title: app.w.C.title, code: 'CXL', of: app.w.boats.length, setup: raceSetup() }]);
+  } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.userFinishT != null && heard().decisions.some(owesAnswer)) {
+    // you left with a protest against you unanswered: heard in your absence (RRS 63.1(b)), and the race logged so
+    for (const d of heard().decisions) if (owesAnswer(d)) answered.set(`${d.protest.vs}@${d.protest.t}`, 'hearing');
+    const sc = scores(); logRace(scoreOrder([...sc.values()], id => app.w.boats[id].finished ? app.w.boats[id].finishT : null).map(s => app.w.boats[s.id]), sc);
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.t > 0 && app.w.userFinishT == null) {
     // you left the race before finishing: retired
     app.send({ k: 'shown', logged: true });
@@ -305,7 +309,8 @@ function owesAnswer(d: Decision): boolean {
 /** The protest hearings, on the facts as they are now (rules/hearing.ts): the decisions and the boats disqualified
  * (not you, until you've chosen the hearing over retiring). */
 function heard(): ReturnType<typeof hearings> {
-  const w = app.w, h = hearings(w.protests, id => { const b = w.boats[id]; return { id, racing: w.racing(b), retired: !!b.retired }; });
+  // (a boat that has finished is through with her turns: 44.2, before she finishes; so not 'pending' once across)
+  const w = app.w, h = hearings(w.protests, id => { const b = w.boats[id]; return { id, racing: w.racing(b) && !b.finished, retired: !!b.retired }; });
   if (h.decisions.some(owesAnswer)) h.dsq.delete(w.user.id);
   return h;
 }
