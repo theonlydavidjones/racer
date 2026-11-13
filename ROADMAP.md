@@ -198,7 +198,8 @@ What's planned, roughly in order. Done work is described in the README.
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
    current's flow-mapped texture, a jump in the focus (camera switch, the chart opened and closed, "Move her here"), or
-   float precision far from the origin. Then add one test over every water layer: none moves past a still boat faster
+   float precision far from the origin. Owner's report: cruising, off South Beach (about 6 km southeast of the
+   Cityfront, far from the sim's origin), when it started unknown. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
 8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
