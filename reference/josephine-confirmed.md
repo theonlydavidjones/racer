@@ -54,8 +54,9 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   default (the owner).
 
 ## Foredeck
-- The mast's foot: a round stainless plate on the deck, a black rubber boot round the mast's foot, and a stainless ring
-  on short legs just above the plate that the lines thread under or are made fast to (owner's photos).
+- The mast's foot: a round stainless plate on the deck, a black rubber boot round the mast's foot, and a stainless
+  horseshoe: its two ends fixed to the deck either side just forward of the mast, arching up and round the mast's after
+  side, about 6 in high at its top aft; the lines thread under it or are made fast to it (owner's photos and words).
 - The forehatch: about half a metre forward of the mast on the centreline, square, big enough for a person or the
   anchor (drawn at the class's largest opening, 500 mm, CR 3.31); low, nearly flush with the deck, an aluminium frame
   with rounded corners, a smoked acrylic lid with four aluminium bars running fore and aft, hinged on its forward edge.
