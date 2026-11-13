@@ -2,7 +2,9 @@ import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 export interface Settings {
-  mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
+  mode: 'race' | 'drill' | 'sail' | 'manoeuvres'; // full race, start practice (from one minute to go), just sail (open water, no race), or the tack and gybe drill (open water, alone)
+  /** The tack and gybe drill's bests: the fewest metres lost, by manoeuvre and wind band ('tack-medium'), with a good crew's then. */
+  drillBest?: Record<string, { lostM: number; goodM: number }>;
   course: string; // course id, or 'rc': the race committee chooses (courses/committee.ts)
   raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time

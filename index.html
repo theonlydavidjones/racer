@@ -83,6 +83,8 @@
   <!-- how each sail is drawing (its lines are in the sail controls band) -->
   <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
   <div class="tp-hint" id="tpHint"></div>
+  <!-- the tack and gybe drill: your last manoeuvre, scored, and what to change -->
+  <div class="tp-drill" id="tpDrill" hidden></div>
   <!-- what the sail control under the mouse (or last touched) does (the band has no hover titles) -->
   <div class="tp-help" id="tpHelp" hidden></div>
   <div class="tp-shape" id="tpShape"></div>
@@ -241,7 +243,7 @@
         <small id="tideNote"></small>
         <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
         <button class="ghost" id="bCond" type="button">Change the conditions…</button>
-        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="ghost" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: every tack and gybe scored against a good crew's, with what to change">Practise tacks and gybes</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
       </div>
     </div>
   </div>
