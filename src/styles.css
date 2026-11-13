@@ -1290,21 +1290,21 @@ button.t-av.dim:hover{opacity:.8}
 .t-date small{font:700 9px/1 var(--f-inst);letter-spacing:.1em;margin-top:2px}
 /* the rows: one grid (a lead tile, the line, Change), the controls opening under it */
 #setup .steps{gap:12px}
-#setup .srow{border:1px solid var(--rule);border-radius:12px;background:var(--ink);transition:border-color .12s}
-#setup .srow[hidden]{display:none}
-#setup .srow:not(.open):hover{border-color:rgba(255,182,39,.5)}
-#setup .srow.open:not(.always){border-color:var(--accent)}
-#setup .srow-head{display:grid;grid-template-columns:96px 1fr auto;align-items:center;column-gap:18px;padding:14px 16px;cursor:pointer;border-radius:12px}
-#setup .srow-head:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#setup .srow-lead{display:flex;align-items:center;justify-content:center}
-#setup .srow-main{display:flex;align-items:center;gap:14px;min-width:0;flex-wrap:wrap}
-#setup .srow-go{color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;white-space:nowrap}
-#setup .srow-body{display:none;padding:0 16px 16px;flex-direction:column;gap:14px}
-#setup .srow.open .srow-body{display:flex;border-top:1px solid var(--rule);padding-top:14px}
-#setup .srow.always .srow-head{display:none}
-#setup .srow.always .srow-body{border-top:0}
-#setup .srow .step{border-top:0;padding:0}
-#setup .srow .step>span:first-child::before{content:none}
+.srow{border:1px solid var(--rule);border-radius:12px;background:var(--ink);transition:border-color .12s}
+.srow[hidden]{display:none}
+.srow:not(.open):hover{border-color:rgba(255,182,39,.5)}
+.srow.open:not(.always){border-color:var(--accent)}
+.srow-head{display:grid;grid-template-columns:96px 1fr auto;align-items:center;column-gap:18px;padding:14px 16px;cursor:pointer;border-radius:12px}
+.srow-head:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.srow-lead{display:flex;align-items:center;justify-content:center}
+.srow-main{display:flex;align-items:center;gap:14px;min-width:0;flex-wrap:wrap}
+.srow-go{color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;white-space:nowrap}
+.srow-body{display:none;padding:0 16px 16px;flex-direction:column;gap:14px}
+.srow.open .srow-body{display:flex;border-top:1px solid var(--rule);padding-top:14px}
+.srow.always .srow-head{display:none}
+.srow.always .srow-body{border-top:0}
+.srow .step{border-top:0;padding:0}
+.srow .step>span:first-child::before{content:none}
 #setup #row-fleet .step>span:first-child,#setup #row-boat .step>span:first-child,#setup #row-when .step>span:first-child{display:none}
 #setup #oppList{display:flex;flex-direction:column;gap:0}
 #setup #crewRows{display:flex;flex-direction:column}
@@ -1317,8 +1317,19 @@ button.t-av.dim:hover{opacity:.8}
 .t-strip>div{display:flex;align-items:center;gap:8px;background:var(--ink);border:1px solid var(--rule);border-radius:10px;padding:8px 10px;min-width:0}
 .t-strip b{font:700 17px/1 var(--f-inst);white-space:nowrap}
 .t-strip small{display:block;font:600 11px/1.2 var(--f-inst);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#setSide #bCond{padding:8px 10px;font-size:12px}
+#setSide #bCond,#drillSide #bCond{padding:8px 10px;font-size:12px}
 #setSide .gobtns .ghost{padding:8px 10px;font-size:12px}
 #setSide #bGo{padding:18px;font-size:18px}
 #setup #crewRows{display:block;margin:0;font-size:inherit}
 #setup #crewRows .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:600 13px/1 var(--f-inst);padding:0}
+/* Drill, its own start-page section (the owner, 13 Nov 2026): the three drills, each Go, beside the setup's boat and
+   crew, the day and the conditions (moved here while it's open) */
+.modes.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.drillpage .dlist{display:flex;flex-direction:column;gap:12px}
+.drillpage .dcard{display:grid;grid-template-columns:64px 1fr auto;column-gap:16px;row-gap:12px;align-items:center;padding:14px 16px;border:1px solid var(--rule);border-radius:12px;background:var(--ink)}
+.drillpage .dic{width:56px;height:56px;border-radius:12px;background:#123b52;display:grid;place-items:center}
+.drillpage .dsets{grid-column:2 / -1;display:flex;gap:10px;flex-wrap:wrap}
+.drillpage .dsets .seg button{padding:7px 12px}
+.drillpage .dgo{padding:10px 20px;font-size:14px}
+#drillSide{display:flex;flex-direction:column;gap:12px}
+#drillView #raceFromRow,#drillView #raceFromNote{display:none}

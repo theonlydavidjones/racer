@@ -166,9 +166,10 @@
   <div class="panel wide home">
     <div class="eyebrow">San Francisco Bay</div>
     <h1>Folkboat Racing Sim</h1>
-    <div class="modes three">
+    <div class="modes four">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
+      <button type="button" class="modecard" data-home="drill"><b>Drill</b><span>The start, tacks and gybes, mark roundings</span></button>
       <button type="button" class="modecard" data-home="fleet"><b>Yacht Club</b><span>Your boats, your crew, the club</span></button>
     </div>
     <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button></div>
@@ -190,6 +191,29 @@
     <button type="button" class="linkbtn back" id="pastBack" data-home="back">‹ Race</button>
     <h1>Past races</h1>
     <div class="pastnote"><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
+  </div>
+</div>
+
+<!-- Drill: its own start-page section (the owner, 13 Nov 2026): the three drills, each Go, beside the setup's own boat
+     and crew, the day and the conditions (moved here while it's open: app.ts dockSetup) -->
+<div class="overlay" id="drillView" hidden>
+  <div class="panel wide setup drillpage">
+    <div class="sethead"><button type="button" class="linkbtn back" id="drillBack" data-home="back">‹ Start page</button><h1>Drill</h1></div>
+    <div class="setgrid">
+      <div class="dlist">
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" aria-hidden="true"><line x1="4" y1="22" x2="36" y2="22" stroke="#ffb627" stroke-width="2.6"/><rect x="2" y="12" width="5" height="10" fill="#e8eef2"/><circle cx="36" cy="22" r="3" fill="#ff8a2a"/><path d="M20 4 l4 9 h-8 z" fill="#9fd3ea"/></svg></span>
+          <span class="t-h">The start</span>
+          <button class="cta dgo" id="bDrill" type="button" title="The last minutes to the gun, then a debrief and a replay">Go</button>
+          <div class="dsets"><div class="seg" id="drillFromSeg" aria-label="Minutes to the gun"><button type="button" data-df="60">1 min</button><button type="button" data-df="120">2 min</button><button type="button" data-df="180">3 min</button></div><div class="seg" id="drillSoloSeg" aria-label="Alone or with the fleet"><button type="button" data-ds="1">Alone</button><button type="button" data-ds="0">With the fleet</button></div></div></div>
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" stroke="#9fd3ea" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 26 L14 6 L22 26 L30 6"/><path d="M30 6 l-1 6 M30 6 l-5 3"/></svg></span>
+          <span class="t-h">Tacks and gybes</span>
+          <button class="cta dgo" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: each one scored against a good crew's">Go</button></div>
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" aria-hidden="true"><circle cx="24" cy="14" r="4" fill="#ffb627"/><path d="M6 26 Q8 8 24 6 Q36 6 34 18 Q32 26 20 26" stroke="#9fd3ea" stroke-width="2.2" stroke-dasharray="3 3" stroke-linecap="round"/></svg></span>
+          <span class="t-h">Mark roundings</span>
+          <button class="cta dgo" id="bRoundings" type="button" title="Alone on the practice course: each rounding scored against a good crew's">Go</button></div>
+      </div>
+      <div class="side" id="drillSide"></div>
+    </div>
   </div>
 </div>
 
@@ -248,7 +272,7 @@
           <div class="t-pickrow"><span class="t-lab">Boat</span><span class="t-group"><span class="t-group" id="boatTiles"></span><button type="button" class="t-av" id="bBoat" title="Your boats, in the Yacht Club"><span class="t-tile t-add">+</span><small>Yacht Club</small></button></span></div>
           <select id="boatPick" class="pick" aria-label="The boat you'll sail" hidden></select><small id="boatSum" hidden></small><small id="crewSum" hidden></small>
           <div class="crewrows" id="crewRows"></div>
-          <div class="t-pickrow"><span class="t-lab">Start</span><div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div></div>
+          <div class="t-pickrow" id="raceFromRow"><span class="t-lab">Start</span><div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div></div>
           <small id="raceFromNote"></small></div>
           </div>
         </section>
@@ -261,14 +285,14 @@
         </section>
       </div>
       <div class="side" id="setSide">
-        <div class="condhead"><span>Conditions</span><b id="condState">real</b></div>
+        <div class="condhead" id="condHead"><span>Conditions</span><b id="condState">real</b></div>
         <div class="t-strip" id="condStrip"></div>
         <dl class="cond" id="condSum" hidden></dl>
         <canvas id="tideGraph" aria-label="Current and wind through the day"></canvas>
         <small id="tideNote"></small>
-        <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
+        <details class="more" id="condMore"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
         <button class="ghost" id="bCond" type="button">Change the conditions…</button>
-        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="ghost" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: every tack and gybe scored against a good crew's, with what to change">Practise tacks and gybes</button><button class="ghost" id="bRoundings" type="button" title="Alone on the practice course, in this day's wind and sea: laps round the windward mark and the pin, each rounding scored against a good crew's">Practise mark roundings</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
       </div>
     </div>
   </div>

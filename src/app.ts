@@ -1019,9 +1019,9 @@ function realLine(): string | undefined {
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; send({ k: 'pause', on: false }); };
 $('bRestart').onclick = () => { $('pause').hidden = true; beginRace(); };
-$('bSettings').onclick = () => { $('pause').hidden = true; openSetup(); };
+$('bSettings').onclick = () => { $('pause').hidden = true; toSetup(); };
 $('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
-$('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
+$('bSet2').onclick = () => { $('results').hidden = true; toSetup(); };
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
 /** Cruise setup: the start and the destination, picked on the chart (ui/setupChart.ts); each pick rebuilds the world. */
@@ -1138,7 +1138,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -1162,7 +1162,7 @@ addEventListener('keydown', e => {
     if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
     if (boatPanel.open) { $('boatPanel').querySelector<HTMLElement>('[data-act="done"]')?.click(); return; }
     if (fleet.escape()) return;
-    if (!$('raceChoose').hidden || !$('pastView').hidden || !$('setup').hidden || fleet.open) { nav.back(); return; }
+    if (!$('raceChoose').hidden || !$('pastView').hidden || !$('setup').hidden || !$('drillView').hidden || fleet.open) { nav.back(); return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
     if (condLive && !$('condDlg').hidden) { $('bCondClose').click(); return; } // (back to the pause menu)
     if (!$('pause').hidden) { $('bResume').click(); return; }
@@ -1365,7 +1365,6 @@ function courseCard(): void {
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
   $('whereField').hidden = !cruise;
   if (cruise) setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
-  $('bDrill').hidden = cruise;
   $('bGo').textContent = cruise ? 'Cast off' : 'Start the sequence';
   $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
   $('setupTitle').textContent = cruise ? 'Cruise' : 'Create a race';
@@ -1564,13 +1563,13 @@ function drawHeads(): void {
   const seat = (i: number, label: string) => seats[i] ? tile(initials(name(seats[i])), name(seats[i]), CLUB_TILE, { round: true }) : emptyTile(label, false, { round: true });
   const kg = ($('crewSum').textContent!.match(/([\d,]+)\s*lb/) || [])[1];
   set('boat', tile(bn, boat.name || 'Unnamed', boat.hull.upper, { country: bc, on: true }),
-    `<span class="t-group">${tile(initials(you), 'Helm', '#ffb627', { round: true })}${seat(0, 'Main')}${seat(1, 'Jib')}</span><span class="t-text">${kg ? `<span class="t-s">${kg} lb aboard</span>` : ''}${cruise ? '' : `<span class="t-s">${S.raceFrom === 'slip' ? 'From her slip' : 'Starts at the line'}</span>`}</span>`);
+    `<span class="t-group">${tile(initials(you), 'Helm', '#ffb627', { round: true })}${seat(0, 'Main')}${seat(1, 'Jib')}</span><span class="t-text">${kg ? `<span class="t-s">${kg} lb aboard</span>` : ''}${cruise || !$('drillView').hidden ? '' : `<span class="t-s">${S.raceFrom === 'slip' ? 'From her slip' : 'Starts at the line'}</span>`}</span>`);
   // when: the day, and the gun (or when she leaves)
   const day = new Date(w.raceDate + 'T12:00');
   set('when', `<span class="t-date"><b>${day.getDate()}</b><small>${day.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</small></span>`,
     `<span class="t-text"><span class="t-h">${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${cruise ? 'leaving at' : 'gun at'} ${esc(S.tideTime || '12:00')}</span>${sunsetNow ? `<span class="t-s">Sunset ${esc(sunsetNow)}</span>` : ''}</span>`);
   // which rows show (a row whose fields are all hidden: not this mode's), and which is open
-  for (const r of document.querySelectorAll<HTMLElement>('#setup .srow')) {
+  for (const r of document.querySelectorAll<HTMLElement>('.srow')) {
     const was = r.hidden;
     r.hidden = ![...r.querySelector('.srow-body')!.children].some(c => !(c as HTMLElement).hidden);
     // (the cruise's chart, drawn while its row was still hidden, had no size: drawn again now it shows)
@@ -1582,12 +1581,12 @@ function drawHeads(): void {
   }
 }
 // a row's line opens it (and closes the one open); Done folds it
-document.querySelector('#setup .steps')!.addEventListener('click', e => {
+document.addEventListener('click', e => {
   const head = (e.target as HTMLElement).closest<HTMLElement>('.srow-head'); if (!head) return;
   const row = head.closest<HTMLElement>('.srow')!.dataset.row!;
   rowOpen = rowOpen === row ? null : row; drawHeads();
 });
-document.querySelector('#setup .steps')!.addEventListener('keydown', e => {
+document.addEventListener('keydown', e => {
   const k = e as KeyboardEvent, head = (k.target as HTMLElement).closest<HTMLElement>('.srow-head');
   if (head && (k.key === 'Enter' || k.key === ' ')) { k.preventDefault(); head.click(); }
 });
@@ -1615,17 +1614,42 @@ function condStrip(st: { windKt?: number; windFrom?: number; windAll?: boolean; 
   ].join(''));
   setupHeads();
 }
-function openSetup(): void { settleLog(openSetupNow); }
-function openSetupNow(): void {
+function openSetup(view: 'setup' | 'drill' = 'setup'): void { settleLog(() => openSetupNow(view)); }
+/** Back to where the sail was set up: the setup, or the Drill page (for a drill). */
+function toSetup(): void { if (nav.here.k === 'drill') showPlace(nav.here); else openSetup(); }
+/*
+ * The Drill page shows the setup's own boat-and-crew and when rows, its conditions strip, graph and Change the conditions:
+ * the same elements, moved there while it's open and back when the setup opens, so there's one set of each.
+ */
+const DOCKED = ['row-boat', 'row-when', 'condHead', 'condStrip', 'tideGraph', 'condMore', 'bCond'];
+const dockHome = new Map<string, Comment>();
+function dockSetup(view: 'setup' | 'drill'): void {
+  for (const id of DOCKED) {
+    const el = $(id);
+    if (!dockHome.has(id)) { const c = document.createComment(id); el.before(c); dockHome.set(id, c); }
+    if (view === 'drill') $('drillSide').appendChild(el); else dockHome.get(id)!.after(el);
+  }
+}
+// the start drill's minutes to the gun, and alone or with the fleet (the debrief's own choices set these too)
+function paintDrillPage(): void {
+  for (const b of $('drillFromSeg').querySelectorAll<HTMLElement>('[data-df]')) b.setAttribute('aria-pressed', String(+b.dataset.df! === (S.drillFrom ?? DRILL_FROM)));
+  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === (S.drillSolo ?? true)));
+}
+$('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; S.drillFrom = +b.dataset.df!; saveSettings(S); paintDrillPage(); });
+$('drillSoloSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds]'); if (!b) return; S.drillSolo = b.dataset.ds === '1'; saveSettings(S); paintDrillPage(); });
+function openSetupNow(view: 'setup' | 'drill' = 'setup'): void {
   replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (S.mode === 'drill' || S.mode === 'manoeuvres' || S.mode === 'roundings') { S.mode = 'race'; prepare(); }
   // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
   // and is sent nothing until it starts)
   setStill(true); rowOpen = null; setupHeads();
-  courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
+  courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); dockSetup(view); $('setup').hidden = view !== 'setup'; $('drillView').hidden = view !== 'drill'; if (view === 'drill') { $('drillBack').textContent = nav.backLabel(); paintDrillPage(); } if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
-  nav.reset({ k: 'setup' }); // (the pause menu's and the results' Back to setup: the setup you sailed from)
+  // (the pause menu's and the results' Back to setup: the setup you sailed from, or the Drill page for a drill)
+  const drilling = S.mode === 'drill' || S.mode === 'manoeuvres' || S.mode === 'roundings';
+  nav.reset(drilling ? { k: 'drill' } : { k: 'setup' });
+  for (const id of ['bSettings', 'bSet2', 'bDSetup']) $(id).textContent = drilling ? 'Back to Drill' : 'Back to setup';
   realRaceHolds();
   saveSettings(S);
   newGame(seed);
@@ -1697,11 +1721,11 @@ $('bDReplay').onclick = () => { if (drillClip) drillView.play(w, drillClip); };
 $('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
 $('bDNew').onclick = () => { closeDrill(); beginRace(); };
 $('bDKeep').onclick = () => { closeDrill(); send({ k: 'pause', on: false }); };
-$('bDSetup').onclick = () => { closeDrill(); openSetup(); };
+$('bDSetup').onclick = () => { closeDrill(); toSetup(); };
 $('bGo').onclick = () => { if (S.mode === 'drill') S.mode = 'race'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-$('bDrill').onclick = () => { S.mode = 'drill'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-$('bManoeuvres').onclick = () => { S.mode = 'manoeuvres'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-$('bRoundings').onclick = () => { S.mode = 'roundings'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
+$('bDrill').onclick = () => { S.mode = 'drill'; courseView.close(); navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
+$('bManoeuvres').onclick = () => { S.mode = 'manoeuvres'; courseView.close(); navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
+$('bRoundings').onclick = () => { S.mode = 'roundings'; courseView.close(); navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
 /* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
 const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
 let lastPick = hostOf(S.course) === 'ggyc' && S.course !== RC_COURSE ? S.course : COURSES.find(c => c.group)!.id;
@@ -2036,15 +2060,16 @@ const fleet: Fleet = new Fleet(S, {
  * The back stack (ui/nav.ts; docs/UI-AUDIT.md §3): the screens around the sailing, each shown here, and named for the
  * back link of the screen above it.
  */
-const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'past' ? 'Past races' : p.k === 'club' ? 'Yacht Club'
+const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'past' ? 'Past races' : p.k === 'drill' ? 'Drill' : p.k === 'club' ? 'Yacht Club'
   : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
 function showPlace(p: Place): void {
   if (p.k === 'home') { openHome(); return; }
-  for (const id of ['home', 'raceChoose', 'pastView', 'setup', 'condDlg']) $(id).hidden = true;
+  for (const id of ['home', 'raceChoose', 'pastView', 'setup', 'drillView', 'condDlg']) $(id).hidden = true;
   if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
   if (p.k === 'race') { $('raceBack').textContent = nav.backLabel(); $('raceChoose').hidden = false; }
   else if (p.k === 'past') { $('pastBack').textContent = nav.backLabel(); pastRaces(); $('pastView').hidden = false; }
   else if (p.k === 'setup') { prepare(); openSetup(); }
+  else if (p.k === 'drill') { if (S.mode === 'sail') S.mode = 'race'; prepare(); openSetup('drill'); }
   else if (p.k === 'club') { if (p.tab === 'members') fleet.openMembers(); else fleet.openList(); }
   else fleet.openBoat(p.id);
 }
@@ -2053,7 +2078,7 @@ function openHomeNow(): void {
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
-  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'coachPanel']) $(id).hidden = true;
+  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'coachPanel']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);
@@ -2069,6 +2094,7 @@ document.addEventListener('click', e => {
   else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'fleet') nav.go({ k: 'club' });
   else if (where === 'past') nav.go({ k: 'past' });
+  else if (where === 'drill') nav.go({ k: 'drill' });
 });
 $('bExit').onclick = () => openHome();
 $('bExit2').onclick = () => openHome();
