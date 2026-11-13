@@ -1,5 +1,5 @@
 import { ATTRS, attrOf, type Attr } from '../boat/crewPhys';
-import type { BoatSpec } from '../boat/spec';
+import { sailNo, type BoatSpec } from '../boat/spec';
 import { YOU, type Member } from '../club/members';
 import { SKIPPER_ATTRS, type SkipperAttr } from '../ai/skipper';
 
@@ -49,12 +49,16 @@ export function berth(m: Member, boats: BoatSpec[]): string {
   }
   return 'Free · not on a boat';
 }
-/** Their seat, for the card: the skipper's, the middle crew's (the main), the forward hand's (the jib and the pole), or none. */
+/**
+ * Their seat, for the card: the skipper's, the middle crew's (the main), the forward hand's (the jib and the pole), or
+ * none. A boat goes by her country and sail number beside her name (the owner: sailors in a fleet go by sail numbers).
+ */
 function seat(m: Member, boats: BoatSpec[]): { line: string; kind: 'skipper' | 'middle' | 'forward' | 'free' } {
-  if (m.id === YOU) { const b = boats.find(x => x.skipper === 'you'); return { line: b ? `Skipper of ${esc(b.name || 'your boat')}` : 'Skipper', kind: 'skipper' }; }
+  const named = (b: BoatSpec) => `${esc(b.name || 'Unnamed')} ${esc(sailNo(b))}`;
+  if (m.id === YOU) { const b = boats.find(x => x.skipper === 'you'); return { line: b ? `Skipper of ${named(b)}` : 'Skipper', kind: 'skipper' }; }
   for (const b of boats) {
     const ids = b.crewIds ?? [], i = ids.indexOf(m.id); if (i < 0) continue;
-    const name = esc(b.name || 'Unnamed');
+    const name = named(b);
     if (ids.length === 1) return { line: `Crew on ${name} (main and jib)`, kind: 'middle' };
     return i === 0 ? { line: `Middle crew on ${name} (the main)`, kind: 'middle' } : { line: `Forward hand on ${name} (the jib and the pole)`, kind: 'forward' };
   }

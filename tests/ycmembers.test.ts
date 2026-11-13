@@ -26,7 +26,7 @@ describe('the Members tab', () => {
     expect(yours).toBeGreaterThan(-1); expect(club).toBeGreaterThan(yours);
     expect(g.indexOf('<b>You</b>')).toBeLessThan(g.indexOf('<b>Sam</b>')); expect(g.indexOf('<b>Sam</b>')).toBeLessThan(club); expect(g.indexOf('<b>Ines</b>')).toBeGreaterThan(club);
     // one line who they are and where they sail; three ratings, the ones for the seat
-    expect(g).toContain('Crew on Josephine (main and jib)'); expect(g).toContain('Free: not on a boat');
+    expect(g).toMatch(/Crew on Josephine [A-Z]{3} \d+ \(main and jib\)/); expect(g).toContain('Free: not on a boat');
     const samCard = g.slice(g.indexOf('<b>Sam</b>'), g.indexOf('</button>', g.indexOf('<b>Sam</b>')));
     expect(samCard.match(/class="mbar"/g)).toHaveLength(3); expect(samCard).toContain('Trim'); expect(samCard).not.toContain('Composure');
   });
