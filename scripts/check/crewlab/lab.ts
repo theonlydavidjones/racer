@@ -14,6 +14,10 @@ import { newCrew, DEFAULT_CREW, type CrewPlace } from '../../../src/boat/crewPhy
 import { testBoat, sail, startTack } from '../../../tests/helpers/testBoat';
 import { beatAngle } from '../../../src/boat/polar';
 import type { Boat } from '../../../src/boat/boat';
+import { dress } from '../../../src/render/crewBody';
+
+// ?summer: a warm, dry day's kit (shorts and sneakers for about half the crew: render/crewBody.ts kitFor)
+{ const sm = new URLSearchParams(location.search).get('summer'); if (sm != null) dress.warm = sm === 'all' ? 'all' : true; } // (?summer=all: everyone)
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });

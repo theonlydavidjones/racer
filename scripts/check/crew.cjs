@@ -4,8 +4,8 @@
  * in the crew lab (scripts/check/crewlab: one boat sailing in the real physics, the camera anywhere around her). Needs
  * the dev server (npm run dev) on :5173.
  *
- *   node scripts/check/crew.cjs <out-dir> [night]   → out-dir/crew_<case>_<S|P>_<side>.png, and tack_/gybe_ sequences
- *   (night: the lab's night lighting)
+ *   node scripts/check/crew.cjs <out-dir> [night] [summer]   → out-dir/crew_<case>_<S|P>_<side>.png, and tack_/gybe_ sequences
+ *   (night: the lab's night lighting; summer: everyone in a warm, dry day's kit)
  */
 const { chromium } = require('playwright');
 const CASES = [
@@ -15,8 +15,8 @@ const CASES = [
 (async () => {
   const out = process.argv[2] || '.', b = await chromium.launch(), p = await b.newPage({ viewport: { width: 900, height: 640 } });
   let errors = 0; p.on('pageerror', e => { errors++; console.log('page error:', e.message); });
-  await p.goto('http://localhost:5173/scripts/check/crewlab/'); await p.waitForFunction(() => window.lab, null, { timeout: 60000 });
-  const night = process.argv[3] === 'night';
+  await p.goto('http://localhost:5173/scripts/check/crewlab/' + (process.argv.includes('summer') ? '?summer=all' : '')); await p.waitForFunction(() => window.lab, null, { timeout: 60000 });
+  const night = process.argv.includes('night');
   for (const [name, setup] of CASES) for (const tack of ['S', 'P']) {
     await p.evaluate(([s, nt]) => { lab.setup(s); lab.night(nt); lab.sail(s.pole ? 50 : 30); }, [{ ...setup, tack }, night]);
     // the windward side (the wind over starboard on starboard tack) and the leeward side, and from above astern

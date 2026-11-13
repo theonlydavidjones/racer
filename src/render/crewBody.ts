@@ -176,6 +176,9 @@ export interface Kit {
   eyes?: 'shades' | 'specs';
   /** a small badge on the cap's front, and a maker's logo on the jacket's chest (their colours) */
   badge?: Mat; logo?: Mat;
+  /** shorts and sneakers (a warm, dry day: the owner's photo) instead of salopettes and sea boots; `boots`/`sole` are
+   * then the sneakers' upper and sole, `pants` the shorts */
+  shorts?: boolean;
 }
 /** Skin under the sim's light: albedos a little warmer than the tones they're meant to read as, since the sky light
  * cools everything turned away from the sun (render/scene.ts hemisphere 0xe8f2ff over 0x29485a). */
@@ -228,6 +231,15 @@ export const KITS: Kit[] = [
     boots: { c: 0x1c1e21, r: 0.35 }, sole: { c: 0xd8d8d2, r: 0.8 }, gloves: { c: 0x1d1f23, r: 0.7 }, palm: { c: 0x4a4e54, r: 0.85 },
     head: 'cap', hat: { c: 0x1f2c48, r: 0.85 }, hair: { c: 0xb89466, r: 0.9 },
     eyes: 'specs', lens: { c: 0x6f7f8c, r: 0.06 }, frame: { c: 0x18191c, r: 0.4 }, badge: { c: 0xe8e4d8, r: 0.7 }, logo: { c: 0xd8d8d2, r: 0.6 }
+  },
+  { // F: the photo's helm on a warm, dry day: the navy jacket and inflatable, maroon shorts, white sneakers
+    name: 'F', skin: SKIN.light,
+    jacket: { c: 0x1c2c4c, r: 0.42 }, yoke: { c: 0x16213a, r: 0.5 }, trim: { c: 0x15181c, r: 0.55 }, tape: { c: 0xb9bcbf, r: 0.35 },
+    pants: { c: 0x6a2a32, r: 0.85 }, patch: { c: 0x4a1e24, r: 0.85 }, shorts: true,
+    pfd: 'inflatable', pfdBody: { c: 0x22325a, r: 0.6 }, pfdTrim: { c: 0x2e8fbf, r: 0.55 },
+    boots: { c: 0xe9e8e2, r: 0.6 }, sole: { c: 0xdedcd4, r: 0.85 }, gloves: { c: 0x1d1f23, r: 0.7 }, palm: { c: 0x4a4e54, r: 0.85 },
+    head: 'cap', hat: { c: 0x18191c, r: 0.85 }, hair: { c: 0x8a6a3e, r: 0.9 },
+    lens: { c: 0x2c3846, r: 0.08 }, frame: { c: 0x141518, r: 0.4 }, badge: { c: 0xd8611f, r: 0.7 }, logo: { c: 0xd8d8d2, r: 0.6 }
   }
 ];
 
@@ -296,6 +308,18 @@ const LEG_P = profile([
   [-0.67, 0.058, 0.06, 0.064, 0.005, 2, -0.001], // (over the boot's shaft, the cloth bunching a little)
   [-0.72, 0.061, 0.063, 0.067, 0.004, 2, 0.0],
   [-0.745, 0.064, 0.066, 0.07, 0.004, 2, 0.0]
+]);
+/** A bare leg below a pair of shorts (centred on the hip joint, as LEG_P): the knee, the calf's swell behind, the shin,
+ * a slim ankle (an adult's: about 11 cm across the knee, 12 the calf, 7 the ankle). */
+const SHIN_P = profile([
+  [-0.3, 0.06, 0.066, 0.06, -0.004, 2, -0.006],
+  [-0.38, 0.051, 0.058, 0.05, -0.004, 2, -0.008],
+  [-0.43, 0.047, 0.056, 0.046, -0.002, 2.1, -0.009], // the knee, the kneecap in front
+  [-0.48, 0.046, 0.046, 0.053, 0.004, 2, -0.008],
+  [-0.55, 0.05, 0.043, 0.062, 0.009, 2, -0.005], // the calf
+  [-0.64, 0.042, 0.04, 0.048, 0.006, 2, -0.002],
+  [-0.74, 0.033, 0.034, 0.036, 0.004, 2, 0.0],
+  [-0.84, 0.03, 0.03, 0.032, 0.004, 2, 0.0] // the ankle
 ]);
 /** A sleeve, centred on the shoulder joint, from inside the jacket's shoulder to a cuff at the wrist. */
 const SLEEVE_P = profile([
@@ -381,6 +405,18 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
   loft(M, rings(SEAT_P, [0.12, 0.04, -0.02, -0.05, -0.08, -0.1, -0.115, -0.128, -0.137], 20), { mat: kit.pants, w: () => [[HIPS, 1]], capEnd: true });
   for (const i of [0, 1]) {
     const xs = i ? 1 : -1, cx = xs * hx;
+    const wAnk = (q: V3): W => blend(KN[i], ANK[i], ss(-0.8, -0.88, q.y));
+    if (kit.shorts) {
+      // shorts to just above the knee, a little loose, their hem turned; the bare leg below; low sneakers
+      const sy = [0.0, -0.08, -0.16, -0.24, -0.3, -0.33];
+      const sh = sy.map(y => ring(LEG_P(y), 14, 0.008 * ss(-0.08, -0.3, y), cx)).map((r, k) => drape(r, 0.004 * ss(-0.2, -0.33, sy[k]), 4, 0.9 + i)); // (as the trousers under the jacket's hem, a little looser lower down)
+      sh.push(drape(ring(LEG_P(-0.33), 14, -0.004, cx), 0.004, 4, 0.9 + i).map(q => q.setY(-0.335)), ring(LEG_P(-0.3), 14, -0.01, cx));
+      loft(M, sh, { mat: kit.pants, w: wLeg(i), shade: (_q, r) => r >= sy.length ? 0.4 : 1 });
+      const ly = [-0.3, -0.36, -0.4, -0.43, -0.46, -0.5, -0.55, -0.6, -0.66, -0.72, -0.78, -0.82, -0.85];
+      loft(M, rings(SHIN_P, ly, 12, 0, cx), { mat: skinMat(kit.skin), w: (q: V3) => q.y < -0.8 ? wAnk(q) : wLeg(i)(q) });
+      // a white sock's cuff showing above the shoe
+      loft(M, [-0.83, -0.855, -0.875].map(y => ring([y, 0.033, 0.034, 0.036, 0.004, 2], 12, 0.003, cx)), { mat: { c: 0xe6e5df, r: 0.9 }, w: wAnk });
+    } else {
     const ys = [0.0, -0.08, -0.18, -0.28, -0.36, -0.43, -0.48, -0.54, -0.6, -0.64, -0.675, -0.705, -0.73, -0.745];
     const leg = rings(LEG_P, ys, 14, 0, cx).map((r, k) => drape(r, 0.0035 * ss(-0.58, -0.745, ys[k]) * (0.6 + 0.4 * Math.sin(ys[k] * 95)), 4, 1.3 + i + 3 * ys[k])); // (bunched folds above the boot)
     // (the cuff turns in: its inside, in shade)
@@ -389,14 +425,15 @@ function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
     loft(M, rings(LEG_P, [-0.35, -0.39, -0.43, -0.47, -0.51], 7, 0.004, cx, 0, FRONT - 0.95, FRONT + 0.95, true), { mat: kit.patch, w: wLeg(i), wrap: false }); // the knee's patch
     // ——— the sea boots: a shaft up under the trousers, the foot, a sole with a little lip
     // (the ankle's joint at the shin's end, 0.86 below the hips: the boot's shaft bends there, the foot and sole move with it)
-    const wAnk = (q: V3): W => blend(KN[i], ANK[i], ss(-0.8, -0.88, q.y));
     loft(M, [-0.66, -0.76, -0.82, -0.85, -0.875].map(y => ring([y, 0.046, 0.051, 0.054, 0.006, 2.2], 12, 0, cx)), { mat: kit.boots, w: wAnk });
+    }
+    // (sneakers: the same last, lower and a little slimmer; a sea boot's foot otherwise)
     const foot: [z: number, rx: number, yt: number, yb: number, yc: number][] = [
       [0.078, 0.03, 0.028, 0.028, -0.886], [0.064, 0.044, 0.052, 0.036, -0.884], [0.02, 0.049, 0.06, 0.04, -0.882], [-0.05, 0.052, 0.042, 0.034, -0.89],
       [-0.12, 0.052, 0.03, 0.031, -0.894], [-0.175, 0.046, 0.023, 0.028, -0.897], [-0.205, 0.033, 0.017, 0.024, -0.899], [-0.215, 0.014, 0.01, 0.016, -0.9]
     ];
     const fx = cx + xs * 0.006;
-    loft(M, foot.map(f => around(10).map(th => { const c = Math.cos(th), sn = Math.sin(th); return V(fx + f[1] * spow(c, 0.8), f[4] + (sn > 0 ? f[2] : f[3]) * spow(sn, 0.8), f[0]); })), { mat: kit.boots, w: () => [[ANK[i], 1]], capStart: true, capEnd: true });
+    loft(M, foot.map(f => around(10).map(th => { const c = Math.cos(th), sn = Math.sin(th); const lo = kit.shorts ? 0.82 : 1, nw = kit.shorts ? 0.94 : 1; return V(fx + f[1] * nw * spow(c, 0.8), f[4] + (sn > 0 ? f[2] * lo : f[3]) * spow(sn, 0.8), f[0]); })), { mat: kit.boots, w: () => [[ANK[i], 1]], capStart: true, capEnd: true });
     const sole = [[0.082, 0.032], [0.06, 0.05], [0.0, 0.054], [-0.1, 0.058], [-0.17, 0.052], [-0.205, 0.038], [-0.219, 0.018]];
     loft(M, sole.map(([z, rx]) => around(10).map(th => V(fx + rx * spow(Math.cos(th), 0.6), -0.917 + 0.011 * spow(Math.sin(th), 0.6), z))), { mat: kit.sole, w: () => [[ANK[i], 1]], capStart: true, capEnd: true });
   }
@@ -690,7 +727,12 @@ const LENSES = [0x303a44, 0x2c3846, 0x3a2e26, 0x26303a];
  * colour: a cap, a beanie or the hood up over a cap; their jacket in the team colour or their own; salopettes; an
  * inflatable or a foam vest; boots, skin, hair and lenses.
  */
-export function kitFor(seed: number, team: number): Kit {
+/** (Dev switch for now: a warm, dry day. To be driven by the day's real air temperature, rain and sea: environment/weather.ts) */
+export const dress: { warm: boolean | 'all' } = { warm: false }; // ('all': everyone in shorts, for checking the kit)
+/** Shorts in the colours they come in (the owner's photo: maroon), and sneakers: white, or grey and navy. */
+const SHORTS = [0x6a2a32, 0x2a3346, 0xb9a88a, 0x4a4f57, 0x23272e, 0x3f5a3a];
+const SNEAKERS: [Mat, Mat][] = [[{ c: 0xe9e8e2, r: 0.6 }, { c: 0xdedcd4, r: 0.85 }], [{ c: 0xe9e8e2, r: 0.6 }, { c: 0x8c6a4a, r: 0.85 }], [{ c: 0x3a3f47, r: 0.6 }, { c: 0xdedcd4, r: 0.85 }], [{ c: 0x1f2c48, r: 0.6 }, { c: 0xe9e8e2, r: 0.85 }]];
+export function kitFor(seed: number, team: number, warm: boolean | 'all' = dress.warm): Kit {
   const jc = hash(seed, 10) < 0.5 ? team : pick(TOPS, seed, 11);
   const jacket: Mat = { c: jc, r: 0.42 }, yoke: Mat = { c: hash(seed, 12) < 0.6 ? 0x2c3037 : darker(jc, 0.55), r: 0.5 };
   const pc = hash(seed, 13) < 0.3 ? darker(jc, 0.95) : pick(BIBS, seed, 14);
@@ -710,7 +752,9 @@ export function kitFor(seed: number, team: number): Kit {
     // (a few in everyday glasses instead of sunglasses: a pale tint, a dark or a tortoiseshell frame)
     ...(hash(seed, 16) < 0.25 ? { eyes: 'specs' as const, lens: { c: 0x6f7f8c, r: 0.06 }, frame: { c: hash(seed, 17) < 0.5 ? 0x18191c : 0x4a3424, r: 0.4 } } : {}),
     badge: head !== 'beanie' && hash(seed, 18) < 0.6 ? { c: pick([0xd8611f, 0xe8e4d8, 0xc8372d, 0xd4a017], seed, 19), r: 0.7 } : undefined,
-    logo: hash(seed, 20) < 0.6 ? { c: 0xd8d8d2, r: 0.6 } : undefined
+    logo: hash(seed, 20) < 0.6 ? { c: 0xd8d8d2, r: 0.6 } : undefined,
+    // (a warm, dry day: about half in shorts and sneakers, as in the owner's photo; the rest keep their salopettes)
+    ...(warm === 'all' || (warm && hash(seed, 21) < 0.5) ? (() => { const [up, so] = pick(SNEAKERS, seed, 22), sc = pick(SHORTS, seed, 23); return { shorts: true, pants: { c: sc, r: 0.85 }, patch: { c: darker(sc, 0.7), r: 0.85 }, boots: up, sole: so }; })() : {})
   };
 }
 
