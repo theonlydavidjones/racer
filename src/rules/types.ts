@@ -7,6 +7,10 @@ export interface RulesBoat {
   x: number; y: number;
   h: number; // heading, deg
   vx: number; vy: number; // velocity over the ground, m/s
+  /** Speed through the water, m/s, and the current she's in (m/s, east and north). Omitted: still water, and her speed
+   *  over the ground. (Rule 16.1's room is judged in the water, where the boats steer: a current they share changes
+   *  nothing between them.) */
+  v?: number; cur?: { x: number; y: number };
   tack: Tack;
   tacking: boolean; // past head to wind, not yet close-hauled
   lastTackT: number; // race time she last changed tack, tacking or gybing (rule 15: a change of tack, either way)

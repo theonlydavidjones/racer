@@ -1,5 +1,5 @@
 import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec } from '../core/math';
-import { escapes, type Pose } from '../boat/arcs';
+import { escapes, straightOn, type Pose } from '../boat/arcs';
 import { clearAstern, cpa, hullGap } from './geometry';
 import { returning, rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, PoseRing, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
@@ -157,15 +157,22 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
 /** How many poses a pair keeps of each boat, and how often: 8 s at 0.1 s. */
 const RING = 80, RING_DT = 0.1;
 
-/** Keep `b`'s pose in this pair's history (at most every RING_DT s): a fixed ring, no allocation once made. */
+/**
+ * Keep `b`'s pose in this pair's history (at most every RING_DT s): a fixed ring, no allocation once made. Kept in the
+ * water's frame (her position less the current's drift, her speed through the water), where boats steer and turn: a
+ * current both are in changes nothing between them.
+ */
 export function recordPose(rec: PairRecord, b: RulesBoat, t: number): void {
   const H = rec.hist ??= {};
   let r = H[b.id];
   if (!r) r = H[b.id] = { t: new Float64Array(RING), x: new Float64Array(RING), y: new Float64Array(RING), h: new Float64Array(RING), v: new Float64Array(RING), n: 0, i: 0 };
   const last = r.n ? (r.i + RING - 1) % RING : -1;
-  if (last >= 0 && t < r.t[last]) r.n = r.i = 0; // (time went back: a new race, a test re-run)
+  // (time went back, a new race or a test re-run; or a gap, the pair not looked at while apart: start afresh)
+  if (last >= 0 && (t < r.t[last] || t - r.t[last] > 1)) r.n = r.i = 0;
   else if (last >= 0 && t - r.t[last] < RING_DT - 1e-9) return;
-  r.t[r.i] = t; r.x[r.i] = b.x; r.y[r.i] = b.y; r.h[r.i] = b.h; r.v[r.i] = Math.hypot(b.vx, b.vy);
+  const c = b.cur;
+  r.t[r.i] = t; r.x[r.i] = b.x - (c ? c.x * t : 0); r.y[r.i] = b.y - (c ? c.y * t : 0); r.h[r.i] = b.h;
+  r.v[r.i] = b.v ?? Math.hypot(b.vx, b.vy);
   r.i = (r.i + 1) % RING; r.n = Math.min(RING, r.n + 1);
 }
 
@@ -186,44 +193,79 @@ function poseAt(r: PoseRing, t: number): Pose {
 }
 
 /** Rule 16.1's "room to keep clear": the reaction time of a helmsman watching the other boat ("promptly", Definitions,
- * Room), s. A modelling choice (docs/ROOM-TO-RESPOND.md): human reaction to a visual cue is about 0.7–1.5 s. */
+ * Room; WS Case 103's "competent, but not expert" crew), s. A modelling choice (docs/ROOM-TO-RESPOND.md): human
+ * reaction to a visual cue is about 0.7–1.5 s. */
 export const RESPOND_DELAY = 1;
+/** The gap that counts as having kept clear, m: hull to hull, a half metre more than touching (CONTACT_GAP is beam to
+ * beam). Definitions, Keep Clear (b): the right-of-way boat "can also change course in both directions without
+ * immediately making contact"; and the room is to be "seamanlike". A modelling choice. */
+export const KEEP_CLEAR_GAP = CONTACT_GAP + 0.5;
+/** Turns are judged over this long a window, s: long enough to see through the yaw a seaway gives her every wave. */
+const TURN_WINDOW = 1;
 
 /**
- * Rule 16.1 (and 16.2): when the right-of-way boat `row` changed course, did she leave `kc` room to keep clear?
- * Definitions, Room: "the space a boat needs ... while manoeuvring promptly in a seamanlike way". From where both were
- * when her present turn toward the other began (this pair's history), could the other, reacting promptly, have turned
- * away (physics' own turn rate, src/boat/arcs.ts escapes) and kept her hull clear of the right-of-way boat's actual
- * course? WS Case 105: the boat that could have kept clear (there, by gybing away) and didn't broke the basic rule; the
- * one that luffed broke nothing. Without a history (a single look), the turn is taken as leaving no room.
+ * Rule 16.1: when the right-of-way boat `row` changed course, did she leave `kc` room to keep clear? Definitions, Room:
+ * "the space a boat needs ... while manoeuvring promptly in a seamanlike way". From where both were when her latest turn
+ * toward the other began (this pair's history), the other boat, reacting promptly, turns away the way a helmsman would
+ * choose from what she could see then (WS Case 92: she "is required to act only in response to what the right-of-way
+ * boat is doing at the time; she is not required to anticipate"): does that keep her clear of the right-of-way boat's
+ * actual course? WS Case 105: the boat that could have kept clear (there, by gybing away) and didn't broke the basic
+ * rule; the one that luffed broke nothing. Without a history, the turn is taken as leaving no room.
  */
 export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: PairRecord): boolean {
-  return roomGap(row, kc, ctx, rec) >= CONTACT_GAP;
+  return roomGap(row, kc, ctx, rec) >= KEEP_CLEAR_GAP;
 }
 
-/** The widest gap `kc` could have kept from `row`, turning away promptly once `row` began her turn, m (leftRoom). */
+/** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
 export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, rec: PairRecord): number {
   const R = rec.hist?.[row.id], K = rec.hist?.[kc.id];
   if (!R || !K || R.n < 2) return 0;
-  // when her present turn began: back through her samples while she kept turning the same way (faster than 1°/s)
-  const now = R.t[at(R, 0)], dir = Math.sign(wrap(R.h[at(R, 0)] - R.h[at(R, 1)])) || Math.sign(wrap(row.h - (row.headingAgo ?? row.h)));
-  let k = 0;
-  while (k < R.n - 1) {
-    const a = at(R, k + 1), b = at(R, k), dh = wrap(R.h[b] - R.h[a]), dt = R.t[b] - R.t[a];
-    if (dt <= 0 || Math.sign(dh) !== dir || Math.abs(dh) / dt < 1) break;
-    k++;
-  }
-  const t0 = R.t[at(R, k)];
-  if (now - t0 < 1e-6) return 0;
-  const k0 = poseAt(K, t0);
-  const rowTrack = (tau: number): Pose => {
+  const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)];
+  const dir = Math.sign(wrap(row.h - (row.headingAgo ?? row.h))) || Math.sign(wrap(R.h[at(R, 0)] - R.h[at(R, 1)]));
+  if (!dir) return 0;
+  const W = Math.min(TURN_WINDOW, now - oldest);
+  const turned = (t: number) => wrap(poseAt(R, t).h - poseAt(R, t - W).h) * dir / W; // deg/s her way, over the window
+  // the end of her latest turn: within the last RULE16_WINDOW (the turn may be over by the time they touch, Case 105)
+  let tEnd: number | null = null;
+  for (let t = now; t >= Math.max(oldest + W, now - RULE16_WINDOW) - 1e-9; t -= RING_DT) if (turned(t) >= 1.5) { tEnd = t; break; }
+  if (tEnd == null) return 0;
+  // and its start: back while she was still turning that way, at 1°/s or more
+  let t0 = tEnd - W;
+  for (let t = tEnd; t - W >= oldest - 1e-9; t -= RING_DT) { if (turned(t) < 1) break; t0 = t - W; }
+  // where the keep-clear boat was then, and the turn she was already making
+  const k0 = poseAt(K, t0), kb = poseAt(K, Math.max(oldest, t0 - 0.5));
+  const kc0 = { ...k0, turnRate: t0 - 0.5 >= oldest ? wrap(k0.h - kb.h) / 0.5 : 0 };
+  // the right-of-way boat's actual course from t0 (then on as she is)
+  const v = row.v ?? Math.hypot(row.vx, row.vy), last = poseAt(R, now);
+  const actual = (tau: number): Pose => {
     const t = t0 + tau;
     if (t <= now) return poseAt(R, t);
-    const u = V(row.h), v = Math.hypot(row.vx, row.vy), dt = t - now;
-    return { x: row.x + u.x * v * dt, y: row.y + u.y * v * dt, h: row.h, v };
+    const u = V(last.h), d = t - now;
+    return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
   };
-  const c = escapes(k0, [rowTrack], kc.ww?.from ?? ctx.windFrom, { delay: RESPOND_DELAY, horizon: now - t0 + 2 });
-  return Math.max(...c.map(q => q.minGap));
+  // what the keep-clear boat could see when she reacted: the other carrying on as she was then
+  const tr = Math.min(now, t0 + RESPOND_DELAY), seen = poseAt(R, tr), seenB = poseAt(R, Math.max(oldest, tr - 0.5));
+  const seenRate = tr - 0.5 >= oldest ? wrap(seen.h - seenB.h) / 0.5 : 0;
+  const ahead = straightOn(seen, seenRate);
+  const predicted = (tau: number): Pose => t0 + tau <= tr ? actual(tau) : ahead(t0 + tau - tr);
+  const wind = kc.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 2 };
+  const choices = escapes(kc0, [predicted], wind, o);
+  const choice = choices.reduce((a, b) => b.minGap > a.minGap + 0.05 || (Math.abs(b.minGap - a.minGap) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
+  return escapes(kc0, [actual], wind, { ...o, turns: choice.turn ? [choice.turn] : [] }).find(q => q.turn === choice.turn)!.minGap;
+}
+
+/**
+ * Rule 16.2 (2025–2028): "In addition, on a beat to windward when a port-tack boat is keeping clear by sailing to pass
+ * to leeward of a starboard-tack boat, the starboard-tack boat shall not bear away if as a result the port-tack boat
+ * must change course immediately to continue keeping clear." Is `P` sailing to pass astern of (to leeward of) `S`?
+ * Her course crosses S's track behind S. "On a beat" runs from the starting signal (WS Case 132).
+ */
+function duckingAstern(P: RulesBoat, S: RulesBoat, ctx: RulesContext): boolean {
+  if (ctx.t <= 0 || P.tack !== 'P') return false;
+  const p = V(P.headingAgo ?? P.h), s = V(S.headingAgo ?? S.h), cross = p.x * s.y - p.y * s.x;
+  if (Math.abs(cross) < 1e-3) return false;
+  const dx = S.x - P.x, dy = S.y - P.y, alongS = (dx * p.y - dy * p.x) / cross; // where P's course meets S's track, from S
+  return alongS < 0;
 }
 
 /** Rule 16.2: was she on a beat and did she bear away over the last RULE16_WINDOW seconds? */
@@ -427,16 +469,16 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     // is the sign.
     fouler = row; rule = '23'; part = '23.2'; turned = turnedToward(row, kc) || undefined;
   } else if (['10', '11', '12', '13', '21.1', '21.2', '21.3'].includes(r.rule) && (turned = turnedToward(row, r.kc)) > 0
-    && ((r.rule === '10' && boreAwayOnBeat(row, ctx)) || !leftRoom(row, r.kc, ctx, rec))) {
+    && ((r.rule === '10' && boreAwayOnBeat(row, ctx) && duckingAstern(r.kc, row, ctx)) || !leftRoom(row, r.kc, ctx, rec))) {
     // (rule 16.1 whatever gave her right of way: the basic rules, or a tacking boat, or one returning, taking a penalty or
     // backing a sail keeping clear of her under 13 or 21)
     // Rule 16.1: the right-of-way boat changed course toward the other boat without leaving her room to keep clear (from
     // where they were when her turn began, could the other have turned away in time: leftRoom). A turn that left room
     // is no breach, and contact after it is the keep-clear boat's (WS Case 105).
-    // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is passing astern of her. Stricter: she
-    // "shall not change course if as a result the port-tack boat would immediately need to change course to continue
+    // Rule 16.2: on a beat, a starboard boat bearing away onto a port boat that is sailing to pass to leeward of her.
+    // Stricter: she "shall not bear away if as a result the port-tack boat must change course immediately to continue
     // keeping clear", room or no room (WS Case 92).
-    fouler = row; rule = r.rule === '10' && boreAwayOnBeat(row, ctx) ? '16.2' : '16.1';
+    fouler = row; rule = r.rule === '10' && boreAwayOnBeat(row, ctx) && duckingAstern(r.kc, row, ctx) ? '16.2' : '16.1';
   } else if (r.rule === '11' && rec.r17 === row.id && ctx.t > 0 && row.aboveProper) {
     // Rule 17: overlapped from astern within two lengths, then sailed above her proper course
     fouler = row; rule = '17';

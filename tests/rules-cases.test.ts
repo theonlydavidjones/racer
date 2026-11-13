@@ -244,12 +244,51 @@ describe('Rules 10–17 · Section A and B', () => {
     expect(case53(true).after.foul).toBeNull();
   });
 
-  it('Case 105: running on opposite tacks side by side, starboard luffs and port doesn\'t respond though she had room (she could gybe): port broke 10; starboard didn\'t break 16.1', () => {
-    const S = boat('S', { at: [0, 0], heading: 185 }), P = boat('P', { at: [-6, 0], heading: 175 });
+  // (sailed through in 0.1 s steps, as the World looks at a pair: each boat's heading as a function of time)
+  const sailOn = (p: ReturnType<typeof pair>, boats: [ReturnType<typeof boat>, (t: number) => number, number][], t0: number, t1: number, extra?: (b: ReturnType<typeof boat>, t: number) => void) => {
+    for (let t = t0; t <= t1 + 1e-9; t += 0.1) {
+      for (const [b, hOf, v] of boats) {
+        const h = hOf(t), u = V(h);
+        b.h = h; b.headingAgo = hOf(t - 3); b.v = v; b.vx = u.x * v; b.vy = u.y * v; b.x += u.x * v * 0.1; b.y += u.y * v * 0.1;
+        extra?.(b, t);
+      }
+      const r = p.at(t);
+      if (r.foul) return r.foul;
+    }
+    return null;
+  };
+  const case105 = (luffRate: number, apart: number, cur?: { x: number; y: number }) => {
+    // running south on opposite tacks, side by side; S luffs toward P (30° at luffRate°/s), then holds; P holds on
+    const S = boat('S', { at: [0, 0], heading: 181 }), P = boat('P', { at: [-apart, 0], heading: 179 });
     const p = pair(S, P);
-    clean(p, 50);
-    moveTo(S, [-1.5, -3], 205, 185); moveTo(P, [-4.2, -3]); // S luffs 20° toward P; P holds her course
-    expect(p.at(53).foul).toMatchObject({ by: 'P', rule: '10' }); // (the engine: S, 16.1: finding 2)
+    const hS = (t: number) => 181 + Math.min(30, Math.max(0, (t - 50) * luffRate));
+    return sailOn(p, [[S, hS, 2.5], [P, () => 179, 2.5]], 48, 70, cur ? (b, t) => { b.cur = cur; b.x += cur.x * 0.1; b.y += cur.y * 0.1; b.vx += cur.x; b.vy += cur.y; void t; } : undefined);
+  };
+  it('Case 105: running on opposite tacks side by side, starboard luffs and port doesn\'t respond though she had room (she could gybe): port broke 10; starboard didn\'t break 16.1', () => {
+    expect(case105(6, 9)).toMatchObject({ by: 'P', rule: '10' }); // a 30° luff over 5 s, from 9 m apart, over before they touch
+  });
+  it('Case 105, the other way: a luff so quick and close that no prompt turn could clear her is starboard\'s 16.1', () => {
+    expect(case105(30, 4)).toMatchObject({ by: 'S', rule: '16.1' });
+  });
+  it('Case 105 in a current: the 1.5 m/s ebb both boats are in changes nothing between them', () => {
+    for (const cur of [{ x: 1.5, y: 0 }, { x: 0, y: 1.5 }, { x: 0, y: -1.5 }, { x: -1.1, y: 1.1 }]) {
+      expect(case105(6, 9, cur), JSON.stringify(cur)).toMatchObject({ by: 'P', rule: '10' });
+      expect(case105(30, 4, cur), JSON.stringify(cur)).toMatchObject({ by: 'S', rule: '16.1' });
+    }
+  });
+  it('16.2 is only for a port boat ducking: one trying to cross ahead, that starboard bears away a little from with room to spare, broke 10', () => {
+    // beating, P on port crossing ahead of S; S foots off 8° over 2 s (no luff, no hunting) and P, still trying to cross, hits her
+    const S = boat('S', { at: [0, 0], heading: 315 }), P = boat('P', { at: [-19.5, 0.5], heading: 45 }); // P a little ahead in the crossing
+    const p = pair(S, P);
+    expect(sailOn(p, [[S, t => 315 - Math.min(8, Math.max(0, (t - 50) * 4)), 2.5], [P, () => 45, 2.5]], 48, 60)).toMatchObject({ by: 'P', rule: '10' });
+  });
+
+  it('Case 105 in a seaway: the yaw of each wave doesn\'t hide when her luff began', () => {
+    const S = boat('S', { at: [0, 0], heading: 181 }), P = boat('P', { at: [-9, 0], heading: 179 });
+    const p = pair(S, P);
+    const yaw = (t: number) => 1.5 * Math.sin(t * 2 * Math.PI / 3.2); // ±1.5° on a 3.2 s encounter period
+    const hS = (t: number) => 181 + Math.min(30, Math.max(0, (t - 50) * 6)) + yaw(t);
+    expect(sailOn(p, [[S, hS, 2.5], [P, t => 179 + yaw(t + 1), 2.5]], 48, 70)).toMatchObject({ by: 'P', rule: '10' });
   });
 });
 
