@@ -34,6 +34,36 @@ perf test's: Seaweed Soup course 10, a fleet of eight (seven opponents), west wi
 
 This agrees with the Coordinator's 55–58. Main sits right at the line.
 
+### 1.1a The budget's units: the step's own thread (13 Nov 2026)
+
+A reading over budget on main (55.8–57.6) was bisected from v168 (425a5eb) to e75a23d: no code regression (the two
+ends' medians over 11 runs each, 53.17 and 53.72; two commits with identical `src`, 56.27 and 52.32 over 5 runs each).
+The same code read anywhere from about 50 to 58 against 54.7, for two reasons:
+
+- `process.cpuUsage()` counts every thread in the process. The sim's step measured ~1,140 CPU µs against ~900 µs of
+  wall time on one thread: about a quarter of it is V8's helpers (concurrent compiling and marking), a share that
+  varies. Under `node --single-threaded` the two agree (1,117 and 1,127).
+- Even the step's own thread drifts ±6% on this shared host, run to run: its memory and caches slow the sim
+  (memory, allocation) more than the reference (arithmetic in the cache).
+
+So the test now times **the step's own thread** (`process.threadCpuUsage()`, Node 22) for both the sim and the
+reference, and judges **the median of three races** (a fresh World each, the same seed and steps). The budget moved
+to the new units only, measured both ways at once on v168, twelve runs:
+
+| | median | range |
+|---|---|---|
+| the process's CPU time (the old units) | 53.74 | 51.52–58.16 |
+| the step's thread (the new) | 42.31 | 39.84–45.34 |
+| the thread's share, run by run | 0.787 | ±1.2% (sd) |
+
+**54.7 × 42.31 / 53.74 = 43.06 → 43.1.** The same line as before for the same code, as v128's change from the wall
+clock was (40 × 49.8 / 36.4 = 54.7).
+
+The new test, ten runs on main (4f72dbf, which reads like e75a23d): medians 38.87–43.91, their median 41.67 (sd 1.41;
+52.95 in the old units), one run over 43.1. On the old test the same code failed six vitest runs in eight. The
+remaining misses are the host's slow drift, which lasts minutes and so outlasts the three races, and main's typical
+reading is within about 3% of the line. Only room under the budget would remove them, and the budget is the owner's.
+
 ### 1.2 Where a step's time goes (Node CPU profile, 450 s of the race from t = −150 s, 27,000 steps)
 
 Inclusive time (a function plus everything it calls), as a share of all the steps' time:
@@ -422,10 +452,36 @@ settings and seed, and never stepped.
 
 ## Method (to repeat these numbers)
 
-- The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line).
+- The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line: the median of three races, each one's after it).
 - Step profile and spikes: a throwaway vitest file building the perf test's World, then `node:inspector`'s Profiler
   over 450 s of the race (sampling at 200 µs), and wall time per step grouped by `steps % 30 / 60 / 1800`.
 - The browser frame: `npm run dev`, Playwright, the perf.cjs setup (seeded `Math.random`, the full fleet, 22 kt),
   `w.step`, `view.render` and `__hud.update` wrapped with timers, CDP `Profiler` over 60 frames, the samples filtered
   to those under `frame()`.
 - The host: the response headers of the claude.ai artifact page (COOP, no COEP, CSP).
+
+## The compiler's thrown-away work (13 Nov 2026)
+
+Bay East's waves (phase 2) cost about +30% in perf.test's first race in a fresh process, and about +3% after. The
+step's own thread didn't show it: profiles and call counts matched. The cost was V8's optimizing compiler, on its own
+threads: in that first race it compiled the rules' two hottest functions, `checkPairs` 629 times and `assessPair` 196,
+and threw each one away ("Maps became deprecated during optimization"), 14 s of work (bay-east-11: 15 aborts, 0.4 s).
+
+- **The cause:** boat fields built holding a whole number that later hold a fraction (`lastTackT`: −999, then her first
+  tack's time; the penalty's fields; `poleT`; and `weatherHeld` and `carOff`, given later from 0). V8 keeps a field that
+  has only held small integers as one. When it first holds a fraction, the boats' hidden classes change (15–97 maps at
+  a time), and if that comes after the rules' functions have learnt the old ones, their every recompile is discarded
+  until the old classes are collected. The waves only moved those first fractions later in the race. Any change to the
+  race could do the same.
+- **The fix** (world.ts `asDoubles`, makeBoat): those fields are made doubles as she's built (stored once as a fraction
+  and put back, the value unchanged), and `weatherHeld` and `carOff` are declared `undefined` from the start. On
+  bay-east-12: no aborts for either function, and the first race 1,023–1,085 CPU µs a step against 1,615–1,772 (bay-east-11:
+  1,122–1,177). The race is identical to the last digit, on that branch and on main.
+- **The guard:** `node scripts/check/deopt.cjs` (~30 s): the perf race, cold, under `node --trace-opt`, failing if any one
+  function's compiles are aborted more than 20 times. Main: about 10 in all, no function over 3. The unfixed
+  bay-east-12: `checkPairs` 608, `assessPair` 195 (fails). To find the field when it fails: `node --no-sparkplug
+  --trace-generalization`, looking for `s->d` (a whole number becoming a fraction) with `(+N maps)` after the hot
+  function is first marked for optimizing.
+- In the browser the compiler's threads are off the worker's, so this costs a player background CPU in the first race
+  rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
+  nothing.
