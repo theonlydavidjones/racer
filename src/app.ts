@@ -1474,7 +1474,8 @@ $('pastRows').addEventListener('click', e => {
   ghostNext = g && en.setup && g.key === setupKey(en.setup) ? g : null;
   // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
   // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
-  if (en.setup) Object.assign(S, { windTurn: 0, judging: 'umpired' }, structuredClone(en.setup.s)); // (a race saved before On-the-water judging was umpired) else { S.tideDate = en.day; S.tideTime = en.time; }
+  // (a race saved before On-the-water judging was umpired)
+  if (en.setup) Object.assign(S, { windTurn: 0, judging: 'umpired' }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
