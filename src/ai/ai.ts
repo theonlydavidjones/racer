@@ -116,6 +116,8 @@ const ESC_TURN_FOR = 2;
 const TACK_SHORT_M_PER_KT = 0.18;
 /** Held off a tack of her own choosing this long (s) by a boat close by, she eases to drop back behind it. */
 const TACK_HELD_EASE = 15;
+/** Below this speed through the water (m/s) she keeps her sails drawing to steer, rather than ease them to slow. */
+const SLOW_TO_STEER = 1.2;
 /** A boat sailing on as she is: her present turn for ESC_TURN_FOR s, then straight on. */
 function onward(o: Boat): (t: number) => Pose {
   const arc = straightOn({ x: o.x, y: o.y, h: o.h, v: o.v + (o.astern ?? 0) }, o.turnRate ?? 0), end = arc(ESC_TURN_FOR), line = straightOn(end, 0);
@@ -207,9 +209,11 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
       const all = [ownI, ...idx], best = Math.max(...all.map(i => slack(i, false)));
       const level = all.filter(i => slack(i, false) >= best - 0.05); // (within 5 cm of the best: no real difference)
       heading = cands[level.reduce((p, q) => Math.cos((cands[q].heading - away) * Math.PI / 180) > Math.cos((cands[p].heading - away) * Math.PI / 180) ? q : p)].heading;
-      // and the sails eased to take the way off her, if that helps: not on a run (easing barely slows her there), nor
-      // when what she'd meet is stopped (slowing only leaves her beside it, as stuck as it is)
-      luff = b.twa < 110 && threats.some(q => q.v + (q.astern ?? 0) > 0.5);
+      // and the sails eased to take the way off her: not on a run (easing barely slows her there), nor with too little
+      // way on to steer (at a crawl she needs her sails drawing to steer at all: eased, a boat crossing her bow caught
+      // her lying there, pre-start, unable to bear away), nor when what she'd meet is stopped (slowing only leaves her
+      // beside it, as stuck as it is)
+      luff = b.twa < 110 && me.v > SLOW_TO_STEER && threats.some(q => q.v + (q.astern ?? 0) > 0.5);
     }
   }
   ai.esc = { at: w.t, ids, heading, luff, aim: aimH };
@@ -781,8 +785,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // Rule 23.2: a boat taking a penalty or sailing on another leg she mustn't interfere with, right of way or not,
     // unless she's sailing her proper course ("after the starting signal this rule does not apply when the boat is
     // sailing her proper course": on it she holds on, and the other keeps clear, Rule 14 apart). Off it (above it, as
-    // the World judges, sim/world.ts aboveProper), she gives it the room she'd give a boat she must keep clear of.
-    else if (r.kc === o && b.started && b.aboveProper && (o.penalty > 0 || (o.leg !== b.leg && o.started && !o.finished)) && cp.t < ai.kn.keepClearS / 2 && cp.d < ai.kn.keepClearM / 2 + lagM) kcThreats.push(o);
+    // the World judges, sim/world.ts aboveProper), she gives it the room she'd give a boat she must keep clear of; and
+    // a boat spinning her penalty turns she gives room whatever her course, as a sailor does: where it will be in a few
+    // seconds is anyone's guess, and the boat she'd fouled a moment before, holding on beside it, hit it again
+    else if (r.kc === o && b.started && (o.penalty > 0 || (b.aboveProper && o.leg !== b.leg && o.started && !o.finished)) && cp.t < ai.kn.keepClearS / 2 && cp.d < ai.kn.keepClearM / 2 + lagM) kcThreats.push(o);
     else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       rowThreats.push(o);
@@ -798,6 +804,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const others = near.filter(n => !threats.includes(n.o) && n.dx * n.dx + n.dy * n.dy < 1600).map(n => n.o);
     const e = keepClear(w, b, kcThreats, rowThreats, course, others, bh ? [bh.c] : []);
     const heading = e.heading;
+    if (e.luff && heading == null) { luff = true; if (threats.some(o => o.id !== ai.hailTack?.with)) avoiding = true; }
     if (heading != null) {
       desired = sailable(b, heading); luff = e.luff;
       if (threats.some(o => o.id !== ai.hailTack?.with)) avoiding = true; // (the boat of the hail: rule 20.2 has their room in hand)
