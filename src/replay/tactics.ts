@@ -171,7 +171,7 @@ export function tactics(I: TacIn): Tactics {
   // the race: the three causes that cost most, over all the legs (and the start)
   const tot: Partial<Record<Cause, number>> = {};
   for (const r of rows) for (const [c, v] of Object.entries(r.causes) as [Cause, number][]) if (v > 0) tot[c] = (tot[c] ?? 0) + v;
-  const top = (Object.entries(tot) as [Cause, number][]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cause, s]) => ({ cause, s: Math.round(s), words: WORDS[cause][1] }));
+  const top = (Object.entries(tot) as [Cause, number][]).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([cause, s]) => ({ cause, s: Math.round(s), words: WORDS[cause][1] }));
   const ideals = I.legs.map(l => l.ideal);
   return { rows, top, idealTotal: ideals.every(x => x != null) ? ideals.reduce((a, x) => a! + x!, 0) : null };
 }

@@ -22,7 +22,7 @@ export function tacticsHtml(T: Tactics, boats: { id: number; name: string; short
   let edge = { l: 0, r: 0 };
   const offLab = (x: number, y: number, d: number, c: string) => {
     if (Math.abs(d) <= RANGE) return '';
-    const n = d > 0 ? edge.l++ : edge.r++, dy = [4, -8, 16, -20][n % 4];
+    const n = d > 0 ? edge.l++ : edge.r++, dy = [4, -8, -20, 28][n % 4]; // (up first, clear of the cause bars under the row)
     return `<text x="${(x + (d > 0 ? 10 : -10)).toFixed(1)}" y="${y + dy}" fill="${c}" font-size="10" text-anchor="${d > 0 ? 'start' : 'end'}">${d > 0 ? '−' : '+'}${Math.round(Math.abs(d))} s</text>`;
   };
   const rows = T.rows.map((r, i) => {
