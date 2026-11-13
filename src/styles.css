@@ -880,6 +880,22 @@ body.pilot-on #bHome{display:none}
 .sb-tab[hidden]{display:none}
 button.sb-tab:hover{color:var(--text)!important}
 .sb-pole{color:var(--text)!important}
+/* design branch (ROADMAP 8b): the Auto-trim tab saying who trims. Amber is yours, everywhere */
+.sb-all .dot{width:7px;height:7px;border-radius:50%;background:#3fd197;display:inline-block}
+.sb-all b{font-weight:800}
+/* A: amber when any line is yours, filled when all are */
+.sb-all.own-some{color:var(--accent)!important;border-color:var(--accent)!important}
+.sb-all.own-all{color:#1a1205!important;background:var(--accent)!important;border-color:var(--accent)!important}
+/* B: a two-way switch, Crew | You, the side holding lines lit */
+.sb-all .seg{padding:3px 7px;border-radius:4px;color:var(--muted)}
+.sb-all .seg.crew.on{color:var(--text);background:rgba(63,209,151,.16)}
+.sb-all .seg.you.on{color:#1a1205;background:var(--accent)}
+.sb-all:has(.seg){padding:0 3px!important;gap:2px}
+/* C: a meter, one segment a line, amber for yours */
+.sb-all .meter{display:inline-flex;gap:1.5px;margin-left:2px}
+.sb-all .meter i{width:4px;height:9px;border-radius:1px;background:#2c4252}
+.sb-all .meter i.y{background:var(--accent)}
+.sb-all.own-none .meter i{background:rgba(63,209,151,.45)}
 .sb-pole.mine{color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
 .sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}

@@ -150,6 +150,11 @@ const jdial = (side: Side) => {
   <button type="button" class="sb-jh l" data-act="jless" aria-label="Jumpers: a half turn off"></button><button type="button" class="sb-jh r" data-act="jmore" aria-label="Jumpers: a half turn on"></button></div>`;
 };
 
+/** The lines the band shows you owning, for the Auto-trim tab's count (design branch: ROADMAP 8b's options). */
+const OWN_LINES: LineKey[] = ['mainsheet', 'traveller', 'jibsheet', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard', 'backstay', 'car'];
+/** Which option to show (design branch only): ?own=A, B or C. */
+const OWN = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('own')) || 'A';
+
 export class SailBand {
   readonly el: HTMLElement;
   private runKey: CtlKey | null = null;
@@ -299,6 +304,10 @@ export class SailBand {
     const t = e.target as HTMLElement, act = t.closest<HTMLElement>('[data-act]')?.dataset.act, d = t.closest<HTMLElement>('[data-line]');
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
+    if (act === 'takeAll') { // (design option B: every line yours, where it is)
+      this.stopRun(null); for (const k of OWN_LINES) this.host.send({ k: 'line', key: k, mine: true });
+      this.host.toast('Every line is yours: each stays where it is until you work it.', 2500); this.host.changed(); return;
+    }
     if (act === 'pole') { this.host.pole(); return; }
     if (act === 'hail') { this.host.hail(); this.hailT = 0; return; } // (look again at once: the hail's been made)
     if (act === 'jless' || act === 'jmore') { this.turnJumpers(act === 'jmore' ? 0.5 : -0.5); return; }
@@ -418,8 +427,28 @@ export class SailBand {
   }
 
   /** Every frame while it's open: the ropes, the boom and the car, who has what, and where the crew would set it. */
+  /** The Auto-trim tab in the option being shown: how many lines are yours, and what pressing it does. */
+  private ownTab(u: Boat): void {
+    const tab = this.el.querySelector<HTMLElement>('.sb-all')!, total = OWN_LINES.length + 1;
+    const n = OWN_LINES.filter(k => byHand(u, k)).length + (u.poleMine ? 1 : 0), key = `${OWN}${n}`;
+    if (tab.dataset.k === key) return; tab.dataset.k = key;
+    tab.classList.remove('own-none', 'own-some', 'own-all');
+    tab.classList.add(n === 0 ? 'own-none' : n >= total ? 'own-all' : 'own-some');
+    if (OWN === 'A') {
+      tab.innerHTML = n === 0 ? '<i class="dot"></i>Auto-trim' : `<b>${n === total ? 'All' : n}</b> yours · Hand back`;
+      tab.dataset.help = n === 0 ? 'Auto-trim is on: the crew trims every line. Tap a line\'s name to take it.' : `Auto-trim: ${n === total ? 'every line is' : `${n} line${n > 1 ? 's are' : ' is'}`} yours (amber). Tap to hand ${n > 1 ? 'them' : 'it'} back to the crew.`;
+    } else if (OWN === 'B') {
+      tab.innerHTML = `<span class="seg crew${n < total ? ' on' : ''}" data-act="all">Crew${n < total && n > 0 ? ` ${total - n}` : ''}</span><span class="seg you${n > 0 ? ' on' : ''}" data-act="takeAll">You${n > 0 ? ` ${n}` : ''}</span>`;
+      tab.dataset.help = 'Who trims: the crew, or you (amber). Tap Crew to hand every line back; tap You to take every line where it is. Tap a line\'s name to take or hand back just that one.';
+    } else {
+      const segs = Array.from({ length: total }, (_, i) => `<i${i < n ? ' class="y"' : ''}></i>`).join('');
+      tab.innerHTML = `${n === 0 ? 'Auto-trim' : 'Hand back'}<span class="meter">${segs}</span>`;
+      tab.dataset.help = n === 0 ? 'Auto-trim is on: the crew trims all 12 lines. Tap a line\'s name to take it.' : `${n} of ${total} lines are yours (amber). Tap to hand them back to the crew.`;
+    }
+  }
   update(): void {
     const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
+    this.ownTab(u);
     this.tabs(w, u);
     this.colours(u.spec);
     this.carNote(u);
