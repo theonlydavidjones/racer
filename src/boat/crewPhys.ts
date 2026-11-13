@@ -335,13 +335,14 @@ export const ROLL_HOLD = 2;
  *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
  *   Performance Sailing);
  * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
+ * - `react`: a puff that needs them out at once (`urgent` times the dead band) still takes this long (s) to answer;
  * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time):
  *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
  *   body, not a move.
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, react: 0.5, fore: 0.3, settle: 4 };
 interface Held { arm: number; z: number; since: number; off: number }
 
 /**
@@ -546,8 +547,10 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
-    // change of place for the trim, waits until it has lasted, and the dwell
-    const go = (out && dArm > HOLD.urgent * dead) || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
+    // change of place for the trim, waits until it has lasted, and the dwell. (Half a second to react, about a person's
+    // reaction to a cue they're watching for: with none, they set off the instant the rising puff first called for a
+    // move, a seat on the bench, then out to the deck a few seconds later as it filled in: two moves for one puff)
+    const go = (out && dArm > HOLD.urgent * dead && h.off >= HOLD.react) || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
     if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; return; }
     // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
     h.arm = Math.min(h.arm, maxOf(i));
