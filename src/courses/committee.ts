@@ -67,6 +67,8 @@ export interface LegEstimate { to: string; kind: LegKind; minutes: number; sogKt
 export interface CourseEstimate { file: CourseFile; no: number; minutes: number; legs: LegEstimate[]; slowestKt: number; upwindStart: boolean }
 
 /** Seconds lost in each tack or gybe, and at each mark. */
+// (8 s a tack or gybe, unsourced: calibrated together with FLEET_FACTOR against fleet runs, so it stays until the two
+// are re-checked together; the passage planner's measured cost is sim/routing.ts manoeuvreS)
 const MANOEUVRE_S = 8, ROUNDING_S = 10;
 /**
  * Calibrated against the sim's own fleet sailing the courses (12 kt slack, the real tide and ebb; courses 1, 3, 5,

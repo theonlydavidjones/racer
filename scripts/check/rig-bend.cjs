@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1000, height: 700 } });
   const errs = []; p.on('pageerror', e => errs.push(String(e)));
-  await p.goto('http://localhost:5173/'); await p.waitForTimeout(5000);
+  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="fleet"]').click()); await p.waitForTimeout(800); await p.evaluate(() => document.querySelector('.fcard').click()); await p.waitForTimeout(1500);
   const res = [];
   for (const [twa, bs] of [[55, 0], [55, 1], [-55, 0], [-55, 1], [22, 0]]) {

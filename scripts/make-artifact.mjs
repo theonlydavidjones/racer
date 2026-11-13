@@ -12,9 +12,15 @@ const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
 const threeVersion = JSON.parse(await readFile(new URL('node_modules/three/package.json', root), 'utf8')).version;
 const assets = new URL('dist-artifact/assets/', root);
 const files = await readdir(assets);
-const js = files.find(f => f.endsWith('.js')), css = files.find(f => f.endsWith('.css'));
-if (!js || !css) throw new Error('Run `vite build -c vite.artifact.config.ts` first');
+const js = files.find(f => f.endsWith('.js') && !f.startsWith('worker-')), css = files.find(f => f.endsWith('.css'));
+// the race's worker (src/sim/worker.ts, built by Vite as one classic script): put in the page as a script element that
+// isn't run, which the page starts the worker from (src/sim/spawn.ts). The claude.ai host lets a page start a worker
+// from a blob URL, not from a data: URL (the owner's probe, 13 Nov 2026).
+const workerJs = files.find(f => f.startsWith('worker-') && f.endsWith('.js'));
+if (!js || !css || !workerJs) throw new Error('Run `vite build -c vite.artifact.config.ts` first');
 const code = await readFile(new URL(js, assets), 'utf8');
+const workerCode = await readFile(new URL(workerJs, assets), 'utf8');
+if (workerCode.includes('</script')) throw new Error('worker bundle contains </script>, cannot inline');
 const style = await readFile(new URL(css, assets), 'utf8');
 if (code.includes('</script')) throw new Error('bundle contains </script>, cannot inline');
 
@@ -28,6 +34,7 @@ const out = `${head}
 ${style}
 </style>
 ${body}
+<script type="text/plain" id="sim-worker">${workerCode}</script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@${threeVersion}/build/three.module.js"}}</script>
 <script type="module">
 ${code}
@@ -35,4 +42,4 @@ ${code}
 `;
 await mkdir(new URL('artifact/', root), { recursive: true });
 await writeFile(new URL('artifact/folkboat-racing-sim.html', root), out);
-console.log(`artifact/folkboat-racing-sim.html: ${(out.length / 1024).toFixed(0)} KB, three@${threeVersion} from jsDelivr, sim v${pkg.version}`);
+console.log(`artifact/folkboat-racing-sim.html: ${(out.length / 1024).toFixed(0)} KB (the race's worker ${(workerCode.length / 1024).toFixed(0)} KB of it), three@${threeVersion} from jsDelivr, sim v${pkg.version}`);

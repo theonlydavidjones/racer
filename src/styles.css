@@ -464,7 +464,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .debrief .dbTip{color:var(--muted)}
 
 /* the race replay: your whole race with the debrief on it (replay/raceReplay.ts) */
-#raceReplay{z-index:30}
+#raceReplay{z-index:30;background:rgba(6,14,21,.92)} /* (over the pause or results panel: none of it showing through) */
 .rrPanel{max-width:1320px}
 .rrHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .rrHead .ghost{flex:0 0 auto}
@@ -490,6 +490,9 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .rrList li.rrPick{cursor:pointer}
 .rrList li.rrPick:hover,.rrList li.rrPick:focus-visible{border-color:var(--rule);background:rgba(150,196,218,.05);outline:0}
 .rrList li.on{border-color:var(--accent)}
+.rrMoments{list-style:none;margin:6px 0 0;padding:0 0 0 10px;border-left:2px solid var(--rule);display:flex;flex-direction:column;gap:4px}
+.rrMoments li{font-size:13px;line-height:1.4;padding:3px 6px;color:var(--text)}
+.rrMoments .dbLost{margin-right:4px}
 
 /* the race committee's choice of course */
 .coursecard .rcpick{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
@@ -682,6 +685,7 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .layerpop .lp-h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .layerpop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;white-space:nowrap}
 .layerpop input{accent-color:#ff6a1a}
+.layerpop .lp-k{font:600 10px/1 var(--f-inst);color:var(--muted);margin-left:4px;padding:1px 4px;border:1px solid var(--rule);border-radius:3px} /* (a training view's key) */
 .lp-wrap{position:relative}
 #chartLayersPop{position:absolute;top:calc(100% + 6px);left:0}
 
@@ -1058,6 +1062,12 @@ body.showroom #crewPop{visibility:hidden}
 /* the map-layers button: a small round icon on the chart's rim, top left; the chart hint is the map's hover text */
 .maplayers,.maplayers{top:calc(env(safe-area-inset-top,0px) + 94px)!important;right:calc(max(16px,env(safe-area-inset-right,0px)) + 168px)!important;width:28px;height:28px;border-radius:50%!important;padding:0;display:flex;align-items:center;justify-content:center}
 #mapHint{display:none}
+/* the inset's navigator view, cruising (ui/hud.ts insetView): a quiet round button on the circle's rim, top right,
+   mirroring the layers button (the owner: no new buttons on the game surface outside the map) */
+#bMapNav.maplayers{right:calc(max(16px,env(safe-area-inset-right,0px)) + 14px)!important}
+#bMapNav[hidden]{display:none!important}
+#bMapNav[aria-pressed="true"]{background:#ffb627;color:#0c2534;border-color:#ffb627}
+body.showroom #bMapNav{display:none!important}
 /* the Flags tile: the flags and pennants only (the owner, 12 Nov); the next signal's countdown is the clock's, the meanings the index's */
 #sigPanel #sigText{display:none}
 /* the band in the middle of the screen, under the rig (the chase-view layout): the trim panel no longer sits beside it */
@@ -1105,3 +1115,7 @@ body.showroom #crewPop{visibility:hidden}
 #flowPanel .fp-story em.luff{color:#ffd34d}#flowPanel .fp-story em.stall{color:#ff6a5c}
 #flowPanel .fp-twist,#flowPanel .fp-slot,#flowPanel .fp-keel{color:var(--muted)}
 body.showroom #flowPanel{display:none}
+/* real past races (sim/realRaces.ts): the list above your own past races, and your row among the real fleet's */
+#realRows:not(:empty){margin-bottom:10px}
+#realRows .warn,#resReal .warn{color:#ffb08a}
+#resReal tr.you td{color:var(--accent);font-weight:700}
