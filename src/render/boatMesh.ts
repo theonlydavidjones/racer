@@ -18,7 +18,7 @@ import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
-import { Sail, Telltale, luffTellStates, sailEdges, type SailDef, type SailShape, type TellState } from './sails';
+import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailShape } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
@@ -401,6 +401,8 @@ const carPos = (side: number, fore: number, ins: number) => {
   const z = FORESTAY_DECK.z + 2.65 + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (z - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
   return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.035, z); // on the cabin top's arch
 };
+/** Whether (x, z) is over the cabin top. */
+const onCabin = (x: number, z: number) => { const u = uAtZ(z); return u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u); };
 /** What a line lying on her rests on at (x, z): the cabin top where it's under the line, else the deck (m over the waterline). */
 const restOn = (x: number, z: number) => { const u = uAtZ(z); return u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u) ? cabinTopAt(u, x) : deckY(u, Math.abs(x)); };
 /**
@@ -411,10 +413,11 @@ const restOn = (x: number, z: number) => { const u = uAtZ(z); return u > CABIN.u
  */
 const FAIRLEAD_Z = -L / 2 + CABIN.u1 * L - 0.30;
 const fairlead = (side: number) => { const u = uAtZ(FAIRLEAD_Z), x = side * (halfBeam(u) - 0.13); return new THREE.Vector3(x, deckY(u, Math.abs(x)), FAIRLEAD_Z); };
-/** Points in each half of the jib sheet, from the clew's ring out: three in the span to the car, the car, two on the cabin
- * top (it's arched: a straight run would cut through it), the cabin's edge, the fairlead, the winch and two in the tail.
+/** Points in each half of the jib sheet, from the clew's ring out: twelve in the span to the car (a slack one lies over the
+ * cabin top's arch), the car, two on the cabin top (it's arched: a straight run would cut through it), the cabin's edge,
+ * the fairlead, the winch and two in the tail.
  * The whole line: both halves and the ring between them. */
-const JIB_HALF_PTS = 11, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
+const JIB_HALF_PTS = 20, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
 /**
  * The cockpit coaming's height (m) along the boat: at least 200 mm just aft of the cabin, 140 mm at station 4.5 and
  * 80 mm at station 3 (CR 3.22); drawn a little above each.
@@ -559,7 +562,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const side of [1, -1]) {
     const x = side * (tw - 0.02), foot = new THREE.Vector3(side * 0.3, sheer(1) - 0.05, 3.62);
     const cl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.035, 0.06), CAM_GREEN); cl.position.set(x, ty + 0.017, TRAV_Z); grp.add(cl); // green cam cleats, as on Josephine
-    grp.add(line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay', 'backstay'));
+    // (under the after deck and the side deck, inside her: scripts/check/line-clash.cjs lists it as inside by design)
+    { const l = line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay', 'backstay'); l.userData.inside = true; grp.add(l); }
     grp.add(line([new THREE.Vector3(x, ty + 0.03, TRAV_Z - 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.06)], 'backstay', 'backstay')); // the tail
   }
   // vang: a rope tackle from a block under the boom, about a quarter of the way out, down to a block on a fitting at the
@@ -630,7 +634,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     for (let i = 1; i <= n; i++) {
       const t = i / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, zPrev = a.z + (b.z - a.z) * (i - 1) / n;
       // (crossing the cabin's forward edge: a point on the edge, so the line goes over it and down the face)
-      if ((zPrev - zFront) * (z - zFront) < 0) { const tf = (zFront - a.z) / (b.z - a.z), xf = a.x + (b.x - a.x) * tf; out.push(new THREE.Vector3(xf, surf(xf, zFront + 0.002), zFront + 0.002), new THREE.Vector3(xf, deckY(uAtZ(zFront - 0.01), Math.abs(xf)) + 0.012, zFront - 0.01)); }
+      if ((zPrev - zFront) * (z - zFront) < 0) { const tf = (zFront - a.z) / (b.z - a.z), xf = a.x + (b.x - a.x) * tf; const top = surf(xf, zFront + 0.003); out.push(new THREE.Vector3(xf, top, zFront + 0.003), new THREE.Vector3(xf, top, zFront - 0.004), new THREE.Vector3(xf, deckY(uAtZ(zFront - 0.012), Math.abs(xf)) + 0.012, zFront - 0.012)); }
       out.push(new THREE.Vector3(x, i === n && b.y ? b.y : surf(x, z), z));
     }
     return out;
@@ -652,7 +656,9 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     // at the mast's foot, as the photo of her cabin top looking forward shows)
     const fb = footBlock(side * (0.04 + 0.028 * i)), mid = new THREE.Vector3(x * 0.95, 0, zClear);
     fixed(line([cp, ...lay(cp, mid), ...lay(mid, fb.clone())], role, key));
-    fixed(line([cp.clone().setZ(zA + 0.02), new THREE.Vector3(x + side * 0.02, cp.y - 0.25 - 0.04 * i, zA + 0.1)], role, key)); // the tail, down the bulkhead
+    // the tail: aft over the cabin's after edge and down its face into the cockpit (not through the cabin's corner)
+    { const zE = -L / 2 + CABIN.u1 * L, top = cabinTopAt(uAtZ(zE - 0.004), x) + 0.012;
+      fixed(line([cp.clone().setZ(zA + 0.02), new THREE.Vector3(x, top, zE - 0.004), new THREE.Vector3(x, top - 0.02, zE + 0.012), new THREE.Vector3(x + side * 0.02, cp.y - 0.25 - 0.04 * i, zE + 0.05)], role, key)); }
     if (key === 'vang') fixed(line([fb, VANG_FOOT.clone().add(new THREE.Vector3(side * 0.012, -0.02, 0))], 'main', 'vang')); // the vang's tail, to its lower block
     else if (key === 'outhaul') upMast([fb, new THREE.Vector3(side * 0.03, fb.y + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(side * 0.015, BOOM_TOP - BOOM_R, MAST_AFT_Z + 0.012)], 'main', 'outhaul');
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
@@ -1023,11 +1029,11 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     if (pr) { const want = sgn > 0 ? pr.stbd : pr.port, other = sgn > 0 ? pr.port : pr.stbd; if (pr.front.map !== want) { pr.front.map = want; pr.back.map = other; } }
   }
   if (b.isUser) {
-    const st = b.luff ? { windward: 'lift' as TellState, leeward: 'hang' as TellState } : luffTellStates(plan === 'jib' ? tj : null, b.awa);
+    const tells = boatTells(plan === 'jib' ? tj : null, tm, b.awa, !!b.luff), st = tells.jib;
     const amt = tj?.amount ?? 0, mirJ = m.jib.mesh.scale.x < 0;
     m.jibTells.windward.forEach(tt => tt.update(jibShape, st.windward, amt, mirJ));
     m.jibTells.leeward.forEach(tt => tt.update(jibShape, st.leeward, amt, mirJ));
-    const leech: TellState = b.awa > 115 || b.luff ? 'hang' : tm.flow === 'stalled' && tm.amount > 0.12 ? 'curl' : 'stream';
+    const leech = tells.leech;
     m.leechTells.forEach(tt => tt.update(mainShape, leech, tm.amount, m.main.mesh.scale.x < 0));
   }
   syncPole(m, plan === 'wing');
@@ -1162,7 +1168,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     // (the masthead where the bent mast has it; the apex on the straight wire from there to the fixed foot: both legs meet it)
     const headAft = -mastFwd(MAST_TOP - DECK_AT_MAST, m.rigDrawn.bow, m.rigDrawn.topAft); apex.z += headAft * (1 - f);
     q.setXYZ(0, MASTHEAD.x, MASTHEAD.y, MASTHEAD.z + headAft); q.setXYZ(1, apex.x, apex.y, apex.z);
-    q.setXYZ(2, 0.3, foot.y + 0.02, foot.z - 0.1); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, -0.3, foot.y + 0.02, foot.z - 0.1); q.needsUpdate = true; }
+    q.setXYZ(2, 0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, -0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.needsUpdate = true; }
   // the jib sheet: one line, its middle at the clew's ring; each half runs through its car on the cabin top, off the cabin's
   // side to its fairlead on the side deck, aft along the rail to its winch, round it, and the tail into the cockpit. The
   // working half (the leeward, or the windward when she's backed) taut; the lazy one slack, lying on the boat
@@ -1176,22 +1182,34 @@ function syncLines(m: BoatMesh, b: Boat): void {
     const loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
     const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
-    for (let k = 1; k <= 3; k++) {
-      const t = k / 4, x = clew.x + (car.x - clew.x) * t, z = clew.z + (car.z - clew.z) * t;
+    for (let k = 1; k <= 12; k++) {
+      const t = k / 13, x = clew.x + (car.x - clew.x) * t, z = clew.z + (car.z - clew.z) * t;
       at(k, x, Math.max(restOn(x, z) + 0.012, clew.y + (cy - clew.y) * t - 4 * t * (1 - t) * sag), z);
     }
-    at(4, car.x, cy, car.z);
+    // (where the span comes onto the cabin top or off it, the point outside moved to the cabin's edge at the top's
+    // height: the sheet goes over the edge, not through the face below it)
+    for (let k = 0; k < 13; k++) {
+      const i0 = JIB_HALF_PTS + side * k, i1 = JIB_HALF_PTS + side * (k + 1), on0 = onCabin(q.getX(i0), q.getZ(i0)), on1 = onCabin(q.getX(i1), q.getZ(i1));
+      if (on0 === on1) continue;
+      let lo = 0, hi = 1; // (bisect along the span for the edge)
+      for (let n = 0; n < 12; n++) { const m = (lo + hi) / 2; if (onCabin(q.getX(i0) + (q.getX(i1) - q.getX(i0)) * m, q.getZ(i0) + (q.getZ(i1) - q.getZ(i0)) * m) === on0) lo = m; else hi = m; }
+      const off = on0 ? i1 : i0, t = on0 ? hi + 0.002 : lo - 0.002, ex = q.getX(i0) + (q.getX(i1) - q.getX(i0)) * t, ez = q.getZ(i0) + (q.getZ(i1) - q.getZ(i0)) * t;
+      if (off === JIB_HALF_PTS) continue; // (the clew itself stays where the sail has it)
+      const tx = q.getX(i0) + (q.getX(i1) - q.getX(i0)) * (on0 ? hi - 0.002 : lo + 0.002), tz = q.getZ(i0) + (q.getZ(i1) - q.getZ(i0)) * (on0 ? hi - 0.002 : lo + 0.002);
+      q.setXYZ(off, ex, Math.max(q.getY(off), restOn(tx, tz) + 0.012), ez);
+    }
+    at(13, car.x, cy, car.z);
     // (off the cabin top at its edge, the last point under the line from the car to the fairlead that's still over the top)
     const fl = fairlead(side);
     let ex = car.x, ez = car.z;
     for (let i = 1; i <= 16; i++) { const t = i / 16, x = car.x + (fl.x - car.x) * t, z = car.z + (fl.z - car.z) * t, u = uAtZ(z); if (u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u)) { ex = x; ez = z; } else break; }
-    for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(4 + k, x, restOn(x, z) + 0.012, z); }
-    at(8, fl.x, fl.y + 0.035, fl.z);
-    const wv = L2.winches[tk]; at(9, wv.x, wv.y, wv.z);
+    for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(13 + k, x, restOn(x, z) + 0.012, z); }
+    at(17, fl.x, fl.y + 0.035, fl.z);
+    const wv = L2.winches[tk]; at(18, wv.x, wv.y, wv.z);
     // (the tail: off the winch's top, over the coaming and down onto the cockpit seat)
     const u = uAtZ(wv.z), ci = cockpitHalf(u);
-    at(10, side * (ci - 0.01), wv.y + 0.02, wv.z + 0.04);
-    at(11, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
+    at(19, side * (ci - 0.01), wv.y + 0.02, wv.z + 0.04);
+    at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
   }
   q.needsUpdate = true;
 }
