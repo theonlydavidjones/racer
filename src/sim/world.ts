@@ -1540,7 +1540,7 @@ export class World {
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
-    b.boom += (side * BOOM_STOP - b.boom) * k; // (out to the shroud) b.jib += (side * 35 - b.jib) * k;
+    b.boom += (side * BOOM_STOP - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (the boom out to the shroud)
     crewRig(b, dt, this.emit);
   }
 
