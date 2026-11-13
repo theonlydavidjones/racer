@@ -92,4 +92,26 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
       }
     }, 300000);
   }
+
+  // (v162 sails the race in a Web Worker and draws its copy a frame later: a frame gets no steps, one, or two, as it
+  // always could in the page too (and three to five at 4x). The figures walk by the race's own clock, so the uneven
+  // frames don't show: no stepping and stopping)
+  it('drawn with uneven frames (0, 1 or 2 steps each), they move as with one step every frame', () => {
+    const drawn = (pattern: number[]) => {
+      const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 14, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
+      const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user;
+      const p = LL(37.835, -122.40); u.x = p.x; u.y = p.y; w.step(DT); u.h = n360(u.ww.from + 135); u.v = 2.5; engage(u, w.pilot, 'auto');
+      const cr = buildCrew(u.crew!.spec.helm, u.crew!.spec.crew, [1, 2, 3], 1), figs = [cr.helm, ...cr.crew], sp = figs.map(() => 0);
+      let k = 0, jerk = 0;
+      while (w.t < 240) {
+        for (let i = pattern[k++ % pattern.length]; i > 0; i--) w.step(DT);
+        syncCrew(cr, u.rel >= 0 ? 1 : -1, u.crew, DT, false, undefined, u.heel, u.tacking);
+        if (w.t > 30) figs.forEach((f, i) => { jerk += Math.abs(f.speed - sp[i]); sp[i] = f.speed; });
+      }
+      return jerk;
+    };
+    const even = drawn([1]), uneven = drawn([1, 0, 2, 1, 1, 0, 2, 1]);
+    console.log(`walking speed's frame-to-frame change: one step a frame ${even.toFixed(1)}, uneven ${uneven.toFixed(1)} (by the page's frame time it was 38.5)`);
+    expect(uneven).toBeLessThan(even * 1.2);
+  }, 300000);
 });
