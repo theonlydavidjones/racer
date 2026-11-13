@@ -864,7 +864,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   //    each to a small block-and-tackle on the mast's side by its foot, the tackle's fall to the foot block and aft to the
   //    piano (the owner, on Josephine). The tackle's purchase and exact height aren't known: drawn as a 2:1, its moving
   //    block on the halyard's end about 0.4 m up, its standing part and fall at the foot block (estimates).
-  const mastLines: Lines['mastLines'] = [], deckAt = (x: number, z: number) => deckY(uAtZ(z), Math.abs(x));
+  const mastLines: Lines['mastLines'] = [];
   // (a line lying on the boat from a to b: straight in plan, following the cabin top, over its forward edge and down its
   // face to the deck; a point every 5 cm, so it follows the cabin's curved nose and crown, and points at the edge)
   const zFront = -L / 2 + CABIN.u0 * L;
@@ -880,8 +880,15 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     return out;
   };
   const fixed = (l: THREE.Line) => { l.userData.fixed = true; grp.add(l); return l; }; // (never moves: syncRopes lays it once)
-  const footZ = MAST_AFT_Z + 0.06;
-  const footBlock = (x: number) => { const fb = sheaveBlock(0.016, 0.03); fb.position.set(x, deckAt(x, footZ), footZ); fb.rotation.y = Math.PI / 2; grp.add(fb); return new THREE.Vector3(x, deckAt(x, footZ) + 0.03, footZ); };
+  // the turning blocks at the mast's foot, shackled under the stainless horseshoe that arches round the mast's after side
+  // (Boat Detail's MAST_RING, from the owner's photos: "the lines from the mast attach to, or thread under" it), each
+  // at its own angle round the arch from dead aft, in the piano's order outward, the sheave hanging below the rod and
+  // facing aft so the line turns from the mast to the deck
+  const footBlock = (side: number, i: number) => {
+    const t = side * (12 + 14 * i) * Math.PI / 180, rod = horseshoeAt(t);
+    const fb = sheaveBlock(0.016, -0.03); fb.position.copy(rod); grp.add(fb);
+    return rod.clone().setY(rod.y - 0.03);
+  };
   const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts, role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); return l; };
   const stem = new THREE.Vector3(0, FORESTAY_DECK.y + 0.04, FORESTAY_DECK.z + 0.14);
   { const sb = sheaveBlock(0.016, 0.03); sb.position.copy(stem).setY(FORESTAY_DECK.y); grp.add(sb); }
@@ -894,7 +901,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const cl = new THREE.Mesh(key === 'cunningham' ? new THREE.BoxGeometry(0.035, 0.025, 0.06) : new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
     // (straight forward along the cabin top outboard of the hatch, fanning a little inward, then straight in to its block
     // at the mast's foot, as the photo of her cabin top looking forward shows)
-    const fb = footBlock(side * (0.04 + 0.028 * i)), mid = new THREE.Vector3(x * 0.95, 0, zClear);
+    const fb = footBlock(side, i), mid = new THREE.Vector3(x * 0.95, 0, zClear);
     fixed(line([cp, ...lay(cp, mid), ...lay(mid, fb.clone())], role, key));
     // the tail: aft over the cabin's after edge and down its face into the cockpit (not through the cabin's corner)
     { const zE = -L / 2 + CABIN.u1 * L, top = cabinTopAt(uAtZ(zE - 0.004), x) + 0.012;
@@ -938,7 +945,10 @@ const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z;
 const MS_GAP = 0.15;
 /** The vang's lower block: shackled at the base of the mast, abaft it, its sheave 5 cm above whatever the mast stands
  * out of there (the owner's photo: the block at the mast base, with the jammer on it). */
-const VANG_FOOT = new THREE.Vector3(0, Math.max(DECK_AT_MAST, cabinTopAt(uAtZ(MAST_AFT_Z + 0.04), 0) * (uAtZ(MAST_AFT_Z + 0.04) > CABIN.u0 ? 1 : 0)) + 0.05, MAST_AFT_Z + 0.04);
+/** A point on the mast foot's stainless horseshoe (MAST_RING) at angle t (rad) round from dead aft: r out from the mast's
+ * centre, h·cos(90°·t/150°) up off the deck (its two ends on the deck either side just forward of the mast). */
+const horseshoeAt = (t: number) => new THREE.Vector3(MAST_RING.r * Math.sin(t), deckY(uAtZ(MAST_Z), 0) + MAST_RING.h * Math.cos(Math.PI / 2 * t / MAST_RING.ends), MAST_Z + MAST_RING.r * Math.cos(t));
+const VANG_FOOT = horseshoeAt(0).add(new THREE.Vector3(0, 0.05, 0)); // (shackled to the horseshoe's crown, dead aft, standing up toward the boom)
 /** Where the vang's span meets the boom (m aft of the gooseneck): about 0.9 m, scaled off the owner's side photo against
  * the boom's 1.0 m over the deck, the tackle rising at about 42° from the mast's foot. The span's two legs reach the
  * boom either side of it (VANG_LEGS), and its block hangs 0.3 m down the line toward the foot (VANG_SPAN, in the boom's
