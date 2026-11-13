@@ -226,6 +226,13 @@ What's planned, roughly in order. Done work is described in the README.
      first.
    - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
+   - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
+     OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
+     of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
+     the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
+     the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
+     these.
    - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
