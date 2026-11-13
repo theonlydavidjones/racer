@@ -166,7 +166,8 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // Wikipedia); the clocks on all four faces. The clocks' size and height, the cap's form (a steep pyramid with a small
   // lantern and finial) and its proportions are read off photographs. Not lit here: no source for its night lighting.
   {
-    const GRANITE = lam(0xd6d3cb), SHADE = lam(0x4f4c47), DIAL = lam(0xece8dc), g = new THREE.Group();
+    // (flat-shaded: a square shaft's faces are flat, not a cylinder's rounded light)
+    const GRANITE = new THREE.MeshLambertMaterial({ color: 0xd6d3cb, flatShading: true }), SHADE = lam(0x4f4c47), DIAL = lam(0xece8dc), g = new THREE.Group();
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(9.3 / Math.SQRT2, 10.06 / Math.SQRT2, 57.8, 4, 1), GRANITE);
     shaft.rotation.y = Math.PI / 4; shaft.position.y = 57.8 / 2; g.add(shaft);
     // the clock faces, one on each side below the belfry (5.2 m across: the 17 ft UC Berkeley gives, read as the dial)
@@ -178,31 +179,32 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
       pier.position.x = u * Math.sin(a) + v * Math.cos(a); pier.position.z = u * Math.cos(a) - v * Math.sin(a); g.add(pier);
     }
     g.add(block(10.4, 10.4, 1.6, GRANITE, 66.8)); // the cornice over the arcade
-    const cap = new THREE.Mesh(new THREE.ConeGeometry(10.4 / Math.SQRT2, 19, 4, 1), GRANITE); cap.rotation.y = Math.PI / 4; cap.position.y = 68.4 + 9.5; g.add(cap);
-    g.add(block(1.8, 1.8, 3.2, GRANITE, 87.4)); // the lantern
+    // the cap: a steep pyramid to a small flat top, the lantern on it
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.6 / Math.SQRT2, 10.4 / Math.SQRT2, 19, 4, 1), GRANITE); cap.rotation.y = Math.PI / 4; cap.position.y = 68.4 + 9.5; g.add(cap);
+    g.add(block(1.6, 1.6, 3.2, GRANITE, 87.4)); // the lantern
     const fin = new THREE.Mesh(new THREE.ConeGeometry(0.45, 3, 8), SHADE); fin.position.y = 92.1; g.add(fin); // the finial, to 93.6 m
     place(g, 37.87208, -122.25784);
   }
   // The Claremont Hotel (1915; now the Claremont Club & Spa), on the hillside at the mouth of Claremont Canyon: a long
   // white Tudor Revival building, "one of the world's tallest wooden buildings", its central tower 49 m (160 ft) and ten
   // storeys at the tower (Wikipedia "Claremont Hotel"; OSM building:levels 10). Painted white since 1937. Its outline is
-  // OpenStreetMap's (way 41745855, 47 corners, 177 m north–south by 93 m). The wings' height (about six storeys, 22 m),
+  // OpenStreetMap's (way 41745855, 47 corners, 177 m north–south by 93 m). The wings' height (about five storeys, 18 m),
   // the dark roofs and where the tower stands in the outline (by its middle) are read off photographs: OSM doesn't tag the
   // tower separately. Its rooms lit in the evening like homes (night.ts).
   {
-    const WHITE_WALL = lam(0xf1efe8), ROOF = lam(0x55585b), at = { lat: 37.85945, lon: -122.24185 };
+    const WHITE_WALL = new THREE.MeshLambertMaterial({ color: 0xf1efe8, flatShading: true }), ROOF = new THREE.MeshLambertMaterial({ color: 0x55585b, flatShading: true }), at = { lat: 37.85945, lon: -122.24185 };
     litWindows(WHITE_WALL, { floor: 3.4, bay: 3.0, kind: 'home', seed: 11 });
     const OUTLINE: [number, number][] = [[37.8591757, -122.2425210], [37.8586557, -122.2419335], [37.8587252, -122.2418338], [37.8587433, -122.2418502], [37.8588493, -122.2416907], [37.8589103, -122.2417530], [37.8590960, -122.2415244], [37.8591920, -122.2416383], [37.8592801, -122.2415301], [37.8594052, -122.2416787], [37.8593658, -122.2417377], [37.8594837, -122.2417530], [37.8595002, -122.2416812], [37.8595701, -122.2417300], [37.8595450, -122.2419315], [37.8595749, -122.2419365], [37.8595811, -122.2418782], [37.8596118, -122.2418842], [37.8596243, -122.2417797], [37.8597590, -122.2418078], [37.8598490, -122.2419552], [37.8598832, -122.2419228], [37.8599244, -122.2419661], [37.8599411, -122.2419982], [37.8599094, -122.2420292], [37.8600500, -122.2422490], [37.8602455, -122.2423113], [37.8602270, -122.2425790], [37.8600019, -122.2425505], [37.8599797, -122.2425684], [37.8599568, -122.2425774], [37.8599321, -122.2425783], [37.8599153, -122.2425590], [37.8599021, -122.2425366], [37.8598961, -122.2424998], [37.8598968, -122.2424779], [37.8598067, -122.2423370], [37.8597908, -122.2423521], [37.8597753, -122.2423669], [37.8597356, -122.2423555], [37.8597401, -122.2423038], [37.8593760, -122.2422370], [37.8593442, -122.2422854], [37.8593606, -122.2423060], [37.8593283, -122.2423520], [37.8592961, -122.2423978], [37.8592774, -122.2423820]];
     const o = LL(at.lat, at.lon), local = OUTLINE.map(([la, lo]) => { const q = LL(la, lo); return { x: q.x - o.x, y: q.y - o.y }; });
-    // on its hillside: the walls run down to the lowest corner's ground, the roofs level at the tower's ground + 22 m
+    // on its hillside: the walls run down to the lowest corner's ground, the roofs level at the tower's ground + 18 m
     const g0 = ground(at.lat, at.lon), low = Math.min(...OUTLINE.map(([la, lo]) => ground(la, lo)));
     const shape = new THREE.Shape(); local.forEach((q, i) => i ? shape.lineTo(q.x, q.y) : shape.moveTo(q.x, q.y));
-    const wings = new THREE.ExtrudeGeometry(shape, { depth: g0 + 22 - (low - 2), bevelEnabled: false }); wings.rotateX(-Math.PI / 2); wings.translate(0, low - 2 - g0, 0);
-    const roofs = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false }); roofs.rotateX(-Math.PI / 2); roofs.translate(0, 22, 0);
+    const wings = new THREE.ExtrudeGeometry(shape, { depth: g0 + 18 - (low - 2), bevelEnabled: false }); wings.rotateX(-Math.PI / 2); wings.translate(0, low - 2 - g0, 0);
+    const roofs = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false }); roofs.rotateX(-Math.PI / 2); roofs.translate(0, 18, 0);
     const g = group(new THREE.Mesh(wings, WHITE_WALL), new THREE.Mesh(roofs, ROOF));
-    // the central tower: a square tower through the roofs to its belvedere, and a steep pyramid roof to 49 m
-    g.add(block(14, 14, 38 - 22, WHITE_WALL, 22));
-    const top = new THREE.Mesh(new THREE.ConeGeometry(14 / Math.SQRT2 + 0.6, 11, 4, 1), ROOF); top.rotation.y = Math.PI / 4; top.position.y = 38 + 5.5; g.add(top);
+    // the central tower: a square tower rising well clear of the wings to its belvedere, and a steep spire to 49 m
+    g.add(block(13, 13, 36 - 18, WHITE_WALL, 18));
+    const top = new THREE.Mesh(new THREE.ConeGeometry(13 / Math.SQRT2 + 0.5, 13, 4, 1), ROOF); top.rotation.y = Math.PI / 4; top.position.y = 36 + 6.5; g.add(top);
     place(g, at.lat, at.lon, 0, g0);
   }
   // the skyline's tallest towers, at their real positions and heights (Wikipedia's pages for each). Their shapes and
