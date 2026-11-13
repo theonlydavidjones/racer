@@ -81,11 +81,14 @@ const ENGAGED = 2 * LOA;
 /** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
 const TANGLE_MAX = 30;
 
+/** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
+ * and about 2 s to turn: a modelling choice). */
+const COMPELLED_WINDOW = 3;
 /* Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
  * boat is exonerated for her breach." Causal: compelled when, by the time it was clear the other boat had broken a rule,
  * she could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). The sim's
  * sign of it: the boat that broke a rule against her is still within ENGAGED of her when she breaks hers (she's still
- * dealing with that boat: swerving from her, or pushed by her), within TANGLE_MAX. */
+ * dealing with that boat: swerving from her, or pushed by her), within COMPELLED_WINDOW. */
 
 export interface StartReport { delay: number; frac: number; kt: number }
 
@@ -233,7 +236,7 @@ export class World {
   private lastFoul = new Map<number, { t: number; x: number; y: number; vs: number }>();
   /** Rule 44.1: each boat's last penalized foul, against whom, and whether she has since been clear of that boat. */
   private lastFoulVs = new Map<number, { vs: number; t: number; clear: boolean }>();
-  private lastTouch = new Map<number, { t: number; x: number; y: number }>();
+  private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
   private fouledAt = new Map<number, { by: number; t: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
   private hHist: number[][] = [];
@@ -930,9 +933,15 @@ export class World {
       } else if (touching && b.markTouch !== touching.name) {
         b.v *= 0.6;
         // Rule 44.1(a): a Part 2 foul and a mark touch in the same incident: only the Part 2 penalty
-        const lf = this.lastFoul.get(b.id), vs = lf ? this.boats.find(o => o.id === lf.vs) : undefined;
-        const sameIncident = !!lf && this.t - lf.t < TANGLE_MAX && ((!!vs && hullGap(b, vs) < ENGAGED) || dist(lf, touching.p) < ENGAGED + touching.r);
-        if (!sameIncident) { addPenalty(b, ONE_TURN); this.lastTouch.set(b.id, { t: this.t, x: b.x, y: b.y }); }
+        // (still caught up in that foul: not yet a length clear of the boat she fouled since, the tangle's own test; or the
+        // foul was here at this mark; and her turns not begun, which ends an incident as it does a tangle)
+        const lf = this.lastFoul.get(b.id), lv = this.lastFoulVs.get(b.id);
+        const atMark = !!lf && solidGap(lf, lf, touching) - touching.r < ENGAGED;
+        const sameIncident = !!lf && this.t - lf.t < TANGLE_MAX && !b.penaltyDir && ((!!lv && lv.vs === lf.vs && !lv.clear) || atMark);
+        if (!sameIncident) {
+          addPenalty(b, ONE_TURN);
+          this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id) });
+        }
         if (b.isUser) {
           if (!sameIncident) this.fouls++;
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
@@ -1076,8 +1085,11 @@ export class World {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
+      // (within the time a helmsman needs to react and turn once the other boat's breach is plain, COMPELLED_WINDOW, and
+      // with that boat still on her: a later breach, or one with the other gone, she could have avoided, Appeal 2.
+      // A fuller test would ask escapes(), src/boat/arcs.ts, whether any turn could have kept her clear)
       const byBoat = by ? this.boats.find(o => o.id === by.by) : undefined;
-      if (incident.kind !== 'hail' && by && byBoat && by.by !== victim.id && this.t - by.t < TANGLE_MAX && hullGap(f, byBoat) < ENGAGED) incident.exoneratedBy = by.by;
+      if (incident.kind !== 'hail' && by && byBoat && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW && hullGap(f, byBoat) < ENGAGED) incident.exoneratedBy = by.by;
       // Part 2 preamble: the rules of Part 2 still apply between boats that intend to race, are racing or have been racing,
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
@@ -1103,7 +1115,7 @@ export class World {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1' && f.penalty <= 0) this.assignPenalty(f); // a boat already doing turns finishes them (and one not racing, under 23.1, takes none: rule 44.1)
+      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.assignPenalty(f); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
     }
   }
 
@@ -1771,8 +1783,11 @@ export class World {
   /** Give a boat the penalty for a Part 2 foul. A mark touch in the same incident needs no penalty of its own (Rule 44.1(a)). */
   assignPenalty(b: Boat): void {
     // (the touch she's still turning for came in this same incident: just now, where she is: rule 44.1(a), Appeal 65)
-    const lt = this.lastTouch.get(b.id), touched = !!lt && this.t - lt.t < TANGLE_MAX && dist(lt, b) < ENGAGED && b.penalty > 0;
-    startPenalty(b, this.penaltyDeg); // replaces a one-turn penalty from that touch, if she hadn't finished it
+    // (the touch she's still to turn for came in this same incident: the boat she's now fouled was by her then, and her
+    // turns hadn't begun: rule 44.1(a), Appeal 65. Then the foul's penalty replaces the touch's; otherwise it's owed on top)
+    const lt = this.lastTouch.get(b.id), vs = this.lastFoulVs.get(b.id)?.vs;
+    const touched = !!lt && this.t - lt.t < TANGLE_MAX && !b.penaltyDir && vs != null && lt.near.includes(vs) && b.penalty > 0;
+    if (touched || b.penalty <= 0) startPenalty(b, this.penaltyDeg); else addPenalty(b, this.penaltyDeg);
     if (touched) { this.lastTouch.delete(b.id); if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Your mark touch was part of the same incident, so the foul\'s penalty covers it (Rule 44.1(a)).' }); }
   }
   /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */

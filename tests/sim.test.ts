@@ -379,6 +379,29 @@ describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(
   });
 });
 
+describe('One penalty per incident, not per rule (Rule 44.1(a), US Appeal 65)', () => {
+  const W = () => { const w = new World(SS2, settings({ fleet: 1, current: 'slack' }), 7); w.t = 30; return w; };
+  type Priv = { lastTouch: Map<number, { t: number; near: number[] }>; lastFoulVs: Map<number, { vs: number; t: number; clear: boolean }> };
+  it('a foul in the same incident as a mark touch she is still to turn for: the foul\'s penalty covers both', () => {
+    const w = W(), u = w.user, o = w.boats[1], p = w as unknown as Priv;
+    u.penalty = u.penaltyTotal = 360; p.lastTouch.set(u.id, { t: w.t - 2, near: [o.id] }); p.lastFoulVs.set(u.id, { vs: o.id, t: w.t, clear: false });
+    w.assignPenalty(u);
+    expect(u.penaltyTotal).toBe(720);
+  });
+  it('a foul on a boat that had nothing to do with that touch is a separate incident: its turns are owed on top', () => {
+    const w = W(), u = w.user, o = w.boats[1], p = w as unknown as Priv;
+    u.penalty = u.penaltyTotal = 360; p.lastTouch.set(u.id, { t: w.t - 2, near: [] }); p.lastFoulVs.set(u.id, { vs: o.id, t: w.t, clear: false });
+    w.assignPenalty(u);
+    expect(u.penaltyTotal).toBe(1080);
+  });
+  it('nor once her turns for the touch have begun', () => {
+    const w = W(), u = w.user, o = w.boats[1], p = w as unknown as Priv;
+    u.penaltyTotal = 360; u.penalty = 300; u.penaltyDir = 1; // (60° of it turned) p.lastTouch.set(u.id, { t: w.t - 2, near: [o.id] }); p.lastFoulVs.set(u.id, { vs: o.id, t: w.t, clear: false });
+    w.assignPenalty(u);
+    expect(u.penaltyTotal).toBe(1080);
+  });
+});
+
 describe('Exoneration (Rule 43.1(a))', () => {
   //            wind ↓
   //    Zed ↗ (port) forces Fox (starboard) to swerve...
@@ -415,6 +438,7 @@ describe('Exoneration (Rule 43.1(a))', () => {
     for (const b of w.boats) { const u = V(b.h); b.vx = u.x * b.v; b.vy = u.y * b.v; }
     fox.forced14 = zed.id; Object.assign(fox, at(9, 1.5)); // (Fox clear of Vic for now)
     (w as unknown as { checkPairs(): void }).checkPairs(); w.drainEvents(); // Zed fouls Fox (the swerve)
+    expect((w as unknown as { fouledAt: Map<number, { by: number }> }).fouledAt.get(fox.id)?.by).toBe(zed.id);
     // a second later Zed is long gone, and Fox, free to keep clear, touches Vic: the old 3 s window would have excused her
     w.t += 1; fox.forced14 = null; Object.assign(zed, at(60, 40)); Object.assign(fox, at(1.2, 1.5));
     const incidents: { fouler: number; rule: string; ex?: number }[] = [];
