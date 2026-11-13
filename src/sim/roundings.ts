@@ -116,27 +116,28 @@ export interface CrewRounding { lostM: number; freeS: number; poleS: number; dro
 // Measured by driving the sim's own crew round the practice course with this tracker (tests/roundings-crew.test.ts has
 // the harness), in slack water and flat seas: the median over five seeds and about two dozen roundings at each wind,
 // roundings where it touched the mark left out (13 Nov 2026). No published figure exists for any of it. A single
-// rounding varies a good deal (the middle half spans about ±8 m at the leeward mark, ±10–20 m at the windward, mostly
-// how many tacks she made inside 100 m), so the medians are lightly smoothed across the winds. The windward mark costs more
-// as the wind rises (the bear-away and the pole at a higher speed); the leeward costs about 10 m in any wind. Columns:
+// rounding varies a good deal (the middle half spans about ±5 m at the leeward mark, ±10–15 m at the windward, mostly
+// how many tacks she made inside 100 m), so the medians are lightly smoothed across the winds. The sim crew rounds about
+// 12 m wide (ai.ts aimPoint), crossing each mark's ray above its level, and that costs it ground there and back. The
+// windward mark costs more as the wind rises (the bear-away and the pole at a higher speed); the leeward about 30 m. Columns:
 // {lostM, freeS, poleS, dropS, exitD, peakRate, minSpeed}; freeS and poleS are the windward mark's (poleS 0: the crew
 // leaves the jib to leeward, in light air), dropS and exitD the leeward's.
 export const SIM_CREW: Record<RoundingKind, [number, CrewRounding][]> = {
   windward: [
-    [6, { lostM: 20, freeS: 8, poleS: 0, dropS: 0, exitD: 11, peakRate: 12.0, minSpeed: 0.69 }],
-    [8, { lostM: 17, freeS: 5, poleS: 16, dropS: 0, exitD: 10, peakRate: 12.9, minSpeed: 0.73 }],
-    [12, { lostM: 18, freeS: 8, poleS: 15.5, dropS: 0, exitD: 14, peakRate: 15.1, minSpeed: 0.72 }],
-    [16, { lostM: 36, freeS: 9, poleS: 15, dropS: 0, exitD: 13, peakRate: 17.2, minSpeed: 0.63 }],
-    [20, { lostM: 38, freeS: 5, poleS: 15, dropS: 0, exitD: 14, peakRate: 17.6, minSpeed: 0.55 }],
-    [25, { lostM: 48, freeS: 10, poleS: 15, dropS: 0, exitD: 16, peakRate: 17.5, minSpeed: 0.46 }]
+    [6, { lostM: 45, freeS: 8, poleS: 0, dropS: 0, exitD: 11, peakRate: 12.0, minSpeed: 0.69 }],
+    [8, { lostM: 43, freeS: 5, poleS: 16, dropS: 0, exitD: 10, peakRate: 12.9, minSpeed: 0.73 }],
+    [12, { lostM: 45, freeS: 8, poleS: 15.5, dropS: 0, exitD: 14, peakRate: 15.1, minSpeed: 0.72 }],
+    [16, { lostM: 60, freeS: 9, poleS: 15, dropS: 0, exitD: 13, peakRate: 17.2, minSpeed: 0.63 }],
+    [20, { lostM: 62, freeS: 5, poleS: 15, dropS: 0, exitD: 14, peakRate: 17.6, minSpeed: 0.55 }],
+    [25, { lostM: 73, freeS: 10, poleS: 15, dropS: 0, exitD: 16, peakRate: 17.5, minSpeed: 0.46 }]
   ],
   leeward: [
-    [6, { lostM: 13, freeS: 0, poleS: 0, dropS: 26, exitD: 16, peakRate: 9.9, minSpeed: 0.73 }],
-    [8, { lostM: 14, freeS: 0, poleS: 0, dropS: 26, exitD: 16, peakRate: 11.3, minSpeed: 0.82 }],
-    [12, { lostM: 10, freeS: 0, poleS: 0, dropS: 28, exitD: 18, peakRate: 14.3, minSpeed: 0.84 }],
-    [16, { lostM: 9, freeS: 0, poleS: 0, dropS: 22, exitD: 17, peakRate: 17.1, minSpeed: 0.76 }],
-    [20, { lostM: 6, freeS: 0, poleS: 0, dropS: 20, exitD: 18, peakRate: 19.1, minSpeed: 0.67 }],
-    [25, { lostM: 9, freeS: 0, poleS: 0, dropS: 19, exitD: 18, peakRate: 20.2, minSpeed: 0.52 }]
+    [6, { lostM: 33, freeS: 0, poleS: 0, dropS: 26, exitD: 16, peakRate: 9.9, minSpeed: 0.73 }],
+    [8, { lostM: 35, freeS: 0, poleS: 0, dropS: 26, exitD: 16, peakRate: 11.3, minSpeed: 0.82 }],
+    [12, { lostM: 32, freeS: 0, poleS: 0, dropS: 28, exitD: 18, peakRate: 14.3, minSpeed: 0.84 }],
+    [16, { lostM: 32, freeS: 0, poleS: 0, dropS: 22, exitD: 17, peakRate: 17.1, minSpeed: 0.76 }],
+    [20, { lostM: 28, freeS: 0, poleS: 0, dropS: 20, exitD: 18, peakRate: 19.1, minSpeed: 0.67 }],
+    [25, { lostM: 38, freeS: 0, poleS: 0, dropS: 19, exitD: 18, peakRate: 20.2, minSpeed: 0.52 }]
   ]
 };
 export function simCrew(kind: RoundingKind, tws: number): CrewRounding {
