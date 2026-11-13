@@ -43,7 +43,8 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { drawCourse, drawLaylines, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { ShadowLayer } from './shadowLayer';
 import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
@@ -106,7 +107,11 @@ export class Hud {
   private mapC = $<HTMLCanvasElement>('map');
   /** The wind or current as Windy draws it (ui/flow.ts): the colour field for each map, and its moving streaks (drawn
    * every frame on a canvas over each map: the maps themselves are drawn ten times a second, or when the chart moves). */
-  private flowField = { chart: new FlowField() }; // (the full chart's only: the inset shows no field)
+  private flowField = { chart: new FlowField() };
+  /** The wind shadows on each map (ui/shadowLayer.ts): the race's own wind, the lee of everything upwind. */
+  private shadows = { inset: new ShadowLayer(), chart: new ShadowLayer() };
+  /** Shadows switched on and none in view, on each map: the chart says so. */
+  private shadowNone: Record<'inset' | 'chart', boolean> = { inset: false, chart: false }; // (the full chart's only: the inset shows no field)
   private streaks = { chart: new Streaks(900) };
   private mapFx = $<HTMLCanvasElement>('mapFx');
   /** how each map was drawn last (its transform), for the streaks */
@@ -643,6 +648,13 @@ export class Hud {
       const fw = ctx.measureText(fogLine).width; ctx.fillStyle = I.halo; ctx.fillRect(10, 8, fw + 12, 18);
       ctx.fillStyle = I.text; ctx.fillText(fogLine, 16, 21);
     }
+    // the wind shadows switched on with none in view: say so, so the switch isn't taken for broken
+    if (this.shadowNone.chart) {
+      const t = 'Wind shadows: nothing upwind casts one here (land, boats, ships, piers)';
+      ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+      const y = fogLine ? 30 : 8, tw = ctx.measureText(t).width; ctx.fillStyle = I.halo; ctx.fillRect(10, y, tw + 12, 18);
+      ctx.fillStyle = I.text; ctx.fillText(t, 16, y + 13);
+    }
     // north, the wind, and a scale bar
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('N', w - 28, 22); ctx.beginPath(); ctx.moveTo(w - 28, 28); ctx.lineTo(w - 23, 42); ctx.lineTo(w - 33, 42); ctx.closePath(); ctx.fill();
@@ -761,8 +773,9 @@ export class Hud {
     if (flowHere && kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
     if (field === 'sea' && detail === 'chart' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
-    if (on('shadows') && !wd.freeSail) sim.push('shadows');
-    this.keyState[detail] = { sim, pal, scale };
+    // (the shadows, sampled below: in the key only when there's one in view)
+    const shadowsOn = on('shadows');
+    this.keyState[detail] = { sim, pal, scale }; // (the shadows add themselves when drawn, below: the key reads this list when asked)
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
     // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore),
@@ -782,7 +795,14 @@ export class Hud {
       if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = I.ship; ctx.globalAlpha = PEN.ahead.alpha; ctx.lineWidth = PEN.ahead.w; ctx.setLineDash(PEN.ahead.dash); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
       if (labels) { ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = I.shipHalo; const lx = (a[0] + b2[0]) / 2 + 6, ly = (a[1] + b2[1]) / 2 - 6; ctx.strokeText(ty.name, lx, ly); ctx.fillStyle = I.shipText; ctx.fillText(ty.name, lx, ly); }
     }
-    if (on('shadows') && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
+    // the wind shadows (the owner: "toggling wind shadow doesn't do anything that I can see": it was a 60 m cone behind
+    // each boat, a few pixels on the chart, and off when cruising): the lee of land, boats, ships, the committee boat
+    // and the bridge piers, from the race's own wind, so the map and the sails agree; the inset's every 2 s of race time
+    if (shadowsOn) {
+      const L = this.shadows[detail]; L.draw(ctx, tf, w, h, wd, detail === 'chart' ? 8 : 6, detail === 'chart' ? 0.5 : 2);
+      if (L.maxDeficit >= 0.05) sim.push('shadows');
+      this.shadowNone[detail] = L.maxDeficit < 0.05;
+    } else this.shadowNone[detail] = false;
     // the boats: each in her colour with a halo and a dark edge, so she reads on any part of the chart; you bigger, in cyan
     // (bigger on the full chart, and bigger still zoomed out, where everything else shrinks round her)
     const big = detail === 'chart' ? (scale < 0.1 ? 1.6 : 1.25) : 1;

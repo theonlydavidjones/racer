@@ -175,7 +175,7 @@ export class Fleet {
         <div class="seg"><button type="button" data-f="view" data-v="grid" aria-pressed="${this.view === 'grid'}">Grid</button><button type="button" data-f="view" data-v="list" aria-pressed="${this.view === 'list'}">List</button></div>
         <button type="button" class="cta" data-f="new">New boat</button></div>${tabs}
       ${body}
-      <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or race or cruise her.</small></div>`);
+      </div>`);
     // her pictures: drawn one at a time once the list is up (each is a 3D render of her as she's set up)
     const imgs = [...this.list.querySelectorAll<HTMLImageElement>('img[data-thumb]')], job = ++this.thumbJob;
     const next = () => {
@@ -239,8 +239,7 @@ export class Fleet {
           : '<small>No races yet. Sail her in a race, or race against her, and her results go here.</small>'}</section>
       <section><h3>Crew history</h3>
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
-          : '<small>Nobody has sailed her yet.</small>'}
-        <small>When you don't sail her, a generic AI skipper does.</small></section>
+          : '<small>Nobody has sailed her yet.</small>'}</section>
       </div>`);
   }
 
