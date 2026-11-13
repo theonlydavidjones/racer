@@ -77,8 +77,24 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
   return v;
 }
 
-/** Seconds lost in a tack or gybe (the committee's course table uses the same: courses/committee.ts). */
-export const MANOEUVRE_S = 8;
+/**
+ * Seconds a tack or a gybe costs, by the true wind (kt): the distance made good the sim's own Folkboat loses in one
+ * (boat/physics.ts, measured against a twin sailing on: tests/manoeuvre.test.ts keeps this table in step with it),
+ * over her VMG. A tack loses 0.8–1.2 boat lengths (most in light air, where she's slowest to get going again); keelboats
+ * generally lose 1–2 (US Sailing, "Tacking Tips Part II – The Acceleration": a secondary figure; no Folkboat-specific
+ * one was found). A gybe from her deep run angle is a small turn and costs little.
+ */
+export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
+  tack: [[6, 7.6], [8, 5.3], [12, 3.3], [16, 3.4], [20, 3.3]],
+  gybe: [[6, 1.8], [8, 1.1], [12, 0.5], [16, 0.1], [20, 0.1]]
+};
+export function manoeuvreS(kind: 'tack' | 'gybe', tws: number): number {
+  const T = MANOEUVRE_LOSS[kind];
+  if (tws <= T[0][0]) return T[0][1];
+  for (let i = 1; i < T.length; i++) if (tws <= T[i][0]) { const f = (tws - T[i - 1][0]) / (T[i][0] - T[i - 1][0]); return T[i - 1][1] + (T[i][1] - T[i - 1][1]) * f; }
+  return T[T.length - 1][1];
+}
+
 const DT = 10;
 
 /** The wind on the water under a scenario. */
@@ -105,11 +121,13 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
   const turns: SailResult['turns'] = [];
   let turnedNow = false, lastTurnT = -Infinity, forced: LegKind | null = null;
-  /** A tack or a gybe here: where, on the drawn track, and the time it costs (she's stopped in it, drifting). */
-  const turn = (kind: 'tack' | 'gybe', c: Vec) => {
+  /** A tack or a gybe here: where, on the drawn track, and the time it costs (manoeuvreS, in the wind here). */
+  const turn = (kind: 'tack' | 'gybe', c: Vec, tws: number) => {
     tacks++; turns.push({ p: { ...p }, kind }); turnedNow = true; lastTurnT = t;
     const lp = path[path.length - 1]; if (lp.p.x !== p.x || lp.p.y !== p.y) path.push({ p: { ...p }, t });
-    t += MANOEUVRE_S / 60; p = { x: p.x + c.x * MANOEUVRE_S, y: p.y + c.y * MANOEUVRE_S };
+    // (what it costs, as time with no way on, drifting with the current: the distance made good it loses, over her VMG)
+    const ms = manoeuvreS(kind, tws);
+    t += ms / 60; p = { x: p.x + c.x * ms, y: p.y + c.y * ms };
   };
   const path = [{ p: { ...p }, t }];
   let sumKt = 0, sumCur = 0, n = 0, maxLeft = 0, maxRight = 0, minShore = Infinity;
@@ -179,7 +197,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         const xt = cross(legU, sub(p, a)); // + left of the straight course
         if (((tack === 'S' && xt > lim) || (tack === 'P' && xt < -lim)) && t - lastTurnT > 0.5) flip = true; // (half a minute on a board at least)
       }
-      if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c); }
+      if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt); }
       h = hd(tack); v = vb;
       if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
         const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
@@ -190,7 +208,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     // laid for the mark): that's a tack or a gybe too, and costs the same
     // (within 15° of dead downwind she sails a little by the lee rather than gybe: a crossing there isn't counted, and her
     // own gybes, on the layline or the lane's edge, are counted where she makes them)
-    { const r = wrap(h - w.from), sd2 = Math.abs(r) < 165 ? Math.sign(r) : 0; if (side && sd2 && sd2 !== side && !turnedNow) turn(Math.abs(r) < 90 ? 'tack' : 'gybe', c); if (sd2) side = sd2; turnedNow = false; }
+    { const r = wrap(h - w.from), sd2 = Math.abs(r) < 165 ? Math.sign(r) : 0; if (side && sd2 && sd2 !== side && !turnedNow) turn(Math.abs(r) < 90 ? 'tack' : 'gybe', c, w.kt); if (sd2) side = sd2; turnedNow = false; }
     const d = V(h);
     p = { x: p.x + (d.x * v + c.x) * DT, y: p.y + (d.y * v + c.y) * DT };
     t += DT / 60;
