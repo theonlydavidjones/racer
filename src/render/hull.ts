@@ -333,8 +333,9 @@ export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
  */
 const stZ = (st: number) => L / 2 - 2 * 0.5 - (st - 3) * 0.5;
 /**
- * The hollow under the after deck (Josephine, the owner): open to the cockpit at its after end, it runs aft to z1, its
- * floor `floor` m over the waterline, its sides the hull's own inside; storage, and room for the footrest to slide back
+ * The hollow under the after deck (Josephine, the owner): open to the cockpit at its after end and open under the
+ * plank, it runs aft to z1, its floor the cockpit sole's level carried aft (or the hull's inside, where that rises
+ * higher), its sides the hull's own inside; storage, and room for the footrest to slide back
  * into. The footrest: one teak plank right across the cockpit's after end, about 2 ft (`len`) fore and aft, its top
  * level with the seats. Its edges ride on two slim metal rails screwed flat to the hull's inside, port and starboard,
  * that run only as far forward as the plank goes. Slid out, its forward edge is halfway between the thwart's after edge
@@ -343,7 +344,7 @@ const stZ = (st: number) => L / 2 - 2 * 0.5 - (st - 3) * 0.5;
  * shape where it slides back to (footrestEdge), so slid out, where she's wider, it stands a little clear of the hull.
  * (The hollow's size is an estimate from the photo.)
  */
-export const HOLLOW = { floor: 0.17, z1: L / 2 - 0.41 };
+export const HOLLOW = { z1: L / 2 - 0.41 };
 /** `y`: the rails' top, the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
 export const FOOTREST = { y: COCKPIT.sole + 0.30 - 0.025, len: 0.61, out: 0.35, rail: 0.022 };
 /** The hull's lining's half-breadth at the footrest's rails, at z (the lining stands 30 mm in from hullInnerHalf). */
@@ -585,7 +586,7 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   };
   out.push(strip(span(z0, zA, 16).map(u => [V(-sh(u), sole, zAt(u)), V(sh(u), sole, zAt(u))]))); // the sole
   for (const s of [1, -1]) {
-    const bench = span(z0, benchAft), well = span(benchAft, zA, 8); void shelfFwd; // (no after shelf: the footwell runs to the cockpit's after end, where the sliding footrest comes out from under the after deck)
+    const bench = span(z0, benchAft), well = span(benchAft, zA, 8), WELL_K = 14; void shelfFwd; // (WELL_K: steps up the hull's curve, fine enough to follow it) // (no after shelf: the footwell runs to the cockpit's after end, where the sliding footrest comes out from under the after deck)
     // the bench is a lazarette, a solid locker: its front a varnished panel up to the lid, and the lid on top, 25 mm
     // thick, its edge standing a little proud of the front
     const lid = 0.025;
@@ -595,24 +596,34 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
     lining.push(strip(bench.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
     // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
     const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
-      for (let k = 0; k <= 5; k++) { const y = sole + (top - sole) * k / 5; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
+      for (let k = 0; k <= WELL_K; k++) { const y = sole + (top - sole) * k / WELL_K; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
       return pts; };
-    for (let k = 0; k < 6; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
+    for (let k = 0; k <= WELL_K; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
     const ub = zU(benchAft); panel.push(face(benchAft, [[s * (sh(ub) - 0.012), sole], ...hullSide(ub, s, true), [s * (sh(ub) - 0.012), seat]])); // the locker's end, out to the hull
   }
-  // the cockpit's after end, and under the after deck a hollow (Josephine, the owner's photo): open to the cockpit, its
-  // floor HOLLOW.floor up, running aft to HOLLOW.z1, lined; the footrest plank slides in and out of it on rails (boatMesh)
-  { const { floor, z1 } = HOLLOW, zs = span(zA, z1, 8), wH = (u: number) => Math.max(0.1, hullInnerHalf(u, floor) - 0.03);
-    const ua = zU(zA); lining.push(face(zA, [[-sh(ua), sole], [sh(ua), sole], [wH(ua), floor], [-wH(ua), floor]])); // the step up from the sole into it
-    lining.push(strip(zs.map(u => [V(-wH(u), floor, zAt(u)), V(wH(u), floor, zAt(u))]))); // its floor
+  // the cockpit's after end, and under the after deck a hollow (Josephine, the owner's photo): open to the cockpit and
+  // open under the footrest plank, its floor the cockpit sole's level carried on aft until the hull's own inside rises
+  // above that (the hull lifting towards the transom), running aft to HOLLOW.z1, lined; the plank slides in and out of it
+  // on rails (boatMesh)
+  { const { z1 } = HOLLOW, zs = span(zA - 0.04, z1, 10); // (begun a little forward of the after end, under the well's lining, so the two meet without a seam)
+    const floorY = (u: number) => { let y = sole; while (y < sole + 0.4 && hullInnerHalf(u, y) - 0.03 < 0.1) y += 0.005; return y; };
+    const wF = (u: number) => Math.max(0.07, hullInnerHalf(u, floorY(u)) - 0.03);
+    lining.push(strip(zs.map(u => [V(-wF(u), floorY(u), zAt(u)), V(wF(u), floorY(u), zAt(u))]))); // its floor
     // its sides: the hull's inside, from the floor up to the deck over it
-    const profOf = (s: number) => (u: number) => { const top = deckY(u, halfBeam(u)) - 0.02, q: THREE.Vector3[] = [];
-        for (let k = 0; k <= 5; k++) { const y = floor + (top - floor) * k / 5; q.push(V(s * Math.max(wH(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
+    const profOf = (s: number) => (u: number) => { const f = floorY(u), top = deckY(u, halfBeam(u)) - 0.02, q: THREE.Vector3[] = [];
+        for (let k = 0; k <= 14; k++) { const y = f + (top - f) * k / 14; q.push(V(s * Math.max(wF(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
         return q; };
-    for (const s of [1, -1]) { const prof = profOf(s); for (let k = 0; k < 5; k++) lining.push(strip(zs.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; }))); }
+    // the step up from the sole into it, where the hull's bottom rises above the sole's level: the well's lining at the
+    // cockpit's after end (upright at the sole's edge, then the hull's inside) below the hollow's floor
+    const ua = zU(zA), fa = floorY(ua), wa = wF(ua), sa = sh(ua);
+    if (fa > sole + 0.005) {
+      const side: number[][] = [];
+      for (let k = 1; k <= 24; k++) { const y = sole + (fa - sole) * k / 24; side.push([Math.min(wa, Math.max(sa, Math.min(hullInnerHalf(ua, y), halfBeam(ua)) - 0.03)), y]); }
+      lining.push(face(zA, [[-sa, sole], [sa, sole], ...side, ...side.slice().reverse().map(([x, y]) => [-x, y])])); }
+    for (const s of [1, -1]) { const prof = profOf(s); for (let k = 0; k < 14; k++) lining.push(strip(zs.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; }))); }
     // its after end, closing it off from the floor to the deck, hull side to hull side
     const ub = zU(z1), sb = profOf(1)(ub), pt = profOf(-1)(ub), top: number[][] = [];
-    for (let i = 1; i < 8; i++) { const x = sb[5].x - (sb[5].x - pt[5].x) * i / 8; top.push([x, deckY(ub, Math.abs(x)) - 0.01]); }
+    for (let i = 1; i < 8; i++) { const x = sb[14].x - (sb[14].x - pt[14].x) * i / 8; top.push([x, deckY(ub, Math.abs(x)) - 0.01]); }
     lining.push(face(z1, [...sb.map(q => [q.x, q.y]), ...top, ...pt.reverse().map(q => [q.x, q.y])])); }
   return { teak: out, lining, panel };
 }
