@@ -198,12 +198,7 @@ describe('Rules 10–17 · Section A and B', () => {
     moveTo(BP, [-2.6, -2.2]); // BP's bow into AS
     return { before, contact: p.at(51) };
   };
-  it('Case 27 (the setup): AS is clear ahead of BP; the engine today blames BP under 15 when AS tacks into her (finding 4)', () => {
-    const r = case27();
-    expect(r.before).toMatchObject({ keepsClear: 'BP', rule: '12' });
-    expect(r.contact.foul).toMatchObject({ by: 'BP', rule: '15' });
-  });
-  it.fails('Case 27: a boat that tacks close ahead of another on the same tack breaks 13 (and 15) when they collide; BP got right of way by AS\'s own action, so no rule 15 for BP', () => {
+  it('Case 27: a boat that tacks close ahead of another on the same tack breaks 13 (and 15) when they collide; BP got right of way by AS\'s own action, so no rule 15 for BP', () => {
     expect(case27().contact.foul).toMatchObject({ by: 'AS', rule: expect.stringMatching(/^(13|15)$/) });
   });
 
@@ -216,12 +211,7 @@ describe('Rules 10–17 · Section A and B', () => {
     moveTo(L, off([0, 0], 300, -1, -5.5), 270); // L bears away at once, as rule 15 asks while W responds
     return { overlap, after: p.at(-28.5, { swerve }) };
   };
-  it('Case 53 (the setup): L overlaps W from astern; the engine gives W time (15), but calls L for bearing away to give it (finding 5)', () => {
-    const r = case53(true);
-    expect(r.overlap).toMatchObject({ keepsClear: 'W', rule: '11', foul: null });
-    expect(r.after.foul).toMatchObject({ by: 'L', rule: '15', kind: 'swerve' });
-  });
-  it.fails('Case 53: a near-stationary windward boat overlapped to leeward from astern gets time to respond (15); L bearing away to give it breaks no rule', () => {
+  it('Case 53: a near-stationary windward boat overlapped to leeward from astern gets time to respond (15); L bearing away to give it breaks no rule', () => {
     expect(case53(true).after.foul).toBeNull();
   });
 
@@ -262,10 +252,19 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     A.lastTackT = 51; moveTo(A, [0.5, 0.5], 45); // she has tacked onto port (close-hauled)
     return p.at(52);
   };
-  it('Case 101 (the setup): after "You tack" and her tack, the engine makes the boat that replied keep clear under 20 (finding 6)', () => {
-    expect(case101()).toMatchObject({ keepsClear: 'B', rule: '20' });
+  it('Case 101: once she has tacked and had the time to bear away round the other\'s stern, contact is the hailing boat\'s (10)', () => {
+    const b0 = off([0, 0], 315, -9, 6);
+    const A = boat('A', { at: [0, 0], heading: 315 }), B = boat('B', { at: b0, heading: 315 });
+    const p = pair(A, B);
+    clean(p, 50);
+    p.rec.hail = { by: A.id, at: 50, kind: 'room', replyAt: 50.5 };
+    A.lastTackT = 51; moveTo(A, [0.5, 0.5], 45);
+    p.at(52);
+    const b1 = off(b0, 315, 10); moveTo(B, b1); // B holds her course
+    moveTo(A, off(b1, 315, 4.5), 45); // and A, four seconds after her tack, sails across B's bow
+    expect(p.at(55).foul).toMatchObject({ by: 'A', rule: '10' });
   });
-  it.fails('Case 101: right of way doesn\'t pass to the boat entitled to room: after "You tack" and her tack onto port, the hailing boat must keep clear of the boat on starboard (10)', () => {
+  it('Case 101: right of way doesn\'t pass to the boat entitled to room: after "You tack" and her tack onto port, the hailing boat must keep clear of the boat on starboard (10)', () => {
     expect(case101()).toMatchObject({ keepsClear: 'A', rule: '10' });
   });
 

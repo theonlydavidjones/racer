@@ -531,7 +531,8 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
-    expect(p.at(54)).toMatchObject({ keepsClear: 'Blue', rule: '20', foul: null }); // Blue now gives Red room to tack and avoid her
+    // Blue now owes Red room to tack and avoid her, but right of way doesn't pass with it (WS Case 101): Red, astern, keeps clear
+    expect(p.at(54)).toMatchObject({ keepsClear: 'Red', rule: '12', foul: null });
     red.tacking = true; red.lastTackT = 54.5; moveTo(red, [0, 0], 0);
     expect(p.at(56).foul).toBeNull();
   });

@@ -36,14 +36,14 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 17 | 102 | 13 | Rule 13 ends when she's on a close-hauled course, whatever her speed | partly (the physics decides when she's close-hauled) |
 | 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered |
 | 24 | 111 | 11, 12, 15 | B overlaps to leeward from astern close to A's stern: A must luff promptly; contact then is B's (15) | partly (whether A responded promptly) |
-| 27 | 117 | 13, 15 | AS tacks right in front of BP: AS broke 13 and 15 | **finding 4** |
+| 27 | 117 | 13, 15 | AS tacks right in front of BP: AS broke 13 and 15 | covered (finding 4, fixed) |
 | 30 | 123 | 12, 19 | B astern blankets A, A gybes unintentionally: B broke 12 | partly (the unintended gybe) |
 | 43 | 142 | 10, 13, 15, 19.2(b) | S tacks near a bank, P sails on: P broke 10; 19.2(b) and 20 don't apply | covered |
 | 46 | 147 | 11, 16.1, 17 | L luffs to her proper course after a leeward overlap from astern: W broke 11 | partly (proper course) |
 | 50 | 153 | 10 | No contact, S bore away for fear of it: P broke 10 | partly (only as a forced swerve) |
 | 51 | 155 | 11, 43.1(a) | A chain of four boats before the start: W broke 11; the others exonerated | partly (two-boat chains only) |
 | 52 | 157 | 16.1 | Pre-start manoeuvring to drive a boat off the line: no breach | partly |
-| 53 | 159 | 11, 15 | L overlaps a near-stationary W from astern: 15 gives W time; no breach | **finding 5** |
+| 53 | 159 | 11, 15 | L overlaps a near-stationary W from astern: 15 gives W time; no breach | covered (finding 5, fixed) |
 | 87 | 203 | 10, 14 | P3 hits S on the line: P3 broke 10 | partly (S's own rule 14) |
 | 88 | 205 | 10 | P passes 2 ft astern after S luffed hard: P broke 10 (keeping clear isn't just avoiding contact) | partly (only as a forced swerve) |
 | 92 | 213 | 16.1, 16.2 | S keeps bearing away onto P passing astern: S broke 16.2, then 16.1 | covered |
@@ -90,7 +90,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 41 | 139 | 11, 12, 19.2 | Two overlapped boats overtake a third to leeward: the third is an obstruction while astern, then 11 | partly (three boats) |
 | 49 | 151 | 19.2(b), 23.2 | PL gives PW no room to bear away from S on another leg: PL broke 19.2(b); S didn't break 23.2 | partly (procedure) |
 | 54 | 161 | 20 | When a boat may hail, and the hailed boat's options | partly (hail timing: sim/obstruction.ts hailRange) |
-| 101 | 229 | 20.2(c) | "You tack", A tacks to port, then must keep clear (10) | **finding 6** |
+| 101 | 229 | 20.2(c) | "You tack", A tacks to port, then must keep clear (10) | covered (finding 6, fixed) |
 | 113 | 251 | 20 | L, M and W: M must pass the hail on to W (20.3) | partly (the pass-on's timing only) |
 | 117 | 259 | 15, 19.2(b) | A row of boats isn't a continuing obstruction; L overlapping D to leeward ends D being an obstruction | partly |
 | 124 | 276 | 19.2(a), 19.2(b) | Who chooses the side to pass an obstruction | partly |
@@ -119,9 +119,10 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 ## Tally
 
-- Covered, the test reaching the Case's answer: 13 (2, 6, 7, 9, 11, 12, 13, 15, 23, 43, 59, 81, 92). Cases 2 and 59 only while nobody
-  gybes (finding 3).
-- Findings, the engine answering differently: 5 (27, 53, 93, 101, 105), plus finding 3 (the gybe), found while checking Case 2.
+- Covered, the test reaching the Case's answer: 16 (2, 6, 7, 9, 11, 12, 13, 15, 23, 27, 43, 53, 59, 81, 92, 101). Cases 2 and 59
+  only while nobody gybes (finding 3).
+- Findings, the engine answering differently: 2 (93, 105), plus finding 3 (the gybe), found while checking Case 2. Findings 4–6
+  (Cases 27, 53, 101) are fixed.
 - Partly: 42.
 - Not modelled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
@@ -163,19 +164,23 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
    90°), used by 18.2(b), 18.3 and 18.2(d)'s "tacker" (ovStart); rule 15's "just tacked" and the rest keep lastTackT, since a gybe
    too can give the other boat right of way. physics.ts is Deep Physics'.
    Test: "Case 2, with the gybes" (`it.fails`).
-4. **Case 27 (rules 13, 15): rule 15's grace goes to the wrong boat when the boat ahead tacks.** AS, clear ahead and to leeward of BP
+4. **Fixed.** **Case 27 (rules 13, 15): rule 15's grace goes to the wrong boat when the boat ahead tacks.** AS, clear ahead and to leeward of BP
    on port, tacks; BP, faster, hits her while she is still turning. The Case: AS broke 13 (and 15). The engine: BP, under 15. In
    src/rules/pairs.ts the grace is given whenever right of way passes and the boat that had been keeping clear under 12 is the one
    that now has it (`rec.rule === '12' && rec.kc === newRow.id`); here BP stays the keep-clear boat but under 13, and the condition
    still fires for the change itself. Rule 15 is for a boat that *acquires* right of way, not for the boat whose own action (AS's
    tack) changed it. A fix: only when the new rule is 11 (a leeward overlap from astern), `&& r.rule === '11'`. Test: Case 27.
-5. **Case 53 (rule 15): a leeward boat bearing away to give the windward boat its rule 15 time is called for a swerve.** L overlaps a
+5. **Fixed.** **Case 53 (rule 15): a leeward boat bearing away to give the windward boat its rule 15 time is called for a swerve.** L overlaps a
    near-stationary W to leeward from astern and bears away at once to give W room. The Case: no breach. The engine: L, under 15
    (kind 'swerve': it reads her bearing away as the right-of-way boat forced to swerve). During the grace the boat that gets right of
    way and changes course *away* from the other is complying with 15, not a victim of the other's breach. A fix: in the grace window,
    don't count a turn away by the boat that gained right of way as a forced swerve. Test: Case 53.
-6. **Cases 101 and 35 (rule 20.2(c)): after "You tack" the engine makes the boat that replied keep clear under 20.** A, hailing for
+6. **Fixed.** **Cases 101 and 35 (rule 20.2(c)): after "You tack" the engine makes the boat that replied keep clear under 20.** A, hailing for
    room to tack, is told "You tack"; she tacks onto port; B is on starboard. The Case: right of way doesn't pass with the room; A, on
    port, keeps clear under 10, and B must only give her room to tack and keep clear. The engine (src/rules/rightOfWay.ts) returns B
    as the keep-clear boat, `rule: '20'`, from the reply onward. A fix: after "You tack" B owes A room (a room obligation, like 18
    or 19), not right of way; once A has tacked and is clear of B, rule 10 governs. Test: Case 101.
+   The fix: right of way follows the basic rules after "You tack"; the room is judged at an incident (src/rules/pairs.ts):
+   contact while the hailing boat is still tacking, or within rule 15's few seconds after (her time to bear away round the
+   other's stern), or after the replying boat turned toward her, is the replying boat's breach of 20.2(c); after that it is
+   the hailing boat's, under 10 (or 12, or 13).
