@@ -13,7 +13,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, type Instrument } from './tacktick';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN, WINDOW } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN, WINDOW, FOOTREST, footrestWall, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -268,15 +268,17 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     }
     grp.add(new THREE.Mesh(mergeGeometries(seams.map(q => q.toNonIndexed()), false)!, BLACK));
     grp.add(new THREE.Mesh(mergeGeometries(hinges.map(q => q.toNonIndexed()), false)!, CHROME)); }
+  // the side coamings run aft to where the after coaming's corners begin to round (LIP_R forward of its after face)
+  const LIP_R = 0.12, uLip = uAtZ(zc(COCKPIT.u1) + COAMING_T / 2 - LIP_R), capSide: Record<number, THREE.Vector3[]> = {};
   for (const s of [1, -1]) {
     // the coamings: the cabin sides carried on aft (moulded with them on a glassfibre boat), a wooden cap on top (CR 3.25)
     const pts: THREE.Vector3[] = [], caps: THREE.Vector3[] = [];
     for (let i = 0; i <= 16; i++) {
-      const u = COCKPIT.u0 + (COCKPIT.u1 - COCKPIT.u0) * i / 16, x = cockpitHalf(u) + COAMING_T / 2, y = deckY(u, x);
+      const u = COCKPIT.u0 + (uLip - COCKPIT.u0) * i / 16, x = cockpitHalf(u) + COAMING_T / 2, y = deckY(u, x);
       pts.push(new THREE.Vector3(s * x, y, zc(u))); caps.push(new THREE.Vector3(s * x, y + COAMING_H(zc(u)), zc(u)));
     }
     grp.add(new THREE.Mesh(rail(pts, i => COAMING_H(pts[i].z), COAMING_T), sideMat));
-    grp.add(new THREE.Mesh(rail(caps, 0.02, 0.04), MAT.wood));
+    capSide[s] = caps; // (the cap is laid in one piece with the after coaming's, below)
     // the toerail along the sheer, unbroken; and alongside the cockpit, just inboard of it, the hiking rail, a broad varnished plank laid flat along
     // the deck's edge on spacer blocks, that the crew sit on when they hike out (Josephine: the owner's photo of her
     // starboard side at the dock)
@@ -293,12 +295,17 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // the raised lip across the after end of the cockpit, moulded in with the side coamings and turning into them round
   // its corners (at least 80 mm high at station 3, CR 3.22), so water on the after deck stays out of the cockpit
   {
-    const u1 = COCKPIT.u1, z1 = zc(u1) + COAMING_T / 2, w = cockpitHalf(u1) + COAMING_T / 2, r = 0.12, lip: THREE.Vector3[] = [];
-    for (let i = 0; i <= 8; i++) { const a = Math.PI / 2 * i / 8; lip.push(new THREE.Vector3(-(w - r + r * Math.cos(a)), 0, z1 - r + r * Math.sin(a))); }
-    for (let i = 8; i >= 0; i--) { const a = Math.PI / 2 * i / 8; lip.push(new THREE.Vector3(w - r + r * Math.cos(a), 0, z1 - r + r * Math.sin(a))); }
+    const u1 = COCKPIT.u1, z1 = zc(u1) + COAMING_T / 2, w = cockpitHalf(uLip) + COAMING_T / 2, r = LIP_R, lip: THREE.Vector3[] = [];
+    for (let i = 1; i <= 8; i++) { const a = Math.PI / 2 * i / 8; lip.push(new THREE.Vector3(-(w - r + r * Math.cos(a)), 0, z1 - r + r * Math.sin(a))); }
+    for (let i = 8; i >= 1; i--) { const a = Math.PI / 2 * i / 8; lip.push(new THREE.Vector3(w - r + r * Math.cos(a), 0, z1 - r + r * Math.sin(a))); }
     for (const q of lip) q.y = deckY(uAtZ(q.z), Math.abs(q.x));
-    const lipRail = wall(lip, i => COAMING_H(lip[i].z), COAMING_T);
-    grp.add(new THREE.Mesh(lipRail, sideMat));
+    // (joined to the side coamings' after ends, so the walls and the cap turn the corners in one smooth curve)
+    const side = (s: number) => capSide[s].map(q => q.clone().setY(q.y - COAMING_H(q.z)));
+    const round = [side(-1).at(-1)!, ...lip, side(1).at(-1)!];
+    grp.add(new THREE.Mesh(wall(round, i => COAMING_H(round[i].z), COAMING_T), sideMat));
+    // the wooden cap, one piece from the cabin along both sides and round the after coaming (Josephine, the owner's photo)
+    const cap = [...side(-1), ...lip, ...side(1).reverse()].map(q => q.clone().setY(q.y + COAMING_H(q.z)));
+    grp.add(new THREE.Mesh(wall(cap, () => 0.02, 0.04), MAT.wood));
     // a mooring cleat on the after deck, a little to starboard of the centreline (as on Josephine)
     const cz = (z1 + L / 2) / 2, cx = 0.12, cy = deckY(uAtZ(cz), cx);
     const cleat = new THREE.Group();
@@ -306,6 +313,27 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     for (const dz of [-0.035, 0.035]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, 0.022), STEEL); leg.position.set(0, 0.017, dz); cleat.add(leg); }
     cleat.position.set(cx, cy, cz); grp.add(cleat);
   }
+  // the footrest (Josephine, the owner's photo): one teak plank right across the cockpit's after end, its grain across
+  // like the washboards, sliding out from the hollow under the after deck as a footrest for the helm sitting on the
+  // after deck, or back under it so they can stand to steer. Its edges ride on two slim metal rails screwed flat to the
+  // hull's inside (footrestWall), from as far forward as it goes to its after end slid back. It's drawn slid out and
+  // moves with her footrest state (b.footrest: 0 out … 1 back under the deck), out if she has none.
+  { const zA = -L / 2 + COCKPIT.u1 * L, { y, len, out, rail: rw } = FOOTREST, N = 10, rails: THREE.BufferGeometry[] = [];
+    for (const sx of [-1, 1]) {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= N; i++) { const z = zA - out + (len + out) * i / N; pts.push(new THREE.Vector3(sx * (footrestWall(z) - rw / 2), y - 0.006, z)); }
+      rails.push(wall(pts, () => 0.006, rw).toNonIndexed());
+    }
+    grp.add(new THREE.Mesh(mergeGeometries(rails), TRACK_ALU));
+    // (the plank in plan, x across and z along, where it lies slid out: the hull's shape where it slides back to, `out` aft)
+    const ring: THREE.Vector2[] = [];
+    for (let i = 0; i <= N; i++) { const z = zA - out + len * i / N; ring.push(new THREE.Vector2(footrestEdge(z + out), z)); }
+    for (let i = N; i >= 0; i--) { const z = zA - out + len * i / N; ring.push(new THREE.Vector2(-footrestEdge(z + out), z)); }
+    const pg = new THREE.ExtrudeGeometry(new THREE.Shape(ring), { depth: 0.025, bevelEnabled: false, curveSegments: 1 }), pp = pg.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pp.count; i++) { const x = pp.getX(i), z = pp.getY(i), d = pp.getZ(i); pp.setXYZ(i, x, y + d, z); }
+    const plankGeo = flipWinding(pg.toNonIndexed()); plankGeo.computeVertexNormals(); // (x, z, up from x, y, depth turns it inside out: turned back)
+    const plank = new THREE.Group(); grp.add(plank); grp.userData.footrest = plank;
+    plank.add(new THREE.Mesh(grainUV(plankGeo, true), teakMat().warm)); }
   // the midships mooring cleats: on the side deck just inboard of the toerail, halfway along the cabin light (Josephine,
   // the owner's photo: hers has one, to starboard; a cleat each side by default, the usual fit), lying fore and aft
   for (const s of [1, -1]) {
@@ -1197,6 +1225,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
   syncCompanionway(m.companionway, b);
+  // the footrest slid out, or back under the after deck
+  { const fr = m.grp.userData.footrest as THREE.Group | undefined, t = Math.max(0, Math.min(1, (b as Boat & { footrest?: number }).footrest ?? 0)); if (fr) fr.position.z = t * FOOTREST.out; }
   // the cabin's lantern swings on its chain under her motion, and its light goes with it
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
@@ -1687,6 +1717,10 @@ function windowTexture(): THREE.CanvasTexture {
 }
 
 /** A wall standing up from a path of points, h high and t thick across the path (in plan), with its top closed. */
+function flipWinding(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  for (const a of Object.values(g.attributes) as THREE.BufferAttribute[]) for (let i = 0; i + 2 < a.count; i += 3) for (let k = 0; k < a.itemSize; k++) { const t = a.getComponent(i + 1, k); a.setComponent(i + 1, k, a.getComponent(i + 2, k)); a.setComponent(i + 2, k, t); }
+  return g;
+}
 function wall(pts: THREE.Vector3[], hh: (i: number) => number, t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [];
   for (let i = 0; i < pts.length; i++) {
