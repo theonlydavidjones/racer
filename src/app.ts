@@ -484,6 +484,10 @@ function openFlow(open = !flowPanel.open): void {
 addEventListener('resize', () => { if (flowPanel.open) look.panelShift = -(flowPanel.el.getBoundingClientRect().width + 16) / 2; });
 $('tpMore').onclick = () => openLines();
 $('bBand').onclick = () => openLines();
+// (the owner OKd the mock-up, 13 Nov: no Sail controls button. The ▾ tab on the band's edge puts the band away; put away,
+// the windex stays where it was, and a click on it brings the band back, its hover saying so)
+document.querySelector<HTMLElement>('#sailBand .sb-away')!.addEventListener('click', e => { e.stopPropagation(); openLines(false); });
+document.querySelector<HTMLElement>('#sailBand .sb-wx')!.addEventListener('click', () => { if (!band.open) openLines(true); });
 /* The wind indicator (render/windLadder.ts, the owner's first training tool): the true and apparent wind in the air
  * beside her at three heights, off unless you turn it on (the inset map's Layers menu, or its key), and remembered. */
 const ladder = new WindLadder(); ladder.grp.visible = false; view.scene.add(ladder.grp);

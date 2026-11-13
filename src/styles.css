@@ -1168,3 +1168,12 @@ body.showroom #flowPanel{display:none}
 .dopts .seg{flex:1 1 200px}
 .dopts .dlabel{flex:1 0 100%;font:600 11px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .attempts tr.best td{color:var(--accent);font-weight:700} /* the best of a drill's attempts (shared with the manoeuvres drill) */
+/* the band put away with its ▾ tab and brought back with a click on the windex (the owner, 13 Nov) */
+.sb-away{font-size:12px!important;padding:0 8px!important;color:var(--muted)!important}
+.sb-wx{position:relative}
+.sb-wx-hint{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;padding:3px 7px;border-radius:5px;
+  background:rgba(9,22,33,.86);border:1px solid var(--rule);font:700 9.5px/1 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:var(--text);
+  opacity:0;transition:opacity .15s;pointer-events:none}
+.sailband.shut .sb-wx{pointer-events:auto;cursor:pointer;border-radius:50%}
+.sailband.shut .sb-wx:hover .sb-wx-hint{opacity:1}
+.sailband.shut .sb-wx:hover svg{filter:drop-shadow(0 0 0 2px var(--accent)) brightness(1.15)}
