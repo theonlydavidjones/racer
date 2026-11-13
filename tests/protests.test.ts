@@ -95,6 +95,8 @@ describe('Protests: the AI boats take their turns, or not, and protest (ai/condu
     expect(w.protests[0]).toMatchObject({ by: o.id, vs: u.id, rule: '10', owed: true, turnsT: null });
     w.step(DT); expect(w.protests[0].turnsT).toBeNull(); // (her turns still to do)
     u.penalty = 0; w.step(DT); expect(w.protests[0].turnsT).not.toBeNull();
+  });
+});
 
 describe('Umpired: finishing with the penalty not taken', () => {
   // (World Sailing Appendix UF, 2025: an umpire may disqualify a boat that fails to take a penalty, UF3.4(a)(5), UF3.5(c))
