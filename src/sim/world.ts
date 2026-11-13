@@ -1124,7 +1124,7 @@ export class World {
     for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
     // (each boat's speed, and her velocity, before any contact this step takes her way off: a jam is judged on how they
     // were sailing, not on what the touch did to them)
-    const pre = new Map(this.boats.map(b => [b.id, { v: b.v, vx: b.vx, vy: b.vy }]));
+    const pre = found.length ? new Map(this.boats.map(b => [b.id, { v: b.v, vx: b.vx, vy: b.vy }])) : null; // (only when there's something to judge)
     for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
@@ -1138,7 +1138,7 @@ export class World {
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
       if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
-      const pA = pre.get(A.id)!, pB = pre.get(B.id)!;
+      const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
