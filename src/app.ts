@@ -46,7 +46,7 @@ import { PerfMeter } from './ui/perfMeter';
 import { compassPoint, degAndPoint, turnWords } from './core/compass';
 import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
 import { compass, sunPosition, sunTimes } from './environment/sun';
-import { startDebrief } from './sim/startDebrief';
+import { startDebrief, type StartStats } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
 import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } from './ui/feedback';
@@ -83,7 +83,9 @@ const navView = new NavView();
 const drillView = new ReplayView($<HTMLCanvasElement>('dcanvas'));
 const raceReplay = new RaceReplay($('raceReplay'));
 /** Start practice begins this many seconds before the gun, and the debrief comes this long after it. */
-const DRILL_FROM = 60, DRILL_DEBRIEF_AT = 15;
+const DRILL_FROM = 120, DRILL_DEBRIEF_AT = 15;
+/** The start-line drill's attempts this session, for the run to compare (newest last). */
+const drillRuns: (StartStats & { n: number; from: number; solo: boolean })[] = [];
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
@@ -190,7 +192,7 @@ function newGame(seed = randomSeed()): void {
   const rc = S.course === RC_COURSE ? committee(WS) : null;
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   const args: WorldArgs = { file: rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course), settings: WS, seed,
-    opts: S.mode === 'drill' ? { startAt: DRILL_FROM, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
+    opts: S.mode === 'drill' ? { startAt: S.drillFrom ?? DRILL_FROM, solo: S.drillSolo ?? true, showFlags, courseSignal } : S.mode === 'sail' && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
   host?.dispose();
   // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
   // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
@@ -1332,7 +1334,7 @@ function beginRaceNow(seed?: number): void {
   toast(S.mode === 'sail'
     ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}.${w.dest ? ' The navigator (M) has a passage plan.' : ' Try the tiller, the trim and the pole.'}`
     : S.mode === 'drill'
-    ? `Start practice: one minute to the gun. Be on the line at full speed when it goes. Current: ${w.cur.label}.`
+    ? `Start practice${w.boats.length === 1 ? ', alone' : ''}: ${w.startAt / 60 === 1 ? 'one minute' : `${w.startAt / 60} minutes`} to the gun. Check the line head to wind, time your run in, and be on the line at full speed when it goes. Current: ${w.cur.label}.`
     : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
   if (w.courseSignal && S.mode !== 'sail') logMessage(`Course ${w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signalled by the warning signal). ${w.courseSignal.why}`);
 }
@@ -1342,6 +1344,8 @@ let drillClip: ReplayClip | null = null;
 function showDrill(): void {
   drillShown = true; send({ k: 'pause', on: true }); setControlsIdle();
   const d = startDebrief(w);
+  if (d.stats) drillRuns.push({ ...d.stats, n: drillRuns.length + 1, from: w.startAt, solo: w.boats.length === 1 });
+  drillOptions(); drillTable();
   $('dTitle').textContent = d.title;
   const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   $('dFacts').innerHTML = d.facts.map(f => `<li>${esc(f)}</li>`).join('');
@@ -1352,6 +1356,30 @@ function showDrill(): void {
   drillView.play(w, drillClip);
 }
 const closeDrill = () => { $('drill').hidden = true; drillView.stop(); };
+/** The drill's two choices (inside its panel): how long before the gun each attempt starts, and alone or with the fleet. */
+function drillOptions(): void {
+  const from = S.drillFrom ?? DRILL_FROM, solo = S.drillSolo ?? true;
+  $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
+    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet</button></div>`;
+}
+$('dOpts').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-v]'), g = b?.closest<HTMLElement>('[data-dopt]')?.dataset.dopt; if (!b || !g) return;
+  if (g === 'from') S.drillFrom = +b.dataset.v!; else S.drillSolo = b.dataset.v === '1';
+  saveSettings(S); drillOptions();
+});
+/** The run of attempts this session: each start's numbers, the best marked, to see the trend. */
+function drillTable(): void {
+  if (drillRuns.length < 2) { $('dRuns').innerHTML = ''; return; }
+  // (a start is as good as it is on time and at speed: each 10% of speed short counts as about 5 s late, the time it
+  // takes a Folkboat to build that speed back)
+  const score = (r: typeof drillRuns[number]) => r.grade === 'ocs' ? Infinity : Math.abs(r.lateS) + (100 - r.pct) / 2;
+  const best = drillRuns.reduce((a, r) => score(r) < score(a) ? r : a);
+  const endW = (e: string) => e === 'pin' ? w.C.pinLabel : e === 'committee' ? w.C.committeeLabel : 'middle';
+  const rows = drillRuns.slice(-10).map(r => `<tr${r === best ? ' class="best"' : ''}><td>${r.n}</td><td>${r.grade === 'ocs' ? `over, ${Math.round(-r.behindM)} m` : r.behindM < 0 ? `past, ${Math.round(-r.behindM)} m` : `${Math.round(r.behindM)} m · ${Math.round(r.lateS)} s`}</td><td>${r.pct}%</td><td>${esc(endW(r.end))}${r.fav ? (r.onFav ? ' ✓' : '') : ''}</td><td>${r.grade}</td></tr>`).join('');
+  const last = drillRuns.slice(-3), avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const clean = last.filter(r => r.grade !== 'ocs'), trend = drillRuns.length >= 4 && clean.length ? ` Your last three averaged ${Math.round(avg(clean.map(r => r.lateS)))} s late at ${Math.round(avg(last.map(r => r.pct)))}% speed${clean.length < last.length ? ` (${last.length - clean.length} over early)` : ''}.` : '';
+  $('dRuns').innerHTML = `<p class="lede">Your starts this session (the best highlighted; ✓ started at the favoured end).${trend}</p><table class="res attempts"><thead><tr><th>#</th><th>At the gun</th><th>Speed</th><th>End</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 $('bDReplay').onclick = () => { if (drillClip) drillView.play(w, drillClip); };
 $('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
 $('bDNew').onclick = () => { closeDrill(); beginRace(); };
