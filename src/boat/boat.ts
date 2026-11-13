@@ -53,7 +53,11 @@ export interface AiState {
   commitFor: number; // the desired heading that commitment was for
   /** Her last keep-clear decision (ai.ts, from boat/arcs.ts escapes): when she made it, the boats it was about, and the
    * heading she's holding to keep clear (null: her own course does). She holds it until she next looks, about a second. */
-  esc?: { at: number; ids: string; heading: number | null; luff: boolean } | null;
+  /** How long a tack of her own choosing has been held off by a boat close by (ai.ts, Rule 13), s. */
+  tackHeldT?: number;
+  /** When she began getting clear for her penalty turns (RRS 44.2). */
+  clearFrom?: number;
+  esc?: { at: number; ids: string; heading: number | null; luff: boolean; aim?: number } | null;
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */

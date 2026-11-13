@@ -54,8 +54,10 @@ export function legacyKnobs(aware: boolean): SkipperKnobs {
     dirtyAirS: 6,
     // (slow, heavy boats need time to respond: she starts keeping clear 12 s out)
     keepClearM: 14, keepClearS: 12,
-    // (a second to see it and put the helm over; a metre and a half between the hulls, about half a beam's slop either way
-    // in judging another boat's course)
+    // (estimates, to be set by the foul census against the real fleets' rate (docs/SKIPPER-MODEL-PROPOSAL.md): a second
+    // to see a boat as a danger and judge it, about a driver's for an unexpected hazard; a metre and a half more than the
+    // contact distance between the hulls, two-thirds of a Folkboat's 2.2 m beam, for the error in judging another boat's
+    // course a few lengths off)
     reactS: 1, clearGapM: 1.5
   };
 }
