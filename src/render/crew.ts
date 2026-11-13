@@ -567,7 +567,7 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
     ik(a, a.root.position, tgt, BONE.upper, BONE.fore, V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
     const par = f.root.parent; if (!par) return;
     f.root.updateMatrixWorld(true);
-    const sd = i ? 1 : -1, hints = [V(sd * 0.9, 0.3, 0.8), V(sd * 0.9, 0.4, 0.3)];
+    const sd = i ? 1 : -1, hints = [V(sd * 0.9, -0.2, 0.7), V(sd * 1, 0, 0.3)];
     const bad = () => {
       f.root.updateMatrixWorld(true);
       const el = par.worldToLocal(a.mid.getWorldPosition(_h));
