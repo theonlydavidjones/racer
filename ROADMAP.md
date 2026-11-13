@@ -259,6 +259,9 @@ What's planned, roughly in order. Done work is described in the README.
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The on-screen tiller instructions out** (owner, 13 November; minutes): the keys line across the screen (#keysHint,
+     "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
+     The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
    - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
@@ -944,6 +947,13 @@ traveling over the hull and sails to help players learn about sail shape and lam
   - **A drill's own shape,** so it doesn't feel like cruising: a set course in open water, numbered reps, a short
     score after each (speed lost, distance lost, the turn's rate and the tiller's), and a best-of summary.
   - On the screen rule: the cues live on the water and on the boat, not as new buttons.
+
+- **4. A learn-to-sail mode** (owner, 13 November: the on-screen tiller instructions don't need to be there, "except maybe
+  in a 'learn to sail' mode, which we haven't even roadmapped yet"; not ranked; a design to the owner first). For
+  someone who has never sailed: the parts of the boat, steering with the tiller, the points of sail, trimming to the
+  telltales, tacking and gybing, heaving to and docking, each as a short guided lesson on the water, with the
+  instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
+  coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
 
 ## Next up
 
