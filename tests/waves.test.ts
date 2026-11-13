@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { WaveSet } from '../src/render/waves';
+import { N_WAVES, WaveField } from '../src/environment/waveField';
 import type { SeaHere } from '../src/environment/sea';
 
+/** The field's components as objects, for reading. */
+const comps = (f: WaveField) => Array.from({ length: N_WAVES }, (_, i) => ({ dir: f.dir[i], k: f.k[i], w: f.w[i], amp: f.amp[i], phase: f.phase[i], swell: f.swell[i] > 0 }));
+const O = { x: 0, y: 0 };
 const sea = (hsW: number, tpW: number, hsS = 0): SeaHere => ({ hsW, tpW, fromW: 225, hsS, tpS: 14, fromS: 260, steep: 0.05, white: 0, fetch: 5000 });
 
 /** Settle the wave set on a sea (the heights ease toward it). */
-function settle(s: SeaHere): WaveSet {
-  const ws = new WaveSet(); ws.setSwellPeriod(s.tpS);
-  for (let i = 0; i < 400; i++) ws.update(s, 225, 0.1);
+function settle(s: SeaHere): WaveField {
+  const ws = new WaveField(s.tpS);
+  for (let i = 0; i < 400; i++) ws.update(s, 225, 0.1, O);
   return ws;
 }
 
@@ -23,7 +26,7 @@ describe('the waves you see', () => {
   });
 
   it('spread round the wind, as a young wind sea does: the energy-weighted mean on the wind, about ±25° either side', () => {
-    const ws = settle(sea(0.6, 3)), wind = ws.comps.filter(c => !c.swell), travel = 225 + 180;
+    const ws = settle(sea(0.6, 3)), wind = comps(ws).filter(c => !c.swell), travel = 225 + 180;
     const e = wind.map(c => c.amp ** 2), tot = e.reduce((a, b) => a + b, 0);
     const off = wind.map(c => ((c.dir - travel + 540) % 360) - 180);
     const mean = off.reduce((a, d, i) => a + d * e[i], 0) / tot, sd = Math.sqrt(off.reduce((a, d, i) => a + d * d * e[i], 0) / tot);
@@ -33,7 +36,7 @@ describe('the waves you see', () => {
 
   it('peak where the spectrum does: most of the chop in the components near the peak wavelength', () => {
     const ws = settle(sea(0.6, 3)), Lp = 9.81 * 9 / (2 * Math.PI); // 14 m
-    const wind = ws.comps.filter(c => !c.swell), big = wind.reduce((a, c) => (c.amp > a.amp ? c : a));
+    const wind = comps(ws).filter(c => !c.swell), big = wind.reduce((a, c) => (c.amp > a.amp ? c : a));
     const L = 2 * Math.PI / big.k;
     expect(L).toBeGreaterThan(Lp * 0.6); expect(L).toBeLessThan(Lp * 1.3);
   });
@@ -44,9 +47,9 @@ describe('the water doesn\'t rush when the wind or the swell swings (owner\'s re
   // direction d (the chop eases round to the course's mean wind, the swell follows the buoy's direction) turned the
   // whole pattern about the origin: at 3.6 km a 10° swing moved the water past you several times faster than it runs.
   // Turned about where you are instead, it runs at its own speed there.
-  const phaseAt = (ws: WaveSet, p: { x: number; y: number }, t: number) => ws.comps.map(c => c.k * (Math.sin(c.dir * Math.PI / 180) * p.x + Math.cos(c.dir * Math.PI / 180) * p.y) - c.w * t + c.phase);
+  const phaseAt = (ws: WaveField, p: { x: number; y: number }, t: number) => comps(ws).map(c => c.k * (Math.sin(c.dir * Math.PI / 180) * p.x + Math.cos(c.dir * Math.PI / 180) * p.y) - c.w * t + c.phase);
   it('far from the origin, the mean wind shifting 10°: the pattern where you are runs at the waves\' own speed', () => {
-    const s = sea(0.6, 3, 0.5), ws = new WaveSet(); ws.setSwellPeriod(s.tpS);
+    const s = sea(0.6, 3, 0.5), ws = new WaveField(s.tpS);
     const p = { x: 3000, y: 2000 }, dt = 1 / 60;
     for (let i = 0; i < 400; i++) ws.update(s, 225, 0.1, p);
     let t = 0, prev = phaseAt(ws, p, t), worst = 0;
@@ -54,7 +57,7 @@ describe('the water doesn\'t rush when the wind or the swell swings (owner\'s re
       t += dt; ws.update({ ...s, fromS: 260 + Math.min(10, i * dt) }, 225 + Math.min(10, i * dt), dt, p);
       const now = phaseAt(ws, p, t);
       // (the phase kept within a turn: its change taken the short way round)
-      ws.comps.forEach((c, k) => { if (c.amp > 0) { const d = now[k] - prev[k] + c.w * dt, dd = d - 2 * Math.PI * Math.round(d / (2 * Math.PI)); worst = Math.max(worst, Math.abs(dd / dt) / c.w); } });
+      comps(ws).forEach((c, k) => { if (c.amp > 0) { const d = now[k] - prev[k] + c.w * dt, dd = d - 2 * Math.PI * Math.round(d / (2 * Math.PI)); worst = Math.max(worst, Math.abs(dd / dt) / c.w); } });
       prev = now;
     }
     expect(worst).toBeLessThan(0.02); // (it was many times the wave's own speed)

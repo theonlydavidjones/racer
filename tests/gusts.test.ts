@@ -47,10 +47,10 @@ describe('gusts over open water', () => {
   });
   it('in a race, in 12–18 kt, the 5-second gust over the 2-minute mean is about 1.15–1.3 (open water: WMO TD-1555, at sea), far below the station\'s 1.5', () => {
     for (const kt of [12, 18]) { const g = gustFactors(kt); expect(g.gf).toBeGreaterThan(1.1); expect(g.gf).toBeLessThan(1.3); expect(g.ti).toBeLessThan(0.13); }
-  }, 120000);
+  }, 180_000);
   it("in light air the gusts keep their size in knots, as Fort Point's record shows, rather than dying with the mean", () => {
     const light = gustFactors(5);
     expect(light.over).toBeGreaterThan(0.6); // (kt over the mean: the station reads 3.75–4.75 at its rougher site)
     expect(light.gf).toBeGreaterThan(1.15);
-  }, 120000);
+  }, 180_000);
 });

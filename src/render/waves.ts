@@ -1,129 +1,35 @@
-import { D2R, type Vec } from '../core/math';
-import type { SeaHere } from '../environment/sea';
+import type { Vec } from '../core/math';
+import { N_WAVES, type WaveField } from '../environment/waveField';
 
 /**
- * The waves you see: a sum of Gerstner waves built from the sea state, the same on the GPU (the water
- * surface) and on the CPU (how the boats heave, pitch and roll). Twelve wind-sea components at fixed
- * wavelengths from 1.6 to 24 m (geometric steps), heights from the JONSWAP spectrum for the chop where you are,
- * and directions sampled from the cos^2s spreading of a young wind sea (s ≈ 8: most energy within ±30° of the
- * wind, a little out to ±60°), with irregular phases. Neighbouring wavelengths travel at different angles, so
- * the crests are short and broken (short-crested, as a real wind sea is) rather than long parallel rows. Three
- * swell components around the swell's period, from the swell's direction. Fixed wavelengths mean the pattern
- * never jumps as the sea changes: only the heights move. How big the waves are elsewhere on the water comes from
- * a sea map (wind-sea and swell scale per place).
- * (Spreading: Mitsuyasu et al. 1975, s ≈ 5–15 near the spectral peak for wind seas; Holthuijsen, Waves in
- * Oceanic and Coastal Waters, ch. 6.)
+ * The waves you see: the World's wave field (environment/waveField.ts), the same one the boats' heave and pitch come
+ * from (boat/seaway.ts waveMotion), drawn as Gerstner waves on the GPU (the water surface, below).
  */
+export { N_WAVES } from '../environment/waveField';
 
-const G = 9.81;
-export const N_WAVES = 15;
-const N_WIND = 12;
-const WIND_L = Array.from({ length: N_WIND }, (_, i) => 1.6 * Math.pow(24 / 1.6, i / (N_WIND - 1)));
-// directions: the twelve quantiles of a cos^2s(θ/2) spread with s = 8 (close to a normal spread of σ ≈ 27°: ±3, 9, 15,
-// 22, 31, 47°), dealt out left and right of the wind so no two neighbours run within 10° of each other; the widest
-// on the shortest waves (measured spreads widen away from the peak), the band round the usual peak (5–15 m on the
-// Bay) still spread ±22°, so its crests stay short rather than lining up in rows
-const WIND_SPREAD = [-47, 31, -31, 47, -9, 22, -15, 9, -22, 3, 15, -3];
-const SWELL_F = [0.8, 1, 1.25]; // × the swell's wavelength
-const SWELL_SPREAD = [-8, 0, 6];
-const PHASES = [0.3, 2.1, 4.4, 1.2, 5.6, 3.3, 0.8, 2.7, 5.1, 1.9, 3.9, 0.1, 4.8, 2.4, 5.9];
-
-export interface WaveComp { dir: number; k: number; w: number; amp: number; phase: number; q: number; swell: boolean; /** (sin, cos of dir, kept for the dir they were worked out for: height() is asked thousands of times a frame) */ sd?: number; cd?: number; at?: number }
-
-/** JONSWAP spectral density (shape only) at frequency f for peak period tp. */
-function jonswap(f: number, tp: number): number {
-  const fp = 1 / tp, s = f <= fp ? 0.07 : 0.09, r = Math.exp(-((f - fp) ** 2) / (2 * s * s * fp * fp));
-  return Math.pow(f, -5) * Math.exp(-1.25 * Math.pow(fp / f, 4)) * Math.pow(3.3, r);
-}
-
-export class WaveSet {
-  readonly comps: WaveComp[] = [];
-  /** The sea the component heights are set for (the reference the sea map scales from). */
-  ref = { hsW: 0, hsS: 0 };
-  /** Set once the heights have been set for this world (scene.ts clears it for a new one). */
-  primed = false;
-  private windDir = NaN;
-  private swellL = 150;
-
-  constructor() {
-    WIND_L.forEach((L, i) => { const k = 2 * Math.PI / L; this.comps.push({ dir: 0, k, w: Math.sqrt(G * k), amp: 0, phase: PHASES[i], q: 0, swell: false }); });
-    SWELL_F.forEach((_, i) => this.comps.push({ dir: 0, k: 1, w: 1, amp: 0, phase: PHASES[N_WIND + i], q: 0, swell: true }));
-  }
-
-  /** Set the swell's period (fixed for a race: it comes from the buoy record for the day). */
-  setSwellPeriod(tp: number, t = 0): void {
-    this.swellL = G * tp * tp / (2 * Math.PI);
-    // (mid-sail, at time t: each component's phase carried over, so the surface doesn't jump where it is)
-    this.comps.filter(c => c.swell).forEach((c, i) => { const w0 = c.w; c.k = 2 * Math.PI / (this.swellL * SWELL_F[i]); c.w = Math.sqrt(G * c.k); c.phase += (c.w - w0) * t; });
-  }
-
-  /**
-   * Ease the component heights toward the sea at the focus (`s`), the chop running downwind of `windFrom`
-   * (the course's mean wind, so the pattern doesn't swing with every shift). `focus`: where you are (sim coords).
-   * A wave's phase is k·(d·p) − ωt + φ at the world position p; swinging its direction d about the world's origin,
-   * kilometres off on the Bay, swept the whole pattern past you (at 3.6 km a 10° swing over half a minute ran the
-   * water by at many times the waves' own speed: the owner's "the water surface starts rushing by"). So as d turns,
-   * φ takes up the change at the focus, and the pattern turns about where you are.
-   */
-  update(s: SeaHere, windFrom: number, dt: number, focus: Vec = { x: 0, y: 0 }): void {
-    const turn = (c: WaveComp, dir: number) => {
-      if (dir === c.dir) return;
-      const a0 = c.dir * D2R, a1 = dir * D2R;
-      c.phase += c.k * ((Math.sin(a0) - Math.sin(a1)) * focus.x + (Math.cos(a0) - Math.cos(a1)) * focus.y);
-      c.phase %= 2 * Math.PI; // (kept small: float32 in the shader)
-      c.dir = dir;
-    };
-    const travel = windFrom + 180;
-    if (Number.isNaN(this.windDir)) this.windDir = travel;
-    this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
-    // (a new world starts with its sea already running: the first update sets the heights, later ones ease toward them)
-    const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
-    // wind sea: heights shaped by the spectrum, scaled so the sum has the right significant height
-    const hsW = s.hsW, tp = Math.max(1, s.tpW);
-    const raw = WIND_L.map((L, i) => {
-      const f = Math.sqrt(G / (2 * Math.PI * L)), f0 = Math.sqrt(G / (2 * Math.PI * (WIND_L[i + 1] ?? L * 1.4))), f1 = Math.sqrt(G / (2 * Math.PI * (WIND_L[i - 1] ?? L / 1.4)));
-      return jonswap(f, tp) * (f1 - f0) / 2;
-    });
-    const tot = raw.reduce((a, b) => a + b, 0) || 1;
-    this.comps.slice(0, N_WIND).forEach((c, i) => {
-      const target = Math.sqrt(2 * raw[i] / tot) * hsW / 4; // Σ a²/2 = (Hs/4)²
-      c.amp += (target - c.amp) * ease;
-      turn(c, this.windDir + WIND_SPREAD[i]);
-      c.q = 0.45; // sharpen the crests of the chop (less with more components, so the sum never loops)
-    });
-    const hsS = s.hsS;
-    this.comps.slice(N_WIND).forEach((c, i) => {
-      const target = (i === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
-      c.amp += (target - c.amp) * ease; turn(c, s.fromS + 180 + SWELL_SPREAD[i]); c.q = 0.3;
-    });
-    this.ref.hsW += (hsW - this.ref.hsW) * ease; this.ref.hsS += (hsS - this.ref.hsS) * ease;
-  }
-
-  /** Sea surface height (m) at a point (sim coords) at time t, with the local scale of wind sea and swell. */
-  height(p: Vec, t: number, kW: number, kS: number): number {
-    let h = 0;
-    for (const c of this.comps) {
-      if (c.amp <= 0) continue;
-      if (c.at !== c.dir) { c.sd = Math.sin(c.dir * D2R); c.cd = Math.cos(c.dir * D2R); c.at = c.dir; }
-      const dx = c.sd!, dy = c.cd!;
-      h += c.amp * (c.swell ? kS : kW) * Math.sin(c.k * (dx * p.x + dy * p.y) - c.w * t + c.phase);
-    }
-    return h;
-  }
-
-  /** Uniform arrays for the water shader: (dir x, dir y, k, amp) and (ω, phase, Q, swell?). */
-  pack(a: Float32Array, b: Float32Array): void {
-    this.comps.forEach((c, i) => {
-      a[i * 4] = Math.sin(c.dir * D2R); a[i * 4 + 1] = Math.cos(c.dir * D2R); a[i * 4 + 2] = c.k; a[i * 4 + 3] = c.amp;
-      b[i * 4] = c.w; b[i * 4 + 1] = c.phase; b[i * 4 + 2] = c.q; b[i * 4 + 3] = c.swell ? 1 : 0;
-    });
+/**
+ * Uniform arrays for the water shader: (dir x, dir y, k, amp) and (ω, phase at the origin `o` now, Q, swell?).
+ * The phase k·(d·p) − ωt + φ is worked out here, in double precision, at a local origin `o` near the camera (its
+ * k·(d·o) − ωt + φ, wrapped to one turn), so the shader adds only k·(d·(p − o)): small numbers. Out at South Beach
+ * (6 km from the sim's origin) after an hour, the full phase of the shortest wave is ~50,000 rad, where float32 keeps
+ * a few thousandths of a radian and a GPU's sin() isn't promised to be accurate at all.
+ */
+export function packWaves(f: WaveField, a: Float32Array, b: Float32Array, t: number, o: Vec): void {
+  for (let i = 0; i < N_WAVES; i++) {
+    a[i * 4] = f.sd[i]; a[i * 4 + 1] = f.cd[i]; a[i * 4 + 2] = f.k[i]; a[i * 4 + 3] = f.amp[i];
+    const th = f.k[i] * (f.sd[i] * o.x + f.cd[i] * o.y) - f.w[i] * t + f.phase[i];
+    b[i * 4] = f.w[i]; b[i * 4 + 1] = th - 2 * Math.PI * Math.floor(th / (2 * Math.PI)); b[i * 4 + 2] = f.q[i]; b[i * 4 + 3] = f.swell[i];
   }
 }
 
-/** How a boat sits on the waves: heave (m), pitch (bow up, rad) and roll (to starboard, rad), from the surface under her. */
-export function boatOnWaves(ws: WaveSet, p: Vec, h: number, t: number, kW: number, kS: number): { heave: number; pitch: number; roll: number } {
-  const f = { x: Math.sin(h * D2R), y: Math.cos(h * D2R) }, s = { x: f.y, y: -f.x }; // forward, starboard
-  const at = (a: number, b: number) => ws.height({ x: p.x + f.x * a + s.x * b, y: p.y + f.y * a + s.y * b }, t, kW, kS);
+/**
+ * How a hull with no motion of its own sits on the waves (the ghost of an earlier run: its track has no heave or pitch):
+ * heave (m), pitch (bow up, rad) and roll (to starboard, rad) from the surface under her. The boats themselves ride on
+ * their own heave and pitch (Boat.heave, Boat.pitch).
+ */
+export function boatOnWaves(f: WaveField, p: Vec, h: number, t: number, kW: number, kS: number): { heave: number; pitch: number; roll: number } {
+  const D = Math.PI / 180, fw = { x: Math.sin(h * D), y: Math.cos(h * D) }, s = { x: fw.y, y: -fw.x }; // forward, starboard
+  const at = (a: number, b: number) => f.height({ x: p.x + fw.x * a + s.x * b, y: p.y + fw.y * a + s.y * b }, t, kW, kS);
   // a 6 m waterline and 2.2 m beam average out the shortest waves, as a real hull does
   const bow = at(2.6, 0), stern = at(-2.6, 0), port = at(0, -0.9), stbd = at(0, 0.9), mid = at(0, 0);
   return { heave: 0.25 * (bow + stern + port + stbd) * 0.8 + 0.2 * mid, pitch: Math.atan2(bow - stern, 5.2) * 0.8, roll: Math.atan2(port - stbd, 1.8) * 0.5 };
@@ -139,6 +45,7 @@ export const WAVE_GLSL = /* glsl */`
 uniform vec4 uWaveA[${N_WAVES}];
 uniform vec4 uWaveB[${N_WAVES}];
 uniform float uTime;
+uniform vec2 uWaveO; // the local origin the phases in uWaveB are for (packWaves)
 // p: sim coords (x east, y north); kW, kS: local scale; dist: from the camera (m)
 // A wave moves the mesh only where the mesh is fine enough to draw it (the grid spacing at that distance is under a
 // third of its wavelength): finer waves are left to the shading, or they alias into rings round the camera.
@@ -149,7 +56,7 @@ vec3 waveDisp(vec2 p, float kW, float kS, float dist) {
     vec4 A = uWaveA[i], B = uWaveB[i];
     float L = 6.2832 / A.z, fade = 1.0 - smoothstep(L * 0.18, L * 0.33, grid);
     float a = A.w * mix(kW, kS, B.w) * fade;
-    float th = A.z * dot(A.xy, p) - B.x * uTime + B.y;
+    float th = A.z * dot(A.xy, p - uWaveO) + B.y;
     d.xy += B.z * a * A.xy * cos(th);
     d.z += a * sin(th);
   }
@@ -158,7 +65,7 @@ vec3 waveDisp(vec2 p, float kW, float kS, float dist) {
 // surface slope (dh/dx, dh/dy) and height, all wavelengths, each faded out where it gets smaller than the patch of
 // water one pixel covers (foot, m: long at a glancing angle), so the far water doesn't shimmer with aliased crests.
 // For the light only, each wind-sea component also comes in groups: its height swells and fades over a few
-// wavelengths, as in a real sea (wave groups: the sum of neighbouring frequencies beating), so the crests don't run
+// wavelengths, as in a real sea (wave groups: the sum of neighboring frequencies beating), so the crests don't run
 // on in endless even rows. (The boats ride the plain sum, waveDisp.)
 float wgHash(vec2 q) { return fract(sin(dot(q, vec2(127.1, 311.7))) * 43758.5453); }
 float wgNoise(vec2 q) { vec2 i = floor(q), f = fract(q); f = f * f * (3.0 - 2.0 * f);
@@ -172,7 +79,7 @@ vec3 waveSlope(vec2 p, float kW, float kS, float foot) {
     vec2 along = A.xy, across = vec2(-A.y, A.x);
     float env = B.w > 0.5 ? 1.0 : 0.25 + 1.5 * wgNoise(vec2(dot(p, along) - 0.5 * B.x / A.z * uTime, dot(p, across) * 0.4) / (L * 4.0) + float(i) * 7.31);
     float a = A.w * mix(kW, kS, B.w) * fade * env;
-    float th = A.z * dot(A.xy, p) - B.x * uTime + B.y;
+    float th = A.z * dot(A.xy, p - uWaveO) + B.y;
     s.xy += a * A.z * A.xy * cos(th);
     s.z += a * sin(th);
   }

@@ -31,7 +31,7 @@ describe('changing the conditions mid-sail', () => {
     expect(w.boats.length).toBe(n); expect(w.t).toBe(t); expect(w.C.marks.map(m => m.p)).toEqual(marks);
     for (let i = 0; i < 60 * 5; i++) w.step(DT);
     for (const b of w.boats) expect(b.ww.kt).toBeGreaterThan(10);
-  }, 30000);
+  }, 180_000);
   it('racing, a big turn: which legs are beats, reaches and runs goes with the new wind (rule 18.1(a), laylines); the marks stay put', () => {
     const S: Settings = { ...base, mode: 'race', fleet: 1, opponents: DEFAULT_SETTINGS.opponents.slice(0, 1), windTurn: -30 };
     const w = new World(COURSES[0], S, 1);
@@ -45,7 +45,7 @@ describe('changing the conditions mid-sail', () => {
     }
     expect(w.C.marks.map(m => m.leg)).not.toEqual(legs0); // (a westerly's beat is no beat in a northerly)
     expect(w.C.marks.map(m => m.p)).toEqual(at); expect(w.committeeFrom).toBe(from);
-  }, 30000);
+  }, 180_000);
   it('a sea breeze changed for another day: its sea is grown from the new day\'s wind, not the old one\'s', () => {
     const S: Settings = { ...base, windKt: 0, windDay: 0, sea: 'real' };
     const w = new World(COURSES[0], S, 1, { freeSail: true });

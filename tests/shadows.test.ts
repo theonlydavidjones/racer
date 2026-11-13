@@ -9,7 +9,7 @@ const caster = { x: 0, y: 0, h: 318, arel: 28, awa: 28, aws: 16 * 0.5144, ww: { 
 const H = BOAT_WAKE.mast, FROM = 0;
 const downstream = V(caster.h + caster.arel + 180), leeward = V(caster.h - 90); // her wake runs along her apparent wind
 const at = (along: number, side = 0, c = caster) => {
-  const s = new WindSum(), p = { x: downstream.x * along + leeward.x * side, y: downstream.y * along + leeward.y * side };
+  const s = new WindSum(FROM), p = { x: downstream.x * along + leeward.x * side, y: downstream.y * along + leeward.y * side };
   addBoatWake(s, c, p, 12); return s.result(FROM);
 };
 
@@ -23,7 +23,7 @@ describe('dirty air: the wake of a boat\'s sails', () => {
   });
 
   it('the wake lies along her apparent wind, not the true wind: straight downwind of her in the true wind, it\'s weaker', () => {
-    const s = new WindSum(); addBoatWake(s, caster, { x: 0, y: -2 * H }, 12); // two mast heights dead downwind (true)
+    const s = new WindSum(FROM); addBoatWake(s, caster, { x: 0, y: -2 * H }, 12); // two mast heights dead downwind (true)
     expect(s.result(FROM).k).toBeGreaterThan(at(2 * H).k);
   });
 
@@ -37,8 +37,8 @@ describe('dirty air: the wake of a boat\'s sails', () => {
 
   it('downwind, a running boat\'s shadow is far stronger (her sails are mostly drag)', () => {
     const run = { ...caster, h: 180 - 10, arel: 170, awa: 170, aws: 6 * 0.5144 };
-    const e = V(run.h + run.arel + 180), s = new WindSum(); addBoatWake(s, run, { x: e.x * 2 * H, y: e.y * 2 * H }, 12);
-    const sUp = new WindSum(); addBoatWake(sUp, { ...caster, aws: 6 * 0.5144 }, { x: downstream.x * 2 * H, y: downstream.y * 2 * H }, 12);
+    const e = V(run.h + run.arel + 180), s = new WindSum(FROM); addBoatWake(s, run, { x: e.x * 2 * H, y: e.y * 2 * H }, 12);
+    const sUp = new WindSum(FROM); addBoatWake(sUp, { ...caster, aws: 6 * 0.5144 }, { x: downstream.x * 2 * H, y: downstream.y * 2 * H }, 12);
     expect(1 - s.result(FROM).k).toBeGreaterThan(2 * (1 - sUp.result(FROM).k));
   });
 
@@ -50,14 +50,14 @@ describe('dirty air: the wake of a boat\'s sails', () => {
 describe('ships, the committee boat, and the lee of the land', () => {
   it('a container ship beam-on to the wind: near calm in her lee, ~70–90% of the wind 10–15 heights downwind', () => {
     const ship = { x: 0, y: 0, h: 90, v: 0 }; // stopped, beam-on to a northerly
-    const k = (d: number) => { const s = new WindSum(); addShipWake(s, FROM, 12, ship, 45, 300, 42, { x: 0, y: -d }); return s.result(FROM).k; };
+    const k = (d: number) => { const s = new WindSum(FROM); addShipWake(s, FROM, 12, ship, 45, 300, 42, { x: 0, y: -d }); return s.result(FROM).k; };
     expect(k(150)).toBeLessThan(0.4);
     expect(k(450)).toBeGreaterThan(0.6); expect(k(450)).toBeLessThan(0.9);
     expect(k(1500)).toBeGreaterThan(0.93);
   });
 
   it('the committee boat only matters a few boat lengths downwind of her', () => {
-    const k = (d: number) => { const s = new WindSum(); addCommitteeWake(s, FROM, { x: 0, y: 0 }, { x: 0, y: -d }); return s.result(FROM).k; };
+    const k = (d: number) => { const s = new WindSum(FROM); addCommitteeWake(s, FROM, { x: 0, y: 0 }, { x: 0, y: -d }); return s.result(FROM).k; };
     expect(k(12)).toBeLessThan(0.9); expect(k(60)).toBeGreaterThan(0.97);
   });
 

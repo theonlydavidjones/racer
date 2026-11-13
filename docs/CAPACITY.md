@@ -34,6 +34,36 @@ perf test's: Seaweed Soup course 10, a fleet of eight (seven opponents), west wi
 
 This agrees with the Coordinator's 55–58. Main sits right at the line.
 
+### 1.1a The budget's units: the step's own thread (13 Nov 2026)
+
+A reading over budget on main (55.8–57.6) was bisected from v168 (425a5eb) to e75a23d: no code regression (the two
+ends' medians over 11 runs each, 53.17 and 53.72; two commits with identical `src`, 56.27 and 52.32 over 5 runs each).
+The same code read anywhere from about 50 to 58 against 54.7, for two reasons:
+
+- `process.cpuUsage()` counts every thread in the process. The sim's step measured ~1,140 CPU µs against ~900 µs of
+  wall time on one thread: about a quarter of it is V8's helpers (concurrent compiling and marking), a share that
+  varies. Under `node --single-threaded` the two agree (1,117 and 1,127).
+- Even the step's own thread drifts ±6% on this shared host, run to run: its memory and caches slow the sim
+  (memory, allocation) more than the reference (arithmetic in the cache).
+
+So the test now times **the step's own thread** (`process.threadCpuUsage()`, Node 22) for both the sim and the
+reference, and judges **the median of three races** (a fresh World each, the same seed and steps). The budget moved
+to the new units only, measured both ways at once on v168, twelve runs:
+
+| | median | range |
+|---|---|---|
+| the process's CPU time (the old units) | 53.74 | 51.52–58.16 |
+| the step's thread (the new) | 42.31 | 39.84–45.34 |
+| the thread's share, run by run | 0.787 | ±1.2% (sd) |
+
+**54.7 × 42.31 / 53.74 = 43.06 → 43.1.** The same line as before for the same code, as v128's change from the wall
+clock was (40 × 49.8 / 36.4 = 54.7).
+
+The new test, ten runs on main (4f72dbf, which reads like e75a23d): medians 38.87–43.91, their median 41.67 (sd 1.41;
+52.95 in the old units), one run over 43.1. On the old test the same code failed six vitest runs in eight. The
+remaining misses are the host's slow drift, which lasts minutes and so outlasts the three races, and main's typical
+reading is within about 3% of the line. Only room under the budget would remove them, and the budget is the owner's.
+
 ### 1.2 Where a step's time goes (Node CPU profile, 450 s of the race from t = −150 s, 27,000 steps)
 
 Inclusive time (a function plus everything it calls), as a share of all the steps' time:
@@ -145,7 +175,7 @@ What follows for the build:
 ### 1.6 What a snapshot costs
 
 A structured clone of every cloneable field of all eight boats is ~5.1–5.8 KB a boat, 42 KB for the fleet, and takes
-**171 µs** to serialise in Node. A lean render-state is a fraction of that: positions, headings, heel, sail shapes,
+**171 µs** to serialize in Node. A lean render-state is a fraction of that: positions, headings, heel, sail shapes,
 crew poses and lines, packed in a `Float64Array` that is transferred, not copied. So the cost of sending the state each
 frame is a few tenths of a millisecond at most, on threads that have room for it.
 
@@ -207,7 +237,7 @@ the same order.
 
 **Risks.**
 1. The frame's CSP may forbid blob workers. The first step checks this. If it is forbidden, the fallback is today's
-   behaviour, and options B, C and D remain.
+   behavior, and options B, C and D remain.
 2. It's a large refactor of app.ts and the HUD: everything that reads `w.*` must read the snapshot. It touches files
    other sessions are working in (app.ts, ui/hud.ts, render/scene.ts), so it needs a quiet window from the Coordinator,
    or landing in slices (step 1 below lands in-process first and changes nothing visible).
@@ -295,7 +325,7 @@ The owner gave the go on 13 November 2026, through the Coordinator. Step 2 is on
 - **sim/commands.ts**: every change the page makes to the race, as plain data, each applied by the page's old code
   moved unchanged. That covers the helm and tiller, lashing, lines taken and given back, the band's targets and
   jumpers, the lazy car, the crew's place, the pole, the ensign and lights, the halyards, the pilot, the motor, a hail,
-  push-off and cast-off, the destination, home and move-here, retiring, a penalty, conditions, the chart's colours and
+  push-off and cast-off, the destination, home and move-here, retiring, a penalty, conditions, the chart's colors and
   layers, the log's notes, and running, pause and speed.
 - **sim/host.ts**: `SimView`, the World as the page may read it: read-only all the way down, with none of the methods
   that change the race. `SimHost` with `frame` (the old accumulator), `idle`, `send` and `drainEvents`, and
@@ -420,12 +450,75 @@ settings and seed, and never stepped.
   twice: once for the mirror and once for the worker. One copy would do if the page could `import()` a blob URL
   (the worker and the page sharing a module). The probe didn't test that, so a second probe would settle it.
 
+## 7. One copy of the sim's code (13 Nov 2026)
+
+The owner's second probe (runs/20261113174553925, Safari 27 on macOS, inside claude.ai): the page imports a module from a
+blob URL, a blob module imports another, a module worker imports a blob module, and the import map reaches blob modules.
+So the page and its worker share one copy of the sim's code.
+
+| | before | after |
+|---|---|---|
+| The page (HTML) | **9,430 KB** | **5,253 KB** |
+| the sim's code the page and the worker share | in it twice (page 5,256 KB, worker 4,276 KB) | once: `sync`, 4,214 KB |
+| the page's own code (UI, drawing) | (in the page's script) | `app`, 900 KB |
+| start-up, saves, the worker's loop | (in the page's script) | `main`, `cloud`, `worker`: 5 KB together |
+
+- **The build** (vite.artifact.config.ts): the page (src/main.ts) and the worker (src/sim/worker.ts) are two entries of one
+  build, so the bundler puts the code they share in one chunk. It imports nothing (no three.js) and uses no `import.meta`.
+- **The page** (scripts/make-artifact.mjs, scripts/artifact-boot.js): each chunk sits in a script element that isn't run.
+  The start-up script makes each a module from a blob URL, with its imports of the others pointed at their blob URLs,
+  and imports the page's entry. The order is as before: the saves first (`hydrate`), then the app.
+- **The worker** is one classic script, with no imports, from a blob URL: its chunk and the shared one put together
+  (each chunk a function returning its exports, its imports of the others calls to them). A module worker importing the
+  page's blob URLs works on an https page, but Chromium won't start a module worker from a blob at all on a page opened
+  as a file. A classic blob worker starts anywhere it ever did.
+- **If blob modules are refused** (the host's rules change, or a browser won't), the page's chunks are put together the
+  same way as one module, inserted inline. The race then sails in the page's own thread, as whenever its worker can't
+  start. That's exact as long as no module reassigns an export: the build refuses `export let`, `export var` and a local
+  `export { }` anywhere in src/. Which way it went is in `document.documentElement.dataset.simLoad` (`blob` or
+  `fallback`) and the console.
+- **Checked at build time**, failing it otherwise, with rolldown's own parser (`rolldown/parseAst`, installed with vite):
+  each chunk's imports are the manifest's, and each chunk's name appears only at those imports; the forms the
+  put-together rewrites (imports first, one export list last); the worker's chunks don't import three.js (a worker has
+  no import map); and nothing in a chunk that the HTML parser would change. The page now declares its charset first:
+  the put-together edits go by position in the chunks' text, which holds non-ASCII.
+- **smoke.cjs** runs both ways: from the file (blob modules, the race in its worker, the mirror checked), and from an
+  https origin whose content security policy refuses `blob:` (the fallback, the race in the page, its clock running).
+- The same CPU as before: the page and the worker each still compile the sim's code. What's saved is about 4 MB of page
+  to download and to hold as text.
+
 ## Method (to repeat these numbers)
 
-- The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line).
+- The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line: the median of three races, each one's after it).
 - Step profile and spikes: a throwaway vitest file building the perf test's World, then `node:inspector`'s Profiler
   over 450 s of the race (sampling at 200 µs), and wall time per step grouped by `steps % 30 / 60 / 1800`.
 - The browser frame: `npm run dev`, Playwright, the perf.cjs setup (seeded `Math.random`, the full fleet, 22 kt),
   `w.step`, `view.render` and `__hud.update` wrapped with timers, CDP `Profiler` over 60 frames, the samples filtered
   to those under `frame()`.
 - The host: the response headers of the claude.ai artifact page (COOP, no COEP, CSP).
+
+## The compiler's thrown-away work (13 Nov 2026)
+
+Bay East's waves (phase 2) cost about +30% in perf.test's first race in a fresh process, and about +3% after. The
+step's own thread didn't show it: profiles and call counts matched. The cost was V8's optimizing compiler, on its own
+threads: in that first race it compiled the rules' two hottest functions, `checkPairs` 629 times and `assessPair` 196,
+and threw each one away ("Maps became deprecated during optimization"), 14 s of work (bay-east-11: 15 aborts, 0.4 s).
+
+- **The cause:** boat fields built holding a whole number that later hold a fraction (`lastTackT`: −999, then her first
+  tack's time; the penalty's fields; `poleT`; and `weatherHeld` and `carOff`, given later from 0). V8 keeps a field that
+  has only held small integers as one. When it first holds a fraction, the boats' hidden classes change (15–97 maps at
+  a time), and if that comes after the rules' functions have learned the old ones, their every recompile is discarded
+  until the old classes are collected. The waves only moved those first fractions later in the race. Any change to the
+  race could do the same.
+- **The fix** (world.ts `asDoubles`, makeBoat): those fields are made doubles as she's built (stored once as a fraction
+  and put back, the value unchanged), and `weatherHeld` and `carOff` are declared `undefined` from the start. On
+  bay-east-12: no aborts for either function, and the first race 1,023–1,085 CPU µs a step against 1,615–1,772 (bay-east-11:
+  1,122–1,177). The race is identical to the last digit, on that branch and on main.
+- **The guard:** `node scripts/check/deopt.cjs` (~30 s): the perf race, cold, under `node --trace-opt`, failing if any one
+  function's compiles are aborted more than 20 times. Main: about 10 in all, no function over 3. The unfixed
+  bay-east-12: `checkPairs` 608, `assessPair` 195 (fails). To find the field when it fails: `node --no-sparkplug
+  --trace-generalization`, looking for `s->d` (a whole number becoming a fraction) with `(+N maps)` after the hot
+  function is first marked for optimizing.
+- In the browser the compiler's threads are off the worker's, so this costs a player background CPU in the first race
+  rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
+  nothing.

@@ -157,7 +157,7 @@ export function litWindows(mat: THREE.Material, o: { floor?: number; bay?: numbe
           float floorOn = step(wH(vec2(fid * 1.37, s + 1.0)), pFloor), runOn = step(wH(vec2(rid + s * 0.73, id.y * 1.91)), pRun);
           float on = floorOn * runOn * step(wH(id + vec2(s * 1.13, 0.5)), 0.85) + off * (1.0 - floorOn) * step(0.993, wH(id * 1.7 + s));
           float rh = wH(vec2(rid * 1.3 + 0.2, id.y + s)), br = 0.3 + 0.7 * rh;
-          // colour: offices 3500–4100 K, homes 2700–3000 K and one in eight a cool LED
+          // color: offices 3500–4100 K, homes 2700–3000 K and one in eight a cool LED
           vec3 cOff = mix(vec3(1.0, 0.84, 0.66), vec3(0.86, 0.9, 1.0), wH(vec2(rid, id.y * 0.37 + s)));
           vec3 cHome = wH(vec2(rid * 0.7, id.y + s * 2.0)) < 0.125 ? vec3(0.8, 0.85, 1.0) : mix(vec3(1.0, 0.62, 0.32), vec3(1.0, 0.76, 0.5), rh);
           vec3 wc = mix(cHome, cOff, off);
@@ -343,7 +343,7 @@ export function crownDisplayMaterial(y0: number, y1: number): THREE.ShaderMateri
         float vid = smoothstep(0.55, 0.8, vn(vec2(c.x * 0.09 + dir * uTime * (0.6 + nHash(sc + 1.0)), c.y * 0.14 + sc * 7.0)) * (0.7 + 0.3 * vn(c * 0.3 + uTime)));
         float stars = step(0.992, nHash2(c)) * (0.5 + 0.5 * sin(uTime * (1.0 + 3.0 * nHash2(c.yx)) + c.x));
         float b = mix(0.12 + 0.88 * vid, stars, uStars) * uOn * (0.5 + 0.5 * uNight) * (1.0 - smoothstep(fogNear, fogFar, vDepth));
-        vec3 col = mix(vec3(1.0, 0.62, 0.42), vec3(0.95, 0.96, 1.0), smoothstep(0.3, 0.9, uNight)); // the sunset's colours at first
+        vec3 col = mix(vec3(1.0, 0.62, 0.42), vec3(0.95, 0.96, 1.0), smoothstep(0.3, 0.9, uNight)); // the sunset's colors at first
         gl_FragColor = vec4(col * b * 0.9, 1.0);
       }`,
   });
