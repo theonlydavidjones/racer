@@ -58,24 +58,33 @@ export function drawFog(ctx: CanvasRenderingContext2D, tf: Tf, v: Visibility, ct
 }
 
 /**
- * Sea state: the significant height of the chop and swell together, as stipple (more dots where the waves are higher),
- * so it can't be taken for the chart's depth tints; the height in metres on the chart.
+ * Sea state, from the sim's own sea (the waves the boats sail in, World.seaHere): one mark about every 120 px of the
+ * map, so it reads at any zoom without crowding. Each gives the significant height of the chop and swell together
+ * ("0.6 m", their energies add), bold on a halo like the map's other overlays, and, where there's swell worth the name
+ * (0.1 m or more), an arrow the way it runs, longer for a bigger swell; the chop runs with the wind, which the map
+ * shows already. In teal, a colour NOAA's chart doesn't use (the owner: the old stipple and 9 px labels were "too small
+ * and low-contrast to be useful").
  */
 export function drawSea(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: Vec) => SeaHere | null, ctr: Vec, half: number, I: Ink, labels: boolean): void {
-  ctx.save();
-  const sp = Math.max(200, half / 6), x0 = Math.floor((ctr.x - half) / sp) * sp, y0 = Math.floor((ctr.y - half) / sp) * sp;
-  ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const o = tf(0, 0), e = tf(1, 0), pxPerM = Math.hypot(e[0] - o[0], e[1] - o[1]); if (!(pxPerM > 0)) return;
+  const sp = Math.max(120, 120 / pxPerM), x0 = Math.floor((ctr.x - half) / sp) * sp, y0 = Math.floor((ctr.y - half) / sp) * sp;
+  // the way north points on the screen (the map may be turned): for the arrows
+  const nth = tf(0, 1), ang0 = Math.atan2(nth[1] - o[1], nth[0] - o[0]);
+  ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${labels ? 12 : 10}px "Saira Semi Condensed", sans-serif`;
   for (let x = x0; x <= ctr.x + half; x += sp) for (let y = y0; y <= ctr.y + half; y += sp) {
     const c = { x: x + sp / 2, y: y + sp / 2 }, s = at(c); if (!s) continue;
-    const hs = Math.hypot(s.hsW, s.hsS); // (the two together: their energies add)
-    // dots at fixed spots in the cell (the same each frame), as many as the waves are high: 0 to 40 for 0 to 2.5 m
-    const n = Math.round(clamp(hs / 2.5, 0, 1) * 40);
-    let r = (Math.abs(Math.round(x) * 73856093 ^ Math.round(y) * 19349663) % 2147483647) || 1;
-    const rnd = () => (r = r * 16807 % 2147483647) / 2147483647;
-    ctx.fillStyle = I.seaText;
-    for (let k = 0; k < n; k++) { const q = tf(x + rnd() * sp, y + rnd() * sp); ctx.fillRect(q[0] - 0.7, q[1] - 0.7, 1.4, 1.4); }
-    const cs = tf(c.x, c.y), p0 = tf(x, y), p1 = tf(x + sp, y), px = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
-    if (labels && px > 60 && hs > 0.05) { const t = `${hs.toFixed(1)} m sea`; ctx.strokeStyle = I.halo; ctx.lineWidth = 3; ctx.strokeText(t, cs[0], cs[1] + 0.3 * px); ctx.fillStyle = I.seaText; ctx.fillText(t, cs[0], cs[1] + 0.3 * px); }
+    const hs = Math.hypot(s.hsW, s.hsS); if (hs < 0.05) continue;
+    const q = tf(c.x, c.y);
+    if (s.hsS >= 0.1) {
+      // the arrow: from where the swell comes to where it goes (fromS is the direction it comes from)
+      const a = ang0 + (s.fromS + 180) * Math.PI / 180, len = 12 + 14 * clamp(s.hsS / 2, 0, 1), dx = Math.cos(a), dy = Math.sin(a);
+      const ax = q[0] - dx * len / 2, ay = q[1] - dy * len / 2 - 12, bx = q[0] + dx * len / 2, by = q[1] + dy * len / 2 - 12;
+      const head = (w: number, col: string) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.moveTo(bx, by); ctx.lineTo(bx - dx * 6 - dy * 4, by - dy * 6 + dx * 4); ctx.moveTo(bx, by); ctx.lineTo(bx - dx * 6 + dy * 4, by - dy * 6 - dx * 4); ctx.stroke(); };
+      head(5, I.halo); head(2, I.seaMark);
+    }
+    const t = `${hs.toFixed(1)} m`;
+    ctx.strokeStyle = I.halo; ctx.lineWidth = 4; ctx.strokeText(t, q[0], q[1] + 4); ctx.fillStyle = I.seaMark; ctx.fillText(t, q[0], q[1] + 4);
   }
   ctx.restore();
 }

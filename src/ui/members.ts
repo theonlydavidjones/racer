@@ -90,7 +90,7 @@ export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
   return `<div class="mtools"><button type="button" class="cta" data-f="mnew">New member</button></div>
     ${group('You and your crew', yours, 'Just you so far: New member adds someone to sail with you.')}
     ${club.length ? group('The club', club, '') : ''}
-    <small class="fnote">Yours are yours to set; the club's own members are shown as the club knows them. Open anyone for all their ratings.</small>`;
+`;
 }
 
 /** A member's page: their name and build, their skill and crew ratings, a skipper too, and leaving the club. */
