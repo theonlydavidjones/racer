@@ -69,12 +69,20 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
   if (!m.q) return segPt(m.p, bw, st);
   return Math.min(segPt(m.p, bw, st), segPt(m.q, bw, st), segPt(bw, m.p, m.q), segPt(st, m.p, m.q));
 }
-/** How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. */
+/**
+ * How long after a Part 2 foul a mark touch counts as the same incident (Rule 44.1(a)), s. A time proxy: the published test
+ * is causal, "whether the second occurrence was the inevitable result of the first" (US Sailing Appeal 65; Appeal 82, a
+ * boom touching the mark in the tack, the same incident). No source gives seconds.
+ */
 const SAME_INCIDENT = 8;
 /** Rule 44.1: a tangle after a foul (the boats still together, the turns not begun) counts as one incident for at most this long, s. */
 const TANGLE_MAX = 30;
 
-/** A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. */
+/**
+ * A boat forced into a breach by another boat's breach this recently is exonerated (Rule 43.1(a)), s. A time proxy: the
+ * published test is whether she was "compelled", unable to avoid it once the other's breach was clear (WS Case 3; US
+ * Sailing Appeals 2, 19, 78). No source gives seconds.
+ */
 const COMPELLED_WINDOW = 3;
 
 export interface StartReport { delay: number; frac: number; kt: number }
