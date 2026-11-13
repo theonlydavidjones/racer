@@ -101,7 +101,7 @@ Use them; they're cheaper than doing it all yourself and catch what the author m
   class rules, RRS text, places. It returns facts with sources. Run several in parallel for independent questions.
 - **visual-checker** (lighter model): after any change to what's drawn, before publishing. It renders both tacks from
   both sides and checks against a sailor's checklist.
-- **physics-reviewer** (strongest model, read-only): before publishing any change under src/boat, src/environment,
+- **physics-reviewer** (Fable 5.2, the strongest model; trial from 13 Nov 2026, owner; read-only): before publishing any change under src/boat, src/environment,
   src/sim, src/ai or src/rules. An independent review against the science and the RRS; fix what it confirms.
 
 Keep the core simulation work (physics, world, main loop) in the main session: those files are shared, so splitting
