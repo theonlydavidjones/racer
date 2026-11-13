@@ -1,6 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
-import { CABIN, CABIN_LEAN, cabinSideH, COMPANIONWAY, L, WINDOW, cabinHalf, cabinTopAt, cabinTopY, deckY, halfBeam, hullInnerHalf } from './hull';
+import { CABIN, CABIN_LEAN, cabinSideH, winTop, COMPANIONWAY, L, WINDOW, cabinHalf, cabinTopAt, cabinTopY, deckY, halfBeam, hullInnerHalf } from './hull';
 
 /**
  * The cabin's inside, to the class construction plan (1:10, rev. 2024; read from its St. 8 section and profile):
@@ -43,7 +43,7 @@ function section(u: number): { x: number; y: number; wood: boolean; win?: boolea
   pts.push({ x: ch + 0.01, y: dS - INSET, wood: false }); // under the side deck, in to the cabin side
   // the cabin side, up past the window to the top's edge (the window's band marked, for the opening)
   const H = cabinSideH(u);
-  for (const h of [0, WINDOW.h0, WINDOW.h1, H]) pts.push({ x: ch - CABIN_LEAN * h / H, y: dS + h - (h === H ? INSET : 0), wood: false, win: h === WINDOW.h0 });
+  for (const h of [0, WINDOW.h0, winTop(u), H]) pts.push({ x: ch - CABIN_LEAN * h / H, y: dS + h - (h === H ? INSET : 0), wood: false, win: h === WINDOW.h0 });
   const w = ch - CABIN_LEAN;
   // the cabin top's underside, in to the centreline (a point at the hatch opening's edge, where it's cut through)
   const xs = [...[1, 2, 3, 4, 5].map(k => w * (1 - k / 5)), COMPANIONWAY.hw].sort((a, b) => b - a);
@@ -178,12 +178,13 @@ export function cabinInteriorGeometry(): THREE.BufferGeometry {
   for (const side of [1, -1]) {
     const N = 8, outer = (u: number, h: number) => cabinHalf(u) - CABIN_LEAN * h / cabinSideH(u), inner = (u: number, h: number) => outer(u, h) - INSET;
     const P = (u: number, h: number, x: number) => new THREE.Vector3(side * x, deckY(u, cabinHalf(u)) + h, zAt(u));
-    for (const h of [WINDOW.h0, WINDOW.h1]) for (let i = 0; i < N; i++) { // the sill and the head
+    for (const top of [false, true]) for (let i = 0; i < N; i++) { // the sill and the head (the head tapering with the glass)
       const ua = WINDOW.hole0 + (WINDOW.hole1 - WINDOW.hole0) * i / N, ub = WINDOW.hole0 + (WINDOW.hole1 - WINDOW.hole0) * (i + 1) / N;
-      tri(P(ua, h, outer(ua, h)), P(ub, h, outer(ub, h)), P(ub, h, inner(ub, h)), LINING, LINING, LINING); tri(P(ua, h, outer(ua, h)), P(ub, h, inner(ub, h)), P(ua, h, inner(ua, h)), LINING, LINING, LINING);
+      const ha = top ? winTop(ua) : WINDOW.h0, hb = top ? winTop(ub) : WINDOW.h0;
+      tri(P(ua, ha, outer(ua, ha)), P(ub, hb, outer(ub, hb)), P(ub, hb, inner(ub, hb)), LINING, LINING, LINING); tri(P(ua, ha, outer(ua, ha)), P(ub, hb, inner(ub, hb)), P(ua, ha, inner(ua, ha)), LINING, LINING, LINING);
     }
     for (const u of [WINDOW.hole0, WINDOW.hole1]) { // the ends
-      const a = P(u, WINDOW.h0, outer(u, WINDOW.h0)), b = P(u, WINDOW.h1, outer(u, WINDOW.h1)), c = P(u, WINDOW.h1, inner(u, WINDOW.h1)), d = P(u, WINDOW.h0, inner(u, WINDOW.h0));
+      const ht = winTop(u), a = P(u, WINDOW.h0, outer(u, WINDOW.h0)), b = P(u, ht, outer(u, ht)), c = P(u, ht, inner(u, ht)), d = P(u, WINDOW.h0, inner(u, WINDOW.h0));
       tri(a, b, c, LINING, LINING, LINING); tri(a, c, d, LINING, LINING, LINING);
     }
   }
@@ -291,7 +292,7 @@ export function windowLids(): THREE.BufferGeometry {
   for (const side of [1, -1]) for (let i = 0; i < N; i++) {
     const ua = WINDOW.hole0 + (WINDOW.hole1 - WINDOW.hole0) * i / N, ub = WINDOW.hole0 + (WINDOW.hole1 - WINDOW.hole0) * (i + 1) / N;
     const pt = (u: number, h: number) => { const w = cabinHalf(u) - CABIN_LEAN * h / cabinSideH(u); return [side * w, deckY(u, cabinHalf(u)) + h, zAt(u)]; };
-    const a = pt(ua, WINDOW.h0), b = pt(ub, WINDOW.h0), c = pt(ub, WINDOW.h1), d = pt(ua, WINDOW.h1);
+    const a = pt(ua, WINDOW.h0), b = pt(ub, WINDOW.h0), c = pt(ub, winTop(ub)), d = pt(ua, winTop(ua));
     pos.push(...a, ...b, ...c, ...a, ...c, ...d);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); return g;

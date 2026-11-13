@@ -13,7 +13,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, type Instrument } from './tacktick';
-import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN } from './hull';
+import { CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, cabinHalf, CABIN_LEAN, WINDOW } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -197,8 +197,10 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // is what shows through it)
   const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   for (const s of [1, -1]) {
-    const geo = sidePatch(uAtZ(-0.05), 0.95, CABIN.h * 0.32, CABIN.h * 0.72, 24, 2);
-    if (s < 0) mirrorPatch(geo);
+    // (a patch over the light and its frame; the picture draws the tapered glass and the frame on it, the same shape both
+    // sides: mirrored to port without turning the picture round)
+    const f = WINDOW.frame, geo = sidePatch(WINDOW.uc, WINDOW.len + 2 * f, WINDOW.h0 - f, WINDOW.h1 + f, 32, 6);
+    if (s < 0) { geo.scale(-1, 1, 1); (geo.index!.array as Uint16Array | Uint32Array).reverse(); geo.computeVertexNormals(); }
     grp.add(new THREE.Mesh(geo, winMat));
   }
   const topAft = cab.topY(CABIN.u1), zAft = zc(CABIN.u1);
@@ -339,7 +341,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
     document.fonts?.load(`170px ${NAME_FONT}`).then(() => { draw(); tex.needsUpdate = true; }).catch(() => { /* the fallback script face */ });
     for (const s of [1, -1]) {
-      const geo = sidePatch(uAtZ(0.84), 0.86, 0.02, 0.19, 32, 4);
+      const geo = sidePatch(uAtZ(1.04), 0.6, 0.045, 0.165, 32, 4); // (just aft of the window, about centred on the cabin's after end and half a metre long, as on Josephine: the owner's side photo)
       if (s < 0) mirrorPatch(geo);
       grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
     }
@@ -1511,14 +1513,36 @@ function mirrorPatch(geo: THREE.BufferGeometry): void {
   (geo.index!.array as Uint16Array | Uint32Array).reverse(); geo.computeVertexNormals();
 }
 let winCache: THREE.CanvasTexture | null = null;
-/** The long cabin light: dark tinted glass with a sky sheen, in a thin aluminium frame with rounded ends. */
+/**
+ * The long cabin light's picture (WINDOW, hull.ts): over the patch from the frame's after end (u 0) to its forward end
+ * (u 1) and from below the frame (v 0) to above it (v 1). The glass dark-tinted and see-through, its bottom edge straight
+ * and its top tapering down toward the bow, both ends rounded; round it the brushed aluminium frame, about 3/4 in wide,
+ * riveted all round (the owner, of Josephine).
+ */
 function windowTexture(): THREE.CanvasTexture {
   if (winCache) return winCache;
-  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64; const c = cv.getContext('2d')!;
-  const rr = (x: number, y: number, w: number, h: number, r: number) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
-  c.fillStyle = '#b9bec3'; rr(2, 4, 508, 56, 26); c.fill(); // the frame
-  const g = c.createLinearGradient(0, 10, 0, 54); g.addColorStop(0, '#3c4c5a'); g.addColorStop(0.45, '#1c252d'); g.addColorStop(1, '#141a20');
-  c.save(); rr(10, 10, 492, 44, 20); c.clip(); c.clearRect(0, 0, 512, 64); c.fillStyle = g; c.globalAlpha = 0.5; c.fillRect(0, 0, 512, 64); c.restore(); // the glass: tinted, see-through
+  const W = 1024, H = 128, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
+  const f = WINDOW.frame, Lz = WINDOW.len + 2 * f, Hh = WINDOW.h1 - WINDOW.h0 + 2 * f;
+  const X = (z: number) => (WINDOW.z1 + f - z) / Lz * W, Y = (h: number) => H - (h - (WINDOW.h0 - f)) / Hh * H; // (z: aft is u 0, at the left)
+  /** The glass's outline grown by `g` (m): bottom straight, top tapering, ends half-round. */
+  const outline = (g: number) => {
+    const pts: [number, number][] = [], n = 14, b = WINDOW.h0 - g;
+    const top = (z: number) => WINDOW.h0 + WINDOW.hFwd + (WINDOW.hAft - WINDOW.hFwd) * (z - WINDOW.z0) / WINDOW.len + g;
+    const rA = (top(WINDOW.z1) - b) / 2, rF = (top(WINDOW.z0) - b) / 2, zA = WINDOW.z1 - rA + g, zF = WINDOW.z0 + rF - g;
+    for (let k = 0; k <= n; k++) { const a = -Math.PI / 2 + Math.PI * k / n; pts.push([zA + rA * Math.cos(a), b + rA + rA * Math.sin(a)]); } // the after end
+    for (let k = 0; k <= n; k++) { const a = Math.PI / 2 + Math.PI * k / n; pts.push([zF + rF * Math.cos(a), b + rF + rF * Math.sin(a)]); } // the forward end
+    c.beginPath(); pts.forEach(([z, h], i) => (i ? c.lineTo(X(z), Y(h)) : c.moveTo(X(z), Y(h)))); c.closePath();
+  };
+  // the frame: brushed aluminium (fine streaks along it)
+  outline(f); c.save(); c.clip(); c.fillStyle = '#b8bdc2'; c.fillRect(0, 0, W, H);
+  for (let i = 0; i < 160; i++) { const y = Math.random() * H; c.strokeStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '90,95,100'},0.12)`; c.lineWidth = 1; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y + (Math.random() - 0.5) * 2); c.stroke(); }
+  c.restore();
+  // its rivets, all round, in the middle of the frame about every 6 cm
+  outline(f / 2); c.save(); c.setLineDash([2.2, (0.06 / Lz) * W - 2.2]); c.lineCap = 'round'; c.lineWidth = 3.2; c.strokeStyle = '#7d8388'; c.stroke(); c.restore();
+  // the glass: cut out, then tinted, see-through, a little sky in its top
+  outline(0); c.save(); c.clip(); c.clearRect(0, 0, W, H);
+  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(70,88,104,0.55)'); g.addColorStop(0.5, 'rgba(28,37,45,0.5)'); g.addColorStop(1, 'rgba(20,26,32,0.5)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H); c.restore();
   winCache = new THREE.CanvasTexture(cv); winCache.anisotropy = 4; return winCache;
 }
 

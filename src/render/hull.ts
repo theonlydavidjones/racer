@@ -404,11 +404,18 @@ export function cabinHalf(u: number): number {
 /** How far the cabin sides lean in over their height (m). */
 export const CABIN_LEAN = 0.015;
 /**
- * The long cabin light each side (as on Josephine; portholes' shape is free, CR 3.19): centred at station uc, `len` m
- * long, from h0 to h1 above the deck at the cabin side. Its glass is cut through the cabin side between hole0 and hole1
- * (short of its rounded ends, which the frame covers), so the cabin's inside is seen through it.
+ * The long cabin light each side, as on Josephine (the owner's answers and photos; portholes' shape is free, CR 3.19):
+ * about 1 m of glass from about half a metre aft of the cabin's front edge to just forward of the name (z0..z1), its
+ * bottom edge straight, h0 above the deck at the cabin side, and its top tapering down toward the bow, the glass hAft
+ * tall at its after end and hFwd at its forward end; both ends rounded; in a brushed aluminium frame about 3/4 in wide
+ * (frame), riveted all round. The glass's heights are read off the owner's side photo (an estimate, within a cm).
+ * Its opening is cut through the cabin side between hole0 and hole1 (the frame covers its rounded ends), and the
+ * cabin's inside is seen through it. h1 is the glass's top at its tallest, the after end.
  */
-export const WINDOW = { uc: zU(-0.05), len: 0.95, h0: CABIN.h * 0.32, h1: CABIN.h * 0.72, hole0: zU(-0.05) - (0.95 / 2 - 0.045) / L, hole1: zU(-0.05) + (0.95 / 2 - 0.045) / L };
+const WIN = { z0: -0.35, z1: 0.65, h0: 0.085, hAft: 0.095, hFwd: 0.06, frame: 0.019 };
+export const WINDOW = { ...WIN, uc: zU((WIN.z0 + WIN.z1) / 2), len: WIN.z1 - WIN.z0, h1: WIN.h0 + WIN.hAft, hole0: zU(WIN.z0 + 0.025), hole1: zU(WIN.z1 - 0.03) };
+/** The window glass's top edge (m above the deck at the cabin side) at station u: tapering down toward the bow. */
+export const winTop = (u: number) => WIN.h0 + WIN.hFwd + (WIN.hAft - WIN.hFwd) * Math.min(1, Math.max(0, (u - zU(WIN.z0)) / (zU(WIN.z1) - zU(WIN.z0))));
 
 /** Height of the cabin sides' top edge at station u. */
 /**
@@ -456,7 +463,7 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   // four rows up each side: from below the deck, the window's sill and head, the top edge; the window's band is open
   const R = 4;
   for (const o of ring) {
-    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, Math.min(d + WINDOW.h0, t), Math.min(d + WINDOW.h1, t), t]; // (where the nose is lower than the window's band, the rows close up under the top)
+    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, Math.min(d + WINDOW.h0, t), Math.min(d + winTop(o.u), t), t]; // (where the nose is lower than the window's band, the rows close up under the top)
     for (const y of hs) { const f = t - d > 1e-4 ? Math.max(0, (y - d) / (t - d)) : 1; sides.push(o.x - Math.sign(o.x) * CABIN_LEAN * f, y, zAt(o.u)); }
   }
   // (all round but the after end: that's the bulkhead, with the companionway in it)

@@ -22,6 +22,9 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   profile photo was an illusion of its angle.)
 - The cabin top rises toward its after end (profile photo).
 - The cabin front rounds down to the deck.
+- The cabin light each side: about 1 m long, from about half a metre aft of the cabin's front edge to just forward of the
+  name; its bottom edge straight, its top tapering down toward the bow; rounded ends; a brushed aluminium frame about
+  3/4 in wide, screws or rivets all round.
 - The grab rails run most of the cabin top's length, curved to follow the roof (which slants down forward), about
   halfway between the hatch and the roof's edge.
 - The jib car tracks are H-shaped, on the cabin top between the grab rail and the roof's edge; cross-bar about 5 in,
