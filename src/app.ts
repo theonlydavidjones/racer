@@ -24,6 +24,8 @@ import { D2R, V, brg, dist, wrap } from './core/math';
 import { EXONERATION, RULES, explain, ptsText, raceScores, scoreOrder, type Incident, type ScoreOut } from './rules';
 import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
+import { keepSeasonRace, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
+import { seasonHtml } from './ui/season';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
 import { placeAmong, realFleetIds, realRace, realRaces, sailKey } from './sim/realRaces';
 import type { Boat, LineKey } from './boat/boat';
@@ -1581,6 +1583,7 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
       ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) };
     out.push(entry);
     // your run, kept as a ghost for this race if you save it (her own track from the race's, once a second)
+    if (b.isUser && entry.setup) { const sr = seasonRaceOf(); pendingSeason = sr ? { ...sr, at: entry.at } : null; }
     if (b.isUser && entry.setup) pendingGhost = { at: entry.at, key: setupKey(entry.setup), elapsed: entry.elapsed, place: entry.place, of: entry.of, code: entry.code, pts: trackOf(w.track, b.id) };
   });
   stage(out);
@@ -1600,6 +1603,8 @@ function logOuting(): void {
     // you left the race before finishing: retired
     send({ k: 'shown', logged: true });
     stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'RET', of: w.boats.length, setup: raceSetup() }]);
+    // (a season race left unfinished: RET in the series too, if it's saved)
+    { const sr = seasonRaceOf(); pendingSeason = sr && pending ? { ...sr, at: pending[0].at } : null; }
   }
 }
 /** The sail just ended, waiting for you to say whether it goes in the logbook. */
@@ -1624,6 +1629,7 @@ function settleLog(next: () => void): void {
     $('keepAsk').hidden = true; pending = null;
     if (keep) addLog(p);
     if (keep && pendingGhost) keepGhost(pendingGhost); pendingGhost = null;
+    if (keep && pendingSeason) { const r = seasonResult(pendingSeason.at); if (r) keepSeasonRace(pendingSeason.series.id, pendingSeason.no, r); } pendingSeason = null;
     toast(keep ? 'Saved to her logbook.' : 'Discarded.', 2200);
     next();
   };
@@ -1654,9 +1660,10 @@ function showResults(): void {
   $('resStart').textContent = sr ? `Your start: crossed ${sr.delay.toFixed(1)} s after the gun at ${sr.kt.toFixed(1)} kt, ${Math.round(sr.frac * 100)}% of the way from ${w.C.pinLabel} to ${w.C.committeeLabel}.` : 'No clean start recorded.';
   const code = (b: Boat) => { const s = sc.get(b.id)!; return b.scoring === 'ZFP' ? ` · ZFP: ${Number.isInteger(s.across!) ? nth(s.across!) : `tied ${nth(Math.floor(s.across!))}`} across the line, +${ptsText(s.penalty)} points (Rule 30.2, 44.3(c))${s.final ? '' : '; her place waits on the boats still racing'}` : b.scoring ? ` · ${b.scoring}: disqualified (Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'})` : ''; };
   const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
-  $('resBody').innerHTML = rows.map(b => `<tr><td>${rankOf(b)}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td><td>${sc.get(b.id)!.points != null ? ptsText(sc.get(b.id)!.points!) : ''}</td></tr>`).join('');
+  $('resBody').innerHTML = rows.map(b => `<tr><td>${rankOf(b)}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no.replace(/^US\s+/, 'USA ')}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td><td>${sc.get(b.id)!.points != null ? ptsText(sc.get(b.id)!.points!) : ''}</td></tr>`).join('');
   $('resFouls').textContent = `Fouls you committed: ${w.fouls}. Fouls against you: ${w.fouledBy}.`;
   { const rr = realResults(); $('resReal').innerHTML = rr; $('resReal').hidden = !rr; }
+  { const sl = seasonLine(); $('resSeason').innerHTML = sl; $('resSeason').hidden = !sl; }
   const db = debriefHtml('Your race, debriefed');
   $('resDebrief').innerHTML = db; $('resDebrief').hidden = !db; $('resStart').hidden = !!db; // the debrief has the start in full
   $('bWatch').hidden = !w.log || w.track.length < 2;
@@ -1784,6 +1791,8 @@ const fleet: Fleet = new Fleet(S, {
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); prepare(); openSetup();
   },
+  seasonHtml: () => { const s = seasons()[0]; return s ? seasonHtml(s, seasonResults(s.id)) : ''; },
+  sailSeason: no => sailSeason(no),
   back: () => { if (fleetFrom === 'setup') { prepare(); openSetup(); } else { newGame(); $('home').hidden = false; } }
 });
 function openHome(): void { settleLog(openHomeNow); }
@@ -1863,11 +1872,12 @@ function realResults(): string {
   const mine = sailKey(S.boat.sails.number);
   const rows = [...fin.map(b => ({ name: titleCase(b.boat), no: b.key, t: b.elapsedS!, sim: simT(b.key), you: false, yours: !!mine && b.key === mine })), { name: 'You', no: '', t: you, sim: undefined, you: true, yours: false }].sort((a, b) => a.t - b.t);
   const gap = you - win, perMile = gap / Math.max(0.1, r.distanceNm);
+  const simCol = rows.some(x => x.sim || x.yours); // (a season race sails the club's fleet: no real boat in the sim)
   return `<div class="eyebrow">Against the real fleet · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
-    + `<p class="lede">On the day you'd have been <b>${nth} of ${of}</b>: ${gap <= 0 ? `${mmss(-gap)} ahead of the winner` : `${mmss(gap)} behind the winner, ${Math.round(perMile)} s a mile`}. Their times are the published ones (${esc(r.event)}, race ${r.raceNo}: all on the same rating, so elapsed time decides); the sim's column is the AI sailing each boat today, a check on the sim against the real fleet.</p>`
+    + `<p class="lede">On the day you'd have been <b>${nth} of ${of}</b>: ${gap <= 0 ? `${mmss(-gap)} ahead of the winner` : `${mmss(gap)} behind the winner, ${Math.round(perMile)} s a mile`}. Their times are the published ones (${esc(r.event)}, race ${r.raceNo}: all on the same rating, so elapsed time decides)${simCol ? '; the sim\'s column is the AI sailing each boat today, a check on the sim against the real fleet' : ''}.</p>`
     + (r.uncertain ? `<p class="lede">${esc(r.uncertain)}</p>` : '')
     + (r.doubt ? `<p class="lede">${esc(r.doubt)}</p>` : '')
-    + `<table class="res"><thead><tr><th></th><th>Boat</th><th>Real</th><th>In the sim</th></tr></thead><tbody>${rows.map((x, i) => `<tr${x.you ? ' class="you"' : ''}><td>${i + 1}</td><td>${esc(x.name)} <span style="color:var(--muted)">${esc(x.no)}</span></td><td>${mmss(x.t)}</td><td>${x.you ? '' : x.yours ? 'your number: you sailed for her' : x.sim?.finished ? mmss(x.sim.finishT!) : x.sim ? '–' : ''}</td></tr>`).join('')}</tbody></table>`
+    + `<table class="res"><thead><tr><th></th><th>Boat</th><th>Real</th>${simCol ? '<th>In the sim</th>' : ''}</tr></thead><tbody>${rows.map((x, i) => `<tr${x.you ? ' class="you"' : ''}><td>${i + 1}</td><td>${esc(x.name)} <span style="color:var(--muted)">${esc(x.no)}</span></td><td>${mmss(x.t)}</td>${simCol ? `<td>${x.you ? '' : x.yours ? 'your number: you sailed for her' : x.sim?.finished ? mmss(x.sim.finishT!) : x.sim ? '–' : ''}</td>` : ''}</tr>`).join('')}</tbody></table>`
     + `<p class="lede"><a href="${esc(r.url)}" target="_blank" rel="noopener">The published results</a></p>`;
 }
 
@@ -1877,6 +1887,53 @@ function realResults(): string {
 let pastList: LogEntry[] = [];
 const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id === e.setup!.course) ? e.setup.course
   : COURSES.slice().sort((a, b) => b.title.length - a.title.length).find(c => e.title.startsWith(c.title))?.id ?? null;
+/* ---------------- the season (club/season.ts): a real club series, race by race, against the club's fleet ---------------- */
+let pendingSeason: { series: Series; no: number; at: string } | null = null;
+/** Sail race `no` of the season: its real day and start, the day's observed wind and tide, its course (or the committee's), the club's fleet. */
+function sailSeason(no: number): void {
+  const series = seasons()[0], r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
+  Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.realId ?? undefined });
+  replayPin = null; ghostNext = null;
+  S.opponents = [...series.fleet]; S.fleet = S.opponents.length;
+  if (!S.boat.slip) S.raceFrom = 'water';
+  saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
+  beginRace();
+}
+/** The season race this race is, if it's one: that race's course, day and start, in the day's real conditions, against the series' fleet. */
+function seasonRaceOf(): { series: Series; no: number } | null {
+  if (S.mode !== 'race' || !w || w.freeSail) return null;
+  for (const series of seasons()) for (const r of series.races) {
+    if (r.abandoned || S.course !== r.courseId || S.tideDate !== r.date || S.tideTime !== r.start) continue;
+    if (S.windKind !== 'auto' || S.windKt || S.windTurn || S.windDir != null || replayPin != null || S.current !== 'real') continue;
+    if (S.opponents.length !== series.fleet.length || !series.fleet.every(o => S.opponents.includes(o))) continue;
+    return { series, no: r.no };
+  }
+  return null;
+}
+/** Her hull's colour, for a boat in the race: yours, a club boat, or one of the club's other Folkboats. */
+function hullOf(b: Boat): string {
+  if (b.isUser) return S.boat.hull.upper;
+  const id = S.opponents[b.id - 1] ?? '';
+  if (id.startsWith('stock:')) return FLEET[+id.slice(6)]?.hull ?? '#ccc';
+  return (isGeneric(id) ? genericSpec(id, S.boats.map(x => x.sails.number))?.hull.upper : b.spec?.hull.upper) ?? '#ccc';
+}
+/** This race's scores, as the season keeps them: each boat by country and sail number; the boats still racing in the order they're in now. */
+function seasonResult(at: string): SeasonResult | null {
+  if (!w) return null;
+  const sc = scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
+  return { at, scores: rows.map((b, i) => { const s = sc.get(b.id)!; return { sail: b.no.replace(/^US\s+/, 'USA '), name: b.isUser ? (S.boat.name || 'You') : b.name, hull: hullOf(b), you: b.isUser, points: s.points ?? (b.isUser ? w.boats.length + 1 : i + 1), code: s.points == null && b.isUser ? 'RET' : s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.code }; }) };
+}
+/** At the finish of a season race: where this race puts you in the series (counted once you save it). */
+function seasonLine(): string {
+  const sr = seasonRaceOf(); if (!sr) return '';
+  const now = seasonResult('now'); if (!now) return '';
+  const res = { ...seasonResults(sr.series.id), [sr.no]: now }, { rows } = standings(sr.series, res);
+  const you = rows.find(r => r.you), lead = rows[0]; if (!you) return '';
+  const done = sr.series.races.filter(r => !r.abandoned).every(r => res[r.no]);
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  return `<b>${esc(sr.series.title.replace(/ \d{4}.*/, ''))}: ${ordinal(you.rank)} · ${you.nett} nett</b> <span>· ${lead === you ? (done ? 'you win the series' : 'you lead') : `${esc(lead.sail)} ${esc(lead.name)} ${done ? 'wins' : 'leads'} on ${lead.nett}`} · counts when you save it</span>`;
+}
 /**
  * A ghost to race against, when there's a run of this very race kept (replay/ghost.ts): your best (the fastest finish), this
  * run if it's another, or none. Sailing it again, the ghost sails its run beside you.
