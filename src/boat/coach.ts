@@ -9,6 +9,7 @@ import { beatAngle, polar } from './polar';
 import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { KT, clamp } from '../core/math';
+import { inBasin } from '../geo/marina';
 import { TUNE_PRESETS, forestayTension, presetFor, tuneName, tuneWords } from './rigTune';
 
 /**
@@ -399,6 +400,11 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
 function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   const base = { id: 'ok', who: 'you', gain: 0, kind: 'ok' as const };
   if (b.docked) return { ...base, head: 'In her slip. Push off when you\'re ready.', why: '', look: '' };
+  // pushed off with no sail up and stopped in a harbor: no way on, so the rudder can't turn her (8m, the owner at Gashouse
+  // Cove). The ways out a sailor has: a sail up for way (the jib goes up at any angle but head to wind), the main hoisted at
+  // the dock held head to wind, or a paddle (Crew Controls' 8c, to add here when it lands)
+  if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && Math.hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
+    return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way; next time, hoist the main at the dock, head to wind.', why: '', look: 'which way the wind is setting her' };
   if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: 'Sails going up (or down): the coach waits until they\'re set.', why: '', look: '' };
   if (b.luff) return { ...base, kind: 'info', head: 'Sails eased right out: she\'s slowing.', why: 'Easing both sails until they flog is the brake: she coasts to a stop.', look: 'the speedo; trim back in to go' };
   if (b.tacking || b.turnTarget != null) return { ...base, kind: 'info', head: s.twa < 90 ? 'Through the tack: the crew is changing the jib over.' : 'Through the gybe: the boom is coming across.', why: '', look: s.twa < 90 ? 'the new jib telltales once she\'s settled on the new tack' : 'the boom: duck' };

@@ -154,8 +154,11 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing') continue;
       if (15 * Math.abs(Math.sin(rel(from, s.heading) * Math.PI / 180)) < WIND_SWINGS) continue;
       n++;
-      expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading))); // (the bow comes round toward the wind: the stern goes downwind)
-      if (p.hold) { held++; expect(Math.abs(rel(from, s.heading + p.turn))).toBeLessThan(6); expect(Math.abs(p.hold.off)).toBeGreaterThanOrEqual(30); expect(Math.abs(p.hold.off)).toBeLessThanOrEqual(60); } // (held head to wind, then her bow pushed off)
+      // (the bow comes round toward the wind, the stern going downwind; or, with no room for that in a breeze a hand can hold
+      // (marina.ts CREW_TURNS), the crew turns her the other way by hand, to point her downwind out of it)
+      if (Math.sign(p.turn) !== Math.sign(rel(from, s.heading))) expect(Math.abs(rel(from + 180, p.h))).toBeLessThanOrEqual(61);
+      else expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading)));
+      if (p.hold) { held++; expect(Math.abs(rel(from, s.heading + p.turn))).toBeLessThan(6); expect(Math.abs(p.hold.off)).toBeGreaterThanOrEqual(30); expect(Math.abs(p.hold.off) <= 60 || Math.abs(p.hold.off) >= 135).toBe(true); } // (held head to wind, then her bow pushed off for the main; or, with no room for that, walked right round to point downwind: marina.ts CREW_TURNS)
     }
     expect(n).toBeGreaterThan(40); expect(held).toBeGreaterThan(10); // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead)
     // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
