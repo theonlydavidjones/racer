@@ -22,9 +22,9 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   if (B.penalty > 0 && !(A.penalty > 0)) return { kc: B, rule: '21.2' };
   if (A.backing && !B.backing) return { kc: A, rule: '21.3' };
   if (B.backing && !A.backing) return { kc: B, rule: '21.3' };
-  // Rule 20.2(c): she replied "You tack", so she gives the hailing boat room to tack and avoid her.
-  const h = rec?.hail;
-  if (h && h.kind === 'room' && h.replyAt != null) return h.by === A.id ? { kc: B, rule: '20' } : { kc: A, rule: '20' };
+  // (Rule 20.2(c), "You tack": the boat that replied owes the hailing boat room to tack and avoid her, but right of way
+  // doesn't pass with it: the hailing boat keeps clear under 13 while tacking and 10 after, as WS Case 101 has it. The
+  // room is judged at an incident, src/rules/pairs.ts.)
   // Rule 18.3: she tacked onto starboard in the zone; she must not make the boat fetching the mark sail above
   // close-hauled to avoid her, and gives it mark-room if it gets inside her. Only bites while they're overlapped.
   const r3 = rec?.r183;
@@ -40,7 +40,7 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   const noRoom18 = (inside: number) => { const o = rec?.ovStart; return !!o && o.insideMark === inside && o.markUnable && (o.astern === inside || o.tacker === inside); };
   // Rule 20.2(e): from the time a boat hails for room to tack until she has tacked and avoided the hailed boat, rule
   // 18.2 does not apply between them (rec.r202e, kept by assessPair until then, outlasting the hail itself).
-  const hailing = (!!h && h.kind === 'room') || !!rec?.r202e;
+  const hailing = rec?.hail?.kind === 'room' || !!rec?.r202e;
   if (!hailing && rec && rec.mark && !rec.mark.ended && A.leg === rec.mark.idx && B.leg === rec.mark.idx) {
     const mk = ctx.marks[rec.mark.idx], m = rec.mark;
     if (A.tack === B.tack || !mk.beat) {

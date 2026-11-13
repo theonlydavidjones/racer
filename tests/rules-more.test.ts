@@ -22,7 +22,7 @@ describe('Rule 18.2(c) and (d) · mark-room after 18.2(a) has ended', () => {
     const red = boat('Red', { at: [9, 30.5], heading: 190 });
     const p = pair(blue, red, [mark]);
     expect(p.at(100).rule).toBe('18.2(a)');
-    blue.lastTackT = 100.5; // Blue passes head to wind: 18.2(a) no longer applies
+    blue.lastTackT = 100.5; blue.headToWindT = 100.5; // Blue passes head to wind: 18.2(a) no longer applies
     moveTo(blue, [6, 20]); moveTo(red, [8, 28]);
     expect(p.at(101)).toMatchObject({ keepsClear: 'Red', rule: '12' }); // not overlapped: the basic rules
     return { blue, red, p };
@@ -42,6 +42,28 @@ describe('Rule 18.2(c) and (d) · mark-room after 18.2(a) has ended', () => {
     moveTo(blue, [3.5, 4]); moveTo(red, [2, 14]); expect(p.at(103).rule).toBe('12'); // Red still clear astern, Blue at the mark
     moveTo(red, [1, 4.5]); // Red's bow now inside Blue, between her and the mark: no room
     expect(p.at(104).rule).not.toBe('18.2(c)');
+  });
+});
+
+describe('Rule 18.2(d) · an overlap obtained by tacking, not by gybing', () => {
+  //   Red ↙ (gybes) ... Blue ↙        Red changes tack and the overlap begins at once
+  function overlapAfter(passedHeadToWind: boolean) {
+    const blue = boat('Blue', { at: [0, 0], heading: 190 });
+    const red = boat('Red', { at: [-6, 20], heading: 190 });
+    const p = pair(blue, red);
+    p.at(100);
+    red.lastTackT = 100.5; if (passedHeadToWind) red.headToWindT = 100.5;
+    moveTo(red, [-6, 1]); // now overlapped
+    p.at(101);
+    return { red, p };
+  }
+  it('a gybe that brings an overlap does not make her the tacking boat', () => {
+    const { p } = overlapAfter(false);
+    expect(p.rec.ovStart).toMatchObject({ tacker: null });
+  });
+  it('a tack that brings an overlap does', () => {
+    const { red, p } = overlapAfter(true);
+    expect(p.rec.ovStart).toMatchObject({ tacker: red.id });
   });
 });
 
