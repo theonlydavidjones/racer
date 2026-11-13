@@ -324,6 +324,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   let desired = b.h, luff = false, beating = false;
   let aim: Vec | null = null; // (the point she's steering for, racing)
   ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
+  // (her crew's pole call first, whatever she does next: it reads only where she is and how she's sailing, and it has to
+  // run through penalty turns and after she's finished too, or a pole left out on the run stays out on the reach home)
+  crewPoleCall(w, b);
   if (b.penalty > 0) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
@@ -708,7 +711,6 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
   if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
   b.desired = desired; b.luff = luff;
-  crewPoleCall(w, b);
 }
 
 /**
