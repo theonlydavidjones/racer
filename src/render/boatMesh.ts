@@ -3,7 +3,7 @@ import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
-import { CAR_FORE_PINS, CAR_IN_PINS } from '../boat/controls';
+import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
@@ -447,7 +447,7 @@ const TRACK = { bar: 0.127, leg: 0.178 };
 /** The cabin-top grab rails: their middle station, and how far out (m), halfway between the hatch's runner and the roof's edge there. */
 const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.hw + 0.045 + cabinHalf(HANDRAIL_U) - CABIN_LEAN) / 2;
 /** Where the grab rails begin forward: level with the jib car tracks' forward ends (the owner). */
-const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
+const HANDRAIL_Z0 = FORESTAY_DECK.z + CAR_AFT - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
 /** The mast's foot on deck (m): the stainless plate's radius, the rubber boot's height, and the horseshoe's radius round the mast, its height at the top (aft of the mast, about 6 in), and how far round it reaches from aft (rad: its ends on the deck either side just forward of the mast). The lines thread under it or are made fast to it. */
@@ -653,16 +653,12 @@ const ACRYLIC = new THREE.MeshPhongMaterial({ color: 0x2b3036, specular: 0xfffff
 const COCKPIT_LINING = new THREE.MeshLambertMaterial({ color: 0xe9e3d4, side: THREE.DoubleSide });
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), CAM_GREEN = new THREE.MeshLambertMaterial({ color: 0x3fb36a });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
-/** Josephine's jib car on its cabin-top H (m): the bar's middle off the centreline, its holes' spacing, and the middle fore–aft hole's distance aft of the forestay pin. */
-export const JOSEPHINE_CAR = { centre: 0.66, pin: 0.024, aft: 2.65 };
 const carPos = (side: number, fore: number, ins: number) => {
   // where Josephine's car is (the owner): on the cabin top, on a short H whose cross-bar (about 5 in) lies between the
-  // grab rail and the roof's edge, the car's forward edge level with the rail's forward end. On our cabin top that puts
-  // the bar's middle JOSEPHINE_CAR.centre off the centreline, its holes JOSEPHINE_CAR.pin apart; fore and aft, the middle
-  // hole JOSEPHINE_CAR.aft behind the forestay pin, holes 25 mm apart. (North Sails' guide gives 58 cm and 2.65 m for a
-  // cabin-top lead; Josephine's own figures, from the owner's description, stand until the owner measures them.) The
-  // physics' sheet lead (carLead) takes the same figures; tests/rig.test.ts holds the two together.
-  const z = FORESTAY_DECK.z + JOSEPHINE_CAR.aft + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2));
+  // grab rail and the roof's edge. Its holes are the physics' (controls.ts JOSEPHINE_CAR, CAR_AFT: the one source, so the
+  // sheet is drawn where carLead leads it): the bar's middle hole JOSEPHINE_CAR.centre off the centreline, its holes
+  // JOSEPHINE_CAR.pin apart; fore and aft, the middle hole CAR_AFT behind the forestay's pin, holes 25 mm apart.
+  const z = FORESTAY_DECK.z + CAR_AFT + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2));
   return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.045, z); // on the cabin top's arch, riding its bar
 };
 /** Whether (x, z) is over the cabin top. */
