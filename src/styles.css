@@ -880,7 +880,8 @@ body.pilot-on #bHome{display:none}
 .sb-tab[hidden]{display:none}
 button.sb-tab:hover{color:var(--text)!important}
 .sb-pole{color:var(--text)!important}
-.sb-pole.mine{color:var(--accent)!important}
+.sb-pole.mine,.sb-all.mine{color:var(--accent)!important}
+.sb-all.mine{border-color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
 .sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
 .sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}

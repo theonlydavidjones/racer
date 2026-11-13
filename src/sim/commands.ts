@@ -34,7 +34,7 @@ export type Command =
   | { k: 'lash'; on: boolean }
   /** Take a line yourself (it stays where it is until you work it), or give it back to the crew. */
   | { k: 'line'; key: LineKey; mine: boolean }
-  /** Auto-trim: every line, both jib cars and the pole back to the crew. */
+  /** Hand Back (the band's tab): every line, both jib cars and the pole back to the crew. */
   | { k: 'allToCrew' }
   /** Move the lazy jib car (taking the cars): fore–aft and in–out steps. */
   | { k: 'lazyCar'; fore: number; ins: number }
@@ -50,7 +50,7 @@ export type Command =
   | { k: 'lazyCarTo'; fore: number; ins: number }
   /** Where the crew sit: your choice across and fore and aft (null: theirs), or null to put them back on auto. */
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
-  /** Set or stow the whisker pole (it's yours until Auto-trim). */
+  /** Set or stow the whisker pole (it's yours until Hand Back). */
   | { k: 'pole'; want: boolean }
   /** Strike or hoist the ensign. */
   | { k: 'ensign'; struck: boolean }
