@@ -9,7 +9,7 @@ import { packWaves } from '../src/render/waves';
 import { LL } from '../src/geo/geo';
 import { HARBORS, harborAt, hitsWall } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
-import { basinCalm, basinFloor } from '../src/environment/current';
+import { basinCalm, basinFloor, basinGrids } from '../src/environment/current';
 
 /**
  * "Rushing water" (the owner, v146, v158 and again v176): the water's pattern running past a still boat faster than the
@@ -97,7 +97,7 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
         for (let d = 1; d < L; d += 2) {
           const m = { x: a.x + t.x * d, y: a.y + t.y * d }, p = { x: m.x + n.x * 1.5, y: m.y + n.y * 1.5 }, q = { x: m.x - n.x * 1.5, y: m.y - n.y * 1.5 };
           if ([-1.5, -1, -0.5, 0, 0.5, 1, 1.5].some(r => solid({ x: m.x + n.x * r, y: m.y + n.y * r }))) continue;
-          expect(Math.abs(kt(p) - kt(q)), `${h.id} at ${m.x.toFixed(0)},${m.y.toFixed(0)}`).toBeLessThan(0.2);
+          expect(Math.abs(kt(p) - kt(q)), `${h.id} at ${m.x.toFixed(0)},${m.y.toFixed(0)}`).toBeLessThan(0.3); // (the fade itself, 90% of 2.5 kt over 30 m, changes up to 0.23 kt in these 3 m)
         }
       }
       // deep inside (its calm at the floor): the eddy's share of the 2.5 kt outside
@@ -111,6 +111,20 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
         expect(basinCalm(p), `${h.id} open water at ${x},${y}`).toBeGreaterThan(0.99);
       }
     }
+    // across the edge of each harbor's grid (120 m out from its works): no seam, wherever it's water both sides
+    for (const g of basinGrids()) {
+      const { x0: X0, x1: X1, y0: Y0, y1: Y1 } = g.box, h = { id: g.ids.join('+') };
+      const across = (p: { x: number; y: number }, n: { x: number; y: number }) => {
+        const a = { x: p.x - n.x * 6, y: p.y - n.y * 6 }, b = { x: p.x + n.x * 6, y: p.y + n.y * 6 };
+        if (solid(a) || solid(b) || solid(p)) return;
+        expect(Math.abs(basinCalm(a) - basinCalm(b)), `${h.id} grid edge at ${p.x.toFixed(0)},${p.y.toFixed(0)}`).toBeLessThan(0.05);
+      };
+      for (let x = X0; x <= X1; x += 3) { across({ x, y: Y0 + 2 }, { x: 0, y: 1 }); across({ x, y: Y1 - 2 }, { x: 0, y: 1 }); }
+      for (let y = Y0; y <= Y1; y += 3) { across({ x: X0 + 2, y }, { x: 1, y: 0 }); across({ x: X1 - 2, y }, { x: 1, y: 0 }); }
+    }
+    // behind thin breakwaters and land (the review's leaks through a wall's staircase on the grid), and in ponds with
+    // only a narrow way out (calm against a 1 m reference worked out the same way: 0.10–0.17)
+    for (const [x, y] of [[784, -295], [736, -303], [688, -311], [852, -263], [4975, -3572], [5442, 11200], [4900, -3150]]) expect(basinCalm({ x, y }), `${x},${y}`).toBeLessThan(0.4);
     // the strip between South Beach's docks and its breakwater (outside the basin's outline, walled off from the stream)
     for (const p of [{ x: 5175, y: -3300 }, { x: 5177, y: -3422 }]) expect(kt(p)).toBeLessThan(0.6);
   }, 120_000);

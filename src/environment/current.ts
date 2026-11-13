@@ -1,6 +1,6 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
 import { anyShoreDist, anyShoreDistNear, onLand, wharfDist, wharfShelter } from '../geo/shore';
-import { BREAKWATER_W, HARBORS, SHORE_W, hitsWall, inBasin, type Harbor } from '../geo/marina';
+import { BREAKWATER_W, HARBORS, SHORE_W, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import type { Wind } from './wind';
 
 export interface CurrentPreset { id: string; set: number; kt: number; label: string; button: string }
@@ -46,8 +46,8 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
  * Kranenburg 1994 on harbors beside a stream).
  * So the stream here fades with how far the water is from the open stream, measured through the water, round the
  * breakwaters, piers and shore (not through them; the floating docks don't count, the water runs under them): open
- * water is any 30 m clear of every wall and outside every basin (BASIN_CLEAR), and the stream is whole within that
- * distance of it, so it runs on along a breakwater's outside and in through a mouth. Past that it fades over
+ * water is any 30 m clear of every wall and outside every basin (BASIN_CLEAR) that joins the open Bay through such water,
+ * and the stream is whole within that distance of it, so it runs on along a breakwater's outside and in through a mouth. Past that it fades over
  * BASIN_MOUTH meters to BASIN_EDDY of itself in a harbor with breakwaters, or BASIN_OPEN among docks that lie open to
  * an estuary with no breakwater (more of the stream gets in among their piles and hulls). All four are estimates: no
  * measured figure was found for these harbors, or in general.
@@ -55,12 +55,25 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
 export const BASIN_EDDY = 0.1, BASIN_OPEN = 0.3, BASIN_MOUTH = 30, BASIN_CLEAR = 30;
 /** The raster each harbor's calm is worked out on: cell size and margin round its works (m). */
 const CELL = 4, PAD = 120;
-interface Calm { x0: number; y0: number; nx: number; ny: number; d: Float32Array; floor: number }
-const CALMS = new Map<string, Calm>();
-/** The distance through the water from open water (m; Infinity where it's solid or cut off), on a grid round harbor `h`. */
-function calmOf(h: Harbor): Calm {
-  let c = CALMS.get(h.id); if (c) return c;
-  const x0 = h.reach.x0 - PAD, y0 = h.reach.y0 - PAD, nx = Math.ceil((h.reach.x1 - h.reach.x0 + 2 * PAD) / CELL) + 1, ny = Math.ceil((h.reach.y1 - h.reach.y0 + 2 * PAD) / CELL) + 1, N = nx * ny;
+interface Calm { x0: number; y0: number; nx: number; ny: number; d: Float32Array; floor: Float32Array; box: { x0: number; x1: number; y0: number; y1: number } }
+/** The harbors in groups whose margins overlap (the Alameda marinas lie within 120 m of one another), each group on one
+ * grid, so a grid's edge is always out in the open stream, 120 m from every harbor's works, never through a neighbor. */
+const GROUPS: { box: { x0: number; x1: number; y0: number; y1: number }; harbors: Harbor[]; calm?: Calm }[] = (() => {
+  let gs = HARBORS.map(h => ({ box: { x0: h.reach.x0 - PAD, x1: h.reach.x1 + PAD, y0: h.reach.y0 - PAD, y1: h.reach.y1 + PAD }, harbors: [h] }));
+  for (let merged = true; merged;) {
+    merged = false;
+    for (let a = 0; a < gs.length && !merged; a++) for (let b = a + 1; b < gs.length && !merged; b++) {
+      const A = gs[a].box, B = gs[b].box; if (A.x1 < B.x0 || B.x1 < A.x0 || A.y1 < B.y0 || B.y1 < A.y0) continue;
+      gs[a] = { box: { x0: Math.min(A.x0, B.x0), x1: Math.max(A.x1, B.x1), y0: Math.min(A.y0, B.y0), y1: Math.max(A.y1, B.y1) }, harbors: [...gs[a].harbors, ...gs[b].harbors] };
+      gs = gs.filter((_, i) => i !== b); merged = true;
+    }
+  }
+  return gs;
+})();
+/** The distance through the water from open water (m; Infinity where the water's cut off, −1 where it's solid), on a group of harbors' grid. */
+function calmOf(g: typeof GROUPS[number]): Calm {
+  if (g.calm) return g.calm;
+  const x0 = g.box.x0, y0 = g.box.y0, nx = Math.ceil((g.box.x1 - g.box.x0) / CELL) + 1, ny = Math.ceil((g.box.y1 - g.box.y0) / CELL) + 1, N = nx * ny;
   const solid = new Uint8Array(N), at = (i: number, j: number) => ({ x: x0 + i * CELL, y: y0 + j * CELL });
   // the walls, every harbor's within reach: a breakwater's or shore line's cells out to its half-width plus a cell's
   // half-diagonal (so a wall a cell thick can't be slipped through), its solid areas, and the land
@@ -72,12 +85,16 @@ function calmOf(h: Harbor): Calm {
         if (Math.hypot(p.x - a.x - u * dx, p.y - a.y - u * dy) < r) solid[j * nx + i] = 1; } } };
   for (const H of HARBORS) {
     if (H.reach.x1 < x0 || H.reach.x0 > x0 + nx * CELL || H.reach.y1 < y0 || H.reach.y0 > y0 + ny * CELL) continue;
-    for (const b of H.breakwaters) if (!b.area) line(b.pts, BREAKWATER_W / 2);
+    for (const b of H.breakwaters) line(b.area ? [...b.pts, b.pts[0]] : b.pts, b.area ? 0 : BREAKWATER_W / 2); // (an area's outline, so a thin one can't be slipped through either)
+    for (const a of H.areas) line([...a, a[0]], 0);
     for (const l of H.shore) line(l, SHORE_W / 2);
   }
-  const basin = new Uint8Array(N);
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (solid[k]) continue; const p = at(i, j);
-    if (onLand(p) || hitsWall(p)) solid[k] = 1; else if (inBasin(p)) basin[k] = 1; }
+  // ... and the land and walls at the cell's middle and its four corners (a strip of land a couple of meters wide on a
+  // slant would otherwise fall between the middles)
+  const basin = new Uint8Array(N), h2 = CELL / 2, corner = new Uint8Array((nx + 1) * (ny + 1)); // (the corners, shared between cells: each looked up once)
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) corner[j * (nx + 1) + i] = onLand({ x: x0 + i * CELL - h2, y: y0 + j * CELL - h2 }) ? 1 : 0;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (solid[k]) continue; const p = at(i, j), K = j * (nx + 1) + i;
+    if (corner[K] || corner[K + 1] || corner[K + nx + 1] || corner[K + nx + 2] || hitsWall(p) || onLand(p)) solid[k] = 1; else if (inBasin(p)) basin[k] = 1; }
   // distances on the grid (8 neighbours, never cutting a solid corner), from `src` cells, through water
   const SQ = Math.SQRT2 * CELL, NB: [number, number, number][] = [[1, 0, CELL], [-1, 0, CELL], [0, 1, CELL], [0, -1, CELL], [1, 1, SQ], [1, -1, SQ], [-1, 1, SQ], [-1, -1, SQ]];
   const spread = (d: Float32Array, through: (k: number) => boolean) => { // (a Dijkstra on a small binary heap)
@@ -89,42 +106,62 @@ function calmOf(h: Harbor): Calm {
         if (!through(q) || (di && dj && (!through(j * nx + a) || !through(b * nx + i)))) continue;
         if (d[k] + w < d[q]) { d[q] = d[k] + w; push(q); } } } };
   // open water: 30 m clear of every wall (its clearance spread over everything, walls the sources), outside every basin
+  // (a two-pass chamfer distance from the walls: the same 4 m and 5.66 m steps as the Dijkstra below, in two sweeps)
   const clear = new Float32Array(N).fill(Infinity); for (let k = 0; k < N; k++) if (solid[k]) clear[k] = 0;
-  spread(clear, () => true);
-  const d = new Float32Array(N).fill(Infinity); for (let k = 0; k < N; k++) if (!solid[k] && !basin[k] && clear[k] >= BASIN_CLEAR) d[k] = 0;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; let v = clear[k];
+    if (i > 0) v = Math.min(v, clear[k - 1] + CELL); if (j > 0) { v = Math.min(v, clear[k - nx] + CELL); if (i > 0) v = Math.min(v, clear[k - nx - 1] + SQ); if (i < nx - 1) v = Math.min(v, clear[k - nx + 1] + SQ); } clear[k] = v; }
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) { const k = j * nx + i; let v = clear[k];
+    if (i < nx - 1) v = Math.min(v, clear[k + 1] + CELL); if (j < ny - 1) { v = Math.min(v, clear[k + nx] + CELL); if (i < nx - 1) v = Math.min(v, clear[k + nx + 1] + SQ); if (i > 0) v = Math.min(v, clear[k + nx - 1] + SQ); } clear[k] = v; }
+  // the open stream: the water round the grid's edge (120 m out from the harbor's works), and water 30 m clear of every
+  // wall and outside every basin that joins it through such water (not a pond walled in but for a narrow way out)
+  const d = new Float32Array(N).fill(Infinity), edge = (k: number) => { const i = k % nx, j = (k - i) / nx; return i === 0 || j === 0 || i === nx - 1 || j === ny - 1; };
+  const wide = new Float32Array(N).fill(Infinity), isWide = (k: number) => !solid[k] && !basin[k] && clear[k] >= BASIN_CLEAR;
+  for (let k = 0; k < N; k++) if (edge(k) && isWide(k)) wide[k] = 0;
+  spread(wide, isWide);
+  for (let k = 0; k < N; k++) if (!solid[k] && !basin[k] && (edge(k) || Number.isFinite(wide[k]))) d[k] = 0;
   spread(d, q => !solid[q]);
-  c = { x0, y0, nx, ny, d, floor: h.breakwaters.length ? BASIN_EDDY : BASIN_OPEN }; CALMS.set(h.id, c); return c;
+  for (let k = 0; k < N; k++) if (solid[k]) d[k] = -1; // (solid: no water to ask about; water cut off from the stream keeps Infinity, its calm the floor)
+  // the floor: the harbor's whose basin it is; outside the basins, the harbor whose works it lies among
+  const floor = new Float32Array(N), fl = (h: Harbor) => h.breakwaters.length ? BASIN_EDDY : BASIN_OPEN;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const p = at(i, j), H = basin[j * nx + i] ? harborAt(p) : null;
+    let f = H && g.harbors.includes(H) ? fl(H) : -1;
+    if (f < 0) { let best = Infinity; for (const h of g.harbors) { const r = h.reach, dx = Math.max(r.x0 - p.x, 0, p.x - r.x1), dy = Math.max(r.y0 - p.y, 0, p.y - r.y1), dd = dx * dx + dy * dy; if (dd < best) { best = dd; f = fl(h); } } }
+    floor[j * nx + i] = f; }
+  return g.calm = { x0, y0, nx, ny, d, floor, box: g.box };
 }
 /** The calm one harbor's grid gives at p (1 off its grid, and in open water). */
 function calmIn(c: Calm, p: Vec): number {
   const fx = (p.x - c.x0) / CELL, fy = (p.y - c.y0) / CELL, i = Math.floor(fx), j = Math.floor(fy);
   if (i < 0 || j < 0 || i >= c.nx - 1 || j >= c.ny - 1) return 1;
   // (bilinear between the four nodes, over those in water: a wall's own nodes don't pull it either way)
+  // (only nodes in sight of p: by a thin wall the nodes on it are solid, and the water beyond it, a node away, mustn't
+  // be blended in. Checked only there, next to a solid node)
   const u = fx - i, v = fy - j; let s = 0, w = 0;
+  const nearWall = [0, 1].some(a => [0, 1].some(b => c.d[(j + b) * c.nx + i + a] < 0));
+  const seen = (I: number, J: number) => { if (!nearWall) return true; const q = { x: c.x0 + I * CELL, y: c.y0 + J * CELL };
+    for (const f of [0.25, 0.5, 0.75]) { const r = { x: p.x + (q.x - p.x) * f, y: p.y + (q.y - p.y) * f }; if (hitsWall(r) || onLand(r)) return false; } return true; };
   for (const [a, b, ww] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]] as const) {
-    const d = c.d[(j + b) * c.nx + i + a]; if (!Number.isFinite(d) || ww <= 0) continue;
-    s += ww * (c.floor + (1 - c.floor) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
+    const d = c.d[(j + b) * c.nx + i + a]; if (d < 0 || ww <= 0 || !seen(i + a, j + b)) continue;
+    const f = c.floor[(j + b) * c.nx + i + a]; s += ww * (f + (1 - f) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
   }
   if (w > 0) return s / w;
   // (right against a wall, all four nodes solid: the nearest water nodes, two cells round, weighed by nearness)
   for (let b = -2; b <= 3; b++) for (let a = -2; a <= 3; a++) {
     const I = i + a, J = j + b; if (I < 0 || J < 0 || I >= c.nx || J >= c.ny) continue;
-    const d = c.d[J * c.nx + I]; if (!Number.isFinite(d)) continue;
-    const ww = 1 / (0.01 + (I - fx) ** 2 + (J - fy) ** 2); s += ww * (c.floor + (1 - c.floor) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
+    const d = c.d[J * c.nx + I]; if (d < 0 || !seen(I, J)) continue;
+    const ww = 1 / (0.01 + (I - fx) ** 2 + (J - fy) ** 2), f = c.floor[J * c.nx + I]; s += ww * (f + (1 - f) * Math.exp(-Math.max(0, d - BASIN_CLEAR) / BASIN_MOUTH)); w += ww;
   }
-  return w > 0 ? s / w : 1;
+  return w > 0 ? s / w : inBasin(p) ? c.floor[Math.max(0, Math.min(c.ny - 1, j)) * c.nx + Math.max(0, Math.min(c.nx - 1, i))] : 1;
 }
 /** How much of the stream reaches p (1 in open water): the most open of the harbor grids it's on. */
 export function basinCalm(p: Vec): number {
-  let k = 1, on = false;
-  for (const h of HARBORS) {
-    if (p.x < h.reach.x0 - PAD || p.x > h.reach.x1 + PAD || p.y < h.reach.y0 - PAD || p.y > h.reach.y1 + PAD) continue;
-    const c = calmIn(calmOf(h), p); k = on ? Math.max(k, c) : c; on = true;
-  }
-  return k;
+  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return calmIn(calmOf(g), p);
+  return 1;
 }
-/** (for the tests) The fraction of the stream left deep inside harbor h. */
-export const basinFloor = (h: Harbor) => calmOf(h).floor;
+export const _calmGrid = (h: Harbor) => calmOf(GROUPS.find(g => g.harbors.includes(h))!);
+/** (for the tests) The grids' boxes, and the harbors on each. */
+export const basinGrids = () => GROUPS.map(g => ({ box: g.box, ids: g.harbors.map(h => h.id) }));
+export const basinFloor = (h: Harbor) => h.breakwaters.length ? BASIN_EDDY : BASIN_OPEN;
 
 /** Current at a point, in m/s, from the open-water current, eased near the shore. */
 export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
