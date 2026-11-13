@@ -854,6 +854,12 @@ Also asked for:
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
   the university's and the hotel's own figures) and they belong in the landmark set used for transits, like Coit
   Tower and the Transamerica Pyramid.
+  **Sutro Tower, properly built** (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
+  landmark already in the transit set, src/sim/transits.ts; 3–5 h). Today (render/landscape.ts) it's three banded legs
+  to 298 m with crossarms at two levels and thin masts on top. Find why it reads as cut off: the masts too thin to
+  see, the top lost to the far clipping plane or the fog, or the base sunk in the terrain. Build it to its real form,
+  sourced: the three-legged frame with its two levels of crossarms, the antenna masts on top, its red and white bands,
+  and its aircraft warning lights at night.
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
