@@ -744,7 +744,10 @@ function realLine(): string | undefined {
   const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!); if (!fin.length) return undefined;
   const you = w.userFinishT, { place, of } = placeAmong(r, you), gap = you - fin[0].elapsedS!, per = gap / Math.max(0.1, r.distanceNm);
   const day = new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  return `On ${day} (${r.event}, race ${r.raceNo}) you'd have placed ${ordinal(place)} of ${of}: ${gap <= 0 ? `${mmss(-gap)} ahead of ${titleCase(fin[0].boat)}, who won` : `${mmss(gap)} behind ${titleCase(fin[0].boat)}, who won, ${Math.round(per)} s a mile over its ${r.distanceNm} nm`}.${r.doubt && gap > 0 ? ` ${r.doubt}` : ''}`;
+  // Charts' "Course uncertain: …" sentence, where the sim's own perfect boat can't match the real times (the course or
+  // the recorded wind in doubt); ahead of the doubt about the distance. (Read loosely: the field lands on its own.)
+  const uncertain = (r as { uncertain?: string | null }).uncertain ?? null;
+  return `On ${day} (${r.event}, race ${r.raceNo}) you'd have placed ${ordinal(place)} of ${of}: ${gap <= 0 ? `${mmss(-gap)} ahead of ${titleCase(fin[0].boat)}, who won` : `${mmss(gap)} behind ${titleCase(fin[0].boat)}, who won, ${Math.round(per)} s a mile over its ${r.distanceNm} nm`}.${uncertain ? ` ${uncertain}` : ''}${r.doubt && gap > 0 ? ` ${r.doubt}` : ''}`;
 }
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; send({ k: 'pause', on: false }); };
