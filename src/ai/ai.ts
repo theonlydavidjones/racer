@@ -7,7 +7,7 @@ import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
-import { landAlong, landAlongNear, onLand } from '../geo/shore';
+import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
@@ -178,13 +178,13 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   return { desired, luff: false, beating };
 }
 /**
- * Where she stands off the harbour (h: its entrance): open water within 800 m of it, reached from it straight, with no
- * land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, reached from
+ * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
  * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 80 m apart along the wind's line
  * across, so the fleet isn't all on one point.
  */
 function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
-  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
+  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
   const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 80;
   let best: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
