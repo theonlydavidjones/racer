@@ -385,7 +385,9 @@ export interface BoatMesh {
 }
 /** The working lines drawn on the boat: they move with the controls. */
 interface Lines {
-  travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; carBars: Record<Tack, THREE.Mesh>; winches: Record<Tack, THREE.Vector3>;
+  travCar: THREE.Mesh; backstay: THREE.Line; cars: Record<Tack, THREE.Mesh>; carBars: Record<Tack, THREE.Mesh>;
+  /** The winches' handles below the side deck, turned about their spindles (rotation.y; 0 pointing aft). */
+  handles: Record<Tack, THREE.Group>; winches: Record<Tack, THREE.Vector3>;
   /** The jib sheet: one line, its middle made fast to the ring on the clew, each half through its car and its fairlead
    * block to its winch and the tail into the cockpit (JIB_SHEET_PTS points: port's tail first, starboard's last). */
   jibSheet: THREE.Line; clewRing: THREE.Mesh;
@@ -413,6 +415,18 @@ const HANDRAIL_U = (CABIN.u0 + CABIN.u1) / 2 + 0.03, HANDRAIL_X = (COMPANIONWAY.
 const HANDRAIL_Z0 = FORESTAY_DECK.z + 2.65 - 0.025 * (CAR_FORE_PINS - 1) / 2 - 0.02;
 /** The jib car tracks' anodised aluminium: dull grey, weathered (the owner's photo). */
 const TRACK_ALU = new THREE.MeshLambertMaterial({ color: 0x8d9196 });
+/** The jib winch's handle below the side deck (m): its spindle's drop under the deck, the crank arm's length (about 10 in, the owner), the grip's length. */
+export const WINCH_HANDLE = { drop: 0.05, len: 0.254, grip: 0.1 };
+/**
+ * Where a jib winch's handle is, in the boat's frame (side +1 starboard): the pivot where the arm leaves the spindle
+ * under the side deck, straight below the winch, and the grip's middle at rest (the arm pointing aft). Crew Figures'
+ * hands go on the grip; a turn of the handle swings it about the pivot's vertical axis.
+ */
+export function winchHandle(side: number): { pivot: THREE.Vector3; grip: THREE.Vector3 } {
+  const u = uAtZ(JIB_WINCH_Z), x = side * (cockpitHalf(u) + COAMING_T + 0.075), under = deckY(u, Math.abs(x)) - 0.03; // (the deck's underside)
+  const pivot = new THREE.Vector3(x, under - WINCH_HANDLE.drop, JIB_WINCH_Z);
+  return { pivot, grip: pivot.clone().add(new THREE.Vector3(0, -WINCH_HANDLE.grip / 2 - 0.005, WINCH_HANDLE.len)) };
+}
 /** The jib winch's height, base to the top of its drum's cap. */
 const WINCH_H = 0.123;
 let teakMats: { trim: THREE.Material; deck: THREE.Material; warm: THREE.Material } | null = null;
@@ -687,7 +701,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb); }
   const vang = line(Array.from({ length: 5 }, () => VANG_FOOT.clone()), 'main', 'vang'); grp.add(vang);
   // winches on the cockpit coamings, near the forward end
-  const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, carBars = {} as Record<Tack, THREE.Mesh>;
+  const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, carBars = {} as Record<Tack, THREE.Mesh>, handles = {} as Record<Tack, THREE.Group>;
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) {
     // the jib sheet winch, as on Josephine (the owner's photos): on a moulded pedestal standing on the side deck against
     // the coaming's outer face, about half-way between the cabin's after end and the thwart, a little nearer the thwart:
@@ -699,7 +713,13 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     for (const [r0, r1, h, y] of [[0.065, 0.065, 0.025, 0.0125], [0.05, 0.055, 0.075, 0.0625], [0.04, 0.05, 0.02, 0.11]] as const) {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, 20), CHROME); m.position.y = y; winch.add(m);
     }
-    const socket = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.004, 12), BLACK); socket.position.y = 0.121; winch.add(socket); // the handle's socket
+    // the winch's handle: it isn't on top. Josephine's winches are fixed, and each is turned from below the side deck,
+    // in the cockpit (the owner's photo): its spindle comes down through the deck, and a crank arm about 10 in long
+    // runs from it, pointing aft at rest, with a black grip hanging from its end. (winchHandle gives where it is.)
+    { const h = winchHandle(side), arm = new THREE.Group(); arm.position.copy(h.pivot); grp.add(arm); handles[tk] = arm;
+      const spindle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, WINCH_HANDLE.drop + 0.01, 10), CHROME); spindle.position.y = WINCH_HANDLE.drop / 2 + 0.005; arm.add(spindle);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, WINCH_HANDLE.len, 8).rotateX(Math.PI / 2), CHROME); rod.position.z = WINCH_HANDLE.len / 2; arm.add(rod); // (built pointing aft, +z)
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.015, WINCH_HANDLE.grip, 10), BLACK); grip.position.set(0, -WINCH_HANDLE.grip / 2 - 0.005, WINCH_HANDLE.len); arm.add(grip); }
     winches[tk] = new THREE.Vector3(wx, wy + 0.07, zw);
     // the H-shaped car track on the cabin top (Josephine, the owner's photo looking aft from the mast): two short fore–aft
     // tracks lying flat on the roof, inboard and outboard of the car's run, with their pin holes; across them a bar, pinned
@@ -807,7 +827,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
   }
-  return { travCar, backstay, cars, carBars, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  return { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
 }
 /** Mainsheet: from the end of the boom (its height and distance from the gooseneck) down to the traveller. */
 const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Vector3(0, 0.78, 3.62);

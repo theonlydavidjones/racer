@@ -54,6 +54,8 @@ showing it, and add to it whenever the owner confirms something. One line each; 
 - The lazarettes are solid lockers, not benches.
 - The jib winches stand on the side deck about a third of the way along the cockpit, with room for a crew to sit on the
   rail forward of each and another (a little less room) aft of it; their tops about flush with the coaming.
+- The winches are fixed, not removable; each is turned from below the side deck, in the cockpit: a spindle down through
+  the deck and a crank arm about 10 in long, pointing aft at rest, with a black grip hanging from its end (owner's photo).
 - No post under the thwart (that was the boom crutch, only for stowing). The thwart's underside is curved, about 6 in
   deep at the middle tapering to 4 in at the ends. No slanted panels below it.
 - Nothing pokes up through the after deck.
