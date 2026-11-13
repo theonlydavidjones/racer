@@ -1,5 +1,6 @@
 import chart from '../geo/data/enc-chart.json';
 import marinPiers from '../geo/data/marin-piers.json';
+import beachData from '../geo/data/beaches.json';
 import { LL } from '../geo/geo';
 
 /**
@@ -93,4 +94,29 @@ export function chartCoast(): Coast {
     return best;
   };
   return built = { inside, nearest, rocks };
+}
+
+/**
+ * What the water's edge is made of on the Marin Headlands' shore, from Point Bonita to Fort Baker (the box of
+ * src/geo/data/beaches.json, scripts/make-beaches.mjs): sand where OpenStreetMap maps a beach (Black Sands, Kirby
+ * Cove, Horseshoe Bay's), rock everywhere else, as that shore is: cliffs of the Headlands' chert and greywacke falling
+ * straight to the water. Null outside the box, where the shore keeps its colouring by slope. (NOAA's chart can't say:
+ * its coastlines there carry no category.)
+ */
+type Ring = { x: number; y: number }[];
+let beachRings: { r: Ring; x0: number; x1: number; y0: number; y1: number }[] | null = null;
+const BEACH_BOX = (beachData as unknown as { box: { south: number; north: number; west: number; east: number } }).box;
+export function shoreKind(lat: number, lon: number, x: number, y: number): 'sand' | 'rock' | null {
+  if (lat < BEACH_BOX.south || lat > BEACH_BOX.north || lon < BEACH_BOX.west || lon > BEACH_BOX.east) return null;
+  beachRings ??= (beachData as unknown as { beaches: { pts: [number, number][] }[] }).beaches.map(b => {
+    const r = b.pts.map(p => LL(p[0], p[1]));
+    return { r, x0: Math.min(...r.map(p => p.x)), x1: Math.max(...r.map(p => p.x)), y0: Math.min(...r.map(p => p.y)), y1: Math.max(...r.map(p => p.y)) };
+  });
+  // (within 15 m of a beach's outline: the mapped beach stops at about the high-water line, the mesh's waterline is MLLW)
+  const M = 15;
+  for (const b of beachRings) {
+    if (x < b.x0 - M || x > b.x1 + M || y < b.y0 - M || y > b.y1 + M) continue;
+    if (inRing(x, y, b.r) || b.r.some((a, i) => segD(x, y, a, b.r[(i + 1) % b.r.length]) < M)) return 'sand';
+  }
+  return 'rock';
 }

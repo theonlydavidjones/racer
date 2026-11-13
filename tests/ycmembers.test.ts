@@ -18,11 +18,17 @@ describe('the Members tab', () => {
     expect(berth(sam, boats)).toBe('Crew on Josephine · crew');
     expect(berth(ines, boats)).toBe('Free · not on a boat');
   });
-  it('shows everyone\'s ratings, and filters', () => {
-    const g = membersGrid([you, sam, ines], boats, 'all');
-    expect(g).toContain('Trim'); expect(g.match(/class="mcard"/g)).toHaveLength(3);
-    expect(membersGrid([you, sam, ines], boats, 'yours').match(/class="mcard"/g)).toHaveLength(2);
-    expect(membersGrid([you, sam, ines], boats, 'skipper').match(/class="mcard"/g)).toHaveLength(1);
+  it('lists you and your crew, then the club, with no filter and no badges (docs/UI-AUDIT.md §4.8)', () => {
+    const g = membersGrid([ines, sam, you], boats);
+    expect(g.match(/class="mcard"/g)).toHaveLength(3);
+    expect(g).not.toContain('data-f="mfilter"'); expect(g).not.toContain('Your member'); expect(g).not.toContain('Club member');
+    const yours = g.indexOf('You and your crew'), club = g.indexOf('The club');
+    expect(yours).toBeGreaterThan(-1); expect(club).toBeGreaterThan(yours);
+    expect(g.indexOf('<b>You</b>')).toBeLessThan(g.indexOf('<b>Sam</b>')); expect(g.indexOf('<b>Sam</b>')).toBeLessThan(club); expect(g.indexOf('<b>Ines</b>')).toBeGreaterThan(club);
+    // one line who they are and where they sail; three ratings, the ones for the seat
+    expect(g).toMatch(/Crew on Josephine [A-Z]{3} \d+ \(main and jib\)/); expect(g).toContain('Free: not on a boat');
+    const samCard = g.slice(g.indexOf('<b>Sam</b>'), g.indexOf('</button>', g.indexOf('<b>Sam</b>')));
+    expect(samCard.match(/class="mbar"/g)).toHaveLength(3); expect(samCard).toContain('Trim'); expect(samCard).not.toContain('Composure');
   });
   it('edits your members, not the club\'s; your own name stays "You"', () => {
     const m = { ...sam };

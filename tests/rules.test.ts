@@ -220,7 +220,7 @@ describe('Rule 18.2(a) · mark-room at the zone', () => {
     p.at(100);
     moveTo(blue, [2.5, 21]); moveTo(red, [8.5, 19.5]);
     p.at(101);
-    blue.lastTackT = 101.5; blue.tacking = false;
+    blue.lastTackT = 101.5; blue.headToWindT = 101.5; blue.tacking = false;
     expect(p.at(102).rule).not.toBe('18.2(a)');
   });
 
@@ -266,7 +266,7 @@ describe('Rule 18.3 · tacking in the zone', () => {
     const p = pair(blue, red, [mk]);
     expect(p.at(100).foul).toBeNull(); // Red on port, Blue on starboard
     // Red passes head to wind at 100.8
-    red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; moveTo(red, redAt, 0);
+    red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; red.headToWindT = 100.8; moveTo(red, redAt, 0);
     const mid = p.at(101);
     red.tacking = false; moveTo(red, redAt, 315);
     return { blue, red, p, mid };
@@ -292,6 +292,21 @@ describe('Rule 18.3 · tacking in the zone', () => {
     expect(p.at(103, { swerve: true }).foul).toMatchObject({ by: 'Red', rule: '18.3', kind: 'swerve' });
   });
 
+  it('18.3 is no right of way: Blue, to windward, bearing away into Red (to round the mark, say) broke 11', () => {
+    const { blue, p } = scene();
+    p.at(103);
+    moveTo(blue, ahead(4, 3.6), 290, 315); // Blue bears away 25° onto Red's windward side
+    expect(p.at(104).foul).toMatchObject({ by: 'Blue', rule: '11', kind: 'contact' });
+  });
+
+  it('18.3 is no right of way from clear ahead either: once Red\'s rule 15 time is over, Blue sailing into her stern broke 12 (she could bear away)', () => {
+    const { blue, p } = scene({ redAt: ahead(12, 0) }); // Red tacks dead ahead of Blue, a length and a half clear
+    expect(p.at(103)).toMatchObject({ keepsClear: 'Blue', rule: '12', foul: null });
+    p.at(107);
+    moveTo(blue, ahead(4.2, 0)); // Blue's bow into Red's stern, still clear astern
+    expect(p.at(107.5).foul).toMatchObject({ by: 'Blue', rule: '12' });
+  });
+
   it('tacking outside the zone is plain Rule 11 (after Rule 15 gives Blue time to respond)', () => {
     const far = (k: number): [number, number] => [blueAt[0] * k, blueAt[1] * k];
     const blue = boat('Blue', { at: far(2.2), heading: 315 });
@@ -299,7 +314,7 @@ describe('Rule 18.3 · tacking in the zone', () => {
     const red = boat('Red', { at: redAt, heading: 45 });
     const p = pair(blue, red, [mark]);
     p.at(100);
-    red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; moveTo(red, redAt, 0); p.at(101);
+    red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; red.headToWindT = 100.8; moveTo(red, redAt, 0); p.at(101);
     red.tacking = false; moveTo(red, redAt, 315);
     expect(p.rec.r183).toBeNull();
     expect(p.at(110)).toMatchObject({ keepsClear: 'Blue', rule: '11' });
@@ -311,9 +326,9 @@ describe('Rule 18.3 · tacking in the zone', () => {
       const redAt = ahead(4, 5), red = boat('Red', { at: redAt, heading: 8 });
       const p = pair(blue, red, [mark]);
       p.at(99);
-      moveTo(blue, blueAt, 315); blue.lastTackT = 99.5; // ...then tacks onto starboard, fetching
+      moveTo(blue, blueAt, 315); blue.lastTackT = 99.5; blue.headToWindT = 99.5; // ...then tacks onto starboard, fetching
       p.at(100);
-      red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; moveTo(red, redAt, 0); p.at(101);
+      red.tacking = true; red.tack = 'S'; red.lastTackT = 100.8; red.headToWindT = 100.8; moveTo(red, redAt, 0); p.at(101);
       red.tacking = false; moveTo(red, redAt, 315);
       return { blue, red, p };
     })();
@@ -531,8 +546,9 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
-    expect(p.at(54)).toMatchObject({ keepsClear: 'Blue', rule: '20', foul: null }); // Blue now gives Red room to tack and avoid her
-    red.tacking = true; red.lastTackT = 54.5; moveTo(red, [0, 0], 0);
+    // Blue now owes Red room to tack and avoid her, but right of way doesn't pass with it (WS Case 101): Red, astern, keeps clear
+    expect(p.at(54)).toMatchObject({ keepsClear: 'Red', rule: '12', foul: null });
+    red.tacking = true; red.lastTackT = 54.5; red.headToWindT = 54.5; moveTo(red, [0, 0], 0);
     expect(p.at(56).foul).toBeNull();
   });
 
@@ -550,8 +566,9 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
-    red.lastTackT = 51; moveTo(red, [-3, 9], 45); // Red tacks onto port, toward Blue's stern
-    moveTo(blue, [-4.5, 10.5], 315); // Blue slowed down and is still in the way
+    p.at(50.6);
+    red.lastTackT = 51; red.headToWindT = 51; moveTo(red, [-3, 9], 45); // Red tacks onto port, toward Blue's stern
+    moveTo(blue, [-4.5, 10.5], 315); blue.vx *= 0.2; blue.vy *= 0.2; // Blue slowed down and is still in the way
     expect(p.at(53).foul).toMatchObject({ by: 'Blue', rule: '20', kind: 'contact' });
   });
 
@@ -560,7 +577,7 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room', replyAt: 50.5 };
-    red.lastTackT = 51; moveTo(red, [6, 4], 45);
+    red.lastTackT = 51; red.headToWindT = 51; moveTo(red, [6, 4], 45);
     p.at(58);
     expect(p.rec.hail).toBeNull();
     expect(p.at(59).rule).toBe('10');
@@ -571,9 +588,9 @@ describe('Rule 20 · room to tack at an obstruction', () => {
     const p = pair(red, blue);
     p.at(50);
     p.rec.hail = { by: red.id, at: 50, kind: 'room' };
-    blue.lastTackT = 52; moveTo(blue, [3, 12], 45);
+    blue.lastTackT = 52; blue.headToWindT = 52; moveTo(blue, [3, 12], 45);
     expect(p.at(53).foul).toBeNull(); // Blue responded at 52-53
-    red.lastTackT = 54; moveTo(red, [-1, 2], 45); // and Red tacks as soon as possible (20.2(d))
+    red.lastTackT = 54; red.headToWindT = 54; moveTo(red, [-1, 2], 45); // and Red tacks as soon as possible (20.2(d))
     expect(p.at(56).foul).toBeNull();
     expect(p.at(59).foul).toBeNull();
     expect(p.rec.hail).toBeNull();

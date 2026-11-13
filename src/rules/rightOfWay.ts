@@ -22,16 +22,22 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   if (B.penalty > 0 && !(A.penalty > 0)) return { kc: B, rule: '21.2' };
   if (A.backing && !B.backing) return { kc: A, rule: '21.3' };
   if (B.backing && !A.backing) return { kc: B, rule: '21.3' };
-  // Rule 20.2(c): she replied "You tack", so she gives the hailing boat room to tack and avoid her.
-  const h = rec?.hail;
-  if (h && h.kind === 'room' && h.replyAt != null) return h.by === A.id ? { kc: B, rule: '20' } : { kc: A, rule: '20' };
-  // Rule 18.3: she tacked onto starboard in the zone; she must not make the boat fetching the mark sail above
-  // close-hauled to avoid her, and gives it mark-room if it gets inside her. Only bites while they're overlapped.
+  // (Rule 20.2(c), "You tack": the boat that replied owes the hailing boat room to tack and avoid her, but right of way
+  // doesn't pass with it: the hailing boat keeps clear under 13 while tacking and 10 after, as WS Case 101 has it. The
+  // room is judged at an incident, src/rules/pairs.ts.)
+  // Rule 18.3: she tacked onto starboard in the zone. 18.2 is off between them (pairs.ts clears the mark-room record), and
+  // 18.3 adds two duties, not right of way: (a) she shall not cause the boat fetching the mark to sail above close-hauled
+  // to avoid contact, and (b) she shall give it mark-room if it becomes overlapped inside her. So she keeps clear here
+  // only where the basic rules wouldn't make her: with the fetching boat to windward of her (the outside, at a mark left
+  // to port on starboard), where rule 11 alone would have that boat luff above close-hauled to keep clear. To leeward,
+  // inside, the fetching boat has right of way under 11 anyway, and rules 15 and 16 govern her as usual (WS Case 93:
+  // the boat that gets that leeward overlap from clear astern and luffs at once into the tacker broke 15 and 16.1).
+  // Only bites while they're overlapped.
   const r3 = rec?.r183;
   if (r3 && A.leg === r3.idx && B.leg === r3.idx) {
     const mk = ctx.marks[r3.idx], z = ZONE * 1.4;
     const T = r3.tacker === A.id ? A : B, O = T === A ? B : A;
-    if (r3.binds && markDist(A, mk) < z && markDist(B, mk) < z && T.tack === 'S' && !T.tacking && O.tack === 'S' && !O.tacking && !clearAstern(A, B) && !clearAstern(B, A)) return { kc: T, rule: '18.3' };
+    if (r3.binds && markDist(A, mk) < z && markDist(B, mk) < z && T.tack === 'S' && !T.tacking && O.tack === 'S' && !O.tacking && !clearAstern(A, B) && !clearAstern(B, A) && windward(T, O, ctx) === O) return { kc: T, rule: '18.3' };
   }
   // Rule 18.2(a): fixed when the first boat reached the zone; ends (18.2(b)) once the entitled boat passes
   // head to wind or leaves the zone. Rule 18 doesn't apply on opposite tacks on a beat (18.1(a)(1)).
@@ -40,7 +46,7 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   const noRoom18 = (inside: number) => { const o = rec?.ovStart; return !!o && o.insideMark === inside && o.markUnable && (o.astern === inside || o.tacker === inside); };
   // Rule 20.2(e): from the time a boat hails for room to tack until she has tacked and avoided the hailed boat, rule
   // 18.2 does not apply between them (rec.r202e, kept by assessPair until then, outlasting the hail itself).
-  const hailing = (!!h && h.kind === 'room') || !!rec?.r202e;
+  const hailing = rec?.hail?.kind === 'room' || !!rec?.r202e;
   if (!hailing && rec && rec.mark && !rec.mark.ended && A.leg === rec.mark.idx && B.leg === rec.mark.idx) {
     const mk = ctx.marks[rec.mark.idx], m = rec.mark;
     if (A.tack === B.tack || !mk.beat) {
@@ -68,13 +74,19 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   if (A.tack !== B.tack) return A.tack === 'P' ? { kc: A, rule: '10' } : { kc: B, rule: '10' };
   if (clearAstern(A, B)) return { kc: A, rule: '12' };
   if (clearAstern(B, A)) return { kc: B, rule: '12' };
-  // Overlapped on the same tack: the windward boat is the one on the other's windward side (Definitions,
-  // Leeward and Windward). Sides are measured across the boats' mean heading: on starboard tack the wind
-  // comes over the starboard side, so the boat farther to starboard is windward; on port, farther to port.
+  return { kc: windward(A, B, ctx), rule: '11' };
+}
+
+/**
+ * Of two boats overlapped on the same tack, the windward one: the one on the other's windward side (Definitions,
+ * Leeward and Windward). Sides are measured across the boats' mean heading: on starboard tack the wind comes over the
+ * starboard side, so the boat farther to starboard is windward; on port, farther to port.
+ */
+function windward<B extends RulesBoat>(A: B, B: B, ctx: RulesContext): B {
   const ua = V(A.h), ub = V(B.h);
   let mx = ua.x + ub.x, my = ua.y + ub.y;
   if (Math.hypot(mx, my) < 0.2) { const n = V(ctx.windFrom); mx = n.y; my = -n.x; } // nearly opposite headings: fall back to the wind
   const stbd = { x: my, y: -mx }, side = A.tack === 'S' ? 1 : -1;
   const aOut = ((A.x - B.x) * stbd.x + (A.y - B.y) * stbd.y) * side;
-  return aOut > 0 ? { kc: A, rule: '11' } : { kc: B, rule: '11' };
+  return aOut > 0 ? A : B;
 }

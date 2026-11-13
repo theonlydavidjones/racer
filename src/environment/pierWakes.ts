@@ -84,10 +84,10 @@ export function addPierWakes(sum: WindSum, from: number, p: Vec): void {
     const d = bluffDeficit(x, y, P.top, W, L);
     if (d <= 0.001) continue;
     if (/^Golden Gate Bridge, south tower/.test(P.name)) { if (/fender/.test(P.name)) fender = d; else tower = d; continue; }
-    sum.add(e.x, e.y, -d);
+    sum.addDeficit(e.x, e.y, d);
   }
   const gg = Math.max(fender, tower);
-  if (gg > 0.001) sum.add(e.x, e.y, -gg);
+  if (gg > 0.001) sum.addDeficit(e.x, e.y, gg);
 }
 
 /* ---------- the water ---------- */

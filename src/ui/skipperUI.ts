@@ -29,10 +29,10 @@ export function skipperOf(m: Member): SkipperAttrs {
 const pct = (v: number) => Math.round(v * 100);
 const bar = (label: string, v: number) => `<span>${label}</span><div class="mbar"><i style="width:${pct(v)}%"></i></div><span>${pct(v)}</span>`;
 
-/** Her card's seven bars. */
-export function skipperBars(m: Member): string {
+/** Her card's bars: all seven, or only those named (the card shows the three that matter at the helm: ui/members.ts). */
+export function skipperBars(m: Member, only?: readonly SkipperAttr[]): string {
   const sk = skipperOf(m);
-  return `<div class="mbars mbars-sk">${SKIPPER_LABELS.map(([a, l]) => bar(l, sk[a])).join('')}</div>`;
+  return `<div class="mbars mbars-sk">${SKIPPER_LABELS.filter(([a]) => !only || only.includes(a)).map(([a, l]) => bar(l, sk[a])).join('')}</div>`;
 }
 
 /**
