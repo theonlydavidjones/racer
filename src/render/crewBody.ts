@@ -53,6 +53,7 @@ const PAL_W = 32;
 /** The geometry being built: positions, palette slot, skin weights and a shade (a darkening for the inside of a collar,
  * a cuff or a hood, where little light gets in). */
 class Mesh {
+  constructor(base: Mat[] = []) { base.forEach(m => this.slot(m)); }
   P: number[] = []; UV: number[] = []; SI: number[] = []; SW: number[] = []; C: number[] = []; I: number[] = [];
   mats: Mat[] = [];
   slot(m: Mat): number { const i = this.mats.findIndex(q => q.c === m.c && q.r === m.r); if (i >= 0) return i; this.mats.push(m); return this.mats.length - 1; }
@@ -125,7 +126,9 @@ function onRow(r: Row, th: number, d = 0, ox = 0, oz = 0, gx = 1, gz = 1): V3 {
   return V(ox + x * gx, r[0], oz + z * gz);
 }
 const range = (a: number, b: number, n: number) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
-const around = (n: number, a = 0, b = Math.PI * 2, open = false) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (open ? n - 1 : n));
+/** How finely round things are divided, for the level of detail being built (1 near, less far off: buildArtBody). */
+let SEG = 1;
+const around = (n0: number, a = 0, b = Math.PI * 2, open = false) => { const n = Math.max(open ? 3 : 4, Math.round(n0 * SEG)); return Array.from({ length: n }, (_, i) => a + (b - a) * i / (open ? n - 1 : n)); };
 
 /** A tube swept along a path (open or closed), its cross-section an ellipse `a` across and `b` out from the surface,
  * `out` saying which way is out at each point; its centre lifted `lift`·b off the path (so it sits on a surface). */
@@ -306,9 +309,14 @@ function loftParts(M: Mesh, rings: V3[][], parts: [number, Mat][], o: Omit<Piece
   });
 }
 
-export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
-  const s = p.h / 1.75, g = Math.max(0.85, Math.min(1.35, Math.sqrt(p.w / (p.h * p.h) / 24)));
-  const M = new Mesh();
+/** The materials a kit uses, in a fixed order (the palette's texels). */
+const BUCKLE: Mat = { c: 0x6c7076, r: 0.3 }, LABEL: Mat = { c: 0x6a665f, r: 0.9 };
+const kitMats = (k: Kit): Mat[] => [skinMat(k.skin), k.jacket, k.yoke, k.trim, k.tape, k.pants, k.patch, k.pfdBody, k.pfdTrim, k.boots, k.sole, k.gloves, k.palm, k.hat, k.hair, k.lens, k.frame, BUCKLE, LABEL];
+
+/** A person's geometry, garment by garment, in the bones' rest pose; `seg` how finely round things are divided. */
+function bodyMesh(kit: Kit, g: number, seg: number): Mesh {
+  SEG = seg;
+  const M = new Mesh(kitMats(kit));
   const skin = skinMat(kit.skin);
   const hx = BONE.hipX * g, sx = BONE.shoulderX * g;
   const HY = BONE.headY; // the head bone's height on the spine
@@ -359,7 +367,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
   }
   {
     const path = range(-0.095, 0.5, 10).map(y => onRow(JACKET_P(y), FRONT, 0.002, 0, 0, g, g));
-    for (const f of [0.3, 0.7, 0.97]) path.push(colRing(f, 0.002)[18]);
+    for (const f of [0.3, 0.7, 0.97]) { const r = colRing(f, 0.002); path.push(r[Math.round(r.length * 0.75) % r.length]); } // (its front)
     sweep(M, path, { mat: kit.trim, w: wTorso, a: () => 0.011, b: () => 0.0035, out: () => V(0, 0, -1), n: 4, lift: 0.6, sq: 4 });
   }
   for (const i of [0, 1]) {
@@ -400,7 +408,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
     }
     // the harness's waist belt and its buckle
     sweep(M, around(20).map(th => onRow(JACKET_P(0.19), th, 0.003, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.02, b: () => 0.004, out: q => V(q.x, 0, q.z), closed: true, n: 4, sq: 4 });
-    box(M, V(0, 0.19, (JACKET_P(0.19)[4]! - JACKET_P(0.19)[2]) * g - 0.009), V(0.022, 0.018, 0.006), { c: 0x6c7076, r: 0.3 }, [[SPINE, 1]]);
+    box(M, V(0, 0.19, (JACKET_P(0.19)[4]! - JACKET_P(0.19)[2]) * g - 0.009), V(0.022, 0.018, 0.006), BUCKLE, [[SPINE, 1]]);
   } else {
     // a foam vest: front and back panels over the jacket, narrowed to straps over the shoulders and round the arms
     const VEST_X = (y: number) => Math.min(JACKET_P(y)[1] + 0.02, 0.19 - 0.6 * Math.max(0, y - 0.33));
@@ -415,7 +423,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
     sweep(M, range(0.1, 0.5, 8).map(y => onRow(vrow(y), FRONT, 0, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.008, b: () => 0.003, out: () => V(0, 0, -1), n: 4, sq: 4 });
     const yb = 0.15;
     sweep(M, around(20).map(th => onRow(vrow(yb), th, 0.003, 0, 0, g, g)), { mat: kit.trim, w: wTorso, a: () => 0.013, b: () => 0.003, out: q => V(q.x, 0, q.z), closed: true, n: 4, sq: 4 });
-    box(M, V(0, yb, (vrow(yb)[4]! - vrow(yb)[2]) * g - 0.008), V(0.02, 0.014, 0.006), { c: 0x6c7076, r: 0.3 }, [[SPINE, 1]]);
+    box(M, V(0, yb, (vrow(yb)[4]! - vrow(yb)[2]) * g - 0.008), V(0.02, 0.014, 0.006), BUCKLE, [[SPINE, 1]]);
     for (const xs of [-1, 1]) box(M, V(xs * 0.075 * g, 0.4, (vrow(0.4)[4]! - vrow(0.4)[2]) * g - 0.003), V(0.022, 0.009, 0.003), kit.tape, [[SPINE, 1]], xs * -0.4);
   }
 
@@ -430,7 +438,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
     const prof = t < 0.18 ? Math.sin(t / 0.18 * Math.PI / 2) : Math.max(0, 1 - 0.7 * (t - 0.18) / 0.82), a = th - FRONT, w = 0.13 + 0.03 * (1 - t);
     return 0.021 * prof * Math.exp(-a * a / (2 * w * w));
   };
-  const hth = Array.from({ length: 26 }, (_, k) => FRONT + Math.PI * spow(2 * k / 26 - 1, 1.7));
+  const nh = Math.round(26 * SEG), hth = Array.from({ length: nh }, (_, k) => FRONT + Math.PI * spow(2 * k / nh - 1, 1.7));
   loft(M, hy.map(y => hth.map(th => { const q = headAt(y, th), n = nose(y, th); q.x += n * Math.cos(th); q.z += n * Math.sin(th); return up(q); })), { mat: skin, w: wHead, capEnd: true });
   // the ears
   if (kit.head !== 'hood') for (const xs of [-1, 1]) blob(M, V(xs * 0.076, HY + 0.124, 0.006), V(0.01, 0.027, 0.017), skin, [[HEAD, 1]], 8, 5, new THREE.Euler(0, xs * 0.3, 0));
@@ -478,7 +486,7 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
     // the cuff: ribbed knit (in the geometry), a little thicker, its fold rounded over at the top
     const cuffRing = (f: number, d: number, rib = 1) => around(40).map(th => { const y = band(th) + 0.044 * f; const q = headAt(y, th, d + rib * 0.0012 * Math.cos(20 * th)); q.y = y; return up(q); });
     loft(M, [cuffRing(0, 0.004, 0), cuffRing(0.08, 0.011), cuffRing(0.5, 0.0125), cuffRing(0.92, 0.012), cuffRing(1.0, 0.008, 0)], { mat: kit.hat, w: () => [[HEAD, 1]], shade: (_q, r) => r === 0 ? 0.75 : 1 });
-    { const q = up(headAt(band(FRONT) + 0.022, FRONT, 0.0135)); q.y = HY + band(FRONT) + 0.022; box(M, q, V(0.01, 0.0055, 0.0015), { c: 0x6a665f, r: 0.9 }, [[HEAD, 1]]); } // a small woven label
+    { const q = up(headAt(band(FRONT) + 0.022, FRONT, 0.0135)); q.y = HY + band(FRONT) + 0.022; box(M, q, V(0.01, 0.0055, 0.0015), LABEL, [[HEAD, 1]]); } // a small woven label
     loft(M, [0.07, 0.09, 0.12].map(y => around(10, FRONT + 2.1, FRONT + TAU - 2.1, true).map(th => up(headAt(y, th, 0.0035)))), { mat: kit.hair, w: () => [[HEAD, 1]], wrap: false }); // hair at the nape
   } else {
     // the jacket's hood, up, over a cap (its peak out under the hood's edge, shading the face, as sailors wear them):
@@ -500,37 +508,71 @@ export function buildArtBody(p: Person, kit: Kit): Body & { tris: number } {
     for (const xs of [-1, 1]) blob(M, up(V(xs * 0.05, 0.048, -0.106)), V(0.006, 0.011, 0.006), kit.trim, [[SPINE, 1]], 6, 4); // the drawcord's toggles
   }
 
-  // ——— into one skinned mesh on the eleven bones
+  SEG = 1;
+  return M;
+}
+
+/** How far off (m) a person is drawn in less detail: past the chase camera's distance (24 m, render/scene.ts), where a
+ * figure is a few dozen pixels tall and the coarser one can't be told apart, about half the triangles. */
+export const CREW_LOD_M = 32, CREW_LOD_SEG = 0.5;
+
+/** A person: their geometry near and far off (a THREE.LOD), both skinned to one skeleton on the eleven bones. */
+export function buildArtBody(p: Person, kit: Kit): Body & { tris: number; trisFar: number } {
+  const s = p.h / 1.75, g = Math.max(0.85, Math.min(1.35, Math.sqrt(p.w / (p.h * p.h) / 24)));
+  const hx = BONE.hipX * g, sx = BONE.shoulderX * g, HY = BONE.headY;
   const root = new THREE.Group(); root.scale.setScalar(s);
   const B = (parent: THREE.Object3D | null, x: number, y: number, z: number) => { const b = new THREE.Bone(); b.position.set(x, y, z); parent?.add(b); return b; };
   const hips = B(null, 0, 0, 0), spine = B(hips, 0, 0, 0), head = B(spine, 0, HY, 0);
   const sh = [-1, 1].map(q => B(spine, q * sx, BONE.shoulderY, 0)), el = sh.map(b => B(b, 0, -BONE.upper, 0));
   const hp = [-1, 1].map(q => B(hips, q * hx, 0, 0)), kn = hp.map(b => B(b, 0, -BONE.thigh, 0));
   head.rotation.order = 'YXZ';
-  const bones = [hips, spine, head, sh[0], el[0], sh[1], el[1], hp[0], kn[0], hp[1], kn[1]];
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.Float32BufferAttribute(M.P, 3));
-  geom.setAttribute('uv', new THREE.Float32BufferAttribute(M.UV, 2));
-  geom.setAttribute('color', new THREE.Float32BufferAttribute(M.C, 3));
-  geom.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(M.SI, 4));
-  geom.setAttribute('skinWeight', new THREE.Float32BufferAttribute(M.SW, 4));
-  geom.setIndex(M.I); geom.computeVertexNormals();
-  const mesh = new THREE.SkinnedMesh(geom, material(M.mats));
-  mesh.add(hips); root.add(mesh); mesh.bind(new THREE.Skeleton(bones));
-  mesh.castShadow = true; mesh.receiveShadow = true;
-  return { root, torso: spine, head, arm: [{ root: sh[0], mid: el[0] }, { root: sh[1], mid: el[1] }], leg: [{ root: hp[0], mid: kn[0] }, { root: hp[1], mid: kn[1] }], scale: s, mesh, tris: M.tris };
+  const skeleton = new THREE.Skeleton([hips, spine, head, sh[0], el[0], sh[1], el[1], hp[0], kn[0], hp[1], kn[1]]);
+  root.add(hips);
+  const near = bodyMesh(kit, g, 1), far = bodyMesh(kit, g, CREW_LOD_SEG), row = paletteRow(near.mats);
+  const skinned = (M: Mesh) => {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(M.P, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(M.UV.map((u, i) => i % 2 ? (row + 0.5) / ATLAS_ROWS : u), 2));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(M.C, 3));
+    geom.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(M.SI, 4));
+    geom.setAttribute('skinWeight', new THREE.Float32BufferAttribute(M.SW, 4));
+    geom.setIndex(M.I); geom.computeVertexNormals();
+    const mesh = new THREE.SkinnedMesh(geom, bodyMaterial());
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    return mesh;
+  };
+  const lod = new THREE.LOD(), mesh = skinned(near), meshFar = skinned(far);
+  lod.addLevel(mesh, 0); lod.addLevel(meshFar, CREW_LOD_M); root.add(lod);
+  root.updateMatrixWorld(true); mesh.bind(skeleton); meshFar.bind(skeleton);
+  return { root, torso: spine, head, arm: [{ root: sh[0], mid: el[0] }, { root: sh[1], mid: el[1] }], leg: [{ root: hp[0], mid: kn[0] }, { root: hp[1], mid: kn[1] }], scale: s, mesh, tris: near.tris, trisFar: far.tris };
 }
 
-/** The palette: colour and roughness, one texel per material (nearest-filtered: a colour stops at its texel). */
-function material(mats: Mat[]): THREE.MeshStandardMaterial {
-  const col = new Uint8Array(PAL_W * 4), rough = new Uint8Array(PAL_W * 4);
+/**
+ * The crew's palette: one texture for everyone (a row of texels per kit, one texel per material: colour, and roughness
+ * in a second texture), so all the crew share one material and two small textures however many boats there are. A kit
+ * seen before (a boat's crew are the same race to race) reuses its row.
+ */
+const ATLAS_ROWS = 512;
+const atlasCol = new Uint8Array(PAL_W * ATLAS_ROWS * 4), atlasRough = new Uint8Array(PAL_W * ATLAS_ROWS * 4), rowOf = new Map<string, number>();
+const atlasTex = (a: Uint8Array) => { const t = new THREE.DataTexture(a, PAL_W, ATLAS_ROWS, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };
+let BODY_MAT: THREE.MeshStandardMaterial | null = null;
+function bodyMaterial(): THREE.MeshStandardMaterial {
+  return BODY_MAT ??= new THREE.MeshStandardMaterial({ map: atlasTex(atlasCol), roughnessMap: atlasTex(atlasRough), roughness: 1, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+}
+function paletteRow(mats: Mat[]): number {
+  const key = mats.map(m => `${m.c}:${m.r}`).join(',');
+  let row = rowOf.get(key);
+  if (row != null) return row;
+  // (full: start again from the top. Only after hundreds of different kits, long after the races that used the first rows)
+  if (rowOf.size >= ATLAS_ROWS) rowOf.clear();
+  row = rowOf.size; rowOf.set(key, row);
   mats.forEach((m, i) => {
-    const c = new THREE.Color(m.c);
-    col.set([c.r * 255, c.g * 255, c.b * 255, 255], i * 4);
-    rough.set([0, m.r * 255, 0, 255], i * 4);
+    const c = new THREE.Color(m.c), o = (row! * PAL_W + i) * 4;
+    atlasCol.set([c.r * 255, c.g * 255, c.b * 255, 255], o);
+    atlasRough.set([0, m.r * 255, 0, 255], o);
   });
-  const tex = (a: Uint8Array) => { const t = new THREE.DataTexture(a, PAL_W, 1, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.needsUpdate = true; return t; };
-  return new THREE.MeshStandardMaterial({ map: tex(col), roughnessMap: tex(rough), roughness: 1, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+  const mat = bodyMaterial(); mat.map!.needsUpdate = true; mat.roughnessMap!.needsUpdate = true;
+  return row;
 }
 
 // ———————————————————————————— who they are: a kit for each person ————————————————————————————
