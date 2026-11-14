@@ -19,11 +19,16 @@ import { IDLE, OUTBOARDS, type OutboardHp } from '../boat/motor';
  * gearcase, the skeg, where the gear lever sits) is in the proportions of these motors, measured off their pictures: an
  * estimate, to within a few centimetres.
  *
- * The bracket is a stainless lifting one, the kind seen a lot on Folkboats (same thread): a hardwood board that slides on
- * two rails, raised when sailing (the motor tilted up on it, clear of the water) and let down about 0.26 m to motor, so the
- * plate goes 0.1–0.15 m under, deep enough not to suck air in a chop. Folkboats hang the rudder on the transom, so it's
- * on the port quarter, clear of the rudder, the tiller and the ensign staff. Its rails stand vertical, held off the raked
- * transom by a short arm at the top and a long one below (the travel, and the standoff, are estimates).
+ * The bracket is a sliding one on the after deck, as Folkboats carry them: the class allows "the permanent part mounted on
+ * the aft deck", the motor itself coming off to race (NFIA Technical Committee, March 2006, "Racing with an outboard
+ * engine mounted", folkboat.com/clarifications), and sliding brackets that let the motor "be pulled right up" are seen "a
+ * lot on Nordic Folkboats" (an owner on the IF-boat forum, second-hand). Its stainless plate is bolted to the after deck
+ * on the port quarter (Folkboats hang the rudder on the transom: clear of it, the tiller and the ensign staff), two rails
+ * hang from it just aft of the transom's top, held off the raked transom by a pad low down, and a hardwood board slides on
+ * them: raised well above the deck when sailing, the motor tilted up on it, clear of the water and out of the way; let down
+ * to put the plate 0.1–0.15 m under, deep enough not to suck air in a chop. The motor clamps to the board and lifts off
+ * it to be stowed (the lazarette). No Folkboat bracket's dimensions were found: the travel, the plate and the stand-off
+ * are estimates.
  *
  * Frames: the boat's (bow toward −z, starboard +x, y up). The motor's own frame has its origin on the clamp's top, the
  * board's aft face at z = 0, y up and +z aft (the prop aft, the tiller forward), so that tilting it up is a turn about x.
@@ -40,7 +45,7 @@ const SWIVEL_Z = 0.09, TILT = new THREE.Vector3(0, -0.035, 0.045);
 /** Full tilt (rad): the motor's own tilt stop, about 75° on these small motors (an estimate). */
 export const TILT_UP = 75 * Math.PI / 180;
 /** The bracket: the board's top raised and lowered (m above the waterline), and the mount's place on the port quarter. */
-export const BOARD_UP = 0.63, BOARD_DOWN = 0.37;
+export const BOARD_UP = sheer(1) + 0.3, BOARD_DOWN = 0.42;
 /** The lower arm's foot: the transom's no wider than the mount's offset below about 0.17 m (its half-width 0.62 m at 0.25). */
 const TRANSOM_LOW = 0.25;
 const MOUNT_X = -0.42, BOARD_W = 0.3, BOARD_H = 0.24, BOARD_T = 0.032;
@@ -125,6 +130,10 @@ export interface OutboardMesh {
   /** its wash on the water astern of the prop (when running in gear) */
   wash: THREE.Mesh;
   hp: number;
+  /** the motor's clamp on the board (off the bracket with the motor) */
+  clamp: THREE.Group;
+  /** the tilt tube's height on the board (the motor lifts off from there) */
+  tiltY: number;
   /** where things are now: the board's top (m), the tilt (rad), the swivel (rad), the prop's turn (rad) */
   at: { board: number; tilt: number; swivel: number; spin: number };
 }
@@ -134,16 +143,21 @@ export function buildOutboard(hp: number): OutboardMesh {
   const { GREY, DARK, PROP, STEEL, BOARD } = materials();
   const D = hp >= 5 ? SIX : SMALL, group = new THREE.Group(); group.name = 'outboard';
   // the bracket's fixed part: two vertical rails, held off the raked transom by a short arm at the top and a long one low down
-  const zRail = sheer(1) > 0 ? aftLineZ(BOARD_UP) + 0.06 : 0, yLo = BOARD_DOWN - BOARD_H - 0.02, yHi = BOARD_UP + 0.03;
+  const deckY = sheer(1), zRail = aftLineZ(deckY) + 0.07, yLo = BOARD_DOWN - BOARD_H - 0.02, yHi = BOARD_UP + 0.04;
   const steel: THREE.BufferGeometry[] = [];
+  // the plate on the after deck, and the two arms out from it to the rails' heads, over the transom's top
+  steel.push(new THREE.BoxGeometry(BOARD_W + 0.06, 0.01, 0.2).translate(MOUNT_X, deckY + 0.008, aftLineZ(deckY) - 0.1));
+  steel.push(new THREE.CylinderGeometry(0.012, 0.012, BOARD_W + 0.024, 10).rotateZ(Math.PI / 2).translate(MOUNT_X, yHi, zRail)); // (the rails' head, across)
   for (const sx of [-1, 1]) {
     const x = MOUNT_X + sx * (BOARD_W / 2 + 0.012);
     steel.push(new THREE.CylinderGeometry(0.011, 0.011, yHi - yLo, 10).translate(x, (yHi + yLo) / 2, zRail));
-    for (const y of [yHi - 0.03, TRANSOM_LOW]) { // the arms back to the transom (where it's wide enough there), and their feet
-      const z1 = aftLineZ(y) + 0.005, len = zRail - z1;
-      steel.push(new THREE.CylinderGeometry(0.009, 0.009, len, 8).rotateX(Math.PI / 2).translate(x, y, (zRail + z1) / 2));
-      steel.push(new THREE.BoxGeometry(0.05, 0.07, 0.006).rotateX(-Math.atan2(aftLineZ(1) - aftLineZ(0), 1)).translate(x, y, z1));
-    }
+    const zp = aftLineZ(deckY) - 0.18; // (a strut from the plate's forward edge up and aft to the rail: the bracket's stand)
+    const a = new THREE.Vector3(x, deckY + 0.012, zp), b = new THREE.Vector3(x, deckY + 0.2, zRail), d = b.clone().sub(a);
+    steel.push(new THREE.CylinderGeometry(0.009, 0.009, d.length(), 8).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize())).translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2));
+    steel.push(new THREE.CylinderGeometry(0.009, 0.009, zRail - aftLineZ(deckY), 8).rotateX(Math.PI / 2).translate(x, deckY + 0.012, (zRail + aftLineZ(deckY)) / 2)); // (the arm over the transom's top)
+    const z1 = aftLineZ(TRANSOM_LOW) + 0.005; // the pad holding the rails off the raked transom, low down where it's wide enough
+    steel.push(new THREE.CylinderGeometry(0.009, 0.009, zRail - z1, 8).rotateX(Math.PI / 2).translate(x, TRANSOM_LOW, (zRail + z1) / 2));
+    steel.push(new THREE.BoxGeometry(0.05, 0.07, 0.006).rotateX(-Math.atan2(aftLineZ(1) - aftLineZ(0), 1)).translate(x, TRANSOM_LOW, z1));
   }
   group.add(new THREE.Mesh(mergeGeometries(steel), STEEL));
   // the board, sliding on the rails: the motor's clamped to its top
@@ -159,7 +173,7 @@ export function buildOutboard(hp: number): OutboardMesh {
     new THREE.BoxGeometry(0.17, 0.02, BOARD_T + 0.05).translate(0, 0.01, 0.005),
     ...[-0.05, 0.05].flatMap(x => [new THREE.BoxGeometry(0.04, 0.06, 0.012).translate(x, -0.03, -motorAt - 0.006), new THREE.CylinderGeometry(0.006, 0.006, 0.07, 6).rotateZ(Math.PI / 2).translate(x, -0.06, -motorAt - 0.03)])
   ];
-  board.add(new THREE.Mesh(mergeGeometries(clamp), GREY));
+  const clampG = new THREE.Group(); clampG.add(new THREE.Mesh(mergeGeometries(clamp), GREY)); board.add(clampG); // (the motor's own: it comes off with it)
   const tilt = new THREE.Group(); tilt.position.set(0, TILT.y, motorAt + TILT.z); board.add(tilt);
   const swivel = new THREE.Group(); swivel.position.set(0, -TILT.y, SWIVEL_Z - TILT.z); tilt.add(swivel); // (on the steering axis)
   // the swivel case round the steering axis
@@ -206,11 +220,18 @@ export function buildOutboard(hp: number): OutboardMesh {
   wash.visible = false; group.add(wash);
   // (each moving part's pieces merged, one mesh a material: about eight draw calls for the whole motor and bracket)
   for (const g of [board, swivel, prop]) mergeByMaterial(g);
-  return { group, board, tilt, swivel, prop, wash, hp, at: { board: BOARD_UP, tilt: TILT_UP, swivel: 0, spin: 0 } };
+  return { group, board, tilt, clamp: clampG, swivel, prop, wash, hp, tiltY: tilt.position.y, at: { board: BOARD_UP, tilt: TILT_UP, swivel: 0, spin: 0 } };
 }
 
+/** How long the crew's lift off the board, or onto it, takes at the end of stowing or the start of shipping (s): an estimate. */
+const LIFT = 3;
+
 /** What syncOutboard reads of her motor (boat/motor.ts MotorState); with none, it's tilted up for sailing. */
-export interface OutboardState { down: boolean; running: boolean; gear: 'F' | 'N' | 'R'; throttle: number; swivel?: boolean; pulling?: unknown }
+export interface OutboardState { down: boolean; running: boolean; gear: 'F' | 'N' | 'R'; throttle: number; swivel?: boolean; pulling?: unknown;
+  /** off the bracket, in the lazarette: the bracket drawn empty, raised (Crew Controls' Stow / Ship) */
+  stowed?: boolean;
+  /** being slid off the bracket to stow it, or onto it to ship it: seconds left */
+  shifting?: { to: 'stowed' | 'bracket'; left: number } }
 
 /**
  * Move the outboard toward its state, at a person's pace (the board let down or hauled up in a second or two, the motor
@@ -219,7 +240,11 @@ export interface OutboardState { down: boolean; running: boolean; gear: 'F' | 'N
  * shown as a blur once it's too fast to see. dt in seconds.
  */
 export function syncOutboard(o: OutboardMesh, m: OutboardState | undefined, dt: number): void {
-  const down = !!m?.down, ease = (cur: number, want: number, rate: number) => cur + Math.max(-rate * dt, Math.min(rate * dt, want - cur));
+  // on the bracket or not: off it once stowed; lifted off over the last seconds of stowing it, and set on in the first of
+  // shipping it (the crew's lift: LIFT s, the motor rising off the board, then gone below)
+  const lift = m?.shifting ? (m.shifting.to === 'stowed' ? 1 - Math.min(1, m.shifting.left / LIFT) : Math.min(1, m.shifting.left / LIFT)) : m?.stowed ? 1 : 0;
+  o.tilt.visible = o.clamp.visible = lift < 1; o.tilt.position.y = o.tiltY + 0.35 * lift; o.clamp.position.y = 0.35 * lift;
+  const down = !!m?.down && !m?.stowed, ease = (cur: number, want: number, rate: number) => cur + Math.max(-rate * dt, Math.min(rate * dt, want - cur));
   // let down: the board first, then the motor tilted down; hauled up: tilted, then the board
   const wantTilt = down ? 0 : TILT_UP, wantBoard = down ? BOARD_DOWN : BOARD_UP;
   if (down) { o.at.board = ease(o.at.board, wantBoard, 0.2); if (o.at.board < BOARD_DOWN + 0.05) o.at.tilt = ease(o.at.tilt, wantTilt, 1.4); }

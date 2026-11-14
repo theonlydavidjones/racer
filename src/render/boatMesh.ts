@@ -371,7 +371,8 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   grp.add(rud);
   // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
   // prop turning, from the motor's state (syncBoatMesh)
-  if (b.spec?.perf.outboard === 'bracket') { const ob = buildOutboard(b.motor?.hp ?? b.spec.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
+  // (and its bracket alone, empty and raised, while it's stowed below: Crew Controls' Stow / Ship)
+  if (b.spec?.perf.outboard === 'bracket' || b.motor) { const ob = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
   // her name on both sides, where the boats carry it: on the cabin side and the coaming, aft of the window and
   // forward of the winch (there's no room for it on the topsides under the low sheer); hand-lettered script
   if (paint.boatName) {

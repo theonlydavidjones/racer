@@ -26,6 +26,15 @@ describe('the outboard as drawn follows the motor', () => {
     expect(idle).toBeGreaterThan(0); expect(idle).toBeLessThan(full / 3);
     expect(revs(o, { ...on, gear: 'R' })).toBeLessThan(0);
   });
+  it('stowed, it is off the bracket and the bracket raised; lifted off at the end of stowing, set on at the start of shipping', () => {
+    const o = buildOutboard(3.5), off = { down: false, running: false, gear: 'N' as const, throttle: 0 };
+    run(o, { ...off, stowed: true }, 5); expect(o.tilt.visible).toBe(false); expect(o.at.board).toBeCloseTo(BOARD_UP);
+    syncOutboard(o, { ...off, shifting: { to: 'stowed', left: 20 } }, 0.05); expect(o.tilt.visible).toBe(true); // (still on it, being unclamped)
+    syncOutboard(o, { ...off, shifting: { to: 'stowed', left: 1 } }, 0.05); expect(o.tilt.visible).toBe(true); expect(o.tilt.position.y).toBeGreaterThan(o.tiltY); // (lifting off)
+    syncOutboard(o, { ...off, shifting: { to: 'bracket', left: 20 } }, 0.05); expect(o.tilt.visible).toBe(false);
+    syncOutboard(o, { ...off }, 0.05); expect(o.tilt.visible).toBe(true); expect(o.tilt.position.y).toBeCloseTo(o.tiltY);
+    run(o, { ...off, down: true, stowed: true }, 5); expect(o.at.board).toBeCloseTo(BOARD_UP); // (stowed, nothing lets it down)
+  });
   it('costs a handful of draw calls (each moving part one mesh a material)', () => {
     let n = 0; buildOutboard(3.5).group.traverse(c => { if ((c as { isMesh?: boolean }).isMesh) n++; });
     expect(n).toBeLessThanOrEqual(10);
