@@ -3,7 +3,7 @@ import { maxTurnRate } from './dynamics';
 import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
-import { landAlong, wharfNearest } from '../geo/shore';
+import { landAlong, wharfNearest, wharfShelter } from '../geo/shore';
 import { detour } from '../ai/ai';
 import { routeAround } from '../sim/routing';
 
@@ -181,7 +181,9 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   const r = p.route;
   // on to the next turn when the way to it is clear of land ADVANCE_CLEAR either side, so she never cuts the corner of a
   // pier head or a breakwater's end; or at the turn itself (8 m), so she can't circle it
-  while (p.ri < r.length - 1 && (clearLine(b, r[p.ri + 1], ADVANCE_CLEAR) || Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 8)) p.ri++;
+  // (in enclosed water, a marina's fairways 20-30 m wide, 15 m either side never fits: there, the fairway's half-width)
+  const adv = wharfShelter(b) < 0.5 ? ADVANCE_CLEAR : 6;
+  while (p.ri < r.length - 1 && (clearLine(b, r[p.ri + 1], adv) || Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 8)) p.ri++;
   if (p.ri >= r.length - 1) { p.route = null; return 'clear'; } // (on the last leg: straight for it)
   return r[p.ri];
 }
@@ -229,7 +231,8 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
     }
     // a pier or a breakwater come within a berth of her, to leeward as she sags down on it or abeam: tack away from it,
     // as a sailor does, not just for land dead ahead
-    const wn = wharfNearest(b, BERTH);
+    // (not in enclosed water, a marina's fairways, where a dock is always that close: there the route's line is the guide)
+    const wn = wharfShelter(b) < 0.5 ? wharfNearest(b, BERTH) : null;
     const away = !!wn && wn.d > 0 && dot(V(close(other)), wn.n) > dot(V(cur), wn.n) + 0.2;
     if ((fetch(other) && !fetch(b.tack)) || shore || away) { p.lastTackT = t; p.goTack = other; return close(other); }
   }
