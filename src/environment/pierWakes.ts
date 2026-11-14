@@ -73,7 +73,12 @@ function extent(P: Pier, c: Vec, e: Vec): { W: number; L: number; back: number; 
 /* ---------- the wind ---------- */
 
 /** The piers' wind shadows at p (the true wind from `from`), added to `sum`. Where one stands inside another, the deeper of the two. */
+/** The box round every pier's wind wake (each pier's box and its reach): outside it, none of them reaches. */
+let PIER_AIR: { x0: number; x1: number; y0: number; y1: number } | null = null;
 export function addPierWakes(sum: WindSum, from: number, p: Vec): void {
+  // (one test for all of them, as every boat asks every step; then each pier's own, as before)
+  const A = PIER_AIR ??= PIERS.reduce((a, P) => { const b = P.box, r = 30 * P.top + 100; return { x0: Math.min(a.x0, b.x0 - r), x1: Math.max(a.x1, b.x1 + r), y0: Math.min(a.y0, b.y0 - r), y1: Math.max(a.y1, b.y1 + r) }; }, { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
+  if (p.x < A.x0 || p.x > A.x1 || p.y < A.y0 || p.y > A.y1) return;
   const e = V(from + 180);
   let fender = 0, tower = 0;
   for (const P of PIERS) {
@@ -122,9 +127,14 @@ function wakesFor(flows: Vec[]): typeof wakeList {
  * The current at p with the piers' wakes in it: `here` the current at p without them, `flows[i]` the stream meeting
  * WAKE_PIERS[i] (m/s), `t` the time (s) for the eddies.
  */
+/** The box round every pier's water wake (its middle, and the reach each tests): outside it, none of them reaches. */
+let PIER_WATER: { x0: number; x1: number; y0: number; y1: number } | null = null;
 export function withPierWakes(p: Vec, here: Vec, flows: Vec[], t: number): Vec {
   let ox = here.x, oy = here.y;
   const R2 = (WAKE.reach + 100) ** 2;
+  // (one test for all of them, as every boat's current asks every step: past it, each pier's own distance test fails)
+  const B = PIER_WATER ??= WAKE_PIERS.reduce((a, { c }) => { const R = WAKE.reach + 100 + 1e-6; return { x0: Math.min(a.x0, c.x - R), x1: Math.max(a.x1, c.x + R), y0: Math.min(a.y0, c.y - R), y1: Math.max(a.y1, c.y + R) }; }, { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
+  if (p.x < B.x0 || p.x > B.x1 || p.y < B.y0 || p.y > B.y1) return { x: ox, y: oy };
   for (const { P, c, U, e, W, back } of wakesFor(flows)) {
     const dx = p.x - c.x, dy = p.y - c.y;
     if (dx * dx + dy * dy > R2) continue;

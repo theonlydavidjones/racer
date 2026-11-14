@@ -19,6 +19,7 @@
  * Missing the best shape costs a few percent of drive: on top of the sheet angle (angle of attack), which
  * matters most.
  */
+import { GOOSENECK_AFT } from './rake';
 import type { Tack } from './boat';
 import { jibTune, mainTune, type TuneEffect } from './rigTune';
 
@@ -55,13 +56,15 @@ export const defaultControls = (): Controls => ({
 /* ---------- from controls to sheet angles ---------- */
 
 /** The traveller car's travel either side of the middle (m) on Josephine's thwart, and the mainsheet's blocks' distance
- * aft of the gooseneck (m: the thwart's from the mast's after side), as the boat is drawn (render/boatMesh.ts TRAV_HALF
- * and MS_R, from the owner's photos; tests/rig.test.ts holds them together). */
-export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957;
+ * aft of the gooseneck (m: the thwart is 2.957 m aft of the mast's after side at the deck, and the raked mast carries the
+ * gooseneck GOOSENECK_AFT of that aft, boat/rake.ts), as the boat is drawn (render/boatMesh.ts TRAV_HALF and MS_R, from
+ * the owner's photos; tests/rig.test.ts holds them together). */
+export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957 - GOOSENECK_AFT;
 /**
  * How far the traveller alone swings the boom (deg, the car from the middle to either end): the sheet's blocks on the
  * boom stand over the car, which runs on a straight track across the thwart, so atan(TRAVELLER_HALF / SHEET_POINT):
- * 9.6°. The car's travel is read off the photos, good to a few centimetres (±0.03 m is ±0.6°), so 9.5° is within it and
+ * 9.9° with the mast raked (9.6° upright). The car's travel is read off the photos, good to a few centimetres (±0.03 m is
+ * ±0.6°), so 9.5° is within it and
  * stays until the track's measured: the AI's homing after racing's called off (tests/abandon-home.test.ts) turns on a
  * tenth of a degree here, which is flagged. (North Sails' guide moves the cars 15–20 cm to windward in light air: −0.3
  * to −0.4 of the travel.)
@@ -77,7 +80,7 @@ export const TRAVELLER_SWING = 9.5;
 export const BOOM_STOP = 70;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
-  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:
+  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the mainsheet's blocks on the boom:
   // the car's ±0.5 m of travel swings the boom ±TRAVELLER_SWING; centred, the boom is on the centreline
   const car = TRAVELLER_SWING * c.traveller;
   // (the sheet's 0–1 to the boom's angle, 80·s^1.5: a feel scale, not the rope's geometry. Real rope swings the boom
@@ -315,7 +318,7 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   luff disappear. When the wind exceeds 15 knots it is pulled hard".
  * - Traveller: "In light winds (0-6 knots) pull the traveller cars 15-20 cm to windward. In medium winds (6-14 knots) set
  *   them in the middle. In higher wind the cars are eased to leeward to decrease heel and thus rudder pressure." (The
- *   traveller's ±1 is ±9.6° of boom (TRAVELLER_SWING), ±0.5 m of car under the end of the boom (boomAngle): 15–20 cm is −0.3 to −0.4.)
+ *   traveller's ±1 is ±9.5° of boom (TRAVELLER_SWING), ±0.5 m of car under the mainsheet's blocks (boomAngle): 15–20 cm is −0.3 to −0.4.)
  * - Vang: "Never use the kickingstrap upwind in less than 18 knots"; above that it's on, to hold the leech when the main
  *   is eased in the gusts.
  * - Jib halyard: "Never pull the halyard too tight. This will cause the draft of the jib to move too far forward. Pull it

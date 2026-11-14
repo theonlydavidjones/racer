@@ -19,7 +19,7 @@ lead is Deep Physics' car-lead work, and the sheet curves are a calibration choi
   2.65 m aft of the forestay pin.
 - **The sim's rig:**
   - the traveller car travels ±0.5 m on the thwart (`TRAV_HALF`, from the photos);
-  - the mainsheet is on the boom 2.96 m aft of the gooseneck (`SHEET_ON_BOOM`);
+  - the mainsheet is on the boom 2.86 m aft of the gooseneck (`SHEET_POINT`: 2.957 m aft of the mast's after side at the deck, less the 0.097 m the 5.6° rake carries the gooseneck aft, boat/rake.ts);
   - the boom is about 0.75 m above the traveller car;
   - the jib's LP is 2.36 m (ORC).
 
@@ -27,11 +27,11 @@ lead is Deep Physics' car-lead work, and the sheet curves are a calibration choi
 
 | controls.ts | the real rig | verdict |
 |---|---|---|
-| traveller: ±9.5° of boom | the car runs on a straight track across the thwart, under the sheet's blocks 2.957 m aft of the gooseneck: atan(0.5 / 2.957) = **9.6°** | **sound**: `TRAVELLER_SWING` stays 9.5°, within the photo-read travel's ±0.6°, until the track's measured (tests/abandon-home.test.ts fails at 9.6°: flagged) |
+| traveller: ±9.5° of boom | the car runs on a straight track across the thwart, under the sheet's blocks 2.86 m aft of the gooseneck: atan(0.5 / 2.86) = **9.9°** (9.6° with the mast upright) | **sound**: `TRAVELLER_SWING` stays 9.5°, within the photo-read travel's ±0.6°, until the track's measured (tests/abandon-home.test.ts fails at 9.6°: flagged) |
 | boom max 85° (trim.ts `SAILS.main.max`, "boom on the shroud") | at boom height the shroud is about 0.83 m out and 0.26 m aft of the gooseneck (CR 7.20, 7.60, the drawn chainplate 0.98 m out); the boom's side meets the slanted wire at **≈ 70°** (about 66° at the class's limits, 0.90 m out and 0.36 m aft; less with the vang off, as the boom lifts) | **wrong by 15°**: on a run the drawn boom goes through the shroud, and the main is let further out than a Folkboat's can be |
 | jib lead 8° + 1.25°·pin (8°–13°) | North: **12.3°** if its 2.65 m is fore and aft (atan), **12.6°** if it's the straight tape from the forestay pin to the block its wording describes (asin); Josephine: 14.0° / 14.4° the same two ways, her holes 24 mm apart = **0.49° a hole** (±1.0° over five) | **too narrow, and the pins too far apart**: the middle hole should be about 12–14°, not 10.5°, with about 0.5° a pin, not 1.25° (for Deep Physics' car-lead work) |
 | jib min 8° (`SAILS.jib.min`) | the lead itself | follows the lead |
-| mainsheet: angle = 80°·s^1.5 | the sheet's length is 4 parts, each from the boom's blocks to the car: √(h² + (R sin θ)² + (R(1 − cos θ))²), with h 0.75 m and R 2.96 m. As a share of the ease to the shroud stop: 10° at 6%, 20° at 19%, 45° at 60% | **not geometric**: the sim needs 25% of the sheet for the first 10°, where the real sheet needs 6%. Close-hauled the real boom swings out fast for little rope (with the vang holding it down) |
+| mainsheet: angle = 80°·s^1.5 | the sheet's length is 4 parts, each from the boom's blocks to the car: √(h² + (R sin θ)² + (R(1 − cos θ))²), with h 0.75 m and R 2.86 m. As a share of the ease to the shroud stop: 10° at 6%, 20° at 19%, 45° at 60% | **not geometric**: the sim needs 25% of the sheet for the first 10°, where the real sheet needs 6%. Close-hauled the real boom swings out fast for little rope (with the vang holding it down) |
 | jib sheet: angle = lead + 70°·s^1.4 | the sheet from the clew (LP 2.36 m from the tack) to the car, about 0.4 m below it: 20° at 5%, 30° at 22%, 45° at 52% | **not geometric**, in the same way |
 | jib max 68° | the clew's that far out with the sheet off | plausible; no source either way |
 

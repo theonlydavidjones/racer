@@ -223,7 +223,9 @@ export const BAYS: Bay[] = [
 /** How far into a bay a point is (m) from its mouth. */
 const bayIn = (B: Bay, p: Vec): number => (p.x - B.q.x) * B.into.x + (p.y - B.q.y) * B.into.y;
 const inPolyV = (P: Vec[], p: Vec): boolean => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
-const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly, p)) return B; return null; };
+/** Each bay's box (round its outline): a quick no, as the race water is kilometers from both. */
+const BAY_BOX = BAYS.map(B => ({ x0: Math.min(...B.poly.map(q => q.x)), x1: Math.max(...B.poly.map(q => q.x)), y0: Math.min(...B.poly.map(q => q.y)), y1: Math.max(...B.poly.map(q => q.y)) }));
+const bayAt = (p: Vec): Bay | null => { for (let i = 0; i < BAYS.length; i++) { const b = BAY_BOX[i]; if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue; if (inPolyV(BAYS[i].poly, p)) return BAYS[i]; } return null; };
 /**
  * The tide's height (m above MLLW) at p and a time (ms UTC), for the water's depth over the chart's soundings. On each
  * bay's depth grid (depthBand) it's that bay's own station's, the one the bay's stream fills it by (BAYS), so the water
@@ -382,7 +384,7 @@ export class CurrentField {
     this.lastKey = key; this.lastList = l;
     return l;
   }
-  at(p: Vec): Vec {
+  at(p: Vec, B: Bay | null = bayAt(p)): Vec {
     let wx = 0, wy = 0, ws = 0;
     const list = this.near(p), sx = this.sx, sy = this.sy, soft2 = this.soft2, stamp = this.stamp, epoch = this.epoch;
     for (let k = 0; k < list.length; k++) {
@@ -392,7 +394,6 @@ export class CurrentField {
       wx += v.x * w; wy += v.y * w; ws += w;
     }
     const c = ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
-    const B = bayAt(p);
     if (!B) return c;
     // (the open water's stream hands over to the bay's own across its mouth; and round where another channel comes in,
     // its stream, the stations', to the bay's across the same distance)
@@ -446,7 +447,7 @@ export class CurrentField {
     const B = bayAt(p);
     let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
     for (const k of B?.inflows ?? []) bay = Math.min(bay, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
-    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
+    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
     return { x: c.x * k, y: c.y * k };
   }
 }
