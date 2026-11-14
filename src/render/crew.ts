@@ -869,10 +869,12 @@ const _s = V(0, 0, 0), _t = V(0, 0, 0), _u = V(0, 0, 0), _sh = V(0, 0, 0), _v = 
 /** How fast a hand or a foot moves to its new place at most (m/s): briskly, as a sailor's do (an estimate). */
 const LIMB_SPEED = 2.2;
 /**
- * The hips' pace about the boat: at most `speed` (m/s), setting off and pulling up at `acc` (m/s²); up and down, `up`
- * and `upAcc`. Estimates: a crew crosses the cockpit in a tack at about 1 m/s (crewPhys.ts), a little quicker
- * crouched for a short hop; a walk from standing reaches its pace in a step or two, about 1.5 to 2 m/s²; sit-to-stand,
- * the hips rise at 0.6 to 1 m/s at most.
+ * The most the hips' spring is let move: at most `speed` (m/s), setting off and pulling up at `acc` (m/s²); up and
+ * down, `up` and `upAcc`. A person's own pace is lower: a crew crosses the cockpit in a tack at about 1 m/s
+ * (crewPhys.ts), a walk from standing reaches its pace in a step or two, about 1.5 to 2 m/s², and sit-to-stand the hips
+ * rise at 0.6 to 1 m/s at most (estimates). These are as low as the poses' in-between steps allow for now: at 1.6 m/s
+ * and 5 m/s² a shin or an elbow goes into the boat in a hiking tack and a two-handed tack (crewfig). Working those
+ * through is what brings it down to a person's pace.
  */
 const HIP = { speed: 2.0, acc: 8, up: 1.6, upAcc: 8 };
 /** Ease `p` toward `q` by the share `a`, but no further than `max`. */
