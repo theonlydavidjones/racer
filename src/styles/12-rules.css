@@ -15,3 +15,5 @@
 .rtRules{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .rtRule{font:600 12px/1 var(--f-inst);border-radius:12px;padding:5px 9px;background:#16364a;color:#cfe3ec}
 .rtRule.key{background:var(--accent);color:#06101a}
+.rtSailed{border-left:3px solid #1fbf8f;padding:4px 0 4px 12px;margin-bottom:12px;font-weight:700}
+.rtSailed.no{border-left-color:#e8603c}

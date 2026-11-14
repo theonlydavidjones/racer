@@ -13,6 +13,8 @@ export type SailAge = 'new' | 'mid' | 'old';
 
 export interface BoatSpec {
   id: string; // stable, for your list of boats
+  /** Laid up for repairs until this day (YYYY-MM-DD, your clock), after a wreck or damage (docs/WRECK-PROPOSAL.md). */
+  laidUpUntil?: string;
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
@@ -150,6 +152,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
       .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // (her crew's seats, from the Yacht Club's members: at most two, ids only)
+    ...(typeof x.laidUpUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.laidUpUntil) ? { laidUpUntil: x.laidUpUntil } : {}), // (laid up for repairs: WRECK-PROPOSAL)
     ...(Array.isArray(x.crewIds) ? { crewIds: x.crewIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 2) } : {}),
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
@@ -205,4 +208,10 @@ const ENSIGN_OF: Record<string, string> = {
   NOR: 'nor', FRA: 'fra', NZL: 'nzl', JPN: 'jpn'
 };
 export const ensignFor = (country: string): string | undefined => ENSIGN_OF[country];
-
+/** The day `plus` days from today on your own clock, YYYY-MM-DD (not UTC: on the Bay after 4 pm that's already tomorrow). */
+export function localDay(plus = 0): string {
+  const d = new Date(); d.setDate(d.getDate() + plus);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+/** Laid up for repairs today (BoatSpec.laidUpUntil: after a wreck or damage, docs/WRECK-PROPOSAL.md). */
+export const laidUp = (b: { laidUpUntil?: string }): boolean => !!b.laidUpUntil && b.laidUpUntil >= localDay();

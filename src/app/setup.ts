@@ -13,7 +13,7 @@ import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
-import { type BoatSpec } from '../boat/spec';
+import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
 import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
@@ -177,7 +177,10 @@ function courseCard(): void {
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
   $('whereField').hidden = !cruise;
   if (cruise) app.setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
-  $('bGo').textContent = cruise ? 'Cast off' : 'Start the sequence';
+  const sp = cruise ? null : app.seasonPick; // (a season race: its own name on the button, and its brief over the rows)
+  $('bGo').textContent = cruise ? 'Cast off' : sp ? `Sail Race ${sp.no}` : 'Start the sequence';
+  $('seasonBrief').hidden = !sp;
+  if (sp) morph($('seasonBrief'), `${sp.burgee ? `<img class="t-burgee" src="${sp.burgee}" alt="">` : ''}<span class="t-h">${sp.series.title.replace(/</g, '&lt;')} · Race ${sp.no}</span>`);
   $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
   $('setupTitle').textContent = cruise ? 'Cruise' : 'Create a race';
   $('setupBack').textContent = app.nav.backLabel() || (cruise ? '‹ Start page' : '‹ Race');
@@ -209,9 +212,20 @@ function tideBox(): void {
   const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
   d.value = app.w.raceDate; tm.value = app.S.tideTime || '12:00';
   drawTideGraph();
+  app.adjustUi(); // (the conditions' state: a new day may have no forecast yet)
 }
 /** The day for the conditions strip: wind and current as arrows, the sea, the sun (or when she'd arrive). */
-type Strip = { windKt?: number; windFrom?: number; windAll?: boolean; curKt?: number; curSet?: number; curKind?: string; sea?: string; seaSub?: string; sunset?: string; arrive?: string };
+type Strip = { windWait?: string; windKt?: number; windFrom?: number; windAll?: boolean; curKt?: number; curSet?: number; curKind?: string; sea?: string; seaSub?: string; sunset?: string; arrive?: string };
+/**
+ * The day's wind isn't known yet (the owner, 13 Nov 2026: past a real forecast's reach, never a made-up wind labeled
+ * real): no observations and no forecast, only the month's records. What to say instead: the day the NWS forecast,
+ * which runs about a week ahead, will reach it; or, for a past day with no record, that there's none.
+ */
+function noRealWind(): string {
+  if (!app.w.seaBreeze || app.w.weather.source !== 'records') return '';
+  const day = Date.parse(app.w.raceDate + 'T12:00'), opens = new Date(day - 7 * 86400000);
+  return day > Date.now() ? `forecast ${opens.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'no record';
+}
 /** Where the day's wind comes from, in one line for the conditions card (tideBox). */
 let condSource = '';
 /** Current (filled: flood up, ebb down) and the westerly (line, right scale) at the start line through the day; the conditions card's rows. */
@@ -250,7 +264,10 @@ function drawTideGraph(): void {
     const kts: number[] = [];
     for (let i = 0; i <= n; i++) { const b = app.w.weather.at(from + (to - from) * i / n); kts.push(b.kt * windTerrain(p, b.from)); }
     const kmax = Math.max(10, Math.ceil(Math.max(...kts) / 5) * 5), yk = (v: number) => bot - v / kmax * (bot - top);
-    ctx.strokeStyle = '#7fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); kts.forEach((v, i) => (i ? ctx.lineTo(x(i), yk(v)) : ctx.moveTo(x(i), yk(v)))); ctx.stroke();
+    // (no observations or forecast for the day: the month's records, drawn dashed, and the strip says when the forecast comes)
+    const wait = noRealWind();
+    if (wait) { strip.windWait = wait; ctx.setLineDash([4, 4]); }
+    ctx.strokeStyle = '#7fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); kts.forEach((v, i) => (i ? ctx.lineTo(x(i), yk(v)) : ctx.moveTo(x(i), yk(v)))); ctx.stroke(); ctx.setLineDash([]);
     ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = '#7fe0a8'; ctx.textAlign = 'right';
     ctx.fillText(`WIND · top ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
     const b = app.w.weather.at(app.w.gunUtc), b2 = app.w.weather.at(app.w.gunUtc + 90), k = windTerrain(p, b.from);
@@ -388,7 +405,10 @@ function drawHeads(): void {
     r.hidden = ![...r.querySelector('.srow-body')!.children].some(c => !(c as HTMLElement).hidden);
     // (the cruise's chart, drawn while its row was still hidden, had no size: drawn again now it shows)
     if (was && !r.hidden && r.dataset.row === 'where') app.setupChart?.sync(true);
-    const open = !r.hidden && (r.classList.contains('always') || r.dataset.row === rowOpen); // (a hidden row isn't open)
+    // (a season race: the series fixes its course, fleet and day; her boat and crew stay yours)
+    const locked = !!app.seasonPick && S.mode !== 'sail' && LOCKED.includes(r.dataset.row!);
+    r.classList.toggle('locked', locked);
+    const open = !r.hidden && !locked && (r.classList.contains('always') || r.dataset.row === rowOpen); // (a hidden row isn't open)
     r.classList.toggle('open', open);
     r.querySelector('.srow-head')!.setAttribute('aria-expanded', String(open));
     r.querySelector('.srow-go')!.textContent = open ? 'Done ▴' : 'Change ▾';
@@ -398,6 +418,7 @@ function drawHeads(): void {
 document.addEventListener('click', e => {
   const head = (e.target as HTMLElement).closest<HTMLElement>('.srow-head'); if (!head) return;
   const row = head.closest<HTMLElement>('.srow')!.dataset.row!;
+  if (head.closest('.srow.locked')) return;
   rowOpen = rowOpen === row ? null : row; drawHeads();
   // the date's calendar opens downward: the When row, last on the screen, is brought up so it has room (the owner: "date
   // picker gets cropped at bottom of screen"); the panel gets room below it to scroll into (styles: .whenroom)
@@ -423,16 +444,16 @@ function courseThumb(W: number, H: number): string {
 function condStrip(st: Strip, rows: [string, string][]): void {
   const say = (k: string) => (rows.find(r => r[0] === k)?.[1] ?? '').replace(/<[^>]*>/g, '').replace(/"/g, '&quot;');
   const arrow = (to: number | undefined, col: string) => to == null ? '' : `<svg viewBox="-12 -12 24 24" width="22" height="22" aria-hidden="true"><circle r="11" fill="none" stroke="#2e4a5e"/><g transform="rotate(${Math.round(to)})"><line y1="7" y2="-5" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/><path d="M0 -9 L4 -3 L-4 -3 Z" fill="${col}"/></g></svg>`;
-  const cell = (title: string, pic: string, big: string, small: string) => `<div title="${title}">${pic}<span><b>${big}</b><small>${small}</small></span></div>`;
+  const cell = (title: string, pic: string, big: string, small: string, cls = '') => `<div title="${title}"${cls ? ` class="${cls}"` : ''}>${pic}<span><b>${big}</b><small>${small}</small></span></div>`;
   morph($('condStrip'), [
-    st.windKt != null ? cell(say('Wind'), arrow(st.windAll ? undefined : ((st.windFrom ?? 0) + 180) % 360, '#7ee0a5'), `${st.windKt} kt`, st.windAll ? 'all over' : `from ${compassPoint(st.windFrom ?? 0)}`) : '',
+    st.windWait ? cell('No observations or forecast for this day yet: the graph\'s dashed line is the month\'s records', '', 'Wind', st.windWait, 'wait') : st.windKt != null ? cell(say('Wind'), arrow(st.windAll ? undefined : ((st.windFrom ?? 0) + 180) % 360, '#7ee0a5'), `${st.windKt} kt`, st.windAll ? 'all over' : `from ${compassPoint(st.windFrom ?? 0)}`) : '',
     st.curKt != null ? cell(say('Current'), arrow(st.curKind === 'slack' ? undefined : st.curSet, '#6fb7ff'), `${st.curKt.toFixed(1)} kt`, st.curKind ?? '') : cell(say('Current'), '', 'Current', say('Current')),
     st.sea ? cell(say('Sea'), '<svg viewBox="0 0 24 16" width="22" height="16" aria-hidden="true"><path d="M1 10 q3 -5 6 0 t6 0 t6 0" fill="none" stroke="#9fd3ea" stroke-width="2"/></svg>', st.sea, st.seaSub ?? '') : '',
     st.arrive ? cell(say('Arrive'), '', st.arrive, 'arrive') : st.sunset ? cell(say('Sun'), `<svg viewBox="-12 -12 24 24" width="20" height="20" aria-hidden="true"><circle r="5" fill="#ffcf5a"/>${[0, 45, 90, 135, 180, 225, 270, 315].map(a => `<line y1="-8" y2="-11" stroke="#ffcf5a" stroke-width="1.6" transform="rotate(${a})"/>`).join('')}</svg>`, st.sunset, 'sunset') : ''
   ].join(''));
   setupHeads();
 }
-function openSetup(view: 'setup' | 'drill' = 'setup'): void { app.results.settleLog(() => openSetupNow(view)); }
+function openSetup(view: 'setup' | 'drill' | 'season' = 'setup'): void { app.results.settleLog(() => openSetupNow(view)); }
 /** Back to where the sail was set up: the setup, or the Drill page (for a drill). */
 function toSetup(): void { if (app.nav.here.k === 'drill') app.showPlace(app.nav.here); else openSetup(); }
 /*
@@ -440,13 +461,19 @@ function toSetup(): void { if (app.nav.here.k === 'drill') app.showPlace(app.nav
  * the same elements, moved there while it's open and back when the setup opens, so there's one set of each.
  */
 const DOCKED = ['row-boat', 'row-when', 'condHead', 'condStrip', 'tideGraph', 'condMore', 'bCond'];
+/** The season's overview shows the race chosen the same way: its course, its day, the day's strip, her and her crew. */
+const DOCKED_SEASON = ['row-course', 'row-when', 'condStrip', 'row-boat'];
+/** The rows a season race locks (the series sets them). */
+const LOCKED = ['course', 'fleet', 'when'];
 const dockHome = new Map<string, Comment>();
-function dockSetup(view: 'setup' | 'drill'): void {
-  for (const id of DOCKED) {
+function dockSetup(view: 'setup' | 'drill' | 'season'): void {
+  const here = view === 'drill' ? DOCKED : view === 'season' ? DOCKED_SEASON : [];
+  for (const id of new Set([...DOCKED, ...DOCKED_SEASON])) {
     const el = $(id);
     if (!dockHome.has(id)) { const c = document.createComment(id); el.before(c); dockHome.set(id, c); }
-    if (view === 'drill') $('drillSide').appendChild(el); else dockHome.get(id)!.after(el);
+    if (!here.includes(id)) dockHome.get(id)!.after(el);
   }
+  for (const id of here) $(view === 'drill' ? 'drillSide' : 'svDock').appendChild($(id)); // (in the page's own order)
 }
 // the start drill's minutes to the gun, and alone or with the fleet (the debrief's own choices set these too)
 function paintDrillPage(): void {
@@ -455,18 +482,20 @@ function paintDrillPage(): void {
 }
 $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; app.S.drillFrom = +b.dataset.df!; saveSettings(app.S); paintDrillPage(); });
 $('drillSoloSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds]'); if (!b) return; app.S.drillSolo = b.dataset.ds === '1'; saveSettings(app.S); paintDrillPage(); });
-function openSetupNow(view: 'setup' | 'drill' = 'setup'): void {
+function openSetupNow(view: 'setup' | 'drill' | 'season' = 'setup'): void {
   app.replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') { app.S.mode = 'race'; prepare(); }
   // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
   // and is sent nothing until it starts)
   setStill(true); rowOpen = null; setupHeads();
-  app.courseView.close(); app.navView.close(); if (app.w.running) app.send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = app.S.course; paintSeg(); crewRows(); courseCard(); dockSetup(view); $('setup').hidden = view !== 'setup'; $('drillView').hidden = view !== 'drill'; if (view === 'drill') { $('drillBack').textContent = app.nav.backLabel(); paintDrillPage(); } if (app.S.mode === 'sail') app.setupChart?.sync(true); tideBox(); }
+  app.courseView.close(); app.navView.close(); if (app.w.running) app.send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = app.S.course; paintSeg(); crewRows(); courseCard(); dockSetup(view); $('setup').hidden = view !== 'setup'; $('drillView').hidden = view !== 'drill'; $('seasonView').hidden = view !== 'season'; if (view === 'drill') { $('drillBack').textContent = app.nav.backLabel(); paintDrillPage(); } if (app.S.mode === 'sail') app.setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { app.results.settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
+  // laid up for repairs after a wreck or damage (docs/WRECK-PROPOSAL.md): she can't be taken out until then
+  { const until = app.S.boat.laidUpUntil; if (laidUp(app.S.boat)) { toast(`${app.S.boat.name} is laid up for repairs until ${until}: choose another boat.`, 4000); return; } }
   // (the pause menu's and the results' Back to setup: the setup you sailed from, or the Drill page for a drill)
-  const drilling = app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings';
-  app.nav.reset(drilling ? { k: 'drill' } : { k: 'setup' });
+  const drilling = app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings', sp = app.S.mode === 'race' ? app.seasonPick : null;
+  app.nav.reset(...(drilling ? [{ k: 'drill' } as const] : sp ? [{ k: 'race' } as const, { k: 'season', id: sp.series.id } as const, { k: 'setup' } as const] : [{ k: 'setup' } as const]));
   for (const id of ['bSettings', 'bSet2', 'bDSetup']) $(id).textContent = drilling ? 'Back to Drill' : 'Back to Setup';
   app.realRaceHolds();
   saveSettings(app.S);
@@ -485,6 +514,13 @@ function beginRaceNow(seed?: number): void {
   app.word('bFast', 'Speed 1×');
   horn(1.0);
   const m0 = app.w.C.marks[0];
+  if (sp) { // a season race: one line, where she is and what's next (the owner OK'd design/season-flow)
+    const [h, mi] = (app.S.tideTime || '12:00').split(':').map(Number), wm = h * 60 + mi - app.S.seq, warn = `${Math.floor(wm / 60)}:${String(wm % 60).padStart(2, '0')}`;
+    // (one line, no full stop: the Messages card shows a message up to its first; under 70 characters, so none of it is cut)
+    toast(app.w.fromSlip ? `In your ${app.w.homeSlip!.kind === 'alongside' ? 'berth' : 'slip'} · warning signal ${warn} · sail out to the start` : `${sp.series.title} · Race ${sp.no} · warning signal ${warn}`, 6000);
+    if (app.w.courseSignal) logMessage(`Course ${app.w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signaled by the warning signal). ${app.w.courseSignal.why}`);
+    return;
+  }
   if (app.w.fromSlip) {
     const m = Math.round((app.w.startAt - app.S.seq * 60) / 60);
     toast(`In her ${app.w.homeSlip!.kind === 'alongside' ? 'berth' : 'slip'} in ${harborOf(app.w.homeSlip!.marina)?.short ?? 'her marina'}, ${app.w.homeSlip!.label}, ${app.w.homeSlip!.kind === 'alongside' ? 'alongside the end of the dock, bow out,' : 'bow in'} and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${app.keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to have the crew walk her out by hand into the fairway, then sail her out through the entrance${app.S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
@@ -536,8 +572,8 @@ function openLessons(): void {
 $('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLElement).closest<HTMLElement>('[data-lesson]')?.dataset.lesson as LessonId | undefined; if (id) { $('lessons').hidden = true; beginLesson(id); } });
 $('bLessonsX').onclick = () => { $('lessons').hidden = true; };
 /** Start a Learn to sail lesson (its tile, in the Drill section). */
-function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons']) $(el).hidden = true; beginRace(); }
-return { beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
+function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons', 'seasonView']) $(el).hidden = true; beginRace(); }
+return { noRealWind, beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
 }
 
 /**

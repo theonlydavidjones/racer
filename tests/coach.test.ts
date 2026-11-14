@@ -156,13 +156,13 @@ describe('the trim coach: from the physics review', () => {
     const b = boat({ heading: 318, windKt: 6 }); wrong(b, 'mainsheet', 0);
     for (const l of [teach(b).top, ...teach(b).more]) expect(l.head).not.toMatch(/about 0°/);
   });
-  it('the mainsheet held eased in light air: the crew brings the traveller up to put the boom where it should be', () => {
+  it('the mainsheet held eased: the boom is yours, the crew leave the car where it was, and the coach says to trim', () => {
+    // (North Sails' Folkboat guide sets the car by the wind, the middle at 6-14 kt; the crew no longer haul it up to undo
+    // your eased sheet: physics.ts, traveler-ease.test.ts)
     for (const W of [8, 12]) {
-      const own = boat({ heading: 318, windKt: W }), b = boat({ heading: 318, windKt: W }); wrong(b, 'mainsheet', 0.3); hold(own, 30);
-      expect(b.ctl.traveller).toBeLessThan(-0.5);
-      // the boom where it should be; what's left is the leech, open with the sheet slanting from a car to windward
-      // (controls.ts mainShape): a few percent
-      expect(kt(b)).toBeGreaterThan(kt(own) * 0.96);
+      const set = boat({ heading: 318, windKt: W }).ctl.traveller, b = boat({ heading: 318, windKt: W }); wrong(b, 'mainsheet', 0.3);
+      expect(Math.abs(b.ctl.traveller - set)).toBeLessThan(0.05);
+      expect(teach(b).top.head).toMatch(/main/i);
     }
   });
   it('the traveller held up in a breeze: right in the model, but it says why most boats drop it', () => {

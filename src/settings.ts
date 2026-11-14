@@ -35,6 +35,8 @@ export interface Settings {
   drillFrom?: number; drillSolo?: boolean;
   /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
   rulesRight?: number[];
+  /** Sail it yourself: the Case sailed (its number), with mode 'lesson' and lesson 'case'. */
+  rulesCase?: number;
   /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
   lesson?: LessonId; lessonsPassed?: LessonId[];
   /** The last float plan left with the club (Before you go): where, back by (hh:mm), how many aboard. */

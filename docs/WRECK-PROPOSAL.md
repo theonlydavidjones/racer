@@ -1,4 +1,4 @@
-# Wrecks: the design (agreed 14 Nov 2026; to build after #292)
+# Wrecks: the design (agreed 14 Nov 2026; built 14 Nov 2026, section 8)
 
 The owner, 13 Nov 2026: "we need to work through the broader logic and plan for wrecks. I don't know yet."
 
@@ -73,3 +73,32 @@ The suggestion is the lightest version: the boat is "laid up for repairs" for so
    - Repairs: she's laid up for a few real days. No money.
 4. **Season scoring:** a wreck in a season race is RET only. Not answered by the owner; the Coordinator's call for now.
 5. **Who can be wrecked:** only your boat, not the AI boats. Not answered by the owner; the Coordinator's call for now.
+
+## 8. As built (14 Nov 2026)
+
+**Grading a blow.** The shared measure, src/boat/damage.ts (with Rules), grades every contact.
+- Energy: ½·μ·v², from the contact point's speed into the face, along the face's outward normal, her turn included (boat/physics.ts `closingAt`). A glancing touch closes slowly.
+- Mass: her displacement with her crew.
+- The bands are ESTIMATES: 0.5 and 1.5 m/s. No published data was found; World Sailing Case 19 and US Sailing Q&A 115 give the meaning of "damage" and "serious damage".
+
+**What she hit:**
+- Fort Mason's piles;
+- a pier, wharf, breakwater or seawall, as concrete;
+- a floating dock, a scrape at most;
+- the open shore, as mud and sand for now: no damage. Which stretches are seawall, riprap or beach isn't in the sim's data yet, nor are the charted rocks.
+
+**Pinned on Fort Mason's piles.** Kept on them for 30 s by a set her crew can't fend off: about 0.23 m/s, a hand's 250 N against the water's drag on her beam on (ESTIMATES).
+- End on for most of it: a wreck.
+- Beam on: damage.
+
+**The rest:**
+- **Ships:** a wreck at any speed.
+- **Who:** only your boat is wrecked or marked.
+- **When it happens:** the race pauses on one line of how and where, then Go ashore, Call a tow or Carry on. Racing, she retires (RET).
+- **The logbook** keeps the wreck, the tow, or the worst damage.
+- **Repairs:** she's laid up 3 days after a wreck and 1 after damage (ESTIMATES), on your own clock. A laid-up boat can't be taken out, and the Yacht Club shows it.
+
+**Still to source:**
+- the shore's kinds, and the charted rocks, from the NOAA chart;
+- the bands;
+- the pinning numbers.

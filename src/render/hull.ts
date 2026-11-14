@@ -131,7 +131,7 @@ function sectionShape(u: number): { al: number; be: number } {
 }
 
 /** 16 planks a side (CR 2.207.5: no fewer than 16 at station 8; 2.207.6: none but the keel plank over 130 mm wide), each lapping 13 mm over the one below (about the plank's thickness, CR 2.207.2) */
-const NU = 72, NF = 5, STRAKES = 16, LAP = 0.013;
+const NU_NEAR = 72, NU_MID = 54, NU_FAR = 36, NF_NEAR = 5, STRAKES = 16, LAP = 0.013;
 /**
  * How far the plank stands out at fraction t down strake k: clinker, so each plank's lower edge laps over the outside
  * of the plank below and the plank lies at a slight angle, out toward its lower edge. The garboard's lower edge isn't
@@ -219,7 +219,11 @@ export const PAINT_LINES = { wl: 0.045, wlRise: 0.035, stripe: 0.065, stripeRise
 export const paintLines = (z: number) => { const e = (2 * z / L) ** 2; return { wl: PAINT_LINES.wl + PAINT_LINES.wlRise * e, top: PAINT_LINES.wl + PAINT_LINES.stripe + (PAINT_LINES.wlRise + PAINT_LINES.stripeRise) * e }; };
 
 /** The shell's geometry; its vertex colours are only the light and shade of the laps (the paint is per pixel: boatMesh.ts). */
-function hullGeometryBuild(_paint?: HullPaint): THREE.BufferGeometry {
+function hullGeometryBuild(_paint?: HullPaint, level = 0): THREE.BufferGeometry {
+  // further off (boatMesh's levels of detail), the same planking more coarsely: each plank's face one band and its land
+  // left out (level 1, from where a plank is a few pixels wide), and fewer stations too (2, from where a lap's 13 mm is
+  // a fraction of a pixel). The hull's outline and the planks' shading are all that show from there.
+  const far = level > 0, NU = [NU_NEAR, NU_MID, NU_FAR][level], J = far ? 1 : 3, NF = far ? 2 : NF_NEAR;
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const white = new THREE.Color(1, 1, 1), colorAt = (_y: number) => white;
   // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel. Each entry
@@ -229,8 +233,8 @@ function hullGeometryBuild(_paint?: HullPaint): THREE.BufferGeometry {
   const strips: Row[] = [];
   for (let k = 0; k < STRAKES; k++) {
     const row: Row = [];
-    if (k > 0) row.push({ k, t: 0, dg: -0.025, pl: k, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
-    for (let j = 0; j <= 3; j++) row.push({ k, t: j / 3, pl: k, lap: strakeLap(k, j / 3), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
+    if (k > 0 && !far) row.push({ k, t: 0, dg: -0.025, pl: k, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
+    for (let j = 0; j <= J; j++) row.push({ k, t: j / J, pl: k, lap: strakeLap(k, j / J), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
     strips.push(row);
     if (k < STRAKES - 1) strips.push([{ k: k + 1, t: 0, pl: k, lap: LAP }, { k: k + 1, t: 0, pl: k, lap: 0 }]); // the lap's edge, facing down
   }
@@ -392,7 +396,7 @@ export const deckY = (u: number, x: number) => sheer(u) + CAMBER * Math.max(0, 1
 function deckGeometryBuild(): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [];
   const us: number[] = [];
-  for (let i = 0; i <= NU; i++) us.push(i / NU);
+  for (let i = 0; i <= NU_NEAR; i++) us.push(i / NU_NEAR);
   for (const e of [CABIN.u0, CABIN.u1, COCKPIT.u1]) us.push(e - 1e-4, e + 1e-4);
   us.sort((a, b) => a - b);
   const inner = (u: number) => (u > CABIN.u0 && u < CABIN.u1 ? cabinHalf(u) : u > COCKPIT.u0 && u < COCKPIT.u1 ? cockpitHalf(u) : 0);
@@ -835,6 +839,16 @@ function cloneGeo(v: unknown): unknown {
   return v; // (numbers, and the functions that go with them, as the cabin's topY)
 }
 export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.hullGeometry ??= hullGeometryBuild(_paint)) as ReturnType<typeof hullGeometryBuild>; }
+/** The hull drawn from further off (boatMesh's levels of detail, 1 or 2): the same lines, planked more coarsely. */
+export function hullGeometryFar(level: 1 | 2 = 2): THREE.BufferGeometry { return cloneGeo(hullLevel(level)) as THREE.BufferGeometry; }
+/**
+ * The hull at a level of detail (0 in full … 2 the coarsest), one copy every boat draws: nothing changes a hull's shape
+ * from boat to boat (her paint is in her material), so the fleet needn't hold eight of each. (render/dispose.ts frees it
+ * only once no boat in the scene draws it; three.js sends it to the GPU again if a later boat does.)
+ */
+export function hullLevel(level: 0 | 1 | 2): THREE.BufferGeometry {
+  return (GEO_CACHE['hullLevel' + level] ??= hullGeometryBuild(undefined, level)) as THREE.BufferGeometry;
+}
 export function deckGeometry(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.deckGeometry ??= deckGeometryBuild()) as ReturnType<typeof deckGeometryBuild>; }
 export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } { return cloneGeo(GEO_CACHE.cabinGeometry ??= cabinGeometryBuild()) as ReturnType<typeof cabinGeometryBuild>; }
 export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE.BufferGeometry[]; panel: THREE.BufferGeometry[] } { return cloneGeo(GEO_CACHE.cockpitGeometry ??= cockpitGeometryBuild()) as ReturnType<typeof cockpitGeometryBuild>; }

@@ -199,7 +199,10 @@ What's planned, roughly in order. Done work is described in the README.
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
-   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
+   Still there on 14 November (owner: "still have backwards arms", a second screenshot): both crew in the cockpit, the
+   blue jacket at the piano and the orange jacket by the compass, have forearms bent backwards at the elbow, hands
+   pointing behind them. No fix has gone in yet. The owner doesn't
    remember the conditions it happened in, so the check covers every pose and wind.
 8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
@@ -232,7 +235,7 @@ What's planned, roughly in order. Done work is described in the README.
    - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
      Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
      Gashouse Cove with the wind on the beam both ways.
-8o. **Hoisting at the mast, finishing at the piano** (owner, 13 November; next; 2–3 h). First ask: "when sails are down,
+8o. ~~**Hoisting at the mast, finishing at the piano**~~ (done: each sail hoists in about 5 s at the mast, the take-up its own state) (owner, 13 November; next; 2–3 h). First ask: "when sails are down,
    hoisting the halyards does not hoist the sail… we can probably use the lines instead of the hoist buttons, no?" Then
    the owner's correction: "there is some difference. the sails are hoisted from the mast. the piano controls use a
    block and tackle to finalize the last several inches of hoisting. so having the piano halyard control fully 'on'
@@ -295,7 +298,15 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
-8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
+8z. ~~**Now — the cruise setup's map is blank**~~ (done: redrawn whenever its size changes, 0e622c58) (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
+   no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
+   (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
+   picking on a blank map. Suspects: the setup now builds the World only at Start (cca5f47), so the map has nothing to
+   draw; the app.ts split (src/app/setup.ts); the chart's tiles or canvas not sized when the panel opens. "Plan on the
+   big chart" should be checked too. Add a check that the setup's map draws the chart.
+   Done on claude/cruise-map: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
+   panel was laid out, it had no size and nothing redrew it. The big chart was fine. scripts/check/setup-map.cjs.
+8y. ~~**The mast passes through the jib when she's hove to**~~ (done: the backed jib lies against the mast and shrouds, 476ed502) (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
    screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
    through the mast (and likely the windward shroud and spreader). As in real life, a backed jib bellies to windward
    and comes up against the shroud and spreader, draping round them, never through the mast. So the jib's shape needs
@@ -312,7 +323,7 @@ What's planned, roughly in order. Done work is described in the README.
      option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
      thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
      and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
-8x. **URGENT — the whole new release stutters** (regression, performance; owner, 14 November): "the whole new release is
+8x. ~~**URGENT — the whole new release stutters**~~ (fixed on main: each boat's fixed parts merged into one mesh per material, the hull in three levels of detail, small parts culled, fewer shader programs, page writes only on change, triangles back to v186's; a frame-time release gate, perf-ab.cjs, and the F9 frame-time readout) (regression, performance; owner, 14 November): "the whole new release is
    moving very, very slow. whitecaps on the water are stuttering. everything is stuttering." The boat editor's slowness
    (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare
    frame time and the worker's step against v178 (perf-pair.mjs, and the frame-time readout), and look first at what
@@ -333,7 +344,7 @@ What's planned, roughly in order. Done work is described in the README.
    Batch 40 is held until the frame fix lands, so nothing adds load meanwhile.
    frame-time check to the release smoke test so a stuttering build
    can't ship.
-8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
+8v. ~~**Now — the boat editor is very slow**~~ (done: look-only changes restyle her in place, sail pictures shared, the cockpit linings worked out once; a speed check) (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
    - each change rebuilding the whole boat model or the showroom scene;
@@ -342,14 +353,14 @@ What's planned, roughly in order. Done work is described in the README.
    - the time of day rebuilding the sky and lights from scratch.
    Profile one click of each kind, fix the slow path, and add a check that a boat-editor change takes under a frame
    budget.
-8u. **Partly fixed — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
+8u. ~~**Partly fixed — the boat editor shows no way to set her sail number or country**~~ (done: a stray .row2 rule; checked on every boat, dd7db94c) (bug; 1 h): owner, "I'm in the boat
    editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
    in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
    input), so something hides them on screen. Not the Save banner (owner: there's none showing). Suspects: the turning boat's panel pushing
    Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
    published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
    ensign. Owner, 14 November: they're back for Josephine; the other boats in the fleet still to check.
-8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
+8t. ~~**Now — the boats have vanished from the boat cards' pictures**~~ (done: framed by what's drawn, 03b2c494) (regression; 1–2 h): owner, with a screenshot of the
    Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
    Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
    - the pictures are kept between visits, so empty ones may have been saved and are now reused;
@@ -523,6 +534,18 @@ as it is.
 - **The cabin instrument:** the Tacktick-style unit at the hatch garage's forward end, key 6. This begins the tactical
   compass item.
 - **A racing season:** a proposal for the owner (docs), built from the real 2025–26 Seaweed Soup.
+
+**Built 14 November** (on main; each release now passes the frame gate first):
+- Learn to sail: the lessons (including heavy-air easing, Lesson 11) and a gear check before casting off.
+- The rules trainer: "Sail it yourself". A World Sailing Case laid out on the water, you helm the boat it's about; 23
+  Cases sailed and taught.
+- Wrecks, built from Marinas' design: every contact graded (boat/damage.ts); a hard blow, a ship, or being pinned in
+  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, and she's laid up for repairs.
+- The season's flow as approved: Race → Season → the overview → Sail race N → its setup; the announced 2026–27 race days.
+- The drills' cues by the boat and guides on the water (8b and Training tools 3, as approved).
+- No on-screen tiller instructions outside the Learn to sail lessons.
+- The crew's main hand tacks facing the mainsheet, not reaching behind (the first of the owner's backwards arms).
+- The rig checked against the class rules' measurement bands; the traveler held where you leave it.
 
 **Built 13 November, also** (to v178):
 - Josephine as she really is: sail number USA 122 (the 2026–27 Seaweed Soup results), and her club BVBC.
@@ -761,6 +784,12 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   ~~Also in the showroom~~ (done: the showroom's Time of day and Conditions…) (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
+- **Later — your crew's looks and character** (the owner, 14 November 2026; Crew Figures with Crew Model; community and
+  fun, after physics and racing): set each crew member's outfit when you configure them in the Yacht Club's Members tab:
+  foul-weather gear, jackets, life jackets, hats and caps, sunglasses, gloves, boots, and their colors (club colors
+  and burgees among them). Plus other fun attributes: hair, beards, a nickname, a favorite position aboard, a lucky
+  item. Looks only, no effect on the physics; anything that would change the boat (weight, height, skill) stays where
+  it is set today. In the members' own pictures and on the water.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
   - From Marinas, the motor: the outboard's thrust is off her centerline (about 0.45 m out on the bracket, some 180 N·m at full
     throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
@@ -1164,6 +1193,12 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colors, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colors are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
+  **Grounding on depth** (Coordinator, 14 November; Bay East, after bay-east-17; physics review; with Skipper Model for
+  the AI's routing): today a boat runs aground only on the coastline, so at low water she sails over drying flats and
+  shoals with her 1.20 m draft (Folkboat, class rules). San Rafael's and San Leandro's flats, Richardson Bay and the
+  Berkeley flats are where Folkboats really go aground. The chart's depth plus the tide's height there (tide.ts
+  tideHeightAt) against her draft: soft mud, so she's aground, not wrecked, and stuck until the tide lifts her or she
+  kedges off (the anchor); the AI's routes keep to water deep enough.
   ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
@@ -1353,7 +1388,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
-- **Wrecks** (designed: docs/WRECK-PROPOSAL.md, the owner's answers 14 November; Marinas; after #292; not urgent; 6–10 h):
+- **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
   short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
   lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,
