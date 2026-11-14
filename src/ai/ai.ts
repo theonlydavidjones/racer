@@ -867,8 +867,11 @@ export function crewPoleCall(w: World, b: Boat): void {
   // of practice; the 0.7: "seasoned", above a club crew.)
   const c = b.crew, fwd = c && c.spec.crew.length ? c.spec.crew[c.spec.crew.length - 1] : null;
   const nextDeep = !!nm && nm.type === 'round' && Math.abs(wrap(b.ww.from - brg(nm.next.x - nm.p.x, nm.next.y - nm.p.y) - 180)) < 30;
+  // (once a prep has lapsed unused, she wasn't bearing away yet: short of the mark she needs them on the rail again, and
+  // they don't turn back for the mast the moment they've left it; not again for 15 s, an estimate)
+  const lapsed = b.polePrepUntil != null && (c?.clock ?? 0) > b.polePrepUntil && (c?.clock ?? 0) - b.polePrepUntil < 15;
   if (!!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < Math.max(12, 8 * b.v)
-    && (c!.hike ?? 0) < 0.3 && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0) b.polePrepUntil = (c!.clock ?? 0) + 10;
+    && (c!.hike ?? 0) < 0.3 && !lapsed && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0) b.polePrepUntil = (c!.clock ?? 0) + 10;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
   // (and a crew commits: they call it once she's settled deep, a few seconds past 157°, not on every wander of the course;
   // once it's called they see it through unless she comes up toward a reach (140°), and stow it after a few seconds
