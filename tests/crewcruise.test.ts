@@ -19,7 +19,7 @@ import { n360 } from '../src/core/math';
  * sea. Every figure is drawn each step (render/crew.ts) and watched while she sails steadily (more than 10 s from a tack
  * or gybe), counting:
  * - trips: along the boat to a new place, or out to a job;
- * - pose changes (sitting, hiking, to leeward, a job);
+ * - changes of posture (sat, crossing, at a job), each held a second or more;
  * - crossings of the cockpit that her side didn't call for;
  * - the hips' travel fore and aft while they're not on the way anywhere (the "crawling along the rail");
  * - the body's lean, pitch and roll (the "flopping");
@@ -27,7 +27,7 @@ import { n360 } from '../src/core/math';
  * - the most they turn round in 4 s;
  * - time two of them spend within a body's width of each other both moving at once (the "dancing around each other").
  */
-type Watch = { seat?: number; inJob?: boolean; jobEnd?: number; secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
+type Watch = { seat?: number; inJob?: boolean; jobEnd?: number; fam?: string; famNew?: string; famT?: number; secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
 
 function cruise(twa: number, kt: number, mins: number) {
   const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
@@ -52,7 +52,12 @@ function cruise(twa: number, kt: number, mins: number) {
       const now = { pose: a.pose, gz: a.goal?.z ?? a.z, x: a.x, yaw: c.yaw, knee: f.leg.map(l => l.mid.rotation.x), hip: { x: c.hip.x, y: c.hip.y, z: c.hip.z }, pitch: c.pitch, roll: c.roll };
       if (q && steady) {
         s.secs += DT;
-        if (now.pose !== q.pose) s.poses++;
+        // (a change of posture, as it shows: sat (on a seat or out on the rail, leaning in or out on it, to windward or to
+        // leeward: the lean and the crossings are counted on their own), crossing, or at a job, each held at least a
+        // second. Not the labels' flicker as one move goes from crossing to sitting to sat to leeward within a second)
+        const fam = ['sit', 'lee', 'hike', 'helm'].includes(now.pose) ? 'seated' : now.pose;
+        if (fam !== s.famNew) { s.famNew = fam; s.famT = w.t; }
+        if (s.famNew !== s.fam && w.t - (s.famT ?? 0) >= 1) { if (s.fam) s.poses++; s.fam = s.famNew; }
         // (a trip: out to a job, or along the boat to a new seat. The way back from a job to a seat is the same trip, not
         // another: within HOLD.leeLast's 15 s of it, they're still coming back from it, to whichever side they're wanted)
         const inJob = atJob(a), back = s.jobEnd != null && w.t - s.jobEnd < 15;
@@ -97,7 +102,9 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         // way back from it is one trip: counted as two, out and back, this was 1 a minute. In 6 kt on a reach the jib car's
         // set once for the new course, the vang as the breeze comes and goes: three in five and a half minutes)
         expect(o.trips, `${t}: trips a minute`).toBeLessThan(0.6);
-        expect(o.poses, `${t}: pose changes a minute`).toBeLessThan(3);
+        // (to a job and back is two; the trips' 0.6 a minute and a crossing now and then: under 1.5. Counted by the labels,
+        // with the leaning in and out on the rail and each move's flicker of labels, this was 3)
+        expect(o.poses, `${t}: changes of posture a minute`).toBeLessThan(1.5);
         // (off the wind, across the cockpit only when she gybes; close-hauled or reaching in light air, to leeward for a
         // lull that lasts, heeling her, or to trim the jib from there, and back up as the breeze fills: a move each way in
         // a few minutes, not each puff (crewPhys.ts hold, under 8 kt and up to 120° true))
