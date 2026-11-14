@@ -1,16 +1,20 @@
 /**
  * The outboard on her transom bracket: what it pushes, and what it costs her when it's down and not pushing.
  *
- * The motors (a small four-stroke, as a Folkboat carries): Tohatsu's MFS2.5, MFS3.5 and MFS6 classes. The 3.5's figures
- * (gear ratio 2.15:1, full throttle 5,000–6,000 rpm, its standard prop 7.4 in across by 7.0 in pitch, three blades, about
- * 18.4 kg) and the 2.5's gearbox (forward and neutral only: no reverse, the motor swivels round to go astern) are from
- * Tohatsu's specifications as summarised by retailers (tohatsu.com itself wasn't reachable from the session that wrote this).
- * The 3.5's gearbox is the same, forward and neutral only, with the motor swiveled right round for astern: so two
- * summaries have it (Boat Detail's reading of the MFS3.5B owner's manual as summarized, a dog clutch shifting F–N; and
- * Tohatsu's North American specification for the MFS3.5C as a search summary gave it, "Forward-Neutral"). NOT read from
- * the manual itself (tohatsu.com wasn't reachable, 14 Nov 2026), and one retailer's listing is said to show F–N–R: to
- * check against Tohatsu's own table when it can be read. The 6 has a reverse gear (as summarized; to check likewise).
- * The 2.5's and the 6's props are assumed the 3.5's, and the 6's weight (26 kg) is Tohatsu's, as summarised: to check.
+ * The motors (a small four-stroke, as a Folkboat carries): Tohatsu's MFS2.5, MFS3.5 and the single-cylinder MFS6, from
+ * Tohatsu's own pages and owner's manuals (read 14 Nov 2026):
+ * - The 2.5 and the 3.5 (MFS2.5C/3.5C owner's manual, tohatsu.com/marine/common/owners_manual/MFS2.5-3.5C_EUR_EN_web.pdf,
+ *   specifications; and tohatsu.com/marine/int/outboards/mfs35c.html): "Clutch: Dog clutch system (F-N)", "Gear Shift:
+ *   Forward - Neutral", "Forward-neutral shifting with 360° steering"; gear ratio 2.15 (28:13); propeller 3 × 7.4 × 7.0 in;
+ *   18.5 kg with the short shaft (19.5 long), the same for both; full throttle 5,000–6,000 rpm for the 3.5, 4,500–5,500
+ *   for the 2.5. Neither has a reverse gear. To go astern the manual has you slow to idle, shift to neutral, "turn the
+ *   outboard motor at an angle of 180°" and shift to Forward.
+ * - The 6 (tohatsu.com/marine/int/outboards/mfs6c_1.html; MFS4C/5C/6C owner's manual): "Gear Shift Forward - Neutral -
+ *   Reverse", gear ratio 2.15 (13:28), 5,000–6,000 rpm, 25 kg at its lightest (25.6–27.1 kg by shaft and tank). Its
+ *   standard propeller is 7.8 in across; the pitch here (7.0 in) is the manual's lower-pitch option, the plain motor's
+ *   standard reading as 8.0 in in a table that didn't copy cleanly: to check.
+ * (Before: the 2.5 was down as 13 kg, the 6's gear ratio as 2.08, which is the two-cylinder 6's, and the 3.5 as having a
+ * reverse gear.)
  *
  * Thrust: no published bollard pull for these motors was found, so it's worked out from the prop's size and the motor's
  * power by propeller momentum (actuator-disc) theory, the textbook starting point (e.g. Carlton, Marine Propellers and
@@ -30,9 +34,9 @@ export type OutboardHp = 2.5 | 3.5 | 6;
 export interface Outboard { hp: OutboardHp; kg: number; reverse: boolean; propD: number; pitch: number; rpm: number; gear: number }
 /** The motors on offer (see above for where the figures come from). */
 export const OUTBOARDS: Record<OutboardHp, Outboard> = {
-  2.5: { hp: 2.5, kg: 13, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
-  3.5: { hp: 3.5, kg: 18.4, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
-  6: { hp: 6, kg: 26, reverse: true, propD: 7.8 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.08 }
+  2.5: { hp: 2.5, kg: 18.5, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5000, gear: 2.15 },
+  3.5: { hp: 3.5, kg: 18.5, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
+  6: { hp: 6, kg: 26, reverse: true, propD: 7.8 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 }
 };
 /** A small outboard's prop: how much of the ideal disc's thrust it gets at rest (an estimate: small props do 0.5–0.7). */
 export const FIGURE_OF_MERIT = 0.55;

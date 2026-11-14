@@ -321,7 +321,7 @@ physics, ranked like the ten above:
 | OUTBOARDS.rpm | 5500 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
 | OUTBOARDS.gear | 2.15 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
 | OUTBOARDS.hp | 3.5 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.kg | 18.4 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
+| OUTBOARDS.kg | 18.5 | 29 | sourced | Tohatsu's owner's manuals and product pages, read 14 Nov 2026 (2.5 and 3.5: 18.5 kg short shaft; 6: 25–27 kg) |
 | OUTBOARDS.propD | 7… | 29 | estimate | 3.5's prop assumed for all |
 | OUTBOARDS.pitch | 7… | 29 | estimate | 3.5's prop assumed for all |
 | OUTBOARDS.rpm | 5500 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
