@@ -20,11 +20,12 @@ import { inBasin } from '../geo/marina';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before'
+export type LessonId = 'boat' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before'
   | 'case'; // (not a lesson of the grid: the Rules trainer's Sail it yourself, sim/caseRun.ts, sailed the same way; the World calls it)
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
+  { id: 'boat', no: 1, title: 'The boat', icon: '⛵', asa: '1, 2 (the parts she has); 3 (her sides)' }, // (not sailed: her parts, found on her in the showroom, app/boatLesson.ts)
   { id: 'before', no: 2, title: 'Before you go', icon: '🦺', asa: '16, 17, 18, 21' },
   { id: 'tiller', no: 3, title: 'The tiller', icon: '🧭', asa: '24, 26, 27' },
   { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', asa: '22, 28–32' },
@@ -80,7 +81,7 @@ export const LESSON_MARKS = {
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
-  tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
+  boat: '', tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
   tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
   breeze: 'Take the mainsheet: it\'s blowing 15', case: 'Sail it without breaking a rule', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
