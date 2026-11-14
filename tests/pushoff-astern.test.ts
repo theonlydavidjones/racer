@@ -3,7 +3,7 @@
 // being pushed back with no sail." The crew's shove carries her well out into the fairway, with way enough to steer her
 // stern first, and the tiller turns her the right way going astern.
 import { describe, expect, it } from 'vitest';
-import { ASTERN_ENOUGH, ASTERN_RUN, HARBORS, berthClear, slipsIn } from '../src/geo/marina';
+import { ASTERN_ENOUGH, ASTERN_RUN, HARBORS, NO_WAY_OUT, SLIPS, berthClear, slipById, slipsIn } from '../src/geo/marina';
 import { asternCoast } from '../src/boat/physics';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
@@ -16,6 +16,9 @@ const STEERS = 0.3;
 const wrap = (a: number) => ((a + 540) % 360) - 180;
 
 describe('pushed off astern', () => {
+  it('a save naming a berth since taken out of use (NO_WAY_OUT) finds her the nearest berth kept on the same dock', () => {
+    for (const id of NO_WAY_OUT) { const s = slipById(id); expect(s, id).toBeTruthy(); expect(SLIPS).toContain(s); expect(s!.marina).toBe(id.split(':')[0]); }
+  });
   it('never gentler than steerage way', () => { expect(asternCoast(ASTERN_STEERAGE)).toBeGreaterThan(ASTERN_ENOUGH); });
   it('the shove: her walk-back pace and a last push, about 0.64 m/s, which glides her about as far as the planner looks', () => {
     expect(ASTERN_SHOVE).toBeGreaterThan(0.55); expect(ASTERN_SHOVE).toBeLessThan(0.7);
@@ -26,8 +29,9 @@ describe('pushed off astern', () => {
     const bad: string[] = []; let n = 0;
     for (const H of HARBORS) {
       const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
-      for (let i = 0; i < 20; i++) {
-        const s = all[Math.floor(i * all.length / 20)];
+      const k = Math.min(20, all.length); // (each berth once: no repeats in a small harbor)
+      for (let i = 0; i < k; i++) {
+        const s = all[Math.floor(i * all.length / k)];
         const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
         const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: Math.max(kt, 0.01), windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
         const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
@@ -39,18 +43,22 @@ describe('pushed off astern', () => {
         let steer = 0, went = 0, inside = '', hard = 0, best = -Infinity, bestEnd = -Infinity, touched = false;
         for (let t = 0; t < 60; t += DT) {
           u.tiller = plan.helm && Math.abs(wrap(u.h - h0)) < 85 ? plan.helm : 0;
-          const x = u.x, y = u.y; w.step(DT); went += Math.hypot(u.x - x, u.y - y);
+          // (how far she's gone along her own line, stern first: not her drift to leeward)
+          const x = u.x, y = u.y, s0 = Math.hypot(u.vx, u.vy), hu = { x: Math.sin(u.h * Math.PI / 180), y: Math.cos(u.h * Math.PI / 180) };
+          w.step(DT); went += Math.abs((u.x - x) * hu.x + (u.y - y) * hu.y);
+          // (a touch the sim stopped her for: a bump or collision told, or her way gone in one step, as travel() stops her against a dock)
+          const bumped = w.drainEvents().some(e => e.type === 'toast' && /Bump|Collision|hit |touched|piles/.test(e.msg)) || (s0 > 0.1 && Math.hypot(u.vx, u.vy) < 0.3 * s0);
           if ((u.astern ?? 0) > STEERS) steer += DT;
           // (her middle past her finger's end, and her nearest end, bow or stern, along the slip's line: the furthest she gets
           // before she touches anything)
           const out = -((u.x - s.p.x) * f.x + (u.y - s.p.y) * f.y) - 0.45 * s.finger, end = out - 3.8 * Math.abs(Math.cos((u.h - s.heading) * Math.PI / 180));
-          const clear = berthClear(u, u.h, s);
+          const clear = berthClear(u, u.h, s) && !bumped;
           if (!clear) {
             // (in the water the plan found clear, nothing, ever; past it, steering her on down the fairway or getting sail on her is
             // the helmsman's, as on a real boat (the Coordinator, 14 Nov 2026), and whatever she touches she touches at a crawl:
             // under DAMAGE_V.scrape, 0.5 m/s, the shared damage measure's scrape, an ESTIMATE (boat/damage.ts): never more than a scrape)
             if (went <= plan.coast) inside ||= `${t.toFixed(1)} s, ${went.toFixed(1)} m of ${plan.coast} clear`;
-            else hard = Math.max(hard, Math.hypot(u.vx, u.vy));
+            else hard = Math.max(hard, bumped ? s0 : Math.hypot(u.vx, u.vy)); // (a bump: her speed the step before)
             touched = true;
           }
           if (!touched && out > best) { best = out; bestEnd = end; }

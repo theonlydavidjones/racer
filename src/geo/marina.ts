@@ -227,7 +227,9 @@ const END_TIES: Slip[] = HARBORS.flatMap(H => {
 SLIPS.push(...END_TIES);
 const BY_ID = new Map(SLIPS.map(s => [s.id, s]));
 /** A slip by its id (a bare label is one of West Harbor's: saves from before the other marinas). */
-export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(id.includes(':') ? id : `west-harbor:${id}`) ?? BY_ID.get(currentSlipId(id)) ?? null; // (a slip by its id today first; an old save's by its renaming)
+export const slipById = (id: string | undefined): Slip | null => !id ? null : BY_ID.get(id.includes(':') ? id : `west-harbor:${id}`) ?? BY_ID.get(currentSlipId(id)) ?? MOVED.get(currentSlipId(id)) ?? null; // (a slip by its id today first; an old save's by its renaming; a berth since taken out, the nearest on her dock)
+/** Berths taken out of use (NO_WAY_OUT) that a save may still name: each to the nearest berth kept on the same dock, her boat moved there. */
+const MOVED = new Map<string, Slip>();
 /**
  * A slip's id as it is now: West Harbor's and Gashouse Cove's slips were the sim's lettered ones (A12) before they took the
  * marina's own numbers (651), and a save from then follows its berth to its number (data/slip-renames.json, written by
@@ -730,6 +732,11 @@ export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-c
   // clear water doesn't hold: tests/pushoff-astern.test.ts's bar, every berth swept, 14 Nov 2026. A walk-out on a stern line, next,
   // may open them again)
   'south-beach:G88', 'horseshoe-bay:C22', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2'];
+const outOfUse = ALL_SLIPS.filter(s => NO_WAY_OUT.includes(s.id));
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
+for (const o of outOfUse) {
+  const near = SLIPS.filter(s => s.marina === o.marina && s.dock === o.dock && s.kind === o.kind).sort((a, b) => Math.hypot(a.p.x - o.p.x, a.p.y - o.p.y) - Math.hypot(b.p.x - o.p.x, b.p.y - o.p.y))[0];
+  if (near) MOVED.set(o.id, near);
+}
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();

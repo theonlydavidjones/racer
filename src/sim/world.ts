@@ -185,7 +185,8 @@ export const SHOVE_N = 27 * 9.80665;
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /**
  * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more on physics.ts's sternway
- * drag (ASTERN_DRAG: from 0.55 m/s she's above 0.3 for about 12.8 s in still air, 10 s and more with a breeze on her bow;
+ * drag (ASTERN_DRAG: from 0.55 m/s she's above 0.3 for about 12.8 s in still air; a breeze on her bow carries her on longer,
+ * one on her stern shortens it, to under 10 s in 12 kt dead astern of her;
  * the helm hard over turns her about 2 deg/s at it). Her coast from it (about 9.3 m) runs on past the clear water the planner found at the tightest berths: the rest is the
  * helmsman's, steering her on down the fairway, or a bump at a crawl.
  */
@@ -1875,7 +1876,7 @@ export class World {
         let lo = 0, hi = ASTERN_SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
         this.letGo(b, P.h, 0, Math.max(ASTERN_STEERAGE, lo));
         // (told now, as she's shoved, not when the walk began a quarter of a minute before: the physics review)
-        if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `Shoved off astern: ${P.helm ? `tiller to ${P.helm > 0 ? 'starboard' : 'port'}, and steer her stern down the fairway.` : 'steer her stern down the fairway.'}${P.headToWind ? ' She\'ll be head to wind: get the main up first (U), or she\'ll soon stop.' : ''}` });
+        if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `Shoved off astern: ${P.helm ? `tiller to ${P.helm > 0 ? 'starboard' : 'port'}, and steer her stern down the fairway.` : 'steer her stern down the fairway.'}` });
       }
     }
     if (b.pushing && b.pushing.jump > 0) { b.pushing.jump += dt / 0.7; if (b.pushing.jump >= 1) b.pushing = undefined; }

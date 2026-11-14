@@ -261,7 +261,8 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     for (const [old, now] of Object.entries(renames)) {
       if (old.includes(' end ')) continue; // (an end tie: its dock's new name, worked out at load)
       expect(now).toMatch(/^(west-harbor|gashouse-cove):\d+$/);
-      if (slipById(now)) expect(slipById(old)?.id).toBe(now); // (unless she couldn't be got out of it: those are dropped at load)
+      const kept = slipById(now); // (a berth she couldn't be got out of is dropped at load, and a save naming it gets the nearest on its dock)
+      if (kept) expect(slipById(old)?.id).toBe(kept.id);
     }
     expect(fixSpec({ ...DEFAULT_BOAT, slip: 'A20' })).toMatchObject({ marina: 'west-harbor', slip: 'west-harbor:651' });
     expect(fixSpec({ ...DEFAULT_BOAT, slip: 'gashouse-cove:B10' }).slip).toMatch(/^gashouse-cove:\d+$/);
