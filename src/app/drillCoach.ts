@@ -197,7 +197,7 @@ export class DrillCoach {
     const up = dir(u.ww.from), side = (pos.x - Q.x) * up.x + (pos.y - Q.y) * up.y; // (+: to windward of the line)
     const d = dist(pos, Q), toQ = n360(Math.atan2(Q.x - pos.x, Q.y - pos.y) / D2R);
     const spec: GuideSpec = { lane: [{ pts: [pos, Q], half: 6 }], gate: { p: Q, h: toQ, half: 9 } };
-    const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 25)},${Math.round(pos.y / 25)}`;
+    const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}`; // (the lane redrawn as she moves: about once a second)
     const left = -w.t;
     if (side > 1 && left > 0) return { spec, key, wake: null, cue: { word: 'Dip back', sub: `over the line · ${Math.round(left)} s` } };
     // her time to the line: at her speed for that course, the stream along it, and the time to get up to speed (a
