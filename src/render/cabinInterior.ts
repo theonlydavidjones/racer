@@ -1,5 +1,6 @@
 import './three-setup';
 import * as THREE from 'three';
+import { MAST_RAKE } from '../boat/rake';
 import { CABIN, CABIN_LEAN, cabinSideH, winTop, COMPANIONWAY, L, WINDOW, cabinHalf, cabinTopAt, cabinTopY, deckY, halfBeam, hullInnerHalf } from './hull';
 
 /**
@@ -171,9 +172,14 @@ function cabinInteriorGeometryBuild(): THREE.BufferGeometry {
   { const zl0 = zMain - 0.42, zl1 = zMain - 0.01, xi = -(INTERIOR.berthIn + 0.02), xo = -(Math.min(...[zl0, zl1].map(z => Math.min(hullInnerHalf(uAt(z), INTERIOR.berth), halfBeam(uAt(z))))) - INSET - 0.01) /* (its back as far out as the hull allows at its foot, the narrowest place, so no corner shows through the planking) */, yt = deckY(uAt(zMain - 0.2), cabinHalf(uAt(zMain - 0.2))) - INSET;
     box(xo, xi, INTERIOR.berth, yt, zl0, zl1, WOOD);
     box(xi - 0.004, xi + 0.001, INTERIOR.berth + 0.06, yt - 0.06, zl0 + 0.04, zl1 - 0.04, SEAM); } // its door's outline
-  // the mast, stepped on the keel: through the forepeak from the deck down (aluminium, 133 × 110 mm; boatMesh MAST_Z)
-  { const mz = -L / 2 + 0.8 + 2.0 + 0.0665, top = deckY(uAt(mz), 0) - INSET;
-    box(-0.055, 0.055, INTERIOR.sole, top, mz - 0.0665, mz + 0.0665, SPAR); }
+  // the mast, stepped on the keel: through the forepeak from the deck down (aluminium, 133 × 110 mm; boatMesh MAST_Z),
+  // raked as it is above (boat/rake.ts, about its centre at the deck): leaning forward going down, its step on the keel
+  // about 12 cm forward of the hole in the deck. (boatMesh imports this file, so its MAST_Z is spelled out here.)
+  { const mz = -L / 2 + 0.8 + 2.0 + 0.0665, top = deckY(uAt(mz), 0) - INSET, k = Math.tan(MAST_RAKE), x0 = -0.055, x1 = 0.055, y0 = INTERIOR.sole, z0 = mz - 0.0665, z1 = mz + 0.0665;
+    const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z + (y - top) * k), c = SPAR;
+    const f = (a: THREE.Vector3, b: THREE.Vector3, cc: THREE.Vector3, d: THREE.Vector3) => { tri(a, b, cc, c, c, c); tri(a, cc, d, c, c, c); };
+    f(v(x0, y0, z1), v(x1, y0, z1), v(x1, top, z1), v(x0, top, z1)); f(v(x0, y0, z0), v(x1, y0, z0), v(x1, top, z0), v(x0, top, z0)); // (its fore and after faces)
+    f(v(x0, y0, z0), v(x0, y0, z1), v(x0, top, z1), v(x0, top, z0)); f(v(x1, y0, z0), v(x1, y0, z1), v(x1, top, z1), v(x1, top, z0)); } // (its sides)
   // each window's reveal: the cabin side's thickness round the opening, lining to the outside skin, so no gap shows
   for (const side of [1, -1]) {
     const N = 8, outer = (u: number, h: number) => cabinHalf(u) - CABIN_LEAN * h / cabinSideH(u), inner = (u: number, h: number) => outer(u, h) - INSET;
