@@ -836,7 +836,7 @@ const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];
  * graded by what she hit), kept as the worst this outing; a wreck, for your boat only (the owner's answers, WRECK-PROPOSAL
  * section 7), ends it unless you carry on. Returns the grade.
  */
-function hurt(b: Boat, what: { kind: Struck; name: string }, closing: number, hit: Vec, emit: Emit): DamageLevel {
+export function hurt(b: Boat, what: { kind: Struck; name: string }, closing: number, hit: Vec, emit: Emit): DamageLevel {
   const m = displacement((b.crew ??= newCrew(DEFAULT_CREW, b.tack)).spec), level = damageOf(impactEnergy(closing, m), what.kind, m);
   if (!b.isUser) return level; // (the AI boats aren't wrecked or marked: the Coordinator's call, for now)
   if (RANK.indexOf(level) > RANK.indexOf(b.damage?.level ?? 'none')) b.damage = { level, what: what.name };

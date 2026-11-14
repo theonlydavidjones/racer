@@ -1,6 +1,10 @@
 import { V, type Vec } from '../core/math';
 import type { Emit } from '../sim/events';
 import { waterOver } from '../environment/bottom';
+import { HAZARDS, hazardAt } from '../environment/hazards';
+import { tideHeightAt } from '../environment/tide';
+import { KT } from '../core/math';
+import { hurt } from './physics';
 import { displacement, newCrew, DEFAULT_CREW } from './crewPhys';
 import { TRIM } from './hullTrim';
 import type { Boat } from './boat';
@@ -43,7 +47,8 @@ export const keelDepth = (b: Boat): number => GROUND.draft * Math.cos((b.heel ??
  * bottom, the mud's friction against that motion, and she's stopped short of where she'd have got to. `ms`: the time
  * (UTC, ms), for the tide.
  */
-export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: { t: number }, t: number, h0 = b.h): void {
+export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: { t: number }, t: number, h0 = b.h, x0 = b.x - b.vx * dt, y0 = b.y - b.vy * dt): void {
+  if (rockStep(b, ms, emit, toast, t, x0, y0)) return;
   const p: Vec = { x: b.x, y: b.y }, w = waterOver(p, ms);
   const into = w === null ? 0 : keelDepth(b) - w; // (how far the keel would be below the bottom, afloat)
   if (into <= 0) { b.aground = undefined; return; }
@@ -78,4 +83,38 @@ export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: {
   const u = u0, s = s0, rx = nx - b.cur.x, ry = ny - b.cur.y, ahead = rx * u.x + ry * u.y;
   b.v = Math.max(0, ahead); b.astern = Math.max(0, -ahead); b.sway = rx * s.x + ry * s.y;
   if (b.isUser && was === undefined && t - toast.t > 4) { toast.t = t; emit({ type: 'toast', msg: `Aground on the mud: ${w!.toFixed(1)} m of water, and she draws ${keelDepth(b).toFixed(2)} m.` }); }
+}
+
+/** Along her keel, from amidships (m, + forward): where it can strike (the keel is 5.9 m: hullTrim.ts TRIM.keelL). */
+const KEEL_AT = [2.4, 0, -2.4];
+/**
+ * Her keel against a charted rock, wreck or obstruction (environment/hazards.ts) where the tide leaves less water over
+ * it than she draws: hard, not mud. She can't go into it: put back where she was this step, her motion toward it taken
+ * away (she can slide round it or back off it), and the blow graded as any other (physics.ts hurt: boat/damage.ts, her
+ * closing speed into it, as rock: a wreck at speed). Graded once a contact, as she comes onto it. True if she's on one.
+ */
+function rockStep(b: Boat, ms: number, emit: Emit, toast: { t: number }, t: number, x0: number, y0: number): boolean {
+  const u = V(b.h), keel = keelDepth(b);
+  let H = null, q: Vec | null = null;
+  for (const a of KEEL_AT) {
+    const r = { x: b.x + u.x * a, y: b.y + u.y * a }, h = hazardAt(r);
+    if (h && h.top + tideHeightAt(r, ms) < keel && (!H || h.top < H.top)) { H = h; q = r; }
+  }
+  if (!H || !q) { b.onRock = undefined; return false; }
+  // her motion over the ground, as travel left her (ground.ts groundStep), and its part toward the rock's middle
+  const s = V(b.h + 90), ahead = b.v - (b.astern ?? 0), side = b.sway ?? 0;
+  let vx = u.x * ahead + s.x * side + b.cur.x, vy = u.y * ahead + s.y * side + b.cur.y;
+  const dx = H.c.x - q.x, dy = H.c.y - q.y, L = Math.hypot(dx, dy), nx = L > 1e-6 ? dx / L : u.x, ny = L > 1e-6 ? dy / L : u.y;
+  const closing = Math.max(0, vx * nx + vy * ny);
+  if (closing > 0) { vx -= closing * nx; vy -= closing * ny; b.x = x0; b.y = y0; } // (stopped against it: no further in)
+  b.vx = vx; b.vy = vy;
+  const rx = vx - b.cur.x, ry = vy - b.cur.y, along = rx * u.x + ry * u.y;
+  b.v = Math.max(0, along); b.astern = Math.max(0, -along); b.sway = rx * s.x + ry * s.y;
+  if (b.onRock !== H.id) {
+    b.onRock = H.id;
+    const level = hurt(b, { kind: 'rock', name: H.name }, closing, q, emit);
+    if (b.isUser && t - toast.t > 4 && level !== 'wreck') { toast.t = t; emit({ type: 'toast', msg: `You struck ${H.name} at ${(closing / KT).toFixed(1)} kn${level === 'damage' ? ': she\'s damaged' : ''}. ${HAZARDS[H.id - 1].top < 0 ? 'It dries at low water.' : `${H.top.toFixed(1)} m over it at the chart's datum.`}` }); }
+  }
+  b.aground = undefined;
+  return true;
 }

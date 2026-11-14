@@ -1043,7 +1043,7 @@ export class World {
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
-      groundStep(b, this.clockUtc * 60e3, dt, this.emit, this.groundToast, this.t, h0); // (her keel on the mud, where the tide leaves less water than she draws: boat/ground.ts)
+      groundStep(b, this.clockUtc * 60e3, dt, this.emit, this.groundToast, this.t, h0, x0, y0); // (her keel on the mud, where the tide leaves less water than she draws: boat/ground.ts)
       if (b.wrecked && b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); // (in a season race, RET only: the Coordinator)
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
