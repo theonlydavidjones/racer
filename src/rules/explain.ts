@@ -13,7 +13,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '18.2(a)': ['Rule 18.2(a) · Mark-room', 'When the first of two boats reaches the zone (three hull lengths from the mark): if they are overlapped, the outside boat gives the inside boat mark-room; if not, the boat that hasn\'t reached the zone gives the other boat mark-room. That holds even if the overlap later changes, until the boat entitled to mark-room passes head to wind or leaves the zone (18.2(b)). Rule 18 doesn\'t apply between boats on opposite tacks on a beat.'],
   '18.2(c)': ['Rule 18.2(c) · Mark-room, once 18.2(a) has ended', 'When rule 18.2(a) no longer applies (the boat that was entitled to mark-room passed head to wind or left the zone) and the boats are overlapped, the outside boat gives the inside boat mark-room. Not if the inside boat got her overlap from clear astern, or by tacking to windward, when the outside boat couldn\'t give room from that moment (18.2(d)).'],
   '18.3': ['Rule 18.3 · Tacking in the zone', 'If a boat passes head to wind from port to starboard tack in the zone of a mark to be left to port, rule 18.2 doesn\'t apply between her and a starboard-tack boat that is fetching the mark. If that boat has been on starboard since entering the zone, the boat that tacked shall not cause her to sail above close-hauled to avoid contact, and shall give her mark-room if she becomes overlapped inside.'],
-  '18.4': ['Rule 18.4 · Gybing in the zone', 'When an inside overlapped right-of-way boat must gybe at a mark to sail her proper course, until she gybes she shall sail no farther from the mark than needed to sail that course. (Not at a gate mark.)'],
+  '18.4': ['Rule 18.4 · Jibing in the zone', 'When an inside overlapped right-of-way boat must jibe at a mark to sail her proper course, until she jibes she shall sail no farther from the mark than needed to sail that course. (Not at a gate mark.)'],
   '19': ['Rule 19 · Room to pass an obstruction', 'At an obstruction (the shore, a pier, the committee boat after the start, or a boat both must keep clear of, such as a starboard-tack boat two port-tack boats are meeting), when boats are overlapped the outside boat gives the inside boat room between her and the obstruction, unless she has been unable to from the moment the overlap began (19.2(b)). At a continuing obstruction like the shore, a boat that was clear astern and pushes into a gap that isn\'t there when the overlap begins isn\'t entitled to room, and keeps clear (19.2(c)).'],
   '20': ['Rule 20 · Room to tack at an obstruction', 'A boat sailing close-hauled or above, approaching an obstruction she will soon have to change course substantially to avoid, may hail "Room to tack" at a boat on the same tack. The hailed boat shall respond either by tacking as soon as possible, or by immediately replying "You tack" and then giving the hailing boat room to tack and avoid her. Once the hailed boat responds, the hailing boat shall tack as soon as possible. From the hail until the hailing boat has tacked and avoided the hailed boat, mark-room (rule 18.2) doesn\'t apply between them (20.2(e)). A hailed boat that means to tack but has another boat on the same tack to windward may pass the hail on to that boat (20.3).'],
   '21.1': ['Rule 21.1 · Returning to start', 'After her starting signal, a boat sailing back toward the pre-start side of the starting line (or its extensions) to start keeps clear of boats that are not, until her hull is completely on the pre-start side.'],
@@ -100,8 +100,8 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
     }
     case '18.4': {
       const mk = e.markName ?? 'the mark';
-      what = you ? `You were inside at ${mk} with right of way and had to gybe to sail the next leg, but you sailed on past the mark instead, taking ${o} wide.` : `${o} was inside you at ${mk} and had to gybe there, but sailed on past it, carrying you wide.`;
-      tip = you ? 'Your mark-room is room to round, not to carry the outside boat away from the mark. When you need to gybe at the mark, gybe there.' : 'An inside boat that must gybe may not take you farther from the mark than her course needs.';
+      what = you ? `You were inside at ${mk} with right of way and had to jibe to sail the next leg, but you sailed on past the mark instead, taking ${o} wide.` : `${o} was inside you at ${mk} and had to jibe there, but sailed on past it, carrying you wide.`;
+      tip = you ? 'Your mark-room is room to round, not to carry the outside boat away from the mark. When you need to jibe at the mark, jibe there.' : 'An inside boat that must jibe may not take you farther from the mark than her course needs.';
       break;
     }
     case '19':
@@ -170,7 +170,7 @@ export function situationText(rule: RuleId, youKeepClear: boolean, other: string
     '17': kc ? `${nm} overlapped from astern. Keep clear.` : `You overlapped from astern: no higher than your proper course.`,
     '18.2(a)': kc ? `Give ${nm} mark-room.` : `${nm} owes you mark-room.`,
     '18.2(c)': kc ? `${nm} is inside: give them mark-room.` : `You're inside: ${nm} owes you mark-room.`,
-    '18.4': kc ? `Gybe at the mark: don't take ${nm} wide.` : `${nm} must gybe at the mark, not take you wide.`,
+    '18.4': kc ? `Jibe at the mark: don't take ${nm} wide.` : `${nm} must jibe at the mark, not take you wide.`,
     '19': kc ? `Give ${nm} room at the obstruction.` : `${nm} owes you room at the obstruction.`,
     '18.3': kc ? `You tacked in the zone: don't make ${nm} sail above close-hauled.` : `${nm} tacked in the zone in front of you: they must keep clear.`,
     '20': kc ? `Give ${nm} room to tack and get clear of you.` : `${nm} must give you room to tack.`,

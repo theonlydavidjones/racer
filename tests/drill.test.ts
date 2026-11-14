@@ -42,7 +42,7 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
   });
   it('a gybe is found and scored as a gybe', () => {
     const s = drill('gybe', 12)!;
-    expect(s.kind).toBe('gybe'); expect(s.lostM).toBeLessThan(6); expect(s.coach).toMatch(/^A good gybe/);
+    expect(s.kind).toBe('gybe'); expect(s.lostM).toBeLessThan(6); expect(s.coach).toMatch(/^A good jibe/);
   });
   it('a timid tack (too little helm) sits head to wind too long, loses more, and is told to turn more firmly', () => {
     // (so timid she creeps through the eye: told so, as a stalled tack, whether or not there was a speed to score it by)
@@ -86,7 +86,7 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     const g = d.list.filter(x => x.kind === 'gybe');
     expect(g.length).toBeGreaterThan(0);
     expect(g.every(x => !x.scored)).toBe(true);
-    expect(g[0].coach).toMatch(/Gybe not scored/);
+    expect(g[0].coach).toMatch(/Jibe not scored/);
     expect(d.list.filter(x => x.scored).every(x => x.lostM >= -2.5)).toBe(true);
   });
   it('a tack from a reach is noted, not scored', () => {
