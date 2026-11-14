@@ -1359,7 +1359,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
-- ~~**Wrecks**~~ (done: live in v193, #307; docs/WRECK-PROPOSAL.md section 8. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
+- ~~**Wrecks**~~ (done: live in v193, #307; docs/WRECK-PROPOSAL.md section 8. Then the shore's kinds from NOAA's chart (geo/shoreKind.ts: seawall, riprap, beach; Marinas). Next: the bottom, its charted rocks, obstructions and wrecks (grounding on depth; Bay East). Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
   short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
   lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,

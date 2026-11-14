@@ -20,8 +20,10 @@ function aim(w: World, from: Vec, h: number, off: number, v: number) {
 function run(w: World, s: number) { const out = { toasts: [] as string[], wrecked: [] as string[] }; for (let i = 0; i < s / DT; i++) { w.step(DT); for (const e of w.drainEvents()) { if (e.type === 'toast') out.toasts.push(e.msg); if (e.type === 'wrecked') out.wrecked.push(`${e.how} @ ${e.where}`); } } return out; }
 /** West Harbor's breakwater, from the Bay to its north: concrete and rock. */
 const offWestHarbor = LL(37.8098, -122.4410);
-/** Crissy Field's shore, from the water off it: the open shore (mud and sand, for now). */
+/** Crissy Field's shore, from the water off it: the open shore, where the chart gives no kind (a beach): mud and sand. */
 const offCrissy = LL(37.8075, -122.4560);
+/** The Marina Green, from the water off it: NOAA's chart has it a sea wall (SLCONS CATSLC 10: geo/shoreKind.ts). */
+const offMarinaGreen = LL(37.8095, -122.4380);
 
 describe('wrecks', () => {
   it('into a harbor breakwater at 2 m/s (about 4 kn): a wreck, at that harbor, held there', () => {
@@ -37,7 +39,7 @@ describe('wrecks', () => {
     const w = world('sail'); aim(w, offWestHarbor, 180, 1, 0.3); run(w, 8);
     expect(w.user.wrecked).toBeUndefined(); expect(w.user.damage?.level ?? 'scrape').toBe('scrape');
   });
-  it('the open shore at 2 m/s: aground, no damage (mud and sand until its kinds are sourced)', () => {
+  it('a beach at 2 m/s (the chart gives Crissy Field\'s shore no kind): aground, no damage', () => {
     const w = world('sail'); aim(w, offCrissy, 180, 2, 2); const r = run(w, 4);
     expect(r.wrecked).toHaveLength(0); expect(w.user.damage).toBeUndefined(); expect(r.toasts.some(m => /Aground/.test(m))).toBe(true);
   });
@@ -77,4 +79,12 @@ describe('wrecks', () => {
     w.step(DT);
     expect(u.wrecked?.where).toBe('on the Bay'); expect(u.retired).toBe(true);
   });
+  // (the open shore's kinds from NOAA's chart, geo/shoreKind.ts: the Marina Green is a sea wall)
+  it('the Marina Green\'s seawall at 2 m/s: a wreck, "hit the seawall"; at 1 m/s, damage', () => {
+    const w = world('sail'); aim(w, offMarinaGreen, 180, 2, 2); const r = run(w, 4);
+    expect(r.wrecked, r.toasts.join(' / ')).toHaveLength(1); expect(r.wrecked[0]).toMatch(/^hit the seawall at 3\.\d kn @ /);
+    const w2 = world('sail'); aim(w2, offMarinaGreen, 180, 2, 1); const r2 = run(w2, 6);
+    expect(r2.wrecked).toHaveLength(0); expect(w2.user.damage).toEqual({ level: 'damage', what: 'the seawall' });
+  });
 });
+
