@@ -19,7 +19,7 @@ export interface Pose { x: number; y: number; h: number; v: number }
 
 /** The boat that is to keep clear, now: her pose, the turn she is already making (deg/s, + to starboard: mid-tack, or
  * answering the helm), and her weather helm (deg; physics' helmNeed, 0 if not known). */
-export interface Escaper extends Pose { turnRate?: number; helmNeed?: number; /** her leeway, deg (turnSpeed's course angle; default 4) */ leeway?: number }
+export interface Escaper extends Pose { turnRate?: number; helmNeed?: number; /** her leeway, deg (turnSpeed's course angle; default 4) */ leeway?: number; /** she lets her sheets fly as she turns (b.luff) */ luff?: boolean }
 
 export interface EscapeOpts {
   /** Reaction time before the helm goes over, s: she carries on as she is until then. */
@@ -69,7 +69,7 @@ export function escapePaths(kc: Escaper, windFrom: number, o: EscapeOpts): Escap
       h += r * dt;
       // (Deep Physics checked the prediction against the AI's real steered turn: the heading within 3-6°, the position
       // 1.3-5 m out at 8 s, nearly all of it the speed; turnSpeed is their answer, Skipper Model's request)
-      v = turnSpeed(v, r, h, windFrom, wKt, dt, kc.helmNeed ?? 0, kc.leeway ?? 4);
+      v = turnSpeed(v, r, h, windFrom, wKt, dt, kc.helmNeed ?? 0, kc.leeway ?? 4, turn !== 0 && t > o.delay && !!kc.luff);
       const u = V(h); x += u.x * v * dt; y += u.y * v * dt;
       hullEndsInto(x, y, h, E, 4 * i);
     }
