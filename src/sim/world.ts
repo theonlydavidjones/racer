@@ -468,20 +468,26 @@ export class World {
     this.windModel = { base: this.C.base, kt: this.lessonKt(settings.windKt || 12), phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
     // cruising: from a place on the water or her slip in her marina, to another place or back to her slip
     if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(this.homeSlip)}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
-    { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
-      // (racing from a spot: over her passage to the line as well)
+    // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
+    // (racing from a spot: over her passage to the line as well)
+    const puffsOver = (): [Puffs, { c: Vec; half: number }] => {
       const from = this.fromSpot ?? (settings.sailFrom === 'slip' ? this.homeSlip?.p : null) ?? getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.fromSpot ? this.C.center : this.dest?.p ?? from;
       const wide = this.freeSail || !!this.fromSpot, c = wide ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
       const half = wide ? Math.max(3000, dist(from, to) / 2 + 1500) : 3000;
-      this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2));
-      this.fieldArea = { c, half: half + 600 };
-    }
+      return [new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2)), { c, half: half + 600 }];
+    };
+    [this.puffs, this.fieldArea] = puffsOver();
     this.updateBreeze();
-    if (this.fromSpot) this.startAt = this.timeSpotStart(settings.seq);
+    // (from a spot: the passage timed in the mean wind, as the race's own with its shifts, not the old oscillation)
+    this.windModel.shifted = true;
+    if (this.fromSpot) {
+      this.startAt = this.timeSpotStart(settings.seq);
+      if (this.spotTooFar) { [this.puffs, this.fieldArea] = puffsOver(); this.updateBreeze(); this.clockWhileBuilt(-this.startAt); } // (the by-the-line race's own puffs, exactly)
+      this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (the sea grown against the final clock)
+    }
     // the wind's shifts: on a past day, the record's own; otherwise a field with Fort Point's statistics for this kind of
     // day and strength, carried down the course with the wind (environment/shifts.ts; its own random numbers, so the
     // rest of the race draws what it did)
-    this.windModel.shifted = true;
     if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
     this.gusts = new GustField(makeRng((seed ^ 0x6a57) >>> 0), this.windModel.base, this.windModel.kt * KT);
     this.courseWind();
@@ -804,9 +810,10 @@ export class World {
   /**
    * The time to sail from a spot to the line (s, before rounding): around the land (routing.ts routeAround), every
    * 200 m the wind on the water there (the field's lees, the current's own wind) and the stream. Through the water at
-   * her speed made good for that course (madeGood); over the ground, crabbed across the stream (sin δ = c⊥ / v) and
-   * carried by it along (v·cos δ + c∥). Then a fifth more (the tacks or jibes, a helm that isn't the polar's), three
-   * minutes to get going, and up to the next 5 minutes: being late for your own start costs more than waiting.
+   * her speed made good for that course (madeGood), short of the polar's (0.6–0.8 of it, less in light air); over the
+   * ground, with a fair stream crabbed across it (sin δ = c⊥ / v) and carried along (v·cos δ + c∥), against a foul one
+   * stemming all of it. Then a tenth more, three minutes to get going, and up to the next 5 minutes: being late for your
+   * own start costs more than waiting.
    */
   spotPassage(a: Vec, b: Vec): number {
     const pts = routeAround(a, b, 150); let s = 0;
@@ -816,12 +823,17 @@ export class World {
       for (let j = 0; j < n; j++) {
         const m = { x: p.x + u.x * dl * (j + 0.5), y: p.y + u.y * dl * (j + 0.5) };
         const cur = this.currentAt(m, true), ww = windOnWater(this.windHere(m, undefined, false), cur);
-        const v = madeGood(ww.kt, Math.abs(wrap(course - ww.from))), along = cur.x * u.x + cur.y * u.y, across = cur.x * u.y - cur.y * u.x;
-        const vg = v > Math.abs(across) ? Math.sqrt(v * v - across * across) + along : 0;
+        // (her speed through the water short of the polar's: a helm that isn't the polar's, the tacks or jibes; more so
+        // in light air, where a learner makes about three quarters of it)
+        const v = madeGood(ww.kt, Math.abs(wrap(course - ww.from))) * clamp(0.45 + 0.05 * ww.kt, 0.6, 0.8);
+        const along = cur.x * u.x + cur.y * u.y, across = cur.x * u.y - cur.y * u.x;
+        // a fair stream: crabbed across it and carried along; a foul one: set down by it as well as stemming it (a helm
+        // pointed at the line, not crabbed, ends up stemming the whole stream)
+        const vg = along >= 0 ? (v > Math.abs(across) ? Math.sqrt(v * v - across * across) + along : 0) : v - Math.hypot(along, across);
         s += dl / Math.max(0.15, vg);
       }
     }
-    return Math.max(5, Math.ceil((s * 1.2 / 60 + 3) / 5) * 5) * 60;
+    return Math.max(5, Math.ceil((s * 1.1 / 60 + 3) / 5) * 5) * 60;
   }
 
   /* ---------- the wind across the course (environment/weather.ts), cached on a grid ---------- */

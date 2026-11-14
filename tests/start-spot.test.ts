@@ -45,31 +45,46 @@ describe('Start: somewhere else', () => {
     }
   });
 
-  it('sailed to the line on a reach in a set wind and an ebb, she gets there before the warning signal', () => {
-    // north of the line, out on the Bay: the line is south of her, the westerly abeam
-    const S0 = race({ windKt: 12, current: 'bigebb' }), w0 = new World(COURSES[0], S0, 1), c = w0.C.center, at = { x: c.x, y: c.y + 2500 };
-    expect(onLand(at)).toBe(false);
-    const S = race({ windKt: 12, current: 'bigebb', raceSpot: spotId(at), raceFrom: 'spot' }), w = new World(COURSES[0], S, 1), u = w.user;
-    expect(w.fromSpot).not.toBeNull();
-    const off = Math.abs(wrap(brg(c.x - at.x, c.y - at.y) - w.wind.from));
-    expect(off).toBeGreaterThan(beatAngle(w.wind.kt) + 5); expect(off).toBeLessThan(140); // (a reach: no tacks to script)
-    // the helm: steered for the line's middle, the tiller to port to turn to starboard
-    let arrived: number | null = null;
-    while (w.t < -S.seq * 60 && arrived == null) {
-      const want = brg(c.x - u.x, c.y - u.y), err = wrap(want - u.h);
-      u.tiller = clamp(-err / 20, -1, 1);
+  // A learner's helm, scripted: for the line's middle; closer to the wind than close-hauled, close-hauled (3° free) on
+  // the side nearer it until it's laid; deeper than her run angle, that angle, likewise; not crabbed for the stream.
+  const sailToLine = (w: World, S: Settings): { at: number | null; off: number } => {
+    const u = w.user, c = w.C.center;
+    while (w.t < -S.seq * 60) {
+      const to = brg(c.x - u.x, c.y - u.y), wf = u.ww.from, off = wrap(to - wf), beat = beatAngle(Math.max(1, u.ww.kt)) + 3, run = 150;
+      const want = Math.abs(off) < beat ? wf + Math.sign(off || 1) * beat : Math.abs(off) > run ? wf + Math.sign(off || 1) * run : to;
+      u.tiller = clamp(-wrap(want - u.h) / 20, -1, 1);
       w.step(DT);
-      if (dist(u, c) < 150) arrived = w.t;
+      if (dist(u, c) < 150) return { at: w.t, off: 0 };
     }
-    expect(arrived, `still ${dist(u, c).toFixed(0)} m off at the warning signal`).not.toBeNull();
-  }, 300000);
+    return { at: null, off: dist(u, c) };
+  };
+  const from = (o: Partial<Settings>, bearing: number, m: number) => { const c = new World(COURSES[0], race(o), 1).C.center; return { x: c.x + Math.sin(bearing * Math.PI / 180) * m, y: c.y + Math.cos(bearing * Math.PI / 180) * m }; };
+  for (const [name, o, bearing, m] of [
+    ['a reach in 12 kt with the ebb across', { windKt: 12, current: 'bigebb' }, 0, 2500],
+    ['a reach off Sausalito in 12 kt against a 2.5 kt ebb', { windKt: 12, current: 'bigebb' }, 332, 5400],
+    ['from south of Alcatraz on a real sea-breeze day, in light air', { windKt: 0 }, 60, 2600],
+  ] as [string, Partial<Settings>, number, number][]) {
+    it(`sailed to the line by a learner's helm, she gets there before the warning signal: ${name}`, () => {
+      const at = from(o, bearing, m); expect(onLand(at)).toBe(false);
+      const S = race({ ...o, raceFrom: 'spot', raceSpot: spotId(at) }), w = new World(COURSES[0], S, 1);
+      expect(w.fromSpot).not.toBeNull();
+      const r = sailToLine(w, S);
+      expect(r.at, `still ${r.off.toFixed(0)} m off at the warning signal (lead ${(w.startAt - S.seq * 60) / 60} min)`).not.toBeNull();
+    }, 900000);
+  }
 
   it('too far to sail to the line in two hours: by the line, and the World says so', () => {
     const far = LL(37.9200, -122.3900); // off Point San Pablo, about 13 km up the Bay, in a light breeze
     expect(onLand(far)).toBe(false);
     const S = race({ windKt: 4, raceFrom: 'spot', raceSpot: spotId(far) }), w = new World(COURSES[0], S, 1);
     expect(w.fromSpot).toBeNull(); expect(w.spotTooFar).toBe(true); expect(w.startAt).toBe(S.seq * 60);
-  });
+    // the by-the-line race exactly: the same puffs, wind and fleet (the reviewer: the passage's puffs were kept)
+    const line = new World(COURSES[0], race({ windKt: 4, raceFrom: 'water', opponents: DEFAULT_SETTINGS.opponents, fleet: DEFAULT_SETTINGS.fleet }), 1);
+    const w2 = new World(COURSES[0], race({ windKt: 4, raceFrom: 'spot', raceSpot: spotId(far), opponents: DEFAULT_SETTINGS.opponents, fleet: DEFAULT_SETTINGS.fleet }), 1);
+    for (let k = 0; k < 30 * 60; k++) { line.step(DT); w2.step(DT); }
+    expect(w2.wind.from).toBeCloseTo(line.wind.from, 6); expect(w2.wind.kt).toBeCloseTo(line.wind.kt, 6);
+    w2.boats.forEach((b, k) => { expect(b.x).toBeCloseTo(line.boats[k].x, 3); expect(b.y).toBeCloseTo(line.boats[k].y, 3); });
+  }, 300000);
 
   it('a spot on land, off the chart, or none starts by the line as usual', () => {
     const land = LL(37.8020, -122.4400); // the Marina District
