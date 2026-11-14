@@ -21,6 +21,7 @@ import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLi
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 import { PART_SMALL } from './fittings';
 import { buildOutboard, syncOutboard, type OutboardMesh } from './outboard';
+import { bracketFitted } from '../boat/outboardMount';
 const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
 const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
@@ -371,8 +372,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   grp.add(rud);
   // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
   // prop turning, from the motor's state (syncBoatMesh)
-  // (and its bracket alone, empty and raised, while it's stowed below: Crew Controls' Stow / Ship)
-  if (b.spec?.perf.outboard === 'bracket' || b.motor) { const ob = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
+  // (and its bracket alone, empty and raised, while it's stowed below from it: Crew Controls' Stow / Ship)
+  // (no bracket at all with no motor aboard: boat/outboardMount.ts bracketFitted; built later if one's shipped mid-sail)
+  if (bracketFitted(b)) { const ob = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
   // her name on both sides, where the boats carry it: on the cabin side and the coaming, aft of the window and
   // forward of the winch (there's no room for it on the topsides under the low sheer); hand-lettered script
   if (paint.boatName) {
@@ -1459,7 +1461,9 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
   syncCompanionway(m.companionway, b);
   // her outboard: let down or tilted up, the prop turning (the motor's state: boat/motor.ts, b.motor)
-  if (m.outboard) syncOutboard(m.outboard, b.motor, Math.max(0, dt));
+  { const fit = bracketFitted(b);
+    if (fit && !m.outboard) { m.outboard = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); m.grp.add(m.outboard.group); } // (a motor shipped from below mid-sail: its bracket fitted)
+    if (m.outboard) { m.outboard.group.visible = fit; if (fit) syncOutboard(m.outboard, b.motor, Math.max(0, dt)); } }
   // the footrest: slid out while the helm sits on the after deck (their feet on it), slid back under the deck when they
   // stand to steer (the owner). b.footrest (0 out … 1 back) is set by whoever poses the helm (crew.ts): out by default,
   // as the helm sits. It slides there by hand, about half a metre a second, not in a jump.

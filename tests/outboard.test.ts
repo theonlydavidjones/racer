@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { OUTBOARD_PROP } from '../src/boat/outboardMount';
+import { OUTBOARD_PROP, bracketFitted } from '../src/boat/outboardMount';
 import { buildOutboard, syncOutboard, BOARD_DOWN, BOARD_UP, TILT_UP } from '../src/render/outboard';
 
 /** Run the motor's drawing toward a state for t seconds. */
@@ -43,6 +43,16 @@ describe('the outboard as drawn follows the motor', () => {
       o.group.updateMatrixWorld(true); const p = o.prop.getWorldPosition(new THREE.Vector3()), want = OUTBOARD_PROP[hp];
       expect(Math.hypot(p.x - want.x, p.y - want.y, p.z - want.z)).toBeLessThan(0.01);
     }
+  });
+  it('the bracket is on her only with a motor aboard: on it, or stowed below from it; none with the motor ashore', () => {
+    const spec = (outboard: string) => ({ perf: { outboard } }), motor = { stowed: false };
+    expect(bracketFitted({ spec: spec('none') })).toBe(false); // (no motor at all: a clean transom)
+    expect(bracketFitted({ spec: spec('stowed') })).toBe(false); // (left ashore, as for a race)
+    expect(bracketFitted({ spec: spec('stowed'), motor: { stowed: true } })).toBe(false);
+    expect(bracketFitted({ spec: spec('bracket'), motor: { stowed: true } })).toBe(true); // (stowed below mid-sail: the empty bracket)
+    expect(bracketFitted({ spec: spec('bracket'), motor })).toBe(true); // (on the bracket)
+    expect(bracketFitted({ spec: spec('stowed'), motor })).toBe(true); // (shipped onto the bracket mid-sail)
+    expect(bracketFitted({ spec: spec('stowed'), motor: { stowed: true, shifting: { to: 'bracket', left: 20 } } })).toBe(true); // (being shipped)
   });
   it('costs a handful of draw calls (each moving part one mesh a material)', () => {
     let n = 0; buildOutboard(3.5).group.traverse(c => { if ((c as { isMesh?: boolean }).isMesh) n++; });

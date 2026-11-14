@@ -19,3 +19,14 @@ export const OUTBOARD_PROP: Record<2.5 | 3.5 | 6, { x: number; y: number; z: num
   3.5: { x: MOUNT_X, y: -0.215, z: 4.153 },
   6: { x: MOUNT_X, y: -0.167, z: 4.176 }
 };
+
+/**
+ * Whether her stern carries the bracket at all (owner: "just take the whole mount off if the motor is stowed ashore"):
+ * fitted while the motor's on it, and while it's stowed below from it mid-sail (the bracket left on, empty and raised); with
+ * no motor aboard (her spec has none, or it's left ashore, as for a race: spec 'stowed', no motor state), a clean transom.
+ */
+export function bracketFitted(b: { spec?: { perf: { outboard?: string } }; motor?: object }): boolean {
+  if (b.spec?.perf.outboard === 'bracket') return true;
+  const m = b.motor as { stowed?: boolean; shifting?: unknown } | undefined; // (stowed and shifting: Crew Controls' Stow / Ship)
+  return !!m && (!m.stowed || !!m.shifting);
+}
