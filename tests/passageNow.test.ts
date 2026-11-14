@@ -88,13 +88,14 @@ describe('sailLeg (the review of the course estimate)', () => {
   });
 
   it('with runs off (the tiller pilot on Nav, which runs straight for it), a dead run has no gybes and goes straight', () => {
-    // 12 kt from 000; the mark 1500 m dead downwind, 180°, no current
-    const a = LL(37.8350, -122.4000), b = { x: a.x, y: a.y - 1500 };
+    // 12 kt from 130°; the mark 1500 m on 310°, dead downwind (the fetch above, in open water), no current
+    const a = LL(37.8350, -122.4000), u = V(310), b = { x: a.x + u.x * 1500, y: a.y + u.y * 1500 };
     expect(onLand(a) || onLand(b)).toBe(false);
-    const run = sailLeg(plain(12, 0, { kt: 0, to: 0 }), a, b, 0, 'middle'), straight = sailLeg(plain(12, 0, { kt: 0, to: 0 }), a, b, 0, 'middle', undefined, 30, 240, false);
+    const day = plain(12, 130, { kt: 0, to: 0 });
+    const run = sailLeg(day, a, b, 0, 'middle'), straight = sailLeg(day, a, b, 0, 'middle', undefined, 30, 240, false);
     expect(run.turns.some(q => q.kind === 'gybe')).toBe(true); // (the passage plan's own way: gybed down the run's laylines)
-    expect(straight.ok).toBe(true); expect(straight.turns.length).toBe(0);
-    for (const q of straight.path) expect(Math.abs(q.p.x - a.x), 'on the straight line').toBeLessThan(5);
+    expect(straight.ok).toBe(true); expect(straight.turns, JSON.stringify(straight.turns)).toEqual([]);
+    for (const q of straight.path) { const d = { x: q.p.x - a.x, y: q.p.y - a.y }; expect(Math.abs(d.x * u.y - d.y * u.x), 'on the straight line').toBeLessThan(5); }
   });
 
   it('runs on from where she rounded each turn of the route: the track has no jumps', () => {
