@@ -206,6 +206,11 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8v. **The steered stern-first exit** (Marinas, with Deep Physics; after #289's turning at rest; 3–5 h): on her real sternway
+   drag (#317) the wind keeps driving a boat shoved off astern on across the fairway, so in a breeze hands off isn't an
+   exit. Steer her stern first out of the slip (the tiller reversed going astern), then get the jib up and sail off as her
+   bow comes round. Done when tests/pushoff-astern.test.ts's 4, 8 and 12 kt cases pass (expected failures until then:
+   4 of about 45 push-offs touch at 4 kt, 11 at 8 kt, 13 at 12 kt).
 8m. **Now — leaving the slip at Gashouse Cove: she drifts to windward under bare poles** (bug, physics; 3–5 h; owner, 13
    November): "coming out of a slip at Gas House Cove. The wind is on the beam on the port side. I get pushed off. I
    don't raise the sails. And the boat seems to just drift to windward, weirdly, even if I have the tiller at

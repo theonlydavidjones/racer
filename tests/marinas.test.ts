@@ -297,12 +297,23 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       expect(w.homeSlip?.id).toBe(slip.id); expect(u.docked).toBeTruthy(); expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01);
       for (let i = 0; i < 120; i++) w.step(DT);
       expect(Math.hypot(u.x - slip.p.x, u.y - slip.p.y)).toBeLessThan(0.01); // made fast
-      expect(w.pushOff()).toBe(true);
+      expect(w.pushOff()).toBe(true); const P = (u.handled as { plan?: { kind: string; back: number; coast?: number } } | undefined)?.plan;
       expect(u.pushing).toBeTruthy(); expect(Math.abs(u.pushing!.lat - 2)).toBeLessThan(0.6); // her own finger, in her own harbor
       for (let i = 0; i < 60 * 150 && u.handled && !u.handled.held; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
       if (u.handled?.held) { w.setSail('main', true); for (let i = 0; i < 60 * 40; i++) w.step(DT); w.pushOff(); for (let i = 0; i < 60 * 60 && u.handled; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); } } // (held head to wind: main up, and let go)
-      expect(u.handled).toBeUndefined(); expect(Math.max(u.v, u.astern ?? 0)).toBeGreaterThan(0.2); // under her own way, ahead or astern: steerable
-      for (let i = 0; i < 60 * 5; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+      expect(u.handled).toBeUndefined();
+      if (P?.kind === 'astern') {
+        // shoved off astern, the shove gauged to the room (world.ts; the Coordinator's ruling on #317): she goes stern first,
+        // gently, too slowly to steer, and comes to rest in the fairway where the plan put her, back + coast from her berth
+        // (to 1.5 m), touching nothing; the crew gets sail on from there
+        expect(u.astern ?? 0).toBeGreaterThan(0.03);
+        for (let i = 0; i < 60 * 120 && (u.astern ?? 0) > 0.02; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+        const back = (u.x - slip.p.x) * -Math.sin(slip.heading * Math.PI / 180) + (u.y - slip.p.y) * -Math.cos(slip.heading * Math.PI / 180);
+        expect(Math.abs(back - (P.back + (P.coast ?? 0)))).toBeLessThan(1.5);
+      } else {
+        expect(Math.max(u.v, u.astern ?? 0)).toBeGreaterThan(0.2); // under her own way: steerable
+        for (let i = 0; i < 60 * 5; i++) { w.step(DT); expect(hitsHarbor(u)).toBe(false); }
+      }
       w.t = 300; Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 10, v: 0.2, astern: 0 }); w.step(DT);
       expect(w.arrivedT).not.toBeNull(); expect(u.docked).toBeTruthy();
     }
