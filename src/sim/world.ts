@@ -1017,10 +1017,25 @@ export class World {
       // (no shore within 150 m ahead, across a swath 15° either side: straight ahead alone, a shore she closes at a fine
       // angle is seen only once she's on it)
       const clear = (h: number) => [0, 15, -15].every(k => landAlong(b, { x: b.x + V(h + k).x * 150, y: b.y + V(h + k).y * 150 }) === Infinity);
-      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them: a heading on the other
-      // tack only by a jibe, the wind behind her; else close-hauled on her own)
-      const mine = (h: number) => { const t = sailable(b, h), rel = wrap(b.ww.from - t); return (rel >= 0 ? 'S' : 'P') === b.tack || Math.abs(rel) > 90 ? t : n360(b.ww.from + (b.tack === 'S' ? -1 : 1) * (beatAngle(b.ww.kt) + 1)); };
-      const c0 = mine(this.freeCourse.get(b.id) ?? b.h);
+      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them, and jibes for none
+      // with a boat within two lengths, where a jibe swaps the right of way at close quarters (Rule 15): judged on the turn
+      // she'd make, the short way round from her heading as her helm takes her (physics.ts), not on where it ends. Through
+      // the wind: close-hauled on her own tack (a boat keeping clear goes round one ahead of her without tacking: astern
+      // of her, or to leeward); through dead downwind with a boat that near: a run on her own tack)
+      const from = b.ww.from, own = b.tack === 'S' ? -1 : 1;
+      const crowded = this.boats.some(o => o !== b && Math.hypot(o.x - b.x, o.y - b.y) < 2 * LOA);
+      const through = (t: number, x: number) => { const d = wrap(t - b.h), f = wrap(x - b.h); return Math.sign(f) === Math.sign(d) && Math.abs(f) < Math.abs(d); };
+      // (and a move away from a boat no more than BEAR_CAP off her course, so it doesn't run on round, through a jibe,
+      // while the gap's still closing: past that, or through the wind, she bears away BEAR_CAP below her course instead)
+      const BEAR_CAP = 40, base = this.freeCourse.get(b.id) ?? b.h;
+      const mine = (h: number, away = false) => {
+        let t = sailable(b, h);
+        if (away && (through(t, from) || Math.abs(wrap(t - base)) > BEAR_CAP)) t = sailable(b, base + own * BEAR_CAP);
+        if (through(t, from)) return n360(from + own * (beatAngle(b.ww.kt) + 1));
+        if (crowded && through(t, from + 180)) return n360(from + own * 179);
+        return t;
+      };
+      const c0 = mine(base);
       const course = clear(c0) ? c0 : [30, -30, 60, -60, 90, -90, 135, -135].map(k => mine(c0 + k)).find(clear) ?? c0;
       if (course !== c0) this.freeCourse.set(b.id, course); // (a shore ahead: her course from now on, not back to it after)
       let call: { h: number; luff: boolean } | null = null, room = false, urgent = false;
@@ -1031,11 +1046,11 @@ export class World {
         const r = this.rights(b, o);
         const side = Math.sign(dot(V(b.h + 90), { x: dx, y: dy })) || 1; // (+1: the other boat's to starboard of her)
         const rate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
-        if (rate < 0 && g < CONTACT_GAP + 1) urgent = true;
+        if (rate < -0.05 && g < CONTACT_GAP + 1) urgent = true; // (closing faster than 5 cm/s: pressed together, the rate's sign flickers)
         if (r.kc === b && rate > 0.05) { call = { h: mine(b.h), luff: false }; break; } // (drawing away: she is keeping clear)
-        call = keepClearMove(this, b, o); if (call) call = { h: mine(call.h), luff: call.luff };
-        if (!call && r.kc === o && rate < 0 && g < OPEN_GAP) { // (bearing off 30° from her side)
-          call = { h: mine(b.h - side * 30), luff: false };
+        call = keepClearMove(this, b, o); if (call) call = { h: mine(call.h, true), luff: call.luff };
+        if (!call && r.kc === o && rate < -0.05 && g < OPEN_GAP) { // (bearing off 30° from her side)
+          call = { h: mine(b.h - side * 30, true), luff: false };
         }
         if (call) break;
         if (r.kc === o && Math.hypot(dx, dy) < 2 * LOA && Math.sign(wrap(course - b.h)) === side) room = true;
