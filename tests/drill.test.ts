@@ -218,6 +218,15 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     // the whole turn: both bursts and the pause between them, not ended at the pause
     expect(s!.turnS).toBeGreaterThan(turnT + 2.2 - 1);
   });
+  it('in a heavier sea on the beam after the tack (1 m, 4 s), the turn still ends and the tack is scored', () => {
+    // (a pause past the eye restarts the count of her steady second: a sea that yaws her must still let the turn end)
+    const tws = 18, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    b.sea = { ...b.sea, hsW: 1, tpW: 4, fromW: (b.ww.from + 270) % 360, steep: 0.05 };
+    run(b, d, 60); startTack(b); run(b, d, 90);
+    const s = d.list.find(x => x.kind === 'tack');
+    expect(s, d.list.map(x => x.coach).join(' | ')).toBeTruthy();
+    expect(s!.scored, s!.coach).toBe(true); expect(s!.turnS).toBeLessThan(14);
+  });
   it('sitting in irons and wagging the tiller tells it once, not on every flip', () => {
     const tws = 6, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
     run(b, d, 40); b.handsOff = true; b.tiller = -0.08; run(b, d, 110);
