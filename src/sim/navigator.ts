@@ -101,7 +101,8 @@ export function passageNow(w: SimView): PassageNow | null {
   // not jibing down the run's laylines, which it doesn't do yet; and upwind, on the board she's on to its layline, as
   // the pilot beats (it tacks when the other tack fetches), not up a lane either side of the course)
   const pp = w.pilot, navOn = pp?.mode === 'nav' && w.arrivedT == null, piloted = navOn && pp.route ? pp.route : null;
-  const refs = [w.weather, w.tide, w.windModel, w.sea, piloted, navOn, navOn && u.tack];
+  // (her tack picks the board drawn under Nav; under power it flips about and draws nothing: not a key then)
+  const refs = [w.weather, w.tide, w.windModel, w.sea, piloted, navOn, navOn && !pp.direct && u.tack];
   const m = nowMemo.get(w); if (m && m.key === key && m.refs.every((r, i) => r === refs[i])) return m.v;
   const o = outlookFor(w), route = piloted ? [from, ...piloted.slice(pp.ri)] : routeAround(from, dest.p), r = passage(o, route, t0, !navOn, navOn ? (u.tack === 'S' ? 'left' : 'right') : 'middle');
   const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);

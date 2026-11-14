@@ -139,7 +139,7 @@ const PLAN_AHEAD = 400;
  * the piers by a few metres, or she's been set more than OFF_ROUTE metres off the leg to it. Planning from among the
  * Wharf's docks takes a tenth of a second or more, so not on a timer. A plan that found no way is tried again once
  * she's sailed RETRY_M metres or RETRY_T seconds on. */
-const OFF_ROUTE = 40, RETRY_M = 30, RETRY_T = 60;
+const OFF_ROUTE = 40, RETRY_M = 30, RETRY_T = 60, STRAIGHT_OFF = 20;
 /** The way to the turn must keep this clear of a pier either side (m), or it's planned again from where she is: the
  * route keeps 10 m off, and a sag to leeward that leaves her steering a chord past a pier head has lost it. */
 const LEG_CLEAR = 5;
@@ -192,7 +192,7 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   const ahead = { x: b.x + (dest.x - b.x) * k, y: b.y + (dest.y - b.y) * k };
   // (with a route in hand, it's kept to the end: the direct line flickering clear and not at a gap's mouth would drop it
   // and plan it again every step)
-  if (!p.route && clearLine(b, ahead, 20)) { p.routeTo = null; return 'clear'; }
+  if (!p.route && clearLine(b, ahead, 20)) return 'clear'; // (routeTo kept: a destination it was planned for isn't new again)
   const moved = !p.routeTo || Math.hypot(p.routeTo.x - dest.x, p.routeTo.y - dest.y) > 1;
   // (lost: the turn's out of sight, though not because she's touched the land herself, or she's been set off the leg she's
   // on, measured from where she was when it was planned for the first leg)
@@ -203,8 +203,11 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
       // come closer, and planning again would only draw the same one, every few seconds)
       && clearLine(p.ri > 1 ? p.route[p.ri - 1] : p.routeFrom ?? b, p.route[p.ri], LEG_CLEAR)));
   // (no route in hand: plan, unless the last plan, from near here and not long ago, found none)
-  // (a plan that said "straight there" is an answer, not a failure: asked again only on the timer, not every RETRY_M)
-  const retry = !p.route && (!p.routeFrom || (!p.straight && Math.hypot(b.x - p.routeFrom.x, b.y - p.routeFrom.y) > RETRY_M) || t - p.routeT > RETRY_T);
+  // (with no route in hand, asked again once she's RETRY_M on, or STRAIGHT_OFF off the line it was asked along (a
+  // "straight there" holds only from where it was asked: beating, she's soon off it, the piers' ends in her way), or
+  // RETRY_T later; a straight answer is quick to give, with no search)
+  const off = p.routeFrom ? offLeg(b, p.routeFrom, dest) : Infinity;
+  const retry = !p.route && (!p.routeFrom || off > STRAIGHT_OFF || Math.hypot(b.x - p.routeFrom.x, b.y - p.routeFrom.y) > RETRY_M || t - p.routeT > RETRY_T);
   if ((moved || lost || retry) && (moved || t - p.routeT >= MIN_REPLAN)) {
     const r = routeAround(b, dest, 30); p.plans++;
     p.route = r.length > 2 ? r : null; p.straight = r.length === 2; p.ri = 1; p.routeT = t; p.routeTo = { ...dest }; p.routeFrom = { x: b.x, y: b.y };
