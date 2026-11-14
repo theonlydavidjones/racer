@@ -919,8 +919,12 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   const footZ = MAST_AFT_Z + 0.06;
   const footBlock = (x: number) => { const fb = sheaveBlock(0.016, 0.03); fb.position.set(x, deckAt(x, footZ), footZ); fb.rotation.y = Math.PI / 2; grp.add(fb); return new THREE.Vector3(x, deckAt(x, footZ) + 0.03, footZ); };
   const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts, role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); return l; };
-  const stem = new THREE.Vector3(0, FORESTAY_DECK.y + 0.04, FORESTAY_DECK.z + 0.14);
-  { const sb = sheaveBlock(0.016, 0.03); sb.position.copy(stem).setY(FORESTAY_DECK.y); grp.add(sb); }
+  // the jib's luff tensioner (Josephine's, the owner's photos; on the sail band the jib Cunningham): a tackle down the
+  // mast's starboard side, its top block clipped into an eye in the jib halyard once the jib is up (into a ring on the
+  // mast when the sails are stowed: about the same place), its lower block low on the mast; pulling its tail hauls the
+  // halyard down and stretches the jib's luff. The tail, from the piano, comes up to the lower block from the foot block.
+  const JC = { x: MAST_ATH / 2 + 0.03, z: MAST_Z - 0.01, top: DECK_AT_MAST + 0.72, low: DECK_AT_MAST + 0.26 }; // (its clip about halfway up to the gooseneck, forward of the vang: the owner's photo)
+  { for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
   const cringles: Lines['cringles'] = [];
   const PIANO: Record<'S' | 'P', LineColorKey[]> = { S: ['vang', 'outhaul', 'jibCunningham', 'jibHalyard'], P: ['vang', 'outhaul', 'cunningham', 'jibCunningham', 'downhaul'] };
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) PIANO[tk].forEach((key, i) => {
@@ -940,11 +944,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
       const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02); grp.add(gb);
       cringles.push({ l: upMast([fb, new THREE.Vector3(-0.07, fb.y + 0.1, MAST_AFT_Z + 0.02), new THREE.Vector3(-0.07, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham'), sail: 'main' });
-    } else if (key === 'jibCunningham') { // (the owner: it pulls the jib down from the mast's lower part, so nothing of it runs
-      // along the foredeck to the stem; drawn from the foot block up the mast's front to where it goes in, low down)
-      const ex = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.45, MAST_FRONT_Z - 0.004);
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.012), STEEL); plate.position.copy(ex).setY(ex.y + 0.02); grp.add(plate);
-      upMast([fb, new THREE.Vector3(side * 0.03, fb.y + 0.1, MAST_FRONT_Z - 0.012), ex], 'jib', 'jibCunningham');
+    } else if (key === 'jibCunningham') { // up to the tensioner's lower block, then its four parts between the blocks (drawn once)
+      const lo = new THREE.Vector3(JC.x, JC.low - 0.02, JC.z);
+      upMast([fb, new THREE.Vector3(side * 0.04, fb.y + 0.08, JC.z), lo], 'jib', 'jibCunningham');
+      if (side > 0) { const pts: THREE.Vector3[] = []; for (let k = 0; k < 4; k++) { const o = (k - 1.5) * 0.006; pts.push(new THREE.Vector3(JC.x, k % 2 ? JC.top - 0.012 : JC.low + 0.012, JC.z + o)); } upMast(pts, 'jib', 'jibCunningham'); }
     } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
       const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
