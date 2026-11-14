@@ -343,9 +343,14 @@ export function comparePlans(o: Outlook, a: Vec, b: Vec, t0: number, sc: Scenari
  * alike, and doesn't change which is quickest.) On 7 Nov 2026's ebb the Cityfront's second run to Fort Mason gains 11%
  * that way, called; the first 9%, not. */
 export const SHORE_CALL = 0.1;
-/** Along the shore is the call: SHORE_CALL quicker than the best of the others. */
+/** Whether the shore's gain may be called at all. Off until environment/current.ts shoreRelief has a measured source
+ * behind it (docs/CONSTANTS.md, top 10 #3): the size of the gain is the relief profile's, and the brief shouldn't
+ * recommend a tactic on a number nobody has measured. The planner still works the shore out (shoreLeg), for the tests
+ * and for the day the relief is sourced; then this goes on. */
+export const SHORE_CALL_ON = false;
+/** Along the shore is the call: SHORE_CALL quicker than the best of the others (and SHORE_CALL_ON). */
 export function shoreCalled(r: Record<Plan, SailResult>): boolean {
-  if (!r.shore.ok) return false;
+  if (!SHORE_CALL_ON || !r.shore.ok) return false;
   const others = (['left', 'middle', 'right'] as Plan[]).filter(k => r[k].ok).map(k => r[k].minutes);
   return !others.length || r.shore.minutes < Math.min(...others) * (1 - SHORE_CALL);
 }
@@ -353,7 +358,7 @@ export function shoreCalled(r: Record<Plan, SailResult>): boolean {
  * already chosen, weighed again under a what-if (strategist SCENARIOS): along the shore stays the plan for as long as
  * it's still the fastest outright, the call once made not unmade by a smaller margin. */
 export function bestPlan(r: Record<Plan, SailResult>, held?: Plan): Plan {
-  const keepShore = shoreCalled(r) || (held === 'shore' && r.shore.ok);
+  const keepShore = shoreCalled(r) || (SHORE_CALL_ON && held === 'shore' && r.shore.ok);
   const ok = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => r[k].ok && (k !== 'shore' || keepShore));
   return ok.length ? ok.reduce((a, k) => (r[k].minutes < r[a].minutes ? k : a)) : 'middle';
 }
