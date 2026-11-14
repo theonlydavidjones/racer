@@ -1,4 +1,4 @@
-import { V, n360, type Vec } from '../core/math';
+import { V, n360 } from '../core/math';
 import type { Emit } from '../sim/events';
 import { waterOver } from '../environment/bottom';
 import { displacement, newCrew, DEFAULT_CREW } from './crewPhys';
@@ -45,7 +45,7 @@ export const keelDepth = (b: Boat): number => GROUND.draft * Math.cos((b.heel ??
  * (UTC, ms), for the tide.
  */
 export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: { t: number }, t: number, h0 = b.h): void {
-  const p: Vec = { x: b.x, y: b.y }, w = waterOver(p, ms);
+  const w = waterOver(b, ms); // (her own position: no new object, every boat, every step)
   const into = w === null ? 0 : keelDepth(b) - w; // (how far the keel would be below the bottom, afloat)
   if (into <= 0) { b.aground = undefined; return; }
   const mass = b.crew ? displacement(b.crew.spec) : STD_MASS;

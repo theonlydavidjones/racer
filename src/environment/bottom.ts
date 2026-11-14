@@ -55,15 +55,22 @@ function cell(i: number, j: number): number {
   return t ? t[(j % TILE) * TILE + (i % TILE)] : NaN;
 }
 
+/**
+ * For each square of four cells (by its north-west one): 1 if none of them is shoal water, 2 if one is, 0 not yet looked
+ * at. Filled as boats ask: the open water every boat sails nearly all the time, one read and no more (every boat, every step).
+ */
+const QUAD = new Uint8Array(J.nx * J.ny);
 /** The bottom's depth below MLLW at p (m; negative on a flat that dries that high), or null where the water's deep. */
 export function bottomDepth(p: Vec): number | null {
   const { lat, lon } = toLL(p);
   const fx = (lon - B.west) * MLON / CELL - 0.5, fy = (B.north - lat) * MLAT / CELL - 0.5;
   const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
-  // (the quick no: the four cells round p all in tiles with no shoal water, as almost everywhere a boat sails)
-  if (i >= 0 && j >= 0 && i + 1 < J.nx && j + 1 < J.ny && !PACKED[((j / TILE) | 0) * TNX + ((i / TILE) | 0)] && !PACKED[(((j + 1) / TILE) | 0) * TNX + (((i + 1) / TILE) | 0)] && !PACKED[((j / TILE) | 0) * TNX + (((i + 1) / TILE) | 0)] && !PACKED[(((j + 1) / TILE) | 0) * TNX + ((i / TILE) | 0)]) return null;
+  const q = i >= 0 && j >= 0 && i < J.nx && j < J.ny ? j * J.nx + i : -1;
+  if (q >= 0 && QUAD[q] === 1) return null; // (no shoal water in the four cells round p)
   const a = cell(i, j), b = cell(i + 1, j), c = cell(i, j + 1), d = cell(i + 1, j + 1);
-  if (Number.isNaN(a) && Number.isNaN(b) && Number.isNaN(c) && Number.isNaN(d)) return null;
+  const none = !(a < Infinity) && !(b < Infinity) && !(c < Infinity) && !(d < Infinity); // (NaN deep, Infinity land: neither is shoal)
+  if (q >= 0) QUAD[q] = none ? 1 : 2;
+  if (none || (Number.isNaN(a) && Number.isNaN(b) && Number.isNaN(c) && Number.isNaN(d))) return null;
   // (a known deep neighbor is read as the deep water's edge, so the depth runs smoothly out toward it; one with no depth
   // area, land, is left out and the others weighed up: the flat runs on to the shore as it is, not deepening at the beach)
   let s = 0, w = 0;
@@ -71,7 +78,7 @@ export function bottomDepth(p: Vec): number | null {
   add(a, (1 - u) * (1 - v)); add(b, u * (1 - v)); add(c, (1 - u) * v); add(d, u * v);
   if (w <= 0) return null; // (land all round: the sim's own shore decides there)
   const z = s / w;
-  return z >= DEEP ? null : z;
+  return z >= DEEP - 1e-9 ? null : z; // (four cells read as deep average to a hair under DEEP: deep)
 }
 /** The water's depth over the bottom at p at a time (ms UTC), m (0 on a dry flat), or null where it's deep water. */
 export function waterOver(p: Vec, ms: number): number | null {
