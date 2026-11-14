@@ -245,7 +245,7 @@ export const CLOSE_M = 4 * LOA;
  * compiling and throwing the result away, some 800 times in the first race after load on Bay East's waves branch (14 s
  * of the engine's compiler threads; docs/CAPACITY.md, "The compiler's thrown-away work"; scripts/check/deopt.cjs).
  * weatherHeld and carOff, given later and starting at 0, are declared undefined in makeBoat for the same reason; and
- * lastHitT, paddle and the anchor's (rule 42.3(h)'s contact time, the crutch, the anchor and rule 22's flags), given mid-race, so a first bump doesn't add a field. (V8's
+ * lastHitT and paddle (rule 42.3(h)'s contact time and the crutch), given mid-race, so a first bump doesn't add a field. (V8's
  * matter: Safari's engine keeps shapes its own way, and this costs it nothing.)
  */
 const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT'] as const;
@@ -606,7 +606,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, anchor: undefined, anchored: false, aground: false, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -1333,7 +1333,7 @@ export class World {
     if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
     if (this.steps % 30 === 0 && !this.user.handled) this.crewPaddleCall(this.user); // (a jam, looked for twice a second)
     this.paddleWork(this.user);
-    this.anchorWork(this.user, dt);
+    if (this.user.anchor) this.anchorWork(this.user, dt);
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -1341,7 +1341,7 @@ export class World {
       if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
-      if (this.onRode(b)) { this.anchorStep(b, dt); continue; } // (lying to her anchor: boat/anchor.ts)
+      if (b.anchor && this.onRode(b)) { this.anchorStep(b, dt); continue; } // (lying to her anchor: boat/anchor.ts)
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
@@ -1368,7 +1368,7 @@ export class World {
     this.trackCourses();
     this.shipEncounters();
     // (rule 22's states for the rules: anchored, aground; the World's own grounding is a bump, not a state she stays in)
-    for (const b of this.boats) { const an = lyingToAnchor(b), ag = !!b.anchor?.aground; if (b.anchored !== an) b.anchored = an; if (b.aground !== ag) b.aground = ag; }
+    for (const b of this.boats) if (b.anchor || b.anchored || b.aground) { const an = lyingToAnchor(b), ag = !!b.anchor?.aground; if (b.anchored !== an) b.anchored = an; if (b.aground !== ag) b.aground = ag; } // (only a boat with her anchor out, or just weighed: the rest never get the fields, so the fleet's shape doesn't change. Declaring them on every boat made the step 1-2% slower, perf-pair)
     // (a Case's boat sails above her proper course where the Case says so, rule 17: the Case's call, not the sim's)
     if (this.caseRun) for (const b of this.boats) if (b.script && !this.caseRun.free.includes(b.script)) b.aboveProper = b.started && !!this.caseRun.pose(b.script, this.t).f.aboveProper; // (before her start she has none: Definitions, Proper Course)
     this.checkPairs();
