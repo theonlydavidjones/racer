@@ -5,7 +5,7 @@
  * to come closer. Every part found passes it. Nothing new on the screen: the line is the showroom's own bar.
  * (A part of src/app.ts: it reaches the app's own state through `app`, app.ts's ctx.)
  */
-import { ALSO, HIT_PX, PARTS, screenArea, screenDist, type PartKey } from '../render/boatParts';
+import { ALSO, HIT_PX, PARTS, TWIN, screenArea, screenDist, type PartId, type PartKey } from '../render/boatParts';
 import { saveSettings } from '../settings';
 import { $ } from '../ui/dom';
 import type { AppCtx } from '../app';
@@ -25,7 +25,7 @@ export function mountBoatLesson(app: AppCtx) {
    * point at the one you mean.
    */
   function onPart(k: PartKey, x: number, y: number): boolean {
-    const mine = new Set<PartKey>([k, ...(ALSO[k] ?? [])]), tack = app.w.user.tack;
+    const mine = new Set<PartId>([k, ...(ALSO[k] ?? [])]), twins = new Set<PartId>(TWIN[k] ?? []), tack = app.w.user.tack;
     let d = Infinity, area = false;
     for (const q of mine) {
       const sp = app.view.projectPart(q, tack); if (!sp) continue;
@@ -34,7 +34,7 @@ export function mountBoatLesson(app: AppCtx) {
     }
     if (d === Infinity) return area; // (an area: the lines drawn over it don't take it from it)
     return !PARTS.some(p => {
-      if (mine.has(p.key)) return false;
+      if (mine.has(p.key) || twins.has(p.key)) return false;
       const sp = app.view.projectPart(p.key, tack); return !!sp && sp.kind !== 'area' && screenDist(sp, x, y) < d - 2;
     });
   }

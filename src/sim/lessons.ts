@@ -24,7 +24,7 @@ export type LessonId = 'boat' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jib
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
-  { id: 'boat', no: 1, title: 'The boat', icon: '⛵', asa: '1, 2, 3' }, // (not sailed: her parts, found on her in the showroom, app/boatLesson.ts)
+  { id: 'boat', no: 1, title: 'The boat', icon: '⛵', asa: '1, 2 (the parts she has); 3 (her sides)' }, // (not sailed: her parts, found on her in the showroom, app/boatLesson.ts)
   { id: 'before', no: 2, title: 'Before you go', icon: '🦺', asa: '16, 17, 18, 21' },
   { id: 'tiller', no: 3, title: 'The tiller', icon: '🧭', asa: '24, 26, 27' },
   { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', asa: '22, 28–32' },

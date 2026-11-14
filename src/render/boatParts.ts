@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { BoatMesh } from './boatMesh';
 import { RIG, SHROUD } from './boatMesh';
-import { CABIN, COCKPIT, HEEL, L, TRANSOM_TOP, WINDOW, cabinHalf, cabinTopY, cockpitHalf, deckY, halfBeam, keel, sheer, uAtZ } from './hull';
+import { CABIN, COAMING_T, COCKPIT, HEEL, L, TRANSOM_TOP, WINDOW, aftLineZ, cabinHalf, cabinTopY, canoe, cockpitHalf, deckY, halfBeam, hullHalfAt, keel, sheer, uAtZ } from './hull';
 import type { Tack } from '../boat/boat';
 
 /**
@@ -36,33 +36,42 @@ function worldVerts(o: THREE.Object3D | null | undefined, max = 160): THREE.Vect
 /** A line's points in the world, in order. */
 const linePts = (l: THREE.Line | null | undefined) => (l ? worldVerts(l, 400) : []);
 /** The lines drawn for one control (boatMesh.ts tags them with their control's key). */
-function keyed(m: BoatMesh, ...keys: string[]): THREE.Vector3[][] {
+function keyed(m: BoatMesh, ...keys: (string | THREE.Object3D)[]): THREE.Vector3[][] {
   const out: THREE.Vector3[][] = [];
-  m.grp.traverse(o => { if ((o as THREE.Line).isLine && keys.includes(o.userData.key)) { const p = linePts(o as THREE.Line); if (p.length) out.push(p); } });
+  m.grp.traverse(o => { if ((o as THREE.Line).isLine && keys.includes(o.userData.key) && !keys.includes(o)) { const p = linePts(o as THREE.Line); if (p.length) out.push(p); } });
   return out;
 }
-/** A sail's cloth as drawn: rows from the foot (0) to the head, each from the luff to the leech (sails.ts Sail). */
-function cloth(m: BoatMesh, which: 'main' | 'jib'): THREE.Vector3[][] {
+/** A sail's cloth as drawn: rows from the foot (0) to the head, each from the luff to the leech (sails.ts Sail), and each
+ * row's height up the luff (0 … 1: the rows aren't evenly spaced, the windows' edges add their own). */
+function cloth(m: BoatMesh, which: 'main' | 'jib'): THREE.Vector3[][] & { t?: number[] } {
   const s = m[which]; if (!s.mesh.visible) return [];
   const pos = s.geom.getAttribute('position') as THREE.BufferAttribute, uv = s.geom.getAttribute('uv') as THREE.BufferAttribute;
   s.mesh.updateWorldMatrix(true, false);
-  const rows: THREE.Vector3[][] = []; let row: THREE.Vector3[] = [];
+  const rows: THREE.Vector3[][] & { t?: number[] } = [], t: number[] = [uv.getY(0)]; let row: THREE.Vector3[] = [];
   for (let i = 0; i < pos.count; i++) {
-    if (i > 0 && uv.getX(i) < uv.getX(i - 1)) { rows.push(row); row = []; } // (a new row: back at the luff)
+    if (i > 0 && uv.getX(i) < uv.getX(i - 1)) { rows.push(row); row = []; t.push(uv.getY(i)); } // (a new row: back at the luff)
     row.push(v3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(s.mesh.matrixWorld));
   }
-  rows.push(row);
+  rows.push(row); rows.t = t;
   return rows;
 }
 /** Points of the boat's own frame, in the world. */
 const inBoat = (m: BoatMesh, pts: THREE.Vector3[]) => { m.grp.updateWorldMatrix(true, false); return pts.map(p => p.clone().applyMatrix4(m.grp.matrixWorld)); };
 /** One side's topsides (side +1 starboard, −1 port): the sheer down to the waterline. */
-const topsides = (s: number) => US(0, 1, 16).flatMap(u => [v3(s * halfBeam(u), sheer(u), zOf(u)), v3(s * halfBeam(u) * 0.8, 0.02, zOf(u))]);
+const topsides = (s: number) => US(0, 1, 16).flatMap(u => [v3(s * halfBeam(u), sheer(u), zOf(u)), ...(canoe(u) < 0.02 ? [v3(s * hullHalfAt(u, 0.02), 0.02, zOf(u))] : [])]);
+/** Her mooring cleats, on deck: the foredeck's (just aft of the stemhead), the two midships, and the after deck's (boatMesh.ts). */
+const CLEATS = (() => {
+  const fz = RIG.FORESTAY_DECK.z + 0.35, mz = (WINDOW.z0 + WINDOW.z1) / 2, mu = uAtZ(mz), az = (zOf(COCKPIT.u1) + COAMING_T / 2 + L / 2) / 2;
+  return [v3(0, deckY(uAtZ(fz), 0), fz), ...[-1, 1].map(s => v3(s * (halfBeam(mu) - 0.075), deckY(mu, halfBeam(mu) - 0.075), mz)), v3(0.12, deckY(uAtZ(az), 0.12), az)];
+})();
 /** One half of the deck, the centerline out to the sheer. */
 const deckHalf = (s: number) => US(0, 1, 16).flatMap(u => [v3(s * halfBeam(u), sheer(u), zOf(u)), v3(0, deckY(u, 0), zOf(u))]);
 
 /** The named parts, each with what it is in a few words (ASA 101's knowledge items 1–3 that she has: see PARTS). */
 export type PartKey = typeof PARTS[number]['key'];
+/** And the parts never asked for by name, found as part of another (the jumper stays as standing rigging; the backstay's
+ * control line as running rigging). */
+export type PartId = PartKey | 'jumper' | 'backstayLine';
 /**
  * ASA 101 Keelboat Sailing 1's knowledge items 1 ("Describe and identify the following sailboat parts and their
  * functions") and 2 ("… sails, sail parts and sail controls"), and the side terms of item 3, as far as a Nordic Folkboat
@@ -80,7 +89,7 @@ export const PARTS = [
   { key: 'deck', name: 'deck', set: 0, what: 'the hull\'s top, to work on' },
   { key: 'port', name: 'port side', set: 0, what: 'left, looking forward' },
   { key: 'starboard', name: 'starboard side', set: 0, what: 'right, looking forward' },
-  { key: 'keel', name: 'keel', set: 0, what: 'its weight holds her up; it stops her sliding sideways' },
+  { key: 'keel', name: 'keel', set: 0, what: 'under the water: keeps her upright, stops her sliding' },
   { key: 'rudder', name: 'rudder', set: 0, what: 'steers her' },
   { key: 'tiller', name: 'tiller', set: 0, what: 'the helm: it turns the rudder' },
   { key: 'cockpit', name: 'cockpit', set: 0, what: 'where you sail her from' },
@@ -119,16 +128,21 @@ export const PARTS = [
 ] as const;
 
 /** Parts a click on another also finds (the transom is the stern; a shroud is standing rigging; …). */
-export const ALSO: Partial<Record<PartKey, PartKey[]>> = {
-  stern: ['transom'], standing: ['forestay', 'backstay', 'shroud'],
-  running: ['halyard', 'mainsheet', 'jibsheet', 'vang', 'cunningham', 'outhaul']
+export const ALSO: Partial<Record<PartKey, PartId[]>> = {
+  stern: ['transom'], standing: ['forestay', 'backstay', 'shroud', 'jumper'],
+  running: ['halyard', 'mainsheet', 'jibsheet', 'vang', 'cunningham', 'outhaul', 'backstayLine']
+};
+/** Parts drawn along the same line (a sail's luff on its stay or mast, its foot on the boom, its tack at the gooseneck): a
+ * click on one is a click on the other, so neither takes it from the other. */
+export const TWIN: Partial<Record<PartKey, PartKey[]>> = {
+  luff: ['forestay', 'mast'], forestay: ['luff'], mast: ['luff'], foot: ['boom'], boom: ['foot'], tack: ['gooseneck'], gooseneck: ['tack']
 };
 
 /**
  * A part as it is on the boat now, in the world: her tack (for windward and leeward), and `near`, the side of her the
  * camera's on (+1 starboard; a side's topsides count only from that side, as you'd point at the side you can see).
  */
-export function partShape(m: BoatMesh, key: PartKey, tack: Tack, near: number): PartShape | null {
+export function partShape(m: BoatMesh, key: PartId, tack: Tack, near: number): PartShape | null {
   const B = (pts: THREE.Vector3[]) => inBoat(m, pts), side = (s: number): PartShape => ({ kind: 'area', pts: [B(deckHalf(s)), ...(Math.sign(near) === s ? [B(topsides(s))] : [])] });
   const main = () => cloth(m, 'main'), jib = () => cloth(m, 'jib'), both = () => [main(), jib()].filter(r => r.length);
   // the boom in its own swinging frame: from the gooseneck to its end (boatMesh.ts: E long, on top of it the main's foot)
@@ -139,17 +153,17 @@ export function partShape(m: BoatMesh, key: PartKey, tack: Tack, near: number): 
     case 'hull': return { kind: 'area', pts: [B([...topsides(1), ...topsides(-1)])] };
     case 'bow': return { kind: 'pt', pts: [B([v3(0, sheer(0), zOf(0)), v3(0, sheer(0.04) * 0.6, zOf(0.04))])] };
     case 'stern': return { kind: 'pt', pts: [B([v3(0, TRANSOM_TOP.y, TRANSOM_TOP.z - 0.15)])] };
-    case 'transom': return { kind: 'area', pts: [B([-1, 1].flatMap(s => [v3(s * halfBeam(1), sheer(1), L / 2), v3(s * halfBeam(1) * 0.5, 0.1, L / 2 - 0.3)]))] };
+    case 'transom': return { kind: 'area', pts: [B([-1, 1].flatMap(s => [v3(s * halfBeam(1), sheer(1), L / 2), v3(s * halfBeam(1) * 0.5, 0.1, aftLineZ(0.1))]))] };
     case 'deck': return { kind: 'area', pts: [B([...deckHalf(1), ...deckHalf(-1)])] };
     case 'port': return side(-1);
     case 'starboard': return side(1);
     // the ballast keel and deadwood, under the water: from where the keel's profile leaves the canoe body to its heel
-    case 'keel': return { kind: 'area', pts: [B(US(0.25, uAtZ(HEEL.z), 10).flatMap(u => [v3(0, keel(u), zOf(u)), v3(0, -0.3, zOf(u))]))] };
+    case 'keel': return { kind: 'area', pts: [B(US(0.25, uAtZ(HEEL.z), 10).flatMap(u => [v3(0, keel(u), zOf(u)), v3(0, canoe(u), zOf(u))]))] };
     case 'rudder': return { kind: 'area', pts: [worldVerts(m.rudder.children[0])] };
     case 'tiller': return { kind: 'area', pts: [worldVerts(m.rudder.children[1])] };
     case 'cockpit': return { kind: 'area', pts: [B(US(COCKPIT.u0, COCKPIT.u1).flatMap(u => [-1, 1].map(s => v3(s * cockpitHalf(u), deckY(u, cockpitHalf(u)), zOf(u)))))] };
     case 'cabin': return { kind: 'area', pts: [B(US(CABIN.u0, CABIN.u1).flatMap(u => [-1, 1].flatMap(s => [v3(s * cabinHalf(u), deckY(u, cabinHalf(u)), zOf(u)), v3(s * cabinHalf(u) * 0.9, cabinTopY(u), zOf(u))])))] };
-    case 'cleat': { const z = (WINDOW.z0 + WINDOW.z1) / 2, u = uAtZ(z); return { kind: 'pt', pts: [B([-1, 1].map(s => v3(s * (halfBeam(u) - 0.075), deckY(u, halfBeam(u) - 0.075), z)))] }; }
+    case 'cleat': return { kind: 'pt', pts: [B(CLEATS)] };
     case 'winch': return { kind: 'pt', pts: [B([m.lines.winches.S, m.lines.winches.P])] };
     case 'mast': return { kind: 'line', pts: [worldVerts(m.rigDrawn.mast, 400)] };
     case 'boom': return { kind: 'line', pts: [[boomAt(0), boomAt(E / 2), boomAt(E + 0.1)]] };
@@ -167,16 +181,25 @@ export function partShape(m: BoatMesh, key: PartKey, tack: Tack, near: number): 
     case 'leech': return { kind: 'line', pts: both().map(r => r.map(row => row[row.length - 1])) };
     case 'foot': return { kind: 'line', pts: both().map(r => r[0]) };
     case 'batten': {
-      // the main's four, in from its leech (boatMesh.ts MAIN_DEF): along the row nearest each, its length of the chord
-      const r = main(); if (!r.length) return null;
-      return { kind: 'line', pts: (RIG.MAIN_DEF.battens ?? []).map(bt => {
-        const row = r[Math.round(bt.t * (r.length - 1))], n = row.length - 1, a = row[n], chord = row[0].distanceTo(a);
-        return [a, a.clone().lerp(row[0], Math.min(1, bt.len / Math.max(0.1, chord)))];
-      }) };
+      // the main's four and the jib's three (boatMesh.ts MAIN_DEF, JIB_DEF), in from the leech square to it, as the
+      // pockets are drawn: from the leech at its height up the luff, its length along the sail away from the leech's line
+      const out: THREE.Vector3[][] = [];
+      for (const [r, def] of [[main(), RIG.MAIN_DEF], [jib(), RIG.JIB_DEF]] as const) {
+        if (!r.length || !r.t) continue;
+        for (const bt of def.battens ?? []) {
+          let i = 0; while (i < r.t.length - 2 && r.t[i + 1] < bt.t) i++;
+          const f = Math.min(1, Math.max(0, (bt.t - r.t[i]) / Math.max(1e-6, r.t[i + 1] - r.t[i]))), lee = (j: number) => r[j][r[j].length - 1];
+          const a = lee(i).clone().lerp(lee(i + 1), f), luffAt = r[i][0].clone().lerp(r[i + 1][0], f);
+          const up = lee(i + 1).clone().sub(lee(i)).normalize(), toLuff = luffAt.sub(a).normalize();
+          const dir = toLuff.addScaledVector(up, -toLuff.dot(up)).normalize();
+          out.push([a, a.clone().addScaledVector(dir, bt.len)]);
+        }
+      }
+      return out.length ? { kind: 'line', pts: out } : null;
     }
     case 'telltale': return { kind: 'pt', pts: [[...m.jibTells.windward, ...m.jibTells.leeward, ...m.leechTells].flatMap(t => worldVerts(t.mesh, 4))] };
     case 'halyard': return { kind: 'line', pts: keyed(m, 'jibHalyard', 'downhaul') };
-    case 'mainsheet': return { kind: 'line', pts: [linePts(m.mainsheet), ...keyed(m, 'mainsheet')].filter(p => p.length) };
+    case 'mainsheet': return { kind: 'line', pts: [linePts(m.mainsheet), ...keyed(m, 'mainsheet', ...m.lines.travLines)].filter(p => p.length) }; // (not the traveler's control lines, keyed with it)
     case 'jibsheet': return { kind: 'line', pts: [linePts(m.lines.jibSheet), ...keyed(m, 'jibsheet')].filter(p => p.length) };
     case 'fairlead': return { kind: 'pt', pts: [[...worldVerts(m.lines.cars.S, 8), ...worldVerts(m.lines.cars.P, 8)]] };
     case 'traveler': return { kind: 'line', pts: [worldVerts(m.lines.travCar, 8), ...m.lines.travLines.map(linePts)].filter(p => p.length) };
@@ -186,6 +209,8 @@ export function partShape(m: BoatMesh, key: PartKey, tack: Tack, near: number): 
     // the wind's sides: on port tack the wind comes over her port side, which is windward
     case 'windward': return side(tack === 'P' ? -1 : 1);
     case 'leeward': return side(tack === 'P' ? 1 : -1);
+    case 'jumper': return { kind: 'line', pts: m.rigDrawn.jumperLines.map(linePts).filter(p => p.length) };
+    case 'backstayLine': return { kind: 'line', pts: keyed(m, 'backstay') };
     case 'standing': case 'running': return null; // (found through the parts they're made of: ALSO)
   }
 }

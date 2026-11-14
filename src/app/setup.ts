@@ -49,7 +49,8 @@ function prepare(seed = randomSeed()): void {
   app.incidentClips = []; // (a new race: its own rule incidents)
   app.pendingPenalty = null; // (an incident's penalty is for the race it happened in)
   // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
-  const shown: BoatSpec | null = app.boatPanel?.open ? app.boatPanel.editing : app.fleet?.showing ?? null, showFlags = !!shown;
+  // (lesson 1, The boat: your own boat on show, sailing, never in her slip with her sails down)
+  const shown: BoatSpec | null = app.boatPanel?.open ? app.boatPanel.editing : app.fleet?.showing ?? (app.boatLesson?.on ? app.S.boat ?? null : null), showFlags = !!shown;
   const WS0 = shown && shown.id !== app.S.boatId ? (() => { const o = app.S.opponents.filter(x => x !== shown.id); return { ...app.S, boat: shown, opponents: o, fleet: o.length }; })() : app.S;
   // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
   const WS1 = app.replayPin != null ? { ...WS0, windDir: app.replayPin } : WS0;
