@@ -13,11 +13,12 @@ import type { Outlook } from './outlook';
  * on the map do) or off the shore; reaching she steers up-current of the mark to hold a straight line over the ground.
  *
  * A plan is which way to go first: left or right (looking upwind: starboard tack goes left, upwind and downwind), or
- * up the middle, tacking on a line either side of the straight course. Comparing them shows which side of the course
+ * up the middle, tacking on a line either side of the straight course; or, against a foul tide, along the shore in
+ * its slacker water (shoreLeg). Comparing them shows which side of the course
  * the wind and the tide favour, and by how much.
  */
 
-export type Plan = 'left' | 'right' | 'middle';
+export type Plan = 'left' | 'right' | 'middle' | 'shore';
 export type LegKind = 'beat' | 'run' | 'reach';
 
 /** Ways the day might differ from the forecast, for testing a plan: the wind veered (+) or backed (deg), stronger or
@@ -308,16 +309,27 @@ export function shoreLeg(o: Outlook, a: Vec, b: Vec, t0: number, off: number, sc
   return { ok: true, minutes: m, kind: kind!, path, tacks, turns, meanKt: sumKt / m, meanCurAlong: sumCur / m, maxLeft, maxRight, minShore };
 }
 
-/** All three plans for a leg (a reach has just the one way: straight there). */
+/** How foul the current must be along a leg (kt against her, on average over the straight course) before she weighs
+ * working the shore: weaker than that, the slacker water near the beach isn't worth the way in and out. */
+const SHORE_FOUL_KT = 0.4;
+/** How far off the shore she works it, m: tried in turn, the fastest kept (closer is slacker water, but more distance
+ * sailed in and out). */
+const SHORE_OFFS = [60, 120, 200];
+/** All the plans for a leg (a reach has just the one way: straight there, or along the shore). */
 export function comparePlans(o: Outlook, a: Vec, b: Vec, t0: number, sc: Scenario = AS_FORECAST, arrive = 30): Record<Plan, SailResult> {
   const mid = sailLeg(o, a, b, t0, 'middle', sc, arrive);
-  if (mid.kind === 'reach') return { left: mid, right: mid, middle: mid };
-  return { left: sailLeg(o, a, b, t0, 'left', sc, arrive), right: sailLeg(o, a, b, t0, 'right', sc, arrive), middle: mid };
+  // along the shore, against a foul tide only (the fastest of its offsets): not a way, otherwise
+  const shore = mid.meanCurAlong < -SHORE_FOUL_KT
+    ? SHORE_OFFS.map(off => shoreLeg(o, a, b, t0, off, sc, arrive)).filter((r): r is SailResult => !!r).sort((x, y) => x.minutes - y.minutes)[0] ?? null
+    : null;
+  const none: SailResult = { ...mid, ok: false, why: undefined };
+  if (mid.kind === 'reach') return { left: mid, right: mid, middle: mid, shore: shore ?? none };
+  return { left: sailLeg(o, a, b, t0, 'left', sc, arrive), right: sailLeg(o, a, b, t0, 'right', sc, arrive), middle: mid, shore: shore ?? none };
 }
 
 /** The fastest of the plans that get there. */
 export function bestPlan(r: Record<Plan, SailResult>): Plan {
-  const ok = (['left', 'middle', 'right'] as Plan[]).filter(k => r[k].ok);
+  const ok = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => r[k].ok);
   return ok.length ? ok.reduce((a, k) => (r[k].minutes < r[a].minutes ? k : a)) : 'middle';
 }
 

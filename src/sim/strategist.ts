@@ -53,7 +53,7 @@ const SCENARIOS: { label: string; sc: Scenario }[] = [
   { label: 'it blows a quarter lighter', sc: { ...AS_FORECAST, kMul: 0.75 } }
 ];
 
-const PLAN_WORD: Record<Plan, string> = { left: 'left', right: 'right', middle: 'up the middle' };
+const PLAN_WORD: Record<Plan, string> = { left: 'left', right: 'right', middle: 'up the middle', shore: 'along the shore' };
 const KIND_WORD: Record<LegKind, string> = { beat: 'a beat', run: 'a run', reach: 'a reach' };
 
 /** Where a leg really starts and ends: an island mark (Alcatraz) is rounded at a berth off its shore, not at its middle. */
@@ -72,7 +72,7 @@ export function planLegs(w: SimView, o: Outlook): LegPlan[] {
   for (let i = 0; i <= C.marks.length; i++) {
     const { from, to, extra } = legEnds(C, i);
     const plans = comparePlans(o, from, to, t), best = bestPlan(plans), kind = plans.middle.kind;
-    const sorted = (['left', 'middle', 'right'] as Plan[]).filter(k => plans[k].ok).map(k => plans[k].minutes).sort((a, b) => a - b);
+    const sorted = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => plans[k].ok).map(k => plans[k].minutes).sort((a, b) => a - b);
     const margin = sorted.length > 1 ? (sorted[1] - sorted[0]) / Math.max(1, sorted[0]) : 0;
     const flips: { label: string; plan: Plan }[] = [];
     if (kind !== 'reach') for (const s of SCENARIOS) {
@@ -230,14 +230,17 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
     return items;
   }
   const sides = (['left', 'right'] as Plan[]).filter(k => P[k].ok);
-  const name = (k: Plan) => k === 'middle' ? 'up the middle' : `${k} (${sideWords(L.from, L.to, P[k].path.map(q => q.p), L.kind === 'beat' ? k === 'left' : k === 'right')})`;
-  const times = (['left', 'middle', 'right'] as Plan[]).map(k => `${PLAN_WORD[k]} ${P[k].ok ? mins(P[k].minutes) : 'can\'t get there'}`).join(', ');
-  const second = (['left', 'middle', 'right'] as Plan[]).filter(k => k !== L.best && P[k].ok).sort((a, b) => P[a].minutes - P[b].minutes)[0];
+  const name = (k: Plan) => k === 'middle' ? 'up the middle' : k === 'shore' ? 'along the shore, in the slacker water near the beach' : `${k} (${sideWords(L.from, L.to, P[k].path.map(q => q.p), L.kind === 'beat' ? k === 'left' : k === 'right')})`;
+  const times = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => k !== 'shore' || P[k].ok).map(k => `${PLAN_WORD[k]} ${P[k].ok ? mins(P[k].minutes) : 'can\'t get there'}`).join(', ');
+  const second = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => k !== L.best && P[k].ok).sort((a, b) => P[a].minutes - P[b].minutes)[0];
   const gain = second ? (P[second].minutes - best.minutes) * 60 : 0;
   const sure = L.certainty === 'clear' ? 'A clear call: it holds whichever way the forecast is off.' : L.certainty === 'likely' ? 'Likely, but not certain.' : 'An open leg: no side pays enough to bank on.';
   items.push({ head, src: 'model', text: `${when}. Going ${name(L.best)} is fastest by ${Math.round(gain)} s over going ${second ? PLAN_WORD[second] : '—'} (${times}). ${sure}` });
   // why: the current and the wind on each side
-  if (sides.length === 2 && L.best !== 'middle') {
+  if (L.best === 'shore') {
+    const b = P.shore, m = P.middle;
+    items.push({ head: 'Why', src: 'model', text: `The tide's against you on this leg, and it runs slower near the beach: ${kt1(-b.meanCurAlong)} kt against you along the shore, ${kt1(-m.meanCurAlong)} kt out on the course. Work in toward the shore, keep about ${Math.round(Math.max(30, b.minShore))} m off it (the chart's shoals and the beach), and come out to the mark at the end. Bay sailors work the Cityfront this way on an ebb.` });
+  } else if (sides.length === 2 && L.best !== 'middle') {
     const other: Plan = L.best === 'left' ? 'right' : 'left', b = P[L.best], a = P[other];
     const dc = b.meanCurAlong - a.meanCurAlong, dk = b.meanKt - a.meanKt, why: string[] = [];
     if (Math.abs(dc) > 0.08) why.push(dc > 0 ? `the current is ${kt1(Math.abs(dc))} kt kinder there (${b.meanCurAlong >= 0 ? `${kt1(b.meanCurAlong)} kt helping` : `${kt1(-b.meanCurAlong)} kt against`}, against ${a.meanCurAlong >= 0 ? `${kt1(a.meanCurAlong)} kt helping` : `${kt1(-a.meanCurAlong)} kt against`} on the ${other})` : `even though the current is ${kt1(-dc)} kt worse there`);
