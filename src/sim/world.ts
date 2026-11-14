@@ -1,5 +1,6 @@
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
+import { addHarborLee } from '../environment/harborLee';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -738,6 +739,7 @@ export class World {
     }
     if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
     addPierWakes(sum, from, p);
+    addHarborLee(sum, from, p); // (the harbors' walls and Fort Mason's sheds: environment/harborLee.ts)
     const r = sum.result(from);
     return { k: r.k * lee, shift: r.shift };
   }
