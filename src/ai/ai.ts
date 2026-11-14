@@ -11,7 +11,7 @@ import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround } from '../sim/routing';
-import { HARBORS } from '../geo/marina';
+import { HARBORS, inBasin } from '../geo/marina';
 import { AI_EVERY, type World } from '../sim/world';
 
 /**
@@ -48,6 +48,18 @@ const HALF_BEAM = 1.1;
  * must keep clear is doing so: she holds on rather than ease and head up further. Measured between the centrelines
  * (rules hullGap), so the two half-beams are added. */
 const OPEN_GAP = 3 + 2 * HALF_BEAM;
+/** Out of another boat's wind shadow on a run, she heads up this far (deg) onto a broad reach: it brings the apparent
+ * wind forward and sends her sideways at about 0.4 of her speed, clear of a shadow a few metres wide (sim/world.ts
+ * shadowAt, the wake model) in a few seconds; it costs her 1 − cos 25° ≈ 9% of her speed toward a mark downwind,
+ * against the quarter or more of the wind the shadow takes (DIRTY_RUN_K). Poled out, no higher than the pole stays
+ * set (crewPoleCall stows it below 150°, and each stowing and setting leaves the jib dead for 5–8 s). */
+const DIRTY_RUN_UP = 25, DIRTY_RUN_POLED_TWA = 152;
+/** In a shadow, running: less than this share of the wind she'd have without the other boats (land's lee apart). */
+const DIRTY_RUN_K = 0.75;
+/** Once she's headed up out of a shadow, she holds the higher course this long (s), to get clear of it rather than
+ * bear away back into it the moment the wind comes back; and she gybes away if she's still in it after three times her
+ * dirtyAirS, but not within 20 s of her last gybe (a gybe costs her speed: back and forth, she'd lose more than the shadow). */
+const DIRTY_RUN_HOLD = 15;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
 function avoidMarks(w: World, b: Boat, desired: number): number {
   let near: string | null = null;
@@ -86,10 +98,15 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
       // sail on into it), pass it on the other side, bearing away. Once she's chosen a side she holds to it until she's
       // clear (her course swinging as she turns would swap them back and forth, and she'd hold on into it)
       const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
-      const prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
+      // (the mark she's rounding she passes on its rounding side, whichever side it happens to be on now: kept on the
+      // side it was on, after penalty turns beside it had left it to port of a mark to be left to starboard, she sailed
+      // round and round it the wrong way, never rounding it, for the rest of the race)
+      const nm = b.started ? w.nextMark(b) : null;
+      const rounding = nm && nm.type === 'round' && !nm.reach && `${nm.p.x.toFixed(0)},${nm.p.y.toFixed(0)}` === key ? (nm.side === 's' ? 1 : -1) : 0;
+      const prev = rounding || (b.ai?.passing?.key === key ? b.ai.passing.side : 0);
       const useKeep = prev ? Math.sign(rel || 1) === prev : Math.abs(wrap(sailable(b, keep) - keep)) < 1;
       desired = useKeep ? keep : other;
-      near = key; if (b.ai && !prev) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
+      near = key; if (b.ai && (!prev || rounding)) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
     }
   }
   if (b.ai?.passing && b.ai.passing.key !== near && !w.touchableMarks(b).some(m => `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}` === b.ai!.passing!.key && dist(b, m.p) < 30)) b.ai.passing = null;
@@ -152,7 +169,10 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   if (!ai.home) {
     let at = w.C.center, best = Infinity;
     for (const H of HARBORS) for (const e of H.exits) { const d = dist(e, w.C.center); if (d < best) { best = d; at = e; } }
-    const stand = standOff(w, b, at, from);
+    // (the fleet's places worked out once, when racing's called off, with the course's wind then, and kept: every boat
+    // reads hers from the same list)
+    const places = w.cancelled ? (w.cancelled.places ??= standOffPlaces(w, at, w.wind.from)) : standOffPlaces(w, at, w.wind.from);
+    const stand = places[w.boats.filter(o => !o.isUser).indexOf(b)] ?? at;
     ai.home = { route: routeAround(b, stand, 120), i: 0, at: stand, lying: false };
   }
   const h = ai.home, toLee = (p: Vec, d: number) => { const u = V(from + 180); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; };
@@ -160,7 +180,20 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
   if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
   else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = b.tack; }
-  if (h.lying) return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+  if (h.lying) {
+    // (another boat lying to, or stopped, within a couple of lengths: they'd drift down together side by side, stopped,
+    // for as long as they lay there. The one further from her own spot sails off clear before lying to again)
+    // (sailing off until 25 m clear, so she doesn't lie to again on the edge and drift back in)
+    const was = h.parting != null ? w.boats.find(o => o.id === h.parting) : undefined;
+    if (was && dist(was, b) < 25) return { desired: sailable(b, brg(b.x - was.x, b.y - was.y)), luff: false, beating: false };
+    h.parting = undefined;
+    for (const o of w.boats) {
+      if (o === b || dist(o, b) > 15) continue;
+      const mine = dist(b, h.at), theirs = o.ai?.home ? dist(o, o.ai.home.at) : -1;
+      if (mine > theirs || (mine === theirs && b.id > o.id)) { h.parting = o.id; return { desired: sailable(b, brg(b.x - o.x, b.y - o.y)), luff: false, beating: false }; }
+    }
+    return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+  }
   // her way: each turn of it passed within 60 m, or the next in sight with clear water to it
   while (h.i < h.route.length - 1 && (dist(b, h.route[h.i]) < 60 || landAlong(b, h.route[h.i + 1]) === Infinity)) h.i++;
   const q = h.i < h.route.length - 1 ? h.route[h.i] : h.at, bq = brg(q.x - b.x, q.y - b.y), rel = Math.abs(wrap(from - bq));
@@ -182,28 +215,58 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   }
   return { desired, luff: false, beating };
 }
-/**
- * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
- * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
- * such, a little upwind of it the better (on a lee shore, well out); each boat her own, 80 m apart along the wind's line
- * across, so the fleet isn't all on one point.
- */
 /** No land, pier, dock or breakwater within r m of p, looking out eight ways (anyShoreDist doesn't see what's built). */
 function clearRound(p: Vec, r: number): boolean {
   for (let a = 0; a < 360; a += 45) { const u = V(a); if (landAlong(p, { x: p.x + u.x * r, y: p.y + u.y * r }) < Infinity) return false; }
   return true;
 }
-function standOff(w: World, b: Boat, h: Vec, from: number): Vec {
+/**
+ * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
+ * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * such, a little upwind of it the better (on a lee shore, well out): the fleet's spot; each boat her own place 80 m apart along the wind's line
+ * across, so the fleet isn't all on one point. All the fleet's places (non-user boats, in order).
+ */
+function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
   const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && clearRound(p, 100) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
-  const k = w.boats.filter(o => !o.isUser).indexOf(b), across = V(from + 90), spread = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 80;
-  let best: Vec | null = null, cost = Infinity;
+  // The fleet's one spot first (open water, the nearer and the more upwind of the entrance the better); then each boat
+  // her own place 80 m apart across the wind from it, alternately either side. (Each choosing her own best spot with
+  // the spread added, they all chose points round the same corner of open water, 11–32 m apart, and those sailing back
+  // to theirs passed close to those lying to.)
+  const open: Vec[] = []; // (open water she can reach straight from the entrance)
+  let base: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
-    const u = V(a), c = { x: h.x + u.x * r, y: h.y + u.y * r }, p = { x: c.x + across.x * spread, y: c.y + across.y * spread };
+    const u = V(a), p = { x: h.x + u.x * r, y: h.y + u.y * r };
     if (!clearLee(p) || landAlong(h, p) < Infinity) continue;
-    const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2; // (nearer, and upwind of the entrance, the better)
-    if (q < cost) { cost = q; best = p; }
+    open.push(p);
+    const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2;
+    if (q < cost) { cost = q; base = p; }
   }
-  return best ?? h;
+  const fleet = w.boats.filter(o => !o.isUser);
+  if (!base) return fleet.map(() => h);
+  // Apart across the wind is what counts: lying to, a boat sags straight to leeward until she's drifted 300 m, so two
+  // places one dead to leeward of the other share a lane, the one drifting down through the other's spot and that one
+  // beating back up through hers. Clear: 60 m apart across the wind, or more than her drift along it.
+  const across = V(from + 90), taken: Vec[] = [];
+  const clearOf = (p: Vec) => taken.every(q => { const dx = p.x - q.x, dy = p.y - q.y; return Math.abs(dx * across.x + dy * across.y) >= 60 || Math.abs(dx * lee.x + dy * lee.y) > 300; });
+  const ok = (p: Vec) => clearLee(p) && landAlong(base!, p) === Infinity && clearOf(p);
+  for (let k = 0; k < fleet.length; k++) {
+    const side = k % 2 ? 1 : -1, spread = side * Math.ceil(k / 2) * 80;
+    let spot: Vec | null = null;
+    // her place, or further out along the same line across the wind; then the other side; then the nearest open
+    // water clear of the others; failing that, the open water furthest across the wind from them
+    for (const s of [1, -1]) for (let m = Math.abs(spread); m <= 800 && !spot; m += 20) {
+      const p = { x: base.x + across.x * side * s * m, y: base.y + across.y * side * s * m };
+      if (ok(p)) spot = p;
+    }
+    const want = { x: base.x + across.x * spread, y: base.y + across.y * spread };
+    if (!spot) { let bd = Infinity; for (const p of open) if (clearOf(p) && dist(p, want) < bd) { bd = dist(p, want); spot = p; } }
+    if (!spot) {
+      let bg = -1;
+      for (const p of open) { const g = taken.reduce((m, q) => Math.min(m, Math.abs((p.x - q.x) * across.x + (p.y - q.y) * across.y)), Infinity); if (g > bg) { bg = g; spot = p; } }
+    }
+    taken.push(spot ?? base);
+  }
+  return taken;
 }
 
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
@@ -287,7 +350,27 @@ function inIslandLee(q: Vec, from: number): boolean {
  * in the rounding direction (clockwise leaving it to starboard), steering for the furthest point off its shore she
  * can see with clear water between.
  */
-function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number): Vec {
+export function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number, rounded = false): Vec {
+  // in the island's lee already, she gets out of it first, whatever the way round,
+  // across the wind (out of a wind shadow the quick way is sideways to the wind, not on away from the island, which is
+  // downwind and deeper into it, where an ebb would hold her), on the side nearer where she's going. (Standing off from
+  // the island's centre there, the fleet lost over half an hour in Alcatraz's lee on the real 1 November 2025 race:
+  // Charts' real past races, #192)
+  // (once she has rounded it: before that, the rounding's own way round)
+  // (in its lee by the wind she has, the shadows' own model, sim/world.ts leeK: a single ray upwind misses the lee off
+  // an island's corner)
+  // (tested before the clear run below, whose single ray upwind passes her as clear in the lee's tail, 220–500 m off
+  // the shore at 30–65% of the wind, and off a corner: she'd run on down through it)
+  // (the side chosen as she enters the lee and kept until she's out of it: chosen afresh each moment, with her mark
+  // nearly dead downwind, the side would swap as she crossed the line down through it, and she'd swing from one beam
+  // reach to the other in the lee's calm core)
+  const bb = b as Boat, ai = bb.ai, lee = bb.leeK != null ? bb.leeK : inIslandLee(b, windFrom) ? 0 : 1;
+  if (ai && lee >= LEE_OUT + 0.1) ai.leeSide = null;
+  if (rounded && lee < LEE_OUT) {
+    const a = V(windFrom + 90), side = ai?.leeSide ?? (dot(a, sub(P, b)) >= 0 ? 1 : -1);
+    if (ai) ai.leeSide = side;
+    return { x: b.x + a.x * side * ISLAND_EXIT, y: b.y + a.y * side * ISLAND_EXIT };
+  }
   if (clearRun(b, P, windFrom)) return P;
   const M = m.p, dir = m.side === 's' ? 1 : -1, b0 = brg(b.x - M.x, b.y - M.y), bP = brg(P.x - M.x, P.y - M.y);
   const span = ((dir * (bP - b0)) % 360 + 360) % 360; // how far round to the aim point
@@ -301,6 +384,13 @@ function aroundIsland(m: CourseMark, b: Vec, P: Vec, windFrom: number): Vec {
   const u = V(b0), r = markReach(m, b) + islandBerth(u, windFrom) * 1.5;
   return { x: M.x + u.x * r, y: M.y + u.y * r };
 }
+/** How far across the wind she steers to get out of an island's lee (m): beyond the shadow's width off Alcatraz. */
+const ISLAND_EXIT = 300;
+/** In an island's lee: less than this share of the wind there, by the land's wind shadow alone. (The model's lee off
+ * Alcatraz has sharp sides, 0.2 to 0.8–0.9 of the wind within 50 m, and 0.7 lies 300–350 m beyond its downwind shore:
+ * past the calm core, where what's left of the shadow costs less than the way out of it. She's out of it, and free to
+ * choose her side afresh, once she has a tenth more than that.) */
+const LEE_OUT = 0.7;
 
 /**
  * The fastest way to the start line from here: of close-hauled, a reach or a run on either tack (a start to
@@ -339,11 +429,19 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     let near: Vec | null = null, nd = PENALTY_CLEAR;
     for (const o of w.boats) if (o !== b) { const d = dist(o, b); if (d < nd) { nd = d; near = o; } }
     for (const m of w.touchableMarks(b)) { const d = dist(m.p, b); if (d < MARK_CLEAR && d < nd + 10) { nd = d; near = m.p; } } // and away from the marks
-    ai.clearing = !!near && b.penalty >= b.penaltyTotal - 1; // not started turning yet
+    // not started turning yet; or a new penalty came while she was turning (in a jam): rule 44.2, she takes it "after
+    // getting well clear of other boats", so she gets clear again before she carries on turning
+    if (ai.penSeen != null && b.penaltyTotal > ai.penSeen + 1) ai.reclear = true;
+    // (and while turning, a boat drifting in close: she must keep clear of everyone while she takes it, rule 21.2, so she
+    // stops spinning and sails clear again, rather than turn into her; a mark that close, likewise: no touching it either)
+    if (b.penaltyDir && near && nd < PENALTY_CLEAR * 0.6) ai.reclear = true;
+    ai.penSeen = b.penaltyTotal;
+    if (!near) ai.reclear = false;
+    ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
     b.luff = false; return;
   }
-  ai.clearing = false;
+  ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
   const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
   if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
@@ -444,7 +542,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       P = aimPoint(w, b);
       // just rounded an island: carry on round it the same way, with the same berth, until she's clear of it and its lee
       const prev = b.leg > 0 && b.leg <= w.C.marks.length ? w.C.marks[b.leg - 1] : null;
-      if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from);
+      if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from, true);
     }
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
@@ -531,6 +629,29 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // downwind (sim/laylines.ts), as she tacks on them upwind. A gybe she's decided on is held as a tack is.
       const rS = n360(ww.from - ra), rP = n360(ww.from + ra);
       desired = (ai.goTack ? ai.goTack.to : b.tack) === 'S' ? rS : rP;
+      // Clear air downwind: with the wind astern a boat's sails throw a long, deep shadow downwind, and boats running
+      // together sat in each other's for many minutes at a third of the wind (the AI looked for clear air only on a
+      // beat). A sailor heads up out of it, onto a broad reach, and if that doesn't clear her, gybes away.
+      // (Not by heading up while a boat on the same tack is to windward of her within two lengths: that boat is very
+      // likely the one blanketing her, and heading up luffs it, above her proper course (the course she'd sail without
+      // it) where rule 17 forbids that to a boat that came up from clear astern. Then she gybes away instead.)
+      const dirtyRun = (b.shadowK ?? 1) / (b.leeK ?? 1) < DIRTY_RUN_K;
+      ai.dirtyRunT = dirtyRun ? (ai.dirtyRunT ?? 0) + dt : Math.max(0, (ai.dirtyRunT ?? 0) - dt * 2);
+      const other = b.tack === 'S' ? 'P' : 'S', otherH = other === 'S' ? rS : rP;
+      const gybeAway = () => { if (w.t - b.lastTackT > 20 && !blocked(w, b, otherH, 60)) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = otherH; ai.dirtyRunT = 0; ai.dirtyRunUntil = undefined; } };
+      if (!ai.goTack && (ai.dirtyRunT ?? 0) > ai.kn.dirtyAirS) {
+        const windward = w.boats.some(o => o !== b && !o.finished && o.tack === b.tack && dist(o, b) < 2 * LOA && w.rights(b, o).rule === '11' && w.rights(b, o).kc === o);
+        if (windward) gybeAway();
+        else if ((ai.dirtyRunT ?? 0) > ai.kn.dirtyAirS * 3) gybeAway();
+        else ai.dirtyRunUntil = w.t + DIRTY_RUN_HOLD;
+      }
+      if (!ai.goTack && ai.dirtyRunUntil != null) {
+        if (w.t > ai.dirtyRunUntil) ai.dirtyRunUntil = undefined;
+        else {
+          const twa = b.poleWant ? Math.max(DIRTY_RUN_POLED_TWA, ra - DIRTY_RUN_UP) : ra - DIRTY_RUN_UP;
+          desired = b.tack === 'S' ? n360(ww.from - twa) : n360(ww.from + twa); // (heading up: on starboard, to starboard)
+        }
+      }
       if (!ai.goTack && w.t - b.lastTackT > 12) {
         const d = sub(P, b), vr = targetFor(b, ra);
         // (the other gybe lays the mark when its track over the ground passes no more than 3° to leeward of it: on
@@ -620,8 +741,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // First, her right of way. Rule 16.1: a right-of-way boat changing course must give the other boat room to keep
   // clear, so if the turn she wants would close on a boat close by she turns only as far as still leaves it that room.
   // (Room: 8 m between centres, a little more than a Folkboat's length (7.6 m); with less than that already, she
-  // mustn't close it further.)
-  if (startArea) for (const { o, dx, dy, r, cp } of near) {
+  // mustn't close it further.) Anywhere on the course, not just at the start, and Rule 15 with it: a boat that has
+  // just got right of way by her own action must at first give the other boat room to keep clear. (She needn't sail
+  // away: holding her course gives the room. Two boats running side by side zigzagged together and touched: the one
+  // keeping clear gybed away, became the leeward boat on the same tack, and at once steered back toward the boat that
+  // now had to keep clear of her.) Not while she sails within the mark-room she's entitled to: rounding is her room
+  // (Rule 21: exonerated for 15 and 16 there).
+  for (const { o, dx, dy, r, cp } of near) {
+    if (r.mr && !r.mr.ended && (r.mr.inside === b.id || r.mr.ahead === b.id)) continue;
     if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
     const ROOM = 8, need = Math.min(ROOM, clearanceOn(w, b, b.h, o));
     if (clearanceOn(w, b, desired, o) >= need) continue;
@@ -727,12 +854,39 @@ export function aiThink(w: World, b: Boat, dt: number): void {
  * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
  * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
  * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
- * from doing it over and over as she wanders about a deep run. The AI boats' crews, and yours while the pole is theirs
- * (the band's Auto-trim).
+ * from doing it over and over as she wanders about a deep run. The AI boats' crews only: never inside a harbor's basin.
+ * Yours never sets it on their own (the owner: "pole-out should only ever be on my command"): poleMustCome.
  */
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0) b.poleWant = false;
+  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0 || inBasin(b)) b.poleWant = false;
   else if (twa > 157) b.poleWant = true;
+}
+/**
+ * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come
+ * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts
+ * jibEfficiency; between there and 154.5 it does less than the jib would to leeward, and that's your call, with the
+ * coach's cue), the jib is down, penalty turns, a harbor's basin, or the dock. Null when it may stay out. (Gybing it end
+ * for end with her, as she gybes, is still your pole going across.) `highS`: how long she's been at 145° or higher with it
+ * wanted: a crew doesn't strip the pole for a shift of a few seconds, only once she's stayed up there 3 s, or at once
+ * when she's higher than 135°, where it's plainly aback (estimates of practice). The World keeps that clock (b.poleHighAt).
+ */
+export function poleMustCome(b: PoleBoat, highS = 0): string | null {
+  return poleBlocked(b) ?? (b.twa < 135 || (b.twa <= 145 && highS >= 3) ? POLE_TOO_HIGH : null);
+}
+/** Why your crew won't set the pole on a new call (none at 145° true and higher, or where it must come in), or null. The
+ * band's Pole tab shows only when this is null (or the pole is out, or going out or in); a call it refuses says why. */
+export function poleRefused(b: PoleBoat): string | null {
+  return poleBlocked(b) ?? (b.twa <= 145 ? POLE_TOO_HIGH : null);
+}
+const POLE_TOO_HIGH = 'she\'s too high for it: the poled-out jib won\'t fill';
+/** What the pole's rules read (the page's mirror of your boat will do). */
+type PoleBoat = Readonly<Pick<Boat, 'docked' | 'x' | 'y' | 'penalty' | 'twa'>> & { readonly rig?: Readonly<NonNullable<Boat['rig']>> };
+function poleBlocked(b: PoleBoat): string | null {
+  if (b.docked) return 'at the dock';
+  if (inBasin(b)) return 'not in the harbor: no room to pole out in a marina';
+  if (b.penalty > 0) return 'in for the penalty turns';
+  if (!!b.rig && (b.rig.jib < 1 || !b.rig.jibUp)) return 'the jib is down';
+  return null;
 }

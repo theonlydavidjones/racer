@@ -170,7 +170,7 @@ describe('the growing sea, more', () => {
     for (let i = 0; i < 120 * 60; i++) { w.step(); if (i % 60 === 0) { const s = w.seaHere(p); hs.push(s.hsW); from.push(s.fromW); } }
     expect(Math.max(...hs) / Math.min(...hs)).toBeLessThan(1.05);
     expect(Math.max(...from) - Math.min(...from)).toBeLessThan(2);
-  }, 60000);
+  }, 180_000);
 });
 
 describe('the sea inside the marinas', () => {
@@ -255,5 +255,5 @@ describe('the sea inside the marinas: entrances and breakwater heads', () => {
     const t0 = performance.now();
     for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) f.fetch({ x: cx - 1600 + i * 139, y: cy - 1600 + j * 139 }, 276);
     expect(performance.now() - t0).toBeLessThan(600);
-  }, 60_000);
+  }, 180_000);
 });

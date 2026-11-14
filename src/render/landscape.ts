@@ -5,9 +5,10 @@ import * as THREE from 'three';
 import { LL } from '../geo/geo';
 import { LAND, onLand, shoreDist } from '../geo/shore';
 import { HARBOR } from '../geo/marina';
+import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
-import { segPt } from '../core/math';
+import { inPoly, segPt } from '../core/math';
 import { buildBayBridge, BAY_APPROACH } from './bayBridge';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildEastBay } from './eastBay';
@@ -42,7 +43,11 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // shore you see is the one you run aground on
   {
     const s = new THREE.Shape();
-    LAND.forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
+    // (less Fort Mason's piers: they stand on piles over the water, drawn below; the apron runs straight along the bulkhead
+    // across each pier's foot)
+    const foot = (p: { x: number; y: number }) => FORT_MASON_PILES.some(f => p.x >= f.box.x0 && p.x <= f.box.x1 && p.y >= f.box.y0 && p.y <= f.box.y1
+      && Math.min(...[f.pts[0], f.pts[f.pts.length - 1]].map(q => Math.hypot(p.x - q.x, p.y - q.y))) > 20); // (the apron runs under the deck's shore end: no seam)
+    LAND.filter(p => !foot(p)).forEach((p, i) => i ? s.lineTo(p.x, p.y) : s.moveTo(p.x, p.y));
     // West Harbor's basin is water (geo/marina.ts): cut out of the apron
     const hole = new THREE.Path(); HARBOR.basin.forEach((p, i) => i ? hole.lineTo(p.x, p.y) : hole.moveTo(p.x, p.y)); s.holes.push(hole);
     const g = new THREE.ExtrudeGeometry(s, { depth: 2.3, bevelEnabled: false }); g.rotateX(-Math.PI / 2);
@@ -157,6 +162,55 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     glows.push({ ...LL(37.79519, -122.40279), h: 235, color: 0xfff1d8, i: 0.35, w: 4 });
     const wings = [-1, 1].map(s => { const w = new THREE.Mesh(new THREE.ConeGeometry(9, 160, 4, 1), lam(0xe4e1d9)); w.rotation.y = Math.PI / 4; w.position.set(s * 26, 80, 0); w.scale.set(0.55, 1, 0.55); return w; });
     place(group(pyr, spire, ...wings), 37.79519, -122.40279);
+  }
+  // Sather Tower, the Campanile, on the UC Berkeley campus (1914, John Galen Howard): the East Bay's mark for a bearing
+  // across the Central Bay. 93.6 m (307 ft) to its finial (OpenStreetMap way 24024507, height 93.6; Wikipedia "Sather
+  // Tower"), at 37.87208 N, 122.25784 W (the outline's centre: OSM; Wikipedia's 37.8719, 122.2578 agrees within 15 m).
+  // A steel frame clad in light grey granite. A square shaft about 10 m (33 ft) on a side at its foot, 9.3 m (30 ft
+  // 6 in) at 57.8 m (a secondary figure, unconfirmed); the observation deck, the belfry's arcade, at 61 m (200 ft;
+  // Wikipedia); the clocks on all four faces. The clocks' size and height, the cap's form (a steep pyramid with a small
+  // lantern and finial) and its proportions are read off photographs. Not lit here: no source for its night lighting.
+  {
+    // (flat-shaded: a square shaft's faces are flat, not a cylinder's rounded light)
+    const GRANITE = new THREE.MeshLambertMaterial({ color: 0xd6d3cb, flatShading: true }), SHADE = lam(0x4f4c47), DIAL = lam(0xece8dc), g = new THREE.Group();
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(9.3 / Math.SQRT2, 10.06 / Math.SQRT2, 57.8, 4, 1), GRANITE);
+    shaft.rotation.y = Math.PI / 4; shaft.position.y = 57.8 / 2; g.add(shaft);
+    // the clock faces, one on each side below the belfry (5.2 m across: the 17 ft UC Berkeley gives, read as the dial)
+    for (let k = 0; k < 4; k++) { const d = new THREE.Mesh(new THREE.CircleGeometry(2.6, 24), DIAL), a = k * Math.PI / 2; d.position.set(4.72 * Math.sin(a), 50, 4.72 * Math.cos(a)); d.rotation.y = a; g.add(d); }
+    // the belfry: a dark core behind an arcade, three piers to a side, under a cornice
+    g.add(block(7.4, 7.4, 9, SHADE, 57.8));
+    for (let side = 0; side < 4; side++) for (let k = -1; k <= 1; k += 2) {
+      const pier = block(1.6, 1.6, 9, GRANITE, 57.8), a = side * Math.PI / 2, u = 3.85, v = k * 3.85;
+      pier.position.x = u * Math.sin(a) + v * Math.cos(a); pier.position.z = u * Math.cos(a) - v * Math.sin(a); g.add(pier);
+    }
+    g.add(block(10.4, 10.4, 1.6, GRANITE, 66.8)); // the cornice over the arcade
+    // the cap: a steep pyramid to a small flat top, the lantern on it
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(1.6 / Math.SQRT2, 10.4 / Math.SQRT2, 19, 4, 1), GRANITE); cap.rotation.y = Math.PI / 4; cap.position.y = 68.4 + 9.5; g.add(cap);
+    g.add(block(1.6, 1.6, 3.2, GRANITE, 87.4)); // the lantern
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.45, 3, 8), SHADE); fin.position.y = 92.1; g.add(fin); // the finial, to 93.6 m
+    place(g, 37.87208, -122.25784);
+  }
+  // The Claremont Hotel (1915; now the Claremont Club & Spa), on the hillside at the mouth of Claremont Canyon: a long
+  // white Tudor Revival building, "one of the world's tallest wooden buildings", its central tower 49 m (160 ft) and ten
+  // storeys at the tower (Wikipedia "Claremont Hotel"; OSM building:levels 10). Painted white since 1937. Its outline is
+  // OpenStreetMap's (way 41745855, 47 corners, 177 m north–south by 93 m). The wings' height (about five storeys, 18 m),
+  // the dark roofs and where the tower stands in the outline (by its middle) are read off photographs: OSM doesn't tag the
+  // tower separately. Its rooms lit in the evening like homes (night.ts).
+  {
+    const WHITE_WALL = new THREE.MeshLambertMaterial({ color: 0xf1efe8, flatShading: true }), ROOF = new THREE.MeshLambertMaterial({ color: 0x55585b, flatShading: true }), at = { lat: 37.85945, lon: -122.24185 };
+    litWindows(WHITE_WALL, { floor: 3.4, bay: 3.0, kind: 'home', seed: 11 });
+    const OUTLINE: [number, number][] = [[37.8591757, -122.2425210], [37.8586557, -122.2419335], [37.8587252, -122.2418338], [37.8587433, -122.2418502], [37.8588493, -122.2416907], [37.8589103, -122.2417530], [37.8590960, -122.2415244], [37.8591920, -122.2416383], [37.8592801, -122.2415301], [37.8594052, -122.2416787], [37.8593658, -122.2417377], [37.8594837, -122.2417530], [37.8595002, -122.2416812], [37.8595701, -122.2417300], [37.8595450, -122.2419315], [37.8595749, -122.2419365], [37.8595811, -122.2418782], [37.8596118, -122.2418842], [37.8596243, -122.2417797], [37.8597590, -122.2418078], [37.8598490, -122.2419552], [37.8598832, -122.2419228], [37.8599244, -122.2419661], [37.8599411, -122.2419982], [37.8599094, -122.2420292], [37.8600500, -122.2422490], [37.8602455, -122.2423113], [37.8602270, -122.2425790], [37.8600019, -122.2425505], [37.8599797, -122.2425684], [37.8599568, -122.2425774], [37.8599321, -122.2425783], [37.8599153, -122.2425590], [37.8599021, -122.2425366], [37.8598961, -122.2424998], [37.8598968, -122.2424779], [37.8598067, -122.2423370], [37.8597908, -122.2423521], [37.8597753, -122.2423669], [37.8597356, -122.2423555], [37.8597401, -122.2423038], [37.8593760, -122.2422370], [37.8593442, -122.2422854], [37.8593606, -122.2423060], [37.8593283, -122.2423520], [37.8592961, -122.2423978], [37.8592774, -122.2423820]];
+    const o = LL(at.lat, at.lon), local = OUTLINE.map(([la, lo]) => { const q = LL(la, lo); return { x: q.x - o.x, y: q.y - o.y }; });
+    // on its hillside: the walls run down to the lowest corner's ground, the roofs level at the tower's ground + 18 m
+    const g0 = ground(at.lat, at.lon), low = Math.min(...OUTLINE.map(([la, lo]) => ground(la, lo)));
+    const shape = new THREE.Shape(); local.forEach((q, i) => i ? shape.lineTo(q.x, q.y) : shape.moveTo(q.x, q.y));
+    const wings = new THREE.ExtrudeGeometry(shape, { depth: g0 + 18 - (low - 2), bevelEnabled: false }); wings.rotateX(-Math.PI / 2); wings.translate(0, low - 2 - g0, 0);
+    const roofs = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false }); roofs.rotateX(-Math.PI / 2); roofs.translate(0, 18, 0);
+    const g = group(new THREE.Mesh(wings, WHITE_WALL), new THREE.Mesh(roofs, ROOF));
+    // the central tower: a square tower rising well clear of the wings to its belvedere, and a steep spire to 49 m
+    g.add(block(13, 13, 36 - 18, WHITE_WALL, 18));
+    const top = new THREE.Mesh(new THREE.ConeGeometry(13 / Math.SQRT2 + 0.5, 13, 4, 1), ROOF); top.rotation.y = Math.PI / 4; top.position.y = 36 + 6.5; g.add(top);
+    place(g, at.lat, at.lon, 0, g0);
   }
   // the skyline's tallest towers, at their real positions and heights (Wikipedia's pages for each). Their shapes and
   // sizes are simplified from photographs; the SoMa ones are square to Market Street, which runs at 45° (the Ferry
@@ -299,21 +353,49 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     mergeByMaterial(fbg, [TWR, DECK, SHELTER, POLE]);
     glows.push({ ...tc, h: 45, color: 0xffe0b0, i: 0.45, w: 6 });
   }
-  // Sutro Tower: three red-and-white legs on Mt Sutro, 298 m, crossarms at two levels, three masts on top
+  // Sutro Tower (1973) on Mount Sutro, the city's mark you see from all over the Bay. Wikipedia ("Sutro Tower"): a three-
+  // legged steel truss 297.8 m (977 ft) to its top from a base 254.2 m (834 ft) above the sea; the legs' triangle 45.7 m
+  // (150 ft) a side at the base, drawn in to 18.3 m (60 ft) at the waist and out again to 30.5 m (100 ft) at the
+  // antenna level; Level 6, the outriggers' deck, at 228.8 m (751 ft). The steel ends at 237.7 m (779.9 ft, "structure
+  // height excluding appurtenances": ASR 1001289 as the FCC's licence records repeat it), and three antenna stacks stand
+  // above it, one over each leg, to the top. Painted in alternate bands of aviation orange and white, orange at top and
+  // bottom (FAA AC 70/7460-1: bands about a seventh of the height, none over 100 ft: eleven of 27 m here; the tower's own
+  // count isn't published that we could reach). Lit (Sutro Tower Inc., after the 2020 repack): a medium-intensity beacon
+  // on each stack's top, flashing white by day and red at night, and six steady red lights on Level 6's outriggers. The
+  // waist's height (about 152 m), the outriggers' reach and the stacks' girth (3 m) are read off photographs.
+  // (It was drawn before with thin rods above 230 m that vanished at any distance: the "decapitated" look.)
   {
-    const g = new THREE.Group(), RW = [lam(0xc8372d), lam(0xf2f0ea)];
-    const leg = (a: THREE.Vector3, b: THREE.Vector3, r: number, bands: number) => {
-      for (let i = 0; i < bands; i++) {
-        const p0 = a.clone().lerp(b, i / bands), p1 = a.clone().lerp(b, (i + 1) / bands), len = p0.distanceTo(p1);
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 6), RW[i % 2]); m.position.copy(p0).lerp(p1, 0.5);
-        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p1.clone().sub(p0).normalize()); g.add(m);
+    const H = 297.7, STEEL = 237.7, L6 = 228.8, WAIST = 152, BAND = H / 11, g = new THREE.Group();
+    const ORANGE = lam(0xd9532c), WHITE = lam(0xf2f0ea), DECK = lam(0x8a8a86);
+    const tri = (side: number, y: number) => [0, 1, 2].map(k => new THREE.Vector3(side / Math.sqrt(3) * Math.sin(k * 2.0944), y, side / Math.sqrt(3) * Math.cos(k * 2.0944)));
+    // a member from a to b, r thick, coloured by the band each piece of it is in (cut at the bands' edges)
+    const member = (a: THREE.Vector3, b: THREE.Vector3, r: number) => {
+      const cuts = [0, 1]; for (let y = BAND; y < H; y += BAND) { const t = (y - a.y) / (b.y - a.y); if (t > 0 && t < 1) cuts.push(t); }
+      cuts.sort((u, v) => u - v);
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const p0 = a.clone().lerp(b, cuts[i]), p1 = a.clone().lerp(b, cuts[i + 1]), len = p0.distanceTo(p1); if (len < 0.05) continue;
+        const band = Math.floor(((p0.y + p1.y) / 2) / BAND), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), band % 2 === 0 ? ORANGE : WHITE);
+        m.position.copy(p0).lerp(p1, 0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p1.clone().sub(p0).normalize()); g.add(m);
       }
     };
-    const tri = (r: number, y: number) => [0, 1, 2].map(k => new THREE.Vector3(r * Math.sin(k * 2.094), y, r * Math.cos(k * 2.094)));
-    const base = tri(26.5, 0), mid = tri(14, 157), top = tri(12, 230), tips = tri(12, 298);
-    for (let k = 0; k < 3; k++) { leg(base[k], top[k], 2.2, 8); leg(top[k], tips[k], 1.2, 3); }
-    for (const lvl of [mid, top]) for (let k = 0; k < 3; k++) leg(lvl[k], lvl[(k + 1) % 3], 1.3, 3);
-    void mid;
+    const base = tri(45.7, 0), waist = tri(18.3, WAIST), l6 = tri(30.5, L6), top = tri(30.5, STEEL), tips = tri(30.5, H);
+    for (let k = 0; k < 3; k++) {
+      member(base[k], waist[k], 2.4); member(waist[k], l6[k], 2.2); member(l6[k], top[k], 2.2); // the legs
+      member(top[k], tips[k], 1.5); // the antenna stack over the leg
+    }
+    // the horizontal frames between the legs: low down, at the waist, Level 6 and the top of the steel
+    for (const lvl of [tri(36, 60), waist, l6, top]) for (let k = 0; k < 3; k++) member(lvl[k], lvl[(k + 1) % 3], 1.1);
+    // Level 6's deck, and its outriggers reaching out past each leg
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(30.5 / Math.sqrt(3) + 2, 30.5 / Math.sqrt(3) + 2, 1.6, 3), DECK); deck.position.y = L6; g.add(deck);
+    const reach = tri(30.5 + 2 * 9 * Math.sqrt(3), L6); // (9 m beyond each leg)
+    for (let k = 0; k < 3; k++) member(l6[k], reach[k], 1.0);
+    // the lights: points of a fixed size on screen (a light at night is seen from far beyond where its lamp would be a
+    // pixel), the beacons flashing (sutroBeacons, scene.ts), the outriggers' six steady
+    const pts = (ps: THREE.Vector3[], color: number, size: number) => { const geo = new THREE.BufferGeometry().setFromPoints(ps); const o = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, fog: false })); o.visible = false; g.add(o); return o; };
+    const beaconAt = tips.map(t => t.clone().setY(H + 0.8));
+    sutroBeacons.red = pts(beaconAt, 0xff2a1a, 4); sutroBeacons.white = pts(beaconAt, 0xffffff, 3);
+    const steady: THREE.Vector3[] = []; for (let k = 0; k < 3; k++) { steady.push(reach[k].clone().setY(L6 + 1)); steady.push(l6[k].clone().lerp(l6[(k + 1) % 3], 0.5).setY(L6 + 1)); }
+    bridgeLights.push(pts(steady, 0xff2a1a, 3));
     place(g, 37.75523, -122.45284);
   }
   // the Palace of Fine Arts: the rotunda (an octagon of columns under a salmon dome, 49 m) and the colonnades
@@ -337,13 +419,43 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // north seawall, facing the Bay (the start line's inner end: see the Seaweed Soup course files)
   place(block(22, 25, 8, lam(0xf4f1ea)), 37.80773, -122.44259, 79, 2.3);
   place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80799, -122.44260, 0, 2.3);
-  // Fort Mason's piers, with the long pier sheds
-  // (on the real piers, OpenStreetMap's coast: Piers 1, 2 and 3, ending at 37.8085, 37.8091 and 37.8092; each shed's
-  // north end a few metres short of its pier's, turned to the pier: they run 7–14° west of north)
-  for (const [end, lon, brg] of [[37.8085, -122.4324, 346], [37.8091, -122.4316, 350], [37.8092, -122.4304, 353]]) {
-    const r = brg * Math.PI / 180, back = 80; // the shed's middle, 80 m back along the pier from the end
-    place(group(block(20, 150, 3, lam(0x9d968a)), block(18, 140, 13, lam(0xd9cfb8), 3)), end - back * Math.cos(r) / 111320, lon - back * Math.sin(r) / 88000, brg, 0);
+  // Fort Mason's piers, with the long pier sheds: each on its own pier's centerline (geo/fortMason.ts), its north end a
+  // few meters short of the pier's
+  for (const f of FORT_MASON_PILES) {
+    const n = f.pts.length, base = { x: (f.pts[0].x + f.pts[n - 1].x) / 2, y: (f.pts[0].y + f.pts[n - 1].y) / 2 };
+    const far = [...f.pts].sort((p, q) => Math.hypot(q.x - base.x, q.y - base.y) - Math.hypot(p.x - base.x, p.y - base.y)).slice(0, 2);
+    const end = { x: (far[0].x + far[1].x) / 2, y: (far[0].y + far[1].y) / 2 };
+    // (along the pier's longest side, so the shed runs parallel to its edges; the bulkhead end is cut on the skew)
+    const side = f.pts.map((p, i) => [p, f.pts[(i + 1) % n]]).sort(([a, b], [c2, d]) => Math.hypot(d.x - c2.x, d.y - c2.y) - Math.hypot(b.x - a.x, b.y - a.y))[0];
+    const sl = Math.hypot(side[1].x - side[0].x, side[1].y - side[0].y), sg = Math.sign((side[1].x - side[0].x) * (end.x - base.x) + (side[1].y - side[0].y) * (end.y - base.y)) || 1;
+    const u = { x: sg * (side[1].x - side[0].x) / sl, y: sg * (side[1].y - side[0].y) / sl }, c = { x: end.x - u.x * 80, y: end.y - u.y * 80 }; // (its middle 80 m back from the end)
+    const shed = group(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK)); shed.position.copy(P3(c.x, c.y, 0)); shed.rotation.y = -Math.atan2(u.x, u.y); grp.add(shed);
   }
+  // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
+  // through: a boat set onto them is caught (boat/physics.ts onPiles). The deck's height and the piles' size and spacing are
+  // ESTIMATES (no survey found): a deck about 3 m above the water and 0.7 m thick, piles 0.6 m across about 4.5 m apart
+  // each way, drawn down to 4 m below the surface; the sheds 18 × 140 × 13 m (Pier 3's Festival Pavilion is listed at
+  // 483 × 110 ft, wider than OSM's 25 m deck there: one of the two is off, unresolved).
+  {
+    const deckMat = lam(0x9d968a), pileMat = lam(0x6f6a60), PITCH = 4.5, R = 0.3, D = 0.7;
+    const decks: THREE.BufferGeometry[] = [], at: THREE.Vector3[] = [];
+    for (const f of FORT_MASON_PILES) {
+      const sh = new THREE.Shape(); f.pts.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y));
+      const g = new THREE.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, PIER_DECK - D, 0); decks.push(g);
+      // the piles on a grid along the pier (from its bulkhead end toward its end), kept a little inside the deck's edge
+      const a = f.pts[0], e = f.pts.reduce((m, p) => Math.hypot(p.x - a.x, p.y - a.y) > Math.hypot(m.x - a.x, m.y - a.y) ? p : m, a);
+      const L = Math.hypot(e.x - a.x, e.y - a.y), u = { x: (e.x - a.x) / L, y: (e.y - a.y) / L }, n = { x: -u.y, y: u.x };
+      for (let s = -10; s <= L + 10; s += PITCH) for (let t = -20; t <= 20; t += PITCH) {
+        const q = { x: a.x + u.x * s + n.x * t, y: a.y + u.y * s + n.y * t };
+        if (inPoly(q, f.pts) && f.pts.every((p, i) => segPt(q, p, f.pts[(i + 1) % f.pts.length]) > 0.6)) at.push(P3(q.x, q.y, 0));
+      }
+    }
+    grp.add(new THREE.Mesh(mergeGeometries(decks), deckMat));
+    const piles = new THREE.InstancedMesh(new THREE.CylinderGeometry(R, R, PIER_DECK - D + 4, 8), pileMat, at.length), m = new THREE.Matrix4();
+    at.forEach((v, i) => piles.setMatrixAt(i, m.makeTranslation(v.x, (PIER_DECK - D - 4) / 2, v.z))); // (from 4 m down to the deck's underside)
+    grp.add(piles);
+  }
+
   // Fort Point: the brick fort (1853–61) at the foot of the bridge, on the rock blasted down to 15 ft (4.6 m) above
   // the sea (Wikipedia, "Fort Point National Historic Site"): three tiers of casemates round a courtyard, with the
   // lighthouse on its roof. Position and footprint from the DataSF building footprints; the bridge's arch crosses its
@@ -487,6 +599,13 @@ function rsq(a: number, hw: number, r: number, aspect = 1): [number, number] {
 
 /** Lights that come on at dusk: the towers' red aviation lights and the roadway lamps. */
 export const bridgeLights: THREE.Object3D[] = [];
+/**
+ * Sutro Tower's three beacons (medium intensity, FAA L-864/L-865): red flashes at night, white by day, 30 a minute (the
+ * FAA's 20–40), each lit for a third of a second (scene.ts).
+ */
+export const sutroBeacons: { red?: THREE.Object3D; white?: THREE.Object3D } = {};
+/** Fort Mason's pier decks' top above the water, m (ESTIMATE: no survey found). */
+const PIER_DECK = 3;
 
 /**
  * The Golden Gate Bridge from its published dimensions: a 1,280 m main span between towers 227 m above the

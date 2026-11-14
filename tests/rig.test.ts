@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { RIG } from '../src/render/boatMesh';
 import { sailArea, sailEdges } from '../src/render/sails';
 import { CABIN, COCKPIT, L, deckY, halfBeam, sheer, uAtZ } from '../src/render/hull';
-import { carLead } from '../src/boat/controls';
+import { carLead, SHEET_POINT, TRAVELLER_HALF, TRAVELLER_SWING } from '../src/boat/controls';
 
 /** The drawn boat against the class rules (NFIA CR 2025–2028) and FRIDA's ORC certificate (EST F51, 2026). */
 describe('the drawn rig and hull', () => {
@@ -36,10 +36,11 @@ describe('the drawn rig and hull', () => {
     // the head is below the hounds, on the stay
     expect(j.head.length()).toBeLessThan(RIG.HOUNDS.distanceTo(RIG.FORESTAY_DECK));
   });
-  it('draws the jib cars where the physics\' lead angles put them, about 2.65 m aft of the stay', () => {
+  it('draws the jib cars where the physics\' lead angles put them, the middle hole a 2.65 m tape from the stay\'s pin (North)', () => {
+    const mid = RIG.carPos(1, 3, 2);
+    expect(mid.distanceTo(RIG.FORESTAY_DECK)).toBeCloseTo(2.65, 1); // (the tape runs up to the car on the cabin top)
     for (const ins of [0, 2, 4]) {
       const car = RIG.carPos(1, 3, ins), d = car.z - RIG.FORESTAY_DECK.z;
-      expect(d).toBeCloseTo(2.65, 2);
       expect(Math.atan2(car.x, d) * 180 / Math.PI).toBeCloseTo(carLead(ins), 3);
     }
   });
@@ -56,5 +57,14 @@ describe('the drawn rig and hull', () => {
     expect(st(6) - z(CABIN.u1)).toBeGreaterThanOrEqual(0); expect(st(6) - z(CABIN.u1)).toBeLessThanOrEqual(0.30);
     expect(z(CABIN.u0)).toBeGreaterThan(RIG.MAST_FRONT_Z + 0.133); // aft of the mast
     expect(z(COCKPIT.u1)).toBeCloseTo(st(3), 3);
+  });
+});
+
+describe('the traveller: the physics and the drawing agree', () => {
+  it('the car\'s travel and the sheet\'s point on the boom are the drawn ones (controls.ts TRAVELLER_SWING)', () => {
+    expect(TRAVELLER_HALF).toBeCloseTo(RIG.TRAV_HALF, 6);
+    expect(SHEET_POINT).toBeCloseTo(RIG.MS_R, 2);
+    // (the swing within the car's measured travel of its geometry, atan(travel / sheet point))
+    expect(Math.abs(TRAVELLER_SWING - Math.atan(TRAVELLER_HALF / SHEET_POINT) * 180 / Math.PI)).toBeLessThan(0.6);
   });
 });

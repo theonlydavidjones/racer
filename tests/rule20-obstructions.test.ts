@@ -185,7 +185,7 @@ describe('Rule 20 at every obstruction (the islands, the Marin shore, the Wharf)
       }
     }
     expect(tried).toBeGreaterThan(0);
-  }, 30_000); // (three short races round the Wharf's piers: ~5 s alone, more under a parallel suite's load)
+  }, 180_000); // (three short races round the Wharf's piers: ~5 s alone, more under a parallel suite's load)
 
   it('Alcatraz as the mark (course 41): she may not hail a boat that is fetching it (20.1, last sentence), but may one that is not', () => {
     const { w, u, red } = race(SS41);

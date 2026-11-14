@@ -21,6 +21,14 @@ const VIEWS = {
   coit: [LL(37.8095, -122.4045, 3), LL(37.8024, -122.40584, 110)], // Coit Tower close, from off Pier 33
   water: [LL(37.8118, -122.4510, 9), LL(37.8240, -122.4510, 0)], // the water near the start line: puffs and waves
   water_low: [LL(37.8118, -122.4510, 2.2), LL(37.8200, -122.4500, 0)], // the water from a boat's deck
+  lime_point: [LL(37.8200, -122.4700, 4), LL(37.8255, -122.4790, 20)], // Lime Point and the north tower's base, from the water southeast of it
+  horseshoe: [LL(37.8270, -122.4700, 4), LL(37.8325, -122.4765, 20)], // Horseshoe Bay and Fort Baker, from the water off its mouth
+  marin_shore: [LL(37.8180, -122.4880, 5), LL(37.8290, -122.4800, 30)], // the Marin shore inside the Gate, from the water west of the bridge
+  over_limebox: [LL(37.8265, -122.4805, 450), LL(37.8265, -122.48051, 0)], // overhead, close: Lime Point's OSM box (its west edge at 122.4845° W)
+  lime_west: [LL(37.8215, -122.4830, 25), LL(37.8262, -122.4845, 10)], // the west edge of Lime Point's box, from the water south of it
+  over_horseshoe_w: [LL(37.8328, -122.4778, 260), LL(37.8328, -122.47781, 0)], // overhead, close: Horseshoe Bay's west shore (OSM's beaches there)
+  over_blacksands: [LL(37.8245, -122.5090, 320), LL(37.8245, -122.50901, 0)], // overhead, close: Black Sands Beach under the Headlands' cliffs
+  over_lime: [LL(37.8285, -122.4775, 1200), LL(37.8285, -122.47751, 0)], // overhead: Lime Point and Horseshoe Bay
   over_gate: [LL(37.8150, -122.4700, 3200), LL(37.8150, -122.47001, 0)], // overhead: the Golden Gate
   over_bay: [LL(37.8250, -122.4200, 9000), LL(37.8250, -122.42001, 0)], // overhead: the Central Bay
   over_angel: [LL(37.8620, -122.4320, 3500), LL(37.8620, -122.43201, 0)], // overhead: Angel Island
@@ -48,6 +56,11 @@ const VIEWS = {
   over_ryc: [LL(37.9085, -122.3830, 500), LL(37.9085, -122.38301, 0)], // overhead: Brickyard Cove, Richmond YC's harbor
   over_encinal: [LL(37.7830, -122.2625, 400), LL(37.7830, -122.26251, 0)], // overhead: Encinal YC on the Estuary
   over_estuary: [LL(37.7820, -122.2600, 1800), LL(37.7820, -122.26001, 0)], // overhead: the Estuary's harbors, Marina Village to Alameda Marina
+  // Fort Mason's piers on their piles and the Gashouse Cove entrance (8n, November 2026)
+  fm_piles: [LL(37.8082, -122.4335, 2.2), LL(37.8078, -122.4318, 1.5)], // in the Gashouse entrance, under Pier 3's deck from a boat's deck
+  fm_entrance: [LL(37.8090, -122.4300, 6), LL(37.8079, -122.4329, 2)], // the entrance from the Bay: Light 2 and its sign, Pier 3's end
+  fm_sign: [LL(37.80812, -122.43270, 2.2), LL(37.80798, -122.43291, 3.4)], // the sign close, from the entrance channel
+  over_fm: [LL(37.8082, -122.4315, 260), LL(37.8082, -122.43151, 0)], // overhead: the three piers and Gashouse Cove
   // the Ferry Building (November 2026)
   ferry_bay: [LL(37.7990, -122.3890, 6), LL(37.7955, -122.3937, 30)], // the Bay face, the gates and the sign, from off Pier 7
   ferry_street: [LL(37.7940, -122.3968, 120), LL(37.7954, -122.3936, 20)], // the tower and the Embarcadero arcade from above Market Street

@@ -17,7 +17,7 @@
 <header id="hud">
   <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
   <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
-  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The grey tick is your heading on the other tack (or gybe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
+  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The gray tick is your heading on the other tack (or jibe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
 </header>
 <!-- the wind and the water, and the app's own buttons: top right -->
 <div id="hudRight">
@@ -27,25 +27,23 @@
 <div class="ibar dim" id="appBar">
   <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
   <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
-  <button class="ib" id="bSound" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
-  <button class="ib" id="bExit" type="button" hidden title="Leave and go back to the start page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
+  <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
+  <button class="ib" id="bExit" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
 </div>
 </div>
 <!-- top left, under the pods: where next, the flags flying, (the wind-angle dial, a training aid) -->
+<!-- the wind angle dial, when it's on: right side, under the inset map (the owner, ROADMAP 8b) -->
+<canvas id="dial" aria-label="Wind angle dial"></canvas>
 <div id="leftCol">
-  <canvas id="dial" aria-label="Wind angle dial"></canvas>
   <div id="nextCard" hidden role="button" tabindex="0" title="Where next: the start line before the start, the next mark, the finish; cruising, the navigator. Click for the course and the strategist (cruising, the navigator)."><div class="nc-h" id="ncHead"></div>
     <div class="nc-row"><div class="nc-num" id="ncNum"></div><svg id="ncSketch" viewBox="0 0 150 46" aria-hidden="true" font-family="Saira Semi Condensed, sans-serif"></svg></div>
-    <div class="nc-sub" id="linebox"></div><div class="nc-sub nc-tr" id="transit" hidden></div></div>
+    <div class="nc-sub" id="linebox"></div><div class="nc-sub nc-tr" id="transit" hidden></div><div class="nc-sub nc-ghost" id="ghostNote" hidden title="Your ghost: your own earlier run of this race. Not in the race: a pacing reference."></div></div>
 <button type="button" id="sigPanel" hidden title="Flags flying now on the committee boat. Click for the flag index."><span class="sig-lab">Flags</span><span id="sigFlags"></span><span id="sigText"></span></button>
 <div id="flagIndex" hidden role="dialog" aria-labelledby="fiTitle"><button type="button" class="fi-x" id="bFlagIndexX" aria-label="Close the flag index">×</button><h3 id="fiTitle">Flag index</h3><div id="fiBody"></div></div>
 </div>
 <canvas id="map" aria-label="Course map, tap to zoom" title="Tap the map for the chart"></canvas>
 <canvas id="mapFx" aria-hidden="true"></canvas>
-<button type="button" id="bMapLayers" class="maplayers" title="Map layers: wind, current, sea, fog, ships…" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5 15 5 8 8.5 1 5Z M1 8l7 3.5L15 8 M1 11l7 3.5 7-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
-<div id="mapLayersPop" class="layerpop" hidden></div>
 <div id="mapHint">Tap map · chart</div>
-<button type="button" id="bMapNav" class="maplayers mapnav" hidden title="Navigator: the passage, whole (again for the map)" aria-label="Navigator view" aria-pressed="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 14V2.5 M3 3h8l-1.8 2.6L11 8.2H3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
 <div id="plan" hidden role="dialog" aria-modal="true" aria-labelledby="planTitle">
   <div class="ch-head">
     <div><h2 id="planTitle">Plan the cruise</h2><p class="ch-sub" id="planSub">Drag the start or the destination to move it. Tap the water, a place or her slip to put the one that's selected there. Drag the chart to move it, scroll to zoom.</p></div>
@@ -53,17 +51,17 @@
   </div>
   <canvas id="planC" aria-label="Chart of the Bay: drag the start or the destination, tap to place the selected one, drag to move, scroll to zoom"></canvas>
   <canvas id="planFx" aria-hidden="true"></canvas>
-  <div id="planField" class="fieldpick" role="radiogroup" aria-label="What the chart colours the water with"><button type="button" data-field="wind" role="radio">Wind</button><button type="button" data-field="current" role="radio">Current</button><button type="button" data-field="sea" role="radio">Waves</button><button type="button" data-field="fog" role="radio">Fog</button><button type="button" data-field="off" role="radio">Off</button></div>
+  <div id="planField" class="fieldpick" role="radiogroup" aria-label="What the chart colors the water with"><button type="button" data-field="wind" role="radio" title="The wind's speed in color; the streaks go the way it blows, 6 times its real speed">Wind</button><button type="button" data-field="current" role="radio" title="The current's speed in color; the streaks go the way the water goes, 20 times its real speed (3 seconds are a minute of the tide)">Current</button><button type="button" data-field="sea" role="radio">Waves</button><button type="button" data-field="fog" role="radio">Fog</button><button type="button" data-field="off" role="radio">Off</button></div>
   <div class="ch-info"><div id="planInfo"></div></div>
 </div>
 <div id="chart" hidden role="dialog" aria-modal="true" aria-labelledby="chartTitle">
   <div class="ch-head">
-    <div><h2 id="chartTitle">Chart</h2><p class="ch-sub" id="chartSub"></p></div>
-    <div class="ch-btns"><span class="lp-wrap"><button class="ghost" type="button" id="bChartLayers" aria-expanded="false">Layers</button><div id="chartLayersPop" class="layerpop" hidden></div></span><button class="ghost" type="button" id="bChartPal" title="The chart's colours: NOAA's paper chart (day) or a dark display (dusk)">Dusk colours</button><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
+    <div><h2 id="chartTitle">Chart</h2></div>
+    <div class="ch-btns"><span class="lp-wrap"><button class="ghost" type="button" id="bChartLayers" aria-expanded="false">Layers</button><div id="chartLayersPop" class="layerpop" hidden></div></span><button class="ghost" type="button" id="bChartPal" title="The chart's colors: NOAA's paper chart (day) or a dark display (dusk)">Dusk colors</button><button class="ghost" type="button" id="bChartBoat">Back to boat</button><button class="ghost" type="button" id="bChartClose">Close · Esc</button></div>
   </div>
   <canvas id="chartC" aria-label="Chart of the Bay: drag to move, scroll to zoom, tap to pick a destination"></canvas>
   <canvas id="chartFx" aria-hidden="true"></canvas>
-  <div id="chartField" role="radiogroup" aria-label="What the chart colours the water with"><button type="button" data-field="wind" role="radio">Wind</button><button type="button" data-field="current" role="radio">Current</button><button type="button" data-field="sea" role="radio">Waves</button><button type="button" data-field="fog" role="radio">Fog</button><button type="button" data-field="off" role="radio">Off</button></div>
+  <div id="chartField" role="radiogroup" aria-label="What the chart colors the water with"><button type="button" data-field="wind" role="radio" title="The wind's speed in color; the streaks go the way it blows, 6 times its real speed">Wind</button><button type="button" data-field="current" role="radio" title="The current's speed in color; the streaks go the way the water goes, 20 times its real speed (3 seconds are a minute of the tide)">Current</button><button type="button" data-field="sea" role="radio">Waves</button><button type="button" data-field="fog" role="radio">Fog</button><button type="button" data-field="off" role="radio">Off</button></div>
   <div class="ch-info"><div id="chartInfo"></div><button class="cta" type="button" id="bChartGo" hidden>Sail here</button><button class="ghost" type="button" id="bChartMove" hidden title="Put her here, stopped: the cruise and its log carry on">Move her here</button></div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -83,6 +81,8 @@
   <!-- how each sail is drawing (its lines are in the sail controls band) -->
   <div class="tp-row tp-states"><span class="tp-lab">Main</span><span class="tp-state" id="tpMain">Good</span><span class="tp-lab">Jib</span><span class="tp-state" id="tpJib">Good</span></div>
   <div class="tp-hint" id="tpHint"></div>
+  <!-- the tack and gybe drill: your last manoeuvre, scored, and what to change -->
+  <div class="tp-drill" id="tpDrill" hidden></div>
   <!-- what the sail control under the mouse (or last touched) does (the band has no hover titles) -->
   <div class="tp-help" id="tpHelp" hidden></div>
   <div class="tp-shape" id="tpShape"></div>
@@ -104,7 +104,7 @@
   <div class="row2">
     <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
       <div class="tiller-track"></div><div class="tiller-mid"></div><div class="tiller-handle" id="tillerHandle"></div>
-      <span class="tiller-lab" id="tillerLab">Tiller · centred</span>
+      <span class="tiller-lab" id="tillerLab">Tiller · centered</span>
     </div>
     <div class="pilot" id="pilot" hidden role="group" aria-label="Tiller pilot">
       <span class="pl-lab">Pilot</span>
@@ -137,8 +137,8 @@
 </div>
 <!-- the view: bottom right, with the keys line over it on hover -->
 <div class="ibar" id="viewBar">
-  <button class="ib" id="bCrew" type="button" hidden aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
-  <button class="ib on" id="bBand" type="button" aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
+  <button class="ib" id="bCrew" type="button" aria-expanded="false" aria-controls="crewPop" title="The crew's weight: where they sit, fore and aft and across"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6" r="2.6"/><path d="M4.5 17v-1.5a5.5 5.5 0 0 1 11 0V17"/></svg><span class="w">Crew · auto</span></button>
+  <button class="ib on" id="bBand" type="button" hidden aria-pressed="true"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h14"/><path d="M5 5v7M9 5v7M13 5v7"/><path d="M3.5 9h3M7.5 7h3M11.5 10h3"/></svg><span class="w">Sail controls</span></button>
   <button class="ib" id="bEnsign" type="button" hidden title="Strike the ensign in a blow: the flag lowered and its staff stowed below, before it flogs itself to rags. Again hoists it."><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V3"/><path d="M5 4h9l-2 3 2 3H5"/><path class="dn" d="M15 12v6M12.5 15.5 15 18l2.5-2.5"/></svg><span class="w">Strike ensign</span></button>
   <button class="ib" id="bLook" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4"/><path d="M6 8l4-4 4 4"/></svg><span class="w">Ahead</span></button>
   <button class="ib" id="bView" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"/><circle cx="10" cy="10" r="2"/></svg><span class="w">Cockpit</span></button>
@@ -147,10 +147,11 @@
   <div class="tp-crewbox" id="tpCrewBox">
     <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
       <span class="who" id="whoCrew" data-line="crew" role="group" aria-label="Who works the crew weight"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
+    <div class="tp-seg tp-dock" id="tpDockRow" hidden><button class="tp-btn two" type="button" id="bLines"><span class="w" id="bLinesW">Lines ready</span><small id="bLinesS">G &middot; step off at the shrouds</small></button></div>
     <div class="tp-crewopen" id="tpCrewOpen" hidden>
       <div class="tp-wind" id="tpWind">Wind over the port side: port is windward, starboard leeward</div>
       <div class="tp-seg tp-across" id="tpCrewRow" role="group" aria-label="Where the crew sit across the boat">
-        <button class="tp-btn two" type="button" data-ca="lee"><span class="w">Sit to leeward</span><small data-side="lee">stbd &middot; heels her</small></button><button class="tp-btn two" type="button" data-ca="mid"><span class="w">Middle</span><small>on the centreline</small></button><button class="tp-btn two" type="button" data-ca="up"><span class="w">Sit up</span><small data-side="up">port side deck</small></button><button class="tp-btn two" type="button" data-ca="hike"><span class="w">Hike out</span><small data-side="hike">port rail &middot; holds her up</small></button>
+        <button class="tp-btn two" type="button" data-ca="lee"><span class="w">Sit to leeward</span><small data-side="lee">stbd &middot; heels her</small></button><button class="tp-btn two" type="button" data-ca="mid"><span class="w">Middle</span><small>on the centerline</small></button><button class="tp-btn two" type="button" data-ca="up"><span class="w">Sit up</span><small data-side="up">port side deck</small></button><button class="tp-btn two" type="button" data-ca="hike"><span class="w">Hike out</span><small data-side="hike">port rail &middot; holds her up</small></button>
       </div>
       <div class="tp-seg tp-fore" id="tpForeRow" role="group" aria-label="Where the crew sit fore and aft (tap the lit one again to leave it to the crew)">
         <button class="tp-btn two" type="button" data-cf="fwd"><span class="w">Forward</span><small>bow down &middot; light, flat</small></button><button class="tp-btn two" type="button" data-cf="aft"><span class="w">Aft</span><small>stern down &middot; fast, or chop</small></button><button class="tp-btn two" type="button" data-cf="deck"><span class="w">Foredeck</span><small>up forward &middot; a light-air run</small></button>
@@ -158,46 +159,77 @@
     </div>
   </div>
 </div>
-<span class="keys" id="keysHint"></span>
 
 <div class="overlay" id="home">
   <div class="panel wide home">
     <div class="eyebrow">San Francisco Bay</div>
     <h1>Folkboat Racing Sim</h1>
-    <div class="modes three">
+    <div class="modes four">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
-      <button type="button" class="modecard" data-home="fleet"><b>Fleet</b><span>Your boats and their records</span></button>
+      <button type="button" class="modecard" data-home="drill"><b>Drill</b><span>The start, tacks and jibes, mark roundings</span></button>
+      <button type="button" class="modecard" data-home="fleet"><b>Yacht Club</b><span>Your boats, your crew, the club</span></button>
     </div>
     <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button></div>
   </div>
 </div>
-<div class="overlay" id="club" hidden>
-  <div class="panel">
-    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
-    <div class="eyebrow">Yacht Club</div>
-    <h2>Coming next</h2>
-    <p>The club is where you'll keep your crew and skippers: who sails with you, and who skippers each boat you race against. A skipper's skill (starts, shifts, laylines, boat handling) will decide how well the AI sails, on top of the boat's own condition.</p>
-    <div class="btnrow"><button class="cta" type="button" data-home="home">Back</button></div>
-  </div>
-</div>
 <div class="overlay" id="raceChoose" hidden>
   <div class="panel wide home">
-    <button type="button" class="linkbtn back" data-home="home">‹ Start page</button>
+    <button type="button" class="linkbtn back" id="raceBack" data-home="back">‹ Start page</button>
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
-      <button type="button" class="modecard" id="bPast" aria-expanded="false"><b>Run a past race</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
+      <button type="button" class="modecard" id="bPast" data-home="past"><b>Past races</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
     </div>
-    <div class="pastnote" id="pastNote" hidden><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="pastView" hidden>
+  <div class="panel wide home">
+    <button type="button" class="linkbtn back" id="pastBack" data-home="back">‹ Race</button>
+    <h1>Past races</h1>
+    <div class="pastnote"><div class="pastrows" id="realRows"></div><div class="pastrows" id="pastRows"></div></div>
+  </div>
+</div>
+
+<!-- Drill: its own start-page section (the owner, 13 Nov 2026): the three drills, each Go, beside the setup's own boat
+     and crew, the day and the conditions (moved here while it's open: app.ts dockSetup) -->
+<div class="overlay" id="drillView" hidden>
+  <div class="panel wide setup drillpage">
+    <div class="sethead"><button type="button" class="linkbtn back" id="drillBack" data-home="back">‹ Start page</button><h1>Drill</h1></div>
+    <div class="setgrid">
+      <div class="dlist">
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" aria-hidden="true"><line x1="4" y1="22" x2="36" y2="22" stroke="#ffb627" stroke-width="2.6"/><rect x="2" y="12" width="5" height="10" fill="#e8eef2"/><circle cx="36" cy="22" r="3" fill="#ff8a2a"/><path d="M20 4 l4 9 h-8 z" fill="#9fd3ea"/></svg></span>
+          <span class="t-h">The start</span>
+          <button class="cta dgo" id="bDrill" type="button" title="The last minutes to the gun, then a debrief and a replay">Go</button>
+          <div class="dsets"><div class="seg" id="drillFromSeg" aria-label="Minutes to the gun"><button type="button" data-df="60">1 min</button><button type="button" data-df="120">2 min</button><button type="button" data-df="180">3 min</button></div><div class="seg" id="drillSoloSeg" aria-label="Alone or with the fleet"><button type="button" data-ds="1">Alone</button><button type="button" data-ds="0">With the fleet</button></div></div></div>
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" stroke="#9fd3ea" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 26 L14 6 L22 26 L30 6"/><path d="M30 6 l-1 6 M30 6 l-5 3"/></svg></span>
+          <span class="t-h">Tacks and jibes</span>
+          <button class="cta dgo" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: each one scored against a good crew's">Go</button></div>
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" aria-hidden="true"><circle cx="24" cy="14" r="4" fill="#ffb627"/><path d="M6 26 Q8 8 24 6 Q36 6 34 18 Q32 26 20 26" stroke="#9fd3ea" stroke-width="2.2" stroke-dasharray="3 3" stroke-linecap="round"/></svg></span>
+          <span class="t-h">Mark roundings</span>
+          <button class="cta dgo" id="bRoundings" type="button" title="Alone on the practice course: each rounding scored against a good crew's">Go</button></div>
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" aria-hidden="true"><path d="M20 4 L20 24 M20 6 Q30 14 21 22 Z" fill="#e8eef2" stroke="#e8eef2" stroke-width="1.4" stroke-linejoin="round"/><path d="M19 8 Q11 15 18 22 Z" fill="#9fd3ea"/><path d="M8 25 Q20 29 32 25" stroke="#9fd3ea" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+          <span class="t-h">Learn to sail</span>
+          <button class="cta dgo" id="bLessons" type="button">Lessons</button></div>
+        <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" aria-hidden="true"><path d="M8 22 l6 -12 l4 12 z" fill="#56b4e9"/><path d="M24 22 l6 -12 l4 12 z" fill="#e8603c"/><path d="M20 4 v22" stroke="#ffb627" stroke-width="1.6" stroke-dasharray="2 3"/></svg></span>
+          <span class="t-h">Rules trainer</span>
+          <button class="cta dgo" id="bRules" type="button">Cases</button></div>
+      </div>
+      <div class="side" id="drillSide"></div>
+    </div>
   </div>
 </div>
 
 <div class="overlay" id="setup" hidden>
   <div class="panel wide setup">
-    <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="race">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
+    <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="back">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
     <div class="setgrid">
       <div class="steps">
+        <!-- four rows on one grid (the owner OKd design/setup-tight): each a line of tiles and words, its controls open in place -->
+        <section class="srow" id="row-course" data-row="course">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="hostField"><span>Host club</span>
           <div class="seg" id="hostSeg"><button type="button" data-host="ggyc">Golden Gate YC · Seaweed Soup</button><button type="button" data-host="practice">Practice area (no club)</button></div>
           <details class="si" id="siBox"><summary><small><span id="siSum"></span> <u>Change</u></small></summary>
@@ -209,6 +241,8 @@
                 <small id="prepNote"></small></div>
               <div class="field" id="penaltyField"><span>Penalty for a foul</span>
                 <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (Rule 44.1)</button><button type="button" data-v="1">One turn</button></div></div>
+              <div class="field" id="judgingField"><span>On-the-water judging</span>
+                <div class="seg" data-k="judging"><button type="button" data-v="protests">Protests (Part 5)</button><button type="button" data-v="umpired">Umpired</button></div></div>
               <div class="field" id="biasField"><span>Line set by the committee</span>
                 <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
             </div>
@@ -218,30 +252,53 @@
           <div class="seg" data-k="raceLength" id="lengthField"><button type="button" data-v="short">Short · ~30 min</button><button type="button" data-v="medium">Club race · ~60 min</button><button type="button" data-v="long">Long · ~90 min</button></div>
           <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select>
           <div class="coursecard" id="courseCard"></div></div>
+          </div>
+        </section>
+        <section class="srow" id="row-fleet" data-row="fleet">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="fleetField"><span>Competitors <b id="oppCount"></b></span>
           <div class="opps" id="oppList"></div></div>
+          </div>
+        </section>
+        <section class="srow always" id="row-where" data-row="where">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="whereField"><span>Where <button type="button" class="ghost sm" id="bPlanOpen" title="Both pins on one big chart: drag either, then Done">Plan on the big chart</button></span>
           <div class="seg" id="setupPinSeg"><button type="button" data-pin="from">Start</button><button type="button" data-pin="to">Destination</button></div>
           <canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas>
           <p class="pins" id="setupPins"></p>
           <div class="pinbtns"><small id="setupChartHint"></small><button type="button" class="ghost sm" id="bPinSlip">Her slip</button><button type="button" class="ghost sm" id="bPinNone">Nowhere in particular</button></div></div>
-        <div class="field step" id="crewField"><span>Your boat and crew</span>
-          <div class="boatsum"><select id="boatPick" class="pick" aria-label="The boat you'll sail"></select><button type="button" class="ghost sm" id="bBoat">Your boats…</button></div>
-          <small id="boatSum"></small>
-          <details class="crewbox" id="crewBox"><summary><small><span id="crewSum"></span> <u>Who's aboard</u></small></summary><div class="crewrows" id="crewRows"></div></details>
-          <div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div>
+          </div>
+        </section>
+        <section class="srow" id="row-boat" data-row="boat">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
+        <div class="field step" id="crewField">
+          <div class="t-pickrow"><span class="t-lab">Boat</span><span class="t-group"><span class="t-group" id="boatTiles"></span><button type="button" class="t-av" id="bBoat" title="Your boats, in the Yacht Club"><span class="t-tile t-add">+</span><small>Yacht Club</small></button></span></div>
+          <select id="boatPick" class="pick" aria-label="The boat you'll sail" hidden></select><small id="boatSum" hidden></small><small id="crewSum" hidden></small>
+          <div class="crewrows" id="crewRows"></div>
+          <div class="t-pickrow" id="raceFromRow"><span class="t-lab">Start</span><div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div></div>
           <small id="raceFromNote"></small></div>
+          </div>
+        </section>
+        <section class="srow" id="row-when" data-row="when">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
         <div class="field step" id="tideBox"><span id="whenLab">Start time</span>
           <div class="tiderow"><label>Date <input type="date" id="tideDate"></label><label><span id="timeLab">Start signal</span> <input type="time" id="tideTime" step="300"></label></div></div>
+          </div>
+        </section>
       </div>
       <div class="side" id="setSide">
-        <div class="condhead"><span>Conditions</span><b id="condState">real</b></div>
-        <dl class="cond" id="condSum"></dl>
+        <div class="condhead" id="condHead"><span>Conditions</span><b id="condState">real</b></div>
+        <div class="t-strip" id="condStrip"></div>
+        <dl class="cond" id="condSum" hidden></dl>
         <canvas id="tideGraph" aria-label="Current and wind through the day"></canvas>
         <small id="tideNote"></small>
-        <details class="more"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
+        <details class="more" id="condMore"><summary><small><u>More about the day</u></small></summary><small id="windKindNote"></small></details>
         <button class="ghost" id="bCond" type="button">Change the conditions…</button>
-        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="ghost" id="bDrill" type="button" title="Starts one minute before the gun; a debrief and replay 15 s after it">Practise the start</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
+        <div class="gobtns"><button class="ghost" id="bPreview" type="button">Course and strategist</button><button class="cta" id="bGo" type="button">Start the sequence</button></div>
       </div>
     </div>
   </div>
@@ -258,16 +315,14 @@
       <div class="adjrow" id="windDaySeg"><span>Records day</span><div class="seg" data-k="windDay"><button type="button" data-v="0">Light</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Windy</button></div></div>
       <div class="adjrow" id="windTurnRow"><span>Turn the wind</span><button type="button" class="realbtn" data-real="windTurn">Usual</button><input type="range" id="adjWindTurn" min="-30" max="30" step="5" aria-label="Turn the wind: up to 30° either way from its usual direction"><b id="adjWindTurnV"></b></div>
       <div class="adjrow"><span>Current</span><div class="seg" data-k="current"><!-- filled from src/environment/current.ts --></div></div>
-      <small id="currentNote">Ebb runs west along the Cityfront, toward the Gate; flood runs east. Both are weaker close to shore.</small>
       <div class="adjrow"><span>Chop</span><button type="button" class="realbtn" data-real="chop">Real</button><input type="range" id="adjChop" min="0" max="3" step="0.1"><b id="adjChopV"></b></div>
       <div class="adjrow"><span>Swell outside</span><button type="button" class="realbtn" data-real="swellHs">Real</button><input type="range" id="adjSwell" min="0" max="5" step="0.1"><b id="adjSwellV"></b></div>
       <div class="adjrow" id="swellDaySeg"><span>Records swell</span><div class="seg" data-k="swellDay"><button type="button" data-v="0">Small</button><button type="button" data-v="1">Typical</button><button type="button" data-v="2">Big</button></div></div>
-      <div class="adjrow"><span>Rain</span><div class="seg" data-k="rain"><button type="button" data-v="0">None</button><button type="button" data-v="1">Light</button><button type="button" data-v="2">Heavy</button></div></div>
+      <div class="adjrow"><span>Rain</span><div class="seg" data-k="rain"><button type="button" data-v="real">Real</button><button type="button" data-v="0">None</button><button type="button" data-v="1">Light</button><button type="button" data-v="2">Heavy</button></div></div>
       <div class="adjrow"><span>Fog</span><div class="seg" data-k="fog"><button type="button" data-v="real">Real</button><button type="button" data-v="0">None</button><button type="button" data-v="1">Patchy</button><button type="button" data-v="2">Thick</button></div></div>
       <div class="adjrow"><span>Ship traffic</span><div class="seg" data-k="traffic"><button type="button" data-v="1">Ships, ferries &amp; tour boats</button><button type="button" data-v="0">None</button></div></div>
     </div>
-    <small>Chop comes from the wind over the water and the open water upwind; the swell is the ocean's, from the San Francisco Bar buoy, dying away inside the Gate. Real fog is the summer fog bank at the Gate, by month and hour. Ships keep to their usual tracks; the collision regulations apply between you and them, not the racing rules.</small>
-    <div class="btnrow"><button class="ghost" id="bCondReal" type="button">Put everything back to real</button><button class="cta" id="bCondDone" type="button">Done</button></div>
+    <div class="btnrow"><button class="ghost" id="bCondReal" type="button">Put everything back to real</button></div>
   </div>
 </div>
 
@@ -331,6 +386,24 @@
   </div>
 </div>
 
+<div class="overlay" id="lessonCard" hidden>
+  <div class="panel">
+    <div class="cvhead"><div><div class="eyebrow">Learn to sail · Before you go</div><h2>At the dock</h2></div><button class="ghost" id="bDockX" type="button">Lessons</button></div>
+    <div id="dockCard"></div>
+  </div>
+</div>
+<div class="overlay" id="rulesTrainer" hidden>
+  <div class="panel">
+    <div class="cvhead"><div><div class="eyebrow">Drill</div><h2>Rules trainer</h2></div><button class="ghost" data-rt="close" type="button">Back</button></div>
+    <div class="rtBody"></div>
+  </div>
+</div>
+<div class="overlay" id="lessons" hidden>
+  <div class="panel">
+    <div class="cvhead"><div><div class="eyebrow">Learn to sail</div><h2>Lessons</h2></div><button class="ghost" id="bLessonsX" type="button">Back</button></div>
+    <div id="lessonGrid"></div>
+  </div>
+</div>
 <div class="overlay" id="drill" hidden>
   <div class="panel">
     <div class="eyebrow">Start practice</div>
@@ -338,6 +411,8 @@
     <canvas id="dcanvas" aria-label="Overhead replay of your start"></canvas>
     <ul class="facts" id="dFacts"></ul>
     <div class="verdict" id="dVerdict"><ul class="facts" id="dTips"></ul></div>
+    <div id="dRuns"></div>
+    <div class="dopts" id="dOpts" aria-label="Next attempt: minutes to the gun, alone or with the fleet"></div>
     <div class="btnrow"><button class="ghost" id="bDReplay" type="button">Watch again</button><button class="cta" id="bDAgain" type="button">Same start again</button></div>
     <div class="btnrow"><button class="ghost" id="bDNew" type="button">New start</button><button class="ghost" id="bDKeep" type="button">Keep racing</button><button class="ghost" id="bDSetup" type="button">Back to setup</button></div>
   </div>
@@ -356,26 +431,32 @@
       <div><div class="eyebrow">Settings</div><h2>Settings</h2></div>
       <button class="ghost" id="bKeysClose" type="button">Done</button>
     </div>
+    <div class="yctabs" id="setTabs"><button type="button" data-st="aids" aria-pressed="true">Training aids</button><button type="button" data-st="keys" aria-pressed="false">Keys</button></div>
+    <div class="settab" id="setAids">
     <div class="field"><span>Training aids</span>
       <div class="togs">
         <label class="tog">Show laylines and zones<input type="checkbox" data-t="aids"><span class="tog-sw"></span></label>
         <label class="tog">Show wind-angle dial<input type="checkbox" data-t="windDial"><span class="tog-sw"></span></label>
         <label class="tog" title="In the chase view, the camera rides up and down with her on the swell (smoothed, never tilting). Off, it holds still and you see her rise and fall">Chase camera rides with her on the swell<input type="checkbox" data-t="camRide"><span class="tog-sw"></span></label>
       </div>
-      <small>Real boats have neither: they have the windex and the telltales.</small></div>
+      </div>
     <details class="more"><summary><u>How to sail her ▸</u></summary>
     <div class="help">
-      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed centre line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the centre, harder over. Click again, T or Esc lets go, and the tiller springs back to centre. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
+      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed center line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the center, harder over. Click again, T or Esc lets go, and the tiller springs back to center. You can also hold A / D to turn to port / starboard. Tack and jibe by steering through the wind.</span>
       <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
       <b>Hail</b><span>The Hail tab on the sail controls band (it shows when there's a hail to make) or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
       <b>Look</b><span>Arrow keys (or Q / E / R / F), or drag the view on a touch screen. Looking never steers the boat. W or double-tap looks ahead again.</span>
     </div></details>
+    </div>
+    <div class="settab" id="setKeys" hidden>
+    <div class="kindex" id="keysIndex"></div>
     <div class="field"><span>Keyboard</span>
-    <small>Click a key, then press the one you want. A key you assign moves off whatever it did before. Esc cancels. Your keys are saved in this browser.</small></div>
+    <small>Click a key, then press the one you want.</small></div>
     <p class="knote" id="keysNote" aria-live="polite"></p>
     <div id="keysList"></div>
-    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button><button class="cta" id="bKeysDone" type="button">Done</button></div>
+    <div class="btnrow"><button class="ghost" id="bKeysReset" type="button">Reset keys to defaults</button></div>
+    </div>
   </div>
 </div>
 
@@ -393,28 +474,36 @@
 </div>
 
 <div class="overlay" id="pause" hidden>
-  <div class="panel">
-    <h2>Paused</h2>
-    <div class="btnrow"><button class="cta" id="bResume" type="button">Resume</button></div>
-    <div class="btnrow"><button class="ghost" id="bPauseCond" type="button" title="New wind, current and sea, at once: the sail carries on">Change the conditions…</button></div>
-    <div id="pauseDebrief" class="debrief" hidden></div>
-    <div class="btnrow" id="pauseWatch" hidden><button class="ghost" id="bWatch2" type="button">Watch your race so far</button></div>
-    <div class="btnrow"><button class="ghost" id="bRestart" type="button">Restart this race</button><button class="ghost" id="bSettings" type="button">Back to setup</button><button class="ghost" id="bKeys2" type="button">Settings</button></div>
-    <div class="btnrow"><button class="ghost" id="bSound2" type="button">Sound: on</button><button class="ghost" id="bExit2" type="button">Exit to the start page</button></div>
+  <div class="panel menu2">
+    <div class="mcol">
+      <h2>Paused</h2>
+      <div class="mgrp"><button class="cta" id="bResume" type="button">Resume</button></div>
+      <div class="mgrp"><button class="ghost" id="bPauseCond" type="button" title="New wind, current and sea, at once: the sail carries on">Change Conditions</button><button class="ghost" id="bWatch2" type="button" hidden>Watch Race So Far</button></div>
+      <div class="mgrp"><button class="ghost" id="bRestart" type="button">Restart Race</button><button class="ghost" id="bSettings" type="button">Back to Setup</button><button class="ghost" id="bKeys2" type="button">Settings</button></div>
+      <div class="mgrp apart"><button class="ghost mexit" id="bExit2" type="button">Exit</button></div>
+    </div>
+    <div id="pauseDebrief" class="debrief mbody" hidden></div>
   </div>
 </div>
 
 <div class="overlay" id="results" hidden>
-  <div class="panel">
-    <div class="eyebrow">Race complete</div>
-    <h2 id="resTitle">Finish</h2>
-    <p id="resStart"></p>
-    <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
-    <p id="resFouls" class="lede"></p>
-    <div id="resReal" class="debrief" hidden></div>
-    <div id="resDebrief" class="debrief"></div>
-    <div class="btnrow"><button class="ghost" id="bWatch" type="button">Watch your race</button></div>
-    <div class="btnrow"><button class="cta" id="bAgain" type="button">Race again</button><button class="ghost" id="bSet2" type="button">Back to setup</button></div>
+  <div class="panel menu2">
+    <div class="mcol">
+      <div class="eyebrow">Race complete</div>
+      <h2 id="resTitle">Finish</h2>
+      <div class="mgrp"><button class="cta" id="bAgain" type="button">Race Again</button></div>
+      <div class="mgrp"><button class="ghost" id="bWatch" type="button">Watch Race</button><button class="ghost" id="bSet2" type="button">Back to Setup</button></div>
+      <div class="mgrp apart"><button class="ghost mexit" id="bExit3" type="button">Exit</button></div>
+    </div>
+    <div class="mbody">
+      <p id="resStart"></p>
+      <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
+      <p id="resFouls" class="lede"></p>
+      <div id="resProtests" class="debrief protests" hidden></div>
+      <div id="resSeason" class="ressea" hidden></div>
+      <div id="resReal" class="debrief" hidden></div>
+      <div id="resDebrief" class="debrief"></div>
+    </div>
   </div>
 </div>
 <div class="overlay" id="raceReplay" hidden></div>
@@ -426,6 +515,12 @@
     <h2 id="motorAskTitle">Retire to use her motor?</h2>
     <p>A boat racing may use only the wind and the water (RRS 42.1), and not an engine even to get clear after hitting something, unless the sailing instructions allow it (42.3(h), 42.3(i)). Starting the motor retires her: scored <b>RET</b> (RRS A5.1). Then it's hers to use; keep clear of the boats still racing.</p>
     <div class="btnrow"><button class="cta" type="button" id="bMotorYes">Retire and start it</button><button class="ghost" type="button" id="bMotorNo">Keep racing</button></div>
+  </div>
+</div>
+<div class="overlay" id="leaveAsk" hidden role="dialog" aria-modal="true" aria-labelledby="leaveTitle">
+  <div class="panel small">
+    <h2 id="leaveTitle">Leave race?</h2>
+    <div class="btnrow"><button class="cta" type="button" id="bLeaveNo">Keep Racing</button><button class="ghost" type="button" id="bLeaveYes">Leave</button></div>
   </div>
 </div>
 <div class="overlay" id="homeAsk" hidden role="dialog" aria-modal="true" aria-labelledby="homeTitle">

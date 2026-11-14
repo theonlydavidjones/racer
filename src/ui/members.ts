@@ -1,22 +1,23 @@
 import { ATTRS, attrOf, type Attr } from '../boat/crewPhys';
-import type { BoatSpec } from '../boat/spec';
+import { sailNo, type BoatSpec } from '../boat/spec';
 import { YOU, type Member } from '../club/members';
 import { SKIPPER_ATTRS, type SkipperAttr } from '../ai/skipper';
 
 /**
  * The Yacht Club's Members tab (docs/YACHT-CLUB.md, phase 2): the roster as cards, and a member's page. Everyone's
- * ratings are shown (the owner: "skippers have reputations that precede them. Make them known"), in plain words: "Your
- * member" or "Club member", then "Skipper", "Crew" or "Skipper & crew". The crew half is here; the skipper half (her
- * seven ratings and her record) is Skipper Model's, through SKIPPER_UI below.
+ * ratings are shown (the owner: "skippers have reputations that precede them. Make them known"). The roster is two
+ * plain lists, you and your crew first, then the club, with no filter to work and no badges (docs/UI-AUDIT.md §4.8, the
+ * owner's yes, 13 Nov 2026): each card says in one line who they are and where they sail, and shows the three ratings
+ * that matter in their seat; all of them are on their page. The crew half is here; the skipper half (her seven ratings
+ * and her record) is Skipper Model's, through SKIPPER_UI below.
  */
-export type MemberFilter = 'all' | 'skipper' | 'crew' | 'yours';
 
 /** The crew attributes in plain words (boat/crewPhys.ts Attr), and what each does, for the tooltips. */
 export const CREW_UI: [Attr, string, string][] = [
   ['trim', 'Trim', 'How close to the best they keep the sails and the boat: heel, weight, the lines'],
   ['react', 'Reactions', 'How quickly they start on a change: a puff, a call, a tack'],
   ['eyes', 'Eyes', 'How far off they see puffs and lulls coming, and how few they miss'],
-  ['handling', 'Boat handling', 'The pace of their work: tacks, gybes, the pole, the hatch'],
+  ['handling', 'Boat handling', 'The pace of their work: tacks, jibes, the pole, the hatch'],
   ['fitness', 'Fitness', 'How far out they hike and how long they last'],
   ['composure', 'Composure', 'How well they hold up under pressure: the start, the marks, close crosses'],
 ];
@@ -25,7 +26,8 @@ export const SKILLS: [number, string][] = [[0.25, 'Novice'], [0.6, 'Club racer']
 
 /** The skipper half (Skipper Model): her ratings as bars on the card, and her section on the member's page. */
 export const SKIPPER_UI: {
-  bars(m: Member): string;
+  /** Her ratings as bars: all seven, or only those named. */
+  bars(m: Member, only?: readonly SkipperAttr[]): string;
   section(m: Member): string;
 } = { bars: () => '', section: () => '' };
 
@@ -47,39 +49,67 @@ export function berth(m: Member, boats: BoatSpec[]): string {
   }
   return 'Free · not on a boat';
 }
+/**
+ * Their seat, for the card: the skipper's, the middle crew's (the main), the forward hand's (the jib and the pole), or
+ * none. A boat goes by her country and sail number beside her name (the owner: sailors in a fleet go by sail numbers).
+ */
+function seat(m: Member, boats: BoatSpec[]): { line: string; kind: 'skipper' | 'middle' | 'forward' | 'free' } {
+  const named = (b: BoatSpec) => `${esc(b.name || 'Unnamed')} ${esc(sailNo(b))}`;
+  if (m.id === YOU) { const b = boats.find(x => x.skipper === 'you'); return { line: b ? `Skipper of ${named(b)}` : 'Skipper', kind: 'skipper' }; }
+  for (const b of boats) {
+    const ids = b.crewIds ?? [], i = ids.indexOf(m.id); if (i < 0) continue;
+    const name = named(b);
+    if (ids.length === 1) return { line: `Crew on ${name} (main and jib)`, kind: 'middle' };
+    return i === 0 ? { line: `Middle crew on ${name} (the main)`, kind: 'middle' } : { line: `Forward hand on ${name} (the jib and the pole)`, kind: 'forward' };
+  }
+  return m.roles.includes('skipper') && !m.roles.includes('crew') ? { line: 'Skipper, not on a boat of yours', kind: 'skipper' } : { line: 'Free: not on a boat', kind: 'free' };
+}
+/**
+ * The three ratings that matter most in a seat, for the card. The middle crew trims the main to the puffs and the
+ * helm's calls (trim, eyes, reactions); the forward hand does the work at the mast and on the foredeck, the jib sheets,
+ * the pole and the tacks (boat handling, fitness, reactions); a skipper, the start, the speed and the calls.
+ */
+const SEAT_CREW: Record<'middle' | 'forward' | 'free', Attr[]> = { middle: ['trim', 'eyes', 'react'], forward: ['handling', 'fitness', 'react'], free: ['trim', 'handling', 'react'] };
+const SEAT_SKIPPER: readonly SkipperAttr[] = ['start', 'speed', 'tactics'];
 
 const bar = (label: string, v: number) =>
   `<span>${label}</span><div class="mbar"><i style="width:${Math.round(v * 100)}%"></i></div><span>${Math.round(v * 100)}</span>`;
 
-/** The roster, as cards, filtered. */
-export function membersGrid(ms: Member[], boats: BoatSpec[], filter: MemberFilter): string {
-  const shown = ms.filter(m => filter === 'all' || (filter === 'yours' ? m.origin === 'yours' : m.roles.includes(filter)));
+/** The roster: you and your crew, then the club's members, as cards. */
+export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
   const card = (m: Member) => {
-    const crew = m.roles.includes('crew') && m.id !== YOU
-      ? `<div class="mbars">${CREW_UI.map(([a, l]) => bar(l, attrOf(m, a))).join('')}</div>` : '';
-    return `<button type="button" class="mcard" data-f="member" data-v="${esc(m.id)}"><b>${esc(m.name)}</b><span class="msub">${berth(m, boats)} · ${fmtHeight(m.h)} · ${Math.round(m.w / LB)} lb</span>
-      <span class="mwho">${whoLine(m)}</span>${crew}${m.roles.includes('skipper') ? SKIPPER_UI.bars(m) : ''}</button>`;
+    const st = seat(m, boats);
+    const bars = st.kind === 'skipper' ? SKIPPER_UI.bars(m, SEAT_SKIPPER)
+      : `<div class="mbars">${CREW_UI.filter(([a]) => SEAT_CREW[st.kind as 'middle'].includes(a)).map(([a, l]) => bar(l, attrOf(m, a))).join('')}</div>`;
+    return `<button type="button" class="mcard" data-f="member" data-v="${esc(m.id)}"><b>${esc(m.name)}</b><span class="msub">${st.line} · ${fmtHeight(m.h)}, ${Math.round(m.w / LB)} lb</span>${bars}</button>`;
   };
-  const tabs = ([['all', 'Everyone'], ['skipper', 'Skippers'], ['crew', 'Crew'], ['yours', 'Yours']] as [MemberFilter, string][])
-    .map(([v, l]) => `<button type="button" data-f="mfilter" data-v="${v}" aria-pressed="${filter === v}">${l}</button>`).join('');
-  return `<div class="mtools"><div class="seg">${tabs}</div><button type="button" class="cta" data-f="mnew">New member</button></div>
-    <div class="mgrid">${shown.map(card).join('') || '<small class="fnote">No one here yet.</small>'}</div>
-    <small class="fnote">Your members are yours to set; the club's own come with its sliders (later). Everyone's ratings are shown: reputations precede them.</small>`;
+  // (you first, then your boats' crews by seat, then the rest of yours; the club's own after)
+  const order = (m: Member) => m.id === YOU ? 0 : boats.some(b => b.crewIds?.includes(m.id)) ? 1 : 2;
+  const yours = ms.filter(m => m.origin === 'yours').sort((a, b) => order(a) - order(b)), club = ms.filter(m => m.origin !== 'yours');
+  const group = (title: string, list: Member[], empty: string) => `<h3 class="mgroup">${title}</h3><div class="mgrid">${list.map(card).join('') || `<small class="fnote">${empty}</small>`}</div>`;
+  return `<div class="mtools"><button type="button" class="cta" data-f="mnew">New member</button></div>
+    ${group('You and your crew', yours, 'Just you so far: New member adds someone to sail with you.')}
+    ${club.length ? group('The club', club, '') : ''}
+`;
 }
 
 /** A member's page: their name and build, their skill and crew ratings, a skipper too, and leaving the club. */
-export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean): string {
+export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean, save: { dirty: boolean; asking: boolean } = { dirty: false, asking: false }): string {
   const yours = m.origin === 'yours', you = m.id === YOU;
   const skillSel = `<select data-m="skill"${yours ? '' : ' disabled'}>${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((m.skill ?? 0.6) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  // each rating follows their Skill until you set it (the owner: say so plainly): the number always shown, "auto" by one
+  // that's following Skill, as the band marks the crew's against your own
   const sliders = CREW_UI.map(([a, l, t]) => {
     const v = attrOf(m, a), own = m.attr?.[a] != null;
-    return `<label class="mslider" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-m="attr" data-a="${a}"${yours ? '' : ' disabled'}><output>${own ? Math.round(v * 100) : 'as skill'}</output></label>`;
+    return `<label class="mslider${own ? ' own' : ''}" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-m="attr" data-a="${a}"${yours ? '' : ' disabled'}><output>${Math.round(v * 100)}${own ? '' : '<i class="mauto">auto</i>'}</output></label>`;
   }).join('');
+  const anyOwn = CREW_UI.some(([a]) => m.attr?.[a] != null);
   const skipperToo = !you && yours ? `<label class="mcheck"><input type="checkbox" data-m="skipper"${m.roles.includes('skipper') ? ' checked' : ''}> Also sails as a skipper</label>` : '';
   const del = you || !yours ? '' : confirmDelete
     ? `<div class="gconfirm">Remove ${esc(m.name)} from the club? <button type="button" class="ghost danger" data-f="mdelYes">Remove</button><button type="button" class="ghost" data-f="mdelNo">Keep</button></div>`
     : `<button type="button" class="ghost" data-f="mdel">Remove from the club</button>`;
-  return `<div class="mhead"><button type="button" class="linkbtn" data-f="mback">‹ Members</button><h2>${esc(m.name)}</h2><span class="mwho">${whoLine(m)}</span></div>
+  return `<div class="mhead"><button type="button" class="linkbtn" data-f="mback">‹ Members</button><h2>${esc(m.name)}</h2><span class="mwho">${whoLine(m)}</span>${save.dirty && !save.asking ? '<button type="button" class="cta sm" data-f="msave">Save</button>' : ''}</div>
+    ${save.asking ? askSaveHtml : ''}
     <div class="mpage">
       <section><h3>${you ? 'You' : 'Who they are'}</h3>
         <label class="mfield"><span>Name</span><input data-m="name" value="${esc(m.name)}"${you || !yours ? ' disabled' : ''}></label>
@@ -88,13 +118,16 @@ export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean)
         <label class="mfield"><span>Skill</span>${skillSel}</label>
         <p class="fnote">${berth(m, boats)}</p>${skipperToo}${del}
       </section>
-      <section><h3>${you ? 'As crew, when you crew' : 'As crew'}</h3>${sliders}
-        ${yours ? '<button type="button" class="ghost" data-f="mreset">All as skill</button>' : ''}</section>
+      <section><h3>${you ? 'As crew, when you crew' : 'As crew'}</h3>
+        <p class="fnote">Each rating follows ${you ? 'your' : 'their'} Skill until you set it.</p>${sliders}
+        ${yours && anyOwn ? `<button type="button" class="ghost" data-f="mreset">Reset to ${you ? 'my' : 'their'} Skill</button>` : ''}</section>
       ${m.roles.includes('skipper') && !you ? `<section><h3>As skipper</h3>${SKIPPER_UI.section(m)}</section>` : ''}
     </div>`;
 }
 
 /** A change on a member's page (an input's data-m, and its value): applied to the member. Returns whether it changed. */
+/** Leaving with unsaved changes (the owner): Save or Discard, in place, before going. */
+export const askSaveHtml = '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-f="askSave">Save</button><button type="button" class="ghost" data-f="askDiscard">Discard</button></div>';
 export function applyMemberInput(m: Member, field: string, value: string, attr?: string, checked?: boolean): boolean {
   if (m.origin !== 'yours') return false;
   switch (field) {

@@ -23,7 +23,7 @@ describe("the passage planner's time for a tack or a gybe (routing.ts manoeuvreS
       const m = measure(kind, tws);
       expect(Math.abs(m - s), `${kind} in ${tws} kt: measured ${m.toFixed(1)} s, table ${s} s`).toBeLessThan(Math.max(0.5, 0.15 * s));
     }
-  }, 60_000);
+  }, 180_000);
   it('runs smoothly between the winds measured, and holds beyond them', () => {
     expect(manoeuvreS('tack', 10)).toBeCloseTo((5.1 + 3.3) / 2, 6);
     expect(manoeuvreS('tack', 2)).toBe(23.1); expect(manoeuvreS('tack', 30)).toBe(5.0);

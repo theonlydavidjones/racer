@@ -348,8 +348,18 @@ export const ROLL_HOLD = 2;
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4 };
-interface Held { arm: number; z: number; since: number; off: number; /** sent out by a puff (the urgent move) */ push?: boolean }
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30 };
+// (crossHeel, crossLast: on a run (the crew's own `downwind`, past 120 true), a move across to the other side of the
+// boat, between gybes, waits until she has carried more than crossHeel degrees of heel that the move takes off, for
+// crossLast seconds (half a gust-lull cycle, Bethwaite's minute: not one puff or lull, and many roll periods: a roll's
+// heel comes and goes in a few seconds); at once only for twice that to leeward in a puff that needs them out
+// (HOLD.urgent). On a run
+// heel costs her nothing below 20 degrees (balance.ts heelFactor) and the crew's aim there is 1 degree (crewBestHeel),
+// so the wanted weight hovers about the middle and swings with each roll; a crew sitting on a run settles on one side for
+// minutes, steadying the roll by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Not on a reach:
+// there the side they want changes with the breeze, and a puff needs them up to windward at once (the physics review).
+// Both numbers estimates.)
+interface Held { arm: number; z: number; since: number; off: number; cross?: number; /** sent out by a puff (the urgent move) */ push?: boolean }
 
 /**
  * Where the crew go now, at a human pace. Each free person goes where the weight is wanted (or where you've put them);
@@ -539,6 +549,19 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // of them away at a job, a move by the rest is needed more, not less)
   const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * W.reduce((a, w) => a + w, 0));
   const ppl = c.ppl!;
+  // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
+  const stay = (i: number, h: Held, t: Target) => {
+    h.arm = Math.min(h.arm, maxOf(i));
+    t.arm = h.arm; t.z = h.z;
+    if (i === 0) t.pose = 'helm';
+    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
+  };
+  // (a move across the boat on a run; and the heel she's carrying, which is what a move across would be for)
+  const crossing = (i: number) => {
+    const t = tgt[i], h = held[i];
+    return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+  };
+  const heelLee = k.heel ?? 0; // (+ to leeward: physics.ts heelMag)
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
@@ -551,6 +574,16 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
     if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
+    // (on a run, across to the other side only for a real heel: lasting, or at once in a puff that needs them out;
+    // HOLD.crossHeel, crossLast)
+    if (crossing(i)) {
+      // (the heel this move would take off: to windward against a heel to leeward, to leeward against one to windward; a
+      // roll the other way is no reason to cross, and a dip under it counts down, not from scratch)
+      const fixes = out ? heelLee : -heelLee;
+      h.cross = fixes > HOLD.crossHeel ? (h.cross ?? 0) + step : Math.max(0, (h.cross ?? 0) - step);
+      const puff = out && heelLee > 2 * HOLD.crossHeel && dArm > HOLD.urgent * dead;
+      if (!puff && h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
+    } else h.cross = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // (sent out by a puff that's still filling in: they keep going as it asks for more, out along the deck, rather than
@@ -561,12 +594,8 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // change of place for the trim, waits until it has lasted, and the dwell
     const urgent = out && dArm > HOLD.urgent * dead;
     const go = urgent || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
-    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.push = urgent; return; }
-    // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
-    h.arm = Math.min(h.arm, maxOf(i));
-    t.arm = h.arm; t.z = h.z;
-    if (i === 0) t.pose = 'helm';
-    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
+    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.push = urgent; return; } // (moved: the waits start afresh)
+    stay(i, h, t);
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
   // while the other stays put would otherwise put them in each other's laps)
