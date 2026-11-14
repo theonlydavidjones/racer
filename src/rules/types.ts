@@ -32,6 +32,8 @@ export interface RulesBoat {
   ww?: { from: number; kt?: number };
   /** Her steady leeway, deg (physics.ts; the room-to-respond prediction's course angle; omitted in diagrams). */
   leeway?: number;
+  /** Her sternway, m/s (physics.ts; omitted in diagrams). */
+  astern?: number;
   /** Her rudder blade's angle, -1..1 of its throw, + turning her to starboard (physics.ts; omitted in diagrams). */
   helm?: number;
   /** Her heading RULE16_WINDOW seconds ago (for Rule 16.1). Omit if unknown. */
