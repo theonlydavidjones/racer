@@ -6,8 +6,8 @@ import { LESSON_MARKS, LessonTracker, MOB_LEEWAY, mobDrift, type MobEnv } from '
 import { KT, V } from '../src/core/math';
 import type { Boat } from '../src/boat/boat';
 
-const boat = (o: Partial<{ x: number; y: number; h: number; v: number; twa: number }>): Boat => ({
-  x: o.x ?? 0, y: o.y ?? 0, h: o.h ?? 0, v: o.v ?? 2.5, twa: o.twa ?? 90, tack: 'S', astern: 0
+const boat = (o: Partial<{ x: number; y: number; h: number; v: number; twa: number; tack: 'P' | 'S' }>): Boat => ({
+  x: o.x ?? 0, y: o.y ?? 0, h: o.h ?? 0, v: o.v ?? 2.5, twa: o.twa ?? 90, tack: o.tack ?? 'S', astern: 0
 }) as unknown as Boat;
 const still: MobEnv = { current: () => ({ x: 0, y: 0 }), wind: () => ({ from: 270, kt: 10 }) };
 const S = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'lesson', lesson: 'mob', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0, ...o });
@@ -30,7 +30,7 @@ describe('Learn to sail, lesson 10: crew overboard', () => {
     expect(L.mob!.y).toBeLessThan(-3); // (heading north: over the stern, behind her)
     // she comes back and stops with them 2 m off her side (heading south now, they're abeam)
     const m = L.mob!, b = boat({ x: m.x - 2, y: m.y, h: 180, v: 0.4 * KT });
-    for (let k = 0; k < 4; k++) L.update(b, t++, 1, 0, still);
+    for (let k = 0; k < LESSON_MARKS.mobHoldS; k++) L.update(b, t++, 1, 0, still);
     expect(L.passed).toBe(true); expect(L.cue).toMatch(/^Alongside in \d+:\d\d ✓$/);
     expect(L.mobTime).toBeGreaterThan(0);
   });
@@ -54,5 +54,41 @@ describe('Learn to sail, lesson 10: crew overboard', () => {
     const moved = { x: L.mob.x - p0.x, y: L.mob.y - p0.y }, T = 100 * DT;
     expect(Math.hypot(moved.x - cur.x * T, moved.y - cur.y * T)).toBeLessThan(0.05 * T + 0.02); // (the current, plus leeway of a few cm/s)
     expect(new World(COURSES[0], S({ mode: 'race' } as Partial<Settings>), 3).lesson).toBeNull();
+  });
+
+  it('the leeway\'s crosswind keeps to its side: +1 to the right of downwind', () => {
+    // wind from the west: downwind is east; right of that, looking downwind, is south (−y)
+    expect(mobDrift({ x: 0, y: 0 }, { from: 270, kt: 10 }, 1).y).toBeLessThan(0);
+    expect(mobDrift({ x: 0, y: 0 }, { from: 270, kt: 10 }, -1).y).toBeGreaterThan(0);
+  });
+
+  it('on port tack they go over her port quarter, the windward side the crew sit on', () => {
+    const L = new LessonTracker('mob', null);
+    for (let t = 0; t < LESSON_MARKS.reachS + 1; t++) L.update(boat({ tack: 'P' }), t, 1, 0, still);
+    expect(L.mob!.x).toBeLessThan(0); // (heading north: port is west)
+  });
+
+  const overboard = () => { const L = new LessonTracker('mob', null); let t = 0; for (; t < LESSON_MARKS.reachS + 1; t++) L.update(boat({}), t, 1, 0, still); return { L, t }; };
+
+  it('her stem coming onto them is a hit, even slowly; stopped on her windward side doesn\'t count; time reads m:ss', () => {
+    let { L, t } = overboard(); const m = L.mob!;
+    // 1.5 kt, heading north, they're 3.5 m ahead on her centerline: the stem comes onto them
+    for (let k = 0; k < 6; k++) L.update(boat({ x: m.x, y: L.mob!.y - 3.5 + k * 0.1, h: 0, v: 1.5 * KT }), t++, 1, 0, still);
+    expect(L.passed).toBe(false); expect(L.cue).toMatch(/^You hit them with the bow/);
+    ({ L, t } = overboard());
+    // starboard tack (wind over her starboard side), stopped with them 2 m to starboard: to windward of her
+    const q = L.mob!, b = boat({ x: q.x - 2, y: q.y, h: 0, v: 0.3 * KT });
+    for (let k = 0; k < 6; k++) L.update(b, t++, 1, 0, still);
+    expect(L.passed).toBe(false); expect(L.cue).toMatch(/^Stop to windward of them/);
+    // and slipping past at 1.5 kt never holds long enough
+    ({ L, t } = overboard());
+    const r = L.mob!;
+    for (let k = 0; k < 10; k++) L.update(boat({ x: r.x + 2, y: r.y - 4 + k * 0.77, h: 0, v: 1.5 * KT }), t++, 1, 0, still);
+    expect(L.passed).toBe(false);
+    // the time: 119.6 s reads 2:00, not 1:60
+    ({ L, t } = overboard());
+    const z = L.mob!; t = z.t + 119.6 - LESSON_MARKS.mobHoldS + 1;
+    for (let k = 0; k < LESSON_MARKS.mobHoldS; k++) L.update(boat({ x: z.x + 2, y: z.y, h: 0, v: 0.2 * KT }), t + k, 1, 0, still);
+    expect(L.passed).toBe(true); expect(L.cue).toBe('Alongside in 2:00 ✓');
   });
 });
