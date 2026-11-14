@@ -45,11 +45,16 @@ export const BOARD_UP = 0.63, BOARD_DOWN = 0.37;
 const TRANSOM_LOW = 0.25;
 const MOUNT_X = -0.42, BOARD_W = 0.3, BOARD_H = 0.24, BOARD_T = 0.032;
 
-const GREY = new THREE.MeshPhongMaterial({ color: 0x8e949b, specular: 0x777777, shininess: 60 }); // Tohatsu's gray cowl and leg
-const DARK = new THREE.MeshPhongMaterial({ color: 0x2b2e32, specular: 0x333333, shininess: 30 }); // the tiller grip, the lower cowl's seal, the cord's handle
-const PROP = new THREE.MeshPhongMaterial({ color: 0x5d6268, specular: 0x999999, shininess: 70, side: THREE.DoubleSide }); // its aluminum prop
-const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9cdd1, specular: 0xffffff, shininess: 90 }); // the bracket's stainless
-const BOARD = new THREE.MeshPhongMaterial({ color: 0x6e4a2c, specular: 0x222222, shininess: 20 }); // its hardwood board
+// (made when the first motor is: a material made as the module loads would shift the page's random numbers before the
+// race is set up, three.js drawing one for each object's id, and change the race scripts/check/perf.cjs sails)
+let mats: { GREY: THREE.Material; DARK: THREE.Material; PROP: THREE.Material; STEEL: THREE.Material; BOARD: THREE.Material } | null = null;
+const materials = () => mats ??= {
+  GREY: new THREE.MeshPhongMaterial({ color: 0x8e949b, specular: 0x777777, shininess: 60 }), // Tohatsu's gray cowl and leg
+  DARK: new THREE.MeshPhongMaterial({ color: 0x2b2e32, specular: 0x333333, shininess: 30 }), // the tiller grip, the lower cowl's seal, the cord's handle
+  PROP: new THREE.MeshPhongMaterial({ color: 0x5d6268, specular: 0x999999, shininess: 70, side: THREE.DoubleSide }), // its aluminum prop
+  STEEL: new THREE.MeshPhongMaterial({ color: 0xc9cdd1, specular: 0xffffff, shininess: 90 }), // the bracket's stainless
+  BOARD: new THREE.MeshPhongMaterial({ color: 0x6e4a2c, specular: 0x222222, shininess: 20 }), // its hardwood board
+};
 
 /**
  * A skin through closed rings of equal length (each a loop of points), capped at both ends: the cowl, the leg, the
@@ -123,6 +128,7 @@ export interface OutboardMesh {
 
 /** The outboard (2.5, 3.5 or 6 hp) and its lifting bracket, on her port quarter. */
 export function buildOutboard(hp: number): OutboardMesh {
+  const { GREY, DARK, PROP, STEEL, BOARD } = materials();
   const D = hp >= 5 ? SIX : SMALL, group = new THREE.Group(); group.name = 'outboard';
   // the bracket's fixed part: two vertical rails, held off the raked transom by a short arm at the top and a long one low down
   const zRail = sheer(1) > 0 ? aftLineZ(BOARD_UP) + 0.06 : 0, yLo = BOARD_DOWN - BOARD_H - 0.02, yHi = BOARD_UP + 0.03;
