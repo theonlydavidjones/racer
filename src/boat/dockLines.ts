@@ -1,5 +1,5 @@
 import type { Boat } from './boat';
-import { HANDLING, HULL } from './dynamics';
+import { HANDLING, HULL, windFore, windSide, windTurn } from './dynamics';
 import { ASTERN_DRAG, HOVE } from './physics';
 import { FULL_RUDDER, RUDDER } from './balance';
 import { displacement } from './crewPhys';
@@ -125,14 +125,16 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   X += motorForce(b);
   // the wind on her, relative to her motion through the water (the wind's over the water: windOnWater): her bare hull and
   // rig, and any sail still hoisted, let fly and flogging (HANDLING.flogCdA, as dynamics.ts airDrag); its broadside push a
-  // little ahead of the keel's centre, the mast being forward (HOVE.windLever)
+  // where its centre lies fore and aft (dynamics.ts windTurn)
   const wTo = (wind.from + 180) * D2R, wv = wind.kt * 0.5144, vw = { x: vg.x - cur.x, y: vg.y - cur.y };
   const ax = Math.sin(wTo) * wv - vw.x, ay = Math.cos(wTo) * wv - vw.y, aws = Math.hypot(ax, ay);
   if (aws > 0.01) {
     const q = 0.5 * AIR * aws * aws, along = (ax * fwd.x + ay * fwd.y) / aws, across = (ax * stb.x + ay * stb.y) / aws;
     const cloth = Math.min(1, ((b.rig?.main ?? 0) + (b.rig?.jib ?? 0)) / 2);
-    const wy = q * HOVE.windSide * across * Math.abs(across);
-    X += q * (HANDLING.windageCdA + HANDLING.flogCdA * cloth) * along; Y += wy; M += wy * HOVE.windLever;
+    // (dynamics.ts windFore, windSide, windTurn: the same windage as her own step's, by the angle the wind comes from)
+    const awa = Math.atan2(Math.abs(across), -along) / D2R, side = Math.sign(across), bare = 1 - (b.rig?.main ?? 0);
+    const wy = side * q * windSide(awa, 3, bare);
+    X += q * (-windFore(awa, 3, bare) + HANDLING.flogCdA * cloth * along); Y += wy; M += side * q * windTurn(awa, 3, bare);
   }
   // the lines
   for (const L of [...lines]) {

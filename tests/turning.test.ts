@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { hullSide, hullYawM, steadyTurnRate } from '../src/boat/turning';
+import { RUDDER_STALL, helmForMoment, hullSide, hullYawM, rudderCoef, steadyTurnRate, turnDragN } from '../src/boat/turning';
+import { HOVE } from '../src/boat/physics';
+import { RUDDER } from '../src/boat/balance';
+import { HULL } from '../src/boat/dynamics';
+import { D2R } from '../src/core/math';
 import { testBoat, sail, kt } from './helpers/testBoat';
 import type { Boat } from '../src/boat/boat';
 it('closed form matches the strips', () => {
@@ -30,4 +34,43 @@ it('under bare poles beam-on in 25 kt the wind on her topsides, rig and crew hee
   // Against 8 kt, where her heel is nearly all her crew's weight, wherever they sit: about 4° further to leeward)
   const h25 = heelIn(25), h8 = heelIn(8);
 expect(h25).toBeGreaterThan(h8 + 1.5); expect(h25 - h8).toBeLessThan(6);
+});
+
+it("the blade's lift and drag run on through its stall with no step, and a helmsman's hardest helm stays short of it", () => {
+  const e = 1e-4, a = rudderCoef(RUDDER_STALL - e), b = rudderCoef(RUDDER_STALL + e);
+  expect(Math.abs(b.cl - a.cl)).toBeLessThan(0.01 * a.cl); expect(Math.abs(b.cd - a.cd)).toBeLessThan(0.02 * a.cd);
+  // past it: less lift, much more drag; broadside-on a plate's 1.2, all drag
+  expect(rudderCoef(30 * D2R).cl).toBeLessThan(a.cl); expect(rudderCoef(30 * D2R).cd).toBeGreaterThan(3 * a.cd);
+  expect(rudderCoef(Math.PI / 2).cd).toBeCloseTo(1.2, 6); expect(Math.abs(rudderCoef(Math.PI / 2).cl)).toBeLessThan(1e-6);
+  // asked for more turn than the blade can give, the helm goes to the stall and no further, in whatever water meets it
+  for (const u of [0.5, 1.2, 2.4, 3.2]) for (const r of [-0.3, -0.05, 0, 0.05, 0.3]) for (const want of [-1e6, 1e6]) {
+    const delta = helmForMoment(want, u, 0, r), aoa = delta - Math.atan2(HOVE.rudderFlow * r * RUDDER.arm, u);
+    if (Math.abs(delta) < 30 * D2R - 1e-9) expect(Math.abs(aoa)).toBeLessThanOrEqual(RUDDER_STALL);
+  }
+});
+it("a turn's drag goes as the square of the turn, to nothing with her way, and by what her keel is already carrying", () => {
+  expect(turnDragN(0.2, 0)).toBe(0);
+  expect(turnDragN(0.2, 2.4) / turnDragN(0.1, 2.4)).toBeCloseTo(4, 6);
+  for (const u of [0.05, 0.2, 0.5, 1, 2.4]) expect(turnDragN(0.25, u)).toBeLessThanOrEqual(HULL.displacement * 1.2 * u * 0.25);
+  // with 800 N of side force on her keel already: luffing (a turn toward the wind) loads it harder, bearing away unloads it
+  expect(turnDragN(0.2, 2.4, 800)).toBeGreaterThan(turnDragN(0.2, 2.4)); expect(turnDragN(-0.2, 2.4, 800)).toBeLessThan(turnDragN(0.2, 2.4));
+});
+it('going astern, the helm hard over slows her sternway: it does not add to it', () => {
+  const astern = (tiller: number) => {
+    const b = testBoat({ heading: 0, kt: 0, windKt: 15 }) as Boat & { handsOff?: boolean };
+    b.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; b.handsOff = true; b.astern = 0.6;
+    sail(b, 3, () => { b.tiller = tiller; });
+    return b.astern ?? 0;
+  };
+  expect(astern(1)).toBeLessThanOrEqual(astern(0) + 1e-6);
+});
+it('left alone under bare poles she swings to lie with the wind near her beam, from head to wind or stern-to (computed from the drawn boat, not observed)', () => {
+  for (const h of [15, 165]) {
+    const b = testBoat({ heading: h, kt: 0, windFrom: 0, windKt: 12 }) as Boat & { handsOff?: boolean };
+    b.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; b.handsOff = true;
+    sail(b, 240, () => { b.tiller = 0; });
+    const off = Math.abs(((b.ww.from - b.h + 540) % 360) - 180);
+    expect(off).toBeGreaterThan(70); expect(off).toBeLessThan(105);
+    expect(Math.abs(b.turnRate ?? 0)).toBeLessThan(0.3); // (settled)
+  }
 });

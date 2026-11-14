@@ -187,8 +187,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // (the tiller in your hand is where you put it. A steering key is the helm put over as far as turns her: to the
       // blade's best angle in the water meeting it, just short of its stall, as a helmsman who feels the blade holds
       // it; hard over when there's no flow to stall in)
-      const best = Math.min(FULL_RUDDER * D2R, RUDDER_STALL + Math.abs(Math.atan2(HOVE.rudderFlow * r0 * RUDDER.arm, Math.max(0.01, Math.abs(u0)))));
-      delta = clamp(toWind * (b.steer * best - b.tiller * FULL_RUDDER * D2R), -FULL_RUDDER * D2R, FULL_RUDDER * D2R);
+      const full = FULL_RUDDER * D2R, inflow = Math.atan2(HOVE.rudderFlow * r0 * RUDDER.arm, Math.max(0.01, Math.abs(u0))) * (u0 < 0 ? -1 : 1);
+      const keys = !b.steer ? 0 : Math.abs(u0) < 0.1 ? toWind * b.steer * full : clamp(toWind * b.steer * (RUDDER_STALL - 1e-6) + inflow, -full, full); // (toward the wind +)
+      delta = clamp(keys - toWind * b.tiller * full, -full, full);
     }
   } else if (b.penalty > 0 && !b.ai?.clearing) {
     // penalty turns: the crew backs the sails to spin the boat even when slow
@@ -240,13 +241,19 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (scull && b.penalty <= 0) b.scullDir = Math.sign(scull);
   if (b.isUser && !scull && b.turnTarget == null && aboveCH && !((b.jibBacked ?? 0) > 0)) {
     // (every swing pushes, the return stroke too: an even wag nets nothing. Which way she's being sculled is the way
-    // she's turned by it, once she's turning half a degree a second; from then a net push the other way, taken over a couple
-    // of strokes (b.scullNet, N·m + to starboard), isn't the helmsman's to make: SCULL 2)
-    const raw = delta !== deltaWas ? toWind * bladeSwingForce((delta - deltaWas) / dt, delta) * RUDDER.arm : 0;
-    const net = b.scullNet = (b.scullNet ?? 0) + (raw - (b.scullNet ?? 0)) * Math.min(1, dt / (2 * SCULL.period));
-    if (b.scullDir == null && Math.abs(rDeg) > 0.5 && net * rDeg > 0) b.scullDir = Math.sign(rDeg);
-    if (b.scullDir == null || net * b.scullDir > -0.5 * scullMoment()) mScull = toWind * raw;
-  } else if (b.scullNet) b.scullNet = 0;
+    // the pushes net out over a few strokes (b.scullMean, their mean moment, N·m + to starboard: a wag's ripple in it is
+    // a quarter of a stroke's net). From then a push the other way is taken only as far as the pushes her own way have
+    // lately paid for (b.scullNet: their running balance over a couple of strokes, N·m·s): a stroke's return is, a
+    // stroke back the other way isn't. SCULL 2: "further connected sculling to offset the first sculling action is
+    // prohibited", so the helmsman doesn't)
+    const raw = delta !== deltaWas ? toWind * bladeSwingForce((delta - deltaWas) / dt, delta) * RUDDER.arm : 0; // (+ to starboard)
+    const mean = b.scullMean = (b.scullMean ?? 0) + (raw - (b.scullMean ?? 0)) * dt / (4 * SCULL.period);
+    let net = (b.scullNet ?? 0) * Math.exp(-dt / (2 * SCULL.period)), push = raw;
+    if (b.scullDir == null) { if (Math.abs(mean) > 0.4 * scullMoment()) b.scullDir = Math.sign(mean); }
+    else if (raw * b.scullDir < 0) push = -b.scullDir * Math.min(Math.abs(raw), Math.max(0, net * b.scullDir) / dt);
+    b.scullNet = net + push * dt;
+    mScull = toWind * push;
+  } else if (b.scullNet || b.scullMean) b.scullNet = b.scullMean = 0;
   // the rudder's force on her stern, and her turn from all the moments
   const rud = rudderForce(u0, 0, r0, delta);
   let r1 = r0 + (mFree + rud.y * RUDDER.arm + mScull) / I * dt;
@@ -259,7 +266,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
   // (what the turn costs her way: the blade's drag beyond what it has sailing straight with a little weather helm, which
   // the polar's speeds have in them, and her keel's drag making the side force that takes her round: turning.ts)
-  const turnDrag = Math.max(0, Math.abs(rud.x) - rudderDragIdeal(u0, IDEAL_HELM)) + turnDragN(r1);
+  // (against her motion, ahead or astern; her keel's load from her sails, to windward, as last step had it)
+  const turnDrag = Math.sign(u0) * (Math.max(0, Math.abs(rud.x) - rudderDragIdeal(u0, IDEAL_HELM)) + turnDragN(r1, u0, (b.forces?.heel ?? 0) * Math.cos((b.heelMag ?? 0) * D2R)));
   b.turnRate = toWind * r1 / D2R;
   let rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
@@ -331,7 +339,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (balance.ts helmNeeded's, with the windage, at her own speed: the blade's lift goes as her speed squared, so in
   // light air she needs more of it for the same sails, down to a knot: below that it's not the rudder that holds her)
   const mTurn = sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * clrShift(cs.trim) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, 3, 1 - (b.rig?.main ?? 1));
-  b.turnM = (rel >= 0 ? 1 : -1) * mTurn;
+  b.turnM = (b.tack === 'S' ? 1 : -1) * mTurn; // (by her tack: dead downwind the boom stays where it is as the wind crosses her stern)
   // (and, a little, her hull's broadside drag as she makes leeway: its centre is aft of the keel's, HOVE.dragAft, so it
   // turns her bow off: turning.ts hullSide's strips, summed)
   const lee = -(rel >= 0 ? 1 : -1) * (b.sway ?? 0), mLee = -0.5 * 1025 * HOVE.latArea * HOVE.crossCd * HOVE.dragAft * lee * Math.abs(lee);
@@ -476,18 +484,16 @@ export const HOVE = {
   swayAdded: 0.9, yawAdded: 0.4,
   /** Radius of gyration in yaw, as a fraction of LOA (0.25, the usual figure for a yacht). */
   gyration: 0.25,
-  /** How far ahead of the keel's centre her windage acts side-on (the mast is forward), m (its size: dynamics.ts windSide). */
-  windLever: 0.3,
   /**
    * How much of the sideways flow (her slip, and her stern's swing) reaches the rudder: it hangs on the long keel's
    * after edge (CR 4.70, 5.40), which straightens most of it. TUNED, not measured, to the hove-to observations with the
-   * class's blade (tests/heaveto.test.ts: anecdotal): from 0.3 to 0.45 she lies hove to in 8 to 25 kt as they describe,
-   * fore-reaching 0.7–1.1 kt (the Pardeys: half a knot to a knot); at 0.28 (the old, smaller blade's force at 0.5) she
-   * tacks herself out of it in 8 kt; at 0.5 with this blade, the jib aback and the tiller amidships, she bears away
-   * onto a reach at 4 kt and never slows to be lashed. (Keuning's downwash measurements, behind a fin keel with a
-   * separate rudder, give about a half: embargoed, cited second-hand.)
+   * class's blade (tests/heaveto.test.ts: anecdotal): from 0.4 to 0.5 she lies hove to in 8 to 25 kt as they describe,
+   * fore-reaching 0.7–1.2 kt (the Pardeys: half a knot to a knot); at 0.35 and below she tacks herself out of it in
+   * 8 kt (at 0.28 this blade pushes as the old, smaller one did at 0.5); toward 0.5, the jib aback and the tiller
+   * amidships, she bears away onto a reach at 4 kt before she can be lashed. (Keuning's downwash measurements, behind
+   * a fin keel with a separate rudder, give about a half: embargoed, cited second-hand.)
    */
-  rudderFlow: 0.35,
+  rudderFlow: 0.4,
   /** Backed sail: normal-force coefficient at 90° (Hoerner: 1.17 for a flat plate, more for a cupped sail). */
   cnBacked: 1.2
 };
@@ -499,15 +505,29 @@ export const HOVE = {
  * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
  * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
  */
-export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
+export function turnDragForce(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
   const r = Math.abs(rate) * D2R, u = Math.max(0.3, v);
   if (r < 1e-4) return 0;
   // the blade's angle of attack for a steady turn at this rate: what her hull's damping asks of it, less what her
-  // weather helm does toward the wind (more, turning away from it)
-  const q = 0.5 * 1025 * u * u * RUDDER.area, toWind = Math.sign(rate) * Math.sign(wrap(windFrom - h) || 1);
-  const aoa = (-hullSide(u, 0, r).m) / (q * RUDDER.slope * RUDDER.arm) - toWind * clamp(helmNeed, -12, 12) * D2R;
-  const drag = q * Math.max(0, rudderCoef(clamp(aoa, -Math.PI / 2, Math.PI / 2)).cd - rudderCoef(IDEAL_HELM * D2R).cd) + turnDragN(r);
-  return drag / (HANDLING.mass * u);
+  // weather helm does toward the wind (more, turning away from it); never past its stall, as the helmsman holds it
+  // (turning.ts helmForMoment), in the water meeting it (her way and her stern's swing: turning.ts steadyTurnRate's)
+  const vy = HOVE.rudderFlow * r * RUDDER.arm, q = 0.5 * 1025 * (u * u + vy * vy) * RUDDER.area, toWind = Math.sign(rate) * Math.sign(wrap(windFrom - h) || 1);
+  const lim = RUDDER_STALL - 1e-6, aoa = clamp(-hullYawM(u, 0, r) / (q * RUDDER.slope * RUDDER.arm) - toWind * clamp(helmNeed, -12, 12) * D2R, -lim, lim);
+  return q * Math.max(0, rudderCoef(aoa).cd - rudderCoef(IDEAL_HELM * D2R).cd) + turnDragN(r, u);
+}
+export const turnBleed = (rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number => turnDragForce(rate, v, h, windFrom, helmNeed) / (HANDLING.mass * Math.max(0.3, v));
+
+/**
+ * Her speed a step on, turning at `rate` deg/s on heading `h` in `tws` kt of true wind from `windFrom` (for predicting
+ * a turn: src/boat/arcs.ts): the same surge law as her own step, cut down to what a prediction can know. Her sails'
+ * drive toward the polar's speed on the heading she's on (so bearing away she holds her speed or gains it, and luffing
+ * above her beat angle she slows: the polar's pinching curve, nothing in the no-go zone), her flogging sails' and her
+ * rig's windage there, and the turn's own drag (turnDragForce). Not in it: her trim, her crew, the sea.
+ */
+export function turnSpeed(v: number, rate: number, h: number, windFrom: number, tws: number, dt: number, helmNeed = 0): number {
+  const twa = Math.abs(wrap(windFrom - h)), beat = beatAngle(tws), ap = apparent(windFrom, tws, h, v);
+  const drag = turnDragForce(rate, v, h, windFrom, helmNeed) + airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, false));
+  return Math.max(0, v + surgeAccel(v, polar(tws, twa, 'jib'), drag) * dt);
 }
 
 /**
@@ -942,9 +962,9 @@ export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.h
 
 /**
  * At a tack (or gybe) the jib sheets stay on their own sides. The crew lets the old sheet fly and tails the new one, so
- * the leeward sheet carries on where it was. But a sheet you hold is yours: hold the windward sheet through the turn and
- * the sheets change roles as they really do, the one you had trimmed becoming the windward sheet with the jib aback
- * (the classic way to heave to: tack and leave the jib sheet made fast).
+ * the leeward sheet carries on where it was. But a sheet you hold is yours: hold either through the turn and the sheets
+ * change roles as they really do, the one you had trimmed becoming the windward sheet with the jib aback (the classic
+ * way to heave to: tack and leave the jib sheet made fast).
  */
 function jibSheetsAtTack(b: Boat, emit: Emit): void {
   // (the crew holding her hove to, and she's gone through the wind all the same, a shift or the lashed tiller moved: the
@@ -952,11 +972,15 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
   // the lines stay the crew's, who trim her once she's sailing)
   // (the same sheets, the same lengths of them: controls.ts asWindwardSheet)
   if (!byHand(b, 'jibsheetW') && keepsHove(b)) { const c = b.ctl; [c.jibsheet, c.jibsheetW] = [asLeewardSheet(c.jibsheetW), asWindwardSheet(c.jibsheet)]; return; }
-  if (!byHand(b, 'jibsheetW')) return;
-  const c = b.ctl, h = b.hand ??= {}, leeMine = byHand(b, 'jibsheet');
+  // (a sheet in your hand at the tack is yours through it: it stays as it was, made fast, on its own side. The working
+  // sheet becomes the windward one, the jib aback on it until you ease it or hand it back; the lazy one, if it was
+  // yours, becomes the leeward one. The owner, 13 Nov 2026: "physics should decide, responsive to what the pilot does")
+  const leeMine = byHand(b, 'jibsheet'), wMine = byHand(b, 'jibsheetW');
+  if (!leeMine && !wMine) return;
+  const c = b.ctl, h = b.hand ??= {};
   [c.jibsheet, c.jibsheetW] = [asLeewardSheet(c.jibsheetW), asWindwardSheet(c.jibsheet)];
-  h.jibsheet = true; h.jibsheetW = leeMine;
-  if (b.ctlTarget) { const tl = b.ctlTarget.jibsheet, tw = b.ctlTarget.jibsheetW; delete b.ctlTarget.jibsheet; delete b.ctlTarget.jibsheetW; if (tw != null) b.ctlTarget.jibsheet = asLeewardSheet(tw); if (tl != null && leeMine) b.ctlTarget.jibsheetW = asWindwardSheet(tl); }
+  h.jibsheet = wMine; h.jibsheetW = leeMine;
+  if (b.ctlTarget) { const tl = b.ctlTarget.jibsheet, tw = b.ctlTarget.jibsheetW; delete b.ctlTarget.jibsheet; delete b.ctlTarget.jibsheetW; if (tw != null && wMine) b.ctlTarget.jibsheet = asLeewardSheet(tw); if (tl != null && leeMine) b.ctlTarget.jibsheetW = asWindwardSheet(tl); }
   if (leeMine && c.jibsheetW < 0.6) emit({ type: 'toast', msg: 'You held the jib sheet through the tack: the jib is aback. Ease the windward sheet (or tap its Auto) to let it across.', ms: 5000 });
   else if (!leeMine) emit({ type: 'toast', msg: 'The jib sheets changed sides: the one you held is now the leeward sheet, and yours to trim (tap its Auto to give it to the crew).', ms: 5000 });
 }

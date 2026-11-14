@@ -10,7 +10,7 @@
 import orc from './data/nordic-folkboat-orc.json';
 import { D2R, clamp } from '../core/math';
 import { FULL_RUDDER, RUDDER } from './balance';
-import { HULL } from './dynamics';
+import { HANDLING, HULL } from './dynamics';
 import { HOVE } from './physics';
 
 const RHO = 1025;
@@ -23,17 +23,22 @@ const RHO = 1025;
  * it, Cn rising from the stall's to 1.2 at 90° (Hoerner, Fluid-Dynamic Drag, 3-16: a flat plate; as the backed jib).
  */
 export const RUDDER_STALL = 15 * D2R;
+/** How far past the stall the blade's force takes to lie square to it (rad): 10°, an estimate (a stall isn't a step). */
+const STALL_BLEND = 10 * D2R;
 /** Section drag of the blade, unstalled (a faired wooden blade at Reynolds numbers near 10⁶: about 0.01–0.02; Hoerner 6-2). */
 const RUDDER_CD0 = 0.015;
 
 /** The blade's lift and drag coefficients at angle of attack `a` (rad, signed): lift with the sign of `a`. */
 export function rudderCoef(a: number): { cl: number; cd: number } {
   const s = Math.abs(a);
-  if (s <= RUDDER_STALL) { const cl = RUDDER.slope * a; return { cl, cd: RUDDER_CD0 + cl * cl / (Math.PI * RUDDER.aspect) }; }
-  // stalled: a plate, its force square to it. Continuous with the lift at the stall
+  if (s <= RUDDER_STALL + 1e-9) { const cl = RUDDER.slope * a; return { cl, cd: RUDDER_CD0 + cl * cl / (Math.PI * RUDDER.aspect) }; }
+  // stalled: a plate, its force square to it. Continuous with the stall's own lift and drag: the force's size goes from
+  // the stall's to the plate's 1.2 at 90°, and its direction swings from where it lay at the stall (a few degrees aft
+  // of square to the flow) to square to the blade over the next STALL_BLEND of angle, as the flow lets go of its back
   const clS = RUDDER.slope * RUDDER_STALL, cdS = RUDDER_CD0 + clS * clS / (Math.PI * RUDDER.aspect);
   const cn0 = Math.hypot(clS, cdS), t = Math.min(1, (s - RUDDER_STALL) / (Math.PI / 2 - RUDDER_STALL)), cn = cn0 + (1.2 - cn0) * t;
-  return { cl: Math.sign(a) * cn * Math.cos(s), cd: Math.max(cdS, cn * Math.sin(s)) };
+  const psi0 = Math.atan2(cdS, clS), psi = psi0 + (s - psi0) * Math.min(1, (s - RUDDER_STALL) / STALL_BLEND);
+  return { cl: Math.sign(a) * cn * Math.cos(psi), cd: cn * Math.sin(psi) };
 }
 
 /**
@@ -78,26 +83,38 @@ export function hullSide(u: number, d: number, r: number): { y: number; m: numbe
  */
 let S2 = 0, S4 = 0;
 export function hullYawM(u: number, d: number, r: number): number {
+  if (d === 0 && r === 0) return 0;
   const L = orc.boat.imsL, N = STRIPS;
   if (!S2) for (let i = 0; i < N; i++) { const x = -L / 2 + (i + 0.5) * L / N; S2 += x * x; S4 += x * x * x * x; }
-  if (Math.abs(d) <= Math.abs(r) * L / 2) return hullSide(u, d, r).m;
   const k = 0.5 * RHO * HOVE.latArea / N, aL = Math.PI * HOVE.aspect / 2, uEff = u >= 0 ? u : 0.5 * -u, kD = -HOVE.dragAft / (S2 / N);
-  // Σ f·x with f = −k·(aL·u·vy + Cd·(1 + kD·x)·vy·|vy|), vy = d − r·x of one sign throughout: m = −Σ f·x
-  return k * (aL * uEff * -r * S2 + Math.sign(d) * HOVE.crossCd * (-2 * d * r * S2 + kD * (d * d * S2 + r * r * S4)));
+  // Σ f·x with f = −k·(aL·u·vy + Cd·(1 + kD·x)·vy·|vy|), vy = d − r·x; m = −Σ f·x
+  if (Math.abs(d) > Math.abs(r) * L / 2) return k * (aL * uEff * -r * S2 + Math.sign(d) * HOVE.crossCd * (-2 * d * r * S2 + kD * (d * d * S2 + r * r * S4)));
+  let m = k * aL * uEff * -r * S2; // (the lift's part is the same sum either way; the broadside drag's strip by strip, where the water passes her ends opposite ways)
+  for (let i = 0; i < N; i++) { const x = -L / 2 + (i + 0.5) * L / N, vy = d - r * x; m += k * HOVE.crossCd * (1 + kD * x) * vy * Math.abs(vy) * x; }
+  return m;
 }
 
 /** Her moment of inertia in yaw with the water she carries round with her, kg·m² (HOVE.gyration, yawAdded: estimates). */
-export const yawInertia = (disp: number = HULL.displacement) => disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
+let yawI = 0;
+export const yawInertia = (disp: number = HULL.displacement) => disp === HULL.displacement ? (yawI ||= disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded)) : disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
 
 /**
- * What a turn costs her in drag beyond the rudder's own (N): to go round, the water must push her sideways toward the
- * centre of the turn, m·u·r, and her keel makes that as lift, with its induced drag: D = F²/(½ρ·πT²·u²)·½ =
- * m²r²/(ρ·πT²) (the slender wing of her leeway, Newman §5.12). It goes as the square of the turn rate, so a helmsman's
- * small corrections cost next to nothing and a hard turn brakes her, at any speed.
+ * What a turn costs her in drag beyond the rudder's own (N; negative: it saves her some). To go round, the water must
+ * push her sideways toward the centre of the turn, m·u·r, and her keel makes that as lift, with its induced drag:
+ * D = F²/(ρ·πT²·u²) for a side force F on her draft T (the slender wing of her leeway, Newman §5.12; ORC's eq. 6.37).
+ * Her keel is already carrying her sails' side force `side` (N, to windward), whose drag the polar's speeds have in
+ * them, so the turn's part is ((side + m·u·r)² − side²)/(ρ·πT²·u²), `r` her turn toward the wind (rad/s): luffing, the
+ * keel is loaded harder and it costs more than the bare (m·u·r)²; bearing away it's unloaded. Square in the turn rate
+ * either way, so a helmsman's small corrections cost next to nothing and a hard turn brakes her. With little way on the
+ * drift this asks of her is no small angle and the wing's result fails: there the whole of the side force stands for
+ * its drag, m·|u·r|, and it goes to nothing as she stops (no way, no centripetal force).
+ * `m`: her mass with the water she carries fore and aft (HANDLING.mass's share).
  */
-export function turnDragN(r: number, disp: number = HULL.displacement): number {
-  const m = disp * (1 + 0.1); // (a little of the water goes round with her fore and aft: HANDLING.mass's share)
-  return m * m * r * r / (RHO * Math.PI * orc.boat.draft ** 2);
+export function turnDragN(r: number, u: number, side = 0, disp: number = HULL.displacement): number {
+  const m = disp * HANDLING.mass / HULL.displacement, F = m * Math.abs(u) * r, cap = Math.abs(F);
+  if (cap < 1e-9) return 0;
+  const d = ((side + F) * (side + F) - side * side) / (RHO * Math.PI * orc.boat.draft ** 2 * Math.max(1e-6, u * u));
+  return clamp(d, -cap, cap);
 }
 
 /**
@@ -109,7 +126,7 @@ export function helmForMoment(want: number, u: number, d: number, r: number): nu
   const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
   const q = 0.5 * RHO * v2 * RUDDER.area * RUDDER.slope * RUDDER.arm * (back ? 0.7 : 1);
   const inflow = Math.atan2(vy, Math.max(0.01, uf));
-  const aoa = q > 1e-6 ? clamp(want / q, -RUDDER_STALL, RUDDER_STALL) : Math.sign(want) * RUDDER_STALL;
+  const lim = RUDDER_STALL - 1e-6, aoa = q > 1e-6 ? clamp(want / q, -lim, lim) : Math.sign(want) * lim; // (just inside it: the angles are summed and taken apart again)
   return clamp((aoa + inflow) * (back ? -1 : 1), -FULL_RUDDER * D2R, FULL_RUDDER * D2R);
 }
 

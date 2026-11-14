@@ -41,21 +41,25 @@ describe('in irons, with her sails up', () => {
     expect(Math.abs(held - alone)).toBeLessThan(2.5); expect(Math.abs(held - alone)).toBeLessThan(0.5 * Math.abs(tapped - alone));
     expect(Math.abs(tapped - alone)).toBeGreaterThan(4); expect(Math.abs(stroke - alone)).toBeGreaterThan(4);
   });
-  it('once sculled one way, not back the other (SCULL 2): she holds the way she started until she\'s close-hauled', () => {
-    const { w, u } = world(10);
-    u.h = (w.windHere(u, u).from - 15 + 360) % 360;
-    for (let i = 0; i < 60 * 10; i++) { u.steer = tap(i, -1); u.v = 0; u.astern = 0; w.step(DT); } // (sculled ten seconds toward the wind)
-    const h0 = u.h, way = Math.sign(u.turnRate ?? 0), r0 = Math.abs(u.turnRate ?? 0) * D2R, T = 5;
-    expect(r0 / D2R).toBeGreaterThan(0.5);
-    for (let i = 0; i < 60 * T; i++) { u.steer = tap(i, 1); u.v = 0; u.astern = 0; w.step(DT); } // (then the stroke the other way)
-    const turned = (((u.h - h0 + 540) % 360) - 180) * way;
-    // no flow and no sculling back: she isn't turned the other way. She carries on the way she was going, on her own
-    // momentum: her yaw inertia against her hull and keel broadside to the water, I·dr/dt = −k·r², which coasts her
-    // (I/k)·ln(1 + r0·k·t/I) in t seconds from r0 (turning.ts). Half as much again allowed, for the flogging sails' and
-    // the wind's own small moments on her and the strokes' ripple; and no less than half of it (she isn't stopped dead)
-    const I = yawInertia(), k = -hullSide(0, 0, 1).m, coast = (I / k) * Math.log(1 + r0 * k * T / I) / D2R;
-    expect(turned).toBeGreaterThan(0.5 * coast);
-    expect(turned).toBeLessThan(1.5 * coast + 0.2);
+  it('once sculled one way, not back the other (SCULL 2): strokes the other way leave her coasting on, no slower than if the tiller were left alone', () => {
+    // (in a calm, so nothing but the water and the tiller turns her)
+    const after = (then: (i: number) => { steer?: number; tiller?: number }) => {
+      const { w, u } = world(1);
+      u.h = (w.windHere(u, u).from - 10 + 360) % 360;
+      for (let i = 0; i < 60 * 8; i++) { u.steer = tap(i, -1); u.tiller = 0; u.v = 0; u.astern = 0; w.step(DT); } // (sculled eight seconds one way)
+      const h0 = u.h, way = Math.sign(u.turnRate ?? 0), r0 = Math.abs(u.turnRate ?? 0);
+      for (let i = 0; i < 60 * 6; i++) { const x = then(i); u.steer = x.steer ?? 0; u.tiller = x.tiller ?? 0; u.v = 0; u.astern = 0; w.step(DT); }
+      return { turned: (((u.h - h0 + 540) % 360) - 180) * way, rate: (u.turnRate ?? 0) * way, r0 };
+    };
+    const coast = after(() => ({})), taps = after(i => ({ steer: tap(i, 1) }));
+    const strokes = after(i => { const ph = (i % 60) / 60; return { tiller: ph < 1 / 3 ? -1 + 6 * ph : 1 - 3 * (ph - 1 / 3) }; }); // (and by hand, the stroke that turns her to starboard)
+    expect(coast.r0).toBeGreaterThan(0.5);
+    // her own momentum against her hull and keel broadside to the water, I·dr/dt = −k·r²: she coasts
+    // (I/k)·ln(1 + r0·k·t/I) in t seconds (turning.ts)
+    const I = yawInertia(), k = -hullSide(0, 0, 1).m, r0 = coast.r0 * D2R, expected = (I / k) * Math.log(1 + r0 * k * 6 / I) / D2R;
+    expect(Math.abs(coast.turned - expected)).toBeLessThan(0.15 * expected);
+    // sculled back the other way, by key or by hand: no less than she coasts, to a few percent, and still turning her first way
+    for (const x of [taps, strokes]) { expect(x.turned).toBeGreaterThan(0.95 * coast.turned); expect(x.rate).toBeGreaterThan(0.9 * coast.rate); }
   });
   it('going astern, the bow goes the way the tiller\'s pushed, and the tiller is drawn where it\'s held', () => {
     const { w, u } = world(15);
@@ -63,9 +67,7 @@ describe('in irons, with her sails up', () => {
     expect(u.astern ?? 0).toBeGreaterThan(0.3);
     u.scullDir = -1; // (sculling held to port, so the tiller's pump to starboard can't scull her: this is the flow working the rudder backwards)
     const h0 = u.h;
-    // (tiller to port, put over across a second and held: thrown over at once, the blade's own swing kicks her stern
-    // the other way for a moment, which is sculling's push, not the flow's)
-    for (let i = 0; i < 60 * 3; i++) { u.tiller = -0.8 * Math.min(1, i / 60); u.steer = 0; w.step(DT); }
+    for (let i = 0; i < 60 * 2; i++) { u.tiller = -0.8; u.steer = 0; w.step(DT); } // (tiller to port)
     expect(((u.h - h0 + 540) % 360) - 180).toBeLessThan(-1); // (the bow to port, the way the tiller's pushed)
     // (drawn where it's held: the same helm as the tiller to port gives with way on ahead, +, though she turns to port)
     expect(Math.sign(u.helm ?? 0)).toBe(1);
