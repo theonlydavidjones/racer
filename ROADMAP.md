@@ -295,6 +295,17 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8w. **The crew's places on the rail, and moving through the cockpit** (owner, 14 November; accuracy; next; 3–5 h; Crew
+   Figures, with a physics review since the stations feed the trim):
+   - Moving fore and aft: "they tend to squat-crawl along the side of the hull, between the coaming and the toe rail, to
+     move fore and aft. that's just not true to life. any human crew would step into the cockpit to get around." So
+     the route is down into the footwell, along it, and back up, not along the side deck outside the coaming.
+   - Their places, sitting on the rail: "front crew would be between the aft cabin wall and the winch, middle crew
+     between the winch and the thwart, and the skipper behind the thwart. the area behind the thwart is pretty
+     exclusively reserved for the skipper." Today the middle crew sits aft of the thwart. Change the stations from the
+     option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
+     thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
+     and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
 8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
