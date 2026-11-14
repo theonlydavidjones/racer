@@ -62,6 +62,22 @@ describe('Sail it yourself: a Case on the water', () => {
     expect(w.lesson!.cue).toBe('Foul: Rule 11 · Same tack, overlapped');
   });
 
+  it('a Case\'s boat on its track, not steered, that breaks a rule: the card says so, and she owes no penalty', () => {
+    const w = caseWorld(7), R = w.caseRun!, u = w.user, L = w.boats.find(b => b.name === 'L')!;
+    for (let i = 0; i < 60; i++) w.step(DT);
+    // (you stopped dead ahead of L, on her track: she comes up from clear astern, rule 12, and can't keep clear)
+    const q = R.pose('L', w.t), ahead = { x: q.p.x + Math.sin(q.h * Math.PI / 180) * 9, y: q.p.y + Math.cos(q.h * Math.PI / 180) * 9 };
+    let inc: { scripted?: boolean; fouler: { id: number }; rule: string } | null = null;
+    for (let i = 0; i < 20 * 60 && !inc; i++) {
+      Object.assign(u, { x: ahead.x, y: ahead.y, h: q.h, desired: q.h, v: 0.2 });
+      w.step(DT); if (w.paused) w.paused = false;
+      for (const e of w.drainEvents()) if (e.type === 'incident') inc = e.incident;
+    }
+    expect(inc?.fouler.id).toBe(L.id); expect(inc?.rule).toBe('12');
+    expect(inc?.scripted).toBe(true);
+    expect(L.penalty).toBe(0);
+  });
+
   it('what happens between two of the Case\'s own boats is the Case\'s: no turns for them (Case 11, three boats)', () => {
     expect(sail(caseWorld(11), (_t, h) => h).aiPenalty).toBe(0);
   });

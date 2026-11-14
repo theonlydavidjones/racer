@@ -1374,6 +1374,7 @@ export class World {
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
       if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
+      if (f.script && !this.caseRun?.free.includes(f.script)) incident.scripted = true; // (a Case's boat on its track: the card says so)
       const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
       if (incident.kind === 'contact') {
