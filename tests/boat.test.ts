@@ -215,8 +215,10 @@ describe('downwind: wing-on-wing with the whisker pole', () => {
     b.poleWant = true; sail(b, 12);
     expect(b.pole).toBe('set');
     const tack0 = b.tack;
-    b.h = 185; b.turnTarget = null; // gybe
-    sail(b, 1);
+    // (a gybe called: turned on round, her crew bring the main across. Set down 10° by the lee with nobody meaning a
+    // gybe, she'd hold her main there: tests/by-the-lee.test.ts)
+    b.turnTarget = 190; b.turnDir = 1;
+    sail(b, 2.5);
     expect(b.tack).not.toBe(tack0);
     expect(b.pole).toBe('setting');
     sail(b, 10);

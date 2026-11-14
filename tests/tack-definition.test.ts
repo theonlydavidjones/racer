@@ -46,8 +46,9 @@ describe('her tack, by the definitions', () => {
       expect(b.tack, 'by the lee: still her main\'s tack').toBe(tack); expect(byBoom(b)).toBe(tack); expect(b.gybeTo).toBeUndefined();
     }
   });
-  it('further by the lee the main goes across, and her tack changes when the boom has crossed her centerline: never one tack by the rules and the main on the other side', () => {
-    for (const user of [true, false]) {
+  it('gybed by her crew (an AI boat, who doesn\'t sail by the lee), her tack changes when the boom has crossed her centerline: never one tack by the rules and the main on the other side', () => {
+    // (the player's boat holds her main by the lee until the wind takes it, or she's turned through the gybe: tests/by-the-lee.test.ts)
+    for (const user of [false]) {
       const b = testBoat({ heading: 170, kt: 4, windKt: 10 }); b.isUser = user; sail(b, 15, () => held(b, 170));
       expect(b.tack).toBe('P'); expect(b.boom).toBeGreaterThan(30);
       let wrong = 0, gybing = 0, changedAt = NaN, boomThen = NaN, was = b.tack as string;

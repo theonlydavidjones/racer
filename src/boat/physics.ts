@@ -447,6 +447,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (Math.abs(b.sway) < 1e-4) b.sway = 0;
   }
   travel(b, dt, t, emit, groundToast);
+  boomStep(b, dt, t, emit);
   sailVisuals(b, plan, dt);
 }
 
@@ -964,27 +965,112 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
  * lee or directly downwind, her leeward side is the side on which her mainsail lies."
  *  - With the wind forward of dead astern on one side, that side is her windward side. Through head to wind she keeps
  *    the tack she had until the wind is on her other side: a tack.
- *  - Dead downwind and by the lee, her tack is her mainsail's, whatever side the wind is on. Within 4° of dead downwind
- *    the main stays where it is (so she can sail a little by the lee); further by the lee the main goes across (the
- *    crew gybes it, or the wind does), and her tack changes when the boom has crossed her centerline, not before:
- *    until then b.gybeTo holds the tack she's gybing to and the boom is on its way (sailVisuals).
+ *  - Dead downwind and by the lee, her tack is her mainsail's, whatever side the wind is on. The main stays where it
+ *    lies until it's gybed: by her crew, when she's being turned through the gybe (gybeMeant), or by the wind, when it
+ *    gets behind the leech (boomStep). Her tack changes when the boom has crossed her centerline, not before: until
+ *    then b.gybeTo holds the tack she's gybing to and the boom is on its way.
  *  - With no mainsail set there's none to go by: the wind's side.
  * `rel` the wind's bearing off her bow (deg, + over her starboard side), `twa` its size; `sheets`: her jib sheets change
  * over with it (the player's boat, and anyone hove to).
  */
 function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, sheets: boolean): void {
   const mainUp = b.rig?.mainUp ?? true;
+  if (b.turnTarget != null) b.turnCalledT = t; // (a called turn under way: gybeMeant)
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176 && mainUp) tk = b.tack; // dead downwind: the tack she had, her main where it lies
-  if (tk === b.tack) { b.gybeTo = undefined; return; } // (or the wind has come back before the boom crossed)
-  if (twa < 90) { b.tacking = true; b.headToWindT = t; } // head to wind: a tack (a gybe passes the wind astern)
-  else if (mainUp) {
-    // by the lee past where the main will stay: it's going across, and she's on her old tack until it has
-    b.gybeTo = tk;
+  if (twa >= 90 && mainUp && tk !== b.tack) {
+    // by the lee: her main's side is her leeward side, so she's on her old tack until the boom has crossed. Her crew
+    // gybe it if she's being turned through a gybe; otherwise it lies where it is until the wind gets behind it
     const across = tk === 'S' ? -1 : 1; // (the boom's side on the new tack: to port on starboard)
-    if (Math.sign(b.boom) !== across && Math.abs(b.boom) >= 1) return;
+    if (Math.sign(b.boom) !== across && Math.abs(b.boom) >= 1) {
+      if (b.boomFree == null && gybeMeant(b, tk, t)) b.gybeTo = tk;
+      return;
+    }
   }
+  if (tk === b.tack) { if (b.boomFree == null) b.gybeTo = undefined; return; } // (the wind back on her main's side before the crew had gybed it)
+  if (twa < 90) { b.tacking = true; b.headToWindT = t; } // head to wind: a tack (a gybe passes the wind astern)
   b.tack = tk; b.gybeTo = undefined; b.lastTackT = t; if (sheets) jibSheetsAtTack(b, emit);
+}
+
+/**
+ * Is she being gybed on purpose, onto `to`? Then her crew bring the main across as her stern comes through the wind
+ * (the boom handed over on the sheet, sailVisuals), as before. An AI boat never sails by the lee except to gybe; the
+ * player's boat when a turn has been called (or was, within the last 3 s), or while her helm is taking her on round (turning further by the lee at
+ * GYBE_TURN deg/s or more). Held steady by the lee, nobody touches the main: it stays until the wind takes it.
+ */
+const GYBE_TURN = 2;
+function gybeMeant(b: Boat, to: 'S' | 'P', t: number): boolean {
+  if (!b.isUser) return true;
+  // (a called turn, and for a moment after she's reached its heading: a turn called onto the other gybe is a gybe
+  // called, though it ends only a few degrees past dead astern)
+  if (b.turnCalledT != null && t - b.turnCalledT < 3) return true; // (tackStep keeps the time)
+  return (b.turnRate ?? 0) * (to === 'S' ? 1 : -1) >= GYBE_TURN; // (onto starboard she's turning to starboard: her stern through the wind, which comes round onto her starboard quarter)
+}
+
+/**
+ * The main by the lee, and the gybe the wind makes (the owner, 14 Nov 2026: the main holds 15 to 20° by the lee before
+ * the wind gets behind it, as a real boat's does, and the crash across comes from the physics).
+ *
+ * What holds it: by the lee the wind still blows on the sail's own side as long as it comes from outside the line of
+ * the sail, so the boom is pressed out against its sheet. It lets go from the leech: "As soon as the leech of the
+ * mainsail starts to flick across, a gybe inevitably follows" (Yachting Monthly, "How to gybe safely and easily").
+ * The leech is the edge the wind now meets first, and it stands inside the boom's line by the sail's own fullness
+ * (leechHook: the sail's shape as the sim has it; that the leech lets go just there is the model's reading, not a
+ * measurement). So the wind gets behind it when the apparent wind at the sail is more than (the boom's angle − that)
+ * round her stern: about 43° of apparent wind with the boom on the shroud at 70°, and sooner with the main not eased
+ * right out. In true wind that is 25 to 30° by the lee in flat water (running, the apparent wind swings further round
+ * than the true), less when she rolls or a sea slews her stern: "Rolling motion, slight changes in the boat heading or wind direction can
+ * cause an unexpected and surprising jibe" (Wikipedia, Jibe). No published angle was found for where it goes.
+ *
+ * Then the boom is free and the wind swings it: the sail's force broadside (a flat plate's, Cn 1.2: Hoerner) at the
+ * sail's centre, BOOM_ARM from the mast, against the boom's and the sail's inertia with the air the sail carries
+ * (BOOM_I, an estimate: a 9 kg spar 3.3 m long, 33 kg·m²; 5 kg of cloth, 9; the air, a plate's added inertia about
+ * its edge (9/128)·π·ρ·c⁴ summed up the triangle, 51), and the air's own damping of a sail moving through it. In 12 kt
+ * it is across in a second and a half; in 25 kt in half a second, the boom's end at 20 m/s. Fetched up on its sheet
+ * on the new side, its turning momentum goes into her hull: she's slewed toward the wind, and her sails, full on the
+ * new side at once, heel her and round her up (the roll and the helm's own models).
+ */
+const BOOM_ARM = 1.1, BOOM_I = 95, PLATE_CN = 1.2;
+/** How far inside the boom's line the main's leech stands, deg: the sail's own fullness as a circular arc, whose ends
+ * turn in by 2·atan(2 × its depth). 27° at a depth of 12%; flattened, less, so a flat main holds further by the lee. */
+const leechHook = (b: Boat) => 2 * Math.atan(2 * b.shape.main.depth) / D2R;
+/** The apparent wind's bearing round her stern, deg, + toward starboard of dead astern (from over her starboard quarter). */
+const windAstern = (b: Boat) => (b.arel >= 0 ? 1 : -1) * (180 - Math.abs(b.arel));
+function boomStep(b: Boat, dt: number, t: number, emit: Emit): boolean {
+  const out = Math.abs(b.boom), side = Math.sign(b.boom), mainUp = b.rig?.mainUp ?? true;
+  if (b.boomFree == null) {
+    // the wind onto the back of the leech: off the wind, the main set and out on one side, not being handed across
+    const lee = side * windAstern(b); // (how far round her stern onto the main's own side the wind comes: by the lee)
+    if (!mainUp || b.gybeTo || out < 5 || b.twa < 90 || !(b.aws > 0.5) || lee <= 0 || lee <= out - leechHook(b)) return false;
+    b.boomFree = 0; b.boomFrom = side; b.gybeTo = b.tack === 'S' ? 'P' : 'S';
+  }
+  // free: the wind's moment on the sail about the mast (it streams the boom away from where the wind comes from), less
+  // the air's damping, against the inertia; past her centerline the sail fills on its new side
+  const q = 0.5 * 1.225 * b.aws * b.aws, K = q * SAIL_AREA.main * (b.rig?.main ?? 1) * PLATE_CN * BOOM_ARM;
+  const was = b.boomFrom ?? side, hook = Math.sign(b.boom) === was ? was * leechHook(b) : 0;
+  // (the wind back on the main's own side before it had gone: it fills again, and the sheet has it)
+  if (Math.sign(b.boom) === was && was * windAstern(b) <= 0) { b.boomFree = undefined; b.boomFrom = undefined; b.gybeTo = undefined; return false; }
+  const M = K * Math.sin((b.boom - hook - windAstern(b)) * D2R) - K * BOOM_ARM * (b.boomFree * D2R) / Math.max(1, b.aws);
+  b.boomFree += M / BOOM_I / D2R * dt;
+  b.boom += b.boomFree * dt;
+  // (across her centerline: her mainsail's side is her leeward side from this step, so her tack changes with it)
+  if (b.gybeTo && Math.sign(b.boom) === -was) { b.tack = b.gybeTo; b.gybeTo = undefined; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); }
+  // fetched up on the sheet on the new side (or blown back out on the old one: the wind came back)
+  const stop = b.luff ? SAILS.main.max : Math.max(5, b.sheets.main);
+  if (Math.abs(b.boom) >= stop && Math.sign(b.boom) === Math.sign(b.boomFree)) {
+    const crossed = Math.sign(b.boom) !== was, w = b.boomFree * D2R;
+    b.boom = Math.sign(b.boom) * stop;
+    if (crossed) {
+      // the boom's turning momentum into her hull (about the mast, near enough her middle): a boom swinging to port
+      // slews her bow to starboard, toward the wind she's now on
+      const I = HULL.displacement * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
+      b.turnRate = (b.turnRate ?? 0) - BOOM_I * w / I / D2R; b.yawRate = b.turnRate;
+      b.crashT = t;
+      if (b.isUser) emit({ type: 'toast', ms: 5000, msg: 'Crash jibe: the wind got behind the main. Head up a little, or jibe on purpose.' });
+    }
+    b.boomFree = undefined; b.boomFrom = undefined; if (!crossed) b.gybeTo = undefined;
+  }
+  return true;
 }
 
 /** Where the boom and jib are drawn: easing toward their sheet angles. */
@@ -997,7 +1083,7 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   // Jib: to leeward normally (to windward when backed); poled out square to windward when wing-on-wing; hanging
   // centred while the crew works the pole.
   const jibT = plan === 'wing' ? -jibSide * 82 : plan === 'main' ? jibSide * 10 : jibSide * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
-  b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4);
+  if (b.boomFree == null) b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4); // (free, the wind has it: boomStep)
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 

@@ -585,7 +585,7 @@ export class World {
       // (given later, from 0 and then fractions: declared here, see asDoubles)
       weatherHeld: undefined, carOff: undefined,
       // (her turning's own, declared here so every boat keeps the one shape whichever of them she first needs: physics.ts)
-      turnM: 0, scullDir: undefined, scullNet: 0, scullMean: 0, groundT: undefined, gybeTo: undefined,
+      turnM: 0, scullDir: undefined, scullNet: 0, scullMean: 0, groundT: undefined, gybeTo: undefined, turnCalledT: undefined, boomFree: undefined, boomFrom: undefined, crashT: undefined,
       crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
