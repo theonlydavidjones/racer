@@ -984,7 +984,11 @@ export class World {
       return;
     }
     if (a.phase === 'fetch') { u.anchor = null; this.anchorJob(u, false); this.emit({ type: 'toast', msg: 'The anchor stays below.' }); return; }
-    if (a.phase === 'paying' || a.phase === 'down') { a.phase = 'hauling'; a.t = 0; this.emit({ type: 'toast', msg: 'Weighing anchor: hauling in the rode.' }); }
+    if (a.phase === 'paying' || a.phase === 'down') {
+      a.phase = 'hauling'; a.t = 0;
+      if (a.at) { const p = stemHead(u), g = Math.hypot(a.at.x - p.x, a.at.y - p.y) || 1; a.haulDir = { x: (a.at.x - p.x) / g, y: (a.at.y - p.y) / g }; }
+      this.emit({ type: 'toast', msg: 'Weighing anchor: hauling in the rode.' });
+    }
   }
   /** The water's depth (m) at `p`, with the tide's height (San Francisco's station, 9414290): in San Rafael and San Leandro
    * Bays the 50 m sounding grid (environment/tide.ts depthBand); elsewhere NOAA's chart, its depth areas and soundings
@@ -1027,9 +1031,10 @@ export class World {
       if (a.out <= d + 0.05) { a.phase = 'breaking'; a.t = 0; }
     } else if (a.phase === 'breaking' && a.t >= ANCHOR.breakS / pace) {
       // broken out: she's free. Rule 45, Case 5: hauling in may bring her back to where it went down, but not gather way
-      // over the ground past it (her way over the ground, not through the water: in a foul stream she's held still)
-      const ground = Math.hypot(b.vx, b.vy);
-      if (ground > 0.5 && this.racing(b)) this.rule42(b, 'anchor');
+      // over the ground past it: her way over the ground the way the haul pulled her (not through the water: in a foul
+      // stream she's held still; nor being blown back as it breaks out, which isn't propulsion)
+      const hd = a.haulDir, pulled = hd ? b.vx * hd.x + b.vy * hd.y : 0;
+      if (pulled > 0.5 && this.racing(b)) this.rule42(b, 'anchor');
       a.phase = 'stowing'; a.t = 0; a.line = undefined; a.at = undefined; a.dragging = false; b.atAnchor = false;
       this.emit({ type: 'toast', msg: 'Anchor\'s aweigh.' });
     } else if (a.phase === 'stowing' && a.t >= ANCHOR.stowS / pace) {
@@ -1048,7 +1053,7 @@ export class World {
       // the anchor slides along the bottom toward her, by as much as the rode was stretched past what it holds
       const p = stemHead(b), g = Math.hypot(p.x - a.at!.x, p.y - a.at!.y) || 1e-6, s = Math.min(g, L.slip!);
       a.at = { x: a.at!.x + (p.x - a.at!.x) / g * s, y: a.at!.y + (p.y - a.at!.y) / g * s };
-      if (a.drop && Math.hypot(a.at.x - a.drop.x, a.at.y - a.drop.y) > 20) { a.drop = { ...a.at }; a.chart = this.chartAt(a.at); } // (dragged to new ground: its chart depth)
+      const c0 = a.charted ?? a.drop; if (c0 && Math.hypot(a.at.x - c0.x, a.at.y - c0.y) > 20) { a.charted = { ...a.at }; a.chart = this.chartAt(a.at); } // (dragged to new ground: its chart depth)
     }
     if (this.steps % 60 === 0) a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
     // (head to wind or stream with her sails let fly she lies upright: her heel eases off as the hull's damping lets it)

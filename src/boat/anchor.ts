@@ -71,6 +71,10 @@ export interface AnchorState {
   t0?: number;
   /** told to take the way off her first */
   waited?: boolean;
+  /** where its chart depth was last read (dragged 20 m on, read again) */
+  charted?: Vec;
+  /** the way the haul pulls her (unit, over the ground: toward the anchor as hauling began), for rule 42 */
+  haulDir?: Vec;
 }
 
 /** How fast the forward hand works (a slower crewmate takes longer). */

@@ -58,15 +58,19 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     expect(dist(stemHead(u), a.at!)).toBeLessThan(a.out + 0.5);
   });
   it('on a scope too short to hold, in a breeze, the anchor drags (at a good scope, a Folkboat\'s pull is a small share of what it holds)', () => {
-    const w = world(22, 'flood'), u = w.user;
+    const w = world(30, 'flood'), u = w.user;
     applyCommand(w, { k: 'anchor' }); run(w, 90);
     const a = u.anchor!; expect(a.phase).toBe('down');
     expect(a.dragging).toBe(false);
-    a.out = 1.55 * ((a.depth ?? 0) + ANCHOR.bowH); // (all but straight up and down: it barely holds)
+    a.out = 1.45 * ((a.depth ?? 0) + ANCHOR.bowH); // (all but straight up and down: it barely holds)
     let dragged = false, at0 = { ...a.at! };
-    for (let i = 0; i < 60 * 60; i++) { w.step(DT); if (a.dragging) dragged = true; }
+    // (dragging, it still resists with what it holds: the rode taut at its holding, not slack)
+    let T = 0, n = 0, taut = 0;
+    for (let i = 0; i < 60 * 60; i++) { w.step(DT); if ((a.line?.T ?? 0) > 1) taut++; if (a.dragging) { dragged = true; T += (a.line?.T ?? 0) / (a.line?.holds ?? 1); n++; } }
+    expect(taut / 3600, 'the rode taut, not leaping slack as the anchor jumps').toBeGreaterThan(0.8);
     expect(dragged).toBe(true);
     expect(dist(at0, a.at!)).toBeGreaterThan(0.5);
+    expect(T / n, 'its pull, a share of its holding').toBeGreaterThan(0.95);
   });
   it('weighed: hauled in, broken out and stowed, and she\'s free; racing, no penalty (rule 45)', { timeout: 60000 }, () => {
     const w = world(1, 'flood', 'race'), u = w.user;

@@ -149,7 +149,9 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
     let T = stretch > 0 ? Math.max(0, k * stretch + cDamp * rate) : 0;
     if (L.state === 'held' && T > HELD_MAX) { L.len += (T - HELD_MAX) / k; T = HELD_MAX; } // (renders out through the hand)
     L.slip = 0;
-    if (L.holds != null && T > L.holds) { L.slip = (T - L.holds) / k; T = L.holds; } // (the anchor drags: no more pull on her than it holds)
+    // (the anchor drags: no more pull on her than it holds, and it gives by the rode's stretch past what that holds, not
+    // the damper's share, so the rode stays stretched to its holding and the anchor follows her at her own pace)
+    if (L.holds != null && T > L.holds) { L.slip = Math.max(0, stretch - L.holds / k); T = L.holds; }
     if (L.state === 'made' && T > LINE_BREAK) { out.parted = L; lines.splice(lines.indexOf(L), 1); continue; } // (it parts)
     L.T = T;
     const fx = lx.x * T, fy = lx.y * T;
