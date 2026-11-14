@@ -37,7 +37,7 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
-import { ensignFor, sailNo } from '../boat/spec';
+import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
 import { skillOf } from '../boat/crewPhys';
@@ -241,6 +241,13 @@ function asDoubles(b: Boat): Boat {
   return b;
 }
 
+/** A boat's look from her spec (her paint and lettering): the same for a boat put in the water and one restyled in it. */
+export function boatLook(spec: BoatSpec) {
+  return {
+    no: sailNo(spec), hullColor: spec.hull.upper, sailColor: spec.sails.color === 'black' ? '#232427' : '#fbfaf5',
+    paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
+  };
+}
 export class World {
   readonly C: Course;
   settings: Settings;
@@ -561,9 +568,9 @@ export class World {
     const spec = isUser ? this.settings.boat : oppSpec; // your boat as you've set her up (or a rival you've set up)
     return asDoubles({
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
-      hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? (spec.sails.color === 'black' ? '#232427' : '#fbfaf5') : F.sail,
+      hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? boatLook(spec).sailColor : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor } } : { paint: F.paint }),
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: boatLook(spec).paint } : { paint: F.paint }),
       ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
@@ -1986,6 +1993,20 @@ export class World {
    * the course (racing: the marks stay where they were laid; changing the course needs a signal), her destination and the
    * log carry on. The day and the start time stay the sail's own.
    */
+  /**
+   * Your boat's look changed in the boat editor (her paint, hatch, cockpit, lettering, sail numbers): taken by the boat
+   * in the water as she is, nothing else about the race touched, so the showroom redraws only her (ROADMAP 8v). Only
+   * for what doesn't change how she sails (app.ts lookOnly decides).
+   */
+  applyLook(spec: BoatSpec): void {
+    const b = this.user; this.settings.boat = spec;
+    const l = boatLook(spec); b.no = l.no; b.hullColor = l.hullColor; b.sailColor = l.sailColor; b.spec = spec; b.paint = l.paint;
+  }
+  /** The showroom's clock moved (the time she's shown at): the same day and place, lit for the new hour (ROADMAP 8v). */
+  setClock(tideTime: string): void {
+    this.settings.tideTime = tideTime; this.gunUtc = sfLocalToUtcMin(this.raceDate, tideTime || '12:00');
+    for (const b of this.boats) if (b.ensign) b.ensignNight = !ensignDue(this.clockUtc, inBasin(b), false); // (her ensign, struck at sunset)
+  }
   applyConditions(next: Settings): void {
     const s: Settings = { ...this.settings };
     for (const k of CONDITION_KEYS) (s as unknown as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k];
