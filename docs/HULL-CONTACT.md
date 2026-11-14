@@ -39,11 +39,11 @@ stern in line (subtract 0 to 0.66 m). "Becomes" is the new constant, hull to hul
 | Constant (file) | Now | Real now | Becomes | Why |
 |---|---|---|---|---|
 | `CONTACT_GAP` (rules/pairs.ts) | 2.2 | 0 abeam; 1.5 in line | **0.15** | Touching. A small tolerance for the step (a boat at 3 m/s moves 5 cm a step) and for booms and crew, which touch first (Cases 7, 49). |
-| `KEEP_CLEAR_GAP` (pairs.ts) | 2.7 | 0.5 | **0.65** | Its own definition: half a metre more than touching. |
+| `KEEP_CLEAR_GAP` (pairs.ts) | 2.7 | 0.5 | **0.65** | Its own definition: half a meter more than touching. |
 | `ROOM_GAP` (pairs.ts) | 3.5 | 1.3 | **1.3** | Room to pass between a boat and a mark or obstruction. Its comment's beam plus 1.3 m: Cases 35 and 88. |
 | `OPEN_GAP` (ai/ai.ts) | 5.2 | 3.0 abeam | **3.0** | Its own comment: "at least 3 m of water between the hulls", now measured so. |
 | Tangle "clear", lastFoulVs (sim/world.ts) | LOA | 5.4 abeam | **LOA** | "A length apart": the definition's own sense, between the hulls. |
-| Tangle `parted` (world.ts) | max(g0, 2.2) + 1 | 1 m off touching | **max(g0, 0.15) + 1** | A metre wider than touching. |
+| Tangle `parted` (world.ts) | max(g0, 2.2) + 1 | 1 m off touching | **max(g0, 0.15) + 1** | A meter wider than touching. |
 | `ENGAGED` (world.ts) | 2 LOA | 13.1 abeam | **2 LOA** | "Within two lengths" of the boat she fouled. |
 | `RULE17_RANGE` (pairs.ts) | 2 LOA | 13.1 abeam | **2 LOA** | Rule 17: "within two of her hull lengths". |
 | `youTackPays` (world.ts) | 0.6 LOA | 2.4 abeam | **0.6 LOA** | Clear ahead by most of a length, hull to hull. |
@@ -70,6 +70,6 @@ points) don't change.
 ## Open
 
 - Booms and crew outboard (Cases 7 and 49 count them as contact). The 0.15 m tolerance covers crew's hands; a boom
-  squared out on a run is a metre or more beyond the hull. That's a later addition: the boom as a segment from the
+  squared out on a run is a meter or more beyond the hull. That's a later addition: the boom as a segment from the
   gooseneck at the trim's angle.
 - Heel: left out first (6%).
