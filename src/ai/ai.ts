@@ -863,14 +863,16 @@ function duckUnder(b: Boat): number { return sailable(b, b.tack === 'P' ? b.h + 
 function swerveFrom(b: Boat, dx: number, dy: number): number { return sailable(b, brg(-dx, -dy)); }
 
 /**
- * The race AI's keep-clear for one other boat, alone (Learn to sail's rules of the road sails her by it, sim/lessons.ts):
- * the moves aiThink makes for that boat, when it makes them. Required to keep clear, with the closest approach inside her
- * keep-clear time and distance: on her heading if she's already opening with room between the hulls, else Rule 10's duck,
- * or turning away and easing for the others. With right of way and contact a few seconds off: Rule 14's swerve. Else
- * null: she sails her own course.
+ * The race AI's keep-clear for one other boat, in its simple form (Learn to sail's rules of the road sails her by it, and
+ * a Case's boat sailing free: sim/lessons.ts, sim/world.ts): required to keep clear, with the closest approach inside her
+ * keep-clear time and distance, she sails on if she's already opening with room between the hulls, else ducks (Rule 10,
+ * as aiThink does) or, for the other rules, turns straight away and eases (aiThink's fuller moves, the rule 11 head-up,
+ * the overlapped and hailed cases and the start's clearance checks, are left out). With right of way and contact a few
+ * seconds off: Rule 14's swerve. Else null: she sails her own course. `standOn`: the right of way is hers whatever the
+ * racing rules say (the Navigation Rules' stand-on vessel): only the swerve.
  */
-export function keepClearMove(w: World, b: Boat, o: Boat): { h: number; luff: boolean } | null {
-  const r = w.rights(b, o), cp = cpa(b, o), dx = o.x - b.x, dy = o.y - b.y, v = b.v + (b.astern ?? 0);
+export function keepClearMove(w: World, b: Boat, o: Boat, standOn = false): { h: number; luff: boolean } | null {
+  const r = standOn ? { kc: o, rule: '' } : w.rights(b, o), cp = cpa(b, o), dx = o.x - b.x, dy = o.y - b.y, v = b.v + (b.astern ?? 0);
   const lagT = Math.min(1.5, yawLag(v)), lagM = v * yawLag(v);
   if (r.kc === b && cp.t < b.ai!.kn.keepClearS && cp.d < b.ai!.kn.keepClearM + lagM) {
     const rangeRate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
