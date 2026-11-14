@@ -659,7 +659,7 @@ function lessonTick(): void {
     // passed: a moment to see it, then paused on the lessons, this one ticked (a Case sailed: back on it in the Rules
     // trainer, with how it came out)
     const R = w.caseRun;
-    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) rulesTrainer.sailed(R.c.case, R.result === 'clear', R.fouls[0]); else setup.openLessons(); } }, 3000);
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', R.fouls[0]); } else setup.openLessons(); } }, 3000);
   }
   tipFade();
 }
