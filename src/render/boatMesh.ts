@@ -1,5 +1,5 @@
 import './three-setup';
-import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
+import { ensignStep, flagDrawn, flagExtension, flagHang, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
@@ -1496,7 +1496,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
         const k = (i / 3) % (FLAG_SEGS + 1), x = ROW_X[k], y = f.base[i + 1];
         // streaming, it lies out along the wind; hanging, the fly falls away below the hoist, which stays on its staff or
         // halyard (the foot folds in under it rather than hanging the whole flag's length lower)
-        a[i] = x * cs; a[i + 1] = y - x * sn * (1 + y / f.h); a[i + 2] = ROW_Z[k];
+        const [hx, hy] = flagHang(x, y, f.h, f.fly, cs, sn); a[i] = hx; a[i + 1] = hy; a[i + 2] = ROW_Z[k];
       }
       p.needsUpdate = true;
     }
