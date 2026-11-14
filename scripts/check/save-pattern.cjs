@@ -61,10 +61,17 @@ const out = process.argv[2] || '.';
   await click('.fcard'); await page.waitForTimeout(2000);
   await click('[data-f="edit"]'); await page.waitForTimeout(2500);
   // (8u: her sail number and home country are there to change, in Particulars; a stray .row2 rule once hid them)
-  const shown = () => page.evaluate(() => ['country', 'number'].every(k => { const e = document.querySelector(`#boatPanel [data-k="${k}"]`); return !!e && e.getBoundingClientRect().width > 0; }));
+  // (8i: the editor's groups fold; Her holds them, opened by its Change)
+  const openGrp = g => page.evaluate(g => { if (!document.querySelector(`#boatPanel .be-grp.open[data-grp="${g}"]`)) document.querySelector(`#boatPanel [data-act="grp"][data-v="${g}"]`)?.click(); }, g);
+  const shown = async () => { await openGrp('her'); await page.waitForTimeout(300); return page.evaluate(() => ['country', 'number'].every(k => { const e = document.querySelector(`#boatPanel [data-k="${k}"]`); return !!e && e.getBoundingClientRect().width > 0; })); };
   if (!(await shown())) fail('the editor hides her sail number or home country');
   const hull0 = (await stored()).boats?.[0]?.hull?.upper;
-  const pick = async () => page.evaluate(h => { const b = [...document.querySelectorAll('[data-act="upper"]')].find(x => x.dataset.v !== h); b.click(); return b.dataset.v; }, hull0);
+  // (her topsides, by the one color picker: Hull's Change, the Topsides button, a preset)
+  const topsides = async h => { await openGrp('hull'); await page.waitForTimeout(300);
+    if (!(await has('#boatPanel .be-picker[data-key="upper"]'))) { await click('#boatPanel [data-act="pick"][data-v="upper"]'); await page.waitForTimeout(300); }
+    return page.evaluate(h => { const b = [...document.querySelectorAll('#boatPanel .be-picker[data-key="upper"] [data-cp="preset"]')].find(x => h ? x.dataset.v === h : x.dataset.v.toLowerCase() !== (window.__hull0 ?? '').toLowerCase()); b.click(); return b.dataset.v; }, h); };
+  await page.evaluate(h => { window.__hull0 = h; }, hull0);
+  const pick = async () => topsides(null);
   const newHull = await pick(); await page.waitForTimeout(800);
   if ((await stored()).boats?.[0]?.hull?.upper !== hull0) fail('the editor saved before Save');
   if (!(await has('#boatPanel [data-act="save"]'))) fail('no Save in the editor once changed');
@@ -73,7 +80,7 @@ const out = process.argv[2] || '.';
   if (await page.evaluate(() => !document.getElementById('boatPanel').hidden)) fail('Save didn\'t close the editor');
   await page.screenshot({ path: out + '/save-boat-saved.png' });
   await click('[data-f="edit"]'); await page.waitForTimeout(2500);
-  await page.evaluate(h => { [...document.querySelectorAll('[data-act="upper"]')].find(x => x.dataset.v === h).click(); }, hull0); await page.waitForTimeout(800);
+  await topsides(hull0); await page.waitForTimeout(800);
   await page.keyboard.press('Escape'); await page.waitForTimeout(600);
   if (!(await has('#boatPanel [data-act="askSave"]'))) fail('leaving the editor unsaved (Esc) didn\'t ask');
   await page.screenshot({ path: out + '/save-boat-ask.png' });
@@ -101,6 +108,7 @@ const out = process.argv[2] || '.';
     await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(500);
     await page.evaluate(k => document.querySelectorAll('.fcard')[k].click(), i); await page.waitForTimeout(1500);
     await click('[data-f="edit"]'); await page.waitForTimeout(2000);
+    await openGrp('her'); await page.waitForTimeout(300);
     const who = await page.evaluate(() => { const c = document.querySelector('#boatPanel [data-k="country"]'), no = document.querySelector('#boatPanel [data-k="number"]'), nm = document.querySelector('#boatPanel [data-k="name"]'); return `${nm?.value} ${c?.value} ${no?.value}`; });
     const ok = await shown(); console.log(`editor: ${who}: ${ok ? 'sail number and country shown' : 'HIDDEN'}`);
     if (!ok) fail(`the editor hides ${who}'s sail number or home country`);

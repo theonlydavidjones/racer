@@ -14,3 +14,4 @@
 @import './styles/12-rules.css'; /* the Rules trainer (after Learn to sail's 11) */
 @import './styles/13-pause.css'; /* the pause menu and the results: one column of actions; Leave race? */
 @import './styles/14-season.css'; /* the season's flow: the Season card, the overview, a season race's locked setup */
+@import './styles/15-boat-editor.css'; /* the boat editor: groups, one color picker, lines as rope (8i) */

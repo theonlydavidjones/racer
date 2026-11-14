@@ -57,15 +57,17 @@ export class Fleet {
    */
   private draft: Member | null = null;
   private seatDraft: string[] | null = null;
+  /** Her skipper, chosen on her page (the owner, 8i: the skipper belongs with her crew here, not in the boat editor); kept on Save. */
+  private skipperDraft: BoatSpec['skipper'] | null = null;
   private leaving: (() => void) | null = null;
   private flash = '';
   private flashT = 0;
   private get memberDirty(): boolean { const m = this.stored(); return !!this.draft && !!m && JSON.stringify(this.draft) !== JSON.stringify(m); }
-  private get seatsDirty(): boolean { return !!this.seatDraft && !!this.cur && JSON.stringify(this.seatDraft) !== JSON.stringify(this.cur.crewIds ?? []); }
+  private get seatsDirty(): boolean { return !!this.cur && ((!!this.seatDraft && JSON.stringify(this.seatDraft) !== JSON.stringify(this.cur.crewIds ?? [])) || (!!this.skipperDraft && this.skipperDraft !== this.cur.skipper)); }
   /** Go on, or, with changes unsaved, ask first (the answer goes on). */
   private guard(next: () => void): void {
     if (this.memberDirty || this.seatsDirty) { this.leaving = next; if (this.list.hidden) this.drawBoat(); else this.drawList(); return; }
-    this.leaving = null; this.draft = null; this.seatDraft = null; next();
+    this.leaving = null; this.draft = null; this.seatDraft = null; this.skipperDraft = null; next();
   }
   /** A quick "Saved" on her page (the boat editor's Save). */
   flashSaved(): void { this.saved('boat'); if (this.boatOpen) this.drawBoat(); }
@@ -80,14 +82,17 @@ export class Fleet {
   }
   private saveSeats(): void {
     const b = this.cur; if (b && this.seatDraft) { b.crewIds = [...this.seatDraft]; this.hooks.changed(); this.hooks.membersChanged(); }
-    this.seatDraft = null;
+    if (b && this.skipperDraft && this.skipperDraft !== b.skipper) { b.skipper = this.skipperDraft; this.hooks.changed(); }
+    this.seatDraft = null; this.skipperDraft = null;
   }
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
     for (const el of [this.list, this.page]) el.addEventListener('click', e => this.click(e));
     // (her crew's seats, on her page: picked from the members; none leaves the seat empty, the forward hand moving up)
     this.page.addEventListener('change', e => {
-      const t = e.target as HTMLSelectElement, b = this.cur; if (!b || t.dataset.f !== 'seat') return;
+      const t = e.target as HTMLSelectElement, b = this.cur; if (!b) return;
+      if (t.dataset.f === 'skipper') { this.skipperDraft = t.value === 'you' ? 'you' : 'ai'; this.drawBoat(); return; } // (kept when you Save)
+      if (t.dataset.f !== 'seat') return;
       const ids = [...(this.seatDraft ?? b.crewIds ?? [])], i = Number(t.dataset.v);
       if (t.value) ids[i] = t.value; else ids.splice(i, 1);
       this.seatDraft = ids.filter(Boolean).slice(0, 2); this.drawBoat(); // (kept when you Save)
@@ -120,7 +125,7 @@ export class Fleet {
   }
   openBoat(id: string): void {
     const b = this.S.boats.find(x => x.id === id); if (!b) { this.openList(); return; }
-    this.boatId = id; this.confirmDelete = false; this.seatDraft = null; this.leaving = null;
+    this.boatId = id; this.confirmDelete = false; this.seatDraft = null; this.skipperDraft = null; this.leaving = null;
     this.list.hidden = true;
     this.drawBoat(); this.page.hidden = false; this.hooks.showroom(b);
   }
@@ -138,8 +143,8 @@ export class Fleet {
     const v = t.dataset.v ?? '';
     switch (t.dataset.f) {
       case 'back': this.guard(() => { this.close(); this.hooks.back(); }); return;
-      case 'askSave': { const go = this.leaving; this.leaving = null; if (this.draft) this.saveMember(); if (this.seatDraft) this.saveSeats(); this.saved(this.list.hidden ? 'boat' : 'list'); go?.(); return; }
-      case 'askDiscard': { const go = this.leaving; this.leaving = null; this.draft = null; this.seatDraft = null; go?.(); return; }
+      case 'askSave': { const go = this.leaving; this.leaving = null; if (this.draft) this.saveMember(); if (this.seatDraft || this.skipperDraft) this.saveSeats(); this.saved(this.list.hidden ? 'boat' : 'list'); go?.(); return; }
+      case 'askDiscard': { const go = this.leaving; this.leaving = null; this.draft = null; this.seatDraft = null; this.skipperDraft = null; go?.(); return; }
       case 'msave': this.saveMember(); this.memberId = null; this.saved('list'); this.drawList(); return;
       case 'bsave': this.saveSeats(); this.saved('boat'); this.drawBoat(); return;
       case 'view': this.view = v === 'list' ? 'list' : 'grid'; try { localStorage.setItem(VIEW_KEY, this.view); } catch { /* ignore */ } this.drawList(); return;
@@ -256,7 +261,7 @@ export class Fleet {
         ${row('Sail number', esc(sailNo(b)))}${laidUp(b) ? row('Laid up', `for repairs, until ${esc(b.laidUpUntil!)}`) : ''}
         ${row('Country', esc(countryName(b.sails.country) || '—'))}
         ${row('Yacht club', esc(clubName(b.club) || 'None'))}
-        ${row('Skipper', skipperName(b))}
+        ${row('Skipper', `<select data-f="skipper" aria-label="Skipper">${(['you', 'ai'] as const).map(k => `<option value="${k}"${(this.skipperDraft ?? b.skipper) === k ? ' selected' : ''}>${k === 'you' ? 'You' : 'AI skipper (generic)'}</option>`).join('')}</select>`)}
         ${this.crewRows(b)}
         ${row('Home marina', esc(marinaName(b.marina) || 'None'))}
         ${row('Slip', slip ? `${slip.label.replace(/^Slip /, '')} (${dockName(slip.dock)}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
