@@ -122,6 +122,8 @@ export const harborOf = (id: string | undefined): Harbor | null => HARBORS.find(
 export const harborAt = (p: Vec): Harbor | null => HARBORS.find(h => inBox(p, h.box) && inPoly(p, h.basin)) ?? null;
 /** In a harbor's basin? */
 export const inBasin = (p: Vec): boolean => harborAt(p) !== null;
+/** The harbor whose basin, breakwaters and docks reach to here (for saying where something happened). */
+export const harborNear = (p: Vec): Harbor | null => HARBORS.find(h => inBox(p, h.reach)) ?? null;
 
 /** Within `half` of a dock's centre line, square at its ends (as the docks are built), and round only at its bends. */
 const nearLine = (p: Vec, pts: Vec[], half: number) => {

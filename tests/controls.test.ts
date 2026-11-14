@@ -103,7 +103,7 @@ describe('you on the controls', () => {
     sail(b, 1); // (the crew has set her up)
     const loaded = { ...b.ctl.car.P }, lazy = { ...b.ctl.car.S };
     moveLazyCar(b, 2, -1);
-    expect(b.carCmd).toEqual({ fore: lazy.fore + 2, ins: lazy.ins - 1 });
+    expect(b.carCmd).toEqual({ fore: lazy.fore + 2, ins: lazy.ins - 1, side: b.tack }); // (the car asked for: the windward one)
     sail(b, 2);
     expect(b.ctl.car.S).toEqual(lazy); // not yet: someone has to go forward and do it
     sail(b, 25); // the crew goes forward, moves it and comes back
