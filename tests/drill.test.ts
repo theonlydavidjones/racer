@@ -203,6 +203,31 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     expect(s, d.list.map(x => x.coach).join(' | ')).toBeTruthy();
     if (s!.scored) expect(s!.rate).toBeLessThan(4.5);
   });
+  it('a tack that pauses a moment just past the eye, then turns on, is timed to the end of the whole turn', () => {
+    // (her heading set by hand: 10°/s across the eye to 10° past it, held 2.2 s, long enough for the 2 s rate to read
+    // steady for a moment but not the second it takes to call the turn over, then on at 10°/s to her new close-hauled)
+    const tws = 12, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
+    run(b, d, 50); b.handsOff = true;
+    let t = 0, h = b.h, phase = 0, at = 0, turnT = 0;
+    run(b, d, 60, () => { t += 1 / 60; const off = wrap(h - b.ww.from); // (the heading off the wind: − to port of it)
+      if (phase === 0) { turnT += 1 / 60; h += 10 / 60; if (off >= 10) { phase = 1; at = t; } }
+      else if (phase === 1) { if (t - at > 2.2) phase = 2; }
+      else if (phase === 2) { turnT += 1 / 60; h += 10 / 60; if (off >= ang) { phase = 3; at = t; } }
+      b.h = (h + 360) % 360; });
+    const s = d.list.find(x => x.scored);
+    expect(s, d.list.map(x => x.coach).join(' | ')).toBeTruthy();
+    // the whole turn: both bursts and the pause between them, not ended at the pause
+    expect(s!.turnS).toBeGreaterThan(turnT + 2.2 - 1);
+  });
+  it('in a heavier sea on the beam after the tack (1 m, 4 s), the turn still ends and the tack is scored', () => {
+    // (a pause past the eye restarts the count of her steady second: a sea that yaws her must still let the turn end)
+    const tws = 18, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat, d = new DrillTracker();
+    b.sea = { ...b.sea, hsW: 1, tpW: 4, fromW: (b.ww.from + 270) % 360, steep: 0.05 };
+    run(b, d, 60); startTack(b); run(b, d, 90);
+    const s = d.list.find(x => x.kind === 'tack');
+    expect(s, d.list.map(x => x.coach).join(' | ')).toBeTruthy();
+    expect(s!.scored, s!.coach).toBe(true); expect(s!.turnS).toBeLessThan(14);
+  });
   it('sitting in irons and wagging the tiller tells it once, not on every flip', () => {
     const tws = 6, ang = FOLKBOAT.beatAngle(tws), b = testBoat({ heading: 360 - ang, kt: FOLKBOAT.speedKt(tws, ang), windKt: tws }) as Boat & { handsOff?: boolean }, d = new DrillTracker();
     run(b, d, 40); b.handsOff = true; b.tiller = -0.08; run(b, d, 110);

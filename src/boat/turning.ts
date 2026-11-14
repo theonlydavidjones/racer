@@ -51,10 +51,25 @@ export function rudderCoef(a: number): { cl: number; cd: number } {
  * against her motion (negative ahead).
  */
 export function rudderForce(u: number, d: number, r: number, delta: number): { y: number; x: number } {
+  rudderInto(u, d, r, delta);
+  return { y: RUD.y, x: RUD.x };
+}
+/** rudderForce's answer left in RUD, for every boat every step (nothing made to throw away). */
+export const RUD = { y: 0, x: 0 };
+export function rudderInto(u: number, d: number, r: number, delta: number): void {
   const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
-  const aoa = (back ? -delta : delta) - Math.atan2(vy, Math.max(0.01, uf));
-  const c = rudderCoef(clamp(aoa, -Math.PI / 2, Math.PI / 2)), q = 0.5 * RHO * v2 * RUDDER.area, k = back ? 0.7 : 1;
-  return { y: q * c.cl * k, x: -q * c.cd * (back ? -1 : 1) };
+  const a = clamp((back ? -delta : delta) - inflowAngle(vy, uf), -Math.PI / 2, Math.PI / 2), q = 0.5 * RHO * v2 * RUDDER.area;
+  let cl: number, cd: number;
+  // (below the stall: rudderCoef's own first line, written out; past it, rudderCoef)
+  if (Math.abs(a) <= RUDDER_STALL + 1e-9) { cl = RUDDER.slope * a; cd = RUDDER_CD0 + cl * cl / (Math.PI * RUDDER.aspect); } else { const c = rudderCoef(a); cl = c.cl; cd = c.cd; }
+  RUD.y = q * cl * (back ? 0.7 : 1); RUD.x = -q * cd * (back ? -1 : 1);
+}
+/** The angle the water meets the blade at from her stern's sideways motion (rad): asked twice a step for the same water
+ * (the helm for a turn, then the force it makes), so the last answer is kept. */
+let inVy = NaN, inUf = NaN, inA = 0;
+function inflowAngle(vy: number, uf: number): number {
+  if (vy !== inVy || uf !== inUf) { inVy = vy; inUf = uf; inA = Math.atan2(vy, Math.max(0.01, uf)); }
+  return inA;
 }
 
 const STRIPS = 8;
@@ -130,7 +145,7 @@ export function turnDragN(r: number, u: number, side = 0, disp: number = HULL.di
 export function helmForMoment(want: number, u: number, d: number, r: number): number {
   const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
   const q = 0.5 * RHO * v2 * RUDDER.area * RUDDER.slope * RUDDER.arm * (back ? 0.7 : 1);
-  const inflow = Math.atan2(vy, Math.max(0.01, uf));
+  const inflow = inflowAngle(vy, uf);
   const lim = RUDDER_STALL - 1e-6, aoa = q > 1e-6 ? clamp(want / q, -lim, lim) : Math.sign(want) * lim; // (just inside it: the angles are summed and taken apart again)
   return clamp((aoa + inflow) * (back ? -1 : 1), -FULL_RUDDER * D2R, FULL_RUDDER * D2R);
 }

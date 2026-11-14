@@ -395,11 +395,12 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   if (!out && A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round' && A.started && B.started) {
     const mk = ctx.marks[A.leg], dA = markDist(A, mk), dB = markDist(B, mk);
     // Rule 18.3 needs to know who has been on starboard since entering the zone.
-    for (const [X, d] of [[A, dA], [B, dB]] as const) {
+    const zone = (X: B, d: number) => {
       if (d >= ZONE) delete rec.stbdInZone[X.id];
       else if (!(X.id in rec.stbdInZone)) rec.stbdInZone[X.id] = X.tack === 'S' && !X.tacking;
       else if (X.tack !== 'S' || X.tacking) rec.stbdInZone[X.id] = false;
-    }
+    };
+    zone(A, dA); zone(B, dB); // (A then B, as before; no arrays a pair a step)
     // Rule 18.3: a boat passing head to wind from port to starboard in the zone of a mark to be left to port.
     // Rule 18.2 then doesn't apply between her and a starboard-tack boat fetching the mark.
     for (const [T, O] of [[A, B], [B, A]] as const) {

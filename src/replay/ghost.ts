@@ -29,7 +29,8 @@ const KEY = 'fbsim-ghosts-v1', KEEP = 20;
 /** The race, as a key: two runs with the same key are the same race (course, seed and every setting it was sailed in). */
 export function setupKey(s: RaceSetup | undefined): string {
   if (!s) return '';
-  const o = s.s, keys = Object.keys(o).sort();
+  // (a race saved before On-the-water judging was umpired: the same race as one keyed with it)
+  const o = s.s.judging === undefined ? { ...s.s, judging: 'umpired' } : s.s, keys = Object.keys(o).sort();
   return JSON.stringify([s.course, s.seed, keys.map(k => [k, o[k]])]);
 }
 

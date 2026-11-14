@@ -4,6 +4,9 @@ Toward criterion 5 of docs/VISION-ROADMAP.md: the Racing Rules of Sailing covere
 the sim can judge. Source: World Sailing, *The Case Book for 2025–2028*, version 2025-07
 (https://media.sailing.org/sailing/wp-content/uploads/2025/07/31104846/WS-Case-Book-2025-2028-v2025-07.pdf); "p." is the PDF page.
 
+Twelve covered Cases are also kept as data, for the Rules trainer and their tests alike: src/rules/cases.ts (7, 11, 13, 14,
+15, 23, 25, 27, 43, 53, 92, 105), sailed through the engine in tests/rules-cases-data.test.ts.
+
 Every Case whose rules-referred list touches Part 2 (rules 10–24, 43, 44), marks and obstructions (18–20), starting and the course
 (28–31), or the Definitions those use. Cases are taken from each Case's own header; prose citations aren't counted.
 

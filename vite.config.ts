@@ -4,5 +4,5 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   base: './',
   build: { target: 'es2022', chunkSizeWarningLimit: 900 }, // three.js alone is ~600 kB
-  test: { include: ['tests/**/*.test.ts'] },
+  test: { include: ['tests/**/*.test.ts'], setupFiles: ['tests/setup/judging.ts'] },
 });
