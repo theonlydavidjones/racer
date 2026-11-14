@@ -495,7 +495,7 @@ const band = new SailBand({
   hold: (k, d) => { if (d == null) delete btnCmd[k]; else btnCmd[k] = d; applyHeld(); },
   changed: () => showTrimOwner(),
   toast: (m, ms) => toast(m, ms),
-  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
+  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Hand Back: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
