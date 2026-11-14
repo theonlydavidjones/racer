@@ -510,6 +510,21 @@ export class SceneView {
     this.markObjs.push({ p, float, wake, fixed: shape === 'beacon' });
   }
 
+  /**
+   * One boat restyled (the boat editor, a look-only change: ROADMAP 8v): her mesh built afresh from the boat as she is
+   * now, in place of the old one; the rest of the scene, the race and the other boats untouched. The new materials
+   * compile as they're first drawn (the same kinds as before, so their programs are mostly there already).
+   */
+  rebuildBoat(w: SimView, i: number): void {
+    const old = this.boatMeshes[i], b = w.boats[i]; if (!old || !b) return;
+    const m = buildBoatMesh(b);
+    m.grp.position.copy(old.grp.position); m.grp.quaternion.copy(old.grp.quaternion); m.grp.rotation.order = old.grp.rotation.order;
+    m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    this.scene.remove(old.grp); this.scene.add(m.grp); this.boatMeshes[i] = m;
+    this.fittings.set(this.boatMeshes.map(x => x.grp));
+    disposeUnused([old.grp], this.scene);
+  }
+
   /** The course or destination changed (a new destination picked on the chart): build its marks again. */
   refreshCourse(w: SimView): void { this.buildCourse(w); }
   /** New conditions mid-sail (SimView.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */

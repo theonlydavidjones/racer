@@ -3,7 +3,7 @@ import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
-import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR } from '../boat/controls';
+import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
@@ -13,12 +13,15 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
+import { PART_SMALL } from './fittings';
+const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
+const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
@@ -85,10 +88,22 @@ const MAIN_DEF: SailDef = {
   tack: V3(0, BOOM_TOP, 0), head: V3(0, BOOM_TOP + P, 0), clew: V3(0, BOOM_TOP, E), depth: 0.42, rows: 18, cols: 10,
   // the roach square to the straight leech, from the width it adds square to the luff
   roach: t => (MAIN_GIRTH(t) - E * (1 - t)) * MAIN_LEECH / P,
-  windows: [{ t0: 0.3 / P, t1: 0.65 / P, s0: 0.18, s1: 0.18 + 1.8 / E }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
-  battens: [{ t: 0.2, len: 1.0 }, { t: 0.41, len: 1.0 }, { t: 0.61, len: 1.0 }, { t: 0.82, len: 0.6 }], battenLines: false,
+  // (the windows: the class allows two, 0.5 m² between them, none nearer than 150 mm to an edge, CR 9.13: the long one
+  // low down, 1.1 m by 0.35 m, and the small spreader window up the luff, about 0.49 m² together)
+  windows: [{ t0: 0.3 / P, t1: 0.65 / P, s0: 0.18, s1: 0.18 + 1.1 / E }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
+  battenLines: false,
   footOnSpar: true // the foot's bolt-rope in the boom's groove, the clew lashed at its end
 };
+/** The height fraction at which a sail's leech is the fraction f of its length down from the head (along the drawn leech). */
+function leechT(d: SailDef, f: number): number {
+  const N = 400, pts = [...Array(N + 1)].map((_, i) => sailEdges(d, i / N)[1]), cum = [0];
+  for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  const want = cum[N] * (1 - f); let i = 1; while (i < N && cum[i] < want) i++;
+  return (i - 1 + (want - cum[i - 1]) / (cum[i] - cum[i - 1])) / N;
+}
+// the main's four battens, each where the class puts it: at the points dividing the leech into five equal parts (CR 9.23,
+// within 100 mm), the top one no longer than 800 mm and the others 1050 mm, measured outside the pocket (CR 9.24)
+MAIN_DEF.battens = [0.8, 0.6, 0.4, 0.2].map((f, i) => ({ t: leechT(MAIN_DEF, f), len: i < 3 ? 1.0 : 0.6 }));
 /** The forestay: the jib swings around it, so its luff stays on the stay. */
 const JIB_AXIS = HOUNDS.clone().sub(FORESTAY_DECK).normalize();
 /**
@@ -108,7 +123,8 @@ const JIB_DEF: SailDef = (() => {
     tack, head: tack.clone().addScaledVector(a, JIB_LUFF), clew: tack.clone().addScaledVector(n, JIB_LP).addScaledVector(a, f), depth: 0.36, rows: 14, cols: 8,
     roach: t => JIB_ROACH * Math.sin(Math.PI * t) ** 1.5,
     windows: [{ t0: 0.14, t1: 0.21, s0: 0.17, s1: 0.56 }],
-    battens: [{ t: 0.25, len: 0.7 }, { t: 0.51, len: 0.47 }, { t: 0.76, len: 0.37 }], battenLines: false
+    // (three battens dividing the leech into equal parts, inside lengths 600, 400 and 300 mm at most, bottom to top: CR 9.35)
+    battens: [{ t: 0.25, len: 0.6 }, { t: 0.51, len: 0.4 }, { t: 0.76, len: 0.3 }], battenLines: false
   };
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
@@ -168,7 +184,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     ? reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x777777, shininess: 75 }), 0.14) // glossy gelcoat, reflecting the sky
     : reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: b.hullColor === '#9a6a36' ? 60 : 25 }), b.hullColor === '#9a6a36' ? 0.08 : 0.04); // painted or varnished planking
   paintMaterial(hullMat, C(b.hullColor), C(boot), C(paint.bottom));
-  grp.add(new THREE.Mesh(hullGeometry(), hullMat));
+  // (her sixteen strakes in full near by; beyond HULL_MID_M, where a plank is a few pixels wide, each plank's face one
+  // band; beyond HULL_FAR_M, where a lap's 13 mm is well under a pixel, fewer stations too: a quarter, then a fifth, of
+  // the triangles, the same lines. The fleet's hulls were drawn in full at any distance, the most of a boat's triangles.)
+  { const hull = new THREE.LOD(); hull.addLevel(new THREE.Mesh(hullLevel(0), hullMat), 0);
+    hull.addLevel(new THREE.Mesh(hullLevel(1), hullMat), HULL_MID_M); hull.addLevel(new THREE.Mesh(hullLevel(2), hullMat), HULL_FAR_M); grp.add(hull); }
   // the sea is never drawn inside the hull: a lid over the cockpit at deck level, in the depth buffer only (drawn after
   // the boat and before the water, which scene.ts draws last of the solid things)
   // (the companionway's openings too: one mesh for both)
@@ -210,10 +230,12 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // clock as the ports)
   // the cabin's inside (cabinInterior.ts), seen through the companionway and the windows, lit by its one lantern
   const below = cabinInteriorMaterial();
-  grp.add(new THREE.Mesh(cabinInteriorGeometry(), below));
+  // (seen only through the companionway and the windows: left out, FittingCull, once the companionway is under about five
+  // pixels across, as nothing of it could be made out; the windows' glow after dark is their own glass's, drawn still)
+  const inside = new THREE.Mesh(cabinInteriorGeometry(), below); inside.userData.cullR = INSIDE_R; grp.add(inside);
   grp.userData.below = below;
   // its lantern, on its own arm from the shackle so it can swing (syncBoatMesh)
-  const lanternArm = new THREE.Group(); lanternArm.add(new THREE.Mesh(lanternGeometry(), below)); grp.add(lanternArm);
+  const lanternArm = new THREE.Group(), lantern = new THREE.Mesh(lanternGeometry(), below); lantern.userData.cullR = INSIDE_R; lanternArm.add(lantern); grp.add(lanternArm);
   grp.userData.lantern = makeLanternSwing(lanternArm);
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
   // the companionway (Josephine: the owner's photos): the sliding hatch, weathered teak, on bronze runners, and three
@@ -393,7 +415,7 @@ export interface BoatMesh {
   pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
   /** The mast (bent by syncRig: its unbent vertices kept) and the forestay (sagging), with the bend last drawn. */
-  rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
+  rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; bands: THREE.Mesh; bandsBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
   /** The racing instrument on the cabin top (her heading and speed on its face), on your own boat. */
@@ -473,7 +495,8 @@ function teakMat() {
   return teakMats ??= {
     trim: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide }),
     deck: new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide }),
-    warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30 })
+    // (double-sided as the trim is, though it needn't be: the same shader programs as the trim's, four fewer to build)
+    warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide })
   };
 }
 /** Texture coordinates for a piece of teak: the grain along its length (z, fore and aft; or x, across, for the washboards), about 0.3 m across a repeat. */
@@ -1101,6 +1124,19 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.5, 0.5, mastH, 14, MAST_SEGS) : new THREE.CylinderGeometry(0.34, 0.5, mastH, 10, MAST_SEGS), spar);
   mast.scale.set(MAST_ATH, 1, MAST_FA); mast.position.set(0, DECK_AT_MAST + mastH / 2, MAST_Z); rig.add(mast);
   const mastBase = (mast.geometry.attributes.position.array as Float32Array).slice();
+  // the class's measurement bands (CR 6.1.11: each at least 13 mm wide, "clearly discernible while racing"; dark, as the
+  // class's spar drawing, Dwg 11, has them): No. I right round the mast with its upper edge at the Lower Mast Point, the
+  // boom's top; No. II on the mast's fore side only, its lower edge at the Forestay Height Point, where the stay meets it;
+  // No. III right round, its lower edge at the upper band, the head's limit, P above No. I. One mesh, bent with the mast.
+  const BAND = 0.025, bandGeos: THREE.BufferGeometry[] = [];
+  const ringAt = (y0: number, arc: number, start: number) => {
+    const u = (y0 + BAND / 2 - DECK_AT_MAST) / mastH, r = (alu ? 0.5 : 0.5 - 0.16 * u) + 0.012; // (the mast's own radius there, tape-thick proud of it)
+    const g = new THREE.CylinderGeometry(r, r, BAND, alu ? 14 : 10, 1, true, start, arc);
+    g.scale(MAST_ATH, 1, MAST_FA); g.translate(0, y0 + BAND / 2, MAST_Z); bandGeos.push(g.toNonIndexed());
+  };
+  ringAt(BOOM_TOP - BAND, Math.PI * 2, 0); ringAt(HOUNDS.y, Math.PI, Math.PI / 2); ringAt(BOOM_TOP + P, Math.PI * 2, 0); // (three.js's arc starts at +z, aft: π/2 to 3π/2 is the fore half)
+  const bands = new THREE.Mesh(mergeGeometries(bandGeos, false)!, BLACK); bands.userData.bends = true; rig.add(bands); // (bent each time the mast is: syncRig)
+  const bandsBase = (bands.geometry.attributes.position.array as Float32Array).slice();
   // the mast's foot on deck (Josephine, the owner's photos): a round stainless plate on the deck; a black rubber boot
   // round the mast from the deck about 0.4 m up, where it goes down through the deck to its step on the keel; and a
   // stainless horseshoe over the plate, which the lines from the mast thread under or are made fast to before running aft (MAST_RING, for Rigging). Sizes read off the photos, estimates.
@@ -1129,6 +1165,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // the mainsheet's upper block, hung from a strap under the boom's end
   { for (const dz of [-MS_GAP / 2, MS_GAP / 2]) { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, MS_R + dz); boomPivot.add(ub); } } // (two blocks on bails, fore and aft)
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
+  // the boom band (CR 6.3.3: the Boom Point, its forward edge no more than 3380 mm from the mast's after side; the clew
+  // may not go aft of it), dark like the mast's
+  { const bb = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R + 0.0015, BOOM_R + 0.0015, 0.025, aluBoom ? 10 : 5, 1, true), BLACK); bb.rotation.x = Math.PI / 2; bb.position.set(0, BOOM_TOP - BOOM_R, E + 0.0125); boomPivot.add(bb); }
   if (aluBoom) { // the extrusion's black moulded end fitting, at its after end (as CircleSea's)
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R * 1.05, BOOM_R * 1.05, 0.06, 10), MAT.dark); cap.rotation.x = Math.PI / 2; cap.position.set(0, BOOM_TOP - BOOM_R, E + 0.12 - 0.02); boomPivot.add(cap);
   }
@@ -1344,7 +1383,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
   mergeStatic(grp, out);
   return out;
 }
@@ -1377,13 +1416,18 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
     for (const m of ms) { const mw = m.matrixWorld.clone().premultiply(inv); m.parent!.remove(m); mw.decompose(m.position, m.quaternion, m.scale); grp.add(m); }
     grp.remove(c);
   }
+  // the small parts (cleats, blocks, shackles: under PART_SMALL across) merged into a set of their own, so it's still left
+  // out (FittingCull) from as far off as its largest part would cover under a pixel: merged with the hull they'd be
+  // drawn from anywhere
+  const radius = (m: THREE.Mesh): number => { const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); return g.boundingSphere!.radius * Math.max(m.scale.x, m.scale.y, m.scale.z); };
+  const tierOf = (r: number): number => r <= PART_SMALL ? 0 : -1;
   const buckets = new Map<string, THREE.Mesh[]>();
   for (const c of grp.children) {
     const m = c as THREE.Mesh;
     if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || keep.has(m) || m.name || m.children.length || !m.visible || m.renderOrder !== 0 || Array.isArray(m.material)) continue;
     const mat = m.material as THREE.Material;
     if (mat.transparent || m.morphTargetInfluences || Object.keys(m.userData).length) continue;
-    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',');
+    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',') + '|' + (m.frustumCulled ? tierOf(radius(m)) : -1) + '|' + +m.castShadow + +m.receiveShadow; // (its shadows as they were: a merged mesh that took them up where its parts hadn't would want shader programs of its own)
     if (!g.getAttribute('position') || !g.getAttribute('normal')) continue;
     (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(m);
   }
@@ -1397,7 +1441,8 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
       g.morphAttributes = {}; g.clearGroups(); return g;
     });
     const merged = mergeGeometries(geos, false); if (!merged) continue;
-    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms.some(m => m.castShadow); one.receiveShadow = ms.some(m => m.receiveShadow);
+    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms[0].castShadow; one.receiveShadow = ms[0].receiveShadow;
+    if (+key.split('|')[2] >= 0) one.userData.cullR = Math.max(...ms.map(radius)); // (FittingCull: left out as its largest part would be)
     for (const m of ms) { grp.remove(m); m.geometry.dispose(); }
     for (const g of geos) g.dispose();
     grp.add(one);
@@ -1501,7 +1546,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const jibSgn = (b.jibBacked ?? 0) > 0 ? Math.sign(b.boom || 1) : Math.sign(b.jib || 1);
   m.jib.mesh.scale.x = jibSgn;
   { // hoisting and striking: the main's head comes down its track to the boom; the jib's head down the forestay
-    const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
+    // (with the last inches the piano's: a halyard short of its take-up leaves the head a few inches down, controls.ts)
+    const hm = hoistedShare(b.rig?.main ?? 1, b.rig?.mainTaut ?? 1, 'main'), hj = hoistedShare(b.rig?.jib ?? 1, b.rig?.jibTaut ?? 1, 'jib');
     m.main.mesh.visible = hm > 0.02; m.main.mesh.scale.y = Math.max(0.02, hm); m.main.mesh.position.y = MAIN_DEF.tack.y * (1 - hm);
     m.mainFurl.visible = hm < 0.98; m.mainFurl.scale.set(0.3 + 0.7 * (1 - hm), 1, 0.3 + 0.7 * (1 - hm));
     m.jib.mesh.visible = hj > 0.02; m.jibBag.visible = hj < 0.98; m.jibBag.scale.setScalar(0.4 + 0.6 * (1 - hj));
@@ -1549,6 +1595,9 @@ function syncRig(m: BoatMesh, b: Boat, jibSgn: number, load: number, dt: number)
     const g = r.mast.geometry, a = g.attributes.position.array as Float32Array, base = r.mastBase, half = (MAST_TOP - DECK_AT_MAST) / 2;
     for (let i = 0; i < a.length; i += 3) a[i + 2] = base[i + 2] - mastFwd(base[i + 1] + half, d.bow, d.topAft) / MAST_FA; // (the mesh is scaled by MAST_FA fore and aft)
     g.attributes.position.needsUpdate = true;
+    { const ba = r.bands.geometry.attributes.position.array as Float32Array, bb = r.bandsBase; // (the bands, in the rig's frame)
+      for (let i = 0; i < ba.length; i += 3) ba[i + 2] = bb[i + 2] - mastFwd(bb[i + 1] - DECK_AT_MAST, d.bow, d.topAft);
+      r.bands.geometry.attributes.position.needsUpdate = true; }
     // what's fixed to the mast goes with it: the windex and its tabs at the head, the gooseneck (and the boom), the
     // jumper stays' ends (their struts are at the hounds, which don't move)
     const at = (h: number) => mastFwd(h - DECK_AT_MAST, d.bow, d.topAft);
@@ -1646,7 +1695,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     q.needsUpdate = true; }
   // the Cunninghams' cringles come down with their sails as they're struck (the tack stays put)
   for (const { l, sail } of L2.cringles) {
-    const q = l.geometry.attributes.position as THREE.BufferAttribute, n = q.count - 1, h = sail === 'main' ? b.rig?.main ?? 1 : b.rig?.jib ?? 1;
+    const q = l.geometry.attributes.position as THREE.BufferAttribute, n = q.count - 1, h = sail === 'main' ? hoistedShare(b.rig?.main ?? 1, b.rig?.mainTaut ?? 1, 'main') : hoistedShare(b.rig?.jib ?? 1, b.rig?.jibTaut ?? 1, 'jib');
     if (sail === 'main') q.setY(n, BOOM_TOP + MAIN_CUNNINGHAM_UP * h);
     else { const p2 = tmpE.copy(FORESTAY_DECK).addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP * h); q.setXYZ(n, p2.x, p2.y, p2.z); }
     q.needsUpdate = true;

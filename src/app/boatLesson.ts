@@ -73,7 +73,7 @@ export function mountBoatLesson(app: AppCtx) {
   }
   function open(): void {
     on = true; i = 0; done = false; noteUntil = 0;
-    for (const id of ['home', 'drillView', 'lessons', 'setup']) $(id).hidden = true;
+    for (const id of ['home', 'drillView', 'lessons', 'setup', 'seasonView']) $(id).hidden = true;
     document.body.classList.add('partsLesson'); app.showroom(true); app.look.spin = true; app.look.chase = CHASE; app.newGame();
     paint();
   }

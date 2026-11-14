@@ -95,8 +95,6 @@
   <!-- sailing the boat: what the helm does (the lashing is on the tiller itself: double-click) -->
   <div class="row1 ibar" id="helmBar">
     <button class="ib on" id="bPushOff" type="button" hidden title="The crew shoves her off the dock astern"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3v14"/><path d="M7 10h10"/><path d="M13 6l4 4-4 4"/></svg><span class="w">Push off</span></button>
-    <button class="ib" id="bJib" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 17 12 3v14Z"/></svg><span class="w">Hoist jib</span></button>
-    <button class="ib" id="bMain" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3v14h9Z"/></svg><span class="w">Hoist main</span></button>
     <button class="ib" id="bCourse" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 17V3"/><path d="M5 4h9l-2 3 2 3H5"/></svg><span class="w">Course</span></button>
     <button class="ib" id="bPilot" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5.5l2 5.5h-4Z"/></svg><span class="w">Autopilot</span></button>
     <button class="ib" id="bHome" type="button" hidden title="Send her back to her home slip"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5"/><path d="M5.5 8v8h9V8"/><path d="M8.5 16v-4h3v4"/></svg><span class="w">Home</span></button>
@@ -180,7 +178,21 @@
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
+      <button type="button" class="modecard" id="bSeasonCard" data-home="season"><b>Season</b><span id="seasonCardSub"></span></button>
       <button type="button" class="modecard" id="bPast" data-home="past"><b>Past races</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- the season's overview (the owner approved design/season-flow): the calendar, the race chosen, the standings -->
+<div class="overlay" id="seasonView" hidden>
+  <div class="panel wide home seasonpage">
+    <button type="button" class="linkbtn back" id="seasonBack" data-home="back">‹ Race</button>
+    <div class="sv-head" id="svHead"></div>
+    <div class="sv-cal" id="svCal"></div>
+    <div class="sv-grid">
+      <div class="sv-card"><h3 id="svNextH"></h3><div id="svDock"></div><div class="sv-go"><button class="cta" id="bSailSeason" type="button">Sail</button></div></div>
+      <div class="sv-card"><h3 id="svStandH"></h3><div class="sv-tbl" id="svTable"></div></div>
     </div>
   </div>
 </div>
@@ -227,6 +239,7 @@
     <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="back">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
     <div class="setgrid">
       <div class="steps">
+        <div class="sv-brief" id="seasonBrief" hidden></div>
         <!-- four rows on one grid (the owner OKd design/setup-tight): each a line of tiles and words, its controls open in place -->
         <section class="srow" id="row-course" data-row="course">
           <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
@@ -529,6 +542,13 @@
     <h2 id="homeTitle">Retire and head home?</h2>
     <p>She'll be scored <b>RET</b>, retired (RRS A5.1), and she's no longer racing: keep clear of the boats still racing (RRS 23.1). Her home slip becomes the destination for the navigator and the tiller pilot.</p>
     <div class="btnrow"><button class="cta" type="button" id="bHomeYes">Retire and head home</button><button class="ghost" type="button" id="bHomeNo">Keep racing</button></div>
+  </div>
+</div>
+<div class="overlay" id="wreckAsk" hidden role="dialog" aria-modal="true" aria-labelledby="wreckTitle">
+  <div class="panel">
+    <h2 id="wreckTitle">Wrecked</h2>
+    <p id="wreckWhat"></p>
+    <div class="btnrow"><button class="cta" type="button" id="bWreckAshore">Go ashore</button><button class="ghost" type="button" id="bWreckTow">Call a tow</button><button class="ghost" type="button" id="bWreckOn">Carry on</button></div>
   </div>
 </div>
 <div class="overlay" id="keepAsk" hidden role="dialog" aria-modal="true" aria-labelledby="keepTitle">
