@@ -2,6 +2,7 @@ import type { Vec } from '../core/math';
 import { toLL } from '../geo/geo';
 import bottom from './data/bottom.json';
 import { tideHeightAt } from './tide';
+import { hazardNear } from './hazards';
 
 /**
  * The bottom where a keel could touch it, and the water over it: for running aground on depth.
@@ -81,9 +82,13 @@ export function waterOver(p: Vec, ms: number): number | null {
 export const SHOAL_MARGIN = 0.3;
 /**
  * Too shallow for her at p at a time (ms UTC): less water than `draft` (m: her keel upright, boat/ground.ts GROUND.draft)
- * and SHOAL_MARGIN. For the AI's routes, as onLand is for the shore. False in deep water (and off the chart).
+ * and SHOAL_MARGIN, over the bottom there, or over a charted rock, wreck or obstruction within `clear` m of p
+ * (environment/hazards.ts: a route sampled every so many meters would step over a rock a few meters across). For the
+ * AI's routes, as onLand is for the shore. False in deep water (and off the chart).
  */
-export function shoal(p: Vec, ms: number, draft: number): boolean {
+export function shoal(p: Vec, ms: number, draft: number, clear = 0): boolean {
   const w = waterOver(p, ms);
-  return w !== null && w < draft + SHOAL_MARGIN;
+  if (w !== null && w < draft + SHOAL_MARGIN) return true;
+  const H = hazardNear(p, clear);
+  return H !== null && H.top + tideHeightAt(p, ms) < draft + SHOAL_MARGIN;
 }
