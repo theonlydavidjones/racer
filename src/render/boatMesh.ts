@@ -940,13 +940,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
       const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02); grp.add(gb);
       cringles.push({ l: upMast([fb, new THREE.Vector3(-0.07, fb.y + 0.1, MAST_AFT_Z + 0.02), new THREE.Vector3(-0.07, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham'), sail: 'main' });
-    } else if (key === 'jibCunningham') { // forward outboard of the forehatch (its frame x ±0.29, z −2.04 to −1.46) to the stem's block, clear of the mooring cleat
-      // (a rope lying on the deck: in gentle curves round the hatch, not straight runs with corners, the owner)
-      const plan = new THREE.CatmullRomCurve3([[Math.abs(fb.x), fb.z - 0.02], [0.1, MAST_FRONT_Z - 0.15], [0.24, -1.32], [0.36, -1.75], [0.31, -2.2], [0.07, stem.z + 0.06]].map(([x, z]) => new THREE.Vector3(side * x, 0, z)), false, 'centripetal');
-      const pp = plan.getSpacedPoints(Math.ceil(plan.getLength() / 0.06)), run: THREE.Vector3[] = [];
-      for (let i = 0; i + 1 < pp.length; i++) run.push(...lay(pp[i], pp[i + 1]));
-      fixed(line([fb, ...run, stem.clone().setX(side * 0.015)], 'jib', 'jibCunningham'));
-      if (side > 0) cringles.push({ l: line([stem.clone(), FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP)], 'jib', 'jibCunningham'), sail: 'jib' }), grp.add(cringles[cringles.length - 1].l);
+    } else if (key === 'jibCunningham') { // (the owner: it pulls the jib down from the mast's lower part, so nothing of it runs
+      // along the foredeck to the stem; drawn from the foot block up the mast's front to where it goes in, low down)
+      const ex = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.45, MAST_FRONT_Z - 0.004);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.012), STEEL); plate.position.copy(ex).setY(ex.y + 0.02); grp.add(plate);
+      upMast([fb, new THREE.Vector3(side * 0.03, fb.y + 0.1, MAST_FRONT_Z - 0.012), ex], 'jib', 'jibCunningham');
     } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
       const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
@@ -1532,7 +1530,14 @@ function syncLines(m: BoatMesh, b: Boat): void {
     const loaded = hj > 0.9 && (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
     const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
-    for (let k = 1; k <= 12; k++) {
+    if (!loaded && hj > 0.9) {
+      // the lazy sheet, the jib up: from the clew (aft of the mast, to leeward) forward round the front of the mast and
+      // back to its own car, slack, lying on the foredeck where it can (the owner, and his photo underway)
+      const fz = MAST_FRONT_Z - 0.14, lx = -side * 0.16, wx = side * 0.16, onDeck = (x: number, z: number) => restOn(x, z) + 0.012;
+      for (let k = 1; k <= 4; k++) { const t = k / 4, x = clew.x + (lx - clew.x) * t, z = clew.z + (fz - clew.z) * t; at(k, x, Math.max(onDeck(x, z), clew.y + (onDeck(lx, fz) - clew.y) * Math.sqrt(t) * 1.0 - 0.1 * t * (1 - t)), z); }
+      for (let k = 5; k <= 7; k++) { const t = (k - 4) / 4, a = Math.PI * t, x = lx * Math.cos(a), z = fz - 0.06 * Math.sin(a); at(k, x, onDeck(x, z), z); } // (round the mast's front)
+      for (let k = 8; k <= 12; k++) { const t = (k - 7) / 6, x = wx + (car.x - wx) * t, z = fz + (car.z - fz) * t; at(k, x, onDeck(x, z), z); }
+    } else for (let k = 1; k <= 12; k++) {
       const t = k / 13, x = clew.x + (car.x - clew.x) * t, z = clew.z + (car.z - clew.z) * t;
       at(k, x, Math.max(restOn(x, z) + 0.012, clew.y + (cy - clew.y) * t - 4 * t * (1 - t) * sag), z);
     }
