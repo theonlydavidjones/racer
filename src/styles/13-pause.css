@@ -16,3 +16,7 @@
 .menu2 .mbody>:first-child{margin-top:0}
 #leaveAsk .panel{max-width:300px}
 #leaveAsk{z-index:10}
+/* a small dialog's ✕ (Leave race? / Stop sailing?): the same as Keep, in the panel's top corner */
+.panel.small{position:relative}
+.ask-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;border-radius:6px;background:none;color:var(--muted);font:600 16px/1 var(--f-body);cursor:pointer}
+.ask-x:hover,.ask-x:focus-visible{background:var(--btn-hi);color:var(--text)}
