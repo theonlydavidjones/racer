@@ -24,6 +24,9 @@
  * no thrust), pitch × prop rpm. Reverse is weaker than ahead (the blades work backwards: REVERSE, an estimate). The rated
  * power is the crank's; the gearbox takes perhaps 5–10% of it, inside the figure of merit's uncertainty.
  * For the 3.5 that's about 400 N at rest (90 lbf), falling to nothing at about 7.6 m/s (15 kt).
+ * A check, second hand: Yacht magazine's bollard-pull tests of 5 hp four-strokes are reported at 0.55–0.61 kN (the
+ * Tohatsu MFS5 0.61; seen in search results only, the article wasn't reachable); this working gives about 0.52 kN for 5 hp on the 6's prop,
+ * so the figure of merit may be a little low. Not changed on a figure we couldn't read.
  */
 import type { Boat } from './boat';
 import { OUTBOARD_PROP } from './outboardMount';
@@ -105,8 +108,10 @@ export function motorForce(b: Boat): number {
 }
 
 /**
- * Prop walk: the side push of a turning prop, as a share of its thrust (ESTIMATES, small). A right-handed prop (clockwise
- * seen from astern, as these motors' are) pushing ahead walks her stern to starboard; pushing astern, to port, whether
+ * Prop walk: the side push of a turning prop, as a share of its thrust. ESTIMATES, small: no figure for an outboard was
+ * found (researched 14 Nov 2026; Practical Boat Owner, pbo.co.uk/?p=6109, describes the paddle-wheel effect and an
+ * off-center motor's turn in words only; figures of 10–14% astern are for ships' props under a hull). A right-handed
+ * prop (clockwise seen from astern: taken as these motors' from parts listings, Tohatsu's manual doesn't say) pushing ahead walks her stern to starboard; pushing astern, to port, whether
  * by the 6's reverse gear (the prop turning the other way) or by the small motors turned round on the bracket (the same
  * push, pointed the other way). It's a real effect on an inboard, whose prop works under the hull on a sloping shaft;
  * an outboard's works level, clear astern of her, under its anti-ventilation plate, and walks very little.
