@@ -1017,22 +1017,37 @@ export class World {
       // (no shore within 150 m ahead, across a swath 15° either side: straight ahead alone, a shore she closes at a fine
       // angle is seen only once she's on it)
       const clear = (h: number) => [0, 15, -15].every(k => landAlong(b, { x: b.x + V(h + k).x * 150, y: b.y + V(h + k).y * 150 }) === Infinity);
-      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them, and jibes for none
-      // with a boat within two lengths, where a jibe swaps the right of way at close quarters (Rule 15): judged on the turn
+      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them, and on port jibes for
+      // none with a boat within two lengths, where onto starboard she'd take the right of way at close quarters (Rule 15;
+      // from starboard onto port she gives it up, which Rule 14's avoiding contact may need: a starboard boat on a run with
+      // a port boat closing on her windward quarter has no other way clear): judged on the turn
       // she'd make, the short way round from her heading as her helm takes her (physics.ts), not on where it ends. Through
-      // the wind: close-hauled on her own tack (a boat keeping clear goes round one ahead of her without tacking: astern
-      // of her, or to leeward); through dead downwind with a boat that near: a run on her own tack)
+      // the wind: close-hauled on her own tack; with a boat that near, short of dead downwind on her own tack by more than
+      // the wind's swing second to second, 3–5°, so a degree's veer doesn't carry her across)
       const from = b.ww.from, own = b.tack === 'S' ? -1 : 1;
       const crowded = this.boats.some(o => o !== b && Math.hypot(o.x - b.x, o.y - b.y) < 2 * LOA);
       const through = (t: number, x: number) => { const d = wrap(t - b.h), f = wrap(x - b.h); return Math.sign(f) === Math.sign(d) && Math.abs(f) < Math.abs(d); };
       // (and a move away from a boat no more than BEAR_CAP off her course, so it doesn't run on round, through a jibe,
-      // while the gap's still closing: past that, or through the wind, she bears away BEAR_CAP below her course instead)
-      const BEAR_CAP = 40, base = this.freeCourse.get(b.id) ?? b.h;
-      const mine = (h: number, away = false) => {
+      // while the gap's still closing: past that, or through the wind, she turns whichever way on her own tack opens the
+      // gap more, judged on the closest approach over the next 15 s at her speed: bearing away BEAR_CAP below her course,
+      // or heading up as far as BEAR_CAP above it (close-hauled at most) and easing to slow. A boat keeping clear of one
+      // ahead goes round her without tacking, and never turns down onto a boat to leeward of her, Rule 11)
+      const BEAR_CAP = 40, RUN_OFF = 5, base = this.freeCourse.get(b.id) ?? b.h, hauled = n360(from + own * (beatAngle(b.ww.kt) + 1));
+      let ease = false;
+      const mine = (h: number, away: { x: number; y: number; vx: number; vy: number } | null = null) => {
         let t = sailable(b, h);
-        if (away && (through(t, from) || Math.abs(wrap(t - base)) > BEAR_CAP)) t = sailable(b, base + own * BEAR_CAP);
-        if (through(t, from)) return n360(from + own * (beatAngle(b.ww.kt) + 1));
-        if (crowded && through(t, from + 180)) return n360(from + own * 179);
+        if (away && (through(t, from) || Math.abs(wrap(t - base)) > BEAR_CAP)) {
+          const down = sailable(b, base + own * BEAR_CAP), upH = base - own * BEAR_CAP, up = through(upH, from) || Math.abs(wrap(from - upH)) < beatAngle(b.ww.kt) + 1 ? hauled : sailable(b, upH);
+          const miss = (h: number) => { // (the closest approach over 15 s, she on h at her speed, the other as she's going)
+            const wx = away.vx - V(h).x * Math.max(1, v), wy = away.vy - V(h).y * Math.max(1, v), ww = wx * wx + wy * wy;
+            const tt = ww < 1e-6 ? 0 : clamp(-(away.x * wx + away.y * wy) / ww, 0, 15);
+            return Math.hypot(away.x + wx * tt, away.y + wy * tt);
+          };
+          if (miss(up) > miss(down)) { t = up; ease = true; } else t = down;
+        }
+        if (through(t, from)) return hauled;
+        const relOwn = -own * wrap(from - t);
+        if (crowded && b.tack === 'P' && (relOwn > 180 - RUN_OFF || (relOwn < 0 && Math.abs(relOwn) > 90))) return n360(from + own * (180 - RUN_OFF));
         return t;
       };
       const c0 = mine(base);
@@ -1048,9 +1063,9 @@ export class World {
         const rate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
         if (rate < -0.05 && g < CONTACT_GAP + 1) urgent = true; // (closing faster than 5 cm/s: pressed together, the rate's sign flickers)
         if (r.kc === b && rate > 0.05) { call = { h: mine(b.h), luff: false }; break; } // (drawing away: she is keeping clear)
-        call = keepClearMove(this, b, o); if (call) call = { h: mine(call.h, true), luff: call.luff };
+        ease = false; call = keepClearMove(this, b, o); if (call) call = { h: mine(call.h, { x: dx, y: dy, vx: o.vx, vy: o.vy }), luff: call.luff || ease };
         if (!call && r.kc === o && rate < -0.05 && g < OPEN_GAP) { // (bearing off 30° from her side)
-          call = { h: mine(b.h - side * 30, true), luff: false };
+          ease = false; call = { h: mine(b.h - side * 30, { x: dx, y: dy, vx: o.vx, vy: o.vy }), luff: ease };
         }
         if (call) break;
         if (r.kc === o && Math.hypot(dx, dy) < 2 * LOA && Math.sign(wrap(course - b.h)) === side) room = true;
