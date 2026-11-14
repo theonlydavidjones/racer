@@ -194,7 +194,10 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   // on, measured from where she was when it was planned for the first leg)
   const sight = p.route ? landAlong(b, p.route[p.ri]) : Infinity;
   const lost = !!p.route && ((sight > 0 && sight < Infinity) || offLeg(b, p.ri > 1 ? p.route[p.ri - 1] : p.routeFrom ?? b, p.route[p.ri]) > OFF_ROUTE
-    || (sight === Infinity && !inFairway(b) && !clearLine(b, p.route[p.ri], LEG_CLEAR)));
+    || (sight === Infinity && !inFairway(b) && !clearLine(b, p.route[p.ri], LEG_CLEAR)
+      // (only when the leg as planned was clear by that much: near its ends, by a slip or a gap, the planner's own legs
+      // come closer, and planning again would only draw the same one, every few seconds)
+      && clearLine(p.ri > 1 ? p.route[p.ri - 1] : p.routeFrom ?? b, p.route[p.ri], LEG_CLEAR)));
   // (no route in hand: plan, unless the last plan, from near here and not long ago, found none)
   const retry = !p.route && (!p.routeFrom || Math.hypot(b.x - p.routeFrom.x, b.y - p.routeFrom.y) > RETRY_M || t - p.routeT > RETRY_T);
   if ((moved || lost || retry) && (moved || t - p.routeT >= MIN_REPLAN)) {
