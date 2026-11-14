@@ -72,10 +72,10 @@ describe('West Harbor', () => {
     Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading, docked: undefined, handled: undefined, v: 0, astern: 0.8 });
     const h0 = u.h; u.tiller = -0.8; for (let i = 0; i < 240; i++) w.step(DT); u.tiller = 0; // (4 s: at 0.8 m/s astern she answers the helm over about 2 s, physics.ts yawLag)
     expect(((u.h - h0 + 540) % 360) - 180).toBeLessThan(-3); // tiller to port: bow to port
-    // the crew hoists: the jib in about 15 s, the main in about 30 s (slower off the wind)
+    // the crew hoists at the mast, the main and then the jib, about 5 s each (the owner), the main slower off the wind
     w.setSail('jib', true); w.setSail('main', true);
-    for (let i = 0; i < 60 * 20; i++) w.step(DT);
-    expect(u.rig!.jib).toBe(1); expect(u.rig!.main).toBeGreaterThan(0.2);
+    for (let i = 0; i < 60 * 30; i++) w.step(DT);
+    expect(u.rig!.main).toBe(1); expect(u.rig!.jib).toBe(1);
     // back in, stern first: not home; bow first and stopped: home, and made fast again
     w.t = 300; Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 180, v: 0.2, astern: 0 }); w.step(DT);
     expect(w.arrivedT).toBeNull();
