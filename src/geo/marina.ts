@@ -443,13 +443,13 @@ function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
 }
 /**
  * How far she glides stern first once she's shoved off astern, m: the crew's shove (world.ts ASTERN_SHOVE, about 0.64 m/s)
- * carries her about 44 m on physics.ts's sternway drag before her way's gone (tests/pushoff-astern.test.ts holds the two
+ * carries her about 11.5 m on physics.ts's sternway drag (ASTERN_DRAG) before her way's gone (tests/pushoff-astern.test.ts holds the two
  * together). The planner looks that far along the way she's steered: round, and on down the fairway.
  */
-export const ASTERN_RUN = 45;
+export const ASTERN_RUN = 12;
 /** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one: what a
- * shove of 0.3 m/s carries her (still steering, about 1.3 deg/s with the helm hard over: physics.ts). */
-export const ASTERN_ENOUGH = 24; // (world.ts ASTERN_STEERAGE glides her a little further: tests/pushoff-astern.test.ts)
+ * shove of ASTERN_STEERAGE carries her (world.ts: steering for 10 s and more). */
+export const ASTERN_ENOUGH = 8; // (world.ts ASTERN_STEERAGE coasts her a little further: tests/pushoff-astern.test.ts)
 /** The most she's turned stern first before she's straightened up, deg: her stern pointing down the fairway. */
 const ASTERN_TURN = 90;
 /**

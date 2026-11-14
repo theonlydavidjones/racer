@@ -184,10 +184,12 @@ export const SHOVE_N = 27 * 9.80665;
  */
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /**
- * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more (the helm hard over turns her
- * about 1.7 deg/s at it: physics.ts). Her glide from it is about 6 m (physics.ts asternCoast).
+ * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more on physics.ts's sternway
+ * drag (ASTERN_DRAG: from 0.5 m/s she's above 0.3 for about 10.6 s, the helm hard over turning her about 2 deg/s at it).
+ * Her coast from it (about 8 m) runs on past the clear water the planner found at the tightest berths: the rest is the
+ * helmsman's, steering her on down the fairway, or a bump at a crawl.
  */
-export const ASTERN_STEERAGE = 0.38;
+export const ASTERN_STEERAGE = 0.5;
 /**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
  * ½·ρ·Cd·∫r³dA along her length (the lateral area spread evenly over it: A·L³/4). About 1×10⁵: at 3°/s about 300 N·m.
