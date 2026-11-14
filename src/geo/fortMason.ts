@@ -30,10 +30,11 @@ export function underPier(p: Vec): PileField | null {
 }
 /**
  * Being set onto a pier: her drift over the ground (the stream's set and the wind's push, with her own way through the
- * water) carried on, the seconds until it puts her among a pier's piles, within `ahead` seconds; null if it doesn't.
+ * water) carried on, the seconds until it puts any of her hull's points (bow, stern, her sides) among a pier's piles,
+ * within `ahead` seconds; null if it doesn't.
  */
-export function setOntoPier(p: Vec, vx: number, vy: number, ahead = 30): { pier: PileField; s: number } | null {
+export function setOntoPier(pts: Vec[], vx: number, vy: number, ahead = 30): { pier: PileField; s: number } | null {
   if (Math.hypot(vx, vy) < 0.03) return null;
-  for (let s = 0; s <= ahead; s += 1) { const f = underPier({ x: p.x + vx * s, y: p.y + vy * s }); if (f) return { pier: f, s }; }
+  for (let s = 0; s <= ahead; s += 0.5) for (const p of pts) { const f = underPier({ x: p.x + vx * s, y: p.y + vy * s }); if (f) return { pier: f, s }; }
   return null;
 }

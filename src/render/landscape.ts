@@ -433,7 +433,9 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   }
   // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
   // through: a boat set onto them is caught (boat/physics.ts onPiles). The deck's height and the piles' size and spacing are
-  // ESTIMATES (no survey found): a deck about 3 m above the water, piles 0.6 m across about 4.5 m apart each way.
+  // ESTIMATES (no survey found): a deck about 3 m above the water and 0.7 m thick, piles 0.6 m across about 4.5 m apart
+  // each way, drawn down to 4 m below the surface; the sheds 18 × 140 × 13 m (Pier 3's Festival Pavilion is listed at
+  // 483 × 110 ft, wider than OSM's 25 m deck there: one of the two is off, unresolved).
   {
     const deckMat = lam(0x9d968a), pileMat = lam(0x6f6a60), PITCH = 4.5, R = 0.3, D = 0.7;
     const decks: THREE.BufferGeometry[] = [], at: THREE.Vector3[] = [];

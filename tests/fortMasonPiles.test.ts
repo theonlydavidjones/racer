@@ -36,9 +36,10 @@ describe("Fort Mason's piers", () => {
     expect(underPier(mid(FORT_MASON_PILES[0].pts[4], FORT_MASON_PILES[1].pts[5]))).toBeNull(); // (the slip of water between Piers 3 and 2)
   });
   it('drifting toward a pier, the coach can see it coming', () => {
-    const p = { x: face.x + out.x * 6, y: face.y + out.y * 6 };
-    const s = setOntoPier(p, -out.x * 0.4, -out.y * 0.4); expect(s?.pier.name).toBe(pier3.name); expect(s!.s).toBeGreaterThan(10); expect(s!.s).toBeLessThan(20);
-    expect(setOntoPier(p, out.x * 0.4, out.y * 0.4)).toBeNull(); // (drifting away)
+    // (her center 6 m off, bow on, drifting in at 0.4 m/s: her bow, 3.8 m ahead of her center, gets there first, in about 5.5 s)
+    const p = { x: face.x + out.x * 6, y: face.y + out.y * 6 }, bowP = { x: p.x - out.x * 3.8, y: p.y - out.y * 3.8 };
+    const s = setOntoPier([p, bowP], -out.x * 0.4, -out.y * 0.4); expect(s?.pier.name).toBe(pier3.name); expect(s!.s).toBeGreaterThanOrEqual(5); expect(s!.s).toBeLessThanOrEqual(6.5);
+    expect(setOntoPier([p, bowP], out.x * 0.4, out.y * 0.4)).toBeNull(); // (drifting away)
   });
   it('careless: let drift onto the pier with no way on to steer, she\'s stopped dead on its piles, and told so in one line', () => {
     const w = cruise(); place(w, 3, 0.3); const msgs = run(w, 30);
@@ -47,11 +48,33 @@ describe("Fort Mason's piers", () => {
   });
   it('set sideways onto it: stopped on its piles', () => {
     const w = cruise(); place(w, 3, 0.25, true); const msgs = run(w, 30);
-    expect(msgs.some(m => /Set onto the piles/.test(m)), msgs.join(' / ')).toBe(true);
+    expect(msgs.some(m => /the piles of Fort Mason's Pier 3/.test(m)), msgs.join(' / ')).toBe(true); expect(underPier(w.user)).toBeNull();
   });
   it('struck bow first under way, she bounces off its face (a collision)', () => {
     const w = cruise(); place(w, 4, 2); const msgs = run(w, 4);
     expect(msgs.some(m => /Collision: you hit the piles of Fort Mason's Pier 3/.test(m)), msgs.join(' / ')).toBe(true);
     expect(msgs.some(m => /Set onto the piles/.test(m))).toBe(false);
   });
+  it('stern first onto the piles (sternway, as after missing a tack): stopped on them, and told it\'s the piles, not the bottom', () => {
+    const w = cruise(); place(w, 3, 0); const u = w.user; u.h = (u.h + 180) % 360; u.astern = 0.4; const msgs = run(w, 20);
+    expect(msgs.some(m => /Set onto the piles of Fort Mason's Pier 3/.test(m)), msgs.join(' / ')).toBe(true);
+    expect(msgs.some(m => /touched bottom/.test(m))).toBe(false); expect(underPier(u)).toBeNull();
+  });
+  it('lying against them, drifting on at a few cm/s: told once, gently, not over and over', () => {
+    const w = cruise(); place(w, 1.3, 0.03, true); const msgs = run(w, 60).filter(m => /piles/.test(m));
+    expect(msgs.length).toBeGreaterThanOrEqual(1); expect(msgs.length).toBeLessThanOrEqual(2); expect(msgs[0]).toMatch(/Against the piles of Fort Mason's Pier 3: fend off/);
+  });
+  // (the physics review's case: sailing out of the cove along Pier 3's face with the westerly setting her onto it. She
+  // used to slip a few cm into the face and be pushed back along her own heading, still on land, every step: astern
+  // through the city)
+  for (const kt of [4, 8, 14]) it(`sailing along its face, sails up, ${kt} kt westerly setting her on: she slides along it and never goes through it`, () => {
+    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, windDir: 270, mode: 'sail', sailFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
+    const w = new World(COURSES[0], S, 1, { freeSail: true }); for (let i = 0; i < 30; i++) w.step(DT);
+    const u = w.user, along = brg(-edge.x, -edge.y); // (out along the face, toward the pier's end)
+    Object.assign(u, { docked: undefined, x: face.x + out.x * 1.25, y: face.y + out.y * 1.25, h: (brg(edge.x, edge.y) + 0) % 360, v: 1, astern: 0, sway: 0, turnRate: 0, steer: 0, tiller: 0, turnTarget: null });
+    void along; u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
+    let worst = 0;
+    for (let i = 0; i < 60 / DT; i++) { w.step(DT); w.drainEvents(); if (onLand(u)) worst = 99; worst = Math.max(worst, Math.hypot(u.x - face.x, u.y - face.y)); }
+    expect(onLand(u)).toBe(false); expect(worst).toBeLessThan(150); // (her middle never on land, and nowhere near the city)
+  }, 60000);
 });
