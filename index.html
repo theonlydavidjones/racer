@@ -17,7 +17,7 @@
 <header id="hud">
   <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
   <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
-  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The gray tick is your heading on the other tack (or gybe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
+  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The gray tick is your heading on the other tack (or jibe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
 </header>
 <!-- the wind and the water, and the app's own buttons: top right -->
 <div id="hudRight">
@@ -147,6 +147,7 @@
   <div class="tp-crewbox" id="tpCrewBox">
     <div class="tp-crewhead"><button type="button" class="tp-crewline" id="tpCrewLine" aria-expanded="false"><span class="tp-lab" id="tpCrewLab">Crew</span><span class="tp-crewstat" id="tpCrew"></span><span class="tp-fold" aria-hidden="true">&#9656;</span></button>
       <span class="who" id="whoCrew" data-line="crew" role="group" aria-label="Who works the crew weight"><button type="button" data-who="crew">Crew</button><button type="button" data-who="you">You</button></span></div>
+    <div class="tp-seg tp-dock" id="tpDockRow" hidden><button class="tp-btn two" type="button" id="bLines"><span class="w" id="bLinesW">Lines ready</span><small id="bLinesS">G &middot; step off at the shrouds</small></button></div>
     <div class="tp-crewopen" id="tpCrewOpen" hidden>
       <div class="tp-wind" id="tpWind">Wind over the port side: port is windward, starboard leeward</div>
       <div class="tp-seg tp-across" id="tpCrewRow" role="group" aria-label="Where the crew sit across the boat">
@@ -166,7 +167,7 @@
     <div class="modes four">
       <button type="button" class="modecard" data-home="race"><b>Race</b><span>Create a race, or run a past one</span></button>
       <button type="button" class="modecard" data-home="cruise"><b>Cruise</b><span>Sail anywhere on the Bay</span></button>
-      <button type="button" class="modecard" data-home="drill"><b>Drill</b><span>The start, tacks and gybes, mark roundings</span></button>
+      <button type="button" class="modecard" data-home="drill"><b>Drill</b><span>The start, tacks and jibes, mark roundings</span></button>
       <button type="button" class="modecard" data-home="fleet"><b>Yacht Club</b><span>Your boats, your crew, the club</span></button>
     </div>
     <div class="homefoot"><button class="ghost sm" id="bKeys0" type="button">Settings</button></div>
@@ -203,7 +204,7 @@
           <button class="cta dgo" id="bDrill" type="button" title="The last minutes to the gun, then a debrief and a replay">Go</button>
           <div class="dsets"><div class="seg" id="drillFromSeg" aria-label="Minutes to the gun"><button type="button" data-df="60">1 min</button><button type="button" data-df="120">2 min</button><button type="button" data-df="180">3 min</button></div><div class="seg" id="drillSoloSeg" aria-label="Alone or with the fleet"><button type="button" data-ds="1">Alone</button><button type="button" data-ds="0">With the fleet</button></div></div></div>
         <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" stroke="#9fd3ea" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 26 L14 6 L22 26 L30 6"/><path d="M30 6 l-1 6 M30 6 l-5 3"/></svg></span>
-          <span class="t-h">Tacks and gybes</span>
+          <span class="t-h">Tacks and jibes</span>
           <button class="cta dgo" id="bManoeuvres" type="button" title="Alone in open water, in this day's wind and sea: each one scored against a good crew's">Go</button></div>
         <div class="dcard"><span class="dic"><svg viewBox="0 0 40 30" width="40" height="30" fill="none" aria-hidden="true"><circle cx="24" cy="14" r="4" fill="#ffb627"/><path d="M6 26 Q8 8 24 6 Q36 6 34 18 Q32 26 20 26" stroke="#9fd3ea" stroke-width="2.2" stroke-dasharray="3 3" stroke-linecap="round"/></svg></span>
           <span class="t-h">Mark roundings</span>
@@ -234,6 +235,8 @@
                 <small id="prepNote"></small></div>
               <div class="field" id="penaltyField"><span>Penalty for a foul</span>
                 <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (Rule 44.1)</button><button type="button" data-v="1">One turn</button></div></div>
+              <div class="field" id="judgingField"><span>On-the-water judging</span>
+                <div class="seg" data-k="judging"><button type="button" data-v="protests">Protests (Part 5)</button><button type="button" data-v="umpired">Umpired</button></div></div>
               <div class="field" id="biasField"><span>Line set by the committee</span>
                 <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
             </div>
@@ -377,6 +380,12 @@
   </div>
 </div>
 
+<div class="overlay" id="lessons" hidden>
+  <div class="panel">
+    <div class="cvhead"><div><div class="eyebrow">Learn to sail</div><h2>Lessons</h2></div><button class="ghost" id="bLessonsX" type="button">Back</button></div>
+    <div id="lessonGrid"></div>
+  </div>
+</div>
 <div class="overlay" id="drill" hidden>
   <div class="panel">
     <div class="eyebrow">Start practice</div>
@@ -415,7 +424,7 @@
       </div>
     <details class="more"><summary><u>How to sail her ▸</u></summary>
     <div class="help">
-      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed center line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the center, harder over. Click again, T or Esc lets go, and the tiller springs back to center. You can also hold A / D to turn to port / starboard. Tack and gybe by steering through the wind.</span>
+      <b>Steer</b><span>Click the water (or press T) to take the tiller. While you hold it, the cursor's left–right position is the tiller handle: the dashed center line is straight ahead; slide right of it to push the tiller to starboard (the boat turns to port), left to turn to starboard. Further from the center, harder over. Click again, T or Esc lets go, and the tiller springs back to center. You can also hold A / D to turn to port / starboard. Tack and jibe by steering through the wind.</span>
       <b>Luff</b><span>Hold S to ease the sails and slow down. This is how you burn time before the gun.</span>
       <b>Trim</b><span>The crew trims the sails unless you switch Trim to "you". Then Trim/Ease, or Z/X for the main and , / . for the jib. Watch the telltales: windward ones lifting means trim in or bear away; leeward ones drooping means ease or head up.</span>
       <b>Hail</b><span>The Hail tab on the sail controls band (it shows when there's a hail to make) or H. Near the shore, close-hauled, with a boat to windward stopping you tacking: "Room to tack!" and they must tack (Rule 20). On starboard with a port boat coming at you: "Starboard!" If another boat hails you for room to tack, tack right away.</span>
@@ -472,6 +481,7 @@
       <p id="resStart"></p>
       <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
       <p id="resFouls" class="lede"></p>
+      <div id="resProtests" class="debrief protests" hidden></div>
       <div id="resSeason" class="ressea" hidden></div>
       <div id="resReal" class="debrief" hidden></div>
       <div id="resDebrief" class="debrief"></div>

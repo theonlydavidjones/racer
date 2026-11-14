@@ -6,3 +6,4 @@ export * from './rightOfWay';
 export * from './pairs';
 export * from './explain';
 export * from './scoring';
+export * from './hearing';

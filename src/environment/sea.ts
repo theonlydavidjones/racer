@@ -572,7 +572,8 @@ export class SeaField {
     let w = grow(Math.min(F, Fd));
     for (let i = 0; i < 2; i++) { const cg = groupSpeed(w.tp); w = grow(Math.min(F * cg / Math.max(0.3 * cg, cg + Uc), Fd)); }
     // ... then steepened (or eased) by the change in current since the water the waves came through, ~1 km upwind
-    const up = currentAt({ x: p.x - to.x * 1000, y: p.y - to.y * 1000 });
+    // (in a basin, the chop is made on the basin's own still water: no change of current under it)
+    const up = inBasin(p) ? cur : currentAt({ x: p.x - to.x * 1000, y: p.y - to.y * 1000 });
     const wc = onCurrent(w.hs, w.tp, Uc - dot(up, to));
     let hsW = wc.H * clamp((U - 1) / 2, 0, 1); // glassy below ~2 m/s
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks

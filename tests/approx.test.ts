@@ -3,7 +3,7 @@
 //     shore (environment/current.ts shoreRelief), every boat every step.
 //  2. Pairs of boats far apart, not converging and with nothing on their record, not assessed in full (World.apart).
 //  3. The AI boats thinking twenty times a second, every step in close quarters (World.AI_EVERY, closeQuarters).
-// Kept out of test:fast (it sails eight races of six minutes).
+// Kept out of test:fast (it sails races of six minutes: 128 for the AI's).
 import { describe, expect, it } from 'vitest';
 import { anyShoreDist, anyShoreDistNear, onLand, setShoreGrid } from '../src/geo/shore';
 import { APPROX_RACES, approxRace, type ApproxOpts } from './helpers/races';
@@ -62,8 +62,18 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
   // (staggered across the fleet) against every step: no further from that race than a 0.1% change in the current takes
   // it (as the lattice above), and no more penalties. Over sixteen races (eight on each course): each race is chaotic, so
   // a change elsewhere in the sim draws a different sample of them, and eight left the mean a few hundredths of a point
-  // either side of the bound by luck (the Coordinator, 13 Nov 2026: a stronger test, not a looser one)
-  it('sails no further from the every-step race than a 0.1% change in the current does, over sixteen races, with no more fouls', async () => {
+  // either side of the bound by luck (the Coordinator, 13 Nov 2026: a stronger test, not a looser one).
+  //
+  // The fouls, over 48 races (the sixteen and 32 more, alternating courses), as a paired test. Each seed sails the same
+  // race both ways, so the difference per seed, twenty a second minus every step, carries the effect without most of the
+  // race-to-race scatter. Measured (Deep Physics, 13 Nov 2026, 64 seeds outside the test's on main and on a branch):
+  // about 2 fouls a race every step, the per-seed difference's standard deviation 1.4–1.6, its mean +0.13 and −0.34; the
+  // old bound on two sixteen-race totals (20 Hz ≤ 1.3 × every step + 2) had a margin of about 10 against a spread of
+  // about ±7, and failed about one run in ten with no real effect. Now: fail when the mean difference is above its
+  // one-sided 99% bound under no effect, t(0.99, 47 df) = 2.408 standard errors (the sample's own). Resampling those 64
+  // measured pairs: with no effect it fails about one run in a hundred (the old test, one in twenty); a real rise of half
+  // again in the fouls (+1 a race) it catches 99 times in 100 (the old, 73); of a third (+0.6 a race), 65 (the old, 38).
+  it('sails no further from the every-step race than a 0.1% change in the current does, over sixteen races, with no more fouls (48)', async () => {
     const dev: number[] = [], nudge: number[] = [];
     let penE = 0, penD = 0;
     const pens = (r: ReturnType<typeof race>) => r.fouls;
@@ -71,15 +81,22 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
     const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [0, 11], [0, 12], [0, 13], [0, 14], [1, 7], [1, 8], [1, 9], [1, 10], [1, 15], [1, 16], [1, 17], [1, 18]] as const;
     const jobs = SEEDS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }],
       [i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }], [i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }]]);
+    // (the fouls only: 32 more seeds, each sailed both ways; seeds 19–50, the courses in turn)
+    const MORE = Array.from({ length: 32 }, (_, k) => [k % 2, 19 + k] as const);
+    jobs.push(...MORE.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }]]));
     const R = await sail('approxRace', jobs);
+    const diff: number[] = []; // (per seed: twenty a second's fouls minus every step's)
     SEEDS.forEach((_, k) => {
       const [exR, dR, upR, downR] = R.slice(4 * k, 4 * k + 4), ex = fleetV(exR.boats);
-      dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR);
+      dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR));
       nudge.push((Math.abs(fleetV(upR.boats) / ex - 1) + Math.abs(fleetV(downR.boats) / ex - 1)) / 2);
     });
+    MORE.forEach((_, k) => { const [exR, dR] = R.slice(4 * SEEDS.length + 2 * k, 4 * SEEDS.length + 2 * k + 2); penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR)); });
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(mean(dev), `twenty a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
-    expect(penD, `penalties: every step ${penE}, twenty a second ${penD}`).toBeLessThanOrEqual(penE * 1.3 + 2);
+    const n = diff.length, dm = mean(diff), sd = Math.sqrt(diff.reduce((a, x) => a + (x - dm) ** 2, 0) / (n - 1)), T99 = 2.408; // (t, 47 df)
+    expect(n).toBe(48);
+    expect(dm, `penalties over ${n} races: every step ${penE}, twenty a second ${penD}; the mean difference ${dm.toFixed(2)} a race, its 99% bound ${(T99 * sd / Math.sqrt(n)).toFixed(2)}`).toBeLessThanOrEqual(T99 * sd / Math.sqrt(n));
   }, 3_600_000);
 });
 
