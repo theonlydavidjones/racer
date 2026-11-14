@@ -216,14 +216,16 @@ const pileSlotDepth = (p: Vec): number => {
 /** In a slot the stream is the piles' (PILE_FLOW), from the open Bay's at its mouth over its first SLOT_IN meters. */
 const SLOT_IN = 20;
 /** Still water k beside a pile pier (pd m from its shed) brought up toward PILE_FLOW within its deck and the mixing zone past it. */
-const pierMix = (k: number, pd: number) => k >= PILE_FLOW || pd >= DECK + PILE_MIX ? k : pd <= DECK ? PILE_FLOW : k + (PILE_FLOW - k) * (1 - (pd - DECK) / PILE_MIX);
+const pierMix = (k: number, pd: number, p: Vec) => k >= PILE_FLOW || pd >= DECK + PILE_MIX ? k : pd <= DECK ? PILE_FLOW : inBasin(p) ? k : k + (PILE_FLOW - k) * (1 - (pd - DECK) / PILE_MIX);
+// (not inside a harbor's basin: a closed basin beside the pier has nowhere for the water to go, so none comes through the
+// piles into it, only the slack under the deck's edge; Deep Physics' review of the cove's mouth)
 const slotFlow = (depth: number) => PILE_FLOW + (1 - PILE_FLOW) * Math.max(0, 1 - depth / SLOT_IN);
 /** As basinCalm, for drawing only: undefined where the grid isn't built yet (it never builds one). */
 export function basinCalmIfBuilt(p: Vec): number | undefined {
   const pd = pilePierDist(p); if (pd <= 0) return 1;
   const sd = pileSlotDepth(p); if (sd >= 0) return pd <= DECK ? Math.min(PILE_FLOW, slotFlow(sd)) : slotFlow(sd);
-  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) { if (!g.calm) return undefined; return pierMix(calmIn(g.calm, p), pd); }
-  if (pd < DECK + PILE_MIX) return pierMix(1, pd);
+  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) { if (!g.calm) return undefined; return pierMix(calmIn(g.calm, p), pd, p); }
+  if (pd < DECK + PILE_MIX) return pierMix(1, pd, p);
   return 1;
 }
 export function basinCalm(p: Vec): number {
@@ -236,7 +238,7 @@ export function basinCalm(p: Vec): number {
   // (beside a pier: still water there comes up toward what the piles pass, as it mixes with what came through them;
   // the open stream running past a pier's head isn't slowed)
   const k = basinCalmGrid(p);
-  return pierMix(k, pd);
+  return pierMix(k, pd, p);
 }
 /** The harbors' grids' own calm at p (basinCalm, without the piers). */
 function basinCalmGrid(p: Vec): number {
