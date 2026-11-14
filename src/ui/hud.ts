@@ -550,7 +550,10 @@ export class Hud {
     ctx.beginPath(); ctx.moveTo(bx + Math.cos(pa) * 4, by + Math.sin(pa) * 4); ctx.lineTo(bx - Math.cos(pa - 0.5) * 9, by - Math.sin(pa - 0.5) * 9); ctx.lineTo(bx - Math.cos(pa + 0.5) * 9, by - Math.sin(pa + 0.5) * 9); ctx.fill();
     ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
     // her point of sail, as the windex shows it (the owner: the dial names it); also on the canvas for the checks
-    const pos = pointOfSailWord(u); this.dialC.dataset.pos = pos; this.dialC.setAttribute('aria-label', `Wind angle dial: ${pos}, true wind ${Math.round(u.twa)}°, apparent ${Math.round(u.awa)}°`);
+    // (the element's own words only when they change: a write a frame restyles the page every frame)
+    const pos = pointOfSailWord(u), lab = `Wind angle dial: ${pos}, true wind ${Math.round(u.twa)}°, apparent ${Math.round(u.awa)}°`;
+    if (this.dialC.dataset.pos !== pos) this.dialC.dataset.pos = pos;
+    if (this.dialC.getAttribute('aria-label') !== lab) this.dialC.setAttribute('aria-label', lab);
     ctx.fillStyle = '#e9f2f5'; ctx.font = '700 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(pos, cx, cy - R * 0.5);
     ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif';
     ctx.fillText('TWA ' + Math.round(u.twa) + '°', cx, cy + R * 0.56);

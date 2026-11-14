@@ -400,11 +400,14 @@ export class SailBand {
     const wx = this.el.querySelector<HTMLElement>('.sb-wx')!;
     wx.querySelector('.sb-vane')!.setAttribute('transform', `rotate(${u.arel.toFixed(1)} 70 70)`);
     const awa = Math.round(Math.abs(u.awa));
-    wx.querySelector('.sb-awa')!.textContent = `${awa}°`;
+    // (written only when they change: a write a frame, even of the same text, has the page restyle every frame)
+    const put = (el: Element, t: string) => { if (el.textContent !== t) el.textContent = t; };
+    const attr = (el: Element, k: string, v: string) => { if (el.getAttribute(k) !== v) el.setAttribute(k, v); };
+    put(wx.querySelector('.sb-awa')!, `${awa}°`);
     // her point of sail under the vane (the owner: the windex names it: Close-hauled, Beam reach, Broad reach, Run)
-    const pos = pointOfSailWord(u); wx.querySelector('.sb-pos')!.textContent = pos;
-    wx.setAttribute('aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
-    wx.dataset.help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`;
+    const pos = pointOfSailWord(u); put(wx.querySelector('.sb-pos')!, pos);
+    attr(wx, 'aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
+    { const help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`; if (wx.dataset.help !== help) wx.dataset.help = help; }
     // who trims: Auto-Trim while the crew has every line; Hand Back (amber, as the lines you hold) once any is yours
     const all = this.el.querySelector<HTMLElement>('.sb-all')!, word = trimTab(u);
     if (all.textContent !== word) {
