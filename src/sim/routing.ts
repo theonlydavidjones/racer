@@ -306,9 +306,9 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   // pull it straight: from each turn, on to the farthest point in clear sight
   const out = [a];
   let i = 0;
-  // (where nothing in sight keeps WHARF_CLEAR off the piers, a marina's fairways, the farthest point in sight by the
-  // land alone, as before, rather than the grid's every 10 m step)
-  const seen = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  // (where nothing in sight keeps WHARF_CLEAR off the piers, a marina's fairways, the farthest point in sight keeping
+  // MARINA_CLEAR off them, rather than the grid's every 10 m step)
+  const seen = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity || !wharfClear(p, q, [a, b], MARINA_CLEAR)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   while (i < pts.length - 1) {
     let j = pts.length - 1;
     while (j > i + 1 && !visible(pts[i], pts[j])) j--;
@@ -372,15 +372,17 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
  * seawall").
  */
 export const WHARF_CLEAR = 10;
+/** In a marina's fairways (20–30 m between its docks), where WHARF_CLEAR won't fit: down the middle, half of it (m). */
+const MARINA_CLEAR = 5;
 /** Clear of the Wharf's structures by WHARF_CLEAR along a to b, sampled every 4 m, except within that of `free` (where
  * she is now, or where she's going: a slip or a dock may be closer). */
-function wharfClear(a: Vec, b: Vec, free: Vec[] = []): boolean {
-  const L = dist(a, b); if (!wharfNearest(a, L + WHARF_CLEAR) && !wharfNearest(b, L + WHARF_CLEAR)) return true;
+function wharfClear(a: Vec, b: Vec, free: Vec[] = [], clear = WHARF_CLEAR): boolean {
+  const L = dist(a, b); if (!wharfNearest(a, L + clear) && !wharfNearest(b, L + clear)) return true;
   const n = Math.max(1, Math.ceil(L / 4));
   for (let k = 0; k <= n; k++) {
     const q = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
-    if (free.some(f => dist(q, f) < WHARF_CLEAR + 2)) continue;
-    if (wharfNearest(q, WHARF_CLEAR)) return false;
+    if (free.some(f => dist(q, f) < clear + 2)) continue;
+    if (wharfNearest(q, clear)) return false;
   }
   return true;
 }
@@ -388,8 +390,12 @@ function wharfClear(a: Vec, b: Vec, free: Vec[] = []): boolean {
  * WHARF_CLEAR off them. */
 function escapeWharf(p: Vec): Vec[] {
   const out = (q: Vec) => wharfNearest(q, 150) === null;
-  const blocked = (q: Vec) => onLand(q) || (dist(q, p) > WHARF_CLEAR + 2 && !!wharfNearest(q, WHARF_CLEAR));
-  // (a marina's fairways, 20–30 m between its docks, leave no room for the clearance: there, down the fairway as before)
-  return gridPath(p, p, 10, 700, blocked, (u, v) => landAlong(u, v) === Infinity && wharfClear(u, v, [p]), out, 0)
-    ?? gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, out, 0) ?? [p];
+  // (a marina's fairways, 20–30 m between its docks, leave no room for the whole clearance: there, half of it, down the
+  // middle of the fairway; and only failing that, as before, the docks alone)
+  for (const c of [WHARF_CLEAR, MARINA_CLEAR]) {
+    const blocked = (q: Vec) => onLand(q) || (dist(q, p) > c + 2 && !!wharfNearest(q, c));
+    const r = gridPath(p, p, 10, 700, blocked, (u, v) => landAlong(u, v) === Infinity && wharfClear(u, v, [p], c), out, 0);
+    if (r) return r;
+  }
+  return gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, out, 0) ?? [p];
 }
