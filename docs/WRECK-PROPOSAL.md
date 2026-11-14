@@ -71,8 +71,8 @@ The suggestion is the lightest version: the boat is "laid up for repairs" for so
 3. **Towing and repairs** (left to the Coordinator):
    - Towing: yes, optional. It ends the outing as "towed in".
    - Repairs: she's laid up for a few real days. No money.
-4. **Season scoring:** a wreck in a season race is RET only. Not answered by the owner; the Coordinator's call for now.
-5. **Who can be wrecked:** only your boat, not the AI boats. Not answered by the owner; the Coordinator's call for now.
+4. **Season scoring:** a wreck in a season race is RET only (the owner confirmed, 14 Nov 2026: "Ok").
+5. **Who can be wrecked:** only your boat, not the AI boats (the owner confirmed, 14 Nov 2026: "Ok").
 
 ## 8. As built (14 Nov 2026)
 

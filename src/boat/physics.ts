@@ -838,7 +838,7 @@ const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];
  */
 function hurt(b: Boat, what: { kind: Struck; name: string }, closing: number, hit: Vec, emit: Emit): DamageLevel {
   const m = displacement((b.crew ??= newCrew(DEFAULT_CREW, b.tack)).spec), level = damageOf(impactEnergy(closing, m), what.kind, m);
-  if (!b.isUser) return level; // (the AI boats aren't wrecked or marked: the Coordinator's call, for now)
+  if (!b.isUser) return level; // (the AI boats aren't wrecked or marked: the owner, 14 Nov 2026)
   if (RANK.indexOf(level) > RANK.indexOf(b.damage?.level ?? 'none')) b.damage = { level, what: what.name };
   if (level === 'wreck') wreck(b, `hit ${what.name} at ${(closing / KT).toFixed(1)} kn`, hit, emit);
   return level;

@@ -43,7 +43,7 @@ describe('wrecks', () => {
     const w = world('sail'); aim(w, offCrissy, 180, 2, 2); const r = run(w, 4);
     expect(r.wrecked).toHaveLength(0); expect(w.user.damage).toBeUndefined(); expect(r.toasts.some(m => /Aground/.test(m))).toBe(true);
   });
-  it('racing, wrecked: she retires (RET only, in a season race too: the Coordinator, for now)', () => {
+  it('racing, wrecked: she retires (RET only, in a season race too: the owner, 14 Nov 2026)', () => {
     const w = world('race'); aim(w, offWestHarbor, 180, 2, 2); run(w, 4);
     expect(w.user.wrecked).toBeTruthy(); expect(w.user.retired).toBe(true);
   });
@@ -52,7 +52,7 @@ describe('wrecks', () => {
     const u = w.user; u.h = 0; w.carryOn(); u.v = 1; run(w, 3);
     expect(u.wrecked?.carryOn).toBe(true); expect(Math.hypot(u.vx, u.vy)).toBeGreaterThan(0.05);
   });
-  it('the AI boats are never wrecked or marked (only your boat: the Coordinator, for now)', () => {
+  it('the AI boats are never wrecked or marked (only your boat: the owner, 14 Nov 2026)', () => {
     const w = world('race'); const ai = w.boats.find(b => !b.isUser)!;
     const u = V(180); let d = 0; while (!onLand({ x: offWestHarbor.x + u.x * d, y: offWestHarbor.y + u.y * d })) d += 0.25;
     Object.assign(ai, { x: offWestHarbor.x + u.x * (d - 5.8), y: offWestHarbor.y + u.y * (d - 5.8), h: 180, v: 2 });
