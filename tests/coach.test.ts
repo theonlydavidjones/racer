@@ -85,7 +85,7 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0; sail(b, 20);
     expect(teach(b).top.id).toBe('hove:takemain');
     // (the main eased until the coach has no more to say about it, as the player does: a tenth of the sheet at a time.
-    // It was eased to 0.55 once and for all, which with the jib's lead as the car has it leaves her still doing 4 kt, and
+    // It was eased to 0.55 once and for all, which with the jib's lead as the car has it leaves her still doing 4.2 kt at 0.55, and
     // the coach rightly asks for more: 14 Nov 2026)
     takeLine(b, 'mainsheet'); b.ctlTarget.mainsheet = 0.55; sail(b, 20);
     for (let k = 0; k < 2 && teach(b).top.id === 'hove:easemain'; k++) { (b.ctlTarget ??= {}).mainsheet = b.ctl.mainsheet + 0.1; sail(b, 20); }
