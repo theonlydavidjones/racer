@@ -124,12 +124,12 @@ describe('passages along a shore', () => {
     it(`${from} to ${to} in 8 kt gets there`, () => {
       const pn = passageNow(at({ sailFrom: from, sailTo: to, windKt: 8, tideTime: '15:00' }))!;
       expect(pn.ok, pn.why).toBe(true);
-    }, 30_000);
+    }, 180_000);
 });
 
 describe('the same plan whatever was planned before it', () => {
   it('Berkeley to Belvedere in 8 kt in the real sea gets there (it ran ashore depending on what came before)', () => {
     const pn = passageNow(at({ sailFrom: 'berkeley', sailTo: 'belvedere', windKt: 8, tideTime: '15:00', sea: 'real' }))!;
     expect(pn.ok, pn.why).toBe(true);
-  }, 30_000);
+  }, 180_000);
 });

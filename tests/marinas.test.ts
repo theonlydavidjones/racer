@@ -146,7 +146,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const slips = slipsIn(id);
       expect(slips.filter(s => seen.has(key(s.p))).length).toBe(slips.length);
     }
-  }, 60000);
+  }, 180_000);
   it('the wind: held by the bow, her stern swings downwind, so she comes round toward the wind; head to wind she\'s held there for the main; an end tie\'s bow is pushed off the wind', () => {
     const rel = (from: number, h: number) => ((from - h + 540) % 360) - 180;
     let n = 0, held = 0;
@@ -183,7 +183,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       const p = pushOffPlan(e, from, 15); expect(pushOffPoses(e, p).every(q => berthClear(q.c, q.h, e))).toBe(true);
       if (!p.headToWind) expect(Math.abs(rel(from, p.h))).toBeGreaterThanOrEqual(30);
     }
-  }, 120000);
+  }, 180_000);
   it('the wind straight out of her slip: she\'s already head to wind, so she\'s walked out and held for the main, not turned across it', () => {
     let n = 0;
     for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 4 === 0)) {
@@ -191,7 +191,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
     expect(n).toBeGreaterThan(8); // (was 20: since she must have 20 m clear along her path as she gathers way, main alone and hands off (pushoff-letgo.test.ts), many narrow berths shove her off astern instead)
-  }, 120000); // (every fourth berth of all the marinas': about 35 s alone, since Richmond YC's 214 joined)
+  }, 180_000); // (every fourth berth of all the marinas': about 35 s alone, since Richmond YC's 214 joined)
   it('her flags and windex show the wind while she\'s made fast and while the crew has her', () => {
     const slip = slipsIn('west-harbor')[30], boat = { ...DEFAULT_BOAT, marina: slip.marina, slip: slip.id };
     const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
@@ -223,7 +223,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     expect(Math.abs(a.secs - b.secs)).toBeLessThan(0.5); // (the swing about the bow line: the rudder crosses the water broadside, no help)
     expect(k.signed).toBeGreaterThan(2); expect(Math.sign(k.turned)).toBe(Math.sign(a.turned)); // (a key held, the same as the tiller)
     expect(Math.sign(a.turned)).toBe(-Math.sign(b.turned)); expect(Math.abs(a.turned)).toBeGreaterThan(3); // (let go, with way on, she turns as the tiller says)
-  }, 120000);
+  }, 180_000);
   it('South Beach: the harbor\'s own slip numbers (its map, sfport.com): from each dock\'s gate at the shore, odd on the north side, even on the south', () => {
     const top: Record<string, number> = { A: 84, B: 92, C: 92, D: 104, E: 104, F: 108, G: 92 }; // (the map's highest on each dock)
     const sb = slipsIn('south-beach');

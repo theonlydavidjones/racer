@@ -138,7 +138,7 @@ function windLimitSection(w: SimView, o: Outlook, finishT: number): BriefSection
     lede: over ? `The forecast reaches ${Math.round(peak.kt)} kt over the course (${clockOf(peak.t)}, ${when}): over the fleet's ${CANCEL_KT} kt limit. Expect the committee to call racing off.`
       : `The forecast peaks at ${Math.round(peak.kt)} kt over the course (${clockOf(peak.t)}, ${when}): a few knots under the fleet's ${CANCEL_KT} kt limit.`,
     items: [
-      { head: 'The fleet\'s practice', src: 'practice', text: `On the Bay, Folkboat racing is cancelled at about ${CANCEL_KT} kt: at that speed things start breaking on boats, and the fleet doesn't reef. Before the start the committee shows AP over A with two sounds (postponed, no more racing today); once racing, N over A with three sounds (abandoned, no more racing today).` },
+      { head: 'The fleet\'s practice', src: 'practice', text: `On the Bay, Folkboat racing is canceled at about ${CANCEL_KT} kt: at that speed things start breaking on boats, and the fleet doesn't reef. Before the start the committee shows AP over A with two sounds (postponed, no more racing today); once racing, N over A with three sounds (abandoned, no more racing today).` },
       over ? { head: 'Before you leave the dock', src: 'practice', text: 'Check for the race chair\'s word before casting off: on a day like this the fleet usually decides at the dock. If you\'re out when it\'s called off, depower and sail home; the ebb against the westerly makes the worst of the sea off the Cityfront and in the Gate.' }
         : { head: 'If it builds', src: 'practice', text: `A puffier or later breeze than forecast can take it over ${CANCEL_KT} kt: if the committee calls it off, come home with the sails depowered (see Trim and tuning).` }
     ]
@@ -158,7 +158,7 @@ function daySection(w: SimView, o: Outlook, finishT: number): BriefSection {
   const items: BriefItem[] = [];
   const tr = windTrend(o, gun, finishT), dk = tr.kt1 - tr.kt0, dd = tr.dFrom, persistent = Math.abs(dd) >= 5 && Math.abs(dd) > 1.5 * tr.swing;
   const trend = Math.abs(dk) < 1.5 ? `holds at about ${Math.round((tr.kt0 + tr.kt1) / 2)} kt` : `${dk > 0 ? 'builds' : 'eases'} from about ${Math.round(tr.kt0)} to ${Math.round(tr.kt1)} kt`;
-  const swing = persistent ? `and ${dd > 0 ? 'veers (swings clockwise)' : 'backs (swings anticlockwise)'} about ${Math.round(Math.abs(dd))}°, from ${deg3(tr.from0)} to ${deg3(tr.from1)}`
+  const swing = persistent ? `and ${dd > 0 ? 'veers (swings clockwise)' : 'backs (swings counterclockwise)'} about ${Math.round(Math.abs(dd))}°, from ${deg3(tr.from0)} to ${deg3(tr.from1)}`
     : tr.swing >= 4 ? `and oscillates rather than shifting: it swings ${Math.round(tr.swing)}° or so either side of ${deg3((tr.from0 + tr.from1) / 2)} (between ${deg3(tr.lo)} and ${deg3(tr.hi)}), with no steady trend`
     : 'and holds its direction';
   items.push({ head: 'The breeze', src: 'data', text: `Over the race it ${trend} ${swing}. (A straight line fitted through the wind every 2 minutes, so one gusty reading doesn't count as a trend.)` });
@@ -170,7 +170,7 @@ function daySection(w: SimView, o: Outlook, finishT: number): BriefSection {
   if (pts.length > 1) {
     const ws = pts.map(q => ({ ...q, kt: o.wind(q.p, gun + 15).kt })).sort((a, b) => b.kt - a.kt), hi = ws[0], lo = ws[ws.length - 1];
     const slot = slotFlow(o.breeze(gun).from) > 0.5;
-    if (hi.kt - lo.kt > 1) items.push({ head: 'Where it blows', src: 'model', text: `At the start, about ${Math.round(hi.kt)} kt at ${hi.name} and ${Math.round(lo.kt)} kt at ${lo.name}. ${slot ? 'The westerly comes in through the Gate and blows hardest in a band toward Alcatraz and Angel Island (the slot); ' : 'In this wind there\'s no slot (that\'s the westerly, funnelled through the Gate); '}the land slows the wind within a few hundred metres of the shore, and an island leaves a near-calm close behind it and lighter air for kilometres downwind (behind Angel Island, 3–5 km). (From ${w.weather.fieldSource}.)` });
+    if (hi.kt - lo.kt > 1) items.push({ head: 'Where it blows', src: 'model', text: `At the start, about ${Math.round(hi.kt)} kt at ${hi.name} and ${Math.round(lo.kt)} kt at ${lo.name}. ${slot ? 'The westerly comes in through the Gate and blows hardest in a band toward Alcatraz and Angel Island (the slot); ' : 'In this wind there\'s no slot (that\'s the westerly, funnelled through the Gate); '}the land slows the wind within a few hundred meters of the shore, and an island leaves a near-calm close behind it and lighter air for kilometers downwind (behind Angel Island, 3–5 km). (From ${w.weather.fieldSource}.)` });
   }
   // the tide: the nearest NOAA station's slacks and peaks around the race
   if (o.stations) {
@@ -197,7 +197,7 @@ function startSection(w: SimView, o: Outlook, legs: LegPlan[]): BriefSection {
   const fav = gain > 0 ? C.committeeLabel : C.pinLabel, m = Math.abs(gain), bias = Math.asin(clamp(m / len, -1, 1)) / D2R;
   const first = legs[0];
   if (first.kind === 'beat') {
-    items.push({ head: 'Favoured end', src: 'model', text: m < LOA ? `The line is square to the wind at the gun (${deg3(wd.from)}): neither end gains more than a boat length. Start where you have clear air and can go the way you want.` : `The ${fav} end is ${Math.round(m)} m (${Math.round(m / LOA)} boat lengths) further upwind: the line is ${Math.round(bias)}° off square to the ${deg3(wd.from)} wind. A boat starting there is that far ahead of one at the other end the moment the gun goes. Check it yourself before the start: head to wind on the line and see which end the bow points nearer to, or sail down the line on a close reach and watch the jib.` });
+    items.push({ head: 'Favored end', src: 'model', text: m < LOA ? `The line is square to the wind at the gun (${deg3(wd.from)}): neither end gains more than a boat length. Start where you have clear air and can go the way you want.` : `The ${fav} end is ${Math.round(m)} m (${Math.round(m / LOA)} boat lengths) further upwind: the line is ${Math.round(bias)}° off square to the ${deg3(wd.from)} wind. A boat starting there is that far ahead of one at the other end the moment the gun goes. Check it yourself before the start: head to wind on the line and see which end the bow points nearer to, or sail down the line on a close reach and watch the jib.` });
   } else items.push({ head: 'A reaching start', src: 'model', text: `The first leg is ${KIND_WORD[first.kind]}, so the line's bias matters less than being at full speed in clear air at the gun. The boats to windward have clear air and can roll the boats below them; the end nearer the first mark is the shorter way.` });
   // the current at the line
   const c = o.current(C.center, gun - 1), toward = dot(c, C.N), perMin = toward * 60;
@@ -208,7 +208,7 @@ function startSection(w: SimView, o: Outlook, legs: LegPlan[]): BriefSection {
   if (first.kind === 'beat' && first.best !== 'middle' && first.certainty !== 'open') {
     const leftN = { x: -up.y, y: up.x }, leftEnd = dot(sub(C.pin, C.committee), leftN) > 0 ? C.pinLabel : C.committeeLabel, rightEnd = leftEnd === C.pinLabel ? C.committeeLabel : C.pinLabel;
     const want = first.best === 'left' ? leftEnd : rightEnd;
-    items.push({ head: 'Start toward your plan', src: 'practice', text: `The first beat favours the ${first.best} (see the legs below), and the ${want} end is on that side. ${want === fav ? `It's also the favoured end: a clear call, so expect a crowd there and win the end with timing, not by barging. ${(want === C.committeeLabel ? C.committeeKind : C.pinKind) === 'shore' ? 'This end is the shore, an obstruction: Rule 19 room applies there, but don\'t count on being given it; a windward boat must keep clear of a leeward one (Rule 11).' : 'Approaching a starting mark surrounded by navigable water there\'s no mark-room or obstruction room (the preamble to Section C switches off rules 18 and 19 there), and a windward boat must keep clear of a leeward one (Rule 11).'}` : `The favoured end is the other one, so weigh the ${Math.round(m)} m you'd give away there against the gain of getting ${first.best} first. Usually, if the gain on the beat is bigger than the line's bias, start toward the side.`}` });
+    items.push({ head: 'Start toward your plan', src: 'practice', text: `The first beat favors the ${first.best} (see the legs below), and the ${want} end is on that side. ${want === fav ? `It's also the favored end: a clear call, so expect a crowd there and win the end with timing, not by barging. ${(want === C.committeeLabel ? C.committeeKind : C.pinKind) === 'shore' ? 'This end is the shore, an obstruction: Rule 19 room applies there, but don\'t count on being given it; a windward boat must keep clear of a leeward one (Rule 11).' : 'Approaching a starting mark surrounded by navigable water there\'s no mark-room or obstruction room (the preamble to Section C switches off rules 18 and 19 there), and a windward boat must keep clear of a leeward one (Rule 11).'}` : `The favored end is the other one, so weigh the ${Math.round(m)} m you'd give away there against the gain of getting ${first.best} first. Usually, if the gain on the beat is bigger than the line's bias, start toward the side.`}` });
   }
   return { id: 'start', title: 'The start', items };
 }
@@ -249,9 +249,9 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
     if (Math.abs(sh) >= 3 && !(dayShift && Math.sign(day.dFrom) === Math.sign(sh))) why.push(`the wind swings about ${Math.round(Math.abs(sh))}° ${sh > 0 ? 'right (veers)' : 'left (backs)'} during this leg, but over the race it oscillates rather than shifts one way, so treat it as a shift to tack (or gybe) on, not a side to bank on`);
     else if (Math.abs(sh) >= 3 && Math.abs(sh) > 1.5 * lt.swing) {
       const side = shiftSide(sh, L.kind);
-      why.push(side === L.best ? `the wind ${sh > 0 ? 'veers' : 'backs'} about ${Math.round(Math.abs(sh))}° during the leg, which favours the ${side}${L.kind === 'run' ? ' on a run' : ''}`
-        : `the wind ${sh > 0 ? 'veers' : 'backs'} about ${Math.round(Math.abs(sh))}° during the leg, which on its own would favour the ${side}${L.kind === 'run' ? ' on a run' : ''}, but the rest outweighs it`);
-    } else if (lt.swing >= 4) why.push(`the wind oscillates about ${Math.round(lt.swing)}° either way during the leg with no steady trend, so the shifts don't favour a side: tack (or gybe) on them`);
+      why.push(side === L.best ? `the wind ${sh > 0 ? 'veers' : 'backs'} about ${Math.round(Math.abs(sh))}° during the leg, which favors the ${side}${L.kind === 'run' ? ' on a run' : ''}`
+        : `the wind ${sh > 0 ? 'veers' : 'backs'} about ${Math.round(Math.abs(sh))}° during the leg, which on its own would favor the ${side}${L.kind === 'run' ? ' on a run' : ''}, but the rest outweighs it`);
+    } else if (lt.swing >= 4) why.push(`the wind oscillates about ${Math.round(lt.swing)}° either way during the leg with no steady trend, so the shifts don't favor a side: tack (or gybe) on them`);
     if (why.length) items.push({ head: 'Why', src: 'model', text: `${why.join('; ')}.`.replace(/^./, s => s.toUpperCase()) });
   }
   if (L.best === 'middle' || L.certainty === 'open') items.push({ head: 'How to sail it', src: 'practice', text: `When the sides are close, play what you can see: tack on the headers (when the compass says you've been knocked 5° or more and it's held for a few seconds), sail toward the dark patches of pressure coming down the course, and stay between the fleet and the mark rather than banking on a corner.` });
@@ -269,7 +269,7 @@ function courseSection(o: Outlook, legs: LegPlan[]): BriefSection {
   const items = legs.flatMap(L => { const it = legItems(o, L); if (L.island) it.push(it.shift()!); return it; });
   // ("about a tenth longer": the sim's own fleet sailing the same legs took 5–20% longer on the beats, 47 min planned
   // against about 50 sailed; tests/sim-fleet.test.ts holds the brief to that)
-  return { id: 'legs', title: 'The course: which way on each leg', lede: 'Each leg is sailed on paper three ways, at the Folkboat\'s polar speeds in the wind and current the day brings along the way: going left first and tacking (or gybing) on the layline, going right first, and staying near the middle. Left and right are looking upwind, as sailors say it; the direction in brackets says where on the water that is. The best plan is drawn on the map. Each is then tested against the forecast being off, to say how sure the call is. The times are for a perfect sail (about 8 s lost in each tack or gybe): upwind, a race typically takes about a tenth longer, and more on the first beat and round the first mark, where the fleet is bunched.', items };
+  return { id: 'legs', title: 'The course: which way on each leg', lede: 'Each leg is sailed on paper three ways, at the Folkboat\'s polar speeds in the wind and current the day brings along the way: going left first and tacking (or gybing) on the layline, going right first, and staying near the middle. Left and right are looking upwind, as sailors say it; the direction in brackets says where on the water that is. The best plan is drawn on the map. Each is then tested against the forecast being off, to say how sure the call is. The times are for a perfect sail (each tack or gybe costing what the boat measured for the wind: about 3 s in a breeze, over 20 in a drifter): upwind, a race typically takes about a tenth longer, and more on the first beat and round the first mark, where the fleet is bunched.', items };
 }
 
 /** The other boats: what you know about them. */
@@ -280,7 +280,7 @@ function fleetSection(w: SimView): BriefSection {
     const bits: string[] = [];
     if (b.spec) {
       const p = b.spec.perf, fouled = p.cleanedWeeks >= 8;
-      bits.push(`${p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : p.mainAge === 'old' || p.jibAge === 'old' ? 'tired sails' : 'part-worn sails'}`, `${p.mast === 'wood' ? 'a wooden mast' : 'an aluminium mast'}`, fouled ? `a bottom ${p.cleanedWeeks} weeks from a scrub (slower, most of all in light air)` : 'a clean bottom');
+      bits.push(`${p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : p.mainAge === 'old' || p.jibAge === 'old' ? 'tired sails' : 'part-worn sails'}`, `${p.mast === 'wood' ? 'a wooden mast' : 'an aluminum mast'}`, fouled ? `a bottom ${p.cleanedWeeks} weeks from a scrub (slower, most of all in light air)` : 'a clean bottom');
     } else bits.push(`a ${b.build?.hull === 'wood' ? 'wooden' : 'glassfibre'} club boat in good order`);
     const ai = b.ai;
     if (ai) {
@@ -299,7 +299,7 @@ function fleetSection(w: SimView): BriefSection {
     if (p.mainAge === 'old' || p.jibAge === 'old') notes.push('her sails are tired: the draft blows aft in a breeze, so pull the Cunningham on earlier than the other boats do');
     if (notes.length) items.push({ head: 'Your boat', src: 'model', text: notes.join('; ').replace(/^./, s => s.toUpperCase()) + '.' });
   }
-  items.push({ head: 'Racing the fleet', src: 'practice', text: opp.length <= 3 ? 'In a small fleet every boat counts: once you\'re ahead, stay between the boats behind and the next mark (cover them loosely, so you don\'t lose the side you wanted). On a clear call get to the favoured side first; on an open leg sail your own race in clear air.' : 'In a bigger fleet, the start and the first beat decide most of it: clear air off the line is worth more than the favoured end, and on the first beat sail toward the favoured side without getting caught on a layline early, where every boat that tacks ahead of you takes your wind.' });
+  items.push({ head: 'Racing the fleet', src: 'practice', text: opp.length <= 3 ? 'In a small fleet every boat counts: once you\'re ahead, stay between the boats behind and the next mark (cover them loosely, so you don\'t lose the side you wanted). On a clear call get to the favored side first; on an open leg sail your own race in clear air.' : 'In a bigger fleet, the start and the first beat decide most of it: clear air off the line is worth more than the favored end, and on the first beat sail toward the favored side without getting caught on a layline early, where every boat that tacks ahead of you takes your wind.' });
   return { id: 'fleet', title: 'The competition', items };
 }
 
@@ -331,7 +331,7 @@ function trimSection(w: SimView, o: Outlook, legs: LegPlan[], finishT: number): 
     const head = `${ph.name} (${clockOf(ph.a)}–${clockOf(ph.b)}): ${Math.round(lo)}–${Math.round(hi)} kt, gusts to ~${Math.round(gustKt)}, ${describeSea(sea)}`;
     // (the traveller isn't given from the crew model: its solver trades the traveller against the mainsheet for the same
     // boom angle, and lands it to leeward in medium air, which isn't how boats are sailed; that's for the trim model)
-    const trav = tws < 13 ? 'traveller up enough to keep the boom near the centreline' : tws < 17 ? 'traveller centred, eased down in the puffs' : 'traveller down to leeward once the rest is done';
+    const trav = tws < 13 ? 'traveler up enough to keep the boom near the centerline' : tws < 17 ? 'traveler centered, eased down in the puffs' : 'traveler down to leeward once the rest is done';
     const set = `Upwind: outhaul ${amount(s.outhaul, ['eased', 'eased a little', 'half', 'well on', 'tight'])}, backstay ${amount(s.backstay)}, Cunningham ${amount(s.cunningham)}, vang ${amount(s.vang)}, ${trav}, jib cars on pin ${s.carFore + 1} of ${CAR_FORE_PINS} from forward. That sets the main about ${Math.round(tm.depth * 100)}% deep with its draft ${Math.round(tm.draft * 100)}% of the way back and ${Math.round(tm.twist)}° of twist.`;
     const chop = chopB - flat >= 1 ? ` In this chop the best angle upwind opens from ${Math.round(flat)}° to ${Math.round(chopB)}° off the true wind: foot for speed, don't pinch.` : '';
     const body = `${regime[0].toUpperCase()}${regime.slice(1)} air. ${set} Target upwind: ${kt1(vb / KT)} kt at ${Math.round(chopB)}° to the true wind.${chop} ${crew}`;
@@ -340,8 +340,8 @@ function trimSection(w: SimView, o: Outlook, legs: LegPlan[], finishT: number): 
     if (prevKt != null && Math.abs(mean - prevKt) >= 2.5) {
       const up = mean > prevKt;
       items.push({ head: up ? 'As it builds' : 'As it eases', src: 'model', text: up
-        ? `Depower in the order the boat answers to: outhaul first (a flatter foot), then the backstay (it bends the mast to flatten the main and tightens the forestay to flatten the jib), then the Cunningham to pull the draft back forward, then the vang on hard and the jib cars aft to twist off the top of the jib; the traveller down to leeward last, when you're still overpowered.`
-        : 'Power up in the reverse order: traveller back up, cars forward, vang and Cunningham off, backstay eased for a fuller jib and main, then the outhaul. Get the crew in off the rail before the boat goes upright.' });
+        ? `Depower in the order the boat answers to: outhaul first (a flatter foot), then the backstay (it bends the mast to flatten the main and tightens the forestay to flatten the jib), then the Cunningham to pull the draft back forward, then the vang on hard and the jib cars aft to twist off the top of the jib; the traveler down to leeward last, when you're still overpowered.`
+        : 'Power up in the reverse order: traveler back up, cars forward, vang and Cunningham off, backstay eased for a fuller jib and main, then the outhaul. Get the crew in off the rail before the boat goes upright.' });
     }
     prevKt = mean;
   }

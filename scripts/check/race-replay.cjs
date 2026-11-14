@@ -25,6 +25,10 @@ const out = process.argv[2];
   console.log(JSON.stringify(info, null, 1));
   await page.evaluate(() => { document.getElementById('bPause').click(); });
   await page.waitForTimeout(500);
+  // the tactical chart at the top of the pause debrief
+  await page.evaluate(() => document.querySelector('#pauseDebrief .tacHost')?.scrollIntoView());
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: out + '/tac-top.png' });
   // the debrief on the pause screen: its section against the leader
   await page.evaluate(() => { const e = [...document.querySelectorAll('#pauseDebrief .eyebrow')].find(x => /^Against/i.test(x.textContent)); e?.scrollIntoView(); });
   await page.waitForTimeout(400);

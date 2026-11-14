@@ -335,7 +335,7 @@ export function tuneBrief(t: RigTune, lo: number, mean: number, hi: number, jump
   }
   const order = ['light', 'medium', 'strong'], soft = order.indexOf(name) < order.indexOf(want);
   return `She's on ${NAMES[name]}, with ${Math.round(lo)}–${Math.round(hi)} kt forecast: ${soft
-    ? 'too soft a rig for it. The forestay will sag (a full jib with a round entry that won\'t point), and she\'ll heel and carry more helm: get the backstay on early and hard, and the traveller down sooner.'
+    ? 'too soft a rig for it. The forestay will sag (a full jib with a round entry that won\'t point), and she\'ll heel and carry more helm: get the backstay on early and hard, and the traveler down sooner.'
     : 'too tight a rig for it. The forestay will be straight and the jib flat: it points, but has no power to drive through a lull or the chop. Keep the backstay right off, ease the jib sheet a touch, and foot for speed.'} ${sagNow} For next time, North Sails' setting: ${fmtSet(g)}. ${locked}`;
 }
 

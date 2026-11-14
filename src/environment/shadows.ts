@@ -35,10 +35,38 @@ export const NO_SHADOW: Shadow = { k: 1, shift: 0 };
 /** Perturbations to the true wind, in units of the true wind speed, accumulated and then turned into k and shift. */
 export class WindSum {
   x = 0; y = 0; // the perturbation (flow direction, east and north)
+  // the wakes' deficits (addDeficit), split along the true wind's flow and across it: along, the signed sum of their
+  // squares; across, their plain sum
+  private along2 = 0; private across = 0;
+  private readonly fx: number; private readonly fy: number;
+  /** For the true wind from `from` (deg). */
+  constructor(from: number) { const f = V(from + 180); this.fx = f.x; this.fy = f.y; }
   /** Add a flow perturbation `amt` (fraction of the true wind) along unit vector (ux, uy). */
   add(ux: number, uy: number, amt: number): void { this.x += ux * amt; this.y += uy * amt; }
+  /**
+   * Add a wake's deficit `d` (fraction of the true wind, slower air) along her wake's direction (ux, uy). Overlapping
+   * wakes don't take their deficits out of the wind one after another: the air already slowed by one has less to lose
+   * to the next. They combine as the root of the sum of their squares (Katić, Højstrup & Jensen 1986, "A simple model
+   * for cluster efficiency", EWEC), not their sum, which took a bunched fleet running in line down to a fifth of the
+   * wind (three Folkboats 11–30 m ahead: 0.47 summed, about 0.64 so). (Katić's rule comes from wind turbines' wakes;
+   * there are no measurements for sails' and hulls' wakes, and we assume it carries over. Each boat's deficit is taken
+   * against the wind she herself sails in, already slowed by any wake she is in.)
+   * The root-sum-square is taken of their parts along the true wind, signed (a ferry running faster than the wind
+   * carries the air forward in her wake: the opposite sign, and cancelling as it would added); their parts across it,
+   * which turn the wind rather than slow it, add. So one wake is as before, wakes in line combine as Katić's, and a
+   * second wake at any angle only ever deepens the shadow along the wind.
+   */
+  addDeficit(ux: number, uy: number, d: number): void {
+    const a = d * (ux * this.fx + uy * this.fy), c = d * (ux * this.fy - uy * this.fx);
+    this.along2 += a * Math.abs(a); this.across += c;
+  }
   /** The wind's speed factor and direction shift, for the true wind from `from`. */
   result(from: number): Shadow {
+    if (this.along2 !== 0 || this.across !== 0) {
+      // (back from along and across the flow f to east and north: along f, and across it f⊥ = (fy, −fx))
+      const a = Math.sign(this.along2) * Math.sqrt(Math.abs(this.along2)), c = this.across;
+      this.x -= a * this.fx + c * this.fy; this.y -= a * this.fy - c * this.fx; this.along2 = this.across = 0;
+    }
     if (this.x === 0 && this.y === 0) return NO_SHADOW;
     const f = V(from + 180), fx = f.x + this.x, fy = f.y + this.y, k = Math.hypot(fx, fy);
     const flowNow = Math.atan2(fx, fy) / D2R, flowWas = from + 180;
@@ -71,7 +99,7 @@ export function addBoatWake(sum: WindSum, c: Caster, p: Vec, trueKt: number): vo
     // the momentum wake: slower air
     const ks = 0.04 + 0.02 * breeze, sigma = ks * x + 0.22 * d0, cd = c.luff ? 0.12 : cdFor(c.awa), q = cd / (8 * (sigma / d0) ** 2);
     const deficit = q >= 1 ? 0.65 : Math.min(0.65, 1 - Math.sqrt(1 - q));
-    sum.add(e.x, e.y, -deficit * Math.exp(-(y * y) / (2 * sigma * sigma)) * scale * clamp(x / (0.3 * H), 0, 1));
+    sum.addDeficit(e.x, e.y, deficit * Math.exp(-(y * y) / (2 * sigma * sigma)) * scale * clamp(x / (0.3 * H), 0, 1));
     // the downwash: turned toward her windward side (a header for a boat on her tack)
     const Lv = H * (4 - 1.5 * breeze), ang = -7.5 * cl * Math.exp(-x / Lv) / (1 + (y / (0.5 * H)) ** 2);
     sum.add(lx, ly, ang * D2R * scale);
@@ -110,14 +138,14 @@ export function addShipWake(sum: WindSum, from: number, trueKt: number, v: { x: 
   const sinA = Math.abs(vs.x * ey - vs.y * ex), cosA = Math.abs(vs.x * ex + vs.y * ey);
   const W = sinA * len + cosA * beam, L = cosA * len + sinA * beam;
   const d = bluffDeficit(x, y, air, W, L);
-  if (d > 0.001) sum.add(ex, ey, -d * rel / trueKt);
+  if (d > 0.001) sum.addDeficit(ex, ey, d * rel / trueKt);
 }
 
 /** The committee boat (anchored, about 12 m long and 4 m tall, lying head to wind): only the lower part of a rig is in it. */
 export function addCommitteeWake(sum: WindSum, from: number, c: Vec, p: Vec): void {
   const e = V(from + 180), dx = p.x - c.x, dy = p.y - c.y, x = dx * e.x + dy * e.y, y = dx * e.y - dy * e.x;
   const d = bluffDeficit(x, y, 4, 4, 12) * 0.7;
-  if (d > 0.001) sum.add(e.x, e.y, -d);
+  if (d > 0.001) sum.addDeficit(e.x, e.y, d);
 }
 
 /* ---------- the lee of the land ---------- */

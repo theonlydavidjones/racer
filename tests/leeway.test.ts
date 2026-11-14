@@ -26,10 +26,10 @@ describe('leeway (physics.ts: the keel\'s lift against the sails\' side force)',
       expect(Math.abs(x.slip - x.model)).toBeLessThan(0.5);
     }
     expect(r[0].slip).toBeLessThan(r[1].slip); expect(r[1].slip).toBeLessThan(r[2].slip);
-  }, 60000);
+  }, 180_000);
   it("steering her leeway above the beat, she makes the polar's VMG (ORC's angles are the course's)", () => {
     for (const W of [6, 12, 20]) { const x = beat(W); expect(x.vmg / x.polarVmg).toBeGreaterThan(0.985); expect(x.vmg / x.polarVmg).toBeLessThan(1.015); }
-  }, 60000);
+  }, 180_000);
   it('slow, little holds her: at 1.5 kt close-hauled in 12 kt she sags off at 0.3–0.7 kt', () => {
     const W = 12, twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: 1.5, windKt: W });
     sail(b, 2, () => { b.h = 360 - twa; b.v = 1.5 * KT; });

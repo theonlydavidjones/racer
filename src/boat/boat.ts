@@ -25,6 +25,9 @@ export interface AiState {
   /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
   kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** The penalty total she last saw: a new penalty while she's turning sends her to clear water again first (44.2). */
+  penSeen?: number;
+  reclear?: boolean;
   /** After the gun, not yet started and on the course side of the line (round outside an end): going back below it first. */
   below?: boolean;
   /** Expensive start-timing predictions, refreshed 10 times a second. */
@@ -38,7 +41,7 @@ export interface AiState {
   urgent?: boolean;
   /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
    *  harbour, and whether she's lying to there (and on which tack) */
-  home?: { route: Vec[]; i: number; at: Vec; lying: boolean; tack?: 'S' | 'P' };
+  home?: { route: Vec[]; i: number; at: Vec; lying: boolean; tack?: 'S' | 'P'; parting?: number }; // (parting: lying to, sailing off clear of this boat)
   /** The world's step on which she last thought (world.ts AI_EVERY) */
   thought?: number;
   /** The tack she began to answer a hail (or after hers was answered), kept until she's close-hauled on it: through the
@@ -48,6 +51,12 @@ export interface AiState {
   commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
+  /** How long she's been in another boat's wind shadow running, s (it eases off twice as fast once she's clear). */
+  dirtyRunT?: number;
+  /** Headed up out of a wind shadow on a run: she holds the higher course until this time. */
+  dirtyRunUntil?: number;
+  /** Getting out of an island's lee after rounding it: the side she chose (+1: to the right of the wind's direction). */
+  leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
@@ -207,7 +216,7 @@ export interface Boat {
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
-  /** Your boat: the pole is yours to call (you've worked it), not the crew's (ai.ts crewPoleCall). */
+  /** Your boat: the pole is yours to call, always (the owner); the crew only stows it when it must come in (ai.ts poleMustCome). */
   poleMine?: boolean;
   pole: PoleState;
   poleT: number; // seconds left in the current crew job
@@ -235,6 +244,8 @@ export interface Boat {
   carPlan?: { fore: number; ins: number } | null; carOff?: number;
   /** Heel rate (deg/s, + rolling to port) and the boat's roll: heel follows its equilibrium as a damped oscillator (balance.ts rollStep). */
   heelRate?: number;
+  /** The waves' motion (boat/seaway.ts waveMotion): heave (m, up) and its rate (m/s), pitch (rad, bow up) and its rate (rad/s). */
+  heave?: number; heaveRate?: number; pitch?: number; pitchRate?: number;
   /** The waves' added resistance as a share of the calm-water resistance (for the trim), and seconds until it's worked out again. */
   seaShare?: number; seaShareT?: number;
   /** Her push against the polar crew's, a share of the drive (physics.ts powerFactor), and seconds until it's worked out again. */
@@ -262,6 +273,10 @@ export interface Boat {
   ensign?: string; special?: string;
   /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
   ensignStruck?: boolean;
+  /** Coming in to a berth: the crew's lines going ashore (boat/dockLines.ts, sim/world.ts mooringStep). */
+  mooring?: import('./dockLines').Mooring;
+  /** The ensign down for its hours: outside 0800–sunset, unless she's entering or leaving a harbour (boat/colours.ts). */
+  ensignNight?: boolean;
   /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */
   paint?: Paint;
   /** How you've set her up (your boat only): looks and condition. */
@@ -295,7 +310,7 @@ export interface Paint { /** the sail numbers' and the class insignia's colours,
 export interface FleetEntry { name: string; hull: string; sail: string; tag: string; no: string; build: Build; paint: Paint }
 export const FLEET: FleetEntry[] = [
   // the playable boat, Josephine: pearl-white glassfibre hull, pale green non-skid deck, aluminium mast and boom
-  { name: 'You', hull: '#f4f1e8', sail: '#fbfaf5', tag: '#ffb627', no: 'US 110', build: { hull: 'fiberglass', spars: 'aluminium' }, paint: { deck: '#8e9f7c', boot: '#24324f', bottom: '#2a2d33', boatName: 'JOSEPHINE' } },
+  { name: 'You', hull: '#f4f1e8', sail: '#fbfaf5', tag: '#ffb627', no: 'USA 122', build: { hull: 'fiberglass', spars: 'aluminium' }, paint: { deck: '#8e9f7c', boot: '#24324f', bottom: '#2a2d33', boatName: 'JOSEPHINE' } },
   { name: 'Red', hull: '#b3302a', sail: '#f6f2ea', tag: '#ff6a5c', no: 'US 87', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } },
   { name: 'Blue', hull: '#25579e', sail: '#f6f2ea', tag: '#6fa8ff', no: 'US 104', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#2a2d33' } },
   { name: 'Green', hull: '#2b7349', sail: '#f6f2ea', tag: '#58d08a', no: 'US 92', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } },

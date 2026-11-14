@@ -2,7 +2,10 @@ import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 export interface Settings {
-  mode: 'race' | 'drill' | 'sail'; // full race, start practice (from one minute to go), or just sail (open water, no race)
+  mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings'; // full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
+  /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
+   * drill's are the fewest metres lost, by manoeuvre and wind band ('tack-medium'), with a good crew's then. */
+  practiceBest?: Record<string, { lostM: number; goodM: number }>;
   course: string; // course id, or 'rc': the race committee chooses (courses/committee.ts)
   raceLength?: 'short' | 'medium' | 'long'; // with the committee's choice: the target time for the leaders
   windKt: number; // open-water wind, kt; 0 = the afternoon westerly from the NOAA records for the race day and time
@@ -42,7 +45,8 @@ export interface Settings {
   mapLayers?: Partial<Record<'wind' | 'current' | 'sea' | 'fog' | 'ships' | 'laylines' | 'shadows', boolean>>; // the map's layers, on or off (ui/layers.ts; unset: the default)
   sailFrom: string; // Just sail: where you start (a place id, sim/places.ts)
   sailTo: string; // Just sail: where you're heading ('' = nowhere in particular)
-  realRace?: string; // a real past race being sailed (sim/realRaces.ts): its fleet raced as the real boats, your time set against theirs
+  realRace?: string;
+  insetView?: 'map' | 'nav'; // what the inset map shows cruising: the water round her, or the navigator's passage (chosen in the full chart's Layers menu) // a real past race being sailed (sim/realRaces.ts): its fleet raced as the real boats, your time set against theirs
   raceFrom?: 'water' | 'slip'; // Race: start on the water by the line, or in her slip in time to sail out to it
   burgee?: string; // (older saves: your burgee, now in boat.flags)
   /** Your boats (boat/spec.ts), and the one you're sailing. `boat` is that one (the same object as its entry in `boats`). */
