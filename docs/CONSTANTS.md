@@ -478,17 +478,19 @@ physics, ranked like the ten above:
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| MOUTH.gyre | 0.25 | 71 | sourced | "a first guess": Bijvelds 1997 §3, after Booij 1986 (nearer 0.1 in the case he checks) |
-| MOUTH.peak, rim | 0.75, 1.25 | 73 | estimate | the gyre's shape: assumed |
-| MOUTH.beta | 0.59 | 75 | estimate | Booij's β, 0.4–1 (in Langendoen 1989 ch. 2); our researcher's reading |
-| MOUTH.spread | 0.23 | 78 | sourced | Booij's measurement in a harbor's mouth as B = ΔU/(dU/dy)max (Bijvelds 1997 §4) |
-| MOUTH.B0 | 1 | 78 | estimate | the layer's width at the corner |
-| MOUTH.spacing | 3 | 81 | estimate | the largest eddies' size (Tukker 1997, in Bijvelds), taken as their spacing |
-| MOUTH.carry | 0.5 | 81 | sourced | Bijvelds 1997 |
-| MOUTH.u, v | 0.2, 0.1 | 81 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one row of eddies (upper bound) |
-| MOUTH.free | 0.18 | 83 | sourced | Brown & Roshko 1974, Bijvelds eq. 3.6 |
+| MOUTH.gyre | 0.25 | 81 | sourced | "a first guess": Bijvelds 1997 §3, after Booij 1986 (nearer 0.1 in the case he checks) |
+| MOUTH.peak, rim | 0.75, 1.25 | 83 | estimate | the gyre's shape: assumed |
+| MOUTH.beta | 0.59 | 85 | estimate | Langendoen's value for a square harbor open across its width; 0.4–1 with the shape |
+| MOUTH.spread | 0.23 | 88 | sourced | Booij's measurement in a harbor's mouth as B = ΔU/(dU/dy)max (Bijvelds 1997 §4) |
+| MOUTH.B0 | 1 | 88 | estimate | the layer's width at the corner |
+| MOUTH.spacing | 3 | 91 | estimate | the largest eddies' size (Tukker 1997, in Bijvelds), taken as their spacing |
+| MOUTH.carry | 0.5 | 91 | sourced | Bijvelds 1997 |
+| MOUTH.v | 0.1 | 91 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one row of eddies (upper bound) |
+| MOUTH.cf, depth | 0.0025, 3 | 94 | sourced | the usual tidal-model drag (not measured here); Coast Pilot 7's 8–12 ft |
+| MOUTH.free | 0.18 | 96 | sourced | Brown & Roshko 1974, Bijvelds eq. 3.6 |
 | (the pile lee's reach) | 1–2 pier-heads | | estimate | not derived: see the module's comment |
 | (the layer's head start through the piles) | the pier's width | | estimate | nothing found on shear layers through pile fields |
+| (the still pool's reach) | 2 gyre radii | | estimate | |
 
 ### src/environment/pierWakes.ts
 

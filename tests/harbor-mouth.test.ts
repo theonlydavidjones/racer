@@ -89,8 +89,11 @@ describe('the water in the entrance', () => {
     // (given a day of the same ebb it comes round: a quarter of what the piles pass)
     for (let t = 3630; t <= 30 * 3600; t += 30) refreshMouths(S, t, () => stream(0.25));
     expect(S.gyre[0]).toBeCloseTo(0.25 * 0.25 * PILES, 3);
-    // (in slack water it neither grows nor dies: nothing is there to turn it or, in a tide's time, to stop it)
-    const held = S.gyre[0]; for (let t = 30 * 3600 + 30; t <= 31 * 3600; t += 30) refreshMouths(S, t, () => stream(0)); expect(S.gyre[0]).toBeCloseTo(held, 6);
+    // (in slack water nothing turns it and the bed's drag runs it down: slowly, c_f·u/h, a fifth to a tenth in two hours)
+    const held = S.gyre[0]; for (let t = 30 * 3600 + 30; t <= 32 * 3600; t += 30) refreshMouths(S, t, () => stream(0));
+    expect(S.gyre[0] / held).toBeLessThan(0.93); expect(S.gyre[0] / held).toBeGreaterThan(0.7);
+    // (1/(1 + u0·c_f·t/h) with c_f = 0.0025 in 3 m of water)
+    expect(S.gyre[0] / held).toBeCloseTo(1 / (1 + held * 0.0025 * 7200 / 3), 2);
   });
   it('shears from the stream to the basin\'s water across the mouth, in a layer as wide as Booij measured in a harbor\'s mouth (0.23 m per m)', () => {
     for (const U of [FLOOD, EBB]) {
@@ -115,12 +118,13 @@ describe('the water in the entrance', () => {
   it('lets no steady stream in or out through the gap of a closed basin, whatever the tide\'s set', () => {
     for (const U of [FLOOD, EBB]) for (const set of [-0.1, 0.1]) { // (the stream set 6° in toward the basin, or out)
       const c = { x: M.along.x * U + M.into.x * set * Math.abs(U), y: M.along.y * U + M.into.y * set * Math.abs(U) }, S = mouthState(); refreshMouths(S, 0, () => c);
-      let q = 0; const T = eddyPeriod(0, c);
-      for (let x = 0.25; x < M.W; x += 0.5) for (let i = 0; i < 24; i++) q += intoOf(withHarborMouths(at(x, 0), c, 1, S, i * T / 24)) * 0.5 / 24;
-      expect(Math.abs(q)).toBeLessThan(0.01 * Math.abs(U) * M.W); // (unchecked, half the set over the whole gap: 5%)
+      const T = eddyPeriod(0, c), through = (n: number) => { let q = 0; for (let x = 0.25; x < M.W; x += 0.5) for (let i = 0; i < 24; i++) q += intoOf(withHarborMouths(at(x, n), c, 1, S, i * T / 24)) * 0.5 / 24; return Math.abs(q); };
+      expect(through(0)).toBeLessThan(0.01 * Math.abs(U) * M.W); // (unchecked: 5% at the line, 10% off it)
+      // (nor does it run at the gap just outside it, to vanish at the line: 3 m and 6 m off)
+      expect(through(-3)).toBeLessThan(0.02 * Math.abs(U) * M.W); expect(through(-6)).toBeLessThan(0.025 * Math.abs(U) * M.W);
     }
   });
-  it('carries a row of eddies down the layer: across the stream ±0.1 of the speed\'s change on its center line, along it ±0.2 on its flanks and opposite there', () => {
+  it('carries a row of eddies down the layer: across the stream ±0.1 of the speed\'s change on its center line, along it on its flanks, opposite there, as one row of eddies moves the water', () => {
     for (const U of [FLOOD, EBB]) {
       const dn = Math.sign(U), dU = 0.75 * Ur(U), T = eddyPeriod(0, stream(U)), N = 480, B = 1 + 0.23 * (M.W / 2 + piles(U)), x = down(U, M.W / 2);
       // (three layer-widths apart at half the stream: about a minute on this flood, over three on the ebb through the piles)
@@ -130,8 +134,14 @@ describe('the water in the entrance', () => {
       const series = (n: number, part: (v: Vec) => number) => { const m = part(mean(at(x, n), U)); return Array.from({ length: 4 * N }, (_, i) => part(flow(at(x, n), U, i * T / N)) - m); };
       const rms = (a: number[]) => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length), dot = (a: number[], b: number[]) => a.reduce((s, v, i) => s + v * b[i], 0) / (a.length * rms(a) * rms(b));
       const vMid = series(0, intoOf), uMid = series(0, alongOf), uOut = series(-flank, alongOf), uIn = series(flank, alongOf);
-      // (Uijttewaal & Tukker, in Bijvelds §2: v'² ≈ (0.1·ΔU)², u'² ≈ (0.2·ΔU)²)
-      expect(rms(vMid)).toBeCloseTo(0.1 * dU, 3); expect(rms(uOut)).toBeCloseTo(0.2 * dU, 3); expect(rms(uIn)).toBeCloseTo(0.2 * dU, 3);
+      // (Uijttewaal & Tukker, in Bijvelds §2: v'² ≈ (0.1·ΔU)² at the center. A row of eddies three widths apart with that
+      // much across has 0.74 of it along the stream on its flanks, 4·(2/(3√3))·3/(2π): the rest of the measured 0.2 is the
+      // broadband turbulence, not in the row)
+      expect(rms(vMid)).toBeCloseTo(0.1 * dU, 3); expect(rms(uOut)).toBeCloseTo(0.0735 * dU, 3); expect(rms(uIn)).toBeCloseTo(0.0735 * dU, 3);
+      // (the water neither piles up nor thins out: what the along-stream swing gathers, the cross-stream swing carries off)
+      { const h = 0.05, tt = 0.3 * T, f = (dx: number, n: number) => flow(at(x + dx, n), U, tt), dudx = (alongOf(f(h, -flank)) - alongOf(f(-h, -flank))) / (2 * h), dvdn = (intoOf(f(0, -flank + h)) - intoOf(f(0, -flank - h))) / (2 * h);
+        const mdx = (alongOf(mean(at(x + h, -flank), U)) - alongOf(mean(at(x - h, -flank), U))) / (2 * h), mdn = (intoOf(mean(at(x, -flank + h), U)) - intoOf(mean(at(x, -flank - h), U))) / (2 * h);
+        const a = dudx - mdx, b = dvdn - mdn; expect(Math.abs(a)).toBeGreaterThan(1e-4); expect(Math.abs(a + b)).toBeLessThan(0.4 * Math.abs(a)); } // (not exactly nothing: the layer widens down the gap; with the swings the wrong way round, the two add)
       expect(rms(uMid)).toBeLessThan(0.01 * dU); // (nothing along the stream on the center line)
       expect(dot(uOut, uIn)).toBeCloseTo(-1, 3); // (the two flanks opposite)
       expect(Math.abs(dot(uOut, vMid))).toBeLessThan(0.01); // (a quarter-turn from the cross-stream swing)
@@ -189,6 +199,22 @@ describe('in the world', () => {
     expect(off).toBeGreaterThan(0.6); expect(off).toBeLessThan(0.9); // (1.24 kt there without the piles: 0.6 of it)
     const deep = { x: M.c.x + M.into.x * 0.75 * M.R, y: M.c.y + M.into.y * 0.75 * M.R };
     expect(w.currentAt(deep).x).toBeGreaterThan(0.03); // (the ebb runs west; the gyre's far side comes back east)
+  });
+  it('under the real tide the gyre is the one this tide has left, whenever the sail began, and a change of wind leaves it be', () => {
+    const real = (time: string) => new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', tideDate: '2026-11-14', tideTime: time, current: 'real' } as Settings, 1, { freeSail: true });
+    const deep = { x: M.c.x + M.into.x * 0.75 * M.R, y: M.c.y + M.into.y * 0.75 * M.R }, gyre = (w: World) => alongOf(w.currentAt(deep));
+    const at4 = real('16:00'), at5 = real('17:00'), tide = at4 as unknown as { t: number; updateTide(): void };
+    const g4 = gyre(at4); expect(Math.abs(g4)).toBeGreaterThan(0.003);
+    // (an hour on in the first sail, read every half minute as a boat would, against a sail begun at that hour)
+    for (let i = 0; i < 120; i++) { tide.t += 30; tide.updateTide(); at4.currentAt(deep); }
+    const late = gyre(at4), fresh = gyre(at5);
+    expect(Math.abs(late - fresh)).toBeLessThan(0.15 * Math.max(Math.abs(late), Math.abs(fresh)) + 0.002);
+    // (it isn't just the stream of the moment: over 24 hours the gyre runs behind the stream, so they differ in sign at times)
+    let opposed = 0; for (let h = 0; h < 24; h++) { const w = real(`${String(h).padStart(2, '0')}:00`), f = alongOf(w.currentAt(M.ref)); if (Math.abs(f) > 0.03 && Math.sign(alongOf(w.currentAt(deep))) === Math.sign(f)) opposed++; }
+    expect(opposed).toBeGreaterThan(1); // (the far side running WITH the stream: the old tide's gyre)
+    // (the eddies' beat and the gyre carry on through a change of the wind's setting)
+    const before = at4.currentAt(deep); at4.applyConditions({ ...at4.settings, windKt: 16 } as Settings); const after = at4.currentAt(deep);
+    expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeLessThan(0.002);
   });
   it('is smooth to sail through: no step in the water between one half-meter and the next, either tide', () => {
     for (const cur of ['flood', 'bigebb']) {

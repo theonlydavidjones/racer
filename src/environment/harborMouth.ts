@@ -1,7 +1,7 @@
 import { clamp, segPt, type Vec } from '../core/math';
 import { HARBORS, type Harbor } from '../geo/marina';
-import { PILE_PIERS, landDist } from '../geo/shore';
-import { PILE_FLOW } from './current';
+import { PILE_PIERS, landDist, pilePierDist } from '../geo/shore';
+import { PILE_FLOW, basinFloor } from './current';
 
 /**
  * The water in a harbor's entrance, where the tidal stream runs across its mouth (the owner, 13 Nov 2026, of Gashouse
@@ -25,14 +25,22 @@ import { PILE_FLOW } from './current';
  *    plan (36 m in radius, behind a 37 m mouth). It turns as a solid body, fastest three-quarters of the way out, and
  *    dies in the boundary layer at its rim (the shape is assumed).
  *  - **It follows the tide late.** A gyre takes Te ≈ 50·β²·Le·B/(Ur·Bm) to answer a change in the stream (Booij 1986,
- *    in Langendoen ch. 2; β 0.4–1, 0.59 taken). With the gyre's own pool for Le and B and the mouth for Bm, that is
- *    about 3 hours with half a knot across the mouth (0.25 m/s) and 1½ hours at 0.43 m/s, the
- *    most this mouth sees: not short beside the tide (Langendoen asks for a tide of 4·Te or more before the gyre may
- *    be taken as steady). So its speed is carried, and follows the stream's with that time: it is still turning the
- *    old way for an hour or more after slack, and never reaches the quarter on a short tide. (Langendoen describes
- *    what the old gyre really does then: it draws the new stream in behind it while a new gyre starts at the upstream
- *    corner and squeezes it out. Here the one gyre just slows and reverses.) When a sail begins, the gyre is given
- *    what the stream of the moment would hold steady: the tide's past isn't known.
+ *    in Langendoen p. 4; β 0.4–1 with the harbor's shape, 0.59 for his square harbor open across its whole width,
+ *    taken here for want of a figure for a narrow mouth: the range would give 1.3 to 8 hours at 0.25 m/s). With the
+ *    gyre's own pool for Le and B and the mouth for Bm, that is about 2¾ hours with half a knot across the mouth
+ *    (0.25 m/s), 1.6 hours at 0.43 m/s, and 1/0.6 longer on the ebb, whose stream has come through the piles: not short
+ *    beside the tide (Langendoen asks for a tide of 4·Te or more before the gyre may be taken as steady). So its speed
+ *    is carried, and follows the stream's with that time: it is still turning the old way an hour or two after
+ *    slack, and never reaches the quarter on the real tide. (Langendoen describes what the old gyre really does then:
+ *    it draws the new stream in behind it while a new gyre starts at the upstream corner and squeezes it out. Here the
+ *    one gyre just slows and reverses.) With no stream to drive it the bed's drag runs it down, c_f·u/h (c_f = 0.0025
+ *    as in pierWakes.ts, 3 m of water: Coast Pilot 7's 8–12 ft): slowly, a fifth in two hours. When the water is first
+ *    looked at under the real tide, the gyre is spun up through the 13 hours of predictions before, so it is the same
+ *    gyre whenever the sail began; under a steady preset it is what that stream holds.
+ *  - **The pool round the gyre** (out to twice its radius, but not under the pier's piles) is the harbor's stillest
+ *    water: the harbor's own calm (current.ts basinCalm, measured through the water from the open Bay) would leave
+ *    half the stream and more running on just inside the gap, where the sources have the stream leave the corner and
+ *    pass the mouth by.
  *  - **The mixing layer.** Between the stream and the gyre is a layer of sheared water that starts thin at the upstream
  *    corner and widens across the mouth. Its width B = ΔU/(dU/dy)max grows as 0.23 m per m in a harbor's mouth (Booij's
  *    measurement, b = 0.17·x between his own marks, B = 1.39·b: Bijvelds §4; his computed layers gave 0.13–0.20, and
@@ -40,12 +48,13 @@ import { PILE_FLOW } from './current';
  *    corner. Across it the water goes from the stream's speed to the gyre's as a tanh.
  *  - **The eddies** a boat feels are the layer's own. Its largest are up to three layer-widths in size (Tukker 1997, in
  *    Bijvelds): taken here as a row of them that far apart, carried along at half the stream's speed (Bijvelds), so
- *    one passes every minute and a half or so on a flood of half a knot across the mouth, every few minutes on the
- *    ebb. The water's speed swings by about 0.2·ΔU along the stream and 0.1·ΔU across it, root mean square, at the
- *    layer's center (Uijttewaal & Tukker, in Bijvelds §2). All of the cross-stream figure is put into the one row, on
- *    the center line, as a row of eddies has it; the along-stream swing of a row is nothing on the center line and
- *    opposite to either side, so the 0.2 is given to its two flanks (the measured figure at the center is the
- *    broadband turbulence, which isn't modeled). An upper bound either way.
+ *    one passes about every two minutes on a flood of half a knot across the mouth, every six or seven on such an ebb
+ *    (slower through the piles, and the layer wider). The water's speed swings by about 0.1·ΔU across the stream, root
+ *    mean square, at the layer's center (Uijttewaal & Tukker, in Bijvelds §2), ΔU the stream's speed less the gyre's
+ *    edge as it is at the time (so more when the gyre is still turning the old way). All of that is put into the one
+ *    row, on the center line. Along the stream a row of eddies swings the water to either side of the line, opposite
+ *    ways, by as much as keeps the water from piling up: 0.74 of the cross-stream swing for eddies three widths apart.
+ *    The measured 0.2·ΔU along the stream at the center is mostly the broadband turbulence, which isn't modeled.
  *  - **Through the piles** (the ebb here). Pier 1 stands across the stream for 54 m north of the mouth, so on the ebb
  *    the water crossing the mouth has all come through its piles: slowed to PILE_FLOW of the stream (Bay East's
  *    estimate from the owner's photograph of the columns), a weak lee and not a headland's separation. The lee is
@@ -55,8 +64,9 @@ import { PILE_FLOW } from './current';
  *    is NOT derived: bed friction alone would carry it some 600 m (h/(2·c_f), 3 m of water, c_f = 0.0025 as in
  *    pierWakes.ts), but the shore relief already slows that water for the shore's sake, so it is held for one
  *    pier-head's distance downstream and faded over the next.
- *  - The stream's own set is a few degrees off the mouth's line, which would carry water steadily in (or out) through
- *    the gap of a closed basin: across the layer that part is taken out.
+ *  - The stream's own set is up to 16° off the mouth's line (the presets; 1–9° on the real tide of 14 Nov 2026), which
+ *    would carry water steadily in (or out) through the gap of a closed basin: that part is taken out across the
+ *    layer and, fading, for a gap's width off it on the Bay's side, where the stream turns to run along the line.
  *  - Not modeled, and not known: on the flood the breakwater's last leg runs 27° off the stream after a knuckle 64 m
  *    west of the tip, so the stream may leave the wall there, not at the tip, and the mouth lie in that corner's lee;
  *    on the ebb the same leg stands 35 m into the stream just past the mouth, and water piling on it would push in
@@ -78,7 +88,10 @@ export const MOUTH = {
   spread: 0.23, B0: 1,
   /** the eddies' spacing in layer widths (the size the largest reach: Tukker 1997, in Bijvelds; taken as their spacing),
    * the speed they're carried at over the stream's (Bijvelds), and their swing along and across the stream over ΔU, rms */
-  spacing: 3, carry: 0.5, u: 0.2, v: 0.1,
+  spacing: 3, carry: 0.5, v: 0.1,
+  /** the bed's drag on the gyre once nothing drives it: c_f (the usual tidal-model figure, as pierWakes.ts; not measured
+   * here) over the depth, m (Coast Pilot 7: 8–12 ft to the berths) */
+  cf: 0.0025, depth: 3,
   /** a free mixing layer's rate (Brown & Roshko 1974, Bijvelds eq. 3.6), for the pile lee's Bay side: × (U1 − U2)/(U1 + U2) */
   free: 0.18
 };
@@ -93,6 +106,8 @@ interface Mouth {
   c: Vec; R: number; turn: number;
   /** how steeply each corner's own wall runs out toward the Bay from the mouth's line (m out per m along it, beyond the gap) */
   wallA: number; wallB: number;
+  /** the harbor's stillest water over the stream (current.ts basinFloor) */
+  floor: number;
   /** where the stream across the mouth is read: half a mouth's width outside its middle */
   ref: Vec;
   box: { x0: number; x1: number; y0: number; y1: number };
@@ -141,9 +156,10 @@ function build(id: string): Mouth | null {
   }
   if (R < 5) return null;
   // each corner's wall beyond the gap: toward the point of its outline furthest out to the Bay within 70 m
-  const wall = (B: { pts: Vec[] }, q: Vec) => { let out = 0, far = 1; for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = Math.abs((p.x - q.x) * along.x + (p.y - q.y) * along.y); if (o > out && Math.hypot(o, l) < 70) { out = o; far = l; } } return Math.min(5, out / Math.max(far, 1)); };
+  // (the steepest line from the corner to a point of its outline on the far side of it from the gap)
+  const wall = (B: { pts: Vec[] }, q: Vec, away: number) => { let k = 0; for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > 5 && l > -3 && Math.hypot(o, l) < 70) k = Math.max(k, o / Math.max(l, 1)); } return Math.min(5, k); };
   const pileA = reach(first.B), pileB = reach(second.B), far = Math.max(2 * pileA, 2 * pileB, W) + 10, r = Math.max(far, MOUTH.rim * R + W);
-  return { harbor: h, a, b, along, into, W, pileA, pileB, widthA: width(first.B), widthB: width(second.B), c, R, turn: (into.y * along.x - into.x * along.y) > 0 ? 1 : -1, wallA: wall(first.B, a), wallB: wall(second.B, b),
+  return { harbor: h, a, b, along, into, W, pileA, pileB, widthA: width(first.B), widthB: width(second.B), c, R, turn: (into.y * along.x - into.x * along.y) > 0 ? 1 : -1, wallA: wall(first.B, a, -1), wallB: wall(second.B, b, 1), floor: basinFloor(h),
     ref: { x: mid.x - into.x * W / 2, y: mid.y - into.y * W / 2 },
     box: { x0: Math.min(a.x, b.x, c.x) - r, x1: Math.max(a.x, b.x, c.x) + r, y0: Math.min(a.y, b.y, c.y) - r, y1: Math.max(a.y, b.y, c.y) + r } };
 }
@@ -170,19 +186,41 @@ export const gyreTime = (i: number, f: Vec): number => { const M = MOUTHS[i]; re
  */
 export interface MouthState { t: number; flows: Vec[]; gyre: number[]; phase: number[] }
 export const mouthState = (): MouthState => ({ t: NaN, flows: [], gyre: [], phase: [] });
+/** The gyre's edge speed dt seconds on, in a stream f across mouth i: toward a quarter of the stream in Booij's time,
+ * and the bed's drag on whatever it carries beyond what that stream holds up (so in slack water it runs down). */
+function spin(i: number, g: number, f: Vec, dt: number): number {
+  const c = crossing(MOUTHS[i], f), want = MOUTH.gyre * c.Ur * Math.sign(c.along), Te = gyreTime(i, f);
+  for (let left = dt; left > 0; left -= 60) {
+    const h = Math.min(60, left);
+    g += (want - g) * (1 - Math.exp(-h / Te));
+    g -= MOUTH.cf / MOUTH.depth * (Math.abs(g) * g - Math.abs(want) * want) * h;
+  }
+  return g;
+}
+/** Is p where a harbor mouth's water is (a box check: asked for every boat's current, every step)? */
+export function nearMouth(p: Vec): boolean {
+  for (const M of MOUTHS) { const B = M.box; if (p.x > B.x0 && p.x < B.x1 && p.y > B.y0 && p.y < B.y1) return true; }
+  return false;
+}
+/** How far back the gyre is spun up from when the water is first looked at (h), and in what steps. */
+const PAST = 13, PAST_STEP = 0.25;
 /**
  * Bring the state to time t (s), reading the stream at each MOUTH_REFS point with `read`. The first time (or after
- * time has gone backwards) the gyre starts as the stream of the moment would have it: where the tide has been is not
- * known.
+ * time has gone backwards) the gyre is spun up through the last 13 hours of the stream, where they can be read
+ * (`past`: the stream at a point so many hours ago; the real tide's predictions), so it is the gyre this tide has left
+ * whenever the sail began; with no past (a steady preset) it is what that stream holds steady.
  */
-export function refreshMouths(S: MouthState, t: number, read: (p: Vec) => Vec): void {
+export function refreshMouths(S: MouthState, t: number, read: (p: Vec) => Vec, past?: (p: Vec, hoursAgo: number) => Vec): void {
   const dt = t - S.t, fresh = !(dt >= 0) || S.flows.length !== MOUTHS.length;
   for (let i = 0; i < MOUTHS.length; i++) {
-    const f = read(MOUTH_REFS[i]), c = crossing(MOUTHS[i], f), want = MOUTH.gyre * c.Ur * Math.sign(c.along);
-    if (fresh) { S.gyre[i] = want; S.phase[i] = 0; }
-    else {
+    const f = read(MOUTH_REFS[i]);
+    if (fresh) {
+      const c = crossing(MOUTHS[i], past ? past(MOUTH_REFS[i], PAST) : f); let g = MOUTH.gyre * c.Ur * Math.sign(c.along);
+      if (past) for (let h = PAST - PAST_STEP; h >= 0; h -= PAST_STEP) g = spin(i, g, past(MOUTH_REFS[i], h), PAST_STEP * 3600);
+      S.gyre[i] = g; S.phase[i] ??= 0; // (the eddies keep their beat through a change of conditions)
+    } else {
       S.phase[i] = (S.phase[i] + dt / eddyPeriod(i, S.flows[i])) % 1; // (at the rate of the stream that ran since the last look)
-      S.gyre[i] += (want - S.gyre[i]) * (1 - Math.exp(-dt / gyreTime(i, f)));
+      S.gyre[i] = spin(i, S.gyre[i], f, dt);
     }
     S.flows[i] = f;
   }
@@ -216,10 +254,16 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
     }
     // the gyre: within its radius the water is its own, and the harbor's (slow) water comes back in over its rim
     const gx = p.x - M.c.x, gy = p.y - M.c.y, s = Math.hypot(gx, gy) / M.R;
+    // (round it, out to twice its radius, the pool's other water is the harbor's stillest: the stream doesn't turn in
+    // through the mouth, whatever the harbor's own calm, measured through the water from the open Bay, leaves there)
     let keep = 1, wx = 0, wy = 0;
-    if (s < MOUTH.rim) {
-      const w = S.gyre[i] * gyreShape(s) / Math.max(s * M.R, 1e-6) * M.turn, q = clamp((s - 1) / (MOUTH.rim - 1), 0, 1);
-      keep = q * q * (3 - 2 * q); wx = -gy * w; wy = gx * w;
+    if (s < 2) {
+      if (s < MOUTH.rim) {
+        const w = S.gyre[i] * gyreShape(s) / Math.max(s * M.R, 1e-6) * M.turn, q = clamp((s - 1) / (MOUTH.rim - 1), 0, 1);
+        keep = q * q * (3 - 2 * q); wx = -gy * w; wy = gx * w;
+      }
+      // (not under a pier's piles, where the stream runs through: coming in over 4 m off its deck)
+      if (k > M.floor) { const q = clamp((s - MOUTH.rim) / (2 - MOUTH.rim), 0, 1), off = clamp(pilePierDist(p) / 4, 0, 1); keep *= 1 - off * (1 - (M.floor + (k - M.floor) * q * q * (3 - 2 * q)) / k); }
     }
     // the mixing layer across the gap: the stream outside it, the basin's water inside. (Its width from the upstream
     // corner; as the stream dies at slack, from the middle, so nothing steps when the tide turns)
@@ -228,18 +272,19 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
     ox = m * sx + (1 - m) * (keep * ox + wx); oy = m * sy + (1 - m) * (keep * oy + wy);
     // (no steady stream runs in or out through the gap of a closed basin: what the tide's own set, or the gyre's rim,
     // would carry across the line is taken out there)
-    if (x > 0 && x < M.W) { const vi = (ox * M.into.x + oy * M.into.y) * core * clamp(Math.min(x, M.W - x) / 3, 0, 1); ox -= M.into.x * vi; oy -= M.into.y * vi; }
+    // (and for a gap's width off it on the Bay's side, where the stream turns to run along the line and not at it)
+    if (x > 0 && x < M.W && n > -3 * M.W) { const vi = (ox * M.into.x + oy * M.into.y) * (n > 0 ? core : Math.exp(n / M.W)) * clamp(Math.min(x, M.W - x) / 3, 0, 1); ox -= M.into.x * vi; oy -= M.into.y * vi; }
     // its eddies, a row carried down the layer; they form over the gap's first quarter and break up on its far corner
     if (q > -5 && q < 5 && x > 0 && x < 1.5 * M.W && Ur > 0) {
-      const dU = (1 - MOUTH.gyre) * Ur, amp = Math.SQRT2 * dU * clamp(4 * (x + piles) / M.W, 0, 1) * clamp(3 - 2 * x / M.W, 0, 1);
-      const ph = 2 * Math.PI * (S.phase[i] + (t - S.t) / eddyPeriod(i, f) - x / eddySpacing(M, piles));
-      // (a row of eddies: across the stream the water swings most on the layer's center line; along it, most to either
-      // side of the line and opposite ways there, a quarter-turn apart)
-      const eu = MOUTH.u * amp * Math.tanh(q) * core / ODD_PEAK * Math.sin(ph), ev = MOUTH.v * amp * core * Math.cos(ph);
+      // (the speed's change across the layer: the stream's, less the gyre's edge as it is now, with it or against it)
+      const dU = Math.abs(Ur - dn * S.gyre[i]), amp = Math.SQRT2 * dU * clamp(4 * (x + piles) / M.W, 0, 1) * clamp(3 - 2 * x / M.W, 0, 1);
+      const lam = eddySpacing(M, piles), ph = 2 * Math.PI * (S.phase[i] + (t - S.t) / eddyPeriod(i, f) - x / lam);
+      // (a row of eddies: across the stream the water swings most on the layer's center line; along it, to either side
+      // of the line and opposite ways there, a quarter-turn apart, and by just as much as lets the water neither pile
+      // up nor thin out: u = dψ/dn, v = −dψ/dx of the one stream function)
+      const ev = MOUTH.v * amp * core * Math.cos(ph), eu = -MOUTH.v * amp * (4 * lam / (2 * Math.PI * Bw)) * Math.tanh(q) * core * Math.sin(ph);
       ox += ex * eu + M.into.x * ev; oy += ey * eu + M.into.y * ev;
     }
   }
   return { x: ox, y: oy };
 }
-/** the peak of tanh(q)·sech²(q), at tanh²(q) = 1/3 */
-const ODD_PEAK = 2 / (3 * Math.sqrt(3));
