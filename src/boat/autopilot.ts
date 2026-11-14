@@ -125,8 +125,15 @@ const BOXED = 15;
 /** How far ahead along the direct line land has to be before Nav plans a way round it (m): nearer the destination's
  * own approach, or a pier on the way, not the shore across the Bay. */
 const PLAN_AHEAD = 400;
-/** Re-plan the way (s): the tide and her own drift move her off it slowly; a turn gone out of sight re-plans at once. */
-const REPLAN = 20;
+/** Re-plan the way at least this often (s), and at once when the turn she's steering for goes out of sight or she's
+ * been set more than OFF_ROUTE metres off the leg to it: planning from among the Wharf's docks takes a tenth of a second
+ * or more, so not every few seconds. */
+const REPLAN = 60, OFF_ROUTE = 40;
+/** How far she is off the leg from a to b (m): her distance from the segment. */
+function offLeg(q: Vec, a: Vec, b: Vec): number {
+  const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q.x - a.x) * vx + (q.y - a.y) * vy) / L2));
+  return Math.hypot(q.x - a.x - vx * t, q.y - a.y - vy * t);
+}
 /** Clear of land this far either side of a straight line (m)? */
 function clearLine(a: Vec, b: Vec, side: number): boolean {
   const L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 1) return true;
@@ -137,7 +144,7 @@ function clearLine(a: Vec, b: Vec, side: number): boolean {
  * The turn Nav steers for: the direct way while it's clear (20 m either side) as far as PLAN_AHEAD; otherwise the
  * passage planner's route (sim/routing.ts routeAround, which threads the Wharf's piers keeping 10 m off them), kept and
  * followed turn by turn: on to the next turn once she can see it clear (or she's at this one), worked out again
- * every REPLAN seconds, for a new destination, or when the turn she's on goes out of sight. 'clear': steer for `dest`;
+ * every REPLAN seconds, for a new destination, or when the turn she's on goes out of sight or she's set off the leg. 'clear': steer for `dest`;
  * 'none': land's in the way and there's no route round it.
  */
 function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'none' {
@@ -147,7 +154,7 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   // and plan it again every step)
   if (!p.route && clearLine(b, ahead, 20)) return 'clear';
   const moved = !p.routeTo || Math.hypot(p.routeTo.x - dest.x, p.routeTo.y - dest.y) > 1;
-  const lost = !!p.route && landAlong(b, p.route[p.ri]) < Infinity;
+  const lost = !!p.route && (landAlong(b, p.route[p.ri]) < Infinity || offLeg(b, p.route[p.ri - 1], p.route[p.ri]) > OFF_ROUTE);
   if (!p.route || moved || lost || t - p.routeT > REPLAN) {
     const r = routeAround(b, dest, 30);
     p.route = r.length > 2 ? r : null; p.ri = 1; p.routeT = t; p.routeTo = { ...dest };
