@@ -306,6 +306,13 @@ What's planned, roughly in order. Done work is described in the README.
      option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
      thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
      and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
+8x. **URGENT — the whole new release stutters** (regression, performance; owner, 14 November): "the whole new release is
+   moving very, very slow. whitecaps on the water are stuttering. everything is stuttering." The boat editor's slowness
+   (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare
+   frame time and the worker's step against v178 (perf-pair.mjs, and the frame-time readout), and look first at what
+   the latest batches added to every frame or step (the protests batch, the basin grids warmed between frames, the app
+   split, new per-frame water or crew work). Add a frame-time check to the release smoke test so a stuttering build
+   can't ship.
 8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
