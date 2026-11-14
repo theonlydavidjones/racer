@@ -18,7 +18,7 @@ import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
-import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
+import { Sail, Telltale, boatTells, leechFlow, leechTellAt, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 import { PART_SMALL } from './fittings';
 const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
 const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
@@ -1568,8 +1568,9 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     const amt = tj?.amount ?? 0, mirJ = m.jib.mesh.scale.x < 0;
     m.jibTells.windward.forEach(tt => tt.update(jibShape, st.windward, amt, mirJ));
     m.jibTells.leeward.forEach(tt => tt.update(jibShape, st.leeward, amt, mirJ));
-    const leech = tells.leech;
-    m.leechTells.forEach(tt => tt.update(mainShape, leech, tm.amount, m.main.mesh.scale.x < 0));
+    // (each leech telltale from its own batten's section: the top one the twist gauge, sails.ts leechTellAt)
+    const lf = leechFlow(b, t, MAIN_DEF.battens![MAIN_DEF.battens!.length - 1].t);
+    m.leechTells.forEach((tt, i) => tt.update(mainShape, leechTellAt(tm, b.awa, !!b.luff, lf, tt.t, i * 1.7), tm.amount, m.main.mesh.scale.x < 0));
   }
   syncPole(m, plan === 'wing');
   syncLines(m, b);

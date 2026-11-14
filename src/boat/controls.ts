@@ -252,11 +252,18 @@ export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = 
 }
 
 /** The fastest shape for a sail in this wind (kt) and apparent wind angle. */
+/**
+ * Upwind, how far into the powered-up middle of the wind range she is: powerUp (0 in a drifter, 1 from about 10 kt) and
+ * depower (from 12 kt, or by how overpowered she is, heel and helm, when known: a heavier crew or a stiffer boat carries
+ * full power longer). targetShape's sail shapes follow them, and so do the main's leech telltales (render/sails.ts).
+ */
+export function sailPower(tws: number, overpowered?: number): { powerUp: number; depower: number } {
+  return { powerUp: smooth((tws - 4) / 6), depower: overpowered ?? smooth((tws - 12) / 8) };
+}
 export function targetShape(sail: 'main' | 'jib', tws: number, awa: number, overpowered?: number): Shape {
   const a = Math.abs(awa), reach = smooth((a - 55) / 45), run = smooth((a - 120) / 40);
-  // upwind: power up to the middle of the range, then depower: by how overpowered she is (heel and helm, when known:
-  // a heavier crew or a stiffer boat carries full power longer), or else by the wind
-  const powerUp = smooth((tws - 4) / 6), depower = overpowered ?? smooth((tws - 12) / 8);
+  // upwind: power up to the middle of the range, then depower (sailPower)
+  const { powerUp, depower } = sailPower(tws, overpowered);
   const base = sail === 'main'
     // (fully depowered, as flat as the rig will make them: the main to about 8% camber (the outhaul on its band from
     // 12 kt, then the backstay bending the mast, the luff and the vang), the jib about 7.5%)

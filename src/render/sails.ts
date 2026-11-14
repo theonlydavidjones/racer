@@ -1,6 +1,9 @@
 import './three-setup';
 import * as THREE from 'three';
-import type { SailTrim } from '../boat/trim';
+import { sailTrim, SAILS, type SailTrim } from '../boat/trim';
+import { sailPower, targetShape } from '../boat/controls';
+import { CE_ABOVE_WL, RIG as BAL } from '../boat/balance';
+import type { Boat } from '../boat/boat';
 
 /**
  * A sail as a live surface: camber, twist toward the head, a luff bubble when it's under-trimmed, and
@@ -269,6 +272,47 @@ export class Telltale {
  * leeward once the main's stalled past a little (the flow's left the sail before the leech), hanging downwind or luffing. */
 export function leechTellState(trim: SailTrim, awa: number, luffing: boolean): TellState {
   return awa > 115 || luffing ? 'hang' : trim.flow === 'stalled' && trim.amount > 0.12 ? 'curl' : 'stream';
+}
+
+/** How the main's twist and the breeze set each leech telltale (for leechTellAt). */
+export interface LeechFlow {
+  twist: number; // the main's twist now (deg, head against foot: controls.ts mainShape)
+  target: number; // the fast twist for the breeze (controls.ts targetShape)
+  powerUp: number; depower: number; // controls.ts sailPower
+  fCE: number; // the height fraction up the luff (0 boom, 1 head) the sim's one trim is worked out at (balance.ts CE_ABOVE_WL)
+  fTop: number; // the top batten's
+  time: number; // s, for the breeze's unsteadiness
+}
+/**
+ * One of the main's leech telltales, at height fraction f up its luff: the sim trims the main at one height (trim.err,
+ * at the centre of effort), and each section of the sail sees its own angle of attack about it.
+ * - Twist: the main is a tapering wing, a triangle, and an untwisted tapering wing loads its tip hardest, so its head
+ *   stalls first. The twist that makes the head work like the rest is the fast twist (targetShape's); short of it (the
+ *   leech closed by a hard sheet) each section's angle of attack climbs with height, past it (eased) falls.
+ * - The fast trim's own edge: North Sails' Nordic Folkboat tuning guide reads the top leech telltale as the twist gauge:
+ *   "In light winds the mainsheet is eased so that the top tell-tale flies straight", while sheeted for height in a
+ *   medium breeze it's stalled about half the time. So the fast trim leaves the top section on the edge of its stall in
+ *   the powered-up middle of the range (EDGE, scaled by powerUp and eased off as she depowers and the leech opens), and
+ *   clear of it in a drifter.
+ * - The breeze isn't steady (its gusts and the waves): the top section's angle of attack wanders a degree or two.
+ * Curling or streaming is sailTrim's own stall, at the section's angle: the same line as the sail's.
+ */
+/** The main's twist against the fast one now, for her leech telltales (the 3D boat's and the flow view's alike). `fTop`: the
+ * top batten's height fraction (render/boatMesh.ts MAIN_DEF: at the leech's upper fifth, CR 9.23, about 0.80 of the luff). */
+export function leechFlow(b: Boat, time: number, fTop = 0.8): LeechFlow {
+  const tws = b.ww.kt, { powerUp, depower } = sailPower(tws, b.depower);
+  return { twist: b.shape.main.twist, target: targetShape('main', tws, b.awa, b.depower).twist, powerUp, depower, fCE: (CE_ABOVE_WL - BAL.hbi - BAL.BAS) / BAL.P, fTop, time };
+}
+export function leechTellAt(trim: SailTrim, awa: number, luffing: boolean, lf: LeechFlow, f: number, phase = 0): TellState {
+  if (awa > 115 || luffing) return 'hang';
+  const up = Math.max(0, (f - lf.fCE) / (lf.fTop - lf.fCE)); // (0 at the centre of effort and below, 1 at the top batten)
+  const EDGE = 4 + 0.12 * 25; // (sailTrim's curl line: its stall starts 4° past the best angle, and curls by an amount of 0.12)
+  const wander = up * 1.5 * (Math.sin(lf.time * 0.9 + phase) * 0.6 + Math.sin(lf.time * 0.37 + phase * 2.1) * 0.4);
+  const err = trim.err + (lf.target - lf.twist) * (f - lf.fCE) + EDGE * lf.powerUp * (1 - lf.depower) * up + wander;
+  // (sailTrim's own stall at this error: taken upwind, at 45° apparent, the sheet set to give exactly this err; the
+  // section's off-the-wind case is the 'hang' above)
+  const at = sailTrim('main', 45, 45 - SAILS.main.aoa - err);
+  return at.flow === 'stalled' && at.amount > 0.12 ? 'curl' : 'stream';
 }
 /** The boat's telltales as she has them: the jib's luff pair (none when it isn't on its sheet) and the main's leech one,
  * from the sails' trim and the apparent wind (deg off the bow); luffing on purpose, the jib's windward ones lift and the

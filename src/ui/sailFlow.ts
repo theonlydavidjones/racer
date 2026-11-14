@@ -3,7 +3,7 @@ import type { Boat } from '../boat/boat';
 import { byHand, crewEaseBoom, sailFrame } from '../boat/physics';
 import { SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
-import { boatTells, type TellState } from '../render/sails';
+import { boatTells, leechFlow, leechTellAt, type TellState } from '../render/sails';
 
 /*
  * The flow view's model (the owner's training tool #2): the sails cut across at three heights, each section where the
@@ -114,7 +114,7 @@ export function flowState(b: Boat): FlowState {
     sails.push({ sail, trim, awa, across: awa - b.sheets[sail], best: SAILS[sail].aoa, twist: shape.twist, sheet: b.sheets[sail], atMin: b.sheets[sail] <= SAILS[sail].min + 0.5, atMax: b.sheets[sail] >= SAILS[sail].max - 0.5 });
   }
   // (the telltales and whether she's off the wind: as the 3D boat has them, from the masthead's apparent wind b.awa)
-  const tells = boatTells(b.trim.jib, b.trim.main, b.awa, !!b.luff);
+  const tells = boatTells(b.trim.jib, b.trim.main, b.awa, !!b.luff), lf = leechFlow(b, 0);
   const cuts = FLOW_HEIGHTS.map(({ name, z }) => {
     const w = windAt(b, z), sections: FlowSection[] = [];
     for (const fs of sails) {
@@ -122,7 +122,7 @@ export function flowState(b: Boat): FlowState {
       if (!at) continue;
       sections.push({
         sail: fs.sail, luff: at.luff, chord: at.chord, angle: b.sheets[fs.sail] + shape.twist * fAt(fs.sail, z), depth: shape.depth, draft: shape.draft,
-        trim: fs.trim, tells: fs.sail === 'jib' ? tells.jib : { leech: tells.leech }
+        trim: fs.trim, tells: fs.sail === 'jib' ? tells.jib : { leech: leechTellAt(b.trim.main, b.awa, !!b.luff, lf, fAt('main', z)) } // (the leech telltale at this cut's height)
       });
     }
     return { name, z, aws: w.kt, awa: w.awa, sections };
