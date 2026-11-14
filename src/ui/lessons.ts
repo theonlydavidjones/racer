@@ -26,20 +26,19 @@ export function lessonGridHtml(passed: readonly LessonId[]): string {
 }
 
 /**
- * Before you go (lesson 2; ASA 101 K16, K18, S21): the federally required gear for a 25 ft sailboat with an outboard on
- * coastal waters, each a picture and a word, tapped to check it's aboard; then a three-field float plan, left with the
- * club. The list follows the USCG's "A Boater's Guide to the Federal Requirements for Recreational Boats" (33 CFR 175:
- * life jackets 175.15, a throwable at 16 ft and over; visual distress signals, day and night, on coastal waters 175.110;
- * 33 CFR 83 Rule 33, a sound signal; a fire extinguisher, a boat with a closed cabin 175.300).
- * TO VERIFY against uscgboating.org and ecfr.gov before this ships (the hosts are being allowed): the researcher's list
- * came from memory, 14 Nov 2026.
+ * Before you go (lesson 2; ASA 101 K16, K18, S21): the federally required gear for this boat (25 ft, an outboard, a closed
+ * cabin, on coastal waters), each a picture and a word, tapped to check it's aboard; then a three-field float plan, left
+ * with the club. Verified against the live eCFR (33 CFR 175, 83; up to date 12 Nov 2026,
+ * https://www.ecfr.gov/current/title-33/part-175) and the USCG's "A Boater's Guide to the Federal Requirements for
+ * Recreational Boats" (Nov 2023, uscgboating.org), 14 Nov 2026. The navigation lights (Rule 25, 33 CFR 83.25: sidelights
+ * and a sternlight, or a masthead tricolor under 20 m, sunset to sunrise) are the lesson's next step, switched on.
  */
 export const GEAR: { key: string; icon: string; name: string; tip: string }[] = [
-  { key: 'pfd', icon: '🦺', name: 'Life jackets', tip: 'One for each person aboard (33 CFR 175.15)' },
-  { key: 'throw', icon: '🛟', name: 'Throwable', tip: 'A ring or cushion to throw, at 16 ft and over (33 CFR 175.15)' },
-  { key: 'sound', icon: '📯', name: 'Horn', tip: 'A sound signal (33 CFR 83, Rule 33)' },
-  { key: 'flares', icon: '🧨', name: 'Flares', tip: 'Visual distress signals, day and night, on coastal waters (33 CFR 175.110)' },
-  { key: 'fire', icon: '🧯', name: 'Extinguisher', tip: 'A boat with a closed cabin (33 CFR 175.300)' }
+  { key: 'pfd', icon: '🦺', name: 'Life jackets', tip: 'One wearable for each person aboard (33 CFR 175.15(a))' },
+  { key: 'throw', icon: '🛟', name: 'Throwable', tip: 'One to throw, as well, at 16 ft and over (33 CFR 175.15(b))' },
+  { key: 'sound', icon: '📯', name: 'Horn', tip: 'Some means of an efficient sound signal, under 12 m (33 CFR 83.33(b))' },
+  { key: 'flares', icon: '🧨', name: 'Flares', tip: 'Visual distress signals for day and night, at 16 ft and over on coastal waters (33 CFR 175.110)' },
+  { key: 'fire', icon: '🧯', name: 'Extinguisher', tip: 'One 5-B: an outboard boat under 26 ft with a closed cabin (33 CFR 175.320)' }
 ];
 export function dockCardHtml(checked: ReadonlySet<string>, crew: number): string {
   const all = GEAR.every(g => checked.has(g.key));
