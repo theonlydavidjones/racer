@@ -11,6 +11,7 @@ import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boa
 import { JUMPER_HALF_TURN_S } from '../boat/condition';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
+import { pointOfSailWord } from './pointOfSail';
 
 /**
  * The sail controls band (the owner's design, 12 Nov 2026; the UI session's mock-up, design/sail-controls-band.html):
@@ -122,7 +123,7 @@ const windexSvg = () => {
   <path d="M70 26 C 82 44, 84 70, 80 106 L 60 106 C 56 70, 58 44, 70 26 Z" fill="url(#sbWxHull)" opacity=".85"/>${tab(-1)}${tab(1)}
   <g class="sb-vane"><line x1="70" y1="106" x2="70" y2="26" stroke="#ff6a3d" stroke-width="3" stroke-linecap="round"/><path d="M70 10 L79 30 L70 25 L61 30 Z" fill="#ffb627" stroke="#1a1205" stroke-width="1"/><path d="M70 98 L77 108 L77 114 L70 106 L63 114 L63 108 Z" fill="#ff6a3d" stroke="#1a1205" stroke-width="1"/></g>
   <circle cx="70" cy="70" r="5" fill="#e9f2f5" stroke="#08141e" stroke-width="1.5"/>
-  <text class="sb-awa" x="70" y="131" text-anchor="middle">0°</text></svg>`;
+  <text class="sb-pos" x="70" y="119" text-anchor="middle"></text><text class="sb-awa" x="70" y="131" text-anchor="middle">0°</text></svg>`;
 };
 
 /** A jib car on its H-shaped track: two fore-and-aft legs, a crossbar between them (7 rows), the car on it (5 pins). */
@@ -396,7 +397,9 @@ export class SailBand {
     wx.querySelector('.sb-vane')!.setAttribute('transform', `rotate(${u.arel.toFixed(1)} 70 70)`);
     const awa = Math.round(Math.abs(u.awa));
     wx.querySelector('.sb-awa')!.textContent = `${awa}°`;
-    wx.setAttribute('aria-label', `Windex: apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
+    // her point of sail under the vane (the owner: the windex names it: Close-hauled, Beam reach, Broad reach, Run)
+    const pos = pointOfSailWord(u); wx.querySelector('.sb-pos')!.textContent = pos;
+    wx.setAttribute('aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
     wx.dataset.help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`;
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;

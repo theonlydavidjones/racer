@@ -156,3 +156,4 @@ body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 /* (the messages stop above the band while it is open) */
 body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
 
+.sb-pos{fill:#ffffff;font:700 10.5px var(--f-inst);letter-spacing:.04em;paint-order:stroke;stroke:#08141e;stroke-width:3px} /* the windex's point of sail (ROADMAP 8j) */

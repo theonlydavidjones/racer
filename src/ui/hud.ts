@@ -55,6 +55,7 @@ import { setVisibility, visibilityFor } from '../environment/weather';
 import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
+import { pointOfSailWord } from './pointOfSail';
 
 export function fmtClock(t: number): string {
   const a = Math.abs(t), m = Math.floor(a / 60), s = Math.floor(a % 60);
@@ -68,13 +69,8 @@ export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
  * and sea, boat/seaway.ts), a beam reach the wind square across her (80–100°), a run within 20° of dead downwind; head
  * to wind inside 30°, where no sail draws.
  */
-export function pointOfSail(u: Boat): { short: string; long: string } {
-  const a = Math.abs(u.twa), beat = beatFor(u);
-  const [short, long] = a < 30 ? ['head to wind', 'head to wind'] : a < beat + 7 ? ['close-hauled', 'close-hauled']
-    : a < 80 ? ['close reach', 'on a close reach'] : a <= 100 ? ['beam reach', 'on a beam reach']
-    : a < 160 ? ['broad reach', 'on a broad reach'] : ['run', 'running'];
-  return { short, long };
-}
+// (her point of sail: ui/pointOfSail.ts, shown with the windex in the band and on the dial)
+export { pointOfSail } from './pointOfSail';
 
 /** Which way north points on a map turned so that `W` (deg, the wind's direction) is at the top: the angle (rad) to
  * turn an up-pointing arrow by, clockwise on the canvas (makeTf: a bearing b is drawn at b − W from up). */
@@ -549,6 +545,10 @@ export class Hud {
     const pa = Math.atan2(by - ay, bx - ax);
     ctx.beginPath(); ctx.moveTo(bx + Math.cos(pa) * 4, by + Math.sin(pa) * 4); ctx.lineTo(bx - Math.cos(pa - 0.5) * 9, by - Math.sin(pa - 0.5) * 9); ctx.lineTo(bx - Math.cos(pa + 0.5) * 9, by - Math.sin(pa + 0.5) * 9); ctx.fill();
     ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
+    // her point of sail, as the windex shows it (the owner: the dial names it); also on the canvas for the checks
+    const pos = pointOfSailWord(u); this.dialC.dataset.pos = pos; this.dialC.setAttribute('aria-label', `Wind angle dial: ${pos}, true wind ${Math.round(u.twa)}°, apparent ${Math.round(u.awa)}°`);
+    ctx.fillStyle = '#e9f2f5'; ctx.font = '700 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(pos, cx, cy - R * 0.5);
+    ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif';
     ctx.fillText('TWA ' + Math.round(u.twa) + '°', cx, cy + R * 0.56);
     ctx.fillText('AWA ' + Math.round(u.awa) + '°', cx, cy + R * 0.8);
   }
