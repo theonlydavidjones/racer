@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
-import { DECK_ARM } from '../boat/crewPhys';
+import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
 import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
 
@@ -433,7 +433,7 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
 }
 
 /** Where a crew member is and what they're doing (crewPhys.ts), as a pose on something real. */
-function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, windward: number, isMoving: boolean, motion: number, idx: number, tackRole: 'jib' | 'main' | null = null, dest = z): PoseT {
+function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, windward: number, isMoving: boolean, motion: number, idx: number, tackRole: 'jib' | 'main' | null = null, dest = z, jibTrim = idx === 0): PoseT {
   const k = fig.scale, s = Math.abs(x) > 0.05 ? Math.sign(x) : windward, ax = Math.abs(x);
   if (tackRole) {
     // through a tack, down in the cockpit and across under the boom (the owner): the forward crew on one knee working
@@ -579,8 +579,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // (and the tailing elbow down by their side, inboard of the coaming beside them, not out over it)
     { const e = V((near ? 1 : -1) * 0.3, -1, 0.2), t = V((near ? 1 : -1) * 0.3, -1, 0.3); p.elbow = near ? [t, e] : [e, t]; }
     p.pitch = 0.05; p.look = winchGrip(ws, 0); // (sat up, back to the coaming: leant forward, the shoulder came inboard, away from the handle)
-  } else if (idx === 0 && lean <= 0.15) {
-    // the jib trimmer: the sheet in the forward hand, led from the leeward winch
+  } else if (jibTrim && lean <= 0.15) {
+    // the jib trimmer: the sheet in the forward hand, led from the leeward winch (whoever trims it: the forward crew of two,
+    // crewPhys.ts slotOf, not crew 1 by their place in the list)
     const w = winchAt(-windward);
     const hold = p.hip.clone().add(V(0, 0.26 * k, 0)).addScaledVector(fwd(p.yaw), 0.5 * k).lerp(w, 0.15); // (at arm's length, the elbow easy)
     // (in front of them, not reached back aft: sat at the bench's forward end turned a little aft, the sheet hand went back
@@ -991,7 +992,9 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       // (in their order along the cockpit, front to back, as the physics keeps them (crewPhys.ts stationZ): not by where
       // each is this moment. One still crossing can be a little forward of the other for a second, and the one sat
       // forward was put aft past the thwart, then left there when the other moved on)
-      zs[j] = lo; zs[i] = lo + SEP;
+      // (by their stations' order, crewPhys.ts slotOf, not their place in the list: the main trimmer, crew 1, sits aft of
+      // the jib hand now, and put forward by their number the two swapped places across the winch)
+      const n = cr.crew.length, [front, back] = slotOf(i, n) <= slotOf(j, n) ? [i, j] : [j, i]; zs[front] = lo; zs[back] = lo + SEP;
     }
   }
   // a tack under way: from the helm putting her about (the roll's lead) through the wind until they're across. The forward
@@ -1055,7 +1058,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (the side they're going to, the physics' own: at the role's end they can be just across the middle from it)
     if (wasTack && !f.tack && f.cur && Math.cos(f.cur.yaw) < -0.3) f.turnDir = -Math.sign(x) || -Math.sign(f.cur.hip.x) || 1;
     const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
-    const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z);
+    const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z, cr.crew.length < 2 || i === fore);
     // (on the way along the side deck, and settling into the new place after it)
     const routed = route(f, want, dt, f.scale);
     if (routed) f.walked = true; else if (f.walked && f.cur && f.cur.hip.distanceTo(want.hip) < 0.03) f.walked = false;
