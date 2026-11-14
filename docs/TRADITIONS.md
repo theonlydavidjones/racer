@@ -159,9 +159,8 @@ until the owner confirms it from the fleet.
       women famously flash the boats as they round.
     - In the sim (owner's decision, 13 November, replacing the earlier "nothing explicit"): as in real life, "this is a
       true to life sim." The committee boat's crew flash the fleet as boats round: adult women, topless only, nothing
-      sexual, drawn in the crew figures' own stylized style. Whether it sits behind a mature-content setting in
-      Settings, and that setting's default, is pending the owner's answer. Before any public release, the host club's
-      permission covers this as well as its name.
+      sexual, drawn in the crew figures' own stylized style, and shown blurred (owner: "just blur the titties"). No
+      mature-content setting. Before any public release, the host club's permission covers this as well as its name.
     - Not yet sourced: the course and marks (norcalsailing.com and sail-world.com are blocked here).
 15. **Dressing ship.** Kept as reference (item 6 has the CCA's practice); the owner hasn't seen it done in the fleet, so
     it's ranked low.

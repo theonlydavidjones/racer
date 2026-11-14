@@ -176,7 +176,7 @@ export class PlanChart {
       // the course she'd sail leaving now (sim/navigator.ts passageNow): over the ground, tacks and gybes, and when she'd get there
       const pn = passageNow(w);
       if (pn) {
-        const turns = [pn.tacks.length ? `${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : '', pn.gybes.length ? `${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ');
+        const turns = [pn.tacks.length ? `${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : '', pn.gybes.length ? `${pn.gybes.length} jibe${pn.gybes.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ');
         way += pn.ok
           ? `<p><b>Sailing it:</b> about ${(pn.sailedM / 1852).toFixed(1)} nm over the ground${turns ? `, ${turns}` : ''}; ${mins(pn.minutes)}, leaving ${clockOf(pn.leave)} and arriving about <b>${clockOf(pn.eta!)}</b> (the Folkboat's polar speeds in the forecast wind and NOAA's current).</p>`
           : `<p class="warn">Leaving at ${clockOf(pn.leave)} she can't get there: ${whyNot(pn.why)}.</p>`;

@@ -4,7 +4,7 @@
  */
 import { PREP_MEANING } from '../sim/signals';
 import { describeSea } from '../environment/sea';
-import { CURRENTS } from '../environment/current';
+import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
@@ -66,6 +66,7 @@ function prepare(seed = randomSeed()): void {
       : new LocalHost(facts, app.SIM_GUARD);
   }
   app.w = app.host.view; app.shownDest = app.w.dest; app.speedSet = app.w.speed; app.drillShown = false; app.resultsShown = false;
+  warmBasinsIdle(() => app.w);
   document.documentElement.dataset.sim = app.host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   app.unshown = true; document.documentElement.dataset.prepared = String(++app.prepared);
 }
@@ -263,7 +264,7 @@ function drawTideGraph(): void {
     ctx.fillText(inside ? 'arrive' : `arrive ${sfClock(pn.eta)} →`, !inside ? W - 12 : close ? xd + 4 : xd, 10);
   }
   const day = new Date(app.w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
+  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} jibe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(app.w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   $('tideNote').textContent = `${condSource}${app.w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
 }
@@ -330,8 +331,8 @@ function beginRaceNow(seed?: number): void {
   app.realRaceHolds();
   saveSettings(app.S);
   newGame(seed);
-  if (app.S.mode === 'manoeuvres') { logMessage('— Tacks and gybes'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
-    toast(`Tacks and gybes: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
+  if (app.S.mode === 'manoeuvres') { logMessage('— Tacks and jibes'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
+    toast(`Tacks and jibes: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and jibe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
@@ -382,4 +383,17 @@ $('bCondClose').onclick = () => {
 };
 
 return { beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, tideBox, wake };
+}
+
+/**
+ * The page's own copy of the harbors' still-water grids (environment/current.ts), worked on in its idle time round the
+ * boats, so the chart and the water have them before they're looked at, and a race in the page's own thread (?inproc,
+ * or a worker that wouldn't start) never stops to build one. Started once; it naps a second when there's nothing near.
+ */
+let basinsWarming = false;
+function warmBasinsIdle(view: () => { boats: readonly { x: number; y: number }[] } | undefined): void {
+  if (basinsWarming) return; basinsWarming = true;
+  const idle = (cb: (ms: number) => void) => typeof requestIdleCallback === 'function' ? requestIdleCallback(d => cb(Math.max(0, d.timeRemaining() - 1)), { timeout: 1000 }) : setTimeout(() => cb(4), 50);
+  const tick = (ms: number) => { const w = view(), more = !!w && warmBasins(w.boats, 3000, ms); if (more) idle(tick); else setTimeout(() => idle(tick), 1000); };
+  idle(tick);
 }

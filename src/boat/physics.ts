@@ -52,6 +52,20 @@ export function sailPlan(b: Boat): SailPlan {
  * spreaders and shrouds and the slides bind, so it goes up far more slowly.
  */
 export const HOIST = { main: 30, jib: 15, strikeMain: 15, strikeJib: 10 };
+/**
+ * At the dock (and walked or pushed off it): the crew sit centred on the benches, not hiked or to leeward for a heel she
+ * isn't sailing at (the owner); their weight still moves only her heel, never her across the water. (placeCrew, placed
+ * in the middle for the moment, as you'd place them yourself: your own placing comes back with her under way.)
+ */
+export function crewAtDock(b: Boat, dt: number): void {
+  const cs = b.crew; if (!cs) return;
+  const yours = cs.place;
+  // (placed by you, they're where you put them, at the dock as under way; and fore and aft in the cockpit unless you've
+  // put them elsewhere: no bow hand off to the mast for the trim of a boat that isn't sailing)
+  cs.place = { across: yours?.across ?? 'mid', fore: yours?.fore ?? 'mid' };
+  placeCrew(cs, { need: 0, twa: b.twa, tws: b.ww.kt, v: 0, pole: false, tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(b.ww.kt), extraMoment: 0, sea: 0, heel: b.heelMag ?? 0, tackComing: false, rmPerDeg: 250 }, dt);
+  cs.place = yours;
+}
 export function crewRig(b: Boat, dt: number, emit: Emit): void {
   const r = b.rig; if (!r) return;
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg, ms: 3500 }); };
@@ -83,7 +97,7 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
   else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
   else if (b.pole === 'set' && b.tack !== b.poleTack) {
     b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack;
-    say('Gybing the pole end-for-end. The jib is down for a few seconds.');
+    say('Jibing the pole end-for-end. The jib is down for a few seconds.');
   }
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
@@ -254,7 +268,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
   // (off the wind the heel is the same balance of moments as upwind: the eased sails' smaller side force is what heels her
   // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
-  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt);
+  // (under bare poles, the sails struck, there's no heel worth sailing at: the crew sit her upright, in the middle, not out
+  // to windward for a breeze she isn't sailing in nor to leeward for a light-air heel she can't have; as at the dock,
+  // crewAtDock. Placed by you, they stay where you put them)
+  // (struck, not half-hoisted: a sail half up still heels her, sf.main.heel by the hoist, and they sit up for it)
+  const bare = !!b.rig && b.rig.main <= 0.05 && b.rig.jib <= 0.05, yours = cs.place;
+  if (bare && !yours?.across) cs.place = { across: 'mid', fore: yours?.fore ?? 'mid' };
+  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt, bare ? 0 : undefined);
+  cs.place = yours;
   rollTo(b, heelT, rel, disp, dt);
   b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.ceh, clrShift(cs.trim));
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
