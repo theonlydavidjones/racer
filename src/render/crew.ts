@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -66,7 +66,8 @@ const SEAT_Y = COCKPIT_FIT.seat, { benchAft: BENCH_AFT } = COCKPIT_FIT;
 /** The race's clock as the figures are posed (s): a winch's strokes go by it, not the page's. */
 let poseClock = 0;
 /** The winch someone is cranking this frame, if anyone (Crew.winch). */
-let cranked: { side: 1 | -1; turn: number } | undefined;
+type Cranked = { side: 1 | -1; turn: number; fig?: Figure; hand?: number };
+let cranked: Cranked | undefined;
 /**
  * The jib winch handle's grip at `turn` (boatMesh.ts winchHandle and WINCH_HANDLE, Boat Detail's: a 10-inch handle in the
  * winch's socket, its spindle under the side deck's edge, the grip on its end, 0 pointing aft). The middle of the grip,
@@ -83,6 +84,24 @@ export function winchGrip(side: number, turn: number): THREE.Vector3 {
  * (Lewmar's ratchet handles: worked in part-turns where a full sweep is blocked). An estimate of the stroke's pace.
  */
 const SHORT_PULL = { swing: 0.38, hz: 0.9 };
+/** The cranker's seat on the bench: the after shoulder about level with the handle's end, the arm in under the deck ahead of the after end of the space there (COCKPIT_FIT.benchAft). */
+const BENCH_TOP_AFT = 1.68;
+/** How far round toward the winch's handle they turn from facing in (of the whole way): enough for the shoulder to reach. */
+const WINCH_TURN = 0;
+/**
+ * Under the side deck, beside the cockpit: open to it along the bench, from the coaming's foot out to the lining, from the
+ * locker lid up to the deck's underside (hull.ts; Boat Detail's, as the owner describes Josephine: the winches turned from
+ * below the side deck, the handle reached in under its edge). Where a hand can go in to the winch's grip.
+ */
+export function underDeck(x: number, y: number, z: number): boolean {
+  if (!(z > COCK0 + 0.06 && z < BENCH_AFT)) return false;
+  const u = uAtZ(z), ax = Math.abs(x);
+  // (out to the lining, and the grip's own width past it: at the short pull's full swing outboard the handle's end comes
+  // within a couple of centimetres of it, Boat Detail asked)
+  return ax > cockpitHalf(u) - 0.01 && ax < benchOut(u) + 0.03 && y > SEAT_Y && y < deckY(u, ax) - 0.03;
+}
+/** What's under a hand: the ground, or in under the side deck, the locker lid. */
+const handFloor = (x: number, y: number, z: number) => (underDeck(x, y, z) ? SEAT_Y : ground(x, z));
 let footrestBack = 0;
 export function setFootrest(back: number): void { footrestBack = Math.max(0, Math.min(1, back)); }
 const footrestOut = () => FOOTREST.out * (1 - footrestBack);
@@ -143,7 +162,7 @@ function groundNear(x: number, z: number, r: number): number {
 
 /** A pose in the boat's frame: the hips, which way they face (yaw: 0 forward, + turning to port), the torso's lean
  * (+ back, − forward) and roll, the ankles and the hands (left, right), and what they're looking at. */
-interface PoseT { /** walking along the side deck (deckWalk): both feet up out of the cockpit at once */ deck?: boolean; /** which way the knees point (boat frame), if not forward */ knee?: THREE.Vector3; /** how far that's taken over from forward, 0 to 1 (eased: a knee doesn't flip in a frame) */ kneeW?: number; /** the knees come round slowly (sitting down on the side deck, the hips held up clear) */ kneeSlow?: boolean; hip: THREE.Vector3; yaw: number; pitch: number; roll: number; feet: [THREE.Vector3, THREE.Vector3]; hands: [THREE.Vector3, THREE.Vector3]; look: THREE.Vector3; /** walking or crawling: the feet step (planted, then swung) */ step?: boolean }
+interface PoseT { /** walking along the side deck (deckWalk): both feet up out of the cockpit at once */ deck?: boolean; /** which way the knees point (boat frame), if not forward */ knee?: THREE.Vector3; /** how far that's taken over from forward, 0 to 1 (eased: a knee doesn't flip in a frame) */ kneeW?: number; /** the knees come round slowly (sitting down on the side deck, the hips held up clear) */ kneeSlow?: boolean; hip: THREE.Vector3; yaw: number; pitch: number; roll: number; feet: [THREE.Vector3, THREE.Vector3]; hands: [THREE.Vector3, THREE.Vector3]; look: THREE.Vector3; /** walking or crawling: the feet step (planted, then swung) */ step?: boolean; /** which way an elbow points for an arm that isn't down and back (torso frame), by hand */ elbow?: [THREE.Vector3 | undefined, THREE.Vector3 | undefined] }
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** The figure's forward and right in the boat frame for a yaw (it faces −z at yaw 0). */
 const fwd = (yaw: number) => V(-Math.sin(yaw), 0, -Math.cos(yaw)), right = (yaw: number) => V(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -515,11 +534,30 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // it, boatMesh.ts by Crew.winch; the other hand tailing the sheet off the drum)
     // (the winch on the side they're on: to leeward in light air, to windward in a breeze, the jib cross-sheeted there so
     // the trimmer can sit out to it (crewWork.ts stationFor's winch))
-    const ws = (Math.abs(x) > 0.3 ? Math.sign(x) : windward > 0 ? -1 : 1) as 1 | -1, w = winchAt(ws, 0.04);
+    const ws = (Math.abs(x) > 0.3 ? Math.sign(x) : windward > 0 ? -1 : 1) as 1 | -1;
+    // (sat on the bench beside it, just forward of the handle's end, reaching out under the side deck: from up on the
+    // deck the handle under it is out of reach, about 0.7 m from the shoulder)
+    p = onSeat(ws, ws * Math.max(ax, 0.45), Math.min(Math.max(zc, JIB_WINCH_Z), BENCH_TOP_AFT), k);
     const turn = SHORT_PULL.swing * Math.sin(2 * Math.PI * SHORT_PULL.hz * poseClock + idx);
-    cranked = { side: ws, turn };
-    p.hands = [winchGrip(ws, turn), w.clone().add(V(-ws * 0.12, -0.05, 0.25))];
-    p.pitch = -0.35; p.look = winchGrip(ws, 0);
+    cranked = { side: ws, turn, fig };
+    // (turned toward it, half round from sitting facing in, so the reaching shoulder comes to it)
+    { const g0 = winchGrip(ws, 0), dx = g0.x - p.hip.x, dz = g0.z - p.hip.z, face = Math.atan2(-dx, -dz), d = Math.atan2(Math.sin(face - p.yaw), Math.cos(face - p.yaw)), q = WINCH_TURN * d;
+      // (the feet come round with the hips, about them: not left where they were for facing in, the shins in the bench)
+      p.yaw += q; const c = Math.cos(q), sn = Math.sin(q);
+      for (const ft of p.feet) { const fx = ft.x - p.hip.x, fz = ft.z - p.hip.z; ft.x = p.hip.x + fx * c + fz * sn; ft.z = p.hip.z - fx * sn + fz * c; onGround(ft); } }
+    // (the hand on the winch's side cranks, the other tails the sheet)
+    // (the hand round the grip's lower half: the forearm under the deck's edge, not up against its underside)
+    const g = winchGrip(ws, turn).add(V(0, -0.03, 0)), rr = right(p.yaw);
+    // (sat facing in, the after arm cranks: its shoulder about level with the handle's end, the elbow down inside the
+    // coaming, the forearm out under the deck's edge. The forward one, nearer in a straight line, would reach through the
+    // winch's pedestal. The other hand tails the sheet off the drum, inboard of it)
+    const near = rr.z > 0 ? 1 : 0;
+    const tail = V(ws * (chz(JIB_WINCH_Z) - 0.1), deckY(uAtZ(JIB_WINCH_Z), chz(JIB_WINCH_Z)) + coamH(JIB_WINCH_Z) + 0.02, JIB_WINCH_Z - 0.05);
+    p.hands = near ? [tail, g] : [g, tail]; cranked.hand = near;
+    // (the cranking elbow down and a little out, below the deck's edge, the forearm level in under it to the grip: not
+    // back past the handle's end)
+    { const e = V((near ? 1 : -1) * 0.3, -1, 0.2); p.elbow = near ? [undefined, e] : [e, undefined]; }
+    p.pitch = 0.05; p.look = winchGrip(ws, 0); // (sat up, back to the coaming: leant forward, the shoulder came inboard, away from the handle)
   } else if (idx === 0 && lean <= 0.15) {
     // the jib trimmer: the sheet in the forward hand, led from the leeward winch
     const w = winchAt(-windward);
@@ -634,7 +672,7 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   // the owner, "these arms are backwards. poor guy")
   f.arm.forEach((a, i) => {
     const tgt = local(p.hands[i], _p).applyQuaternion(_tq).clone();
-    ik(a, a.root.position, tgt, BONE.upper, BONE.fore, V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
+    ik(a, a.root.position, tgt, BONE.upper, BONE.fore, p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
     const par = f.root.parent; if (!par) return;
     f.root.updateMatrixWorld(true);
     const sd = i ? 1 : -1, hints = [V(sd * 0.9, -0.2, 0.7), V(sd * 1, 0, 0.3)];
@@ -706,16 +744,20 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       if (passes) { _w.copy(sh).addScaledVector(out, 0.28).setY(Math.min(sh.y, Math.max(hd.y, want.hands[i].y)));
         // (and round it inside the cockpit, not out through the coaming)
         if (inCockpit(Math.abs(c.hip.x), c.hip.z)) { const lim = chz(_w.z) - 0.1; if (Math.abs(_w.x) > lim) _w.x = Math.sign(_w.x) * lim; } }
-      toward(hd, passes ? _w : want.hands[i], a, LIMB_SPEED * dt);
+      // (going in under the side deck to the winch's grip: down inside the cockpit first, to the grip's height, then out
+      // under the deck's edge to it, not down through the deck)
+      const gw = want.hands[i], inTo = !passes && underDeck(gw.x, gw.y, gw.z) && !underDeck(hd.x, hd.y, hd.z) && Math.abs(hd.y - gw.y) > 0.03;
+      if (inTo) _w.set(Math.sign(gw.x) * (chz(gw.z) - 0.08), gw.y, gw.z);
+      toward(hd, passes || inTo ? _w : gw, a, LIMB_SPEED * dt);
       // (coming to a step up, the bench's edge or the coaming, it stops and rises to it at a hand's pace: never snapped up onto it)
-      if (ground(hd.x, hd.z) + 0.02 > hy + LIMB_SPEED * dt) { hd.x = hx; hd.z = hz; hd.y = Math.max(hy, ground(hx, hz) + 0.02) + LIMB_SPEED * dt; }
+      if (handFloor(hd.x, hd.y, hd.z) + 0.02 > hy + LIMB_SPEED * dt) { hd.x = hx; hd.z = hz; hd.y = Math.max(hy, handFloor(hx, hy, hz) + 0.02) + LIMB_SPEED * dt; }
       // (rising early to clear an edge it's coming to, at a hand's pace; never inside what's under it)
       // (only over something on its way that's higher than both ends, the coaming between the deck and the cockpit: not
       // whatever's merely near it, which held a hand up beside the coaming on its way down to a locker lid)
       let clear = 0;
       if (far) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
-      hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), ground(hd.x, hd.z) + 0.02); }
+      hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step || sw) {
       // walking or crawling (and a step under way is finished, whatever comes next): each foot stays planted until it's left behind, then swings (lifted) to a new place
@@ -926,7 +968,12 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     apply(f, ease(f, routed ?? want, dt), upright(f, against(pose), dt), dt);
     f.root.visible = true;
   });
-  cr.winch = cranked; // (boatMesh.ts turns the handle with the hand)
+  // (boatMesh.ts turns the handle with the hand: where the hand has got to, a step behind the stroke it's making, so the
+  // grip's in it, not a few centimetres ahead)
+  const ck = cranked as Cranked | undefined; // (set while posing them, above)
+  if (ck?.fig?.cur && ck.hand != null) { const h = ck.fig.cur.hands[ck.hand], p0 = winchGrip(ck.side, 0), pv = p0.clone().setZ(p0.z - WH.len);
+    const t = Math.atan2(h.x - pv.x, h.z - pv.z); if (Math.abs(t) < 1.2) ck.turn = t; }
+  cr.winch = ck ? { side: ck.side, turn: ck.turn } : undefined;
   // the helm
   const hp = ppl?.[0], h = cr.helm, x = hp ? hp.x : windward * 0.55, z = hp?.z ?? 2.95;
   cr.helmSide = Math.abs(x) > 0.05 ? Math.sign(x) : windward;
