@@ -3,7 +3,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
@@ -27,7 +27,7 @@ import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incid
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink, poleMustCome } from '../ai/ai';
+import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
@@ -939,7 +939,9 @@ export class World {
       this.keepClearOfShips(b);
     }
     // your pole: out only on your call; your crew brings it in only when it must come in, and says why (ai.ts poleMustCome)
-    if (this.user.poleWant) { const why = poleMustCome(this.user); if (why) { this.user.poleWant = false; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
+    // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
+    const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
+    if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -1810,12 +1812,21 @@ export class World {
     return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 
+  /** Your call on the whisker pole (the band's Pole tab, O), answered by the crew: setting it, stowing it, or why not
+   * (ai.ts poleRefused). The race says so, not the page from its mirror, so the message is what the crew actually do. */
+  poleCall(want: boolean): void {
+    const u = this.user, why = want ? poleRefused(u) : null;
+    if (why) { this.emit({ type: 'toast', msg: `Crew: no pole now, ${why}.`, ms: 3000 }); return; }
+    if (want !== u.poleWant) this.emit({ type: 'toast', msg: want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib won't fill.` : `Crew: stowing the pole (about ${POLE.stow} s).`, ms: 3000 });
+    u.poleWant = want; u.poleMine = true;
+  }
+
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */
   setSail(sail: 'main' | 'jib', up: boolean): void {
     const u = this.user, r = u.rig ??= { main: 1, jib: 1, mainUp: true, jibUp: true };
     if (sail === 'main') r.mainUp = up; else r.jibUp = up;
-    if (!up && sail === 'jib') u.poleWant = false;
-    this.emit({ type: 'toast', msg: `${up ? 'Hoisting' : 'Striking'} the ${sail}.`, ms: 2000 });
+    const poleIn = !up && sail === 'jib' && u.poleWant; if (poleIn) u.poleWant = false;
+    this.emit({ type: 'toast', msg: `${up ? 'Hoisting' : 'Striking'} the ${sail}${poleIn ? ', the pole in first' : ''}.`, ms: 2000 });
   }
 
   /** A boat in her slip: made fast, she stays put; her crew can hoist or strike sail there. */
