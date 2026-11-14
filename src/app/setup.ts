@@ -332,6 +332,8 @@ function openSetupNow(): void {
   app.courseView.close(); app.navView.close(); if (app.w.running) app.send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = app.S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (app.S.mode === 'sail') app.setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { app.results.settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
+  // laid up for repairs after a wreck or damage (docs/WRECK-PROPOSAL.md): she can't be taken out until then
+  { const until = app.S.boat.laidUpUntil; if (until && until >= new Date().toISOString().slice(0, 10)) { toast(`${app.S.boat.name} is laid up for repairs until ${until}: choose another boat.`, 4000); return; } }
   app.nav.reset({ k: 'setup' }); // (the pause menu's and the results' Back to setup: the setup you sailed from)
   app.realRaceHolds();
   saveSettings(app.S);

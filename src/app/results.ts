@@ -5,6 +5,7 @@
 import { place } from '../sim/places';
 import { keepGhost, setupKey, trackOf } from '../replay/ghost';
 import { addLog, type LogEntry, type RaceSetup } from '../boat/logbook';
+import { saveSettings } from '../settings';
 import { slipById, slipPlace } from '../geo/marina';
 import { type BoatSpec } from '../boat/spec';
 import { tactics, type Tactics } from '../replay/tactics';
@@ -194,7 +195,7 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
   rows.forEach(b => {
     const spec = b.isUser ? app.S.boat : b.spec && app.S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
     const dsq = b.scoring === 'UFD' || b.scoring === 'BFD' || sc.get(b.id)?.code === 'DSQ';
-    const entry: LogEntry = { ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
+    const entry: LogEntry = { ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? hurtOf() : {}), ...(b.isUser ? { setup: raceSetup() } : {}),
       ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) };
     out.push(entry);
     // your run, kept as a ghost for this race if you save it (her own track from the race's, once a second)
@@ -203,13 +204,34 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
   });
   stage(out);
 }
+/** Wrecked and towed in (the wreck's choice, app.ts wreckAsk): this outing's log says so. */
+let towedIn: unknown = null;
+function towed(): void { towedIn = app.w; }
+/** What harm came to her this outing, for her logbook: wrecked (how, where; towed in), or the worst damage short of it. */
+function hurtOf(): Partial<LogEntry> {
+  const u = app.w.user, d = u.damage?.level;
+  if (u.wrecked) return { wreck: `${u.wrecked.how}, at ${u.wrecked.where}`, ...(towedIn === app.w ? { towed: true } : {}) };
+  return d === 'damage' || d === 'serious' ? { damage: d } : {};
+}
+/** Repairs (the owner's answers, WRECK-PROPOSAL section 7): wrecked, she's laid up for a few real days; damaged, a day
+ * (ESTIMATES: WRECK_DAYS, DAMAGE_DAYS). No money. Once per outing, whether or not it's kept in her logbook. */
+const WRECK_DAYS = 3, DAMAGE_DAYS = 1, laidUp = new WeakSet<object>();
+function layUp(): void {
+  const w = app.w; if (!w || laidUp.has(w)) return;
+  const h = hurtOf(), days = h.wreck ? WRECK_DAYS : h.damage ? DAMAGE_DAYS : 0; if (!days) return;
+  laidUp.add(w);
+  const until = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+  if (!app.S.boat.laidUpUntil || app.S.boat.laidUpUntil < until) app.S.boat.laidUpUntil = until;
+  saveSettings(app.S);
+}
 /** Leaving an outing (back to the start page, to setup, or starting another): log it if there's anything to log. */
 function logOuting(): void {
   if (!app.w || app.w.logged || app.S.mode === 'drill') return;
-  if (app.S.mode === 'sail' && app.w.freeSail && app.w.t >= 60) {
+  layUp();
+  if (app.S.mode === 'sail' && app.w.freeSail && (app.w.t >= 60 || app.w.user.wrecked)) {
     app.send({ k: 'shown', logged: true });
     const from = app.S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(app.S.boat.slip))})` : place(app.S.sailFrom)?.name ?? 'the Bay';
-    stage([{ ...outing(app.S.boat, true), kind: 'cruise', title: `From ${from}${app.w.dest ? ` to ${app.w.dest.name}` : ''}`, elapsed: Math.round(app.w.t), nm: app.w.sailedM / 1852, arrived: app.w.arrivedT != null }]);
+    stage([{ ...outing(app.S.boat, true), kind: 'cruise', title: `From ${from}${app.w.dest ? ` to ${app.w.dest.name}` : ''}`, elapsed: Math.round(app.w.t), nm: app.w.sailedM / 1852, arrived: app.w.arrivedT != null, ...hurtOf() }]);
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.cancelled) {
     // racing called off for the wind: no result, but the outing goes in her logbook
     app.send({ k: 'shown', logged: true });
@@ -221,7 +243,7 @@ function logOuting(): void {
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.t > 0 && app.w.userFinishT == null) {
     // you left the race before finishing: retired
     app.send({ k: 'shown', logged: true });
-    stage([{ ...outing(app.S.boat, true), kind: 'race', title: app.w.C.title, code: 'RET', of: app.w.boats.length, setup: raceSetup() }]);
+    stage([{ ...outing(app.S.boat, true), kind: 'race', title: app.w.C.title, code: 'RET', of: app.w.boats.length, setup: raceSetup(), ...hurtOf() }]);
     // (a season race left unfinished: RET in the series too, if it's saved)
     { const sr = app.seasonRaceOf(); app.pendingSeason = sr && pending ? { ...sr, at: pending[0].at } : null; }
   }
@@ -241,8 +263,8 @@ function settleLog(next: () => void): void {
   const mins = (s?: number) => s == null ? '' : `${Math.floor(s / 60)} min`;
   $('keepTitle').textContent = e.kind === 'race' ? 'Keep this race?' : 'Keep this cruise?';
   $('keepWhat').textContent = e.kind === 'race'
-    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing canceled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
-    : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}. Saved, it goes in her logbook.`;
+    ? `${e.title}: ${e.wreck ? `wrecked (${e.wreck})${e.towed ? ', towed in' : ''}` : e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing canceled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
+    : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}${e.wreck ? `, wrecked (${e.wreck})${e.towed ? ', towed in' : ''}` : e.damage ? `, ${e.damage} damage` : ''}. Saved, it goes in her logbook.`;
   $('keepAsk').hidden = false;
   const done = (keep: boolean) => {
     $('keepAsk').hidden = true; pending = null;
@@ -353,5 +375,5 @@ function showResults(): void {
 }
 
 
-return { ordinal, raceSetup, scores, settleLog, showResults };
+return { ordinal, raceSetup, scores, settleLog, showResults, towed };
 }

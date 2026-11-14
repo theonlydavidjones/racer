@@ -275,7 +275,22 @@ function handle(e: SimEvent): void {
     case 'horn': if (e.delayMs) setTimeout(() => horn(e.dur), e.delayMs); else horn(e.dur); break;
     case 'incident': showIncident(e.a, e.b, e.incident, { frames: e.frames, focus: [e.a.id, e.b.id], wind: e.wind, kind: 'incident' }); break;
     case 'finished': break;
+    case 'wrecked': wreckAsk(e.how, e.where); break;
   }
+}
+
+/**
+ * Your boat wrecked (docs/WRECK-PROPOSAL.md, the owner's answers): one short statement of how and where, and the choice:
+ * go ashore (the outing ends, logged), call a tow (ends it "towed in"), or carry on, marked wrecked.
+ */
+function wreckAsk(how: string, where: string): void {
+  send({ k: 'pause', on: true }); setControlsIdle();
+  $('wreckWhat').textContent = `${how[0].toUpperCase()}${how.slice(1)}, at ${where}.`;
+  $('wreckAsk').hidden = false;
+  const close = () => { $('wreckAsk').hidden = true; };
+  $('bWreckAshore').onclick = () => { close(); openHome(); };
+  $('bWreckTow').onclick = () => { close(); results.towed(); openHome(); };
+  $('bWreckOn').onclick = () => { close(); send({ k: 'carryOn' }); send({ k: 'pause', on: false }); toast('Carrying on, marked wrecked.', 2500); };
 }
 
 let lastClip: ReplayClip | null = null;

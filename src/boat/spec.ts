@@ -13,6 +13,8 @@ export type SailAge = 'new' | 'mid' | 'old';
 
 export interface BoatSpec {
   id: string; // stable, for your list of boats
+  /** Laid up for repairs until this day (YYYY-MM-DD, your clock), after a wreck or damage (docs/WRECK-PROPOSAL.md). */
+  laidUpUntil?: string;
   name: string; // on her quarters
   hull: { material: HullMaterial; upper: string; lower: string; stripe: string }; // colours as hex; stripe '' = none
   deck: string; // a hex colour, or 'teak-silver' / 'teak-polished' (laid teak: wooden boats, and glassfibre ones refitted)
