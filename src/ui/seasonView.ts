@@ -1,5 +1,5 @@
 import type { LiveBoat, SeasonResult, Series } from '../club/season';
-import { seasonHtml } from './season';
+import { standingsTable } from './season';
 import { morph } from './morph';
 
 /**
@@ -40,19 +40,21 @@ export function paintSeasonView(d: SeasonViewData): void {
     const sub = r.abandoned ? 'Abandoned' : places[r.no] != null ? ord(places[r.no]) : r.no === next ? 'Next' : '';
     return `<button type="button" class="sv-day ${cls}" data-sv-race="${r.no}"${r.abandoned ? ' disabled' : ''} title="${r.abandoned ? 'Abandoned: every boat scored ABN' : places[r.no] != null ? 'Sail it again: your saved result is replaced' : 'Sail it: the day\'s real wind and tide'}">${dateTile(r.date)}<span class="t-text"><span class="sv-r">RACE ${r.no}</span><span class="sv-res">${sub || '&nbsp;'}</span></span></button>`;
   });
-  for (let no = series.races.length + 1; no <= series.scheduled; no++)
-    tiles.push(`<div class="sv-day tbc" title="Not published yet"><span class="t-date"><b>–</b></span><span class="t-text"><span class="sv-r">RACE ${no}</span><span class="sv-res">&nbsp;</span></span></div>`);
+  // (the race days still to come: announced, dashed, sailed once the club publishes the race; club/season.ts calendar)
+  for (let no = series.races.length + 1; no <= series.scheduled; no++) {
+    const c = series.calendar.find(x => x.no === no);
+    tiles.push(`<div class="sv-day tbc" title="To come: sailed here once its results are published">${c ? dateTile(c.date) : '<span class="t-date"><b>–</b></span>'}<span class="t-text"><span class="sv-r">RACE ${no}</span><span class="sv-res">&nbsp;</span></span></div>`);
+  }
   morph($('svCal'), tiles.join(''));
   $('svCal').style.gridTemplateColumns = `repeat(${Math.max(5, tiles.length)}, minmax(0, 1fr))`;
   const r = series.races.find(x => x.no === chosen);
   $('svNextH').textContent = r ? `Race ${r.no} · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : 'Every race sailed';
   const go = $('bSailSeason') as HTMLButtonElement; go.hidden = !r; go.textContent = r ? `Sail Race ${r.no}` : '';
   $('svDock').hidden = !r;
-  // the standings: the Yacht Club's table, without its own heading, race days and notes (they're above, here)
+  // the standings: the Yacht Club's own table (ui/season.ts)
   const sailedN = Object.keys(places).length;
   $('svStandH').textContent = `Standings · after ${sailedN} of ${series.scheduled}`;
-  const t = $('svTable'); t.innerHTML = seasonHtml(series, res, [series], d.live);
-  t.querySelectorAll('.season .shead, .season .sdays, .season .sfoot').forEach(e => e.remove());
+  $('svTable').innerHTML = `<div class="season">${standingsTable(series, res, d.live)}</div>`;
 }
 /** The Race page's Season card: the club's burgee, the next race's day, and where you stand. */
 export function seasonCardHtml(d: { series: Series; res: Record<number, SeasonResult>; burgee: string; place: number | null }): string {
