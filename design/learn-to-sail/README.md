@@ -44,7 +44,7 @@ Nothing new on screen. The marks go on what's already there:
    - The target is a teal band on the heading tape: the headings that put her on that point, from the real wind, ◆ at its
      middle.
    - The windex's point word is amber while she's off it.
-3. **Holding it** (`3-hold.jpg`). In the band, the line says what to hold ("hold it: the jib's luff telltales streaming, windward and leeward"). The fill
+3. **Holding it** (`3-hold.jpg`). In the band, the line says what to hold ("hold it, jib luff telltales streaming"). The fill
    runs along its foot over the 15 s, and the windex word turns green.
 4. **Stuck** (`4-stuck.jpg`). After 20 s with no progress, the help:
    - a dashed teal way from her heading to the band on the tape;

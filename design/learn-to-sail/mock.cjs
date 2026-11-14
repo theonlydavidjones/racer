@@ -85,7 +85,7 @@ const TEAL = '#2fd4c4', AMBER = '#ffb35c', GREEN = '#3fd197';
   // 3. in the band, holding: the fill along the line's foot, a ring round the windex filling with it
   s = await sail(25, 44);
   b = bandFor(s, 38, 49);
-  await draw({ line: 'Close-hauled: hold it, both telltales streaming', p: .6, dots: { done: 0 }, tape: [38, 49], band: null, inBand: true }); await page.screenshot({ path: out + '/3-hold.jpg', quality: 85 });
+  await draw({ line: 'Close-hauled: hold it, jib luff telltales streaming', p: .6, dots: { done: 0 }, tape: [38, 49], band: null, inBand: true }); await page.screenshot({ path: out + '/3-hold.jpg', quality: 85 });
   // 4. stuck (20 s and no nearer): the way to the band dashed on the windex, the tiller pilot's head ringed
   s = await sail(14, 82);
   b = bandFor(s, 38, 49);
