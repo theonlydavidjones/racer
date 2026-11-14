@@ -184,7 +184,7 @@ export class CourseView {
     ctx.fillStyle = '#0c2534'; ctx.fillRect(0, 0, cw, ch);
     drawPuffs(ctx, tf, w.puffs.cells, w.puffs.dir, w.puffs.gustiness);
     drawLand(ctx, tf);
-    { const half = Math.max(cw, ch) / this.view.scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentAt(p), this.view.cx, this.view.cy, half, Math.max(80, half / 6), 14, onLand); }
+    { const half = Math.max(cw, ch) / this.view.scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentDrawn(p), this.view.cx, this.view.cy, half, Math.max(80, half / 6), 14, onLand); }
 
     // start/finish line
     const pin = S(C.pin), com = S(C.committee), lc = S(C.center);

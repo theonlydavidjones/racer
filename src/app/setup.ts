@@ -4,7 +4,7 @@
  */
 import { PREP_MEANING } from '../sim/signals';
 import { describeSea } from '../environment/sea';
-import { CURRENTS } from '../environment/current';
+import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
@@ -66,6 +66,7 @@ function prepare(seed = randomSeed()): void {
       : new LocalHost(facts, app.SIM_GUARD);
   }
   app.w = app.host.view; app.shownDest = app.w.dest; app.speedSet = app.w.speed; app.drillShown = false; app.resultsShown = false;
+  warmBasinsIdle(() => app.w);
   document.documentElement.dataset.sim = app.host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   app.unshown = true; document.documentElement.dataset.prepared = String(++app.prepared);
 }
@@ -383,4 +384,17 @@ $('bCondClose').onclick = () => {
 };
 
 return { beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, tideBox, wake };
+}
+
+/**
+ * The page's own copy of the harbors' still-water grids (environment/current.ts), worked on in its idle time round the
+ * boats, so the chart and the water have them before they're looked at, and a race in the page's own thread (?inproc,
+ * or a worker that wouldn't start) never stops to build one. Started once; it naps a second when there's nothing near.
+ */
+let basinsWarming = false;
+function warmBasinsIdle(view: () => { boats: readonly { x: number; y: number }[] } | undefined): void {
+  if (basinsWarming) return; basinsWarming = true;
+  const idle = (cb: (ms: number) => void) => typeof requestIdleCallback === 'function' ? requestIdleCallback(d => cb(Math.max(0, d.timeRemaining() - 1)), { timeout: 1000 }) : setTimeout(() => cb(4), 50);
+  const tick = (ms: number) => { const w = view(), more = !!w && warmBasins(w.boats, 3000, ms); if (more) idle(tick); else setTimeout(() => idle(tick), 1000); };
+  idle(tick);
 }
