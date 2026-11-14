@@ -37,13 +37,21 @@ const ZS = Array.from({ length: 12 }, (_, i) => RIG_LO + (i + 0.5) * (RIG_HI - R
 /** Perera's K for a fence h high over open water (z0 = 0.0002 m). */
 const kFence = (h: number) => 2 * 0.4 * 0.4 / Math.log(h / 0.0002);
 
-/** The rig-averaged deficit x m behind a solid fence h high (Perera, above). */
+/** The rig-averaged deficit x m behind a solid fence h high (Perera, above): read off a table for the walls' own height
+ * (every boat asks for every wall piece near her, every step), worked out exactly for any other. */
 export function fenceDeficit(x: number, h: number): number {
+  if (h !== WALL_H) return fenceDeficitExact(x, h);
+  const f = Math.max(0, x) / FENCE_DX, i = Math.floor(f);
+  if (i >= FENCE_TAB.length - 1) return fenceDeficitExact(x, h);
+  return FENCE_TAB[i] + (FENCE_TAB[i + 1] - FENCE_TAB[i]) * (f - i);
+}
+function fenceDeficitExact(x: number, h: number): number {
   const xx = Math.max(5 * h, x), s = Math.pow(kFence(h) * xx / h, -0.47);
   let d = 0;
   for (let i = 0; i < ZS.length; i++) { const eta = ZS[i] / h * s; d += WS[i] * 9.75 * (h / xx) * eta * Math.exp(-0.67 * Math.pow(eta, 1.5)); }
   return Math.min(0.7, d / WSUM);
 }
+const FENCE_DX = 0.5, FENCE_TAB = Float64Array.from({ length: Math.ceil(80 * WALL_H / FENCE_DX) + 2 }, (_, i) => fenceDeficitExact(i * FENCE_DX, WALL_H));
 /** The rig-averaged deficit x m behind a step h high (above). */
 export function stepDeficit(x: number, h: number): number {
   if (x <= 0) return 0;
@@ -79,6 +87,21 @@ const GROUPS = (() => {
   for (const B of BODIES) { const k = B.kind === 'shed' ? 'sheds' : `${Math.round(B.box.x0 / 1500)},${Math.round(B.box.y0 / 1500)}`; (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(B); }
   return [...byKey.values()].map(bs => ({ bodies: bs, box: bs.reduce((a, b) => ({ x0: Math.min(a.x0, b.box.x0), x1: Math.max(a.x1, b.box.x1), y0: Math.min(a.y0, b.box.y0), y1: Math.max(a.y1, b.box.y1) }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity }) }));
 })();
+/** The bodies whose reach overlaps each 50 m cell, filed the first time a cell is asked about (a boat's wind tests a
+ * handful, not every wall piece of the harbor she's near). */
+const CELL_M = 50, CELLS = new Map<number, Body[]>(), NONE: Body[] = [];
+function cellBodies(p: Vec): Body[] {
+  const i = Math.floor(p.x / CELL_M), j = Math.floor(p.y / CELL_M), key = i * 1_000_003 + j;
+  let l = CELLS.get(key);
+  if (!l) {
+    const x0 = i * CELL_M, y0 = j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M; l = [];
+    for (const G of GROUPS) { if (G.box.x1 < x0 || G.box.x0 > x1 || G.box.y1 < y0 || G.box.y0 > y1) continue;
+      for (const B of G.bodies) if (!(B.box.x1 < x0 || B.box.x0 > x1 || B.box.y1 < y0 || B.box.y0 > y1)) l.push(B); }
+    if (!l.length) l = NONE;
+    CELLS.set(key, l);
+  }
+  return l;
+}
 /** Each breakwater's width across the wind, by wind direction (a tenth of a degree): it's asked for every piece, every boat. */
 const WALL_W = new Map<Vec[], Map<number, number>>();
 function wallWidth(wall: Vec[], from: number): number {
@@ -142,9 +165,10 @@ function shedFace(pts: Vec[], p: Vec, e: Vec): { x: number; miss: number } | nul
 /** The deficit at p (a fraction of the wind, over the rig) behind the walls and sheds, the wind from `from`: the strongest one's. */
 export function harborLeeDeficit(p: Vec, from: number): number {
   if (p.x < BOX.x0 || p.x > BOX.x1 || p.y < BOX.y0 || p.y > BOX.y1) return 0;
+  const list = cellBodies(p); if (!list.length) return 0;
   const e = V(from + 180); let best = 0;
-  for (const G of GROUPS) { if (p.x < G.box.x0 || p.x > G.box.x1 || p.y < G.box.y0 || p.y > G.box.y1) continue;
-  for (const B of G.bodies) {
+  {
+  for (const B of list) {
     if (p.x < B.box.x0 || p.x > B.box.x1 || p.y < B.box.y0 || p.y > B.box.y1) continue;
     let d: number;
     if (B.kind === 'shed') {
