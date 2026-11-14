@@ -777,7 +777,8 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (not going in under the side deck: that's below the coaming, not over it)
       if (far && !inTo) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
-      hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
+      // (the rise from where it was this frame, at a hand's pace in all: not that on top of the move toward its place)
+      hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step || sw) {
       // walking or crawling (and a step under way is finished, whatever comes next): each foot stays planted until it's left behind, then swings (lifted) to a new place
@@ -817,10 +818,11 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         let top = 0; for (let q = 1; q < 5; q++) { _u.copy(foot).lerp(want.feet[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(foot.x, foot.z), ground(want.feet[i].x, want.feet[i].z)) + 0.03) clear = top + 0.06;
       }
-      foot.y = Math.max(foot.y, ground(foot.x, foot.z) + 0.06, Math.min(clear, foot.y + LIMB_SPEED * dt));
+      foot.y = Math.max(foot.y, ground(foot.x, foot.z) + 0.06, Math.min(clear, fy + LIMB_SPEED * dt)); // (from where it was this frame, as a hand's)
       // (while the hips are still out on the side deck, the knees are over the coaming: the feet hang from them, not
       // down on the bench, which would drag the thighs through it)
-      if (c.hip.z > COCK0 && c.hip.z < COCK1 && Math.abs(c.hip.x) > chz(c.hip.z) - 0.05) foot.y = Math.max(foot.y, deckY(uAtZ(c.hip.z), chz(c.hip.z)) + coamH(c.hip.z) + 0.04 - BONE.shin * f.scale);
+      // (raised to it at a foot's pace: set there, the feet jumped 0.28 m off the sole in a frame as the hips came to the deck's edge)
+      if (c.hip.z > COCK0 && c.hip.z < COCK1 && Math.abs(c.hip.x) > chz(c.hip.z) - 0.05) foot.y = Math.max(foot.y, Math.min(deckY(uAtZ(c.hip.z), chz(c.hip.z)) + coamH(c.hip.z) + 0.04 - BONE.shin * f.scale, foot.y + LIMB_SPEED * dt));
     }
   }
   // (the hips stay a shin's length or so above the feet: someone stepping up onto the deck rises with the step, they
@@ -829,7 +831,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   // (walking along the side deck, from where the feet are on average, so a foot lifted mid-step doesn't hoist the hips:
   // the weight stays low)
   const lowest = want.deck ? (c.feet[0].y + c.feet[1].y) / 2 + 0.26 * f.scale : Math.max(c.feet[0].y, c.feet[1].y) + 0.32 * f.scale;
-  if (want.step && c.hip.y < lowest) { c.hip.y = Math.min(lowest, c.hip.y + 1.5 * dt); if (v.y < 0) v.y = 0; } // (rising with the step, at a person's pace)
+  // (rising with the step, at a person's pace: 1.5 m/s in all from where they were this frame, not that on top of the
+  // spring's rise and the push off the seat, which came to 3.7 m/s getting up from the winch)
+  if (want.step && c.hip.y < lowest) { c.hip.y = Math.min(lowest, Math.max(c.hip.y, y0 + 1.5 * dt)); if (v.y < 0) v.y = 0; }
   c.look.lerp(want.look, a);
   // (the knees turn to where the pose points them over a tenth of a second, and back to forward the same way; but at
   // once as a foot steps down inside the coaming, so that knee drops in with it rather than dragging across the top;
