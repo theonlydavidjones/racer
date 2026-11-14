@@ -3,7 +3,7 @@ import { RUDDER_STALL, helmForMoment, hullSide, hullYawM, rudderCoef, steadyTurn
 import { HOVE } from '../src/boat/physics';
 import { RUDDER } from '../src/boat/balance';
 import { HULL } from '../src/boat/dynamics';
-import { D2R } from '../src/core/math';
+import { D2R, wrap } from '../src/core/math';
 import { testBoat, sail, kt } from './helpers/testBoat';
 import type { Boat } from '../src/boat/boat';
 it('closed form matches the strips', () => {
@@ -73,4 +73,23 @@ it('left alone under bare poles she swings to lie with the wind near her beam, f
     expect(off).toBeGreaterThan(70); expect(off).toBeLessThan(105);
     expect(Math.abs(b.turnRate ?? 0)).toBeLessThan(0.3); // (settled)
   }
+});
+
+it('aground with no way on, her crew gets her head round and off: backing the jib and sculling to get clear (RRS 42.3(h); Skipper Model, 14 Nov 2026)', () => {
+  // (Skipper Model's case: an AI boat that touched a jetty on a reach, the wind abeam, wanting to bear away along it.
+  // Stopped dead each time she drives in, she has no water over the rudder, and her sails' own weather helm rounds her
+  // up at the jetty again. Held stopped here, as the jetty holds her)
+  const turned = (aground: boolean) => {
+    const b = testBoat({ heading: 10, kt: 0, windFrom: 283, windKt: 11 }); b.isUser = false; b.desired = 75;
+    sail(b, 15, t => { b.v = 0; b.astern = 0; b.sway = 0; if (aground) b.groundT = t; });
+    return wrap(b.h - 10);
+  };
+  // (left to her rudder she gets nowhere near it, or goes the other way)
+  expect(turned(false)).toBeLessThan(25);
+  // (her crew backing the jib: round at the sculled turn's pace, 4.4°/s, and so on her way inside a quarter of a minute)
+  expect(turned(true)).toBeGreaterThan(35); expect(turned(true)).toBeLessThan(66); // (15 s at 4.4°/s is 66°, less her getting going)
+  // (the leave ends a quarter of a minute after she last touched: no more of it once she's been off that long)
+  const b = testBoat({ heading: 10, kt: 0, windFrom: 283, windKt: 11 }); b.isUser = false; b.desired = 190; b.groundT = -20;
+  sail(b, 15, () => { b.v = 0; b.astern = 0; b.sway = 0; });
+  expect(wrap(b.h - 10)).toBeLessThan(25);
 });

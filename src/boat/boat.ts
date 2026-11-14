@@ -188,6 +188,9 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** When she last touched the shore, a dock or a pier (race time, s): for some seconds after, her crew may get her
+   * off by any means, sculling included, on any point of sail (physics.ts; RRS 42.3(h)). */
+  groundT?: number;
   /** What turns her by itself, N·m, + to starboard: her sails' moment about the keel and the wind's on her topsides, rig
    * and crew, from the last step's forces (physics.ts; turning.ts takes it with the rudder's and the hull's). */
   turnM?: number;

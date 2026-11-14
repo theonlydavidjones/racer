@@ -153,9 +153,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (deg/s; going astern it works backwards, and less well)
   const u0 = b.v - astern, d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.turnRate ?? 0) * D2R;
   const flow = steadyTurnRate(Math.abs(u0)) / D2R * (u0 < 0 ? 0.7 : 1);
-  const aboveCH = Math.abs(wrap(ww.from - b.h)) < beatAngle(ww.kt) - 2;
-  if (!aboveCH) b.scullDir = undefined; // (close-hauled or below: the sculling's done)
-  const scullOK = (dir: number) => aboveCH && !((b.jibBacked ?? 0) > 0) && (b.scullDir == null || b.scullDir === dir);
+  const beat = beatAngle(ww.kt); // (her beat angle in this wind: asked once a step)
+  const aboveCH = Math.abs(wrap(ww.from - b.h)) < beat - 2;
+  // (aground, or just off it: RRS 42.3(h), "to get clear after grounding or colliding with a vessel or object, a boat may
+  // use force applied by her crew ... and any equipment other than a propulsion engine". With no way on the rudder does
+  // nothing, so for a quarter of a minute after she touches she may be sculled round on any point of sail)
+  const freeing = b.groundT != null && t - b.groundT < GROUND_FREE && t >= b.groundT;
+  if (!aboveCH && !freeing) b.scullDir = undefined; // (close-hauled or below: the sculling's done)
+  const scullOK = (dir: number) => (aboveCH || freeing) && !((b.jibBacked ?? 0) > 0) && (b.scullDir == null || b.scullDir === dir);
   /** The most she can turn this way (+ to starboard), deg/s. */
   const rateFor = (dir: number) => dir && scullOK(dir) ? Math.max(flow, scullTurnRate()) : flow;
   // she answers the helm over a moment, not at once: her yaw inertia against the water's damping (yawLag); a helmsman
@@ -224,6 +229,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     const want = clamp(lead * 1.6, -lim, lim);
     delta = helmFor(want); // the AI holds whatever helm the boat needs
     if (Math.abs(want) > flow + 1e-6) scull = Math.sign(want);
+    // (aground or just off it, with no way on: her sails' own weather helm rounds her back up at what she hit, and
+    // neither the rudder nor sculling can hold her off it. Her crew backs the jib and lets the main fly to pay her head
+    // off, as a crew does: turned at least at the sculled turn's pace toward where she wants to go. The backed jib's
+    // moment isn't worked out, as it isn't for the penalty turns above)
+    if (freeing && Math.abs(err) > 10 && Math.abs(u0) < 1) floor = Math.sign(err) * scullTurnRate();
   }
   // the blade follows the tiller at a hand's pace (turning.ts SCULL.maxSwing), and swung through the water it pushes
   // on her stern by its own motion: nothing to speak of with way on, but with none it's how she's sculled. It is what
@@ -239,7 +249,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   delta = clamp(delta, deltaWas - swingMax * back, deltaWas + swingMax * back);
   let mScull = scull ? toWind * scull * scullMoment() : 0;
   if (scull && b.penalty <= 0) b.scullDir = Math.sign(scull);
-  if (b.isUser && !scull && b.turnTarget == null && aboveCH && !((b.jibBacked ?? 0) > 0)) {
+  if (b.isUser && !scull && b.turnTarget == null && (aboveCH || freeing) && !((b.jibBacked ?? 0) > 0)) {
     // (every swing pushes, the return stroke too: an even wag nets nothing. Which way she's being sculled is the way
     // the pushes net out over a few strokes (b.scullMean, their mean moment, N·m + to starboard: a wag's ripple in it is
     // a quarter of a stroke's net). From then a push the other way is taken only as far as the pushes her own way have
@@ -279,7 +289,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
   if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); } // (head to wind: a tack; a gybe passes the wind astern)
-  if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
+  if (b.tacking && twa + leeSlip(b) >= Math.min(40, beat - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
   crewPole(b, dt, emit);
   const plan = sailPlan(b);
@@ -393,7 +403,6 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // under bare poles she still drifts off downwind on the windage of her hull and rig (about a tenth of the wind)
   if (partUp) target = Math.max(target, 0.1 * ww.kt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)));
   if (b.penalty > 0) target *= 0.7;
-  const beat = beatAngle(ww.kt);
   // (the rudder's drag and the turn's: turnDrag, above)
   const helmDrag = turnDrag;
   // the rig sweeping through the air as she rolls (a roll tack's flatten, a crew throwing their weight out): the extra
@@ -506,6 +515,9 @@ export const HOVE = {
  * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
  * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
  */
+/** How long after touching the shore her crew may still be getting her off (s): the sculling gate, above. An estimate. */
+const GROUND_FREE = 15;
+let cdIdealHelm = 0;
 export function turnDragForce(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
   const r = Math.abs(rate) * D2R, u = Math.max(0.3, v);
   if (r < 1e-4) return 0;
@@ -514,7 +526,7 @@ export function turnDragForce(rate: number, v: number, h: number, windFrom: numb
   // (turning.ts helmForMoment), in the water meeting it (her way and her stern's swing: turning.ts steadyTurnRate's)
   const vy = HOVE.rudderFlow * r * RUDDER.arm, q = 0.5 * 1025 * (u * u + vy * vy) * RUDDER.area, toWind = Math.sign(rate) * Math.sign(wrap(windFrom - h) || 1);
   const lim = RUDDER_STALL - 1e-6, aoa = clamp(-hullYawM(u, 0, r) / (q * RUDDER.slope * RUDDER.arm) - toWind * clamp(helmNeed, -12, 12) * D2R, -lim, lim);
-  return q * Math.max(0, rudderCoef(aoa).cd - rudderCoef(IDEAL_HELM * D2R).cd) + turnDragN(r, u);
+  return q * Math.max(0, rudderCoef(aoa).cd - (cdIdealHelm ||= rudderCoef(IDEAL_HELM * D2R).cd)) + turnDragN(r, u);
 }
 export const turnBleed = (rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number => turnDragForce(rate, v, h, windFrom, helmNeed) / (HANDLING.mass * Math.max(0.3, v));
 
@@ -887,11 +899,11 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
   else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
     const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
-    b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
+    b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0; b.groundT = t;
     bump(pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
   } else if (ast > 0 && onLand(stern(b))) {
     const hit = stern(b), pier = pierNear(hit, 6);
-    b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
+    b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0; b.groundT = t;
     bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
   }
   // set sideways onto something (the wind on her bare rig across her, at a dock, or her leeway): her side at the beam, amidships
@@ -904,6 +916,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
     if (hit) {
       const pier = pierNear(hit, 6);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
+      if (!hitsHarbor(hit)) b.groundT = t; // (the shore or a pier, not her own dock's fenders)
       bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
     }
   }
