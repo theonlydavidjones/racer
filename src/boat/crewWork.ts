@@ -243,9 +243,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a new point of sail since this line was last set, more than 20° of the wind's angle: rounding a mark, bearing
       // away, coming up: the trim wanted is new, so it's seen to now, not after the waits)
       const newCourse = Math.abs((b.twa ?? 0) - (c.lineTwa?.[k] ?? -999)) > 20;
-      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT));
-      // (a walk for a real change: a new point of sail, a new breeze, or a line they've not set yet)
+      // (a walk for a real change: a new point of sail, a new breeze (LINE_WIND), or a line they've not set yet. Urgent too:
+      // the wish over the gust-lull cycle well off counts only with a new breeze, as a puff's run of a minute moved it)
       const newWind = Math.abs(windNow(b) - (c.lineTws?.[k] ?? -999)) >= LINE_WIND;
+      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (newWind && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || (!newCourse && !newWind))) continue;
       urgentTo = urgent && walk;
       if (!walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
