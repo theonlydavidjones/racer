@@ -13,12 +13,12 @@ import { onLand, wharfNearest } from '../src/geo/shore';
 // them away from where she starts and finishes: half her 7.6 m length and a few metres; the route keeps 10 m). No step
 // of the race takes long (the route is worked out now and then, not every step), and she doesn't tack and tack again.
 const S = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'flat', ...o });
-const PIER39 = LL(37.8105, -122.4092), SAUSALITO = LL(37.8550, -122.4760), BASIN = LL(37.8075, -122.4250), WEST = LL(37.8110, -122.4330), EAST = LL(37.8140, -122.4120), NORTH = LL(37.8140, -122.4250);
+const PIER39 = LL(37.8105, -122.4092), NW = LL(37.8250, -122.4450), BASIN = LL(37.8075, -122.4250), WEST = LL(37.8110, -122.4330), EAST = LL(37.8140, -122.4120), NORTH = LL(37.8140, -122.4250);
 const ROUTES: [string, typeof BASIN, typeof BASIN][] = [
   ['into the basin from the west', WEST, BASIN], ['into the basin from the east', EAST, BASIN],
   ['out of the basin to the west', BASIN, WEST], ['out of the basin to the north', BASIN, NORTH],
   ['past the pier, west to east', WEST, EAST], ['past the pier, east to west (a beat)', EAST, WEST],
-  ['out of the basin, northwest toward Sausalito', BASIN, SAUSALITO], ['out of the Pier 39 marina to the west', PIER39, WEST]];
+  ['out of the basin, northwest toward Sausalito', BASIN, NW], ['out of the Pier 39 marina to the west', PIER39, WEST]];
 describe('the navigator round Aquatic Park', () => {
   for (const from of [270, 300]) for (const [name, a, b] of ROUTES) it(`${name}, wind from ${from}°`, () => {
     const w = new World(COURSES[0], S({ windDir: from }), 4, { freeSail: true }), u = w.user;

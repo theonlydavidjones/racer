@@ -136,23 +136,29 @@ function clearLine(a: Vec, b: Vec, side: number): boolean {
 /**
  * The turn Nav steers for: the direct way while it's clear (20 m either side) as far as PLAN_AHEAD; otherwise the
  * passage planner's route (sim/routing.ts routeAround, which threads the Wharf's piers keeping 10 m off them), kept and
- * followed turn by turn: on to the next turn once she's reached this one or can see the next clear, worked out again
- * every REPLAN seconds, for a new destination, or when the turn she's on goes out of sight. Null: steer for `dest`.
+ * followed turn by turn: on to the next turn once she can see it clear (or she's at this one), worked out again
+ * every REPLAN seconds, for a new destination, or when the turn she's on goes out of sight. 'clear': steer for `dest`;
+ * 'none': land's in the way and there's no route round it.
  */
-function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | null {
+function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'none' {
   const L = Math.hypot(dest.x - b.x, dest.y - b.y), k = Math.min(1, PLAN_AHEAD / Math.max(L, 1));
   const ahead = { x: b.x + (dest.x - b.x) * k, y: b.y + (dest.y - b.y) * k };
-  if (clearLine(b, ahead, 20)) { p.route = null; return null; }
+  // (with a route in hand, it's kept to the end: the direct line flickering clear and not at a gap's mouth would drop it
+  // and plan it again every step)
+  if (!p.route && clearLine(b, ahead, 20)) return 'clear';
   const moved = !p.routeTo || Math.hypot(p.routeTo.x - dest.x, p.routeTo.y - dest.y) > 1;
   const lost = !!p.route && landAlong(b, p.route[p.ri]) < Infinity;
   if (!p.route || moved || lost || t - p.routeT > REPLAN) {
     const r = routeAround(b, dest, 30);
     p.route = r.length > 2 ? r : null; p.ri = 1; p.routeT = t; p.routeTo = { ...dest };
-    if (!p.route) return null;
+    if (!p.route) return clearLine(b, ahead, 20) || landAlong(b, dest) === Infinity ? 'clear' : 'none';
   }
   const r = p.route;
-  while (p.ri < r.length - 1 && (Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 25 || clearLine(b, r[p.ri + 1], 12))) p.ri++;
-  return p.ri >= r.length - 1 ? null : r[p.ri];
+  // on to the next turn when the way to it is clear of land 12 m either side, so she never cuts the corner of a pier
+  // head turning into a gap; or at the turn itself (8 m), so she can't circle it
+  while (p.ri < r.length - 1 && (clearLine(b, r[p.ri + 1], 12) || Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 8)) p.ri++;
+  if (p.ri >= r.length - 1) { p.route = null; return 'clear'; } // (on the last leg: straight for it)
+  return r[p.ri];
 }
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
 function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
@@ -165,10 +171,12 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   // entrance), steer for the route's next turn, upwind or down, not just the nearest clear heading: a heading search
   // runs her down onto the outside of Aquatic Park's Municipal Pier and holds her there (the owner: "auto nav failed
   // to navigate around the seawall"). The route is kept and followed turn by turn (followRoute).
-  p.wp = followRoute(b, p, dest, t);
+  const way = followRoute(b, p, dest, t); p.wp = way === 'clear' || way === 'none' ? null : way;
   let P = p.wp ?? dest;
   const bP0 = brg(P.x - b.x, P.y - b.y);
-  if (!p.wp && Math.abs(wrap(from - bP0)) > 50) { // reaching or running with no route: round any land in the way
+  // (the old heading search only where land's in the way and the planner found no way round: where the planner says the
+  // way's clear, it is, and the search's wider berth would turn her off it, into the wind at a basin's entrance)
+  if (way === 'none' && Math.abs(wrap(from - bP0)) > 50) { // reaching or running with no route: round any land in the way
     if (t - p.detourT > 2) { p.detour = detour(b, P); p.detourT = t; }
     if (p.detour) P = p.detour;
   } else p.detour = null;
