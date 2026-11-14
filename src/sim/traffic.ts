@@ -106,3 +106,52 @@ export function vesselHull(v: Vessel): { a: Vec; b: Vec; r: number } {
   const ty = VESSEL[v.kind], u = { x: Math.sin(v.h * D2R), y: Math.cos(v.h * D2R) };
   return { a: { x: v.x + u.x * ty.len / 2, y: v.y + u.y * ty.len / 2 }, b: { x: v.x - u.x * ty.len / 2, y: v.y - u.y * ty.len / 2 }, r: ty.beam / 2 };
 }
+
+/**
+ * A ship's way: the water she needs clear, in her own frame. From her stern (nothing abaft it: a boat astern is no
+ * hindrance to her) to WAY_AHEAD of her lengths ahead of her bow, and her half-beam and WAY_ABEAM m either side. Long
+ * ahead and narrow abeam, as a ship that can't stop or turn sees it. The numbers are modeling choices: Rule 8(f) asks
+ * for "early action to allow sufficient sea room" with no distance, and no Bay SI or VTS text gives one; the only
+ * figure in a racing SI found, "do not cross the bow of any ship in the channel within two of her ship lengths", is San
+ * Diego's (Cortez Racing Association 2020 SIs, 1.2). docs/SHIP-PROTESTS.md.
+ */
+export const WAY_AHEAD = 2, WAY_ABEAM = 50;
+/** Only a ship in the deep-water channel is one "that can safely navigate only within a narrow channel or fairway"
+ * (Inland Rule 9(b)): the container ship and the tanker. The ferries, the tour boats and the Coast Guard boat are
+ * power-driven vessels with room to maneuver (Rule 18(a)): no Rule 9 protest over them. */
+export const channelBound = (v: Vessel): boolean => SERVICES[v.id]?.route === 'channel';
+
+/** A point in a ship's frame: how far ahead of her middle (along) and to her starboard (lat), m. */
+export function shipFrame(v: Vessel, x: number, y: number): { along: number; lat: number } {
+  const ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R), rx = x - v.x, ry = y - v.y;
+  return { along: rx * ux + ry * uy, lat: rx * uy - ry * ux };
+}
+
+/**
+ * When a boat at (x, y) moving at (vx, vy) over the ground first comes into the ship's way in the next `T` s, as both
+ * hold their course and speed (0 if she's in it now), or null if she doesn't. `extra` widens the way all round, m.
+ */
+export function entersWay(v: Vessel, x: number, y: number, vx: number, vy: number, T: number, extra = 0): number | null {
+  const ty = VESSEL[v.kind], ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R), p = shipFrame(v, x, y);
+  // her motion relative to the ship's, in the ship's frame
+  const wx = vx - ux * v.v, wy = vy - uy * v.v, da = wx * ux + wy * uy, dl = wx * uy - wy * ux;
+  const a0 = -ty.len / 2 - extra, a1 = ty.len / 2 + WAY_AHEAD * ty.len + extra, l = ty.beam / 2 + WAY_ABEAM + extra;
+  // (the slabs' overlap in time: Liang–Barsky clipping of her track against the box)
+  let t0 = 0, t1 = T;
+  const slab = (p0: number, d: number, lo: number, hi: number): boolean => {
+    if (Math.abs(d) < 1e-9) return p0 >= lo && p0 <= hi;
+    let ta = (lo - p0) / d, tb = (hi - p0) / d; if (ta > tb) { const s = ta; ta = tb; tb = s; }
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); return t0 <= t1;
+  };
+  return slab(p.along, da, a0, a1) && slab(p.lat, dl, -l, l) ? t0 : null;
+}
+
+/** The distance from a point to the ship's hull, m (0 or less: touching). */
+export function hullDist(v: Vessel, x: number, y: number): number {
+  const ty = VESSEL[v.kind], p = shipFrame(v, x, y), a = Math.max(0, Math.abs(p.along) - ty.len / 2);
+  return Math.hypot(a, p.lat) - ty.beam / 2; // (as a capsule: her ends rounded)
+}
+
+/** How far a vessel's whistle is heard, m: Annex III 1(c), by her length (200 m or more 2 nm; 75–200 m 1.5 nm;
+ * 20–75 m 1 nm; under 20 m 0.5 nm). */
+export const whistleRange = (v: Vessel): number => { const L = VESSEL[v.kind].len; return 1852 * (L >= 200 ? 2 : L >= 75 ? 1.5 : L >= 20 ? 1 : 0.5); };

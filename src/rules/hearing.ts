@@ -13,7 +13,7 @@ export interface ProtestRec {
   owed: boolean | null; turnsT: number | null;
   exonerated?: boolean;
   notRacing?: boolean;
-  committee?: { vessel: number; name: string; room: number; closest: number; done: boolean };
+  committee?: { vessel: number; name: string; entered: boolean; closest: number; done: boolean };
 }
 
 /** What the committee needs to know of the protested boat now. */
@@ -72,13 +72,13 @@ export function decide(p: ProtestRec, vs: Protestee): Decision {
  * as disqualification not excludable (DNE)" (the 2025 Sunset Series and 2025–26 Midwinters SIs). Still a hearing that
  * finds the facts (YRA Appeal 08-02: a hail ignored "triggers a protest and a hearing, but does NOT cause an automatic
  * DSQ"; the boat was reinstated because no facts showed she impeded). Here the facts are the record's: she rebuts the
- * presumption if, from the signal on, she kept outside the sea room the ship wanted (Rule 8(f): "early action to allow
- * sufficient sea room"). Neither retiring nor turns answer it ("A violation of Rule 9 may not be exonerated by a Turns
+ * presumption if, from the signal until the ship had passed her, she never came into the ship's way (sim/traffic.ts
+ * entersWay; Rule 8(f): "early action to allow sufficient sea room"). Neither retiring nor turns answer it ("A violation of Rule 9 may not be exonerated by a Turns
  * or Scoring penalty", RYC clause 16).
  */
 function shipHearing(c: NonNullable<ProtestRec['committee']>, d: (o: Outcome) => Decision): Decision {
   if (!c.done) return d('pending');
-  return d(c.closest >= c.room ? 'dismissed' : 'DNE');
+  return d(c.entered ? 'DNE' : 'dismissed');
 }
 
 /**
@@ -88,9 +88,9 @@ function shipHearing(c: NonNullable<ProtestRec['committee']>, d: (o: Outcome) =>
 export function hearings(ps: ProtestRec[], boat: (id: number) => Protestee): { decisions: Decision[]; dsq: Map<number, string>; dne: Map<number, string> } {
   const seen = new Set<string>(), decisions: Decision[] = [], dsq = new Map<number, string>(), dne = new Map<number, string>();
   for (const p of ps) {
-    const key = `${p.vs}@${p.t}`;
+    const key = `${p.committee ? 'rc:' : ''}${p.vs}@${p.t}`; // (the committee's ship protest is its own hearing, whatever a boat protested at that moment)
     if (seen.has(key)) continue;
-    const ds = ps.filter(q => q.vs === p.vs && q.t === p.t).map(q => decide(q, boat(q.vs)));
+    const ds = ps.filter(q => q.vs === p.vs && q.t === p.t && !q.committee === !p.committee).map(q => decide(q, boat(q.vs)));
     const dd = ds.find(x => x.outcome !== 'invalid') ?? ds[0];
     seen.add(key); decisions.push(dd);
     if (dd.outcome === 'DSQ') dsq.set(p.vs, dd.rule ?? '');

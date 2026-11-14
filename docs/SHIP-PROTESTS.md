@@ -36,36 +36,55 @@ DSQ. Built on the hearing."
 
 ## As built
 
+- **The ship's way** (sim/traffic.ts `entersWay`):
+  - The water a ship needs clear, measured from her hull: from her stern to two of her lengths ahead of her bow
+    (`WAY_AHEAD`), and her half-beam plus 50 m to either side (`WAY_ABEAM`).
+  - Nothing abaft the stern: a boat astern of her is no hindrance.
 - **The signal** (sim/world.ts `dangerSignals`):
-  - A moving ship sounds five blasts at any boat whose closest approach over the next `SHIP_LOOK` (40 s) comes inside
-    `shipRoom`: half the ship's length plus 60 m, measured from her middle.
-  - It's one signal per ship, and it sounds again only after 45 s. Every boat inside the room is named.
-  - You hear it to about 2 km.
-- **The protest:** in a club race judged by protests, each boat named while racing gets one race committee protest per
-  encounter (`COMMITTEE`, rule '9').
-- **The facts** (`committeeWatch`): the protest records her closest approach to the ship from the signal on. It stops
-  recording when the ship has passed, after two minutes, or when the boat finishes or retires.
+  - A moving vessel sounds five blasts for any boat that would come into her way within `SHIP_LOOK` (40 s), as both
+    hold on.
+  - It's one signal for all the boats it's for. She sounds again for another boat after 10 s, or for the same boat
+    after 45 s.
+  - It's heard to the whistle's Annex III range for her length.
+- **The protest:** only a ship in the deep-water channel (the container ship and the tanker) is one that "can safely
+  navigate only within a narrow channel or fairway". In a club race judged by protests, each boat she sounds for while
+  racing gets one race committee protest per encounter (`COMMITTEE`, rule '9'). The ferries, the tour boats and the
+  Coast Guard boat sound the signal without a protest: they are power-driven vessels with room to maneuver, and the
+  14 m Coast Guard boat is herself a vessel "of less than 20 meters" under Rule 9(b).
+- **The facts** (`committeeWatch`): the protest records whether the boat was ever in the ship's way from the signal
+  until the ship had passed her (the boat abaft her stern), and her closest approach to the hull. Retiring or finishing
+  doesn't stop the record: Rule 9 binds a boat racing or not.
 - **The hearing** (rules/hearing.ts `shipHearing`):
   - Not decided while the ship is still passing.
-  - She is presumed to have impeded the ship. The record rebuts that if she kept outside the room the ship wanted
-    (Rule 8(f)'s "sufficient sea room"). Then the protest is dismissed.
+  - She is presumed to have impeded the ship. The record rebuts that if she was never in the ship's way; then the
+    protest is dismissed.
   - Otherwise she scores DNE. Retiring doesn't answer it.
+  - It is a hearing of its own, apart from any boat's protest at the same moment.
 - **Scoring:** a DNE scores as a disqualification (A5.2: one more than the boats entered). The season's throwout skips
   it (90.3(b)).
 - **Under umpiring** (practice, the drills): the signal and its warning only, with no protest.
-- **The AI boats** look the same 40 s ahead to keep clear. They steer for the ship's stern a little before she would
-  doubt them.
+- **The AI boats** (`keepClearOfShips`):
+  - Each watches every vessel's way 120 s ahead.
+  - Coming into it, she steers square off the ship's track to the side she's on, and holds that until her track is
+    clear of the way by 30 m, looking half as long again.
+  - In the test, a container ship steams through a seven-boat fleet on the beat and no AI boat is in her way.
 
 ## Modeling choices (no number in the sources)
 
-- `SHIP_LOOK` 40 s and the room (half her length plus 60 m) are the sim's. Rule 8(f) gives no distance, and no Bay SI or
-  VTS text found gives one. The only distance in a racing SI is San Diego's "two of her ship lengths" (Cortez Racing
-  Association), which isn't the Bay's.
-- The committee always protests. In real life it acts only on a report naming the boat. Here the ship always names her.
+- **The way's size** (two lengths ahead, 50 m abeam) and `SHIP_LOOK` (40 s) are the sim's. Rule 8(f) gives no
+  distance, and no Bay SI or VTS text found gives one. The only distance in a racing SI is San Diego's "do not cross the
+  bow of any ship in the channel within two of her ship lengths" (Cortez Racing Association), which the way's length
+  follows.
+- **The rule is a composite of two Bay SIs.** The five-blast presumption is Richmond YC's, which names no penalty. The
+  DNE is from the Sunset Series and Midwinters SIs, which have no presumption and are limited to vessels confined to a
+  channel. ROADMAP has the two together. Which SI the Seaweed Soup (GGYC) sails under for ships wasn't found.
+- **The committee always protests.** In real life it acts only on a report from the ship, the pilot or the Coast Guard
+  naming the boat. Here the ship always names her.
 
 ## Left for later
 
-- Ferries and the Coast Guard boat sound the signal too. Whether a ferry counts as a vessel that "can safely navigate
-  only within a narrow channel" (Rule 9) is a question to check against the 33 CFR 165.1181 Regulated Navigation Area.
 - The moving security zone around tankers, cruise ships and other High Value Assets (33 CFR 165.1183: 500 yards).
 - The engine allowed to clear a channel (RRS 42.3(i), RYC SI 1.5) with its scoring penalty.
+- Whether the Regulated Navigation Area's traffic lanes (33 CFR 165.1181) make Rule 9 or 10(j) apply to the ferries on
+  their routes.
+- The logbook records a DNE as "Disqualified" (code DSQ).

@@ -32,6 +32,8 @@ export interface AiState {
   below?: boolean;
   /** Expensive start-timing predictions, refreshed 10 times a second. */
   plan: { leave: number; tReach: number; coast: number; back: boolean };
+  /** The vessel she's keeping out of the way of, by id (sim/world.ts keepClearOfShips), or null. */
+  shipClear?: number | null;
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the

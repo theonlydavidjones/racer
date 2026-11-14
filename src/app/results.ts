@@ -303,8 +303,8 @@ function protestSection(): void {
     const head = `<div class="pHead"><span>${nm(p.by)} protest${p.by === u.id ? '' : 's'} ${p.vs === u.id ? 'you' : nm(p.vs)} · ${rule}</span></div>`;
     if (owesAnswer(d)) return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" class="ghost" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
     if (p.committee) { const c = p.committee, m = (x: number) => `${Math.round(x)} m`;
-      return head + `<div class="pTiles">${[['Signal', `Five blasts, the ${c.name.toLowerCase()}`], ['Closest', m(c.closest)], ['Room she wanted', m(c.room)]].map(([k, v]) => `<div class="pTile">${k}<b>${v}</b></div>`).join('')}</div>`
-        + `<div class="pDec${d.outcome === 'DNE' ? ' bad' : ''}">${d.outcome === 'pending' ? 'Not decided yet: the ship still passing' : d.outcome === 'dismissed' ? 'Dismissed: she kept clear (the presumption rebutted)' : OUT[d.outcome]}</div>`; }
+      return head + `<div class="pTiles">${[['Signal', `Five blasts, the ${c.name.toLowerCase()}`], ['In her way', c.entered ? 'Yes' : 'No'], ['Closest to her hull', m(Math.max(0, c.closest))]].map(([k, v]) => `<div class="pTile">${k}<b>${v}</b></div>`).join('')}</div>`
+        + `<div class="pDec${d.outcome === 'DNE' ? ' bad' : ''}">${d.outcome === 'pending' ? 'Not decided yet: the ship still passing' : d.outcome === 'dismissed' ? 'Dismissed: she kept out of the ship\'s way (the presumption rebutted)' : OUT[d.outcome]}</div>`; }
     const turns = p.owed == null ? '–' : !p.owed ? 'Declined' : p.turnsT != null ? 'Taken' : 'Not taken';
     const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
     return head + `<div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}${clipOf(p.t) ? ` &nbsp; <a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</div>`
