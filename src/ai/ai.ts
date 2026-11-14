@@ -154,6 +154,9 @@ export function sailable(b: Boat, desired: number): number {
   return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
 }
 
+/** Lying to beam-on with her sails let fly she still forereaches and drifts, 0.4–1.2 m/s in the abandon-home traces (the
+ * sim's own boat, 20–26 kt): faster than that, a boat is sailing with way on, not lying to. */
+const LYING_DRIFT = 1.2;
 /**
  * Racing called off for the day (N over A, or AP over A: "no more racing today", RRS Race Signals), as it is in a breeze
  * over the fleet's limit (sim/signals.ts): she sails home, to the racing harbour nearest the course (geo/marina.ts), by
@@ -179,7 +182,14 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
   if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
-  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = b.tack; }
+  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) {
+    // (lying to beam-on she still forereaches, up to a metre a second in a breeze: on the tack that carries her away
+    // from the fleet's spot, out along her own side of the line across the wind, not across her neighbours' lanes. The
+    // boat on the fleet's spot itself lies to on the tack she came in on)
+    h.lying = true; h.tack = b.tack;
+    const base = w.cancelled?.places?.[0], u = V(from - 90);
+    if (base && dist(base, h.at) > 20) h.tack = u.x * (h.at.x - base.x) + u.y * (h.at.y - base.y) > 0 ? 'S' : 'P';
+  }
   if (h.lying) {
     // (another boat lying to, or stopped, within a couple of lengths: they'd drift down together side by side, stopped,
     // for as long as they lay there. The one further from her own spot sails off clear before lying to again)
@@ -188,11 +198,13 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
     if (was && dist(was, b) < 25) return { desired: sailable(b, brg(b.x - was.x, b.y - was.y)), luff: false, beating: false };
     h.parting = undefined;
     for (const o of w.boats) {
-      if (o === b || dist(o, b) > 15) continue;
+      // (lying to or stopped beside her, drifting: not a boat sailing, with way on, which is keeping clear of her or
+      // sailing past, and which she'd only sail off across)
+      if (o === b || dist(o, b) > 15 || o.v + (o.astern ?? 0) > LYING_DRIFT) continue;
       const mine = dist(b, h.at), theirs = o.ai?.home ? dist(o, o.ai.home.at) : -1;
       if (mine > theirs || (mine === theirs && b.id > o.id)) { h.parting = o.id; return { desired: sailable(b, brg(b.x - o.x, b.y - o.y)), luff: false, beating: false }; }
     }
-    return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she came in on)
+    return { desired: n360(from + (h.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (beam-on, on the tack she lies to on)
   }
   // her way: each turn of it passed within 60 m, or the next in sight with clear water to it
   while (h.i < h.route.length - 1 && (dist(b, h.route[h.i]) < 60 || landAlong(b, h.route[h.i + 1]) === Infinity)) h.i++;
