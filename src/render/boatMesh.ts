@@ -314,10 +314,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     grp.add(new THREE.Mesh(wall(cap, () => 0.02, 0.04), MAT.wood));
     // a mooring cleat on the after deck, a little to starboard of the centreline (as on Josephine)
     const cz = (z1 + L / 2) / 2, cx = 0.12, cy = deckY(uAtZ(cz), cx);
-    const cleat = new THREE.Group();
-    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 10), STEEL); horn.rotation.x = Math.PI / 2; horn.position.y = 0.035; cleat.add(horn);
-    for (const dz of [-0.035, 0.035]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.035, 0.022), STEEL); leg.position.set(0, 0.017, dz); cleat.add(leg); }
-    cleat.position.set(cx, cy, cz); grp.add(cleat);
+    const cleat = new THREE.Mesh(cleatGeometry(0.2, 0.016), STEEL); cleat.position.set(cx, cy, cz); grp.add(cleat);
   }
   // the footrest (Josephine, the owner's photo): one teak plank right across the cockpit's after end, its grain across
   // like the washboards, sliding out from the hollow under the after deck as a footrest for the helm sitting on the
@@ -336,9 +333,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // the midships mooring cleats: on the side deck just inboard of the toerail, halfway along the cabin light (Josephine,
   // the owner's photo: hers has one, to starboard; a cleat each side by default, the usual fit), lying fore and aft
   for (const s of [1, -1]) {
-    const cz = (WINDOW.z0 + WINDOW.z1) / 2, u = uAtZ(cz), cx = s * (halfBeam(u) - 0.075), cleat = new THREE.Group();
-    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.15, 10), STEEL); horn.rotation.x = Math.PI / 2; horn.position.y = 0.03; cleat.add(horn);
-    for (const dz of [-0.03, 0.03]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.02), STEEL); leg.position.set(0, 0.015, dz); cleat.add(leg); }
+    const cz = (WINDOW.z0 + WINDOW.z1) / 2, u = uAtZ(cz), cx = s * (halfBeam(u) - 0.075), cleat = new THREE.Mesh(cleatGeometry(0.15, 0.013), STEEL);
     cleat.position.set(cx, deckY(u, Math.abs(cx)), cz); cleat.rotation.z = -s * 0.08; grp.add(cleat); // (sitting on the deck's camber)
   }
   // rudder and tiller, hinged on the raked sternpost/transom line
@@ -393,7 +388,7 @@ export interface BoatMesh {
   ropes: Ropes;
   grp: THREE.Group; boomPivot: THREE.Group; jibPivot: THREE.Group; main: Sail; jib: Sail;
   /** The main flaked on the boom and the jib bagged on the foredeck, when they're down. */
-  mainFurl: THREE.Mesh; jibBag: THREE.Mesh;
+  mainFurl: THREE.Mesh; jibBag: THREE.Group;
   jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
   pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
@@ -544,7 +539,7 @@ function syncCompanionway(c: Companionway, b: Boat): void {
 /**
  * Non-skid on a painted deck and cabin top, as Josephine's (the owner): a paint with crushed walnut shells in it, laid in
  * a field that stops about 2 in (5 cm) short of every edge, leaving the smooth fiberglass, a warm white gelcoat that isn't
- * painted, along the toerail, round the cabin's foot and the cockpit's coamings, round the forehatch and the mast; on the
+ * painted, along the toerail, round the cabin's foot and the cockpit's coamings, and round the mast (not round the forehatch: the field runs flush up to its frame, the owner); on the
  * cabin top in from its edges and round the sliding hatch. Two textures, shared by every boat (colors go in as uniforms):
  * the field's shape in plan (nsMask: x across, z fore and aft, planUV), with its edge antialiased so it reads crisp; and
  * the grit, a fine tile repeated every NS_GRIT_REP m (nsGrit), its grain set by the GRIT style.
@@ -561,7 +556,6 @@ function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
   const hit = nsMasks.get(which); if (hit) return hit;
   const W = 1024, H = 3072, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
   const img = c.createImageData(W, H), d = img.data, m = NS_MARGIN, px = (NS_PLAN.x1 - NS_PLAN.x0) / W;
-  const hz = -1.75, hh = 0.25 + 0.045; // (the forehatch's frame: its middle, half its size)
   for (let j = 0; j < H; j++) {
     const z = NS_PLAN.z0 + (NS_PLAN.z1 - NS_PLAN.z0) * (j + 0.5) / H, u = uAtZ(z);
     // the field's extent across this row: [lo, hi] in |x|, or none
@@ -571,7 +565,7 @@ function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
       const near = (ua: number, ub: number) => u > ua - m / L && u < ub + m / L;
       if (near(CABIN.u0, CABIN.u1)) lo = Math.max(lo, cabinHalf(Math.min(CABIN.u1, Math.max(CABIN.u0 + 0.001, u))) + m);
       if (near(COCKPIT.u0, COCKPIT.u1)) lo = Math.max(lo, cockpitHalf(Math.min(COCKPIT.u1, Math.max(COCKPIT.u0, u))) + COAMING_T + m);
-      if (Math.abs(z - hz) < hh + m) lo = Math.max(lo, hh + m);
+      // (no smooth margin round the forehatch: the non-skid runs right up to its frame, flush, the owner)
       const dm = Math.abs(z - MAST_Z); if (dm < 0.16) lo = Math.max(lo, Math.sqrt(0.16 * 0.16 - dm * dm)); // (a smooth pad round the mast's foot)
     } else if (u > CABIN.u0 && u < CABIN.u1) {
       hi = cabinHalf(u) - CABIN_LEAN - m;
@@ -642,6 +636,8 @@ function planUV(g: THREE.BufferGeometry, _which: 'deck' | 'top'): THREE.BufferGe
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
 const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
+/** The flag halyard: thin pale braid, faint against the sky, so it never reads as standing rigging. */
+const FLAG_LINE = new THREE.LineBasicMaterial({ color: 0xf1ece0, transparent: true, opacity: 0.4, depthWrite: false });
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
 /** The companionway doors' panels (a darker varnish, set in) and their bronze hinges and latch. */
 const DOOR_PANEL = new THREE.MeshPhongMaterial({ color: 0x5e3a1e, specular: 0x442211, shininess: 40 }), BRONZE = new THREE.MeshPhongMaterial({ color: 0x9a7a3c, specular: 0xffe0a0, shininess: 80 });
@@ -775,8 +771,7 @@ function deckFittings(grp: THREE.Group): void {
   parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
   for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * 0.3, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
   { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
-    parts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.2, 10).rotateX(Math.PI / 2).translate(0, cy + 0.035, cz));
-    for (const dz of [-0.035, 0.035]) parts.push(new THREE.BoxGeometry(0.022, 0.035, 0.022).translate(0, cy + 0.017, cz + dz)); }
+    parts.push(cleatGeometry(0.2, 0.016).translate(0, cy, cz)); }
   const flat = parts.map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
   grp.add(new THREE.Mesh(mergeGeometries(flat, false)!, STEEL));
 }
@@ -813,7 +808,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
-    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main'); grp.add(tl); travLines.push(tl);
+    // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
+    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl);
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
@@ -919,8 +915,13 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   const footZ = MAST_AFT_Z + 0.06;
   const footBlock = (x: number) => { const fb = sheaveBlock(0.016, 0.03); fb.position.set(x, deckAt(x, footZ), footZ); fb.rotation.y = Math.PI / 2; grp.add(fb); return new THREE.Vector3(x, deckAt(x, footZ) + 0.03, footZ); };
   const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts, role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); return l; };
-  const stem = new THREE.Vector3(0, FORESTAY_DECK.y + 0.04, FORESTAY_DECK.z + 0.14);
-  { const sb = sheaveBlock(0.016, 0.03); sb.position.copy(stem).setY(FORESTAY_DECK.y); grp.add(sb); }
+  // the jib's luff tensioner (Josephine's, the owner's photos; on the sail band the jib Cunningham): a tackle down the
+  // mast's starboard side, its top block clipped into an eye in the jib halyard once the jib is up (into a ring on the
+  // mast when the sails are stowed: about the same place), its lower block low on the mast; pulling its tail hauls the
+  // halyard down and stretches the jib's luff. The tail, from the piano, comes up to the lower block from the foot block.
+  const JC = { x: MAST_ATH / 2 + 0.03, z: MAST_Z - 0.01, top: DECK_AT_MAST + 0.72, low: DECK_AT_MAST + 0.26 }; // (its clip about halfway up to the gooseneck, forward of the vang: the owner's photo)
+  { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), STEEL); ring.position.set(MAST_ATH / 2 + 0.006, JC.top + 0.05, JC.z); ring.rotation.y = Math.PI / 2; grp.add(ring); // (the ring it clips to with the sails stowed)
+    for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
   const cringles: Lines['cringles'] = [];
   const PIANO: Record<'S' | 'P', LineColorKey[]> = { S: ['vang', 'outhaul', 'jibCunningham', 'jibHalyard'], P: ['vang', 'outhaul', 'cunningham', 'jibCunningham', 'downhaul'] };
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) PIANO[tk].forEach((key, i) => {
@@ -940,16 +941,27 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
       const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02); grp.add(gb);
       cringles.push({ l: upMast([fb, new THREE.Vector3(-0.07, fb.y + 0.1, MAST_AFT_Z + 0.02), new THREE.Vector3(-0.07, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham'), sail: 'main' });
-    } else if (key === 'jibCunningham') { // forward outboard of the forehatch (its frame x ±0.29, z −2.04 to −1.46) to the stem's block, clear of the mooring cleat
-      const d = (z: number) => new THREE.Vector3(side * 0.36, 0, z);
-      fixed(line([fb, ...lay(fb, new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12)), ...lay(new THREE.Vector3(side * 0.09, 0, MAST_FRONT_Z - 0.12), d(-1.38)), ...lay(d(-1.38), d(-2.12)), ...lay(d(-2.12), new THREE.Vector3(side * 0.07, 0, stem.z + 0.06)), stem.clone().setX(side * 0.015)], 'jib', 'jibCunningham'));
-      if (side > 0) cringles.push({ l: line([stem.clone(), FORESTAY_DECK.clone().addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP)], 'jib', 'jibCunningham'), sail: 'jib' }), grp.add(cringles[cringles.length - 1].l);
-    } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
-      const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
+    } else if (key === 'jibCunningham') { // up to the tensioner's lower block, then its four parts between the blocks (drawn once)
+      // (Josephine's has the one tackle and one tail, to starboard: the port piano's jib Cunningham ends at its foot block)
+      const lo = new THREE.Vector3(JC.x, JC.low - 0.02, JC.z);
+      if (side > 0) upMast([fb, new THREE.Vector3(JC.x + 0.01, fb.y + 0.05, MAST_AFT_Z + 0.03), lo], 'jib', 'jibCunningham'); // (round the mast's after corner, outside it)
+      if (side > 0) { const pts: THREE.Vector3[] = []; for (let k = 0; k < 4; k++) { const o = (k - 1.5) * 0.006; pts.push(new THREE.Vector3(JC.x, k % 2 ? JC.top - 0.012 : JC.low + 0.012, JC.z + o)); } upMast(pts, 'jib', 'jibCunningham'); }
+    } else if (key === 'jibHalyard') {
+      // Josephine's jib halyard (the owner): out of the mast's front, round its starboard side and down to the eye in it
+      // where the tensioner's top block clips in once the jib's up, and its tail on down to the foot block and the piano.
+      // With the jib down the tensioner hangs from its ring on the mast instead, and the halyard runs straight down.
+      const exit = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.25, MAST_FRONT_Z + 0.004), corner = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), exit.y - 0.05, MAST_FRONT_Z + 0.006);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
-      const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + (key === 'jibHalyard' ? -0.025 : 0.025), my = fb.y + 0.36;
+      const sx = side * (JC.x + 0.012), eye = new THREE.Vector3(side * JC.x, JC.top + 0.04, JC.z), aftC = new THREE.Vector3(side * (JC.x + 0.012), fb.y + 0.06, MAST_AFT_Z + 0.03);
+      const up = upMast([exit, corner, new THREE.Vector3(side * JC.x, corner.y - 0.05, JC.z), eye, new THREE.Vector3(sx, eye.y - 0.03, JC.z), new THREE.Vector3(sx, JC.low - 0.06, JC.z), aftC, fb.clone()], role, key);
+      const down = upMast([exit, corner, new THREE.Vector3(sx, corner.y - 0.05, JC.z), new THREE.Vector3(sx, JC.low - 0.06, JC.z), aftC, fb.clone()], role, key);
+      grp.userData.jibHalyard = { up, down };
+    } else { // the main halyard: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
+      const exit = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004), corner = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), exit.y - 0.03, MAST_AFT_Z - 0.006);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
+      const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + 0.025, my = fb.y + 0.36;
       const mb = sheaveBlock(0.014, -0.03); mb.position.set(sx, my + 0.03, mz); mb.rotation.y = Math.PI / 2; grp.add(mb); // the moving block, hanging from the halyard's end
-      upMast([exit, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, down the mast's side to the block
+      upMast([exit, corner, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, round the mast's corner (outside it) and down its side to the block
       // the tackle's two parts: the standing part from the foot block's becket up to the moving block, and back down to the
       // foot block's sheave (the fall, which goes aft to the piano)
       upMast([fb.clone().setX(fb.x + side * 0.03), new THREE.Vector3(sx + side * 0.014, my - 0.01, mz), new THREE.Vector3(sx - side * 0.014, my - 0.01, mz), fb.clone()], role, key); // (the two parts a sheave's width apart, either side of it)
@@ -1134,8 +1146,26 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const clothMat = new THREE.MeshLambertMaterial({ color: b.sailColor });
   const mainFurl = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 2.9, 10), clothMat); mainFurl.rotation.x = Math.PI / 2; mainFurl.position.set(0, BOOM_TOP + 0.07, 1.55); mainFurl.visible = false; boomPivot.add(mainFurl);
   for (const z of [0.5, 1.2, 1.9, 2.6]) { const tie = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.012, 4, 10), MAT.dark); tie.rotation.x = Math.PI / 2; tie.position.y = z - 1.55; mainFurl.add(tie); } // (along the cylinder's own axis)
-  const jibBag = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshLambertMaterial({ color: 0x2c3e66 })); jibBag.scale.set(0.2, 0.12, 0.45);
-  jibBag.position.set(-0.05, deckY(uAtZ(-2.9), 0.05) + 0.1, -2.9); jibBag.visible = false; grp.add(jibBag);
+  // the jib, lowered: still hanked on the forestay, its hanks stacked at the stay's foot, and the sail rolled into a long
+  // even roll, square-ended, that runs aft from the tack along the foredeck, beside the forehatch on the side the pole isn't stowed
+  // on, tied with two sail ties (the owner). It shrinks toward the tack as the sail goes up.
+  const jibBag = new THREE.Group(); jibBag.position.copy(FORESTAY_DECK); jibBag.visible = false; grp.add(jibBag);
+  { const side = (b.paint?.poleSide ?? 'port') === 'starboard' ? -1 : 1, foot = JIB_DEF.clew.distanceTo(JIB_DEF.tack);
+    // its path in plan (x out to `side`, z): from just aft of the tack (clear of the stay, which rises from there) out beside the forehatch (its frame x ±0.29) and on aft toward
+    // the side deck, ending short of the cabin's front corner; as long as the sail's foot, as a jib rolled on deck is
+    const plan = new THREE.CatmullRomCurve3([[0.02, 0.1], [0.19, 0.38], [0.41, 0.85], [0.44, 1.35], [0.52, 1.8], [0.64, 2.25]].map(([x, d]) => new THREE.Vector3(side * x, 0, FORESTAY_DECK.z + d)));
+    const T = 90, R = 16, rAt = (t: number) => (t <= 0 || t >= 1 ? 0 : 0.068); // (a rolled sail is round and even, like rolled paper, its ends cut off square: the owner)
+    const tEnd = Math.min(1, foot / plan.getLength()); // (the plan runs about the foot's length; the roll stops there if shorter)
+    const pts = Array.from({ length: T + 1 }, (_, i) => { const t = i / T, q = plan.getPointAt(t * tEnd); return new THREE.Vector3(q.x, deckY(uAtZ(q.z), Math.abs(q.x)) + 0.068 * 0.92, q.z).sub(FORESTAY_DECK); });
+    const curve = new THREE.CatmullRomCurve3(pts), g = new THREE.TubeGeometry(curve, T, 1, R, false), p = g.attributes.position as THREE.BufferAttribute, c = new THREE.Vector3();
+    // (the tube made with radius 1, then each ring brought in to the cigar's radius there, a little flattened where it lies on the deck)
+    for (let i = 0; i <= T; i++) { curve.getPointAt(i / T, c); const r = rAt(i / T); for (let j = 0; j <= R; j++) { const k = i * (R + 1) + j; p.setXYZ(k, c.x + (p.getX(k) - c.x) * r, c.y + (p.getY(k) - c.y) * r * 0.92, c.z + (p.getZ(k) - c.z) * r); } }
+    g.computeVertexNormals(); jibBag.add(new THREE.Mesh(g, clothMat));
+    jibBag.userData.clew = pts[T].clone(); // (the roll's after end, where the clew is rolled in: the sheets lead from there when she's down)
+    for (const t of [0.36, 0.72]) { const q = curve.getPointAt(t), d = curve.getTangentAt(t), r = rAt(t), tie = new THREE.Mesh(new THREE.TorusGeometry(1, 0.012 / r, 4, 14), MAT.dark); // (a sail tie round it, snug)
+      tie.scale.set(r + 0.004, (r + 0.004) * 0.92, r + 0.004); tie.position.copy(q); tie.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d); jibBag.add(tie); }
+    // the hanks, still on the stay: stacked at its foot
+    for (let k = 0; k < 5; k++) { const hk = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.004, 4, 8), STEEL); hk.position.copy(JIB_AXIS).multiplyScalar(0.03 + 0.018 * k); hk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), JIB_AXIS); jibBag.add(hk); } }
   const mainsheet = line(Array.from({ length: 7 }, () => TRAVELLER.clone()), 'main', 'mainsheet'); grp.add(mainsheet); // (four parts and the tail)
   const lines = buildLines(grp, boomPivot);
   // her flags (yachting etiquette: render/flagArt.ts): the ensign on its staff at the stern; the club burgee, or an officer's flag in its place, on the flag halyard under the
@@ -1151,12 +1181,13 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, alphaTest: 0.5 }));
     mesh.position.copy(at); parent.add(mesh);
     // the flag halyard: a loop from the block under the strut down to a cleat on the mast's side about 1.1 m up, where
-    // it's made fast and reached from the deck: one part from the block, the other from the flag's foot (before, a tail
-    // dropped straight down and stopped in the air: the owner's "false shrouds")
+    // it's made fast and reached from the deck: one part from the block, the other from the flag's foot. A flag halyard
+    // is thin, pale braid (a few mm), not wire: drawn faint and light (FLAG_LINE), its two parts together, so it doesn't
+    // read as a stay (the owner, v180: two dark lines from the strut tip looked like extra stays)
     if (tail) {
       const side = Math.sign(at.x) || 1, cleat = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), DECK_AT_MAST + 1.1, MAST_FRONT_Z + 0.03);
-      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), cleat.clone().setY(cleat.y + 0.02)]), MAT.wire));
-      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([at.clone().setX(at.x - side * 0.015), cleat.clone().setY(cleat.y + 0.02).setX(cleat.x - side * 0.004)]), MAT.wire));
+      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), cleat.clone().setY(cleat.y + 0.02)]), FLAG_LINE));
+      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([at.clone().setX(at.x - side * 0.006), cleat.clone().setY(cleat.y + 0.02).setX(cleat.x - side * 0.003)]), FLAG_LINE));
       if (!flagCleats.has(side)) { flagCleats.add(side); const cm = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.09, 0.02), STEEL); cm.position.copy(cleat); parent.add(cm); }
     }
     flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly, h, ph: flags.length * 2.1 }); // (each its own phase)
@@ -1338,7 +1369,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
     m.main.mesh.visible = hm > 0.02; m.main.mesh.scale.y = Math.max(0.02, hm); m.main.mesh.position.y = MAIN_DEF.tack.y * (1 - hm);
     m.mainFurl.visible = hm < 0.98; m.mainFurl.scale.set(0.3 + 0.7 * (1 - hm), 1, 0.3 + 0.7 * (1 - hm));
-    m.jib.mesh.visible = hj > 0.02; m.jibBag.visible = hj < 0.98; m.jibBag.scale.set(0.2 * (0.4 + 0.6 * (1 - hj)), 0.12 * (0.4 + 0.6 * (1 - hj)), 0.45);
+    m.jib.mesh.visible = hj > 0.02; m.jibBag.visible = hj < 0.98; m.jibBag.scale.setScalar(0.4 + 0.6 * (1 - hj));
     // squeeze the jib along the stay (and mirror it to its side): M = (I + (h − 1)·a·aᵀ)·diag(sx, 1, 1), a the forestay
     const a = JIB_AXIS, k = hj - 1, sx = m.jib.mesh.scale.x, jm = m.jib.mesh;
     jm.matrixAutoUpdate = false;
@@ -1494,7 +1525,11 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // the jib sheet: one line, its middle at the clew's ring; each half runs through its car on the cabin top, off the cabin's
   // side to its fairlead on the side deck, aft along the rail to its winch, round it, and the tail into the cockpit. The
   // working half (the leeward, or the windward when she's backed) taut; the lazy one slack, lying on the boat
-  const clew = tmpC.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position);
+  // (with the jib down, its clew is rolled into the after end of the roll on the foredeck, and the sheets lead from
+  // there, slack, lying on the deck and the cabin top; while it's hoisted or lowered, the clew comes between the two)
+  { const jh = m.grp.userData.jibHalyard as { up: THREE.Line; down: THREE.Line } | undefined; if (jh) { jh.up.visible = (b.rig?.jib ?? 1) > 0.5; jh.down.visible = !jh.up.visible; } }
+  const hj = b.rig?.jib ?? 1, clew = tmpC.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position);
+  if (hj < 1) { const rc = m.jibBag.userData.clew as THREE.Vector3; tmpG.copy(rc).multiplyScalar(m.jibBag.scale.x).add(FORESTAY_DECK); clew.lerp(tmpG, 1 - hj); }
   L2.clewRing.position.copy(clew); L2.clewRing.quaternion.copy(m.jibPivot.quaternion);
   const q = L2.jibSheet.geometry.attributes.position as THREE.BufferAttribute;
   q.setXYZ(JIB_HALF_PTS, clew.x, clew.y, clew.z);
@@ -1504,10 +1539,17 @@ function syncLines(m: BoatMesh, b: Boat): void {
     // the winch's handle under the deck: turned by whoever is cranking it (Crew Figures' crew.winch: side and turn, rad
     // about the spindle, 0 pointing aft); a handle nobody is working rests pointing aft
     { const w = (m.crew as { winch?: { side: number; turn: number } }).winch; L2.handles[tk].rotation.y = w && w.side === side ? w.turn : 0; }
-    const loaded = (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
+    const loaded = hj > 0.9 && (side === lee) !== ((b.jibBacked ?? 0) > 0), at = (k: number, x: number, y: number, z: number) => q.setXYZ(JIB_HALF_PTS + side * k, x, y, z);
     // (the span from the ring to the car: straight when it's working; slack, it hangs and lies on the boat where it meets it)
     const sag = loaded ? 0 : 0.35, cy = car.y + 0.055; // (through the car block's sheave)
-    for (let k = 1; k <= 12; k++) {
+    if (!loaded && hj > 0.9) {
+      // the lazy sheet, the jib up: from the clew (aft of the mast, to leeward) forward round the front of the mast and
+      // back to its own car, slack, lying on the foredeck where it can (the owner, and his photo underway)
+      const fz = MAST_FRONT_Z - 0.14, lx = -side * 0.16, wx = side * 0.16, onDeck = (x: number, z: number) => restOn(x, z) + 0.012;
+      for (let k = 1; k <= 4; k++) { const t = k / 4, x = clew.x + (lx - clew.x) * t, z = clew.z + (fz - clew.z) * t; at(k, x, Math.max(onDeck(x, z), clew.y + (onDeck(lx, fz) - clew.y) * Math.sqrt(t) * 1.0 - 0.1 * t * (1 - t)), z); }
+      for (let k = 5; k <= 7; k++) { const t = (k - 4) / 4, a = Math.PI * t, x = lx * Math.cos(a), z = fz - 0.06 * Math.sin(a); at(k, x, onDeck(x, z), z); } // (round the mast's front)
+      for (let k = 8; k <= 12; k++) { const t = (k - 7) / 6, x = wx + (car.x - wx) * t, z = fz + (car.z - fz) * t; at(k, x, onDeck(x, z), z); }
+    } else for (let k = 1; k <= 12; k++) {
       const t = k / 13, x = clew.x + (car.x - clew.x) * t, z = clew.z + (car.z - clew.z) * t;
       at(k, x, Math.max(restOn(x, z) + 0.012, clew.y + (cy - clew.y) * t - 4 * t * (1 - t) * sag), z);
     }
@@ -1747,6 +1789,24 @@ function windowTexture(): THREE.CanvasTexture {
 }
 
 /** A wall standing up from a path of points, h high and t thick across the path (in plan), with its top closed. */
+/**
+ * A mooring cleat, `len` m long fore and aft, its base at the origin: a horn full over its legs (radius `r`) and
+ * tapering out to slim, rounded tips, a little upturned, on two legs flared toward the base (the owner: the ends taper,
+ * not stubby; smooth, not paneled).
+ * Position-and-normal only, ready to merge.
+ */
+function cleatGeometry(len: number, r: number): THREE.BufferGeometry {
+  // (the horn: full over the legs, then tapering steadily out to slim, rounded tips; smooth, not faceted)
+  const h = len / 2, prof: THREE.Vector2[] = [], N = 24, lift = r * 0.4;
+  const rAt = (a: number) => { const t = Math.max(0, Math.min(1, (a - 0.3) / 0.7)); return r * (1 - 0.6 * t * t * (3 - 2 * t)); };
+  for (let i = 0; i <= N; i++) { const y = -h + len * i / N, a = Math.abs(y) / h, tip = Math.sqrt(Math.max(0, 1 - Math.max(0, (a - 0.9) / 0.1) ** 2)); prof.push(new THREE.Vector2(rAt(a) * tip, y)); }
+  const horn = new THREE.LatheGeometry(prof, 24).rotateX(Math.PI / 2), p = horn.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) { const z = p.getZ(i); p.setY(i, p.getY(i) + 1.6 * r + lift * (z / h) ** 2); } // (raised on its legs; the tips turned up a little)
+  horn.computeVertexNormals();
+  const legs = [-1, 1].map(s => new THREE.CylinderGeometry(r * 0.7, r * 1.05, 1.6 * r, 16).translate(0, 0.8 * r, s * len * 0.18));
+  const parts = [horn, ...legs].map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
+  return mergeGeometries(parts, false)!; // (each part keeps its own smooth normals)
+}
 function flipWinding(g: THREE.BufferGeometry): THREE.BufferGeometry {
   for (const a of Object.values(g.attributes) as THREE.BufferAttribute[]) for (let i = 0; i + 2 < a.count; i += 3) for (let k = 0; k < a.itemSize; k++) { const t = a.getComponent(i + 1, k); a.setComponent(i + 1, k, a.getComponent(i + 2, k)); a.setComponent(i + 2, k, t); }
   return g;

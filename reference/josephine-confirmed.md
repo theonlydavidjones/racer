@@ -78,3 +78,6 @@ showing it, and add to it whenever the owner confirms something. One line each; 
   runs on slim metal rails on the hull's inside; the sim leaves them out for simplicity (owner).
 - The coaming's teak cap runs all the way round the after coaming, turning the corners in a smooth curve.
 - The cabin front's foot is aft of the mast foot's horseshoe, with a strip of deck between them.
+- The jib, lowered, stays hanked on the forestay and is rolled on the foredeck: an even roll with square ends, as long
+  as the sail's foot, tied with sail ties (either side is fine) (owner).
+- Mooring cleats (bow, stern, midships): the horns taper to slim tips, smooth, not stubby or paneled (owner).
