@@ -74,11 +74,26 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     steer(w, from - 50); // (up toward the wind, away from her)
     sail(w, 120, () => L.step !== 3);
     expect(L.step).toBe(4);
+    // close-hauled on starboard, as the cue asks: she sails away, and the port boat is set (no stall)
+    setOn(w, from - 45);
+    sail(w, 400, () => L.step === 5);
+    expect(L.step).toBe(5);
+  });
+
+  it('standing on, held on hands off, light air or fresh, close-hauled or reaching: she gives way early, well clear', () => {
+    for (const [kt, twa] of [[6, 45], [12, 90]]) {
+      const w = new World(COURSES[0], S({ windKt: kt } as Partial<Settings>), 3, { freeSail: true }), L = w.lesson!, from = w.windModel.base;
+      L.step = 4; setOn(w, from - twa);
+      sail(w, 20, () => L.step === 5);
+      expect(L.step).toBe(5);
+      const gap = sail(w, 120, () => L.step !== 5);
+      expect(gap).toBeGreaterThan(LOA); expect(L.step).toBe(6); // (under your stern, Rule 16: a length and more)
+    }
   });
 
   it('standing on, she keeps clear of you (the race AI\'s keep-clear); you hold your course and speed', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
-    L.step = 4; setOn(w, from - 60); // (starboard, a close reach)
+    L.step = 4; setOn(w, from - 45); // (starboard, close-hauled)
     sail(w, 10, () => L.step === 5);
     expect(L.step).toBe(5); expect(L.cue).toMatch(/^A port boat/);
     const o = w.boats[1]; expect(o.tack).toBe('P');
@@ -89,7 +104,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
 
   it('turning away when you stand on spoils it, and it\'s set again', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
-    L.step = 4; setOn(w, from - 60);
+    L.step = 4; setOn(w, from - 45);
     sail(w, 10, () => L.step === 5);
     steer(w, from - 150); // (bears away: not holding her course)
     sail(w, 20);

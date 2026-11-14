@@ -471,7 +471,7 @@ export class World {
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
-    if (this.lesson?.id === 'road') {
+    if (this.lesson?.id === 'road' && road) {
       this.roadEnv = this.makeRoadEnv(this.boats[1]);
       // (the North Channel's entrance pair, east of Alcatraz, sim/places.ts marks 7 and 21: NOAA ENC US5CA13M has them as
       // pillar buoys, 1 green Fl G 6s at 37.83201 N 122.40863 W, 2 red Fl R 6s at 37.83331 N 122.39642 W, read 14 Nov 2026;
@@ -937,7 +937,7 @@ export class World {
       speed: h => speedInChop(o.ww.kt, Math.abs(wrap(o.ww.from - h)), o.sea.hsW, o.sea.tpW),
       helm: give => keepClearMove(this, o, this.user, !give),
       sailable: h => sailable(o, h),
-      landAhead: () => landAlong(o, { x: o.x + V(o.h).x * 300, y: o.y + V(o.h).y * 300 }) < Infinity,
+      landAhead: h => landAlong(o, { x: o.x + V(h).x * 300, y: o.y + V(h).y * 300 }) < Infinity,
       gap: () => hullGap(this.user, o)
     };
   }
