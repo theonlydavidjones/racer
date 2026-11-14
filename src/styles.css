@@ -12,3 +12,4 @@
 @import './styles/10-setup-tight.css'; /* the setup's rows and tiles, the Drill page */
 @import './styles/11-lessons.css'; /* Learn to sail's lesson tiles (after UI's 10-setup-tight.css) */
 @import './styles/12-rules.css'; /* the Rules trainer (after Learn to sail's 11) */
+@import './styles/13-pause.css'; /* the pause menu and the results: one column of actions; Leave race? */

@@ -16,6 +16,7 @@ import { wantJumpers } from '../boat/condition';
 import { guideTune } from '../boat/rigTune';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from '../boat/autopilot';
 import type { Settings } from '../settings';
+import type { BoatSpec } from '../boat/spec';
 import type { Moment } from './debrief';
 import type { Vec } from '../core/math';
 import type { World } from './world';
@@ -83,6 +84,10 @@ export type Command =
   | { k: 'penalty'; boat: number }
   /** New conditions for the sail that's running (the conditions panel from the pause menu). */
   | { k: 'conditions'; settings: Settings }
+  /** Your boat restyled in the boat editor (look only: her paint, hatch, cockpit, lettering), taken as she lies. */
+  | { k: 'look'; spec: BoatSpec }
+  /** The showroom's clock: the time of day she's shown at (local, hh:mm). */
+  | { k: 'clock'; tideTime: string }
   /** The page's own settings the World keeps a copy of (the chart's colours, the map's layers): they don't touch the race. */
   | { k: 'settings'; patch: Pick<Partial<Settings>, 'chartPal' | 'mapLayers'> }
   /** A note in the race's log (a rule incident, for the debrief and the race replay). */
@@ -151,6 +156,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'retire': return w.retire(c.why, c.afterFinish);
     case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
+    case 'look': w.applyLook(c.spec); return;
+    case 'clock': w.setClock(c.tideTime); return;
     case 'settings': Object.assign(w.settings, c.patch); return;
     case 'logNote': w.log?.note(c.note); return;
     case 'running': w.running = c.on; return;

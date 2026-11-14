@@ -68,7 +68,7 @@ const BODIES: Body[] = (() => {
   const out: Body[] = [];
   const add = (kind: Kind, pts: Vec[], H: number, wall?: Vec[]) => { const r = reach(kind, H);
     const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length, cy = pts.reduce((a, q) => a + q.y, 0) / pts.length, R = Math.max(...pts.map(q => Math.hypot(q.x - cx, q.y - cy))) + 1e-6;
-    out.push({ kind, pts, H, wall, cx, cy, R, box: { x0: Math.min(...pts.map(q => q.x)) - r, x1: Math.max(...pts.map(q => q.x)) + r, y0: Math.min(...pts.map(q => q.y)) - r, y1: Math.max(...pts.map(q => q.y)) + r } }); };
+    out.push({ kind, pts, H, wall, cx, cy, R, wKey: NaN, wVal: 0, eFrom: NaN, pa: new Float64Array(pts.length), pn: new Float64Array(pts.length), a0: 0, a1: 0, n0: 0, n1: 0, cross: 0, box: { x0: Math.min(...pts.map(q => q.x)) - r, x1: Math.max(...pts.map(q => q.x)) + r, y0: Math.min(...pts.map(q => q.y)) - r, y1: Math.max(...pts.map(q => q.y)) + r } }); }; // (every field there from the start: one shape for all of them, so the loop over them reads each the same fast way)
   // each breakwater a run of wall pieces (its line's segments; an area's outline's)
   for (const h of HARBORS) for (const b of h.breakwaters) {
     const pts = b.area ? [...b.pts, b.pts[0]] : b.pts;
@@ -106,25 +106,31 @@ function couldShelter(B: Body, qx: number, qy: number, e: Vec, slack: number): b
 /** The bodies that can shelter some of each 50 m cell, for each degree of wind direction, filed the first time a cell
  * is asked about: almost always none (a boat's wind is asked for every boat, every step, and most of the walls near her
  * are downwind of her or off to the side). */
-const CELL_M = 50, CELLS = new Map<number, Body[][]>(), NONE: Body[] = [];
+const CELL_M = 50, NONE: Body[] = [];
+/** The cells over the box round every body's reach (BOX), indexed densely: each cell's slot in CELLS (+1; 0 not filed
+ * yet). A plain array read, not a hash: it's asked for every boat, every step. */
+let IDX: Int32Array | null = null, NX = 0, NY = 0;
+const CELLS: Body[][][] = [];
 function cellBodies(p: Vec, from: number): Body[] {
-  const i = Math.floor(p.x / CELL_M), j = Math.floor(p.y / CELL_M), key = i * 1_000_003 + j;
-  let l = CELLS.get(key);
-  if (!l) {
-    const x0 = i * CELL_M, y0 = j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M, near: Body[] = [];
+  if (!IDX) { NX = Math.ceil((BOX.x1 - BOX.x0) / CELL_M) + 1; NY = Math.ceil((BOX.y1 - BOX.y0) / CELL_M) + 1; IDX = new Int32Array(NX * NY); }
+  const i = Math.floor((p.x - BOX.x0) / CELL_M), j = Math.floor((p.y - BOX.y0) / CELL_M);
+  if (i < 0 || j < 0 || i >= NX || j >= NY) return NONE;
+  let s = IDX[j * NX + i];
+  if (s === 0) {
+    const x0 = BOX.x0 + i * CELL_M, y0 = BOX.y0 + j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M, near: Body[] = [];
     for (const G of GROUPS) { if (G.box.x1 < x0 || G.box.x0 > x1 || G.box.y1 < y0 || G.box.y0 > y1) continue;
       for (const B of G.bodies) if (!(B.box.x1 < x0 || B.box.x0 > x1 || B.box.y1 < y0 || B.box.y0 > y1)) near.push(B); }
     // each degree's list, tested from the cell's middle at the degree's middle: anywhere in the cell is within half its
     // diagonal of the middle, and anywhere in the degree turns a point |q| from the body by at most |q|·0.0088 (2 sin 0.25°)
     const cx = x0 + CELL_M / 2, cy = y0 + CELL_M / 2, rc = CELL_M * Math.SQRT1_2;
-    l = Array.from({ length: 360 }, (_, k) => {
+    CELLS.push(Array.from({ length: 360 }, (_, k) => {
       const e = V(k + 0.5 + 180), out = near.filter(B => { const qx = cx - B.cx, qy = cy - B.cy; return couldShelter(B, qx, qy, e, rc + (Math.hypot(qx, qy) + rc) * 0.0088 + 0.01); });
       return out.length ? out : NONE;
-    });
-    CELLS.set(key, l);
+    }));
+    s = CELLS.length; IDX[j * NX + i] = s;
   }
   const k = Math.floor(from) % 360;
-  return l[k < 0 ? k + 360 : k];
+  return CELLS[s - 1][k < 0 ? k + 360 : k];
 }
 /** Each breakwater's width across the wind, by wind direction (a tenth of a degree): it's asked for every piece, every boat. */
 const WALL_W = new Map<Vec[], Map<number, number>>();
@@ -147,7 +153,7 @@ const BOX = BODIES.reduce((a, b) => ({ x0: Math.min(a.x0, b.box.x0), x1: Math.ma
  * asks in the same step's wind. */
 function frame(B: Body, from: number, e: Vec): void {
   if (B.eFrom === from) return;
-  const n = B.pts.length, pa = B.pa ?? (B.pa = new Float64Array(n)), pn = B.pn ?? (B.pn = new Float64Array(n));
+  const n = B.pts.length, pa = B.pa!, pn = B.pn!;
   let a0 = Infinity, a1 = -Infinity, n0 = Infinity, n1 = -Infinity;
   for (let i = 0; i < n; i++) { const q = B.pts[i], a = q.x * e.x + q.y * e.y, c = q.x * e.y - q.y * e.x; pa[i] = a; pn[i] = c; a0 = Math.min(a0, a); a1 = Math.max(a1, a); n0 = Math.min(n0, c); n1 = Math.max(n1, c); }
   B.a0 = a0; B.a1 = a1; B.n0 = n0; B.n1 = n1; B.eFrom = from;
