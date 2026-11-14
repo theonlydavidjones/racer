@@ -195,4 +195,10 @@ const ENSIGN_OF: Record<string, string> = {
   NOR: 'nor', FRA: 'fra', NZL: 'nzl', JPN: 'jpn'
 };
 export const ensignFor = (country: string): string | undefined => ENSIGN_OF[country];
-
+/** The day `plus` days from today on your own clock, YYYY-MM-DD (not UTC: on the Bay after 4 pm that's already tomorrow). */
+export function localDay(plus = 0): string {
+  const d = new Date(); d.setDate(d.getDate() + plus);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+/** Laid up for repairs today (BoatSpec.laidUpUntil: after a wreck or damage, docs/WRECK-PROPOSAL.md). */
+export const laidUp = (b: { laidUpUntil?: string }): boolean => !!b.laidUpUntil && b.laidUpUntil >= localDay();

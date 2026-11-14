@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, newBoat, sailNo, type BoatSpec } from '../boat/spec';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
 import { CLUBS, burgeeCanvas } from '../render/burgees';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
@@ -310,5 +310,3 @@ function crewRow(e: LogEntry): string {
   const what = (e.kind === 'race' ? `Race: ${esc(e.title)}` : `Cruise: ${esc(e.title)}${e.nm != null ? `, ${e.nm.toFixed(1)} nm` : ''}${e.arrived ? ' ✓' : ''}`) + hurt;
   return `<tr><td>${dayLabel(e)}</td><td>${what}</td><td>${e.skipper === 'you' ? 'You' : 'AI (generic)'}</td><td>${esc(e.crew)}</td></tr>`;
 }
-/** Laid up for repairs today (BoatSpec.laidUpUntil: after a wreck or damage, docs/WRECK-PROPOSAL.md). */
-export const laidUp = (b: { laidUpUntil?: string }): boolean => !!b.laidUpUntil && b.laidUpUntil >= new Date().toISOString().slice(0, 10);

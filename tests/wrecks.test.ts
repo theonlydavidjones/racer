@@ -4,6 +4,7 @@ import { onLand } from '../src/geo/shore';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
+import { outward, wreck } from '../src/boat/physics';
 import { V, type Vec } from '../src/core/math';
 
 /** Wrecks (docs/WRECK-PROPOSAL.md, the owner's answers in section 7): every contact graded by boat/damage.ts. */
@@ -30,7 +31,7 @@ describe('wrecks', () => {
   });
   it('into the same breakwater at 1 m/s: damage, told so, not wrecked', () => {
     const w = world('sail'); aim(w, offWestHarbor, 180, 2, 1); const r = run(w, 6);
-    expect(r.wrecked).toHaveLength(0); expect(w.user.damage?.level).toBe('damage'); expect(r.toasts.some(m => /^Damage: you hit the breakwater/.test(m))).toBe(true);
+    expect(r.wrecked).toHaveLength(0); expect(w.user.damage?.level).toBe('damage'); expect(r.toasts.some(m => /^Damage: she hit the breakwater/.test(m))).toBe(true);
   });
   it('at a walk (0.3 m/s): a scrape, the usual bump, no damage kept', () => {
     const w = world('sail'); aim(w, offWestHarbor, 180, 1, 0.3); run(w, 8);
@@ -55,5 +56,25 @@ describe('wrecks', () => {
     Object.assign(ai, { x: offWestHarbor.x + u.x * (d - 5.8), y: offWestHarbor.y + u.y * (d - 5.8), h: 180, v: 2 });
     for (let i = 0; i < 30; i++) w.step(DT);
     expect(ai.wrecked).toBeUndefined(); expect(ai.damage).toBeUndefined();
+  });
+  // (the blow is her speed into the face, along its normal, not her speed: a glancing touch closes slowly, physics.ts closingAt)
+  for (const [deg, want] of [[5, 'scrape'], [20, 'damage']] as const) it(`along the breakwater at 3 m/s, ${deg} degrees into it: ${want}, not a wreck (a glancing blow)`, () => {
+    const w = world('sail'), u = w.user;
+    // (the face's own line, from its outward normal there: she runs along it, turned `deg` toward it, from 30 m back and
+    // 3 m off it; her speed into it 3·sin(deg): 0.26 m/s at 5, 1.03 at 20)
+    const d = V(180); let k = 0; while (!onLand({ x: offWestHarbor.x + d.x * k, y: offWestHarbor.y + d.y * k })) k += 0.05;
+    const f = { x: offWestHarbor.x, y: offWestHarbor.y - k }, n = outward({ x: f.x, y: f.y - 0.05 }), t = { x: -n.y, y: n.x }; // (along it, westward)
+    const r = deg * Math.PI / 180, dir = { x: t.x * Math.cos(r) - n.x * Math.sin(r), y: t.y * Math.cos(r) - n.y * Math.sin(r) };
+    const back = 3 / Math.tan(r) + 3.82; // (from where her bow meets it, back along her course)
+    Object.assign(u, { docked: undefined, x: f.x - dir.x * back, y: f.y - dir.y * back, h: (Math.atan2(dir.x, dir.y) * 180 / Math.PI + 360) % 360, v: 3, astern: 0, sway: 0, turnRate: 0, steer: 0, tiller: 0, turnTarget: null });
+    u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false };
+    const res = run(w, 6);
+    expect(res.wrecked, res.toasts.join(' / ')).toHaveLength(0); expect(u.damage?.level ?? 'scrape').toBe(want);
+  });
+  it('wrecked by a ship in a race (World.shipEncounters, not her own step): retired at once, while she\'s held', () => {
+    const w = world('race'), u = w.user;
+    wreck(u, 'hit by the container ship', u, () => { /* (the page's statement) */ });
+    w.step(DT);
+    expect(u.wrecked?.where).toBe('on the Bay'); expect(u.retired).toBe(true);
   });
 });

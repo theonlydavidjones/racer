@@ -6,6 +6,7 @@ import { place } from '../sim/places';
 import { keepGhost, setupKey, trackOf } from '../replay/ghost';
 import { addLog, type LogEntry, type RaceSetup } from '../boat/logbook';
 import { saveSettings } from '../settings';
+import { localDay } from '../boat/spec';
 import { slipById, slipPlace } from '../geo/marina';
 import { type BoatSpec } from '../boat/spec';
 import { tactics, type Tactics } from '../replay/tactics';
@@ -210,7 +211,7 @@ function towed(): void { towedIn = app.w; }
 /** What harm came to her this outing, for her logbook: wrecked (how, where; towed in), or the worst damage short of it. */
 function hurtOf(): Partial<LogEntry> {
   const u = app.w.user, d = u.damage?.level;
-  if (u.wrecked) return { wreck: `${u.wrecked.how}, at ${u.wrecked.where}`, ...(towedIn === app.w ? { towed: true } : {}) };
+  if (u.wrecked) return { wreck: `${u.wrecked.how}, ${u.wrecked.where}`, ...(towedIn === app.w ? { towed: true } : {}) };
   return d === 'damage' || d === 'serious' ? { damage: d } : {};
 }
 /** Repairs (the owner's answers, WRECK-PROPOSAL section 7): wrecked, she's laid up for a few real days; damaged, a day
@@ -220,14 +221,15 @@ function layUp(): void {
   const w = app.w; if (!w || laidUp.has(w)) return;
   const h = hurtOf(), days = h.wreck ? WRECK_DAYS : h.damage ? DAMAGE_DAYS : 0; if (!days) return;
   laidUp.add(w);
-  const until = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+  const until = localDay(days - 1); // (laid up today and the days after it: 3 days is today and the next two)
   if (!app.S.boat.laidUpUntil || app.S.boat.laidUpUntil < until) app.S.boat.laidUpUntil = until;
   saveSettings(app.S);
 }
 /** Leaving an outing (back to the start page, to setup, or starting another): log it if there's anything to log. */
 function logOuting(): void {
-  if (!app.w || app.w.logged || app.S.mode === 'drill') return;
-  layUp();
+  if (!app.w || app.w.logged) return;
+  layUp(); // (a drill too: she's as damaged)
+  if (app.S.mode === 'drill') return;
   if (app.S.mode === 'sail' && app.w.freeSail && (app.w.t >= 60 || app.w.user.wrecked)) {
     app.send({ k: 'shown', logged: true });
     const from = app.S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(app.S.boat.slip))})` : place(app.S.sailFrom)?.name ?? 'the Bay';

@@ -13,7 +13,7 @@ import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
-import { type BoatSpec } from '../boat/spec';
+import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
 import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
@@ -333,7 +333,7 @@ function openSetupNow(): void {
 function beginRace(seed?: number): void { app.results.settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
   // laid up for repairs after a wreck or damage (docs/WRECK-PROPOSAL.md): she can't be taken out until then
-  { const until = app.S.boat.laidUpUntil; if (until && until >= new Date().toISOString().slice(0, 10)) { toast(`${app.S.boat.name} is laid up for repairs until ${until}: choose another boat.`, 4000); return; } }
+  { const until = app.S.boat.laidUpUntil; if (laidUp(app.S.boat)) { toast(`${app.S.boat.name} is laid up for repairs until ${until}: choose another boat.`, 4000); return; } }
   app.nav.reset({ k: 'setup' }); // (the pause menu's and the results' Back to setup: the setup you sailed from)
   app.realRaceHolds();
   saveSettings(app.S);

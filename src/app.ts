@@ -285,7 +285,7 @@ function handle(e: SimEvent): void {
  */
 function wreckAsk(how: string, where: string): void {
   send({ k: 'pause', on: true }); setControlsIdle();
-  $('wreckWhat').textContent = `${how[0].toUpperCase()}${how.slice(1)}, at ${where}.`;
+  $('wreckWhat').textContent = `${how[0].toUpperCase()}${how.slice(1)}, ${where}.`;
   $('wreckAsk').hidden = false;
   const close = () => { $('wreckAsk').hidden = true; };
   $('bWreckAshore').onclick = () => { close(); openHome(); };

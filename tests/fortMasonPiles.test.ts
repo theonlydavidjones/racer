@@ -53,7 +53,7 @@ describe("Fort Mason's piers", () => {
   // (the blow graded by boat/damage.ts, as on concrete: square on at her displacement with her crew; ESTIMATE bands 0.5 and 1.5 m/s)
   it('struck bow first at 1 m/s under way: she bounces off its face, damaged', () => {
     const w = cruise(); place(w, 4, 1); const msgs = run(w, 6);
-    expect(msgs.some(m => /Damage: you hit the piles of Fort Mason's Pier 3/.test(m)), msgs.join(' / ')).toBe(true);
+    expect(msgs.some(m => /Damage: she hit the piles of Fort Mason's Pier 3/.test(m)), msgs.join(' / ')).toBe(true);
     expect(w.user.damage?.level).toBe('damage'); expect(w.user.wrecked).toBeUndefined();
   });
   it('struck bow first at 2 m/s: wrecked, and told how and where; held there; a race retires her', () => {
@@ -64,14 +64,14 @@ describe("Fort Mason's piers", () => {
     w.carryOn(); expect(w.user.wrecked?.carryOn).toBe(true); // (carry on, marked wrecked: she sails again)
   });
   it('pinned end on, no way on, the stream and wind setting her back each time: in under the deck among the piles, a wreck', () => {
-    const w = cruise(); place(w, 2, 0.25); const u = w.user; let t = 0, wrecked = '';
+    const w = cruise(); place(w, 4.5, 0.35); const u = w.user; let t = 0, wrecked = '';
     // (her drift onto them kept up by hand, as a steady set would: each time she's stopped and pushed off, set back on)
-    for (; t < 60 && !wrecked; t += DT) { if (u.v < 0.1 && !u.wrecked) u.v = 0.25; w.step(DT); for (const e of w.drainEvents()) if (e.type === 'wrecked') wrecked = e.how; }
+    for (; t < 60 && !wrecked; t += DT) { if (u.v < 0.1 && !u.wrecked) u.v = 0.35; w.step(DT); for (const e of w.drainEvents()) if (e.type === 'wrecked') wrecked = e.how; }
     expect(wrecked).toMatch(/set in under Fort Mason's Pier 3, among its piles/); expect(t).toBeGreaterThan(30);
   });
   it('pinned beam on: she lies across two piles, grinding: damage, not a wreck', () => {
-    const w = cruise(); place(w, 1.3, 0.1, true); const u = w.user;
-    for (let t = 0; t < 60; t += DT) { if (Math.abs(u.sway ?? 0) < 0.02) u.sway = 0.1; w.step(DT); w.drainEvents(); }
+    const w = cruise(); place(w, 1.3, 0.3, true); const u = w.user;
+    for (let t = 0; t < 60; t += DT) { if (Math.abs(u.sway ?? 0) < 0.02) u.sway = 0.3; w.step(DT); w.drainEvents(); }
     expect(u.wrecked).toBeUndefined(); expect(u.damage?.level).toBe('damage');
   });
   it('stern first onto the piles (sternway, as after missing a tack): stopped on them, and told it\'s the piles, not the bottom', () => {
@@ -80,8 +80,21 @@ describe("Fort Mason's piers", () => {
     expect(msgs.some(m => /touched bottom/.test(m))).toBe(false); expect(underPier(u)).toBeNull();
   });
   it('lying against them, drifting on at a few cm/s: told once, gently, not over and over', () => {
-    const w = cruise(); place(w, 1.3, 0.03, true); const msgs = run(w, 25).filter(m => /piles/.test(m));
+    const w = cruise(); place(w, 1.3, 0.03, true); const msgs = run(w, 60).filter(m => /piles/.test(m));
     expect(msgs).toHaveLength(1); expect(msgs[0]).toMatch(/Against the piles of Fort Mason's Pier 3: fend off/);
+  });
+  // (pinned means a set her crew can't fend off, about 0.23 m/s against a hand's 250 N: physics.ts PIN_V, ESTIMATES)
+  for (const [v, beam] of [[0.05, false], [0.1, false], [0.05, true], [0.1, true]] as const) it(`kept on them by a set of ${v} m/s, ${beam ? 'beam' : 'end'} on, for 90 s: a hand fends that off, so no wreck and no damage`, () => {
+    const w = cruise(); place(w, 1.3, v, beam); const u = w.user;
+    for (let t = 0; t < 90; t += DT) { if (beam ? Math.abs(u.sway ?? 0) < 0.02 : u.v < 0.02) { if (beam) u.sway = v; else u.v = v; } w.step(DT); w.drainEvents(); }
+    expect(u.wrecked).toBeUndefined(); expect(u.damage?.level ?? 'scrape').toBe('scrape');
+  });
+  it('one end-on touch, then pinned beam on: still beam on, so damage, not in under the deck', () => {
+    const w = cruise(); place(w, 2, 0.3); const u = w.user;
+    for (let t = 0; t < 8; t += DT) { w.step(DT); w.drainEvents(); } // (her bow onto them once)
+    place(w, 1.3, 0.3, true);
+    for (let t = 0; t < 60; t += DT) { if (Math.abs(u.sway ?? 0) < 0.02) u.sway = 0.3; w.step(DT); w.drainEvents(); }
+    expect(u.wrecked).toBeUndefined(); expect(u.damage?.level).toBe('damage');
   });
   // (the physics review's case: sailing out of the cove along Pier 3's face with the westerly setting her onto it. She
   // used to slip a few cm into the face and be pushed back along her own heading, still on land, every step: astern

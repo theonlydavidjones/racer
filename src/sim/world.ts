@@ -946,7 +946,7 @@ export class World {
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
       // wrecked (physics.ts wreck): held where she is, while you choose ashore, a tow or carrying on (the page)
-      if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; continue; }
+      if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
       const x0 = b.x, y0 = b.y;

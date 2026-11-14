@@ -91,7 +91,7 @@ export interface Boat {
   x: number; y: number; h: number; // position (m) and heading (deg)
   /** In her slip, made fast, bow in (sim/world.ts pushOff casts her off). */
   docked?: { slip: string };
-  /** Wrecked (docs/WRECK-PROPOSAL.md; your boat only): how and where; `carryOn` once you've chosen to carry on, marked wrecked. */
+  /** Wrecked (docs/WRECK-PROPOSAL.md; your boat only): how, and where ("at West Harbor…", "on the Bay"); `carryOn` once you've chosen to carry on, marked wrecked. */
   wrecked?: { how: string; where: string; carryOn?: boolean };
   /** The worst damage she's taken this outing (boat/damage.ts), what did it and where. */
   damage?: { level: import('./damage').DamageLevel; what: string };
