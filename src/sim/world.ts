@@ -61,8 +61,8 @@ import { RaceLog } from './debrief';
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
- * start, eased sheets, they take about 10 s (World.idle). */
-const SHOWROOM_SETTLE_S = 15;
+ * start, eased sheets, they take about 10 s; her speed, a heavy boat's in light air, about 50 (World.idle). */
+const SHOWROOM_SETTLE_S = 50;
 /** How near (m) the basins' current is worked out before the start (farther ones in the worker's or the page's spare time: sim/worker.ts, app.ts). */
 const BASINS_NEAR = 4000;
 /** Two-turns penalty, in degrees of turning. */
@@ -1887,7 +1887,8 @@ export class World {
     // The showroom (a held true wind angle: app.ts passes one only there; sailing never does, so it's unchanged): the
     // first time she's shown, her crew's trim is settled at once. She's built with her sheets eased, and from that cold
     // start the crew haul them in at their real rate, which took about 10 s in the showroom with her boom near square
-    // (Rigging's visual check, 14 November); so that time is sailed through here before she's seen, without the waves.
+    // (Rigging's visual check, 14 November); so that time, and her speed and heel coming up with it, are sailed through
+    // here before she's seen, without the waves. (Also the boat cards' pictures, render/thumbs.ts.)
     if (twa != null && this.showroomSettled !== u) {
       this.showroomSettled = u;
       for (let i = 0; i < SHOWROOM_SETTLE_S / dt; i++) this.idleStep(u, dt, twa, false);

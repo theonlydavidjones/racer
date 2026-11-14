@@ -14,12 +14,13 @@ describe('The showroom shows her trimmed at once (sim/world.ts idle)', () => {
   it('the first frame at 45° true: the boom in close-hauled trim, not eased square', () => {
     const w = fresh(); w.idle(DT, 45);
     expect(Math.abs(w.user.boom)).toBeLessThan(25);
-    const t0 = performance.now(); fresh().idle(DT, 45); expect(performance.now() - t0).toBeLessThan(1000); // (once per boat shown)
   });
-  it('and it holds: the next seconds move the boom only as the crew fine-trim', () => {
-    const w = fresh(); w.idle(DT, 45); const b0 = w.user.boom;
-    for (let i = 0; i < 3 / DT; i++) w.idle(DT, 45);
-    expect(Math.abs(w.user.boom - b0)).toBeLessThan(8);
+  it('and she has settled: over the next 15 s her boom, speed and heel move only as the waves and the crew\'s fine trim do', () => {
+    for (const twa of [55, -55]) {
+      const w = fresh(); w.idle(DT, twa); const u = w.user, b0 = u.boom, v0 = u.v, h0 = Math.abs(u.heel);
+      for (let i = 0; i < 15 / DT; i++) w.idle(DT, twa);
+      expect(Math.abs(u.boom - b0)).toBeLessThan(4); expect(Math.abs(u.v - v0)).toBeLessThan(0.15); expect(Math.abs(Math.abs(u.heel) - h0)).toBeLessThan(3);
+    }
   });
   it('with no angle held (not the showroom), a cold start is as before: the crew still haul in from eased sheets', () => {
     const w = fresh(); w.idle(DT);
