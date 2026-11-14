@@ -14,7 +14,11 @@ import { morph } from './morph';
  */
 export class BoatPanel {
   private el: HTMLElement;
-  constructor(private S: Settings, private changed: () => void, private done: () => void) {
+  /**
+   * `changed(save)`: her setup changed (`save`: keep it: your boats saved; else shown in the showroom only, until you Save).
+   * `done(saved)`: back to her page (`saved`: just saved, a quick confirmation there).
+   */
+  constructor(private S: Settings, private changed: (save: boolean) => void, private done: (saved: boolean) => void) {
     this.el = document.getElementById('boatPanel')!;
     this.el.addEventListener('click', e => this.click(e));
     this.el.addEventListener('input', e => this.input(e));
@@ -23,14 +27,15 @@ export class BoatPanel {
 
   get open(): boolean { return !this.el.hidden; }
   show(id = this.S.boatId): void {
-    this.editId = id; this.confirmDiscard = false;
+    this.editId = id; this.leaving = null;
     this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); // for "Discard changes"
     this.render(); this.el.hidden = false;
   }
   /** Your boats as they were when you opened the panel. */
   private snap: { boats: BoatSpec[]; boatId: string; opponents: string[] } | null = null;
-  private confirmDiscard = false;
-  private get edited(): boolean { return !!this.snap && JSON.stringify(this.snap) !== JSON.stringify({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
+  /** Leaving with changes unsaved (the owner): where to, once you've said Save or Discard. */
+  private leaving: (() => void) | null = null;
+  get edited(): boolean { return !!this.snap && JSON.stringify(this.snap) !== JSON.stringify({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
   /** The showroom's slow turn: pause it to look at her from one side (set by main; returns whether she's turning now). */
   onSpin: (() => boolean) | null = null;
   private spinning = true;
@@ -49,14 +54,26 @@ export class BoatPanel {
     if (i >= 0) this.S.boats[i] = b; else this.S.boats.push(b);
     if (b.id === this.S.boatId) this.S.boat = b;
     this.editId = b.id;
-    this.changed(); if (rerender) this.render(); else { this.report(); if (!this.el.querySelector('[data-act="discard"]') && this.edited) this.render(); }
-    this.flashSaved();
+    this.changed(false); if (rerender) this.render(); else { this.report(); if (!this.el.querySelector('[data-act="save"]') && this.edited) this.render(); } // (shown, not yet kept: Save keeps it)
   }
-  private flashSaved(): void {
-    const el = this.el.querySelector('#bpSaved'); if (!el) return;
-    el.classList.add('on'); clearTimeout(this.savedT); this.savedT = window.setTimeout(() => el.classList.remove('on'), 1400);
+  /** Keep her changes: your boats saved, and the panel's starting point moved up to them. */
+  private keep(): void { this.changed(true); this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
+  /** Put her back as she was when the panel opened. */
+  private revert(): void {
+    if (!this.snap) return;
+    const s0 = structuredClone(this.snap);
+    this.S.boats = s0.boats; this.S.boatId = s0.boatId; this.S.opponents = s0.opponents;
+    this.S.boat = this.S.boats.find(x => x.id === s0.boatId) ?? this.S.boats[0];
+    if (!this.S.boats.some(x => x.id === this.editId)) this.editId = this.S.boatId;
+    this.changed(true);
   }
-  private savedT = 0;
+  /** Done (or Esc): back to her page, asking first if her changes aren't saved. */
+  requestDone(): void { this.leave(() => this.done(false)); }
+  /** Go on (Done, Esc, the start page), or with changes unsaved, ask first: Save or Discard. */
+  leave(next: () => void): void {
+    if (!this.edited) { next(); return; }
+    this.leaving = next; this.render();
+  }
   private uniqueName(base: string): string {
     const names = new Set(this.S.boats.map(b => b.name)); let n = base, k = 2;
     while (names.has(n)) n = `${base} ${k++}`;
@@ -67,19 +84,11 @@ export class BoatPanel {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!t) return;
     const v = t.dataset.v ?? '';
     switch (t.dataset.act) {
-      case 'done': this.done(); return;
+      case 'done': this.leave(() => this.done(false)); return;
+      case 'save': this.keep(); this.done(true); return;
+      case 'askSave': { const go = this.leaving; this.leaving = null; this.keep(); go?.(); return; }
+      case 'askDiscard': { const go = this.leaving; this.leaving = null; this.revert(); go?.(); return; }
       case 'spin': if (this.onSpin) { this.spinning = this.onSpin(); t.textContent = this.spinning ? 'Pause turning' : 'Turn her'; t.setAttribute('aria-pressed', String(!this.spinning)); } return;
-      case 'discard': this.confirmDiscard = true; this.render(); return;
-      case 'discardNo': this.confirmDiscard = false; this.render(); return;
-      case 'discardYes': {
-        if (!this.snap) return;
-        const s0 = structuredClone(this.snap);
-        this.S.boats = s0.boats; this.S.boatId = s0.boatId; this.S.opponents = s0.opponents;
-        this.S.boat = this.S.boats.find(x => x.id === s0.boatId) ?? this.S.boats[0];
-        if (!this.S.boats.some(x => x.id === this.editId)) this.editId = this.S.boatId;
-        this.confirmDiscard = false;
-        this.changed(); this.render(); return;
-      }
       case 'skipper': this.set(b => { b.skipper = v === 'you' ? 'you' : 'ai'; }); return;
       case 'material': this.set(b => { b.hull.material = v as BoatSpec['hull']['material']; if (v === 'wood' && b.deck === '#8e9f7c') b.deck = 'teak-silver'; }); return;
       case 'upper': this.set(b => { b.hull.upper = v; }); return;
@@ -187,11 +196,9 @@ export class BoatPanel {
     const deckList = [...TEAK_DECKS, ...HULL_COLORS]; // laid teak on glassfibre decks too (a common refit)
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
     morph(this.el, `
-      <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button><button type="button" class="cta" data-act="done">Done</button></div>
+      <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button>${this.leaving ? '' : this.edited ? '<button type="button" class="cta" data-act="save">Save</button>' : '<button type="button" class="cta" data-act="done">Done</button>'}</div>
       <div class="garage">
-        ${this.confirmDiscard
-          ? `<div class="gconfirm">Undo every change since you started editing? <button type="button" class="ghost danger" data-act="discardYes">Discard changes</button><button type="button" class="ghost" data-act="discardNo">Keep them</button></div>`
-          : `<small><span class="gsaved" id="bpSaved">Saved ✓</span>${this.edited ? ' <button type="button" class="linkbtn" data-act="discard">Discard changes</button>' : ''}</small>`}
+        ${this.leaving ? '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-act="askSave">Save</button><button type="button" class="ghost" data-act="askDiscard">Discard</button></div>' : ''}
       </div>
       <div class="bpbody">
       <section><h3>Particulars</h3>

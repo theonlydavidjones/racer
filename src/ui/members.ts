@@ -94,7 +94,7 @@ export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
 }
 
 /** A member's page: their name and build, their skill and crew ratings, a skipper too, and leaving the club. */
-export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean): string {
+export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean, save: { dirty: boolean; asking: boolean } = { dirty: false, asking: false }): string {
   const yours = m.origin === 'yours', you = m.id === YOU;
   const skillSel = `<select data-m="skill"${yours ? '' : ' disabled'}>${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((m.skill ?? 0.6) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   // each rating follows their Skill until you set it (the owner: say so plainly): the number always shown, "auto" by one
@@ -108,7 +108,8 @@ export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean)
   const del = you || !yours ? '' : confirmDelete
     ? `<div class="gconfirm">Remove ${esc(m.name)} from the club? <button type="button" class="ghost danger" data-f="mdelYes">Remove</button><button type="button" class="ghost" data-f="mdelNo">Keep</button></div>`
     : `<button type="button" class="ghost" data-f="mdel">Remove from the club</button>`;
-  return `<div class="mhead"><button type="button" class="linkbtn" data-f="mback">‹ Members</button><h2>${esc(m.name)}</h2><span class="mwho">${whoLine(m)}</span></div>
+  return `<div class="mhead"><button type="button" class="linkbtn" data-f="mback">‹ Members</button><h2>${esc(m.name)}</h2><span class="mwho">${whoLine(m)}</span>${save.dirty && !save.asking ? '<button type="button" class="cta sm" data-f="msave">Save</button>' : ''}</div>
+    ${save.asking ? askSaveHtml : ''}
     <div class="mpage">
       <section><h3>${you ? 'You' : 'Who they are'}</h3>
         <label class="mfield"><span>Name</span><input data-m="name" value="${esc(m.name)}"${you || !yours ? ' disabled' : ''}></label>
@@ -125,6 +126,8 @@ export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean)
 }
 
 /** A change on a member's page (an input's data-m, and its value): applied to the member. Returns whether it changed. */
+/** Leaving with unsaved changes (the owner): Save or Discard, in place, before going. */
+export const askSaveHtml = '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-f="askSave">Save</button><button type="button" class="ghost" data-f="askDiscard">Discard</button></div>';
 export function applyMemberInput(m: Member, field: string, value: string, attr?: string, checked?: boolean): boolean {
   if (m.origin !== 'yours') return false;
   switch (field) {
