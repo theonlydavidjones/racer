@@ -1,4 +1,5 @@
-import { CoachMemory } from './boat/coach';
+import { CoachMemory, lineNotes } from './boat/coach';
+import { trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
@@ -639,7 +640,25 @@ function renderCoach(): void {
   }
   $('coachBody').innerHTML = html;
 }
-$('bCoach').onclick = () => { const p = $('coachPanel'); p.hidden = !p.hidden; if (!p.hidden) renderCoach(); };
+/* Trim Notes (ui/trimNotes.ts; the owner's Option 2): every line's note, grouped as on the band, paused while it's
+ * open. From the Coach card (its Trim coach button, or All notes in the live note) or its key; Back, Esc or the key
+ * again closes it, and the race carries on if it was sailing when it opened. */
+let notesPaused = false;
+function openTrimNotes(): void {
+  if (!w.running || !$('trimNotes').hidden) return;
+  notesPaused = !w.paused; if (notesPaused) send({ k: 'pause', on: true });
+  const { s, notes } = lineNotes(w.user, { preStart: !w.freeSail && w.t < 0 });
+  $('trimNotesBody').innerHTML = trimNotesHtml(w.user, s, notes);
+  $('trimNotes').hidden = false; $<HTMLButtonElement>('bTrimNotesX').focus();
+}
+function closeTrimNotes(): void {
+  if ($('trimNotes').hidden) return;
+  $('trimNotes').hidden = true;
+  if (notesPaused) send({ k: 'pause', on: false }); notesPaused = false;
+}
+$('trimNotes').addEventListener('click', e => { const el = e.target as HTMLElement; if (el.id === 'bTrimNotesX' || el.id === 'trimNotes') closeTrimNotes(); });
+$('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-all')) openTrimNotes(); });
+$('bCoach').onclick = () => openTrimNotes();
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
@@ -651,9 +670,14 @@ function coachTick(dt: number): void {
   coachT += dt; if (coachT < 0.5 && coachShown) { tipFade(); return; }
   coachT = 0;
   coachShown = coachMem.step(u, w.t, { preStart: !w.freeSail && w.t < 0, justRounded: w.t - legT < 12 });
-  const r = coachShown;
-  $('tpHint').textContent = r.done ?? r.view.top.head;
-  $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : r.view.top.kind);
+  const r = coachShown, top = r.view.top, fix = !r.done && top.kind === 'fix';
+  // the live note: one at a time, numbered, held (the bar runs out over its hold); what the line's doing and why under
+  // it, with All notes; the line ringed in the band, its target on its track
+  $('tpHint').innerHTML = r.done ? ce(r.done) : fix ? `<span class="tp-n">1</span>${ce(top.head.replace(/\.$/, ''))}${r.of > 1 ? `<span class="tp-of">1 of ${r.of}</span>` : ''}` : ce(top.head);
+  $('tpHint').className = 'tp-hint ' + (r.done ? 'done' : top.kind);
+  $('tpSub').innerHTML = fix ? `${top.now ? ce(top.now) + '. ' : ''}${ce(top.short ?? '')}<button type="button" class="tp-all">All notes ›</button>` : '';
+  $('tpHold').hidden = !fix; ($('tpHold').firstElementChild as HTMLElement).style.width = `${Math.round((1 - r.held) * 100)}%`;
+  band.cue(fix && top.line ? top.line : null, fix ? top.to ?? null : null);
   // the headline on the water: only when the panel's shut (it says the same), for six seconds of real time, and it
   // follows the coach while it's up (it never contradicts the panel or the trim panel)
   const tip = $('coachTip'), open = !$('coachPanel').hidden;
@@ -689,6 +713,7 @@ function lessonTick(): void {
   // Before you go: at the dock, its card first (the gear, the float plan), the lesson paused behind it
   if (L.id === 'before' && L.step === 0 && dockFor !== L) { dockFor = L; dockGear.clear(); send({ k: 'pause', on: true }); paintDock(); $('lessonCard').hidden = false; }
   $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
+  $('tpSub').textContent = ''; $('tpHold').hidden = true; band.cue(null); // (a lesson's cue is the one note: the coach waits)
   $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
   if (L.cue !== lessonCue) {
     lessonCue = L.cue;
@@ -1082,7 +1107,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('leaveAsk').hidden || !$('seasonView').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('trimNotes').hidden || !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('leaveAsk').hidden || !$('seasonView').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -1095,6 +1120,7 @@ addEventListener('keydown', e => {
   if (!$('leaveAsk').hidden) { if (e.key === 'Escape') $('bLeaveNo').click(); return; } // leave or keep racing first
   const a = keymap.actionFor(e.key);
   if (e.key === 'Escape') {
+    if (!$('trimNotes').hidden) { closeTrimNotes(); return; }
     if (!$('flagIndex').hidden) { hud.flagIndex(w, false); return; }
     if (raceReplay.isOpen) { raceReplay.close(); return; }
     if (courseView.isOpen) { courseView.close(); return; }
@@ -1118,6 +1144,7 @@ addEventListener('keydown', e => {
   if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.cruising) navView.toggle(w); else courseView.toggle(w); return; }
   if (raceReplay.isOpen) return; // the replay's own buttons only
   if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
+  if (a === 'trimNotes') { if ($('trimNotes').hidden) { if (!anyOverlay()) openTrimNotes(); } else closeTrimNotes(); return; }
   if (anyOverlay() || !a) return;
   if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
   if ((a === 'ctlUp' || a === 'ctlDown') && !e.repeat) { const k = CTL_UI[ctlSel].key; if (k === 'carFore' || k === 'carIn') { stepCar(k, a === 'ctlUp' ? 1 : -1); return; } }

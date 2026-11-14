@@ -218,13 +218,14 @@ function lineWords(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheetW
   return { now: '', short: l.why };
 }
 /** A line that's right: in a few words, what it's doing (Trim Notes' ✓ lines). */
-function okWords(s: Situation, k: LineKey): string {
+function okWords(b: Boat, s: Situation, k: LineKey): string {
   const tws = Math.round(s.tws), up = s.awa < 60;
   switch (k) {
     case 'mainsheet': return s.awa > 110 ? 'Out square to the wind' : 'Drawing: its leech telltales streaming';
     case 'jibsheet': return s.awa > 115 ? 'Out, full' : 'Drawing: its luff telltales streaming, windward and leeward';
     case 'traveller': return 'Boom where it pays';
-    case 'vang': return up && s.tws < 18 ? 'Slack upwind, as the North guide has it' : 'Leech held';
+    // (upwind under 18 kt the guide wants it slack; on, it's worth too little to say so, so say what it's doing)
+    case 'vang': return up && s.tws < 18 ? (b.ctl.vang <= 0.15 ? 'Slack upwind, as the North guide has it' : 'On: the sheet does the work upwind') : 'Leech held';
     case 'outhaul': return `Foot right for ${tws} kt`;
     case 'cunningham': case 'downhaul': return 'Draft about halfway back';
     case 'jibCunningham': case 'jibHalyard': return 'Jib luff smooth, draft forward';
@@ -248,7 +249,7 @@ export function lineNotes(b: Boat, ctx: CoachContext = {}): { s: Situation; note
     const who = byHand(b, k) ? 'you' : 'crew';
     let fix: Lesson | null = null;
     if (!busy && k !== 'car') { const r = bestFor(b, k as Exclude<LineKey, 'car' | 'jibsheetW'>); if (r.gain >= FIX_MIN) fix = lineLesson(b, s, k as Exclude<LineKey, 'car' | 'jibsheetW'>, r.to, r.gain); }
-    notes.push({ line: k, who, fix, ok: okWords(s, k) });
+    notes.push({ line: k, who, fix, ok: okWords(b, s, k) });
   }
   return { s, notes };
 }

@@ -6,7 +6,7 @@ export type Action =
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
-  | 'course' | 'log' | 'pause' | 'keys';
+  | 'course' | 'log' | 'pause' | 'keys' | 'trimNotes';
 
 /** Actions that last while the key is held (the rest fire once per press). */
 export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
@@ -28,6 +28,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'ctlUp', label: 'Selected line: more (tighten; ease a sheet; car aft/out)', group: 'Sails' },
   { id: 'pole', label: 'Whisker pole out / in', group: 'Sails' },
   { id: 'sailBand', label: 'Sail controls: show or put away', group: 'Sails' },
+  { id: 'trimNotes', label: 'Trim notes: every line, what it\'s doing and what it should be (pauses)', group: 'Sails' },
   { id: 'crewLee', label: 'Crew weight a step to leeward (hike → up → middle → leeward)', group: 'Crew' },
   { id: 'crewUp', label: 'Crew weight a step to windward (leeward → middle → up → hike)', group: 'Crew' },
   { id: 'crewFwd', label: 'Crew weight forward a step', group: 'Crew' },
@@ -68,7 +69,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
-  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'],
+  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'], trimNotes: ['/'],
 };
 
 /** Keys you can't rebind (Esc cancels things; Tab moves focus). */

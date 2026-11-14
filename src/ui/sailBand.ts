@@ -88,20 +88,20 @@ const vert = (key: CtlKey | 'jib', side: Side) => {
   return `<div class="sb-v" data-line="${key}" data-side="${side}" style="--rope:${col}">
   <button type="button" class="sb-nm" data-act="name">${SHORT[k]}</button>
   <button type="button" class="sb-a" data-act="ease" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: ease">${chev('u')}</button>
-  <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span>
+  <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span>
   <button type="button" class="sb-a" data-act="pull" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: pull on">${chev('d')}</button></div>`;
 };
 /** The backstay's end on one side, pulled outboard. */
 const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="--rope:${ROPE.backstay}">
   <button type="button" class="sb-nm" data-act="name">Backstay</button>
   <span class="sb-hrow">${side === 'P'
-    ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
-    : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
+    ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
+    : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
 /** A track across the boat (port end left): the mainsheet's boom marker or the traveller's car. */
 const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="--rope:${ROPE.mainsheet}">
   <button type="button" class="sb-nm" data-act="name">${label}</button><span class="sb-end p">P</span>
   <button type="button" class="sb-a" data-act="left" aria-label="${k === 'mainsheet' ? 'Boom toward port' : 'Car to port'}">${chev('l')}</button>
-  <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
+  <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
   <button type="button" class="sb-a" data-act="right" aria-label="${k === 'mainsheet' ? 'Boom toward starboard' : 'Car to starboard'}">${chev('r')}</button><span class="sb-end s">S</span>${k === 'mainsheet' ? '<span class="sb-rin"></span><span class="sb-rtk"></span>' : ''}</div>`;
 /**
  * The windex, as you'd see it looking up at the masthead (in the band's middle, where the helm looks up past the
@@ -167,6 +167,10 @@ export class SailBand {
   private holdT = 0;
   private holding: CtlKey | null = null;
   private sel: CtlKey | null = null;
+  /** The coach's line, ringed, and where it should go (its ◆ on the track): the live note's (app.ts coachTick). */
+  private cueLine: string | null = null; private cueTo: number | null = null;
+  /** Point at a line for the coach: ring it and put its target on its track; null clears it. */
+  cue(line: string | null, to: number | null = null): void { this.cueLine = line; this.cueTo = to; }
   private lastTack: 'S' | 'P' | null = null;
   /** The boat whose rope colours the band shows (re-coloured when you change boats, or her colours). */
   private colorsOf: string | null = null;
@@ -512,6 +516,10 @@ export class SailBand {
       const iv = ideal?.[k as keyof typeof ideal] as number | undefined;
       hide(mark, !mine || iv == null);
       if (iv != null) { const io = Math.round(onOf(k, iv) * 100) + '%'; if (horiz) { mark.style.left = d.dataset.side === 'P' ? `calc(100% - ${io})` : io; } else mark.style.top = io; }
+      // the coach's line: ringed, its target on the track (the lazy jib sheet never: the working one is the coach's)
+      const cued = this.cueLine === k, cue = d.querySelector<HTMLElement>('.sb-cue');
+      d.classList.toggle('cue-ring', cued);
+      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) { const co = Math.round(onOf(k, this.cueTo) * 100) + '%'; if (horiz) cue.style.left = d.dataset.side === 'P' ? `calc(100% - ${co})` : co; else cue.style.top = co; } }
     });
     // the mainsheet: the boom's end across the boat (sin of its angle, toward leeward); the crew's boom, dashed
     {
@@ -521,6 +529,9 @@ export class SailBand {
       boom.style.left = `${50 + x * 50}%`; d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'mainsheet');
       hide(mark, !mine || !ideal);
       if (ideal) mark.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: ideal.mainsheet, traveller: ideal.traveller }) * D2R) * 50}%`;
+      const cued = this.cueLine === 'mainsheet', cue = d.querySelector<HTMLElement>('.sb-cue');
+      d.classList.toggle('cue-ring', cued);
+      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: this.cueTo }) * D2R) * 50}%`; }
     }
     {
       const d = this.el.querySelector<HTMLElement>('.sb-trk[data-line="traveller"]')!, mine = byHand(u, 'traveller');
@@ -528,6 +539,9 @@ export class SailBand {
       d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'traveller');
       const mark = d.querySelector<HTMLElement>('.sb-mark')!; hide(mark, !mine || !ideal);
       if (ideal) mark.style.left = `${50 + ideal.traveller * leeSign(u) * 50}%`;
+      const cued = this.cueLine === 'traveller', cue = d.querySelector<HTMLElement>('.sb-cue');
+      d.classList.toggle('cue-ring', cued);
+      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + this.cueTo * leeSign(u) * 50}%`; }
     }
     this.jumpers(u);
     // the jib cars: the crossbar on its row, the car on its pin; the leeward one is loaded
