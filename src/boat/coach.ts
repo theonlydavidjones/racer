@@ -536,7 +536,7 @@ export function teach(b: Boat, ctx: CoachContext = {}): CoachView {
  * and when the one it's been teaching is fixed, it says so, with the speed it made, for a few seconds.
  */
 /** How long a note stays up at least (s), so it can be read and acted on (the owner: "info is flying by way too fast"). */
-export const HOLD_S = 12;
+export const HOLD_S = 10; // (the owner, 14 Nov 2026: "12 seconds might be a bit long; lets do 10")
 /** How long after a tack, a jibe or a rounding the coach keeps quiet (s): she settles first. */
 export const SETTLE_S = 5;
 
