@@ -262,7 +262,7 @@ export function basinCalm(p: Vec): number {
   // the pier's piles and its shed between them: geo/shore.ts PILE_PIERS. Across the piles the two mix, over a few meters)
   // (the water in the slots between the piers, and beside them, has just come through a pile field: no faster than
   // the piles let it, PILE_FLOW; under a shed itself shoreRelief already takes that, so here it's 1)
-  if (offPiles(p, 100)) return basinCalmGrid(p); // (well clear of the piers, as everywhere else on the Bay: one quick test, every boat, every step)
+  if (offPiles(p, DECK + PILE_MIX)) return basinCalmGrid(p); // (beyond the piers' deck and the mix past it, as everywhere else on the Bay: one quick test, every boat, every step. The slots lie inside the piers' box, and past DECK + PILE_MIX pierMix gives the grid's own)
   const pd = pilePierDist(p); if (pd <= 0) return 1;
   const sd = pileSlotDepth(p); if (sd >= 0) return pd <= DECK ? Math.min(PILE_FLOW, slotFlow(sd)) : slotFlow(sd);
   // (beside a pier: still water there comes up toward what the piles pass, as it mixes with what came through them;

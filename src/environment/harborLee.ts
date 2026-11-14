@@ -111,11 +111,13 @@ const CELL_M = 50, NONE: Body[] = [];
  * yet). A plain array read, not a hash: it's asked for every boat, every step. */
 let IDX: Int32Array | null = null, NX = 0, NY = 0;
 const CELLS: Body[][][] = [];
+let LAST_C = -1, LAST_S = 0; // (the cell last asked about and its slot: a boat's own point asked again)
 function cellBodies(p: Vec, from: number): Body[] {
   if (!IDX) { NX = Math.ceil((BOX.x1 - BOX.x0) / CELL_M) + 1; NY = Math.ceil((BOX.y1 - BOX.y0) / CELL_M) + 1; IDX = new Int32Array(NX * NY); }
   const i = Math.floor((p.x - BOX.x0) / CELL_M), j = Math.floor((p.y - BOX.y0) / CELL_M);
   if (i < 0 || j < 0 || i >= NX || j >= NY) return NONE;
-  let s = IDX[j * NX + i];
+  const c = j * NX + i;
+  let s = c === LAST_C ? LAST_S : IDX[c];
   if (s === 0) {
     const x0 = BOX.x0 + i * CELL_M, y0 = BOX.y0 + j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M, near: Body[] = [];
     for (const G of GROUPS) { if (G.box.x1 < x0 || G.box.x0 > x1 || G.box.y1 < y0 || G.box.y0 > y1) continue;
@@ -129,6 +131,7 @@ function cellBodies(p: Vec, from: number): Body[] {
     }));
     s = CELLS.length; IDX[j * NX + i] = s;
   }
+  LAST_C = c; LAST_S = s;
   const k = Math.floor(from) % 360;
   return CELLS[s - 1][k < 0 ? k + 360 : k];
 }
