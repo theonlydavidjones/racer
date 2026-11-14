@@ -142,7 +142,7 @@ const PLAN_AHEAD = 400;
 const OFF_ROUTE = 40, RETRY_M = 30, RETRY_T = 60;
 /** The way to the turn must keep this clear of a pier either side (m), or it's planned again from where she is: the
  * route keeps 10 m off, and a sag to leeward that leaves her steering a chord past a pier head has lost it. */
-const LEG_CLEAR = 4;
+const LEG_CLEAR = 6;
 /** Tack for more room in a channel only onto a tack with this much water ahead (m): a tack that only swaps a short
  * board for another leaves her in irons by the wall. */
 const ROOM = 25;
