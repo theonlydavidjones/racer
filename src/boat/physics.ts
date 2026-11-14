@@ -866,7 +866,7 @@ export function wreck(b: Boat, how: string, hit: Vec, emit: Emit): void {
  * drawn), grinding her topsides on the concrete: damage.
  */
 const pileTouch = new WeakMap<Boat, { last: number; since: number; ends: number; all: number }>(), pileTold = new WeakMap<Boat, number>();
-const pileAt = new WeakMap<Boat, { x: number; y: number }>(); // (where she was when last told)
+const pileAt = new WeakMap<Boat, { x: number; y: number; set: boolean }>(); // (where she was when last told, and whether it was that she's set on them)
 /** ESTIMATES: how long pinned on the piles (s) before she's in under the deck, and the longest gap between touches that's
  * still pinned (pushed off a little each touch, the stream and the wind set her straight back on). */
 const PINNED = 30, PINNED_GAP = 20;
@@ -893,9 +893,11 @@ function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, hit: Ve
   // (said once each spell on them: no touch for PINNED_GAP s ends one, unless she's still where she touched. Fended a
   // hand's breadth off with next to no wind she takes longer than that to drift back, and it's the same spell: she has
   // to get a couple of meters clear, or hit them hard, to be told again)
-  const told = pileTold.get(b) ?? -99, at = pileAt.get(b), still = !!at && Math.hypot(b.x - at.x, b.y - at.y) < 2 && level !== 'damage';
-  pileTold.set(b, t); if (!still) pileAt.set(b, { x: b.x, y: b.y });
-  if (b.isUser && t - told > PINNED_GAP && !(still && told > -99)) emit({ type: 'toast', ms: 6000, msg: level === 'damage' ? `Hit the piles of ${pier} hard: damage. Get way on and steer off.` : closing < PIN_V ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: held there, she'll be worked in under it. Get way on and steer off.` });
+  // (and told again where she lies if it has got worse: touching gently, then set on them harder)
+  const told = pileTold.get(b) ?? -99, at = pileAt.get(b), set = closing >= PIN_V, worse = set && !!at && !at.set;
+  const still = !!at && Math.hypot(b.x - at.x, b.y - at.y) < 2 && level !== 'damage' && !worse;
+  pileTold.set(b, t); if (!still) pileAt.set(b, { x: b.x, y: b.y, set });
+  if (b.isUser && (t - told > PINNED_GAP || worse) && !(still && told > -99)) emit({ type: 'toast', ms: 6000, msg: level === 'damage' ? `Hit the piles of ${pier} hard: damage. Get way on and steer off.` : closing < PIN_V ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: held there, she'll be worked in under it. Get way on and steer off.` });
 }
 /** Below this speed through the water (m/s), about a knot, her rudder barely bites and she goes where the stream and wind
  * set her (ESTIMATE: no source found for a Folkboat; a long keel's rudder needs some way to answer) */
