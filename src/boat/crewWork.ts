@@ -85,14 +85,18 @@ export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): numbe
   const helm = skillOf(spec.helm), mid = skillOf(spec.crew[0]);
   return mid >= helm && mid >= NOVICE ? 1 : 0;
 }
-/** Who works a line (an index into [helm, crew…]): by the number of crew, and who has the main (mainHand). */
-export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = false): number {
+/** Where the crew are along the deck (crewPhys.ts chooseLayout): in the cockpit, the bow hand at the mast, or both up on the foredeck. */
+export type Forward = 'cockpit' | 'mast' | 'foredeck';
+/** Who works a line (an index into [helm, crew…]): by the number of crew, who has the main (mainHand), and who's forward. */
+export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, layout: Forward = 'cockpit'): number {
   if (nCrew === 0) return 0;
-  const main = mainHand(nCrew, spec, forward);
+  const forward = layout !== 'cockpit', main = mainHand(nCrew, spec, forward);
   if (line === 'mainsheet' || line === 'traveller') return main;
   if (line === 'backstay') return 0;
-  // the jib: the forward crew (with one crew, whichever of the two hasn't the main)
-  if (line === 'jibsheet' || line === 'jibsheetW') return nCrew === 1 ? 1 - main : nCrew;
+  // the jib: the forward crew (with one crew, whichever of the two hasn't the main). With crew gone forward, whoever's
+  // still in the cockpit: a Folkboat's jib sheets lead aft to the cockpit winches, out of reach from the mast (the middle
+  // crew with the bow hand at the mast; the helm, with both sheets, when everyone else is forward)
+  if (line === 'jibsheet' || line === 'jibsheetW') return forward ? (layout === 'mast' && nCrew >= 2 ? 1 : 0) : nCrew === 1 ? 1 - main : nCrew;
   return nCrew; // the forward hand: the cabin-top lines, the cars, the pole, the halyards
 }
 
@@ -166,10 +170,24 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const err = (k: Ctl) => Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
   const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
+  // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
+  // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
+  const fwdL: Forward = c.layout ?? 'cockpit';
+  const worker = (k: string) => {
+    const o = ownerOf(k, n, c.spec, fwdL);
+    if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
+      const j = c.people[o]?.job;
+      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
+    }
+    return o;
+  };
   // finish or drop jobs on lines that are done, or that you've taken. A control line is set to where the crew wanted it
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
-  c.people.forEach(a => {
+  c.people.forEach((a, i) => {
     const j = a.job; if (!j) return;
+    // (a sheet that's no longer theirs, as the crew go forward and the helm takes the main: let go. A sheet follows the
+    // wind, so it's never done; held, the bow hand at the mast kept the main, the helm the jib, and neither was trimmed)
+    if (sheetOf(j.line) && worker(j.line) !== i) { a.job = null; return; }
     // (placed by you: they leave a tweak they'd have to leave their place for, and work the dual-ended lines from there)
     if (waits.includes(j.line) && !j.big) { a.job = null; return; }
     if (placed && BOTH_SIDES.has(j.line)) j.station = null;
@@ -184,17 +202,6 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     }
     else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
   });
-  // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
-  // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
-  const fwdL = (c.layout ?? 'cockpit') !== 'cockpit';
-  const worker = (k: string) => {
-    const o = ownerOf(k, n, c.spec, fwdL);
-    if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
-      const j = c.people[o]?.job;
-      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
-    }
-    return o;
-  };
   // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
   // times a second: quicker than anyone reacts)
   c.jobT = (c.jobT ?? 0) - dt; c.lineT = (c.lineT ?? 0) + dt;
@@ -287,7 +294,7 @@ export const CAR = {
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
 function carJob(b: Boat, dt: number): void {
-  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
+  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, c.layout ?? 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
   const lazy = b.ctl.car[b.tack];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
   // a job under way: on the car the boat has tacked onto, it's loaded now and can't be moved
@@ -321,7 +328,7 @@ function carJob(b: Boat, dt: number): void {
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;
-  const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
+  const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, c.layout ?? 'cockpit'), a = c.people[who];
   if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);
