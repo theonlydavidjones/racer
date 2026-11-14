@@ -220,8 +220,7 @@ describe('The crew', () => {
 });
 
 describe('Sailing a little below the beat angle', () => {
-  // (waiting on the owner's weather-helm figure (asked 14 Nov); the sail moment is unsourced)
-  it.fails("costs what the polar's pinching curve says (ORC's VMG peak), not more: the sails flog only as far as they luff", () => {
+    it("costs what the polar's pinching curve says (ORC's VMG peak), not more: the sails flog only as far as they luff", () => {
     for (const W of [8, 14, 20]) {
       const beat = beatAngle(W), vmg = (off: number) => {
         const twa = beat - off, b = testBoat({ heading: 360 - twa, kt: polar(W, beat, 'jib') / KT, windKt: W });

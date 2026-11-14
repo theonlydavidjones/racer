@@ -1,4 +1,4 @@
-# Deep Physics: handoff (updated 14 Nov 2026, early; Fable session)
+# Deep Physics: handoff (updated 14 Nov 2026, midday; Fable session)
 
 Supersedes the copy on branch `rudder` (kept there for its "things not to relearn", which still hold).
 
@@ -6,20 +6,15 @@ Supersedes the copy on branch `rudder` (kept there for its "things not to relear
 
 | Branch | State | What's left |
 |---|---|---|
-| `turning` (no PR; PR note sent to the Coordinator) | The owner-approved force-based turn, with `shore-relief` (windage) and the class rudder inside it. Feature-complete, physics-reviewed (six findings fixed), main 73e8d65 merged. Full suite on 2ff0ab4: every whole-race test passes. test:fast on 071c957: 10 fail, each with an owner (six wait on the owner's helm answer; two are rule 20, fixed on Rules' `rules-turning`; crew flicker; Marinas' docking rule). | The Coordinator batches it after car-lead and the crew fixes. Rules PRs `rules-turning` into it. Rerun the full suite on the head if asked. When the helm answer comes: calibrate the sails' moment (balance.ts sailYaw), re-measure the tables, and the six tests should come back. |
-| `shore-relief` (no PR, 2de1c5b) | Inside `turning`. Kept in step with main in case the windage is wanted on main sooner. | Nothing unless the Coordinator asks. |
-| `car-lead` (PR #236, a391473, main merged) | Ships inside Boat Detail's combined PR (claude/bow-lines-ship); the Coordinator closes #236. Its yardstick failure was sampling; its every-step fouls equal main's over 64 seeds; perf clear on the Coordinator's host. | Look over Boat Detail's world.ts resolution (dockStep: the jib's line, swallowed by a comment on main too). |
-| `red-loop` (fb385c9) | A repro for Skipper Model, not for merging: main at batch 34 + car-lead, where Red orbits the last mark after a penalty (seed 11, SS2 course 2, ebb). | Delete when Skipper Model is done. |
+| `turning` (PR #289) | The force-based turn, with `shore-relief` and the class rudder inside it. Main v188 and Rules' `rules-turning` merged. Five helm tests marked `it.fails` until the owner's weather-helm answer. Perf inside the gate by perf-pair on two hosts (1.0075, 1.0028). Grounding: after 15 s aground she may be worked free (RRS 42.3(h)). | Lands with Skipper Model's #276 (the fleet fouled twice as often on main's AI with this turn: fouls-per-start test). Merge main again before it's batched. |
+| `fouls-per-start` (02f5d8d9) | The test that caught it: 16 umpired starts; main 23 fouls, turning on main's AI 42, #276 25; bound 28. Excluded from test:fast. | Rides in with #289/#276 (in #276's base). |
+| `harbor-mouth` (PR #308, against Bay East's #300) | The Gashouse Cove entrance: the shed eddies, the gyre and the pile lee (src/environment/harborMouth.ts), reviewed three times. Paired perf 0.988. | In the Coordinator's batch. |
+| `astern-drag` (PR #317, against `turning`) | Sternway on twice her hull's resistance (an estimate) in place of the unsourced ASTERN_DRAG. Reviewed; fixes in. | HELD: shoved astern at SHOVE she now runs 37 m and hits the far side from nearly every such berth hands-off; Marinas to size the shove by asternCoast or test it steered. Then: asternDrag at her mass with crew (held out: it tips abandon-home). Retarget to main after #289. |
+| `tack-by-boom` (PR #318, against `turning`) | Her tack by the RRS definitions: by the lee her mainsail's side, changing when the boom has crossed. Reviewed; fixes in. | Waits on Skipper Model's fix for the abandon-home encounter (AI hunting about dead downwind in 26 kt). Retarget to main after #289. |
+| `drive-blend` (c7a7c874, PARKED) | The beat angle's jumps in chop: the residuary table made a monotone cubic, the drive curve blended across knots and angle bins. | After #289/#276/#317/#318: rebase; five test:fast failures to settle with their owners (tack table at 20 kt, mine; crew.test hike and crewfig; protests; passageNow ending on land, a real bug from the drive blend). Consider zeroing the residuary's linear toe under Fn 0.1 here. |
+| `car-lead` | On main through Boat Detail's #291; sim-fleet runs 18 seeds, bound unchanged. | Nothing. |
+| `red-loop`, `rudder` | Done with. | Delete. |
 | `mainsheet-point` (PR #165) | Unchanged: waits on Crew Figures' crew-still. | |
-| `rudder` | Superseded by `turning`. | Delete once `turning` lands. |
-
-## Turning: what's measured (071c957)
-
-- Turning circle 9.3 m radius at every speed. Crew tack at 12 kt: 3.3 s head to wind, lowest speed 0.63, planner's cost 3.9 s (measured on mirrored courses). Sculled turn 4.4°/s by the standard stroke.
-- Weather helm 0.4° at 12 kt, 1.5° at 20 kt: light, flagged.
-- Bare poles she lies with the wind near her beam (computed). A 720 on the tiller alone is about 80 s (the reviewer suspects the hard-over drag is high for a keel-hung blade).
-- HOVE.rudderFlow 0.4, tuned to the hove-to observations with the class blade (0.4–0.5 hold them).
-- Perf: a lone boat's step +0.7 µs on 13.1; the fleet test reads the same as main within its noise on this host.
 
 ## Turning: flagged, not settled
 
@@ -27,17 +22,19 @@ Supersedes the copy on branch `rudder` (kept there for its "things not to relear
 - heaveTo's b.helm is the raw tiller, unslewed. rudderForce books the blade's lift and drag in the boat's axes without turning them through the inflow angle (a few newtons at rudderFlow 0.4).
 - The coach's heave-to sequence test sits on a knife edge (the main's luff reads 0.17 against 0.15 on main): it passed at rudderFlow 0.40 and failed at 0.38 and 0.42.
 
-## Queue after turning
+## Queue
 
-- ROADMAP 8n point 4: eddies at the Gashouse Cove entrance, on Bay East's current field (bay-east-15 and their harbor-wall lee). The research is in reference/research/gashouse-entrance-eddies.md. NEXT.
-- Audit #23's remainder (see `rudder`'s copy), now including: calAt's clamp (the sail model's raw drive falls short of the polar's need in two cells in five).
+- When the owner answers the weather-helm ask: calibrate the sails' yaw moment, unmark the five `it.fails`, re-measure the tack tables, send "OWNER ASK DONE:".
+- Audit #23's remainder (see `rudder`'s copy), including calAt's clamp (the sail model's raw drive falls short of the polar's need in two cells in five).
 
 ## Owner asks out (through the Coordinator)
 
 1. Josephine's weather helm close-hauled in 15–20 kt.
-2. The jib car's position.
-3. How she lies left alone with her sails down, and how long her bow takes to fall off.
-4. (Useful) her own timed 720.
+2. Her own timed 720.
+3. How hard and fast they scull her.
+4. How far she glides from a slow-walk shove in calm water; her speed under one paddle.
+5. Whether the main should hold 15–20° by the lee before it comes across (now 4°). Not to be built until answered.
+6. How she lies left alone with her sails down, and how long her bow takes to fall off.
 
 ## Things learned this session
 
@@ -45,3 +42,7 @@ Supersedes the copy on branch `rudder` (kept there for its "things not to relear
 - The owner's "drifts to windward under bare poles" was the tidal stream inside Gashouse Cove on main (0.30–0.35 kt), fixed by bay-east-15's basin calm; Bay East has the repro as a test.
 - Run perf.test only on a quiet machine; anything beside it taints it. A lone-boat benchmark (cpuUsage over 36,000 steps) resolves 5% where the fleet test can't resolve 3%.
 - Scratch tests go in tests/zz-*.test.ts (ignored locally via .git/info/exclude) and write to a file: console output is swallowed.
+- Single perf runs on the shared host swing ±10%: only scripts/check/perf-pair.mjs (paired, alternating) settles a perf question.
+- abandon-home's close-quarters count flips on any few-percent physics change (a different case each time): the AI there sits at the bound. Skipper Model has it; don't restate the test.
+- After every merge: `git grep -n "^<<<<<<< "` before committing.
+- A Boat field read in the step must be predeclared in World's boat literal (the object's shape stays one hidden class).

@@ -25,6 +25,9 @@ export interface BoatSpec {
   /** The forehatch: a varnished teak cover on a wooden frame, or a smoked acrylic lid in an aluminium frame (the usual
    * modern production hatch, as Lewmar's). */
   hatch?: 'teak' | 'acrylic';
+  /** The cockpit's floor and lazarettes: oiled teak (Josephine's), or the glassfibre moulding with the deck's non-skid
+   * on its walking surfaces (the owner). */
+  cockpit?: 'teak' | 'fiberglass';
   /** The companionway: open (the hatch slid forward, the doors stowed below), or shut (the hatch slid aft over it, the doors in). */
   companionway?: 'open' | 'closed';
   /** The colour her name is lettered in on the cabin sides ('' or absent: one that stands out). */
@@ -89,6 +92,7 @@ export const DEFAULT_BOAT: BoatSpec = {
   id: 'josephine', name: 'JOSEPHINE',
   hull: { material: 'fiberglass', upper: '#f4f1e8', lower: '#2a2d33', stripe: '#24324f' },
   deck: '#8e9f7c',
+  hatch: 'acrylic', // (Josephine's forehatch: a low aluminium-framed smoked acrylic one, the owner)
   sails: { country: 'USA', number: '122', color: 'white' }, // (Josephine's own: USA 122, the owner and the 2026–27 Seaweed Soup results, reference/results)
   club: 'bvbc', skipper: 'you', // (Josephine's club: Bay View Boat Club, the owner, 13 Nov 2026)
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
@@ -137,8 +141,9 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     ...(typeof x.cabinTop === 'string' && x.cabinTop ? { cabinTop: x.cabinTop } : {}),
     poleSide: x.poleSide === 'starboard' ? 'starboard' : 'port',
     navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
-    hatch: x.hatch === 'acrylic' ? 'acrylic' : 'teak',
+    hatch: x.hatch === 'acrylic' || x.hatch === 'teak' ? x.hatch : d.hatch ?? 'teak',
     companionway: x.companionway === 'closed' ? 'closed' : 'open',
+    cockpit: x.cockpit === 'fiberglass' ? 'fiberglass' : 'teak',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
     ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
@@ -150,6 +155,14 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
     ...(typeof x.slip === 'string' && x.slip ? (sl => ({ marina: sl.split(':')[0], slip: sl }))((r => (slipRenames as Record<string, string>)[r] ?? r)(x.slip.includes(':') ? x.slip : `west-harbor:${x.slip}`)) : typeof x.marina === 'string' && x.marina ? { marina: x.marina } : {})
   };
+  // colours: any #rrggbb from the boat editor's picker (Marinas' rework), not only the old palettes; the deck and cabin
+  // top may instead be laid teak (a material, not a colour). Anything else falls back to her default.
+  const hex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  const surface = (v: unknown) => hex(v) || (typeof v === 'string' && TEAK_DECKS.some(([, k]) => k === v));
+  for (const k of ['upper', 'lower'] as const) if (!hex(spec.hull[k])) spec.hull[k] = d.hull[k];
+  if (spec.hull.stripe != null && spec.hull.stripe !== '' && !hex(spec.hull.stripe)) spec.hull.stripe = d.hull.stripe; // ('' or none: no boot stripe)
+  if (!surface(spec.deck)) spec.deck = d.deck;
+  if (spec.cabinTop != null && !surface(spec.cabinTop)) delete spec.cabinTop;
   if (spec.hull.material !== 'wood') {
     if (spec.hull.upper === BRIGHT_FINISH[1]) spec.hull.upper = d.hull.upper;
   }

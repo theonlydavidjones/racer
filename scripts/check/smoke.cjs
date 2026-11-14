@@ -34,7 +34,23 @@ async function run(browser, way) {
   const load = await page.evaluate(() => document.documentElement.dataset.simLoad); console.log(`[${way}] the sim's code loaded by:`, load);
   if (load !== way) errs.push(`the sim's code loaded by ${load}, not ${way}`);
   await page.waitForTimeout(1500);
-  await page.click('[data-home="fleet"]'); await page.waitForTimeout(800); await page.click('.fcard'); await page.waitForTimeout(1500);
+  await page.click('[data-home="fleet"]'); await page.waitForTimeout(800);
+  // each boat card's picture has the boat in it (ROADMAP 8t: they once framed an empty sea). Her sails and hull stand out
+  // from the sea and sky on their row; an empty picture has none (measured: about 3% of a card with her, 0 without)
+  await page.waitForFunction(() => { const im = [...document.querySelectorAll('img[data-thumb]')]; return im.length && im.every(i => i.complete && i.src.startsWith('data:')); }, null, { timeout: 120000 }).catch(() => {});
+  const cards = await page.evaluate(() => [...document.querySelectorAll('img[data-thumb]')].map(im => {
+    if (!im.src.startsWith('data:') || !im.naturalWidth) return -1; // (no picture: no WebGL)
+    const c = document.createElement('canvas'), w = c.width = im.naturalWidth, h = c.height = im.naturalHeight, g = c.getContext('2d'); g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, w, h).data; let n = 0;
+    for (let y = 0; y < h; y++) {
+      const row = []; for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; row.push(0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]); }
+      const med = [...row].sort((a, b) => a - b)[w >> 1]; for (const v of row) if (v - med > 60) n++;
+    }
+    return n / (w * h);
+  }));
+  console.log(`[${way}] boat cards: the boat's share of each picture`, cards.map(f => f.toFixed(3)).join(' '));
+  if (cards.some(f => f >= 0 && f < 0.005)) errs.push(`a boat card's picture has no boat in it (${cards.map(f => f.toFixed(3)).join(' ')})`);
+  await page.click('.fcard'); await page.waitForTimeout(1500);
   console.log(`[${way}] boat page`, await page.isVisible('#fleetBoat'));
   await page.click('[data-f="toList"]'); await page.waitForTimeout(300); await page.click('[data-f="back"]'); await page.waitForTimeout(800);
   await page.click('[data-home="race"]'); await page.waitForTimeout(500); await page.click('[data-home="create"]'); await page.waitForTimeout(1000);

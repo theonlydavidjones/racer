@@ -102,10 +102,15 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
       // sail on into it), pass it on the other side, bearing away. Once she's chosen a side she holds to it until she's
       // clear (her course swinging as she turns would swap them back and forth, and she'd hold on into it)
       const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
-      const prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
+      // (the mark she's rounding she passes on its rounding side, whichever side it happens to be on now: kept on the
+      // side it was on, after penalty turns beside it had left it to port of a mark to be left to starboard, she sailed
+      // round and round it the wrong way, never rounding it, for the rest of the race)
+      const nm = b.started ? w.nextMark(b) : null;
+      const rounding = nm && nm.type === 'round' && !nm.reach && `${nm.p.x.toFixed(0)},${nm.p.y.toFixed(0)}` === key ? (nm.side === 's' ? 1 : -1) : 0;
+      const prev = rounding || (b.ai?.passing?.key === key ? b.ai.passing.side : 0);
       const useKeep = prev ? Math.sign(rel || 1) === prev : Math.abs(wrap(sailable(b, keep) - keep)) < 1;
       desired = useKeep ? keep : other;
-      near = key; if (b.ai && !prev) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
+      near = key; if (b.ai && (!prev || rounding)) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
     }
   }
   if (b.ai?.passing && b.ai.passing.key !== near && !w.touchableMarks(b).some(m => `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}` === b.ai!.passing!.key && dist(b, m.p) < 30)) b.ai.passing = null;

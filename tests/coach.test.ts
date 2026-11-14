@@ -42,6 +42,12 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     expect(v.top.line).toBe('jibsheet');
     for (const l of v.more) expect(l.gain).toBeLessThanOrEqual(v.top.gain);
   });
+  it('the boom on the shroud on a broad reach: it never says to ease a main that can\'t go out further', () => {
+    for (const [h, w] of [[130, 12], [120, 20], [130, 20]]) {
+      const b = boat({ heading: h, windKt: w });
+      for (const l of [teach(b).top, ...teach(b).more]) expect(l.head).not.toMatch(/^Ease the main/);
+    }
+  });
   it('with the crew trimming, it says trim is right instead of padding', () => {
     for (const [h, w] of [[318, 8], [318, 14], [270, 12], [215, 16]]) {
       const v = teach(boat({ heading: h, windKt: w }));
@@ -78,7 +84,12 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     const b = testBoat({ heading: 318, kt: 4.5, windKt: 15 }); sail(b, 30);
     takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0; sail(b, 20);
     expect(teach(b).top.id).toBe('hove:takemain');
+    // (the main eased until the coach has no more to say about it, as the player does: a tenth of the sheet at a time.
+    // It was eased to 0.55 once and for all, which with the jib's lead as the car has it leaves her still doing 4.2 kt at 0.55, and
+    // the coach rightly asks for more: 14 Nov 2026)
     takeLine(b, 'mainsheet'); b.ctlTarget.mainsheet = 0.55; sail(b, 20);
+    for (let k = 0; k < 2 && teach(b).top.id === 'hove:easemain'; k++) { (b.ctlTarget ??= {}).mainsheet = b.ctl.mainsheet + 0.1; sail(b, 20); }
+    expect(b.ctl.mainsheet).toBeLessThan(0.76); // (not let right out: the boom about 40–60° off)
     expect(teach(b).top.id).toBe('hove:lash');
     b.lashed = -0.7; sail(b, 120);
     const v = teach(b);
