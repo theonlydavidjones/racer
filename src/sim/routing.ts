@@ -3,6 +3,7 @@ import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
 import { anyShoreDist, landAlong, onLand, shoreDist, wharfNearest } from '../geo/shore';
 import { depthBand } from '../environment/tide';
+import { chartDepth } from '../environment/sea';
 import type { Outlook } from './outlook';
 
 /**
@@ -258,9 +259,19 @@ export function groundLaylines(o: Outlook, b: Vec, t: number, kind: 'beat' | 'ru
 /** A Folkboat draws 1.2 m (class rules); inshore she keeps to water this deep below chart datum (MLLW: the tide's
  * low water), with room under the keel for the swell and the chart's own error. */
 export const SAFE_DEPTH = 2.5;
-/** Shoaler than SAFE_DEPTH on the chart (its band's mid depth). Off the chart's grid (depthBand gives [0, 0]: the
- * Cityfront's open water east of the Gate isn't on it), the shore distance alone keeps her off. */
-const tooShoal = (p: Vec): boolean => { const [d1, d2] = depthBand(p); return !(d1 === 0 && d2 === 0) && (d1 + d2) / 2 < SAFE_DEPTH; };
+/** Shoaler than SAFE_DEPTH on the chart: the depth grid's band (its mid depth), or off that grid (depthBand gives
+ * [0, 0]: the Cityfront's water isn't on it) NOAA's ENC itself (sea.ts chartDepth: its depth areas, else the nearest
+ * sounding), on a 25 m lattice. (The Coast Pilot: "Shoals with depths less than 10 feet extend up to 0.2 mile from the
+ * shore" from the Golden Gate Bridge east to the waterfront, NOAA Coast Pilot 7 ch. 7, edition of 8 Nov 2026.) */
+const shoalCache = new Map<string, boolean>();
+const tooShoal = (p: Vec): boolean => {
+  const [d1, d2] = depthBand(p);
+  if (!(d1 === 0 && d2 === 0)) return (d1 + d2) / 2 < SAFE_DEPTH;
+  const key = `${Math.round(p.x / 25)},${Math.round(p.y / 25)}`;
+  let v = shoalCache.get(key);
+  if (v === undefined) { const d = chartDepth(p); v = d != null && d < SAFE_DEPTH; shoalCache.set(key, v); }
+  return v;
+};
 /**
  * Working the shore against a foul tide: in toward the nearer shore, along it in the slacker water there (the stream
  * runs slower near the beach: environment/current.ts shoreRelief), and out to the mark, the way Bay sailors work the
