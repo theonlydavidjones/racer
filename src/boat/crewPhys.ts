@@ -115,6 +115,8 @@ export interface Job {
   big?: boolean;
   /** a big lasting change of a cabin-top line (crewWork.ts LINE_URGENT): seen through, a jib tweak waits */
   urgent?: boolean;
+  /** (A cabin-top line) her true wind angle and their wish over the cycle when they chose where to set it (crewWork.ts LINE_MOVED). */
+  refTwa?: number; refWish?: number;
 }
 /** Where a job puts a person: across (m, + to windward), fore-and-aft (m), and how they're posed. */
 export interface Station { arm: number; z: number; pose: Pose }
@@ -164,7 +166,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** and the wind then (kt, over the last minute) */ lineTws?: Record<string, number>; /** the wind and angle when they last set the lazy jib car themselves */ carSet?: { tws: number; twa: number }; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** and their wish for it over a gust-lull cycle then (crewWork.ts LINE_MOVED) */ lineRef?: Record<string, number>; /** the wind and angle when each jib car was last set (crewWork.ts CAR_WIND) */ carSet?: Partial<Record<'S' | 'P', { tws: number; twa: number }>>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */

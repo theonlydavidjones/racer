@@ -54,13 +54,22 @@ export const LINE_GAP = 60, LINE_TRIP = 90;
 /** A change of a cabin-top line this big (of its range), wanted now and lately, is seen to at once, waits or no: a new point of sail (bearing away, the vang on). A puff swings the outhaul's or the vang's wish about as much, so it's judged against their wish over a whole gust-lull cycle (LINE_GAP), which a puff doesn't carry. An estimate, unsourced. */
 export const LINE_URGENT = 0.25;
 /**
- * And a trip to a cabin-top line, or the lazy jib car, is for a real change since it was last set: a new point of sail
- * (20° of the wind's angle), or the wind over the last minute up or down this much (kt). A crew sets the cunningham and
- * the car for the leg and the breeze, and leaves them; a hand with no sheet to tend sits still rather than find work
- * (the owner on the crew's fore and aft trips: "a key source of the jitteriness of the crew"). 3 kt: the Bay's gusts move
- * even the minute's wind 2 kt or so as they come and go, which isn't a new breeze. An estimate, unsourced.
+ * And a trip to a cabin-top line is for a real change since it was last set: a new point of sail (20° of the wind's
+ * angle), or their wish for it over a gust-lull cycle (LINE_GAP) moved this many of their start thresholds since. A
+ * crew sets the cunningham for the leg and the breeze, and leaves it; a hand with no sheet to tend sits still rather
+ * than find work (the owner on the crew's fore and aft trips: "a key source of the jitteriness of the crew"). On the
+ * line's own wish, not the wind: the outhaul's goes from eased to tight between 8 and 12 kt, the vang's hardly moves
+ * upwind, and a fixed step of the wind was half one line's range and nothing to another (the physics review). A puff
+ * of 20 s moves the minute's wish about a third of the way. An estimate, unsourced.
  */
-export const LINE_WIND = 3;
+export const LINE_MOVED = 2;
+/**
+ * The lazy jib car, which has no wish of its own over time, is reset for a new breeze: the minute's wind up or down by
+ * this share of it (at least 1 kt). The highest minute's mean within ten minutes runs about 5 to 11% over the ten
+ * minutes' (Harper, Kepert and Ginger, WMO guidelines on converting between wind-averaging periods, 2010), so this is
+ * beyond the gusts' own swing. An estimate.
+ */
+export const CAR_WIND = 0.2;
 /** The wind there's been over the last minute (kt): the crew's (crewPhys.ts twsAvg), else this moment's. */
 const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
 
@@ -159,7 +168,8 @@ const DONE = 1e-4;
 export function workPace(b: Boat, who: number): number {
   const c = b.crew; if (!c) return 1;
   const p = allAboard(c.spec)[who];
-  return pace(p) * (who === 0 && c.spec.crew.length === 0 ? 0.6 : 1);
+  // (and the helm with the sheets while the crew are forward on a run: a hand on the tiller, one on the sheet)
+  return pace(p) * (who === 0 && (c.spec.crew.length === 0 || (c.layout ?? 'cockpit') !== 'cockpit') ? 0.6 : 1);
 }
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
@@ -187,7 +197,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const o = ownerOf(k, n, c.spec, fwdL);
     if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
       const j = c.people[o]?.job;
-      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
+      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && (!c.people[m]?.job?.station || c.people[m]!.job!.line === 'jibsheet')) return m; }
     }
     return o;
   };
@@ -207,7 +217,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (Math.abs(to - b.ctl[j.line as Ctl]) < DONE) {
         // (a cabin-top line counts as set when it's done, not when someone set off for it: one taken over half way, by a
         // sheet or the pole, is still to do, and isn't left wrong for LINE_GAP)
-        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; (c.lineTwa ??= {})[j.line] = b.twa ?? 0; (c.lineTws ??= {})[j.line] = windNow(b); }
+        // (and what it was set for: the angle and the wish when they chose where to set it, at the start; stamped at the
+        // end, a line set through a bear-away was judged against the run's angle and left at the reach's setting)
+        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; (c.lineTwa ??= {})[j.line] = j.refTwa ?? b.twa ?? 0; (c.lineRef ??= {})[j.line] = j.refWish ?? j.to ?? b.ctl[j.line as Ctl]; }
         a.job = null;
       }
     }
@@ -223,6 +235,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // sail; not a long puff, which the 20 s wish follows most of the way)
   const ls = c.lineSlow ??= {};
   if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; delete ls[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); ls[k] = ls[k] == null ? w : ls[k] + (w - ls[k]) * Math.min(1, c.lineT / LINE_GAP); } c.lineT = 0; }
+  // (a new point of sail since the line was set; or their wish for it over the cycle moved since: a real change)
+  const newAngle = (k: string) => Math.abs((b.twa ?? 0) - (c.lineTwa?.[k] ?? -999)) > 20;
+  const realChange = (k: string, skill: number) => {
+    const ref = c.lineRef?.[k];
+    return ref == null || newAngle(k) || Math.abs((ls[k] ?? ref) - ref) >= LINE_MOVED * startThreshold(k, skill, ls[k]);
+  };
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
     const who = worker(k), a = c.people[who]; if (!a) continue;
@@ -238,10 +256,11 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
       const there = a.job?.station?.pose === 'piano' || a.pose === 'piano';
       // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the
-      // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed)
+      // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed; and only
+      // for a line here they'd see to now: off, and for a real change)
       if (there && !a.job) {
         const zOf = (l: string) => stationFor(l, who, windward, false)?.z ?? a.z, here = (l: string) => Math.abs(zOf(l) - a.z) < 0.3;
-        if (!here(k) && [...PIANO].some(l => l !== k && here(l) && l in want && worker(l) === who && Math.abs((lw[l] ?? want[l as Ctl]!) - b.ctl[l as Ctl]) >= startThreshold(l, skill, want[l as Ctl]))) continue;
+        if (!here(k) && [...PIANO].some(l => l !== k && here(l) && l in want && worker(l) === who && Math.abs((lw[l] ?? want[l as Ctl]!) - b.ctl[l as Ctl]) >= startThreshold(l, skill, want[l as Ctl]) && realChange(l, skill))) continue;
       }
       // (the waits are for the walk: a line they reach from where they sit, placed by you, they work when it's off)
       // (and none of it for a line knocked off, or wanted well away from where it is, now and lately both: a new point of
@@ -249,12 +268,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (placed by you, they have their own rule for a trip, PLACED_TRIP's big change: these waits are for the crew on auto)
       // (a new point of sail since this line was last set, more than 20° of the wind's angle: rounding a mark, bearing
       // away, coming up: the trim wanted is new, so it's seen to now, not after the waits)
-      const newCourse = Math.abs((b.twa ?? 0) - (c.lineTwa?.[k] ?? -999)) > 20;
-      // (a walk for a real change: a new point of sail, a new breeze (LINE_WIND), or a line they've not set yet. Urgent too:
-      // the wish over the gust-lull cycle well off counts only with a new breeze, as a puff's run of a minute moved it)
-      const newWind = Math.abs(windNow(b) - (c.lineTws?.[k] ?? -999)) >= LINE_WIND;
-      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (newWind && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
-      if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || (!newCourse && !newWind))) continue;
+      const newCourse = newAngle(k);
+      // (a walk for a real change: a new point of sail, their wish over the cycle moved since (LINE_MOVED), or a line
+      // they've not set yet. Urgent too: the wish over the cycle well off counts only once it has moved since the set)
+      const real = realChange(k, skill);
+      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
+      if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       urgentTo = urgent && walk;
       if (!walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
     }
@@ -288,7 +307,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // (an urgent one is set right through to where they want it now: set to the lagging wish it was still well off after,
     // and they were back for it seconds later. A trip to the foredeck (big: the line's PLACED_TRIP off) sets the line where
     // it's wanted, not partway along the lagging wish: one trip, not two)
-    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo && !big ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}) };
+    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo && !big ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}), ...(PIANO.has(k) ? { refTwa: b.twa ?? 0, refWish: ls[k] } : {}) };
     if (PIANO.has(k) && placed) (c.lineSet ??= {})[k] = c.clock ?? 0; // (placed by you: as before, from setting off)
   }
   // work: whoever's at their line works it
@@ -330,9 +349,10 @@ function carJob(b: Boat, dt: number): void {
     if (a.job.reach > 0) { a.job.reach -= dt; return; }
     a.job.work -= dt * workPace(b, who);
     if (a.job.work <= 0) {
-      const t = a.job.target!; lazy.fore = clamp(t.fore, 0, CAR_FORE_PINS - 1); lazy.ins = clamp(t.ins, 0, CAR_IN_PINS - 1);
+      // (their own: to the plan as it is when they've got there, not as it was when they set off)
+      const t = yours ? a.job.target! : b.carPlan ?? a.job.target!; lazy.fore = clamp(t.fore, 0, CAR_FORE_PINS - 1); lazy.ins = clamp(t.ins, 0, CAR_IN_PINS - 1);
+      (c.carSet ??= {})[a.job.side as Tack] = { tws: windNow(b), twa: b.twa ?? 0 };
       a.job = null; if (yours && yours.fore === lazy.fore && yours.ins === lazy.ins) b.carCmd = null; b.carOff = 0;
-      c.carSet = { tws: windNow(b), twa: b.twa ?? 0 };
     }
     return;
   }
@@ -343,9 +363,12 @@ function carJob(b: Boat, dt: number): void {
   b.carOff = (b.carOff ?? 0) + dt;
   // your call: as soon as they're free. Their own: a change that has lasted, worth a pin (a novice: two), and not while
   // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)
-  // (and their own only for a real change since they last set one: LINE_WIND, or a new point of sail)
-  const real = !c.carSet || Math.abs(windNow(b) - c.carSet.tws) >= LINE_WIND || Math.abs((b.twa ?? 0) - c.carSet.twa) > 20;
-  const worth = yours || (real && b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && c.place?.across == null);
+  // (and their own only for a real change since they last set this car: a new breeze (CAR_WIND), a new point of sail;
+  // and not in a tack or a hard turn, or near head to wind, where the plan is for no course she's on)
+  const was = c.carSet?.[side], tws = windNow(b);
+  const real = !was || Math.abs(tws - was.tws) >= Math.max(1, CAR_WIND * tws) || Math.abs((b.twa ?? 0) - was.twa) > 20;
+  const turning = b.tacking || Math.abs(b.yawRate ?? 0) > 6 || !!c.roll || (b.twa ?? 0) < 25;
+  const worth = yours || (real && !turning && b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && c.place?.across == null);
   if (!worth || a.job) return;
   // (their own wish waits while they're up on the foredeck on a run, forward of the mast: a lazy car's pin isn't worth the
   // trip back aft and forward again; they set it on their way back, the car being aft of the mast. From the mast it's a
