@@ -49,3 +49,30 @@ Supersedes the copy on branch `rudder` (kept there for its "things not to relear
 - abandon-home's close-quarters count flips on any few-percent physics change (a different case each time): the AI there sits at the bound. Skipper Model has it; don't restate the test.
 - After every merge: `git grep -n "^<<<<<<< "` before committing.
 - A Boat field read in the step must be predeclared in World's boat literal (the object's shape stays one hidden class).
+
+## Since then (14 Nov 2026)
+
+Branches, newest first:
+- `pushoff-shove` (off main, joint with Marinas): sternway drag is 2 × hullResistance (ASTERN, NACA TN 3361; no constant
+  part), a held tiller steers astern above STEERS_ASTERN 0.05 m/s (HANDLING.asternRudder 0.7), the crew's shove
+  ASTERN_SHOVE ≈ 0.64 m/s (SHOVE_N 265 N: Snook & Ciriello via the Liberty Mutual table). The perf gate reads 1.021 against
+  main: not step code (a lone boat reads 0.985) but the AI staying in irons longer on the truer drag (2028 boat-steps of
+  sternway against 241 in the perf race). With the Coordinator.
+- `by-the-lee` (on `tack-by-boom`, PR #318): her tack is her mainsail's side until the boom crosses; the boom is taken
+  by the wind on the back of the main (boomStep), nothing tuned to an angle. Flat water: taken 23–29° by the lee. Jibe
+  key "/" (turnHo). Owner's rulings: hold then jibe, physics-driven; a meant jibe is called.
+- `contact-impulse`: one-point planar impulse (src/boat/contact.ts). To do: Rules' #355 hullContact, literature in the
+  comment (Tabri 2010; Liu et al. 2018). Lands with or after Skipper Model's lying-to fix.
+- `motor-35` (/home/user/tdev): Tohatsu 2.5/3.5 have no reverse (forward–neutral, 360° swivel), from tohatsu.com manuals.
+- `steer-astern` WIP: the pivot moving aft with sternway (sway slide term). Makes tacks cost more: tables to re-measure.
+- `weather-helm` WIP: CLR_LEAD on the lift share. Own PR after #289 and #276, with the raked rig.
+
+Owner's answers: no figures for glide, paddle or weather helm (keep the estimates; helm to the published ~2°). Mast rake
+5.6° goes into the physics (import MAST_RAKE from src/boat/rake.ts). Off-center thrust and prop walk: yes, after the
+push-off ships (src/boat/outboardMount.ts on #350). Stow motor: Crew Controls' `motor-stow`.
+
+Hosts now reachable (curl works where WebFetch may not): orbit.dtu.dk, acris.aalto.fi, aaltodoc.aalto.fi, stacks.cdc.gov,
+health.usf.edu, demo2.parks.ca.gov, www.pbo.co.uk, tohatsu.com, defender.com, onlineoutboards.com.
+
+Perf: when perf-pair fails on a physics change, first run it with `fleet: 0` (edit line 56 for the run): if the lone boat
+is no slower, the race changed, not the code. Count what the fleet does differently before trimming anything.
