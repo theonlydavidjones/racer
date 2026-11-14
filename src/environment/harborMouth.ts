@@ -31,10 +31,11 @@ import { PILE_FLOW, basinFloor } from './current';
  *    gyre's own pool for Le and B and the mouth for Bm, that is about 2¾ hours with half a knot across the mouth
  *    (0.25 m/s), 1.6 hours at 0.43 m/s, and 1/0.6 longer on the ebb, whose stream has come through the piles: not short
  *    beside the tide (Langendoen asks for a tide of 4·Te or more before the gyre may be taken as steady). So its speed
- *    is carried, and follows the stream's with that time: it is still turning the old way an hour or two after
- *    slack, and never reaches the quarter on the real tide. (Langendoen describes what the old gyre really does then:
- *    it draws the new stream in behind it while a new gyre starts at the upstream corner and squeezes it out. Here the
- *    one gyre just slows and reverses.) With no stream to drive it the bed's drag runs it down, c_f·u/h (c_f = 0.0025
+ *    is carried, and follows the stream's with that time: it never reaches the quarter on the real tide, and since
+ *    the flood doesn't cross the gap (below) it keeps the ebb's sense right round the clock, weaker by the end of each
+ *    flood. (Langendoen describes a gyre meeting a reversed stream: it draws the new stream in behind it while a new
+ *    gyre starts at the upstream corner and squeezes it out. That would be this gyre's fate in a flood that did
+ *    reach the gap.) With no stream to drive it the bed's drag runs it down, c_f·u/h (c_f = 0.0025
  *    as in pierWakes.ts, 3 m of water: Coast Pilot 7's 8–12 ft): slowly, a fifth in two hours. When the water is first
  *    looked at under the real tide, the gyre is spun up through the 13 hours of predictions before, so it is the same
  *    gyre whenever the sail began; under a steady preset it is what that stream holds.
@@ -49,8 +50,8 @@ import { PILE_FLOW, basinFloor } from './current';
  *    corner. Across it the water goes from the stream's speed to the gyre's as a tanh.
  *  - **The eddies** a boat feels are the layer's own. Its largest are up to three layer-widths in size (Tukker 1997, in
  *    Bijvelds): taken here as a row of them that far apart, carried along at half the stream's speed (Bijvelds), so
- *    one passes about every two minutes on a flood of half a knot across the mouth, every six or seven on such an ebb
- *    (slower through the piles, and the layer wider). The water's speed swings by about 0.1·ΔU across the stream, root
+ *    one passes every six or seven minutes in an ebb of half a knot across the mouth (slow through the piles, the
+ *    layer wide). The water's speed swings by about 0.1·ΔU across the stream, root
  *    mean square, at the layer's center (Uijttewaal & Tukker, in Bijvelds §2), ΔU the stream's speed less the gyre's
  *    edge as it is at the time (so more when the gyre is still turning the old way). All of that is put into the one
  *    row, on the center line. Along the stream a row of eddies swings the water to either side of the line, opposite
@@ -71,15 +72,21 @@ import { PILE_FLOW, basinFloor } from './current';
  *  - **The flood comes off the breakwater's knuckle, not its tip** (decided from the physics, 14 Nov 2026: the owner
  *    didn't know, and nothing published resolves this entrance: NOAA's Bay model, SFBOFS, has nodes 80–180 m apart
  *    here, measured from its own mesh; reference/research/gashouse-entrance-eddies.md). The breakwater's last leg
- *    turns 27° away from the flood at a sharp corner 60 m before the tip, standing 36 m out of the mouth's line. A
- *    stream can't follow a sharp turn like that: it leaves the wall at the corner and comes back to it some lengths
- *    on, 6–7 times the step behind a square one (Kim, Kline & Johnston 1980), less behind a slope: 4 is taken, an
- *    estimate, which puts the whole gap (1.7 to 2.7 steps on) inside the corner's lee. Bed friction is too weak here
- *    to shorten it (c_f·L/h ≈ 0.05, under the 0.12 where it takes over: Babarutsi, Ganoulis & Chu 1989). So on the
- *    flood the stream passes the gap some 20–30 m off, behind its own widening layer and its row of large, slow
- *    eddies (one every four minutes or so), and the water at the gap itself is the lee's: slack, with nothing to
- *    drive the cove's gyre, which runs down from what the ebb left. The lee's own slow turning (in such bubbles the
- *    water by the wall creeps back at up to about a fifth of the stream) is not drawn: its size here is unknown.
+ *    starts at the tip of a spur: the wall juts some 30 m out toward the Bay to a sharp corner 60 m before the tip
+ *    (along the mouth's line) and 36 m out of that line, and the leg runs back from it about 30° off the line (20–30°
+ *    off the flood, with its set). A stream can't follow a corner like that: it leaves the wall there and comes
+ *    back to it some lengths on, 6–7 times the step behind a square one (Kim, Kline & Johnston 1980), probably little
+ *    less behind a slope this steep, and a spur holds a longer lee than a step: 4 is taken, an estimate on the short
+ *    side, which still puts the whole gap (1.7 to 2.7 steps on) inside the corner's lee. Bed friction doesn't
+ *    shorten it much (c_f·L/h is 0.05 over the 60 m to the tip and 0.12 over the whole 144 m: at or under the 0.12
+ *    where it takes over, Babarutsi, Ganoulis & Chu 1989). So on the flood the stream passes the gap some 20–30 m
+ *    off (less if the flood is set toward the shore: 5° of set is worth 8 m by the far corner; not modeled), behind its
+ *    own widening layer and its row of large, slow eddies (one every four minutes or so in half a knot), and the
+ *    water at the gap itself is the lee's: slack, with nothing to drive the cove's gyre, which stays the ebb's and
+ *    runs down. The lee's own slow turning (in such bubbles the water by the wall creeps back at up to about a fifth
+ *    of the stream, which here would be the ebb's way) is not drawn: its size is unknown. The lee is cut at Pier 1's
+ *    face: under the piles and in the slot beyond, the water is the piles' own (current.ts), though by this picture
+ *    the lee would reach some 25 m into that slot.
  *  - Not modeled, and not known: on the ebb the same leg stands 35 m into the stream just past the mouth, and water
  *    piling on it would push in through the gap (harbor studies have new water entering at the downstream corner:
  *    Langendoen §3.6; no figure for a wall across the stream was found).
@@ -228,7 +235,11 @@ function spin(i: number, g: number, f: Vec, dt: number): number {
   for (let left = dt; left > 0; left -= 60) {
     const h = Math.min(60, left);
     g += (want - g) * (1 - Math.exp(-h / Te));
-    g -= MOUTH.cf / MOUTH.depth * (Math.abs(g) * g - Math.abs(want) * want) * h;
+    // (the bed's drag: only on what the stream isn't holding up. Booij's quarter already has the drag in it, so a gyre
+    // on its way up to it is left to his time alone; one turning faster than the stream holds, or the other way, or in
+    // slack water, is run down)
+    if (g * want <= 0) g -= MOUTH.cf / MOUTH.depth * Math.abs(g) * g * h;
+    else if (Math.abs(g) > Math.abs(want)) g -= MOUTH.cf / MOUTH.depth * (Math.abs(g) * g - Math.abs(want) * want) * h;
   }
   return g;
 }
@@ -309,7 +320,9 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
       X = x + back;
       if (X > 0) {
         const fade = x > M.W ? clamp(1 - (x - M.W) / 3, 0, 1) : 1, xi = X / (MOUTH.reattach * step);
-        off = step * Math.min(1, X / back) * Math.max(0, 1 - xi * xi) * fade; regain = 1 - (1 - regained(X, step)) * fade;
+        // (and as the stream dies at slack: nothing steps when the layer's line goes back to the gap's)
+        const on = fade * clamp(Uo / 0.05, 0, 1);
+        off = step * Math.min(1, X / back) * Math.max(0, 1 - xi * xi) * on; regain = 1 - (1 - regained(X, step)) * on;
       }
     }
     // the mixing layer: the stream outside it, the lee's or the basin's water inside. (Its width from where it began;
@@ -337,7 +350,7 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
       // (a row of eddies: across the stream the water swings most on the layer's center line; along it, to either side
       // of the line and opposite ways there, a quarter-turn apart, and by just as much as lets the water neither pile
       // up nor thin out: u = dψ/dn, v = −dψ/dx of the one stream function)
-      const ev = MOUTH.v * amp * core * Math.cos(ph), eu = -MOUTH.v * amp * (4 * lam / (2 * Math.PI * Bw)) * Math.tanh(q) * core * Math.sin(ph);
+      const ev = MOUTH.v * amp * core * Math.cos(ph), eu = -MOUTH.v * amp * (4 * lam / (2 * Math.PI * Math.max(Bw, lam / MOUTH.spacing))) * Math.tanh(q) * core * Math.sin(ph); // (no more than where the eddies are their three widths apart: nearer the corner the layer is thinner than its eddies' spacing here allows for)
       ox += ex * eu + M.into.x * ev; oy += ey * eu + M.into.y * ev;
     }
   }

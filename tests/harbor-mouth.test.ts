@@ -84,6 +84,9 @@ describe('the water in the entrance', () => {
     // the gap; an ebb of 0.25 m/s arrives through the piles at 0.15, so about 4½ h)
     expect(gyreTime(0, stream(0.25))).toBeGreaterThan(4.0 * 3600); expect(gyreTime(0, stream(0.25))).toBeLessThan(5.2 * 3600);
     expect(gyreTime(0, stream(0.5)) / gyreTime(0, stream(0.25))).toBeCloseTo(0.5, 6); // (quicker in a faster stream)
+    // (and that is the time it takes: from rest in a steady ebb, 1 − 1/e of the way to its quarter after one Te, the
+    // bed's drag adding nothing on the way up)
+    { const R = settled(0), Te = gyreTime(0, stream(0.5)); for (let t = 30; t <= Te; t += 30) refreshMouths(R, t, () => stream(0.5)); expect(R.gyre[0] / (0.25 * 0.5 * PILES)).toBeCloseTo(1 - 1 / Math.E, 2); }
     const S = settled(0.25), g0 = S.gyre[0];
     expect(g0).toBeCloseTo(0.25 * 0.25 * PILES, 6); // (the ebb's, a quarter of what the piles pass, corner a toward b)
     // (the stream turned to a flood an hour ago: nothing crosses the gap to turn the gyre the other way, so it's still the
@@ -193,6 +196,9 @@ describe('the water in the entrance', () => {
     const T = eddyPeriod(0, stream(U)); expect(T).toBeCloseTo(3 * (1 + 0.23 * (M.W / 2 + M.backB)) / 0.25, 6); expect(T).toBeGreaterThan(200); expect(T).toBeLessThan(300);
     const mid = at(M.W / 2, half - 1), m = intoOf(mean(mid, U)); let s2 = 0; for (let i = 0; i < 240; i++) s2 += (intoOf(flow(mid, U, i * T / 240)) - m) ** 2 / 240;
     expect(Math.sqrt(s2)).toBeGreaterThan(0.6 * 0.1 * 0.5); expect(Math.sqrt(s2)).toBeLessThan(1.05 * 0.1 * 0.5);
+    // (near the knuckle, where the layer is thinner than its eddies' spacing, the water alongside it doesn't surge:
+    // no more along the stream than the 0.74 of the cross-stream swing a row three widths apart has)
+    for (const X of [6, 15, 24, 40]) { const B = 1 + 0.23 * X, q = at(M.W + M.backB - X, -M.stepB * Math.min(1, X / M.backB) * (1 - (X / (4 * M.stepB)) ** 2) - 0.33 * B), mu = alongOf(mean(q, U)); let a2 = 0; for (let i = 0; i < 240; i++) a2 += (alongOf(flow(q, U, i * T / 240)) - mu) ** 2 / 240; expect(Math.sqrt(a2), `X ${X}`).toBeLessThan(0.085 * 0.5); }
     // (and at the gap itself they're all but gone)
     const g0 = flow(at(M.W / 2, 0.5), U, 0), g1 = flow(at(M.W / 2, 0.5), U, T / 4); expect(Math.hypot(g0.x - g1.x, g0.y - g1.y)).toBeLessThan(0.02);
   });
@@ -238,9 +244,10 @@ describe('in the world', () => {
     for (let i = 0; i < 120; i++) { tide.t += 30; tide.updateTide(); at4.currentAt(deep); }
     const late = gyre(at4), fresh = gyre(at5);
     expect(Math.abs(late - fresh)).toBeLessThan(0.15 * Math.max(Math.abs(late), Math.abs(fresh)) + 0.002);
-    // (it isn't just the stream of the moment: over 24 hours the gyre runs behind the stream, so they differ in sign at times)
-    let opposed = 0; for (let h = 0; h < 24; h++) { const w = real(`${String(h).padStart(2, '0')}:00`), f = alongOf(w.currentAt(M.ref)); if (Math.abs(f) > 0.03 && Math.sign(alongOf(w.currentAt(deep))) === Math.sign(f)) opposed++; }
-    expect(opposed).toBeGreaterThan(1); // (the far side running WITH the stream: the old tide's gyre)
+    // (it isn't the stream of the moment: the flood doesn't reach the gap, so round the clock the gyre keeps the ebb's
+    // sense, its far side running east, on the flood's hours too)
+    let ebbs = 0, onFlood = 0; for (let h = 0; h < 24; h++) { const w = real(`${String(h).padStart(2, '0')}:00`), f = alongOf(w.currentAt({ x: M.ref.x, y: M.ref.y + 80 })), g = alongOf(w.currentAt(deep)); if (g < -0.002) { ebbs++; if (f < -0.05) onFlood++; } }
+    expect(ebbs).toBeGreaterThanOrEqual(20); expect(onFlood).toBeGreaterThanOrEqual(4);
     // (the eddies' beat and the gyre carry on through a change of the wind's setting)
     const before = at4.currentAt(deep); at4.applyConditions({ ...at4.settings, windKt: 16 } as Settings); const after = at4.currentAt(deep);
     expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeLessThan(0.002);
