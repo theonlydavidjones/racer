@@ -1522,7 +1522,7 @@ function adjustUi(): void {
     if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = k === 'windTurn' ? 'as usual' : 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
   }
   if (S.current !== 'real') real.push('current');
-  if (S.rain) real.push('rain');
+  if (typeof S.rain === 'number' && S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
   const names: Record<string, string> = { windKt: 'wind speed', windTurn: 'wind turned', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');

@@ -311,9 +311,10 @@ const CELL_REACH = 1800;
  * neither is set (then the real record's, visibilityFor). The scene's haze and the map's words both read it.
  */
 export const SET_VIS = { fog: [Infinity, 3000, 450], rain: [Infinity, 7500, 3100] } as const;
-export function setVisibility(s: { fog?: 'real' | 0 | 1 | 2; rain?: 0 | 1 | 2 }): { m: number; fogSet: boolean } {
+export function setVisibility(s: { fog?: 'real' | 0 | 1 | 2; rain?: 'real' | 0 | 1 | 2 }): { m: number; fogSet: boolean } {
   const fogSet = s.fog != null && s.fog !== 'real';
-  return { m: Math.min(fogSet ? SET_VIS.fog[s.fog as 0 | 1 | 2] : Infinity, SET_VIS.rain[s.rain ?? 0]), fogSet };
+  // (the real rain's visibility is in the real record's: Pier 17's sensor, the forecast grid)
+  return { m: Math.min(fogSet ? SET_VIS.fog[s.fog as 0 | 1 | 2] : Infinity, SET_VIS.rain[typeof s.rain === 'number' ? s.rain : 0]), fogSet };
 }
 
 /**

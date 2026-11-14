@@ -17,7 +17,7 @@ export interface Settings {
   band?: 0 | 1;
   chop?: number; // conditions adjuster: the wind's chop × this (1 = real, 0 = glassy)
   swellHs?: number | null; // conditions adjuster: the ocean swell outside the Gate, m; null = real
-  rain?: 0 | 1 | 2; // none, light, heavy
+  rain?: 'real' | 0 | 1 | 2; // the real record's (environment/rain.ts), or none, light, heavy
   fog?: 'real' | 0 | 1 | 2; // the real summer fog bank, or none, patchy, thick
   windDay: 0 | 1 | 2; // with the westerly: a light, typical or windy day (25th, 50th, 75th percentile)
   current: string; // 'real' (NOAA predictions for tideDate/tideTime) or a uniform preset id

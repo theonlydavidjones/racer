@@ -720,7 +720,7 @@ export class Hud {
   fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
     // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
-    const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
+    const set = setVisibility(wd.settings), why = set.fogSet && typeof wd.settings.rain === 'number' && wd.settings.rain ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
     const here = (m: number) => short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`;
     if (set.fogSet) return here(set.m);
     const v = visibilityFor(wd.raceDate, wd.clockUtc);

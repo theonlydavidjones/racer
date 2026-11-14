@@ -240,7 +240,7 @@ function drawTideGraph(): void {
     rows.unshift(['Wind', `${WIND_KIND_LABEL[app.w.windKind]} ${Math.round(b.kt * k)} kt from ${app.S.windDir != null ? `${degAndPoint(app.S.windDir)} (an older setting)` : app.w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (app.S.windTurn ? ` (${turnWords(app.S.windTurn)} from the usual ${compassPoint(b.from - app.S.windTurn)})` : '')}, ${trend} over 90 min${app.w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
   } else rows.unshift(['Wind', `${Math.round(app.w.wind.kt)} kt from ${degAndPoint(app.w.wind.from)}, as you set it`]);
   if (!app.w.tide) rows.push(['Current', CURRENTS[app.S.current]?.label ?? app.S.current]);
-  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${app.w.sea.swell ? `${Math.round(app.w.sea.swell.hs / 0.3048)} ft, ${Math.round(app.w.sea.swell.tp)} s swell outside the Gate${app.w.sea.swell.total ? ` (the buoy reads ${Math.round(app.w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${app.S.rain ? `, ${app.S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
+  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${app.w.sea.swell ? `${Math.round(app.w.sea.swell.hs / 0.3048)} ft, ${Math.round(app.w.sea.swell.tp)} s swell outside the Gate${app.w.sea.swell.total ? ` (the buoy reads ${Math.round(app.w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${typeof app.S.rain === 'number' && app.S.rain ? `, ${app.S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(app.w.gunUtc * 60000), sp = sunPosition(app.w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';
@@ -274,7 +274,7 @@ $<HTMLInputElement>('tideTime').addEventListener('change', e => { app.S.tideTime
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
     const k = seg.dataset.k as keyof Settings;
-    const cur = String(app.S[k]);
+    const cur = String(app.S[k] ?? (k === 'fog' || k === 'rain' ? 'real' : undefined)); // (fog and rain unset: the real record's)
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
   });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (app.S[c.dataset.t as 'aids' | 'windDial' | 'camRide'] ?? 0) === 1; });
 }
@@ -287,7 +287,7 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { app.S[k] = Number(v) as 0 | 1; (app.w.settings as Settings)[k] = app.S[k]; saveSettings(app.S); paintSeg(); return; }
   if (k === 'windKind') { chooseWindKind(app.S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
-  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
+  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || ((k === 'fog' || k === 'rain') && v === 'real')) ? v : Number(v);
   paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 }));
 /**
