@@ -44,6 +44,8 @@ export interface SailResult {
   maxLeft: number; maxRight: number;
   /** Closest she came to land (m, counted up to 600). */
   minShore: number;
+  /** Along the shore (shoreLeg): how far off the beach (or the shoals) she works it, m. */
+  off?: number;
 }
 
 /**
@@ -125,9 +127,12 @@ function crabTo(u: Vec, c: Vec, v: number): number {
 
 /**
  * Sail from a to b starting at minute t0, by a plan. `arrive`: how close counts as there (m; an island mark's
- * rounding distance). Gives up after `maxMin` minutes (a leg she can't sail: becalmed against the tide).
+ * rounding distance). Gives up after `maxMin` minutes (a leg she can't sail: becalmed against the tide). `inshore`: a
+ * piece of a way along the shore (shoreLeg), where shoal water (tooShoal) fails it as the land does; to a waypoint off
+ * the beach ('waypoint') with no stretch near its end where touching either is let pass (that's for a mark close to the
+ * land, rounded from the water: the last piece, out to the mark, keeps it).
  */
-export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
+export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240, inshore: false | 'waypoint' | 'mark' = false): SailResult {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
   const turns: SailResult['turns'] = [];
@@ -194,7 +199,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         if (!(r0 < 0 && r1 >= 0 && r1 < 90)) return false;
         const f = -r0 / (r1 - r0); p = { x: p.x + g.x * DT * f, y: p.y + g.y * DT * f }; t += DT * f / 60; return true;
       };
-      const near = dist(p, b) < 400;
+      const near = inshore !== 'waypoint' && dist(p, b) < 400;
       // the room ahead on a tack: how close to the land she'd be in a minute and a half (m, up to 600)
       const room = (T: 'S' | 'P') => { const g = gnd(T); return landDist({ x: p.x + g.x * 90, y: p.y + g.y * 90 }); };
       const other = tack === 'S' ? 'P' : 'S';
@@ -228,7 +233,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     const d = V(h);
     p = { x: p.x + (d.x * v + c.x) * DT, y: p.y + (d.y * v + c.y) * DT };
     t += DT / 60;
-    if (onLand(p) && dist(p, b) > 400) return result(false, 'land');
+    if (inshore === 'waypoint' || dist(p, b) > 400 ? onLand(p) || (!!inshore && tooShoal(p)) : false) return result(false, 'land');
     const xt = cross(legU, sub(p, a));
     maxLeft = Math.max(maxLeft, xt); maxRight = Math.max(maxRight, -xt);
     minShore = Math.min(minShore, sd);
@@ -260,17 +265,19 @@ export function groundLaylines(o: Outlook, b: Vec, t: number, kind: 'beat' | 'ru
 /** A Folkboat draws 1.2 m (class rules); inshore she keeps to water this deep below chart datum (MLLW: the tide's
  * low water), with room under the keel for the swell and the chart's own error. */
 export const SAFE_DEPTH = 2.5;
-/** Shoaler than SAFE_DEPTH on the chart: the depth grid's band (its mid depth), or off that grid (depthBand gives
- * [0, 0]: the Cityfront's water isn't on it) NOAA's ENC itself (sea.ts chartDepth: its depth areas, else the nearest
- * sounding), on a 25 m lattice. (The Coast Pilot: "Shoals with depths less than 10 feet extend up to 0.2 mile from the
+/** Shoaler than SAFE_DEPTH on the chart: the depth grid's band, or off that grid (depthBand gives [0, 0]: the
+ * Cityfront's water isn't on it) NOAA's ENC itself (sea.ts chartDepth: its depth areas, else the nearest sounding), on
+ * a 25 m lattice. A band's or an area's shallow edge, not its middle: within a 1.8–3.6 m area the chart promises no
+ * more than 1.8 m, and that's what a navigator must assume. (The Coast Pilot: "Shoals with depths less than 10 feet extend up to 0.2 mile from the
  * shore" from the Golden Gate Bridge east to the waterfront, NOAA Coast Pilot 7 ch. 7, edition of 8 Nov 2026.) */
 const shoalCache = new Map<string, boolean>();
 export const tooShoal = (p: Vec): boolean => {
   const [d1, d2] = depthBand(p);
-  if (!(d1 === 0 && d2 === 0)) return (d1 + d2) / 2 < SAFE_DEPTH;
-  const key = `${Math.round(p.x / 25)},${Math.round(p.y / 25)}`;
+  if (!(d1 === 0 && d2 === 0)) return Math.min(d1, d2) < SAFE_DEPTH;
+  const i = Math.round(p.x / 25), j = Math.round(p.y / 25), key = `${i},${j}`;
   let v = shoalCache.get(key);
-  if (v === undefined) { const d = chartDepth(p); v = d != null && d < SAFE_DEPTH; shoalCache.set(key, v); }
+  // (judged at the lattice point itself, so the answer doesn't hang on which point in the cell was asked first)
+  if (v === undefined) { const d = chartDepth({ x: i * 25, y: j * 25 }, true); v = d != null && d < SAFE_DEPTH; shoalCache.set(key, v); }
   return v;
 };
 /**
@@ -284,7 +291,7 @@ export function shoreLeg(o: Outlook, a: Vec, b: Vec, t0: number, off: number, sc
   const L = dist(a, b); if (L < 600) return null;
   const u = unit(sub(b, a)), n = { x: -u.y, y: u.x }; // (n: left of the course, looking from a to b)
   // the shore's side: the nearer one at the middle of the leg, out to 1200 m
-  const reach = (q: Vec, s: number) => { for (let d = 0; d <= 1200; d += 20) { const r = { x: q.x + n.x * s * d, y: q.y + n.y * s * d }; if (anyShoreDist(r) <= off || tooShoal(r)) return d; } return Infinity; };
+  const reach = (q: Vec, s: number) => { for (let d = 0; d <= 1200; d += 20) { const r = { x: q.x + n.x * s * d, y: q.y + n.y * s * d }; if (anyShoreDist(r) <= off || tooShoal(r)) return Math.max(0, d - 20); } return Infinity; }; // (the last of the water she can work: the step before the shore's `off` or the shoals)
   const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dl = reach(mid, 1), dr = reach(mid, -1), s = dl <= dr ? 1 : -1;
   if (!isFinite(Math.min(dl, dr))) return null;
   const wps: Vec[] = [];
@@ -298,7 +305,7 @@ export function shoreLeg(o: Outlook, a: Vec, b: Vec, t0: number, off: number, sc
   let t = t0, tacks = 0; const path: SailResult['path'] = [], turns: SailResult['turns'] = [];
   let sumKt = 0, sumCur = 0, maxLeft = 0, maxRight = 0, minShore = Infinity, kind: LegKind | null = null;
   for (let i = 1; i < pts.length; i++) {
-    const r = sailLeg(o, pts[i - 1], pts[i], t, 'middle', sc, i === pts.length - 1 ? arrive : 40);
+    const last = i === pts.length - 1, r = sailLeg(o, pts[i - 1], pts[i], t, 'middle', sc, last ? arrive : 40, 240, last ? 'mark' : 'waypoint');
     if (!r.ok) return null;
     t += r.minutes; tacks += r.tacks; path.push(...r.path); turns.push(...r.turns);
     sumKt += r.meanKt * r.minutes; sumCur += r.meanCurAlong * r.minutes; minShore = Math.min(minShore, r.minShore);
@@ -306,38 +313,48 @@ export function shoreLeg(o: Outlook, a: Vec, b: Vec, t0: number, off: number, sc
     kind ??= r.kind;
   }
   const m = t - t0;
-  return { ok: true, minutes: m, kind: kind!, path, tacks, turns, meanKt: sumKt / m, meanCurAlong: sumCur / m, maxLeft, maxRight, minShore };
+  return { ok: true, minutes: m, kind: kind!, path, tacks, turns, meanKt: sumKt / m, meanCurAlong: sumCur / m, maxLeft, maxRight, minShore, off };
 }
 
 /** How foul the current must be along a leg (kt against her, on average over the straight course) before she weighs
  * working the shore: weaker than that, the slacker water near the beach isn't worth the way in and out. */
 export const SHORE_FOUL_KT = 0.4;
-/** How far off the shore she works it, m: tried in turn, the fastest kept (closer is slacker water, but more distance
- * sailed in and out). */
-export const SHORE_OFFS = [60, 120, 200];
+/** How far off the shore she works it, m: tried in turn, the fastest kept. Closer is slacker water but more sailed in
+ * and out; the planner's current is read on a 100 m lattice (outlook.ts), so offsets closer together than that can't be
+ * told apart, and two are enough. */
+export const SHORE_OFFS = [80, 200];
 /** All the plans for a leg (a reach has just the one way: straight there, or along the shore). */
 export function comparePlans(o: Outlook, a: Vec, b: Vec, t0: number, sc: Scenario = AS_FORECAST, arrive = 30): Record<Plan, SailResult> {
   const mid = sailLeg(o, a, b, t0, 'middle', sc, arrive);
-  // along the shore, against a foul tide only (the fastest of its offsets): not a way, otherwise
-  const shore = mid.meanCurAlong < -SHORE_FOUL_KT
+  // along the shore, against a foul tide only (the fastest of its offsets), and not on a reach (straight there is the
+  // reach's way, and what the brief tells her): not a way, otherwise
+  const shore = mid.kind !== 'reach' && mid.meanCurAlong < -SHORE_FOUL_KT
     ? SHORE_OFFS.map(off => shoreLeg(o, a, b, t0, off, sc, arrive)).filter((r): r is SailResult => !!r).sort((x, y) => x.minutes - y.minutes)[0] ?? null
     : null;
   const none: SailResult = { ...mid, ok: false, why: undefined };
   const three = mid.kind === 'reach' ? { left: mid, right: mid, middle: mid } : { left: sailLeg(o, a, b, t0, 'left', sc, arrive), right: sailLeg(o, a, b, t0, 'right', sc, arrive), middle: mid };
-  // (the shore only when it's the call: SHORE_CALL quicker than the best of the others)
-  const others = [three.left, three.right, three.middle].filter(r => r.ok).map(r => r.minutes);
-  const called = !!shore && (!others.length || shore.minutes < Math.min(...others) * (1 - SHORE_CALL));
-  return { ...three, shore: called ? shore! : none };
+  return { ...three, shore: shore ?? none };
 }
 
 /** How much quicker the way along the shore must be than the best of the others (a share of the time) before it's the
- * call: the planner's own error is about that (the AI fleet sails the plan's legs some 15% slower, sim-fleet.test.ts,
- * the same boat alone on a leg 15% slower than the plan has her), and a gain smaller than it isn't one to bank on
- * over the beach's hazards. On 7 Nov 2026's ebb the Cityfront's runs gained 10% and 15% that way. */
+ * call. A judgement, not a measurement (docs/CONSTANTS.md): the gain rests on the current model's relief near the beach,
+ * which has no measured Cityfront profile behind it (environment/current.ts shoreRelief), so a few percent isn't one to
+ * bank on over the beach's hazards. (The planner's error, the fleet some 15% slower than its plans, is in every plan
+ * alike, and doesn't change which is quickest.) On 7 Nov 2026's ebb the Cityfront's second run to Fort Mason gains 11%
+ * that way, called; the first 9%, not. */
 export const SHORE_CALL = 0.1;
-/** The fastest of the plans that get there. */
-export function bestPlan(r: Record<Plan, SailResult>): Plan {
-  const ok = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => r[k].ok);
+/** Along the shore is the call: SHORE_CALL quicker than the best of the others. */
+export function shoreCalled(r: Record<Plan, SailResult>): boolean {
+  if (!r.shore.ok) return false;
+  const others = (['left', 'middle', 'right'] as Plan[]).filter(k => r[k].ok).map(k => r[k].minutes);
+  return !others.length || r.shore.minutes < Math.min(...others) * (1 - SHORE_CALL);
+}
+/** The fastest of the plans that get there (along the shore only when it's the call, shoreCalled). `held`: the plan
+ * already chosen, weighed again under a what-if (strategist SCENARIOS): along the shore stays the plan for as long as
+ * it's still the fastest outright, the call once made not unmade by a smaller margin. */
+export function bestPlan(r: Record<Plan, SailResult>, held?: Plan): Plan {
+  const keepShore = shoreCalled(r) || (held === 'shore' && r.shore.ok);
+  const ok = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => r[k].ok && (k !== 'shore' || keepShore));
   return ok.length ? ok.reduce((a, k) => (r[k].minutes < r[a].minutes ? k : a)) : 'middle';
 }
 

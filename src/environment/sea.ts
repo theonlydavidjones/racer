@@ -259,13 +259,13 @@ function encDepthRings() {
   return depthRings;
 }
 /** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
-export function chartDepth(p: Vec): number | null {
+export function chartDepth(p: Vec, shoalEdge = false): number | null {
   const E = enc as unknown as { soundings: number[] };
   for (const A of encDepthRings()) {
     if (p.x < A.x0 || p.x > A.x1 || p.y < A.y0 || p.y > A.y1) continue;
     let inside = false;
     for (const ring of A.rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
-    if (inside) return Math.max(0, (A.d + A.deep) / 2);
+    if (inside) return Math.max(0, shoalEdge ? A.d : (A.d + A.deep) / 2);
   }
   let best: number | null = null, bd = 200;
   for (let i = 0; i < E.soundings.length; i += 3) { const q = LL(E.soundings[i + 1] / 1e5, E.soundings[i] / 1e5), d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = E.soundings[i + 2] / 10; } }
