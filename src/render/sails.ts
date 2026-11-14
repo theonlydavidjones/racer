@@ -40,7 +40,19 @@ export interface SailShape {
    * (x, z) in the sail's frame times f(t) at height fraction t, fading out across the sail to nothing at the leech.
    */
   luff?: { x: number; z: number; f: (t: number) => number };
+  /**
+   * Spars and wires the cloth can't pass through (the mast, the shrouds), each a rod from a to b with radius r, in the
+   * sail's own frame. Where the belly would reach one, the cloth lies against it instead: held flat on the rod's near
+   * face, and draped away to either side of it (it can't fold sharply round a rod with the wind pressing it on).
+   */
+  obstacles?: SailObstacle[];
 }
+
+/** A rod the sail's cloth lies against: from a to b (in the sail's frame), radius r (m, with the cloth's clearance). */
+export interface SailObstacle { a: THREE.Vector3; b: THREE.Vector3; r: number }
+
+/** How steeply cloth pressed against a rod falls away to either side of it (m of camber per m across the sail). */
+const DRAPE = 0.35;
 
 const tmp = new THREE.Vector3();
 
@@ -138,13 +150,40 @@ export class Sail {
     const th = sh.twist * t * Math.PI / 180, rz = out.z - L.z, rx = x;
     out.x = L.x + rx * Math.cos(th) + rz * Math.sin(th);
     out.z = L.z - rx * Math.sin(th) + rz * Math.cos(th);
+    if (sh.obstacles) {
+      // the cloth's belly is to +x; a rod on that side of the flat sail stops it (a backed jib's belly pressed onto the
+      // mast and the shroud): no further to +x than the rod's near face, and to either side of the rod no further than
+      // a drape falling away from it
+      // (the cloth across the rod lies flat on its near face for a cell of the sail's grid either side, so the faces drawn
+      // between the grid's points don't cut through the rod, then falls away)
+      const flatX = L.x + rz * Math.sin(th), cell = L.distanceTo(F) / this.def.cols;
+      for (const o of sh.obstacles) {
+        const dy = o.b.y - o.a.y; if (Math.abs(dy) < 1e-6) continue;
+        const u = (out.y - o.a.y) / dy; if (u < -0.02 || u > 1.02) continue;
+        const ox = o.a.x + u * (o.b.x - o.a.x), oz = o.a.z + u * (o.b.z - o.a.z);
+        if (ox <= flatX) continue; // (on the sail's other side: the wind doesn't press the cloth that way)
+        const dz = Math.abs(out.z - oz);
+        const lim = ox - o.r + DRAPE * Math.max(0, dz - o.r - cell);
+        if (out.x > lim) out.x = lim;
+      }
+    }
     return out;
   }
 
   /** Chord length at height fraction t, m. */
   chord(t: number): number { const [L, F] = this.edges(t); return L.distanceTo(F); }
 
+  /** The rods this update can meet (reused: nothing allocated per frame). */
+  private near: SailObstacle[] = [];
+
   update(sh: SailShape): void {
+    // only the rods on the belly's side of the sail can stop it (a drawing jib has the mast and both shrouds to
+    // windward: none), so the rest are dropped once here, not tested at every point
+    if (sh.obstacles) {
+      this.near.length = 0;
+      for (const o of sh.obstacles) if (Math.max(o.a.x, o.b.x) + o.r > -0.05) this.near.push(o);
+      sh = this.near.length ? { ...sh, obstacles: this.near } : { ...sh, obstacles: undefined };
+    }
     let k = 0;
     for (const t of this.tVals) for (const s of this.sVals) {
       this.point(t, s, sh, tmp);
