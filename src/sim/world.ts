@@ -4,6 +4,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
+import { collide } from '../boat/contact';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { windSide } from '../boat/dynamics';
@@ -1262,6 +1263,7 @@ export class World {
   private checkPairs(): void {
     this.kcMemo = { t: this.t, m: new Map() }; // after the boats have moved this step
     const bs = this.boats, ctx = this.rulesCtx(), found: { A: Boat; B: Boat; incident: Incident<Boat> }[] = [];
+    let touching: (Boat | undefined)[] | undefined;
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
@@ -1289,6 +1291,8 @@ export class World {
         if (hailer.isUser) this.emit({ type: 'toast', ms: 3500, msg: `${hailed.name} is tacking to give you room. Tack now (Rule 20.2(d)).` });
       }
       if (incident) found.push({ A, B, incident });
+      // (hulls touching, whether or not it's a new incident: the blow between them, below)
+      if (!A.docked && !B.docked && (A.x - B.x) ** 2 + (A.y - B.y) ** 2 < (LOA + CONTACT_GAP) ** 2 && hullGap(A, B) < CONTACT_GAP) (touching ??= []).push(A, B);
       // (a breach against one of them still going on, by its own signs, whoever has right of way now (a right-of-way
       // boat's luff, 16.1, squeezes too): touching, the boat she's fouled by still making her swerve, or inside room-to-
       // keep-clear distance and still closing. Only giving room again, overlapped round the mark, isn't one)
@@ -1349,9 +1353,10 @@ export class World {
         }
       }
       if (incident.kind === 'contact') {
-        A.v *= 0.35; B.v *= 0.35; A.groundT = B.groundT = this.t; // (RRS 42.3(h) covers a collision with a vessel too: they may get clear, boat/physics.ts)
-        const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
-        A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
+        A.groundT = B.groundT = this.t; // (RRS 42.3(h) covers a collision with a vessel too: they may get clear, boat/physics.ts)
+        // (the blow, here: before the tangle below reads the gap they're left at)
+        this.blow(A, B);
+        if (touching) for (let i = 0; i < touching.length; i += 2) if (touching[i] === A && touching[i + 1] === B) touching[i] = touching[i + 1] = undefined;
       }
       // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
       // from that foul (not a length clear of each other since), and before her turns have begun, is that same incident: no
@@ -1389,6 +1394,22 @@ export class World {
         if (after != null) this.pendingProtests.push({ by: victim.id, vs: f.id, at: this.t + after, inc: { vs: f.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part } });
       }
     }
+    // (and the pairs touching that weren't a new incident this step: lying together they press, and slide, and part when
+    // one sails off)
+    if (touching) for (let i = 0; i < touching.length; i += 2) { const A = touching[i], B = touching[i + 1]; if (A && B) this.blow(A, B); }
+  }
+
+  /**
+   * The blow where two hulls touch (boat/contact.ts): an impulse along the line of contact and, by friction, along the
+   * hulls, each boat answering by her own inertia; after the judging, which reads how they were sailing before it. Then
+   * set apart along that line to where they just touch (half each: they're of a weight), so one never lies inside the
+   * other. Every step they touch, not only when it's a new incident.
+   */
+  private blow(A: Boat, B: Boat): void {
+    const c = contactNormal(A, B);
+    collide(A, B, c.a, c.b, c.n);
+    const d = (CONTACT_GAP - hullGap(A, B)) / 2;
+    if (d > 0) { A.x -= c.n.x * d; A.y -= c.n.y * d; B.x += c.n.x * d; B.y += c.n.y * d; }
   }
 
   /** Rule 14 with damage: the right-of-way boat that could have avoided the contact takes a penalty too (43.1(c) doesn't
