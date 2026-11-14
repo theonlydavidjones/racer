@@ -36,7 +36,7 @@ export function trimNotesHtml(u: Boat, s: Situation, notes: LineNote[]): string 
   const line = (k: LineKey) => {
     const n = by.get(k); if (!n) return '';
     const r = rank.get(k), who = n.who === 'crew' ? '<span class="who">Crew</span>' : '';
-    const head = `<div class="tn-h"><b>${NAME[k] ?? k}</b>${who}${r ? `<span class="tn-n">${r}</span>` : '<span class="cue-ok">✓</span>'}</div>${track(k, n)}`;
+    const head = `<div class="tn-h"><b>${NAME[k] ?? k}</b>${who}${r ? `<span class="tn-n">${r}</span>` : n.tick ? '<span class="cue-ok">✓</span>' : ''}</div>${track(k, n)}`;
     return n.fix
       ? `<div class="tn-line fix" data-line="${k}">${head}<dl><dt>Now</dt><dd>${esc(n.fix.now ?? '')}</dd><dt>Should</dt><dd class="sh">${esc(SHORT_SHOULD(n.fix.head))}</dd><dt>Why</dt><dd>${esc(n.fix.short ?? n.fix.why)}</dd></dl></div>`
       : `<div class="tn-line ok" data-line="${k}">${head}<p>${esc(n.ok)}</p></div>`;

@@ -190,66 +190,96 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
  * jib's three pairs on its luff, windward and leeward; the main's on its leech, one at each batten; none on its luff.
  */
 function lineWords(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheetW'>, to: number, l: Lesson): { now: string; short: string } {
-  const more = to > b.ctl[k], tws = Math.round(s.tws), tm = b.trim.main, tj = b.trim.jib;
+  const more = to > b.ctl[k], tws = Math.round(s.tws), tm = b.trim.main, tj = b.trim.jib, mineSheet = byHand(b, 'mainsheet');
   switch (k) {
     case 'mainsheet':
       if (l.kind === 'info') return { now: 'Out against the shroud, stalled', short: 'It can\'t go further: come up, or bear away to a run.' };
-      if (l.head.startsWith('Ease the mainsheet')) return { now: 'Leech closed: the top batten hooked to windward', short: `The top of the main wants a little twist in ${tws} kt.` };
+      if (l.head.startsWith('Ease the mainsheet')) return { now: 'Sheeted hard: the leech closed, too little twist', short: `The top of the main wants a little twist in ${tws} kt.` };
       if (l.head.startsWith('Trim the mainsheet')) return { now: 'Leech twisting open: the top spilling wind', short: 'Sheet tension holds the leech.' };
       if (!more) return s.awa > 110 ? { now: 'Eased right out: she wants to round up', short: 'In a touch and the helm lightens.' }
         : tm.flow === 'luffing' ? { now: 'Eased: the main\'s luff lifting', short: 'A lifting luff isn\'t pulling.' } : { now: 'Further out than this angle wants', short: 'The main isn\'t pulling its weight.' };
-      return s.awa > 110 ? { now: 'In too far for this angle', short: 'Off the wind it pushes: out square to the wind.' }
+      return s.awa > 110 ? { now: 'In too far for this angle', short: 'Off the wind it pushes: out to the shroud.' }
         : s.over ? { now: 'In hard, and she\'s overpowered', short: 'She heels and drags her rudder instead of driving.' }
-        : tm.flow === 'stalled' ? { now: 'In too hard: its leech telltales curling', short: 'Stalled, it pushes her sideways.' } : { now: 'Too close to the centerline', short: 'Over-trimmed for this wind angle.' };
+        // (the leech telltales curl only past a small stall, render/sails.ts leechTellState)
+        : tm.flow === 'stalled' && tm.amount > 0.12 ? { now: 'In too hard: its leech telltales curling', short: 'Stalled, it pushes her sideways.' } : { now: 'In past its best angle', short: 'Over-trimmed for this wind angle.' };
     case 'jibsheet':
-      return more ? { now: 'In too hard: its leeward luff telltales drooping', short: 'A stalled jib pushes her sideways.' }
-        : tj?.flow === 'luffing' ? { now: 'Eased: the jib\'s windward luff telltales lifting', short: 'A luffing jib barely pulls.' } : { now: 'Eased past its best angle', short: 'In to where it pulls hardest.' };
-    case 'traveller':
-      return to < b.ctl[k] ? { now: 'Down to leeward', short: 'Boom to the centerline, leech still open: height.' }
-        : s.over ? { now: `Up, and she's overpowered in ${tws} kt`, short: 'Down: less heel and helm, same shape.' } : { now: 'Boom too close to the centerline', short: 'The main is over-trimmed.' };
-    case 'backstay': return more ? { now: 'Eased: both sails full', short: `In ${tws} kt she wants them flatter: drive, not heel.` } : { now: 'On: both sails flat', short: `In ${tws} kt she wants power: fuller sails.` };
-    case 'vang': return more ? (s.awa > 70 ? { now: 'Off: the top of the main twisting away', short: 'Off the wind the sheet can\'t hold the boom down.' } : { now: 'Off: the leech opens as the sheet eases', short: 'It holds the leech, so the main keeps its shape.' })
-      : { now: 'Tight: the leech too closed', short: 'She needs more twist.' };
+      if (more) return s.awa > 115 ? { now: 'In too far for this angle', short: 'Off the wind it wants to be out, for area.' }
+        : tj?.flow === 'stalled' ? { now: 'In too hard: its leeward luff telltales drooping', short: 'A stalled jib pushes her sideways.' }
+        : { now: 'In past its best angle', short: 'Ease until the windward telltales just lift, then in a touch.' };
+      return tj?.flow === 'luffing' ? { now: 'Eased: the jib\'s windward luff telltales lifting', short: 'A luffing jib barely pulls.' }
+        : s.awa > 115 ? { now: 'Further out than this angle wants', short: 'In a little: it pulls harder.' } : { now: 'Eased past its best angle', short: 'In to where it pulls hardest.' };
+    case 'traveller': {
+      // with the crew on the mainsheet they re-sheet to keep the boom where they want it: then the car moves the leech,
+      // not the boom (coach.ts withCrew; physics.ts trimSails)
+      const at = b.ctl.traveller > 0.1 ? 'Down to leeward' : b.ctl.traveller < -0.1 ? 'Up, but not far enough' : 'In the middle';
+      if (to < b.ctl[k]) return mineSheet ? { now: at, short: 'Boom to the centerline, leech still open: height.' } : { now: at, short: 'Up, and the sheet eases to match: the leech opens.' };
+      if (!mineSheet) return { now: 'Up to windward: the sheet eased to match, the leech open', short: 'Down, and the sheet pulls straighter: the leech closes.' };
+      return s.over ? { now: `Up, and she's overpowered in ${tws} kt`, short: 'Down: less heel and helm, same shape.' } : { now: 'Boom too close to the centerline', short: 'The main is over-trimmed.' };
+    }
+    case 'backstay': return more ? { now: 'Eased: both sails full', short: `In ${tws} kt she wants them flatter: drive, not heel.` }
+      : s.over ? { now: 'On hard: flatter than she needs', short: 'A little off: flat past this costs drive.' } : { now: 'On: both sails flat', short: `In ${tws} kt she wants power: fuller sails.` };
+    case 'vang': {
+      if (more) return s.awa > 70 ? { now: 'Off: the top of the main twisting away', short: 'Off the wind the sheet can\'t hold the boom down.' } : { now: 'Off: the leech opens as the sheet eases', short: 'It holds the leech, so the main keeps its shape.' };
+      // (too tight: the leech closed, or (North: "the kickingstrap pulls on the mast") the mast bent and the main flat)
+      const t = targetShape('main', s.tws, s.awa, b.depower ?? 0).twist;
+      return b.shape.main.twist < t - 1 ? { now: 'Tight: the leech too closed', short: 'She needs more twist.' } : { now: 'Tight: bending the mast, the main flat', short: `In ${tws} kt she wants that depth.` };
+    }
     case 'outhaul': return more ? { now: 'Eased: the foot deep', short: `Power she can't use in ${tws} kt.` } : { now: 'Tight: the foot flat', short: 'A deeper foot is power.' };
     case 'cunningham': case 'downhaul': return more ? { now: 'Eased: the draft blown aft', short: 'Luff tension pulls it forward.' } : { now: 'Tight: the draft too far forward', short: 'Back toward the middle: power.' };
     case 'jibHalyard': return more ? { now: 'Soft: wrinkles off the hanks, the draft aft', short: 'Halyard tension pulls it forward.' } : { now: 'Tight: a crease up the luff', short: 'Lets the draft move back.' };
-    case 'jibCunningham': return more ? { now: 'Eased: the jib\'s draft blown aft', short: 'Luff tension brings it forward.' } : { now: 'Tight: the jib\'s draft too far forward', short: 'Ease it a little.' };
+    case 'jibCunningham': return more ? { now: 'Eased: the jib\'s draft blown aft', short: 'Luff tension brings it forward.' } : { now: 'Tight: the jib\'s draft too far forward', short: 'Draft back toward 40%: a finer entry points higher.' };
   }
   return { now: '', short: l.why };
 }
-/** A line that's right: in a few words, what it's doing (Trim Notes' ✓ lines). */
-function okWords(b: Boat, s: Situation, k: LineKey): string {
-  const tws = Math.round(s.tws), up = s.awa < 60;
+/**
+ * A line that's right (no fix worth saying): what it's doing, read from the boat, and whether it earns the ✓. The words
+ * never claim a state they don't check (the review): a sail's flow, a line's setting, the shape's draft.
+ */
+function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boolean } {
+  const tm = b.trim.main, tj = b.trim.jib, c = b.ctl, upwind = s.awa < 40;
   switch (k) {
-    case 'mainsheet': return s.awa > 110 ? 'Out square to the wind' : 'Drawing: its leech telltales streaming';
-    case 'jibsheet': return s.awa > 115 ? 'Out, full' : 'Drawing: its luff telltales streaming, windward and leeward';
-    case 'traveller': return 'Boom where it pays';
-    // (upwind under 18 kt the guide wants it slack; on, it's worth too little to say so, so say what it's doing)
-    case 'vang': return up && s.tws < 18 ? (b.ctl.vang <= 0.15 ? 'Slack upwind, as the North guide has it' : 'On: the sheet does the work upwind') : 'Leech held';
-    case 'outhaul': return `Foot right for ${tws} kt`;
-    case 'cunningham': case 'downhaul': return 'Draft about halfway back';
-    case 'jibCunningham': case 'jibHalyard': return 'Jib luff smooth, draft forward';
-    case 'backstay': return `Right for ${tws} kt`;
-    case 'car': return up ? 'Set for upwind' : 'Set for this angle';
+    case 'mainsheet':
+      if (b.sheets.main >= SAILS.main.max - 0.5 && tm.flow === 'stalled') return { text: 'Boom on the shroud: as far as it goes', tick: true };
+      if (tm.flow === 'luffing' && s.over) return { text: 'Eased on purpose: keeping her on her feet', tick: true };
+      return { text: s.awa > 110 ? 'Eased right out, boom by the shroud' : 'Drawing: its leech telltales streaming', tick: true };
+    case 'jibsheet':
+      if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'Windward luff telltales lifting a little', tick: true };
+      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'Right out, at its stop: stalled on this broad reach', tick: true };
+      return { text: s.awa > 115 ? 'Eased right out' : 'Drawing: its luff telltales streaming, windward and leeward', tick: true };
+    case 'traveller': return { text: c.traveller > 0.1 ? 'Down to leeward' : c.traveller < -0.1 ? 'Up to windward' : 'In the middle', tick: true };
+    case 'vang':
+      // (North: "Never use the kickingstrap upwind in less than 18 knots"; on, it's worth too little to say so, but no ✓)
+      if (upwind && s.tws < 18) return c.vang <= 0.15 ? { text: 'Off: the sheet has the leech', tick: true } : { text: 'On, idle: the sheet has the leech (North: slack under 18 kt)', tick: false };
+      return { text: c.vang <= 0.15 ? 'Off' : 'On: holding the boom down', tick: true };
+    case 'outhaul': return { text: c.outhaul < 0.4 ? 'Eased: the foot full' : 'On the mark: the foot flat', tick: true };
+    case 'cunningham': case 'downhaul': return { text: `Draft ${Math.round(100 * b.shape.main.draft)}% back`, tick: true };
+    case 'jibHalyard': return { text: c.jibHalyard < 0.2 ? 'Soft: small wrinkles off the hanks' : c.jibHalyard <= 0.75 ? 'Luff just smooth' : 'Hard: the draft well forward', tick: true };
+    case 'jibCunningham': return { text: c.jibCunningham < 0.2 ? 'Off' : 'On: the draft forward', tick: true };
+    case 'backstay': return { text: `${c.backstay < 0.15 ? 'Off' : c.backstay > 0.7 ? 'On hard' : 'On'}: right for ${Math.round(s.tws)} kt`, tick: true };
+    case 'car': { const h = c.car[b.tack]; return { text: `Lead ${h.fore + 1} back, ${h.ins + 1} out`, tick: false }; } // (not priced: no ✓)
   }
-  return 'Right';
+  return { text: 'Right', tick: true };
 }
 
 /** One line's note for Trim Notes: right, or what to do; who has it. */
-export interface LineNote { line: LineKey; who: 'you' | 'crew'; fix: Lesson | null; ok: string }
+export interface LineNote { line: LineKey; who: 'you' | 'crew'; fix: Lesson | null; ok: string; tick: boolean }
 /**
- * Every line's note, whoever has it (Trim Notes: the owner wants each line, not only yours): its best setting with the
- * crew answering it, as the coach finds yours; right if it's worth less than FIX_MIN.
+ * Every line's note (Trim Notes: the owner wants each line). Yours as the coach finds them; the crew's as they've set
+ * them, with no fix: a one-line search at their steady state finds "fixes" that make her slower (the review: easing the
+ * main on purpose in 26 kt, the outhaul on its mark), so their lines say what they're doing.
  */
 export function lineNotes(b: Boat, ctx: CoachContext = {}): { s: Situation; notes: LineNote[] } {
   const s = situation(b, ctx), notes: LineNote[] = [];
-  const busy = b.docked || b.hove || b.luff || b.tacking || b.turnTarget != null;
+  const busy = b.docked || (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) || b.hove || b.luff || b.tacking || b.turnTarget != null || (b.penalty ?? 0) > 0;
   for (const k of [...LINE_KEYS, 'car'] as LineKey[]) {
     if (k === 'jibsheet' && sailPlan(b) !== 'jib') continue;
     const who = byHand(b, k) ? 'you' : 'crew';
     let fix: Lesson | null = null;
-    if (!busy && k !== 'car') { const r = bestFor(b, k as Exclude<LineKey, 'car' | 'jibsheetW'>); if (r.gain >= FIX_MIN) fix = lineLesson(b, s, k as Exclude<LineKey, 'car' | 'jibsheetW'>, r.to, r.gain); }
-    notes.push({ line: k, who, fix, ok: okWords(b, s, k) });
+    // (the main eased on purpose when she's overpowered: not a fix, as the coach's own confirmation has it)
+    const keepOff = k === 'mainsheet' && s.over && (b.depower ?? 0) > 0.6 && b.trim.main.flow === 'luffing';
+    if (!busy && who === 'you' && k !== 'car' && !keepOff) { const r = bestFor(b, k as Exclude<LineKey, 'car' | 'jibsheetW'>); if (r.gain >= FIX_MIN) fix = lineLesson(b, s, k as Exclude<LineKey, 'car' | 'jibsheetW'>, r.to, r.gain); }
+    const ok = okWords(b, s, k);
+    notes.push({ line: k, who, fix, ok: ok.text, tick: ok.tick });
   }
   return { s, notes };
 }
@@ -505,13 +535,14 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   if (ctx.preStart) return { ...base, kind: 'info', head: `Pre-start: trim's set. ${s.speedKt.toFixed(1)} kt; ease to slow, trim to go.`, why: '', look: 'the line and the clock' };
   // the crew's sheets a moment behind a change of course, or she's still getting going: not "right" yet
   // (not the main eased on purpose in a breeze: that's the crew depowering)
-  const lag = ([['main', b.trim.main, 'mainsheet'], ['jib', b.trim.jib, 'jibsheet']] as const).find(([n, t, k]) => t && t.flow !== 'good' && t.amount > 0.1 && !byHand(b, k) && !(b.sheets[n] >= SAILS[n].max - 0.5) && !(n === 'main' && s.over && (b.depower ?? 0) > 0.6 && t.flow === 'luffing'));
+  const lag = ([['main', b.trim.main, 'mainsheet'], ['jib', b.trim.jib, 'jibsheet']] as const).find(([n, t, k]) => t && t.flow !== 'good' && t.amount > 0.1 && !byHand(b, k) && !(b.sheets[n] >= SAILS[n].max - 0.5) && !(n === 'jib' && b.ctl.jibsheet <= 0.01 && t.flow === 'luffing') && !(n === 'main' && s.over && (b.depower ?? 0) > 0.6 && t.flow === 'luffing'));
   if (lag && s.awa < 110) return { ...base, kind: 'info', head: `The crew is catching up: the ${lag[0]} is ${lag[1]!.flow === 'stalled' ? 'stalled' : 'luffing'} for a moment.`, why: 'They trim at a human pace, a second or two behind a change of course or a shift.', look: lag[0] === 'jib' ? 'the jib\'s luff telltales: watch them settle' : lag[1]!.flow === 'stalled' ? 'the main\'s leech telltales: watch them stream again' : 'the luff of the main: watch it stop lifting' };
   if (s.speedKt < 0.85 * s.targetKt && !s.over) return { ...base, kind: 'info', head: `Building speed: ${s.speedKt.toFixed(1)} kt, the polar's ${s.targetKt.toFixed(1)}.`, why: 'The sails are set: a two-tonne boat takes a while to get going. Sail her straight and let her build.', look: 'the speedo climbing' };
   // (a jib a degree or two off its best: its telltales show it before it's worth a lesson; say which, and the touch that
   // fixes it, so "right" never contradicts a lifting telltale)
-  const tj = b.trim.jib, touch = s.up && tj?.flow === 'luffing' ? 'The jib\'s windward luff telltales are just lifting: a touch of jib sheet, or a hair down.'
-    : s.up && tj?.flow === 'stalled' ? 'The jib\'s leeward luff telltales are just drooping: ease a touch, or come up a hair.' : '';
+  const tj = b.trim.jib, tells = s.awa <= 115; // (the telltales fly to 115° apparent, render/sails.ts)
+  const touch = tells && tj?.flow === 'luffing' ? (b.ctl.jibsheet <= 0.01 ? 'The jib\'s windward luff telltales are just lifting with the sheet hard in: bear away a hair.' : 'The jib\'s windward luff telltales are just lifting: a touch of jib sheet, or bear away a hair.')
+    : tells && tj?.flow === 'stalled' ? (b.sheets.jib >= SAILS.jib.max - 0.5 ? 'Sheets right out: on this broad reach the jib\'s leeward luff telltales droop. Come up a little and they stream.' : 'The jib\'s leeward luff telltales are just drooping: ease a touch, or come up a hair.') : '';
   const steer = touch || (s.up ? 'Steer to the jib\'s luff telltales: windward and leeward both streaming.' : s.awa > 110 ? 'Keep the boom out and steer smoothly through the waves.' : 'Ease the sheets until the luffs just lift, then trim back a touch.');
   // (a teaching choice, made deliberately: the traveller held up in a breeze costs almost nothing in the model, since
   // the vang holds the leech while the crew eases the sheet, so it isn't a fix; but it's worth knowing why most boats
@@ -544,6 +575,7 @@ export class CoachMemory {
   top: { id: string; done?: string; line?: LineKey; from?: number; to?: number; gain: number; speedKt: number; since: number } | null = null;
   /** Until when it keeps quiet: through a tack, a jibe or a rounding, and SETTLE_S after. */
   quietUntil = -1e9;
+  private rounding = false;
   doneText: { text: string; until: number } | null = null;
   /** A fix just made: announced once she's had a few seconds to pick up the speed it's worth. */
   pending: { done: string; speedKt: number; at: number } | null = null;
@@ -567,7 +599,10 @@ export class CoachMemory {
   step(b: Boat, t: number, ctx: CoachContext = {}): { view: CoachView; done: string | null; fresh: string | null; held: number; of: number } {
     let view = teach(b, ctx);
     const s = view.situation, prev = this.top;
-    if (b.tacking || b.turnTarget != null || ctx.justRounded) this.quietUntil = t + SETTLE_S;
+    // (a tack or jibe: quiet through it and SETTLE_S after; a rounding, SETTLE_S from when it's called, not its whole window)
+    if (b.tacking || b.turnTarget != null) this.quietUntil = t + SETTLE_S;
+    if (ctx.justRounded && !this.rounding) this.quietUntil = Math.max(this.quietUntil, t + SETTLE_S);
+    this.rounding = !!ctx.justRounded;
     // hold the lesson we're teaching while it's still nearly as big as the biggest; and for HOLD_S at least, unless
     // something worth twice as much (and 1% of her speed) turns up
     if (prev && view.top.id !== prev.id) {
@@ -586,9 +621,10 @@ export class CoachMemory {
     if (!prev || view.top.id !== prev.id) {
       const tp = view.top;
       this.top = tp.kind === 'fix' || tp.id.startsWith('hove:') ? { id: tp.id, done: tp.done, line: tp.line, from: tp.line ? (b.ctl as unknown as Record<string, number>)[tp.line] : undefined, to: tp.to, gain: tp.gain, speedKt: s.speedKt, since: t } : null;
-      // a new thing to fix goes on screen (not the same one again within half a minute; nothing while she settles)
-      if (!fresh && tp.kind === 'fix' && t >= this.quietUntil && t - (this.shown.get(tp.id) ?? -1e9) > 30) { fresh = tp.head; this.shown.set(tp.id, t); }
-    } else if (this.top) this.top.gain = view.top.gain;
+    } else if (this.top) { this.top.gain = view.top.gain; this.top.to = view.top.to; this.top.done = view.top.done; } // (the same line, perhaps the other way now)
+    // a thing to fix goes on screen once she's settled (not the same one again within half a minute): one that became
+    // the top while she was settling is said when the quiet's over
+    { const tp = view.top; if (!fresh && tp.kind === 'fix' && t >= this.quietUntil && t - (this.shown.get(tp.id) ?? -1e9) > 30) { fresh = tp.head; this.shown.set(tp.id, t); } }
     const done = this.doneText && t < this.doneText.until ? this.doneText.text : null;
     const held = this.top ? Math.min(1, (t - this.top.since) / HOLD_S) : 1, of = (view.top.kind === 'fix' ? 1 : 0) + view.more.length;
     return { view, done, fresh, held, of };
