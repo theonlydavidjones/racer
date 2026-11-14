@@ -46,7 +46,8 @@ export const HANDLING = {
   turnRadius: 9,
   /** Going astern the water meets the rudder from aft: the bow goes the way the tiller's pushed, and the blade works less
    * well, this fraction of ahead (an ESTIMATE; Molland & Turnock, Marine Rudders and Control Surfaces, as summarized in
-   * search results we couldn't open, 14 Nov 2026: the lift slope astern 75–85% of ahead, the stall 5–10 degrees sooner).
+   * search results we couldn't open, 14 Nov 2026: the lift slope astern 75–85% of ahead, the stall 5–10 degrees sooner; 0.7, a little under
+   * that for the earlier stall, is the figure this sim has always used and its astern handling is measured on).
    * With the turn rate in proportion to her speed, the helm hard over turns her stern first on a circle of
    * turnRadius / asternRudder. */
   asternRudder: 0.7,

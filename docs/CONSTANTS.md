@@ -346,6 +346,7 @@ physics, ranked like the ten above:
 | ASTERN_DRAG.c0 | 0.005 | 30 | unsourced |  |
 | ASTERN_DRAG.c1 | 0.035 | 30 | unsourced |  |
 | STEERS_ASTERN | 0.05 m/s | | estimate | above it a held tiller steers by the flow going astern; below, it sculls |
+| HANDLING.asternRudder | 0.7 | | estimate | the rudder's lift going astern over ahead (Molland & Turnock, second hand: 75–85%, earlier stall) |
 | POLE.set | 8 | 35 | unsourced |  |
 | POLE.stow | 5 | 35 | unsourced |  |
 | POLE.jibe | 8 | 35 | unsourced |  |
@@ -658,6 +659,11 @@ physics, ranked like the ten above:
 | COMPELLED_WINDOW | 3 | 78 | unsourced | RRS names the rule, not the number |
 | SHOVE | 0.5 | 109 | unsourced |  |
 | WALK | 0.45 | 111 | unsourced |  |
+| SHOVE_N | 265 N (27 kgf) | | sourced | one adult's initial push (Snook & Ciriello 1991, via the Liberty Mutual table) |
+| ASTERN_SHOVE | 0.64 m/s | | estimate | WALK plus SHOVE_N over 1 m of reach (the reach is the estimate) |
+| ASTERN_STEERAGE | 0.5 m/s | | estimate | the gentlest shove: 10 s above 0.3 m/s on ASTERN_DRAG |
+| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 8 m | | derived | how far the two shoves coast on ASTERN_DRAG |
+| DRIFT_PER_KT, SAIL_ON (geo/marina.ts) | 0.017 m/s per kt, 20 s | | estimate | bare-poles drift allowed for while she gets sail on, measured in this sim |
 | CREW_TURN | 2 | 111 | unsourced |  |
 | AI_CREW_SKILL.Red | 0.75 | 134 | design | fleet variety |
 | AI_CREW_SKILL.Blue | 0.6 | 134 | design | fleet variety |

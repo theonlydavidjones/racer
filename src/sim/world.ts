@@ -178,7 +178,7 @@ const WALK = 0.45, CREW_TURN = 2;
 export const SHOVE_N = 27 * 9.80665;
 /**
  * The shove astern as the crew steps aboard at the finger's end, m/s: she's already going astern at their walk, and the last
- * push, SHOVE_N over about a metre of reach, adds its work to that: ½·m·v² = ½·m·WALK² + F·d. About 0.64 m/s, a little
+ * push, SHOVE_N over about a meter of reach, adds its work to that: ½·m·v² = ½·m·WALK² + F·d. About 0.64 m/s, a little
  * more than a slow walk (the reach, a step and the arms' length, an ESTIMATE). Only where there's less room than that
  * carries her (geo/marina.ts ASTERN_RUN) is she shoved more gently, down to ASTERN_STEERAGE.
  */
