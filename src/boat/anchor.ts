@@ -40,6 +40,8 @@ export const ANCHOR = {
   minScope: 3,
   /** the least water to anchor in (m): her draft, 1.14 m (ORC), and a margin */
   minDepth: 1.5,
+  /** her draft (m): ORC certificate */
+  draft: 1.141,
   /** her way through the water (m/s) the forward hand waits for before lowering it: way off her, as it's done */
   wayOff: 0.4
 };
@@ -75,6 +77,8 @@ export interface AnchorState {
   charted?: Vec;
   /** the way the haul pulls her (unit, over the ground: toward the anchor as hauling began), for rule 42 */
   haulDir?: Vec;
+  /** her keel on the bottom: the tide's left her less water than her draft; and where she sits */
+  aground?: Vec | null;
 }
 
 /** How fast the forward hand works (a slower crewmate takes longer). */

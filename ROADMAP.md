@@ -416,6 +416,10 @@ What's planned, roughly in order. Done work is described in the README.
      the 2025–2028 text, rule 45). The strategist and the smart crew should know when to call it.
    - At anchor: the anchor light at night (built, Rule 30) and the anchor ball by day (Rule 30(a)).
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, a key), not a new button.
+   - Later (Coordinator, 14 Nov 2026): at anchor her sails only drag (dockLines dockStep's windage, sheets let fly); a
+     main left drawing should give lift and side force, so she sails about her anchor and the sheets answer. The anchor
+     light and the drying out on a falling tide are in; rule 22 for an anchored boat is Rules', the San Rafael and San
+     Leandro grids' own tides Bay East's.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."

@@ -117,4 +117,15 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     w.moveHere({ x: u.x + 200, y: u.y }, 'here');
     expect(u.anchor ?? null).toBeNull(); expect(u.atAnchor).toBeFalsy();
   });
+  it('the tide falling below her draft leaves her aground where she lies; rising, she floats', { timeout: 60000 }, () => {
+    const w = world(1, 'flood', 'sail', [2, 3]), u = w.user; toasts(w);
+    applyCommand(w, { k: 'anchor' }); run(w, 90);
+    const a = u.anchor!; expect(a.phase).toBe('down');
+    a.chart = -1.8; // (as if she'd swung over a flat the ebb uncovers: the chart's highest drying band)
+    run(w, 3);
+    expect(a.aground, 'aground').toBeTruthy(); expect(toasts(w).some(m => /Aground/.test(m))).toBe(true);
+    const p0 = { x: u.x, y: u.y }; run(w, 20); expect(dist(p0, u)).toBeLessThan(0.01);
+    a.chart = 3; run(w, 3);
+    expect(a.aground ?? null).toBeNull();
+  });
 });

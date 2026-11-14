@@ -1055,7 +1055,18 @@ export class World {
       a.at = { x: a.at!.x + (p.x - a.at!.x) / g * s, y: a.at!.y + (p.y - a.at!.y) / g * s };
       const c0 = a.charted ?? a.drop; if (c0 && Math.hypot(a.at.x - c0.x, a.at.y - c0.y) > 20) { a.charted = { ...a.at }; a.chart = this.chartAt(a.at); } // (dragged to new ground: its chart depth)
     }
-    if (this.steps % 60 === 0) a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
+    if (this.steps % 60 === 0) {
+      a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
+      // the water under her keel where she lies (the shallower of the nearest sounding there and the anchor's ground, a
+      // rode's length off): the tide falling below her draft leaves her on the bottom, and rising again floats her
+      const here = this.waterDepth(b, Math.min(soundingNear(b, 150) ?? Infinity, a.chart ?? Infinity));
+      if (!a.aground && here < ANCHOR.draft) {
+        a.aground = { x: b.x, y: b.y }; b.lastHitT = this.t; // (aground: 42.3(h) lets her get clear of it)
+        if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: `Aground: the tide's fallen to ${here.toFixed(1)} m and left her keel on the bottom. She floats again as it rises.` });
+      } else if (a.aground && here >= ANCHOR.draft + 0.05) { a.aground = null; if (b.isUser) this.emit({ type: 'toast', msg: 'She\'s afloat again.' }); }
+    }
+    // (aground she sits where she touched: no swinging to her anchor, no drift)
+    if (a.aground) { b.x = a.aground.x; b.y = a.aground.y; b.v = 0; b.astern = 0; b.sway = 0; b.turnRate = 0; b.vx = 0; b.vy = 0; }
     // (head to wind or stream with her sails let fly she lies upright: her heel eases off as the hull's damping lets it)
     b.heel = (b.heel ?? 0) * Math.exp(-dt / 3); b.heelMag = Math.abs(b.heel);
     // her sheets let fly (the sails luffing, drawn so), and her crew where they're placed as at a dock: the forward hand at
