@@ -50,7 +50,7 @@ export interface Pilot {
   /** Nav: the way by water when land's in the direct way (sim/routing.ts routeAround: the planner's route round piers,
    * breakwaters and the shore), the turn she's steering for in it, when it was worked out (s), and for where; the turn
    * she's steering for (null: the way's clear). */
-  route: Vec[] | null; ri: number; routeT: number; routeTo: Vec | null; routeFrom: Vec | null; wp: Vec | null;
+  route: Vec[] | null; ri: number; routeT: number; routeTo: Vec | null; routeFrom: Vec | null; wp: Vec | null; straight: boolean;
   /** How many times Nav has worked the way out (for the tests: it's a tenth of a second among the docks). */
   plans: number;
   /** Nav: the heading it's steering now, for the display. */
@@ -82,7 +82,7 @@ const AWA_TAU = 2.5;
 export const AUTO_TACK = 100;
 
 export function newPilot(): Pilot {
-  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, route: null, ri: 0, routeT: -1e9, routeTo: null, routeFrom: null, wp: null, plans: 0, navH: 0, goTack: null, lastTack: null, alarm: null, asternT: null };
+  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, route: null, ri: 0, routeT: -1e9, routeTo: null, routeFrom: null, wp: null, straight: false, plans: 0, navH: 0, goTack: null, lastTack: null, alarm: null, asternT: null };
 }
 
 /** Engage in a mode, taking up where she is now: Auto holds her heading, Wind her apparent wind angle. */
@@ -142,14 +142,18 @@ const PLAN_AHEAD = 400;
 const OFF_ROUTE = 40, RETRY_M = 30, RETRY_T = 60;
 /** The way to the turn must keep this clear of a pier either side (m), or it's planned again from where she is: the
  * route keeps 10 m off, and a sag to leeward that leaves her steering a chord past a pier head has lost it. */
-const LEG_CLEAR = 6;
+const LEG_CLEAR = 5;
 /** Tack for more room in a channel only onto a tack with this much water ahead (m): a tack that only swaps a short
  * board for another leaves her in irons by the wall. */
 const ROOM = 25;
-/** The way she needs to tack (m/s): the sim's tack costs her about 1 m/s (the physics review, 17-22 kt in the basin), so
- * she must go in with that and some to come out sailing; and at least TACK_V_FRAC of her close-hauled speed. Short of
- * it, she foots off to build speed first, unless the land dead ahead is closer than FOOT_ROOM. */
-const TACK_V = 1.6, TACK_V_FRAC = 0.6, FOOT_ROOM = 15, FOOT = 10;
+/** The way she needs to tack (m/s), relative to what she can make in this wind: TACK_V_FRAC of her close-hauled speed
+ * (a tack from much below it, the sim's tack costing her about 1 m/s in 17-22 kt, the physics review, comes out in
+ * irons); not above TACK_V, which in a breeze is way enough; and not below TACK_V_MIN, steerage way through a tack (a
+ * Folkboat tacks from 2-3 kt, about 1-1.5 m/s), unless that's more than most of her close-hauled speed in a very light
+ * air (TACK_V_LIGHT of it). Short of it, she foots off FOOT degrees to build speed first, unless the land dead ahead is
+ * closer than FOOT_ROOM m plus FOOT_S seconds of her way (two boat lengths, and the time a tack takes). */
+const TACK_V = 1.6, TACK_V_MIN = 1.0, TACK_V_FRAC = 0.6, TACK_V_LIGHT = 0.85, FOOT_ROOM = 15, FOOT_S = 8, FOOT = 10;
+const tackWay = (target: number) => Math.min(TACK_V, Math.max(Math.min(TACK_V_MIN, TACK_V_LIGHT * target), TACK_V_FRAC * target));
 /** Pinned: under PINNED_V m/s with land within PINNED_M m of her centre (her half-length and a little), any way round. */
 const PINNED_V = 0.5, PINNED_M = 6;
 /** Never plan more often than this (s), whatever's asking: a plan that finds no way, or one she's just left, waits. */
@@ -199,10 +203,11 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
       // come closer, and planning again would only draw the same one, every few seconds)
       && clearLine(p.ri > 1 ? p.route[p.ri - 1] : p.routeFrom ?? b, p.route[p.ri], LEG_CLEAR)));
   // (no route in hand: plan, unless the last plan, from near here and not long ago, found none)
-  const retry = !p.route && (!p.routeFrom || Math.hypot(b.x - p.routeFrom.x, b.y - p.routeFrom.y) > RETRY_M || t - p.routeT > RETRY_T);
+  // (a plan that said "straight there" is an answer, not a failure: asked again only on the timer, not every RETRY_M)
+  const retry = !p.route && (!p.routeFrom || (!p.straight && Math.hypot(b.x - p.routeFrom.x, b.y - p.routeFrom.y) > RETRY_M) || t - p.routeT > RETRY_T);
   if ((moved || lost || retry) && (moved || t - p.routeT >= MIN_REPLAN)) {
     const r = routeAround(b, dest, 30); p.plans++;
-    p.route = r.length > 2 ? r : null; p.ri = 1; p.routeT = t; p.routeTo = { ...dest }; p.routeFrom = { x: b.x, y: b.y };
+    p.route = r.length > 2 ? r : null; p.straight = r.length === 2; p.ri = 1; p.routeT = t; p.routeTo = { ...dest }; p.routeFrom = { x: b.x, y: b.y };
   }
   if (!p.route) return clearLine(b, ahead, 20) || landAlong(b, dest) === Infinity ? 'clear' : 'none';
   const r = p.route;
@@ -238,7 +243,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   const cts = courseToSteer(bP, vs, c);
   // she can lay it: steer the course that makes good the bearing (her leeway higher, toward the wind)
   const onS = b.tack === 'S', other = onS ? 'P' : 'S', cur = close(b.tack);
-  const canTack = b.v > Math.max(TACK_V, TACK_V_FRAC * targetFor(b, beat)) && t - p.lastTackT > 12 && !b.tacking;
+  const canTack = b.v > tackWay(targetFor(b, beat)) && t - p.lastTackT > 12 && !b.tacking, footRoom = FOOT_ROOM + FOOT_S * b.v;
   if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) {
     const r = wrap(from - cts);
     // (a course on the other tack that turns her through the wind is a tack, and waits for the way and the time to make
@@ -252,7 +257,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
     // (short of the way, with land close ahead on this tack, or stopped against the land, aground or on a pier, where
     // holding a course builds no way at all: turn for the course now, as she's worked off)
     const pinned = b.v < PINNED_V && [0, 45, 90, 135, 180, 225, 270, 315].some(a => { const n = V(a); return landAlong(b, { x: b.x + n.x * PINNED_M, y: b.y + n.y * PINNED_M }) < Infinity; });
-    if (pinned || landDist(b, cur, FOOT_ROOM, 0) < FOOT_ROOM) return n360(cts + Math.sign(r) * lw);
+    if (pinned || landDist(b, cur, footRoom, 0) < footRoom) return n360(cts + Math.sign(r) * lw);
     return cur;
   }
   // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
@@ -282,7 +287,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
     const wn = inFairway(b) ? null : wharfNearest(b, BERTH);
     const away = !!wn && wn.d > 0 && dot(V(close(other)), wn.n) > dot(V(cur), wn.n) + 0.2;
     if ((fetch(other) && !fetch(b.tack)) || shore || away) {
-      if (canTack || landDist(b, cur, look, 0) < FOOT_ROOM) { p.lastTackT = t; p.goTack = other; return close(other); }
+      if (canTack || landDist(b, cur, look, 0) < footRoom) { p.lastTackT = t; p.goTack = other; return close(other); }
       if (shore || away) return foot; // (no way to tack yet: foot off and build it, with the land not yet close ahead)
     }
   }

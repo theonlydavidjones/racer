@@ -586,7 +586,7 @@ export class Hud {
     // (her course with it, drawSailing; and on the map view too while the pilot steers on Nav: the course it will sail, its
     // tacks, jibes and the current's set, not just the line to the destination (the owner, v188: "course is just showing
     // a straight line; no accounting for obstacles or jibing or current"))
-    this.insetPlan = nav ?? (wd.cruising && wd.pilot.mode === 'nav' && wd.arrivedT == null ? this.navPassage(wd) : null);
+    this.insetPlan = nav ?? (wd.cruising && wd.pilot.mode === 'nav' && wd.arrivedT == null && !wd.pilot.direct ? this.navPassage(wd) : null); // (motoring straight for it: no sailed course to draw)
     this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
     this.insetPlan = null;
     const day = (wd.settings.chartPal ?? 'day') === 'day', I = INK[day ? 'day' : 'dusk'];
