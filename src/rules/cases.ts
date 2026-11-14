@@ -235,6 +235,6 @@ export const CASES: RulesCase[] = [
       { letter: 'P', frames: [at(47.9, [-9, 0], 179, { look: false }), ...sail([-9, 0], () => 179, 2.5, 48, 70)] },
     ],
     pair: ['S', 'P'],
-    momentT: 50, ask: 'foul', answer: { who: 'P', rule: '10', line: 'S\'s luff left P room to keep clear: she could have gybed. Port keeps clear (10); S\'s luff didn\'t break 16.1.' }, teach: true,
+    momentT: 50, ask: 'foul', answer: { who: 'P', rule: '10', line: 'S\'s luff left P room to keep clear: she could have jibed. Port keeps clear (10); S\'s luff didn\'t break 16.1.' }, teach: true,
   },
 ];
