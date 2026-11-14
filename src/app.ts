@@ -510,6 +510,8 @@ const band = new SailBand({
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
   hailKey: () => keymap.label('hail'),
+  hoistTab: sail => hoistTab(sail),
+  halyard: sail => halyard(sail),
   // what the control under the mouse (or last touched) does: in the Coach card, not a hover title over the controls
   help: t => {
     const e = $('tpHelp'); e.hidden = !t; if (!t) return;
@@ -753,11 +755,6 @@ $('bLines').onclick = berthKey;
 $('bPushOff').onclick = pushOff;
 /* Hoist or strike a sail (the crew does it at their pace: boat/physics.ts crewRig). */
 function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; send({ k: 'sail', sail, up: !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true) }); }
-// (on press, like the pole button: the label changes as the crew works, and a click needs the same thing under the pointer at both ends)
-for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
-  $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); halyard(sail); });
-  $(id).addEventListener('click', e => { if (e.detail === 0) halyard(sail); }); // keyboard activation only
-}
 /* The tiller pilot (boat/autopilot.ts): cruising only, since RRS 52 says a racing boat's rudder is worked by her
  * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
 function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
@@ -882,16 +879,12 @@ for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pa]')) b.o
   else if (a === 'tack') { if (p.mode === 'nav') toast('Nav calls its own tacks, on the laylines. Switch to Auto or Wind to tack when you choose.', 3500); else send({ k: 'pilot', op: 'tack' }); }
   else send({ k: 'pilot', op: 'adjust', d: +a });
 };
-/** The halyard buttons: a sail that's down (or on its way up or down) always has one; striking a sail is for the marina. */
-function sailButtons(): void {
-  const u = w.user, r = u.rig, inMarina = inBasin(u);
-  for (const [k, id] of [['jib', 'bJib'], ['main', 'bMain']] as const) {
-    const h = r ? r[k] : 1, up = r ? (k === 'main' ? r.mainUp : r.jibUp) : true, el = $(id);
-    const hide = !w.running || (up && h >= 1 && !inMarina), txt = up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
-    if (el.hidden !== hide) el.hidden = hide;
-    word(id, txt); // (only when it changes)
-    el.classList.toggle('on', !up && h === 0);
-  }
+/** The band's hoist tabs (ROADMAP 8o: hoisted and dropped at the mast; the old Hoist buttons are gone): a sail that's
+ * down, or on its way up or down, always has one; striking a sail is for the harbor. */
+function hoistTab(k: 'main' | 'jib'): string | null {
+  const u = w.user, r = u.rig, h = r ? r[k] : 1, up = r ? (k === 'main' ? r.mainUp : r.jibUp) : true;
+  if (!w.running || (up && h >= 1 && !inBasin(u))) return null;
+  return up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
 }
 /**
  * Strike the ensign: cruising in a blow, a crew takes the ensign down and unships its staff before it flogs itself to
@@ -1025,7 +1018,7 @@ function keysHint(): void {
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
-    ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
+    ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
   $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
@@ -1267,7 +1260,7 @@ function frame(now: number): void {
   if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
-  setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
+  setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }

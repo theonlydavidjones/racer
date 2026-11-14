@@ -112,7 +112,7 @@ export interface Boat {
    */
   handled?: { plan: import('../geo/marina').PushOff; from: { x: number; y: number }; h0: number; s: number; a: number; /** held head to wind on the bow line (true), or told to let go (false) */ held?: boolean; releasing?: number; /** deg she's followed the wind round while held */ follow?: number; /** deg the tiller's yawed her, walked out */ yaw?: number; /** her berth's id */ slip?: string };
   /** Her sails: how far each is hoisted (0 down … 1 up) and whether the crew is hoisting (true) or striking (false) it. Absent: both up. */
-  rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean };
+  rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean; /** the last inches taken up at the piano (0..1; absent: done) */ mainTaut?: number; jibTaut?: number };
   v: number; // speed through the water, m/s
   vx: number; vy: number; // velocity over the ground, m/s
   tack: Tack;
@@ -234,7 +234,7 @@ export interface Boat {
   /** The crew has set her up (the first time they trim, their lines start where they want them). */
   crewReady?: boolean;
   /** The lazy jib car you've asked the crew to move to (pins), until it's done (crewWork.ts). */
-  carCmd?: { fore: number; ins: number } | null;
+  carCmd?: { fore: number; ins: number; side?: Tack } | null;
   /** The lazy jib car the crew's own plan wants, and how long (s) the car has been off it. */
   carPlan?: { fore: number; ins: number } | null; carOff?: number;
   /** Heel rate (deg/s, + rolling to port) and the boat's roll: heel follows its equilibrium as a damped oscillator (balance.ts rollStep). */

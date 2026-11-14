@@ -3,7 +3,7 @@ import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
-import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR } from '../boat/controls';
+import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
@@ -1474,7 +1474,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const jibSgn = (b.jibBacked ?? 0) > 0 ? Math.sign(b.boom || 1) : Math.sign(b.jib || 1);
   m.jib.mesh.scale.x = jibSgn;
   { // hoisting and striking: the main's head comes down its track to the boom; the jib's head down the forestay
-    const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
+    // (with the last inches the piano's: a halyard short of its take-up leaves the head a few inches down, controls.ts)
+    const hm = hoistedShare(b.rig?.main ?? 1, b.rig?.mainTaut ?? 1, 'main'), hj = hoistedShare(b.rig?.jib ?? 1, b.rig?.jibTaut ?? 1, 'jib');
     m.main.mesh.visible = hm > 0.02; m.main.mesh.scale.y = Math.max(0.02, hm); m.main.mesh.position.y = MAIN_DEF.tack.y * (1 - hm);
     m.mainFurl.visible = hm < 0.98; m.mainFurl.scale.set(0.3 + 0.7 * (1 - hm), 1, 0.3 + 0.7 * (1 - hm));
     m.jib.mesh.visible = hj > 0.02; m.jibBag.visible = hj < 0.98; m.jibBag.scale.setScalar(0.4 + 0.6 * (1 - hj));
@@ -1616,7 +1617,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     q.needsUpdate = true; }
   // the Cunninghams' cringles come down with their sails as they're struck (the tack stays put)
   for (const { l, sail } of L2.cringles) {
-    const q = l.geometry.attributes.position as THREE.BufferAttribute, n = q.count - 1, h = sail === 'main' ? b.rig?.main ?? 1 : b.rig?.jib ?? 1;
+    const q = l.geometry.attributes.position as THREE.BufferAttribute, n = q.count - 1, h = sail === 'main' ? hoistedShare(b.rig?.main ?? 1, b.rig?.mainTaut ?? 1, 'main') : hoistedShare(b.rig?.jib ?? 1, b.rig?.jibTaut ?? 1, 'jib');
     if (sail === 'main') q.setY(n, BOOM_TOP + MAIN_CUNNINGHAM_UP * h);
     else { const p2 = tmpE.copy(FORESTAY_DECK).addScaledVector(JIB_AXIS, 0.10 + JIB_CUNNINGHAM_UP * h); q.setXYZ(n, p2.x, p2.y, p2.z); }
     q.needsUpdate = true;
