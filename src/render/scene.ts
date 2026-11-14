@@ -16,7 +16,8 @@ import { disposeUnused } from './dispose';
 import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
-import type { Boat } from '../boat/boat';
+import type { Boat, Tack } from '../boat/boat';
+import { partShape, underwaterGhost, type PartId, type ScreenPart } from './boatParts';
 import { cleatOf } from '../boat/dockLines';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
@@ -192,6 +193,26 @@ export class SceneView {
   private mobMesh: THREE.Group | null = null;
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
   get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
+  /**
+   * Lesson 1 (The boat; render/boatParts.ts): one of your boat's named parts where it's drawn on the screen this frame, in
+   * the page's px (as a click's clientX and clientY), or null where she has none or it's out of sight. Read only.
+   */
+  /** Lesson 1: her shape under the water shown faintly through the sea (render/boatParts.ts underwaterGhost), or hidden. */
+  showUnderwater(on: boolean): void {
+    const m = this.boatMeshes[0]; if (!m) return;
+    let g = m.grp.getObjectByName('underwaterGhost');
+    if (!g) { if (!on) return; g = underwaterGhost(m); }
+    g.visible = on; if (g.userData.blade) (g.userData.blade as THREE.Object3D).visible = on;
+  }
+  projectPart(key: PartId, tack: Tack): ScreenPart | null {
+    const m = this.boatMeshes[0]; if (!m) return null;
+    const cam = this.camera; cam.updateMatrixWorld(); m.grp.updateWorldMatrix(true, false);
+    const near = m.grp.worldToLocal(cam.position.clone()).x; // (the side of her the camera's on: + starboard)
+    const shape = partShape(m, key, tack, near); if (!shape) return null;
+    const r = this.renderer.domElement.getBoundingClientRect(), q = new THREE.Vector3();
+    const pts = shape.pts.map(poly => poly.flatMap(p => { q.copy(p).project(cam); return q.z > 1 || q.z < -1 ? [] : [[r.left + (q.x + 1) / 2 * r.width, r.top + (1 - q.y) / 2 * r.height] as [number, number]]; })).filter(p => p.length);
+    return pts.length ? { kind: shape.kind, pts } : null;
+  }
   /** A ghost race's ghost: your earlier run of this race, drawn translucent on its track (replay/ghost.ts). Not in the race. */
   private ghost: { mesh: BoatMesh; pts: GhostPoint[] } | null = null;
   /** Her dock lines ashore (up to six), drawn as rope: off-white, as a dock line usually is. */
