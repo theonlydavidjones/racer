@@ -16,8 +16,9 @@
  *   fallback hands on each chunk's exports as they are when it has run;
  * - nothing in a chunk that the HTML parser would change or end early.
  */
-import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { parseAst } from 'rolldown/parseAst';
+import { reassignableExports } from './export-guard.mjs';
 
 const root = new URL('../', import.meta.url);
 const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
@@ -38,12 +39,8 @@ if (!chunks.has(entry) || !chunks.has(worker)) fail('expected the entries main a
 const cssFile = Object.values(manifest).find(e => e.file.endsWith('.css'))?.file ?? fail('no CSS');
 
 // a binding a module could reassign, exported: the fallback couldn't hand it on live
-const srcFiles = (await readdir(new URL('src/', root), { recursive: true })).filter(f => f.endsWith('.ts'));
-for (const f of srcFiles) {
-  const t = await readFile(new URL(`src/${f}`, root), 'utf8');
-  const m = /^\s*export\s+(?:let|var)\s|^\s*export\s*\{(?![^}]*\}\s*from)/m.exec(t);
-  if (m) fail(`src/${f} exports a binding that could be reassigned (${m[0].trim()}…): export a const, a function or a class`);
-}
+// (scripts/export-guard.mjs; tests/exports.test.ts checks the same before a merge)
+for (const e of await reassignableExports(root)) fail(`${e} exports a binding that could be reassigned: export a const, a function or a class`);
 
 const edits = {}, texts = {}, three = [];
 for (const [name, c] of chunks) {
