@@ -350,6 +350,55 @@ export function couldAvoid(f: RulesBoat, victim: RulesBoat, by: RulesBoat, since
   return got.gaps[0] >= KEEP_CLEAR_GAP; // (kept clear of the victim: Definitions, Keep Clear, as rule 16.1's room)
 }
 
+/** Rule 14 (WS Case 123): it is "clear" that the other boat isn't keeping clear once a competent, but not expert, helmsman
+ * would see a substantial risk of contact: both carrying on as she sees them, touching within the time the keep-clear boat
+ * takes to sail her own length. The Case's moment is "when P's bow crossed in front of S's bow", S's bow then striking
+ * P's quarter: P's length of travel before the contact (3.1 s for a Folkboat at 2.5 m/s). In that geometry the Case's
+ * answer comes out (S could still bear away: rule14.test.ts). */
+export const riskTime = (kcSpeed: number): number => LOA / Math.max(1, kcSpeed);
+
+/**
+ * Rule 14 for the boat with right of way (or entitled to room): she "need not act to avoid contact until it is clear that
+ * the other boat is not keeping clear"; from then she shall avoid it if reasonably possible (WS Case 123: S, who could
+ * still have borne away when P's bow crossed hers, broke 14(a)). It's clear from the start of the unbroken stretch before
+ * the contact in which, both carrying on as she saw them, they'd touch within RISK_T. From then, reacting promptly
+ * (RESPOND_DELAY), she turns the way that what she could see then said would clear (the other carrying on), and that turn
+ * is scored against the other boat's actual track: no hindsight about a late turn of hers (the same standard as 16.1's
+ * room and 43.1(a), WS Case 92). Did it avoid touching? No history: no (nothing to show she had time).
+ */
+export function rowCouldAvoid(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, riskT?: number): boolean {
+  const R = RINGS.get(row), K = RINGS.get(kc);
+  if (!R || !K || R.n < 2 || K.n < 2) return false;
+  const newest = (r: PoseRing) => r.t[at(r, 0)], oldestOf = (r: PoseRing) => r.t[at(r, r.n - 1)];
+  const now = Math.max(newest(R), newest(K)), oldest = Math.max(oldestOf(R), oldestOf(K));
+  if (now - oldest < 0.5) return false;
+  // (her speed from her poses just before the touch: the contact has taken their way off since)
+  const rt = riskT ?? riskTime(poseAt(K, Math.max(oldest, now - 0.5)).v);
+  const rate = (r: PoseRing, t: number) => { const w = Math.min(TURN_WINDOW, t - oldestOf(r)); return w > 0.2 ? wrap(poseAt(r, t).h - poseAt(r, t - w).h) / w : 0; };
+  const seen = (r: PoseRing, t: number) => straightOn(poseAt(r, t), rate(r, t));
+  // a boat's actual track from t0: her recorded poses, then on from her newest sample
+  const trackFrom = (r: PoseRing, b: RulesBoat, t0: number) => {
+    const v = b.v ?? Math.hypot(b.vx, b.vy), tn = newest(r), last = poseAt(r, tn);
+    return (tau: number): Pose => {
+      const t = t0 + tau;
+      if (t <= tn) return poseAt(r, t);
+      const u = V(last.h), d = t - tn;
+      return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
+    };
+  };
+  // the risk as she'd see it at t: both carrying on, do they touch within RISK_T?
+  const risk = (t: number) => escapes({ ...poseAt(R, t), turnRate: rate(R, t), leeway: row.leeway }, [seen(K, t)], row.ww?.from ?? ctx.windFrom, { delay: 99, horizon: rt, turns: [], windKt: row.ww?.kt ?? ctx.windKt })[0].minGap < CONTACT_GAP;
+  // (back from the contact while the risk was there; one sample's break, a sea's knock to a heading, doesn't end it)
+  let tClear: number | null = null, missed = 0;
+  for (let t = now - 0.25; t >= oldest - 1e-9; t -= 0.25) { if (risk(t)) { tClear = t; missed = 0; } else if (++missed > 1) break; }
+  if (tClear == null || now - tClear < RESPOND_DELAY) return false; // (no time even to react)
+  // her prompt turn, by what she could see then, scored against the other's actual track
+  const o = { delay: RESPOND_DELAY, horizon: now - tClear + 1, windKt: row.ww?.kt ?? ctx.windKt }, me = { ...poseAt(R, tClear), turnRate: rate(R, tClear), leeway: row.leeway };
+  const wind = row.ww?.from ?? ctx.windFrom, choices = escapes(me, [seen(K, tClear)], wind, o);
+  const choice = choices.reduce((a, b) => b.minGap > a.minGap + 0.05 || (Math.abs(b.minGap - a.minGap) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
+  return escapes(me, [trackFrom(K, kc, tClear)], wind, { ...o, turns: choice.turn ? [choice.turn] : [] }).find(q => q.turn === choice.turn)!.minGap >= CONTACT_GAP;
+}
+
 /**
  * Rule 16.2 (2025–2028): "In addition, on a beat to windward when a port-tack boat is keeping clear by sailing to pass
  * to leeward of a starboard-tack boat, the starboard-tack boat shall not bear away if as a result the port-tack boat
