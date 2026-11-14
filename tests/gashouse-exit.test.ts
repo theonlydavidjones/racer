@@ -14,6 +14,9 @@ import { brg, wrap } from '../src/core/math';
  * Driven through the helm (the player's steering input, held on a heading), judged by outcomes: how near the piles she
  * comes, whether she has way on through the gap, whether she gets out (Deep Physics: these hold under any turning model).
  * She starts under way inside the cove, not from her slip (the push-off is changing).
+ * In a westerly Pier 1 is to leeward on both tides, so the wind sets a careless boat down onto it either way. On the ebb
+ * the stream does too, running across the gap (about 0.45 kt there in the piles' lee, 0.85 kt past the pier's head); on
+ * the flood the gap is slack (the stream leaves the breakwater's knuckle: environment/harborMouth.ts) and it's the wind alone.
  */
 const M = MOUTHS[0] as unknown as { a: { x: number; y: number }; b: { x: number; y: number }; into: { x: number; y: number }; along: { x: number; y: number } };
 // a: Pier 1's corner (east, to leeward in a westerly); b: the breakwater's tip (west); `into`: into the cove (south)
@@ -50,8 +53,8 @@ describe('leaving Gashouse Cove in a westerly', () => {
     it(`on the ${current}: a skilled exit clears Pier 1's piles, with way on through the gap, and gets out`, () => {
       const r = exit(current, 'skilled');
       expect(r.wrecked).toBe(false);
-      expect(r.closest, `closest to the piles (m)`).toBeGreaterThan(8); // (she starts 20 m off them; held up to windward, 19.9 m at her closest, both tides)
-      expect(r.slowest, `slowest through the gap (m/s)`).toBeGreaterThan(0.8);
+      expect(r.closest, `closest to the piles (m)`).toBeGreaterThan(10); // (she starts 20 m off them; held up to windward, 19.9 m at her closest, both tides)
+      expect(r.slowest, `slowest through the gap (m/s)`).toBeGreaterThan(2); // (2.65 m/s, both tides)
       expect(r.outAt, 'out 150 m past the mouth').not.toBeNull();
     }, 300_000);
     it(`on the ${current}: a careless exit, let go slow and luffing, is set onto the piles`, () => {
