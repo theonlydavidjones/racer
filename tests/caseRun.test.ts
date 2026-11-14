@@ -43,13 +43,28 @@ describe('Sail it yourself: a Case on the water', () => {
   });
 
   it('Case 7: W held on her Case course breaks rule 11, as the Case says; W luffing clear of L sails it clear', () => {
-    expect(sail(caseWorld(7), (_t, h) => h)).toMatchObject({ result: 'foul', fouls: ['11'] });
+    expect(sail(caseWorld(7), (_t, h) => h)).toMatchObject({ result: 'foul', fouls: [{ rule: '11' }] });
     expect(sail(caseWorld(7), (t, h) => t > 44 ? h + 25 : h)).toMatchObject({ result: 'clear', fouls: [] });
   });
 
   it('Case 105: P keeping clear of S\'s luff sails it clear; turning toward her doesn\'t', () => {
     expect(sail(caseWorld(105), (t, h) => t > 49 ? h - 25 : h).result).toBe('clear');
     expect(sail(caseWorld(105), (t, h) => t > 49 ? h + 25 : h).result).toBe('foul');
+  });
+
+  it('touched, the Case\'s boat is a boat, not a pinned wall: she sails free from the contact, and it\'s said so', () => {
+    const w = caseWorld(7), R = w.caseRun!, u = w.user;
+    let touched = -1;
+    while (!R.result && w.t < 200) {
+      u.h = n360(R.pose(R.helm, w.t).h); w.step(DT); if (w.paused) w.paused = false;
+      if (touched < 0 && R.free.length) touched = w.t;
+    }
+    expect(R.free).toEqual(['L']);
+    const L = w.boats.find(b => b.name === 'L')!, q = R.pose('L', w.t);
+    expect(Math.hypot(L.x - q.p.x, L.y - q.p.y)).toBeGreaterThan(1); // (off the Case's track: where the contact and her own way took her)
+    const msgs = w.events.flatMap(e => e.type === 'toast' ? [e.msg] : []);
+    expect(msgs.some(m => m.startsWith(`L (${L.no}) sails on free`))).toBe(true);
+    expect(w.lesson!.cue).toBe('Foul: Rule 11 · Same tack, overlapped');
   });
 
   it('what happens between two of the Case\'s own boats is the Case\'s: no turns for them (Case 11, three boats)', () => {

@@ -2,7 +2,7 @@ import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
-import { CASE_WIND, CaseRun, caseById } from './caseRun';
+import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -25,6 +25,7 @@ import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
 import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -917,7 +918,7 @@ export class World {
    * and flags answer their own apparent wind), carried by the current where they are. */
   private pinCase(dt: number): void {
     const R = this.caseRun!;
-    for (const b of this.boats) if (b.script) {
+    for (const b of this.boats) if (b.script && !R.free.includes(b.script)) {
       const q = R.pose(b.script, this.t), d = this.caseDrift.get(b.id)!, u = V(q.h);
       d.x += b.cur.x * dt; d.y += b.cur.y * dt;
       b.x = q.p.x + d.x; b.y = q.p.y + d.y; b.h = q.h; b.desired = q.h; b.v = q.v;
@@ -928,11 +929,21 @@ export class World {
   private caseStep(): void {
     const R = this.caseRun!, L = this.lesson;
     const ui = this.userIncident;
-    if (ui && ui !== this.caseSeen) { this.caseSeen = ui; if (ui.fouler === this.user.id && !ui.exonerated && !ui.notRacing) R.fouls.push(ui.part ?? ui.rule); }
+    if (ui && ui !== this.caseSeen) {
+      this.caseSeen = ui;
+      if (ui.fouler === this.user.id && !ui.exonerated && !ui.notRacing) R.fouls.push({ rule: ui.rule as RuleId, part: ui.part });
+      // touched: she's a boat, not a track. She sails on free, her helm holding her course, and the contact is physics's
+      // (the Coordinator, 14 Nov 2026: no pinned wall)
+      const o = this.boats.find(b => b.id === ui.vs);
+      if (ui.kind === 'contact' && o?.script && !R.free.includes(o.script)) {
+        R.free.push(o.script); o.aboveProper = false; o.desired = o.h;
+        this.emit({ type: 'toast', ms: 3500, msg: `${o.name} (${o.no}) sails on free after the contact.` });
+      }
+    }
     if (R.result || !R.done(this.t) || !L) return;
     R.result = R.fouls.length ? 'foul' : 'clear';
     L.passed = true; L.passedT = this.t; L.progress = 1;
-    L.cue = R.result === 'clear' ? 'Sailed it clear ✓' : `You broke rule ${R.fouls[0]}`;
+    L.cue = R.result === 'clear' ? 'Sailed it clear ✓' : `Foul: ${foulTitle(R.fouls[0])}`;
   }
   private caseSeen: World['userIncident'] = null;
 
@@ -1031,7 +1042,7 @@ export class World {
     this.trackCourses();
     this.shipEncounters();
     // (a Case's boat sails above her proper course where the Case says so, rule 17: the Case's call, not the sim's)
-    if (this.caseRun) for (const b of this.boats) if (b.script) b.aboveProper = !!this.caseRun.pose(b.script, this.t).f.aboveProper;
+    if (this.caseRun) for (const b of this.boats) if (b.script && !this.caseRun.free.includes(b.script)) b.aboveProper = !!this.caseRun.pose(b.script, this.t).f.aboveProper;
     this.checkPairs();
     if (this.caseRun) this.caseStep();
     if (this.protestsOn) this.protestsStep();

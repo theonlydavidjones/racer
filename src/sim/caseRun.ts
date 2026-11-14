@@ -1,5 +1,7 @@
 import { V, type Vec } from '../core/math';
 import { CASES, poseAt, type CaseFrame, type RulesCase } from '../rules/cases';
+import { RULES } from '../rules/explain';
+import type { RuleId } from '../rules/types';
 
 /**
  * "Sail it yourself" (the Rules trainer, design/rules-trainer-mockup.png): a World Sailing Case laid out on the water and
@@ -30,8 +32,10 @@ export class CaseRun {
   readonly t0: number; readonly endT: number;
   /** The World's boat id for each letter. */
   readonly ids = new Map<string, number>();
-  /** Your fouls in it: the rule each broke (the World's incidents). */
-  fouls: string[] = [];
+  /** Your fouls in it: the rule each broke (the World's incidents: its rule, and the part where it has one). */
+  fouls: { rule: RuleId; part?: string }[] = [];
+  /** The Case's boats sailing free (letters): touched, they're boats, not a track, and sail on as their helm holds them. */
+  free: string[] = [];
   /** How it came out, once called. */
   result: 'clear' | 'foul' | null = null;
 
@@ -74,3 +78,6 @@ function speedAt(F: CaseFrame[], t: number): number {
 export const caseById = (n: number | undefined): RulesCase | undefined => CASES.find(c => c.case === n);
 /** The Cases you can sail: taught ones without marks or a bank (the World's own marks and shore aren't the Case's yet). */
 export const sailable = (c: RulesCase): boolean => c.teach && !c.marks?.length && !c.bank;
+
+/** A foul as a race's incident card titles it (rules/explain.ts): 'Rule 11 · Same tack, overlapped'. */
+export const foulTitle = (f: { rule: RuleId; part?: string }): string => RULES[f.rule]?.[0] ?? `Rule ${f.part ?? f.rule}`;

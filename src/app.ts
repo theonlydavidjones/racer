@@ -62,6 +62,7 @@ import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
 import { dockCardHtml } from './ui/lessons';
 import { RulesTrainer } from './ui/rulesTrainer';
+import { foulTitle } from './sim/caseRun';
 
 /**
  * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
@@ -659,7 +660,7 @@ function lessonTick(): void {
     // passed: a moment to see it, then paused on the lessons, this one ticked (a Case sailed: back on it in the Rules
     // trainer, with how it came out)
     const R = w.caseRun;
-    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', R.fouls[0]); } else setup.openLessons(); } }, 3000);
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', `${w.user.name} (${w.user.no})`, R.fouls[0] ? foulTitle(R.fouls[0]) : '', R.free.map(l => `${l} (${w.boats.find(b => b.name === l)?.no ?? ''}) sailed free after the contact`).join(' · ')); } else setup.openLessons(); } }, 3000);
   }
   tipFade();
 }

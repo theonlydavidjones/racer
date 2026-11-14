@@ -29,11 +29,11 @@ export class RulesTrainer {
 
   open(): void { this.el.hidden = false; this.show(this.k); }
   /** Back from sailing a Case: on that Case, answered, with how your sailing of it came out. */
-  sailed(n: number, ok: boolean, rule: string | undefined): void {
+  sailed(n: number, ok: boolean, you: string, foul: string, also = ''): void {
     const k = this.list.findIndex(c => c.case === n); this.el.hidden = false; this.show(k < 0 ? this.k : k);
     this.answer(this.c.answer.who, false);
     const a = this.el.querySelector<HTMLElement>('.rtSailed'); if (!a) return;
-    a.textContent = ok ? `You sailed ${caseHelm(this.c)} clear ✓` : `You sailed ${caseHelm(this.c)}: rule ${rule}`; a.className = 'rtSailed ' + (ok ? 'ok' : 'no'); a.hidden = false;
+    a.textContent = (ok ? `You sailed ${you} clear ✓` : `You sailed ${you}. Foul: ${foul}`) + (also ? ` · ${also}` : ''); a.className = 'rtSailed ' + (ok ? 'ok' : 'no'); a.hidden = false;
   }
   close(): void { this.el.hidden = true; cancelAnimationFrame(this.raf); }
 
