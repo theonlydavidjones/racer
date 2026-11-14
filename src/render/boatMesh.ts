@@ -13,12 +13,15 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullGeometry, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailShape } from './sails';
+import { PART_SMALL } from './fittings';
+const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullGeometryFar)
+const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
@@ -168,7 +171,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     ? reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x777777, shininess: 75 }), 0.14) // glossy gelcoat, reflecting the sky
     : reflect(new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x333333, shininess: b.hullColor === '#9a6a36' ? 60 : 25 }), b.hullColor === '#9a6a36' ? 0.08 : 0.04); // painted or varnished planking
   paintMaterial(hullMat, C(b.hullColor), C(boot), C(paint.bottom));
-  grp.add(new THREE.Mesh(hullGeometry(), hullMat));
+  // (her sixteen strakes in full near by; beyond HULL_MID_M, where a plank is a few pixels wide, each plank's face one
+  // band; beyond HULL_FAR_M, where a lap's 13 mm is well under a pixel, fewer stations too: a quarter, then a fifth, of
+  // the triangles, the same lines. The fleet's hulls were drawn in full at any distance, the most of a boat's triangles.)
+  { const hull = new THREE.LOD(); hull.addLevel(new THREE.Mesh(hullLevel(0), hullMat), 0);
+    hull.addLevel(new THREE.Mesh(hullLevel(1), hullMat), HULL_MID_M); hull.addLevel(new THREE.Mesh(hullLevel(2), hullMat), HULL_FAR_M); grp.add(hull); }
   // the sea is never drawn inside the hull: a lid over the cockpit at deck level, in the depth buffer only (drawn after
   // the boat and before the water, which scene.ts draws last of the solid things)
   // (the companionway's openings too: one mesh for both)
@@ -210,10 +217,12 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // clock as the ports)
   // the cabin's inside (cabinInterior.ts), seen through the companionway and the windows, lit by its one lantern
   const below = cabinInteriorMaterial();
-  grp.add(new THREE.Mesh(cabinInteriorGeometry(), below));
+  // (seen only through the companionway and the windows: left out, FittingCull, once the companionway is under about five
+  // pixels across, as nothing of it could be made out; the windows' glow after dark is their own glass's, drawn still)
+  const inside = new THREE.Mesh(cabinInteriorGeometry(), below); inside.userData.cullR = INSIDE_R; grp.add(inside);
   grp.userData.below = below;
   // its lantern, on its own arm from the shackle so it can swing (syncBoatMesh)
-  const lanternArm = new THREE.Group(); lanternArm.add(new THREE.Mesh(lanternGeometry(), below)); grp.add(lanternArm);
+  const lanternArm = new THREE.Group(), lantern = new THREE.Mesh(lanternGeometry(), below); lantern.userData.cullR = INSIDE_R; lanternArm.add(lantern); grp.add(lanternArm);
   grp.userData.lantern = makeLanternSwing(lanternArm);
   const compass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), MAT.dark); compass.rotation.x = Math.PI / 2; compass.position.set(0.42, topAft - CABIN.h * 0.5, zAft + 0.016); compass.name = 'compass'; grp.add(compass);
   // the companionway (Josephine: the owner's photos): the sliding hatch, weathered teak, on bronze runners, and three
@@ -473,7 +482,8 @@ function teakMat() {
   return teakMats ??= {
     trim: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide }),
     deck: new THREE.MeshLambertMaterial({ color: 0xffffff, map: teakTexture(false), side: THREE.DoubleSide }),
-    warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30 })
+    // (double-sided as the trim is, though it needn't be: the same shader programs as the trim's, four fewer to build)
+    warm: new THREE.MeshPhongMaterial({ color: 0xffffff, map: teakTexture(false, false), specular: 0x332211, shininess: 30, side: THREE.DoubleSide })
   };
 }
 /** Texture coordinates for a piece of teak: the grain along its length (z, fore and aft; or x, across, for the washboards), about 0.3 m across a repeat. */
@@ -1307,13 +1317,18 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
     for (const m of ms) { const mw = m.matrixWorld.clone().premultiply(inv); m.parent!.remove(m); mw.decompose(m.position, m.quaternion, m.scale); grp.add(m); }
     grp.remove(c);
   }
+  // the small parts (cleats, blocks, shackles: under PART_SMALL across) merged into a set of their own, so it's still left
+  // out (FittingCull) from as far off as its largest part would cover under a pixel: merged with the hull they'd be
+  // drawn from anywhere
+  const radius = (m: THREE.Mesh): number => { const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); return g.boundingSphere!.radius * Math.max(m.scale.x, m.scale.y, m.scale.z); };
+  const tierOf = (r: number): number => r <= PART_SMALL ? 0 : -1;
   const buckets = new Map<string, THREE.Mesh[]>();
   for (const c of grp.children) {
     const m = c as THREE.Mesh;
     if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || keep.has(m) || m.name || m.children.length || !m.visible || m.renderOrder !== 0 || Array.isArray(m.material)) continue;
     const mat = m.material as THREE.Material;
     if (mat.transparent || m.morphTargetInfluences || Object.keys(m.userData).length) continue;
-    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',');
+    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',') + '|' + (m.frustumCulled ? tierOf(radius(m)) : -1) + '|' + +m.castShadow + +m.receiveShadow; // (its shadows as they were: a merged mesh that took them up where its parts hadn't would want shader programs of its own)
     if (!g.getAttribute('position') || !g.getAttribute('normal')) continue;
     (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(m);
   }
@@ -1327,7 +1342,8 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
       g.morphAttributes = {}; g.clearGroups(); return g;
     });
     const merged = mergeGeometries(geos, false); if (!merged) continue;
-    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms.some(m => m.castShadow); one.receiveShadow = ms.some(m => m.receiveShadow);
+    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms[0].castShadow; one.receiveShadow = ms[0].receiveShadow;
+    if (+key.split('|')[2] >= 0) one.userData.cullR = Math.max(...ms.map(radius)); // (FittingCull: left out as its largest part would be)
     for (const m of ms) { grp.remove(m); m.geometry.dispose(); }
     for (const g of geos) g.dispose();
     grp.add(one);
