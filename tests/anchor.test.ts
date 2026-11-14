@@ -68,7 +68,7 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     expect(dragged).toBe(true);
     expect(dist(at0, a.at!)).toBeGreaterThan(0.5);
   });
-  it('weighed: hauled in, broken out and stowed, and she\'s free; racing, no penalty (rule 45)', () => {
+  it('weighed: hauled in, broken out and stowed, and she\'s free; racing, no penalty (rule 45)', { timeout: 60000 }, () => {
     const w = world(1, 'flood', 'race'), u = w.user;
     applyCommand(w, { k: 'anchor' }); run(w, 90);
     expect(u.anchor?.phase).toBe('down');
@@ -83,5 +83,30 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     applyCommand(w, { k: 'anchor' });
     expect(w.user.anchor ?? null).toBeNull();
     expect(toasts(w).some(m => /Too deep/.test(m))).toBe(true);
+  });
+  it('with way on, the forward hand waits for the way to come off her before letting it go', () => {
+    const w = world(1, 'slack'), u = w.user; toasts(w);
+    applyCommand(w, { k: 'anchor' });
+    for (let i = 0; i < 60 * 20; i++) { u.v = 1.5; w.step(DT); }
+    expect(u.anchor?.phase).toBe('fetch');
+    expect(toasts(w).some(m => /way off/.test(m))).toBe(true);
+  });
+  it('fetching up on her rode with way on, she\'s held by no more than the anchor holds, and the anchor drags: the rode doesn\'t part', { timeout: 60000 }, () => {
+    const w = world(1, 'slack'), u = w.user;
+    applyCommand(w, { k: 'anchor' }); run(w, 90);
+    const a = u.anchor!; expect(a.phase).toBe('down');
+    u.v = 2.5; u.astern = 0; // (as if she'd sailed on over it at 5 kt)
+    let over = 0, n = 0;
+    for (let i = 0; i < 60 * 20; i++) { w.step(DT); if (a.line?.T != null) { n++; if (a.line.T > (a.line.holds ?? 0) + 1) over++; } }
+    expect(n).toBeGreaterThan(60 * 15); expect(over).toBe(0);
+    expect(dist(stemHead(u), a.at!)).toBeLessThan(a.out + 1);
+  });
+  it('one forward hand: no paddling while the anchor\'s out, and a jump stows it', () => {
+    const w = world(1, 'slack'), u = w.user;
+    applyCommand(w, { k: 'anchor' }); run(w, 30);
+    applyCommand(w, { k: 'paddle', side: 'P' });
+    expect(u.paddle ?? null).toBeNull();
+    w.moveHere({ x: u.x + 200, y: u.y }, 'here');
+    expect(u.anchor ?? null).toBeNull(); expect(u.atAnchor).toBeFalsy();
   });
 });

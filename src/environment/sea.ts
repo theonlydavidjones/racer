@@ -241,6 +241,15 @@ export function waveLength(T: number, h: number): number {
   return 2 * Math.PI / k;
 }
 
+/** The chart's soundings, decoded once: positions in the sim's frame and depths below MLLW (m). */
+let SOUNDINGS: { p: Vec; d: number }[] | null = null;
+/** The nearest of NOAA's soundings to `p` within `r` m: its depth below MLLW (m), or null. */
+export function soundingNear(p: Vec, r: number): number | null {
+  if (!SOUNDINGS) { const S = (enc as unknown as { soundings: number[] }).soundings; SOUNDINGS = []; for (let i = 0; i < S.length; i += 3) SOUNDINGS.push({ p: LL(S[i + 1] / 1e5, S[i] / 1e5), d: S[i + 2] / 10 }); }
+  let best: number | null = null, bd = r;
+  for (const s of SOUNDINGS) { const d = Math.hypot(s.p.x - p.x, s.p.y - p.y); if (d < bd) { bd = d; best = s.d; } }
+  return best;
+}
 /** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
 export function chartDepth(p: Vec): number | null {
   const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[]; soundings: number[] };

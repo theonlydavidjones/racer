@@ -35,7 +35,13 @@ export const ANCHOR = {
   bow: 3.7,
   /** the scope she's given: 7:1 where the rode allows (the usual guide, 5:1 or more: Fortress) */
   scopeWant: 7,
-  fetchS: 8, payOut: 0.6, haul: 0.25, breakS: 6, stowS: 10, pull: 250
+  fetchS: 8, payOut: 0.6, haul: 0.25, breakS: 6, stowS: 10, pull: 250,
+  /** the least scope worth anchoring at: under 3:1 an anchor may not set (Fortress guide v5) */
+  minScope: 3,
+  /** the least water to anchor in (m): her draft, 1.14 m (ORC), and a margin */
+  minDepth: 1.5,
+  /** her way through the water (m/s) the forward hand waits for before lowering it: way off her, as it's done */
+  wayOff: 0.4
 };
 /** Scope against the share of the anchor's holding (a chandler's table: an ESTIMATE). */
 const SCOPE: [number, number][] = [[1.5, 0], [2, 0.35], [3, 0.53], [4, 0.67], [5, 0.77], [6, 0.85], [7, 0.91], [10, 1]];
@@ -45,7 +51,7 @@ export function scopeShare(scope: number): number {
   return 1;
 }
 /** What the anchor holds (N) on `out` m of rode in `depth` m of water. */
-export const holding = (out: number, depth: number): number => ANCHOR.kg * 9.81 * ANCHOR.holdRatio * scopeShare(out / (depth + ANCHOR.bowH));
+export const holding = (out: number, depth: number): number => Math.max(ANCHOR.kg * 9.81 * 0.87, ANCHOR.kg * 9.81 * ANCHOR.holdRatio * scopeShare(out / (depth + ANCHOR.bowH))); // (at the least its own weight in water, steel's 0.87, dragged over the mud)
 
 /**
  * The anchor: fetch (the hand going forward with it), paying (lowered and the rode running out), down (lying to it),
@@ -59,8 +65,12 @@ export interface AnchorState {
   line?: DockLine;
   /** the anchor dragging (its holding exceeded) */
   dragging?: boolean;
-  /** the depth (m) where it lies, with the tide */
-  depth?: number;
+  /** the depth (m) where it lies, with the tide; and the chart's depth there (m below MLLW) */
+  depth?: number; chart?: number;
+  /** when it went down (sim time): its spell, for rule 42 */
+  t0?: number;
+  /** told to take the way off her first */
+  waited?: boolean;
 }
 
 /** How fast the forward hand works (a slower crewmate takes longer). */
