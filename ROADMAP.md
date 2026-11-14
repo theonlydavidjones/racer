@@ -295,13 +295,50 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
-8u. **Now — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
+8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
+   screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
+   through the mast (and likely the windward shroud and spreader). As in real life, a backed jib bellies to windward
+   and comes up against the shroud and spreader, draping round them, never through the mast. So the jib's shape needs
+   the mast, the shroud and the spreader as obstacles, on both tacks, hove to and when backed in a tack. Check from both
+   sides.
+8w. **The crew's places on the rail, and moving through the cockpit** (owner, 14 November; accuracy; next; 3–5 h; Crew
+   Figures, with a physics review since the stations feed the trim):
+   - Moving fore and aft: "they tend to squat-crawl along the side of the hull, between the coaming and the toe rail, to
+     move fore and aft. that's just not true to life. any human crew would step into the cockpit to get around." So
+     the route is down into the footwell, along it, and back up, not along the side deck outside the coaming.
+   - Their places, sitting on the rail: "front crew would be between the aft cabin wall and the winch, middle crew
+     between the winch and the thwart, and the skipper behind the thwart. the area behind the thwart is pretty
+     exclusively reserved for the skipper." Today the middle crew sits aft of the thwart. Change the stations from the
+     option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
+     thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
+     and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
+8x. **URGENT — the whole new release stutters** (regression, performance; owner, 14 November): "the whole new release is
+   moving very, very slow. whitecaps on the water are stuttering. everything is stuttering." The boat editor's slowness
+   (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare
+   frame time and the worker's step against v178 (perf-pair.mjs, and the frame-time readout), and look first at what
+   the latest batches added to every frame or step (the protests batch, the basin grids warmed between frames, the app
+   split, new per-frame water or crew work). The prime suspect is v187's boat detail (#291). The owner loves the new
+   model ("really don't want to have to roll it back"): fix its render cost rather than roll it back. Merge its small
+   meshes per material, use level of detail by distance, hide the interior and small fittings when unseen, share
+   geometry and materials across the fleet, and limit shadow-casting. Any rollback is the owner's call first. Add a
+   frame-time check to the release smoke test so a stuttering build
+   can't ship.
+8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
+   very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
+   several full seconds." Every change should land within a frame or two, as before. Suspects:
+   - each change rebuilding the whole boat model or the showroom scene;
+   - the boat cards' golden-hour pictures re-rendered on each change;
+   - the Save pattern's "changed?" check copying or comparing the whole save each time;
+   - the time of day rebuilding the sky and lights from scratch.
+   Profile one click of each kind, fix the slow path, and add a check that a boat-editor change takes under a frame
+   budget.
+8u. **Partly fixed — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
    editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
    in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
    input), so something hides them on screen. Not the Save banner (owner: there's none showing). Suspects: the turning boat's panel pushing
    Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
    published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
-   ensign.
+   ensign. Owner, 14 November: they're back for Josephine; the other boats in the fleet still to check.
 8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
    Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
    Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
