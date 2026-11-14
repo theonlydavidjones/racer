@@ -51,10 +51,12 @@ describe('her tack, by the definitions', () => {
       const b = testBoat({ heading: 170, kt: 4, windKt: 10 }); b.isUser = user; sail(b, 15, () => held(b, 170));
       expect(b.tack).toBe('P'); expect(b.boom).toBeGreaterThan(30);
       let wrong = 0, gybing = 0, changedAt = NaN, boomThen = NaN, was = b.tack as string;
+      let jibWas = Math.sign(b.jib);
       sail(b, 40, t => {
         held(b, 170 + Math.min(30, t)); // (a degree a second, to 20° by the lee)
         if (Math.abs(b.boom) >= 1 && byBoom(b) !== b.tack) wrong++;
-        if (b.gybeTo) { gybing++; expect(b.gybeTo).toBe('S'); expect(b.tack).toBe('P'); }
+        if (b.gybeTo) { gybing++; expect(b.gybeTo).toBe('S'); expect(b.tack).toBe('P'); expect(Math.sign(b.jib), 'the jib stays on her tack\'s side until she has gybed').toBe(jibWas); }
+        else if (b.tack === 'P') jibWas = Math.sign(b.jib);
         if (b.tack !== was) { changedAt = wrap(0 - b.h); boomThen = b.boom; was = b.tack; }
       });
       expect(wrong, 'steps with the main on one side and her tack the other').toBe(0);
@@ -67,8 +69,9 @@ describe('her tack, by the definitions', () => {
   it('with no mainsail set there\'s none to go by: the wind\'s side, as soon as it\'s past dead astern', () => {
     const b = testBoat({ heading: 170, kt: 2, windKt: 10 }); b.rig = { main: 0, jib: 1, mainUp: false, jibUp: true };
     sail(b, 10, () => held(b, 170)); expect(b.tack).toBe('P');
-    sail(b, 12, t => held(b, 170 + Math.min(15, 2 * t)));
-    expect(b.tack).toBe('S'); expect(b.gybeTo).toBeUndefined();
+    sail(b, 10, t => held(b, 170 + Math.min(12, 2 * t))); // (to 182°: the wind 2° over her starboard quarter)
+    expect(wrap(0 - b.h)).toBeCloseTo(178, 0);
+    expect(b.tack, '2° past dead astern, no main to lie anywhere').toBe('S'); expect(b.gybeTo).toBeUndefined();
   });
 });
 
