@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
@@ -439,7 +439,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // through a tack, down in the cockpit and across under the boom (the owner): the forward crew on one knee working
     // the jib sheets at the leeward winch, the middle crew up in a crouch tacking the main from the thwart
     // (the jib hand forward by the winches, the main hand aft by the thwart, clear of each other)
-    const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.45, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
+    const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.6, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
       // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
       // within arm's reach of it, the sheet in the inboard hand. Just forward of it, abreast: the winch between the cabin
@@ -454,7 +454,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // with their hands on it behind them, the arms went back through the elbows, the owner's "backwards arms"; and back from
     // it far enough that, bent over in the crouch toward it, their hands are in front of the chest and their knees clear of
     // the thwart)
-    const sheet = V(px * 0.4, 0.9, THWART.z - 0.08);
+    const sheet = V(px * 0.4, 0.9, THWART.z - 0.25); // (the tail hauled in front of the thwart, not over it: an elbow below the hands lay on its top)
     return crouch(px, zz, Math.PI, [sheet.clone().add(V(0.07, 0.05, 0)), sheet.clone().add(V(-0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, 0.4)));
   }
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
@@ -583,6 +583,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // the jib trimmer: the sheet in the forward hand, led from the leeward winch
     const w = winchAt(-windward);
     const hold = p.hip.clone().add(V(0, 0.26 * k, 0)).addScaledVector(fwd(p.yaw), 0.5 * k).lerp(w, 0.15); // (at arm's length, the elbow easy)
+    // (in front of them, not reached back aft: sat at the bench's forward end turned a little aft, the sheet hand went back
+    // into the next crew's place, sat at the winch, the two arms through each other)
+    hold.z = Math.min(hold.z, p.hip.z + 0.05);
     p.hands[s > 0 ? 0 : 1] = hold;
   }
   return p;
@@ -621,6 +624,9 @@ function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.V
   const d = chest.sub(tip), ext = tip.clone().addScaledVector(d.normalize(), Math.max(0.2, Math.min(0.95, d.length() - 0.25)));
   ext.y = Math.min(ext.y, p.hip.y + 0.2 * h.scale); // (low, at the hip, as they pass the stick behind them)
   p.hands[x >= 0 ? 0 : 1] = ext;
+  // (the knees over the cockpit, inboard and up, as they turn to face forward: turned with the body, the knee of a foot
+  // still on the seat inside the coaming swung out over it, the shin through its top)
+  if (Math.abs(p.hip.x) > 0.3) { p.knee = V(-Math.sign(p.hip.x) * 0.5, 0.7, -0.5); p.kneeW = 1; }
   return p;
 }
 
@@ -738,7 +744,17 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
     }
   }
   const y0 = c.hip.y;
-  v.addScaledVector(_s.copy(aim).sub(c.hip), W * W * dt).multiplyScalar(Math.max(0, 1 - 2 * W * dt)); c.hip.addScaledVector(v, dt);
+  // (the spring, held to a person's pace: no faster than HIP.speed along the deck and HIP.up up or down, setting off and
+  // pulling up at no more than HIP.acc. On the spring alone, the pose jumping to a new place took the hips 1 m in a
+  // quarter of a second, at up to 5 m/s, setting off at up to 136 m/s²)
+  { const vx = v.x, vy = v.y, vz = v.z;
+    v.addScaledVector(_s.copy(aim).sub(c.hip), W * W * dt).multiplyScalar(Math.max(0, 1 - 2 * W * dt));
+    const ax = v.x - vx, az = v.z - vz, ah = Math.hypot(ax, az), lim = HIP.acc * dt;
+    if (ah > lim) { v.x = vx + ax * lim / ah; v.z = vz + az * lim / ah; }
+    v.y = vy + Math.max(-HIP.upAcc * dt, Math.min(HIP.upAcc * dt, v.y - vy));
+    const sh = Math.hypot(v.x, v.z); if (sh > HIP.speed) { v.x *= HIP.speed / sh; v.z *= HIP.speed / sh; }
+    v.y = Math.max(-HIP.up, Math.min(HIP.up, v.y)); }
+  c.hip.addScaledVector(v, dt);
   // (getting up, off the rail or a seat, takes a moment: the hips rise no faster than about 1.2 m/s)
   if (c.hip.y > y0 + 1.2 * dt) { c.hip.y = y0 + 1.2 * dt; if (v.y > 1.2) v.y = 1.2; }
   if (rising) c.hip.y = Math.min(aim.y, Math.max(c.hip.y, c.hip.y + 1.0 * dt)); // (pushing up off the seat: briskly)
@@ -749,7 +765,13 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
     // (turning round on a side deck, about half a turn: through facing inboard, toward the cockpit, as anyone turns there,
     // not out over the water; then the turn to sit facing in is back the other way, not on round a whole circle)
     const sx = Math.sign(c.hip.x);
-    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < 0) d -= Math.sign(d) * 2 * Math.PI;
+    // (only when the one way round is clearly out over the water: facing straight inboard, both ways pass fore or aft, and
+    // the test's sign flipped each frame, so they turned a step one way and a step back for ever, the knees with them, 70
+    // rad a minute, sat on the cabin top's edge)
+    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < -0.3) d -= Math.sign(d) * 2 * Math.PI;
+    // (a turn given its way round, back from facing aft at the mainsheet after a tack (syncCrew): on that way until it's
+    // nearly done)
+    if (f.turnDir != null) { if (Math.abs(d) < 0.6) f.turnDir = undefined; else if (Math.sign(d) !== f.turnDir) d += f.turnDir * 2 * Math.PI; }
     const dy = d * a; c.yaw += Math.max(-3 * dt, Math.min(3 * dt, dy));
   }
   // the lean on a slower spring (leaning out as a puff comes, in as it goes: about a third of a second, never a snap)
@@ -781,29 +803,39 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (not going in under the side deck: that's below the coaming, not over it)
       if (far && !inTo) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
-      hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
+      // (the rise from where it was this frame, at a hand's pace in all: not that on top of the move toward its place)
+      hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step || sw) {
       // walking or crawling (and a step under way is finished, whatever comes next): each foot stays planted until it's left behind, then swings (lifted) to a new place
       // ahead, one foot at a time, about a quarter of a second a step: no foot slides on the deck
       if (sw) {
         // (a step over something high takes longer: the foot goes up and over it, not just along)
-        sw.t = Math.min(1, sw.t + dt / Math.max(0.22, (sw.from.distanceTo(sw.to) + 0.6 * Math.max(0, sw.top - Math.min(sw.from.y, sw.to.y))) / 1.4));
-        const e = sw.t * sw.t * (3 - 2 * sw.t), wasY = foot.y;
+        // (and a high step's lift at a foot's pace: over 1.3 s a metre of it at least. The sole to the side deck, 0.9 m up,
+        // in a quarter of a second, the foot left the sole at 13 m/s)
+        const pk = Math.max(sw.top, sw.from.y, sw.to.y) + 0.07 - (sw.from.y + sw.to.y) / 2;
+        sw.t = Math.min(1, sw.t + dt / Math.max(0.22, (sw.from.distanceTo(sw.to) + 0.6 * Math.max(0, sw.top - Math.min(sw.from.y, sw.to.y))) / 1.4, 1.3 * pk));
+        // (along: eased out and in; with something high right where it starts, the coaming beside a foot on the bench, up
+        // first and then along, not along into it and popped up onto it in a frame)
+        const h0 = sw.hold ?? 0, th = Math.max(0, (sw.t - h0) / (1 - h0)), e = th * th * (3 - 2 * th), wasY = foot.y;
         foot.copy(sw.from).lerp(sw.to, e);
         // (lifted clear of whatever it passes over, highest mid-step)
         const peak = Math.max(sw.top, sw.from.y, sw.to.y) + 0.07 - (sw.from.y + sw.to.y) / 2;
         // (lifted a little early, so what it steps over near either end, the thwart, a seat's edge, is cleared on the way)
-        foot.y += Math.max(0, peak) * Math.sin(Math.PI * sw.t) ** 0.6; foot.y = Math.max(foot.y, ground(foot.x, foot.z) + 0.06);
+        foot.y += Math.max(0, peak) * Math.sin(Math.PI * sw.t) ** 0.6; 
+        // (never down inside what's under it; but brought up out of it at a foot's pace if it was in it, not in a frame: a
+        // foot left inside the thwart's edge went up 0.67 m at once)
+        foot.y = Math.max(foot.y, Math.min(ground(foot.x, foot.z) + 0.06, wasY + 1.5 * LIMB_SPEED * dt));
         // (coming down off something it stepped over: at a foot's pace, not dropped in a frame; the step's done when it's down)
-        foot.y = Math.max(foot.y, wasY - 2 * LIMB_SPEED * dt);
+        foot.y = Math.max(foot.y, wasY - LIMB_SPEED * dt); // (at twice it, a step down off the cabin top came down at 4.4 m/s)
         if (sw.t >= 1 && foot.y <= sw.to.y + 0.01) f.swing![i] = null;
       } else if (want.step && foot.distanceTo(want.feet[i]) > 0.16 * f.scale && (!f.swing![1 - i] || (want.deck && inCockpit(Math.abs(foot.x), foot.z)))) {
         // (one at a time; but setting off along the side deck, a foot still down in the cockpit comes up out of it at once)
         const ahead = want.feet[i].clone().addScaledVector(_s.copy(want.feet[i]).sub(foot).setY(0).normalize(), 0.08 * f.scale);
         const to = want.deck ? ahead.setX(want.feet[i].x).setY(ground(want.feet[i].x, ahead.z) + 0.06) : onGround(ahead); let top = Math.max(foot.y, to.y); // (on the side deck, as far out as it's meant to be)
-        for (let q = 1; q < 6; q++) { _t.copy(foot).lerp(to, q / 6); top = Math.max(top, ground(_t.x, _t.z) + 0.06); }
-        f.swing![i] = { from: foot.clone(), to, t: 0, top };
+        // (finely enough not to step over the coaming's own width between two looks; and what's within the first third of the way)
+        let near = 0; for (let q = 1; q < 12; q++) { _t.copy(foot).lerp(to, q / 12); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= 4) near = Math.max(near, g); }
+        f.swing![i] = { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
       }
     } else {
       f.swing![i] = null;
@@ -811,7 +843,10 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (clearing what's between only on a real step to a new place: a foot following a lean, a few centimetres, stays down)
       const going = foot.distanceTo(want.feet[i]) > 0.15;
       const fx = foot.x, fz = foot.z, fy = foot.y;
-      toward(foot, want.feet[i], a, LIMB_SPEED * dt * (rising ? 0.3 : 1));
+      // (a foot down on the sole is a little in from the bench's face, not tucked under its lip with the knee still out over
+      // the bench, the shin through its edge: getting down off the bench by the winch in a tack)
+      const ft = want.feet[i].y < SEAT_Y - 0.1 ? keepOnSole(_fw.copy(want.feet[i])) : want.feet[i];
+      toward(foot, ft, a, LIMB_SPEED * dt * (rising ? 0.3 : 1));
       // (coming to a step up, the bench's edge or the coaming: it stops and lifts to it at a foot's pace, never snapped up)
       if (ground(foot.x, foot.z) + 0.06 > fy + LIMB_SPEED * dt) { foot.x = fx; foot.z = fz; foot.y = Math.max(fy, ground(fx, fz) + 0.06) + LIMB_SPEED * dt; }
       // (rising to clear what's near it as it goes, at a foot's pace; never below what's under it)
@@ -821,10 +856,11 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         let top = 0; for (let q = 1; q < 5; q++) { _u.copy(foot).lerp(want.feet[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(foot.x, foot.z), ground(want.feet[i].x, want.feet[i].z)) + 0.03) clear = top + 0.06;
       }
-      foot.y = Math.max(foot.y, ground(foot.x, foot.z) + 0.06, Math.min(clear, foot.y + LIMB_SPEED * dt));
+      foot.y = Math.max(foot.y, ground(foot.x, foot.z) + 0.06, Math.min(clear, fy + LIMB_SPEED * dt)); // (from where it was this frame, as a hand's)
       // (while the hips are still out on the side deck, the knees are over the coaming: the feet hang from them, not
       // down on the bench, which would drag the thighs through it)
-      if (c.hip.z > COCK0 && c.hip.z < COCK1 && Math.abs(c.hip.x) > chz(c.hip.z) - 0.05) foot.y = Math.max(foot.y, deckY(uAtZ(c.hip.z), chz(c.hip.z)) + coamH(c.hip.z) + 0.04 - BONE.shin * f.scale);
+      // (raised to it at a foot's pace: set there, the feet jumped 0.28 m off the sole in a frame as the hips came to the deck's edge)
+      if (c.hip.z > COCK0 && c.hip.z < COCK1 && Math.abs(c.hip.x) > chz(c.hip.z) - 0.05) foot.y = Math.max(foot.y, Math.min(deckY(uAtZ(c.hip.z), chz(c.hip.z)) + coamH(c.hip.z) + 0.04 - BONE.shin * f.scale, foot.y + LIMB_SPEED * dt));
     }
   }
   // (the hips stay a shin's length or so above the feet: someone stepping up onto the deck rises with the step, they
@@ -833,7 +869,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   // (walking along the side deck, from where the feet are on average, so a foot lifted mid-step doesn't hoist the hips:
   // the weight stays low)
   const lowest = want.deck ? (c.feet[0].y + c.feet[1].y) / 2 + 0.26 * f.scale : Math.max(c.feet[0].y, c.feet[1].y) + 0.32 * f.scale;
-  if (want.step && c.hip.y < lowest) { c.hip.y = Math.min(lowest, c.hip.y + 1.5 * dt); if (v.y < 0) v.y = 0; } // (rising with the step, at a person's pace)
+  // (rising with the step, at a person's pace: 1.5 m/s in all from where they were this frame, not that on top of the
+  // spring's rise and the push off the seat, which came to 3.7 m/s getting up from the winch)
+  if (want.step && c.hip.y < lowest) { c.hip.y = Math.min(lowest, Math.max(c.hip.y, y0 + 1.5 * dt)); if (v.y < 0) v.y = 0; }
   c.look.lerp(want.look, a);
   // (the knees turn to where the pose points them over a tenth of a second, and back to forward the same way; but at
   // once as a foot steps down inside the coaming, so that knee drops in with it rather than dragging across the top;
@@ -846,9 +884,19 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   c.elbow = want.elbow; // (the way an elbow's to go, as the pose has it now: not as it was when they were first drawn)
   return c;
 }
+const _fw = V(0, 0, 0);
 const _s = V(0, 0, 0), _t = V(0, 0, 0), _u = V(0, 0, 0), _sh = V(0, 0, 0), _v = V(0, 0, 0), _w = V(0, 0, 0);
 /** How fast a hand or a foot moves to its new place at most (m/s): briskly, as a sailor's do (an estimate). */
 const LIMB_SPEED = 2.2;
+/**
+ * The most the hips' spring is let move: at most `speed` (m/s), setting off and pulling up at `acc` (m/s²); up and
+ * down, `up` and `upAcc`. A person's own pace is lower: a crew crosses the cockpit in a tack at about 1 m/s
+ * (crewPhys.ts), a walk from standing reaches its pace in a step or two, about 1.5 to 2 m/s², and sit-to-stand the hips
+ * rise at 0.6 to 1 m/s at most (estimates). These are as low as the poses' in-between steps allow for now: at 1.6 m/s
+ * and 5 m/s² a shin or an elbow goes into the boat in a hiking tack and a two-handed tack (crewfig). Working those
+ * through is what brings it down to a person's pace.
+ */
+const HIP = { speed: 2.0, acc: 8, up: 1.6, upAcc: 8 };
 /** Ease `p` toward `q` by the share `a`, but no further than `max`. */
 function toward(p: THREE.Vector3, q: THREE.Vector3, a: number, max: number): void {
   const d = _s.copy(q).sub(p).multiplyScalar(a), l = d.length(); if (l > max) d.multiplyScalar(max / l); p.add(d);
@@ -958,8 +1006,16 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const onBench = cr.crew.map(() => false);
   if (inMid.filter(Boolean).length > 1) {
     const mids = cr.crew.map((_, i) => i).filter(i => inMid[i]).sort((i, j) => Math.abs(ppl![i + 1].z - SOLE_Z) - Math.abs(ppl![j + 1].z - SOLE_Z));
-    for (const i of mids.slice(1)) onBench[i] = true;
+    // (at their own stations well apart fore and aft, the winch's and forward of it (crewPhys.ts Z), neither kneels: each
+    // sits on the bench's edge at their own place. One knelt on the sole's spot, its shins back toward the thwart, and the
+    // one sat at the winch had their feet in among them)
+    const zs2 = mids.map(i => ppl![i + 1].z), apart = Math.max(...zs2) - Math.min(...zs2) >= 0.4;
+    for (const i of apart ? mids : mids.slice(1)) onBench[i] = true;
   }
+  // (and once sat on the bench's edge, they stay there while they're in the middle: not down onto the sole to kneel and
+  // back up each time the other's weight drifts out of the middle and back, the knees kicking 46 rad a minute on a 6 kt
+  // broad reach)
+  cr.crew.forEach((f, i) => { if (inMid[i] && f.benchSide != null) onBench[i] = true; });
   const tackOn = !!c && (tacking || !!c.roll);
   const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
   cr.crew.forEach((f, i) => {
@@ -988,7 +1044,16 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const go = f.going = travelling(f, a, x);
     // (in the tack while it's under way, and until they're across; a job elsewhere, the mast or the car, comes first)
     const busy = pose === 'mast' || pose === 'car' || pose === 'piano' || pose === 'bow' || pose === 'fore';
-    f.tack = !busy && (tackOn || (!!f.tack && go));
+    // (but only once the physics brings them in off the rail: a roll tack holds them out on the old high side as she comes
+    // up and through the wind (crewPhys.ts roll), and drawn down in the cockpit from its start, they were 0.9 m from where
+    // their weight was, and were carried there at 3.7 m/s as it began; then back out to the new rail)
+    const inboard = !a || Math.abs(a.x) < benchEdge(a.z) || pose === 'cross';
+    const wasTack = !!f.tack;
+    f.tack = !busy && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go));
+    // (back from facing aft at the mainsheet, round through facing inboard, away from the bench they're going to: round the
+    // other way, the knee of a foot planted on the sole swung out over the bench, the shin through its edge)
+    // (the side they're going to, the physics' own: at the role's end they can be just across the middle from it)
+    if (wasTack && !f.tack && f.cur && Math.cos(f.cur.yaw) < -0.3) f.turnDir = -Math.sign(x) || -Math.sign(f.cur.hip.x) || 1;
     const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
     const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z);
     // (on the way along the side deck, and settling into the new place after it)

@@ -26,8 +26,15 @@ sea.rotation.x = -Math.PI / 2; scene.add(sea);
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 2000);
 let w: World, b: Boat, m: BoatMesh | null = null, cam = { yaw: 60, pitch: 22, dist: 6.5, at: [0, 0.7, 1.0] as number[] };
 
+/**
+ * The clock syncBoatMesh is given: the race's, made positive. Before the gun the race's clock is negative (from −180 s),
+ * and syncBoatMesh takes a negative last time for "the first frame" and moves nothing: every figure stood still through
+ * the pre-start's tacks. The game gives it the page's clock, always positive.
+ */
+const clk = () => w.t + 1e4;
+
 function draw(): void {
-  syncBoatMesh(m!, b, w.t);
+  syncBoatMesh(m!, b, clk());
   sea.position.set(m!.grp.position.x, 0, m!.grp.position.z);
   m!.grp.updateMatrixWorld(true);
   const yaw = cam.yaw * Math.PI / 180, pitch = cam.pitch * Math.PI / 180, at = new THREE.Vector3(...cam.at as [number, number, number]);
@@ -54,7 +61,7 @@ const clip = {
   /** Sail on `s` seconds without drawing every frame (the figures jump to where they are). */
   run(s: number) { const end = w.t + s; while (w.t < end) w.step(DT); draw(); },
   /** Sail `s` seconds drawing every frame (60 a second), as the game does. */
-  frames(s: number) { for (let i = 0; i < Math.round(s / DT); i++) { w.step(DT); syncBoatMesh(m!, b, w.t); } draw(); },
+  frames(s: number) { for (let i = 0; i < Math.round(s / DT); i++) { w.step(DT); syncBoatMesh(m!, b, clk()); } draw(); },
   cam(yaw: number, pitch: number, dist: number, at?: number[]) { cam = { yaw, pitch, dist, at: at ?? cam.at }; draw(); },
   info: () => (document.getElementById('i') as HTMLElement).textContent
 };

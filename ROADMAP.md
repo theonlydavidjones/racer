@@ -195,7 +195,7 @@ What's planned, roughly in order. Done work is described in the README.
    switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
    re-render under the pointer swallows it. Check every chip row with the same pattern (the map layers, the setup's
    choices). A test that one click switches.
-8e. **Now — a crew member's arms are on backwards** (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
+8e. ~~**Now — a crew member's arms are on backwards**~~ (done, v194, #344: in a tack the main hand crouched facing forward with their hands on the mainsheet at the thwart behind them, reached through the elbows; now they face the sheet. crewfig's 'No backwards arms anywhere' checks every figure in a race's start, cruises and at the dock) (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
