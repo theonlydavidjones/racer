@@ -143,7 +143,7 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Sculling comes
+   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder (in PR #289; sternway in PR #317). Sculling comes
    from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
@@ -151,7 +151,7 @@ What's planned, roughly in order. Done work is described in the README.
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
    Next for the rules (owner, 13 November):
-   - **Protests and hearings (RRS Part 5): design approved** (docs/PROTESTS-PROPOSAL.md, branch rules-protests-design;
+   - ~~**Protests and hearings (RRS Part 5): design approved**~~ (done: 34e430c, 7d5972b, a5135a6; follow-ups b3af54d, dfa6758, 4f501a0, 789f1c7) (docs/PROTESTS-PROPOSAL.md, branch rules-protests-design;
      owner, 13 November):
      - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
      - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
@@ -180,22 +180,22 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
-8h. **Now — the chart's Wind shadow layer shows nothing** (bug; 1–2 h): owner, "also on chart: toggling wind shadow
+8h. ~~**The chart's Wind shadow layer shows nothing**~~ (done: c1ea689, a716a18; the shadows from the physics, checked in the built page) (bug; 1–2 h): owner, "also on chart: toggling wind shadow
    doesn't do anything that I can see." Find out whether it draws nothing (a bug), draws only near other boats or only
    while racing (then say so on the chart when there's nothing to show), or draws too faintly (as with Waves). The
    shadows to show: boats' dirty air, ships, the committee boat, the lee of the land and of the bridge piers, all already
    in the physics. With 8f and 8g: the same layer row.
-8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
+8g. ~~**The chart's Waves layer is unreadable**~~ (done: c1ea689; legible at the chart's usual zoom, checked in the built page) (polish/clarity; 1–2 h): owner, "waves notation in chart view is too
    small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
    chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
    swell's direction) plainly where it matters, without cluttering the chart. Options to the owner if the look changes
    much.
-8f. **Now — the map layer buttons need two clicks** (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
+8f. ~~**The map layer buttons need two clicks**~~ (done: c1ea689; scripts/check/layer-clicks.cjs) (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
    OFF, the long visibility note above it), "these buttons are requiring two clicks for some reason". One click should
    switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
    re-render under the pointer swallows it. Check every chip row with the same pattern (the map layers, the setup's
    choices). A test that one click switches.
-8e. **Now — a crew member's arms are on backwards** (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
+8e. ~~**A crew member's arms are on backwards**~~ (done: 407791f, 2fdfe20; the owner's 14 November report, 792cc3a; every pose from both sides still to confirm) (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
@@ -209,7 +209,7 @@ What's planned, roughly in order. Done work is described in the README.
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
-8m. **Now — leaving the slip at Gashouse Cove: she drifts to windward under bare poles** (bug, physics; 3–5 h; owner, 13
+8m. **Now — leaving the slip at Gashouse Cove: she drifts to windward under bare poles** (partly done: acd54e6, 35957a2, 72f5bfa; the windward drift didn't reproduce, c192351; the slip-572 exits wait on PRs #289 and #326, tests/gashouse.test.ts's it.fails) (bug, physics; 3–5 h; owner, 13
    November): "coming out of a slip at Gas House Cove. The wind is on the beam on the port side. I get pushed off. I
    don't raise the sails. And the boat seems to just drift to windward, weirdly, even if I have the tiller at
    centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
@@ -253,24 +253,24 @@ What's planned, roughly in order. Done work is described in the README.
    - **Lowering:** let the halyard go at the mast, and the sail comes down fast.
    - The sails, flags, telltales and physics answer the hoist as it happens: half-hoisted sails draw badly, luff and
      flog.
-8q. **The boom on the centerline in the slip** (owner, 13 November; <1 h): "when in a slip, boom should be at
+8q. ~~**The boom on the centerline in the slip**~~ (done: 16af648; kept through batch 37, 5d33817) (owner, 13 November; <1 h): "when in a slip, boom should be at
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
-8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (bug; 2–3 h): owner, "at aquatic park, auto
+8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (in PR #337) (bug; 2–3 h): owner, "at aquatic park, auto
    nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
    curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
    geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
    of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
-8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
+8r. ~~**The stowed jib on the foredeck**~~ (done: 59a1cfa, 014db55, 0591197) (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
    intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
    Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
    really lies: rolled or flaked into a long, narrow sausage along the foredeck from the stemhead aft, its luff still on
    the forestay at its forward end (so the stay meets it, not passes through), tied with a sail tie or two. Check from
    both sides.
-8p. **Bug: with the sails down, the jib cars show as loaded** (owner, 13 November; <1 h): "with sails down, neither jib
+8p. ~~**Bug: with the sails down, the jib cars show as loaded**~~ (done: bf2a855, ecc0d4c) (owner, 13 November; <1 h): "with sails down, neither jib
    car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
-8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
+8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
    its "IDLE SPEED / NO WAKE" sign and light to the west, Fort Mason's pier to the east, the Bay and Angel Island
@@ -312,7 +312,7 @@ What's planned, roughly in order. Done work is described in the README.
    and comes up against the shroud and spreader, draping round them, never through the mast. So the jib's shape needs
    the mast, the shroud and the spreader as obstacles, on both tacks, hove to and when backed in a tack. Check from both
    sides.
-8w. **The crew's places on the rail, and moving through the cockpit** (owner, 14 November; accuracy; next; 3–5 h; Crew
+8w. **The crew's places on the rail, and moving through the cockpit** (in PRs #347 and #348) (owner, 14 November; accuracy; next; 3–5 h; Crew
    Figures, with a physics review since the stations feed the trim):
    - Moving fore and aft: "they tend to squat-crawl along the side of the hull, between the coaming and the toe rail, to
      move fore and aft. that's just not true to life. any human crew would step into the cockpit to get around." So
@@ -367,7 +367,7 @@ What's planned, roughly in order. Done work is described in the README.
    - the boat model not built yet when the picture is taken (the setup now builds lazily, and the page is split);
    - the camera framing.
    Fix the cause, throw away any saved empty pictures, and add a check that each card's picture has the boat in it.
-8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
+8l. ~~**Rushing water is back**~~ (done: 31ce983, a test over every water layer; c71226a, ef44267; the chart's streaks, the owner's meaning, c2d8b51) (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
    current's flow-mapped texture, a jump in the focus (camera switch, the chart opened and closed, "Move her here"), or
@@ -378,12 +378,12 @@ What's planned, roughly in order. Done work is described in the README.
    Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
-8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
+8j. ~~**The windex lost its point of sail**~~ (done: e62a2229; tests/pointofsail.test.ts, scripts/check/point-of-sail.cjs) (regression; <1 h): owner, "I want the windex dial to show the point of
    sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
    beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
    dial under the inset map, 8b), and a test that it's on screen.
-8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+8i. **The boat editor reorganized, with a real color picker** (in PR #354; any color kept already, 1271a6f) (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
    the owner first):
    - "all sail stuff together, all hull stuff together, etc." Proposed groups:
      - **Her:** name, sail number and country, club.
@@ -414,7 +414,7 @@ What's planned, roughly in order. Done work is described in the README.
      Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
      fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
      Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
-8k. **Drop and raise the anchor** (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
+8k. **Drop and raise the anchor** (in PR #339; rule 22 in PR #335) (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
    later cruising mode's anchoring challenge):
    - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
      anchor: haul in the rode, break it out, stow it. Each takes the time it takes, by crew and skill.
@@ -427,7 +427,7 @@ What's planned, roughly in order. Done work is described in the README.
      the 2025–2028 text, rule 45). The strategist and the smart crew should know when to call it.
    - At anchor: the anchor light at night (built, Rule 30) and the anchor ball by day (Rule 30(a)).
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, a key), not a new button.
-8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
+8c. **"Oh fuck time to paddle"** (in PR #326) (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
    - One crew member fetches the boom crutch from the cabin (it takes the time it takes), and paddles on the side
@@ -451,24 +451,20 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
-   - **Bugs in the race setup's "When" section** (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
+   - ~~**Bugs in the race setup's "When" section**~~ (done: 196e7db) (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
      - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
        off after the first week. It should open fully visible, flipping upward or scrolling the panel.
      - Starting from her slip at Gashouse Cove with "Leave at 1:35 PM", equal to the 13:35 gun, the line reads "She
        starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
        plainly that she can't make the start from there.
-   - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
-   - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
-     between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
-     no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
-     One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
-     some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
-     first.
+   - ~~The sail band's decorative cleats removed, with no dimming in their place~~ (done: 12f4199) (owner, 13 November).
+   - ~~Yours or the crew's, shown coherently in the sail band~~ (owner, 14 November: declined, "The current tab copy and
+     states are fine." The Auto-trim / Hand back tab stays as it is.)
    - ~~Remove the line~~ (done) "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
-   - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
+   - ~~**Boat editor copy out**~~ (done: 848df4b) (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
-   - **The season's flow** (owner, 13 November; clarity; next; 3–5 h; a mock-up to the owner first): "I'm confused about the
+   - ~~**The season's flow**~~ (done: 65fe35b, 39558a0) (owner, 13 November; clarity; next; 3–5 h; a mock-up to the owner first): "I'm confused about the
      UX for seasons. I go to the yacht club to pick a season (counterintuitive, since I would think to go to Race), then
      when I select a season, BAM, I'm in my slip. no clue what's going on." Proposed:
      1. **Enter from Race:** Race → Season (the Yacht Club's Season tab shows the standings and history too).
@@ -483,7 +479,7 @@ What's planned, roughly in order. Done work is described in the README.
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
      stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
      editor, the Yacht Club's boats) in the audit. Owner's decision: leaving with unsaved edits asks "Save changes?" with Save and Discard.
-   - **The pause menu redesigned** (approved by the owner, "fine for now"; 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
+   - ~~**The pause menu redesigned**~~ (done: 37fd550) (approved by the owner, "fine for now"; 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
      too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
      Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
      Proposed: one narrow column (about a third of the screen's width), grouped by what you're doing:
@@ -493,21 +489,21 @@ What's planned, roughly in order. Done work is described in the README.
      4. The game: Settings, Sound.
      5. Exit to the start page, set apart.
      The same pattern for every menu in the game. A mock-up to the owner first.
-   - **The inset map's flag and layer icons off the game surface** (owner, 13 November; 1–2 h): "the little flag icon and
+   - ~~**The inset map's flag and layer icons off the game surface**~~ (done: 52846f2, 251ad9e, b1bf2ff) (owner, 13 November; 1–2 h): "the little flag icon and
      layer icon on the inset map doesn't belong on the game surface. those should be toggles in the full map view, with
      the inset remembering my choices." The layer choices (and the flag index) move into the full chart. The inset shows
      whatever was last chosen there, saved with the player's settings. The standing screen rule applies.
-   - **The on-screen tiller instructions out** (owner, 13 November; minutes): the keys line across the screen (#keysHint,
+   - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
-   - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
+   - **An audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
      the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
      these.
-   - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
+   - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
-8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
+8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
    way to set the direction.
@@ -638,12 +634,12 @@ is now "much better" (owner).
    the Cunninghams, and the lines visible along the traveler, each led as on Josephine (the Full sail controls
    tables, reference/photos).
 7. From the same review (12 November):
-   - Bugs (Boat Detail; about 1–2 h): a stray second toerail on the starboard side; a half-circle see-through patch at
-     the cabin's front by the mast foot.
-   - Winching (Crew Figures; 1–2 h): the jib winch handle sits under the deck, beneath the winch, which passes through
-     the deck; and the crew winch in short pulls of at most 45°, not full circles.
-   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are; ~~the whisker pole stowed~~ (done: its real 2.85 m, on the side deck)
-     farther forward on the bow; cleats amidships.
+   - Bugs (Boat Detail; about 1–2 h): ~~a stray second toerail on the starboard side~~ (done: e744781); a half-circle see-through patch at
+     the cabin's front by the mast foot (probably done: f4f9d6b, 5c467bf; to check on screen).
+   - Winching (Crew Figures; 1–2 h): ~~the jib winch handle sits under the deck, beneath the winch, which passes through
+     the deck~~ (done: 68d428b, 3f77d2b); and the crew winch in short pulls of at most 45°, not full circles (in PR #347).
+   - Polish (Boat Detail; 2–3 h): the hatch less of a perfect square, as real hatches are (probably done: 42c298b, rounded corners); ~~the whisker pole stowed~~ (done: its real 2.85 m, on the side deck)
+     farther forward on the bow; ~~cleats amidships~~ (done: 8abd529).
 
 **Running order** (11 November, Coordinator, to keep within the 5-hour usage window: at most three build sessions at
 once): running now, Deep Physics (AI tacking), Charts (the bridge towers and their wakes), Boat Detail (the
@@ -664,7 +660,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - ~~**Now — cruise ignores the chosen origin**~~ (done: 1ace228 in #54, checked in the browser by Marinas; bug; ~1 h): owner, "there's a bug in cruise
   mode where I have an origin selected but it still starts me in the slip." When a cruise origin other than her slip is
   chosen, she must start there (sim/world.ts, the slip and docked start, near line 301). Goes with the push-off fix.
-- **Now — double-click to lash the tiller always lashes it amidships** (bug; <1 h; Crew Controls after the reset, with
+- ~~**Double-click to lash the tiller always lashes it amidships**~~ (done: fa60fd0, 99eaf29, #50; it lashes at the first press's angle) (bug; <1 h; Crew Controls after the reset, with
   its batch): owner, "double-clicking to lash the tiller doesn't work. if I double click while the tiller is selected,
   the first click registers as a release, and the second as a lash. that means the tiller always gets lashed
   amidships." Lash at the angle she held before the first click, or hold the release until the double-click window has
@@ -768,7 +764,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   Folkboats to reef; still unconfirmed. Ann Gash (solo round the world, 1975–77) reportedly used a working jib and a
   trysail in a storm, not a reefed main (a search summary of her memoir, not read); Hasler's Jester was junk-rigged
   (Folk Boat Year Book 2021, p.46). Richard Sherwood (1994, via Wikipedia): she "often carries full sail in 20–25".
-- **Next — cruising and racing: pick places on the map, change the conditions, and "Send her home"** (feature; 6–10 h
+- ~~**Cruising and racing: pick places on the map, change the conditions, and "Send her home"**~~ (done: a4cc101, ec76fd9, 770fddc, e87d126; item 8 above) (feature; 6–10 h
   in all): owner, "when cruising, I'd like to be able to pick my start and end locations on the map rather than in
   dropdowns. I'd also, when cruising and racing, like to be able to change the conditions without restarting the
   cruise, and in both modes I would like a 'Send her home' feature (copy TBD) that auto-sets her home slip as the
@@ -791,7 +787,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   item. Looks only, no effect on the physics; anything that would change the boat (weight, height, skill) stays where
   it is set today. In the members' own pictures and on the water.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
-  - From Marinas, the motor: the outboard's thrust is off her centerline (about 0.45 m out on the bracket, some 180 N·m at full
+  - From Marinas, the motor (on branch motor-thrust, c0a8b4a, no PR yet): the outboard's thrust is off her centerline (about 0.45 m out on the bracket, some 180 N·m at full
     throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
     both real lessons at the dock. And sourced figures for the figure of merit (0.55), reverse (0.5) and the leg's drag.
   - From Charts, after Lime Point (#64): ~~blocky 50 m terrain cliffs along the Marin shore~~ (done: the shore fit and
@@ -816,7 +812,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   sea. Options to show the owner as pictures before building: her on the real Bay water and sky at golden hour; or alone
   in soft studio light on a dark gradient, turning slowly (live on hover, still otherwise); either with her heel and sails
   set as she'd sail, and her own colors. A design change, so the owner picks.
-- **Next — chase view: see the sails clear of the dials** (polish; 1–2 h): owner, "right now in chase view the hull
+- ~~**Chase view: see the sails clear of the dials**~~ (done: fa60fd0, 99eaf29, 01919c1, cd2932f) (polish; 1–2 h): owner, "right now in chase view the hull
   appears to be centered in frame, but I need to be able to see the sails easily. currently too much stuff (dials,
   notifs) sit on top of the sail." Frame her so the whole sail plan sits in the open middle of the screen, clear of
   the dials and messages: the hull low in frame (render/scene.ts chase camera), and the HUD kept out of the sails' area.
@@ -843,7 +839,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   (COLREGS/Inland Rules 25 and 30), and off when the owner switches them off. When they're off, hide the fittings too (the bow lantern, the sternlight
   and any masthead tricolour): owner, "hide the fittings". Also check whether the "big white V" at the
   bow (below) is partly the sidelights' glitter streaks on the water.
-- **Now — the crew, drawn and animated as well as the boat** (accuracy + bug; 10–16 h; in progress: Crew Figures, screenshots to the owner partway; moved up from the unranked
+- **Now — the crew, drawn and animated as well as the boat** (partly done: e8cfc06, 84f9e2b, 597babe, d0dfa45, 407791f, 792cc3a; the rest in PRs #347 and #348) (accuracy + bug; 10–16 h; in progress: Crew Figures, screenshots to the owner partway; moved up from the unranked
   "crew figures and animation"): owner, "crew movement animations are clumsy, ugly, and distracting… we have so much
   beauty and accuracy in this game and the physics of crew movement are super cool, but the animations are complete
   garbage… we need crew drawings and animations to be commensurate with what we have for the boat." Found: (1) the crew
@@ -855,7 +851,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   reference/photos), poses for each job (helm on the aft deck or aft rail per the thwart item, hiking with feet under
   the straps, sitting to leeward, at the winch, at the piano, crossing on a tack), and moves that follow the physics.
   Check from both sides on both tacks.
-- **Now — crystal clarity on the crew and trim controls** (polish/clarity; 4–6 h; Crew Controls, after the bottom-bar layout; merged with the trim controls review
+- ~~**Crystal clarity on the crew and trim controls**~~ (done, as item 3 above: b3124c3, v134) (polish/clarity; 4–6 h; Crew Controls, after the bottom-bar layout; merged with the trim controls review
   below): owner, "I also can't understand the buttons, even after using them for a while. how do I get them to hike on
   the lee? which buttons do what? I can't figure it out… we need crystal clarity on the button controls." The crew row
   (Lee · Mid · Up · Hike, keys 7/8 to step, crewWords.ts) needs plain words for what each place does to the boat
@@ -863,7 +859,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   current tack, and what auto is doing now. Every line's setting, too: owner, "can't tell which way is 'on' for the
   backstay. is 0% on? or 100%?" (100% is on: controls.ts, 0 off … 1 bar tight). Label each end in sailors' words
   (eased … on, or for the traveler windward … leeward) and what that end does to the sail. Layout to the owner first.
-- **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
+- **Next — a broader review of the trim controls** (the band done with item 3; the trim coach on branches ui/trim-coach, design/trim-coach, ui/telltale-words, no PR yet) (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
 - ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-colored water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
