@@ -8,7 +8,7 @@
 .sailband.shut{background:none;border-color:transparent;pointer-events:none}
 .sailband.shut .sb-top > :not(.sb-wx),.sailband.shut .sb-tabs,.sailband.shut .sb-pen{visibility:hidden}
 .sailband.shut .sb-bot{visibility:hidden} /* (kept in the layout: the windex stays where it was, not jumping down) */
-.sailband.shut .sb-hail,.sailband.shut .sb-hoist{pointer-events:auto}
+.sailband.shut .sb-hail,.sailband.shut .sb-hoist,.sailband.shut .sb-motor{pointer-events:auto}
 .sb-hoist{color:var(--text)!important}
 .sb-hoist.dim{opacity:.55}
 .sailband.off{opacity:.55}
@@ -51,7 +51,6 @@ body.pilot-on #bHome{display:none}
   body #helmBar #pilot .pl-read{grid-column:span 3;max-width:none;font-size:10px}
 }
 #helmBar #pilot .pl-read{grid-column:span 2;min-width:0;max-width:92px;padding:0 2px;font-size:11px;overflow:hidden;text-overflow:ellipsis}
-.sb-tillerslot #motorHead{position:absolute;left:0;bottom:calc(100% + 30px);width:max-content;max-width:640px;z-index:3;margin:0}
 .sailband.shut .sb-tillerslot{pointer-events:auto}
 .sb-tab{display:flex;align-items:center;gap:6px;height:22px;box-sizing:border-box;padding:0 9px!important;font:700 10px/1 var(--f-inst)!important;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(9,22,33,.86)!important;border:1px solid var(--rule)!important;border-bottom:0!important;border-radius:7px 7px 0 0;color:var(--muted)!important;white-space:nowrap}
@@ -64,6 +63,19 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
 .sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}
 .sb-hail .k{font-size:9.5px;border:1px solid rgba(26,18,5,.5);border-radius:3px;padding:1px 3px}
+/* her outboard (the owner, v193: the floating head hid her hull): a tab, its buttons outlined so they read as buttons */
+.sb-motor{gap:3px;padding:0 4px 0 9px!important;color:var(--text)!important}
+.sb-motor.on .mo-n{color:var(--accent)}
+.sb-motor .mo-n{margin-right:3px}
+.sb-motor .mo-g{display:flex;gap:2px}
+.sb-motor .mo-g[hidden],.sb-motor [hidden]{display:none}
+.sailband .sb-motor button{height:17px;min-width:17px;padding:0 5px;border:1px solid var(--rule);border-radius:4px;color:var(--text);font:700 9.5px/1 var(--f-inst);letter-spacing:.06em}
+.sailband .sb-motor button:hover{border-color:var(--text)}
+.sailband .sb-motor button[aria-pressed="true"],.sailband .sb-motor button.on{border-color:var(--accent);color:var(--accent)}
+.sailband .sb-motor button.refused{border-color:var(--caution);color:var(--caution)}
+.sailband .sb-motor button:disabled{cursor:default;opacity:.5}
+.sailband .sb-motor button.pend{opacity:1;border-color:var(--accent);color:var(--accent)}
+.sb-motor .mo-thr{min-width:30px;text-align:center;font-variant-numeric:tabular-nums}
 .sb-pen{color:var(--accent)!important;cursor:default}
 /* the windex between the two vangs: looking up at the masthead */
 .sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}

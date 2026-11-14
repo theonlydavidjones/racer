@@ -97,7 +97,6 @@
     <button class="ib" id="bCourse" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 17V3"/><path d="M5 4h9l-2 3 2 3H5"/></svg><span class="w">Course</span></button>
     <button class="ib" id="bPilot" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5.5l2 5.5h-4Z"/></svg><span class="w">Autopilot</span></button>
     <button class="ib" id="bHome" type="button" hidden title="Send her back to her home slip"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 9.5 10 4l6.5 5.5"/><path d="M5.5 8v8h9V8"/><path d="M8.5 16v-4h3v4"/></svg><span class="w">Home</span></button>
-    <button class="ib" id="bMotor" type="button" hidden title="Her outboard: tilt, start, gear and throttle"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3h5v5H8z"/><path d="M10.5 8v7"/><path d="M8 15h5"/><path d="M10.5 15v2.5"/><path d="M7.5 17.5h6"/></svg><span class="w">Motor</span></button>
   </div>
   <div class="row2">
     <div class="tiller" id="tiller" role="slider" aria-label="Tiller: drag right to push it to starboard (turns to port)" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0" tabindex="0">
@@ -114,17 +113,6 @@
       <button class="tp-btn" type="button" data-pa="1">+1</button><button class="tp-btn" type="button" data-pa="10">+10</button>
       <button class="tp-btn" type="button" data-pa="tack" title="Auto: turn 100° through the wind · Wind: the same angle on the other tack">Tack</button>
       <button class="tp-btn" type="button" data-pa="off" title="Hand the tiller back to you">Standby</button>
-    </div>
-    <!-- her outboard (boat/motor.ts): its control head, beside the tiller (you steer with the tiller, by the rudder) -->
-    <div class="pilot motorhead" id="motorHead" hidden role="group" aria-label="Outboard">
-      <span class="pl-lab" id="motorLab">Motor</span>
-      <button class="tp-btn" type="button" data-mo="tilt" id="bMoTilt" title="Tilt the motor down into the water, or up clear of it">Tilt down</button>
-      <button class="tp-btn" type="button" data-mo="start" id="bMoStart" title="Pull-start it (in neutral) or stop it">Start</button>
-      <span class="tp-seg" id="moGears"><button class="tp-btn" type="button" data-mg="F" title="Ahead">F</button><button class="tp-btn" type="button" data-mg="N" title="Neutral">N</button><button class="tp-btn" type="button" data-mg="R" id="bMoR" title="Astern">R</button></span>
-      <button class="tp-btn" type="button" data-mo="swivel" id="bMoSwivel" hidden title="The 2.5 has no reverse gear: turn it round on its bracket to push astern">Swivel</button>
-      <label class="mo-thr">Throttle <input type="range" id="moThrottle" min="0" max="100" step="5" value="0" aria-label="Throttle"></label>
-      <span class="pl-read" id="motorRead"></span>
-      <button class="tp-btn" type="button" data-mo="castoff" id="bMoCastOff" hidden title="The crew casts off her lines: she's yours to motor out">Cast off</button>
     </div>
   </div>
 </div>

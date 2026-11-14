@@ -2003,10 +2003,10 @@ export class World {
     return 'ok';
   }
   motorStop(): void { const m = this.user.motor; if (!m) return; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; }
-  /** Into gear: F, N or R (the 2.5 has no reverse: swivel it round instead). Shifting is done at tick-over. */
+  /** Into gear: F, N or R (the 2.5 and the 3.5 have no reverse: swivel it round instead). Shifting is done at tick-over. */
   motorGear(g: 'F' | 'N' | 'R'): void {
     const m = this.user.motor; if (!m) return;
-    if (g === 'R' && !OUTBOARDS[m.hp].reverse) { this.emit({ type: 'toast', msg: 'The 2.5 has no reverse gear: swivel it round on its bracket to push astern.', ms: 3500 }); return; }
+    if (g === 'R' && !OUTBOARDS[m.hp].reverse) { this.emit({ type: 'toast', msg: `The ${m.hp} has no reverse gear: swivel it round on its bracket to push astern.`, ms: 3500 }); return; }
     if (g !== m.gear) m.throttle = Math.min(m.throttle, 0.15);
     m.gear = g;
   }
@@ -2023,7 +2023,7 @@ export class World {
     const u = this.user, m = u.motor;
     if (!u.docked || !m?.running) return false;
     u.docked = undefined; u.v = 0; u.astern = 0;
-    this.emit({ type: 'toast', msg: 'Lines in: she\'s yours. Motor her out (reverse to back out of a slip), then hoist sail and stop the motor.', ms: 5000 });
+    this.emit({ type: 'toast', msg: 'Lines in: she\'s yours. Motor her out (astern to back out of a slip), then hoist sail and stop the motor.', ms: 5000 });
     return true;
   }
   private motorStep(dt: number): void {
