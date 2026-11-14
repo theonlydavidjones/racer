@@ -226,27 +226,26 @@ const inPolyV = (P: Vec[], p: Vec): boolean => { let c = false; for (let i = 0, 
 const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly, p)) return B; return null; };
 /**
  * The tide's height (m above MLLW) at p and a time (ms UTC), for the water's depth over the chart's soundings. On each
- * bay's depth grid (depthBand) it's that bay's own station's, the one that fills the bay (BAYS): Point San Quentin
- * (9414873) on San Rafael Bay's, the nearest NOAA prediction station on its open water (Corte Madera Creek's, 9414874,
- * is up the creek on the flats beyond it), and San Leandro Channel (9414724, inside the grid) on San Leandro Bay's. Both
- * come 42–52 minutes after San Francisco, at 0.93–1.16 of its height (bay-tides.json, NOAA's offsets): at a low water
- * on a big tide, San Leandro Bay's flats are still dry when the City's tide has turned. Elsewhere, San Francisco's
- * (9414290). Across a grid's outer GRID_BLEND m the two are blended, so the water has no step in it where a grid ends.
+ * bay's depth grid (depthBand) it's that bay's own station's, the one the bay's stream fills it by (BAYS), so the water
+ * over a flat is the same to a boat's keel as to the current: Point San Quentin (9414873) on San Rafael Bay's (Corte
+ * Madera Creek's, 9414874, at the creek's mouth on the grid's south-west, has datums within a centimeter of it), and San
+ * Leandro Channel (9414724, inside the grid) on San Leandro Bay's. Both come 42–52 minutes after San Francisco, at
+ * 0.93–1.16 of its height (bay-tides.json, NOAA's offsets). Over a whole grid, to its edges: the tide just outside them
+ * isn't San Francisco's either (Point Orient's, Point San Pedro's, Oakland Airport's are as late), and off a grid the
+ * chart's depth comes from elsewhere anyway. Elsewhere, San Francisco's (9414290).
  */
 export function tideHeightAt(p: Vec, ms: number): number {
-  const sf = sfTide(ms), g = gridAt(p);
-  if (!g) return sf;
-  const w = Math.min(1, g.inside / GRID_BLEND);
-  return w <= 0 ? sf : sf + (bayTide(g.station, ms).h - sf) * w;
+  const station = gridStation(p);
+  return station ? bayTide(station, ms).h : sfTide(ms);
 }
-const GRID_BLEND = 500;
-/** The depth grid p is on: its bay's tide station, and how far inside the grid's edge p is (m). */
+/** Each depth grid's bay's tide station. */
 const GRID_STATIONS = DGRIDS.map(G => { const B = BAYS.find(b => b.name === G.name); if (!B) throw new Error(`depth grid ${G.name}: no bay`); return B.station; });
-function gridAt(p: Vec): { station: string; inside: number } | null {
+/** The tide station of the depth grid p is on (as depthBand finds it), or null. */
+function gridStation(p: Vec): string | null {
   const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
   for (let k = 0; k < DGRIDS.length; k++) { const G = DGRIDS[k];
-    if (lat < G.south || lat > G.north || lon < G.west || lon > G.east) continue;
-    return { station: GRID_STATIONS[k], inside: Math.min((lat - G.south) * D_MLAT, (G.north - lat) * D_MLAT, (lon - G.west) * D_MLON, (G.east - lon) * D_MLON) };
+    const i = Math.floor((lon - G.west) / (G.east - G.west) * G.nx), j = Math.floor((G.north - lat) / (G.north - G.south) * G.ny);
+    if (i >= 0 && j >= 0 && i < G.nx && j < G.ny) return GRID_STATIONS[k];
   }
   return null;
 }
