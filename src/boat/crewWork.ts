@@ -32,6 +32,8 @@ type Ctl = Exclude<keyof Controls, 'car'>;
 /** The lines in the order they're seen to: sheets first, then the main's power, then shape. */
 export const PRIORITY: readonly Ctl[] = ['jibsheet', 'mainsheet', 'traveller', 'backstay', 'vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'];
 const PIANO = new Set<string>(['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard']);
+/** PIANO in its own order, as a list to loop over (the hot path: no spread each step). */
+const PIANO_LIST: readonly Ctl[] = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'];
 /** The cabin-top lines led to both sides (controls.ts: vang, outhaul and jib Cunningham are dual-ended): worked from the windward side deck. */
 const BOTH_SIDES = new Set<string>(['vang', 'outhaul', 'jibCunningham']);
 /**
@@ -81,9 +83,10 @@ const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+const NO_WAITS: readonly string[] = [], CREW_WAITS: readonly string[] = ['cunningham', 'downhaul', 'jibHalyard'], ALONE_WAITS: readonly string[] = [...PIANO];
 export function waitingLines(c: CrewState): readonly string[] {
-  if (c.place?.across == null) return [];
-  return c.spec.crew.length ? ['cunningham', 'downhaul', 'jibHalyard'] : [...PIANO];
+  if (c.place?.across == null) return NO_WAITS;
+  return c.spec.crew.length ? CREW_WAITS : ALONE_WAITS;
 }
 
 /** How far in the jib sheet has to come (of its range) for the trimmer to go to the winch: the haul after a tack, when the
@@ -107,13 +110,22 @@ export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): numbe
 /** Where the crew are along the deck (crewPhys.ts chooseLayout): in the cockpit, the bow hand at the mast, or both up on the foredeck. */
 export type Forward = 'cockpit' | 'mast' | 'foredeck';
 /** How far forward the crew sit (0 aft … 1 forward of the winch): where you've put them, else their own call (crewPhys.ts chooseFore). */
-const foreOf = (c: CrewState): number => c.place?.fore ? { fwd: 1, mid: 0.5, aft: 0, deck: 1 }[c.place.fore] : c.fore01 ?? 0.5;
+function foreOf(c: CrewState): number {
+  const f = c.place?.fore;
+  if (!f) return c.fore01 ?? 0.5;
+  return f === 'fwd' || f === 'deck' ? 1 : f === 'mid' ? 0.5 : 0;
+}
 /** Who works a line (an index into [helm, crew…]): by the number of crew, who has the main (mainHand), and who's forward. */
 export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, layout: Forward = 'cockpit', fwdOfWinch = false): number {
   if (nCrew === 0) return 0;
   // (two crew both forward of the jib winch, light air upwind: the helm takes the main, its sheet led to the thwart
   // behind them; the jib stays the forward crew's, its winch beside them. The owner's call, 14 Nov 2026)
-  const forward = layout !== 'cockpit', main = mainHand(nCrew, spec, forward || fwdOfWinch);
+  return ownerWith(line, nCrew, mainHand(nCrew, spec, layout !== 'cockpit' || fwdOfWinch), layout, fwdOfWinch);
+}
+/** ownerOf with who has the main already worked out (crewJobs: once a step, not for every line). */
+function ownerWith(line: string, nCrew: number, main: number, layout: Forward, fwdOfWinch: boolean): number {
+  if (nCrew === 0) return 0;
+  const forward = layout !== 'cockpit';
   if (line === 'mainsheet' || line === 'traveller') return main;
   if (line === 'backstay') return 0;
   // the jib: the forward crew (with one crew, whichever of the two hasn't the main). With crew gone forward, whoever's
@@ -178,11 +190,44 @@ const DONE = 1e-4;
 /** How fast a person works (multiplier on the controls' rates): their pace, and one-handed if they're steering too. */
 export function workPace(b: Boat, who: number): number {
   const c = b.crew; if (!c) return 1;
-  const p = allAboard(c.spec)[who];
-  // (and the helm with a sheet while the crew are forward: a hand on the tiller, one on the sheet)
-  const n = c.spec.crew.length, helmSheets = (c.layout ?? 'cockpit') !== 'cockpit' || (n === 2 && foreOf(c) >= TWO_FWD);
-  return pace(p) * (who === 0 && (n === 0 || helmSheets) ? 0.6 : 1);
+  const n = c.spec.crew.length;
+  return paceOf(who === 0 ? c.spec.helm : c.spec.crew[who - 1], who, n, helmSheetsOf(c, n));
 }
+/** (the helm with a sheet while the crew are forward: a hand on the tiller, one on the sheet) */
+const helmSheetsOf = (c: CrewState, n: number) => (c.layout ?? 'cockpit') !== 'cockpit' || (n === 2 && foreOf(c) >= TWO_FWD);
+const paceOf = (p: Person, who: number, n: number, helmSheets: boolean) => pace(p) * (who === 0 && (n === 0 || helmSheets) ? 0.6 : 1);
+const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
+/** Who works a line now (crewJobs): its owner, or with the forward hand away at the cabin top or a car, the middle crew on the jib sheet meanwhile. */
+function workerOf(c: CrewState, n: number, fwdL: Forward, ahead: boolean, main: number, k: string): number {
+  const o = ownerWith(k, n, main, fwdL, ahead);
+  if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
+    const j = c.people[o]?.job;
+    if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ahead ? 3 - o : ownerWith('mainsheet', n, main, fwdL, ahead); if (m !== o && (!c.people[m]?.job?.station || c.people[m]!.job!.line === 'jibsheet')) return m; }
+  }
+  return o;
+}
+/** Everyone aboard, [helm, crew…]: the crew's own list (crewPhys.ts placeCrew keeps it, c.ppl) while it's still these
+ * people, else made afresh (allAboard), as it was every step. */
+function pplOf(c: CrewState): Person[] {
+  const p = c.ppl, s = c.spec;
+  if (p && p.length === s.crew.length + 1 && p[0] === s.helm) { let same = true; for (let i = 0; i < s.crew.length; i++) if (p[i + 1] !== s.crew[i]) { same = false; break; } if (same) return p; }
+  return allAboard(s);
+}
+/** Whether line `l`'s station is where they kneel now, at `z` (crewJobs: the ones here first). */
+const hereAt = (l: string, who: number, windward: number, z: number) => Math.abs((stationFor(l, who, windward, false)?.z ?? z) - z) < 0.3;
+/** A new point of sail since line `k` was set (crewJobs). */
+const newAngleOf = (c: CrewState, twa: number, k: string) => c.lineTwa?.[k] != null && Math.abs(twa - c.lineTwa[k]) > 20;
+/** A real change for line `k` since it was set (crewJobs): see LINE_MOVED. */
+function realChangeOf(c: CrewState, twa: number, ls: Record<string, number>, k: string, skill: number): boolean {
+  const ref = c.lineRef?.[k];
+  return ref == null || newAngleOf(c, twa, k) || Math.abs((ls[k] ?? ref) - ref) >= LINE_MOVED * startThreshold(k, skill, ls[k]);
+}
+/** The per-line results crewJobs hands back, kept per boat and filled in afresh each step (read within the step only:
+ * physics.ts trimSails), so a step makes none: a line absent from `want` is undefined, as it was missing before. */
+type Work = { pace: number; to: number };
+type Works = { out: Partial<Record<Ctl, Work>>; cell: Partial<Record<Ctl, Work>> };
+const WORK = new WeakMap<Boat, Works>();
+const put = (wk: Works, k: Ctl, pace: number, to: number) => { const e = wk.cell[k] ??= { pace, to }; e.pace = pace; e.to = to; wk.out[k] = e; };
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
 function reachTime(a: Aboard, st: Station | null, windward: number, p: Person): number {
@@ -196,33 +241,29 @@ function reachTime(a: Aboard, st: Station | null, windward: number, p: Person): 
  * pace it's being worked at (0: nobody on it yet).
  */
 export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number): Partial<Record<Ctl, { pace: number; to: number }>> {
-  const c = b.crew, out: Partial<Record<Ctl, { pace: number; to: number }>> = {};
-  if (!c) { for (const k of Object.keys(want) as Ctl[]) out[k] = { pace: 1, to: want[k]! }; return out; }
-  const n = c.spec.crew.length, ppl = allAboard(c.spec), windward = c.wind;
-  const err = (k: Ctl) => Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
-  const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
+  const c = b.crew;
+  // (the results, per boat, reused: WORK)
+  let wk = WORK.get(b); if (!wk) { wk = { out: {}, cell: {} }; WORK.set(b, wk); }
+  const out = wk.out;
+  for (const k in out) out[k as Ctl] = undefined;
+  if (!c) { for (const k in want) put(wk, k as Ctl, 1, want[k as Ctl]!); return out; }
+  const n = c.spec.crew.length, ppl = pplOf(c), windward = c.wind;
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
-  // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
-  const fwdL: Forward = c.layout ?? 'cockpit', ahead = n === 2 && foreOf(c) >= TWO_FWD;
-  const worker = (k: string) => {
-    const o = ownerOf(k, n, c.spec, fwdL, ahead);
-    if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
-      const j = c.people[o]?.job;
-      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ahead ? 3 - o : ownerOf('mainsheet', n, c.spec, fwdL, ahead); if (m !== o && (!c.people[m]?.job?.station || c.people[m]!.job!.line === 'jibsheet')) return m; }
-    }
-    return o;
-  };
+  // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for):
+  // workerOf
+  const fwdL: Forward = c.layout ?? 'cockpit', ahead = n === 2 && foreOf(c) >= TWO_FWD, twa = b.twa ?? 0;
+  const main = mainHand(n, c.spec, fwdL !== 'cockpit' || ahead);
   // finish or drop jobs on lines that are done, or that you've taken. A control line is set to where the crew wanted it
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
-  c.people.forEach((a, i) => {
-    const j = a.job; if (!j) return;
+  for (let i = 0; i < c.people.length; i++) {
+    const a = c.people[i], j = a.job; if (!j) continue;
     // (a sheet that's no longer theirs, as the crew go forward and the helm takes the main: let go. A sheet follows the
     // wind, so it's never done; held, the bow hand at the mast kept the main, the helm the jib, and neither was trimmed)
     // (the jib held for the forward hand while they're at the cabin top is the middle crew's until they're back: worker)
-    if (sheetOf(j.line) && worker(j.line) !== i && ownerOf(j.line, n, c.spec, fwdL, ahead) !== i) { a.job = null; return; }
+    if (sheetOf(j.line) && workerOf(c, n, fwdL, ahead, main, j.line) !== i && ownerWith(j.line, n, main, fwdL, ahead) !== i) { a.job = null; continue; }
     // (placed by you: they leave a tweak they'd have to leave their place for, and work the dual-ended lines from there)
-    if (waits.includes(j.line) && !j.big) { a.job = null; return; }
+    if (waits.includes(j.line) && !j.big) { a.job = null; continue; }
     if (placed && BOTH_SIDES.has(j.line)) j.station = null;
     if (j.line in want) {
       const to = sheetOf(j.line) ? want[j.line as Ctl]! : j.to ?? want[j.line as Ctl]!;
@@ -236,7 +277,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       }
     }
     else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
-  });
+  }
   // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
   // times a second: quicker than anyone reacts)
   c.jobT = (c.jobT ?? 0) - dt; c.lineT = (c.lineT ?? 0) + dt;
@@ -248,20 +289,23 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const ls = c.lineSlow ??= {};
   // (and her angle over the same 20 s: whether she has turned since the lasting wish began to lag)
   if (look) c.twa20 = c.twa20 == null ? b.twa ?? 0 : c.twa20 + ((b.twa ?? 0) - c.twa20) * Math.min(1, c.lineT / LINE_TAU);
-  if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; delete ls[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); ls[k] = ls[k] == null ? w : ls[k] + (w - ls[k]) * Math.min(1, c.lineT / LINE_GAP); } c.lineT = 0; }
+  if (look) {
+    const fT = Math.min(1, c.lineT / LINE_TAU), fG = Math.min(1, c.lineT / LINE_GAP);
+    for (const k of PIANO_LIST) {
+      if (!(k in want)) { delete lw[k]; delete ls[k]; continue; }
+      const w = want[k]!, l0 = lw[k], s0 = ls[k];
+      lw[k] = l0 == null ? w : l0 + (w - l0) * fT; ls[k] = s0 == null ? w : s0 + (w - s0) * fG;
+    }
+    c.lineT = 0;
+  }
   // (a new point of sail since the line was set; or their wish for it over the cycle well away from where they set
   // it: a real change. Against where it was set, not the wish then: a line set right through for a puff, the wish went
   // back to where it was and the line was left at the puff's setting for good (the physics review). A line not yet
-  // set is not a new point of sail: as she starts, its first trip waits like any other)
-  const newAngle = (k: string) => c.lineTwa?.[k] != null && Math.abs((b.twa ?? 0) - c.lineTwa[k]) > 20;
-  const realChange = (k: string, skill: number) => {
-    const ref = c.lineRef?.[k];
-    return ref == null || newAngle(k) || Math.abs((ls[k] ?? ref) - ref) >= LINE_MOVED * startThreshold(k, skill, ls[k]);
-  };
+  // set is not a new point of sail: as she starts, its first trip waits like any other): newAngleOf, realChangeOf
   if (look) for (const k of PRIORITY) {
     if (!(k in want)) continue;
-    const who = worker(k), a = c.people[who]; if (!a) continue;
-    const skill = attrOf(ppl[who], 'trim'), e = err(k);
+    const who = workerOf(c, n, fwdL, ahead, main, k), a = c.people[who]; if (!a) continue;
+    const skill = attrOf(ppl[who], 'trim'), e = Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
     if (a.job?.line === k) continue;
     let urgentTo = false;
     if (PIANO.has(k)) {
@@ -277,9 +321,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the
       // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed; and only
       // for a line here they'd see to now: off, and for a real change)
-      if (there && !a.job) {
-        const zOf = (l: string) => stationFor(l, who, windward, false)?.z ?? a.z, here = (l: string) => Math.abs(zOf(l) - a.z) < 0.3;
-        if (!here(k) && [...PIANO].some(l => l !== k && here(l) && l in want && worker(l) === who && Math.abs((lw[l] ?? want[l as Ctl]!) - b.ctl[l as Ctl]) >= startThreshold(l, skill, want[l as Ctl]) && realChange(l, skill))) continue;
+      if (there && !a.job && !hereAt(k, who, windward, a.z)) {
+        let other = false;
+        for (const l of PIANO_LIST) {
+          if (l !== k && hereAt(l, who, windward, a.z) && l in want && workerOf(c, n, fwdL, ahead, main, l) === who && Math.abs((lw[l] ?? want[l]!) - b.ctl[l]) >= startThreshold(l, skill, want[l]) && realChangeOf(c, twa, ls, l, skill)) { other = true; break; }
+        }
+        if (other) continue;
       }
       // (the waits are for the walk: a line they reach from where they sit, placed by you, they work when it's off)
       // (and none of it for a line knocked off, or wanted well away from where it is, now and lately both: a new point of
@@ -287,10 +334,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (placed by you, they have their own rule for a trip, PLACED_TRIP's big change: these waits are for the crew on auto)
       // (a new point of sail since this line was last set, more than 20° of the wind's angle: rounding a mark, bearing
       // away, coming up: the trim wanted is new, so it's seen to now, not after the waits)
-      const newCourse = newAngle(k);
+      const newCourse = newAngleOf(c, twa, k);
       // (a walk for a real change: a new point of sail, their wish over the cycle well away from the setting (LINE_MOVED), or a line
       // they've not set yet. Urgent too: the wish over the cycle well off counts only once it has moved since the set)
-      const real = realChange(k, skill);
+      const real = realChangeOf(c, twa, ls, k, skill);
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
@@ -336,13 +383,14 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (PIANO.has(k) && placed) (c.lineSet ??= {})[k] = c.clock ?? 0; // (placed by you: as before, from setting off)
   }
   // work: whoever's at their line works it
-  for (const k of Object.keys(want) as Ctl[]) {
-    const who = worker(k), a = c.people[who];
-    if (k === 'jibsheetW') { out[k] = { pace: workPace(b, who), to: want[k]! }; continue; } // letting the lazy sheet fly is a flick of the wrist
+  const helmSheets = helmSheetsOf(c, n);
+  for (const kk in want) {
+    const k = kk as Ctl, who = workerOf(c, n, fwdL, ahead, main, k), a = c.people[who];
+    if (k === 'jibsheetW') { put(wk, k, paceOf(ppl[who], who, n, helmSheets), want[k]!); continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {
-      if (j.reach > 0) { j.reach -= dt; out[k] = { pace: 0, to }; } else out[k] = { pace: workPace(b, who), to };
-    } else out[k] = { pace: 0, to };
+      if (j.reach > 0) { j.reach -= dt; put(wk, k, 0, to); } else put(wk, k, paceOf(ppl[who], who, n, helmSheets), to);
+    } else put(wk, k, 0, to);
   }
   carJob(b, dt);
   return out;
@@ -401,8 +449,10 @@ function carJob(b: Boat, dt: number): void {
   if (!yours && a.z < Z.mast - 0.5) return;
   // (and at the cabin top, the lines there they still want come first: one stop for all of them, then the car on the
   // way forward, not to the car and back again. The cabin-top jobs are handed out 20 times a second, this every step)
-  const ctl = b.ctl as unknown as Record<string, number>, lw = c.lineWant ?? {};
-  if (!yours && a.pose === 'piano' && [...PIANO].some(k => lw[k] != null && ownerOf(k, n, c.spec, c.layout ?? 'cockpit', n === 2 && foreOf(c) >= TWO_FWD) === who && Math.abs(lw[k] - ctl[k]) >= startThreshold(k, skill, lw[k]))) return;
+  if (!yours && a.pose === 'piano') {
+    const lw = c.lineWant;
+    if (lw) for (const k of PIANO_LIST) if (lw[k] != null && ownerOf(k, n, c.spec, c.layout ?? 'cockpit', n === 2 && foreOf(c) >= TWO_FWD) === who && Math.abs(lw[k] - b.ctl[k]) >= startThreshold(k, skill, lw[k])) return;
+  }
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side, target: { ...want } };
 }
 

@@ -38,9 +38,10 @@ function cruise(twa: number, kt: number, mins: number) {
   const ws: Watch[] = figs.map(() => ({ secs: 0, trips: 0, poses: 0, knee: 0, lean: 0, crawl: 0, cross: 0, spin: 0, turned: 0, hist: [], dance: 0 }));
   let lastTurn = 0, side = Math.sign(u.rel), tack = u.tack;
   // (a crewmate going up to the mast or back from it: the moment the others share changes, and one of them may cross to
-  // keep her heel where it's wanted. One such crossing each, within MAST_CROSS s of it, toward where the physics has them)
+  // keep her heel where it's wanted. One such crossing each, within MAST_CROSS s of it, toward where the physics has them:
+  // long enough for the walk back from the mast, about 3 m, before the helm gives the main back and settles)
   let layout = u.crew!.layout ?? 'cockpit', mastAt = -1e9, mastEvents = 0;
-  const MAST_CROSS = 6;
+  const MAST_CROSS = 10;
   while (w.t < mins * 60) {
     w.step(DT);
     syncCrew(cr, u.rel >= 0 ? 1 : -1, u.crew, DT, false, undefined, u.heel, u.tacking);
