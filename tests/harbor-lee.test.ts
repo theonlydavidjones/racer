@@ -56,7 +56,7 @@ describe('the lee of the harbors\' walls and Fort Mason\'s sheds', () => {
       expect(kt(c), `under ${P.name}`).toBeGreaterThan(0.5); // (was 0: the pier's outline was shore to the water)
     }
     const e = LL(37.80795, -122.43272), at = (d: number) => kt({ x: e.x, y: e.y - d }); // (south of the mouth: into the cove)
-    expect(at(-20)).toBeGreaterThan(1); // 20 m outside: the Bay's stream (2.5 kt preset, eased by the shore)
+    expect(at(-100)).toBeGreaterThan(1); // 100 m out, past Pier 1's head: the Bay's stream (2.5 kt preset, eased by the shore; nearer in, on the ebb, the water has come through the pier's piles)
     expect(at(40)).toBeLessThan(0.35); // five boat lengths in: sheltered
     expect(at(150)).toBeLessThan(0.15);
   });
