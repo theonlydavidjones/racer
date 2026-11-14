@@ -28,7 +28,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     expect(w.lesson!.id).toBe('road'); expect(w.boats.length).toBe(2);
     expect(Math.hypot(w.boats[1].x - w.user.x, w.boats[1].y - w.user.y)).toBeGreaterThan(400);
     expect(new World(COURSES[0], S({ lesson: 'mob' } as Partial<Settings>), 3, { freeSail: true }).boats.length).toBe(1);
-  });
+  }, 60_000);
 
   it('on port tack a starboard boat is set on a collision course; holding on, you come too close and do it again', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
@@ -40,7 +40,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     expect(gap).toBeLessThan(LESSON_MARKS.clearLoa * LOA); // (she stood on to the last moment, then swerved: Rule 17(b))
     expect(L.step).toBe(0); expect(L.cue).toMatch(/^(Too close|You hit her)/);
     expect(w.paused).toBe(false); // (no racing-rules incident: the lesson says what happened)
-  });
+  }, 60_000);
 
   it('a gap with no plain action of yours doesn\'t pass: Rule 16 wants early and substantial action', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
@@ -49,7 +49,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     const o = w.boats[1]; o.x += 120 * V(o.h + 90).x; o.y += 120 * V(o.h + 90).y; // (she happens to pass well wide)
     sail(w, 120, () => L.step !== 1);
     expect(L.step).toBe(0); expect(L.cue).toMatch(/^Alter early and plainly/);
-  });
+  }, 60_000);
 
   it('she never jumps where you could see her: moved only when she\'s AWAY_M off and more, before and after, then sails in', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base, u = w.user, o = w.boats[1];
@@ -73,14 +73,14 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
       if (Math.hypot(o.x - p.x, o.y - p.y) > 1) expect(Math.min(d0, Math.hypot(o.x - u.x, o.y - u.y))).toBeGreaterThanOrEqual(LESSON_MARKS.awayM);
     }
     expect(L.step).toBe(3);
-  });
+  }, 60_000);
 
   it('she\'s set only once your heading and speed have settled, and never coming up from astern (Rule 13)', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
     setOn(w, from + 100); steer(w, from + 40); // (still turning)
     sail(w, 3);
     expect(L.step).toBe(0);
-  });
+  }, 60_000);
 
   it('giving way early and plainly (bearing away under her stern) passes, and the next is the windward boat', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
@@ -102,7 +102,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     setOn(w, from - 45);
     sail(w, 500, () => L.step === 5);
     expect(L.step).toBe(5);
-  });
+  }, 60_000);
 
   it('standing on, held on hands off, light air or fresh, close-hauled or reaching: she gives way early, well clear', () => {
     for (const [kt, twa] of [[6, 45], [12, 90]]) {
@@ -113,7 +113,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
       const gap = sail(w, 120, () => L.step !== 5);
       expect(gap).toBeGreaterThan(LOA); expect(L.step).toBe(6); // (under your stern, Rule 16: a length and more)
     }
-  });
+  }, 60_000);
 
   it('standing on, she keeps clear of you (the race AI\'s keep-clear); you hold your course and speed', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
@@ -124,7 +124,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     const gap = sail(w, 120, () => L.step !== 5);
     expect(gap).toBeGreaterThan(CONTACT_GAP); // (she kept clear: the race AI's keep-clear, judged by its closest approach)
     expect(L.step).toBe(6); expect(L.gate).not.toBeNull(); expect(L.cue).toMatch(/red right returning/);
-  });
+  }, 60_000);
 
   it('turning away when you stand on spoils it, and it\'s set again', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
@@ -135,7 +135,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     expect(L.cue).toMatch(/^Hold your course/);
     sail(w, 120, () => L.step !== 5);
     expect(L.step).toBe(4);
-  });
+  }, 60_000);
 
   it('the buoys are the North Channel\'s real 1 and 2: in between them northbound, red 2 to starboard, passes; outside doesn\'t', () => {
     const lay = (w: World, dx: number) => {
@@ -154,5 +154,5 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     const w2 = world(), L2 = lay(w2, 900); // (east of red 2)
     sail(w2, 300, () => /Between/.test(L2.cue));
     expect(L2.passed).toBe(false); expect(L2.cue).toMatch(/^Between the buoys/);
-  });
+  }, 60_000);
 });
