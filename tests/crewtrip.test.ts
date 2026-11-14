@@ -19,7 +19,7 @@ function race(kt: number, secs: number, seed = 3) {
   const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0, mode: 'race', fleet: 2, opponents: ['stock:1', 'stock:2'] } as Settings;
   const w = new World(COURSES[0], S, seed, {}), b = w.boats.find(x => !x.isUser)!;
   const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [1, 2, 3], 1), figs = [cr.helm, ...cr.crew];
-  type P = { hip: number[]; v: number[]; feet: number[][]; hands: number[][] };
+  type P = { hip: number[]; v?: number[]; feet: number[][]; hands: number[][] };
   const prev: (P | undefined)[] = figs.map(() => undefined);
   const out = figs.map(() => ({ slide: 0, slideFast: 0, maxHip: 0, maxLimb: 0, maxAcc: 0 }));
   while (w.t < secs) {
@@ -28,12 +28,14 @@ function race(kt: number, secs: number, seed = 3) {
     if (w.t < 5) continue; // (from the start: everyone put straight in their places)
     figs.forEach((f, i) => {
       const c = f.cur!, o = out[i], q = prev[i];
-      const now: P = { hip: [c.hip.x, c.hip.y, c.hip.z], v: [0, 0], feet: c.feet.map(p => [p.x, p.y, p.z]), hands: c.hands.map(p => [p.x, p.y, p.z]) };
+      const now: P = { hip: [c.hip.x, c.hip.y, c.hip.z], feet: c.feet.map(p => [p.x, p.y, p.z]), hands: c.hands.map(p => [p.x, p.y, p.z]) };
       if (q) {
         const d = (a: number[], z: number[]) => Math.hypot(a[0] - z[0], a[1] - z[1], a[2] - z[2]) / DT;
         now.v = [(now.hip[0] - q.hip[0]) / DT, (now.hip[2] - q.hip[2]) / DT];
         o.maxHip = Math.max(o.maxHip, d(now.hip, q.hip));
-        o.maxAcc = Math.max(o.maxAcc, Math.hypot(now.v[0] - q.v[0], now.v[1] - q.v[1]) / DT);
+        // (from two real velocities: the first frame measured has none before it, and its change from nothing read as a
+        // figure already walking setting off in a frame)
+        if (q.v) o.maxAcc = Math.max(o.maxAcc, Math.hypot(now.v[0] - q.v[0], now.v[1] - q.v[1]) / DT);
         for (let k = 0; k < 2; k++) {
           const a = now.feet[k], z = q.feet[k];
           o.maxLimb = Math.max(o.maxLimb, d(a, z), d(now.hands[k], q.hands[k]));
