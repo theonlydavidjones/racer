@@ -39,3 +39,13 @@ describe('rule 20: the helm signal, the review\'s cases', () => {
     expect(begunTack(B, hail(B, 315), 0, false)).toBe(false);
   });
 });
+
+describe('rule 20: the helm signal going astern', () => {
+  it('in irons with sternway, the blade the other way is the helm put down toward the wind', () => {
+    const B = boat('B', { at: [0, 0], heading: 318 }), hl = { at: 50, headAt: { [B.id]: { h: 315, wind: 0 } } };
+    B.helm = -0.8; (B as { astern?: number }).astern = 0.4; B.v = 0;
+    expect(begunTack(B, hl, 0)).toBe(true);
+    (B as { astern?: number }).astern = 0; B.v = 1;
+    expect(begunTack(B, hl, 0)).toBe(false);
+  });
+});

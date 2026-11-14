@@ -104,7 +104,10 @@ export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number,
   // few degrees of blade. Once started, she's still at it while her bow stays up (the blade eases as the sails help her
   // round, and a dip below HELM_DOWN mid-tack mustn't read as stopping)
   if (Math.abs(wrap(now - b.h)) > HELM_TWA) return false;
-  return up > HELM_UP && (started || Math.sign(wrap(then - at.h)) * (b.helm ?? 0) >= HELM_DOWN);
+  // (going astern, the blade that turns her bow toward the wind lies the other way: physics.ts stores the blade's real
+  // angle, Deep Physics)
+  const helm = (b.helm ?? 0) * ((b.astern ?? 0) > (b.v ?? 0) ? -1 : 1);
+  return up > HELM_UP && (started || Math.sign(wrap(then - at.h)) * helm >= HELM_DOWN);
 }
 
 /**
