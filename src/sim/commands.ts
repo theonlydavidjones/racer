@@ -124,7 +124,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'pole': u.poleWant = c.want; u.poleMine = true; return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
-    case 'lessonReady': w.lesson?.ready(); return;
+    case 'lessonReady': w.lesson?.ready(w.isNight()); return;
     case 'sail': w.setSail(c.sail, c.up); return;
     case 'pilot':
       if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);

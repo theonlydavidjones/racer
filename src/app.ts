@@ -621,7 +621,8 @@ let lessonCue = '', lessonOf: unknown = null;
 /** Before you go's dock card (ui/lessons.ts dockCardHtml): the gear tapped, then Cast off sends the lesson on. */
 let dockFor: unknown = null;
 const dockGear = new Set<string>();
-const paintDock = () => { $('dockCard').innerHTML = dockCardHtml(dockGear, 1 + (S.crew?.people?.length ?? 0)); };
+const paintDock = () => { $('dockCard').innerHTML = dockCardHtml(dockGear, 1 + (S.crew?.people?.length ?? 0), (S.boat?.perf?.outboard ?? 'none') !== 'none'); };
+$('bDockX').onclick = () => { $('lessonCard').hidden = true; setup.openLessons(); }; // (back to the lessons: this one left)
 $('dockCard').addEventListener('click', e => {
   const el = e.target as HTMLElement, g = el.closest<HTMLElement>('[data-gear]')?.dataset.gear;
   if (g) { if (dockGear.has(g)) dockGear.delete(g); else dockGear.add(g); paintDock(); return; }
@@ -1021,7 +1022,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -1356,7 +1357,7 @@ function openHomeNow(): void {
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
-  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'coachPanel']) $(id).hidden = true;
+  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'coachPanel', 'lessonCard', 'lessons']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);

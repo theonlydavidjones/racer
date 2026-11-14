@@ -35,6 +35,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
+import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
@@ -440,7 +441,8 @@ export class World {
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
     // (a sheltered start, a slip, doesn't raise the mean: out on the Bay she'd have it all)
-    if (settings.mode === 'lesson') { this.lessonField = Math.max(1, this.fieldAt(this.boats[0]).k); this.windModel.kt = this.lessonKt(this.windModel.kt); }
+    // (from a slip, the lesson's wind is taken where she'll sail it, out on the Bay off the Cityfront, not in the basin's lee)
+    if (settings.mode === 'lesson') { const at = this.fromSlip ? getPlace('cityfront')?.p ?? this.boats[0] : this.boats[0]; this.lessonField = this.fieldAt(at).k; this.windModel.kt = this.lessonKt(this.windModel.kt); }
     // a lesson: its buoy (the tiller's, steered for; stop, go and irons', stopped by) 250 m off, 20° to leeward of her
     // heading (TWA about 110°, just abaft the beam), where there's water
     this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
@@ -873,6 +875,9 @@ export class World {
     return g.duration;
   }
   private seaNodes?: { d: number; u: number }[];
+
+  /** After sunset or before sunrise (Rule 20: navigation lights on): the sun's center below the horizon. */
+  isNight(): boolean { return sunPosition(this.clockUtc * 60000).el < 0; }
 
   /** A lesson's mean wind held to the standard's range (sim/lessons.ts LESSON_WIND); any other sail's as it is. */
   // (the range is for the wind she sails in, so the mean is held to it over the field's factor where the lesson is: the

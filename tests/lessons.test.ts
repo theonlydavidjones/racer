@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { LESSON_MARKS, LessonTracker } from '../src/sim/lessons';
 import { onLand } from '../src/geo/shore';
+import { slipsIn } from '../src/geo/marina';
 import { KT } from '../src/core/math';
 import type { Boat } from '../src/boat/boat';
 import { testBoat, sail, startTack } from './helpers/testBoat';
@@ -150,7 +151,7 @@ describe('Learn to sail: the lessons\' checks', () => {
     const b = (o: { x?: number; lightsOff?: boolean; up?: boolean; docked?: boolean }) => ({ ...boat({ x: o.x ?? 0 }), lightsOff: o.lightsOff ?? false, docked: o.docked ? { slip: 's' } : undefined,
       rig: { main: o.up ? 1 : 0, jib: o.up ? 1 : 0, mainUp: !!o.up, jibUp: !!o.up } }) as unknown as Boat;
     L.update(b({ lightsOff: true, docked: true }), 0, 1); expect(L.step).toBe(0);
-    L.ready(); expect(L.step).toBe(1);
+    L.ready(true); expect(L.step).toBe(1); // (after dark: lights first)
     L.update(b({ lightsOff: true, docked: true }), 1, 1); expect(L.step).toBe(1);
     L.update(b({ docked: true }), 2, 1); expect(L.step).toBe(2);
     L.update(b({ x: 50 }), 3, 1); expect(L.passed).toBe(false); // (off the dock, sails still down)
@@ -160,5 +161,23 @@ describe('Learn to sail: the lessons\' checks', () => {
   it('in the World: Before you go starts with her lights off', () => {
     const w = new World(COURSES[0], S({ lesson: 'before' }), 3, { freeSail: true });
     expect(w.user.lightsOff).toBe(true); expect(w.lesson!.cue).toMatch(/float plan/);
+  });
+
+  it('before you go by day skips the lights', () => {
+    const L = new LessonTracker('before', null); L.ready(false); expect(L.step).toBe(2);
+  });
+
+  it('in the World: home to the slip, out of the harbor and back in, docks her and passes', () => {
+    const slip = slipsIn('gashouse-cove').find(s => s.kind !== 'alongside')!;
+    const w = new World(COURSES[0], S({ lesson: 'home', sailFrom: 'slip', sailTo: 'slip', boat: { ...DEFAULT_SETTINGS.boat!, slip: slip.id } }), 3, { freeSail: true }), u = w.user;
+    expect(u.docked).toBeTruthy(); expect(w.lesson!.slip).toBeTruthy();
+    // out on the Bay, past the basin
+    Object.assign(u, { docked: undefined, x: slip.p.x, y: slip.p.y + 600, v: 2 }); w.step(DT);
+    expect(w.lesson!.step).toBe(1);
+    // back: a metre short of her berth on its heading, nearly stopped
+    const back = { x: slip.p.x - Math.sin(slip.heading * Math.PI / 180) * 1, y: slip.p.y - Math.cos(slip.heading * Math.PI / 180) * 1 };
+    Object.assign(u, { x: back.x, y: back.y, h: slip.heading, v: 0.4, astern: 0 });
+    for (let i = 0; i < 60 * 20 && !w.lesson!.passed; i++) w.step(DT);
+    expect(u.docked).toBeTruthy(); expect(w.lesson!.passed).toBe(true);
   });
 });

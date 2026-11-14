@@ -3,6 +3,7 @@ import { KT, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
 import { DrillTracker } from './drill';
 import { byHand } from '../boat/physics';
+import { inBasin } from '../geo/marina';
 
 /**
  * Learn to sail (the owner's go, 13 Nov 2026; design/learn-to-sail-mockup.png and design/LEARN-TO-SAIL-PLAN.md): lessons
@@ -66,11 +67,11 @@ export const LESSON_MARKS = {
    * near 2), so the mark is 2 kt. */
   hoveKt: 2, hoveS: 60,
   /** A breeze: in the top of the lesson range (15 kt where she sails), close-hauled with the mainsheet in your own hand,
-   * heel kept under BREEZE_HEEL (a Folkboat sails best at 15–20° of heel; past 25° she's overpowered: boat/coach.ts) and
-   * under way over BREEZE_KT, for BREEZE_S. */
-  breezeHeel: 25, breezeKt: 2.5, breezeS: 60,
-  /** Home to the slip: out of the harbor (OUT_M from the slip), then back in her slip, bow in, made fast. */
-  homeOutM: 150
+   * heel kept under BREEZE_HEEL, the sim's own line for overpowered (boat/coach.ts: heelMag over 20°; a Folkboat sails
+   * best at 15–20°), and under way over BREEZE_KT, for BREEZE_S. Untouched with two crew she's under 20° about three
+   * quarters of the time, alone about a sixth; eased, all of it (the physics review, 14 Nov 2026): the owner may want it
+   * sailed alone, or the easing itself checked. */
+  breezeHeel: 20, breezeKt: 2.5, breezeS: 60
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
@@ -213,11 +214,15 @@ export class LessonTracker {
     if (this.hold(b.twa >= lo && b.twa <= hi && (b.heelMag ?? 0) < LESSON_MARKS.breezeHeel && b.v / KT > LESSON_MARKS.breezeKt, dt, LESSON_MARKS.breezeS)) this.passed = true;
   }
 
-  /** Before you go: the dock card done (the page's command: the gear checked and the float plan left). */
-  ready(): void { if (this.id === 'before' && this.step === 0) { this.step = 1; this.cue = 'Navigation lights on'; } }
+  /** Before you go: the dock card done (the page's command: the gear checked and the float plan left). After dark the
+   * lights go on before leaving (Rule 20: sunset to sunrise); by day that step is skipped. */
+  ready(night = false): void {
+    if (this.id !== 'before' || this.step !== 0) return;
+    if (night) { this.step = 1; this.cue = 'It\'s dark: navigation lights on'; } else { this.step = 2; this.cue = 'Hoist both sails and push off'; }
+  }
 
-  /** Before you go: at the dock, the gear and the float plan (the page's card), lights on (ASA 101 K17; she starts with
-   * them off), then both sails hoisted and off the dock. */
+  /** Before you go: at the dock, the gear and the float plan (the page's card), after dark the lights on (ASA 101 K17;
+   * she starts with them off), then both sails hoisted and off the dock. */
   private before(b: Boat): void {
     if (this.step === 1) { if (!b.lightsOff) { this.step = 2; this.cue = 'Hoist both sails and push off'; } return; }
     if (this.step !== 2) return;
@@ -225,10 +230,11 @@ export class LessonTracker {
     if (up && !b.docked && this.slip && Math.hypot(b.x - this.slip.x, b.y - this.slip.y) > 30) this.passed = true;
   }
 
-  /** Home to the slip: from her slip out past the harbor, and back in, made fast (world.ts intoSlip: stopped, bow in). */
+  /** Home to the slip: from her slip out of the harbor, and back in, made fast (world.ts intoSlip: stopped, bow in). */
   private home(b: Boat): void {
     if (this.step === 0) {
-      if (this.slip && !b.docked && Math.hypot(b.x - this.slip.x, b.y - this.slip.y) > LESSON_MARKS.homeOutM) { this.step = 1; this.cue = 'Now home: sail in and stop in your slip, bow in'; }
+      // (out of the harbor: out of its basin, whatever the slip's depth in it or the marina)
+      if (this.slip && !b.docked && !inBasin(b)) { this.step = 1; this.cue = 'Now home: sail in and stop in your slip, bow in'; }
       return;
     }
     if (b.docked) this.passed = true;
