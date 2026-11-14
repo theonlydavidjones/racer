@@ -765,7 +765,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     let sweep = wrap(desired - b.h);
     const way = helmWay(b, desired);
     if (way !== 0 && Math.sign(sweep) !== way) sweep += way * 360; // (the long way round, as the helm will take her)
-    const n = Math.ceil(Math.abs(sweep) / 5);
+    const n = Math.min(Math.ceil(Math.abs(sweep) / 5), 18); // (5° steps; the long way round, a gybe of 250°, in 18)
     let ok = b.h, i = 1;
     for (; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
     if (i <= n) {
