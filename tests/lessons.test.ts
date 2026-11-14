@@ -121,4 +121,27 @@ describe('Learn to sail: the lessons\' checks', () => {
     for (let i = 0; i < 120 * 60; i++) { w.step(DT); if (i % 30 === 0) { sum += w.user.ww.kt; n++; } }
     expect(sum / n).toBeLessThan(16.5);
   });
+
+  it('a breeze: the mainsheet in hand, then close-hauled a minute with the heel under 25°', () => {
+    const L = new LessonTracker('breeze', null); let t = 0;
+    const b = (o: Parameters<typeof boat>[0] & { heel?: number; hand?: boolean }) => ({ ...boat(o), isUser: true, hand: o.hand ? { mainsheet: true } : {}, heelMag: o.heel ?? 15 }) as unknown as Boat;
+    for (let k = 0; k < 5; k++) L.update(b({ twa: 42 }), t++, 1);
+    expect(L.step).toBe(0); // (the crew has the sheet: not yet)
+    for (let k = 0; k < 30; k++) L.update(b({ twa: 42, hand: true, heel: 30 }), t++, 1);
+    expect(L.step).toBe(1); expect(L.progress).toBe(0); // (laid over at 30°: no)
+    for (let k = 0; k < LESSON_MARKS.breezeS; k++) L.update(b({ twa: 42, hand: true, heel: 18, v: 3 * KT }), t++, 1);
+    expect(L.passed).toBe(true);
+  });
+
+  it('home to the slip: out past the harbor, then back in her slip and made fast', () => {
+    const L = new LessonTracker('home', null); L.slip = { x: 0, y: 0 };
+    L.update({ ...boat({ x: 0 }), docked: { slip: 's' } } as unknown as Boat, 0, 1); expect(L.step).toBe(0);
+    L.update(boat({ x: 200 }), 1, 1); expect(L.step).toBe(1);
+    L.update({ ...boat({ x: 0 }), docked: { slip: 's' } } as unknown as Boat, 2, 1); expect(L.passed).toBe(true);
+  });
+
+  it('a breeze is sailed at the top of the range; home starts in her own slip', () => {
+    const w = new World(COURSES[0], S({ windKt: 8, lesson: 'breeze' }), 3, { freeSail: true });
+    expect(w.wind.kt).toBeGreaterThan(12);
+  });
 });
