@@ -51,14 +51,21 @@ export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: {
   // (the weight the bottom carries: her buoyancy lost to the keel's depth in it, no more than all of her)
   const load = Math.min(mass * GROUND.g, GROUND.rho * GROUND.g * GROUND.awp * into);
   const dv = GROUND.mu * load / mass * dt; // (how much of her speed over the ground the friction takes this step)
-  const vx = b.vx, vy = b.vy, g = Math.hypot(vx, vy);
+  // (her motion over the ground as travel left her: rebuilt from her speed through the water and the stream, as travel
+  // works it out, since a knock against the shore there stops her speed through the water but not b.vx, b.vy)
+  const u0 = V(b.h), s0 = V(b.h + 90), ahead0 = b.v - (b.astern ?? 0), side0 = b.sway ?? 0;
+  const vx = u0.x * ahead0 + s0.x * side0 + b.cur.x, vy = u0.y * ahead0 + s0.y * side0 + b.cur.y, g = Math.hypot(vx, vy);
+  const mx = b.vx, my = b.vy; // (what travel moved her by this step)
   const was = b.aground;
   b.aground = into;
   // her motion over the ground, slowed (stopped, if the friction takes all of it), and where that leaves her this step
   const k = g > dv ? (g - dv) / g : 0, nx = vx * k, ny = vy * k;
-  b.x += (nx - vx) * dt; b.y += (ny - vy) * dt; b.vx = nx; b.vy = ny;
+  // (knocked against the shore this step, travel has already put her where she ends it: only her motion is the mud's)
+  const knocked = Math.abs(mx - vx) + Math.abs(my - vy) > 1e-9;
+  if (!knocked) { b.x += (nx - mx) * dt; b.y += (ny - my) * dt; }
+  b.vx = nx; b.vy = ny;
   // through the water: her motion over the ground less the stream's (held fast, the water runs past her)
-  const u = V(b.h), s = V(b.h + 90), rx = nx - b.cur.x, ry = ny - b.cur.y, ahead = rx * u.x + ry * u.y;
+  const u = u0, s = s0, rx = nx - b.cur.x, ry = ny - b.cur.y, ahead = rx * u.x + ry * u.y;
   b.v = Math.max(0, ahead); b.astern = Math.max(0, -ahead); b.sway = rx * s.x + ry * s.y;
   if (b.isUser && was === undefined && t - toast.t > 4) { toast.t = t; emit({ type: 'toast', msg: `Aground on the mud: ${w!.toFixed(1)} m of water, and she draws ${keelDepth(b).toFixed(2)} m.` }); }
 }

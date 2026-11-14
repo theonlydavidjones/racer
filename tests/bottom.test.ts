@@ -47,6 +47,23 @@ describe('the Bay\'s shoal bottom, from the chart', () => {
   });
 });
 
+describe('toward the shore', () => {
+  it('the flats run on into the shore, shoaling or level, not deepening at the beach (land beside them isn\'t read as deep)', () => {
+    let n = 0, deeper = 0;
+    for (let la = 37.74; la < 37.98; la += 0.004) for (let lo = -122.55; lo < -122.19; lo += 0.004) {
+      const p = LL(la, lo); if (onLand(p)) continue; const z0 = bottomDepth(p); if (z0 === null || z0 > 1) continue;
+      // (the nearest shore, of 24 bearings, within 400 m; 3 m off it)
+      let best: { d: number; u: { x: number; y: number } } | null = null;
+      for (let a = 0; a < 360; a += 15) { const u = { x: Math.cos(a * Math.PI / 180), y: Math.sin(a * Math.PI / 180) }; for (let d = 2; d < 400; d += 2) if (onLand({ x: p.x + u.x * d, y: p.y + u.y * d })) { if (!best || d < best.d) best = { d, u }; break; } }
+      if (!best || best.d < 20) continue;
+      const z1 = bottomDepth({ x: p.x + best.u.x * (best.d - 3), y: p.y + best.u.y * (best.d - 3) });
+      n++; if (z1 === null || z1 > z0 + 0.3) deeper++;
+    }
+    expect(n).toBeGreaterThan(100);
+    expect(deeper / n).toBeLessThan(0.1); // (a few really do: a dredged channel or a marina's basin along the shore; it was half of them)
+  }, 120_000);
+});
+
 describe('shoal: too shallow for her, for the planner', () => {
   it('Richardson Bay\'s flat at the day\'s low water and not at its high; the race water never', () => {
     const p = LL(37.880, -122.505), day = Date.UTC(2026, 10, 14, 8);

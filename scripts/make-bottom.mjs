@@ -14,7 +14,8 @@
  *   node scripts/make-bottom.mjs
  *
  * Output: src/environment/data/bottom.json: 32 × 32 cell tiles (only those with shoal water), each cell a byte (runs of
- * 0 packed: a 0 then how many): 0 not shoal (deep, or land), else the depth below MLLW = (byte − 1) × STEP + OFF; cells centered at (i + 0.5, j + 0.5) from
+ * 0 and 255 packed: the byte then how many): 0 known deep (a depth area from 3 m down), 255 no depth area (land, or water
+ * the chart doesn't sound), else the depth below MLLW = (byte − 1) × STEP + OFF; cells centered at (i + 0.5, j + 0.5) from
  * the box's north-west corner, rows north to south. No network.
  */
 import { readFile, writeFile } from 'node:fs/promises';
@@ -29,8 +30,7 @@ const bands = [...new Set(enc.depth.map(b => b.d))].sort((a, b) => a - b);
 
 // each cell's band (shoal edge, deep edge), scanline-filled from the depth areas (as make-depth-grid.mjs)
 const d1 = new Float32Array(nx * ny).fill(NaN), d2 = new Float32Array(nx * ny).fill(NaN);
-for (const band of enc.depth) {
-  if (band.d >= SHOAL) continue;
+for (const band of enc.depth) { // (every band, the deep ones too: a deep cell beside the shoal is known deep, not land)
   const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10;
   for (const poly of band.p) {
     const rings = poly.map(dec), lats = rings.flat().map(p => p[1]);
@@ -63,17 +63,19 @@ const bottomAt = (i, j, lo, hi) => {
   return w > 0 ? s / w : (lo + hi) / 2;
 };
 
-/** Runs of empty cells packed: a 0 is followed by how many (1–255) there are. */
-const rle = g => { const out = []; for (let k = 0; k < g.length;) { if (g[k]) { out.push(g[k++]); continue; } let n = 0; while (k < g.length && !g[k] && n < 255) { n++; k++; } out.push(0, n); } return out; };
+/** Runs packed: a 0 (known deep) or a LAND (no depth area: land, or water the chart doesn't sound) is followed by how many (1–255) there are. */
+const LAND = 255;
+const rle = g => { const out = []; for (let k = 0; k < g.length;) { const v = g[k]; if (v && v !== LAND) { out.push(g[k++]); continue; } let n = 0; while (k < g.length && g[k] === v && n < 255) { n++; k++; } out.push(v, n); } return out; };
 const tiles = [];
 let shoal = 0, sounded = 0;
 for (let tj = 0; tj * TILE < ny; tj++) for (let ti = 0; ti * TILE < nx; ti++) {
   const g = new Uint8Array(TILE * TILE); let any = false;
   for (let b = 0; b < TILE; b++) for (let a = 0; a < TILE; a++) {
     const i = ti * TILE + a, j = tj * TILE + b; if (i >= nx || j >= ny) continue;
-    const c = j * nx + i; if (Number.isNaN(d1[c])) continue;
+    const c = j * nx + i; if (Number.isNaN(d1[c])) { g[b * TILE + a] = LAND; continue; }
+    if (d1[c] >= SHOAL) continue; // (known deep: 0)
     const d = bottomAt(i, j, d1[c], d2[c]); if (d >= SHOAL) continue;
-    g[b * TILE + a] = Math.min(255, Math.max(1, 1 + Math.round((d - OFF) / STEP))); any = true; shoal++;
+    g[b * TILE + a] = Math.min(LAND - 1, Math.max(1, 1 + Math.round((d - OFF) / STEP))); any = true; shoal++;
     if (d !== (d1[c] + d2[c]) / 2) sounded++;
   }
   if (any) tiles.push([ti, tj, Buffer.from(rle(g)).toString('base64')]);
@@ -82,6 +84,6 @@ console.log(`${nx}×${ny} cells, ${tiles.length} tiles; ${shoal} shoal cells (${
 await writeFile(new URL('../src/environment/data/bottom.json', import.meta.url), JSON.stringify({
   source: 'NOAA ENC (S-57) depth areas (DEPARE) and soundings (SOUNDG), src/geo/data/enc-chart.json; m below MLLW',
   made: 'scripts/make-bottom.mjs',
-  note: `shoal water only (a band's shoal edge under ${SHOAL} m): the soundings within ${SOUND_R} m (inverse square of distance) held inside the depth area's band, else its middle; byte 0 not shoal (a run of them packed: 0, then how many), else (byte − 1) × step + offset m below MLLW; ${CELL} m cells from the box's north-west corner, rows north to south, in ${TILE} × ${TILE} tiles [ti, tj, base64]`,
+  note: `shoal water only (a band's shoal edge under ${SHOAL} m): the soundings within ${SOUND_R} m (inverse square of distance) held inside the depth area's band, else its middle; byte 0 known deep, ${255} no depth area (land, or unsounded); each a run packed (the byte, then how many); else (byte − 1) × step + offset m below MLLW; ${CELL} m cells from the box's north-west corner, rows north to south, in ${TILE} × ${TILE} tiles [ti, tj, base64]`,
   box: B, cell: CELL, tile: TILE, nx, ny, step: STEP, offset: OFF, tiles
 }) + '\n');
