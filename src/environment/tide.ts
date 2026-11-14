@@ -235,9 +235,13 @@ const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly
  * chart's depth comes from elsewhere anyway. Elsewhere, San Francisco's (9414290).
  */
 export function tideHeightAt(p: Vec, ms: number): number {
-  const station = gridStation(p);
-  return station ? bayTide(station, ms).h : sfTide(ms);
+  const station = gridStation(p) ?? '9414290';
+  // (the same moment for every boat in a step: each station's height worked out once for it)
+  let c = TIDE_NOW.get(station);
+  if (!c || c.ms !== ms) { c = { ms, h: station === '9414290' ? sfTide(ms) : bayTide(station, ms).h }; TIDE_NOW.set(station, c); }
+  return c.h;
 }
+const TIDE_NOW = new Map<string, { ms: number; h: number }>();
 /** Each depth grid's bay's tide station. */
 const GRID_STATIONS = DGRIDS.map(G => { const B = BAYS.find(b => b.name === G.name); if (!B) throw new Error(`depth grid ${G.name}: no bay`); return B.station; });
 /** The tide station of the depth grid p is on (as depthBand finds it), or null. */

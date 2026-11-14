@@ -175,6 +175,8 @@ export interface Boat {
   hand?: Partial<Record<LineKey, boolean>>;
   /** The tiller lashed at this position (−1..1, as `tiller`): it stays there, hands off, until you take it again. */
   lashed?: number | null;
+  /** On the bottom: how far her keel is into it (m), while the bottom carries some of her weight (boat/ground.ts); undefined afloat. */
+  aground?: number;
   /** Sideways speed through the water, m/s, + to starboard: slipping to leeward when hove to (physics.ts heaveTo). In the boat's own frame, so it doesn't flip when the wind crosses the bow. */
   sway?: number;
   /** Turn rate, deg/s, + turning to starboard (clockwise): kept every step, so a turn carries on across a change of model. */
