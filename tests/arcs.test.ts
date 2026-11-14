@@ -57,4 +57,11 @@ describe('escapes(): room to respond (docs/ROOM-TO-RESPOND.md)', () => {
     expect(c.minGap).toBeGreaterThan(1);
     expect(c.heading).toBeGreaterThan(180); // (and she did come round past the half circle)
   });
+
+  it('a tack loses more speed than the same turn bearing away: through the no-go zone her sails give no drive', () => {
+    // close-hauled on starboard (wind from 0°), 2.5 m/s: 90° up through the wind onto port, or 90° down onto a reach
+    const [tack] = escapes({ x: 0, y: 0, h: 315, v: 2.5 }, [], 0, { delay: 0, horizon: 8, turns: [90], windKt: 12 }).slice(1);
+    const [bear] = escapes({ x: 0, y: 0, h: 315, v: 2.5 }, [], 0, { delay: 0, horizon: 8, turns: [-90], windKt: 12 }).slice(1);
+    expect(tack.v).toBeLessThan(bear.v - 0.3);
+  });
 });

@@ -22,7 +22,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, couldAvoid, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -85,9 +85,10 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
  * Rule 44.1(a): a Part 2 breach and a rule 31 touch "in the same incident" need only the Part 2 penalty. "Incident" isn't
  * defined; US Sailing Appeal 65: "The test of whether two occurrences were one or two incidents is whether the second
  * occurrence was the inevitable result of the first. Times, distances, the actions of each boat and the prevailing
- * conditions are all relevant." The sim's sign of it: the touch came while she was still caught up in that foul, within
- * ENGAGED of the boat she fouled, or at the mark where the foul happened (the foul within ENGAGED of it), and within
- * TANGLE_MAX. A touch after she has sailed clear of both is a new incident however soon it comes.
+ * conditions are all relevant." The sim's sign of it: the touch came while she was still caught up in that foul (not yet
+ * a length clear of the boat she fouled since, the tangle's own test), or at the mark where the foul happened (the foul
+ * within ENGAGED of it), before her turns began and within TANGLE_MAX. A touch after she has sailed clear is a new
+ * incident however soon it comes.
  */
 const ENGAGED = 2 * LOA;
 /** Rule 44.1: a tangle after a foul (the boats still together, not a length apart since) counts as one incident for at most this long from its first contact, s. */
@@ -99,14 +100,18 @@ const STEERAGE = 0.5, JAM_CLOSING = 0.4;
 /** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modelling cap). */
 const JAM_MAX = 2 * TANGLE_MAX;
 
-/** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
- * and about 2 s to turn: a modelling choice). */
+/**
+ * Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
+ * boat is exonerated for her breach." Compelled when, by the time it was clear the other boat had broken a rule, she
+ * could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). Judged as
+ * that: from where the boats were when the other's breach came, could she, reacting promptly, have turned to keep
+ * clear of both the boat she then fouled and the one that fouled her (src/rules/pairs.ts couldAvoid, escapes())?
+ * Looked at within COMPELLED_LOOKBACK of that first breach (the boats' pose history reaches back 8 s).
+ */
+const COMPELLED_LOOKBACK = 8;
+/** A mark touch forced by another boat's breach (43.1(a)/(b)): the breach still going on within this long of the touch, s
+ * (the time a helmsman needs to react and turn once the other boat's breach is plain). */
 const COMPELLED_WINDOW = 3;
-/* Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
- * boat is exonerated for her breach." Causal: compelled when, by the time it was clear the other boat had broken a rule,
- * she could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). The sim's
- * sign of it: the boat that broke a rule against her is still within ENGAGED of her when she breaks hers (she's still
- * dealing with that boat: swerving from her, or pushed by her), within COMPELLED_WINDOW. */
 
 export interface StartReport { delay: number; frac: number; kt: number }
 
@@ -541,7 +546,7 @@ export class World {
   }
 
   /* ---------- queries used by AI, HUD and rendering ---------- */
-  rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt), obstacle: this.obstacle, fleet: this.boats, keepsClearOf: this.keepsClearOf }; }
+  rulesCtx(): RulesContext { return { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt), windKt: this.wind.kt, obstacle: this.obstacle, fleet: this.boats, keepsClearOf: this.keepsClearOf }; }
   /** Who keeps clear of whom this step (for a boat as an obstruction: Definitions, Obstruction), memoised per step. */
   private kcMemo = { t: NaN, m: new Map<string, number>() };
   private keepsClearOf = (a: { id: number }, c: { id: number }): boolean => {
@@ -1227,11 +1232,9 @@ export class World {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
       const f = incident.fouler, victim = f === A ? B : A, by = this.fouledAt.get(f.id);
-      // (within the time a helmsman needs to react and turn once the other boat's breach is plain, COMPELLED_WINDOW, and
-      // with that boat still on her: a later breach, or one with the other gone, she could have avoided, Appeal 2.
-      // A fuller test would ask escapes(), src/boat/arcs.ts, whether any turn could have kept her clear)
+      // (unless, from when that boat's breach against her came, she could still have turned to keep clear: Appeal 2)
       const byBoat = by ? this.boats.find(o => o.id === by.by) : undefined;
-      if (incident.kind !== 'hail' && by && byBoat && by.by !== victim.id && this.t - by.t < COMPELLED_WINDOW && hullGap(f, byBoat) < ENGAGED) incident.exoneratedBy = by.by;
+      if (incident.kind !== 'hail' && by && byBoat && by.by !== victim.id && this.t - by.t < COMPELLED_LOOKBACK && !couldAvoid(f, victim, byBoat, by.t, ctx)) incident.exoneratedBy = by.by;
       // Part 2 preamble: the rules of Part 2 still apply between boats that intend to race, are racing or have been racing,
       // but a boat not racing isn't penalized for breaking them (except rule 14 with injury or serious damage, which the
       // sim doesn't model, and rule 23.1, handled as its own case)
