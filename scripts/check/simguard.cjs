@@ -61,7 +61,7 @@ const out = process.argv[2] || '.';
   await step('motor', async () => { await click('#bMotor'); await click('[data-mo="tilt"]'); await click('[data-mo="start"]'); await p.waitForTimeout(3000); await click('[data-mg="F"]');
     await p.evaluate(() => { const t = document.getElementById('moThrottle'); t.value = '40'; t.dispatchEvent(new Event('input')); }); await click('[data-mo="castoff"]'); await p.waitForTimeout(2000); });
   await step('pushoff', async () => { await click('#bPushOff'); await p.waitForTimeout(3000); });
-  await step('halyards', async () => { await p.evaluate(() => { for (const id of ['bJib', 'bMain']) document.getElementById(id)?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); }); await p.waitForTimeout(2000); });
+  await step('halyards', async () => { await p.evaluate(() => { for (const el of document.querySelectorAll('.sb-hoist')) el.click(); }); await p.waitForTimeout(2000); });
   await step('lights/ensign', async () => { await key('5'); await click('#bEnsign'); });
   await step('pilot', async () => { await click('#bPilot'); await p.waitForTimeout(500); await click('[data-pa="10"]'); await click('[data-pa="tack"]'); await click('[data-pm="wind"]'); await key('d', 300); await click('[data-pa="off"]'); });
   await step('chart dest', async () => { await click('#map'); await p.waitForTimeout(1500); const c = await p.$('#chart canvas'); if (c) { const bb = await c.boundingBox(); await p.mouse.click(bb.x + bb.width * 0.6, bb.y + bb.height * 0.4); } await click('#bChartGo'); await p.waitForTimeout(500); });

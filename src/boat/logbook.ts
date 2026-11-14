@@ -20,6 +20,10 @@ export interface LogEntry {
   elapsed?: number;
   /** Cruises: how far she sailed, nm, and whether she got where she was going. */
   nm?: number; arrived?: boolean;
+  /** Wrecked: how, and where (docs/WRECK-PROPOSAL.md); and whether she was towed in. */
+  wreck?: string; towed?: boolean;
+  /** The worst damage she took, short of a wreck (boat/damage.ts): 'damage' or 'serious'. */
+  damage?: string;
   /** Who skippered her, and who crewed. */
   skipper: 'you' | 'ai';
   crew: string;
