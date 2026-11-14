@@ -439,7 +439,7 @@ function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
   return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(off) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(off) * LEE_SAG);
 }
 /**
- * How far she glides stern first once she's shoved off astern, m: the crew's shove (world.ts ASTERN_SHOVE, about 0.63 m/s)
+ * How far she glides stern first once she's shoved off astern, m: the crew's shove (world.ts ASTERN_SHOVE, about 0.64 m/s)
  * carries her about 44 m on physics.ts's sternway drag before her way's gone (tests/pushoff-astern.test.ts holds the two
  * together). The planner looks that far along the way she's steered: round, and on down the fairway.
  */

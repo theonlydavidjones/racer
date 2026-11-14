@@ -170,12 +170,19 @@ export const SHOVE = 0.5;
 /** How fast the crew walks her back by hand, m/s; and the slowest they swing her round about her bow, deg/s, in no wind. */
 const WALK = 0.45, CREW_TURN = 2;
 /**
- * The shove astern as the crew steps aboard at the finger's end, m/s: she's already going astern at their walk, and the last
- * push, a hand's HAND_N (boat/dockLines.ts) over about a metre of reach, adds its work to that: ½·m·v² = ½·m·WALK² + F·d.
- * About 0.63 m/s, a little more than a slow walk (ESTIMATES: the push and its reach are unsourced). Only where there's
- * less room than that carries her (geo/marina.ts ASTERN_RUN) is she shoved more gently, down to ASTERN_STEERAGE.
+ * A crew member's shove, N: the push one adult can give at once, waist high, once (Snook & Ciriello 1991, Ergonomics
+ * 34(9):1197–1213, as tabled by T. E. Bernard, Liberty Mutual Design Goals for Pushing, v2.2, 2002, page 4: initial force
+ * 27 kgf with the hands about 92 cm up, over 2.1 m, once in 8 h, acceptable to 75% of women;
+ * https://health.usf.edu/media/yjtp40mj/lmdesigngoalsmks22.pdf). Men may manage about 1.5 times as much (the table's note).
  */
-export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * HAND_N * 1 / HANDLING.mass);
+export const SHOVE_N = 27 * 9.80665;
+/**
+ * The shove astern as the crew steps aboard at the finger's end, m/s: she's already going astern at their walk, and the last
+ * push, SHOVE_N over about a metre of reach, adds its work to that: ½·m·v² = ½·m·WALK² + F·d. About 0.64 m/s, a little
+ * more than a slow walk (the reach, a step and the arms' length, an ESTIMATE). Only where there's less room than that
+ * carries her (geo/marina.ts ASTERN_RUN) is she shoved more gently, down to ASTERN_STEERAGE.
+ */
+export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /**
  * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more (the helm hard over turns her
  * about 1.7 deg/s at it: physics.ts). Her glide from it (about 30 m on physics.ts's drag) runs on past the clear water the

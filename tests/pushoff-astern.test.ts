@@ -17,7 +17,7 @@ const wrap = (a: number) => ((a + 540) % 360) - 180;
 
 describe('pushed off astern', () => {
   it('never gentler than steerage way', () => { expect(asternCoast(ASTERN_STEERAGE)).toBeGreaterThan(ASTERN_ENOUGH); });
-  it('the shove: her walk-back pace and a last push, about 0.63 m/s, which glides her about as far as the planner looks', () => {
+  it('the shove: her walk-back pace and a last push, about 0.64 m/s, which glides her about as far as the planner looks', () => {
     expect(ASTERN_SHOVE).toBeGreaterThan(0.55); expect(ASTERN_SHOVE).toBeLessThan(0.7);
     expect(asternCoast(ASTERN_SHOVE)).toBeGreaterThan(ASTERN_RUN - 3); expect(asternCoast(ASTERN_SHOVE)).toBeLessThanOrEqual(ASTERN_RUN);
   });
@@ -51,8 +51,9 @@ describe('pushed off astern', () => {
         const f = { x: Math.sin(s.heading * Math.PI / 180), y: Math.cos(s.heading * Math.PI / 180) };
         // (her middle past her finger's end, and her nearest end, bow or stern, along the slip's line)
         const out = -((u.x - s.p.x) * f.x + (u.y - s.p.y) * f.y) - 0.45 * s.finger, end = out - 3.8 * Math.abs(Math.cos((u.h - s.heading) * Math.PI / 180));
-        // (her whole hull 2 m clear of the slip and more, her middle 7.6 m out: half a fairway of 1.5–1.75 boat lengths,
-        // the marina-design range found so far, unverified, 14 Nov 2026; steerable 10 s, everywhere; and in the water the plan
+        // (her whole hull 2 m clear of the slip and more, her middle 7.6 m out: half the narrowest fairway California's
+        // marina guidelines allow, 1.75 berth lengths (DBW, Layout and Design Guidelines for Marina Berthing Facilities, 2005, Table
+        // B-2; https://demo2.parks.ca.gov/pages/28702/files/Guide05.pdf): 6.7 m for her 7.64 m, with a margin; steerable 10 s, everywhere; and in the water the plan
         // found clear, touching nothing: past it, she's the helmsman's to steer on down the fairway)
         if (plan.coast >= 8 && (out < 7.6 || end < 2)) bad.push(`${s.id}: only ${out.toFixed(1)} m out, her nearest end ${end.toFixed(1)} m`);
         if (steer < 10) bad.push(`${s.id}: steerable only ${steer.toFixed(1)} s`);
