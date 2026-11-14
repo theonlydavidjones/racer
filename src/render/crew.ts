@@ -836,7 +836,10 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (clearing what's between only on a real step to a new place: a foot following a lean, a few centimetres, stays down)
       const going = foot.distanceTo(want.feet[i]) > 0.15;
       const fx = foot.x, fz = foot.z, fy = foot.y;
-      toward(foot, want.feet[i], a, LIMB_SPEED * dt * (rising ? 0.3 : 1));
+      // (a foot down on the sole is a little in from the bench's face, not tucked under its lip with the knee still out over
+      // the bench, the shin through its edge: getting down off the bench by the winch in a tack)
+      const ft = want.feet[i].y < SEAT_Y - 0.1 ? keepOnSole(_fw.copy(want.feet[i])) : want.feet[i];
+      toward(foot, ft, a, LIMB_SPEED * dt * (rising ? 0.3 : 1));
       // (coming to a step up, the bench's edge or the coaming: it stops and lifts to it at a foot's pace, never snapped up)
       if (ground(foot.x, foot.z) + 0.06 > fy + LIMB_SPEED * dt) { foot.x = fx; foot.z = fz; foot.y = Math.max(fy, ground(fx, fz) + 0.06) + LIMB_SPEED * dt; }
       // (rising to clear what's near it as it goes, at a foot's pace; never below what's under it)
@@ -874,6 +877,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   c.elbow = want.elbow; // (the way an elbow's to go, as the pose has it now: not as it was when they were first drawn)
   return c;
 }
+const _fw = V(0, 0, 0);
 const _s = V(0, 0, 0), _t = V(0, 0, 0), _u = V(0, 0, 0), _sh = V(0, 0, 0), _v = V(0, 0, 0), _w = V(0, 0, 0);
 /** How fast a hand or a foot moves to its new place at most (m/s): briskly, as a sailor's do (an estimate). */
 const LIMB_SPEED = 2.2;
