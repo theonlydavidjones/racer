@@ -4,7 +4,7 @@
  * controls block view of the hull. and the buttons are glitching. I can't get it to tilt down"). On the built page
  * (artifact/folkboat-racing-sim.html), the race in its worker, on a cruise from her slip (bow in, West Harbor), made fast
  * with her sails down and her 3.5 hp on its bracket: tilt it down, start it, cast off, astern at 50% and she backs out of
- * the slip; neutral until she's at rest; ahead at 50% and she makes a knot or more through the water (boat/motor.ts: the
+ * the slip (R, or with no reverse gear, as the 2.5 and the 3.5 have, Swivel then F); neutral until she's at rest; ahead at 50% and she makes a knot or more through the water (boat/motor.ts: the
  * 3.5's thrust by momentum theory against her hull's resistance gives about 4.6 kt at full throttle and 0.6–2.2 kt at
  * tick-over in gear, tests/motor.test.ts); then stop and tilt it up. Each click must show in the tab and in the race.
  * Also: the tab sits in the band, not over her hull, nothing on the tab is rewritten while nothing changes, and a double
@@ -46,7 +46,7 @@ const root = path.join(__dirname, '../..'), out = process.argv[2] || '.';
   const tab = () => p.evaluate(() => {
     const t = document.querySelector('.sb-motor'), q = k => t.querySelector(`[data-mo="${k}"]`), shown = e => !!e && !e.hidden && !e.closest('[hidden]');
     return { shown: shown(t), tilt: q('tilt').textContent, start: shown(q('start')) ? q('start').textContent : null,
-      cast: shown(q('castoff')), gear: ['F', 'N', 'R'].find(k => q(k).getAttribute('aria-pressed') === 'true') ?? null, thr: t.querySelector('.mo-thr').textContent,
+      cast: shown(q('castoff')), hasR: shown(q('R')), swivel: shown(q('swivel')) ? q('swivel').textContent : null, swOn: q('swivel').classList.contains('on'), swOff: q('swivel').disabled, gear: ['F', 'N', 'R'].find(k => q(k).getAttribute('aria-pressed') === 'true') ?? null, thr: t.querySelector('.mo-thr').textContent,
       kt: +document.getElementById('spd').textContent, sog: +document.getElementById('sog').textContent.replace('SOG ', '') };
   });
   const click = async k => {
@@ -75,7 +75,17 @@ const root = path.join(__dirname, '../..'), out = process.argv[2] || '.';
   await step('Down: tilted into the water', () => click('tilt'), s => s.tilt === 'Up' && s.start === 'Start' && s.gear === 'N');
   await step('Start: the cord pulled, and it runs', () => click('start'), s => s.start === 'Stop');
   await step('Cast off: lines in, hers to motor out', () => click('castoff'), s => s.cast === false);
-  await step('R: astern', () => click('R'), s => s.gear === 'R');
+  // astern: R where the motor has a reverse gear; the 2.5 and the 3.5 have none (forward and neutral only), and swivel
+  // round on the bracket, then F pushes her astern (boat/motor.ts OUTBOARDS)
+  const hasR = (await tab()).hasR;
+  console.log(`(this motor ${hasR ? 'has a reverse gear: R' : 'has no reverse: Swivel, then F'})`);
+  const swivel = async (label, on) => {
+    await click('swivel'); const now = await tab(); // (at once, before the race answers: the button says so and waits)
+    const ok = now.swivel === 'Swiveling…' && now.swOff; console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}, waiting on the race: ${JSON.stringify(now)}`); if (!ok) bad.push(`${label}: no pending state`);
+    await step(`${label}, done`, async () => {}, s => s.swOn === on && s.swivel === 'Swivel' && !s.swOff);
+  };
+  if (hasR) await step('R: astern', () => click('R'), s => s.gear === 'R');
+  else { await swivel('Swivel: turned round', true); await step('F: astern, swiveled round', () => click('F'), s => s.gear === 'F'); }
   for (let i = 0; i < 5; i++) { await click('more'); await p.waitForTimeout(300); }
   await step('+ five times: 50%', async () => {}, s => s.thr === '50%');
   // astern: her log reads nothing (it reads way ahead), her speed over the ground is her sternway (no stream in the slip)
@@ -84,6 +94,7 @@ const root = path.join(__dirname, '../..'), out = process.argv[2] || '.';
   await step('N: neutral', () => click('N'), s => s.gear === 'N');
   const rest = await until(s => s.sog < 0.2, 600000);
   { const ok = rest.sog < 0.2; console.log(`${ok ? 'ok  ' : 'FAIL'} her way off: ${JSON.stringify(rest)}`); if (!ok) bad.push('she didn\'t come to rest'); }
+  if (!hasR) await swivel('Swivel: turned back', false);
   await step('F: ahead', () => click('F'), s => s.gear === 'F');
   // (into gear the throttle comes back to tick-over, 15%, as it's shifted: world.ts motorGear. Back up to 50%)
   for (let i = 0; i < 3; i++) { await click('more'); await p.waitForTimeout(300); } // (15% → 30, 40, 50: the tab's tenths)
