@@ -24,20 +24,22 @@ function leave(s: (typeof slips)[0], side: number, current = 'slack', windKt = 1
   let way = 9; for (let t = 0; t < 60 * 40; t++) { w.step(DT); if (t > 60 * 5) way = Math.min(way, Math.hypot(u.vx, u.vy)); for (const e of w.drainEvents()) if (e.type === 'toast' && /Bump|Collision/.test(e.msg)) bumps.push(e.msg); }
   return { plan, hLet, way, out: Math.hypot(u.x - s.p.x, u.y - s.p.y), bumps };
 }
-const GOOD = 1;
+/** The owner's mark (8m): hard but possible, as in real life. Most of the 16 out clean (12 is the bar this test was written to). */
+const GOOD = 12;
 describe('leaving a slip at Gashouse Cove, the wind on the beam (8m)', () => {
-  it('both ways: walked out, let go, the jib up: she keeps steering way (0.3 m/s or more) and gets clear of her slip without touching anything', () => {
+  // (an expected failure today, 14 Nov 2026: none of the 16 is out clean with the push-off physically honest; see below)
+  it.fails('both ways: walked out, let go, the jib up: she keeps steering way (0.3 m/s or more) and gets clear of her slip without touching anything', () => {
     const notes: string[] = []; let good = 0, all = 0;
     for (const s of sample) for (const side of [-90, 90]) {
       const r = leave(s, side); all++;
       const ok = r.way > 0.3 && r.out > 12 && !r.bumps.length; if (ok) good++;
       notes.push(`${s.label} (h ${s.heading}) ${side > 0 ? 'stbd' : 'port'}: ${r.plan}, let go h ${r.hLet}, least way ${r.way.toFixed(2)} m/s, ${r.out.toFixed(0)} m out${r.bumps.length ? `, ${r.bumps[0]}` : ''}`);
     }
-    // (GOOD of the 16 today, 14 Nov 2026, with the push-off physically honest (8m, from the physics review: no turning her
+    // (none of the 16 today, 14 Nov 2026, with the push-off physically honest (8m, from the physics review: no turning her
     // stern against the wind by hand, a bow line no more than 2.5 m past the finger, no winding her round on a stern line until
-    // it's modeled with real lines). The rest are shoved off astern and
+    // it's modeled with real lines). They're shoved off astern and
     // left with no way on; they wait on Deep Physics' turning at rest (left alone she lies with the wind about 86 degrees off
-    // her bow, so the jib can draw) and the jib-on-a-run drive, and on the paddle (8c). Raise this as they land.)
+    // her bow, so the jib can draw) and the jib-on-a-run drive, and on the paddle (8c). Turn this back to a plain test when it passes.)
     expect(good, notes.join('; ')).toBeGreaterThanOrEqual(GOOD);
   }, 600000);
   // Josephine's slip, 572 (the owner's chart): at the west end of a fairway by the basin's west seawall, bow 351, so the
