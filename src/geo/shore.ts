@@ -645,9 +645,10 @@ export function anyShoreDistNear(p: Vec): number {
  * runs under them (the owner, 13 Nov 2026, at the Gashouse Cove exit), so for the current they aren't shore.
  */
 export const PILE_PIERS: { name: string; height: number; pts: Vec[] }[] = (pilePiers as unknown as { piers: { name: string; height: number; pts: [number, number][] }[] }).piers.map(q => ({ name: q.name, height: q.height, pts: q.pts.map(([la, lo]) => LL(la, lo)) }));
-/** The box round all the pile piers (for a quick no, everywhere else on the Bay: these are asked for every boat, every step). */
+/** The box round all the pile piers (for a quick no, everywhere else on the Bay: these are asked for every boat, every step).
+ * offPiles(p, r): p more than r outside it. */
 const PILE_BOX = (() => { const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), ys = PILE_PIERS.flatMap(P => P.pts.map(q => q.y)); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; })();
-const offPiles = (p: Vec, r: number) => p.x < PILE_BOX.x0 - r || p.x > PILE_BOX.x1 + r || p.y < PILE_BOX.y0 - r || p.y > PILE_BOX.y1 + r;
+export const offPiles = (p: Vec, r: number) => p.x < PILE_BOX.x0 - r || p.x > PILE_BOX.x1 + r || p.y < PILE_BOX.y0 - r || p.y > PILE_BOX.y1 + r;
 /** Inside a pile pier's shed outline, or within `pad` m of it. */
 export function inPilePier(p: Vec, pad = 0): boolean {
   if (offPiles(p, pad)) return false;

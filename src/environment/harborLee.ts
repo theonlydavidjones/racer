@@ -251,5 +251,5 @@ export function harborLeeDeficit(p: Vec, from: number): number {
 /** The walls' and sheds' lee at p, added to `sum` (World.shadowAt). */
 export function addHarborLee(sum: WindSum, from: number, p: Vec): void {
   const d = harborLeeDeficit(p, from);
-  if (d > 0.001) { const e = V(from + 180); sum.addDeficit(e.x, e.y, d); }
+  if (d > 0.001) sum.addDeficit(lastE.x, lastE.y, d); // (harborLeeDeficit's own e for this wind: it's only above 0 once it has made it)
 }

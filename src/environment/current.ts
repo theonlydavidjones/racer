@@ -1,5 +1,5 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { PILE_PIERS, flowShoreDist, flowShoreDistNear, inPilePier, pilePierDist, onLand, wharfDist, wharfShelter } from '../geo/shore';
+import { PILE_PIERS, anyShoreDist, anyShoreDistNear, offPiles, flowShoreDist, flowShoreDistNear, inPilePier, pilePierDist, onLand, wharfDist, wharfShelter } from '../geo/shore';
 import { BREAKWATER_W, HARBORS, SHORE_W, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import type { Wind } from './wind';
 
@@ -44,7 +44,9 @@ const DECK = 2;
 const PILE_MIX = 12;
 export const shoreRelief = (p: Vec, lattice = false): number => {
   // (the distance to the real bank: the coastline's run round a pile pier isn't shore to the water, which runs under it)
-  const k = clamp(0.25 + 0.75 * (lattice ? flowShoreDistNear(p) : flowShoreDist(p)) / 350, 0.25, 1) * (inPilePier(p) ? PILE_FLOW : 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
+  // (more than 380 m from the piers, the only ones it changes, it's the shore's own distance: one quick test, every boat, every step)
+  const far = offPiles(p, 380), dist = far ? (lattice ? anyShoreDistNear(p) : anyShoreDist(p)) : lattice ? flowShoreDistNear(p) : flowShoreDist(p);
+  const k = clamp(0.25 + 0.75 * dist / 350, 0.25, 1) * (!far && inPilePier(p) ? PILE_FLOW : 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
   return w > 0 ? Math.min(k, 1 - w * (1 - clamp(0.25 + 0.75 * wharfDist(p, 350) / 350, 0.25, 1))) : k;
 };
 
@@ -206,13 +208,15 @@ const SLOTS = (() => { const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), 
  * Between two of the piers (one to each side of p, west and east, each reaching p's latitude): how far in from the
  * slot's open end (the nearer of the two piers' heads), m; −1 if not in a slot.
  */
+/** Each pier's southmost and northmost y. */
+const PIER_Y = PILE_PIERS.map(P => [Math.min(...P.pts.map(q => q.y)), Math.max(...P.pts.map(q => q.y))]);
 const pileSlotDepth = (p: Vec): number => {
   if (!(p.x > SLOTS.x0 && p.x < SLOTS.x1 && p.y > SLOTS.y0 && p.y < SLOTS.y1) || inBasin(p)) return -1;
   let west = -Infinity, east = -Infinity;
   // (a pier to the west or east where its outline crosses p's latitude, not by its box: a slanted pier's widest corner
   // would leave a strip beside its wall out of the slot, a step in the stream there)
-  for (const P of PILE_PIERS) {
-    const ys = P.pts.map(q => q.y), top = Math.max(...ys); if (p.y < Math.min(...ys) || p.y > top) continue;
+  for (let n = 0; n < PILE_PIERS.length; n++) {
+    const P = PILE_PIERS[n], [bot, top] = PIER_Y[n]; if (p.y < bot || p.y > top) continue;
     let xMin = Infinity, xMax = -Infinity;
     for (let i = 0; i < P.pts.length; i++) { const a = P.pts[i], b = P.pts[(i + 1) % P.pts.length];
       if ((a.y - p.y) * (b.y - p.y) > 0 || a.y === b.y) continue; const x = a.x + (b.x - a.x) * (p.y - a.y) / (b.y - a.y); xMin = Math.min(xMin, x); xMax = Math.max(xMax, x); }
@@ -240,6 +244,7 @@ export function basinCalm(p: Vec): number {
   // the pier's piles and its shed between them: geo/shore.ts PILE_PIERS. Across the piles the two mix, over a few meters)
   // (the water in the slots between the piers, and beside them, has just come through a pile field: no faster than
   // the piles let it, PILE_FLOW; under a shed itself shoreRelief already takes that, so here it's 1)
+  if (offPiles(p, 100)) return basinCalmGrid(p); // (well clear of the piers, as everywhere else on the Bay: one quick test, every boat, every step)
   const pd = pilePierDist(p); if (pd <= 0) return 1;
   const sd = pileSlotDepth(p); if (sd >= 0) return pd <= DECK ? Math.min(PILE_FLOW, slotFlow(sd)) : slotFlow(sd);
   // (beside a pier: still water there comes up toward what the piles pass, as it mixes with what came through them;
