@@ -89,6 +89,17 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     }
   }, 60_000);
 
+  it('sailing in, she never comes near you uncalled: off the point the call wants, she\'s let go well off', () => {
+    // (standing on, bearing away past the band after she's set: the call withheld, she homed in and hit you, silent)
+    const w = world(), L = w.lesson!, from = w.windModel.base, u = w.user, o = w.boats[1];
+    L.step = 4; setOn(w, from - 90);
+    sail(w, 60, () => !!L.approach); expect(L.approach).not.toBeNull();
+    steer(w, from - 130); // (a broad reach, past the band she was set for: Rule 17 doesn't care, and she must still not sail into you)
+    let gap = Infinity;
+    sail(w, 300, () => { if (L.approach) gap = Math.min(gap, hullGap(u, o)); return L.step !== 4 || (!L.approach && gap < Infinity && Math.hypot(o.x - u.x, o.y - u.y) > 150); });
+    expect(gap).toBeGreaterThan(LESSON_MARKS.clearLoa * LOA);
+  }, 60_000);
+
   it('she\'s set only once your heading and speed have settled, and never coming up from astern (Rule 13)', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
     setOn(w, from + 100); steer(w, from + 40); // (still turning)

@@ -928,6 +928,7 @@ export class World {
       other: o,
       place: (p, h, v, meet) => {
         if ([p, meet, { x: (p.x + u.x) / 2, y: (p.y + u.y) / 2 }, { x: (p.x + meet.x) / 2, y: (p.y + meet.y) / 2 }].some(q => onLand(q) || inBasin(q))) return false;
+        if (landAlong(p, { x: p.x + V(h).x * 300, y: p.y + V(h).y * 300 }) < Infinity) return false; // (and none ahead of her as she starts in: the lesson lets her go for that)
         o.x = p.x; o.y = p.y; o.h = o.desired = n360(h); o.v = v; o.turnRate = 0; o.tacking = false; o.turnTarget = null;
         const g = V(o.h); o.vx = g.x * v + o.cur.x; o.vy = g.y * v + o.cur.y;
         o.ww = windOnWater(this.windHere(o, o), o.cur); settleTrim(o, o.ww.from, o.ww.kt);
