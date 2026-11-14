@@ -46,9 +46,12 @@ describe('hove to, Auto keeps her hove to', () => {
     sail(b, 20);
     const made = b.ctl.jibsheetW, tack = b.tack;
     b.ww.from = (b.ww.from + 270) % 360; // (the wind backs 90 degrees: it's on her other side now)
-    sail(b, 6);
+    // (the sheet made fast is the leeward one as she comes onto the new tack; the crew then trim her for sailing, as
+    // they're free to: so it's read on the step she tacks, not after they've had time to work it)
+    let atTack: number | null = null;
+    sail(b, 6, () => { if (atTack == null && b.tack !== tack) atTack = b.ctl.jibsheet; });
     expect(b.tack).not.toBe(tack);
-    expect(b.ctl.jibsheet, 'the sheet that was made fast, leeward now').toBeCloseTo(made, 2);
+    expect(atTack, 'the sheet that was made fast, leeward now').toBeCloseTo(made, 2);
     expect(b.jibBacked).toBe(0); expect(b.hove).toBe(false);
   }, 180_000);
   it('then let the lashing go and steer off: the crew let the windward sheet fly, and she sails', () => {
