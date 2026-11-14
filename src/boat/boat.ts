@@ -64,6 +64,8 @@ export interface AiState {
    * heading she's holding to keep clear (null: her own course does). She holds it until she next looks, about a second. */
   /** How long a tack of her own choosing has been held off by a boat close by (ai.ts, Rule 13), s. */
   tackHeldT?: number;
+  /** When she last found her own tack held off by a boat close by (ai.ts TACK_LOOK_S), s. */
+  tackHeldAt?: number;
   /** When she began getting clear for her penalty turns (RRS 44.2). */
   clearFrom?: number;
   esc?: { at: number; ids: string; /** the boats she was keeping clear of, and those to keep from touching: the ids' own */ kIds?: number[]; rIds?: number[]; heading: number | null; luff: boolean; aim?: number } | null;

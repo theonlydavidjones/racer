@@ -133,6 +133,8 @@ const ESC_TURNS = [-90, -60, -30, 30, 60, 90];
 const ESC_TURN_FOR = 2;
 /** Held off a tack of her own choosing this long (s) by a boat close by, she eases to drop back behind it. */
 const TACK_HELD_EASE = 15;
+/** Held off a tack of her own choosing, how often she looks again whether it's clear (s). */
+const TACK_LOOK_S = 0.5;
 /** Below this speed through the water (m/s) she keeps her sails drawing to steer, rather than ease them to slow. */
 const SLOW_TO_STEER = 1.2;
 /** Through a tack she sags to leeward of the prediction's path, which keeps her on her heading's line (arcs.ts
@@ -193,9 +195,8 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   // Checked on the ids themselves, before building anything: she asks every step, and nearly always it holds)
   if (E && w.t - E.at < 1 && Math.abs(wrap(aimH - (E.aim ?? aimH))) < 10 && E.kIds && E.rIds && E.kIds.length === kc.length && E.rIds.length === row.length
     && kc.every(o => E.kIds!.includes(o.id)) && row.every(o => E.rIds!.includes(o.id))) return E;
-  const threats = [...kc, ...row], others = othersOf();
+  const threats = kc.concat(row);
   const ids = [...kc.map(o => `k${o.id}`), ...row.map(o => `r${o.id}`)].sort().join(',');
-  if (E && E.ids === ids && w.t - E.at < 1 && Math.abs(wrap(aimH - (E.aim ?? aimH))) < 10) return E;
   // (the gaps she keeps, over the contact distance the rules judge by (which allows for the hulls' flare and the slop in
   // judging a gap): from a boat she must keep clear of, enough that it can sail on without acting (Definitions, Keep
   // Clear); from one that should be keeping clear of her, only enough not to touch, 0.3 m, about a hand's breadth more
@@ -234,6 +235,7 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   // (her own course is no change of course, as far as the others are concerned: only the boats she's keeping clear of)
   const ownSlack = slack(ownI, false) - (kc.length ? OWN_COURSE_EXTRA_M : 0);
   if (!(ownSlack >= 0 && ok(cands[ownI]))) {
+    const others = othersOf(); // (the boats beside the threats: only now, when her own course won't do)
     othersG = run(others); owedRoom = others.map(o => w.rights(b, o).kc === o);
     const nearest = (is: number[]) => is.reduce((p, q) => Math.abs(wrap(cands[q].heading - aimH)) < Math.abs(wrap(cands[p].heading - aimH)) ? q : p);
     const idx = cands.map((_, i) => i).filter(i => i !== ownI && ok(cands[i]));
@@ -980,17 +982,21 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   if (beating && !avoiding && !holdForHail && !b.tacking && !tackNow && !ai.hailTack && !ai.urgent && Math.sign(wrap(ww.from - desired)) !== Math.sign(wrap(ww.from - b.h))
     && Math.abs(wrap(desired - b.h)) > 20 && Math.abs(wrap(ww.from - b.h)) > beatFor(b) - 5 && !blocked(w, b, b.h, 45)) {
     const close = w.boats.filter(o => o !== b && !o.finished && dist(o, b) < 40);
+    // (held off it, she looks again every TACK_LOOK_S rather than every step: a held tack can wait that long; a clear one
+    // is looked at afresh each time, so she never tacks on an old look)
+    const was = ai.tackHeldAt != null && w.t - ai.tackHeldAt < TACK_LOOK_S;
     if (close.length) {
-      const [c] = escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 },
+      const [c] = was ? [null] : escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 },
         close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT, windKt: ww.kt }).filter(q => q.turn !== 0);
-      if (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SAG_M) {
+      if (was || (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SAG_M)) {
+        if (!was) ai.tackHeldAt = w.t;
         desired = b.tack === 'S' ? csS : csP; tackHeld = true;
         ai.tackHeldT = (ai.tackHeldT ?? 0) + dt;
         if (ai.tackHeldT > TACK_HELD_EASE) luff = true;
       }
     }
   }
-  if (!tackHeld) ai.tackHeldT = 0;
+  if (!tackHeld) { ai.tackHeldT = 0; ai.tackHeldAt = undefined; }
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
