@@ -1,9 +1,9 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
-import { DECK_ARM, Z } from '../boat/crewPhys';
+import { DECK_ARM } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number }
 type Limb = Body['arm'][number];
@@ -78,10 +78,17 @@ const ZC_FWD = COCK0 + 0.3, ZC_AFT = Math.min(BENCH_AFT - 0.09, THWART.z - THWAR
 /** Sitting on the side deck (or hiking from it), legs in over the coaming (crewPhys.ts Z: the owner's choice): from the
  * cockpit's forward corner aft beside the benches, and on past the thwart beside the footwell and the footrest to
  * about 2.5, short of the helm; the shins clear of the thwart either side of it. */
-// (out on the side deck, no further forward than just aft of the jib winch on its pedestal there: winchAt, at 1.4, its
-// pedestal's radius and half a hip's width clear; crewPhys.ts Z.deckFwd)
-const DECK_FWD = Z.deckFwd, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.13, THW_B = THWART.z + THWART.half + 0.13;
-const deckZ = (z: number) => { const q = Math.min(DECK_AFT, Math.max(DECK_FWD, z)); return q > THW_A && q < THW_B ? (q - THW_A < THW_B - q ? THW_A : THW_B) : q; };
+// (out on the side deck, from the cockpit's forward end (the hips half a shoulder's width aft of the cabin's after end),
+// a seat either side of the jib winch on its pedestal between the cabin and the thwart (hull.ts JIB_WINCH_Z: the owner
+// wants one on the rail forward of it, and one, with a little less room, aft of it), the pedestal's radius and half a
+// hip's width clear; not on top of it)
+const DECK_FWD = COCK0 + 0.29, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.13, THW_B = THWART.z + THWART.half + 0.13;
+const WIN_A = JIB_WINCH_Z - 0.24, WIN_B = Math.min(JIB_WINCH_Z + 0.24, THW_A); // (its pedestal 0.12 m in radius fore and aft at the deck (Boat Detail), and half a hip)
+const deckZ = (z: number) => {
+  let q = Math.min(DECK_AFT, Math.max(DECK_FWD, z));
+  if (q > WIN_A && q < WIN_B) q = q < JIB_WINCH_Z + 0.1 ? WIN_A : WIN_B; // (forward of it unless clearly aft: the seat aft is the tighter, the thwart at the shins)
+  return q > THW_A && q < THW_B ? (q - THW_A < THW_B - q ? THW_A : THW_B) : q;
+};
 const benchZ = (z: number) => Math.min(ZC_AFT, Math.max(ZC_FWD, z));
 const inCockpit = (ax: number, z: number) => z > COCK0 && z < COCK1 && ax < chz(z);
 /** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, footrest, thwart, coaming, deck, cabin top. */
@@ -138,9 +145,11 @@ const keepOnSole = (p: THREE.Vector3) => {
   return p;
 };
 /** The jib winch on side `ws` (boatMesh.ts buildLines, Boat Detail's, from Josephine's photos: on a moulded pedestal on
- * the side deck against the coaming's outer face, 1.4 m aft of amidships; the sheet leading to it 0.07 above its base);
+ * the side deck against the coaming's outer face, JIB_WINCH_Z aft of amidships; the sheet leading to it 0.07 above its base);
  * `up` higher, as for the handle on top. */
-const winchAt = (ws: number, up = 0) => { const wz = 1.4, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) + 0.03 + 0.07 + up, wz); };
+// (the jib winch's drum, its middle: on the side deck against the coaming between the cabin and the thwart, its top
+// about flush with the coaming's (Boat Detail, Josephine's photo: hull.ts JIB_WINCH_Z, boatMesh.ts WINCH_H 0.123))
+const winchAt = (ws: number, up = 0) => { const wz = JIB_WINCH_Z, u = uAtZ(wz), xo = chz(wz) + COAMING_T; return V(ws * (xo + 0.075), deckY(u, xo) + coamH(wz) - 0.123 + 0.01 + 0.07 + up, wz); };
 /** What the crew watch: the jib's luff (its telltales). */
 const JIB_LUFF = V(0, 1.5, -1.6);
 
@@ -220,6 +229,10 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
     f.route = { side, z: z0, goal, face: goal < z0 || (goal - z0 < 1 && Math.cos(f.cur!.yaw) > 0.5) ? -1 : 1 };
   }
   const q = f.route!;
+  // (on their way across, and where they're going now back on the side they're still on (the physics' goal: its person,
+  // quicker across, may be partway back already), a tack coming before they'd crossed:
+  // they stay, not go on across and turn right round to come back: the owner's "moves restarted before they finish")
+  if (q.down && f.cur && f.goalSide === q.side && Math.sign(c.x) === q.side) { q.down = false; q.sitT = undefined; }
   if (q.down && f.cur) {
     // (across to the other side's seat aft of the thwart: sat on this side's deck, the legs swung in; down into the
     // cockpit forward of the thwart and across it low, under the boom; then up on to the other side's deck and aft along
@@ -337,7 +350,15 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     if (Math.abs(z - MAST_Z) < 0.35 && Math.abs(x) < 0.32) x = (x >= 0 ? 1 : -1) * 0.32;
     const p = kneel(x, z, yaw, [V(0, 0, 0), V(0, 0, 0)], k);
     p.hip.y = g + 0.45 * k; p.pitch = -1.05;
-    p.hands = [0, 1].map(j => { const h = p.hip.clone().addScaledVector(f, (0.42 + 0.08 * Math.sin(ph + j * Math.PI)) * k).addScaledVector(r, (j ? 1 : -1) * 0.16 * k); return h.setY(ground(h.x, h.z) + 0.05); }) as [THREE.Vector3, THREE.Vector3];
+    // (beside the cabin, the knees and feet on the side deck outboard of its side too, not trailing in over it: its side
+    // stands up to 0.38 m above the deck aft, hull.ts cabinSideH, and the shins would go into it)
+    const ch = (q: number) => q > CAB0 - 0.1 && q < COCK0 + 0.05 ? cabinHalf(uAtZ(q)) : 0;
+    const outside = Math.abs(p.hip.x) > ch(p.hip.z);
+    if (outside) for (const ft of p.feet) { const e = ch(ft.z) + 0.12; if (e > 0.12 && Math.abs(ft.x) < e) { ft.x = Math.sign(p.hip.x) * e; ft.y = ground(ft.x, ft.z) + 0.07; } }
+    p.hands = [0, 1].map(j => { const h = p.hip.clone().addScaledVector(f, (0.42 + 0.08 * Math.sin(ph + j * Math.PI)) * k).addScaledVector(r, (j ? 1 : -1) * 0.16 * k);
+      // (and the hands on the deck clear of the cabin's side as well, the forearms not across its corner)
+      if (outside) { const e = ch(h.z) + 0.1; if (e > 0.1 && Math.abs(h.x) < e) h.x = Math.sign(p.hip.x) * e; }
+      return h.setY(ground(h.x, h.z) + 0.05); }) as [THREE.Vector3, THREE.Vector3];
     p.look = p.hip.clone().addScaledVector(f, 2).setY(p.hip.y + 0.4); p.step = true;
     return p;
   }
@@ -367,8 +388,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.1, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
       // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
-      // within arm's reach of it, the sheet in the inboard hand)
-      const ws = -windward, w = winchAt(ws), wz = w.z + 0.2, bx = ws * (chz(wz) - 0.22); // (the forward knee clear of the bulkhead)
+      // within arm's reach of it, the sheet in the inboard hand. Just forward of it, abreast: the winch between the cabin
+      // and the thwart (JIB_WINCH_Z), the kneeling shin behind them clear of the thwart and the front foot of the bulkhead)
+      const ws = -windward, w = winchAt(ws), wz = w.z - 0.05, bx = ws * (chz(wz) - 0.22);
       const yaw = -ws * 0.15, hold = V(bx - ws * 0.12, SEAT_Y + 0.6 * k, wz - 0.25);
       // (the inboard knee up and the outboard one down on the lid by the coaming: the other way round, the forward thigh
       // would lie along the coaming and through it)
@@ -861,6 +883,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
       if (f.aftSide == null || Math.abs(x) > AFT_MID) f.aftSide = Math.sign(x) || windward;
       x = aftSide(f, x, a.z);
     } else f.aftSide = undefined;
+    f.goalSide = a?.goal && Math.abs(a.goal.x) > 0.3 ? Math.sign(a.goal.x) : undefined;
     const dir = track(f, x, a?.z ?? z, sdt);
     // (on the move from 0.22 m/s, settled again under 0.1: no flicker between walking and sitting)
     const go = f.going = travelling(f, a, x);
