@@ -86,5 +86,12 @@ describe('wrecks', () => {
     const w2 = world('sail'); aim(w2, offMarinaGreen, 180, 2, 1); const r2 = run(w2, 6);
     expect(r2.wrecked).toHaveLength(0); expect(w2.user.damage).toEqual({ level: 'damage', what: 'the seawall' });
   });
+  // (the physics review's cases: a beach beside a construction read as the construction, and a pier always under water read as
+  // standing concrete. Each the chart's natural coast or the bottom, not the edge: aground, no wreck)
+  for (const [where, la, lo] of [['Crissy Field, east', 37.8085, -122.4544], ['Crissy Field, east end', 37.8085, -122.4508], ['off the East Beach', 37.8085, -122.4478], ['by Torpedo Wharf', 37.8085, -122.4666], ['Aquatic Park\'s cove (a submerged ruined pier)', 37.8085, -122.4242]] as const)
+    it(`${where} at 2 m/s: the chart's natural coast or the bottom, not a construction: no wreck`, () => {
+      const w = world('sail'); aim(w, LL(la, lo), 180, 2, 2); const r = run(w, 4);
+      expect(r.wrecked, r.toasts.join(' / ')).toHaveLength(0);
+    });
 });
 

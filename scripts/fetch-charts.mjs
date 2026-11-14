@@ -283,7 +283,8 @@ const hazards = [];
 for (const [n, k] of [['UWTROC', 'rock'], ['WRECKS', 'wreck'], ['OBSTRN', 'obstn']]) for (const f of all(n)) {
   const p = P(f), g = f.geometry, h = { k };
   if (p.VALSOU != null) h.d = p.VALSOU; if (p.WATLEV != null) h.wl = p.WATLEV; if (p.CATWRK != null) h.cw = p.CATWRK;
-  // (for grounding, Bay East: whether VALSOU is a least depth (EXPSOU) and how well it's known (QUASOU), and an obstruction's kind (CATOBS))
+  // (for grounding, Bay East: EXPSOU, how VALSOU sits against its depth area's range (1 within, 2 shoaler, 3 deeper); QUASOU,
+  // how well it's known (6: least depth known); CATOBS, an obstruction's kind)
   if (p.EXPSOU != null) h.es = p.EXPSOU; if (list(p.QUASOU).length) h.qs = list(p.QUASOU); if (list(p.CATOBS).length) h.co = list(p.CATOBS);
   if (g.type === 'Point') { if (!inBox(ll(g))) continue; h.p = qp(ll(g)); }
   else { const ps = polys(g).map(fillPoly).filter(Boolean); if (ps.length) h.f = ps; const ls = lines(g).flatMap(clipLine); if (ls.length) h.o = ls; if (!ps.length && !ls.length) continue; }
@@ -302,7 +303,7 @@ for (const f of all('SBDARE')) {
 // category (COALNE CATCOA: 1 steep coast, 2 flat coast, 3 sandy shore, 4 stony shore, 5 shingly shore, 8 marshy shore,
 // 11 shelly shore…) and the shoreline constructions' (SLCONS CATSLC: 1 breakwater, 2 groyne, 3 mole, 4 pier, 5 promenade
 // pier, 6 wharf, 7 training wall, 8 rip rap, 9 revetment, 10 sea wall, 11 landing steps, 12 ramp, 13 slipway, 14 fender,
-// 15 solid face wall, 16 open face wall), with WATLEV and CONDTN where given. Raw codes: the kinds are read in shoreKind.ts
+// 15 solid face wharf, 16 open face wharf), with WATLEV and CONDTN where given. Raw codes: the kinds are read in shoreKind.ts
 const shoreKinds = [];
 for (const f of all('COALNE')) { const c = list(P(f).CATCOA); const o = lines(f.geometry).flatMap(clipLine); if (o.length) shoreKinds.push({ coa: c, o }); }
 for (const f of all('SLCONS')) {
