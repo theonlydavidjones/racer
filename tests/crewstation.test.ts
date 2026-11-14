@@ -27,10 +27,12 @@ export function stationMoves(kt: number) {
     secs += DT;
     ai.forEach((b, k) => b.crew!.people.forEach((a, i) => {
       if (i === 0) return;
-      walked[k][i] += Math.abs(a.z - zWas[k][i]); zWas[k][i] = a.z;
       const g = a.goal?.z ?? a.z; if (Math.abs(g - goalWas[k][i]) > 0.3) { trips[k][i]++; } goalWas[k][i] = g;
       const at = a.goal?.z ?? a.z, seat = !a.job && at >= 0.88 && !atWinch(at); // (the step in past the winch, on the way: not a seat)
       if (seat && !Number.isNaN(prev[k][i]) && Math.abs(at - prev[k][i]) > 0.05) moves[k][i]++;
+      // (along the boat while their place is a seat: a job's trip, the mast and the run's foredeck aside)
+      if (seat && a.z >= 0.88) walked[k][i] += Math.abs(a.z - zWas[k][i]);
+      zWas[k][i] = a.z;
       prev[k][i] = seat ? at : NaN;
     }));
   }
@@ -39,13 +41,14 @@ export function stationMoves(kt: number) {
 }
 
 describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () => {
-  // (before the stations, on this race: the forward hand 1.5 trips and 3.1 m along the boat a minute in 12 kt, the other
-  // crew 0.26 m, sliding along the cockpit; now 1.0 and 0.02, the forward hand's walking about the same, 2.4 to 3.0 m by
-  // the race. That's their jobs: the cabin top, the mast, the run's foredeck; the seats no longer change)
-  for (const kt of [12, 6]) it(`in ${kt} kt: no changes of seat, the other crew all but still, few trips`, () => {
+  // (on this race, before the stations (claude/crew-winch-seats) and now, a minute: changes of seat 0 and 0; the forward
+  // hand's trips 1.5 and 1.27 in 12 kt, the other crew's 0.07 and 0; along the boat while at a seat, a few centimetres to
+  // 0.3 m, a little more now in light air, where both may go forward of the winch for minutes. Trips are jobs: the cabin
+  // top, the mast, the run's foredeck)
+  for (const kt of [12, 6]) it(`in ${kt} kt: no changes of seat, few trips, little walking at the seats`, () => {
     const m = stationMoves(kt);
     for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.05);
-    m.walked.forEach((x, j) => expect(x, `crew ${j % 2 + 1}: m along the boat a minute`).toBeLessThan(j % 2 === 0 ? 0.1 : 3.2));
-    for (const t of m.trips) expect(t, 'trips a minute').toBeLessThan(1.2);
+    m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
+    m.trips.forEach((t, j) => expect(t, `crew ${j % 2 + 1}: trips a minute`).toBeLessThan(j % 2 === 0 ? 0.1 : 1.4));
   }, 600_000);
 });

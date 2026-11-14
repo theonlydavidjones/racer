@@ -724,11 +724,14 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
 const TWO_DWELL = 120;
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const n = c.spec.crew.length; if (!n) return 0.5;
-  // (for the speed she's sailing at, over about a gust-lull cycle (c.vAvg), not a tack's slow few seconds: there it took
-  // them to the forward end, as in light air, and the dwell below kept them there for a minute back up to speed in 25 kt.
-  // The physics review: after a slow spell in a breeze (a start, in irons) the average keeps them at the light-air seats
-  // for minutes; claude/crew-stations judges on the polar's speed for the last minute's wind instead, with the stations)
-  const v = Math.max(0.5, c.vAvg ?? k.v), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
+  // (for the speed she sails at in the wind there's been over the last minute, at this angle: polar.ts, as chooseLayout
+  // has it with the pole out; and not re-thought through a tack and its settling after (HOLD.settle), where the angle
+  // passes head to wind. On this moment's speed, a tack's slow few seconds took them to the forward end, as in light
+  // air, and the dwell below kept them there for a minute back up to speed in 25 kt; on her own speed averaged over a
+  // minute, after a slow spell in a breeze, a start or in irons, they sat at the light-air seats for four minutes (the
+  // physics review))
+  if (c.fore01 != null && (c.roll || (c.clock ?? 0) - (c.settleT ?? -1e9) < HOLD.settle)) return c.fore01;
+  const v = Math.max(0.5, polar(c.twsAvg ?? k.tws, k.twa)), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
   // Where along the cockpit is fastest, all told (physics review): the trim's effect on the hull's resistance
   // (hullTrim.ts trimSpeedFactor) and, sitting out to windward, the deck's half-breadth where they sit, narrower aft
   // (deckHalf), which is their righting arm. Hiking flat out they can't make that up, so it's heel: the moment lost over
