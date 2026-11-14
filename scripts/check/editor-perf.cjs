@@ -35,10 +35,14 @@ const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 
       const t0 = performance.now(); (0, eval)(src); const sync = performance.now() - t0;
       let work = 0; const lt = new PerformanceObserver(l => { for (const e of l.getEntries()) work += e.duration; }); lt.observe({ type: 'longtask', buffered: false });
       await new Promise(r => setTimeout(r, 1500)); lt.disconnect();
-      return { sync, after: work };
+      // (the work the click hands on, once the race has taken it: the restyled boat's mesh, or the new hour's light,
+      // measured by the page itself, app.ts)
+      const later = performance.getEntriesByType('measure').filter(e => e.name.startsWith('editor:') && e.startTime >= t0).reduce((a, e) => a + e.duration, 0);
+      performance.clearMeasures();
+      return { sync: sync + later, handler: sync, later, after: work };
     }, act);
     let prof = null; if (profile) { prof = (await cdp.send('Profiler.stop')).profile; fs.writeFileSync(path.join(out, `editor-${name}.cpuprofile`), JSON.stringify(prof)); }
-    console.log(`${name}: ${r.sync.toFixed(0)} ms in the click's handler; long tasks after it ${r.after.toFixed(0)} ms (frames included)`);
+    console.log(`${name}: ${r.sync.toFixed(0)} ms (${r.handler.toFixed(0)} in the click's handler, ${r.later.toFixed(0)} once the race took it); long tasks after it ${r.after.toFixed(0)} ms (frames included)`);
     return { name, ...r };
   };
   const res = [];
@@ -48,7 +52,7 @@ const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 
   res.push(await timed('cockpit', `(() => { const b = [...document.querySelectorAll('#boatPanel [data-act="cockpit"]')].find(x => x.getAttribute('aria-pressed') !== 'true'); b?.click(); })()`));
   res.push(await timed('time', `(() => { const e = document.getElementById('showTime'); e.value = String((+e.value + 180) % 1440); e.dispatchEvent(new Event('change', { bubbles: true })); })()`));
   const over = res.filter(r => r.sync > budget);
-  for (const r of over) console.log(`FAIL: ${r.name} took ${r.sync.toFixed(0)} ms in its handler (budget ${budget} ms)`);
+  for (const r of over) console.log(`FAIL: ${r.name} took ${r.sync.toFixed(0)} ms of the page's work (budget ${budget} ms)`);
   if (errs.length) console.log('page errors:', errs.slice(0, 3));
   await browser.close(); process.exit(over.length || errs.length ? 1 : 0);
 })();

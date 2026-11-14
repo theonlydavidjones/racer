@@ -1210,7 +1210,7 @@ $('showTime').addEventListener('input', () => { const m = Number(($('showTime') 
 $('showTime').addEventListener('change', () => {
   showMin = Number(($('showTime') as HTMLInputElement).value);
   // (the showroom's clock: the boat on show lit for the new hour, the same World; ROADMAP 8v: a new World was seconds)
-  if (w && (boatPanel?.open || fleet?.showing)) void host.ask({ k: 'clock', tideTime: hhmm(showMin + S.seq) }).then(() => view.conditionsChanged(w));
+  if (w && (boatPanel?.open || fleet?.showing)) void host.ask({ k: 'clock', tideTime: hhmm(showMin + S.seq) }).then(() => { const t0 = performance.now(); view.conditionsChanged(w); performance.measure('editor: clock', { start: t0 }); });
   else setup.newGame();
   showBar();
 });
@@ -1340,7 +1340,7 @@ boatPanel = new BoatPanel(S, save => {
   // a change to how she looks only (her paint, hatch, cockpit, lettering): restyled where she lies, only her mesh built
   // again; anything that changes how she sails (her rig, her bottom, her crew...) puts her in the water afresh (ROADMAP 8v)
   const next = boatPanel.editing, was = w?.user?.spec;
-  if (was && was.id === next.id && lookOnly(was, next)) void host.ask({ k: 'look', spec: structuredClone(next) }).then(() => view.rebuildBoat(w, w.boats.indexOf(w.user)));
+  if (was && was.id === next.id && lookOnly(was, next)) void host.ask({ k: 'look', spec: structuredClone(next) }).then(() => { const t0 = performance.now(); view.rebuildBoat(w, w.boats.indexOf(w.user)); performance.measure('editor: restyle', { start: t0 }); }); // (timed: scripts/check/editor-perf.cjs)
   else setup.newGame();
   boatSummary(); oppRows();
 }, saved => {
@@ -1364,7 +1364,8 @@ const fleet: Fleet = new Fleet(S, {
   // (a member changed: saved, and your boat's race crew drawn again from her seats)
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
-  edit: id => { showroom(true); boatPanel.show(id); setup.newGame(); },
+  // (her page already has her on show, in the same World: the editor opens on it, no new one; ROADMAP 8v)
+  edit: id => { const same = !!w && w.user?.spec?.id === id && fleet?.showing?.id === id; showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
