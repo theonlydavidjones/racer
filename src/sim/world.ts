@@ -1,7 +1,9 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
+import { paddlePower, paddler } from '../boat/paddle';
 import { RoundingTracker } from './roundings';
-import { LESSON_WIND, LessonTracker } from './lessons';
+import { addHarborLee } from '../environment/harborLee';
+import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
@@ -24,7 +26,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { CONTACT_GAP, INCIDENT_COOLDOWN, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
@@ -36,6 +38,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
+import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
@@ -100,6 +103,9 @@ const TANGLE_MAX = 30;
  * JAM_CLOSING: drifting together, at a mark in the ebb, with little flow over either rudder (flowTurnRate(0.5) is about
  * 3°/s) and nothing either can do in the seconds between touches. A modelling choice, no source gives a figure. */
 const STEERAGE = 0.5, JAM_CLOSING = 0.4;
+/** Pressed together: never more than this past touching (CONTACT_GAP) since the last contact, m. A modelling choice: the
+ * contact response (boat/contact.ts) holds boats lying together at touching, give or take the step's motion. */
+const PRESSED_SLACK = 0.3;
 /** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modelling cap). */
 const JAM_MAX = 2 * TANGLE_MAX;
 
@@ -134,6 +140,9 @@ export interface Protest {
  * she could no longer avoid her own breach (US Appeals 2 and 19; WS Cases 3, 30, 51; Appeal 78 for a chain). The sim's
  * sign of it: the boat that broke a rule against her is still within ENGAGED of her when she breaks hers (she's still
  * dealing with that boat: swerving from her, or pushed by her), within COMPELLED_WINDOW. */
+
+/** After a rule 42 penalty, she has this long to stop paddling before going on counts as a fresh breach, s (a judgement). */
+const R42_STOP = 5;
 
 export interface StartReport { delay: number; frac: number; kt: number }
 
@@ -178,6 +187,12 @@ const SWING_DRAG = 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3
 function windSwing(kt: number, rel: number): number {
   const vSide = kt * KT * Math.sin(rel * D2R), torque = 0.5 * 1.225 * HOVE.windSide * vSide * vSide * 3.8;
   return Math.sqrt(torque / SWING_DRAG) / D2R;
+}
+
+/** The nearest land within `r` m (bearings every 15°, 2 m steps), or null. */
+function nearestLand(p: Vec, r: number): Vec | null {
+  for (let d = 2; d <= r; d += 2) for (let a = 0; a < 360; a += 15) { const u = V(a), q = { x: p.x + u.x * d, y: p.y + u.y * d }; if (onLand(q)) return q; }
+  return null;
 }
 
 /** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
@@ -233,7 +248,8 @@ export const CLOSE_M = 4 * LOA;
  * race, after the rules' hottest functions (checkPairs, assessPair) had learnt the boats' old classes, that left them
  * compiling and throwing the result away, some 800 times in the first race after load on Bay East's waves branch (14 s
  * of the engine's compiler threads; docs/CAPACITY.md, "The compiler's thrown-away work"; scripts/check/deopt.cjs).
- * weatherHeld and carOff, given later and starting at 0, are declared undefined in makeBoat for the same reason. (V8's
+ * weatherHeld and carOff, given later and starting at 0, are declared undefined in makeBoat for the same reason; and
+ * lastHitT and paddle (rule 42.3(h)'s contact time and the crutch), given mid-race, so a first bump doesn't add a field. (V8's
  * matter: Safari's engine keeps shapes its own way, and this costs it nothing.)
  */
 const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT'] as const;
@@ -327,13 +343,20 @@ export class World {
   /** Rule 44.1's tangle, pair by pair (pairKey): the last contact between the two, and whether they've since been a
    * length clear of each other, opened by a foul that carried a penalty (`fouler` owes it). A jam of three or four boats
    * is several pairs; each pair's contacts while it lasts are one incident (US Appeal 65: "the inevitable result of the
-   * first") by the same fouler, until her turns begin (then rules 44.2 and 21.2: a new breach), for TANGLE_MAX from the
-   * first contact. The other boat touching back is her own breach, except while the two are jammed (see STEERAGE) or
-   * haven't parted at all since (`parted`: never a metre wider than just after the last touch, `g0`, its push apart
-   * included: one collision going on, the boats swinging against each other, whoever's right of way it is at each
-   * touch). Not for the user once her turns have begun: locked against the boat she fouled, she isn't "well clear"
-   * (44.2), and her turns there don't excuse the touches; the AI gets clear before it turns. */
-  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }>();
+   * first") by the same fouler, for TANGLE_MAX from the first contact. The other boat touching back is her own breach,
+   * except while the two are jammed (see STEERAGE) or haven't parted at all since (`parted`: never a metre wider than
+   * just after the last touch, `g0`, its push apart included, nor than touching, CONTACT_GAP: a touch with the hulls
+   * overlapping reads g0 = 0; one collision going on, the boats swinging against each other, whoever's right of way it is
+   * at each touch). Once the fouler's turns have begun (rules 44.2 and 21.2), a touch after they've parted is a new
+   * breach if she has had steerage way since the last (`steered`: through the water, ahead or astern, at STEERAGE or
+   * more for COMPELLED_WINDOW, a helmsman's reaction and a turn's worth: not the way the touch itself left her), so
+   * could have kept clear; without it, it's the same incident. The user's boat and the AI's alike. Pressed together
+   * (`pressed`: the last incident a contact, the gap never opened past touching since (`opened`, PRESSED_SLACK), and this
+   * the next touch the pair's cooldown allows) it's one collision going on, however long it lasts. A contact that carried
+   * no penalty (exonerated, 43.1(a); not racing; 23.1) opens one too, `pen` false, which holds only for her own touches
+   * while they stay pressed together: a compelled boat isn't charged for being held against the other, but a touch she
+   * chooses later, or the other boat's own breach, is judged afresh. */
+  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean }>();
   private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
   /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
    * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
@@ -474,6 +497,8 @@ export class World {
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
+    // (and the harbor mouths' gyres spun up through the tide's last 13 hours now, not in the race's first step: mouthFlows)
+    this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
     this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
@@ -594,7 +619,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -678,7 +703,8 @@ export class World {
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
     const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
-    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    if (!nearMouth(p)) return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    return withHarborMouths(p, c, k, this.mouthFlows(), this.t); // (and the gyre and eddies in a harbor's mouth: environment/harborMouth.ts)
   }
   /** The stream at a point as if no breakwater stood there: the sea's look upwind for the water its waves came
    * through (environment/sea.ts), which is never a harbor's still basin (no waves come to open water through one). */
@@ -686,7 +712,7 @@ export class World {
    * waiting on a harbor's still-water grid not built yet (the open stream there until it is, a moment later). */
   currentDrawn(p: Vec): Vec {
     const c = withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t), k = basinCalmIfBuilt(p) ?? 1;
-    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    return nearMouth(p) ? withHarborMouths(p, c, k, this.mouthFlows(), this.t) : k === 1 ? c : { x: c.x * k, y: c.y * k };
   }
   openStreamAt(p: Vec): Vec { return withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t); }
   /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
@@ -705,6 +731,24 @@ export class World {
     return this.flows;
   }
   private flowsC: Vec | null = null;
+  /** The harbor mouths' water (environment/harborMouth.ts): the stream crossing each, its gyre and its eddies' phase, brought up to date every half minute. */
+  private mouthS: MouthState = mouthState(); private mouthC: Vec | null = null;
+  private mouthFlows(): MouthState {
+    // (another preset: its water from the start, the eddies keeping their beat. A new object, not the old one changed:
+    // the page's mirror is sent what's new, sim/sync.ts)
+    if (!this.tide && this.mouthC !== this.cvec) { this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; this.mouthC = this.cvec; }
+    const S = this.mouthS;
+    if (!(this.t - S.t >= 0 && this.t - S.t < 30)) {
+      // (the first look under the real tide: the last 13 hours of it, predicted from the same constants, to spin the gyre up;
+      // only the stations within 4 km of a mouth are predicted: the stream there is theirs to within a percent, at an eighth of the cost)
+      let past: ((p: Vec, hoursAgo: number) => Vec) | undefined;
+      if (this.tide && !(this.t - S.t >= 0)) { const now = this.clockUtc, f = new CurrentField(stationsFor(now - 13 * 60 - 5, now + 5, { at: MOUTH_REFS, within: 4000 })); past = (p, h) => { f.setTime(now - h * 60); return f.atShore(p, false); }; }
+      refreshMouths(S, this.t, q => this.streamAt(q, false), past);
+      // (as a new object each time, like the piers' flows: the page's mirror is sent what's new, not what's changed in place)
+      return this.mouthS = { t: S.t, flows: S.flows.slice(), gyre: S.gyre.slice(), phase: S.phase.slice() };
+    }
+    return S;
+  }
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
@@ -817,11 +861,160 @@ export class World {
     }
     if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
     addPierWakes(sum, from, p);
+    addHarborLee(sum, from, p); // (the harbors' walls and Fort Mason's sheds: environment/harborLee.ts)
     const r = sum.result(from);
     return { k: r.k * lee, shift: r.shift };
   }
 
   /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
+  /**
+   * Paddle her with the boom crutch on `side` (back: back-paddling), or stop (null): you calling it (auto false), or the
+   * crew of themselves in a jam (crewPaddleCall). Changing sides keeps the crutch out. Racing, rule 42.1 forbids it
+   * except to get clear after grounding or colliding (42.3(h)), or to help someone in danger (42.3(g)).
+   */
+  paddle(side: 'P' | 'S' | null, back: boolean, auto: boolean): void {
+    const u = this.user, was = u.paddle;
+    // (you stopping the crew's own paddling sticks: they don't start again until the jam has passed. crewPaddleCall)
+    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) { u.paddleOff = true; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
+    if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
+    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t };
+    this.paddleJob(u, side);
+    const solo = (u.crew?.spec.crew.length ?? 0) === 0, who = solo ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
+    const verb = solo || auto ? (back ? 'back-paddle' : 'paddle') : (back ? 'back-paddles' : 'paddles'); // (agreeing with who)
+    const where = `on the ${side === 'P' ? 'port' : 'starboard'} side`, how = `${verb} ${where}`;
+    if (!was) this.emit({ type: 'toast', ms: 5000, msg: `${who} the boom crutch from the cabin and ${how}${auto ? ': she\'s being set onto something with no wind to sail clear.' : '.'}${this.racing(u) && !this.paddleAllowed(u) ? ' Racing, that breaks rule 42.1 unless you\'re getting clear after hitting something (42.3(h)).' : ''}` });
+    else if (was.side !== side || !!was.back !== back) this.emit({ type: 'toast', msg: `Now ${back ? 'back-paddling' : 'paddling'} ${where}.` });
+  }
+  /** Rule 42.3(h): paddling "to get clear after grounding or colliding": judged each moment, within 30 s of the contact
+   * (the rule gives no time; its purpose, getting clear, does: a judgement, as the crew's own call uses), so a spell
+   * begun to get clear doesn't stay legal for a whole calm leg. */
+  paddleAllowed(b: Boat): boolean {
+    const p = b.paddle, hit = b.lastHitT; if (!p || hit == null) return false;
+    return this.t - hit <= 30;
+  }
+  /** The paddler at the side deck on the paddling side, as long as she's paddling (crewPhys places them; render/crew.ts
+   * draws them kneeling there, as at the jib car). */
+  private paddleJob(b: Boat, side: 'P' | 'S' | null): void {
+    const c = b.crew; if (!c) return;
+    const a = c.people[paddler(b)]; if (!a) return;
+    if (!side) { if (a.job?.line === 'paddle') a.job = null; return; }
+    // (the station's arm is out to windward when +: worked for this tack, and again if she swings through the wind while
+    // paddling, so the paddler stays on the side they're paddling: paddleWork)
+    const windward = (b.tack === 'S') === (side === 'S') ? 1 : -1;
+    a.job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' }, side: b.tack };
+  }
+  /** Each step: the paddling ends with the motor driving her or once she's made fast; racing, a breach of rule 42 is
+   * flagged (rules: world.rule42, one penalty a spell). */
+  private paddleWork(b: Boat): void {
+    const p = b.paddle; if (!p) return;
+    if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
+    const job = b.crew?.people[paddler(b)]?.job; if (job?.line === 'paddle' && job.side !== b.tack) this.paddleJob(b, p.side);
+    if (!this.racing(b) || this.paddleAllowed(b)) return;
+    // the 42.3(h) window closing on a spell begun to get clear: the crew's own stops (they keep the rule); yours, a word
+    // and a few seconds' grace from it (as the penalty's own, R42_STOP), before it's a breach. Told at once, even while the
+    // crutch is still being fetched, so a spell called late in the window still gets its grace
+    const hit = b.lastHitT;
+    if (hit != null && p.t0 <= hit + 30) {
+      if (p.auto) { this.paddle(null, false, true); return; }
+      let w = this.r42warn.get(b.id);
+      if (!w || w.t0 !== p.t0) {
+        this.r42warn.set(b.id, w = { t0: p.t0, at: this.t });
+        if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Clear of it now: stop paddling, or it breaks rule 42.1 (42.3(h) covers only getting clear).' });
+      }
+      if (this.t - w.at <= R42_STOP) return;
+    }
+    if (paddlePower(b, this.t) > 0) this.rule42(b, 'paddle');
+  }
+  /**
+   * Rule 42 (propulsion): a boat racing that paddles breaks 42.1 unless an exception holds. Rules builds the incident and
+   * the penalty (DSQ, or Appendix P's two turns where the race applies it), once a spell; until then it's told.
+   */
+  rule42(b: Boat, why: 'paddle'): void {
+    // (one penalty a spell of paddling, b.paddle.t0: switching sides is the same spell; stopping and starting again, a new one)
+    // (and paddling on past R42_STOP after the penalty is a fresh breach, as a judge would see it: one penalty doesn't buy
+    // a whole calm leg; under Appendix P that's her second, P2.2)
+    const p = b.paddle; if (!p || b.retired || b.scoring === 'DSQ' || !this.racing(b)) return; // (disqualified already: nothing more to add)
+    const last = this.r42spell.get(b.id);
+    if (last && last.t0 === p.t0 && this.t - last.at < R42_STOP) return;
+    this.r42spell.set(b.id, { t0: p.t0, at: this.t });
+    const n = (this.r42count.get(b.id) ?? 0) + 1; this.r42count.set(b.id, n);
+    const how = why === 'paddle' ? 'Paddling' : 'Propelling her';
+    if (this.settings.appendixP) {
+      // Appendix P (judges on the water): P2.1, a first penalty is a Two-Turns Penalty under 44.2; P2.2, a second in the
+      // event, she shall promptly retire
+      if (n === 1) {
+        addPenalty(b, 720);
+        if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `${how} while racing breaks rule 42.1 (propulsion). Appendix P applies: a Two-Turns Penalty (P2.1). Get clear and take it. A second rule 42 penalty means retiring (P2.2).` });
+      } else if (b.isUser) this.retire(': a second rule 42 penalty (Appendix P2.2)');
+      else { b.retired = true; b.penalty = 0; }
+    } else {
+      // no Appendix P: rule 44.1's turns are for Part 2 and rule 31 only, so a rule 42 breach is protested and disqualified
+      b.scoring = 'DSQ';
+      if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `${how} while racing breaks rule 42.1 (propulsion): she will be disqualified (DSQ). No penalty turns can exonerate it (rule 44.1 covers Part 2 and rule 31 only). Only getting clear after hitting something (42.3(h)) or helping someone in danger (42.3(g)) allows it.` });
+    }
+  }
+  /** Rule 42 penalties: the spell (b.paddle.t0) each boat was last penalized for, and how many this race (Appendix P2.2). */
+  private r42spell = new Map<number, { t0: number; at: number }>();
+  private r42count = new Map<number, number>();
+  /** The 42.3(h) window's closing told, for each boat's spell (its t0, kept through a change of sides): when. */
+  private r42warn = new Map<number, { t0: number; at: number }>();
+  /**
+   * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
+   * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons in a light air
+   * with the shore within 40 m. They paddle her away from it (back-paddling if it's ahead), on the side that turns her bow off it, and stop
+   * once she's clear with way on or wind to sail by, re-aiming if they're paddling her onto something else. Racing, only
+   * where rule 42 lets them (42.3(h)). Not while you're paddling her yourself, the motor's driving, or she's alongside;
+   * and if you stop them, not again until the jam has passed.
+   */
+  private crewPaddleCall(b: Boat): void {
+    const p = b.paddle, n = b.crew?.spec.crew.length ?? 0;
+    if ((p && !p.auto) || n === 0 || b.docked || b.handled || b.pushing || (b.motor?.running && b.motor.gear !== 'N')) return;
+    // (racing: only to get clear after a contact, 42.3(h), and they stop a little before that's over: paddleAllowed)
+    if (this.racing(b) && !(b.lastHitT != null && this.t - b.lastHitT <= 28)) { if (p) this.paddle(null, false, true); return; }
+    const ahead = b.v - (b.astern ?? 0), calm = b.ww.kt < 3, slow = Math.abs(ahead) < 0.25;
+    // what the stream alone sets her onto in the next minute (her own way she can stop or turn; the stream she can't), and
+    // while paddling, what she's heading for as she goes over the ground (the way they're paddling her)
+    const set = this.driftHazard(b, b.cur), going = p ? this.driftHazard(b, { x: b.vx, y: b.vy }) : null;
+    // in irons: stopped head to wind in a light air (in a breeze she backs the jib and sails out: physics.ts) near the shore
+    const headUp = b.ww.kt < 4 && Math.abs(wrap(b.ww.from - b.h)) < 30 && shoreDist(b) < 40, irons = slow && headUp;
+    const trouble = (calm && !!set) || headUp, jam = slow && trouble;
+    if (!p) {
+      if (!trouble) b.paddleOff = false; // (the jam has passed: next time they may paddle again)
+      if (!jam || b.paddleOff) return; // (you stopped them: they leave it to you)
+      // (off what the stream sets her onto; else land just ahead of her bow, which she backs off; else the nearest shore)
+      const f = V(b.h), close = [6, 10, 15].map(d => ({ x: b.x + f.x * d, y: b.y + f.y * d })).find(q => onLand(q));
+      const at = set ?? close ?? nearestLand(b, 40) ?? { x: b.x + f.x, y: b.y + f.y };
+      const a = this.paddleAim(b, at); this.paddle(a.side, a.back, true); return;
+    }
+    // paddling her into something (a second hazard, or the shore she started off): re-aim off it, given a fair spell
+    // on each side (the same spell: the crutch is in hand. If it's the stroke they're at, they keep at it)
+    if (going && this.t - (p.aimT ?? p.t0) > 10) {
+      const a = this.paddleAim(b, going);
+      if (a.side !== p.side || a.back !== !!p.back) this.paddle(a.side, a.back, true); else p.aimT = this.t;
+      return;
+    }
+    // clear: the stream no longer setting her onto anything, with way on (either way) or wind to sail by
+    // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
+    // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
+    if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
+    else if (this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
+  }
+  /** Where she'll be on land, or within 10 m of a mark, drifting at `vel` (m/s over the ground) in the next minute, looking
+   * every 5 s (at a 2 m/s Gate ebb, 10 m apart: a mark or a thin pier isn't stepped over). */
+  private driftHazard(b: Boat, vel: Vec): Vec | null {
+    for (let k = 1; k <= 12; k++) {
+      const q = { x: b.x + vel.x * 5 * k, y: b.y + vel.y * 5 * k };
+      if (onLand(q)) return q;
+      for (const m of [...this.C.marks, ...(this.rounding?.marks ?? [])]) if (m.shape !== 'island' && dist(q, m.p) < 10) return m.p;
+    }
+    return null;
+  }
+  /** Which side and which way to paddle to get her off `at`: back-paddling if it's ahead, else forward; on the side that
+   * swings her bow off it (forward on port swings her bow to starboard; back-paddling, the other way). */
+  private paddleAim(b: Boat, at: Vec): { side: 'P' | 'S'; back: boolean } {
+    const rel = wrap(brg(at.x - b.x, at.y - b.y) - b.h), back = Math.abs(rel) < 90, turn = -Math.sign(rel) || 1; // (+: bow to starboard)
+    return { side: back ? (turn > 0 ? 'S' : 'P') : (turn > 0 ? 'P' : 'S'), back };
+  }
   private belowSinceGun = new Set<number>();
   /**
    * Definitions, Racing: "from her preparatory signal until she finishes and clears the finishing line and marks or
@@ -909,6 +1102,8 @@ export class World {
     return this.settings.mode === 'lesson' ? clamp(kt, lo / f, hi / f) : kt;
   } // (a breeze: the top of the range; a Case: a breeze she sails at the Cases' own speed in)
   private lessonField: number | null = null;
+  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
+  private readonly mobEnv: MobEnv = { current: p => this.currentAt(p), wind: p => this.windHere(p, undefined, false) };
 
   /** Sail it yourself: each boat set at her pose in the Case at its start, the others to sail its track (their letters
    * for names: the Case's own, as the incident card and the labels then read). */
@@ -1000,6 +1195,7 @@ export class World {
     this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
+    this.mouthFlows(); // (the harbor mouths' water kept up every step, asked for or not: what it holds depends on when it was read, so the race reads it, and the page's mirror is sent it)
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
     for (const b of this.boats) {
@@ -1028,6 +1224,8 @@ export class World {
     // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
     const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
     if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
+    if (this.steps % 30 === 0 && !this.user.handled) this.crewPaddleCall(this.user); // (a jam, looked for twice a second)
+    this.paddleWork(this.user);
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -1054,7 +1252,7 @@ export class World {
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
-    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (a lesson: its check, on the boat as she sails)
+    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0, this.mobEnv); // (a lesson: its check, on the boat as she sails)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);
@@ -1176,7 +1374,7 @@ export class World {
           const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
           const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = Math.hypot(dx, dy) || 1;
           b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          b.v *= m.q ? 0.9 : 0.97;
+          b.v *= m.q ? 0.9 : 0.97; b.lastHitT = this.t;
         }
       }
       // the same touch until she's got clearly away from that mark
@@ -1339,7 +1537,7 @@ export class World {
       const untangle = (X: Boat, Y: Boat) => { const lf = this.lastFoulVs.get(X.id); if (lf && lf.vs === Y.id && !lf.clear && hullGap(X, Y) > LOA) lf.clear = true; };
       untangle(A, B); untangle(B, A); // (each way round, as before; no arrays a pair a step)
       const tg = this.tangles.get(key);
-      if (tg && !tg.clear) { const g = hullGap(A, B); if (g > LOA) tg.clear = true; if (g > tg.g0 + 1) tg.parted = true; }
+      if (tg && !tg.clear) { const g = hullGap(A, B); if (g > LOA) tg.clear = true; if (g > Math.max(tg.g0, CONTACT_GAP) + 1) tg.parted = true; if (g > CONTACT_GAP + PRESSED_SLACK) tg.opened = true; const fb = tg.fouler === A.id ? A : B; if (fb.v + (fb.astern ?? 0) >= STEERAGE) { tg.wayT ??= this.t; if (this.t - tg.wayT >= COMPELLED_WINDOW) tg.steered = true; } else tg.wayT = null; }
       if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
       const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
@@ -1392,28 +1590,38 @@ export class World {
       const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
       if (incident.kind === 'contact') {
-        A.v *= 0.35; B.v *= 0.35;
+        A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
       // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
-      // from that foul (not a length clear of each other since), and before her turns have begun, is that same incident: no
-      // second foul. (The AI gets clear before turning, and again if a new penalty comes mid-turns: rule 44.2.)
+      // from that foul (not a length clear of each other since), is that same incident: no second foul. (The AI gets clear
+      // before turning, and again if a new penalty comes mid-turns: rule 44.2.)
       // (a boat new to the tangle, or one she has got clear of, is a new incident)
       const pk = pairKey(A, B), prior = this.tangles.get(pk);
       // (how long: TANGLE_MAX from the first contact; but while the two are jammed (in the ebb at a mark a fleet can sit at a
       // few tenths of a knot inside a length of each other for minutes) neither can do anything new, and it runs on from
-      // the last contact, up to JAM_MAX from the first)
-      // (and not once her turns have begun: rule 44.2 has her take them "after getting well clear of other boats", and while
-      // taking a penalty rule 21.2 has her keep clear of all others; a contact then, next to the boat she fouled, is her own
-      // choice, not "the inevitable result of the first" (US Appeal 65): a new breach, the user's or the AI's alike. Unless
-      // both are jammed below steerage way: drifting together in the ebb, neither can choose anything)
-      if (incident.kind !== 'hail' && prior && !prior.clear && (!f.penaltyDir || jammed || (!prior.parted && !f.isUser)) && (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX) && (prior.fouler === f.id || jammed || !prior.parted)) {
-        prior.t = this.t; prior.parted = false; prior.g0 = hullGap(A, B); // (the tangle goes on)
-        if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).` });
+      // the last contact, up to JAM_MAX from the first; and while they've never parted since the last touch, pressed
+      // together, it's one collision going on however long it lasts: it runs on from the last contact, without a cap)
+      // (and once her turns have begun: rule 44.2 has her take them "after getting well clear of other boats", and while
+      // taking a penalty rule 21.2 has her keep clear of all others; a contact then, next to the boat she fouled, with way
+      // enough to steer since the last, is her own choice, not "the inevitable result of the first" (US Appeal 65): a new
+      // breach, the user's or the AI's alike. Unless she hasn't had steerage way since, or they haven't parted (one
+      // collision still going on), or both are jammed below steerage way: drifting together in the ebb, neither can
+      // choose anything)
+      // (pressed together, one collision going on: however long it lasts, no cap)
+      const pressed = !!prior && prior.contact && !prior.opened && this.t - prior.t <= INCIDENT_COOLDOWN + 1;
+      const inWindow = !!prior && (pressed || (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX));
+      if (incident.kind !== 'hail' && prior && !prior.clear && inWindow && (prior.pen
+        ? (!f.penaltyDir || jammed || (prior.fouler === f.id && !prior.steered) || !prior.parted) && (prior.fouler === f.id || jammed || !prior.parted)
+        : pressed && prior.fouler === f.id)) {
+        prior.t = this.t; prior.parted = false; prior.steered = false; prior.wayT = null; prior.opened = false; prior.contact = incident.kind === 'contact'; prior.g0 = hullGap(A, B); // (the tangle goes on)
+        if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} ${prior.pen ? 'are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).' : 'are still pressed together: the same incident.'}` });
         continue;
       }
-      if (incident.kind !== 'hail' && incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B) });
+      // (a tangle with no penalty doesn't take the place of one with a penalty still running: her next touch is that one's)
+      const pen = incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1';
+      if (incident.kind !== 'hail' && !(prior && prior.pen && !pen && !prior.clear && this.t - prior.t0 < TANGLE_MAX)) this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B), steered: false, wayT: null, pen, contact: incident.kind === 'contact', opened: false });
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       this.onIncident?.(A, B, incident);
@@ -1521,7 +1729,7 @@ export class World {
         if (gap < 0) {
           const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
           const cx = hv.a.x + (hv.b.x - hv.a.x) * k, cy = hv.a.y + (hv.b.y - hv.a.y) * k, l = Math.hypot(b.x - cx, b.y - cy) || 1;
-          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0;
+          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0; b.lastHitT = this.t;
           if (b.isUser) wreck(b, `hit by the ${ty.name.toLowerCase()}`, b, this.emit); // (a ship: a wreck at any speed, WRECK-PROPOSAL section 1)
           if (b.isUser && !b.wrecked && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
         }
@@ -2093,15 +2301,17 @@ export class World {
     const s: Settings = { ...this.settings };
     for (const k of CONDITION_KEYS) (s as unknown as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k];
     const n = new World(this.file, { ...s, fleet: 0, opponents: [] }, this.seed, { ...this.opts, startAt: this.startAt });
+    const newTide = (['current', 'tideDate', 'tideTime'] as const).some(k => this.settings[k] !== s[k]); // (another tide: the harbor mouths' gyres are spun up afresh; a change of wind leaves them be)
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
-    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; // (the piers' wakes from the new stream at once)
+    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
     this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();
     if (this.tide) this.updateTide();
+    this.mouthFlows(); // (read at once, here as in the race's step, so the race and its mirror hold the same)
     // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
     // as it would on the water, until the new mean settles in)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }

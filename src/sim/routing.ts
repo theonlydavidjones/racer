@@ -84,10 +84,13 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
  * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
  * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
- * (manoeuvreS's `hs`).
+ * (manoeuvreS's `hs`). The 25 kt tack re-measured with tests/manoeuvre.test.ts's measure() once the crew sat either side of
+ * the jib winch at its true place (crewPhys.ts Z.deckFwd, winchAft): 4.3 to 5.0 s. The tack itself cost about 5.0 s
+ * before as well: the 4.3 was her creeping back on her twin over the next few minutes after the crew's shuffle forward
+ * and back re-trimmed her, which is gone (the physics review).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 4.3]],
+  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 5.0]],
   gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
 };
 /**

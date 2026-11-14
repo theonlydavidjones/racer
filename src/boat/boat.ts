@@ -103,6 +103,12 @@ export interface Boat {
   astern?: number;
   /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
   motor?: import('./motor').MotorState;
+  /** The crew paddling her with the boom crutch (boat/paddle.ts): the side, since when, and whether they called it. */
+  paddle?: import('./paddle').PaddleState | null;
+  /** You stopped the crew's own paddling: they leave it to you until the jam has passed (world.ts crewPaddleCall). */
+  paddleOff?: boolean;
+  /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
+  lastHitT?: number;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
@@ -262,7 +268,7 @@ export interface Boat {
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
-  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: the umpire's, for finishing with her penalty not taken)
+  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: disqualified: rule 42 (scored as entries + 1, A5.2), or the umpire's, for finishing with her penalty not taken)
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;

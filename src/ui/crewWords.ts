@@ -78,7 +78,8 @@ const PLACE_TIP: Record<string, string> = {
  */
 export function showCrewRow(u: Boat): void {
   const c = u.crew, pl = c?.place, mine = !!pl, open = mine || crewOpen;
-  const fore = c?.fore01 ?? 0.5, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 ? 'aft' : null, autoA = c ? autoAcross(u) : null;
+  // (two crew at their stations, either side of the winch, isn't Aft: no outline; forward of the winch is Fwd)
+  const fore = c?.fore01 ?? 0.5, two = c?.spec.crew.length === 2, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 && !two ? 'aft' : null, autoA = c ? autoAcross(u) : null;
   // (this runs every frame: touch the page only when something has changed)
   const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}|${u.tack}|${open}`; if (key === lastRow) return; lastRow = key;
   const { ww, lw, wwS, lwS } = sides(u);

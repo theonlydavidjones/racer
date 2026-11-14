@@ -16,7 +16,8 @@ import { disposeUnused } from './dispose';
 import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
-import type { Boat } from '../boat/boat';
+import type { Boat, Tack } from '../boat/boat';
+import { partShape, underwaterGhost, type PartId, type ScreenPart } from './boatParts';
 import { cleatOf } from '../boat/dockLines';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
@@ -188,8 +189,30 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** Crew overboard: the person in the water (made when first needed). */
+  private mobMesh: THREE.Group | null = null;
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
   get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
+  /**
+   * Lesson 1 (The boat; render/boatParts.ts): one of your boat's named parts where it's drawn on the screen this frame, in
+   * the page's px (as a click's clientX and clientY), or null where she has none or it's out of sight. Read only.
+   */
+  /** Lesson 1: her shape under the water shown faintly through the sea (render/boatParts.ts underwaterGhost), or hidden. */
+  showUnderwater(on: boolean): void {
+    const m = this.boatMeshes[0]; if (!m) return;
+    let g = m.grp.getObjectByName('underwaterGhost');
+    if (!g) { if (!on) return; g = underwaterGhost(m); }
+    g.visible = on; if (g.userData.blade) (g.userData.blade as THREE.Object3D).visible = on;
+  }
+  projectPart(key: PartId, tack: Tack): ScreenPart | null {
+    const m = this.boatMeshes[0]; if (!m) return null;
+    const cam = this.camera; cam.updateMatrixWorld(); m.grp.updateWorldMatrix(true, false);
+    const near = m.grp.worldToLocal(cam.position.clone()).x; // (the side of her the camera's on: + starboard)
+    const shape = partShape(m, key, tack, near); if (!shape) return null;
+    const r = this.renderer.domElement.getBoundingClientRect(), q = new THREE.Vector3();
+    const pts = shape.pts.map(poly => poly.flatMap(p => { q.copy(p).project(cam); return q.z > 1 || q.z < -1 ? [] : [[r.left + (q.x + 1) / 2 * r.width, r.top + (1 - q.y) / 2 * r.height] as [number, number]]; })).filter(p => p.length);
+    return pts.length ? { kind: shape.kind, pts } : null;
+  }
   /** A ghost race's ghost: your earlier run of this race, drawn translucent on its track (replay/ghost.ts). Not in the race. */
   private ghost: { mesh: BoatMesh; pts: GhostPoint[] } | null = null;
   /** Her dock lines ashore (up to six), drawn as rope: off-white, as a dock line usually is. */
@@ -430,6 +453,7 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
+  private harborCam = new THREE.Vector3();
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
@@ -864,6 +888,10 @@ export class SceneView {
         pos.needsUpdate = true; g.geometry.setDrawRange(0, n); g.visible = n > 0;
       }
     }
+    // crew overboard (sim/lessons.ts): the person in the water, their head and life jacket riding the waves
+    { const m = w.lesson?.mob ?? null;
+      if (m && !this.mobMesh) { this.mobMesh = personInWater(); this.scene.add(this.mobMesh); }
+      if (this.mobMesh) { this.mobMesh.visible = !!m; if (m) { this.mobMesh.position.copy(P3(m.x, m.y, waves.height(m, tw, 1, 1))); this.mobMesh.rotation.y = -(w.wind.from + 180) * D2R; } } } // (the sea's height right where they are; facing downwind, their back to the wind and sea, as a person floats: McCurdy, USYRU 1986)
     if (this.ghost) {
       const g = ghostAt(this.ghost.pts, w.t), gm = this.ghost.mesh; gm.grp.visible = !!g;
       if (g) {
@@ -941,6 +969,7 @@ export class SceneView {
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
+    this.harbor.update(camera.getWorldPosition(this.harborCam)); // (the moored boats nearest the camera in detail)
     this.renderer.render(this.scene, camera);
   }
 }
@@ -1006,4 +1035,19 @@ export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: nu
     if (aM - aT > span) lo = d; else hi = d;
   }
   return { dist: (lo + hi) / 2, near: along, tBot };
+}
+
+/**
+ * A person in the water in a life jacket: the head and the jacket's orange collar and shoulders above the surface, the
+ * rest below it (as they float, upright, head back: the leeway table's "vertical" person). Sizes of an adult: head about
+ * 0.2 m across, shoulders 0.45 m.
+ */
+function personInWater(): THREE.Group {
+  const g = new THREE.Group(); g.name = 'personInWater';
+  const skin = new THREE.MeshLambertMaterial({ color: 0xc89a78 }), vest = new THREE.MeshLambertMaterial({ color: 0xff5a1f }), hair = new THREE.MeshLambertMaterial({ color: 0x3a2a1e });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), skin); head.position.y = 0.2; g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.103, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), hair); cap.position.y = 0.21; cap.rotation.x = 0.35; g.add(cap); // (tipped toward +z: the back of the head, to windward once turned)
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.065, 8, 18), vest); collar.rotation.x = Math.PI / 2; collar.position.y = 0.08; g.add(collar);
+  const shoulders = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.23, 0.18, 14), vest); shoulders.scale.z = 0.6; shoulders.position.y = -0.04; g.add(shoulders);
+  return g;
 }
