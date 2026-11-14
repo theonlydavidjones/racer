@@ -89,6 +89,7 @@ const hL53 = (t: number) => 300 - Math.min(30, Math.max(0, (t + 31.8) * 30));
 const AS27 = off([0, 0], 45, -10), hAS27 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 50) * 20));
 const hL13 = (t: number) => 280 + Math.min(35, Math.max(0, (t + 35) * 5));
 const S11 = off([0, 0], 315, -2.5 * 6), PW11 = off(off([0, 0], 315, -6), 45, -2.5 * 6), hPW11 = (t: number) => 45 + Math.min(30, Math.max(0, (t - 49) * 8));
+const S23 = off([0, 0], 190, -25), PW23 = off([0, 0], 170, -25);
 const hL7 = (t: number) => 315 + Math.min(5, Math.max(0, (t - 50) * 5));
 const hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
 const hOL25 = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5));
@@ -162,14 +163,17 @@ export const CASES: RulesCase[] = [
 
   {
     case: 23, title: 'Running between two port boats', rules: ['10', '19'], fleet: true,
+    // (sailed, running at 2.5 m/s: S on starboard at 190°, PW on port at 170° from the other side, their courses meeting at
+    // the origin at 56 s; PL on port too, 8 m the far side of S, so S passes between them)
     boats: [
-      { letter: 'S', frames: [at(50, [0, 0], 190)] },
-      { letter: 'PW', frames: [at(50, [4, -1], 170), at(52, [1.6, -1], 170)] },
-      { letter: 'PL', frames: [at(50, [-4, -1], 170)] },
+      { letter: 'S', frames: [at(45.9, S23, 190, { look: false }), ...sail(S23, () => 190, 2.5, 46, 60)] },
+      { letter: 'PW', frames: [at(45.9, PW23, 170, { look: false }), ...sail(PW23, () => 170, 2.5, 46, 60)] },
+      { letter: 'PL', frames: [at(45.9, off(PW23, 170, 0, -16), 170, { look: false }), ...sail(off(PW23, 170, 0, -16), () => 170, 2.5, 46, 60)] },
     ],
-    pair: ['S', 'PW'], checks: [{ t: 50, keepsClear: 'PW', rule: '10' }],
-    momentT: 50, ask: 'foul', answer: { who: 'PW', rule: '10', line: 'Port keeps clear of starboard (10). S is an obstruction to both, but they pass her on opposite sides, so rule 19 doesn\'t apply.' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['S', 'PW'], checks: [{ t: 46, keepsClear: 'PW', rule: '10' }],
+    momentT: 50, ask: 'foul', answer: { who: 'PW', rule: '10', line: 'Port keeps clear of starboard (10). S is an obstruction to both, but they pass her on opposite sides, so rule 19 doesn\'t apply.' }, teach: true,
   },
+
   {
     case: 25, title: 'Leaving the leeward mark', rules: ['11', '16.1', '18'], marks: [mark('p', false), mark('p', true, [0, 400])],
     boats: [
