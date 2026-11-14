@@ -17,7 +17,7 @@ import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
 import type { Boat, Tack } from '../boat/boat';
-import { partShape, type PartId, type ScreenPart } from './boatParts';
+import { partShape, underwaterGhost, type PartId, type ScreenPart } from './boatParts';
 import { cleatOf } from '../boat/dockLines';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
@@ -195,6 +195,13 @@ export class SceneView {
    * Lesson 1 (The boat; render/boatParts.ts): one of your boat's named parts where it's drawn on the screen this frame, in
    * the page's px (as a click's clientX and clientY), or null where she has none or it's out of sight. Read only.
    */
+  /** Lesson 1: her shape under the water shown faintly through the sea (render/boatParts.ts underwaterGhost), or hidden. */
+  showUnderwater(on: boolean): void {
+    const m = this.boatMeshes[0]; if (!m) return;
+    let g = m.grp.getObjectByName('underwaterGhost');
+    if (!g) { if (!on) return; g = underwaterGhost(m); }
+    g.visible = on; if (g.userData.blade) (g.userData.blade as THREE.Object3D).visible = on;
+  }
   projectPart(key: PartId, tack: Tack): ScreenPart | null {
     const m = this.boatMeshes[0]; if (!m) return null;
     const cam = this.camera; cam.updateMatrixWorld(); m.grp.updateWorldMatrix(true, false);

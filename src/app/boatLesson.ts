@@ -80,7 +80,7 @@ export function mountBoatLesson(app: AppCtx) {
   /** Leave it (Esc, or passed): back to the lessons. */
   function close(back = true): void {
     if (!on) return;
-    on = false; document.body.classList.remove('partsLesson'); app.look.spin = true; app.showroom(false);
+    on = false; app.view.showUnderwater(false); document.body.classList.remove('partsLesson'); app.look.spin = true; app.showroom(false);
     if (back) app.openLessons();
   }
   const gl = app.view.renderer.domElement;
@@ -94,7 +94,12 @@ export function mountBoatLesson(app: AppCtx) {
     open, close, click,
     get on() { return on; },
     /** Each frame: the line (a found part's note gives way to the next cue). */
-    tick(): void { if (on) { app.look.chase = Math.min(24, Math.max(5, app.look.chase ?? CHASE)); paint(); } },
+    tick(): void {
+      if (!on) return;
+      app.look.chase = Math.min(24, Math.max(5, app.look.chase ?? CHASE)); paint();
+      // (the keel and the rudder are under the water: her shape below it shown faintly while one is asked for)
+      const k = !done && PARTS[i].key; app.view.showUnderwater(k === 'keel' || k === 'rudder');
+    },
     /** For the checks: the part being looked for. */
     get want(): PartKey | null { return on && !done ? PARTS[i].key : null; }
   };

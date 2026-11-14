@@ -258,3 +258,28 @@ function hull2(p: [number, number][]): [number, number][] {
   for (let i = s.length - 1; i >= 0; i--) { const q = s[i]; while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
   return lo.slice(0, -1).concat(hi.slice(0, -1));
 }
+
+/**
+ * Her shape under the water, faint, drawn through the sea (lesson 1, while it asks for the keel or the rudder: the sea
+ * isn't clear enough to see them): the hull's profile down the centerline to the keel's heel, her waterline round, and
+ * the rudder's blade, which turns with the tiller. Added to her own group, so it heels and pitches with her.
+ */
+export function underwaterGhost(m: BoatMesh): THREE.Object3D {
+  const g = new THREE.Group(); g.name = 'underwaterGhost';
+  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false });
+  const wet = US(0, 1, 60).filter(u => canoe(u) < 0);
+  const profile = [...wet.map(u => v3(0, keel(u), zOf(u)))];
+  profile.unshift(v3(0, 0, zOf(wet[0]))); profile.push(v3(0, 0, zOf(wet[wet.length - 1])));
+  const waterline = [...wet.map(u => v3(hullHalfAt(u, 0), 0, zOf(u))), ...[...wet].reverse().map(u => v3(-hullHalfAt(u, 0), 0, zOf(u)))];
+  waterline.push(waterline[0].clone());
+  for (const pts of [profile, waterline]) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat); l.renderOrder = 10; l.frustumCulled = false; g.add(l); }
+  m.grp.add(g);
+  // the blade: its own mesh drawn again, faint and through the sea, in the rudder's turning frame
+  const blade = m.rudder.children[0] as THREE.Mesh | undefined;
+  if (blade?.geometry) {
+    const ghost = new THREE.Mesh(blade.geometry, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28, depthTest: false, depthWrite: false }));
+    ghost.renderOrder = 10; ghost.name = 'underwaterGhostBlade'; m.rudder.add(ghost);
+    g.userData.blade = ghost;
+  }
+  return g;
+}
