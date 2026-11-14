@@ -3,6 +3,7 @@ import { KT, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
 import { DrillTracker } from './drill';
 import { byHand } from '../boat/physics';
+import { TRAVELLER_SWING } from '../boat/controls';
 import { inBasin } from '../geo/marina';
 
 /**
@@ -69,9 +70,12 @@ export const LESSON_MARKS = {
   /** A breeze (the Coordinator's call for the owner, 14 Nov 2026: check the easing itself): in the top of the lesson range
    * (15 kt where she sails), close-hauled with the mainsheet in your own hand, PUFFS puffs answered: a puff is her wind
    * PUFF_KT over its 20 s mean (in a 15 kt lesson they come every 15–30 s, the sim's own gusts), answered when within
-   * EASE_S of it the main's eased EASE_DEG or more, or the traveler's down EASE_TRAV (yours), and she's kept under
-   * BREEZE_HEEL through it (a Folkboat's overpowered past it: boat/coach.ts uses 20°, the heel here is the result's cap). */
-  puffs: 3, puffKt: 1.5, easeS: 4, easeDeg: 3, easeTrav: 0.15, breezeHeel: 25
+   * EASE_S of it your own lines (sheet, and the traveler if it's yours) have eased the boom EASE_DEG or more from where it
+   * was settled (within SETTLED_DEG over the 3–10 s before), she's kept sailing (over BREEZE_MIN_KT, close-hauled) and
+   * not laid over past BREEZE_HEEL (coach.ts calls 20° overpowered; 25° is laid over). The next puff counts only once her
+   * wind's back within LULL_KT of its mean and you've trimmed back to within TRIM_BACK_DEG: ease in the puff, trim in the
+   * lull. */
+  puffs: 3, puffKt: 1.5, easeS: 4, easeDeg: 3, settledDeg: 1.5, breezeMinKt: 2.5, breezeHeel: 25, lullKt: 0.5, trimBackDeg: 2
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
@@ -112,8 +116,10 @@ export class LessonTracker {
   private held = 0; private seen = 0; private ironsT = 0; private lastTwa = 0;
   /** A breeze: her wind's 20 s mean, and the puff being answered (since when, the sheet and traveler as it came). */
   private puffMean: number | null = null;
-  private sheetAvg: number | null = null;
-  private travAvg: number | null = null; private puff: { t: number; sheet: number; trav: number; eased: boolean; over: boolean } | null = null;
+  private hist: number[] = [];
+  private sampleT = 0;
+  private rearm: { ref: number } | null = null;
+  private puff: { t: number; ref: number; eased: boolean; over: boolean } | null = null;
 
   constructor(id: LessonId, buoy: Vec | null) {
     this.id = id; this.buoy = BUOY_LESSONS.has(id) ? buoy : null;
@@ -215,28 +221,40 @@ export class LessonTracker {
   private breeze(b: Boat, dt: number): void {
     const M = LESSON_MARKS, kt = b.ww.kt;
     this.puffMean = this.puffMean == null ? kt : this.puffMean + (kt - this.puffMean) * dt / 20;
-    // the sheet and traveler as they've been set lately (a 5 s average), so an ease begun as the puff darkens the water
-    // just ahead of her counts, as it should: that's the good habit
-    const a = Math.min(1, dt / 5);
-    this.sheetAvg = this.sheetAvg == null ? b.sheets.main : this.sheetAvg + (b.sheets.main - this.sheetAvg) * a;
-    this.travAvg = this.travAvg == null ? b.ctl.traveller : this.travAvg + (b.ctl.traveller - this.travAvg) * a;
-    if (this.step === 0) { if (byHand(b, 'mainsheet')) { this.step = 1; this.cue = `Close-hauled: ease the main in each puff (0 of ${M.puffs})`; } return; }
-    const [lo, hi] = POINTS[0].band(b), onWind = b.twa >= lo - 5 && b.twa <= hi + 5;
+    const mine = byHand(b, 'mainsheet');
+    if (this.step === 0) { if (mine) { this.step = 1; this.cue = `Close-hauled: ease the main in each puff (0 of ${M.puffs})`; } return; }
+    // the boom as your own lines set it (the crew's traveler doesn't count as your ease): the sheet's part, and the car's
+    // when you have the traveler too (controls.ts boomAngle)
+    const own = 80 * Math.pow(b.ctl.mainsheet, 1.5) + (byHand(b, 'traveller') ? TRAVELLER_SWING * b.ctl.traveller : 0);
+    // a sample every quarter second, the last 10 s
+    this.sampleT += dt;
+    if (this.sampleT >= 0.25) { this.sampleT = 0; this.hist.push(own); if (this.hist.length > 40) this.hist.shift(); }
+    const [lo, hi] = POINTS[0].band(b), sailing = mine && b.twa >= lo - 5 && b.twa <= hi + 5 && b.v / KT > M.breezeMinKt;
+    if (this.rearm) {
+      // the next puff counts once this one's passed (her wind back near its mean) and you've trimmed back in for the lull
+      if (kt < this.puffMean + M.lullKt && own <= this.rearm.ref + M.trimBackDeg) this.rearm = null;
+      return;
+    }
     const P = this.puff;
     if (!P) {
-      // a puff arriving: note the sheet and the traveler as they were before it
-      if (onWind && kt > this.puffMean + M.puffKt) this.puff = { t: 0, sheet: Math.min(b.sheets.main, this.sheetAvg!), trav: Math.min(b.ctl.traveller, this.travAvg!), eased: false, over: false };
+      // a puff arriving: the sheet must have been settled before it (3–10 s ago, within SETTLED_DEG), so pumping it in and
+      // out blindly doesn't answer anything; an ease begun in the last 3 s, as the puff darkens the water ahead, counts
+      if (!sailing || kt <= this.puffMean + M.puffKt || this.hist.length < 40) return;
+      const before = this.hist.slice(0, 28), ref = Math.min(...before);
+      if (Math.max(...before) - ref > M.settledDeg) return;
+      this.puff = { t: 0, ref, eased: false, over: false };
       return;
     }
     P.t += dt;
-    if (P.t <= M.easeS && (b.sheets.main - P.sheet >= M.easeDeg || (byHand(b, 'traveller') && b.ctl.traveller - P.trav >= M.easeTrav))) P.eased = true;
+    if (!sailing) { this.puff = null; return; } // sheet let go, off the wind or stopped: that puff doesn't count
+    if (P.t <= M.easeS && own - P.ref >= M.easeDeg) P.eased = true;
     if ((b.heelMag ?? 0) >= M.breezeHeel) P.over = true;
     if (P.t < M.easeS + 2) return;
     if (P.eased && !P.over) this.good++;
-    this.puff = null;
+    this.puff = null; this.rearm = { ref: P.ref };
     this.progress = this.good / M.puffs;
     if (this.good >= M.puffs) { this.passed = true; return; }
-    this.cue = `Close-hauled: ease the main in each puff (${this.good} of ${M.puffs})`;
+    this.cue = `Close-hauled: ease the main in each puff, trim in the lulls (${this.good} of ${M.puffs})`;
   }
 
   /** Before you go: the dock card done (the page's command: the gear checked and the float plan left). After dark the

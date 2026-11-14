@@ -123,15 +123,41 @@ describe('Learn to sail: the lessons\' checks', () => {
     expect(sum / n).toBeLessThan(16.5);
   });
 
-  it('a breeze: the mainsheet in hand, then three puffs answered by easing it, the heel held; puffs sat through don\'t count', () => {
-    const L = new LessonTracker('breeze', null); let t = 0;
-    const b = { ...boat({ twa: 42, v: 4 * KT }), isUser: true, hand: { mainsheet: true }, heelMag: 18, ww: { kt: 15, from: 0 }, sheets: { main: 12, jib: 10 }, ctl: { traveller: 0 } } as unknown as Boat & { ww: { kt: number }; sheets: { main: number }; heelMag: number };
-    const run = (s: number, f?: () => void) => { for (let k = 0; k < s * 10; k++) { f?.(); L.update(b, t, 0.1); t += 0.1; } };
-    run(30); expect(L.step).toBe(1);
-    // a puff sat through: the sheet left where it is
-    b.ww.kt = 18; run(7); b.ww.kt = 15; run(20); expect(L.good).toBe(0);
-    for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); b.sheets.main = 18; run(6); b.ww.kt = 15; b.sheets.main = 12; run(20); }
-    expect(L.good).toBe(3); expect(L.passed).toBe(true);
+  it('a breeze: three puffs answered by easing the main and trimming back in the lulls; sat through, pumped blindly, eased and never trimmed, or the crew\'s sheet, they don\'t count', () => {
+    const mk = () => {
+      const L = new LessonTracker('breeze', null); let t = 0;
+      const b = { ...boat({ twa: 42, v: 4 * KT }), isUser: true, hand: { mainsheet: true }, heelMag: 18, ww: { kt: 15, from: 0 }, sheets: { main: 12, jib: 10 }, ctl: { mainsheet: 0.3, traveller: 0 } } as unknown as Boat & { ww: { kt: number }; heelMag: number; hand: Record<string, boolean> };
+      const run = (s: number, f?: (t: number) => void) => { for (let k = 0; k < s * 10; k++) { f?.(t); L.update(b, t, 0.1); t += 0.1; } };
+      run(30); expect(L.step).toBe(1);
+      return { L, b, run };
+    };
+    const IN = 0.3, OUT = 0.36; // the boom at 13° and 17° (80·s^1.5)
+    { // sat through
+      const { L, b, run } = mk();
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(7); b.ww.kt = 15; run(20); }
+      expect(L.good).toBe(0);
+    }
+    { // eased in each puff, trimmed back in each lull: three puffs, passed
+      const { L, b, run } = mk();
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); b.ctl.mainsheet = OUT; run(6); b.ww.kt = 15; b.ctl.mainsheet = IN; run(20); }
+      expect(L.good).toBe(3); expect(L.passed).toBe(true);
+    }
+    { // pumped in and out every 1.5 s, whatever the wind
+      const { L, b, run } = mk(); const pump = (t: number) => { b.ctl.mainsheet = Math.floor(t / 1.5) % 2 ? OUT : IN; };
+      run(10, pump);
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(7, pump); b.ww.kt = 15; run(20, pump); }
+      expect(L.good).toBe(0);
+    }
+    { // eased in each puff and never trimmed back: one puff, then nothing till she's trimmed
+      const { L, b, run } = mk(); let s = IN;
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); s += 0.06; b.ctl.mainsheet = s; run(6); b.ww.kt = 15; run(20); }
+      expect(L.good).toBe(1);
+    }
+    { // the crew has the sheet: their easing isn't yours
+      const { L, b, run } = mk(); b.hand.mainsheet = false;
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); b.ctl.mainsheet = OUT; run(6); b.ww.kt = 15; b.ctl.mainsheet = IN; run(20); }
+      expect(L.good).toBe(0);
+    }
   });
 
   it('home to the slip: out past the harbor, then back in her slip and made fast', () => {
