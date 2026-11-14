@@ -46,7 +46,10 @@ export class SetupChart {
       const after = this.at(e.clientX - r.left, e.clientY - r.top); // (zoom about the cursor)
       this.cx += before.x - after.x; this.cy += before.y - after.y; this.draw();
     }, { passive: false });
-    addEventListener('resize', () => this.draw());
+    // (drawn whenever its size changes: opened before the setup's panel is laid out, the canvas has no size and draws
+    // nothing, and no pick redraws it till one's made blind; the owner, 14 Nov 2026: "map is no longer showing in cruise
+    // config". Also the window's resize.)
+    new ResizeObserver(() => this.draw()).observe(this.c);
   }
 
   /** The chart's point under a spot on the canvas. */

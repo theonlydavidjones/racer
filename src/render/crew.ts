@@ -439,7 +439,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // through a tack, down in the cockpit and across under the boom (the owner): the forward crew on one knee working
     // the jib sheets at the leeward winch, the middle crew up in a crouch tacking the main from the thwart
     // (the jib hand forward by the winches, the main hand aft by the thwart, clear of each other)
-    const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.1, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
+    const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.45, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
       // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
       // within arm's reach of it, the sheet in the inboard hand. Just forward of it, abreast: the winch between the cabin
@@ -450,8 +450,12 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
       // would lie along the coaming and through it)
       return kneelOne(bx, wz, yaw, ws > 0 ? 0 : 1, ws > 0 ? [hold, w] : [w, hold], k, w);
     }
+    // (facing aft, the mainsheet on the thwart in front of them, as anyone tacks the main from forward of it: facing forward
+    // with their hands on it behind them, the arms went back through the elbows, the owner's "backwards arms"; and back from
+    // it far enough that, bent over in the crouch toward it, their hands are in front of the chest and their knees clear of
+    // the thwart)
     const sheet = V(px * 0.4, 0.9, THWART.z - 0.08);
-    return crouch(px, zz, 0, [sheet.clone().add(V(-0.07, 0.05, 0)), sheet.clone().add(V(0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, -1)));
+    return crouch(px, zz, Math.PI, [sheet.clone().add(V(0.07, 0.05, 0)), sheet.clone().add(V(-0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, 0.4)));
   }
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
   // (somewhere forward of the cockpit with no job there, as after setting the pole, waiting to see where they go next:
