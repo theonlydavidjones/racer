@@ -197,15 +197,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // (and once she's turned past the heading she set out for, the turn is done: a new course a little behind her is
     // reached the short way back, not the long way on round. Held to it, a boat that had luffed past north to keep clear,
     // asked to come back 30° to port, bore away instead through a gybe and on round into the boat she was keeping clear
-    // of: abandon-home, a 26 kt westerly)
-    if (ai && !midTack && ai.turnCommit !== 0 && !(ai.tackNow && ai.commitHail) && Math.sign(wrap(ai.commitFor - b.h)) !== ai.turnCommit && Math.abs(wrap(ai.commitFor - b.h)) < 90) ai.turnCommit = 0;
+    // of: abandon-home, a 26 kt westerly. Only for a turn committed the short way: one committed the long way round, by
+    // the gybe, looks just the same from its first step, and dropped there she'd re-choose, gather way and reverse into
+    // a tack after all, the bail-out the commitment is for: Deep Physics, November 2026)
+    if (ai && !midTack && ai.turnCommit !== 0 && !ai.commitLong && !(ai.tackNow && ai.commitHail) && Math.sign(wrap(ai.commitFor - b.h)) !== ai.turnCommit && Math.abs(wrap(ai.commitFor - b.h)) < 90) ai.turnCommit = 0;
     if (ai && !midTack && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
       ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
-      ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
+      ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; ai.commitLong = ai.turnCommit !== Math.sign(err); // (long: round by the gybe, too slow to tack) // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
       const long = err + ai.turnCommit * 360;
