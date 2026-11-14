@@ -1,4 +1,5 @@
 import type { Boat, LineKey } from '../boat/boat';
+import { hide, put, attr } from './dom';
 import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
 import { LINES, byHand } from '../boat/physics';
 import { poleRefused } from '../ai/ai';
@@ -379,12 +380,12 @@ export class SailBand {
     const on = !!u.spec?.perf.jumpersUnderWay, now = this.jumpersNow(u), want = u.jumperTarget, busy = on && want != null && Math.abs(want - now) > 1e-6;
     const fmt = (v: number) => (v === 1 ? '1 turn' : `${v} turns`);
     this.el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
-      d.hidden = !on; if (!on) return;
-      d.querySelector('.ndl')!.setAttribute('transform', `rotate(${jAng(now)} 20 20)`);
-      const tg = d.querySelector<SVGElement>('.tgt')!; tg.style.display = busy ? '' : 'none'; if (busy) tg.setAttribute('transform', `rotate(${jAng(want!)} 20 20)`);
-      d.querySelector('.jv')!.textContent = String(now);
+      hide(d, !on); if (!on) return;
+      attr(d.querySelector('.ndl')!, 'transform', `rotate(${jAng(now)} 20 20)`);
+      const tg = d.querySelector<SVGElement>('.tgt')!; tg.style.display = busy ? '' : 'none'; if (busy) attr(tg, 'transform', `rotate(${jAng(want!)} 20 20)`);
+      put(d.querySelector('.jv')!, String(now));
       d.classList.toggle('busy', busy);
-      d.setAttribute('aria-label', `Jumpers: ${fmt(now)}${busy ? `, the crew turning them to ${fmt(want!)}` : ''}`);
+      attr(d, 'aria-label', `Jumpers: ${fmt(now)}${busy ? `, the crew turning them to ${fmt(want!)}` : ''}`);
     });
   }
 
@@ -413,26 +414,26 @@ export class SailBand {
     }
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
-    pen.hidden = !turns; if (turns) pen.textContent = `Penalty · ${turns} turn${turns > 1 ? 's' : ''}`;
+    hide(pen, !turns); if (turns) put(pen, `Penalty · ${turns} turn${turns > 1 ? 's' : ''}`);
     // Hail: only when there's a hail to make (checked a few times a second: it looks round the fleet)
     const hail = this.el.querySelector<HTMLElement>('.sb-hail')!;
-    if (!w.running || w.paused) hail.hidden = true;
+    if (!w.running || w.paused) hide(hail, true);
     else if (performance.now() >= this.hailT) {
       this.hailT = performance.now() + 250; // (by the clock, not frames: the same at any frame rate)
       const words = this.host.hailWords();
-      hail.hidden = !words;
-      if (words) { hail.innerHTML = `Hail · ${words}<span class="k">${this.host.hailKey()}</span>`; hail.dataset.help = `Hail: "${words}" (or press ${this.host.hailKey()}).`; }
+      hide(hail, !words);
+      if (words && hail.dataset.words !== words) { hail.innerHTML = `Hail · ${words}<span class="k">${this.host.hailKey()}</span>`; hail.dataset.help = `Hail: "${words}" (or press ${this.host.hailKey()}).`; hail.dataset.words = words; }
     }
     // the pole: only where the crew would set it (ai.ts poleRefused: a deep run, past 145° true where a poled-out jib
     // fills, polar.ts jibEfficiency; not at the dock, in a basin, in penalty turns or with the jib down). It shows at 148°
     // as you bear away and goes at 145°, and stays while the pole is out or the crew is at it
     const tab = this.el.querySelector<HTMLElement>('.sb-pole')!, deep = Math.abs(u.twa), busy = u.pole !== 'down' || u.poleWant;
     this.poleShown = busy || (!poleRefused(u) && (this.poleShown || deep >= 148));
-    tab.hidden = !this.poleShown;
+    hide(tab, !this.poleShown);
     if (this.poleShown) {
       // "Pole out" sets it, "Pole in" stows it; while the crew is at it, the next word dimmed
       const moving = u.pole === 'setting' || u.pole === 'stowing' || (u.poleWant ? u.pole === 'down' : u.pole === 'set');
-      tab.textContent = u.poleWant ? 'Pole in' : 'Pole out';
+      put(tab, u.poleWant ? 'Pole in' : 'Pole out');
       tab.classList.toggle('dim', moving); tab.classList.toggle('mine', !!u.poleMine);
     }
   }
@@ -496,7 +497,7 @@ export class SailBand {
       d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === k);
       this.ropeTicks(d, k, u, horiz);
       const iv = ideal?.[k as keyof typeof ideal] as number | undefined;
-      mark.hidden = !mine || iv == null;
+      hide(mark, !mine || iv == null);
       if (iv != null) { const io = Math.round(onOf(k, iv) * 100) + '%'; if (horiz) { mark.style.left = d.dataset.side === 'P' ? `calc(100% - ${io})` : io; } else mark.style.top = io; }
     });
     // the mainsheet: the boom's end across the boat (sin of its angle, toward leeward); the crew's boom, dashed
@@ -505,14 +506,14 @@ export class SailBand {
       this.sheetTicks(d, u);
       const x = clamp(Math.sin(u.boom * D2R), -1, 1), boom = d.querySelector<HTMLElement>('.sb-boom')!, mark = d.querySelector<HTMLElement>('.sb-mark')!;
       boom.style.left = `${50 + x * 50}%`; d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'mainsheet');
-      mark.hidden = !mine || !ideal;
+      hide(mark, !mine || !ideal);
       if (ideal) mark.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: ideal.mainsheet, traveller: ideal.traveller }) * D2R) * 50}%`;
     }
     {
       const d = this.el.querySelector<HTMLElement>('.sb-trk[data-line="traveller"]')!, mine = byHand(u, 'traveller');
       d.querySelector<HTMLElement>('.sb-car')!.style.left = `${50 + c.traveller * leeSign(u) * 50}%`;
       d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'traveller');
-      const mark = d.querySelector<HTMLElement>('.sb-mark')!; mark.hidden = !mine || !ideal;
+      const mark = d.querySelector<HTMLElement>('.sb-mark')!; hide(mark, !mine || !ideal);
       if (ideal) mark.style.left = `${50 + ideal.traveller * leeSign(u) * 50}%`;
     }
     this.jumpers(u);
@@ -525,12 +526,12 @@ export class SailBand {
       d.querySelectorAll<HTMLElement>('.sb-hole').forEach(h => h.classList.toggle('row', Number(h.dataset.r) === car.fore));
       // where you've asked for it (the crew on the way), and, while it's yours, where the crew would put it
       const pin = (el: HTMLElement, p: { fore: number; ins: number } | null | undefined) => {
-        el.hidden = !p; if (p) { el.style.gridRow = String(p.fore + 1); el.style.gridColumn = String((side === 'P' ? CAR_IN_PINS - 1 - p.ins : p.ins) + 1); }
+        hide(el, !p); if (p) { el.style.gridRow = String(p.fore + 1); el.style.gridColumn = String((side === 'P' ? CAR_IN_PINS - 1 - p.ins : p.ins) + 1); }
       };
       pin(d.querySelector<HTMLElement>('.sb-jwant')!, !loaded && u.carCmd && (u.carCmd.fore !== car.fore || u.carCmd.ins !== car.ins) ? u.carCmd : null);
       pin(d.querySelector<HTMLElement>('.sb-jideal')!, !loaded && carMine && ideal ? { fore: ideal.carFore, ins: ideal.carIn } : null);
       d.classList.toggle('loaded', loaded); d.classList.toggle('mine', carMine && !loaded);
-      d.querySelector<HTMLElement>('.sb-tag')!.textContent = loaded ? 'loaded' : !loaded && u.carCmd ? 'crew…' : '';
+      put(d.querySelector<HTMLElement>('.sb-tag')!, loaded ? 'loaded' : !loaded && u.carCmd ? 'crew…' : '');
     });
   }
 }
