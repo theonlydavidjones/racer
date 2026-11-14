@@ -92,12 +92,26 @@ points) don't change.
 - **Rule 19, corrected from the table above**: a shore's distance (`obstacle().d`) is from her center, not her side, so
   the room test keeps her half-beam: `oi.d − 1.1 + hullGap < ROOM_GAP`. A boat as the obstruction now gives her distance
   from the center too (her hull gap plus 1.1 m), as a shore does; before, it was a centerline gap, 1.1 m more.
-- **Mark-room's "unable"** (`markUnable`) measures from the outside boat's centerline to the mark, so it keeps the beam:
-  `gapTo − 1 < ROOM_GAP + 2.2`, the same number as before.
-- **A squeeze still going on** (world.ts, for 43.1's exoneration): `SQUEEZE_GAP` 2.2 m of water and closing. It's a
-  modeling choice, in the range the centerline measure gave (1.3 m abeam, 2.4 m bow to side). `ROOM_GAP` alone would
-  have narrowed it to the abeam figure.
-- **Case 11** is drawn 3.4 m apart, center to center (1.2 m of water), not 4: it comes out PL's 19.2(b) from 3 to 3.8 m.
-  At 4 m, by the time PW's bow reaches PL's side (later now, as it really is), PW is turning away from S faster than PL
-  closes, and rule 19's squeeze test (inward against outward motion) no longer reads it as PL's. That test doesn't ask
-  whether the inside boat is using room she's entitled to, which is a known limit, as before.
+- **Mark-room's "unable"** (`markUnable`) measures from the outside boat's centerline to the mark, so her half-beam
+  comes off: the water between her hull and the mark, against the inside boat's beam and room, `gapTo − 1 − 1.1 < 2.2 +
+  ROOM_GAP`. (Before, `gapTo − 1 < 3.5` left the inside boat 0.2 m in all.)
+- **A squeeze still going on** (world.ts, for 43.1's exoneration) stays `ROOM_GAP` and closing. Its test's hand-made foul
+  now also starts the pair's incident cooldown, as a foul the engine calls does.
+- **Rule 19's room** includes the inside boat bearing away to pass the obstruction: the outside boat holding on (not
+  moving away from it) while the water between them closes fails to give it (19.2(b)), as long as the inside boat moves
+  off the obstruction at no more than half her speed (about 30° off its line, a modeling choice). Before, only the
+  outside boat moving in faster than the inside boat moved out counted. Case 11 (3.4 m apart, center to center) comes
+  out PL's 19.2(b) from 3 to 4 m. From 4.5 m PW touches PL with over 3 m of water still to S, more than room, so it's
+  her 11 (tests/rules-cases-data.test.ts).
+
+## Left for later (from the review)
+
+- AI right-of-way boats forced to swerve by an AI boat aren't called (ai/ai.ts: only the user's boat's swerves are).
+  The old early "contact" caught some of those near misses by accident; now a pass at 0.15–0.65 m between two AI boats
+  goes uncalled.
+- `KEEP_CLEAR_GAP` (0.65 m) is the margin rule 16.1's test asks of an escape; bow to side the old figure was about
+  1.6 m of water. `ROOM_GAP` may be the better margin there.
+- A shore's distance is center to shoreline, so `oi.d − 1.1` is the water at her side only with the shore abeam; bow
+  on, it overstates it.
+- Rule 21.2 applies from `penalty > 0` (rightOfWay.ts), before her turns begin; 21.2 says a boat *taking* a penalty.
+- Booms, heel and the rudder, as above.
