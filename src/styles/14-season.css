@@ -1,0 +1,37 @@
+/* The season's flow (the owner approved design/season-flow, 13 Nov 2026): the Race page's Season card, the season's
+   overview, and a season race's setup (its course, fleet and day locked by the series) */
+#raceChoose .modes{grid-template-columns:repeat(3,1fr)}
+.modecard .mc-sea{display:flex;align-items:center;gap:10px;margin-top:10px}
+.modecard .mc-sea .t-burgee{height:22px}
+.modecard .mc-sea .t-date{width:38px;height:38px}
+#seasonView .panel{max-width:1120px;gap:18px}
+.sv-head{display:flex;align-items:center;gap:14px}
+.sv-head h1{font-size:26px;margin:0}
+.sv-head .t-s{margin-left:auto}
+.sv-head .svpick{font:700 22px/1.1 var(--f-inst);background:transparent;color:var(--text);border:0;padding:0;cursor:pointer}
+.sv-cal{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.sv-day{border:1px solid var(--rule);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center;background:var(--ink);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color .12s}
+button.sv-day:hover:not(:disabled){border-color:rgba(255,182,39,.55)}
+.sv-day.done{opacity:.8}
+.sv-day.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.sv-day.abn{opacity:.45;cursor:default}
+.sv-day.tbc{cursor:default}
+.sv-day.tbc .t-date{background:transparent;border:1.5px dashed #5f7a8c;color:#9fb3c2}
+.sv-day .sv-r{font:700 12px/1 var(--f-inst);letter-spacing:.12em;color:var(--muted)}
+.sv-day .sv-res{font:700 18px/1.1 var(--f-inst)}
+.sv-day.on .sv-res{color:var(--accent)}
+.sv-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+.sv-card{border:1px solid var(--rule);border-radius:12px;padding:14px 16px;background:var(--ink);display:flex;flex-direction:column;gap:12px;min-width:0}
+.sv-card h3{margin:0;font:600 11px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+#svDock{display:flex;flex-direction:column;gap:10px}
+#svDock .srow{background:transparent}
+.sv-go .cta{padding:13px 22px;font-size:15px}
+.sv-tbl{max-height:420px;overflow:auto}
+.sv-tbl .season{margin:0}
+/* a season race's setup: the series fixes the course, the fleet and the day */
+.sv-brief{display:flex;align-items:center;gap:12px;border:1px solid var(--accent);border-radius:12px;padding:10px 14px;background:rgba(255,182,39,.07)}
+.sv-brief .t-burgee{height:26px}
+.srow.locked .srow-go{visibility:hidden}
+.srow.locked .srow-head{cursor:default}
+.srow.locked:not(.open):hover{border-color:var(--rule)}
+.t-strip > .wait{border-style:dashed!important;opacity:.85}
