@@ -289,7 +289,9 @@ export const CAR = {
 function carJob(b: Boat, dt: number): void {
   const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
-  const side: Tack = yours?.side && carFree(b, yours.side) ? yours.side : b.tack, lazy = b.ctl.car[side];
+  // (your call for a car that's loaded now, the jib hoisted or a tack: it can't be carried out; dropped, never moved to the other car)
+  if (yours?.side && !carFree(b, yours.side)) { b.carCmd = null; if (a.job?.line === 'car') a.job = null; return; }
+  const side: Tack = yours?.side ?? b.tack, lazy = b.ctl.car[side];
   // a job under way: on a car that's loaded now (the boat tacked onto it, or the jib went up), it can't be moved
   if (a.job?.line === 'car') {
     if (!carFree(b, a.job.side as Tack)) { a.job = null; return; }

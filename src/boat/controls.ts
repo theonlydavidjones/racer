@@ -354,14 +354,14 @@ export function hoistedShare(at: number, taut: number, sail: 'main' | 'jib'): nu
 }
 /**
  * How well a part-hoisted sail draws, per square metre it has up (1 when it's all the way up): with the last inches not
- * taken up, a slack, scalloped luff, falling to 0.75 just up at the mast; below that, the head well down the track, a
+ * taken up, a slack, scalloped luff, falling to 0.92 just up at the mast; below that, the head well down the track, a
  * bunched sail with no luff to hold a shape, falling to 0.3 of a set sail's drive near the boom. ESTIMATES: nothing
  * published measures a part-hoisted sail's drive (the researcher, 14 Nov 2026); the sail-shape model (mainShape, jibShape)
  * already prices the luff tension once the sail is up.
  */
 export function hoistDraw(h: number, sail: 'main' | 'jib'): number {
   const th = HALYARD.takeUpM / HALYARD.luffM[sail];
-  return h >= 1 - th ? 1 - 0.25 * (1 - h) / th : 0.75 * (0.4 + 0.6 * h / (1 - th));
+  return h >= 1 - th ? 1 - 0.08 * (1 - h) / th : 0.92 * (0.33 + 0.67 * h / (1 - th));
 }
 
 export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}): CrewSettings {
