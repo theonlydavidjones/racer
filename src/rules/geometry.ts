@@ -25,6 +25,26 @@ export function hullGap(A: Hull, B: Hull): number {
   return Math.min(segPt(p1, q1, q2), segPt(p2, q1, q2), segPt(q1, p1, p2), segPt(q2, p1, p2));
 }
 
+/** A hull's bow (x1, y1) and stern (x2, y2) at (x, y) on heading h, as endsOf works them out: into `out` from `k`
+ * (boat/arcs.ts keeps her own path's ends so, worked out once for every boat judged against it). */
+export function hullEndsInto(x: number, y: number, h: number, out: Float64Array, k: number): void {
+  const u = V(h);
+  out[k] = x + u.x * HALF; out[k + 1] = y + u.y * HALF; out[k + 2] = x - u.x * HALF; out[k + 3] = y - u.y * HALF;
+}
+/** hullGap with A's ends given as numbers (hullEndsInto's, from `k`): the same arithmetic, nothing made. */
+export function hullGapEnds(E: Float64Array, k: number, B: Hull): number {
+  const p1x = E[k], p1y = E[k + 1], p2x = E[k + 2], p2y = E[k + 3], [q1, q2] = ends(B);
+  const side = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  if (side(p1x, p1y, p2x, p2y, q1.x, q1.y) * side(p1x, p1y, p2x, p2y, q2.x, q2.y) < 0 && side(q1.x, q1.y, q2.x, q2.y, p1x, p1y) * side(q1.x, q1.y, q2.x, q2.y, p2x, p2y) < 0) return 0;
+  return Math.min(segXY(p1x, p1y, q1.x, q1.y, q2.x, q2.y), segXY(p2x, p2y, q1.x, q1.y, q2.x, q2.y), segXY(q1.x, q1.y, p1x, p1y, p2x, p2y), segXY(q2.x, q2.y, p1x, p1y, p2x, p2y));
+}
+/** core/math.ts segPt on numbers: the same arithmetic. */
+function segXY(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const abx = bx - ax, aby = by - ay;
+  const t = clamp(((px - ax) * abx + (py - ay) * aby) / (abx * abx + aby * aby || 1), 0, 1);
+  return Math.hypot(px - ax - abx * t, py - ay - aby * t);
+}
+
 /** Closest point of approach over the next 12 s: time (s) and distance between centres (m). */
 export function cpa(A: Moving, B: Moving): { t: number; d: number } {
   const rx = B.x - A.x, ry = B.y - A.y, ux = B.vx - A.vx, uy = B.vy - A.vy, uu = ux * ux + uy * uy;

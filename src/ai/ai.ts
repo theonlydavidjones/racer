@@ -7,7 +7,7 @@ import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
-import { escapes, straightOn, type Candidate, type Pose } from '../boat/arcs';
+import { escapePaths, escapes, straightOn, type Candidate, type EscapePaths, type Pose } from '../boat/arcs';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
@@ -176,10 +176,15 @@ export function crabFor(brgT: number, v: number, cur: Vec): number {
  * changes role, or her course moves on, and holds what she decided in between, as a helm does: deciding afresh every
  * step she'd swap from one side to the other. `expected`: boats she's already been watching for (no reaction time).
  */
-function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, others: Boat[] = [], expected: number[] = []): { heading: number | null; luff: boolean } {
-  const ai = b.ai!, threats = [...kc, ...row];
+function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, othersOf: () => Boat[] = () => [], expected: number[] = []): { heading: number | null; luff: boolean } {
+  const ai = b.ai!, E = ai.esc;
+  // (what she decided still holds: the same boats in the same roles, within the second, her course much where it was.
+  // Checked on the ids themselves, before building anything: she asks every step, and nearly always it holds)
+  if (E && w.t - E.at < 1 && Math.abs(wrap(aimH - (E.aim ?? aimH))) < 10 && E.kIds && E.rIds && E.kIds.length === kc.length && E.rIds.length === row.length
+    && kc.every(o => E.kIds!.includes(o.id)) && row.every(o => E.rIds!.includes(o.id))) return E;
+  const threats = [...kc, ...row], others = othersOf();
   const ids = [...kc.map(o => `k${o.id}`), ...row.map(o => `r${o.id}`)].sort().join(',');
-  if (ai.esc && ai.esc.ids === ids && w.t - ai.esc.at < 1 && Math.abs(wrap(aimH - (ai.esc.aim ?? aimH))) < 10) return ai.esc;
+  if (E && E.ids === ids && w.t - E.at < 1 && Math.abs(wrap(aimH - (E.aim ?? aimH))) < 10) return E;
   // (the gaps she keeps, over the contact distance the rules judge by (which allows for the hulls' flare and the slop in
   // judging a gap): from a boat she must keep clear of, enough that it can sail on without acting (Definitions, Keep
   // Clear); from one that should be keeping clear of her, only enough not to touch, 0.3 m, about a hand's breadth more
@@ -193,7 +198,9 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   const toCourse = Math.round(wrap(aimH - b.h)), turns = [...(Math.abs(toCourse) > 3 ? [toCourse] : []), ...ESC_TURNS];
   const me = { x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 };
   // (one prediction for all the boats of a kind, her gap to each read separately: boat/arcs.ts Candidate.gaps)
-  const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT, windKt: b.ww.kt }) : null;
+  const eo = { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT, windKt: b.ww.kt };
+  let paths: EscapePaths | undefined; // (her own paths, once for both runs: they don't depend on the other boats)
+  const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, eo, paths ??= escapePaths(me, b.ww.from, eo)) : null;
   const threatsG = run(threats);
   // (the boats beside the threats, only when her own course won't do: most of the time it will, and they cost as much)
   let othersG: Candidate[] | null = null, owedRoom: boolean[] = [];
@@ -238,7 +245,7 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
       luff = b.twa < 110 && me.v > SLOW_TO_STEER && threats.some(q => q.v + (q.astern ?? 0) > 0.5);
     }
   }
-  ai.esc = { at: w.t, ids, heading, luff, aim: aimH };
+  ai.esc = { at: w.t, ids, kIds: kc.map(o => o.id), rIds: row.map(o => o.id), heading, luff, aim: aimH };
   return ai.esc;
 }
 
@@ -918,7 +925,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   else {
     // (her course as it is, the room she owes a third boat over which she holds right of way included (Rule 16.1,
     // above): keeping clear needn't cost that room unless nothing else will do, keepClear)
-    const others = near.filter(n => !threats.includes(n.o) && n.dx * n.dx + n.dy * n.dy < 1600).map(n => n.o);
+    // (the boats beside them: only worked out when she decides afresh)
+    const others = () => near.filter(n => !threats.includes(n.o) && n.dx * n.dx + n.dy * n.dy < 1600).map(n => n.o);
     const e = keepClear(w, b, kcThreats, rowThreats, course, others, bh ? [bh.c] : []);
     const heading = e.heading;
     if (e.luff && heading == null) { luff = true; if (threats.some(o => o.id !== ai.hailTack?.with)) avoiding = true; }
