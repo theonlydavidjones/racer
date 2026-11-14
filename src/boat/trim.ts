@@ -40,8 +40,11 @@ export const SAILS: Record<SailName, SailSpec> = {
 
 /** Luffing starts this far (deg) below the best angle of attack and is complete 10° further on. */
 const LUFF_START = 2, LUFF_SPAN = 10;
-/** Stalling starts this far above the best angle of attack. */
-const STALL_START = 4;
+/** Stalling starts this far above the best angle of attack, and is complete this much further on. */
+export const STALL_START = 4, STALL_SPAN = 25;
+/** The angle of attack past the best (deg) at which the main's leech telltale curls round behind it: stalled by 0.12 of
+ * the span, the flow off the sail before the leech (render/sails.ts leechTellState and leechTellAt). */
+export const LEECH_CURL = STALL_START + 0.12 * STALL_SPAN;
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const smooth = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
@@ -70,7 +73,7 @@ export function sailTrim(sail: SailName, awa: number, sheet: number): SailTrim {
   // flow along the sail (upwind/reaching)
   let effUp = 1, flow: Flow = 'good', amount = 0;
   if (err < -LUFF_START) { amount = clamp((-err - LUFF_START) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
-  else if (err > STALL_START) { amount = clamp((err - STALL_START) / 25, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
+  else if (err > STALL_START) { amount = clamp((err - STALL_START) / STALL_SPAN, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
   // downwind: drive comes from area presented to the wind, so trimmed in means less drive
   const effDown = 0.4 + 0.6 * Math.sin(clamp(sheet, 0, 90) * Math.PI / 180) / Math.sin(clamp(optimalSheet(sail, a), 1, 90) * Math.PI / 180);
   if (dw > 0.5) { flow = 'good'; amount = 0; } // stalled is normal downwind; the telltales just hang
