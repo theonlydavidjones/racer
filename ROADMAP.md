@@ -492,7 +492,7 @@ What's planned, roughly in order. Done work is described in the README.
      these.
    - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
-8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
+8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
    way to set the direction.
