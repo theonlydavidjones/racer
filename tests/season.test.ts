@@ -28,6 +28,12 @@ describe('the season', () => {
     expect(now.races.length).toBe(ev2627.races.length); // (no invented dates)
     expect(now.scheduled).toBe(5);
   });
+  it('2026–27\'s calendar: the five race days as announced (Latitude 38), race 1 published, the rest to come', () => {
+    const now = seasons().at(-1)!;
+    expect(now.calendar.map(c => c.date)).toEqual(['2026-11-07', '2026-12-05', '2027-01-02', '2027-02-06', '2027-03-06']);
+    expect(now.calendar.length).toBe(now.scheduled);
+    expect(now.calendar[0].date).toBe(now.races[0].date); // (a published race's own day)
+  });
   it('the real fleet\'s points scored as a series: no throwout with race 3 abandoned (four of five sailed)', () => {
     const res = Object.fromEntries([1, 2, 4, 5].map(n => [n, real(n)]));
     const { rows, discards } = standings(S, res);
