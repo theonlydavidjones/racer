@@ -3,7 +3,7 @@ import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
-import { CAR_FORE_PINS, CAR_IN_PINS, carLead } from '../boat/controls';
+import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, carLead } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
@@ -398,9 +398,9 @@ const COCKPIT_LINING = new THREE.MeshLambertMaterial({ color: 0xe9e3d4, side: TH
 const BLACK = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), CAM_GREEN = new THREE.MeshLambertMaterial({ color: 0x3fb36a });
 /** Jib car on its cabin-top track: x across (pins 25 mm apart, inboard first), z fore–aft. */
 const carPos = (side: number, fore: number, ins: number) => {
-  // the middle fore–aft pin 2.65 m aft of the stay (North Sails' tuning guide); across, where the physics' lead angle puts it
-  // (carLead, seen from the tack: 12.3° puts the car the guide's 58 cm off the centreline)
-  const z = FORESTAY_DECK.z + 2.65 + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (z - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
+  // the middle fore–aft pin CAR_AFT aft of the stay (North Sails' tuning guide's 2.65 m tape from the stay's pin); across,
+  // where the physics' lead angle puts it (carLead, seen from the tack: the guide's 58 cm off the centreline)
+  const z = FORESTAY_DECK.z + CAR_AFT + 0.025 * (fore - (CAR_FORE_PINS - 1) / 2), x = side * (z - FORESTAY_DECK.z) * Math.tan(carLead(ins) * D2R);
   return new THREE.Vector3(x, cabinTopAt(uAtZ(z), x) + 0.035, z); // on the cabin top's arch
 };
 /** Whether (x, z) is over the cabin top. */
