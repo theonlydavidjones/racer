@@ -475,9 +475,15 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   {
     const side = ap.arel >= 0 ? -1 : 1; // (wind over the starboard side sets her to port)
     const Fy = side * (Fwind + (b.luff ? 0 : Fside)); // (windage: its part across her, dynamics.ts windSide)
-    const sw = b.sway ?? 0, aL = Math.PI * HOVE.aspect / 2, Fw = -0.5 * 1025 * HOVE.latArea * (aL * Math.max(0, b.v) * sw + HOVE.crossCd * sw * Math.abs(sw));
-    b.sway = sw + (Fy + Fw) / (disp * (1 + HOVE.swayAdded)) * dt;
-    if (Math.abs(b.sway) < 1e-4) b.sway = 0;
+    // (her keel's lift with way on, ahead or astern: astern it works half as well, as the dock's step has it, dockLines.ts)
+    const uNow = b.v - (b.astern ?? 0), uLift = uNow >= 0 ? uNow : 0.5 * -uNow;
+    const sw = b.sway ?? 0, aL = Math.PI * HOVE.aspect / 2, Fw = -0.5 * 1025 * HOVE.latArea * (aL * uLift * sw + HOVE.crossCd * sw * Math.abs(sw));
+    // and as she turns her way carries her on: in her own axes that is a slide outward (−u·r, the centripetal term of a
+    // body turning), which her keel then resists. It is what puts her pivot ahead of her middle going ahead (her stern
+    // swings out) and well aft going astern (her bow swings wide), as a boat's is
+    const my = disp * (1 + HOVE.swayAdded), slide = -(HANDLING.mass * disp / HULL.displacement) / my * uNow * (b.turnRate ?? 0) * D2R;
+    b.sway = sw + ((Fy + Fw) / my + slide) * dt;
+    if (Math.abs(b.sway) < 1e-6) b.sway = 0; // (a micron a second: nothing. Not higher: a slow turn's slide builds from less than a tenth of a millimeter a second a step)
   }
   travel(b, dt, t, emit, groundToast);
   sailVisuals(b, plan, dt);
