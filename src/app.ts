@@ -2169,4 +2169,9 @@ requestAnimationFrame(frame);
 
 // Dev-only handle for debugging and browser tests: window.sim() returns the current World.
 if (import.meta.env.DEV) Object.assign(window, { __ghost: (pts: Ghost['pts'] | null) => { activeGhost = pts ? { at: 'dev', key: 'dev', pts } : null; view.setGhost(w, pts); } }); // (a ghost on any race, for checking how it's drawn)
+if (import.meta.env.DEV) void import('./render/drillGuides').then(async m => { // (MOCK-UP: design/drill-redo)
+  const dr = await import('./sim/drill'), po = await import('./boat/polar');
+  const g = new m.DrillGuides(view.scene, view.camera, () => host.world.user);
+  Object.assign(window, { __dg: { set: (s: never) => g.set(s), beat: po.beatAngle, crew: dr.simCrew, low: dr.finishLow } });
+});
 if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; }, __nav: () => nav.trail });
