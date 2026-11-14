@@ -11,15 +11,16 @@ import { PILE_FLOW, basinFloor } from './current';
  *
  * **The place.** East Harbor is entered between the breakwater's light and Fort Mason's Pier 1 (Coast Pilot 7, ch. 7):
  * a gap about 37 m wide facing north, with the stream along the Cityfront running straight across it (NOAA SFB1204:
- * flood 088°, ebb 260°). On the flood the stream comes along the breakwater's outer side and leaves it at the tip; on
- * the ebb it comes through Pier 1's piles (the pier stands on open piles: geo/shore.ts PILE_PIERS).
+ * flood 088°, ebb 260°). On the flood the stream comes along the breakwater's outer side and leaves it at the knuckle
+ * of its last leg (below); on the ebb it comes through Pier 1's piles (the pier stands on open piles: geo/shore.ts
+ * PILE_PIERS).
  *
  * **What the stream does there** (Bijvelds 1997, TU Delft Communications on Hydraulic and Geotechnical Engineering
  * 1-97, and Langendoen 1989, report 8-89: both on harbors beside a river or tidal stream):
  *  - **The gyre.** The stream doesn't turn in through the mouth: it leaves the upstream corner and runs on across, and
  *    its drag on the still water inside turns that water in one gyre, whose edge runs at about a quarter of the stream
  *    ("as a first guess": Bijvelds §3, after Booij 1986; in the case he checks it against, nearer a tenth). Its near
- *    side goes with the stream, its far side against it: clockwise on the flood here, anticlockwise on the ebb. Its
+ *    side goes with the stream, its far side against it: anticlockwise on the ebb here (the flood, below, barely reaches it). Its
  *    size here is the pool of clear water inside the mouth (the docks and the boats in them stop a larger one): the
  *    largest circle of water clear of walls, docks and piles that touches the mouth, worked out from the harbor's own
  *    plan (36 m in radius, behind a 37 m mouth). It turns as a solid body, fastest three-quarters of the way out, and
@@ -67,10 +68,21 @@ import { PILE_FLOW, basinFloor } from './current';
  *  - The stream's own set is up to 16° off the mouth's line (the presets; 1–9° on the real tide of 14 Nov 2026), which
  *    would carry water steadily in (or out) through the gap of a closed basin: that part is taken out across the
  *    layer and, fading, for a gap's width off it on the Bay's side, where the stream turns to run along the line.
- *  - Not modeled, and not known: on the flood the breakwater's last leg runs 27° off the stream after a knuckle 64 m
- *    west of the tip, so the stream may leave the wall there, not at the tip, and the mouth lie in that corner's lee;
- *    on the ebb the same leg stands 35 m into the stream just past the mouth, and water piling on it would push in
- *    through the gap. Either would change the picture more than any figure above (the owner asked: 14 Nov 2026).
+ *  - **The flood comes off the breakwater's knuckle, not its tip** (decided from the physics, 14 Nov 2026: the owner
+ *    didn't know, and nothing published resolves this entrance: NOAA's Bay model, SFBOFS, has nodes 80–180 m apart
+ *    here, measured from its own mesh; reference/research/gashouse-entrance-eddies.md). The breakwater's last leg
+ *    turns 27° away from the flood at a sharp corner 60 m before the tip, standing 36 m out of the mouth's line. A
+ *    stream can't follow a sharp turn like that: it leaves the wall at the corner and comes back to it some lengths
+ *    on, 6–7 times the step behind a square one (Kim, Kline & Johnston 1980), less behind a slope: 4 is taken, an
+ *    estimate, which puts the whole gap (1.7 to 2.7 steps on) inside the corner's lee. Bed friction is too weak here
+ *    to shorten it (c_f·L/h ≈ 0.05, under the 0.12 where it takes over: Babarutsi, Ganoulis & Chu 1989). So on the
+ *    flood the stream passes the gap some 20–30 m off, behind its own widening layer and its row of large, slow
+ *    eddies (one every four minutes or so), and the water at the gap itself is the lee's: slack, with nothing to
+ *    drive the cove's gyre, which runs down from what the ebb left. The lee's own slow turning (in such bubbles the
+ *    water by the wall creeps back at up to about a fifth of the stream) is not drawn: its size here is unknown.
+ *  - Not modeled, and not known: on the ebb the same leg stands 35 m into the stream just past the mouth, and water
+ *    piling on it would push in through the gap (harbor studies have new water entering at the downstream corner:
+ *    Langendoen §3.6; no figure for a wall across the stream was found).
  *    Also not modeled: a second, weaker gyre deeper in; the start-up vortex shed as the stream builds (Signell & Geyer
  *    1991); the water the tide's rise and fall draws through the mouth (a few cm/s here); the single piles' eddies.
  *
@@ -93,7 +105,11 @@ export const MOUTH = {
    * here) over the depth, m (Coast Pilot 7: 8–12 ft to the berths) */
   cf: 0.0025, depth: 3,
   /** a free mixing layer's rate (Brown & Roshko 1974, Bijvelds eq. 3.6), for the pile lee's Bay side: × (U1 − U2)/(U1 + U2) */
-  free: 0.18
+  free: 0.18,
+  /** where a stream that has left a wall's knuckle comes back to the wall's line, in steps (the knuckle's height off the
+   * line): 6–7 behind a square step (Kim, Kline & Johnston 1980, as COMSOL's backstep benchmark quotes it), less
+   * behind a slope like this one's 27°: 4 is an estimate */
+  reattach: 4
 };
 
 interface Mouth {
@@ -106,6 +122,8 @@ interface Mouth {
   c: Vec; R: number; turn: number;
   /** how steeply each corner's own wall runs out toward the Bay from the mouth's line (m out per m along it, beyond the gap) */
   wallA: number; wallB: number;
+  /** each solid corner's knuckle: how far out of the mouth's line its wall stands (the step a stream along it comes off), and how far back along the line from the corner, m (0: none) */
+  stepA: number; backA: number; stepB: number; backB: number;
   /** the harbor's stillest water over the stream (current.ts basinFloor) */
   floor: number;
   /** where the stream across the mouth is read: half a mouth's width outside its middle */
@@ -157,9 +175,13 @@ function build(id: string): Mouth | null {
   if (R < 5) return null;
   // each corner's wall beyond the gap: toward the point of its outline furthest out to the Bay within 70 m
   // (the steepest line from the corner to a point of its outline on the far side of it from the gap)
-  const wall = (B: { pts: Vec[] }, q: Vec, away: number) => { let k = 0; for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > 5 && l > -3 && Math.hypot(o, l) < 70) k = Math.max(k, o / Math.max(l, 1)); } return Math.min(5, k); };
-  const pileA = reach(first.B), pileB = reach(second.B), far = Math.max(2 * pileA, 2 * pileB, W) + 10, r = Math.max(far, MOUTH.rim * R + W);
-  return { harbor: h, a, b, along, into, W, pileA, pileB, widthA: width(first.B), widthB: width(second.B), c, R, turn: (into.y * along.x - into.x * along.y) > 0 ? 1 : -1, wallA: wall(first.B, a, -1), wallB: wall(second.B, b, 1), floor: basinFloor(h),
+  const wall = (B: { pts: Vec[] }, q: Vec, away: number) => { let k = 0; for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > 5 && l > -3 && Math.hypot(o, l) < 90) k = Math.max(k, o / Math.max(l, 1)); } return Math.min(5, k); };
+  // a solid corner's knuckle: the point of its wall furthest out toward the Bay within 90 m, where a stream coming along
+  // that wall leaves it (how far out of the mouth's line, and how far back along it from the corner)
+  const knuckle = (B: { pts: Vec[]; pile: boolean }, q: Vec, away: number) => { let out = 0, back = 0; if (!B.pile) for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > out && l > 5 && Math.hypot(o, l) < 90) { out = o; back = l; } } return out > 5 ? { out, back } : { out: 0, back: 0 }; };
+  const kA = knuckle(first.B, a, -1), kB = knuckle(second.B, b, 1);
+  const pileA = reach(first.B), pileB = reach(second.B), far = Math.max(2 * pileA, 2 * pileB, W, kA.back + kA.out, kB.back + kB.out) + 10, r = Math.max(far, MOUTH.rim * R + W);
+  return { harbor: h, a, b, along, into, W, pileA, pileB, widthA: width(first.B), widthB: width(second.B), c, R, turn: (into.y * along.x - into.x * along.y) > 0 ? 1 : -1, wallA: wall(first.B, a, -1), wallB: wall(second.B, b, 1), stepA: kA.out, backA: kA.back, stepB: kB.out, backB: kB.back, floor: basinFloor(h),
     ref: { x: mid.x - into.x * W / 2, y: mid.y - into.y * W / 2 },
     box: { x0: Math.min(a.x, b.x, c.x) - r, x1: Math.max(a.x, b.x, c.x) + r, y0: Math.min(a.y, b.y, c.y) - r, y1: Math.max(a.y, b.y, c.y) + r } };
 }
@@ -170,12 +192,25 @@ export const MOUTH_REFS: Vec[] = MOUTHS.map(m => m.ref);
 
 /** The gyre's speed at r from its center, over its edge speed: a solid body out to `peak`, dying away by `rim`. */
 const gyreShape = (s: number) => s <= MOUTH.peak ? s / MOUTH.peak : Math.max(0, (MOUTH.rim - s) / (MOUTH.rim - MOUTH.peak));
-/** The stream across mouth i (signed along a→b, m/s) once it's through any piles on its way, and the piles' width it crossed. */
-const crossing = (M: Mouth, f: Vec) => { const along = f.x * M.along.x + f.y * M.along.y, piled = (along > 0 ? M.pileA : M.pileB) > 0; return { along, Ur: Math.abs(along) * (piled ? PILE_FLOW : 1), piles: along > 0 ? M.widthA : M.widthB }; };
-/** The eddies' spacing down the layer (m): `spacing` layer-widths, at the layer's width in the middle of the gap. */
-const eddySpacing = (M: Mouth, piles: number) => MOUTH.spacing * (MOUTH.B0 + MOUTH.spread * (M.W / 2 + piles));
+/** How much of the stream is back at the wall's line, X m past a knuckle `step` m high: none within the separated water, coming back over one more of its lengths. */
+const regained = (X: number, step: number) => { const xi = X / (MOUTH.reattach * step); return xi < 1 ? 0 : 1 - Math.exp(1 - xi); };
+/**
+ * The stream f at mouth i: `along` signed a→b (m/s); `Uo` the stream outside the layer (through any piles on its way);
+ * `Ur` what crosses the gap itself and drives the gyre (nothing, in a knuckle's lee); `run` how far the layer has
+ * already run when it reaches the gap's upstream corner (the piles' width, or back to the knuckle); `step` and `back`
+ * the upstream corner's knuckle.
+ */
+function crossing(M: Mouth, f: Vec) {
+  const along = f.x * M.along.x + f.y * M.along.y, U = Math.abs(along), fromA = along > 0;
+  const piled = (fromA ? M.pileA : M.pileB) > 0, step = fromA ? M.stepA : M.stepB, back = fromA ? M.backA : M.backB;
+  if (piled) return { along, Uo: U * PILE_FLOW, Ur: U * PILE_FLOW, run: fromA ? M.widthA : M.widthB, step: 0, back: 0 };
+  if (step > 0) return { along, Uo: U, Ur: U * regained(back + M.W / 2, step), run: back, step, back };
+  return { along, Uo: U, Ur: U, run: 0, step: 0, back: 0 };
+}
+/** The eddies' spacing down the layer (m): `spacing` layer-widths, at the layer's width off the middle of the gap. */
+const eddySpacing = (M: Mouth, run: number) => MOUTH.spacing * (MOUTH.B0 + MOUTH.spread * (M.W / 2 + run));
 /** How long an eddy takes to pass (s) in a stream f across mouth i (Infinity at slack). */
-export const eddyPeriod = (i: number, f: Vec): number => { const M = MOUTHS[i], c = crossing(M, f); return eddySpacing(M, c.piles) / Math.max(MOUTH.carry * c.Ur, 1e-9); };
+export const eddyPeriod = (i: number, f: Vec): number => { const M = MOUTHS[i], c = crossing(M, f); return eddySpacing(M, c.run) / Math.max(MOUTH.carry * c.Uo, 1e-9); };
 /** The gyre's response time (s) in a stream f across mouth i: Booij's Te ≈ 50·β²·Le·B/(Ur·Bm), the gyre's own pool 2R by 2R behind a mouth Bm = W. */
 export const gyreTime = (i: number, f: Vec): number => { const M = MOUTHS[i]; return 50 * MOUTH.beta ** 2 * (2 * M.R) ** 2 / (Math.max(crossing(M, f).Ur, 1e-9) * M.W); };
 
@@ -238,7 +273,7 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
     const M = MOUTHS[i], B = M.box;
     if (p.x < B.x0 || p.x > B.x1 || p.y < B.y0 || p.y > B.y1) continue;
     const f = S.flows[i]; if (!f) continue;
-    const { along, Ur, piles } = crossing(M, f);
+    const { along, Uo, Ur, run, step, back } = crossing(M, f);
     // the mouth's own frame, downstream from the upstream corner: x along the gap, n into the basin
     const dn = along >= 0 ? 1 : -1, up = dn > 0 ? M.a : M.b, ex = M.along.x * dn, ey = M.along.y * dn;
     const x = (p.x - up.x) * ex + (p.y - up.y) * ey, n0 = (p.x - up.x) * M.into.x + (p.y - up.y) * M.into.y;
@@ -265,20 +300,40 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
       // (not under a pier's piles, where the stream runs through: coming in over 4 m off its deck)
       if (k > M.floor) { const q = clamp((s - MOUTH.rim) / (2 - MOUTH.rim), 0, 1), off = clamp(pilePierDist(p) / 4, 0, 1); keep *= 1 - off * (1 - (M.floor + (k - M.floor) * q * q * (3 - 2 * q)) / k); }
     }
-    // the mixing layer across the gap: the stream outside it, the basin's water inside. (Its width from the upstream
-    // corner; as the stream dies at slack, from the middle, so nothing steps when the tide turns)
-    const live = clamp(Ur / 0.05, 0, 1), xc = clamp(x, 0, M.W), Bw = MOUTH.B0 + MOUTH.spread * (live * (xc + piles) + (1 - live) * M.W / 2);
-    const q = 2 * n / Bw, m = 0.5 * (1 - Math.tanh(q)), ch = Math.cosh(clamp(q, -20, 20)), core = 1 / (ch * ch);
+    // a knuckle upstream (the flood here): the stream left the wall there, and the layer between it and the slow water
+    // in the corner's lee lies off the wall's line, coming back to it where the stream reattaches. X: how far past the
+    // knuckle; off: how far off the line the layer's middle is; regain: how much of the stream is back at the line.
+    // (Past the gap's far corner, within its first 3 m, all of that gives way to what's there: here the pier's piles.)
+    let X = x, off = 0, regain = 1;
+    if (step > 0) {
+      X = x + back;
+      if (X > 0) {
+        const fade = x > M.W ? clamp(1 - (x - M.W) / 3, 0, 1) : 1, xi = X / (MOUTH.reattach * step);
+        off = step * Math.min(1, X / back) * Math.max(0, 1 - xi * xi) * fade; regain = 1 - (1 - regained(X, step)) * fade;
+      }
+    }
+    // the mixing layer: the stream outside it, the lee's or the basin's water inside. (Its width from where it began;
+    // as the stream dies at slack, from the middle, so nothing steps when the tide turns)
+    const live = clamp(Uo / 0.05, 0, 1), reach = M.W + (step > 0 ? back : 0), xr = step > 0 ? clamp(X, 0, reach) : clamp(x, 0, M.W) + run;
+    const Bw = MOUTH.B0 + MOUTH.spread * (live * xr + (1 - live) * (M.W / 2 + run));
+    const q = 2 * (n + off) / Bw, m = 0.5 * (1 - Math.tanh(q)), ch = Math.cosh(clamp(q, -20, 20)), core = 1 / (ch * ch);
+    // (inside the layer on the Bay's side of the line, the lee's water: what little of the stream is back there)
+    if (regain < 1) { const e = clamp(n / 5, 0, 1); keep *= n < 0 ? regain : regain + (1 - regain) * e * e * (3 - 2 * e); }
     ox = m * sx + (1 - m) * (keep * ox + wx); oy = m * sy + (1 - m) * (keep * oy + wy);
     // (no steady stream runs in or out through the gap of a closed basin: what the tide's own set, or the gyre's rim,
-    // would carry across the line is taken out there)
-    // (and for a gap's width off it on the Bay's side, where the stream turns to run along the line and not at it)
-    if (x > 0 && x < M.W && n > -3 * M.W) { const vi = (ox * M.into.x + oy * M.into.y) * (n > 0 ? core : Math.exp(n / M.W)) * clamp(Math.min(x, M.W - x) / 3, 0, 1); ox -= M.into.x * vi; oy -= M.into.y * vi; }
-    // its eddies, a row carried down the layer; they form over the gap's first quarter and break up on its far corner
-    if (q > -5 && q < 5 && x > 0 && x < 1.5 * M.W && Ur > 0) {
-      // (the speed's change across the layer: the stream's, less the gyre's edge as it is now, with it or against it)
-      const dU = Math.abs(Ur - dn * S.gyre[i]), amp = Math.SQRT2 * dU * clamp(4 * (x + piles) / M.W, 0, 1) * clamp(3 - 2 * x / M.W, 0, 1);
-      const lam = eddySpacing(M, piles), ph = 2 * Math.PI * (S.phase[i] + (t - S.t) / eddyPeriod(i, f) - x / lam);
+    // would carry across the line is taken out there, and for a gap's width off it on the Bay's side, where the
+    // stream turns to run along the line and not at it)
+    if (x > 0 && x < M.W && n > -3 * M.W) {
+      const cg = n > 0 ? 1 / Math.cosh(Math.min(20, 2 * n / Bw)) ** 2 : Math.exp(n / M.W), vi = (ox * M.into.x + oy * M.into.y) * cg * clamp(Math.min(x, M.W - x) / 3, 0, 1);
+      ox -= M.into.x * vi; oy -= M.into.y * vi;
+    }
+    // its eddies, a row carried down the layer; they form over its first quarter and break up on the gap's far corner
+    if (q > -5 && q < 5 && X > 0 && x < 1.5 * M.W && Uo > 0) {
+      // (the speed's change across the layer: the stream's, less the gyre's edge as it is now, with it or against it;
+      // off a knuckle, the stream's less what the lee's water has of it)
+      const dU = step > 0 ? Uo * (1 - regain) : Math.abs(Ur - dn * S.gyre[i]);
+      const amp = Math.SQRT2 * dU * clamp(4 * (X + (step > 0 ? 0 : run)) / reach, 0, 1) * clamp(3 - 2 * x / M.W, 0, 1);
+      const lam = eddySpacing(M, run), ph = 2 * Math.PI * (S.phase[i] + (t - S.t) / eddyPeriod(i, f) - X / lam);
       // (a row of eddies: across the stream the water swings most on the layer's center line; along it, to either side
       // of the line and opposite ways there, a quarter-turn apart, and by just as much as lets the water neither pile
       // up nor thin out: u = dψ/dn, v = −dψ/dx of the one stream function)

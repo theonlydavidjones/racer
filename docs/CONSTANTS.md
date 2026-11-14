@@ -488,6 +488,7 @@ physics, ranked like the ten above:
 | MOUTH.v | 0.1 | 91 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one row of eddies (upper bound) |
 | MOUTH.cf, depth | 0.0025, 3 | 94 | sourced | the usual tidal-model drag (not measured here); Coast Pilot 7's 8–12 ft |
 | MOUTH.free | 0.18 | 96 | sourced | Brown & Roshko 1974, Bijvelds eq. 3.6 |
+| MOUTH.reattach | 4 | | estimate | steps to come back to the wall after a knuckle: 6–7 behind a square step (Kim, Kline & Johnston 1980), less behind a 27° slope |
 | (the pile lee's reach) | 1–2 pier-heads | | estimate | not derived: see the module's comment |
 | (the layer's head start through the piles) | the pier's width | | estimate | nothing found on shear layers through pile fields |
 | (the still pool's reach) | 2 gyre radii | | estimate | |

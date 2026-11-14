@@ -55,3 +55,21 @@ FAQ (sfrecpark.org/DocumentCenter/View/20896) may hold bathymetry or hydrodynami
   a new one starts at the upstream corner.
 - Not settled: whether the flood leaves the breakwater at its knuckle 64 m west of the tip (the last leg runs 27° off
   the stream) and whether the ebb piles on that leg and pushes in through the gap. Asked of the owner.
+
+## The flood and the ebb at the gap: what the maps and the literature give (researcher, 14 Nov 2026; the owner: "ask physics and look at the bay tide maps")
+- No published measurement or model resolves this entrance. SFBOFS (NOAA's Bay model, FVCOM, 54,120 nodes): its mesh
+  read from noaa-nos-ofs-pds (sfbofs.t03z.20261110.fields.f000.nc) has 38 nodes within 700 m of the entrance, 80–180 m
+  apart (median 141 m): it cannot hold a 37 m gap or a 70 m breakwater leg. NOAA's printed Tidal Current Charts (data
+  from before 1969): no scan found; DTIC ADA113595 (the Coast Guard's computerized version) not opened.
+- Local notes, none with a speed at the entrance: South End Rowing Club's "Landmarks and Swims 2021" diagram labels
+  "The Ebb EDDY" and "The Flood EDDY" near Fort Mason and Gas House Pier (snippet only: the PDF couldn't be read);
+  a Latitude 38 reader (19 Apr 2019) writes of "a huge back eddy along the city front from Fort Point to Fort Mason".
+- Separation: a backward step's flow comes back to the wall 6–7 step heights on (Kim, Kline & Johnston 1980: 7.1; COMSOL's
+  backstep benchmark 6.64); shorter behind a slope (no figure found for 27°: 4 is our estimate). Shallow flows: bed
+  friction sets the length only when S = c_f·L/h is above about 0.12 (Babarutsi, Ganoulis & Chu 1989, ASCE JHE 115(7)
+  906); here about 0.05. The 2D-diffuser stall angles (Reneau, Johnston & Kline 1967) weren't found in numbers.
+- The ebb on the breakwater's leg: nothing found with a magnitude. Harbor studies have new water entering at the
+  entrance's downstream corner (Langendoen 8-89 §3.6), and walls that catch the stream raise the inflow in models
+  (current-deflecting-wall work: Winterwerp & Kuijper 2003; Hofland & van Leeuwen 1999). Not modeled.
+- Decided from that (Deep Physics): on the flood the stream leaves the breakwater at its last leg's knuckle (60 m
+  before the tip, 36 m out of the mouth's line) and the gap, 1.7–2.7 steps on, lies in the corner's lee. An estimate.
