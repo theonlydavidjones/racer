@@ -75,6 +75,9 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     // minute; and nobody makes one for nothing, no job and no move forward of the winch or to the mast, under 0.1 (0 to
     // 0.07 measured over 5 to 16 kt after the stations swapped); each boat's two crew together, under 1.4)
     m.roles.forEach((r, k) => expect(r.lines, `boat ${k + 1}: the hand with the cabin-top lines, trips a minute`).toBeLessThan(1.4));
+    // (and the other, who stays put: their jobs too, in light air forward of the winch the jib and the mast, 0.22 to 0.67
+    // a minute measured in 5 to 7 kt; from 10 kt up, at their stations, 0 measured)
+    m.roles.forEach((r, k) => expect(r.stay, `boat ${k + 1}: the hand who stays put, trips a minute`).toBeLessThan(kt >= 10 ? 0.1 : 0.7));
     m.free.forEach((f, j) => expect(f, `crew ${j % 2 + 1}: trips a minute for no job`).toBeLessThan(0.1));
     for (let k = 0; k < m.trips.length; k += 2) expect(m.trips[k] + m.trips[k + 1], `boat ${k / 2 + 1}: both crew's trips a minute`).toBeLessThan(1.4);
   }, 600_000);
