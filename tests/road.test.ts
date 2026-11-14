@@ -66,13 +66,27 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     watch();
     expect(L.step).toBe(2); expect(jumps).toBeGreaterThan(0); expect(near).toBe(0);
     // and the next one, set after she's sailed off out of sight
-    setOn(w, from - 90); L.step = 2;
+    setOn(w, from - 130);
     for (let i = 0; i < 600 / DT && L.step < 3; i++) {
       const p = { x: o.x, y: o.y }, d0 = Math.hypot(p.x - u.x, p.y - u.y);
       w.step(DT);
       if (Math.hypot(o.x - p.x, o.y - p.y) > 1) expect(Math.min(d0, Math.hypot(o.x - u.x, o.y - u.y))).toBeGreaterThanOrEqual(LESSON_MARKS.awayM);
     }
     expect(L.step).toBe(3);
+  }, 60_000);
+
+  it('called only as its rule has it: altering after she\'s set, she\'s let go (and set again), never called wrong', () => {
+    // (the windward encounter, you bearing away to a run after she's set: called on range alone, she'd be to windward of
+    // you, the duty hers; heading up close-hauled, she couldn't make the meeting and the lesson waited on her for good)
+    for (const twa2 of [175, 50]) {
+      const w = world(), L = w.lesson!, from = w.windModel.base, u = w.user, o = w.boats[1];
+      L.step = 2; setOn(w, from - 130);
+      sail(w, 60, () => !!L.approach); expect(L.approach).not.toBeNull();
+      sail(w, 10); steer(w, from - twa2);
+      let lee = true;
+      sail(w, 400, () => { if (L.enc) lee = (o.x - u.x) * V(from).x + (o.y - u.y) * V(from).y < 0; return !L.approach; });
+      expect(L.approach).toBeNull(); expect(L.enc === null || lee).toBe(true);
+    }
   }, 60_000);
 
   it('she\'s set only once your heading and speed have settled, and never coming up from astern (Rule 13)', () => {
@@ -90,8 +104,8 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     const gap = sail(w, 90, () => L.step !== 1);
     expect(gap).toBeGreaterThanOrEqual(LESSON_MARKS.clearLoa * LOA);
     expect(L.step).toBe(2); expect(L.cue).toMatch(/starboard tack/);
-    // starboard, a beam reach: a boat to leeward is set coming up close-hauled; you head up and away from her
-    setOn(w, from - 90);
+    // starboard, a broad reach: a boat to leeward is set coming up close-hauled; you head up and away from her
+    setOn(w, from - 130);
     sail(w, 300, () => L.step === 3); // (once the last boat's well away)
     expect(L.step).toBe(3); expect(L.cue).toMatch(/to leeward/);
     const o = w.boats[1]; expect(o.tack).toBe('S');
