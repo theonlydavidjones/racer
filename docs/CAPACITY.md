@@ -308,7 +308,7 @@ The guard must keep watching the race-mode physics at full fidelity. The worker 
 | 5 | **The guards** (§3: spike, determinism, perf.cjs); the budget's new limit proposed to the owner with the measured room | 3–5 | with 3 | — |
 | | **total** | **26–42** | | |
 
-Laptop numbers are estimates from this container's calibration. The `` ` `` key's meter (ui/perfMeter.ts) gives the real
+Laptop numbers are estimates from this container's calibration. The frame-time readout (F9, ui/perfMeter.ts) gives the real
 ones: the owner's sim ms per frame at 4× in a full race, read once before step 2 and once after step 3, would settle
 the headroom on their actual machine.
 
