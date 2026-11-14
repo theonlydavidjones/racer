@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sail, startTack, testBoat } from './helpers/testBoat';
+import { DEFAULT_CREW, newCrew, placeCrew } from '../src/boat/crewPhys';
 
 // On a run the crew settle on one side and stay there between gybes (crewPhys.ts HOLD.crossHeel, crossLast): they steady
 // the roll by leaning, not by crossing the boat with each roll or puff. A gybe still takes them across, and on a reach a
@@ -32,6 +33,36 @@ describe('the crew off the wind', () => {
       // (the helm and the crew, on the windward side: x > 0 is to windward in the crew's frame, b.crew.wind)
       const w = b.crew!.wind;
       expect(b.crew!.people.filter(p => p.x * w > 0.15).length, b.crew!.people.map(p => (p.x * w).toFixed(2)).join(',')).toBeGreaterThanOrEqual(2);
+    }, 30_000);
+  for (const twa of [75, 90, 110])
+    it(`on a light-air reach (${twa}° true), the wind hovering about 6 kt, the helm stays on their side (crewPhys.ts HOLD.helmHeel)`, () => {
+      const b = testBoat({ heading: 360 - twa, kt: 3, windKt: 6 });
+      sail(b, 40, () => { b.h = 360 - twa; });
+      // (gusts and lulls of half a knot either side, a few seconds each: the wind about the light-air threshold)
+      let t = 0;
+      expect(crossings(b, 150, () => { t += 1 / 60; b.ww.kt = 6 + 0.6 * Math.sin(t / 3) * Math.sin(t / 11); b.h = 360 - twa; })[0]).toBe(0);
+    }, 30_000);
+  // (and a lasting error does take the helm across, either way, after about HOLD.helmLast; placeCrew directly, with
+  // the heel she's carrying set: settled on one side, then a steady error of 4-5 degrees the other way)
+  for (const [need, heel, label] of [[-300, 1, 'too flat by 5: to leeward'], [300, 10, 'over-heeled by 4: up to windward']] as const)
+    it(`on a light-air reach, a lasting heel error (${label}) takes the helm across after about 20 s, not at once`, () => {
+      const c = newCrew(DEFAULT_CREW, 'S');
+      const base = { twa: 90, tws: 6, v: 2, pole: false, tack: 'S' as const, windward: 1, beat: 42, extraMoment: 0, sea: 0, rmPerDeg: 250, bestHeel: 6 };
+      for (let i = 0; i < 20 * 30; i++) placeCrew(c, { ...base, need: need < 0 ? 400 : -600, heel: 6 }, 0.05);
+      const x0 = c.people[0].x; let crossed = -1;
+      for (let i = 0; i < 20 * 60 && crossed < 0; i++) { placeCrew(c, { ...base, need, heel }, 0.05); if (Math.sign(c.people[0].x) !== Math.sign(x0)) crossed = i * 0.05; }
+      expect(crossed, 'seconds before the helm went across').toBeGreaterThan(15);
+      expect(crossed).toBeLessThan(30);
+    });
+  for (const [twa, W] of [[90, 5], [110, 4]] as const)
+    it(`sailing a reach (${twa}° true), the wind falling from 9 to ${W} kt: the helm goes to leeward, after the wait`, () => {
+      const b = testBoat({ heading: 360 - twa, kt: 4, windKt: 9 });
+      sail(b, 40, () => { b.h = 360 - twa; });
+      const w = b.crew!.wind; expect(b.crew!.people[0].x * w, 'to windward in 9 kt').toBeGreaterThan(0.15);
+      b.ww.kt = W; let t = 0, crossed = -1;
+      sail(b, 60, () => { t += 1 / 60; b.h = 360 - twa; if (crossed < 0 && b.crew!.people[0].x * w < -0.15) crossed = t; });
+      expect(crossed, 'seconds before the helm was to leeward').toBeGreaterThan(18);
+      expect(crossed).toBeLessThan(40);
     }, 30_000);
   it('a gybe still takes them across', () => {
     const b = testBoat({ heading: 360 - 165, kt: 4, windKt: 12 });

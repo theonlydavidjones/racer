@@ -333,6 +333,8 @@ export interface CrewCall {
   sea?: number;
   /** Her heel now (deg, + to leeward), for the roll tack's flatten: out hard until she's upright. */
   heel?: number;
+  /** The heel the crew sail her at now (deg, + to leeward: physics.ts crewBestHeel, or a fixed one hove to). */
+  bestHeel?: number;
   /** A tack is coming: she's turning up toward the wind to tack (a roll tack starts here). */
   tackComing?: boolean;
   /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
@@ -366,13 +368,33 @@ export const ROLL_HEEL = 5;
  *   last under 20 s, WMO's gust is a 3 s mean; the gust-lull cycle on the water is about a minute: Bethwaite, High
  *   Performance Sailing);
  * - `dwell`: and, moving in, it's this long (s) since they last moved, so they don't shuffle back and forth;
+ * - `wave`: out on the rail, the lean they answer is what's wanted smoothed over about this long (s): about half the
+ *   Bay chop's 2–4 s period, so a wave's heel barely moves it and a puff building over several seconds comes through
+ *   (an estimate);
+ * - `body`: out on the rail, easing in follows the wind over about this long (s), not each wave (out harder in a puff,
+ *   over their reaction time);
  * - `urgent`: a puff that needs them out by this many dead bands is answered at once (only their reaction time), and for `last` s after, as the puff fills in, they carry on out to where it asks, not a second move:
  *   crews hike as a puff hits, and ease in on a lull when it has lasted. Hiking harder or easing on the rail is the
  *   body, not a move.
  * Through a tack or gybe and for `settle` s after, to a job, or where you've put them, they go at once. The numbers are estimates: no coaching
  * source gives them, and no count of a Folkboat crew's moves on a beat was found.
  */
-export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, crossHeel: 5, crossLast: 30 };
+export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle: 4, body: 3, wave: 1.5, crossHeel: 5, crossLast: 30, helmHeel: 3, helmLast: 20, leeLast: 15 };
+// (leeLast: in light air, short of the breeze they sit up for, a move across to leeward waits for a lull that has lasted
+// this long (s), against HOLD.last's 3 for a move on their own side; going back out is as quick as ever. Lulls of a few
+// seconds about the 6 kt threshold had a crew member across to leeward and straight back out two seconds later, the wind
+// rising through 6 again (Crew Figures' flicker test, 7 kt +- 2, its lulls under 6 kt some 10 s long). A crew doesn't
+// cross the cockpit for a dip of a few seconds; they go to leeward for a lull that has come to stay. 15 s, a quarter of
+// the breeze's own minute-long gust-lull cycle (Bethwaite): an estimate.)
+// (helmHeel, helmLast: in light air, short of the breeze the crew sit up for (under 8 kt, placeCrew's `breeze`), on a
+// reach (15 degrees free of the beat up to a run), the helm, one heavy weight that swings her heel some 4 degrees at a
+// stroke, goes across the cockpit
+// only for a heel error from the crew's own (k.bestHeel) that the move takes off of more than helmHeel degrees, for
+// helmLast seconds, or at once for twice that in a puff that needs them out. Without it, the weight wanted about the
+// middle, the helm's own crossing swung her heel past what was wanted and back they came, across every few seconds
+// (Crew Figures' cruising probe: 6 kt, a beam reach). The crew's lighter moves make up the difference meanwhile (alone,
+// the helm is the only weight there is to move: not then). Not on a
+// beat: there the extra heel costs her speed (probed: 6 kt at 45 true, 9.8 degrees mean against 5.6, 0.9% slower). Estimates.)
 // (crossHeel, crossLast: on a run (the crew's own `downwind`, past 120 true), a move across to the other side of the
 // boat, between gybes, waits until she has carried more than crossHeel degrees of heel that the move takes off, for
 // crossLast seconds (half a gust-lull cycle, Bethwaite's minute: not one puff or lull, and many roll periods: a roll's
@@ -383,7 +405,7 @@ export const HOLD = { heel: 2, last: 3, dwell: 10, urgent: 2, fore: 0.3, settle:
 // minutes, steadying the roll by leaning, not by crossing (Crew Figures' cruising probe; seamanship). Not on a reach:
 // there the side they want changes with the breeze, and a puff needs them up to windward at once (the physics review).
 // Both numbers estimates.)
-interface Held { arm: number; z: number; since: number; off: number; cross?: number; /** sent out by a puff (the urgent move) */ push?: boolean }
+interface Held { arm: number; z: number; since: number; off: number; cross?: number; helm?: number; /** out on the rail: the lean wanted, smoothed over a wave (HOLD.wave) */ want?: number; /** sent out by a puff (the urgent move) */ push?: boolean }
 
 /**
  * Where the crew go now, at a human pace. Each free person goes where the weight is wanted (or where you've put them);
@@ -567,7 +589,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const settled: Pose = free ? (arm < leeAt ? 'lee' : a.lean > hikeAt ? 'hike' : 'sit') : t.pose;
     // (moving out to the rail or in from it on their own side, to a seat, is still sitting or hiking: not 'cross', the
     // crouch across under the boom, which had them bob up for a moment with every puff)
-    const outOrIn = !crossing && free && Math.abs(goal.z - a.z) <= 0.5;
+    const outOrIn = !crossing && (free || t.pose === 'helm') && Math.abs(goal.z - a.z) <= 0.5; // (the helm too: out to the rail and in again)
     a.pose = !outOrIn && (Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5) ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
@@ -606,6 +628,10 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
   };
   const heelLee = k.heel ?? 0; // (+ to leeward: physics.ts heelMag)
+  const helmLight = (i: number) => {
+    const t = tgt[i], h = held[i];
+    return i === 0 && c.spec.crew.length > 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+  };
   c.people.forEach((a, i) => {
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
@@ -616,7 +642,23 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
     // again, is the body, not a move)
     const sa = i === 0 ? helmArms(ppl[0]).sit : sitArm(ppl[i], crewEdge(c, i));
-    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) { h.arm = t.arm; h.z = t.z; return; }
+    // (but not with each wave: a hiker settles to how hard the wind's blowing, held by their feet under the strap, while
+    // the trimmer plays the main for the seas. Out harder as a puff hits, at once (their reaction time: the righting
+    // moment's wanted then); easing in, lazily, over a few seconds. Followed instantly both ways, the target's swing with
+    // every wave's heel had them flop out and in a body's length every few seconds: the owner's "flopping around", v162)
+    if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) {
+      // (to the wind, not to each wave: what they answer is the lean wanted smoothed over about a wave's half-period,
+      // HOLD.wave, which a wave's second or two of heel barely moves and a puff's build of several seconds comes through.
+      // Followed out at their reaction time from that, they leaned out and in with every wave on a Bay beat in 14 kt; the
+      // waves' heel taken out of the response instead, by a lag on the move, lagged every puff as well: physics review)
+      h.want = h.want == null ? t.arm : h.want + (t.arm - h.want) * Math.min(1, step / HOLD.wave);
+      // (but a puff that comes at once, more than the dead band's worth, or one filling in after the move out for it
+      // (h.push, HOLD.urgent), straight through: a sailor's hiking harder within a second of the heel)
+      if (t.arm > h.want + dead || (h.push && h.since < HOLD.last && t.arm > h.want)) h.want = t.arm;
+      const tau = h.want > h.arm ? reactTime(ppl[i]) : HOLD.body;
+      h.arm = Math.min(h.arm + (h.want - h.arm) * Math.min(1, step / tau), maxOf(i)); h.z = t.z; t.arm = h.arm; return; // (no further out than they can reach now)
+    }
+    h.want = undefined; // (not out on the rail: from scratch when they next are)
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
     // (on a run, across to the other side only for a real heel: lasting, or at once in a puff that needs them out;
     // HOLD.crossHeel, crossLast)
@@ -628,6 +670,14 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
       const puff = out && heelLee > 2 * HOLD.crossHeel && dArm > HOLD.urgent * dead;
       if (!puff && h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
     } else h.cross = 0;
+    // (the helm in light air on a reach, across only for a heel error the move takes off, lasting:
+    // HOLD.helmHeel, helmLast)
+    if (helmLight(i)) {
+      const err = heelLee - (k.bestHeel ?? heelLee), fixes = out ? err : -err;
+      h.helm = fixes > HOLD.helmHeel ? (h.helm ?? 0) + step : Math.max(0, (h.helm ?? 0) - step);
+      const puff = out && fixes > 2 * HOLD.helmHeel && dArm > HOLD.urgent * dead;
+      if (!puff && h.helm < HOLD.helmLast) { h.off = 0; stay(i, h, t); return; }
+    } else h.helm = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // (sent out by a puff that's still filling in: they keep going as it asks for more, out along the deck, rather than
@@ -636,9 +686,13 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     if (h.push && h.since < HOLD.last && out) { h.arm = t.arm; h.z = t.z; h.off = 0; return; }
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
     // change of place for the trim, waits until it has lasted, and the dwell
+    // (in light air, across the boat to leeward waits for a lull that has lasted, HOLD.leeLast: one of a few seconds had
+    // them across and, the wind back through 6 kt, straight back out again)
+    // (not for the helm where helmLight's own wait has been served, nor on a run, where the run rule's has)
+    const leeCross = !out && k.tws < 8 && k.twa <= 120 && !helmLight(i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
     const urgent = out && dArm > HOLD.urgent * dead;
-    const go = urgent || (worth && h.off >= HOLD.last && (out || h.since >= HOLD.dwell));
-    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.push = urgent; return; } // (moved: the waits start afresh)
+    const go = urgent || (worth && h.off >= (leeCross ? HOLD.leeLast : HOLD.last) && (out || h.since >= HOLD.dwell));
+    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; h.push = urgent; return; } // (moved: the waits start afresh)
     stay(i, h, t);
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
