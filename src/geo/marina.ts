@@ -743,7 +743,13 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
  * Nov 2026). Kept, the owner's ruling (14 Nov 2026): in other winds she's got out as from any berth; in a westerly her
  * crew won't push her off (world.ts pushOff) until the wind goes round. A walk-out on a stern line, next, may open them.
  */
-export const NO_ASTERN_WEST = ['south-beach:G88', 'horseshoe-bay:C22', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2'];
+export const NO_ASTERN_WEST = [
+  'south-beach:G88', 'horseshoe-bay:C22', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2',
+  // (seven more from the every-berth sweep with the wind in the plan, 1,293 astern plans: far enough out and steerable, but
+  // touching in the last meter of the water the plan found clear, 22–56 s after she's let go, at a crawl. The bar is no
+  // touch inside it, as written: the Coordinator, 14 Nov 2026)
+  'west-harbor:507', 'gashouse-cove:124', 'gashouse-cove:212', 'south-beach:F15', 'south-beach:F25', 'south-beach:F49', 'south-beach:G89'
+];
 /** No shove off astern from this berth in this wind (NO_ASTERN_WEST: the wind within 45 degrees of west). */
 export const noAsternPushOff = (s: Slip, windFrom: number | undefined): boolean => NO_ASTERN_WEST.includes(s.id) && windFrom != null && Math.abs(wrap180(windFrom - 270)) <= 45;
 export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-cove:82', 'gashouse-cove:2', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)

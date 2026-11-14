@@ -1791,7 +1791,7 @@ export class World {
     // (the crew judge the breeze, not the gust passing: environment/gusts.ts)
     const wind = this.windHere(u, u, false), plan = slip ? pushOffPlan(slip, wind.from, wind.kt) : null;
     // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast until it goes round, geo/marina.ts NO_ASTERN_WEST)
-    if (slip && plan?.kind === 'astern' && noAsternPushOff(slip, wind.from)) { this.emit({ type: 'toast', ms: 6000, msg: 'No room to push her off from this berth in a westerly: she stays fast until the wind goes round.' }); return false; }
+    if (slip && plan?.kind === 'astern' && noAsternPushOff(slip, wind.from)) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in a westerly: motor out, or wait for the wind to go round.' : 'No room to push her off from this berth in a westerly: she stays fast until the wind goes round.' }); return false; }
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip || !plan) { u.v = SHOVE; return true; }
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };

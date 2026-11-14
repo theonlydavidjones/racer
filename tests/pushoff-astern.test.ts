@@ -84,15 +84,25 @@ describe('pushed off astern', () => {
     const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, windDir: from, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
     return new World(COURSES[0], S, 1, { freeSail: true });
   };
-  it('the five berths kept with no shove off astern in a westerly: each a berth, a save naming it loads it; in a 12 kt westerly her crew keeps her fast, and says so', () => {
+  it('the twelve berths kept with no shove off astern in a westerly: each a berth, a save naming it loads it; in a 12 kt westerly her crew keeps her fast, and says so', () => {
     for (const id of NO_ASTERN_WEST) {
       expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
       const w = sail(id, 270, 12), u = w.user; for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
       expect(u.docked?.slip, `${id}: a save naming it puts her there`).toBe(id);
       const went = w.pushOff(), msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
-      if (!went) { expect(u.docked, id).toBeTruthy(); expect(msgs.some(m => /in a westerly/.test(m)), id).toBe(true); }
+      if (!went) { expect(u.docked, id).toBeTruthy(); expect(msgs.some(m => /in a westerly: she stays fast until the wind goes round/.test(m)), id).toBe(true); }
       else expect(u.handled?.plan.kind, `${id}: pushed off in a westerly, so not astern`).not.toBe('astern');
     }
+  });
+  it('kept fast with a motor on the bracket, the one line says to motor out', () => {
+    expect(NO_ASTERN_WEST).toHaveLength(12);
+    const id = NO_ASTERN_WEST.find(i => { const w = sail(i, 270, 12); for (let k = 0; k < 30; k++) w.step(DT); return !w.pushOff(); })!;
+    expect(id, 'a berth she is kept fast in').toBeTruthy();
+    const w = sail(id, 270, 12), u = w.user; for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
+    u.motor = { hp: 3.5, down: false, running: false, gear: 'N', throttle: 0 };
+    expect(w.pushOff()).toBe(false);
+    const msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
+    expect(msgs).toHaveLength(1); expect(msgs[0]).toBe('No room to push her off from this berth in a westerly: motor out, or wait for the wind to go round.');
   });
   // (the planner's and the shove's glide, from physics.ts asternGlide, against what she sails: a breeze along her line)
   for (const [from, name] of [[0, 'northerly'], [90, 'easterly']] as const) it(`in a 20 kt ${name}, the glide she's shoved for is the glide she sails: within 15% over 30 s, stern first, the helm amidships`, () => {
