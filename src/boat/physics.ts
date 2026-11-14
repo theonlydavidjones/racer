@@ -537,13 +537,16 @@ export const turnBleed = (rate: number, v: number, h: number, windFrom: number, 
  * drive toward the polar's speed at her course's angle (her heading's and her leeway: so bearing away she holds her
  * speed or gains it, and luffing above her beat angle she slows on the polar's pinching curve, with nothing in the
  * no-go zone), her sails' flogging as far as she's pinching (pinchFlog, as her step has it) and her rig's windage with
- * it, and the turn's own drag (turnDragForce). `leeway` deg: hers if known, else a close-hauled boat's 4°. Not in it:
- * her trim, her crew, the sea.
+ * it, and the turn's own drag (turnDragForce). `leeway` deg: hers if known, else a close-hauled boat's 4°. `luff`: her
+ * sheets let fly through the turn (b.luff, as the AI does to slow or to keep clear): the step's own slowing of her
+ * speed (luffDriveFactor) and her sails flogging (flogAmount), so a boat that means to luff as she turns is predicted
+ * as slow as she'll be: tacking with her sheets flying in 22 kt she is down to half a meter a second, not 1.4. Not in
+ * it: her trim, her crew, the sea.
  */
-export function turnSpeed(v: number, rate: number, h: number, windFrom: number, tws: number, dt: number, helmNeed = 0, leeway = 4): number {
-  const twa = Math.abs(wrap(windFrom - h)), crs = Math.min(180, twa + (twa < 150 ? leeway : 0)), ap = apparent(windFrom, tws, h, v);
-  const drag = turnDragForce(rate, v, h, windFrom, helmNeed) + airDrag(ap.aws, ap.awa, pinchFlog(crs, beatAngle(tws)));
-  return Math.max(0, v + surgeAccel(v, polar(tws, crs, 'jib'), drag) * dt);
+export function turnSpeed(v: number, rate: number, h: number, windFrom: number, tws: number, dt: number, helmNeed = 0, leeway = 4, luff = false): number {
+  const twa = Math.abs(wrap(windFrom - h)), crs = Math.min(180, twa + (twa < 150 ? leeway : 0)), ap = apparent(windFrom, tws, h, v), beat = beatAngle(tws);
+  const drag = turnDragForce(rate, v, h, windFrom, helmNeed) + airDrag(ap.aws, ap.awa, luff ? flogAmount(twa, beat, NO_GO, true) : pinchFlog(crs, beat));
+  return Math.max(0, v + surgeAccel(v, polar(tws, crs, 'jib') * (luff ? luffDriveFactor(twa) : 1), drag) * dt);
 }
 
 /**
