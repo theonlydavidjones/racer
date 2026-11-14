@@ -176,8 +176,11 @@ describe('Everyone sits on something (render/crew.ts)', () => {
         f.root.updateMatrixWorld(true);
         const hip = f.root.getWorldPosition(new THREE.Vector3()), e = halfBeam(uAtZ(hip.z));
         // (stepping from one seat to another, over the coaming, the pelvis is up for a moment: settled ones only)
-        const was = (f as Figure & { _was?: THREE.Vector3 })._was; (f as Figure & { _was?: THREE.Vector3 })._was = hip.clone();
-        if (!was || was.distanceTo(hip) > 0.01) return;
+        // (settled: the pelvis within a centimetre of where it was a third of a second ago. Within a centimetre of the frame
+        // before, a hip still coming down onto the side deck at 0.3 m/s, stepped up over the coaming's cap from the bench to
+        // hike, counted as sat 16 cm over its seat)
+        const hist = ((f as Figure & { _was?: THREE.Vector3[] })._was ??= []); hist.push(hip.clone()); if (hist.length > 11) hist.shift();
+        if (hist.length < 11 || hist.some(q => q.distanceTo(hip) > 0.01)) return;
         // (the pelvis sits about 9 cm, scaled, above what's under it; a hiker's is over the deck's edge)
         const under = ground(Math.sign(hip.x) * Math.min(Math.abs(hip.x), e - 0.01), hip.z) + 0.09 * f.scale;
         const g = Math.abs(hip.y - under);
