@@ -180,7 +180,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
       let want = Math.sign(err) === b.turnDir && Math.abs(err) <= Math.max(0, rDeg * b.turnDir) * tau ? 0 : b.turnDir * rateFor(b.turnDir);
-      if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { want = 0; b.turnTarget = null; }
+      if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { want = 0; b.turnTarget = null; b.turnCalledT = t; } // (called, and reached: gybeMeant)
       delta = helmFor(want);
       if (want && scullOK(Math.sign(want)) && Math.abs(want) > flow) scull = Math.sign(want);
     } else {
@@ -447,7 +447,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (Math.abs(b.sway) < 1e-4) b.sway = 0;
   }
   travel(b, dt, t, emit, groundToast);
-  boomStep(b, dt, t, emit);
+  boomStep(b, apF.arel, apF.aws, dt, t, emit); // (the wind at her sails, as their forces have it: the gradient's and her roll's sweep in it)
   sailVisuals(b, plan, dt);
 }
 
@@ -601,6 +601,7 @@ export function driveShare(tws: number, twa: number, u: number): number {
 }
 
 function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
+  b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; // (hove to, her main's sheeted: the sheet has it)
   const ww = b.ww, toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, D = D2R;
   const RHO = 1025, RHO_A = 1.225;
   // the helm: lashed, or wherever you hold it, or hard over through a tack or gybe you've called for (+ turns her to starboard)
@@ -1017,40 +1018,47 @@ function gybeMeant(b: Boat, to: 'S' | 'P', t: number): boolean {
  * The leech is the edge the wind now meets first, and it stands inside the boom's line by the sail's own fullness
  * (leechHook: the sail's shape as the sim has it; that the leech lets go just there is the model's reading, not a
  * measurement). So the wind gets behind it when the apparent wind at the sail is more than (the boom's angle − that)
- * round her stern: about 43° of apparent wind with the boom on the shroud at 70°, and sooner with the main not eased
- * right out. In true wind that is 25 to 30° by the lee in flat water (running, the apparent wind swings further round
- * than the true), less when she rolls or a sea slews her stern: "Rolling motion, slight changes in the boat heading or wind direction can
+ * round her stern: about 40° of apparent wind at the sails with the boom on the shroud at 70°, and sooner with the main
+ * not eased right out. In true wind that is 25 to 30° by the lee in flat water (running, the apparent wind swings further round
+ * than the true); in a seaway the wind's own shifts take it sooner (at 22 kt in the Bay's chop, held 20° by the lee,
+ * within a minute or so three times in four; held 10°, not at all): "Rolling motion, slight changes in the boat heading or wind direction can
  * cause an unexpected and surprising jibe" (Wikipedia, Jibe). No published angle was found for where it goes.
  *
  * Then the boom is free and the wind swings it: the sail's force broadside (a flat plate's, Cn 1.2: Hoerner) at the
  * sail's centre, BOOM_ARM from the mast, against the boom's and the sail's inertia with the air the sail carries
  * (BOOM_I, an estimate: a 9 kg spar 3.3 m long, 33 kg·m²; 5 kg of cloth, 9; the air, a plate's added inertia about
- * its edge (9/128)·π·ρ·c⁴ summed up the triangle, 51), and the air's own damping of a sail moving through it. In 12 kt
- * it is across in a second and a half; in 25 kt in half a second, the boom's end at 20 m/s. Fetched up on its sheet
+ * its edge (9/128)·π·ρ·c⁴ summed up the triangle, 51), and the air's own damping of a sail moving through it. From
+ * the leech backing it is across in 6 s in 6 kt, 3 s in 12 kt and a little over a second in 25 kt, the boom's end at
+ * 2 to 11 m/s. Fetched up on its sheet
  * on the new side, its turning momentum goes into her hull: she's slewed toward the wind, and her sails, full on the
  * new side at once, heel her and round her up (the roll and the helm's own models).
  */
-const BOOM_ARM = 1.1, BOOM_I = 95, PLATE_CN = 1.2;
+const BOOM_ARM = 1.1, BOOM_I = 95, PLATE_CN = 1.2, MAIN_CHORD = 2.4; // (the main's chord at its centre, m: balance.ts CHORD)
 /** How far inside the boom's line the main's leech stands, deg: the sail's own fullness as a circular arc, whose ends
  * turn in by 2·atan(2 × its depth). 27° at a depth of 12%; flattened, less, so a flat main holds further by the lee. */
 const leechHook = (b: Boat) => 2 * Math.atan(2 * b.shape.main.depth) / D2R;
 /** The apparent wind's bearing round her stern, deg, + toward starboard of dead astern (from over her starboard quarter). */
-const windAstern = (b: Boat) => (b.arel >= 0 ? 1 : -1) * (180 - Math.abs(b.arel));
-function boomStep(b: Boat, dt: number, t: number, emit: Emit): boolean {
+const windAstern = (arel: number) => (arel >= 0 ? 1 : -1) * (180 - Math.abs(arel));
+function boomStep(b: Boat, arel: number, aws: number, dt: number, t: number, emit: Emit): boolean {
   const out = Math.abs(b.boom), side = Math.sign(b.boom), mainUp = b.rig?.mainUp ?? true;
   if (b.boomFree == null) {
     // the wind onto the back of the leech: off the wind, the main set and out on one side, not being handed across
-    const lee = side * windAstern(b); // (how far round her stern onto the main's own side the wind comes: by the lee)
-    if (!mainUp || b.gybeTo || out < 5 || b.twa < 90 || !(b.aws > 0.5) || lee <= 0 || lee <= out - leechHook(b)) return false;
-    b.boomFree = 0; b.boomFrom = side; b.gybeTo = b.tack === 'S' ? 'P' : 'S';
+    const lee = side * windAstern(arel); // (how far round her stern onto the main's own side the wind comes: by the lee)
+    if (!mainUp || b.gybeTo || out < 5 || b.twa < 90 || !(aws > 0.5) || lee <= 0 || lee <= out - leechHook(b)) return false;
+    b.boomFree = 0; b.boomFrom = side; b.boomFreeT = t; b.gybeTo = b.tack === 'S' ? 'P' : 'S';
   }
   // free: the wind's moment on the sail about the mast (it streams the boom away from where the wind comes from), less
   // the air's damping, against the inertia; past her centerline the sail fills on its new side
-  const q = 0.5 * 1.225 * b.aws * b.aws, K = q * SAIL_AREA.main * (b.rig?.main ?? 1) * PLATE_CN * BOOM_ARM;
-  const was = b.boomFrom ?? side, hook = Math.sign(b.boom) === was ? was * leechHook(b) : 0;
+  const q = 0.5 * 1.225 * aws * aws, K = q * SAIL_AREA.main * (b.rig?.main ?? 1) * PLATE_CN * BOOM_ARM;
+  // (the leech once backed, the fold runs forward through the sail at the wind's pace, a chord's length in chord/aws
+  // seconds, and the backed cloth pushes the boom in: the line the wind must be inside moves from the leech's to as far
+  // again beyond it. The model's reading of a sail collapsing from its leech, not a measurement)
+  const fold = Math.min(1, (t - (b.boomFreeT ?? t)) * Math.max(1, aws) / MAIN_CHORD);
+  const was = b.boomFrom ?? side, hook = Math.sign(b.boom) === was ? was * leechHook(b) * (1 + fold) : 0;
   // (the wind back on the main's own side before it had gone: it fills again, and the sheet has it)
-  if (Math.sign(b.boom) === was && was * windAstern(b) <= 0) { b.boomFree = undefined; b.boomFrom = undefined; b.gybeTo = undefined; return false; }
-  const M = K * Math.sin((b.boom - hook - windAstern(b)) * D2R) - K * BOOM_ARM * (b.boomFree * D2R) / Math.max(1, b.aws);
+  if (Math.sign(b.boom) === was && was * windAstern(arel) <= 0) { b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.gybeTo = undefined; return false; }
+  // (the air's damping: the sail's own swing changes the wind it feels by arm·ω, and its force goes as that wind squared)
+  const M = K * Math.sin((b.boom - hook - windAstern(arel)) * D2R) - 2 * K * BOOM_ARM * (b.boomFree * D2R) / Math.max(1, aws);
   b.boomFree += M / BOOM_I / D2R * dt;
   b.boom += b.boomFree * dt;
   // (across her centerline: her mainsail's side is her leeward side from this step, so her tack changes with it)
@@ -1066,9 +1074,9 @@ function boomStep(b: Boat, dt: number, t: number, emit: Emit): boolean {
       const I = HULL.displacement * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
       b.turnRate = (b.turnRate ?? 0) - BOOM_I * w / I / D2R; b.yawRate = b.turnRate;
       b.crashT = t;
-      if (b.isUser) emit({ type: 'toast', ms: 5000, msg: 'Crash jibe: the wind got behind the main. Head up a little, or jibe on purpose.' });
+      if (b.isUser) emit({ type: 'toast', ms: 5000, msg: 'Crash jibe: the wind got behind the main. By the lee, head up sooner or call the jibe.' });
     }
-    b.boomFree = undefined; b.boomFrom = undefined; if (!crossed) b.gybeTo = undefined;
+    b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; if (!crossed) b.gybeTo = undefined;
   }
   return true;
 }
@@ -1379,6 +1387,10 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
   // upwind: tack to the same angle on the other side, but at least close-hauled; downwind: gybe to the mirror angle
   // (the beat angle is her course's: her heading is above it by her leeway)
   if (twa < 100) return { dir: rel >= 0 ? 1 : -1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.max(beatFor(b) - (b.leeway ?? 0), Math.min(twa, 60))) };
+  // (by the lee, her main still on the side the wind now comes over: the jibe is the main's to make, not hers to turn
+  // for. Her heading's held and her crew hand it across; turning to the "mirror" would take her back onto the tack
+  // she's on and then jibe her twice)
+  if ((b.rig?.mainUp ?? true) && (rel >= 0 ? 'S' : 'P') !== b.tack) return { dir: rel >= 0 ? 1 : -1, target: b.h };
   return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
 }
 
@@ -1393,6 +1405,7 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
  * (Tests that put a boat somewhere new call it too: she arrives trimmed and upright for her new heading.)
  */
 export function settleTrim(b: Boat, from: number, windKt: number): void {
+  b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.gybeTo = undefined; // (set down somewhere new: her boom where her sheet puts it)
   const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), sw = sailWind(from, windKt, b.h, b.v), c = b.ctl;
   b.rel = rel; b.twa = Math.abs(rel); b.tack = rel >= 0 ? 'S' : 'P';
   b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = sw.awa;

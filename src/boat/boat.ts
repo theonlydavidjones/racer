@@ -184,14 +184,16 @@ export interface Boat {
   /** The tack she's gybing to, while her boom is on its way across: by the lee her tack is her mainsail's side (RRS
    * Definitions), so it changes when the boom has crossed (physics.ts tackStep). */
   gybeTo?: 'S' | 'P';
+  /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
+  turnCalledT?: number;
   /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
    * (physics.ts boomStep). Undefined while the sheet has it. */
-  /** When a called turn (turnTarget) was last under way, s: a gybe it ends on is one her crew make. */
-  turnCalledT?: number;
   boomFree?: number;
+  /** When the wind took it, s. */
+  boomFreeT?: number;
   /** The side it was on when the wind took it (+1 starboard, −1 port). */
   boomFrom?: number;
-  /** When her boom last crashed across in a gybe the wind made (s). */
+  /** When her boom last crashed across in a jibe the wind made (s): for the debrief and the tests. */
   crashT?: number;
   /** When she last touched the shore, a dock or a pier (race time, s): for some seconds after, her crew may get her
    * off by any means, sculling included, on any point of sail (physics.ts; RRS 42.3(h)). */

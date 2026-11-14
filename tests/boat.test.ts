@@ -155,8 +155,8 @@ describe('handling: turning and tacking', () => {
 
     const g = testBoat({ heading: 175, kt: 4 });
     sail(g, 2); const tack0 = g.tack; g.lastTackT = -50;
-    g.h = 185; g.turnTarget = null; // gybe
-    sail(g, 3);
+    startTack(g); // (the jibe called: set down by the lee with nobody meaning one, she'd hold her main, tests/by-the-lee.test.ts)
+    sail(g, 4);
     expect(g.tack).not.toBe(tack0);
     expect(g.lastTackT).toBeGreaterThanOrEqual(0); // the change of tack is still recorded (rule 15)
     expect(g.headToWindT).toBeUndefined();
