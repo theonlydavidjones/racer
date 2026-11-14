@@ -852,13 +852,21 @@ export class World {
     const p = b.paddle; if (!p) return;
     if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
     const job = b.crew?.people[paddler(b)]?.job; if (job?.line === 'paddle' && job.side !== b.tack) this.paddleJob(b, p.side);
-    if (paddlePower(b, this.t) <= 0 || !this.racing(b) || this.paddleAllowed(b)) return;
-    // the 42.3(h) window closing on a spell begun to get clear: the crew's own stops (they keep the rule); yours, a few
-    // seconds' grace and a word, as the penalty's own (R42_STOP), before it's a breach
-    const hit = b.lastHitT, closing = hit != null && p.t0 <= hit + 30 && this.t - hit <= 30 + R42_STOP;
-    if (p.auto) { this.paddle(null, false, true); return; }
-    if (closing) { if (!p.warned) { p.warned = true; if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Clear of it now: stop paddling, or it breaks rule 42.1 (42.3(h) covers only getting clear).' }); } return; }
-    this.rule42(b, 'paddle');
+    if (!this.racing(b) || this.paddleAllowed(b)) return;
+    // the 42.3(h) window closing on a spell begun to get clear: the crew's own stops (they keep the rule); yours, a word
+    // and a few seconds' grace from it (as the penalty's own, R42_STOP), before it's a breach. Told at once, even while the
+    // crutch is still being fetched, so a spell called late in the window still gets its grace
+    const hit = b.lastHitT;
+    if (hit != null && p.t0 <= hit + 30) {
+      if (p.auto) { this.paddle(null, false, true); return; }
+      let w = this.r42warn.get(b.id);
+      if (!w || w.t0 !== p.t0) {
+        this.r42warn.set(b.id, w = { t0: p.t0, at: this.t });
+        if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Clear of it now: stop paddling, or it breaks rule 42.1 (42.3(h) covers only getting clear).' });
+      }
+      if (this.t - w.at <= R42_STOP) return;
+    }
+    if (paddlePower(b, this.t) > 0) this.rule42(b, 'paddle');
   }
   /**
    * Rule 42 (propulsion): a boat racing that paddles breaks 42.1 unless an exception holds. Rules builds the incident and
@@ -891,6 +899,8 @@ export class World {
   /** Rule 42 penalties: the spell (b.paddle.t0) each boat was last penalized for, and how many this race (Appendix P2.2). */
   private r42spell = new Map<number, { t0: number; at: number }>();
   private r42count = new Map<number, number>();
+  /** The 42.3(h) window's closing told, for each boat's spell (its t0, kept through a change of sides): when. */
+  private r42warn = new Map<number, { t0: number; at: number }>();
   /**
    * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
    * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons in a light air

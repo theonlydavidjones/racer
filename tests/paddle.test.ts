@@ -140,6 +140,19 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     paddleSpell(w);
     expect(w.user.retired).toBe(true);
   });
+  it('a spell you call late in the 42.3(h) window still gets its word and grace before a breach', () => {
+    const r = (() => { const S = { ...DEFAULT_SETTINGS, mode: 'race' as const, windKt: 1, windKind: 'west' as const, current: 'slack', sea: 'flat' as const, traffic: 0 as const, fleet: 0, opponents: [] }; const w = new World(courseFile('train'), S, 4242, {}); while (!w.racing(w.user)) w.step(DT); return w; })();
+    r.user.lastHitT = r.t;
+    for (let i = 0; i < 60 * 28; i++) r.step(DT);
+    toasts(r);
+    applyCommand(r, { k: 'paddle', side: 'P' });
+    for (let i = 0; i < 60 * 6; i++) r.step(DT);
+    expect(toasts(r).some(m => /Clear of it now/.test(m))).toBe(true);
+    expect(r.user.scoring ?? null).toBeNull();
+    applyCommand(r, { k: 'paddle', side: null });
+    for (let i = 0; i < 60 * 20; i++) r.step(DT);
+    expect(r.user.scoring ?? null).toBeNull(); // (stopped within the grace: no breach)
+  });
   it('racing, the crew\'s own paddling to get clear after a contact stops as 42.3(h) runs out: no penalty', () => {
     const w = world('race', 1, 'flood');
     while (!w.racing(w.user)) w.step(DT);

@@ -47,7 +47,7 @@ export const PADDLE = {
 const yawDrag = () => 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3 / 32; // (worked when used: physics.ts imports this file)
 
 /** Paddling: the side, when it began (sim time), and whether the crew called it themselves (a jam) or you did. */
-export interface PaddleState { side: 'P' | 'S'; t0: number; auto: boolean; back?: boolean; /** when the side was last chosen (sim time) */ aimT?: number; /** told the 42.3(h) window is closing */ warned?: boolean }
+export interface PaddleState { side: 'P' | 'S'; t0: number; auto: boolean; back?: boolean; /** when the side was last chosen (sim time) */ aimT?: number }
 
 /** Who paddles: the forward hand (the crutch's job, as the pole's), or with no crew the helm. */
 export const paddler = (b: Boat): number => { const n = b.crew?.spec.crew.length ?? 0; return n === 0 ? 0 : ownerOf('pole', n, b.crew!.spec); };
