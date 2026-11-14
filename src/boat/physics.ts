@@ -13,8 +13,8 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs } from './crewWork';
+import { DEFAULT_CREW, STANDARD_DISP, allAboard, crewBestHeel, crewEdgeAt, reactTime, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import { bodyJob, crewJobs, mainHand } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
@@ -972,6 +972,51 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 
+/**
+ * A puff she can't carry, upwind: the depowering steps are set for the breeze, over half a minute (backstay,
+ * cunningham, outhaul: North Sails' Folkboat guides), too slow for a gust, so the main trimmer answers it: the traveller
+ * down to leeward first, then the main eased if that's not enough, the jib left trimmed (North Sails, "Puff response
+ * upwind in heavy air": "trim sails to match this wider Apparent Wind Angle – usually by lowering the traveler"; the
+ * International Folkboat guide: "In gusty conditions this method [the sheet] is too slow and we have to work the
+ * traveler instead"). Held while it blows; sheeted back and the traveller up as it passes (clear of the margins by
+ * PUFF_CLEAR, a quarter: 2.5° of heel or a degree of helm), in the reverse order, over PUFF_BACK s. Over-pressed is past her
+ * crew's best heel by PUFF_HEEL, or the tiller pulling past PUFF_HELM ("If you are battling the helm, or the rail is in
+ * the water, reduce power": North Sails, Steering upwind). The trimmer answers in their reaction time (crewPhys.ts
+ * reactTime: an expert's half a second, a novice's a second and a half), and eases back over PUFF_BACK as the puff
+ * passes. The lines themselves move at their pace: the helm alone, or with the main as the crew go forward, one-handed
+ * (crewWork.ts workPace). The margins and times are estimates: no source gives them in degrees or seconds.
+ */
+export const PUFF_HEEL = 15, PUFF_HELM = 5, PUFF_BACK = 3, PUFF_BOOM = 15, PUFF_CLEAR = 2, PUFF_SEE = 2, PUFF_RIDE = 2, PUFF_SPAN = 10, PUFF_DUMP = 1.5, PUFF_RUN = 0.1, PUFF_LET = 4;
+function puffEase(b: Boat, up: boolean, tws: number, dt: number): number {
+  const was = b.gust ?? 0;
+  if (!up) return (b.gust = 0);
+  const c = b.crew, skill = crewSkill(c), n = c?.spec.crew.length ?? 0;
+  const helm = b.helmNeed ?? 0, heelOver = (b.heelMag ?? 0) - crewBestHeel(b.twa, tws, skill);
+  const over = Math.max((helm - PUFF_HELM) / 4, (heelOver - PUFF_HEEL) / 10);
+  // (eased further while she's over-pressed, as fast as the trimmer reacts; held while she's on her feet in it; back
+  // only once she's clearly under, PUFF_CLEAR, the puff passing: not sheeted in while it's still blowing, to heel again)
+  const trimmer = c ? allAboard(c.spec)[mainHand(n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit')] : null;
+  const react = trimmer ? reactTime(trimmer) : 1;
+  // (how much to let go they judge by the puff itself, its strength over the breeze she's set up for, seen on the water
+  // and felt: a couple of knots she rides out hiking, PUFF_RIDE; PUFF_SPAN more and it's all of it. Easing against her heel
+  // and helm alone, they'd let go until she answered, and with the sheet and her answering a second behind, dump her flat)
+  // (no puff, only a breeze she's over-pressed in: that's the depowering's, the half-minute steps above, not the trimmer's)
+  const gain = tws - (b.twsSlow ?? tws) - PUFF_RIDE, size = gain > 0 ? clamp(gain / PUFF_SPAN, 0.25, 1) : 0;
+  // (and the trimmer eases, then looks: not more until what they've let go has run out to the sail, PUFF_RUN)
+  const running = (b.gustLag ?? 0) > PUFF_RUN;
+  // (more, past the puff's size, slowly, while it's still on her and she's still over-pressed; with the puff gone into
+  // the breeze she's in, only held, the depowering taking it from there)
+  if (over > 0 && was > 0 && size === 0) { b.gustClear = 0; return was; }
+  if (over > 0 && size > 0) { b.gustClear = 0; return (b.gust = running ? was : was < size ? Math.min(size, was + Math.min(over / react, 1 / PUFF_DUMP) * dt) : Math.min(1, was + Math.min(over, 1) * dt / PUFF_BACK)); }
+  // (let go too far, lee helm: some back in at once, at the sheeting-in pace, not after the wait)
+  if (helm < -PUFF_CLEAR) { b.gustClear = 0; return (b.gust = Math.max(0, was - dt / (2 * PUFF_BACK))); }
+  // (clear, and for PUFF_SEE s: they see it has passed before they sheet in, not the first moment she stands up as they
+  // ease, to heel again as the puff's still on)
+  const clear = helm < PUFF_HELM - PUFF_CLEAR && heelOver < PUFF_HEEL - 3;
+  b.gustClear = clear ? (b.gustClear ?? 0) + dt : 0;
+  if (clear && b.gustClear >= PUFF_SEE) return (b.gust = Math.max(0, was - dt / PUFF_BACK));
+  return was;
+}
 /** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step: up to about 7°). */
 export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? 7 * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
 /** The boom angle the crew is aiming for. */
@@ -1084,7 +1129,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
   const easeBoom = crewEaseBoom(b);
-  const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
+  // and a puff she can't carry: the traveller down, then the main eased (puffEase), the second half of it here
+  const gust = puffEase(b, up, tws, dt);
+  const wantMain = optimalSheet('main', b.awaSlow) + easeBoom + PUFF_BOOM * clamp(2 * gust - 1, 0, 1), wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
   // (when a line changes hands the crew thinks again at once, starting from what it has set: its other lines stay put
@@ -1138,6 +1185,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
     if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
     if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller, 'traveller') ? t.traveller : c.traveller; }
+  // (the puff's first half: the traveller down to leeward, from where the crew have it, puffEase)
+  if (gust > 0 && want.traveller != null && !byHand(b, 'traveller')) want.traveller += (1 - want.traveller) * clamp(2 * gust, 0, 1);
   if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
@@ -1153,6 +1202,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (b.carPlan) { c.car.S = { ...b.carPlan }; c.car.P = { ...b.carPlan }; }
   }
   on = crewJobs(b, want, dt);
+  // (how far the eased lines still have to run, those being worked now: puffEase waits on it before paying out more)
+  const runs = (k: 'mainsheet' | 'traveller') => { const j = on[k]; return j && j.pace > 0 ? Math.abs(j.to - c[k]) : 0; };
+  b.gustLag = gust > 0 ? Math.max(runs('mainsheet'), runs('traveller')) : 0;
   for (const k of CREW_LINES) {
     if (byHand(b, k)) hand(k); else move(k, want[k]!);
   }
@@ -1161,7 +1213,11 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   { const dir = byHand(b, 'traveller') ? (b.ctlCmd.traveller ?? (b.ctlTarget?.traveller != null ? b.ctlTarget.traveller - c.traveller : 0)) : (on.traveller ? on.traveller.to : want.traveller!) - c.traveller;
     const rate = travellerRate(dir > 0, tws);
     if (byHand(b, 'traveller')) hand('traveller', rate); else move('traveller', want.traveller!, rate); }
-  if (held('mainsheet')) hand('mainsheet'); else move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
+  // (dumped in a puff the sheet is popped from the cam and let run, the sail's load pulling it out: as quick as the
+  // traveller's release, PUFF_LET times the usual pace; sheeted back in, hauled hand over hand, at the usual pace.
+  // ESTIMATE, like travellerRate's: no measured times found)
+  const mTo = mainsheetFor(wantMain, c.traveller), dumping = gust > 0 && mTo > c.mainsheet;
+  if (held('mainsheet')) hand('mainsheet'); else move('mainsheet', mTo, CONTROL_RATE.mainsheet * (dumping ? PUFF_LET : 1.5));
   // the jib sheets, one on each winch: hauling in on a winch is slow in a breeze, easing is quick
   const going = (k: 'jibsheet' | 'jibsheetW') => b.ctlCmd[k] ?? (b.ctlTarget?.[k] != null ? b.ctlTarget[k]! - c[k] : 0);
   // a windward sheet you've hauled and then eased right off again is the crew's lazy sheet once more
