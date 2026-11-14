@@ -25,7 +25,9 @@ const ROUTES: [string, typeof BASIN, typeof BASIN, number?][] = [
   ['into Hyde Street harbor from the east', EAST, HYDE, 4], ['into Hyde Street harbor from the west', WEST, HYDE, 4]];
 /** A heading along the route's first leg from a to b. */
 const firstLeg = (a: typeof BASIN, b: typeof BASIN) => { const r = routeAround(a, b, 30), q = r[1]; return (Math.atan2(q.x - a.x, q.y - a.y) * 180 / Math.PI + 360) % 360; };
-const bumped = (w: World) => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && /ollision|Bump|ground/.test(e.msg));
+// (the hull's own contact messages, boat/physics.ts travel(): not the traffic warnings, which cite the Collision Regulations)
+const CONTACT = /^Collision: |^Bump: |^Aground!|touched bottom|been set sideways onto/;
+const bumped = (w: World) => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && CONTACT.test(e.msg));
 describe('the navigator round Aquatic Park', () => {
   for (const from of [270, 300, 0]) for (const [name, a, b, berth = 7] of ROUTES) it(`${name}, wind from ${from}°`, () => {
     const w = new World(COURSES[0], S({ windDir: from }), 4, { freeSail: true }), u = w.user;
@@ -65,7 +67,7 @@ describe('the navigator off Municipal Pier, after touching it or stopped in iron
     expect(w.moveHere(at, 'start')).toBe(true);
     u.h = h; u.v = from === h ? 0 : 2.5;
     let touched = false;
-    const hits = () => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && /ollision|ump|ground/.test(e.msg));
+    const hits = () => bumped(w);
     if (from !== h) { for (let t = 0; t < 45; t += DT) { w.step(DT); if (hits()) touched = true; } expect(touched, 'she reached the pier').toBe(true); }
     w.setDest(OUT, 'out'); engage(u, w.pilot, 'nav');
     let lastHit = 0, t = 0;
