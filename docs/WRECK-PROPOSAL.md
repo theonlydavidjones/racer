@@ -1,4 +1,4 @@
-# Wrecks: a proposal (for the owner to work through; nothing here is built)
+# Wrecks: the design (agreed 14 Nov 2026; to build after #292)
 
 The owner, 13 Nov 2026: "we need to work through the broader logic and plan for wrecks. I don't know yet."
 
@@ -63,3 +63,13 @@ The suggestion is the lightest version: the boat is "laid up for repairs" for so
 3. Are towing and repairs worth having, and should repairs take real days?
 4. Should a wreck in a season race count only as RET, or carry more?
 5. Should the AI boats ever be wrecked, or only you?
+
+## 7. The owner's answers (14 Nov 2026, through the Coordinator)
+
+1. **What counts:** the table in section 1 as it stands. The damage cutoffs of 0.5 and 1.5 m/s stay, marked as ESTIMATES until sourced.
+2. **How it ends:** a wreck ends the outing with a short statement of where and how, and it goes in her logbook. An option lets you continue instead, with her marked as wrecked.
+3. **Towing and repairs** (left to the Coordinator):
+   - Towing: yes, optional. It ends the outing as "towed in".
+   - Repairs: she's laid up for a few real days. No money.
+4. **Season scoring:** a wreck in a season race is RET only. Not answered by the owner; the Coordinator's call for now.
+5. **Who can be wrecked:** only your boat, not the AI boats. Not answered by the owner; the Coordinator's call for now.
