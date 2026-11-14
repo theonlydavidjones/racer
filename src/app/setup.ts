@@ -131,11 +131,12 @@ function courseCard(): void {
     document.querySelectorAll<HTMLButtonElement>('#hostSeg [data-host]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.host === host)));
     document.querySelectorAll<HTMLButtonElement>('#courseMode [data-cm]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.cm === 'rc') === rc)));
     $('courseMode').hidden = host === 'practice';
+    $('judgingField').hidden = host === 'practice'; // (the practice area is always umpired)
     $('courseSel').hidden = host === 'practice' || rc;
     if (!rc && host !== 'practice') ($('courseSel') as HTMLSelectElement).value = app.S.course;
     const flag = app.S.prepFlag === 'black' ? 'black flag' : `${app.S.prepFlag ?? 'P'} flag`;
     const line = C.biasAdjustable ? ` · line ${app.S.bias ? (app.S.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(app.S.bias) + '°' : 'square'}` : '';
-    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${app.S.seq}-min sequence · ${flag} · ${app.S.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${line}`;
+    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${app.S.seq}-min sequence · ${flag} · ${app.S.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${app.S.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
   }
   $('lengthField').hidden = app.S.mode === 'sail' || app.S.course !== RC_COURSE;
   $('biasField').hidden = !C.biasAdjustable;
@@ -289,7 +290,7 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { app.S[k] = Number(v) as 0 | 1; (app.w.settings as Settings)[k] = app.S[k]; saveSettings(app.S); paintSeg(); return; }
   if (k === 'windKind') { chooseWindKind(app.S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
-  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
+  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'judging' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 }));
 /**

@@ -207,6 +207,8 @@
                 <small id="prepNote"></small></div>
               <div class="field" id="penaltyField"><span>Penalty for a foul</span>
                 <div class="seg" data-k="penaltyTurns"><button type="button" data-v="2">Two turns (Rule 44.1)</button><button type="button" data-v="1">One turn</button></div></div>
+              <div class="field" id="judgingField"><span>On-the-water judging</span>
+                <div class="seg" data-k="judging"><button type="button" data-v="protests">Protests (Part 5)</button><button type="button" data-v="umpired">Umpired</button></div></div>
               <div class="field" id="biasField"><span>Line set by the committee</span>
                 <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
             </div>
@@ -421,6 +423,7 @@
     <p id="resStart"></p>
     <table class="res"><thead><tr><th>Place</th><th>Boat</th><th>Elapsed</th><th>Points</th></tr></thead><tbody id="resBody"></tbody></table>
     <p id="resFouls" class="lede"></p>
+    <div id="resProtests" class="debrief protests" hidden></div>
     <div id="resSeason" class="ressea" hidden></div>
     <div id="resReal" class="debrief" hidden></div>
     <div id="resDebrief" class="debrief"></div>

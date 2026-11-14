@@ -36,6 +36,10 @@ export interface Settings {
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2;
+  /** On-the-water judging (the owner, 13 Nov 2026): 'protests', the fleet polices itself (a foul's turns are the fouler's
+   * to take, rule 44.1, and the other boat may protest, rule 60); 'umpired', the sim calls each foul and the turns are owed.
+   * A race only: the practice modes are always umpired. */
+  judging?: 'protests' | 'umpired';
   sea: 'real' | 'flat'; // waves: real (from the wind, the fetch, the current and the buoy swell) or flat water
   swellDay: 0 | 1 | 2;
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
@@ -60,7 +64,9 @@ export interface Settings {
   crew: { n: 0 | 1 | 2; helm: Person; people: Person[] }; // the race committee's preparatory flag (RRS 26, 30) // ocean swell outside the Gate: a small, typical or big day for the month (25th, 50th, 75th percentile) // penalty for a foul: two turns (RRS 44.1) or one turn (if the sailing instructions change it)
 }
 
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, camRide: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
+/** On-the-water judging for a race, by default: Protests (the owner, 13 Nov 2026). */
+export const DEFAULT_JUDGING: NonNullable<Settings['judging']> = 'protests';
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, judging: DEFAULT_JUDGING, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, camRide: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
 
 const KEY = 'fbsim-settings-v2';
 /** The most boats you can race against. */

@@ -76,7 +76,7 @@ export type Command =
   | { k: 'sendHome' }
   | { k: 'moveHere'; p: Vec; name: string }
   | { k: 'dest'; p: Vec; name: string }
-  | { k: 'retire'; why?: string }
+  | { k: 'retire'; why?: string; afterFinish?: boolean }
   /** Take a penalty (by boat id): after an incident's replay. */
   | { k: 'penalty'; boat: number }
   /** New conditions for the sail that's running (the conditions panel from the pause menu). */
@@ -145,8 +145,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'sendHome': return w.sendHome();
     case 'moveHere': return w.moveHere(c.p, c.name);
     case 'dest': w.setDest(c.p, c.name); return;
-    case 'retire': return w.retire(c.why);
-    case 'penalty': w.assignPenalty(w.boats[c.boat]); return;
+    case 'retire': return w.retire(c.why, c.afterFinish);
+    case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
     case 'settings': Object.assign(w.settings, c.patch); return;
     case 'logNote': w.log?.note(c.note); return;
