@@ -3,7 +3,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
@@ -27,7 +27,7 @@ import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incid
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink, poleMustCome } from '../ai/ai';
+import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
@@ -35,7 +35,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
@@ -568,7 +568,7 @@ export class World {
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
-      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
+      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
       weatherHeld: undefined, carOff: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
@@ -943,7 +943,9 @@ export class World {
       this.keepClearOfShips(b);
     }
     // your pole: out only on your call; your crew brings it in only when it must come in, and says why (ai.ts poleMustCome)
-    if (this.user.poleWant) { const why = poleMustCome(this.user); if (why) { this.user.poleWant = false; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
+    // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
+    const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
+    if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -1600,11 +1602,12 @@ export class World {
       this.emit({ type: 'toast', msg: 'Made fast to the dock, on her lines.', ms: 3000 });
       return;
     }
-    if (m.phase === 'fast' && berth && this.inBerth(b, berth, 0.3, 5)) {
-      // warped in, lying in her berth (bow in at a slip; either way alongside an end tie or guest dock): made fast there, as
-      // in her own slip (the last few centimetres and degrees taken up by the lines)
-      const rev = berth.kind === 'alongside' && Math.abs(wrap(b.h - berth.heading)) > 90;
-      Object.assign(b, { x: berth.p.x, y: berth.p.y, h: rev ? n360(berth.heading + 180) : berth.heading, v: 0, vx: 0, vy: 0, astern: 0, sway: 0, turnRate: 0 });
+    // warped in, lying in her berth (bow in at a slip; either way alongside an end tie or guest dock): made fast there, as in
+    // her own slip. In her berth to a few tens of centimeters, or every line warped in to its length with her lying to them
+    // (pressed onto her fender by the wind, as a boat tied up lies: the lines can't push her off it)
+    const warped = m.lines.length > 1 && m.lines.every(L => L.state === 'made' && L.goal != null && L.len <= L.goal + 0.05);
+    if (m.phase === 'fast' && berth && (this.inBerth(b, berth, 0.3, 5) || (warped && this.inBerth(b, berth, 0.6, 6)))) {
+      Object.assign(b, { v: 0, vx: 0, vy: 0, astern: 0, sway: 0, turnRate: 0 }); // (the lines settle her into her berth's lie: dockStep)
       b.docked = { slip: berth.id }; b.mooring = undefined;
       this.emit({ type: 'toast', msg: `In her berth and made fast: ${slipPlace(berth)}.`, ms: 4000 });
     }
@@ -1753,7 +1756,7 @@ export class World {
         } else if (P.hold && (H.releasing ?? 0) < 1) {
           // her bow pushed off the wind, about the bow, toward the way out
           H.releasing = Math.min(1, (H.releasing ?? 0) + dt * CREW_TURN * 2 / Math.abs(P.hold.off));
-          const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, 3.8, P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
+          const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, holdPivot(P.hold.off), P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
         } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
       } else {
         // shoved off astern: enough to coast her into the fairway on the water's drag
@@ -1814,23 +1817,41 @@ export class World {
     return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 
+  /** Your call on the whisker pole (the band's Pole tab, O), answered by the crew: setting it, stowing it, or why not
+   * (ai.ts poleRefused). The race says so, not the page from its mirror, so the message is what the crew actually do. */
+  poleCall(want: boolean): void {
+    const u = this.user, why = want ? poleRefused(u) : null;
+    if (why) { this.emit({ type: 'toast', msg: `Crew: no pole now, ${why}.`, ms: 3000 }); return; }
+    if (want !== u.poleWant) this.emit({ type: 'toast', msg: want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib won't fill.` : `Crew: stowing the pole (about ${POLE.stow} s).`, ms: 3000 });
+    u.poleWant = want; u.poleMine = true;
+  }
+
   /** Hoist or strike a sail (the crew takes its time: physics.ts crewRig). */
   setSail(sail: 'main' | 'jib', up: boolean): void {
     const u = this.user, r = u.rig ??= { main: 1, jib: 1, mainUp: true, jibUp: true };
     if (sail === 'main') r.mainUp = up; else r.jibUp = up;
-    if (!up && sail === 'jib') u.poleWant = false;
-    this.emit({ type: 'toast', msg: `${up ? 'Hoisting' : 'Striking'} the ${sail}.`, ms: 2000 });
+    const poleIn = !up && sail === 'jib' && u.poleWant; if (poleIn) u.poleWant = false;
+    this.emit({ type: 'toast', msg: `${up ? 'Hoisting' : 'Striking'} the ${sail}${poleIn ? ', the pole in first' : ''}.`, ms: 2000 });
   }
 
   /** A boat in her slip: made fast, she stays put; her crew can hoist or strike sail there. */
   private dockStep(b: Boat, dt: number): void {
     b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
+    // made fast just now, a little off her berth's lie (lying to her lines against her fender): her lines settle her into it
+    // over a couple of seconds, not in a jump (bow in at a slip; alongside, whichever way she lies)
+    { const s = b.docked ? slipById(b.docked.slip) : null;
+      if (s) { const k = Math.min(1, dt * 1.5), rev = s.kind === 'alongside' && Math.abs(wrap(b.h - s.heading)) > 90, h = rev ? s.heading + 180 : s.heading;
+        b.x += (s.p.x - b.x) * k; b.y += (s.p.y - b.y) * k; b.h = n360(b.h + wrap(h - b.h) * k); } }
     // (her tack by the wind's side, held dead downwind (or head to wind in her slip) as moveBoat holds it: a wind
     // wandering either side of her stern or bow lying in a slip doesn't send the helm across the cockpit each time)
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); if (b.twa < 176 && b.twa > 4) b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true; // sails up at the dock weathervane, let fly
-    b.boom += ((up ? side * 75 : 0) - b.boom) * k; // (the main down: its boom sheeted in amidships, clear of the dock and the boats either side) b.jib += (side * 35 - b.jib) * k;
+    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
+    // the main down, tied up: the mainsheet hauled in and made fast, the traveller car in the middle, so the boom lies on
+    // the centerline, clear of the dock and the boats either side (8q, the owner: "when in a slip, boom should be at
+    // centerline (when starting) or brought to centerline (when finishing a sail and docking)")
+    if (!up) { b.ctl.mainsheet += (0 - b.ctl.mainsheet) * k; b.ctl.traveller += (0 - b.ctl.traveller) * k; if (b.ctlTarget) { delete b.ctlTarget.mainsheet; delete b.ctlTarget.traveller; } }
     crewRig(b, dt, this.emit);
     crewAtDock(b, dt); // (the crew sit centred at the dock and through the push-off, not hiked or to leeward)
   }

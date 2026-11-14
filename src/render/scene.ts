@@ -9,6 +9,7 @@ import { PLACES } from '../sim/places';
 import { Puffs, TerrainGrid } from '../environment/wind';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { sunPosition } from '../environment/sun';
+import { rainLevel } from '../environment/rain';
 import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
@@ -732,10 +733,10 @@ export class SceneView {
     }
   }
 
-  /** Rain (the conditions adjuster): streaks falling round the camera, slanting with the wind. */
+  /** Rain (the conditions adjuster's, or the record's: environment/rain.ts): streaks falling round the camera, slanting with the wind. */
   private rain: { mesh: THREE.LineSegments; drops: Float32Array } | null = null;
   private updateRain(w: SimView, dt: number, camera: THREE.Camera): void {
-    const level = w.settings.rain ?? 0;
+    const level = rainLevel(w.settings.rain, w.clockUtc);
     if (!level) { if (this.rain) this.rain.mesh.visible = false; return; }
     const N = 7200, R = 45, H = 30; // (heavy rain at all of them; light at a sixth)
     if (!this.rain) {
@@ -781,7 +782,7 @@ export class SceneView {
     this.curUni.uFlowM.value.set(fm[0] * sc, fm[3] * sc, 0, fm[1] * sc, fm[4] * sc, 0, 0, 0, 0);
     this.curUni.uCurMean.value.set(w.cvec.x, w.cvec.y);
     this.skyAcc += dt;
-    if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user, w.settings.rain ?? 0, w.settings.fog ?? 'real'); }
+    if (this.skyAcc > 0.5) { this.skyAcc = 0; this.updateSky(w.clockUtc, w.user, rainLevel(w.settings.rain, w.clockUtc), w.settings.fog ?? 'real'); }
     // the fog bank thins as you sail into it, rather than a flat picture of cloud that's suddenly gone as you pass it
     for (const sp of this.fogBank) if (sp.visible) {
       const cp = this.camera.position, d = Math.hypot(sp.position.x - cp.x, sp.position.z - cp.z), wd = sp.scale.x / 2;
