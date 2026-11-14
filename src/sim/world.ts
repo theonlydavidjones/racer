@@ -889,7 +889,9 @@ export class World {
       this.keepClearOfShips(b);
     }
     // your pole: out only on your call; your crew brings it in only when it must come in, and says why (ai.ts poleMustCome)
-    if (this.user.poleWant) { const why = poleMustCome(this.user); if (why) { this.user.poleWant = false; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
+    // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
+    const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
+    if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }

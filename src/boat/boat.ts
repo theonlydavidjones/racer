@@ -217,6 +217,9 @@ export interface Boat {
   /** Your boat: the pole is yours to call, always (the owner); the crew only stows it when it must come in (ai.ts poleMustCome). */
   poleMine?: boolean;
   pole: PoleState;
+  /** Your boat: when she came up to 145° true or higher with the pole wanted (the World's clock, s): it comes in after 3 s
+   * there (ai.ts poleMustCome). */
+  poleHighAt?: number;
   poleT: number; // seconds left in the current crew job
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals

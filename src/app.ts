@@ -33,6 +33,7 @@ import { ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from '
 import { installSkipperUI } from './ui/skipperUI';
 installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said of her, her record)
 import { SailBand } from './ui/sailBand';
+import { poleRefused } from './ai/ai';
 import { WindLadder } from './render/windLadder';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
@@ -653,7 +654,9 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant; send({ k: 'pole', want }); // (the pole is always yours: your call only)
+  const want = !w.user.poleWant, why = want ? poleRefused(w.user) : null; // (the pole is always yours: your call only)
+  if (why) { toast(`Crew: no pole now, ${why}.`, 3000); return; } // (the race refuses it too: sim/commands.ts)
+  send({ k: 'pole', want });
   toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)

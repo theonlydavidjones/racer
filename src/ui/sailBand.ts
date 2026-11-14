@@ -1,6 +1,7 @@
 import type { Boat, LineKey } from '../boat/boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
 import { byHand } from '../boat/physics';
+import { poleRefused } from '../ai/ai';
 import type { BoatView } from '../sim/host';
 import type { Command } from '../sim/commands';
 import { CAR, workPace } from '../boat/crewWork';
@@ -410,10 +411,11 @@ export class SailBand {
       hail.hidden = !words;
       if (words) { hail.innerHTML = `Hail · ${words}<span class="k">${this.host.hailKey()}</span>`; hail.dataset.help = `Hail: "${words}" (or press ${this.host.hailKey()}).`; }
     }
-    // the pole: only on a deep run, where a poled-out jib fills (from about 145° true: polar.ts jibEfficiency): it shows
-    // at 140° as you bear away and goes below 135°, and stays while the pole is out or the crew is at it
+    // the pole: only where the crew would set it (ai.ts poleRefused: a deep run, past 145° true where a poled-out jib
+    // fills, polar.ts jibEfficiency; not at the dock, in a basin, in penalty turns or with the jib down). It shows at 148°
+    // as you bear away and goes at 145°, and stays while the pole is out or the crew is at it
     const tab = this.el.querySelector<HTMLElement>('.sb-pole')!, deep = Math.abs(u.twa), busy = u.pole !== 'down' || u.poleWant;
-    this.poleShown = busy || deep >= (this.poleShown ? 135 : 140);
+    this.poleShown = busy || (!poleRefused(u) && (this.poleShown || deep >= 148));
     tab.hidden = !this.poleShown;
     if (this.poleShown) {
       // "Pole out" sets it, "Pole in" stows it; while the crew is at it, the next word dimmed
