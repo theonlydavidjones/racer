@@ -12,7 +12,7 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
+import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, IDEAL_HELM, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
@@ -1085,6 +1085,14 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
   const easeBoom = crewEaseBoom(b);
   const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
+  // the backstay for the helm (North Sails' Folkboat guide: "In heavy winds, sheet tight and pull the backstay until the
+  // rudder feels light again"): upwind in the guide's higher wind (from about 14 kt), while the helm she needs is past the
+  // top of the light band (IDEAL_HELM + 2°, the published 3–5°'s top: Deep Physics' reading, an estimate) the crew take up
+  // backstay, about all of it in 20 s; once it's light again (under IDEAL_HELM) they ease it off as slowly; between, they
+  // hold it. A floor on their plan: the speed search's depowering and the guide's settings still set it higher.
+  { const breeze = up && !b.hove ? clamp((tws - 13) / 2, 0, 1) : 0, hn = b.helmNeed ?? 0;
+    const dir = breeze > 0 && hn > IDEAL_HELM + 2 ? 1 : hn < IDEAL_HELM || breeze <= 0 ? -1 : 0;
+    b.helmBackstay = clamp((b.helmBackstay ?? 0) + dir * dt / 20, 0, 1) * (breeze > 0 ? 1 : 0); }
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
   // (when a line changes hands the crew thinks again at once, starting from what it has set: its other lines stay put
@@ -1110,7 +1118,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
-    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
+    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.helmBackstay ? { backstay: b.helmBackstay } : undefined); b.crewPlanT = 1;
     b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet);
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {

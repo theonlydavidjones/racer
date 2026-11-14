@@ -196,6 +196,9 @@ export interface Boat {
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
   crewPlan?: CrewSettings | null; crewPlanT?: number;
+  /** The backstay the crew has taken up for the helm upwind in a breeze (0..1, a floor on their plan: physics.ts, North
+   * Sails' Folkboat guide "pull the backstay until the rudder feels light again"). */
+  helmBackstay?: number;
   /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */

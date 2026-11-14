@@ -398,12 +398,14 @@ export function hoistDraw(h: number, sail: 'main' | 'jib'): number {
 /** The mainsheet "sheeted tight" in heavy air (its 0..1: the last few centimetres in hand, about a degree of boom off the
  * car, the vertical sheet holding the leech: mainShape's sheetT at 1). An estimate of the guide's "sheet tight". */
 const HEAVY_SHEET = 0.05;
-export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}): CrewSettings {
+export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}, floors?: Partial<CrewSettings>): CrewSettings {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
   // lines you hold are fixed where you have them: the crew sets the rest around them
   // (with your mainsheet held, the traveller is their only way to put the boom where it should be: the guide's traveller
   // settings assume a main sheeted for the conditions, so then only the depowering floor holds it)
   const free = fixed.mainsheet != null ? depowerLimits(depower ?? 0, awa) : null;
+  // (floors the crew holds on a line whatever the shape would rather: the backstay they've taken up for the helm)
+  const floorOf = (k: keyof CrewSettings) => floors?.[k] ?? -1;
   // in heavy air, upwind, the boom goes down on the traveller and the sheet stays tight (North Sails' Nordic Folkboat
   // guide: "In higher wind the cars are eased to leeward to decrease heel and thus rudder pressure"; "In heavy winds,
   // sheet tight and pull the backstay until the rudder feels light again"; "the top batten is trimmed parallel to the
@@ -413,7 +415,7 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   // guide's other settings (guideLimits). The leech then opens on the backstay, as the guide has it, not on the sheet.
   const heavy = fixed.mainsheet == null ? smooth((tws - 14) / 2) * smooth((60 - Math.abs(awa)) / 20) : 0;
   const tightTrav = heavy > 0 ? heavy * travellerFor(mainAngle, HEAVY_SHEET, -1) + (1 - heavy) * -1 : -1;
-  const lo = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? free.min.traveller : k === 'traveller' ? Math.max(lim.min.traveller ?? -1, tightTrav) : lim.min[k]) ?? (k === 'traveller' ? -1 : 0);
+  const lo = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? free.min.traveller : k === 'traveller' ? Math.max(lim.min.traveller ?? -1, tightTrav) : lim.min[k] != null || floors?.[k] != null ? Math.max(lim.min[k] ?? 0, floorOf(k)) : undefined) ?? (k === 'traveller' ? -1 : 0);
   const hi = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? 1 : lim.max[k]) ?? 1;
   // (the car's in-and-out is the sim's own choice, not the guide's: North's guide gives the track's centre, 58 cm out, and
   // only a fore-and-aft move by the wind, "two holes back" in heavy air; nothing on moving it out as the wind builds)
