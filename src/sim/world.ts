@@ -2052,7 +2052,11 @@ export class World {
     const m = this.user.motor; if (!m) return;
     if (m.shifting) {
       m.shifting.left -= dt;
-      if (m.shifting.left <= 0) { m.stowed = m.shifting.to === 'stowed'; m.shifting = undefined; this.emit({ type: 'toast', msg: m.stowed ? 'Outboard stowed in the lazarette.' : 'Outboard on its bracket, tilted up.', ms: 2500 }); }
+      if (m.shifting.left <= 0) {
+        m.stowed = m.shifting.to === 'stowed'; m.shifting = undefined;
+        // (its weight goes where it now is: off her stern and low, or back out on the bracket; boat/condition.ts)
+        { const u = this.user; if (u.spec) u.cond = condition(u.spec, +this.raceDate.slice(5, 7) || 9, m.stowed ? 'stowed' : 'bracket'); }
+        this.emit({ type: 'toast', msg: m.stowed ? 'Outboard stowed in the lazarette.' : 'Outboard on its bracket, tilted up.', ms: 2500 }); }
       return;
     }
     if (!m.pulling) return;

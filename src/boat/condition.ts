@@ -55,10 +55,15 @@ const MAST_BEND = { soft: 145 / 125, average: 1, stiff: 105 / 125 };
  * estimate): the outboard on its transom bracket, and stowed in a cockpit locker. */
 const STATION = { transom: 3.45, locker: 2.3 };
 
-/** Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water). */
-export function condition(s: BoatSpec, month = 9): Condition {
+/**
+ * Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water).
+ * `outboardAt`: where her motor is right now, if that's not where her setup has it (shipped on the bracket or stowed
+ * below mid-sail, sim/world.ts motorStow): its weight moves with it, aft and up on the bracket, lower and further
+ * forward below.
+ */
+export function condition(s: BoatSpec, month = 9, outboardAt: BoatSpec['perf']['outboard'] = s.perf.outboard): Condition {
   const f = fouling(s.perf.cleanedWeeks, month), finish = s.perf.finish;
-  const ob = s.perf.outboard;
+  const ob = outboardAt;
   const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : outboardKg(s));
   // gear sits about amidships (no moment); the outboard aft
   const extraMoment = ob === 'bracket' ? -outboardKg(s) * STATION.transom : ob === 'stowed' ? -outboardKg(s) * STATION.locker : 0;

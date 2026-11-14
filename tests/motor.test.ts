@@ -161,6 +161,18 @@ describe('Stowing it below and shipping it again (the owner: off the sliding bra
     expect(m.stowed).toBe(false); expect(m.down).toBe(false);
     w.motorTilt(); expect(m.down).toBe(true);
   }, 60_000);
+  it('its weight goes with it: stowed, the same weight aboard but further forward and off the height of the bracket; shipped again, as before', () => {
+    const w = withMotor('sail'), u = w.user, m = u.motor!, on = u.cond!;
+    const shift = () => { applyCommand(w, { k: 'motor', op: 'stow' }); const of = m.shifting!.of; for (let i = 0; i < 60 * (of + 1); i++) w.step(DT); };
+    expect(on.rightingDelta(20)).toBeLessThan(0); // (on the bracket it's weight up at deck level)
+    shift(); expect(m.stowed).toBe(true); const below = u.cond!;
+    expect(below.extraKg).toBe(on.extraKg);
+    expect(Math.abs(below.extraMoment)).toBeLessThan(Math.abs(on.extraMoment)); expect(below.extraMoment).toBeLessThan(0); // (still aft of her middle, less far)
+    expect(below.rightingDelta(20)).toBeGreaterThan(on.rightingDelta(20)); // (and no longer up on the bracket)
+    shift(); expect(m.stowed).toBe(false);
+    expect(u.cond!.extraMoment).toBeCloseTo(on.extraMoment, 9); expect(u.cond!.rightingDelta(20)).toBeCloseTo(on.rightingDelta(20), 9);
+  }, 60_000);
+
   it('stowed below in her setup: cruising, it\'s aboard to ship; racing, it stays below with no motor to work', () => {
     const c = stowedSpec('sail'); expect(c.user.motor).toMatchObject({ stowed: true, down: false, running: false });
     expect(stowedSpec('race').user.motor ?? null).toBeNull();
