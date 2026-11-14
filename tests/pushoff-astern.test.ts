@@ -9,6 +9,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
 import { ASTERN_SHOVE, ASTERN_STEERAGE, DT, World } from '../src/sim/world';
 import { COURSES } from '../src/courses/registry';
+import { DAMAGE_V } from '../src/boat/damage';
 
 /** Going astern faster than this, the rudder turns her about 1.3 deg/s and more (physics.ts): steerage way. An ESTIMATE. */
 const STEERS = 0.3;
@@ -34,13 +35,17 @@ describe('pushed off astern', () => {
         if (plan?.kind !== 'astern') continue; n++;
         for (let k = 0; k < 60 * 60 && u.handled; k++) w.step(DT);
         // (her helmsman puts the tiller over as the plan says until her stern points down the fairway, then amidships)
-        const h0 = u.h; let steer = 0, bump = false, went = 0;
+        const h0 = u.h; let steer = 0, bump = false, went = 0, hard = 0;
         for (let t = 0; t < 60; t += DT) {
           u.tiller = plan.helm && Math.abs(wrap(u.h - h0)) < 85 ? plan.helm : 0;
           const v0 = u.astern ?? 0, x = u.x, y = u.y; w.step(DT); const v1 = u.astern ?? 0; went += Math.hypot(u.x - x, u.y - y);
           if (v1 > STEERS) steer += DT;
           // (her hull clear, as the planner sees it, wherever she goes in the water it found clear before her crew has sail on her)
           if (t <= 20 && went <= plan.coast && !berthClear(u, u.h, s)) bump = true;
+          // (after that, steering her on down the fairway or getting sail on her is the helmsman's, as on a real boat (the
+          // Coordinator, 14 Nov 2026); whatever she touches then, she touches at a crawl: under DAMAGE_V.scrape, 0.5 m/s, the
+          // shared damage measure's scrape (an ESTIMATE, boat/damage.ts), so never more than a scrape)
+          else if (t > 20 && !berthClear(u, u.h, s)) hard = Math.max(hard, Math.hypot(u.vx, u.vy));
           if (v0 > 0.2 && v1 < 0.3 * v0 && went <= plan.coast) bump = true; // (her way gone at once: against something)
         }
         const f = { x: Math.sin(s.heading * Math.PI / 180), y: Math.cos(s.heading * Math.PI / 180) };
@@ -52,6 +57,7 @@ describe('pushed off astern', () => {
         if (plan.coast >= 8 && (out < 7.6 || end < 2)) bad.push(`${s.id}: only ${out.toFixed(1)} m out, her nearest end ${end.toFixed(1)} m`);
         if (steer < 10) bad.push(`${s.id}: steerable only ${steer.toFixed(1)} s`);
         if (bump) bad.push(`${s.id}: touched`);
+        if (hard >= DAMAGE_V.scrape) bad.push(`${s.id}: touched at ${hard.toFixed(2)} m/s after 20 s`);
       }
     }
     expect(n).toBeGreaterThanOrEqual(kt ? 20 : 5); // (in a calm the crew can swing her out from most: few are shoved off astern)
