@@ -2,6 +2,7 @@ import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
+import { CASE_WIND, CaseRun, caseById } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -293,6 +294,8 @@ export class World {
   readonly rounding: RoundingTracker | null;
   /** Learn to sail (sim/lessons.ts): the lesson you're sailing, its cue and its check; that mode only. */
   readonly lesson: LessonTracker | null;
+  /** Sail it yourself: a World Sailing Case on the water (sim/caseRun.ts), you helming one of its boats. */
+  readonly caseRun: CaseRun | null = null;
   /** Racing: the whole race once a second (the race replay), from just before the gun. */
   track: Frame[] = [];
   horns: Record<number, boolean> = {};
@@ -438,7 +441,13 @@ export class World {
     this.courseWind();
     this.buildField();
     this.avgFrom = this.windModel.base;
-    for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    const rc = settings.mode === 'lesson' && settings.lesson === 'case' ? caseById(settings.rulesCase) : undefined;
+    if (rc) { // (the Case laid out where she'd start, turned to the wind there)
+      const o = getPlace(settings.sailFrom)?.p ?? this.C.center;
+      this.caseRun = new CaseRun(rc, this.windHere(o, undefined, false).from, o);
+    }
+    for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    if (this.caseRun) this.placeCase();
     this.startTimes = this.boats.map(() => null);
     // (a sheltered start, a slip, doesn't raise the mean: out on the Bay she'd have it all)
     // (from a slip, the lesson's wind is taken where she'll sail it, out on the Bay off the Cityfront, not in the basin's lee)
@@ -452,6 +461,7 @@ export class World {
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
+    if (this.lesson && this.caseRun) this.lesson.cue = `You're ${this.caseRun.helm}: sail it without breaking a rule`;
     if (this.lesson?.id === 'before') this.boats[0].lightsOff = true; // (Before you go: switching them on is a step)
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
@@ -806,7 +816,7 @@ export class World {
    * retires, or until the race committee signals a general recall, postponement or abandonment".
    */
   racing(b: Boat): boolean {
-    if (this.freeSail || this.cancelled || notRacing(b)) return false;
+    if ((this.freeSail && !this.caseRun) || this.cancelled || notRacing(b)) return false; // (a Case is sailed as a race: its boats are racing)
     const prep = this.sequence.find(s => s.name === 'Preparatory signal');
     return !prep || this.t >= prep.t;
   }
@@ -882,8 +892,49 @@ export class World {
   /** A lesson's mean wind held to the standard's range (sim/lessons.ts LESSON_WIND); any other sail's as it is. */
   // (the range is for the wind she sails in, so the mean is held to it over the field's factor where the lesson is: the
   // Cityfront's is about 1.2, which put a lesson's own wind near 18 kt with the mean at 15)
-  private lessonKt(kt: number): number { const f = this.lessonField ?? 1, lo = this.settings.lesson === 'breeze' ? LESSON_WIND[1] : LESSON_WIND[0]; return this.settings.mode === 'lesson' ? clamp(kt, lo / f, LESSON_WIND[1] / f) : kt; } // (a breeze: the top of the range)
+  private lessonKt(kt: number): number {
+    const f = this.lessonField ?? 1, [lo, hi] = this.settings.lesson === 'breeze' ? [LESSON_WIND[1], LESSON_WIND[1]] : this.settings.lesson === 'case' ? CASE_WIND : LESSON_WIND;
+    return this.settings.mode === 'lesson' ? clamp(kt, lo / f, hi / f) : kt;
+  } // (a breeze: the top of the range; a Case: a breeze she sails at the Cases' own speed in)
   private lessonField: number | null = null;
+
+  /** Sail it yourself: each boat set at her pose in the Case at its start, the others to sail its track (their letters
+   * for names: the Case's own, as the incident card and the labels then read). */
+  private placeCase(): void {
+    const R = this.caseRun!, letters = [R.helm, ...R.c.boats.map(b => b.letter).filter(l => l !== R.helm)];
+    letters.forEach((l, i) => {
+      const b = this.boats[i], cb = R.c.boats.find(x => x.letter === l)!, q = R.pose(l, 0);
+      R.ids.set(l, b.id); b.name = l;
+      b.x = q.p.x; b.y = q.p.y; b.h = q.h; b.desired = q.h; b.v = q.v; b.vx = V(q.h).x * q.v; b.vy = V(q.h).y * q.v;
+      b.started = cb.started ?? true; b.leg = cb.leg ?? 0;
+      if (!b.isUser) { b.script = l; this.caseDrift.set(b.id, { x: 0, y: 0 }); }
+    });
+  }
+  /** How far the current has carried each Case boat (the Case is drawn on the water: they sail through it, and drift with
+   * it, as you do). */
+  private caseDrift = new Map<number, Vec>();
+  /** The Case's boats where its track has them now (after physics has trimmed and heeled them for it: their sails, heel
+   * and flags answer their own apparent wind), carried by the current where they are. */
+  private pinCase(dt: number): void {
+    const R = this.caseRun!;
+    for (const b of this.boats) if (b.script) {
+      const q = R.pose(b.script, this.t), d = this.caseDrift.get(b.id)!, u = V(q.h);
+      d.x += b.cur.x * dt; d.y += b.cur.y * dt;
+      b.x = q.p.x + d.x; b.y = q.p.y + d.y; b.h = q.h; b.desired = q.h; b.v = q.v;
+      b.vx = u.x * q.v + b.cur.x; b.vy = u.y * q.v + b.cur.y; b.turnRate = 0;
+    }
+  }
+  /** After the rules have looked: your fouls, and the Case called once its sailing's over. */
+  private caseStep(): void {
+    const R = this.caseRun!, L = this.lesson;
+    const ui = this.userIncident;
+    if (ui && ui !== this.caseSeen) { this.caseSeen = ui; if (ui.fouler === this.user.id && !ui.exonerated && !ui.notRacing) R.fouls.push(ui.part ?? ui.rule); }
+    if (R.result || !R.done(this.t) || !L) return;
+    R.result = R.fouls.length ? 'foul' : 'clear';
+    L.passed = true; L.passedT = this.t; L.progress = 1;
+    L.cue = R.result === 'clear' ? 'Sailed it clear ✓' : `You broke rule ${R.fouls[0]}`;
+  }
+  private caseSeen: World['userIncident'] = null;
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
@@ -941,7 +992,7 @@ export class World {
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
     // boat answers her helm every step); in close quarters (World.closeQuarters: a boat or a mark within four lengths, about to
     // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
-    for (const b of this.boats) if (!b.isUser) {
+    for (const b of this.boats) if (!b.isUser && !b.script) {
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
@@ -966,6 +1017,7 @@ export class World {
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
       if (b.mooring) this.mooringStep(b, dt); // (coming in: the hand at the shrouds, waiting to step)
     }
+    if (this.caseRun) this.pinCase(dt);
     // the waves: the field eased to its reference sea (waveRef) and turning with the course's mean wind about your boat,
     // and every boat's heave and pitch on it (boat/seaway.ts waveMotion)
     if (this.steps % 30 === 1) this.waveRefSea = null;
@@ -978,7 +1030,10 @@ export class World {
     this.log?.step(this, dt);
     this.trackCourses();
     this.shipEncounters();
+    // (a Case's boat sails above her proper course where the Case says so, rule 17: the Case's call, not the sim's)
+    if (this.caseRun) for (const b of this.boats) if (b.script) b.aboveProper = !!this.caseRun.pose(b.script, this.t).f.aboveProper;
     this.checkPairs();
+    if (this.caseRun) this.caseStep();
     if (this.protestsOn) this.protestsStep();
     if (!this.freeSail) this.signals(prevT);
     this.motorStep(dt);
@@ -1337,7 +1392,7 @@ export class World {
         const other = A.isUser ? B : A;
         this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part, notRacing: !!incident.notRacing, exonerated: incident.exoneratedBy != null };
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.penaltyFor(f, this.t); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
+      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1' && !f.script) this.penaltyFor(f, this.t); // (a Case's boat sails its track: what happens between two of them is the Case's, no turns) // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
       // Protests: an AI boat fouled hails "Protest!" at once (her reaction time), before she knows if the other will turn.
       // (Rule 23.1 too: a boat not racing that interferes is penalized in the race nearest in time, 60.5(c); a Part 2 breach
       // by a boat not racing otherwise isn't, the Part 2 preamble, so nothing to protest)
