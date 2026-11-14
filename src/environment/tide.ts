@@ -152,6 +152,9 @@ export function bayTide(station: string, ms: number): { h: number; rise: number 
   const a = at(ms - 300e3), b = at(ms), c = at(ms + 300e3);
   return { h: b, rise: (c - a) / 600 };
 }
+/** San Francisco's tide (9414290, the reference station): its height above its MLLW (m) at a time (ms UTC), from NOAA's
+ * harmonic constituents (bay-tides.json). */
+export const sfTide = (ms: number): number => predict(BT.refMsl, BT.hc, [ms])[0];
 /** Point San Quentin's tide (San Rafael Bay's). */
 export const sanQuentinTide = (ms: number) => bayTide('9414873', ms);
 
@@ -221,6 +224,32 @@ export const BAYS: Bay[] = [
 const bayIn = (B: Bay, p: Vec): number => (p.x - B.q.x) * B.into.x + (p.y - B.q.y) * B.into.y;
 const inPolyV = (P: Vec[], p: Vec): boolean => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
 const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly, p)) return B; return null; };
+/**
+ * The tide's height (m above MLLW) at p and a time (ms UTC), for the water's depth over the chart's soundings. On each
+ * bay's depth grid (depthBand) it's that bay's own station's, the one that fills the bay (BAYS): Point San Quentin
+ * (9414873) on San Rafael Bay's, the nearest NOAA prediction station on its open water (Corte Madera Creek's, 9414874,
+ * is up the creek on the flats beyond it), and San Leandro Channel (9414724, inside the grid) on San Leandro Bay's. Both
+ * come 42–52 minutes after San Francisco, at 0.93–1.16 of its height (bay-tides.json, NOAA's offsets): at a low water
+ * on a big tide, San Leandro Bay's flats are still dry when the City's tide has turned. Elsewhere, San Francisco's
+ * (9414290). Across a grid's outer GRID_BLEND m the two are blended, so the water has no step in it where a grid ends.
+ */
+export function tideHeightAt(p: Vec, ms: number): number {
+  const sf = sfTide(ms), g = gridAt(p);
+  if (!g) return sf;
+  const w = Math.min(1, g.inside / GRID_BLEND);
+  return w <= 0 ? sf : sf + (bayTide(g.station, ms).h - sf) * w;
+}
+const GRID_BLEND = 500;
+/** The depth grid p is on: its bay's tide station, and how far inside the grid's edge p is (m). */
+const GRID_STATIONS = DGRIDS.map(G => { const B = BAYS.find(b => b.name === G.name); if (!B) throw new Error(`depth grid ${G.name}: no bay`); return B.station; });
+function gridAt(p: Vec): { station: string; inside: number } | null {
+  const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
+  for (let k = 0; k < DGRIDS.length; k++) { const G = DGRIDS[k];
+    if (lat < G.south || lat > G.north || lon < G.west || lon > G.east) continue;
+    return { station: GRID_STATIONS[k], inside: Math.min((lat - G.south) * D_MLAT, (G.north - lat) * D_MLAT, (lon - G.west) * D_MLON, (G.east - lon) * D_MLON) };
+  }
+  return null;
+}
 /** A flow-only station's stream (kt, + its flood) at a time (minutes UTC), from its harmonic constants. */
 function inflowSpeed(id: string, tMin: number): number {
   const d = DEFS.find(x => x.id === id) as HarmonicDef | undefined;
