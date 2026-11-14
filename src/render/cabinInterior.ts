@@ -86,7 +86,7 @@ function aoAt(p: THREE.Vector3): number {
 }
 
 /** The shell: positions, the lining's or the woodwork's colour, and the lantern's light, per vertex. */
-export function cabinInteriorGeometry(): THREE.BufferGeometry {
+function cabinInteriorGeometryBuild(): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], lamp: number[] = [], day: number[] = [], nrm: number[] = [], lit: number[] = [];
   const centre = new THREE.Vector3();
   const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, ca: THREE.Color, cb: THREE.Color, cc: THREE.Color, open = 1) => {
@@ -207,7 +207,7 @@ export const LANTERN_DROP = LANTERN_PIVOT.y - LANTERN.y;
  * small brass lamp on a short chain, its glass bright when lit. It gives no light to itself from the room (aLit 0); its
  * glass and brass carry their own brightness (aLamp).
  */
-export function lanternGeometry(): THREE.BufferGeometry {
+function lanternGeometryBuild(): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], lamp: number[] = [], day: number[] = [];
   const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y - LANTERN_DROP, z), N = 8, r = 0.045, BRASS = new THREE.Color(0xb08a4a), GLOW = new THREE.Color(1, 0.95, 0.85);
   const put = (p: THREE.Vector3, c: THREE.Color, l: number, d: number) => { pos.push(p.x, p.y, p.z); col.push(c.r, c.g, c.b); lamp.push(l); day.push(d); };
@@ -287,7 +287,7 @@ export function swingLantern(s: LanternSwing, grp: THREE.Object3D, dt: number, o
 }
 
 /** Depth-only covers over the windows' openings (as over the cockpit): the sea isn't drawn inside her through them. */
-export function windowLids(): THREE.BufferGeometry {
+function windowLidsBuild(): THREE.BufferGeometry {
   const pos: number[] = [], N = 8;
   for (const side of [1, -1]) for (let i = 0; i < N; i++) {
     const ua = WINDOW.hole0 + (WINDOW.hole1 - WINDOW.hole0) * i / N, ub = WINDOW.hole0 + (WINDOW.hole1 - WINDOW.hole0) * (i + 1) / N;
@@ -326,3 +326,20 @@ export function cabinInteriorMaterial(): THREE.MeshBasicMaterial & { uniforms: {
   m.customProgramCacheKey = () => 'cabinInterior';
   return m;
 }
+
+// ———————————————————————————— the geometry, built once ————————————————————————————
+/**
+ * These shapes don't change from boat to boat (the hull's lines, the cabin, the cockpit), and they're slow to work out
+ * (the cockpit's linings follow the hull's curves, point by point): so each is built once, and every boat, the boat
+ * editor's every rebuild included, gets its own copy (ROADMAP 8v: an editor click rebuilt them all, seconds a click).
+ */
+const GEO_CACHE: Record<string, unknown> = {};
+function cloneGeo(v: unknown): unknown {
+  if (v instanceof THREE.BufferGeometry) return v.clone();
+  if (Array.isArray(v)) return v.map(cloneGeo);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cloneGeo(x)]));
+  return v; // (numbers, and the functions that go with them, as the cabin's topY)
+}
+export function cabinInteriorGeometry(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.cabinInteriorGeometry ??= cabinInteriorGeometryBuild()) as ReturnType<typeof cabinInteriorGeometryBuild>; }
+export function lanternGeometry(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.lanternGeometry ??= lanternGeometryBuild()) as ReturnType<typeof lanternGeometryBuild>; }
+export function windowLids(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.windowLids ??= windowLidsBuild()) as ReturnType<typeof windowLidsBuild>; }
