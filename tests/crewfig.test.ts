@@ -90,6 +90,9 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     // (and in a seaway, lower and on all fours: her pitching 0.03 rad either way every 2.6 s, its rate's root mean square
     // 0.05 rad/s, as in the Bay's westerly at about 20 kt (crew.ts rough). The wind's the light air's, for the pole)
     ['pole out in a seaway: forward low, both hands down', { kt: 7, twa: 172, pole: true, secs: 45, sea: 0.03 }],
+    // (on until one of them's sat on the bow, the legs hanging down over it either side of the stem: the owner's "hang his
+    // legs over the front")
+    ['pole out, on to the bow and sat there', { kt: 7, twa: 172, pole: true, secs: 62 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
   for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
