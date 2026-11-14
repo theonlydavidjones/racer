@@ -298,7 +298,7 @@ What's planned, roughly in order. Done work is described in the README.
 8u. **Now — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
    editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
    in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
-   input), so something hides them on screen. Suspects: the new Save banner or the turning boat's panel pushing
+   input), so something hides them on screen. Not the Save banner (owner: there's none showing). Suspects: the turning boat's panel pushing
    Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
    published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
    ensign.
