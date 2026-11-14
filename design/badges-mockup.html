@@ -1,0 +1,59 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Badges proposal</title><style>
+body{margin:0;background:#06101a;color:#e9f2f5;font:14px/1.4 system-ui,sans-serif;width:1280px}
+.wrap{padding:28px}
+.eyebrow{font:600 11px/1 system-ui;letter-spacing:.16em;text-transform:uppercase;color:#ffb627;margin-bottom:8px}
+h1{margin:0 0 4px;font-size:28px}.sub{color:#94abb7;margin:0 0 20px}
+.ladder{display:grid;grid-template-columns:150px repeat(5,1fr);gap:10px;align-items:stretch}
+.hd{font:700 12px/1.2 system-ui;color:#94abb7;letter-spacing:.06em;text-transform:uppercase;align-self:center}
+.c{background:#0f2130;border:1px solid rgba(150,196,218,.2);border-radius:10px;padding:10px 12px;font-size:12.5px;color:#c7d6de}
+.c b{display:block;font-size:15px;color:#e9f2f5;margin-bottom:2px}
+.c.sim{border-color:#ffb627;background:#1a2a20}.c.sim b{color:#ffb627}
+.c.later{border-style:dashed;opacity:.85}
+.c.none{opacity:.45;font-style:italic}
+.badges{display:flex;gap:18px;margin:26px 0 8px;align-items:center}
+.badge{display:flex;align-items:center;gap:12px;background:#0c2534;border:1px solid rgba(150,196,218,.25);border-radius:40px;padding:8px 18px 8px 8px}
+.medal{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe08a,#c98a12);display:flex;align-items:center;justify-content:center;font:800 14px/1 system-ui;color:#3a2600;box-shadow:0 0 0 3px #0c2534,0 0 0 4px #ffb627}
+.medal.off{background:#16364a;color:#6f8a98;box-shadow:0 0 0 3px #0c2534,0 0 0 4px #2b4a5e}
+.badge b{font-size:16px}.badge span{display:block;color:#94abb7;font-size:12px}
+.hover{position:relative;margin-left:30px;background:#e9f2f5;color:#06101a;border-radius:8px;padding:8px 12px;font-size:12.5px;max-width:330px}
+.hover:before{content:"";position:absolute;left:-7px;top:16px;border:7px solid transparent;border-left:0;border-right-color:#e9f2f5}
+.notes{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.n{background:#0c2534;border-left:3px solid #ffb627;border-radius:6px;padding:8px 12px;font-size:12.5px;color:#c7d6de}.n b{color:#e9f2f5}
+.n.red{border-left-color:#ff6a2a}
+</style></head><body><div class="wrap">
+<div class="eyebrow">Learn to sail · badges · proposal</div>
+<h1>Badges that follow the real ladder</h1>
+<p class="sub">Each course set in the sim practices one real certification's skills. Twelve lessons = 101.</p>
+<div class="ladder">
+ <div class="hd">In the sim</div>
+ <div class="c sim"><b>Learn to sail</b>12 lessons (2 built so far)</div>
+ <div class="c later"><b>Coastal cruising</b>passages, anchoring, reefing, night</div>
+ <div class="c later"><b>Bareboat</b>a day's passage as skipper, docking</div>
+ <div class="c later"><b>Navigation</b>the chart, tides and current, plotting</div>
+ <div class="c later"><b>Racing</b>start, mark, rules, tactics drills</div>
+ <div class="hd">ASA</div>
+ <div class="c"><b>101</b>Basic Keelboat Sailing</div>
+ <div class="c"><b>103</b>Basic Coastal Cruising</div>
+ <div class="c"><b>104</b>Bareboat Cruising</div>
+ <div class="c"><b>105</b>Coastal Navigation</div>
+ <div class="c none"><b>—</b>no racing course found</div>
+ <div class="hd">US Sailing</div>
+ <div class="c"><b>Basic Keelboat</b>(101)</div>
+ <div class="c"><b>Basic Cruising</b>(103)</div>
+ <div class="c"><b>Bareboat Cruising</b>(104)</div>
+ <div class="c"><b>Coastal Navigation</b>(105)</div>
+ <div class="c"><b>Performance Race Week</b>(109, school source)</div>
+ <div class="hd">Bay schools</div>
+ <div class="c" style="grid-column:span 5">ASA: Modern Sailing, Tradewinds, SailTime, Spinnaker · US Sailing: OCSC · Club Nautique (US Sailing) closed end of 2025</div>
+</div>
+<div class="badges">
+ <div class="badge"><div class="medal">101</div><div><b>101 · Basic Keelboat skills</b><span>Learn to sail · 12 of 12</span></div></div>
+ <div class="badge"><div class="medal off">103</div><div><b>103 · Coastal cruising skills</b><span>later</span></div></div>
+ <div class="hover">Practice of the ASA 101 skills in the sim. Not the ASA certification.</div>
+</div>
+<div class="notes">
+ <div class="n"><b>Which ladder?</b> Most Bay schools teach ASA; both number 101 / 103 / 104 alike, so the badge reads the same either way.</div>
+ <div class="n"><b>Racing</b> has no ASA course and only a school-sourced US Sailing one (109): the racing set keeps the sim's own name.</div>
+ <div class="n red"><b>Permission first.</b> ASA's and US Sailing's names and numbers are their marks: ask them before any public release, as with club names and burgees.</div>
+</div>
+</div></body></html>

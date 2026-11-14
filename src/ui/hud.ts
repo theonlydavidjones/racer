@@ -55,6 +55,7 @@ import { setVisibility, visibilityFor } from '../environment/weather';
 import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
+import { pointOfSailWord } from './pointOfSail';
 
 export function fmtClock(t: number): string {
   const a = Math.abs(t), m = Math.floor(a / 60), s = Math.floor(a % 60);
@@ -68,13 +69,8 @@ export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
  * and sea, boat/seaway.ts), a beam reach the wind square across her (80–100°), a run within 20° of dead downwind; head
  * to wind inside 30°, where no sail draws.
  */
-export function pointOfSail(u: Boat): { short: string; long: string } {
-  const a = Math.abs(u.twa), beat = beatFor(u);
-  const [short, long] = a < 30 ? ['head to wind', 'head to wind'] : a < beat + 7 ? ['close-hauled', 'close-hauled']
-    : a < 80 ? ['close reach', 'on a close reach'] : a <= 100 ? ['beam reach', 'on a beam reach']
-    : a < 160 ? ['broad reach', 'on a broad reach'] : ['run', 'running'];
-  return { short, long };
-}
+// (her point of sail: ui/pointOfSail.ts, shown with the windex in the band and on the dial)
+export { pointOfSail } from './pointOfSail';
 
 /** Which way north points on a map turned so that `W` (deg, the wind's direction) is at the top: the angle (rad) to
  * turn an up-pointing arrow by, clockwise on the canvas (makeTf: a bearing b is drawn at b − W from up). */
@@ -549,6 +545,10 @@ export class Hud {
     const pa = Math.atan2(by - ay, bx - ax);
     ctx.beginPath(); ctx.moveTo(bx + Math.cos(pa) * 4, by + Math.sin(pa) * 4); ctx.lineTo(bx - Math.cos(pa - 0.5) * 9, by - Math.sin(pa - 0.5) * 9); ctx.lineTo(bx - Math.cos(pa + 0.5) * 9, by - Math.sin(pa + 0.5) * 9); ctx.fill();
     ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
+    // her point of sail, as the windex shows it (the owner: the dial names it); also on the canvas for the checks
+    const pos = pointOfSailWord(u); this.dialC.dataset.pos = pos; this.dialC.setAttribute('aria-label', `Wind angle dial: ${pos}, true wind ${Math.round(u.twa)}°, apparent ${Math.round(u.awa)}°`);
+    ctx.fillStyle = '#e9f2f5'; ctx.font = '700 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(pos, cx, cy - R * 0.5);
+    ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif';
     ctx.fillText('TWA ' + Math.round(u.twa) + '°', cx, cy + R * 0.56);
     ctx.fillText('AWA ' + Math.round(u.awa) + '°', cx, cy + R * 0.8);
   }
@@ -782,8 +782,11 @@ export class Hud {
     // every 10 s of the clock (the chart's paused); the full chart's only
     if (flowHere) this.flowField.chart.draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
-    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
-    else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
+    if (wd.freeSail) {
+      drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
+      // a lesson's buoy (the tiller: steer for it), a filled yellow dot while it's the one to reach
+      if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
+    } else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     if (on('ships')) for (const v of wd.vessels) {

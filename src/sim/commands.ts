@@ -35,7 +35,7 @@ export type Command =
   | { k: 'lash'; on: boolean }
   /** Take a line yourself (it stays where it is until you work it), or give it back to the crew. */
   | { k: 'line'; key: LineKey; mine: boolean }
-  /** Auto-trim: every line, both jib cars and the pole back to the crew. */
+  /** Hand Back (the band's tab): every line and both jib cars back to the crew (the pole stays yours). */
   | { k: 'allToCrew' }
   /** Move the lazy jib car (taking the cars): fore–aft and in–out steps. */
   | { k: 'lazyCar'; fore: number; ins: number }
@@ -51,7 +51,7 @@ export type Command =
   | { k: 'lazyCarTo'; fore: number; ins: number; side?: 'P' | 'S' }
   /** Where the crew sit: your choice across and fore and aft (null: theirs), or null to put them back on auto. */
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
-  /** Set or stow the whisker pole (it's yours until Auto-trim). */
+  /** Set or stow the whisker pole (always yours: your call only). */
   | { k: 'pole'; want: boolean }
   /** Strike or hoist the ensign. */
   | { k: 'ensign'; struck: boolean }
@@ -77,7 +77,7 @@ export type Command =
   | { k: 'sendHome' }
   | { k: 'moveHere'; p: Vec; name: string }
   | { k: 'dest'; p: Vec; name: string }
-  | { k: 'retire'; why?: string }
+  | { k: 'retire'; why?: string; afterFinish?: boolean }
   /** Take a penalty (by boat id): after an incident's replay. */
   | { k: 'penalty'; boat: number }
   /** New conditions for the sail that's running (the conditions panel from the pause menu). */
@@ -147,8 +147,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'sendHome': return w.sendHome();
     case 'moveHere': return w.moveHere(c.p, c.name);
     case 'dest': w.setDest(c.p, c.name); return;
-    case 'retire': return w.retire(c.why);
-    case 'penalty': w.assignPenalty(w.boats[c.boat]); return;
+    case 'retire': return w.retire(c.why, c.afterFinish);
+    case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
     case 'settings': Object.assign(w.settings, c.patch); return;
     case 'logNote': w.log?.note(c.note); return;
