@@ -924,7 +924,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // mast when the sails are stowed: about the same place), its lower block low on the mast; pulling its tail hauls the
   // halyard down and stretches the jib's luff. The tail, from the piano, comes up to the lower block from the foot block.
   const JC = { x: MAST_ATH / 2 + 0.03, z: MAST_Z - 0.01, top: DECK_AT_MAST + 0.72, low: DECK_AT_MAST + 0.26 }; // (its clip about halfway up to the gooseneck, forward of the vang: the owner's photo)
-  { for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
+  { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), STEEL); ring.position.set(MAST_ATH / 2 + 0.006, JC.top + 0.05, JC.z); ring.rotation.y = Math.PI / 2; grp.add(ring); // (the ring it clips to with the sails stowed)
+    for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
   const cringles: Lines['cringles'] = [];
   const PIANO: Record<'S' | 'P', LineColorKey[]> = { S: ['vang', 'outhaul', 'jibCunningham', 'jibHalyard'], P: ['vang', 'outhaul', 'cunningham', 'jibCunningham', 'downhaul'] };
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) PIANO[tk].forEach((key, i) => {
@@ -945,15 +946,26 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02); grp.add(gb);
       cringles.push({ l: upMast([fb, new THREE.Vector3(-0.07, fb.y + 0.1, MAST_AFT_Z + 0.02), new THREE.Vector3(-0.07, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham'), sail: 'main' });
     } else if (key === 'jibCunningham') { // up to the tensioner's lower block, then its four parts between the blocks (drawn once)
+      // (Josephine's has the one tackle and one tail, to starboard: the port piano's jib Cunningham ends at its foot block)
       const lo = new THREE.Vector3(JC.x, JC.low - 0.02, JC.z);
-      upMast([fb, new THREE.Vector3(side * 0.04, fb.y + 0.08, JC.z), lo], 'jib', 'jibCunningham');
+      if (side > 0) upMast([fb, new THREE.Vector3(JC.x + 0.01, fb.y + 0.05, MAST_AFT_Z + 0.03), lo], 'jib', 'jibCunningham'); // (round the mast's after corner, outside it)
       if (side > 0) { const pts: THREE.Vector3[] = []; for (let k = 0; k < 4; k++) { const o = (k - 1.5) * 0.006; pts.push(new THREE.Vector3(JC.x, k % 2 ? JC.top - 0.012 : JC.low + 0.012, JC.z + o)); } upMast(pts, 'jib', 'jibCunningham'); }
-    } else { // the halyards: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
-      const exit = key === 'jibHalyard' ? new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.62, MAST_FRONT_Z + 0.004) : new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004);
+    } else if (key === 'jibHalyard') {
+      // Josephine's jib halyard (the owner): out of the mast's front, round its starboard side and down to the eye in it
+      // where the tensioner's top block clips in once the jib's up, and its tail on down to the foot block and the piano.
+      // With the jib down the tensioner hangs from its ring on the mast instead, and the halyard runs straight down.
+      const exit = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.25, MAST_FRONT_Z + 0.004), corner = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), exit.y - 0.05, MAST_FRONT_Z + 0.006);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
-      const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + (key === 'jibHalyard' ? -0.025 : 0.025), my = fb.y + 0.36;
+      const sx = side * (JC.x + 0.012), eye = new THREE.Vector3(side * JC.x, JC.top + 0.04, JC.z), aftC = new THREE.Vector3(side * (JC.x + 0.012), fb.y + 0.06, MAST_AFT_Z + 0.03);
+      const up = upMast([exit, corner, new THREE.Vector3(side * JC.x, corner.y - 0.05, JC.z), eye, new THREE.Vector3(sx, eye.y - 0.03, JC.z), new THREE.Vector3(sx, JC.low - 0.06, JC.z), aftC, fb.clone()], role, key);
+      const down = upMast([exit, corner, new THREE.Vector3(sx, corner.y - 0.05, JC.z), new THREE.Vector3(sx, JC.low - 0.06, JC.z), aftC, fb.clone()], role, key);
+      grp.userData.jibHalyard = { up, down };
+    } else { // the main halyard: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
+      const exit = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004), corner = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), exit.y - 0.03, MAST_AFT_Z - 0.006);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
+      const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + 0.025, my = fb.y + 0.36;
       const mb = sheaveBlock(0.014, -0.03); mb.position.set(sx, my + 0.03, mz); mb.rotation.y = Math.PI / 2; grp.add(mb); // the moving block, hanging from the halyard's end
-      upMast([exit, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, down the mast's side to the block
+      upMast([exit, corner, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, round the mast's corner (outside it) and down its side to the block
       // the tackle's two parts: the standing part from the foot block's becket up to the moving block, and back down to the
       // foot block's sheave (the fall, which goes aft to the piano)
       upMast([fb.clone().setX(fb.x + side * 0.03), new THREE.Vector3(sx + side * 0.014, my - 0.01, mz), new THREE.Vector3(sx - side * 0.014, my - 0.01, mz), fb.clone()], role, key); // (the two parts a sheave's width apart, either side of it)
@@ -1519,6 +1531,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // working half (the leeward, or the windward when she's backed) taut; the lazy one slack, lying on the boat
   // (with the jib down, its clew is rolled into the after end of the roll on the foredeck, and the sheets lead from
   // there, slack, lying on the deck and the cabin top; while it's hoisted or lowered, the clew comes between the two)
+  { const jh = m.grp.userData.jibHalyard as { up: THREE.Line; down: THREE.Line } | undefined; if (jh) { jh.up.visible = (b.rig?.jib ?? 1) > 0.5; jh.down.visible = !jh.up.visible; } }
   const hj = b.rig?.jib ?? 1, clew = tmpC.copy(JIB_CLEW).applyQuaternion(m.jibPivot.quaternion).add(m.jibPivot.position);
   if (hj < 1) { const rc = m.jibBag.userData.clew as THREE.Vector3; tmpG.copy(rc).multiplyScalar(m.jibBag.scale.x).add(FORESTAY_DECK); clew.lerp(tmpG, 1 - hj); }
   L2.clewRing.position.copy(clew); L2.clewRing.quaternion.copy(m.jibPivot.quaternion);
