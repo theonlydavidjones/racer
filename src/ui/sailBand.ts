@@ -45,6 +45,9 @@ export interface BandHost {
   hail(): void;
   /** The key bound to Hail, for its tab. */
   hailKey(): string;
+  /** Hoisting or dropping a sail at the mast (the crew's forward hand, or you): the tab's words now, or null to hide it. */
+  hoistTab(sail: 'main' | 'jib'): string | null;
+  halyard(sail: 'main' | 'jib'): void;
   /** What a control does, for the Coach card (null: nothing to say). */
   help(text: string | null): void;
 }
@@ -179,7 +182,7 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
 <span class="sb-tillerslot"></span>
 <span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all" data-help="Auto-trim: every line and both jib cars back to the crew (the whisker pole stays yours)">Auto-trim</button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
@@ -306,6 +309,7 @@ export class SailBand {
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
+    if (act === 'hoist') { this.host.halyard((t.closest<HTMLElement>('[data-sail]')!.dataset.sail as 'main' | 'jib')); return; }
     if (act === 'hail') { this.host.hail(); this.hailT = 0; return; } // (look again at once: the hail's been made)
     if (act === 'jless' || act === 'jmore') { this.turnJumpers(act === 'jmore' ? 0.5 : -0.5); return; }
     if (act !== 'name' || !d) return;
@@ -398,6 +402,12 @@ export class SailBand {
     wx.querySelector('.sb-awa')!.textContent = `${awa}°`;
     wx.setAttribute('aria-label', `Windex: apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
     wx.dataset.help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`;
+    // hoisting and dropping the sails at the mast: a tab for a sail that's down, on its way, or (in a harbor) to drop
+    this.el.querySelectorAll<HTMLElement>('.sb-hoist').forEach(tab => {
+      const txt = this.host.hoistTab(tab.dataset.sail as 'main' | 'jib');
+      if (tab.hidden !== !txt) tab.hidden = !txt;
+      if (txt && tab.textContent !== txt) { tab.textContent = txt; tab.classList.toggle('dim', txt.endsWith('…')); }
+    });
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
     pen.hidden = !turns; if (turns) pen.textContent = `Penalty · ${turns} turn${turns > 1 ? 's' : ''}`;
