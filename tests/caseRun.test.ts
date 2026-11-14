@@ -101,6 +101,29 @@ describe('Sail it yourself: a Case on the water', () => {
     }
   }, 120_000);
 
+  // Known (Coordinator, 14 Nov 2026: landed as it is, these pinned till they're fixed): the freed boat's helm in two
+  // geometries it doesn't yet sail clear. Case 23, seed 1: running on starboard with you on port closing on her windward
+  // quarter, her only way clear is a jibe, at 2.6 m, after which she's the boat that must keep clear and is called under
+  // rule 11. Case 27: freed 3.8 m off at 1 m/s, already ducking, she can't turn in time and the hulls touch.
+  const freedRun = (n: number, seed: number) => {
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'lesson', lesson: 'case', rulesCase: n, sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0 }, seed, { freeSail: true });
+    const R = w.caseRun!, u = w.user;
+    let freed = -1, touching = 0, hers = 0, seen: World['userIncident'] = null;
+    while (w.t < 200 && (freed < 0 || w.t < freed + 60)) {
+      u.h = n360(R.pose(R.helm, w.t).h); w.step(DT); if (w.paused) w.paused = false;
+      if (freed < 0 && R.free.length) { freed = w.t; seen = w.userIncident; }
+      const ui = w.userIncident; if (freed >= 0 && ui && ui !== seen) { seen = ui; if (ui.fouler !== u.id) hers++; } // (the World's calls, after she's freed)
+      if (freed >= 0 && w.t > freed + 0.5) for (const b of w.boats) if (b.script && R.free.includes(b.script) && hullGap(u, b) < CONTACT_GAP) touching++;
+    }
+    return { freed, touching, hers };
+  };
+  it.fails('known: Case 23 (seed 1), freed and running, no foul of hers after (her only way clear is a jibe that makes her keep clear)', () => {
+    const r = freedRun(23, 1); expect(r.freed).toBeGreaterThan(0); expect(r.hers).toBe(0);
+  }, 60_000);
+  it.fails('known: Case 27, freed 3.8 m off at 1 m/s, the hulls don\'t touch after', () => {
+    const r = freedRun(27, 3); expect(r.freed).toBeGreaterThan(0); expect(r.touching).toBe(0);
+  }, 60_000);
+
   it('a Case\'s boat on its track, not steered, that breaks a rule: the card says so, and she owes no penalty', () => {
     const w = caseWorld(7), R = w.caseRun!, u = w.user, L = w.boats.find(b => b.name === 'L')!;
     for (let i = 0; i < 60; i++) w.step(DT);

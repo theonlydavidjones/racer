@@ -1170,6 +1170,14 @@ Also asked for:
   Berkeley flats are where Folkboats really go aground. The chart's depth plus the tide's height there (tide.ts
   tideHeightAt) against her draft: soft mud, so she's aground, not wrecked, and stuck until the tide lifts her or she
   kedges off (the anchor); the AI's routes keep to water deep enough.
+  **The freed Case boat on the escape search** (Coordinator, 14 November; Skipper Model and Debrief; after #276): a Case's
+  boat freed by a contact is helmed by World.freeHelm, the race AI's keep-clear with a no-tack, no-jibe-near guard. It
+  leaves contact on the Case course at 0, from 1200–2400 steps, but some close-quarters geometries remain (pinned
+  it.fails in tests/caseRun.test.ts):
+  - you alongside at 2–3 m steering into her: a tack or jibe is her only way clear, and the World calls her for it;
+  - Case 23, seed 1: running, her only way clear is a jibe at 2.6 m, after which she's called under rule 11;
+  - Case 27: she's freed 3.8 m off at 1 m/s.
+  Once #276's escape search lands, the freed boat should use it.
   ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
