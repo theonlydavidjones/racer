@@ -93,7 +93,7 @@ const FIRST: Record<LessonId, string> = {
  * wind from astern, 160° to 180°. */
 const POINTS: { key: 'close' | 'closeReach' | 'beam' | 'broad' | 'run'; band: (b: Boat) => [number, number]; cue: string }[] = [
   // (the bands meet, so no angle between two points drains the hold unseen)
-  { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 8]; }, cue: 'Close-hauled: the jib\'s luff telltales streaming, windward and leeward' }, // (the boat's own: three pairs on the jib's luff, render/boatMesh.ts; the main's leech telltales, one at each batten, show on the boat)
+  { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 8]; }, cue: 'Close-hauled: trim till the jib\'s luff telltales stream, windward and leeward' },
   { key: 'closeReach', band: b => [beatFor(b) + 8, 75], cue: 'Bear away a little to a close reach, and ease to match' },
   { key: 'beam', band: () => [75, 105], cue: 'Bear away to a beam reach: the wind on the side' },
   { key: 'broad', band: () => [105, 160], cue: 'Bear away to a broad reach: the wind on the quarter' },

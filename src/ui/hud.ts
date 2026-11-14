@@ -289,13 +289,16 @@ export class Hud {
     tm.textContent = mw; tm.className = 'tp-state ' + mc;
     tj.textContent = jw; tj.className = 'tp-state ' + jc;
     // what each state means, and what fixes it (on hover)
-    const why: Record<string, string> = { good: 'Drawing well. Upwind and reaching, the telltales stream on both sides; on a broad reach or run they hang, and the sail wants easing out square to the wind.',
+    // (each sail's own telltales, as the boat has them: the jib's on its luff, windward and leeward; the main's on its leech)
+    const why: Record<string, string> = { good: 'Drawing well. Upwind and reaching, the jib\'s luff telltales stream on both sides; on a broad reach or run they hang, and the sail wants easing out square to the wind.',
       luffing: 'Luffing: eased too far, or she\'s pointing too high, so the front of the sail lifts. Trim in, or if it\'s already in hard, bear away until it stops.',
-      stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the leeward and leech telltales stream.',
+      stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the jib\'s leeward luff telltales stream.',
       backed: 'Aback: the jib is sheeted to windward and pushes her bow away (heaving to).', off: '' };
+    const mainWhy: Record<string, string> = { good: 'Drawing well. Upwind and reaching, the main\'s leech telltales stream off the back; on a broad reach or run they hang, and the sail wants easing out square to the wind.',
+      stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the main\'s leech telltales stream.' };
     // (the boom on the shroud, stalled on a broad reach: it can't be eased any further, so not "ease")
     const onShroud = mc === 'stalled' && u.sheets.main >= BOOM_STOP - 0.5;
-    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Ease the vang to let the top of the main twist off, or bear away (or come up) until the leech telltales stream.' : why[mc] ?? '';
+    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Come up until the main\'s leech telltales stream, or bear away to a run, where they hang and the main just pushes.' : mainWhy[mc] ?? why[mc] ?? '';
     tj.title = why[jc] ?? '';
     // the sails' shape against the best shape for the conditions, and which line fixes it
     const sw = shapeWords(u);
