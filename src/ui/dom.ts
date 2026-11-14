@@ -8,3 +8,5 @@ export const setHtml = (el: Element, h: string): void => { if (el.innerHTML !== 
 export const setAttr = (el: Element, k: string, v: string): void => { if (el.getAttribute(k) !== v) el.setAttribute(k, v); };
 export const setHidden = (el: HTMLElement, on: boolean): void => { if (el.hidden !== on) el.hidden = on; };
 export const setTitle = (el: HTMLElement, t: string): void => { if (el.title !== t) el.title = t; };
+/** The same, by the names the sail band uses (ROADMAP 8x, Crew Controls' #312). */
+export const hide = setHidden, put = setText, attr = setAttr, title = setTitle;
