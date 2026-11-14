@@ -80,7 +80,7 @@ export const TRAVELLER_SWING = 9.5;
 export const BOOM_STOP = 70;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
-  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:
+  // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the mainsheet's blocks on the boom:
   // the car's ±0.5 m of travel swings the boom ±TRAVELLER_SWING; centred, the boom is on the centreline
   const car = TRAVELLER_SWING * c.traveller;
   // (the sheet's 0–1 to the boom's angle, 80·s^1.5: a feel scale, not the rope's geometry. Real rope swings the boom
@@ -318,7 +318,7 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   luff disappear. When the wind exceeds 15 knots it is pulled hard".
  * - Traveller: "In light winds (0-6 knots) pull the traveller cars 15-20 cm to windward. In medium winds (6-14 knots) set
  *   them in the middle. In higher wind the cars are eased to leeward to decrease heel and thus rudder pressure." (The
- *   traveller's ±1 is ±9.6° of boom (TRAVELLER_SWING), ±0.5 m of car under the end of the boom (boomAngle): 15–20 cm is −0.3 to −0.4.)
+ *   traveller's ±1 is ±9.5° of boom (TRAVELLER_SWING), ±0.5 m of car under the mainsheet's blocks (boomAngle): 15–20 cm is −0.3 to −0.4.)
  * - Vang: "Never use the kickingstrap upwind in less than 18 knots"; above that it's on, to hold the leech when the main
  *   is eased in the gusts.
  * - Jib halyard: "Never pull the halyard too tight. This will cause the draft of the jib to move too far forward. Pull it
