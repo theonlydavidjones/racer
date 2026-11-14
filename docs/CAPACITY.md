@@ -487,6 +487,32 @@ So the page and its worker share one copy of the sim's code.
 - The same CPU as before: the page and the worker each still compile the sim's code. What's saved is about 4 MB of page
   to download and to hold as text.
 
+## 8. The step's speed, paired (the owner's method, 14 Nov 2026)
+
+The single-process ratio (§1.1a: the step against a fixed arithmetic workload, on this thread's clock) drifted by ±5–6%
+on the shared host within a day: the same v178 code read 42.65 in the afternoon and 44.80 at night. That's more than the
+room the budget leaves. A shared machine's memory and caches slow the sim, which is memory-heavy, more than they slow
+arithmetic in the cache.
+
+**The method** (scripts/check/perf-pair.mjs): load two versions of the sim in one Node process (vite's runnerImport, two
+module graphs), sail them by turns in 10-second pieces, A, B, B, A, and time each piece on this thread's CPU clock.
+The host's drift lands on both alike. The second version loaded runs about 0.4% slower, so it runs twice, each version
+loaded first once, two races each, and the result is the geometric mean of the four ratios. The other version's `src/`
+comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from origin first if the clone hasn't got it.
+
+| check | four ratios | result |
+|---|---|---|
+| main against itself (calibration) | 1.0006–1.028, most about 1.004 | about ±1–2% |
+| this branch (no src change) against origin/main | 0.988, 0.999, 1.001, 0.982 | 0.992 |
+| main (13 Nov, night) against v178 | 0.990, 0.975, 1.005, 0.978 | about 0.985 (#263) |
+| main (13 Nov, night) against v168 | 1.011, 1.041, 1.026, 1.009 | 1.021 |
+| main 73e8d65 (14 Nov) against v168 | 1.056, 1.049, 1.009, 1.035 | **1.037, over the budget** |
+
+**Two uses:**
+- **The PR gate:** `node scripts/check/perf-pair.mjs`, against origin/main. A PR that touches the step may be at most 1.5% slower.
+- **The owner's budget:** perf.test, and `--budget`, against v168 (425a5eb, the commit 43.1 was set on). v168 measured
+  42.31 in the old units, so 43.1 is v168 × 43.1 / 42.31 = **v168 × 1.019**: the same budget, measured without the drift.
+
 ## Method (to repeat these numbers)
 
 - The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line: the median of three races, each one's after it).
