@@ -82,6 +82,10 @@ export interface AnchorState {
   aground?: { x: number; y: number; h: number } | null;
   /** told the anchor stays down while she's aground */
   waitTide?: boolean;
+  /** the rode's reached the bottom (paid out past the depth): it's holding her, not hanging under her bow */
+  bottom?: boolean;
+  /** the chart's depth under her keel (m below MLLW), and where it was read (read again once she's moved 5 m) */
+  under?: number; underAt?: Vec;
 }
 
 /** Lying to her anchor: the anchor on the bottom holding her, with the rode out to it (paying out once it's reached the
@@ -91,7 +95,7 @@ export interface AnchorState {
 export function lyingToAnchor(b: Pick<Boat, 'anchor'>): boolean {
   const a = b.anchor; if (!a?.at) return false;
   if (a.aground) return true;
-  if (a.phase === 'hauling' || a.phase === 'breaking') return true; // (hauled to up and down, it's still in the mud till it's broken out)
+  if (a.phase === 'hauling' || a.phase === 'breaking') return !!a.bottom; // (hauled to up and down, it's still in the mud till it's broken out; weighed before it reached the bottom, it never held her)
   return (a.phase === 'paying' || a.phase === 'down') && a.out > (a.depth ?? 0) + ANCHOR.bowH; // (paying out: once it's reached the bottom)
 }
 

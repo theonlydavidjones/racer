@@ -154,4 +154,13 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     for (let i = 0; i < 60 * 150 && u.anchor; i++) { w.step(DT); if (u.anchor?.phase === 'breaking') { if (sawBreaking) expect(u.anchored, 'held by it while it breaks out').toBe(true); sawBreaking = true; } if (u.anchor?.phase === 'stowing') { w.step(DT); expect(u.anchored).toBe(false); break; } }
     expect(sawBreaking).toBe(true); expect(u.anchor?.phase).toBe('stowing');
   });
+  it('weighed before it reaches the bottom, it never held her: not anchored, and up it comes', { timeout: 60000 }, () => {
+    const w = world(1, 'slack'), u = w.user;
+    applyCommand(w, { k: 'anchor' });
+    for (let i = 0; i < 60 * 60 && !(u.anchor?.phase === 'paying' && u.anchor.out > 0.5); i++) w.step(DT);
+    expect(u.anchor?.phase).toBe('paying');
+    applyCommand(w, { k: 'anchor' });
+    let held = false; for (let i = 0; i < 60 * 30 && u.anchor; i++) { w.step(DT); if (u.anchored) held = true; }
+    expect(held).toBe(false); expect(u.anchor ?? null).toBeNull();
+  });
 });

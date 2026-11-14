@@ -993,7 +993,7 @@ export class World {
   anchorCall(): void {
     const u = this.user, a = u.anchor;
     if (u.docked || u.handled || u.mooring || u.pushing) { this.emit({ type: 'toast', msg: 'She\'s alongside: there\'s nothing to anchor for.' }); return; }
-    if (u.wrecked) return; // (wrecked: the page's choices, not the anchor)
+    if (u.wrecked && !u.wrecked.carryOn) return; // (wrecked: the page's choices, not the anchor)
     if (!a) {
       const depth = this.waterDepth(stemHead(u));
       if (!this.anchorable(u, depth)) return;
@@ -1022,7 +1022,7 @@ export class World {
   }
   /** The water's depth (m) at `p`, with the tide's height there (environment/tide.ts tideHeightAt: on San Rafael's and
    * San Leandro's grids their own stations', elsewhere San Francisco's, 9414290): in those Bays the 50 m sounding grid (environment/tide.ts depthBand); elsewhere NOAA's chart, its depth areas and soundings
-   * (environment/sea.ts chartDepth). */
+   * (chartAt, unless `chart` is given). */
   private waterDepth(p: Vec, chart?: number): number {
     const h = tideHeightAt(p, this.clockUtc * 60e3), [d1, d2] = depthBand(p);
     if (d1 !== 0 || d2 !== 0) return Math.max(0, wetBand(d1, d2, h).depth);
@@ -1055,11 +1055,11 @@ export class World {
       if (Math.abs(b.v - (b.astern ?? 0)) > ANCHOR.wayOff) { if (!a.waited) { a.waited = true; this.emit({ type: 'toast', msg: 'Crew: take the way off her and I\'ll let it go.' }); } return; }
       // (the water where it's let go, which may not be where you called it: she's carried on while the way came off)
       const at = stemHead(b), chart = this.chartAt(at), depth = this.waterDepth(at, chart);
-      if (b.wrecked || !this.anchorable(b, depth)) { b.anchor = null; this.anchorJob(b, false); return; }
+      if (!this.anchorable(b, depth)) { b.anchor = null; this.anchorJob(b, false); return; }
       a.at = at; a.drop = { x: b.x, y: b.y }; a.chart = chart; a.depth = depth; a.want = Math.min(ANCHOR.rodeM, ANCHOR.scopeWant * (depth + ANCHOR.bowH)); a.t0 = this.t; a.phase = 'paying'; a.t = 0;
       if (b.isUser) { b.steer = 0; b.turnTarget = null; }
     } else if (a.phase === 'paying') {
-      a.out = Math.min(a.want, a.out + ANCHOR.payOut * pace * dt);
+      a.out = Math.min(a.want, a.out + ANCHOR.payOut * pace * dt); if (a.out > d) a.bottom = true;
       if (a.out >= a.want) { a.phase = 'down'; a.t = 0; b.atAnchor = true; this.emit({ type: 'toast', msg: `Anchored: ${Math.round(a.out)} m of rode out, ${(a.out / d).toFixed(1)}:1.` }); }
     } else if (a.phase === 'hauling') {
       // hand over hand while the rode's tension is no more than they can pull (two hands crewed, one alone)
@@ -1070,6 +1070,8 @@ export class World {
         if (!a.aground) { a.phase = 'breaking'; a.t = 0; }
         else if (!a.waitTide) { a.waitTide = true; if (b.isUser) this.emit({ type: 'toast', msg: 'Crew: she\'s on the bottom. The anchor stays down until the tide floats her.' }); }
       }
+    } else if (a.phase === 'breaking' && a.aground) {
+      a.phase = 'hauling'; a.t = 0; // (the tide's left her on the bottom as it broke out: it stays in the mud, and she waits for the tide)
     } else if (a.phase === 'breaking' && a.t >= ANCHOR.breakS / pace) {
       // broken out: she's free. Rule 45, Case 5: hauling in may bring her back to where it went down, but if it "clearly
       // propels her to a different position" it breaks rule 42.1: where she is against where she was as it went down,
@@ -1102,7 +1104,9 @@ export class World {
       a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
       // the water under her keel where she lies (the chart there: chartAt): the tide falling below her draft leaves her
       // on the bottom, and rising again floats her
-      const here = this.waterDepth(b, this.chartAt(b));
+      // (read again only once she's moved 5 m: the chart's areas are a costly look-up, and aground she doesn't move)
+      if (a.under == null || !a.underAt || Math.hypot(b.x - a.underAt.x, b.y - a.underAt.y) > 5) { a.under = this.chartAt(b); a.underAt = { x: b.x, y: b.y }; }
+      const here = this.waterDepth(b, a.under);
       if (!a.aground && here < ANCHOR.draft) {
         a.aground = { x: b.x, y: b.y, h: b.h }; b.lastHitT = this.t; // (aground: 42.3(h) lets her get clear of it)
         if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: `Aground: the tide's fallen to ${here.toFixed(1)} m and left her keel on the bottom. She floats again as it rises.` });

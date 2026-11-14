@@ -250,20 +250,27 @@ export function soundingNear(p: Vec, r: number): number | null {
   for (const s of SOUNDINGS) { const d = Math.hypot(s.p.x - p.x, s.p.y - p.y); if (d < bd) { bd = d; best = s.d; } }
   return best;
 }
-/** NOAA's chart's depth area at a point: its band's shallow and deep edges below MLLW (m), or null off the depth areas. */
-export function chartBand(p: Vec): { d: number; deep: number } | null {
+/** The chart's depth areas, decoded once (as SOUNDINGS): each band's edges, its rings, and their bounding box. */
+let AREAS: { d: number; deep: number; rings: Vec[][]; x0: number; x1: number; y0: number; y1: number }[] | null = null;
+function areas(): NonNullable<typeof AREAS> {
+  if (AREAS) return AREAS;
   const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[] };
   const bands = E.depth.map(b => b.d).filter((d, i, a) => a.indexOf(d) === i).sort((a, b) => a - b);
-  for (const band of E.depth) {
-    for (const poly of band.p) {
-      let inside = false;
-      for (const enc1 of poly) {
-        let x = 0, y = 0; const ring: Vec[] = [];
-        for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; ring.push(LL(y / 1e5, x / 1e5)); }
-        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
-      }
-      if (inside) return { d: band.d, deep: band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10 };
-    }
+  AREAS = [];
+  for (const band of E.depth) for (const poly of band.p) {
+    const rings = poly.map(enc1 => { let x = 0, y = 0; const ring: Vec[] = []; for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; ring.push(LL(y / 1e5, x / 1e5)); } return ring; });
+    const all = rings.flat();
+    AREAS.push({ d: band.d, deep: band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10, rings, x0: Math.min(...all.map(q => q.x)), x1: Math.max(...all.map(q => q.x)), y0: Math.min(...all.map(q => q.y)), y1: Math.max(...all.map(q => q.y)) });
+  }
+  return AREAS;
+}
+/** NOAA's chart's depth area at a point: its band's shallow and deep edges below MLLW (m), or null off the depth areas. */
+export function chartBand(p: Vec): { d: number; deep: number } | null {
+  for (const A of areas()) {
+    if (p.x < A.x0 || p.x > A.x1 || p.y < A.y0 || p.y > A.y1) continue;
+    let inside = false;
+    for (const ring of A.rings) for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
+    if (inside) return { d: A.d, deep: A.deep };
   }
   return null;
 }
