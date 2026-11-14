@@ -15,6 +15,8 @@ const out = process.argv[2] || '.';
   page.on('pageerror', e => errs.push(e.message));
   await page.routeWebSocket(/.*/, ws => ws.close()); // (no hot reload mid-run)
   // (the page: the dev server by default; or the built page, e.g. file:///…/artifact/folkboat-racing-sim.html)
+  // (the built page loads three.js from jsDelivr: served here from node_modules, as smoke.cjs does)
+  await page.route('https://cdn.jsdelivr.net/npm/three@*/build/**', r => r.fulfill({ path: require('path').join(__dirname, '../../node_modules/three/build', require('path').basename(new URL(r.request().url()).pathname)), contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' } }));
   await page.goto(process.argv[3] || 'http://localhost:5199/'); await page.waitForTimeout(process.argv[3] ? 8000 : 3000);
   // (the owner's other boats beside Josephine, as they're named and numbered: each opened in the editor below)
   await page.evaluate(() => {
