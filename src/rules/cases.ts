@@ -109,13 +109,13 @@ export const CASES: RulesCase[] = [
   {
     case: 7, title: 'Overlapped to leeward from clear astern', rules: ['11', '17'],
     // (sailed: W close-hauled at 315°, 2.5 m/s (the polar's 12-15 kt beat, src/boat/polar.ts), holding her course; L comes up
-    // from 12 m astern, 6 m to leeward, at 2.8 m/s (a puff hers first: under hull speed, about 3.1 m/s), overlapping her within two lengths, slows to her speed and luffs slightly, 5° over 1 s at 50 s (no course change
+    // from 8.5 m astern (just clear astern), 6 m to leeward, at 2.8 m/s (a puff hers first: under hull speed, about 3.1 m/s), overlapping her within two lengths, slows to her speed and luffs slightly, 5° over 1 s at 50 s (no course change
     // for 16.1, and no higher than her proper course for 17), closing on W until W's boom touches her)
     boats: [
-      { letter: 'W', frames: [at(21.1, [0, 0], 315, { look: false }), ...sail([0, 0], () => 315, 2.5, 21.2, 70)] },
-      { letter: 'L', frames: [at(21.1, off([0, 0], 315, -12, -6), 315, { look: false }), ...then(sail(off([0, 0], 315, -12, -6), () => 315, 2.8, 21.2, 47.9), hL7, 2.5, 48, 70)] },
+      { letter: 'W', frames: [at(32.9, [0, 0], 315, { look: false }), ...sail([0, 0], () => 315, 2.5, 33, 70)] },
+      { letter: 'L', frames: [at(32.9, off([0, 0], 315, -8.46, -6), 315, { look: false }), ...then(sail(off([0, 0], 315, -8.46, -6), () => 315, 2.8, 33, 47.9), hL7, 2.5, 48, 70)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: 22, keepsClear: 'L', rule: '12' }, { t: 48, keepsClear: 'W', rule: '11' }],
+    pair: ['W', 'L'], checks: [{ t: 33, keepsClear: 'L', rule: '12' }, { t: 48, keepsClear: 'W', rule: '11' }],
     momentT: 50, ask: 'foul', answer: { who: 'W', rule: '11', line: 'W, to windward, keeps clear (rule 11). L came from astern, but sailed no higher than her proper course (17).' }, teach: true,
   },
 
