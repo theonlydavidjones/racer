@@ -8,32 +8,37 @@ import { DT, World } from '../src/sim/world';
 import { boat, ctx } from './diagram';
 
 // Rule 14 for the right-of-way boat (43.1(c): only with damage) and 44.1(b) (serious damage: retire)
-const meet = (vS: number, vP: number) => {
-  // S on starboard at 315°, P on port at 045°, both reaching the origin at 60 s; P never turns
+const meet = (vS: number, vP: number, lead = 0) => {
+  // S on starboard at 315°, P on port at 045°, S's bow reaching P's track at 60 s with P's middle `lead` m past it (3.5:
+  // S's bow on P's quarter, WS Case 123's hit); P never turns
   const S = boat('S', { at: [0, 0], heading: 315 }), P = boat('P', { at: [0, 0], heading: 45 });
-  for (let t = 52; t <= 60 + 1e-9; t += 0.1) for (const [b, h, v] of [[S, 315, vS], [P, 45, vP]] as const) {
-    const u = V(h), d = 60 - t; b.h = h; b.v = v; b.vx = u.x * v; b.vy = u.y * v; b.x = -u.x * v * d; b.y = -u.y * v * d; recordPose(b, t);
+  for (let t = 52; t <= 60 + 1e-9; t += 0.1) for (const [b, h, v, ahead] of [[S, 315, vS, -3.82], [P, 45, vP, lead]] as const) { // (S's middle half a length short: her bow on P's track)
+    const u = V(h), d = 60 - t; b.h = h; b.v = v; b.vx = u.x * v; b.vy = u.y * v; b.x = u.x * (ahead - v * d); b.y = u.y * (ahead - v * d); recordPose(b, t);
   }
   return { S, P };
 };
 describe('rule 14: could the right-of-way boat have avoided contact once it was clear?', () => {
-  it('a slow port boat holding on into a starboard boat at 2.5 m/s: S had time to turn away, so with damage she broke 14 too', () => {
-    const { S, P } = meet(2.5, 1);
+  it('WS Case 123: alike, the same speed, S\'s bow on P\'s quarter: once P\'s bow crossed S\'s, S could still bear away: she broke 14', () => {
+    const { S, P } = meet(2.5, 2.5, 3.5);
     expect(rowCouldAvoid(S, P, ctx(60))).toBe(true);
   });
-  it('WS Case 123: alike, the same speed, opposite tacks: once it was clear (substantial risk), S could still bear away: she broke 14', () => {
-    const { S, P } = meet(2.5, 2.5);
+  it('a slow port boat holding on: clear from further off (her length takes her longer), and S had time', () => {
+    const { S, P } = meet(2.5, 1, 1);
     expect(rowCouldAvoid(S, P, ctx(60))).toBe(true);
   });
-  it('a slow starboard boat against a faster port boat: once it was clear, it was too late for her', () => {
-    const slow = meet(1.5, 2.5);
+  it('bow to bow at the same speed: by the time it\'s clear it is too late for S (she need not act sooner)', () => {
+    const { S, P } = meet(2.5, 2.5, 0);
+    expect(rowCouldAvoid(S, P, ctx(60))).toBe(false);
+  });
+  it('a slow starboard boat against a faster port boat: too late for her', () => {
+    const slow = meet(1.5, 2.5, 3.5);
     expect(rowCouldAvoid(slow.S, slow.P, ctx(60))).toBe(false);
   });
-  it('the moment it\'s clear matters: were it only 3 s before the contact, the same S could not', () => {
-    const { S, P } = meet(2.5, 2.5);
-    expect(rowCouldAvoid(S, P, ctx(60), 3)).toBe(false);
+  it('the moment it\'s clear matters: given only 2.5 s, S in the Case 123 crossing could not', () => {
+    const { S, P } = meet(2.5, 2.5, 3.5);
+    expect(rowCouldAvoid(S, P, ctx(60), 2.5)).toBe(false);
   });
-  it('no history: no (she had no time we can show)', () => {
+  it('no history: no (nothing to show she had time)', () => {
     expect(rowCouldAvoid(boat('S', { at: [0, 0], heading: 315 }), boat('P', { at: [5, 5], heading: 45 }), ctx(60))).toBe(false);
   });
 });

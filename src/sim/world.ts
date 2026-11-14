@@ -1259,13 +1259,17 @@ export class World {
           // isn't keeping clear; from then, if she could have avoided the contact, she broke 14, and with damage 43.1(c)
           // doesn't exonerate her (WS Case 123). Racing or not: the Part 2 preamble penalizes rule 14 with serious damage
           // even then. With serious damage her penalty is to retire, as anyone's (44.1(b))
-          if (incident.verdict.kc === f && (this.racing(victim) || dmg === 'serious') && rowCouldAvoid(victim, f, ctx)) {
-            if (dmg === 'serious') this.mustRetire(victim, f, '14'); else this.rule14(victim, f);
-          }
+          // (the other boat is the right-of-way boat, or one entitled to room or mark-room, which 14 and 43.1(c) cover alike;
+          // but where a boat not racing broke 23.1, a racing keep-clear boat that hit her broke 14 outright, no grace. Once
+          // per tangle: a repeat touch in it is the same incident, 44.1)
+          const tg = this.tangles.get(pairKey(A, B)), inTangle = !!tg && !tg.clear && this.t - tg.t0 < TANGLE_MAX, retires: number[] = [];
+          const broke14 = incident.part === '23.1' && incident.verdict.kc === victim ? true : (this.racing(victim) || dmg === 'serious') && rowCouldAvoid(victim, f, ctx);
+          if (broke14 && !inTangle) { if (dmg === 'serious') { if (this.mustRetire(victim, f, '14')) retires.push(victim.id); } else this.rule14(victim, f); }
           // 44.1(b): serious damage, the boat whose breach did it retires, turns or no: the fouler, or the boat that compelled
           // her into it (43.1(a)); not racing as well (the preamble's exception; her penalty in this race, the nearest, 63.1)
           const culprit = incident.exoneratedBy != null ? this.boats.find(o => o.id === incident.exoneratedBy) ?? f : f;
-          if (dmg === 'serious') this.mustRetire(culprit, culprit === f ? victim : f, incident.rule);
+          if (dmg === 'serious' && this.mustRetire(culprit, culprit === f ? victim : f, incident.rule)) retires.push(culprit.id);
+          if (retires.length) incident.retires = retires;
         }
       }
       if (incident.kind === 'contact') {
@@ -1312,12 +1316,13 @@ export class World {
 
   /** Rule 44.1(b): she broke a rule (`rule`) and caused serious damage: her penalty is to retire (RET; finished, she's
    * scored RET too, A5.2). A retired AI boat sails home (ai.ts, as when racing is called off). */
-  private mustRetire(b: Boat, other: Boat, rule: string): void {
-    if (b.retired) return;
-    if (b.isUser && !b.finished && this.retire(` (Rule ${rule} with serious damage: 44.1(b))`)) return;
+  private mustRetire(b: Boat, other: Boat, rule: string): boolean {
+    if (b.retired) return false;
+    if (b.isUser && !b.finished && this.retire(` (Rule ${rule} with serious damage: 44.1(b))`)) return true;
     b.retired = true; b.penalty = 0; b.penaltyTurned = 0;
     if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: `Serious damage: you retire (Rule 44.1(b)).` });
     else if (other.isUser) this.emit({ type: 'toast', ms: 5000, msg: `${b.name}: serious damage, retires (Rule 44.1(b)).` });
+    return true;
   }
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */

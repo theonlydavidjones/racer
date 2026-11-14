@@ -307,8 +307,8 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
     : `${other.name} takes a ${turns} penalty.`;
   // (the contact's damage, src/boat/damage.ts: serious, the boat that broke the rule retires, turns or no (44.1(b));
   // damage, the right-of-way boat may have broken 14 too, which the world tells in its own line)
-  const serious = inc.damage === 'serious' && !exonerated;
-  if (serious) $('rPen').textContent = `Serious damage: ${youFault ? 'you retire' : `${inc.fouler.name} retires`} (Rule 44.1(b)).`;
+  const serious = inc.damage === 'serious', out = (inc.retires ?? []).map(id => id === user.id ? 'you' : w.boats[id].name);
+  if (serious && out.length) $('rPen').textContent = `Serious damage: ${out.join(' and ')} retire${out.length === 1 && out[0] !== 'you' ? 's' : ''} (Rule 44.1(b)).`;
   else if (inc.damage === 'damage') $('rPen').textContent = `Damage. ${$('rPen').textContent}`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
   pendingPenalty = exonerated || notRacing || (preamble && !serious) || serious ? null : inc.fouler;

@@ -199,5 +199,7 @@ export interface Incident<B> {
   notRacing?: boolean;
   /** A contact's damage (src/boat/damage.ts): 'damage' or worse makes rule 14 bite (43.1(c)); 'serious', 44.1(b). */
   damage?: 'none' | 'scrape' | 'damage' | 'serious' | 'wreck';
+  /** The boats that retire for it under 44.1(b) (serious damage), ids. */
+  retires?: number[];
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }
