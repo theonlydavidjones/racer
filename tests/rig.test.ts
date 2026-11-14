@@ -36,10 +36,11 @@ describe('the drawn rig and hull', () => {
     // the head is below the hounds, on the stay
     expect(j.head.length()).toBeLessThan(RIG.HOUNDS.distanceTo(RIG.FORESTAY_DECK));
   });
-  it('draws the jib cars where the physics\' lead angles put them, about 2.65 m aft of the stay', () => {
+  it('draws the jib cars where the physics\' lead angles put them, the middle hole a 2.65 m tape from the stay\'s pin (North)', () => {
+    const mid = RIG.carPos(1, 3, 2);
+    expect(mid.distanceTo(RIG.FORESTAY_DECK)).toBeCloseTo(2.65, 1); // (the tape runs up to the car on the cabin top)
     for (const ins of [0, 2, 4]) {
       const car = RIG.carPos(1, 3, ins), d = car.z - RIG.FORESTAY_DECK.z;
-      expect(d).toBeCloseTo(2.65, 2);
       expect(Math.atan2(car.x, d) * 180 / Math.PI).toBeCloseTo(carLead(ins), 3);
     }
   });

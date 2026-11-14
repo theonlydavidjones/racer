@@ -21,7 +21,7 @@ import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
 import { transitOffset } from '../sim/transits';
-import { targetShape, type Shape } from '../boat/controls';
+import { BOOM_STOP, targetShape, type Shape } from '../boat/controls';
 
 /** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
 function shapeWords(u: Boat): string {
@@ -293,7 +293,10 @@ export class Hud {
       luffing: 'Luffing: eased too far, or she\'s pointing too high, so the front of the sail lifts. Trim in, or if it\'s already in hard, bear away until it stops.',
       stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the leeward and leech telltales stream.',
       backed: 'Aback: the jib is sheeted to windward and pushes her bow away (heaving to).', off: '' };
-    tm.title = why[mc] ?? ''; tj.title = why[jc] ?? '';
+    // (the boom on the shroud, stalled on a broad reach: it can't be eased any further, so not "ease")
+    const onShroud = mc === 'stalled' && u.sheets.main >= BOOM_STOP - 0.5;
+    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Ease the vang to let the top of the main twist off, or bear away (or come up) until the leech telltales stream.' : why[mc] ?? '';
+    tj.title = why[jc] ?? '';
     // the sails' shape against the best shape for the conditions, and which line fixes it
     const sw = shapeWords(u);
     $('tpShape').innerHTML = sw;
