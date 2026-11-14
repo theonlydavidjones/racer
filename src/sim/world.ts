@@ -980,7 +980,7 @@ export class World {
       // (the Coordinator, 14 Nov 2026: no pinned wall)
       const o = this.boats.find(b => b.id === ui.vs);
       if (ui.kind === 'contact' && o?.script && !R.free.includes(o.script)) {
-        R.free.push(o.script); o.aboveProper = false; o.desired = o.h;
+        R.free.push(o.script); o.aboveProper = false; o.desired = o.h; this.freeCourse.set(o.id, o.h);
         this.emit({ type: 'toast', ms: 3500, msg: `${o.name} (${o.no}) sails on free after the contact.` });
       }
     }
@@ -990,6 +990,20 @@ export class World {
     L.cue = R.result === 'clear' ? 'Sailed it clear ✓' : `Foul: ${foulTitle(R.fouls[0])}`;
   }
   private caseSeen: World['userIncident'] = null;
+  /** A Case's boats sailing free: the course each was on when she was freed, her helm's course from then on. */
+  private freeCourse = new Map<number, number>();
+  /**
+   * A Case's boat sailing free is a boat, helmed: her course, and the rules as the race AI keeps them (ai.ts keepClearMove):
+   * keeping clear of a boat she must (Rules 10–13), and avoiding contact when she has right of way and can (Rule 14).
+   */
+  private freeHelm(): void {
+    const R = this.caseRun!;
+    for (const b of this.boats) if (b.script && R.free.includes(b.script)) {
+      let mv: { h: number; luff: boolean } | null = null;
+      for (const o of this.boats) if (o !== b && (mv = keepClearMove(this, b, o))) break;
+      b.desired = mv ? mv.h : this.freeCourse.get(b.id) ?? b.h; b.luff = mv?.luff ?? false;
+    }
+  }
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
@@ -1047,6 +1061,7 @@ export class World {
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
     // boat answers her helm every step); in close quarters (World.closeQuarters: a boat or a mark within four lengths, about to
     // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
+    if (this.caseRun) this.freeHelm();
     for (const b of this.boats) if (!b.isUser && !b.script && b !== this.roadEnv?.other) { // (a Case's boats sail its track; the lesson's boat, the lesson sails her)
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)

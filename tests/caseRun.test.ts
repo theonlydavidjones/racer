@@ -7,6 +7,7 @@ import { DT, World } from '../src/sim/world';
 import { n360, wrap } from '../src/core/math';
 import { CASES } from '../src/rules/cases';
 import { caseHelm, sailable } from '../src/sim/caseRun';
+import { hullGap } from '../src/rules';
 
 const caseWorld = (n: number) => new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'lesson', lesson: 'case', rulesCase: n, sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0 }, 3, { freeSail: true });
 /** Sail it to the end, the helm steering `helm(Case time, her Case heading)`; incidents' pauses let go at once. */
@@ -60,6 +61,22 @@ describe('Sail it yourself: a Case on the water', () => {
     const msgs = w.events.flatMap(e => e.type === 'toast' ? [e.msg] : []);
     expect(msgs.some(m => m.startsWith(`L (${L.no}) sails on free`))).toBe(true);
     expect(w.lesson!.cue).toBe('Foul: Rule 11 · Same tack, overlapped');
+  });
+
+  it('freed, she keeps the rules as the race AI does: clear astern of you stopped on her course, she keeps clear (rule 12)', () => {
+    const w = caseWorld(7), R = w.caseRun!, u = w.user, L = w.boats.find(b => b.name === 'L')!;
+    while (!R.free.length && w.t < 200) { u.h = n360(R.pose(R.helm, w.t).h); w.step(DT); if (w.paused) w.paused = false; }
+    expect(R.free).toEqual(['L']);
+    for (let i = 0; i < 5 * 60; i++) { w.step(DT); if (w.paused) w.paused = false; } // (apart again)
+    // you, stopped 40 m dead ahead of her on her heading: she's clear astern, and must keep clear
+    const ah = { x: L.x + Math.sin(L.h * Math.PI / 180) * 40, y: L.y + Math.cos(L.h * Math.PI / 180) * 40 }, h0 = L.h;
+    let gap = Infinity;
+    for (let i = 0; i < 30 * 60; i++) {
+      Object.assign(u, { x: ah.x, y: ah.y, h: h0, desired: h0, v: 0, vx: 0, vy: 0 });
+      w.step(DT); if (w.paused) w.paused = false;
+      gap = Math.min(gap, hullGap(u, L));
+    }
+    expect(gap).toBeGreaterThan(8); // (well round you: held on her course, she'd pass about 4 m off, a length's turn too late)
   });
 
   it('a Case\'s boat on its track, not steered, that breaks a rule: the card says so, and she owes no penalty', () => {
