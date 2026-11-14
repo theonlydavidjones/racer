@@ -84,7 +84,7 @@ const LOCAL_WORLD = new Set(['kcMemo']);
  * on a World before it's a mirror (the setup's cards ask the current, the line's transit, the sea's growth), and the two
  * sides' numbers must not depend on who asked what. Their contents are sent as new objects the first time.
  */
-const UNNUMBERED = new Set(['flows', 'flowsC', '_transit', 'seaNodes']);
+const UNNUMBERED = new Set(['flows', 'flowsC', 'mouthS', 'mouthC', '_transit', 'seaNodes']); // (mouthS: the harbor mouths' water, as the piers' flows)
 const LOCAL = new Map<object, ReadonlySet<string>>([
   [CurrentField.prototype, new Set(['vecs', 'stamp', 'bayFlow', 'cells', 'lastKey', 'lastList'])],
   // (the fetch on a 150 m grid by wind direction, worked out at the grid's node: the same whoever asks first)
