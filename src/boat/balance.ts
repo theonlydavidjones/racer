@@ -81,9 +81,24 @@ export const CE_ABOVE_WL = 4.29;
  * sails as FRIDA's ORC certificate measures them (the drawn rig: render/boatMesh.ts, tests/rig.test.ts). A sail's
  * centre of pressure at its best trim, mostly from camber, is near its centre of area (thin-aerofoil theory: camber's
  * lift at mid chord). Where the centre of lateral resistance lies between them isn't published: it's kept where the
- * earlier estimate (−0.62, +1.55) had it, the area-weighted centre of effort about on it (the weather helm comes from
- * the sails' twist and draft, ceAft).
+ * earlier estimate (−0.62, +1.55) had it, the area-weighted centre of effort about on it. That is where her hull and
+ * keel hold her side-on, stopped or hove to; sailing, her keel's lift acts ahead of it (CLR_LEAD).
  */
+/**
+ * How far ahead of that centre her keel's lift acts when she's sailing (m): the part of her side force her keel
+ * carries as a wing (physics.ts, by her way against her slip), not the part her hull carries broadside, which is what
+ * holds her hove to. CALIBRATED, not measured: set so
+ * that close-hauled in 12 kt she carries about 2° of weather helm, 3° in 16 kt and near 4° heeled in 20 kt. No figure
+ * for a Folkboat was found (the class's tuning guides give none: North Sails' has her backstay pulled "until the rudder
+ * feels light again"), and the owner has none. The target is the general one for keelboats: "if your boat slides
+ * through the water with 5 degrees of leeway, you should be carrying about 2 degrees of rudder angle" (Sailing World,
+ * "The Power of Positive Rudder Angle"), and a towed model's drag least "around the 2°" of rudder at 3° of leeway
+ * (Boonstra, Keel-Rudder Interaction, MSc thesis, TU Delft 2019, ch. 4). With none (0), she carried 0.5° in 12 kt and
+ * 1.5° in 20 kt: all but balanced. The size is a plausible one: a long keel's side force acts well forward of the
+ * middle of its area (a low wing's lift, toward its leading quarter), which is why designers draw the sails' centre
+ * ahead of the hull's.
+ */
+export const CLR_LEAD = 0.6;
 export const LEVER = { main: -0.538, jib: 1.342 };
 /** Chord of each sail at its centre of effort (m). */
 const CHORD = { main: 2.4, jib: 2.0 };

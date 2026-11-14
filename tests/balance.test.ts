@@ -91,13 +91,13 @@ describe('The keel and the heel, by the same balance everywhere', () => {
 
 describe('Helm balance (weather helm)', () => {
   // (waiting on the owner's weather-helm figure (asked 14 Nov); the sail moment is unsourced)
-  it.fails('a little weather helm in a moderate breeze, more as she heels', () => {
+  it('a little weather helm in a moderate breeze, more as she heels', () => {
     const h12 = beat(12).helmNeed!, h20 = beat(20, undefined, true).helmNeed!; // (20 kt held at full power: heeled)
     expect(h12).toBeGreaterThan(0.5); expect(h12).toBeLessThan(4);
     expect(h20).toBeGreaterThan(h12 + 2);
   });
   // (waiting on the owner's weather-helm figure (asked 14 Nov); the sail moment is unsourced)
-  it.fails('easing the boom past its best angle (traveller down, sheet eased) and the backstay on take weather helm off; easing the main further can give lee helm', () => {
+  it('easing the boom past its best angle (traveller down, sheet eased) and the backstay on take weather helm off; easing the main further can give lee helm', () => {
     const base = beat(16, undefined, true).helmNeed!;
     // (the traveller down and the sheet eased, as the name says: dropped on its own, the crew sheets in to keep the boom
     // where they want it, so it doesn't ease the boom)
@@ -107,14 +107,14 @@ describe('Helm balance (weather helm)', () => {
     expect(beat(16, c => { c.mainsheet += 0.25; }).helmNeed!).toBeLessThan(0);
   });
   // (waiting on the owner's weather-helm figure (asked 14 Nov); the sail moment is unsourced)
-  it.fails('let go of the tiller with weather helm and she rounds up into the wind', () => {
+  it('let go of the tiller with weather helm and she rounds up into the wind', () => {
     const b = beat(16), twa0 = b.twa;
     (b as Boat & { handsOff?: boolean }).handsOff = true; b.tiller = 0;
     sail(b, 5);
     expect(b.twa).toBeLessThan(twa0 - 5);
   });
   // (waiting on the owner's weather-helm figure (asked 14 Nov); the sail moment is unsourced)
-  it.fails('carrying a lot of helm is slower than sailing balanced', () => {
+  it('carrying a lot of helm is slower than sailing balanced', () => {
     // the crew's own trim, once they've worked through the depowering steps (one job at a time): they take the helm off her
     // (in 22 kt, where depowering pays: up to about 18 kt the fastest is near full power, physics.ts powerFactor)
     const balanced = beat(22, undefined, false, 60);

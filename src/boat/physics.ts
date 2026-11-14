@@ -12,7 +12,7 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, IDEAL_HELM, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
+import { CE_ABOVE_WL, CE_HEIGHT, CLR_LEAD, FULL_RUDDER, IDEAL_HELM, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
@@ -349,7 +349,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (b.turnM, + to starboard), and as the helm she needs to sail straight: the rudder angle whose lift balances it
   // (balance.ts helmNeeded's, with the windage, at her own speed: the blade's lift goes as her speed squared, so in
   // light air she needs more of it for the same sails, down to a knot: below that it's not the rudder that holds her)
-  const mTurn = sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * clrShift(cs.trim) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, b.crew?.people.length ?? 3, 1 - (b.rig?.main ?? 1));
+  // (her keel's lift acts ahead of where her hull holds her broadside, balance.ts CLR_LEAD: the share of her side force
+  // it carries, by her way against her slip, as the leeway block below has the two: all of it sailing fast, none stopped)
+  const slipNow = Math.abs(b.sway ?? 0), wayNow = Math.max(0, b.v) * Math.PI * HOVE.aspect / 2, byLift = wayNow > 0 ? wayNow / (wayNow + HOVE.crossCd * slipNow) : 0;
+  const mTurn = sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * (clrShift(cs.trim) + CLR_LEAD * byLift) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, b.crew?.people.length ?? 3, 1 - (b.rig?.main ?? 1));
   b.turnM = (b.tack === 'S' ? 1 : -1) * mTurn; // (by her tack: dead downwind the boom stays where it is as the wind crosses her stern)
   // (and, a little, her hull's broadside drag as she makes leeway: its centre is aft of the keel's, HOVE.dragAft, so it
   // turns her bow off: turning.ts hullSide's strips, summed)
