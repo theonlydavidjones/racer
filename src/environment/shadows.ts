@@ -88,6 +88,9 @@ const clFor = (awa: number) => awa <= 60 ? 1.2 : Math.max(0.4, 1.2 - 0.8 * (awa 
 export function addBoatWake(sum: WindSum, c: Caster, p: Vec, trueKt: number): void {
   const H = BOAT_WAKE.mast, d0 = BOAT_WAKE.d0, vaKt = c.aws / 0.5144;
   if (vaKt < 0.5 || trueKt < 0.5) return;
+  // (out of reach, 12 mast heights off, before any of her frame's trig: every boat asks it of every other, every step.
+  // The distance is the same in her frame as here; a micrometer over, so the test after it still decides at the edge)
+  { const ddx = p.x - c.x, ddy = p.y - c.y, R = 12 * H + 1e-6; if (ddx * ddx + ddy * ddy > R * R) return; }
   const e = V(c.h + c.arel + 180); // downstream, along her apparent wind
   const lw0 = c.arel >= 0 ? V(c.h - 90) : V(c.h + 90), dot = lw0.x * e.x + lw0.y * e.y; // to her leeward side, square to the wake
   let lx = lw0.x - dot * e.x, ly = lw0.y - dot * e.y; const ln = Math.hypot(lx, ly) || 1; lx /= ln; ly /= ln;
