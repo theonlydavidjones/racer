@@ -536,13 +536,17 @@ v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (
 thread waiting on the software GPU: frame times, and their 95th and 99th percentiles, mean nothing here. What holds: the
 renderer's counts (draw calls, triangles, programs), the same run to run, the best measure here of what the GPU is asked
 to do; the JS a frame, noisy (±5 ms; a run's outlier can double a view), paired back to back so the drift lands on both;
-and the heap. The real machine's frame times are the ` meter's (ui/perfMeter.ts).
+and the heap. The real machine's frame times are the readout's (ui/perfMeter.ts: the ` key, F9 from v190).
 
 **The gate** (scripts/check/perf-ab.cjs): this tree's page and another version's, each from its own dev server, measured
 by perf.cjs's seven views alternately, two rounds, at half size (the same shape). It fails on draw calls or triangles
 +5%, programs +5, the JS a frame +15% and 3 ms in two views or more (each side's least over the rounds), or the heap
 +15 MB. v188 against v186 fails it on all four; v188 against itself passes (the counts and the heap identical, one
-view's JS +17% under load, which is why one view alone doesn't count). About 30 minutes; on a quiet host (a test
+view's JS +17% under load, which is why one view alone doesn't count). v189 (#313, the boat model's meshes merged)
+against v186 fails it on the GPU's side only: draw calls 1–11% fewer and the JS a frame 7–17% less, but triangles
++12–26% in six views (the night start 1.99 million, at perf.cjs's budget), programs 205 → 217, the heap +26 MB.
+Kept strict (the Coordinator, 14 Nov 2026): whether that many more triangles stutters on a laptop's GPU is for the
+readout on a real machine to say; if it doesn't, the triangles may count only near the budget. About 30 minutes; on a quiet host (a test
 suite beside it slows one side's runs more than the other's). Before publishing, the Coordinator runs it
 against the published version's commit (CLAUDE.md, Workflow).
 
