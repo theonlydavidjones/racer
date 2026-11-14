@@ -818,14 +818,15 @@ export class World {
   paddle(side: 'P' | 'S' | null, back: boolean, auto: boolean): void {
     const u = this.user, was = u.paddle;
     // (you stopping the crew's own paddling sticks: they don't start again until the jam has passed. crewPaddleCall)
-    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) { u.paddleOff = was.auto; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
+    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) { u.paddleOff = true; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
     if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
     u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t };
     this.paddleJob(u, side);
-    const who = (u.crew?.spec.crew.length ?? 0) === 0 ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
-    const how = `${back ? 'back-paddles' : 'paddles'} on the ${side === 'P' ? 'port' : 'starboard'} side`;
+    const solo = (u.crew?.spec.crew.length ?? 0) === 0, who = solo ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
+    const verb = solo || auto ? (back ? 'back-paddle' : 'paddle') : (back ? 'back-paddles' : 'paddles'); // (agreeing with who)
+    const where = `on the ${side === 'P' ? 'port' : 'starboard'} side`, how = `${verb} ${where}`;
     if (!was) this.emit({ type: 'toast', ms: 5000, msg: `${who} the boom crutch from the cabin and ${how}${auto ? ': she\'s being set onto something with no wind to sail clear.' : '.'}${this.racing(u) && !this.paddleAllowed(u) ? ' Racing, that breaks rule 42.1 unless you\'re getting clear after hitting something (42.3(h)).' : ''}` });
-    else if (was.side !== side || !!was.back !== back) this.emit({ type: 'toast', msg: `Now ${how}.` });
+    else if (was.side !== side || !!was.back !== back) this.emit({ type: 'toast', msg: `Now ${back ? 'back-paddling' : 'paddling'} ${where}.` });
   }
   /** Rule 42.3(h): paddling "to get clear after grounding or colliding": judged each moment, within 30 s of the contact
    * (the rule gives no time; its purpose, getting clear, does: a judgement, as the crew's own call uses), so a spell
@@ -851,7 +852,13 @@ export class World {
     const p = b.paddle; if (!p) return;
     if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
     const job = b.crew?.people[paddler(b)]?.job; if (job?.line === 'paddle' && job.side !== b.tack) this.paddleJob(b, p.side);
-    if (paddlePower(b, this.t) > 0 && this.racing(b) && !this.paddleAllowed(b)) this.rule42(b, 'paddle');
+    if (paddlePower(b, this.t) <= 0 || !this.racing(b) || this.paddleAllowed(b)) return;
+    // the 42.3(h) window closing on a spell begun to get clear: the crew's own stops (they keep the rule); yours, a few
+    // seconds' grace and a word, as the penalty's own (R42_STOP), before it's a breach
+    const hit = b.lastHitT, closing = hit != null && p.t0 <= hit + 30 && this.t - hit <= 30 + R42_STOP;
+    if (p.auto) { this.paddle(null, false, true); return; }
+    if (closing) { if (!p.warned) { p.warned = true; if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Clear of it now: stop paddling, or it breaks rule 42.1 (42.3(h) covers only getting clear).' }); } return; }
+    this.rule42(b, 'paddle');
   }
   /**
    * Rule 42 (propulsion): a boat racing that paddles breaks 42.1 unless an exception holds. Rules builds the incident and
@@ -895,7 +902,8 @@ export class World {
   private crewPaddleCall(b: Boat): void {
     const p = b.paddle, n = b.crew?.spec.crew.length ?? 0;
     if ((p && !p.auto) || n === 0 || b.docked || b.handled || b.pushing || (b.motor?.running && b.motor.gear !== 'N')) return;
-    if (this.racing(b) && !(b.lastHitT != null && this.t - b.lastHitT <= 30)) { if (p) this.paddle(null, false, true); return; }
+    // (racing: only to get clear after a contact, 42.3(h), and they stop a little before that's over: paddleAllowed)
+    if (this.racing(b) && !(b.lastHitT != null && this.t - b.lastHitT <= 28)) { if (p) this.paddle(null, false, true); return; }
     const ahead = b.v - (b.astern ?? 0), calm = b.ww.kt < 3, slow = Math.abs(ahead) < 0.25;
     // what the stream alone sets her onto in the next minute (her own way she can stop or turn; the stream she can't), and
     // while paddling, what she's heading for as she goes over the ground (the way they're paddling her)
@@ -906,18 +914,22 @@ export class World {
     if (!p) {
       if (!trouble) b.paddleOff = false; // (the jam has passed: next time they may paddle again)
       if (!jam || b.paddleOff) return; // (you stopped them: they leave it to you)
-      const at = set ?? nearestLand(b, 40) ?? { x: b.x + V(b.h).x, y: b.y + V(b.h).y };
+      // (off what the stream sets her onto; else land just ahead of her bow, which she backs off; else the nearest shore)
+      const f = V(b.h), close = [6, 10, 15].map(d => ({ x: b.x + f.x * d, y: b.y + f.y * d })).find(q => onLand(q));
+      const at = set ?? close ?? nearestLand(b, 40) ?? { x: b.x + f.x, y: b.y + f.y };
       const a = this.paddleAim(b, at); this.paddle(a.side, a.back, true); return;
     }
     // paddling her into something (a second hazard, or the shore she started off): re-aim off it, given a fair spell
-    // on each side; if the same stroke would be chosen again it isn't helping, so they stop
+    // on each side (the same spell: the crutch is in hand. If it's the stroke they're at, they keep at it)
     if (going && this.t - (p.aimT ?? p.t0) > 10) {
       const a = this.paddleAim(b, going);
-      if (a.side !== p.side || a.back !== !!p.back) this.paddle(a.side, a.back, true); else this.paddle(null, false, true);
+      if (a.side !== p.side || a.back !== !!p.back) this.paddle(a.side, a.back, true); else p.aimT = this.t;
       return;
     }
     // clear: the stream no longer setting her onto anything, with way on (either way) or wind to sail by
-    if (!set && !going && !irons && (Math.abs(ahead) > 0.5 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
+    // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
+    // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
+    if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
     else if (this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
   }
   /** Where she'll be on land, or within 10 m of a mark, drifting at `vel` (m/s over the ground) in the next minute, looking

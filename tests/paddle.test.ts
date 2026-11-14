@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { KT, dist } from '../src/core/math';
+import { takeLine } from '../src/boat/physics';
 import { PADDLE, paddleForce, paddleYawRate } from '../src/boat/paddle';
 import { World, DT } from '../src/sim/world';
 import { courseFile } from '../src/courses/registry';
@@ -22,7 +23,7 @@ describe('Paddling her with the boom crutch (boat/paddle.ts): one person against
     b.paddle = { side: 'P', t0: 0, auto: false };
     expect(paddleForce(b, 1)).toBe(0); // (fetching it from the cabin)
     expect(paddleForce(b, PADDLE.fetchS + 1)).toBeCloseTo(PADDLE.fMax, 0); // (at rest: the blade's limit)
-    expect(PADDLE.fMax).toBeGreaterThan(50); expect(PADDLE.fMax).toBeLessThan(70);
+    expect(PADDLE.fMax).toBeGreaterThan(30); expect(PADDLE.fMax).toBeLessThan(45);
   });
   it('makes about a knot and a half in a calm, and holds it (the first push tails off to what they keep up)', () => {
     const b = paddled('P', 100);
@@ -49,7 +50,7 @@ describe('Paddling her with the boom crutch (boat/paddle.ts): one person against
   });
   it('back-paddling makes sternway', () => {
     const b = paddled('S', 60, true);
-    expect((b.astern ?? 0) / KT).toBeGreaterThan(0.4);
+    expect((b.astern ?? 0) / KT).toBeGreaterThan(0.25); // (slowly: her drag going astern, physics.ts ASTERN_DRAG)
   });
 });
 
@@ -126,8 +127,10 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     r.user.lastHitT = r.t;
     applyCommand(r, { k: 'paddle', side: 'P' }); for (let i = 0; i < 60 * 20; i++) r.step(DT);
     expect(r.user.scoring ?? null).toBeNull(); // (getting clear)
-    for (let i = 0; i < 60 * 15; i++) r.step(DT);
-    expect(r.user.scoring).toBe('DSQ'); // (35 s on, still paddling: not getting clear any more)
+    for (let i = 0; i < 60 * 12; i++) r.step(DT);
+    expect(r.user.scoring ?? null).toBeNull(); // (32 s: told it's closing, a few seconds' grace)
+    for (let i = 0; i < 60 * 8; i++) r.step(DT);
+    expect(r.user.scoring).toBe('DSQ'); // (40 s on, still paddling: not getting clear any more)
   });
   it('with Appendix P: a first rule 42 penalty is a Two-Turns Penalty (P2.1), a second spell means retiring (P2.2)', () => {
     const w = racingWorld(true);
@@ -136,6 +139,15 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     expect(w.user.scoring ?? null).toBeNull();
     paddleSpell(w);
     expect(w.user.retired).toBe(true);
+  });
+  it('racing, the crew\'s own paddling to get clear after a contact stops as 42.3(h) runs out: no penalty', () => {
+    const w = world('race', 1, 'flood');
+    while (!w.racing(w.user)) w.step(DT);
+    const u = w.user; u.x = w.C.marks[0].p.x - 30; u.y = w.C.marks[0].p.y; u.v = 0; u.lastHitT = w.t;
+    let paddled = false;
+    for (let i = 0; i < 60 * 45; i++) { w.step(DT); if (u.paddle?.auto) paddled = true; }
+    expect(paddled, 'they paddled to get clear').toBe(true);
+    expect(u.scoring ?? null).toBeNull(); expect(u.penaltyTotal ?? 0).toBe(0);
   });
   it('racing, the crew never paddle of themselves (they keep rule 42) unless she has just hit something', () => {
     const w = world('race', 1, 'flood');
@@ -154,8 +166,11 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
   it('a back-paddling spell ends once she has sternway and is clear (her way is either way)', () => {
     // (head to wind in a light air with the shore dead ahead: they back her off it, and stop once she's clear)
     const w = world('sail', 1), u = w.user;
+    u.v = 0; u.astern = 0; // (from a standstill: she has to make sternway herself)
     u.paddle = { side: 'S', t0: w.t, auto: true, back: true, aimT: w.t };
-    for (let i = 0; i < 60 * 60; i++) w.step(DT);
+    let astern = 0;
+    for (let i = 0; i < 60 * 60 && u.paddle; i++) { w.step(DT); astern = Math.max(astern, u.astern ?? 0); }
+    expect(astern, 'she made sternway').toBeGreaterThan(0.1);
     expect(u.paddle, 'they stopped well before they\'d be worn out (180 s)').toBeNull();
   });
   it('the paddler stays on the side they paddle when she swings through the wind', () => {
@@ -171,11 +186,23 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
 });
 
 describe('Paddled while hove to', () => {
-  it('the crutch pushes her and turns her hove to as well', () => {
-    const still = testBoat({ heading: 90, kt: 0, windKt: 0.5 }), b = testBoat({ heading: 90, kt: 0, windKt: 0.5 });
-    for (const x of [still, b]) (x as Boat & { hove?: boolean }).hove = true;
-    b.paddle = { side: 'P', t0: 0, auto: false };
-    sail(still, 30); sail(b, 30);
-    expect(b.v - (b.astern ?? 0)).toBeGreaterThan(still.v - (still.astern ?? 0) + 0.2);
+  // (hove to as tests/heaveto.test.ts lies her: the jib backed, the main eased, the helm lashed to leeward, 8 kt)
+  const hove = (side: 'P' | 'S' | null) => {
+    const b = testBoat({ heading: 318, kt: 4.5, windKt: 8 });
+    sail(b, 30, () => { b.h = 318 + (b.leeway ?? 0); });
+    takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0;
+    takeLine(b, 'mainsheet'); b.ctlTarget.mainsheet = 0.55;
+    sail(b, 20); b.lashed = -0.6; sail(b, 120);
+    expect(b.hove, 'she lies hove to').toBe(true);
+    if (side) b.paddle = { side, t0: 0, auto: false }; // (the helper's clock starts again at 0 each call)
+    // (her yaw while the crutch is out, the first 12 s of it: hove to she swings about, so over longer it washes out)
+    let v = 0, n = 0, r = 0, m = 0; sail(b, 30, t => { v += b.v - (b.astern ?? 0); n++; if (t > PADDLE.fetchS && t < PADDLE.fetchS + 12) { r += b.yawRate ?? 0; m++; } });
+    return { v: v / n, turned: r / m };
+  };
+  it('the crutch pushes her along hove to, and paddling on port swings her to starboard of where she lay, on starboard to port', () => {
+    const still = hove(null), p = hove('P'), s = hove('S');
+    // (on starboard tack, paddling to starboard bears her away, and pushes her on; on port it heads her up)
+    expect(s.v, JSON.stringify({ still, p, s })).toBeGreaterThan(still.v + 0.03);
+    expect(p.turned).toBeGreaterThan(still.turned); expect(s.turned).toBeLessThan(still.turned);
   });
 });

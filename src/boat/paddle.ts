@@ -19,8 +19,9 @@ import orc from './data/nordic-folkboat-orc.json';
  * - BLADE_EFF: the share of that power that pushes her (a blade slips: momentum theory, 2/(1 + slip ratio)); a small
  *   flat crutch end, clumsily used, 0.3 (an estimate: nothing published for improvised paddles).
  * - F_MAX: the most a stroke can push at rest, from the blade: the crutch's flat end about 0.15 × 0.20 m, a flat plate's
- *   drag coefficient about 2 broadside (Hoerner, Fluid-Dynamic Drag), drawn through the water at about 2 m/s, for about
- *   half of each stroke: ½ × 1025 × 2 × 0.03 × 2² × ½ ≈ 60 N.
+ *   drag coefficient about 1.18 broadside (Hoerner, Fluid-Dynamic Drag, ch. 3: a small rectangular plate, its sides 3:4;
+ *   2 is the infinitely long plate's), drawn through the water at about 2 m/s, for about half of each stroke:
+ *   ½ × 1025 × 1.18 × 0.03 × 2² × ½ ≈ 36 N.
  * Her own hull (physics.ts, the ITTC-1957 friction line on her 14.75 m² of wetted surface, ORC) then sets how fast she
  * goes: about a knot and a half (ITTC alone: about 5 W of thrust power holds 1 kt, 18 W 1.5 kt; the 22 W kept up here
  * holds a little over 1.5 kt).
@@ -35,8 +36,8 @@ export const PADDLE = {
   power: 75, burst: 150, burstS: 20, fadeS: 30,
   /** How much of that power pushes her: a small flat blade, clumsily used (an estimate). */
   bladeEff: 0.3,
-  /** The most a stroke pushes at rest (N), from the blade: ½ρ·Cd·A·u²·½ with A 0.03 m², Cd 2, u 2 m/s. */
-  fMax: 0.5 * 1025 * 2 * 0.03 * 4 * 0.5,
+  /** The most a stroke pushes at rest (N), from the blade: ½ρ·Cd·A·u²·½ with A 0.03 m², Cd 1.18, u 2 m/s. */
+  fMax: 0.5 * 1025 * 1.18 * 0.03 * 4 * 0.5,
   /** Off her centreline (m): the side deck, about 0.95 m out at the cockpit's forward end, and the reach. */
   arm: 1.2,
   /** Fetching the crutch from the cabin and getting to the side deck (s): an estimate. */
@@ -46,7 +47,7 @@ export const PADDLE = {
 const yawDrag = () => 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3 / 32; // (worked when used: physics.ts imports this file)
 
 /** Paddling: the side, when it began (sim time), and whether the crew called it themselves (a jam) or you did. */
-export interface PaddleState { side: 'P' | 'S'; t0: number; auto: boolean; back?: boolean; /** when the side was last chosen (sim time) */ aimT?: number }
+export interface PaddleState { side: 'P' | 'S'; t0: number; auto: boolean; back?: boolean; /** when the side was last chosen (sim time) */ aimT?: number; /** told the 42.3(h) window is closing */ warned?: boolean }
 
 /** Who paddles: the forward hand (the crutch's job, as the pole's), or with no crew the helm. */
 export const paddler = (b: Boat): number => { const n = b.crew?.spec.crew.length ?? 0; return n === 0 ? 0 : ownerOf('pole', n, b.crew!.spec); };
