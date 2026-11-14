@@ -102,12 +102,6 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 .pl-read{font:700 13px/1 var(--f-inst);letter-spacing:.04em;min-width:190px;padding:0 6px;color:var(--accent);white-space:nowrap}
 .pilot .tp-btn{padding:7px 8px}
 #bPilot.on{border-color:var(--accent);color:var(--accent)}
-#controls .motorhead{flex-wrap:nowrap;width:max-content;margin-top:6px}
-#controls .motorhead .tp-btn{min-width:0;height:38px}
-.mo-thr{display:flex;align-items:center;gap:6px;font:600 10px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 4px}
-.mo-thr input{width:110px}
-#moGears .tp-btn[aria-pressed="true"],#motorHead .tp-btn.on{border-color:var(--accent);color:var(--accent)}
-#bMotor.on{border-color:var(--accent);color:var(--accent)}
 #bHome.dim,#bNavHome.dim{opacity:.45} /* (no home slip: the tooltip says how to give her one) */
 #bHome.dim{opacity:.45}
 .pastrow .ghostpick{width:auto;max-width:230px;margin-right:6px;padding:6px 8px;font-size:12px} /* (no home slip: the tooltip says how to give her one) */

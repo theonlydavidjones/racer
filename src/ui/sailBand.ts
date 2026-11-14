@@ -14,6 +14,7 @@ import { JUMPER_HALF_TURN_S } from '../boat/condition';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
 import { pointOfSailWord } from './pointOfSail';
+import { OUTBOARDS } from '../boat/motor';
 
 /**
  * The sail controls band (the owner's design, 12 Nov 2026; the UI session's mock-up, design/sail-controls-band.html):
@@ -53,6 +54,10 @@ export interface BandHost {
   halyard(sail: 'main' | 'jib'): void;
   /** What a control does, for the Coach card (null: nothing to say). */
   help(text: string | null): void;
+  /** Her outboard's tab: shown (she has one on its bracket, sailing, not a drill); and pulling its cord (racing, the app asks
+   * first: starting it retires her, RRS 42.1). */
+  motorOn(): boolean;
+  motorStart(): void;
 }
 
 type Side = 'P' | 'S';
@@ -188,7 +193,7 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-motor" hidden data-help="Her outboard: tilt it down into the water, pull-start it (in neutral), then the gear and the throttle. Tilt it up to sail."><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="The 2.5 has no reverse gear: turn it round on its bracket to push astern">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button></span></span>
 <span class="sb-tillerslot"></span>
 <span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
@@ -312,6 +317,7 @@ export class SailBand {
   }
   private click(e: MouseEvent): void {
     const t = e.target as HTMLElement, act = t.closest<HTMLElement>('[data-act]')?.dataset.act, d = t.closest<HTMLElement>('[data-line]');
+    if (act === 'mo') { this.motorClick(t.closest<HTMLElement>('[data-mo]')!.dataset.mo!); return; }
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
@@ -399,6 +405,67 @@ export class SailBand {
     this.el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { const k = colorKey(d.dataset.line!); if (k) d.style.setProperty('--rope', lineColor(spec, k)); });
   }
 
+  /**
+   * Her outboard's tab (boat/motor.ts; the owner, v193: the floating control head "blocks view of the hull", and its
+   * buttons glitched): tilted up, only "Motor · Down"; down, Start or Stop, the gear (F N R, or the 2.5's Swivel), the
+   * throttle in tenths, and Cast off while she's made fast with it running. Written only when something changes.
+   * A click waits for the race to answer (the worker: a frame or more): the button says what it's doing ("Tilting…") and
+   * its row takes no more clicks until the race shows it done, so a second click can't undo the first from a stale label
+   * (the likeliest "I can't get it to tilt down"). A refusal says why, on the button.
+   */
+  private moPend: { k: string; word: string; done: (m: NonNullable<Boat['motor']>) => boolean; until: number } | null = null;
+  private moNote: { k: string; word: string; until: number } | null = null;
+  private moThr: { v: number; until: number } | null = null;
+  private motorClick(k: string): void {
+    const w = this.host.world(), m = w.user.motor, now = performance.now();
+    if (!m || !w.running) return;
+    const no = (word: string, msg: string) => { this.moNote = { k, word, until: now + 3000 }; this.host.toast(msg, 3500); this.motorTab(w.user as Boat); };
+    if (w.paused) { no('Paused', 'The sail is paused: resume it, then work the motor.'); return; }
+    if (this.moPend && this.moPend.until > now && k !== 'less' && k !== 'more' && k !== 'castoff') return; // (waiting on the race's answer)
+    const pend = (word: string, done: (m: NonNullable<Boat['motor']>) => boolean) => { this.moPend = { k, word, done, until: now + 10000 }; };
+    if (k === 'tilt') { const was = m.down; pend('Tilting…', x => x.down !== was); this.host.send({ k: 'motor', op: 'tilt' }); }
+    else if (k === 'start') {
+      if (m.running || m.pulling) { pend('Stopping…', x => !x.running && !x.pulling); this.host.send({ k: 'motor', op: 'stop' }); }
+      else if (m.gear !== 'N') { no('Neutral first', 'Put it in neutral to start it: it won\'t start in gear.'); return; }
+      else { pend('Starting…', x => x.running || !!x.pulling); this.host.motorStart(); }
+    } else if (k === 'F' || k === 'N' || k === 'R') { if (m.gear !== k) { pend('…', x => x.gear === k); this.host.send({ k: 'motor', op: 'gear', gear: k }); } }
+    else if (k === 'swivel') {
+      if (m.gear !== 'N') { no('Neutral first', 'Into neutral first, then swivel it round.'); return; }
+      const was = !!m.swivel; pend('Swiveling…', x => !!x.swivel !== was); this.host.send({ k: 'motor', op: 'swivel' });
+    } else if (k === 'less' || k === 'more') {
+      const from = this.moThr && this.moThr.until > now ? this.moThr.v : m.throttle, v = clamp(Math.round((from + (k === 'more' ? 0.1 : -0.1)) * 10) / 10, 0, 1);
+      this.moThr = { v, until: now + 10000 }; this.host.send({ k: 'motor', op: 'throttle', v });
+    } else if (k === 'castoff') this.host.send({ k: 'castOff' });
+    this.motorTab(w.user as Boat);
+  }
+  private motorTab(u: Boat): void {
+    const tab = this.el.querySelector<HTMLElement>('.sb-motor')!, m = u.motor, on = !!m && this.host.motorOn();
+    hide(tab, !on); if (!m || !on) return;
+    const now = performance.now();
+    // (the race has answered, or not in 10 s: a refusal it told in Messages)
+    if (this.moPend && (this.moPend.done(m) || this.moPend.until <= now)) this.moPend = null;
+    if (this.moThr && (Math.abs(m.throttle - this.moThr.v) < 0.001 || this.moThr.until <= now)) this.moThr = null;
+    const pend = this.moPend, note = this.moNote && this.moNote.until > now ? this.moNote : null; if (!note) this.moNote = null;
+    const b = (k: string) => tab.querySelector<HTMLButtonElement>(`[data-mo="${k}"]`)!;
+    const word = (k: string, w: string) => {
+      const el = b(k), n = note?.k === k, p = pend?.k === k, gear = k === 'F' || k === 'N' || k === 'R';
+      put(el, n ? note!.word : p && !gear ? pend!.word : w); el.classList.toggle('refused', n);
+      const off = !!pend && k !== 'less' && k !== 'more' && k !== 'castoff'; if (el.disabled !== off) el.disabled = off; // (its row waits on the race)
+      el.classList.toggle('pend', p);
+    };
+    word('tilt', m.down ? 'Up' : 'Down'); attr(b('tilt'), 'title', m.down ? 'Tilt it up, clear of the water (stops it)' : 'Tilt it down into the water');
+    hide(b('start'), !m.down); word('start', m.pulling ? 'Pulling…' : m.running ? 'Stop' : 'Start');
+    const g = tab.querySelector<HTMLElement>('.mo-g')!; hide(g, !m.down);
+    const hasR = OUTBOARDS[m.hp].reverse;
+    hide(b('R'), !hasR); hide(b('swivel'), hasR); b('swivel').classList.toggle('on', !!m.swivel);
+    for (const k of ['F', 'N', 'R', 'swivel']) word(k, k === 'swivel' ? 'Swivel' : k);
+    for (const k of ['F', 'N', 'R']) attr(b(k), 'aria-pressed', String(m.gear === k));
+    for (const k of ['less', 'more']) { hide(b(k), !m.down); word(k, k === 'less' ? '−' : '+'); }
+    const t = tab.querySelector<HTMLElement>('.mo-thr')!; hide(t, !m.down); put(t, `${Math.round((this.moThr?.v ?? m.throttle) * 100)}%`);
+    hide(b('castoff'), !(u.docked && m.running)); word('castoff', 'Cast off');
+    tab.classList.toggle('on', !!m.running);
+  }
+
   /** The windex and the tabs on the band's top edge: Hail (when a hail applies), a penalty's turns, the pole, Auto-Trim / Hand Back. */
   private tabs(w: ReturnType<BandHost['world']>, u: Boat): void {
     // the windex: the vane into the apparent wind (arel, + from starboard: clockwise looking down)
@@ -428,6 +495,7 @@ export class SailBand {
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
     hide(pen, !turns); if (turns) put(pen, `Penalty · ${turns} turn${turns > 1 ? 's' : ''}`);
+    this.motorTab(u);
     // Hail: only when there's a hail to make (checked a few times a second: it looks round the fleet)
     const hail = this.el.querySelector<HTMLElement>('.sb-hail')!;
     if (!w.running || w.paused) hide(hail, true);
