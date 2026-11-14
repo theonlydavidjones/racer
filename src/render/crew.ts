@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, Z } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -52,9 +52,19 @@ const smooth01 = (t: number) => { const q = Math.max(0, Math.min(1, t)); return 
 const COCK0 = -L / 2 + COCKPIT.u0 * L, COCK1 = -L / 2 + COCKPIT.u1 * L, CAB0 = -L / 2 + CABIN.u0 * L;
 /** The cockpit, from hull.ts (COCKPIT_FIT, Boat Detail's, to the construction plan): side benches 300 mm over the sole
  * from the bulkhead aft to St. 4¾, a footwell round the thwart, and a
- * shelf at the benches' height across the after end; the thwart a deep beam across the cockpit, its top a little under
+ * footrest, a plank at the benches' height across the after end (slid out, or back under the after deck); the thwart a deep beam across the cockpit, its top a little under
  * the coaming caps, the footwell either side of the sole open to the hull's inside, no post under the thwart. */
-const SEAT_Y = COCKPIT_FIT.seat, { benchAft: BENCH_AFT, shelfFwd: SHELF_FWD } = COCKPIT_FIT;
+const SEAT_Y = COCKPIT_FIT.seat, { benchAft: BENCH_AFT } = COCKPIT_FIT;
+/**
+ * The footrest (Boat Detail's, the owner's: hull.ts FOOTREST): one teak plank right across the cockpit's after end, its top
+ * at the benches' height, slid out from the hollow under the after deck while the helm sits, their feet on it, and back
+ * under the deck when they stand to steer. `footrestBack` 0 out (as boatMesh draws it by default) … 1 back: how far it's
+ * slid back, as b.footrest. Its front edge, and over it the plank's top; under the deck behind it, the sole carries on.
+ */
+let footrestBack = 0;
+export function setFootrest(back: number): void { footrestBack = Math.max(0, Math.min(1, back)); }
+const footrestOut = () => FOOTREST.out * (1 - footrestBack);
+const onFootrest = (ax: number, z: number) => { const s = footrestOut(); return z >= COCK1 - s && ax < footrestEdge(z + s); };
 const THWART = { z: COCKPIT_FIT.thwart.z, half: COCKPIT_FIT.thwart.half, top: thwartTop() };
 const coamH = COAMING_H;
 /** The sole's half-width at z (between the benches' fronts, narrowing aft with the hull: hull.ts cockpitGeometry). */
@@ -66,7 +76,7 @@ const chz = (z: number) => cockpitHalf(uAtZ(z));
  * benches' after end and the thwart; two on one bench a shoulder's width apart (SEP) fill it. */
 const ZC_FWD = COCK0 + 0.3, ZC_AFT = Math.min(BENCH_AFT - 0.09, THWART.z - THWART.half - 0.17), SEP = 0.48;
 /** Sitting on the side deck (or hiking from it), legs in over the coaming (crewPhys.ts Z: the owner's choice): from the
- * cockpit's forward corner aft beside the benches, and on past the thwart beside the footwell and the after shelf to
+ * cockpit's forward corner aft beside the benches, and on past the thwart beside the footwell and the footrest to
  * about 2.5, short of the helm; the shins clear of the thwart either side of it. */
 // (out on the side deck, no further forward than just aft of the jib winch on its pedestal there: winchAt, at 1.4, its
 // pedestal's radius and half a hip's width clear; crewPhys.ts Z.deckFwd)
@@ -74,12 +84,12 @@ const DECK_FWD = Z.deckFwd, DECK_AFT = 2.5, THW_A = THWART.z - THWART.half - 0.1
 const deckZ = (z: number) => { const q = Math.min(DECK_AFT, Math.max(DECK_FWD, z)); return q > THW_A && q < THW_B ? (q - THW_A < THW_B - q ? THW_A : THW_B) : q; };
 const benchZ = (z: number) => Math.min(ZC_AFT, Math.max(ZC_FWD, z));
 const inCockpit = (ax: number, z: number) => z > COCK0 && z < COCK1 && ax < chz(z);
-/** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, shelf, thwart, coaming, deck, cabin top. */
+/** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, footrest, thwart, coaming, deck, cabin top. */
 export function ground(x: number, z: number): number {
   const ax = Math.abs(x), u = uAtZ(z);
   if (inCockpit(ax, z)) {
     if (Math.abs(z - THWART.z) < THWART.half) return THWART.top;
-    if (z >= SHELF_FWD) return SEAT_Y; // (the after shelf, across)
+    if (onFootrest(ax, z)) return SEAT_Y; // (the footrest, across)
     const sh = soleHalf(z);
     if (ax < sh) return COCKPIT.sole;
     if (z < BENCH_AFT) return SEAT_Y; // (a bench)
@@ -121,7 +131,7 @@ const onGround = (p: THREE.Vector3) => {
 };
 /** A knee or shin down on the cockpit sole between the benches stays on it, clear of the benches' fronts and the thwart. */
 const keepOnSole = (p: THREE.Vector3) => {
-  if (inCockpit(Math.abs(p.x), p.z) && p.z < SHELF_FWD) {
+  if (inCockpit(Math.abs(p.x), p.z) && p.z < COCK1 - footrestOut()) {
     if (p.z > THWART.z - THWART.half - 0.07 && p.z < THWART.z + 0.15) p.z = THWART.z - THWART.half - 0.07;
     const e = soleHalf(p.z) - 0.08; if (Math.abs(p.x) > e) p.x = Math.sign(p.x) * Math.max(0, e);
   }
@@ -472,7 +482,7 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   const hip = V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw = s * (0.55 + 0.5 * lean), r = right(yaw);
   const fz = COCK1 - 0.24, fc = chz(fz) - 0.16; // (feet on the seat inside the coaming, the shins clear of it)
   const foot = (j: number) => { const q = V(s * Math.min(fc - 0.1 * lean, Math.max(0.12, hx - (0.3 + 0.2 * lean) * k)), 0, fz).addScaledVector(r, (j ? 1 : -1) * 0.12 * k); q.x = Math.sign(q.x) * Math.min(Math.abs(q.x), chz(q.z) - 0.16); onGround(q);
-    // (sitting out on the side deck, the knees over the coaming: the feet hang from them, on the shelf or just off it)
+    // (sitting out on the side deck, the knees over the coaming: the feet hang from them, on the footrest or just off it)
     if (hx > chz(fz) - 0.05) q.y = Math.max(q.y, deckY(uAtZ(fz), chz(fz)) + coamH(fz) + 0.04 - BONE.shin * k);
     return q; }
   // the extension: from the tiller's end toward the chest, as long as the hand is from it (it's about a metre long)
