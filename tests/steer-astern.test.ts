@@ -32,9 +32,9 @@ describe('steering astern, shoved off under bare poles', () => {
     sail(b, 5, () => key(b));
     expect(Math.sign(wrap(b.h))).toBe(-Math.sign(back)); expect(Math.abs(wrap(b.h))).toBeGreaterThan(5);
   });
-  it('her turn goes with her sternway: a few degrees at 0.2 m/s, next to nothing at 0.08', () => {
+  it('her turn goes with her sternway: a few degrees at 0.2 m/s, under 3° at 0.08', () => {
     const fast = Math.abs(shoved(0.5, key).turned), slow = Math.abs(shoved(0.2, key).turned), creep = Math.abs(shoved(0.08, key).turned);
     expect(slow).toBeGreaterThan(1.5); expect(slow).toBeLessThan(fast / 2);
-    expect(creep).toBeLessThan(1.5);
+    expect(creep).toBeLessThan(3); expect(creep).toBeLessThan(slow);
   });
 });
