@@ -3,7 +3,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { windSide } from '../boat/dynamics';
 import { flowTurnRate } from '../boat/turning';
@@ -1676,6 +1676,19 @@ export class World {
    * From an end tie they push her off the dock and forward. Then she's under her own way (a slow walk, slowing on the
    * water's drag) and answers the tiller.
    */
+  /**
+   * "Ready about… hard alee" or "Ready to jibe… jibe-ho": the helm calls the turn and her crew work it. Close-hauled or
+   * reaching she's taken through the wind onto the other tack; off the wind, round her stern onto the other jibe, her
+   * crew handing the main across (physics.ts tackTarget, gybeMeant). By the lee already, the main comes across and her
+   * heading's held. Not at the dock, hove to, or with the tiller lashed.
+   */
+  callTurn(): boolean {
+    const u = this.user;
+    if (!this.running || u.docked || u.handled || u.hove || u.lashed != null || u.atAnchor || u.mooring) return false;
+    const to = tackTarget(u);
+    u.turnDir = to.dir; u.turnTarget = to.target; u.turnCalledT = this.t;
+    return true;
+  }
   pushOff(): boolean {
     const u = this.user, H = u.handled;
     // held head to wind on the bow line: let her go now, her bow pushed off

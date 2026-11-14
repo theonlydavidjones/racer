@@ -1092,6 +1092,7 @@ addEventListener('keydown', e => {
     case 'crewFwd': stepCrew('fore', 1); break;
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
+    case 'turnHo': if (w.running && !w.paused) send({ k: 'turn' }); break;
     case 'pushOff': berthKey(); break;
     case 'navLights': { const off = !w.user.lightsOff; send({ k: 'lights', off }); toast(off ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break; }
     case 'jibHalyard': halyard('jib'); break;
