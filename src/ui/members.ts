@@ -40,15 +40,8 @@ export function whoLine(m: Member): string {
   const role = m.roles.includes('skipper') && m.roles.includes('crew') ? 'Skipper & crew' : m.roles.includes('skipper') ? 'Skipper' : 'Crew';
   return `${m.origin === 'yours' ? 'Your member' : 'Club member'} · ${role}`;
 }
-/** Where they sail: "Crew on Josephine · middle: main", "Skipper of Josephine", or "Free". */
-export function berth(m: Member, boats: BoatSpec[]): string {
-  if (m.id === YOU) { const b = boats.find(x => x.skipper === 'you'); return b ? `Skipper of ${esc(b.name || 'your boat')}` : 'Skipper'; }
-  for (const b of boats) {
-    const i = (b.crewIds ?? []).indexOf(m.id);
-    if (i >= 0) return `Crew on ${esc(b.name || 'Unnamed')} · ${(b.crewIds!.length === 1 ? 'crew' : i === 0 ? 'middle: main' : 'forward: jib, pole')}`;
-  }
-  return 'Free · not on a boat';
-}
+/** Where they sail, as their card says it (seat below): the page and the card say the same thing (the owner, v194). */
+export function berth(m: Member, boats: BoatSpec[]): string { return seat(m, boats).line; }
 /**
  * Their seat, for the card: the skipper's, the middle crew's (the main), the forward hand's (the jib and the pole), or
  * none. A boat goes by her country and sail number beside her name (the owner: sailors in a fleet go by sail numbers).
