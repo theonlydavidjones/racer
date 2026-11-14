@@ -97,7 +97,7 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
   else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
   else if (b.pole === 'set' && b.tack !== b.poleTack) {
     b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack;
-    say('Gybing the pole end-for-end. The jib is down for a few seconds.');
+    say('Jibing the pole end-for-end. The jib is down for a few seconds.');
   }
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
@@ -320,7 +320,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // set, as its drag is. With them set, the sail model's heeling force was fitted to her heel under sail, windage and
   // all. Under bare poles it's all there is: a few degrees beam-on in a breeze)
   const bareRig = 1 - (SAIL_AREA.main * (b.rig?.main ?? 1) + SAIL_AREA.jib * (b.rig?.jib ?? 1)) / (SAIL_AREA.main + SAIL_AREA.jib);
-  const windM = bareRig > 0 ? bareRig * 0.5 * 1.225 * ap.aws * ap.aws * windHeel(ap.awa, 3, 1 - (b.rig?.main ?? 1)) : 0;
+  const windM = bareRig > 0 ? bareRig * 0.5 * 1.225 * ap.aws * ap.aws * windHeel(ap.awa, b.crew?.people.length ?? 3, 1 - (b.rig?.main ?? 1)) : 0;
   const rmExtra = (h: number) => (cond ? cond.rightingDelta(h) : 0) - windM; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
   // (off the wind the heel is the same balance of moments as upwind: the eased sails' smaller side force is what heels her
   // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
@@ -338,7 +338,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (b.turnM, + to starboard), and as the helm she needs to sail straight: the rudder angle whose lift balances it
   // (balance.ts helmNeeded's, with the windage, at her own speed: the blade's lift goes as her speed squared, so in
   // light air she needs more of it for the same sails, down to a knot: below that it's not the rudder that holds her)
-  const mTurn = sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * clrShift(cs.trim) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, 3, 1 - (b.rig?.main ?? 1));
+  const mTurn = sailYaw(sf, b.heelMag!, b.sheets.main, sf.ceh) + F * clrShift(cs.trim) - 0.5 * 1.225 * ap.aws * ap.aws * windTurn(ap.awa, b.crew?.people.length ?? 3, 1 - (b.rig?.main ?? 1));
   b.turnM = (b.tack === 'S' ? 1 : -1) * mTurn; // (by her tack: dead downwind the boom stays where it is as the wind crosses her stern)
   // (and, a little, her hull's broadside drag as she makes leeway: its centre is aft of the keel's, HOVE.dragAft, so it
   // turns her bow off: turning.ts hullSide's strips, summed)
@@ -353,7 +353,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // 3–6.4° close-hauled (6 to 20 kt; her windage is in it), nothing downwind. Steering to the beat angle means steering that much higher.
   // (the wind on her topsides, rig and crew sets her to leeward with the sails' side force: dynamics.ts windSide. ORC's
   // polar has it in its leeway too)
-  const Fwind = 0.5 * 1.225 * ap.aws * ap.aws * windSide(ap.awa, 3, 1 - hm);
+  const Fwind = 0.5 * 1.225 * ap.aws * ap.aws * windSide(ap.awa, b.crew?.people.length ?? 3, 1 - hm);
   // (the same balance as her sway's below: the keel's lift and, a little, her hull broadside, F = ½ρ·A·(πAR/2·u·v + Cd·v²),
   // so the leeway she steers for is the slip she makes)
   const Fside = F * Math.cos((b.heelMag ?? 0) * D2R), kLat = 0.5 * 1025 * HOVE.latArea, lwAt = (v: number) => {
@@ -499,7 +499,8 @@ export const HOVE = {
 };
 
 /**
- * The fraction of her speed a turn bleeds away per second (physics.ts's own step, and src/boat/arcs.ts's prediction):
+ * The turn's drag (N), and as the fraction of her speed it bleeds away per second (turnBleed): for a prediction of a turn
+ * (turnSpeed, which src/boat/arcs.ts steps; her own step takes the blade's real angle, the steering block above).
  * dv/dt = −turnBleed·v. Turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what
  * the sails' own turning moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward
  * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
@@ -520,14 +521,16 @@ export const turnBleed = (rate: number, v: number, h: number, windFrom: number, 
 /**
  * Her speed a step on, turning at `rate` deg/s on heading `h` in `tws` kt of true wind from `windFrom` (for predicting
  * a turn: src/boat/arcs.ts): the same surge law as her own step, cut down to what a prediction can know. Her sails'
- * drive toward the polar's speed on the heading she's on (so bearing away she holds her speed or gains it, and luffing
- * above her beat angle she slows: the polar's pinching curve, nothing in the no-go zone), her flogging sails' and her
- * rig's windage there, and the turn's own drag (turnDragForce). Not in it: her trim, her crew, the sea.
+ * drive toward the polar's speed at her course's angle (her heading's and her leeway: so bearing away she holds her
+ * speed or gains it, and luffing above her beat angle she slows on the polar's pinching curve, with nothing in the
+ * no-go zone), her sails' flogging as far as she's pinching (pinchFlog, as her step has it) and her rig's windage with
+ * it, and the turn's own drag (turnDragForce). `leeway` deg: hers if known, else a close-hauled boat's 4°. Not in it:
+ * her trim, her crew, the sea.
  */
-export function turnSpeed(v: number, rate: number, h: number, windFrom: number, tws: number, dt: number, helmNeed = 0): number {
-  const twa = Math.abs(wrap(windFrom - h)), beat = beatAngle(tws), ap = apparent(windFrom, tws, h, v);
-  const drag = turnDragForce(rate, v, h, windFrom, helmNeed) + airDrag(ap.aws, ap.awa, flogAmount(twa, beat, NO_GO, false));
-  return Math.max(0, v + surgeAccel(v, polar(tws, twa, 'jib'), drag) * dt);
+export function turnSpeed(v: number, rate: number, h: number, windFrom: number, tws: number, dt: number, helmNeed = 0, leeway = 4): number {
+  const twa = Math.abs(wrap(windFrom - h)), crs = Math.min(180, twa + (twa < 150 ? leeway : 0)), ap = apparent(windFrom, tws, h, v);
+  const drag = turnDragForce(rate, v, h, windFrom, helmNeed) + airDrag(ap.aws, ap.awa, pinchFlog(crs, beatAngle(tws)));
+  return Math.max(0, v + surgeAccel(v, polar(tws, crs, 'jib'), drag) * dt);
 }
 
 /**
@@ -623,7 +626,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // further aft than a drawing jib's does: `ceAft` shortens its lever ahead of the keel by that (balance.ts sailYaw).
   const jib = { heel: fn * Math.cos(clew), drive: fn * Math.sin(clew), ceAft: 0.25 * Math.sin(clamp(alpha, 0, Math.PI / 2)) };
   // windage: along the apparent wind's flow (aft and to leeward)
-  const windX = -q * windFore(ap.awa, 3, 1 - hm), windY = q * windSide(ap.awa, 3, 1 - hm);
+  const windX = -q * windFore(ap.awa, b.crew?.people.length ?? 3, 1 - hm), windY = q * windSide(ap.awa, b.crew?.people.length ?? 3, 1 - hm);
   // hull and keel: strips along the waterline, each with lift (with way on, either way: a foil's lift opposes the
   // sideways flow whichever end leads; trailing edge first, about half of it: an estimate) and broadside drag
   // (turning.ts hullSide: the same strips as turn her when she's sailing)
@@ -650,7 +653,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // (going astern, the water's drag on her is travel's, ASTERN_DRAG, as when she's driven astern sailing)
   const X = main.drive + jib.drive + windX - hullResistance(Math.max(0, u0)) + inducedX + rudX - (u0 > 0 ? seaDrag(b.sea, b.h, u0) + (cond ? foulingDrag(cond, u0) : 0) : 0);
   const Y = main.heel + jib.heel + windY + hullY + rudY;
-  const M = sailYaw(sails, b.heelMag!, b.sheets.main, smAll.ceh) - q * windTurn(ap.awa, 3, 1 - hm) + hullM + rudY * RUDDER.arm + F * clrShift(cs.trim);
+  const M = sailYaw(sails, b.heelMag!, b.sheets.main, smAll.ceh) - q * windTurn(ap.awa, b.crew?.people.length ?? 3, 1 - hm) + hullM + rudY * RUDDER.arm + F * clrShift(cs.trim);
   const mx = HANDLING.mass * disp / HULL.displacement, my = disp * (1 + HOVE.swayAdded), I = disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
   const u1 = u0 + X / mx * dt; b.v = Math.max(0, u1); b.astern = Math.max(0, -u1);
   b.sway = -toWind * (d0 + Y / my * dt);

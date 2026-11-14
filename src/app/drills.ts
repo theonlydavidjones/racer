@@ -14,7 +14,7 @@ export function mountDrills(app: AppCtx) {
 /* The tack and gybe drill (sim/drill.ts): each manoeuvre scored in the race, shown here in the Coach card as it's
  * scored, the whole list (and your bests, kept by manoeuvre and wind band) on the Pause screen. */
 let drillSeen = 0;
-const drillName = (k: 'tack' | 'gybe') => (k === 'tack' ? 'Tack' : 'Gybe');
+const drillName = (k: 'tack' | 'gybe') => (k === 'tack' ? 'Tack' : 'Jibe');
 const drillKey = (s: ManoeuvreScore) => `${s.kind}-${windBand(s.tws)}`;
 function drillTick(): void {
   const el = $('tpDrill'), list = app.w.drill?.list;
@@ -79,9 +79,9 @@ function drillHtml(): string {
   const bestOf = (k: 'tack' | 'gybe') => list.reduce((bi, x, i) => (x.kind === k && x.scored && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
   const lit = new Set([bestOf('tack'), bestOf('gybe')]);
   const rows = list.map((s, i) => !s.scored ? `<tr class="noscore"><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td colspan="7">not scored</td></tr><tr class="dcoach"><td colspan="9">${s.coach.replace(/</g, '&lt;')}</td></tr>` : `<tr${lit.has(i) ? ' class="best"' : ''}><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td><b>${Math.max(0, Math.round(s.lostM))} m</b></td><td>${Math.round(s.goodM)} m</td><td>${f(s.rate)}°/s</td><td>${s.kind === 'tack' ? f(s.deadS, 1) + ' s' : '—'}</td><td>${f(s.overshoot)}°</td><td>${s.acrossS == null ? '—' : (s.acrossS >= 0 ? '+' : '') + s.acrossS.toFixed(1) + ' s'}</td><td>${f(s.backS)} s</td></tr><tr class="dcoach"><td colspan="9">${s.coach.replace(/</g, '&lt;')}</td></tr>`).join('');
-  const bests = Object.entries(app.S.practiceBest ?? {}).filter(([k]) => /^(tack|gybe)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Gybe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
-  return `<h3>Tacks and gybes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost</th><th>Good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Jib / boom across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or gybes yet: tack when you\'re ready, or bear away to a run, settle, and gybe.</p>'}`
-    + `<p class="drillhow"><span title="Lost: what you gave away along the wind against a twin sailing on at your own pace, until you were back to 90% speed (98% after a gybe). Good crew: the sim's own crew, the same way. Only a tack from close-hauled and a gybe from a run are scored.">How it's scored</span></p>`
+  const bests = Object.entries(app.S.practiceBest ?? {}).filter(([k]) => /^(tack|gybe)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Jibe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
+  return `<h3>Tacks and jibes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost</th><th>Good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Jib / boom across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or jibes yet: tack when you\'re ready, or bear away to a run, settle, and jibe.</p>'}`
+    + `<p class="drillhow"><span title="Lost: what you gave away along the wind against a twin sailing on at your own pace, until you were back to 90% speed (98% after a jibe). Good crew: the sim's own crew, the same way. Only a tack from close-hauled and a jibe from a run are scored.">How it's scored</span></p>`
     + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
 }
 
