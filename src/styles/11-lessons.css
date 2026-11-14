@@ -22,7 +22,7 @@
    coach tip is off, 08-chase.css: a lesson's line went unseen in the Coach card, the owner 14 Nov 2026), its progress
    filling along the foot as you hold what it asks (--p, 0–1: app.ts lessonTick), green once passed */
 body.inLesson #coachTip{display:block!important;top:calc(env(safe-area-inset-top,0px) + 10px);bottom:auto;left:50%;
-  transform:translate(-50%,0);max-width:min(520px,calc(100vw - 900px));min-width:300px;text-align:center;font-size:16px;
+  transform:translate(-50%,0);max-width:min(600px,calc(100vw - 840px));min-width:300px;white-space:nowrap;text-overflow:ellipsis;text-align:center;font-size:16px;
   padding:10px 16px 14px;border-left:0;border-bottom:0;overflow:hidden}
 body.inLesson #coachTip.on{opacity:1}
 body.inLesson #coachTip::after{content:'';position:absolute;left:0;bottom:0;height:5px;width:calc(var(--p,0) * 100%);
