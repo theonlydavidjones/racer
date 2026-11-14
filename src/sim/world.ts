@@ -1,3 +1,5 @@
+import { damageOf, impactEnergy } from '../boat/damage';
+import { HANDLING } from '../boat/dynamics';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
@@ -22,7 +24,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, couldAvoid, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, couldAvoid, rowCouldAvoid, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -1241,6 +1243,13 @@ export class World {
       if (!this.racing(f) && incident.part !== '23.1') incident.notRacing = true;
       const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
+      // the contact's damage (src/boat/damage.ts): the energy of their closing along the line between them, before the
+      // touch took their way off (the reduced mass of two boats alike)
+      if (incident.kind === 'contact') {
+        const nx = B.x - A.x, ny = B.y - A.y, nl = Math.hypot(nx, ny) || 1;
+        const closing = Math.max(0, ((pA.vx - pB.vx) * nx + (pA.vy - pB.vy) * ny) / nl);
+        incident.damage = damageOf(impactEnergy(closing, HANDLING.mass, HANDLING.mass), 'boat', HANDLING.mass);
+      }
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
@@ -1272,7 +1281,31 @@ export class World {
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
       } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.assignPenalty(f); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
+      // Rule 14 and damage. The right-of-way boat is exonerated for breaking 14 if the contact causes no damage or injury
+      // (43.1(c)); with damage, if she could have avoided it once it was clear the other wasn't keeping clear, she broke 14
+      // too. And a boat that broke a rule and caused serious damage must retire, turns or no (44.1(b))
+      const dmg = incident.damage;
+      if ((dmg === 'damage' || dmg === 'serious') && incident.exoneratedBy == null) {
+        if (this.racing(victim) && rowCouldAvoid(victim, f, ctx)) this.rule14(victim, f);
+        if (dmg === 'serious' && !incident.notRacing && incident.part !== '23.1') this.mustRetire(f, victim);
+      }
     }
+  }
+
+  /** Rule 14 with damage: the right-of-way boat that could have avoided the contact takes a penalty too (43.1(c) doesn't
+   * exonerate her). */
+  private rule14(row: Boat, kc: Boat): void {
+    if (row.isUser) this.emit({ type: 'toast', ms: 7000, msg: `The contact with ${kc.name} did damage, and you could have avoided it once it was clear they weren't keeping clear: you broke rule 14 too (43.1(c)). Take your turns.` });
+    else if (kc.isUser) this.emit({ type: 'toast', ms: 5000, msg: `${row.name} could have avoided the contact, and it did damage: they broke rule 14 too.` });
+    this.assignPenalty(row);
+  }
+
+  /** Rule 44.1(b): she broke a rule and caused serious damage: her penalty is to retire. */
+  private mustRetire(b: Boat, other: Boat): void {
+    if (b.retired || b.finished) return;
+    if (b.isUser) { this.retire(` (rule 44.1(b): serious damage to ${other.name})`); return; }
+    b.retired = true; b.penalty = 0; b.penaltyTurned = 0;
+    if (other.isUser) this.emit({ type: 'toast', ms: 5000, msg: `${b.name} did serious damage and retires (rule 44.1(b)).` });
   }
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
@@ -2116,6 +2149,7 @@ export class World {
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
   /** Give a boat the penalty for a Part 2 foul. A mark touch in the same incident needs no penalty of its own (Rule 44.1(a)). */
   assignPenalty(b: Boat): void {
+    if (b.retired) return; // (retired, under 44.1(b) or of her own accord: nothing to turn for)
     // (the touch she's still turning for came in this same incident: just now, where she is: rule 44.1(a), Appeal 65)
     // (the touch she's still to turn for came in this same incident: the boat she's now fouled was by her then, and her
     // turns hadn't begun: rule 44.1(a), Appeal 65. Then the foul's penalty replaces the touch's; otherwise it's owed on top)

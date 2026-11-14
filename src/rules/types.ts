@@ -197,5 +197,7 @@ export interface Incident<B> {
   /** Part 2 preamble: the boat that broke the rule wasn't racing (before her preparatory signal, after a postponement or
    * abandonment, or finished and clear, or retired), so she isn't penalized for it. */
   notRacing?: boolean;
+  /** A contact's damage (src/boat/damage.ts): 'damage' or worse makes rule 14 bite (43.1(c)); 'serious', 44.1(b). */
+  damage?: 'none' | 'scrape' | 'damage' | 'serious' | 'wreck';
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }

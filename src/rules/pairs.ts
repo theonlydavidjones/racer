@@ -351,6 +351,47 @@ export function couldAvoid(f: RulesBoat, victim: RulesBoat, by: RulesBoat, since
 }
 
 /**
+ * Rule 14 for the boat with right of way (or entitled to room): she "need not act to avoid contact until it is clear that
+ * the other boat is not keeping clear"; from then, she shall avoid contact if reasonably possible. It's clear once the
+ * keep-clear boat, turning away promptly, could no longer keep clear (escapes(), from the recorded poses: the same
+ * question as 16.1's room). From that moment, with a prompt helmsman's reaction, could `row` have avoided touching `kc`
+ * by any turn (against `kc`'s actual track)? No history, or the keep-clear boat able to keep clear right up to the
+ * contact: no (she had no time). Whether it matters is 43.1(c)'s: only if the contact caused damage or injury.
+ */
+export function rowCouldAvoid(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): boolean {
+  const R = RINGS.get(row), K = RINGS.get(kc);
+  if (!R || !K || R.n < 2 || K.n < 2) return false;
+  const newest = (r: PoseRing) => r.t[at(r, 0)], oldestOf = (r: PoseRing) => r.t[at(r, r.n - 1)];
+  const now = Math.max(newest(R), newest(K)), oldest = Math.max(oldestOf(R), oldestOf(K));
+  if (now - oldest < 0.5) return false;
+  // a boat's actual track from t0: her recorded poses, then on from her newest sample
+  const trackFrom = (r: PoseRing, b: RulesBoat, t0: number) => {
+    const v = b.v ?? Math.hypot(b.vx, b.vy), tn = newest(r), last = poseAt(r, tn);
+    return (tau: number): Pose => {
+      const t = t0 + tau;
+      if (t <= tn) return poseAt(r, t);
+      const u = V(last.h), d = t - tn;
+      return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
+    };
+  };
+  const start = (r: PoseRing, b: RulesBoat, t0: number) => {
+    const p = poseAt(r, t0), w = Math.min(TURN_WINDOW, t0 - oldestOf(r));
+    return { ...p, turnRate: w > 0.2 ? wrap(p.h - poseAt(r, t0 - w).h) / w : 0, leeway: b.leeway };
+  };
+  const best = (me: RulesBoat, r: PoseRing, other: PoseRing, ob: RulesBoat, t0: number) => {
+    const o = { delay: RESPOND_DELAY, horizon: now - t0 + 1, windKt: me.ww?.kt ?? ctx.windKt };
+    return Math.max(...escapes(start(r, me, t0), [trackFrom(other, ob, t0)], me.ww?.from ?? ctx.windFrom, o).map(c => c.minGap));
+  };
+  // when it became clear: just after the last moment (in half-second steps back from the contact) the keep-clear boat
+  // could still have kept clear
+  let tClear: number | null = null;
+  for (let t = now - 0.5; t >= oldest - 1e-9; t -= 0.5) if (best(kc, K, R, row, t) >= KEEP_CLEAR_GAP) { tClear = t + 0.5; break; }
+  if (tClear == null) tClear = oldest; // (never able, as far back as the history goes)
+  if (now - tClear < 0.2) return false;
+  return best(row, R, K, kc, tClear) >= CONTACT_GAP;
+}
+
+/**
  * Rule 16.2 (2025–2028): "In addition, on a beat to windward when a port-tack boat is keeping clear by sailing to pass
  * to leeward of a starboard-tack boat, the starboard-tack boat shall not bear away if as a result the port-tack boat
  * must change course immediately to continue keeping clear." Is `P` sailing to pass astern of (to leeward of) `S`?
