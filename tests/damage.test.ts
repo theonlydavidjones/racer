@@ -22,9 +22,10 @@ describe('damage (src/boat/damage.ts)', () => {
     expect(damageOf(impactEnergy(2.5, M, M), 'boat', M)).toBe('serious');
     expect(damageOf(impactEnergy(8, M, M), 'boat', M)).toBe('serious');
   });
-  it('a ship or the piles is a wreck at any speed; a fendered dock a scrape at most; mud nothing', () => {
+  it('a ship is a wreck at any speed; piles by the blow, as concrete (lying against them is nothing); a fendered dock a scrape at most; mud nothing', () => {
     expect(damageOf(impactEnergy(0.2, M), 'ship', M)).toBe('wreck');
-    expect(damageOf(impactEnergy(0.1, M), 'piles', M)).toBe('wreck');
+    expect(damageOf(impactEnergy(0.05, M), 'piles', M)).toBe('scrape');
+    expect(damageOf(impactEnergy(2, M), 'piles', M)).toBe('wreck');
     expect(damageOf(impactEnergy(3, M), 'dock', M)).toBe('scrape');
     expect(damageOf(impactEnergy(3, M), 'mud', M)).toBe('none');
     expect(damageOf(0, 'rock', M)).toBe('none');
