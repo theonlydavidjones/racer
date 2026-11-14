@@ -550,7 +550,6 @@ export const GELCOAT = '#f0eadc';
 /** The grit's look: 'walnut' (fine, soft, low contrast), 'sand' (finer, flatter still), 'coarse' (the first try). */
 export type GritStyle = 'walnut' | 'sand' | 'coarse';
 const GRIT: GritStyle = 'walnut'; // (the owner's choice: crushed walnut shells)
-export const setGrit = (g: GritStyle) => { GRIT = g; };
 const nsMasks = new Map<string, THREE.CanvasTexture>(), nsGrits = new Map<string, THREE.CanvasTexture>();
 function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
   const hit = nsMasks.get(which); if (hit) return hit;
