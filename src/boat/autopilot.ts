@@ -3,7 +3,7 @@ import { maxTurnRate } from './dynamics';
 import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
-import { landAlong, wharfNearest, wharfShelter } from '../geo/shore';
+import { landAlong, wharfNearest } from '../geo/shore';
 import { detour } from '../ai/ai';
 import { routeAround } from '../sim/routing';
 
@@ -120,10 +120,10 @@ function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
 
 /** How far ahead on heading h the land is (m), up to d, the whole way, exactly (geo/shore.ts landAlong: a pier or a dock
  * a metre or two wide is in the way, however far ahead it is); Infinity when there's none that near. */
-const landDist = (b: Boat, h: number, d: number) => {
+const landDist = (b: Boat, h: number, d: number, side = SIDE) => {
   const u = V(h), n = { x: u.y, y: -u.x };
   // (her track and SIDE either side: a pier lying at a shallow angle to her course is ahead of her too)
-  return Math.min(...[0, -SIDE, SIDE].map(k => landAlong({ x: b.x + n.x * k, y: b.y + n.y * k }, { x: b.x + n.x * k + u.x * d, y: b.y + n.y * k + u.y * d })));
+  return Math.min(...[0, -side, side].map(k => landAlong({ x: b.x + n.x * k, y: b.y + n.y * k }, { x: b.x + n.x * k + u.x * d, y: b.y + n.y * k + u.y * d })));
 };
 /** How far either side of her track the shore look-ahead looks (m): the 10 m berth the route keeps, and her half-beam. */
 const SIDE = 12;
@@ -144,6 +144,14 @@ const MIN_REPLAN = 5;
 /** On to the next turn early only with this much clear water either side of the way to it (m): the route's 10 m berth
  * and a few metres for her leeway, which on a close reach sets her a few metres to leeward of the line she steers. */
 const ADVANCE_CLEAR = 15;
+/** Down a marina's fairway: a dock or pier within FAIRWAY m on both sides of her (20-30 m between a marina's docks; Aquatic
+ * Park's 57 m entrance and the open water aren't), across any axis. */
+const FAIRWAY = 15;
+function inFairway(b: Vec): boolean {
+  // (whichever way she's heading, or turning: across any of four axes)
+  const hit = (a: number) => { const n = V(a); return landAlong(b, { x: b.x + n.x * FAIRWAY, y: b.y + n.y * FAIRWAY }) < Infinity; };
+  return [0, 45, 90, 135].some(a => hit(a) && hit(a + 180));
+}
 /** How far she is off the leg from a to b (m): her distance from the segment. */
 function offLeg(q: Vec, a: Vec, b: Vec): number {
   const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q.x - a.x) * vx + (q.y - a.y) * vy) / L2));
@@ -181,8 +189,8 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   const r = p.route;
   // on to the next turn when the way to it is clear of land ADVANCE_CLEAR either side, so she never cuts the corner of a
   // pier head or a breakwater's end; or at the turn itself (8 m), so she can't circle it
-  // (in enclosed water, a marina's fairways 20-30 m wide, 15 m either side never fits: there, the fairway's half-width)
-  const adv = wharfShelter(b) < 0.5 ? ADVANCE_CLEAR : 6;
+  // (down a marina's fairway, 20-30 m wide, 15 m either side never fits: there, the fairway's half-width)
+  const adv = inFairway(b) ? 6 : ADVANCE_CLEAR;
   while (p.ri < r.length - 1 && (clearLine(b, r[p.ri + 1], adv) || Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 8)) p.ri++;
   if (p.ri >= r.length - 1) { p.route = null; return 'clear'; } // (on the last leg: straight for it)
   return r[p.ri];
@@ -225,14 +233,16 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
     // land ahead on both tacks: in a basin or a narrow channel, short tacks, onto the one with more room; only boxed in
     // (under BOXED m of water either way) is beyond it
     if (shore && dOther < look) {
-      if (Math.max(dCur, dOther) < BOXED) { p.alarm = 'Pilot alarm: land ahead on both tacks. Pilot on standby: you have the tiller.'; return cur; }
+      // (boxed in by what's dead ahead on each tack, not the look-ahead's berth either side, which in a 57 m gap sees
+      // the piers on both)
+      if (Math.max(landDist(b, cur, look, 0), landDist(b, close(other), look, 0)) < BOXED) { p.alarm = 'Pilot alarm: land ahead on both tacks. Pilot on standby: you have the tiller.'; return cur; }
       if (dOther > dCur) { p.lastTackT = t; p.goTack = other; return close(other); }
       return cur;
     }
     // a pier or a breakwater come within a berth of her, to leeward as she sags down on it or abeam: tack away from it,
     // as a sailor does, not just for land dead ahead
-    // (not in enclosed water, a marina's fairways, where a dock is always that close: there the route's line is the guide)
-    const wn = wharfShelter(b) < 0.5 ? wharfNearest(b, BERTH) : null;
+    // (not down a marina's fairway, where a dock is always that close: there the route's line is the guide)
+    const wn = inFairway(b) ? null : wharfNearest(b, BERTH);
     const away = !!wn && wn.d > 0 && dot(V(close(other)), wn.n) > dot(V(cur), wn.n) + 0.2;
     if ((fetch(other) && !fetch(b.tack)) || shore || away) { p.lastTackT = t; p.goTack = other; return close(other); }
   }
