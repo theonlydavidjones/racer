@@ -43,6 +43,9 @@ async function run(browser, way) {
   const clock = () => page.evaluate(() => document.getElementById('clock').textContent);
   console.log(`[${way}]`, await page.evaluate(() => ['clock', 'spd', 'linebox'].map(i => document.getElementById(i).textContent).join(' | ')));
   // (the race sails in its worker: sim/host.ts WorkerHost; 'local' means in the page, as it must when blob: is refused)
+  // (the windex names her point of sail: ROADMAP 8j)
+  const pos = await page.evaluate(() => document.querySelector('#sailBand .sb-pos')?.textContent ?? ''); console.log(`[${way}] point of sail:`, pos || '(none)');
+  if (!pos) errs.push('no point of sail in the band\'s windex');
   const mode = await page.evaluate(() => document.documentElement.dataset.sim); console.log(`[${way}] the race sails in:`, mode);
   if (mode !== (way === 'blob' ? 'worker' : 'local')) errs.push(`the race sails in ${mode}`);
   await page.evaluate(() => { document.getElementById('bFast').click(); document.getElementById('bFast').click(); });

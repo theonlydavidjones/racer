@@ -1,6 +1,9 @@
 import climate from './data/sf-air-climate.json';
+import byWind from './data/sf-warm-by-wind.json';
 import real from './data/sf-real-days.json';
 import { LL } from '../geo/geo';
+import { sfLocalToUtcMin } from './tide';
+import { OPEN_WATER, type WindKind } from './wind';
 import type { Vec } from '../core/math';
 
 /**
@@ -102,6 +105,34 @@ export function airTempC(date: string, tMin: number, p: Vec = CITYFRONT): AirTem
 /** The temperature counted as a warm day for shorts (°C): 68 °F, the owner's (13 Nov 2026). */
 export const WARM_C = 20;
 
+interface WindCell { ratio: number }
+const W = byWind as unknown as { mids: number[]; stations: Record<string, { cells: Record<'summer' | 'winter', Record<string, WindCell[]>> }> };
+/** The day's wind, as a climate-only day draws it (environment/weather.ts dayWeather): its kind, and its mean speed at
+ * Fort Point (the station, not out on the water) over 11:00–16:59. */
+export interface DayWind { kind: WindKind; kt: number }
+/** The day's wind from its weather (dayWeather): its kind, and the mean of its wind over 11:15–16:45 brought back from
+ * open water to the station's (OPEN_WATER: wind.ts; breezeAt's open-water speeds, on the climate days this is for). */
+export function dayWindOf(date: string, wx: { kind: WindKind; at(tMin: number): { kt: number } }): DayWind {
+  const t0 = sfLocalToUtcMin(date, '11:00');
+  let s = 0; for (let k = 0; k < 12; k++) s += wx.at(t0 + 15 + k * 30).kt;
+  return { kind: wx.kind, kt: s / 12 / OPEN_WATER };
+}
+/**
+ * How much more (or less) often than its month a station's afternoon is warm, given the day's wind
+ * (scripts/fit-warm-days.mjs): the standardized ratio for the season, kind and speed, between the speed bands' middles
+ * on a log scale, so a wind on a band's edge doesn't jump; outside the middles, the end band's.
+ */
+function windRatio(id: string, month: number, wind: DayWind): number {
+  const st = W.stations[id]; if (!st) return 1;
+  const cells = st.cells[month >= 3 && month <= 8 ? 'summer' : 'winter'][wind.kind];
+  if (!cells?.length) return 1;
+  if (wind.kind === 'light' || cells.length === 1) return cells[0].ratio;
+  const M = W.mids, kt = Math.max(M[0], Math.min(M[M.length - 1], wind.kt));
+  const i = Math.min(M.length - 2, Math.max(0, M.findIndex((m, j) => kt >= m && kt <= M[j + 1])));
+  const f = (kt - M[i]) / (M[i + 1] - M[i]);
+  return Math.exp(Math.log(cells[i].ratio) * (1 - f) + Math.log(cells[i + 1].ratio) * f);
+}
+
 /** 0..1 from a date (YYYY-MM-DD): the same for everyone sailing that day. */
 function dayDraw(date: string): number {
   let h = 0x811c9dc5;
@@ -118,14 +149,21 @@ const RACE_HOURS = [12, 13, 14, 15, 16];
  *   the stations.
  * - A day it has only the climate for: warm as often as the stations' days were in that month (the share of days with a
  *   reading at 20 °C or more 12:00–16:59, 2021–2025, blended between the stations), against one number drawn from the
- *   date (the same day for everyone; and a warmer place on the same day is warm first).
- * Not yet: in real life the warm afternoons come with light wind and no fog (offshore or weak sea-breeze days: Fort
- * Point's August–October warm afternoons averaged 7 kt, the rest 9); on a climate-only day the draw here is independent
- * of the day's wind and fog, and heat that comes for several days in a row comes here a day at a time.
+ *   date (the same day for everyone; and a warmer place on the same day is warm first). Given the day's wind (`wind`:
+ *   dayWindOf), that share × how much more or less often days with that wind were warm in that season
+ *   (scripts/fit-warm-days.mjs, the same records and years). On the record: at Fort Point the wind's strength makes no
+ *   difference, and the light and variable days are warm far more often (about ×2.7, most of them autumn's offshore days:
+ *   October's alone are ten of its twenty); along the east shore (Pier 1, Alameda, Richmond) a fresh summer westerly
+ *   (14 kt or so at Fort Point) about ×1.6–1.8, a light one (6 kt) about ×0.6 (the inland heat that drives a strong sea
+ *   breeze reaches the sheltered shore; the fog's own wind keeps Fort Point cool). The sim draws one speed for each kind
+ *   of day in a month (light, typical or windy: wind.ts), so this sets which of its days are warm, not the record's spread.
+ * Not yet: heat that comes for several days in a row comes here a day at a time; and fog (the sim has it only on days
+ * with the real temperature, which decides those days itself).
  */
-export function warmDay(date: string, p: Vec = CITYFRONT): boolean {
+export function warmDay(date: string, p: Vec = CITYFRONT, wind?: DayWind): boolean {
   const month = +date.slice(5, 7) - 1;
   const hot = RACE_HOURS.map(h => { const d = dayTemps(date, month, h); return d ? blend(p, d.vals) : null; });
   if (hot.some(v => v != null)) return hot.some(v => v != null && v >= WARM_C);
-  return dayDraw(date) < (blend(p, Object.fromEntries(IDS.map(id => [id, C.stations[id].warmDay[month]]))) ?? 0);
+  const share = blend(p, Object.fromEntries(IDS.map(id => { const m = C.stations[id].warmDay[month]; return [id, m == null ? null : wind ? Math.min(0.95, m * windRatio(id, month, wind)) : m]; })));
+  return dayDraw(date) < (share ?? 0);
 }
