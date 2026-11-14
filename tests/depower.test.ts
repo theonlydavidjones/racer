@@ -11,7 +11,7 @@ function beat(kt: number, holdFullPower = false) {
   let vmg = 0, n = 0, heel = 0;
   for (let i = 0; i < 60 * 150; i++) {
     u.h = (w.wind.from + 42 + 360) % 360; u.turnTarget = null; u.steer = 0; u.tiller = 0;
-    if (holdFullPower) u.depower = 0;
+    if (holdFullPower) { u.depower = 0; u.gust = 0; } // (full power: no depowering, and the main not dumped in the gusts: physics.ts puffEase)
     w.step(DT);
     if (i > 60 * 90) { vmg += u.v * Math.cos(42 * Math.PI / 180); heel += u.heelMag ?? 0; n++; }
   }

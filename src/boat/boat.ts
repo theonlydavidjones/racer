@@ -236,6 +236,11 @@ export interface Boat {
   crewIdeal?: CrewSettings & { mainsheet: number; jibsheet: number } | null;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
   depower?: number;
+  /** The crew's answer to a puff she can't carry, 0..1 (physics.ts puffEase): the traveller down, then the main eased. */
+  gust?: number;
+  /** How long she's been clear of the puff (s), for puffEase's PUFF_SEE. */
+  gustClear?: number
+  gustLag?: number;
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
   trim: { main: SailTrim; jib: SailTrim | null };
   awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)
