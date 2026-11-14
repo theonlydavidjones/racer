@@ -35,6 +35,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
+import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
@@ -657,7 +658,8 @@ export class World {
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
     const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
-    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    if (!nearMouth(p)) return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    return withHarborMouths(p, c, k, this.mouthFlows(), this.t); // (and the gyre and eddies in a harbor's mouth: environment/harborMouth.ts)
   }
   /** The stream at a point as if no breakwater stood there: the sea's look upwind for the water its waves came
    * through (environment/sea.ts), which is never a harbor's still basin (no waves come to open water through one). */
@@ -665,7 +667,7 @@ export class World {
    * waiting on a harbor's still-water grid not built yet (the open stream there until it is, a moment later). */
   currentDrawn(p: Vec): Vec {
     const c = withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t), k = basinCalmIfBuilt(p) ?? 1;
-    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    return nearMouth(p) ? withHarborMouths(p, c, k, this.mouthFlows(), this.t) : k === 1 ? c : { x: c.x * k, y: c.y * k };
   }
   openStreamAt(p: Vec): Vec { return withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t); }
   /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
@@ -684,6 +686,24 @@ export class World {
     return this.flows;
   }
   private flowsC: Vec | null = null;
+  /** The harbor mouths' water (environment/harborMouth.ts): the stream crossing each, its gyre and its eddies' phase, brought up to date every half minute. */
+  private mouthS: MouthState = mouthState(); private mouthC: Vec | null = null;
+  private mouthFlows(): MouthState {
+    // (another preset: its water from the start, the eddies keeping their beat. A new object, not the old one changed:
+    // the page's mirror is sent what's new, sim/sync.ts)
+    if (!this.tide && this.mouthC !== this.cvec) { this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; this.mouthC = this.cvec; }
+    const S = this.mouthS;
+    if (!(this.t - S.t >= 0 && this.t - S.t < 30)) {
+      // (the first look under the real tide: the last 13 hours of it, predicted from the same constants, to spin the gyre up;
+      // only the stations within 4 km of a mouth are predicted: the stream there is theirs to within a percent, at an eighth of the cost)
+      let past: ((p: Vec, hoursAgo: number) => Vec) | undefined;
+      if (this.tide && !(this.t - S.t >= 0)) { const now = this.clockUtc, f = new CurrentField(stationsFor(now - 13 * 60 - 5, now + 5, { at: MOUTH_REFS, within: 4000 })); past = (p, h) => { f.setTime(now - h * 60); return f.atShore(p, false); }; }
+      refreshMouths(S, this.t, q => this.streamAt(q, false), past);
+      // (as a new object each time, like the piers' flows: the page's mirror is sent what's new, not what's changed in place)
+      return this.mouthS = { t: S.t, flows: S.flows.slice(), gyre: S.gyre.slice(), phase: S.phase.slice() };
+    }
+    return S;
+  }
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
@@ -924,6 +944,7 @@ export class World {
     this.courseWind();
     this.puffs.step(dt, this.wind, p => this.fieldDrift(p)); // each puff goes with the wind where it is
     if (this.tide) { if (this.steps % 60 === 0) this.updateTide(); else this.tide.setTime(this.clockUtc); }
+    this.mouthFlows(); // (the harbor mouths' water kept up every step, asked for or not: what it holds depends on when it was read, so the race reads it, and the page's mirror is sent it)
     this.avgFrom = n360(this.avgFrom + wrap(this.wind.from - this.avgFrom) * dt / 60);
     if (this.steps % 30 === 1) for (const b of this.boats) b.leeK = landLee(b, this.wind.from); // the lee of the land, twice a second
     for (const b of this.boats) {
@@ -1992,15 +2013,17 @@ export class World {
     const s: Settings = { ...this.settings };
     for (const k of CONDITION_KEYS) (s as unknown as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k];
     const n = new World(this.file, { ...s, fleet: 0, opponents: [] }, this.seed, { ...this.opts, startAt: this.startAt });
+    const newTide = (['current', 'tideDate', 'tideTime'] as const).some(k => this.settings[k] !== s[k]); // (another tide: the harbor mouths' gyres are spun up afresh; a change of wind leaves them be)
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
-    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; // (the piers' wakes from the new stream at once)
+    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
     this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();
     if (this.tide) this.updateTide();
+    this.mouthFlows(); // (read at once, here as in the race's step, so the race and its mirror hold the same)
     // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
     // as it would on the water, until the new mean settles in)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
