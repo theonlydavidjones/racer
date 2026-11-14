@@ -1189,7 +1189,7 @@ $('bShowReal').onclick = () => { showMin = null; showCond = null; setup.newGame(
 // mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; setup.tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
-  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
+  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 'real', fog: 'real' });
   saveSettings(S); setup.paintSeg(); setup.setupChanged(() => { setup.courseCard(); setup.tideBox(); });
 };
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
@@ -1382,7 +1382,7 @@ $('realRows').addEventListener('click', e => {
   const r = realRace(b.dataset.real!); if (!r) return;
   // the day as it was: its observed wind and NOAA's tide, the sea it made, the fleet's own start; the real boats that started
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.id });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.id });
   replayPin = null;
   S.opponents = realFleetIds(r, S.boat.sails.number, MAX_OPPONENTS);
   S.fleet = S.opponents.length;
@@ -1440,7 +1440,7 @@ const liveBoat = (sail: string) => {
 function sailSeason(id: string, no: number): void {
   const series = seasonById(id), r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.realId ?? undefined });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.realId ?? undefined });
   replayPin = null; ghostNext = null;
   S.opponents = [...series.fleet]; S.fleet = S.opponents.length;
   if (!S.boat.slip) S.raceFrom = 'water';
@@ -1544,7 +1544,7 @@ function adjustUi(): void {
     if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = k === 'windTurn' ? 'as usual' : 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
   }
   if (S.current !== 'real') real.push('current');
-  if (S.rain) real.push('rain');
+  if (typeof S.rain === 'number' && S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
   const names: Record<string, string> = { windKt: 'wind speed', windTurn: 'wind turned', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');
