@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
-import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { DEFAULT_JUDGING, DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, PROTEST_HAIL, World } from '../src/sim/world';
 import { PROTEST_REACT } from '../src/ai/conduct';
 
@@ -51,8 +51,10 @@ describe('Protests: the hail and the red flag (RRS 60.2(a)(1))', () => {
     expect(w.hailOption()?.kind).not.toBe('protest');
   });
 
-  it('umpired (the default for now), and in the practice area, there is no protest hail', () => {
-    const um = new World(SS2, settings(), 3); racing(um); incident(um, 'them');
+  it('protests are the default for a race (the owner); umpired, and in the practice area, there is no protest hail', () => {
+    expect(DEFAULT_JUDGING).toBe('protests'); // (the shipped default: tests/setup/judging.ts sets the tests' to umpired)
+    expect(new World(SS2, settings({ judging: DEFAULT_JUDGING }), 3).protestsOn).toBe(true);
+    const um = new World(SS2, settings({ judging: 'umpired' }), 3); racing(um); incident(um, 'them');
     expect(um.hailOption()?.kind).not.toBe('protest');
     const pr = new World(TRAIN, settings({ judging: 'protests' }), 3); racing(pr); incident(pr, 'them');
     expect(pr.protestsOn).toBe(false);

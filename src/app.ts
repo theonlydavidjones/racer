@@ -278,7 +278,7 @@ function handle(e: SimEvent): void {
 
 let lastClip: ReplayClip | null = null;
 /** This race's rule incidents, for the race replay (by Moment.ref). */
-let incidentClips: { clip: ReplayClip; title: string; what: string }[] = [];
+let incidentClips: { clip: ReplayClip; title: string; what: string; t?: number }[] = [];
 function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): void {
   setControlsIdle();
   const user = A.isUser ? A : B, other = A.isUser ? B : A, youFault = inc.fouler.isUser;
@@ -311,7 +311,7 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   if (w.log) {
     const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
     send({ k: 'logNote', note: { key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length } });
-    incidentClips.push({ clip, title, what: ex.what });
+    incidentClips.push({ clip, title, what: ex.what, t: w.t });
   }
   $('replay').hidden = false;
   replayView.play(w, clip);

@@ -120,6 +120,8 @@ export interface Protest {
   /** Her penalty for it: owed (she took it on), declined, or null (no foul by her to take one for); and when her turns
    * were done, if they were (RRS 60.5(c)(2): no further penalty). */
   owed: boolean | null; turnsT: number | null;
+  /** The engine found the protested boat exonerated (43.1). */
+  exonerated?: boolean;
   /** The protested boat wasn't racing (the Part 2 preamble: no penalty, except rule 23.1). */
   notRacing?: boolean;
 }
@@ -293,7 +295,7 @@ export class World {
   /** Protests made on the water (RRS 60), in order. */
   protests: Protest[] = [];
   /** The last incident the user was in: the boat, when, and the engine's call (for the Protest hail). */
-  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail'; part?: string; notRacing?: boolean } | null = null;
+  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail'; part?: string; notRacing?: boolean; exonerated?: boolean } | null = null;
   finishShown = false;
   /** This outing's gone into the boats' logbooks (boat/logbook.ts). */
   logged = false;
@@ -1300,7 +1302,7 @@ export class World {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         const other = A.isUser ? B : A;
-        this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part, notRacing: !!incident.notRacing };
+        this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part, notRacing: !!incident.notRacing, exonerated: incident.exoneratedBy != null };
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
       } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.penaltyFor(f, this.t); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
       // Protests: an AI boat fouled hails "Protest!" at once (her reaction time), before she knows if the other will turn.
@@ -1811,9 +1813,9 @@ export class World {
   }
 
   /** Racing, before she's finished: she retires (RET, RRS A5.1), and she's no longer racing. False if she isn't racing. */
-  retire(why = ''): boolean {
+  retire(why = '', afterFinish = false): boolean {
     const u = this.user;
-    if (this.freeSail || u.finished || u.retired) return false; // (before her preparatory signal too: a boat that retires from a race she's entered)
+    if (this.freeSail || (u.finished && !afterFinish) || u.retired) return false; // (after finishing, only to answer a protest: RET, A5.2) // (before her preparatory signal too: a boat that retires from a race she's entered)
     u.retired = true; u.penalty = 0; u.penaltyTurned = 0; u.ocs = false; u.roundEnd = false;
     this.emit({ type: 'toast', msg: `Retired (RET, RRS A5.1)${why}: she's no longer racing. Keep clear of the boats still racing (RRS 23.1).`, ms: 5000 });
     return true;
@@ -2141,7 +2143,7 @@ export class World {
     // (her penalty: declined if she chose not to take it, owed otherwise; done once her turns are, protestsStep. Rule 23.1
     // has no turns to take, 44.1 being for an incident while racing: none owed)
     const owed = !fouled ? null : inc!.part === '23.1' ? false : !this.declined.has(`${vs.id}@${inc!.t}`);
-    this.protests.push({ by: by.id, vs: vs.id, t: inc?.t ?? this.t, rule: fouled ? inc!.rule : null, fouler: inc?.fouler ?? null, kind: inc?.kind ?? null, hailT: this.t, flagT: this.t, owed, turnsT: null, notRacing: fouled && !!inc!.notRacing });
+    this.protests.push({ by: by.id, vs: vs.id, t: inc?.t ?? this.t, rule: fouled ? inc!.rule : null, fouler: inc?.fouler ?? null, kind: inc?.kind ?? null, hailT: this.t, flagT: this.t, owed, turnsT: null, notRacing: fouled && !!inc!.notRacing, exonerated: fouled && !!inc!.exonerated });
     by.protestFlag = true;
     if (by.isUser) this.emit({ type: 'toast', ms: 3500, msg: `"Protest!" Your red flag's up (Rule 60.2).` });
     else if (vs.isUser) this.emit({ type: 'toast', ms: 4500, msg: `${by.name}: "Protest!" (${by.no.replace(/^US\s+/, 'USA ')})` });
