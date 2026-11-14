@@ -4,7 +4,10 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { BREAKWATER_W, FINGER_W, HARBORS, WALKWAY_W, mooredIn, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
 import type { Vec } from '../core/math';
 import { P3 } from './coords';
-import { MAX_BEAM, MOORED, powerParts, sailParts } from './mooredBoats';
+import { MAX_BEAM, MOORED, powerParts, sailParts, type MooredPart } from './mooredBoats';
+import { powerPartsNear, sailPartsNear } from './mooredNear';
+/** The boats drawn in detail (mooredNear.ts): those within NEAR_R m of the camera, the NEAR_MAX nearest of each kind in each harbor. */
+const NEAR_R = 120, NEAR_MAX = 40;
 import type { MooredKind } from '../geo/marina';
 
 // (which slips have a boat, and the boats: geo/marina.ts mooredIn, shared with the sim)
@@ -89,27 +92,40 @@ function rng(seed: number) { return () => { seed = (seed * 16807) % 2147483647; 
  */
 class SlipBoats {
   private parts: { mesh: THREE.InstancedMesh; own?: 'hull' | 'cover' }[] = [];
-  private mats: { slip: Slip; len: number }[] = [];
+  /** The detailed boats (mooredNear.ts) for the slips nearest the camera: NEAR_MAX instances, refilled as it moves. */
+  private near: { mesh: THREE.InstancedMesh; own?: 'hull' | 'cover' }[] = [];
+  private nearOf: number[] = []; // (the boats drawn near, by index)
+  private lastCam = new THREE.Vector3(1e9, 0, 0);
+  private dirty = true;
+  private shown: boolean[] = [];
+  private boats: { slip: Slip; len: number; colour: number; cover: number }[] = [];
   readonly index = new Map<string, number>();
   private beam: number;
   /** Where the boats are (their middle), the level-of-detail's own position: the parts' instances are placed relative to it. */
   private at = new THREE.Vector3();
   constructor(group: THREE.Group, kind: MooredKind, boats: { slip: Slip; len: number; colour: number; cover: number }[]) {
-    this.beam = MOORED[kind].beam;
+    this.beam = MOORED[kind].beam; this.boats = boats;
     const n = boats.length; if (!n) return;
     for (const b of boats) this.at.add(P3(b.slip.p.x, b.slip.p.y, 0)); this.at.divideScalar(n);
     // near by, every part; beyond 1.2 km, where a boat is a few pixels long, a simpler set (mooredBoats.ts `far`)
     const lod = new THREE.LOD(); lod.position.copy(this.at); group.add(lod);
+    const mat = (p: MooredPart) => new THREE.MeshLambertMaterial({ color: p.colour, vertexColors: !!p.vc });
     for (const [far, dist] of [[false, 0], [true, 1200]] as const) {
       const level = new THREE.Group();
       for (const p of kind === 'sail' ? sailParts(far) : powerParts(far)) {
-        const mesh = new THREE.InstancedMesh(p.geo, new THREE.MeshLambertMaterial({ color: p.colour }), n);
+        const mesh = new THREE.InstancedMesh(p.geo, mat(p), n);
         level.add(mesh); this.parts.push({ mesh, own: p.own });
       }
       lod.addLevel(level, dist);
     }
+    // and the few nearest the camera in detail: their own instances, about the same place
+    const nearGrp = new THREE.Group(); nearGrp.position.copy(this.at); group.add(nearGrp);
+    for (const p of kind === 'sail' ? sailPartsNear() : powerPartsNear()) {
+      const mesh = new THREE.InstancedMesh(p.geo, mat(p), Math.min(n, NEAR_MAX)); mesh.count = 0;
+      nearGrp.add(mesh); this.near.push({ mesh, own: p.own });
+    }
     boats.forEach((b, i) => {
-      this.mats.push({ slip: b.slip, len: b.len }); this.index.set(b.slip.id, i);
+      this.index.set(b.slip.id, i); this.shown.push(true);
       for (const p of this.parts) if (p.own) p.mesh.setColorAt(i, new THREE.Color(p.own === 'hull' ? b.colour : b.cover));
       this.place(i, true);
     });
@@ -117,12 +133,40 @@ class SlipBoats {
   }
   private m = new THREE.Matrix4(); private q = new THREE.Quaternion(); private up = new THREE.Vector3(0, 1, 0);
   private s = new THREE.Vector3(); private zero = new THREE.Vector3(0, 0, 0);
+  /** Boat i's matrix (relative to `at`): in her slip, at her length, or scaled to nothing. */
+  private matrix(i: number, show: boolean): THREE.Matrix4 {
+    const { slip, len } = this.boats[i], c = P3(slip.p.x, slip.p.y, 0).sub(this.at);
+    this.q.setFromAxisAngle(this.up, -slip.heading * Math.PI / 180); // her bow toward −z, as the parts are built
+    return this.m.compose(c, this.q, show ? this.s.set(Math.min(len, MAX_BEAM / this.beam), len, len) : this.zero); // (her beam to fit the slip)
+  }
   /** Show or hide the boat in this slip (hidden: scaled to nothing). */
   place(i: number, show: boolean): void {
-    const { slip, len } = this.mats[i], c = P3(slip.p.x, slip.p.y, 0).sub(this.at);
-    this.q.setFromAxisAngle(this.up, -slip.heading * Math.PI / 180); // her bow toward −z, as the parts are built
-    this.m.compose(c, this.q, show ? this.s.set(Math.min(len, MAX_BEAM / this.beam), len, len) : this.zero); // (her beam to fit the slip)
-    for (const p of this.parts) { p.mesh.setMatrixAt(i, this.m); p.mesh.instanceMatrix.needsUpdate = true; }
+    this.shown[i] = show; this.dirty = true;
+    const m = this.matrix(i, show && !this.nearOf.includes(i));
+    for (const p of this.parts) { p.mesh.setMatrixAt(i, m); p.mesh.instanceMatrix.needsUpdate = true; }
+  }
+  /**
+   * Before drawing: the slips within NEAR_R of the camera (the NEAR_MAX nearest) drawn in detail, and left out of the
+   * simpler set; worked out again once the camera has moved a few metres.
+   */
+  update(cam: THREE.Vector3): void {
+    if (!this.near.length || (!this.dirty && cam.distanceToSquared(this.lastCam) < 9)) return;
+    this.lastCam.copy(cam); this.dirty = false;
+    const want: { i: number; d: number }[] = [];
+    this.boats.forEach((b, i) => { if (!this.shown[i]) return; const p = P3(b.slip.p.x, b.slip.p.y, 0), d = p.distanceToSquared(cam); if (d < NEAR_R * NEAR_R) want.push({ i, d }); });
+    want.sort((a, b) => a.d - b.d);
+    const next = want.slice(0, NEAR_MAX).map(w => w.i), was = this.nearOf;
+    if (next.length === was.length && next.every((i, k) => i === was[k])) return;
+    this.nearOf = next;
+    for (const i of new Set([...was, ...next])) { const m = this.matrix(i, this.shown[i] && !next.includes(i)); for (const p of this.parts) { p.mesh.setMatrixAt(i, m); p.mesh.instanceMatrix.needsUpdate = true; } }
+    next.forEach((i, k) => {
+      const b = this.boats[i], m = this.matrix(i, true);
+      for (const p of this.near) { p.mesh.setMatrixAt(k, m); if (p.own) p.mesh.setColorAt(k, new THREE.Color(p.own === 'hull' ? b.colour : b.cover)); }
+    });
+    for (const p of this.near) {
+      p.mesh.count = next.length; p.mesh.instanceMatrix.needsUpdate = true; if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
+      if (next.length) p.mesh.computeBoundingSphere();
+    }
   }
 }
 
@@ -228,6 +272,9 @@ export class Harbor {
     for (const m of mooredIn(H.id)) fleet[m.kind].push(m);
     for (const k of ['sail', 'power'] as const) this.boats.push(new SlipBoats(this.group, k, fleet[k]));
   }
+
+  /** Before drawing: the slips nearest the camera drawn in detail. */
+  update(cam: THREE.Vector3): void { for (const b of this.boats) b.update(cam); }
 
   /** Leave these slips empty (your boats' slips: she's out sailing, or drawn as herself). */
   clearSlips(ids: (string | undefined)[]): void {
