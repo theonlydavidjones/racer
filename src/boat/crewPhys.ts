@@ -115,8 +115,8 @@ export interface Job {
   big?: boolean;
   /** a big lasting change of a cabin-top line (crewWork.ts LINE_URGENT): seen through, a jib tweak waits */
   urgent?: boolean;
-  /** (A cabin-top line) her true wind angle and their wish over the cycle when they chose where to set it (crewWork.ts LINE_MOVED). */
-  refTwa?: number; refWish?: number;
+  /** (A cabin-top line) her true wind angle when they chose where to set it (crewWork.ts LINE_MOVED). */
+  refTwa?: number;
 }
 /** Where a job puts a person: across (m, + to windward), fore-and-aft (m), and how they're posed. */
 export interface Station { arm: number; z: number; pose: Pose }
@@ -134,7 +134,7 @@ export interface CrewState {
   /** Where you've put them (absent: the crew's own call). */
   place?: CrewPlace;
   /** A roll tack in progress: holding the old high side, then flattening; and its clock. */
-  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number } | null;
+  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number; heel0?: number } | null;
   /** The windward side last step (+1 starboard), to see a tack or gybe. */
   wind: number;
   // summaries, for the figures, the coach and tests
@@ -346,10 +346,12 @@ export interface CrewCall {
  */
 export const ROLL_HOLD = 2;
 /**
- * And they go across at once when she's heeling onto the new tack by this much (deg): the new side's sails have filled
- * and the low side they're on is the leeward one now. In light air she heels slowly and the hold runs on, as a roll
- * tack does; in a breeze she's heeled 20° in a second or so, and they sat on the low side through it (Crew Figures,
- * watching a 14 kt race's tacks). An estimate.
+ * And they go across at once when she has heeled this much more (deg) onto the new tack since she came through the
+ * wind: the new side's sails have filled, and the low side they're on is the leeward one now. Measured from her heel
+ * as she came through, which their own weight on the old rail already gives her (5 to 8°). In light air the sails
+ * heel her little and the hold runs on, as a roll tack does; in a breeze she heeled 20° in a second or so with them
+ * still on the low side (Crew Figures, watching a 14 kt race's tacks). Practice: in light air keep still and time the
+ * roll; in a breeze get to the new rail fast (North Sails, Sailing World, Yachting World on keelboat tacks). An estimate.
  */
 export const ROLL_HEEL = 5;
 /**
@@ -402,14 +404,14 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   if (!tacked && k.tackComing && canRoll && !c.roll) c.roll = { phase: 'lead', t: 0 };
   if (tacked) {
     const through = k.twa < 90;
-    c.roll = through && canRoll ? { phase: 'hold', t: 0 } : null;
+    c.roll = through && canRoll ? { phase: 'hold', t: 0, heel0: k.heel ?? 0 } : null;
     c.wind = w; c.side = k.tack;
   }
   if (c.roll) {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
-    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (k.heel ?? 0) > ROLL_HEEL)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (k.heel ?? 0) - (c.roll.heel0 ?? 0) > ROLL_HEEL)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }

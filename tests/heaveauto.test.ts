@@ -52,6 +52,9 @@ describe('hove to, Auto keeps her hove to', () => {
     sail(b, 6, () => { if (atTack == null && b.tack !== tack) atTack = b.ctl.jibsheet; });
     expect(b.tack).not.toBe(tack);
     expect(atTack, 'the sheet that was made fast, leeward now').toBeCloseTo(made, 2);
+    // (and then sailing: the old leeward sheet let fly as the lazy one, the jib trimmed close-hauled, not eased off)
+    expect(b.ctl.jibsheetW, 'the lazy sheet').toBeGreaterThan(0.9);
+    expect(b.ctl.jibsheet, 'trimmed for sailing').toBeLessThan(0.3);
     expect(b.jibBacked).toBe(0); expect(b.hove).toBe(false);
   }, 180_000);
   it('then let the lashing go and steer off: the crew let the windward sheet fly, and she sails', () => {
