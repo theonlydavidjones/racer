@@ -212,6 +212,9 @@ What's planned, roughly in order. Done work is described in the README.
    centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
    slip at Gas House Cove. I've tried over and over and over again. I just can't get pushed back far enough, and I
    can't seem to get the nose around."
+   - Batch 34: at the dock and under bare poles the crew now sit centered; and Deep Physics' test of leaving under bare
+     poles on the real tide, beam wind both ways, finds she goes to leeward, so the windward drift didn't reproduce. If
+     it's still seen, the owner's exact case (time, tide, wind) is needed. The push-off and getting the nose round stay open.
    - **Drifting to windward with no sails up is a bug.** A boat with no way on and no sail up is set to leeward by
      the wind on her hull and rig, plus or minus the current. Nothing drives her upwind. Look at the bare-pole windage
      force's sign or direction, the hove-to and in-irons models acting with the sails down, the shelter field inside
@@ -376,6 +379,12 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **Bugs in the race setup's "When" section** (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
+     - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
+       off after the first week. It should open fully visible, flipping upward or scrolling the panel.
+     - Starting from her slip at Gashouse Cove with "Leave at 1:35 PM", equal to the 13:35 gun, the line reads "She
+       starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
+       plainly that she can't make the start from there.
    - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
@@ -397,7 +406,7 @@ What's planned, roughly in order. Done work is described in the README.
      4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
         signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
         saying.
-   - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
+   - ~~**A Save button on the Yacht Club's member page**~~ (done, batch 34: Save, and "Save changes?" on leaving, on a member's page, a boat's crew and the boat editor) (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
      save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
      stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
