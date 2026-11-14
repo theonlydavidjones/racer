@@ -263,14 +263,16 @@ What's planned, roughly in order. Done work is described in the README.
    pinned, tacks only with the way to, and the map draws the course it sails. tests/aquaticPark-sweep.test.ts is the
    measured baseline (48 runs over six seeds: all arrive, 42 clean, 6 known touches). Follow-ups:
    - 8s-1. **No re-plans mid-maneuver in a gap** (1–2 h): beating out of the 57 m entrance in 18 kt from 350°, a plan made in
-     the gap swings her across the pier end (seeds 4, 5, 7: 3.7 m off to touching). Hold the route through a tack, and
+     the gap swings her across the pier end (seeds 4, 5, 7: 3.7 m off to touching; 4 of 9 seeds tried, with seed 9). Hold the route through a tack, and
      re-plan only once she's clear of the gap.
    - 8s-2. **The Hyde Street and Pier 39 approaches** (2–3 h): reaching into Hyde Street harbor at 150° she touches by its
-     breakwater (seeds 1, 3); beating out of the Pier 39 marina's fairways in a northerly she's set onto the shore
+     breakwater (seeds 1, 3; at 180°, seed 9 passes 3.2 m off); beating out of the Pier 39 marina's fairways in a northerly she's set onto the shore
      (seed 3).
    - 8s-3. **The pilot jibes downwind for VMG** (2–3 h; the Coordinator): on the run's laylines when it clearly pays, with
      the same hysteresis as the tacks, never in a harbor or close to land; then the drawn course jibes with it
      (sim/navigator.ts passageNow runs=true under Nav).
+   - 8s-4. **Under power near land, follow the route's turns** (1 h; review): with land within 150 m of the direct line
+     the motoring pilot still beats (and the map draws the beat). A boat under power should motor the route's legs.
 8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
    intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
    Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it

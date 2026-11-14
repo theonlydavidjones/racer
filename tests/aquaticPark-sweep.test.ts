@@ -9,7 +9,7 @@ import { routeAround } from '../src/sim/routing';
 
 // The navigator's hard cases round Aquatic Park and the Wharf, each sailed over six seeds (the wind's gusts and shifts
 // differ by seed): a measured baseline (the Coordinator, 14 Nov 2026). Every run must arrive with the pilot still steering.
-// Each run is clean (no contact, her centre off the piers by the berth) except the known limits listed by seed with
+// Each run is clean (no contact, her center off the piers by the berth) except the known limits listed by seed with
 // why. A known limit that comes clean fails too, so an improvement shows and the list is kept true.
 // (Full suite only: about 48 runs of up to 90 min of sailing; test:fast leaves it out.)
 const S = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'flat', ...o });
