@@ -383,7 +383,9 @@ interface Lines {
   /** The vang's tackle, from the boom's block (it swings with the boom) to the lower block on the mast's foot. */
   vang: THREE.Line;
 }
-const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 }); // sheets and control lines (the boat's green-grey braid)
+const LINE_MAT = new THREE.LineBasicMaterial({ color: 0x5c7f76 });
+/** The flag halyard: thin pale braid, faint against the sky, so it never reads as standing rigging. */
+const FLAG_LINE = new THREE.LineBasicMaterial({ color: 0xf1ece0, transparent: true, opacity: 0.4, depthWrite: false }); // sheets and control lines (the boat's green-grey braid)
 const STEEL = new THREE.MeshPhongMaterial({ color: 0xc9ced3, specular: 0xffffff, shininess: 90 });
 /** The companionway doors' panels (a darker varnish, set in) and their bronze hinges and latch. */
 const DOOR_PANEL = new THREE.MeshPhongMaterial({ color: 0x5e3a1e, specular: 0x442211, shininess: 40 }), BRONZE = new THREE.MeshPhongMaterial({ color: 0x9a7a3c, specular: 0xffe0a0, shininess: 80 });
@@ -555,7 +557,8 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
-    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main'); grp.add(tl); travLines.push(tl);
+    // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
+    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl);
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
@@ -852,12 +855,13 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, alphaTest: 0.5 }));
     mesh.position.copy(at); parent.add(mesh);
     // the flag halyard: a loop from the block under the strut down to a cleat on the mast's side about 1.1 m up, where
-    // it's made fast and reached from the deck: one part from the block, the other from the flag's foot (before, a tail
-    // dropped straight down and stopped in the air: the owner's "false shrouds")
+    // it's made fast and reached from the deck: one part from the block, the other from the flag's foot. A flag halyard
+    // is thin, pale braid (a few mm), not wire: drawn faint and light (FLAG_LINE), its two parts together, so it doesn't
+    // read as a stay (the owner, v180: two dark lines from the strut tip looked like extra stays)
     if (tail) {
       const side = Math.sign(at.x) || 1, cleat = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), DECK_AT_MAST + 1.1, MAST_FRONT_Z + 0.03);
-      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), cleat.clone().setY(cleat.y + 0.02)]), MAT.wire));
-      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([at.clone().setX(at.x - side * 0.015), cleat.clone().setY(cleat.y + 0.02).setX(cleat.x - side * 0.004)]), MAT.wire));
+      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), cleat.clone().setY(cleat.y + 0.02)]), FLAG_LINE));
+      parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([at.clone().setX(at.x - side * 0.006), cleat.clone().setY(cleat.y + 0.02).setX(cleat.x - side * 0.003)]), FLAG_LINE));
       if (!flagCleats.has(side)) { flagCleats.add(side); const cm = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.09, 0.02), STEEL); cm.position.copy(cleat); parent.add(cm); }
     }
     flags.push({ mesh, base: (geo.attributes.position.array as Float32Array).slice(), fly, h, ph: flags.length * 2.1 }); // (each its own phase)
