@@ -998,6 +998,8 @@ const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = shee
 const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
 /** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
 const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
+/** A shroud's ends (starboard's; port's mirrored), in the boat group's frame: its chainplate on deck, and where it meets the mast. */
+export const SHROUD = { foot: new THREE.Vector3(CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip: new THREE.Vector3(MAST_ATH / 2, SHROUD_Y, MAST_Z) };
 const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
 /** The mast's height segments (for its bend) and the forestay's points (for its sag). */
 const MAST_SEGS = 24, STAY_PTS = 13, STAY_LEN = HOUNDS.distanceTo(FORESTAY_DECK);

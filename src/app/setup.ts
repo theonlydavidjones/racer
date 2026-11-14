@@ -536,7 +536,7 @@ function openLessons(): void {
 $('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLElement).closest<HTMLElement>('[data-lesson]')?.dataset.lesson as LessonId | undefined; if (id) { $('lessons').hidden = true; beginLesson(id); } });
 $('bLessonsX').onclick = () => { $('lessons').hidden = true; };
 /** Start a Learn to sail lesson (its tile, in the Drill section). */
-function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons']) $(el).hidden = true; beginRace(); }
+function beginLesson(id: LessonId): void { if (id === 'boat') { app.boatLesson.open(); return; } app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons']) $(el).hidden = true; beginRace(); }
 return { beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
 }
 
