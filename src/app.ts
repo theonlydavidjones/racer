@@ -508,6 +508,7 @@ const band = new SailBand({
   allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Hand Back: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
   paddle: (side: 'P' | 'S') => paddleSide(side),
+  anchor: () => send({ k: 'anchor' }),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
   hailKey: () => keymap.label('hail'),
@@ -1099,6 +1100,7 @@ addEventListener('keydown', e => {
     case 'autopilot': if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); break;
     case 'pole': togglePole(); break;
     case 'paddle': cyclePaddle(); break;
+    case 'anchor': send({ k: 'anchor' }); break;
     case 'crewLee': stepCrew('across', -1); break;
     case 'crewUp': stepCrew('across', 1); break;
     case 'crewFwd': stepCrew('fore', 1); break;

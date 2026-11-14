@@ -68,7 +68,7 @@ type Role = 'underway' | 'anchor';
 /** What she shows (Rules 25 and 30): nothing (in her slip or made fast to a dock, or switched off), under way, at anchor or on a mooring. */
 export type LightsMode = 'off' | 'underway' | 'anchor';
 interface Lamp { pos: THREE.Vector3; color: THREE.Color; arc: Arc | null; range: number; glow: THREE.Sprite; streak: THREE.Mesh; seen: number; role: Role; split: number; spread: number }
-export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: { m: THREE.MeshPhongMaterial; role: Role }[]; fittings: Record<Role, THREE.Group>; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; below?: { uniforms: { uDay: { value: number }; uLamp: { value: number } } }; hatch?: THREE.MeshPhongMaterial }
+export interface NavLights { group: THREE.Group; lamps: Lamp[]; lenses: { m: THREE.MeshPhongMaterial; role: Role }[]; fittings: Record<Role, THREE.Group>; ball?: THREE.Mesh; kind: 'deck' | 'tricolour'; sigma: number; sigmaC: number; below?: { uniforms: { uDay: { value: number }; uLamp: { value: number } } }; hatch?: THREE.MeshPhongMaterial }
 
 /** Colours of the lights as the eye sees them (inside Annex I §7's chromaticity areas: a deep red, a blue-green, a warm white). */
 const RED = new THREE.Color(1.0, 0.13, 0.08), GREEN = new THREE.Color(0.1, 1.0, 0.55), WHITE = new THREE.Color(1.0, 0.93, 0.8);
@@ -107,7 +107,7 @@ const X = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vec
  * Her lights, added to the boat's group `grp`: `at` gives the lantern positions in the hull's frame (the stemhead, the
  * transom, the masthead). `kind`: sidelights and sternlight on deck, or the masthead tricolour.
  */
-export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; stern: THREE.Vector3; masthead: THREE.Vector3 }, kind: 'deck' | 'tricolour'): NavLights {
+export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; stern: THREE.Vector3; masthead: THREE.Vector3; ball?: THREE.Vector3 }, kind: 'deck' | 'tricolour'): NavLights {
   const group = new THREE.Group(); group.name = 'navLights'; grp.add(group);
   const housing = new THREE.MeshPhongMaterial({ color: 0x15171a, specular: 0x666666, shininess: 60 });
   // the lanterns themselves, a group for each set, always on her: only the light goes on and off
@@ -196,6 +196,10 @@ export function buildNavLights(grp: THREE.Group, at: { stem: THREE.Vector3; ster
     a.add(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.03, 10), housing));
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.04, 10), lens(WHITE)); ring.position.y = 0.035; a.add(ring);
     lamp(ap.clone().add(new THREE.Vector3(0, 0.035, 0)), WHITE, null, 2); }
+  // by day at anchor, one ball in the fore part where it can best be seen (COLREGS Rule 30(a)(i); Inland alike): black,
+  // hoisted on the forestay. Annex I §6 asks 0.6 m across, smaller allowed for a vessel under 20 m "commensurate with her
+  // size": 0.3 m (the size sold for small craft)
+  if (at.ball) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), new THREE.MeshLambertMaterial({ color: 0x0b0c0e })); m.position.copy(at.ball); m.visible = false; m.name = 'anchorBall'; group.add(m); nl.ball = m; }
   return nl;
 }
 
@@ -216,6 +220,7 @@ export function syncNavLights(nl: NavLights, mode: LightsMode = 'underway'): voi
   const dark = ON() > 0 || restricted, lit = (r: Role) => dark && mode === r;
   // (the lanterns themselves stay on her, lit or not, as on any boat: the owner's call)
   nl.fittings.underway.visible = nl.fittings.anchor.visible = true;
+  if (nl.ball) nl.ball.visible = mode === 'anchor' && ON() <= 0; // (the day shape: by day, the light by night)
   // the sea's slopes (Cox & Munk 1954): all directions σ² = 0.003 + 0.00512·U (night.ts, from the true wind); across the
   // wind σ_c² = 0.003 + 0.00192·U (the streak is taken as if seen across the wind)
   nl.sigma = NIGHT.uSlope.value; const U = Math.max(0, (nl.sigma ** 2 - 0.003) / 0.00512); nl.sigmaC = Math.sqrt(0.003 + 0.00192 * U);

@@ -152,6 +152,9 @@ export function bayTide(station: string, ms: number): { h: number; rise: number 
   const a = at(ms - 300e3), b = at(ms), c = at(ms + 300e3);
   return { h: b, rise: (c - a) / 600 };
 }
+/** San Francisco's tide (9414290, the reference station): its height above its MLLW (m) at a time (ms UTC), from NOAA's
+ * harmonic constituents (bay-tides.json). */
+export const sfTide = (ms: number): number => predict(BT.refMsl, BT.hc, [ms])[0];
 /** Point San Quentin's tide (San Rafael Bay's). */
 export const sanQuentinTide = (ms: number) => bayTide('9414873', ms);
 

@@ -103,6 +103,8 @@ export interface Boat {
   paddle?: import('./paddle').PaddleState | null;
   /** You stopped the crew's own paddling: they leave it to you until the jam has passed (world.ts crewPaddleCall). */
   paddleOff?: boolean;
+  /** Her anchor going down, down, or coming up (boat/anchor.ts). */
+  anchor?: import('./anchor').AnchorState | null;
   /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
   lastHitT?: number;
   /**
