@@ -57,9 +57,10 @@ export const LINE_URGENT = 0.25;
  * And a trip to a cabin-top line, or the lazy jib car, is for a real change since it was last set: a new point of sail
  * (20° of the wind's angle), or the wind over the last minute up or down this much (kt). A crew sets the cunningham and
  * the car for the leg and the breeze, and leaves them; a hand with no sheet to tend sits still rather than find work
- * (the owner on the crew's fore and aft trips: "a key source of the jitteriness of the crew"). An estimate, unsourced.
+ * (the owner on the crew's fore and aft trips: "a key source of the jitteriness of the crew"). 3 kt: the Bay's gusts move
+ * even the minute's wind 2 kt or so as they come and go, which isn't a new breeze. An estimate, unsourced.
  */
-export const LINE_WIND = 2;
+export const LINE_WIND = 3;
 /** The wind there's been over the last minute (kt): the crew's (crewPhys.ts twsAvg), else this moment's. */
 const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
 
