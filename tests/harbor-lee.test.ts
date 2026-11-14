@@ -35,15 +35,19 @@ describe('the lee of the harbors\' walls and Fort Mason\'s sheds', () => {
   });
   it('no seams: anywhere in and round the cove and the piers, a meter apart, the lee within a few percent, whatever the wind', () => {
     let worst = 0, where = '';
-    for (const from of [0, 45, 90, 135, 180, 225, 270, 315, 340]) for (let y = -560; y < -100; y += 7) for (let x = 640; x < 1250; x += 1) {
-      const p = { x, y }, q = { x: x + 1, y };
+    for (let from = 0; from < 360; from += 24) for (let y = -560; y < -100; y += 5) for (let x = 640; x < 1250; x += 1) for (const q of [{ x: x + 1, y }, { x, y: y + 1 }]) {
+      const p = { x, y };
       const solid = (r: { x: number; y: number }) => onLand(r) || hitsWall(r), nearLand = (r: { x: number; y: number }) => solid(r) || solid({ x: r.x + 2, y: r.y }) || solid({ x: r.x - 2, y: r.y }) || solid({ x: r.x, y: r.y + 2 }) || solid({ x: r.x, y: r.y - 2 });
       if (nearLand(p) || nearLand(q) || inPilePier(p, 10) || inPilePier(q, 10)) continue; // (at a wall's own face the step is real; beside a shed's corner its wake's edge, the shear layer leaving it, is steep too)
       const d = Math.abs(harborLeeDeficit(p, from) - harborLeeDeficit(q, from));
       if (d > worst) { worst = d; where = `${x},${y} from ${from}`; }
     }
-    expect(worst, where).toBeLessThan(0.08); // (the steepest left: the shear layer off a wall's end close in, a wall height wide; the review's steps were 0.7 in a meter)
+    expect(worst, where).toBeLessThan(0.12); // (the steepest left: the shear layer off a wall's end close in, a wall height wide, a continuous ramp on 0.25 m sampling; the review's steps were 0.7 in a meter)
   }, 120_000);
+  it('the wind blowing down the slots between Fort Mason\'s piers isn\'t in the sheds\' lee', () => {
+    // (along the piers, 351°: the slot between Piers 1 and 2 at y = −340, its middle, a dozen meters clear of each)
+    for (const x of [995, 1000, 1005]) expect(harborLeeDeficit({ x, y: -340 }, 351), `${x}`).toBeLessThan(0.1);
+  });
   it('the current runs under Fort Mason\'s piers, and comes back within a few boat lengths of the cove\'s mouth', () => {
     const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00', current: 'bigebb' } as Settings, 1);
     const kt = (p: { x: number; y: number }) => Math.hypot(w.currentAt(p).x, w.currentAt(p).y) / KT;

@@ -202,21 +202,41 @@ function calmIn(c: Calm, p: Vec): number {
  */
 const SLOTS = (() => { const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), ys = PILE_PIERS.flatMap(P => P.pts.map(q => q.y));
   return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; })();
-const inPileSlots = (p: Vec) => p.x > SLOTS.x0 && p.x < SLOTS.x1 && p.y > SLOTS.y0 && p.y < SLOTS.y1 && !inBasin(p);
+/**
+ * Between two of the piers (one to each side of p, west and east, each reaching p's latitude): how far in from the
+ * slot's open end (the nearer of the two piers' heads), m; −1 if not in a slot.
+ */
+const pileSlotDepth = (p: Vec): number => {
+  if (!(p.x > SLOTS.x0 && p.x < SLOTS.x1 && p.y > SLOTS.y0 && p.y < SLOTS.y1) || inBasin(p)) return -1;
+  let west = -Infinity, east = -Infinity;
+  for (const P of PILE_PIERS) { const xs = P.pts.map(q => q.x), ys = P.pts.map(q => q.y), top = Math.max(...ys); if (p.y < Math.min(...ys) || p.y > top) continue;
+    if (Math.max(...xs) <= p.x) west = Math.max(west, top); if (Math.min(...xs) >= p.x) east = Math.max(east, top); }
+  return west > -Infinity && east > -Infinity ? Math.min(west, east) - p.y : -1;
+};
+/** In a slot the stream is the piles' (PILE_FLOW), from the open Bay's at its mouth over its first SLOT_IN meters. */
+const SLOT_IN = 20;
+/** Still water k beside a pile pier (pd m from its shed) brought up toward PILE_FLOW within its deck and the mixing zone past it. */
+const pierMix = (k: number, pd: number) => k >= PILE_FLOW || pd >= DECK + PILE_MIX ? k : pd <= DECK ? PILE_FLOW : k + (PILE_FLOW - k) * (1 - (pd - DECK) / PILE_MIX);
+const slotFlow = (depth: number) => PILE_FLOW + (1 - PILE_FLOW) * Math.max(0, 1 - depth / SLOT_IN);
 /** As basinCalm, for drawing only: undefined where the grid isn't built yet (it never builds one). */
 export function basinCalmIfBuilt(p: Vec): number | undefined {
-  if (inPileSlots(p)) return 1;
-  const pd = pilePierDist(p); if (pd <= DECK) return 1;
-  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) { if (!g.calm) return undefined; const k = calmIn(g.calm, p); return pd < DECK + PILE_MIX ? k + (1 - k) * (1 - (pd - DECK) / PILE_MIX) : k; }
+  const pd = pilePierDist(p); if (pd <= 0) return 1;
+  const sd = pileSlotDepth(p); if (sd >= 0) return pd <= DECK ? Math.min(PILE_FLOW, slotFlow(sd)) : slotFlow(sd);
+  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) { if (!g.calm) return undefined; return pierMix(calmIn(g.calm, p), pd); }
+  if (pd < DECK + PILE_MIX) return pierMix(1, pd);
   return 1;
 }
 export function basinCalm(p: Vec): number {
   // (under a pier on open piles the stream runs on, as the shore relief has it: the harbor beside it keeps its still water,
   // the pier's piles and its shed between them: geo/shore.ts PILE_PIERS. Across the piles the two mix, over a few meters)
-  if (inPileSlots(p)) return 1;
-  const pd = pilePierDist(p); if (pd <= DECK) return 1;
+  // (the water in the slots between the piers, and beside them, has just come through a pile field: no faster than
+  // the piles let it, PILE_FLOW; under a shed itself shoreRelief already takes that, so here it's 1)
+  const pd = pilePierDist(p); if (pd <= 0) return 1;
+  const sd = pileSlotDepth(p); if (sd >= 0) return pd <= DECK ? Math.min(PILE_FLOW, slotFlow(sd)) : slotFlow(sd);
+  // (beside a pier: still water there comes up toward what the piles pass, as it mixes with what came through them;
+  // the open stream running past a pier's head isn't slowed)
   const k = basinCalmGrid(p);
-  return pd < DECK + PILE_MIX ? k + (1 - k) * (1 - (pd - DECK) / PILE_MIX) : k;
+  return pierMix(k, pd);
 }
 /** The harbors' grids' own calm at p (basinCalm, without the piers). */
 function basinCalmGrid(p: Vec): number {
