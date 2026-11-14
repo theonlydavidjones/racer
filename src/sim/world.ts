@@ -24,7 +24,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { COMMITTEE, CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
@@ -114,6 +114,13 @@ const COMPELLED_WINDOW = 3;
  */
 export const PROTEST_HAIL = 10;
 
+/** How far ahead a ship looks for a boat standing into her way, s: 40 s, about half a minute's warning to act and the
+ * time it takes to clear her path (a modeling choice: Rule 8(f) asks for "early action to allow sufficient sea room",
+ * with no number). */
+export const SHIP_LOOK = 40;
+/** The sea room a ship wants about her, measured from her middle: half her length and 60 m (a modeling choice, as above). */
+export const shipRoom = (v: Vessel): number => VESSEL[v.kind].len / 2 + 60;
+
 /** A protest a boat made on the water (RRS 60.2(a)(1)): who protests whom, the incident (as the engine called it at the
  * time), and when she hailed and flew her flag. For the hearing after the race. */
 export interface Protest {
@@ -128,6 +135,9 @@ export interface Protest {
   exonerated?: boolean;
   /** The protested boat wasn't racing (the Part 2 preamble: no penalty, except rule 23.1). */
   notRacing?: boolean;
+  /** The race committee's protest after a ship's danger signal (by COMMITTEE, rule '9'): the ship, the room she wanted,
+   * the boat's closest approach to her (center to center), and whether the encounter is over. */
+  committee?: { vessel: number; name: string; room: number; closest: number; done: boolean };
 }
 /* Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
  * boat is exonerated for her breach." Causal: compelled when, by the time it was clear the other boat had broken a rule,
@@ -281,6 +291,8 @@ export class World {
   traffic: Traffic;
   vessels: Vessel[] = [];
   private warned = new Map<number, number>();
+  /** The danger signal's last sounding at each boat, by vessel and boat (vessel id × 1024 + boat id). */
+  private blasted = new Map<number, number>();
   /** The waves: chop from the wind and current, swell through the Gate (or flat water). */
   sea: SeaField;
   /** The waves on the water: one field for the boats' heave and pitch and the water you see (environment/waveField.ts). */
@@ -1499,8 +1511,8 @@ export class World {
   private keepClearOfShips(b: Boat): void {
     for (const v of this.vessels) {
       if (!v.moving) continue;
-      const ty = VESSEL[v.kind], u = V(v.h), c = cpa(b, { x: v.x, y: v.y, vx: u.x * v.v, vy: u.y * v.v });
-      if (c.d > ty.len / 2 + 70 || dist(b, v) > 900) continue;
+      const ty = VESSEL[v.kind], u = V(v.h), c = cpa(b, { x: v.x, y: v.y, vx: u.x * v.v, vy: u.y * v.v }, SHIP_LOOK);
+      if (c.d > ty.len / 2 + 70 || dist(b, v) > 900) continue; // (a little wider than the ship's SHIP_ROOM: she keeps clear before the ship doubts her)
       const aim = { x: v.x - u.x * (ty.len * 0.8 + 60), y: v.y - u.y * (ty.len * 0.8 + 60) }; // behind her stern
       b.desired = sailable(b, brg(aim.x - b.x, aim.y - b.y)); b.luff = false;
     }
@@ -1527,7 +1539,8 @@ export class World {
         }
       }
       if (!v.moving) continue;
-      const c = cpa(u, { x: v.x, y: v.y, vx: uv.x * v.v, vy: uv.y * v.v }), close = ty.len / 2 + 60, last = this.warned.get(v.id) ?? -Infinity;
+      this.dangerSignals(v);
+      const c = cpa(u, { x: v.x, y: v.y, vx: uv.x * v.v, vy: uv.y * v.v }, SHIP_LOOK), close = shipRoom(v), last = this.warned.get(v.id) ?? -Infinity;
       if (dist(u, v) > 1500 || c.d > close + 120) continue;
       if (this.t - last > 90) {
         this.warned.set(v.id, this.t);
@@ -1536,12 +1549,49 @@ export class World {
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
           : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
       }
-      // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
-      if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
+    }
+    if (this.protestsOn) this.committeeWatch();
+  }
+
+  /**
+   * The danger signal (IRPCAS / Inland Rule 34(d)): "at least five short and rapid blasts" from a vessel "in doubt whether
+   * sufficient action is being taken by the other to avoid collision"; Rule 9(d): a vessel that can navigate only in the
+   * channel "must use the signal prescribed in Rule 34(d) if in doubt as to the intention of the crossing vessel". She
+   * sounds it at any boat standing into her way: one whose closest approach in the next SHIP_LOOK seconds is inside
+   * SHIP_ROOM. In a club race it brings a protest by the race committee, which the Bay's sailing instructions make
+   * automatic once the ship names the boat by her sail number (Richmond YC 2025 SIs, clause 16; docs/SHIP-PROTESTS.md).
+   */
+  private dangerSignals(v: Vessel): void {
+    const ty = VESSEL[v.kind], uv = V(v.h), mv = { x: v.x, y: v.y, vx: uv.x * v.v, vy: uv.y * v.v }, room = shipRoom(v);
+    for (const b of this.boats) {
+      if (b.retired || b.wrecked || Math.abs(b.x - v.x) > 1500 || Math.abs(b.y - v.y) > 1500) continue;
+      const c = cpa(b, mv, SHIP_LOOK), key = v.id * 1024 + b.id;
+      if (c.d >= room || this.t - (this.blasted.get(key) ?? -Infinity) <= 45) continue;
+      this.blasted.set(key, this.t);
+      // (one signal, heard by every boat near her: sounded again only after 45 s, whoever it's for)
+      if (this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45 && (b.isUser || dist(this.user, v) < 2000)) {
         this.warned.set(-1 - v.id, this.t);
-        for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
-        this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+        for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 }); // (heard to about 2 km: a ship's whistle, Annex III, is audible to 1.5–2 nm)
       }
+      if (b.isUser) this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+      else if (dist(this.user, v) < 2000) this.emit({ type: 'toast', ms: 4000, msg: `Five short blasts from the ${ty.name.toLowerCase()} at ${b.name} (${b.no.replace(/^US\s+/, 'USA ')}).` });
+      // the race committee's protest: one an encounter, while she's racing (Rule 9 applies to her racing or not; the SIs' protest only to a boat racing)
+      if (this.protestsOn && this.racing(b) && !b.finished && !this.protests.some(p => p.vs === b.id && p.committee?.vessel === v.id && !p.committee.done))
+        this.protests.push({ by: COMMITTEE, vs: b.id, t: this.t, rule: '9', fouler: b.id, kind: null, hailT: this.t, flagT: this.t, owed: null, turnsT: null,
+          committee: { vessel: v.id, name: ty.name, room, closest: dist(b, v), done: false } });
+    }
+  }
+
+  /** The facts for the committee's protests, found from the record as the hearing would: how close each boat the ship
+   * sounded at came to her, until the ship had passed her (the closest approach behind them) or two minutes on. */
+  private committeeWatch(): void {
+    for (const p of this.protests) {
+      const c = p.committee; if (!c || c.done) continue;
+      const b = this.boats[p.vs], v = this.vessels.find(x => x.id === c.vessel);
+      if (!v) { c.done = true; continue; }
+      const d = dist(b, v); c.closest = Math.min(c.closest, d);
+      const uv = V(v.h), rx = b.x - v.x, ry = b.y - v.y, closing = rx * (uv.x * v.v - b.vx) + ry * (uv.y * v.v - b.vy) > 0;
+      if (!closing || this.t - p.t > 120 || b.finished || b.retired) c.done = true;
     }
   }
 

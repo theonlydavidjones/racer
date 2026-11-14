@@ -138,8 +138,9 @@ export function standings(series: Series, res: Record<number, SeasonResult>, liv
   const rows: StandingRow[] = [...boats.values()].map(b => {
     const races: StandingRow['races'] = {};
     for (const no of sailed) { const s = res[no].scores.find(x => x.sail === b.sail); races[no] = s ? { points: s.points, code: s.code, out: false } : { points: entries + 1, code: 'DNC', out: false }; }
-    // the worst score(s) thrown out; of equal worst, the earliest race's (as the Low Point System's practice has it)
-    const order = sailed.slice().sort((x, y) => races[y].points - races[x].points || x - y);
+    // the worst score(s) thrown out; of equal worst, the earliest race's (as the Low Point System's practice has it). A DNE
+    // stays in: "any score that is a Disqualification Not Excludable (DNE) shall be included in a boat's series score" (RRS 90.3(b))
+    const order = sailed.filter(no => races[no].code !== 'DNE').sort((x, y) => races[y].points - races[x].points || x - y);
     for (const no of order.slice(0, Math.min(discards, sailed.length - 1))) races[no].out = true;
     const total = sailed.reduce((a, no) => a + races[no].points, 0), nett = sailed.reduce((a, no) => a + (races[no].out ? 0 : races[no].points), 0);
     const now = live?.(b.sail);
