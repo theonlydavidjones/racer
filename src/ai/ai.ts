@@ -154,7 +154,7 @@ function isTack(b: Boat, h: number): boolean {
 }
 /** A boat sailing on as she is: her present turn for ESC_TURN_FOR s, then straight on. */
 function onward(o: Boat): (t: number) => Pose {
-  const arc = straightOn({ x: o.x, y: o.y, h: o.h, v: o.v + (o.astern ?? 0) }, o.turnRate ?? 0), end = arc(ESC_TURN_FOR), line = straightOn(end, 0);
+  const arc = straightOn({ x: o.x, y: o.y, h: o.h, v: o.v - (o.astern ?? 0) }, o.turnRate ?? 0), end = arc(ESC_TURN_FOR), line = straightOn(end, 0);
   return t => t <= ESC_TURN_FOR ? arc(t) : line(t - ESC_TURN_FOR);
 }
 /**
@@ -255,7 +255,10 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
       // way on to steer (at a crawl she needs her sails drawing to steer at all: eased, a boat crossing her bow caught
       // her lying there, pre-start, unable to bear away), nor when what she'd meet is stopped (slowing only leaves her
       // beside it, as stuck as it is)
-      luff = b.twa < 110 && me.v > SLOW_TO_STEER && threats.some(q => q.v + (q.astern ?? 0) > 0.5);
+      // (and never through a tack: let fly there she has no drive to carry her through the wind, and stalls in it, 0.5 m/s
+      // after 8 s in 22 kt where with her sails drawing she'd be at 1.3: a boat that needs to get through a tack keeps
+      // her sails full until she's past head to wind)
+      luff = b.twa < 110 && me.v > SLOW_TO_STEER && threats.some(q => q.v + (q.astern ?? 0) > 0.5) && !isTack(b, heading);
     }
   }
   ai.esc = { at: w.t, ids, kIds: kc.map(o => o.id), rIds: row.map(o => o.id), heading, luff, aim: aimH };
@@ -986,7 +989,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // is looked at afresh each time, so she never tacks on an old look)
     const was = ai.tackHeldAt != null && w.t - ai.tackHeldAt < TACK_LOOK_S;
     if (close.length) {
-      const [c] = was ? [null] : escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 },
+      const [c] = was ? [null] : escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4, luff }, // (her tack as she'd sail it: with her sheets flying if she's easing now, Deep Physics' turnSpeed)
         close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT, windKt: ww.kt }).filter(q => q.turn !== 0);
       if (was || (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SAG_M)) {
         if (!was) ai.tackHeldAt = w.t;
