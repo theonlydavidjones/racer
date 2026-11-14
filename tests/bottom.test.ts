@@ -47,6 +47,27 @@ describe('the Bay\'s shoal bottom, from the chart', () => {
   });
 });
 
+describe('the dredged channels', () => {
+  it('a channel dredged through the flats reads at its dredged depth, not as the flats round it (DRGARE)', () => {
+    type A = { k: string; name?: string; d?: number; f?: number[][][] };
+    const dec = (a: number[]) => { const o: { x: number; y: number }[] = []; let x = 0, y = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; o.push(LL(y / 1e5, x / 1e5)); } return o; };
+    const inPoly = (p: { x: number; y: number }, P: { x: number; y: number }[]) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+    const bad: string[] = []; let n = 0;
+    for (const A of (enc as unknown as { areas: A[] }).areas) if (A.k === 'dredged' && A.f && A.d != null && A.d < 3) for (const poly of A.f) {
+      const P = dec(poly[0]), xs = P.map(q => q.x), ys = P.map(q => q.y); let m = 0, shoaler = 0;
+      for (let x = Math.min(...xs); x < Math.max(...xs); x += 10) for (let y = Math.min(...ys); y < Math.max(...ys); y += 10) {
+        const q = { x, y }; if (!inPoly(q, P) || onLand(q)) continue;
+        // (25 m in from its edge: the 50 m cells along it read half the flats beside it)
+        if (P.some((a, i) => { const b = P[(i + 1) % P.length], dx = b.x - a.x, dy = b.y - a.y, t = Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(q.x - a.x - t * dx, q.y - a.y - t * dy) < 25; })) continue;
+        m++; const z = bottomDepth(q); if (z !== null && z < A.d - 0.5) shoaler++;
+      }
+      n += m; if (m > 5 && shoaler / m > 0.1) bad.push(`${A.name} (${A.d} m): ${shoaler}/${m}`);
+    }
+    expect(n).toBeGreaterThan(200);
+    expect(bad, bad.join('; ')).toEqual([]);
+  }, 120_000);
+});
+
 describe('toward the shore', () => {
   it('the flats run on into the shore, shoaling or level, not deepening at the beach (land beside them isn\'t read as deep)', () => {
     let n = 0, deeper = 0;
@@ -83,5 +104,22 @@ describe('shoal: the charted rocks too', () => {
     expect(R).toBeDefined();
     const day = Date.UTC(2026, 10, 14, 8), off = { x: R.p!.x + 25, y: R.p!.y };
     for (let m = 0; m < 1440; m += 60) { expect(shoal(R.p!, day + m * 60e3, 1.141)).toBe(true); expect(shoal(off, day + m * 60e3, 1.141, 30)).toBe(true); }
+  });
+});
+
+describe('the charted hazards\' tops', () => {
+  it('the dry ones stand out of the tide, those that cover and uncover dry at low water, those of unknown depth at their area\'s shoal edge; an area is near from its edges', async () => {
+    const { HAZARDS, hazardNear } = await import('../src/environment/hazards');
+    const raw = (enc as unknown as { hazards: { wl: number; d?: number }[] }).hazards;
+    expect(HAZARDS.length).toBeGreaterThan(700); // (was 367: the dry ones, the covering wrecks and obstructions, the unknown depths)
+    for (const H of HAZARDS) expect(Number.isFinite(H.top)).toBe(true);
+    const dry = raw.filter(h => (h.wl === 1 || h.wl === 2) && h.d == null).length;
+    expect(HAZARDS.filter(H => H.top <= -1.7).length).toBeGreaterThanOrEqual(dry);
+    // an area hazard: a point just outside the middle of its longest edge is within 30 m of it
+    const A = HAZARDS.find(H => H.area && H.area.length > 2)!;
+    let best = 0, mid = { x: 0, y: 0 }, nrm = { x: 0, y: 0 };
+    for (let i = 0; i < A.area!.length; i++) { const a = A.area![i], b = A.area![(i + 1) % A.area!.length], L = Math.hypot(b.x - a.x, b.y - a.y); if (L > best) { best = L; mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; nrm = { x: -(b.y - a.y) / L, y: (b.x - a.x) / L }; } }
+    const out = [1, -1].map(s => ({ x: mid.x + nrm.x * 10 * s, y: mid.y + nrm.y * 10 * s }));
+    for (const q of out) expect(hazardNear(q, 30)).not.toBeNull();
   });
 });
