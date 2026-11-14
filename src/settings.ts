@@ -53,6 +53,8 @@ export interface Settings {
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
   traffic: 0 | 1; // ship traffic through the race area
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
+  /** Your own colors, saved from the boat editor's color picker (the owner, 8i: "like in Google Docs"), shared by every picker. */
+  myColors?: string[];
   /** The wind indicator (render/windLadder.ts) showing: off unless you turn it on, and remembered. */
   windLadder?: boolean;
   camRide?: 0 | 1; // the chase camera rides up and down with her on the swell (smoothed; heave only); off: it holds still and she rises and falls in the frame

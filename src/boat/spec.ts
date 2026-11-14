@@ -57,6 +57,9 @@ export interface BoatSpec {
   /** Each line's colour in the sail controls band (and on the 3D lines once they're drawn): the owner, 12 Nov 2026.
    * Absent: the band's defaults (LINE_COLORS). */
   lineColors?: Partial<Record<LineColorKey, string>>;
+  /** Each line's rope, by colorway (ROPES' ids: the owner, 8i, "real rope patterns"); its lineColors entry is then the
+   * colorway's own color for the band. Absent: the band's color, as a plain rope. */
+  lineRopes?: Partial<Record<LineColorKey, string>>;
   perf: {
     cleanedWeeks: number; // weeks since the bottom was last cleaned (0 = just cleaned)
     finish: 'race' | 'antifouling'; // the bottom paint's finish when clean: wet-sanded and burnished, or as rolled on
@@ -87,6 +90,21 @@ export const ROPE_COLORS: [string, string][] = [
   ['Orange', '#ff8a3d'], ['Yellow', '#f2c230'], ['Rust', '#c0652a'], ['Red', '#d8343a'], ['Pink', '#ec6aae'], ['Purple', '#9b6bff'],
   ['Blue', '#3d8bff'], ['Teal', '#2ec4d6'], ['Green', '#3fae5a'], ['Gray', '#8fa3b8'], ['White', '#e8edf0'], ['Black', '#2a2d33']
 ];
+/**
+ * Real rope colorways (the owner, 8i: lines "from real rope colorways, drawn as rope", not a free color), from retailers'
+ * listings of the makers' ranges (no maker's own chart could be read): New England Ropes Sta-Set solids and its
+ * white with red, blue or green flecks, and Sta-Set X white with two red tracers; Samson XLS solids including navy, and
+ * navy with a beige tracer; Marlow Doublebraid's gold fleck and solid gray (D2 Racing). The fleck's density and the
+ * tracers' spacing are drawn by eye (no source gives them). `band`: the color the sail controls band shows for it, the
+ * fleck or tracer where there is one, so a mostly white rope still reads as its own line there.
+ */
+export interface Rope { id: string; name: string; base: string; kind: 'solid' | 'fleck' | 'tracer'; mark?: string; band: string }
+export const ROPES: Rope[] = ([
+  ['white', 'White', '#eef0ee', 'solid'], ['gray', 'Gray', '#9aa1a6', 'solid'], ['black', 'Black', '#26282b', 'solid'], ['navy', 'Navy', '#1f2a4a', 'solid'],
+  ['blue', 'Blue', '#2f5fb3', 'solid'], ['red', 'Red', '#c8312f', 'solid'], ['green', 'Green', '#2f7a45', 'solid'],
+  ['red-fleck', 'Red fleck', '#eef0ee', 'fleck', '#c8312f'], ['blue-fleck', 'Blue fleck', '#eef0ee', 'fleck', '#2f5fb3'], ['green-fleck', 'Green fleck', '#eef0ee', 'fleck', '#2f7a45'],
+  ['gold-fleck', 'Gold fleck', '#eef0ee', 'fleck', '#c99a2e'], ['red-tracers', 'White, red tracers', '#eef0ee', 'tracer', '#c8312f'], ['navy-beige', 'Navy, beige tracer', '#1f2a4a', 'tracer', '#cdb98f']
+] as [string, string, string, Rope['kind'], string?][]).map(([id, name, base, kind, mark]) => ({ id, name, base, kind, mark, band: mark ?? (base === '#eef0ee' ? '#e8edf0' : base) }));
 /** A line's colour on this boat. */
 export const lineColor = (b: Pick<BoatSpec, 'lineColors'> | null | undefined, k: LineColorKey): string => b?.lineColors?.[k] ?? LINE_COLORS[k];
 
@@ -148,6 +166,8 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     cockpit: x.cockpit === 'fiberglass' ? 'fiberglass' : 'teak',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
+    ...((lr => (Object.keys(lr).length ? { lineRopes: lr } : {}))(Object.fromEntries(Object.entries(x.lineRopes && typeof x.lineRopes === 'object' ? x.lineRopes : {})
+      .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && ROPES.some(r => r.id === v))) as Partial<Record<LineColorKey, string>>)),
     ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
       .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',

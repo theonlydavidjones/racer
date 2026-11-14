@@ -1,0 +1,55 @@
+/* The boat editor reorganized (ROADMAP 8i, the owner approved design/boat-editor): groups folded to a short list,
+   one property a row, one color picker, lines as real rope. Every rule scoped to the editor (a helm rule once hid its
+   row: 8u). */
+#boatPanel .be{display:flex;flex-direction:column;gap:8px}
+#boatPanel .be-grp{border:1px solid var(--rule);border-radius:10px;background:rgba(255,255,255,.015);transition:border-color .12s}
+#boatPanel .be-grp.open{border-color:var(--accent)}
+#boatPanel .be-grp>header{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;cursor:pointer;border-radius:10px}
+#boatPanel .be-grp>header:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#boatPanel .be-grp:not(.open)>header:hover{background:rgba(255,182,39,.05)}
+#boatPanel .be-grp>header b{font:600 11.5px/1 var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+#boatPanel .be-grp>header i{font:600 11.5px/1 var(--f-inst);font-style:normal;letter-spacing:.06em;color:var(--accent)}
+#boatPanel .be-in{padding:0 12px 10px;display:flex;flex-direction:column}
+#boatPanel .be-kv{display:grid;grid-template-columns:132px 1fr;align-items:center;min-height:30px;border-top:1px solid rgba(150,196,218,.08);gap:8px}
+#boatPanel .be-grp.open .be-kv{min-height:40px}
+#boatPanel .be-kv>span:first-child{font:500 12.5px var(--f-inst);color:var(--muted);letter-spacing:.02em}
+#boatPanel .be-kv>*:last-child{justify-self:end}
+#boatPanel .be-kv .seg{flex-wrap:wrap;justify-content:flex-end}
+#boatPanel .be-kv .seg button{font-size:12px}
+#boatPanel .be-kv select.pick,#boatPanel .be-kv input.pick{max-width:220px}
+#boatPanel .be-v{display:inline-flex;align-items:center;gap:7px;font:600 13px var(--f-inst);color:var(--text)}
+#boatPanel .be-v.mu{color:var(--muted);font-weight:500}
+#boatPanel .be-v .linkbtn{padding:0;font:600 13px var(--f-inst)}
+#boatPanel .be-sq{width:16px;height:16px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3),0 0 0 1px rgba(233,242,245,.15)}
+#boatPanel .be-tile{display:inline-flex;align-items:center;gap:6px}
+#boatPanel .be-tile i{width:11px;height:11px;border-radius:50%;border:2.5px solid;box-sizing:border-box;box-shadow:0 0 0 1px rgba(233,242,245,.28)}
+#boatPanel .be-row2{display:flex;gap:6px}
+#boatPanel .be-num{width:64px}
+#boatPanel .be-slide input{width:150px}
+#boatPanel .be-slide em{font-style:normal;color:var(--muted);font-weight:500;min-width:80px;text-align:right}
+#boatPanel .be-cbtn{display:flex;align-items:center;gap:8px;min-width:150px;border:1px solid var(--rule);border-radius:8px;padding:5px 9px 5px 5px;background:var(--btn);color:var(--text);font:600 12.5px var(--f-inst);cursor:pointer}
+#boatPanel .be-cbtn.on{border-color:var(--accent)}
+#boatPanel .be-cbtn>i{width:26px;height:20px;border-radius:5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+#boatPanel .be-cbtn>i.none{background:repeating-linear-gradient(135deg,transparent 0 4px,rgba(233,242,245,.25) 4px 5px);box-shadow:inset 0 0 0 1px rgba(233,242,245,.25)}
+/* the one color picker */
+#boatPanel .be-picker{border:1px solid var(--rule);border-radius:10px;padding:10px;background:#0b1924;display:flex;flex-direction:column;gap:9px;margin:2px 0 8px}
+#boatPanel .be-sv{height:120px;border-radius:7px;position:relative;cursor:crosshair;touch-action:none}
+#boatPanel .be-sv i{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #0006;transform:translate(-50%,-50%);pointer-events:none}
+#boatPanel .be-hue{height:12px;border-radius:6px;position:relative;cursor:ew-resize;touch-action:none;background:linear-gradient(to right,red,#ff0,lime,cyan,blue,#f0f,red)}
+#boatPanel .be-hue i{position:absolute;top:-2px;width:6px;height:16px;border-radius:3px;background:#fff;box-shadow:0 0 0 1px #0007;transform:translateX(-50%);pointer-events:none}
+#boatPanel .be-hexrow{display:flex;gap:8px;align-items:center}
+#boatPanel .be-hexrow input{width:96px;font:600 13px var(--f-inst);letter-spacing:.06em}
+#boatPanel .be-hexrow .ghost.on{border-color:var(--accent);color:var(--accent)}
+#boatPanel .be-prow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#boatPanel .be-prow>b{width:100%;font:600 10px var(--f-inst);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+#boatPanel .be-ps{width:22px;height:22px;border-radius:5px;border:0;padding:0;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.3),0 0 0 1px rgba(233,242,245,.12)}
+#boatPanel .be-ps.on{outline:2px solid var(--accent);outline-offset:1px}
+#boatPanel .be-ps.add{display:grid;place-items:center;background:transparent;border:1px dashed rgba(233,242,245,.4);color:var(--muted);font:600 14px var(--f-inst)}
+/* the lines as rope */
+#boatPanel .be-rope{display:inline-block;vertical-align:middle;border-radius:5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);flex:none}
+#boatPanel .be-ropes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 10px;border:1px solid var(--rule);border-radius:10px;padding:10px;background:#0b1924;margin:2px 0 8px}
+#boatPanel .be-ropes button{display:flex;align-items:center;gap:8px;background:none;border:0;padding:2px;color:var(--text);font:500 12px var(--f-inst);cursor:pointer;text-align:left}
+#boatPanel .be-ropes button.on{color:var(--accent)}
+#boatPanel .be-ropes button.on .be-rope{outline:2px solid var(--accent);outline-offset:1px}
+#boatPanel .be-tune .field{margin:8px 0 0}
+#boatPanel .be .bpreport{padding-top:8px}
