@@ -96,6 +96,15 @@ export class RulesTrainer {
     g.strokeStyle = '#e9f2f5'; g.fillStyle = '#e9f2f5'; g.lineWidth = 2; g.beginPath(); g.moveTo(40, 26); g.lineTo(40, 66); g.stroke();
     g.beginPath(); g.moveTo(34, 60); g.lineTo(40, 72); g.lineTo(46, 60); g.fill();
     g.font = '700 11px system-ui'; g.textAlign = 'center'; g.fillText('WIND', 40, 18);
+    // a bank (Case 43): the shore along P's course, d m off her port side (the Rules session's data), drawn as land
+    if (c.bank) {
+      const B = c.boats.find(b => b.letter === 'P') ?? c.boats[0], f0 = B.frames[0], f1 = B.frames[B.frames.length - 1];
+      const h = f0.h * Math.PI / 180, px = -Math.cos(h), py = Math.sin(h); // (her port side: x east, y north, h from north)
+      const ext = 400, ux = Math.sin(h), uy = Math.cos(h), o = c.bank.d + 0.5;
+      const A = P(f0.x + px * o - ux * ext, f0.y + py * o - uy * ext), Bq = P(f1.x + px * o + ux * ext, f1.y + py * o + uy * ext);
+      const C2 = P(f1.x + px * (o + 400) + ux * ext, f1.y + py * (o + 400) + uy * ext), D2 = P(f0.x + px * (o + 400) - ux * ext, f0.y + py * (o + 400) - uy * ext);
+      g.fillStyle = '#c8b27a'; g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(Bq[0], Bq[1]); g.lineTo(C2[0], C2[1]); g.lineTo(D2[0], D2[1]); g.closePath(); g.fill();
+    }
     // the marks, with their zone (three lengths)
     for (const m of c.marks ?? []) {
       const [x, y] = P(m.p.x, m.p.y);
