@@ -66,7 +66,7 @@ export interface AiState {
   tackHeldT?: number;
   /** When she began getting clear for her penalty turns (RRS 44.2). */
   clearFrom?: number;
-  esc?: { at: number; ids: string; heading: number | null; luff: boolean; aim?: number } | null;
+  esc?: { at: number; ids: string; /** the boats she was keeping clear of, and those to keep from touching: the ids' own */ kIds?: number[]; rIds?: number[]; heading: number | null; luff: boolean; aim?: number } | null;
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
