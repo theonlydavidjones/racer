@@ -346,6 +346,13 @@ export interface CrewCall {
  */
 export const ROLL_HOLD = 2;
 /**
+ * And they go across at once when she's heeling onto the new tack by this much (deg): the new side's sails have filled
+ * and the low side they're on is the leeward one now. In light air she heels slowly and the hold runs on, as a roll
+ * tack does; in a breeze she's heeled 20° in a second or so, and they sat on the low side through it (Crew Figures,
+ * watching a 14 kt race's tacks). An estimate.
+ */
+export const ROLL_HEEL = 5;
+/**
  * How often a crew moves. A real crew moves on a puff, a lull, a tack or a job, and otherwise sits still: coaches have
  * the crew hold a steady angle of heel, not a precise one (weight first in light to moderate air, and once the boat is
  * set up only small, smooth moves: Sailing World, North Sails, Yachting World on keelboat heel), and the main is played
@@ -402,7 +409,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
-    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (k.heel ?? 0) > ROLL_HEEL)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }
