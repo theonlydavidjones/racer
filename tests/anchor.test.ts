@@ -54,6 +54,10 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     const p0 = { x: u.x, y: u.y }; run(w, 30);
     expect(dist(p0, u), 'held: she lies where she is').toBeLessThan(3);
     expect(a.dragging).toBe(false);
+    // her sheets let fly, and the forward hand at the bow on the anchor (forward of the mast)
+    expect(u.luff).toBe(true);
+    const hand = u.crew!.people.find(p => p.job?.line === 'anchor');
+    expect(hand, 'a hand on the anchor').toBeTruthy(); expect(hand!.z).toBeLessThan(-1);
     // and she lies with the stream (a knot of flood against 1 kt of air): downstream of the anchor, on her rode
     expect(dist(stemHead(u), a.at!)).toBeLessThan(a.out + 0.5);
   });

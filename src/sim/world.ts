@@ -1035,7 +1035,7 @@ export class World {
       // stream she's held still; nor being blown back as it breaks out, which isn't propulsion)
       const hd = a.haulDir, pulled = hd ? b.vx * hd.x + b.vy * hd.y : 0;
       if (pulled > 0.5 && this.racing(b)) this.rule42(b, 'anchor');
-      a.phase = 'stowing'; a.t = 0; a.line = undefined; a.at = undefined; a.dragging = false; b.atAnchor = false;
+      a.phase = 'stowing'; a.t = 0; a.line = undefined; a.at = undefined; a.dragging = false; b.atAnchor = false; b.luff = false;
       this.emit({ type: 'toast', msg: 'Anchor\'s aweigh.' });
     } else if (a.phase === 'stowing' && a.t >= ANCHOR.stowS / pace) {
       b.anchor = null; this.anchorJob(b, false); this.emit({ type: 'toast', msg: 'Anchor stowed.' });
@@ -1058,6 +1058,9 @@ export class World {
     if (this.steps % 60 === 0) a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
     // (head to wind or stream with her sails let fly she lies upright: her heel eases off as the hull's damping lets it)
     b.heel = (b.heel ?? 0) * Math.exp(-dt / 3); b.heelMag = Math.abs(b.heel);
+    // her sheets let fly (the sails luffing, drawn so), and her crew where they're placed as at a dock: the forward hand at
+    // the bow on the anchor's job (physics.ts crewAtDock honors a job's station)
+    b.luff = true; crewAtDock(b, dt);
     // her sails and her angles, as lying to a line ashore (mooringStep)
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
