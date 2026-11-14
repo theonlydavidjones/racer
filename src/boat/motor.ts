@@ -10,7 +10,7 @@
  *   for the 2.5. Neither has a reverse gear. To go astern the manual has you slow to idle, shift to neutral, "turn the
  *   outboard motor at an angle of 180°" and shift to Forward.
  * - The 6 (tohatsu.com/marine/int/outboards/mfs6c_1.html; MFS4C/5C/6C owner's manual): "Gear Shift Forward - Neutral -
- *   Reverse", gear ratio 2.15 (13:28), 5,000–6,000 rpm, 25 kg at its lightest (25.6–27.1 kg by shaft and tank). Its
+ *   Reverse", gear ratio 2.15 (28:13), 5,000–6,000 rpm, 25.6–27.1 kg by shaft and tank (26 here). Its
  *   standard propeller is 7.8 in across; the pitch here (7.0 in) is the manual's lower-pitch option, the plain motor's
  *   standard reading as 8.0 in in a table that didn't copy cleanly: to check.
  * (Before: the 2.5 was down as 13 kg, the 6's gear ratio as 2.08, which is the two-cylinder 6's, and the 3.5 as having a
@@ -113,7 +113,7 @@ export function motorForce(b: Boat): number {
  * off-center motor's turn in words only; figures of 10–14% astern are for ships' props under a hull). A right-handed
  * prop (clockwise seen from astern: taken as these motors' from parts listings, Tohatsu's manual doesn't say) pushing ahead walks her stern to starboard; pushing astern, to port, whether
  * by the 6's reverse gear (the prop turning the other way) or by the small motors turned round on the bracket (the same
- * push, pointed the other way). It's a real effect on an inboard, whose prop works under the hull on a sloping shaft;
+ * push, pointed the other way, at the ahead share: the blades work as made). It's a real effect on an inboard, whose prop works under the hull on a sloping shaft;
  * an outboard's works level, clear astern of her, under its anti-ventilation plate, and walks very little.
  */
 export const PROP_WALK = { ahead: 0.02, astern: 0.04 };
@@ -128,6 +128,8 @@ export function motorYaw(b: Boat): number {
   const m = b.motor; if (!m || !m.down) return 0;
   const at = OUTBOARD_PROP[m.hp], vAhead = b.v - (b.astern ?? 0), T = thrust(m, vAhead);
   const along = T - Math.sign(vAhead) * legDrag(m, Math.abs(vAhead)); // (N, + ahead, acting at x = at.x)
-  const walk = T > 0 ? PROP_WALK.ahead * T : PROP_WALK.astern * T; // (N, + her stern to starboard, acting at.z aft of her middle)
+  // (N, + her stern to starboard, acting at.z aft of her middle. Turned round on the bracket the prop still turns its
+  // ahead way, its blades working as they were made to: the ahead share, pointed the other way; in reverse gear, the astern share)
+  const walk = (m.gear === 'R' ? PROP_WALK.astern : PROP_WALK.ahead) * T;
   return -at.x * along - walk * at.z;
 }

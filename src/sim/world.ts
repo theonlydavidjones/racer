@@ -2011,12 +2011,12 @@ export class World {
     m.gear = g;
   }
   motorThrottle(t: number): void { const m = this.user.motor; if (m) m.throttle = clamp(t, 0, 1); }
-  /** The 2.5: turned round on its bracket, its push goes astern (in neutral). */
+  /** The 2.5 and the 3.5: turned round on the bracket, its push goes astern (in neutral). */
   motorSwivel(): void {
     const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse) return;
     if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Into neutral first, then swivel it round.', ms: 2500 }); return; }
     m.swivel = !m.swivel;
-    this.emit({ type: 'toast', msg: m.swivel ? 'Swivelled round: in gear it pushes her astern.' : 'Swivelled back: in gear it pushes her ahead.', ms: 2500 });
+    this.emit({ type: 'toast', msg: m.swivel ? 'Swiveled round: in gear it pushes her astern.' : 'Swiveled back: in gear it pushes her ahead.', ms: 2500 });
   }
   /** Made fast in her slip, the motor running: the crew casts off the lines and she's yours to motor out. */
   castOff(): boolean {

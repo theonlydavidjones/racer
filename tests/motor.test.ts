@@ -35,8 +35,12 @@ describe('the outboard', () => {
     expect(at.x).toBeLessThan(0); // (to port)
     expect(motorYaw(u)).toBeCloseTo(-at.x * T0 - PROP_WALK.ahead * T0 * at.z, 6);
     expect(motorYaw(u)).toBeGreaterThan(100); expect(motorYaw(u)).toBeLessThan(180);
-    u.motor.swivel = true; expect(motorYaw(u)).toBeLessThan(-60); // (turned round to push astern: her bow to port)
-    u.motor = { hp: 6, down: true, running: true, gear: 'R', throttle: 1 }; expect(motorYaw(u)).toBeLessThan(-40);
+    // (turned round to push astern: her bow to port, the same size the other way)
+    u.motor.swivel = true; expect(motorYaw(u)).toBeCloseTo(at.x * T0 + PROP_WALK.ahead * T0 * at.z, 6); expect(motorYaw(u)).toBeLessThan(-100); expect(motorYaw(u)).toBeGreaterThan(-180);
+    // (the 6 in reverse gear: half its thrust, and the walk's astern share against it)
+    u.motor = { hp: 6, down: true, running: true, gear: 'R', throttle: 1 };
+    const Tr = -thrust(u.motor, 0), at6 = OUTBOARD_PROP[6];
+    expect(motorYaw(u)).toBeCloseTo(at6.x * Tr + PROP_WALK.astern * Tr * at6.z, 6); expect(motorYaw(u)).toBeLessThan(-50); expect(motorYaw(u)).toBeGreaterThan(-110);
     u.motor.gear = 'N'; expect(motorYaw(u)).toBe(0); // (out of gear and stopped in the water: nothing)
     u.motor = { hp: 3.5, down: false, running: false, gear: 'N', throttle: 0 }; u.v = 2; expect(motorYaw(u)).toBe(0); // (tilted up)
     // (down and not driving, sailing at 2 m/s: the leg's drag pulls her port quarter back, a little: her bow to port)
@@ -58,12 +62,16 @@ describe('the outboard', () => {
     // (tiller to starboard turns her bow to port, against the motor: 2° of 30 is 0.067 of full helm)
     let turned = 0, h = u.h; for (let i = 0; i < 60 * 20; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 2 / 30; w.step(DT); turned += wrap(u.h - h); h = u.h; }
     expect(turned).toBeLessThan(0); // (2° is more than it takes: she comes off to port)
+    // (and a quarter of a degree isn't enough: she still goes off to starboard)
+    turned = 0; for (let i = 0; i < 60 * 20; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0.25 / 30; w.step(DT); turned += wrap(u.h - h); h = u.h; }
+    expect(turned).toBeGreaterThan(0);
   });
   it('without a motor, or with it out of gear and tilted up, nothing turns her', () => {
     const w = new World(COURSES[0], { ...S, windKt: 0.5 }, 1, { freeSail: true }), u = w.user;
     u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.v = 1.5; u.astern = 0; u.motor = { hp: 3.5, down: false, running: false, gear: 'N', throttle: 0 };
     let turned = 0, h = u.h; for (let i = 0; i < 60 * 10; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT); turned += wrap(u.h - h); h = u.h; }
     expect(Math.abs(turned)).toBeLessThan(0.5);
+    u.motor = undefined; expect(motorYaw(u)).toBe(0); // (no motor aboard)
   });
   it('sails down, the 3.5 at full throttle motors her at about 4–5 kt; the 2.5 a little less, the 6 a little more', () => {
     const v = (hp: 2.5 | 3.5 | 6) => run({ hp }, 90).v / KT;
