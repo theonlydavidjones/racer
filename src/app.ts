@@ -8,7 +8,7 @@ import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { loadLog, type LogEntry } from './boat/logbook';
 import { harborAt, inBasin } from './geo/marina';
-import { HULL_COLORS, BRIGHT_FINISH, sailNo } from './boat/spec';
+import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
@@ -1224,7 +1224,13 @@ function showBar(): void {
   $('bShowReal').hidden = showMin == null && showCond == null;
 }
 $('showTime').addEventListener('input', () => { const m = Number(($('showTime') as HTMLInputElement).value); $('showTimeV').textContent = hhmm(m); });
-$('showTime').addEventListener('change', () => { showMin = Number(($('showTime') as HTMLInputElement).value); setup.newGame(); showBar(); });
+$('showTime').addEventListener('change', () => {
+  showMin = Number(($('showTime') as HTMLInputElement).value);
+  // (the showroom's clock: the boat on show lit for the new hour, the same World; ROADMAP 8v: a new World was seconds)
+  if (w && (boatPanel?.open || fleet?.showing)) void host.ask({ k: 'clock', tideTime: hhmm(showMin + S.seq) }).then(() => { const t0 = performance.now(); view.conditionsChanged(w); performance.measure('editor: clock', { start: t0 }); });
+  else setup.newGame();
+  showBar();
+});
 $('bShowCond').onclick = () => {
   // the same panel; while it's open your conditions take the showroom's, and they're put back when it closes
   const saved: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
@@ -1281,6 +1287,18 @@ function frame(now: number): void {
 
 /* Your boat: the panel, with the boat in the showroom view beside it. */
 let boatPanel: BoatPanel;
+/** Whether two specs of a boat differ only in how she looks (paint, hatch, cockpit, lettering, sail numbers, line colors):
+ * none of it touches how she sails, so the showroom can restyle her where she lies. */
+function lookOnly(a: BoatSpec, b: BoatSpec): boolean {
+  const strip = (x: BoatSpec) => {
+    const y = structuredClone(x) as BoatSpec & Record<string, unknown>;
+    for (const k of ['name', 'nameColor', 'deck', 'cabinTop', 'hatch', 'cockpit', 'navLights', 'poleSide', 'lineColors']) delete y[k];
+    y.hull = { ...y.hull, upper: '', lower: '', stripe: '' };
+    y.sails = { ...y.sails, color: 'white', number: '', numberColor: undefined, insigniaColor: undefined }; // (her country's her ensign too: a new World)
+    return JSON.stringify(y);
+  };
+  return strip(a) === strip(b);
+}
 function boatSummary(): void {
   const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '', p = b.perf;
   const pick = $('boatPick') as HTMLSelectElement;
@@ -1334,7 +1352,15 @@ $('oppList').addEventListener('click', e => {
   S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);
   fleetChanged();
 });
-boatPanel = new BoatPanel(S, save => { S.fleet = S.opponents.length; if (save) saveSettings(S); setup.newGame(); boatSummary(); oppRows(); }, saved => {
+boatPanel = new BoatPanel(S, save => {
+  S.fleet = S.opponents.length; if (save) saveSettings(S);
+  // a change to how she looks only (her paint, hatch, cockpit, lettering): restyled where she lies, only her mesh built
+  // again; anything that changes how she sails (her rig, her bottom, her crew...) puts her in the water afresh (ROADMAP 8v)
+  const next = boatPanel.editing, was = w?.user?.spec;
+  if (was && was.id === next.id && lookOnly(was, next)) void host.ask({ k: 'look', spec: structuredClone(next) }).then(() => { const t0 = performance.now(); view.rebuildBoat(w, w.boats.indexOf(w.user)); performance.measure('editor: restyle', { start: t0 }); }); // (timed: scripts/check/editor-perf.cjs)
+  else setup.newGame();
+  boatSummary(); oppRows();
+}, saved => {
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
   if (saved) fleet.flashSaved();
 });
@@ -1355,7 +1381,8 @@ const fleet: Fleet = new Fleet(S, {
   // (a member changed: saved, and your boat's race crew drawn again from her seats)
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
-  edit: id => { showroom(true); boatPanel.show(id); setup.newGame(); },
+  // (her page already has her on show, in the same World: the editor opens on it, no new one; ROADMAP 8v)
+  edit: id => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
