@@ -464,7 +464,7 @@ export class SailBand {
     };
     // stowed below (or on its way): only Ship (or its progress); on the bracket, Stow beside the tilt
     const away = !!m.stowed || !!m.shifting;
-    hide(b('tilt'), away); hide(b('stow'), m.down);
+    hide(b('tilt'), away); hide(b('stow'), false); // (down or running, it's still there: a click says why it can't come off yet)
     word('stow', m.shifting ? (m.shifting.to === 'stowed' ? 'Stowing…' : 'Shipping…') : m.stowed ? 'Ship' : 'Stow');
     attr(b('stow'), 'title', m.stowed ? 'Ship it: the crew get it out of the lazarette and clamp it on the bracket' : 'Stow it: the crew slide it off the bracket into the lazarette (stopped and tilted up first)');
     { const el = b('stow'), off = !!m.shifting || !!pend; if (el.disabled !== off) el.disabled = off; el.classList.toggle('pend', !!m.shifting); }

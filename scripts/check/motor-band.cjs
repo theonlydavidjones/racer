@@ -46,7 +46,7 @@ const root = path.join(__dirname, '../..'), out = process.argv[2] || '.';
   const tab = () => p.evaluate(() => {
     const t = document.querySelector('.sb-motor'), q = k => t.querySelector(`[data-mo="${k}"]`), shown = e => !!e && !e.hidden && !e.closest('[hidden]');
     return { shown: shown(t), tilt: q('tilt').textContent, start: shown(q('start')) ? q('start').textContent : null,
-      cast: shown(q('castoff')), hasR: shown(q('R')), swivel: shown(q('swivel')) ? q('swivel').textContent : null, swOn: q('swivel').classList.contains('on'), swOff: q('swivel').disabled, gear: ['F', 'N', 'R'].find(k => q(k).getAttribute('aria-pressed') === 'true') ?? null, thr: t.querySelector('.mo-thr').textContent,
+      cast: shown(q('castoff')), stow: shown(q('stow')) ? q('stow').textContent : null, stowOff: q('stow').disabled, tiltShown: shown(q('tilt')), hasR: shown(q('R')), swivel: shown(q('swivel')) ? q('swivel').textContent : null, swOn: q('swivel').classList.contains('on'), swOff: q('swivel').disabled, gear: ['F', 'N', 'R'].find(k => q(k).getAttribute('aria-pressed') === 'true') ?? null, thr: t.querySelector('.mo-thr').textContent,
       kt: +document.getElementById('spd').textContent, sog: +document.getElementById('sog').textContent.replace('SOG ', '') };
   });
   const click = async k => {
@@ -109,6 +109,18 @@ const root = path.join(__dirname, '../..'), out = process.argv[2] || '.';
   await step('Up: tilted clear of the water', () => click('tilt'), s => s.tilt === 'Down' && s.start === null);
   // a quick double click on the tilt is one tilt, not down-and-up-again before the race has answered
   await step('a double click on Down: down once', async () => { await click('tilt'); await p.waitForTimeout(60); await click('tilt'); await p.waitForTimeout(8000); }, s => s.tilt === 'Up');
+  // stowing it below (the owner: off the sliding bracket into the lazarette): down, it's refused with the reason on the
+  // button; tilted up, the crew take it off (the button waits, then reads Ship); shipped again, it's on the bracket, up
+  await step('Stow while it\'s down: refused, the reason on the button', () => click('stow'), s => s.stow === 'Tilt it up first');
+  await step('Up', () => click('tilt'), s => s.tilt === 'Down' && s.start === null);
+  await click('stow');
+  { const now = await tab(), ok = now.stow === 'Stowing…' && now.stowOff; console.log(`${ok ? 'ok  ' : 'FAIL'} Stow, under way: ${JSON.stringify(now)}`); if (!ok) bad.push('Stow: no progress shown'); }
+  const stowed = await until(s => s.stow === 'Ship', 600000);
+  { const ok = stowed.stow === 'Ship' && !stowed.tiltShown && !stowed.stowOff; console.log(`${ok ? 'ok  ' : 'FAIL'} stowed below: ${JSON.stringify(stowed)}`); if (!ok) bad.push('it didn\'t end stowed, with Ship to click'); }
+  await click('stow');
+  { const now = await tab(), ok = now.stow === 'Shipping…' && now.stowOff; console.log(`${ok ? 'ok  ' : 'FAIL'} Ship, under way: ${JSON.stringify(now)}`); if (!ok) bad.push('Ship: no progress shown'); }
+  const shipped = await until(s => s.stow === 'Stow' && s.tiltShown, 600000);
+  { const ok = shipped.stow === 'Stow' && shipped.tilt === 'Down'; console.log(`${ok ? 'ok  ' : 'FAIL'} shipped on its bracket, tilted up: ${JSON.stringify(shipped)}`); if (!ok) bad.push('it didn\'t end on its bracket'); }
   await p.screenshot({ path: `${out}/motor-band.png` });
   console.log('page errors:', errs.join(' / ') || 'none');
   if (errs.length) bad.push('page errors');
