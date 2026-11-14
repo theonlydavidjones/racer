@@ -59,6 +59,7 @@ import { Nav, type Place } from './ui/nav';
 import { morph } from './ui/morph';
 import { emptyTile, splitNo, tile } from './ui/tiles';
 import { installDevHandles } from './app/devHandles';
+import { mountBoatLesson } from './app/boatLesson';
 import { mountDrills } from './app/drills';
 import { DrillCoach } from './app/drillCoach';
 import { DrillGuides } from './render/drillGuides';
@@ -90,6 +91,9 @@ const ctx = {
   get rulesTrainer() { return rulesTrainer; },
   get beginLesson() { return setup.beginLesson; },
   get openLessons() { return setup.openLessons; },
+  get boatLesson() { return boatLesson; },
+  get showroom() { return showroom; },
+  get newGame() { return setup.newGame; },
   get drillRuns() { return drillRuns; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
@@ -593,6 +597,7 @@ function windShow(on: boolean): void {
 }
 windShow(!!S.windLadder);
 const drills = mountDrills(ctx); // (src/app/drills.ts)
+const boatLesson = mountBoatLesson(ctx); // (src/app/boatLesson.ts)
 /* The drills' coach by the boat (app/drillCoach.ts, render/drillGuides.ts): the guides on the water and the word or two
  * above her masthead, in the tack and gybe drill, the mark-rounding drill and the start practice. */
 const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera);
@@ -1112,6 +1117,7 @@ addEventListener('keydown', e => {
     // the screens around the sailing (docs/UI-AUDIT.md §3 rule 5): Esc is back. A layer over one closes first, then a
     // sub-page (a member's page), then back to where you came from; on the start page, nothing
     if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
+    if (boatLesson.on) { boatLesson.close(); return; } // (lesson 1 left: back to the lessons)
     if (boatPanel.open) { boatPanel.requestDone(); return; }
     if (fleet.escape()) return;
     if (!$('raceChoose').hidden || !$('pastView').hidden || !$('setup').hidden || !$('drillView').hidden || !$('seasonView').hidden || fleet.open) { nav.back(); return; }
@@ -1303,7 +1309,7 @@ function frame(now: number): void {
   // the steps due (sim/host.ts: here, or in the worker): racing at the race's speed; with nothing running (the start
   // page, setup, the showroom) she still sails, in the real wind and physics, so her sails, heel and flags agree; in the
   // showroom on a close reach
-  const showing = boatPanel.open || fleet.boatOpen;
+  const showing = boatPanel.open || fleet.boatOpen || boatLesson.on;
   const simMs = host.advance(dt, showing ? showroomTwa : undefined);
   if (w.running && !w.paused) {
     if (w.userFinishT != null && !w.finishShown && !resultsShown && w.t - w.userFinishT > 3) results.showResults();
@@ -1316,7 +1322,9 @@ function frame(now: number): void {
   setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
+  boatLesson.tick();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
+  else if (boatLesson.on) { look.shift = 0; view.render(w, dt, now, 3, look, over); } // (lesson 1: her on show, the whole view hers)
   else view.render(w, dt, now, viewMode, look, over);
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
