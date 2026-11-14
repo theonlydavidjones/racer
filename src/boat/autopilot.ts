@@ -47,9 +47,10 @@ export interface Pilot {
   lastH: number;
   /** Nav: when it last tacked (s), so it doesn't tack and tack again; a detour round land, worked out now and then. */
   lastTackT: number; detour: Vec | null; detourT: number;
-  /** Nav: the next turn on the way by water (sim/routing.ts routeAround: the planner's route round piers, breakwaters
-   * and the shore), when land's in the direct way, and when it was worked out (s); null when the way is clear. */
-  wp: Vec | null; wpT: number;
+  /** Nav: the way by water when land's in the direct way (sim/routing.ts routeAround: the planner's route round piers,
+   * breakwaters and the shore), the turn she's steering for in it, when it was worked out (s), and for where; the turn
+   * she's steering for (null: the way's clear). */
+  route: Vec[] | null; ri: number; routeT: number; routeTo: Vec | null; wp: Vec | null;
   /** Nav: the heading it's steering now, for the display. */
   navH: number;
   /** Nav: the tack it has decided to go onto, held until she's round. */
@@ -79,7 +80,7 @@ const AWA_TAU = 2.5;
 export const AUTO_TACK = 100;
 
 export function newPilot(): Pilot {
-  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, wp: null, wpT: -1e9, navH: 0, goTack: null, lastTack: null, alarm: null, asternT: null };
+  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, route: null, ri: 0, routeT: -1e9, routeTo: null, wp: null, navH: 0, goTack: null, lastTack: null, alarm: null, asternT: null };
 }
 
 /** Engage in a mode, taking up where she is now: Auto holds her heading, Wind her apparent wind angle. */
@@ -121,17 +122,37 @@ const landDist = (b: Boat, h: number, d: number) => { const u = V(h); return lan
 /** Under this much water ahead on both tacks (m), about two lengths, she's boxed in: the pilot can't tack her out. */
 const BOXED = 15;
 
+/** How far ahead along the direct line land has to be before Nav plans a way round it (m): nearer the destination's
+ * own approach, or a pier on the way, not the shore across the Bay. */
+const PLAN_AHEAD = 400;
+/** Re-plan the way (s): the tide and her own drift move her off it slowly; a turn gone out of sight re-plans at once. */
+const REPLAN = 20;
+/** Clear of land this far either side of a straight line (m)? */
+function clearLine(a: Vec, b: Vec, side: number): boolean {
+  const L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 1) return true;
+  const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+  return [0, -side, side].every(k => landAlong({ x: a.x - uy * k, y: a.y + ux * k }, { x: b.x - uy * k, y: b.y + ux * k }) === Infinity);
+}
 /**
- * The next turn on the way by water to `dest` when land (a pier, a breakwater, the shore) is in the direct way, from
- * the passage planner's route (sim/routing.ts routeAround, which threads the Wharf's piers on a 10 m grid); null when
- * the direct way is clear, 20 m either side of her track.
+ * The turn Nav steers for: the direct way while it's clear (20 m either side) as far as PLAN_AHEAD; otherwise the
+ * passage planner's route (sim/routing.ts routeAround, which threads the Wharf's piers keeping 10 m off them), kept and
+ * followed turn by turn: on to the next turn once she's reached this one or can see the next clear, worked out again
+ * every REPLAN seconds, for a new destination, or when the turn she's on goes out of sight. Null: steer for `dest`.
  */
-function nextTurn(b: Vec, dest: Vec): Vec | null {
-  const L = Math.hypot(dest.x - b.x, dest.y - b.y); if (L < 1) return null;
-  const ux = (dest.x - b.x) / L, uy = (dest.y - b.y) / L;
-  if ([0, -20, 20].every(k => landAlong({ x: b.x - uy * k, y: b.y + ux * k }, { x: dest.x - uy * k, y: dest.y + ux * k }) === Infinity)) return null;
-  const r = routeAround(b, dest, 30);
-  return r.length > 2 ? r[1] : null;
+function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | null {
+  const L = Math.hypot(dest.x - b.x, dest.y - b.y), k = Math.min(1, PLAN_AHEAD / Math.max(L, 1));
+  const ahead = { x: b.x + (dest.x - b.x) * k, y: b.y + (dest.y - b.y) * k };
+  if (clearLine(b, ahead, 20)) { p.route = null; return null; }
+  const moved = !p.routeTo || Math.hypot(p.routeTo.x - dest.x, p.routeTo.y - dest.y) > 1;
+  const lost = !!p.route && landAlong(b, p.route[p.ri]) < Infinity;
+  if (!p.route || moved || lost || t - p.routeT > REPLAN) {
+    const r = routeAround(b, dest, 30);
+    p.route = r.length > 2 ? r : null; p.ri = 1; p.routeT = t; p.routeTo = { ...dest };
+    if (!p.route) return null;
+  }
+  const r = p.route;
+  while (p.ri < r.length - 1 && (Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 25 || clearLine(b, r[p.ri + 1], 12))) p.ri++;
+  return p.ri >= r.length - 1 ? null : r[p.ri];
 }
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
 function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
@@ -143,8 +164,8 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   // the way by water, as the navigator plans it: with land in the direct way (a curved pier, a breakwater, a basin's
   // entrance), steer for the route's next turn, upwind or down, not just the nearest clear heading: a heading search
   // runs her down onto the outside of Aquatic Park's Municipal Pier and holds her there (the owner: "auto nav failed
-  // to navigate around the seawall"). Worked out again every few seconds, and at once on reaching the turn.
-  if (t - p.wpT > 4 || (p.wp && Math.hypot(p.wp.x - b.x, p.wp.y - b.y) < 20)) { p.wp = nextTurn(b, dest); p.wpT = t; }
+  // to navigate around the seawall"). The route is kept and followed turn by turn (followRoute).
+  p.wp = followRoute(b, p, dest, t);
   let P = p.wp ?? dest;
   const bP0 = brg(P.x - b.x, P.y - b.y);
   if (!p.wp && Math.abs(wrap(from - bP0)) > 50) { // reaching or running with no route: round any land in the way

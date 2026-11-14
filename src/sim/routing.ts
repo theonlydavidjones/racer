@@ -290,8 +290,11 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   const eb = wharfNearest(b, 150) ? escapeWharf(b).reverse() : [b];
   const A = ea[ea.length - 1], B = eb[0];
   const near2 = (q: Vec) => dist(q, A) < 400 || dist(q, B) < 400 || nearEnd(q);
+  const ends = [a, b, A, B];
   const blocked2 = (q: Vec) => {
     if (onLand(q)) return true;
+    // (and off the Wharf's piers by WHARF_CLEAR, as the route's straight legs are, except right at its ends)
+    if (wharfNearest(q, WHARF_CLEAR) && !ends.some(e => dist(q, e) < WHARF_CLEAR + 2)) return true;
     if (near2(q)) return false;
     for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
@@ -303,9 +306,13 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   // pull it straight: from each turn, on to the farthest point in clear sight
   const out = [a];
   let i = 0;
+  // (where nothing in sight keeps WHARF_CLEAR off the piers, a marina's fairways, the farthest point in sight by the
+  // land alone, as before, rather than the grid's every 10 m step)
+  const seen = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   while (i < pts.length - 1) {
     let j = pts.length - 1;
     while (j > i + 1 && !visible(pts[i], pts[j])) j--;
+    if (j === i + 1 && !visible(pts[i], pts[j])) { j = pts.length - 1; while (j > i + 1 && !seen(pts[i], pts[j])) j--; }
     out.push(pts[j]); i = j;
   }
   return out;
@@ -318,8 +325,10 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
  */
 function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
   isGoal?: (q: Vec) => boolean, lean = 1): Vec[] | null {
-  const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
-  const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
+  // (the grid fixed to the world, not to her: a route worked out again a few metres on takes the same cells, not a new set
+  // shifted under her that breaks A*'s ties another way, so the turn she's steering for doesn't jump about)
+  const x0 = Math.floor((Math.min(a.x, b.x) - pad) / cell) * cell, y0 = Math.floor((Math.min(a.y, b.y) - pad) / cell) * cell;
+  const nx = Math.ceil((Math.max(a.x, b.x) + pad - x0) / cell) + 1, ny = Math.ceil((Math.max(a.y, b.y) + pad - y0) / cell) + 1;
   const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
   const idx = (q: Vec) => Math.round((q.y - y0) / cell) * nx + Math.round((q.x - x0) / cell);
   const block = new Int8Array(nx * ny).fill(-1); // -1 not yet worked out
