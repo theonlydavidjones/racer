@@ -748,7 +748,10 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
     // (turning round on a side deck, about half a turn: through facing inboard, toward the cockpit, as anyone turns there,
     // not out over the water; then the turn to sit facing in is back the other way, not on round a whole circle)
     const sx = Math.sign(c.hip.x);
-    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < 0) d -= Math.sign(d) * 2 * Math.PI;
+    // (only when the one way round is clearly out over the water: facing straight inboard, both ways pass fore or aft, and
+    // the test's sign flipped each frame, so they turned a step one way and a step back for ever, the knees with them, 70
+    // rad a minute, sat on the cabin top's edge)
+    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < -0.3) d -= Math.sign(d) * 2 * Math.PI;
     const dy = d * a; c.yaw += Math.max(-3 * dt, Math.min(3 * dt, dy));
   }
   // the lean on a slower spring (leaning out as a puff comes, in as it goes: about a third of a second, never a snap)
@@ -963,6 +966,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const zs2 = mids.map(i => ppl![i + 1].z), apart = Math.max(...zs2) - Math.min(...zs2) >= 0.4;
     for (const i of apart ? mids : mids.slice(1)) onBench[i] = true;
   }
+  // (and once sat on the bench's edge, they stay there while they're in the middle: not down onto the sole to kneel and
+  // back up each time the other's weight drifts out of the middle and back, the knees kicking 46 rad a minute on a 6 kt
+  // broad reach)
+  cr.crew.forEach((f, i) => { if (inMid[i] && f.benchSide != null) onBench[i] = true; });
   const tackOn = !!c && (tacking || !!c.roll);
   const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
   cr.crew.forEach((f, i) => {
