@@ -38,8 +38,10 @@ function clothPoints(b: Boat, sh: SailShape): THREE.Vector3[] {
 /** How far (m) a point is inside the mast's section or a shroud's wire, the deepest of them (0: clear). */
 function inside(p: THREE.Vector3): number {
   let worst = 0;
-  const [m0, , m2] = jibRods(), ath = 0.110 / 2, fa = 0.133 / 2; // (the mast's section, boatMesh MAST_ATH and MAST_FA)
-  if (p.y > m0.a.y && p.y < m2.b.y) { const e = Math.hypot(p.x / ath, (p.z - RIG.MAST_Z) / fa); if (e < 1) worst = Math.max(worst, (1 - e) * ath); }
+  const ath = 0.110 / 2, fa = 0.133 / 2; // (the mast's section, boatMesh MAST_ATH and MAST_FA)
+  // (the mast is raked: the point taken back into the upright mast's frame, about the pivot at the deck, before its section is checked)
+  const pv = new THREE.Vector3(0, RIG.DECK_AT_MAST, RIG.MAST_Z), u = p.clone().sub(pv).applyAxisAngle(new THREE.Vector3(1, 0, 0), -RIG.MAST_RAKE).add(pv);
+  if (u.y > RIG.DECK_AT_MAST && u.y < RIG.HOUNDS.y + 0.1) { const e = Math.hypot(u.x / ath, (u.z - RIG.MAST_Z) / fa); if (e < 1) worst = Math.max(worst, (1 - e) * ath); }
   for (const s of jibRods().slice(3)) {
     const d = s.b.clone().sub(s.a), u = THREE.MathUtils.clamp(p.clone().sub(s.a).dot(d) / d.lengthSq(), 0, 1);
     worst = Math.max(worst, 0.004 - p.distanceTo(s.a.clone().addScaledVector(d, u))); // (a 4 mm wire's half-width, and the cloth)
@@ -55,7 +57,8 @@ describe('a backed jib lies against the mast and the shroud, never through them 
     const pts = clothPoints(b, shapeOf(b));
     expect(Math.max(...pts.map(inside))).toBeLessThan(0.003);
     // and it does reach the mast: the belly is pressed onto it (within a few cm of its surface), not held off it
-    const near = Math.min(...pts.filter(p => p.y > RIG.DECK_AT_MAST && p.y < RIG.HOUNDS.y).map(p => Math.hypot(p.x / 0.055, (p.z - RIG.MAST_Z) / 0.0665) - 1));
+    const pv = new THREE.Vector3(0, RIG.DECK_AT_MAST, RIG.MAST_Z), up = (p: THREE.Vector3) => p.clone().sub(pv).applyAxisAngle(new THREE.Vector3(1, 0, 0), -RIG.MAST_RAKE).add(pv);
+    const near = Math.min(...pts.map(up).filter(p => p.y > RIG.DECK_AT_MAST && p.y < RIG.HOUNDS.y).map(p => Math.hypot(p.x / 0.055, (p.z - RIG.MAST_Z) / 0.0665) - 1));
     expect(near * 0.055).toBeLessThan(0.03);
   });
   for (const tack of ['S', 'P'] as const) it(`aback and flogging in a tack (${tack}): the shaking cloth still stops at the mast`, () => {

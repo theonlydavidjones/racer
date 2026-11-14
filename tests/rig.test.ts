@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { RIG } from '../src/render/boatMesh';
 import { sailArea, sailEdges } from '../src/render/sails';
@@ -9,7 +10,8 @@ describe('the drawn rig and hull', () => {
   it('puts the mast 2.80 m from the bow and the forestay 0.80 m (CR 7.21, 6.1.7)', () => {
     expect(RIG.MAST_FRONT_Z + L / 2).toBeCloseTo(2.80, 3);
     expect(RIG.FORESTAY_DECK.z + L / 2).toBeCloseTo(0.80, 3);
-    expect(RIG.HOUNDS.y - RIG.DECK_AT_MAST).toBeCloseTo(6.50, 3); // IG
+    // IG: the hounds 6.50 m up the mast's front from the deck (CR 6.1.11 measures up the mast; the mast is raked)
+    expect(RIG.HOUNDS.distanceTo(RIG.raked(new THREE.Vector3(0, RIG.DECK_AT_MAST, RIG.MAST_FRONT_Z)))).toBeCloseTo(6.50, 3);
     expect(RIG.BOOM_TOP - RIG.DECK_AT_MAST).toBeCloseTo(1.00, 3); // BAS
   });
   it('puts the lower band\'s upper edge (the Lower Mast Point) 1000 ± 10 mm above the deck, along the mast\'s after side (CR 6.1.11)', () => {
@@ -22,9 +24,21 @@ describe('the drawn rig and hull', () => {
     expect(sailArea(RIG.JIB_DEF)).toBeGreaterThan(7.30 * 0.98);
     expect(sailArea(RIG.JIB_DEF)).toBeLessThan(7.30 * 1.02);
   });
+  it('rakes the mast as North Sails\' forestay mark sets it: the forestay 5.50 + 1.31 m (boat/rake.ts)', () => {
+    expect(Math.abs(RIG.HOUNDS.distanceTo(RIG.FORESTAY_DECK) - 6.81)).toBeLessThan(0.01); // (within a centimetre: the mark is read by eye)
+    expect(RIG.MAST_RAKE * 180 / Math.PI).toBeGreaterThan(5); expect(RIG.MAST_RAKE * 180 / Math.PI).toBeLessThan(6.5);
+  });
+  it('draws the main to the class\'s maximum at both bands, its leech inside 9150 mm (CR 9.25, Mainsail drawing 8, ERS G.7.2)', () => {
+    const m = RIG.MAIN_DEF;
+    expect(m.head.distanceTo(m.tack)).toBeCloseTo(8.75, 3); // (head at the upper band: P up the raked mast)
+    expect(m.clew.distanceTo(m.tack)).toBeCloseTo(3.38, 3); // (clew at the boom band: E)
+    expect(m.head.distanceTo(m.clew)).toBeLessThanOrEqual(9.15); expect(m.head.distanceTo(m.clew)).toBeGreaterThan(9.0);
+    expect(RIG.MAIN_LEECH).toBeCloseTo(m.head.distanceTo(m.clew), 6);
+  });
   it('sets the main\'s roach to its measured widths', () => {
-    // width square to the (upright) luff at height fraction t
-    const w = (t: number) => { const [lu, le] = sailEdges(RIG.MAIN_DEF, t); return le.z - lu.z; };
+    // width square to the (raked) luff at height fraction t
+    const m = RIG.MAIN_DEF, lu = m.head.clone().sub(m.tack).normalize();
+    const w = (t: number) => { const [l, le] = sailEdges(m, t), d = le.clone().sub(l); return d.sub(lu.clone().multiplyScalar(d.dot(lu))).length(); };
     for (const [t, g] of [[0.25, 2.89], [0.5, 2.22], [0.75, 1.32], [0.875, 0.72]]) expect(Math.abs(w(t) - g)).toBeLessThan(0.08);
   });
   it('sets the jib\'s luff on the forestay: luff 5.95 m, LP 2.36 m', () => {

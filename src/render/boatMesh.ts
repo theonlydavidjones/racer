@@ -20,6 +20,7 @@ import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLant
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 import { PART_SMALL } from './fittings';
+import { MAST_RAKE } from '../boat/rake';
 const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
 const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
@@ -65,11 +66,23 @@ const DECK_AT_MAST = deckY(uAtZ(MAST_AFT_Z), 0);
 const BAS = 1.0, P = 8.75, E = 3.38, IG = 6.5;
 /** The boom's top (the main's tack and foot), and the masthead. */
 const BOOM_TOP = DECK_AT_MAST + BAS, MAST_TOP = BOOM_TOP + P + 0.28, BOOM_R = 0.045;
+/**
+ * The mast is raked aft (boat/rake.ts: 5.6°, from North Sails' forestay mark), turning about its centre where it passes
+ * through the deck, which is where the class measures its position (CR 6.1.7). Everything here is first laid out on an
+ * upright mast, with heights up it as the class measures them (the bands, the hounds, the masthead), and then put where
+ * it is on the raked one: the mast and what's fixed to it ride in a raked group; what runs from the deck to the mast
+ * (the forestay and jib, the shrouds, the backstay, the halyards up it) takes its upper end from raked().
+ */
+const RAKE_PIVOT = V3(0, DECK_AT_MAST, MAST_Z), RAKE_Q = new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), MAST_RAKE);
+/** Where a point given on the upright mast is on the raked one (in the boat's frame). */
+function raked(v: THREE.Vector3): THREE.Vector3 { return v.clone().sub(RAKE_PIVOT).applyQuaternion(RAKE_Q).add(RAKE_PIVOT); }
 /** The masthead, above the waterline (m): the wind indicator's top rung. */
-export const MASTHEAD_Y = MAST_TOP;
+export const MASTHEAD_Y = raked(V3(0, MAST_TOP, MAST_Z)).y;
 const FORESTAY_DECK = V3(0, deckY(uAtZ(-L / 2 + 0.80), 0), -L / 2 + 0.80); // (on the deck's crown, as the mast)
 /** Where the forestay meets the mast's front (the hounds), and the shrouds its sides. */
-const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
+const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z), HOUNDS_R = raked(HOUNDS);
+/** The gooseneck, where the boom's pivot is: on the raked mast's after side at the boom's top (the boom itself stays square to the deck). */
+const GOOSENECK = raked(V3(0, BOOM_TOP, MAST_AFT_Z));
 /**
  * The main, in the boom's frame (origin at the mast's after side, at the waterline): luff P, foot E, and its roach. Its
  * widths, measured (as ORC does) square from the luff at a quarter, half, three quarters and seven eighths of the way up
@@ -83,11 +96,18 @@ const HOUNDS = V3(0, DECK_AT_MAST + IG, MAST_FRONT_Z);
  * other terms of rule 109, the mast section's perhaps). The physics uses the four certificates' average, 18.45.
  */
 const MAIN_GIRTH = fairCurve([[0, E], [0.25, 2.89], [0.5, 2.22], [0.75, 1.32], [0.875, 0.72], [1, 0.11]]);
-const MAIN_LEECH = Math.hypot(P, E);
+// (the luff up the raked mast, the foot along the boom square to the deck: the angle between them 90° less the rake. A
+// main cut to the class's maximum fills both bands, P and E (CR 9.25), and its leech, head point to clew point on the
+// flat sail (ERS G.7.2), is then √(P² + E² − 2·P·E·sin rake) = 9.07 m, inside the class's 9150 mm, Mainsail drawing 8)
+const MAIN_HEAD = V3(0, BOOM_TOP + P * Math.cos(MAST_RAKE), P * Math.sin(MAST_RAKE));
+const MAIN_LEECH = MAIN_HEAD.distanceTo(V3(0, BOOM_TOP, E));
+/** How much width square to the luff a step square to the straight leech adds: the cosine of the angle between the two edges (P/leech with the luff upright). */
+const ROACH_K = (() => { const lu = MAIN_HEAD.clone().sub(V3(0, BOOM_TOP, 0)).normalize(), le = MAIN_HEAD.clone().sub(V3(0, BOOM_TOP, E)).normalize(); return lu.dot(le); })();
 const MAIN_DEF: SailDef = {
-  tack: V3(0, BOOM_TOP, 0), head: V3(0, BOOM_TOP + P, 0), clew: V3(0, BOOM_TOP, E), depth: 0.42, rows: 18, cols: 10,
-  // the roach square to the straight leech, from the width it adds square to the luff
-  roach: t => (MAIN_GIRTH(t) - E * (1 - t)) * MAIN_LEECH / P,
+  tack: V3(0, BOOM_TOP, 0), head: MAIN_HEAD, clew: V3(0, BOOM_TOP, E), depth: 0.42, rows: 18, cols: 10,
+  // the roach square to the straight leech, from the width it adds square to the luff (the straight leech's own width
+  // square to the luff at t is E·cos(rake)·(1 − t))
+  roach: t => (MAIN_GIRTH(t) - E * Math.cos(MAST_RAKE) * (1 - t)) / ROACH_K,
   // (the windows: the class allows two, 0.5 m² between them, none nearer than 150 mm to an edge, CR 9.13: the long one
   // low down, 1.1 m by 0.35 m, and the small spreader window up the luff, about 0.49 m² together)
   windows: [{ t0: 0.3 / P, t1: 0.65 / P, s0: 0.18, s1: 0.18 + 1.1 / E }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
@@ -105,7 +125,7 @@ function leechT(d: SailDef, f: number): number {
 // within 100 mm), the top one no longer than 800 mm and the others 1050 mm, measured outside the pocket (CR 9.24)
 MAIN_DEF.battens = [0.8, 0.6, 0.4, 0.2].map((f, i) => ({ t: leechT(MAIN_DEF, f), len: i < 3 ? 1.0 : 0.6 }));
 /** The forestay: the jib swings around it, so its luff stays on the stay. */
-const JIB_AXIS = HOUNDS.clone().sub(FORESTAY_DECK).normalize();
+const JIB_AXIS = HOUNDS_R.clone().sub(FORESTAY_DECK).normalize();
 /**
  * The jib, hanked on the forestay, in its own frame (origin where the stay meets the deck): from the certificate, luff
  * 5.95 m and LP 2.36 m (the clew's distance square from the luff), area 7.30 m². Its tack is on a short strop 0.10 m up
@@ -128,7 +148,7 @@ const JIB_DEF: SailDef = (() => {
   };
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
-export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
+export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS: HOUNDS_R, GOOSENECK, MAST_RAKE, raked, MAIN_LEECH, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 
 /** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
@@ -702,7 +722,7 @@ const JIB_HALF_PTS = 20, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
  * The cockpit coaming's height (m) along the boat: at least 200 mm just aft of the cabin, 140 mm at station 4.5 and
  * 80 mm at station 3 (CR 3.22); drawn a little above each.
  */
-const TRAV_Z = COCKPIT_FIT.thwart.z, TRAV_HALF = 0.5, MASTHEAD = new THREE.Vector3(0, MAST_TOP, MAST_Z);
+const TRAV_Z = COCKPIT_FIT.thwart.z, TRAV_HALF = 0.5, MASTHEAD = raked(new THREE.Vector3(0, MAST_TOP, MAST_Z));
 /** Which sail a line works (its colour, the sail-controls band's: jib warm, main cool, the backstay's control white). */
 type Rope = 'jib' | 'main' | 'backstay';
 const ROPE_COLOR: Record<Rope | 'wire', number> = { jib: 0xc4572e, main: 0x2f5f8f, backstay: 0xe6e3da, wire: 0x9aa1a8 };
@@ -790,8 +810,8 @@ function deckFittings(grp: THREE.Group): void {
     parts.push(along(new THREE.CylinderGeometry(0.011, 0.011, 0.17, 8), foot, d, 0.13));
     for (const at of [0.04, 0.22]) parts.push(along(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), foot, d, at)); // its studs
   };
-  for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
-  screw(FORESTAY_DECK.clone(), HOUNDS);
+  for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), raked(new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z)));
+  screw(FORESTAY_DECK.clone(), HOUNDS_R);
   parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
   for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * 0.3, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
   { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
@@ -966,14 +986,15 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const fb = sheaveBlock(0.016, -0.03); fb.position.copy(rod); grp.add(fb);
     return rod.clone().setY(rod.y - 0.03);
   };
-  const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts, role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); return l; };
+  // (a line up the mast lies on the raked mast above its foot blocks: those points raked; the foot blocks themselves on the deck)
+  const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts.map(q => q.y > DECK_AT_MAST + 0.25 ? raked(q) : q), role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); return l; };
   // the jib's luff tensioner (Josephine's, the owner's photos; on the sail band the jib Cunningham): a tackle down the
   // mast's starboard side, its top block clipped into an eye in the jib halyard once the jib is up (into a ring on the
   // mast when the sails are stowed: about the same place), its lower block low on the mast; pulling its tail hauls the
   // halyard down and stretches the jib's luff. The tail, from the piano, comes up to the lower block from the foot block.
   const JC = { x: MAST_ATH / 2 + 0.03, z: MAST_Z - 0.01, top: DECK_AT_MAST + 0.72, low: DECK_AT_MAST + 0.26 }; // (its clip about halfway up to the gooseneck, forward of the vang: the owner's photo)
-  { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), STEEL); ring.position.set(MAST_ATH / 2 + 0.006, JC.top + 0.05, JC.z); ring.rotation.y = Math.PI / 2; grp.add(ring); // (the ring it clips to with the sails stowed)
-    for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
+  { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), STEEL); ring.position.copy(raked(V3(MAST_ATH / 2 + 0.006, JC.top + 0.05, JC.z))); ring.rotation.y = Math.PI / 2; grp.add(ring); // (the ring it clips to with the sails stowed)
+    for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.copy(raked(V3(JC.x, y, JC.z))); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
   const cringles: Lines['cringles'] = [];
   const PIANO: Record<'S' | 'P', LineColorKey[]> = { S: ['vang', 'outhaul', 'jibCunningham', 'jibHalyard'], P: ['vang', 'outhaul', 'cunningham', 'jibCunningham', 'downhaul'] };
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) PIANO[tk].forEach((key, i) => {
@@ -991,7 +1012,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     if (key === 'vang') fixed(line([fb, VANG_FOOT.clone().add(new THREE.Vector3(side * 0.012, -0.02, 0))], 'main', 'vang')); // the vang's tail, to its lower block
     else if (key === 'outhaul') upMast([fb, new THREE.Vector3(side * 0.03, fb.y + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(side * 0.015, BOOM_TOP - BOOM_R, MAST_AFT_Z + 0.012)], 'main', 'outhaul');
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
-      const gb = sheaveBlock(0.014, -0.03); gb.position.set(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02); grp.add(gb);
+      const gb = sheaveBlock(0.014, -0.03); gb.position.copy(raked(V3(-0.07, BOOM_TOP + 0.05, MAST_AFT_Z + 0.02))); grp.add(gb);
       cringles.push({ l: upMast([fb, new THREE.Vector3(-0.07, fb.y + 0.1, MAST_AFT_Z + 0.02), new THREE.Vector3(-0.07, BOOM_TOP + 0.02, MAST_AFT_Z + 0.02), new THREE.Vector3(0, BOOM_TOP + MAIN_CUNNINGHAM_UP, MAST_AFT_Z + 0.01)], 'main', 'cunningham'), sail: 'main' });
     } else if (key === 'jibCunningham') { // up to the tensioner's lower block, then its four parts between the blocks (drawn once)
       // (Josephine's has the one tackle and one tail, to starboard: the port piano's jib Cunningham ends at its foot block)
@@ -1003,14 +1024,14 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       // where the tensioner's top block clips in once the jib's up, and its tail on down to the foot block and the piano.
       // With the jib down the tensioner hangs from its ring on the mast instead, and the halyard runs straight down.
       const exit = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 1.25, MAST_FRONT_Z + 0.004), corner = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), exit.y - 0.05, MAST_FRONT_Z + 0.006);
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(raked(V3(exit.x, exit.y + 0.03, exit.z))); plate.rotation.x = MAST_RAKE; grp.add(plate);
       const sx = side * (JC.x + 0.012), eye = new THREE.Vector3(side * JC.x, JC.top + 0.04, JC.z), aftC = new THREE.Vector3(side * (JC.x + 0.012), fb.y + 0.06, MAST_AFT_Z + 0.03);
       const up = upMast([exit, corner, new THREE.Vector3(side * JC.x, corner.y - 0.05, JC.z), eye, new THREE.Vector3(sx, eye.y - 0.03, JC.z), new THREE.Vector3(sx, JC.low - 0.06, JC.z), aftC, fb.clone()], role, key);
       const down = upMast([exit, corner, new THREE.Vector3(sx, corner.y - 0.05, JC.z), new THREE.Vector3(sx, JC.low - 0.06, JC.z), aftC, fb.clone()], role, key);
       grp.userData.jibHalyard = { up, down };
     } else { // the main halyard: out of the mast low down, to the moving block of a 2:1 tackle, whose fall runs to the foot block
       const exit = new THREE.Vector3(side * 0.03, DECK_AT_MAST + 0.55, MAST_AFT_Z - 0.004), corner = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), exit.y - 0.03, MAST_AFT_Z - 0.006);
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(exit).setY(exit.y + 0.03); grp.add(plate);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.09, 0.012), STEEL); plate.position.copy(raked(V3(exit.x, exit.y + 0.03, exit.z))); plate.rotation.x = MAST_RAKE; grp.add(plate);
       const sx = side * (MAST_ATH / 2 + 0.02), mz = MAST_Z + 0.025, my = fb.y + 0.36;
       const mb = sheaveBlock(0.014, -0.03); mb.position.set(sx, my + 0.03, mz); mb.rotation.y = Math.PI / 2; grp.add(mb); // the moving block, hanging from the halyard's end
       upMast([exit, corner, new THREE.Vector3(sx, exit.y - 0.06, mz), new THREE.Vector3(sx, my + 0.03, mz)], role, key); // the halyard's end, round the mast's corner (outside it) and down its side to the block
@@ -1019,11 +1040,6 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
       upMast([fb.clone().setX(fb.x + side * 0.03), new THREE.Vector3(sx + side * 0.014, my - 0.01, mz), new THREE.Vector3(sx - side * 0.014, my - 0.01, mz), fb.clone()], role, key); // (the two parts a sheave's width apart, either side of it)
     }
   });
-  // the mast's own bands: a black boot where it goes through the deck, and the lower band (CR 6.1.11: its upper edge the
-  // Lower Mast Point, 1.00 m up; dark on Josephine), from the photos of her mast foot
-  for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
-  }
   const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
   // the fittings that never move on her (the blocks, cleats, eyes, the jammer): one mesh per material, not one each,
   // so the rigging's dozens of small parts cost the GPU a couple of draw calls a boat
@@ -1052,7 +1068,7 @@ const VANG_FOOT = horseshoeAt(0).add(new THREE.Vector3(0, 0.05, 0)); // (shackle
  * boom either side of it (VANG_LEGS), and its block hangs 0.3 m down the line toward the foot (VANG_SPAN, in the boom's
  * frame). Estimates from the photos. */
 const VANG_BOOM = 0.9, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
-const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
+const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y - (GOOSENECK.y - BOOM_TOP), VANG_FOOT.z - GOOSENECK.z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
@@ -1064,9 +1080,9 @@ const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = shee
 const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
 /** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
 const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
-const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
+const POLE_INBOARD = raked(new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z)); // pole fitting on the front of the mast
 /** The mast's height segments (for its bend) and the forestay's points (for its sag). */
-const MAST_SEGS = 24, STAY_PTS = 13, STAY_LEN = HOUNDS.distanceTo(FORESTAY_DECK);
+const MAST_SEGS = 24, STAY_PTS = 13, STAY_LEN = HOUNDS_R.distanceTo(FORESTAY_DECK);
 /**
  * The mast's bend at h m above the deck (m, + forward): its middle bowed forward between the deck and the hounds (a
  * sine: the pinned span's shape under a moment at its ends), and above them the topmast carrying on along the tangent the
@@ -1090,9 +1106,9 @@ export function jibRods(bow = 0, topAft = 0): SailObstacle[] {
   const r = Math.max(MAST_FA, MAST_ATH) / 2 + 0.008, top = HOUNDS.y - DECK_AT_MAST;
   for (let i = 0; i < 3; i++) {
     const h0 = top * i / 3, h1 = top * (i + 1) / 3, o = JIB_RODS[i];
-    o.a.set(0, DECK_AT_MAST + h0, MAST_Z - mastFwd(h0, bow, topAft)); o.b.set(0, DECK_AT_MAST + h1, MAST_Z - mastFwd(h1, bow, topAft)); o.r = r;
+    o.a.copy(raked(V3(0, DECK_AT_MAST + h0, MAST_Z - mastFwd(h0, bow, topAft)))); o.b.copy(raked(V3(0, DECK_AT_MAST + h1, MAST_Z - mastFwd(h1, bow, topAft)))); o.r = r;
   }
-  [-1, 1].forEach((sx, k) => { const o = JIB_RODS[3 + k]; o.a.set(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z); o.b.set(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z); o.r = 0.012; });
+  [-1, 1].forEach((sx, k) => { const o = JIB_RODS[3 + k]; o.a.set(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z); o.b.copy(raked(V3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z))); o.r = 0.012; });
   return JIB_RODS;
 }
 const jibInv = new THREE.Matrix4(), jibPose = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1);
@@ -1115,12 +1131,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const rudder = buildHull(b, grp);
   // the rig sits on the real deck height
   const rig = new THREE.Group(); grp.add(rig);
+  // the mast and what's fixed to it, laid out upright and raked as one (raked() for what runs to it from the deck)
+  const mastGrp = new THREE.Group(); mastGrp.position.copy(RAKE_PIVOT); mastGrp.quaternion.copy(RAKE_Q); rig.add(mastGrp);
+  const onMast = new THREE.Group(); onMast.position.copy(RAKE_PIVOT).negate(); mastGrp.add(onMast);
   // aluminium extrusion: constant section; wooden mast: tapered
   // (its section an oval, wider fore and aft; from the deck, through the cabin top, to the masthead)
   const mastH = MAST_TOP - DECK_AT_MAST;
   // (in height segments, so it can bend: syncRig)
   const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.5, 0.5, mastH, 14, MAST_SEGS) : new THREE.CylinderGeometry(0.34, 0.5, mastH, 10, MAST_SEGS), spar);
-  mast.scale.set(MAST_ATH, 1, MAST_FA); mast.position.set(0, DECK_AT_MAST + mastH / 2, MAST_Z); rig.add(mast);
+  mast.scale.set(MAST_ATH, 1, MAST_FA); mast.position.set(0, DECK_AT_MAST + mastH / 2, MAST_Z); onMast.add(mast);
   const mastBase = (mast.geometry.attributes.position.array as Float32Array).slice();
   // the class's measurement bands (CR 6.1.11: each at least 13 mm wide, "clearly discernible while racing"; dark, as the
   // class's spar drawing, Dwg 11, has them): No. I right round the mast with its upper edge at the Lower Mast Point, the
@@ -1133,7 +1152,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     g.scale(MAST_ATH, 1, MAST_FA); g.translate(0, y0 + BAND / 2, MAST_Z); bandGeos.push(g.toNonIndexed());
   };
   ringAt(BOOM_TOP - BAND, Math.PI * 2, 0); ringAt(HOUNDS.y, Math.PI, Math.PI / 2); ringAt(BOOM_TOP + P, Math.PI * 2, 0); // (three.js's arc starts at +z, aft: π/2 to 3π/2 is the fore half)
-  const bands = new THREE.Mesh(mergeGeometries(bandGeos, false)!, BLACK); bands.userData.bends = true; rig.add(bands); // (bent each time the mast is: syncRig)
+  const bands = new THREE.Mesh(mergeGeometries(bandGeos, false)!, BLACK); bands.userData.bends = true; onMast.add(bands); // (bent each time the mast is: syncRig)
   const bandsBase = (bands.geometry.attributes.position.array as Float32Array).slice();
   // the mast's foot on deck (Josephine, the owner's photos): a round stainless plate on the deck; a black rubber boot
   // round the mast from the deck about 0.4 m up, where it goes down through the deck to its step on the keel; and a
@@ -1141,7 +1160,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   { const y0 = deckY(uAtZ(MAST_Z), 0), foot = new THREE.Group(); foot.position.set(0, y0, MAST_Z); rig.add(foot); // (on the deck's crown, the centreline)
     const plate = new THREE.Mesh(new THREE.CylinderGeometry(MAST_RING.plate, MAST_RING.plate, 0.006, 32), STEEL); plate.position.y = 0.003; foot.add(plate);
     const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.56, 1, 18, 1, true), new THREE.MeshLambertMaterial({ color: 0x15171a, side: THREE.DoubleSide }));
-    boot.scale.set(MAST_ATH + 0.012, MAST_RING.boot, MAST_FA + 0.012); boot.position.y = MAST_RING.boot / 2; foot.add(boot);
+    boot.scale.set(MAST_ATH + 0.012, MAST_RING.boot, MAST_FA + 0.012); boot.position.set(0, MAST_RING.boot / 2 * Math.cos(MAST_RAKE), MAST_RING.boot / 2 * Math.sin(MAST_RAKE)); boot.rotation.x = MAST_RAKE; foot.add(boot);
     // the horseshoe: a stainless rod, its two ends fixed to the deck either side just forward of the mast, arching up and
     // round the mast's after side, highest (about 6 in) right aft of it (the owner)
     const pts: THREE.Vector3[] = [], th = MAST_RING.ends;
@@ -1159,7 +1178,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const sailMat = sm('front', pics.mainStbd), sailBack = sm('back', pics.mainPort), jibMat = sm('front', pics.jibStbd), jibBack = sm('back', pics.jibPort);
   sailPics.set(sailMat, { front: sailMat, back: sailBack, stbd: pics.mainStbd, port: pics.mainPort });
   sailPics.set(jibMat, { front: jibMat, back: jibBack, stbd: pics.jibStbd, port: pics.jibPort });
-  const boomPivot = new THREE.Group(); boomPivot.position.set(0, 0, MAST_AFT_Z); rig.add(boomPivot);
+  const boomPivot = new THREE.Group(); boomPivot.position.set(0, GOOSENECK.y - BOOM_TOP, GOOSENECK.z); rig.add(boomPivot);
   // the mainsheet's upper block, hung from a strap under the boom's end
   { for (const dz of [-MS_GAP / 2, MS_GAP / 2]) { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, MS_R + dz); boomPivot.add(ub); } } // (two blocks on bails, fore and aft)
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
@@ -1182,17 +1201,17 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     for (const bt of MAIN_DEF.battens!) leechTells.push(new Telltale(main, bt.t, 0.995, true, 0.3, bt.t * 7));
   }
   // the forestay: sagging to leeward in the jib's pull (syncRig)
-  const forestay = new THREE.Line(new THREE.BufferGeometry().setFromPoints([...Array(STAY_PTS)].map((_, i) => FORESTAY_DECK.clone().lerp(HOUNDS, i / (STAY_PTS - 1)))), MAT.wire);
+  const forestay = new THREE.Line(new THREE.BufferGeometry().setFromPoints([...Array(STAY_PTS)].map((_, i) => FORESTAY_DECK.clone().lerp(HOUNDS_R, i / (STAY_PTS - 1)))), MAT.wire);
   forestay.frustumCulled = false; rig.add(forestay);
   // upper shrouds, each with a cassette-tape telltale tied on low enough to see from the cockpit
   const ribbons: Ribbon[] = [], jumperLines: THREE.Line[] = [], windexTabs: THREE.Mesh[] = [];
   for (const sx of [-1, 1]) {
-    const foot = new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip = new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z);
+    const foot = new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip = raked(new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
     // the shroud, straight from its chainplate to the mast; the jumper strut, and the jumper stay over its tip
     { const st = new THREE.Vector3(sx * STRUT.x, STRUT.y, STRUT.z), root = new THREE.Vector3(sx * MAST_ATH / 2, STRUT_Y, MAST_FRONT_Z + 0.02);
       const len = st.distanceTo(root), js = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.016, len, 5), spar);
-      js.position.copy(st).lerp(root, 0.5); js.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), st.clone().sub(root).normalize()); rig.add(js);
-      const jl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, JUMPER_TOP, MAST_FRONT_Z), st, V3(0, JUMPER_FOOT, MAST_FRONT_Z)]), MAT.wire); rig.add(jl); jumperLines.push(jl); }
+      js.position.copy(st).lerp(root, 0.5); js.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), st.clone().sub(root).normalize()); onMast.add(js);
+      const jl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, JUMPER_TOP, MAST_FRONT_Z), st, V3(0, JUMPER_FOOT, MAST_FRONT_Z)]), MAT.wire); onMast.add(jl); jumperLines.push(jl); }
     rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, tip]), MAT.wire));
     const anchor = foot.clone().lerp(tip, TAPE_HEIGHT / (tip.y - CHAINPLATE_Y));
     const geom = new THREE.BufferGeometry();
@@ -1293,7 +1312,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     // is thin, pale braid (a few mm), not wire: drawn faint and light (FLAG_LINE), its two parts together, so it doesn't
     // read as a stay (the owner, v180: two dark lines from the strut tip looked like extra stays)
     if (tail) {
-      const side = Math.sign(at.x) || 1, cleat = new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), DECK_AT_MAST + 1.1, MAST_FRONT_Z + 0.03);
+      const side = Math.sign(at.x) || 1, cleat = raked(new THREE.Vector3(side * (MAST_ATH / 2 + 0.012), DECK_AT_MAST + 1.1, MAST_FRONT_Z + 0.03));
       parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(at.x, at.y - h - 0.05, at.z), cleat.clone().setY(cleat.y + 0.02)]), FLAG_LINE));
       parent.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([at.clone().setX(at.x - side * 0.006), cleat.clone().setY(cleat.y + 0.02).setX(cleat.x - side * 0.003)]), FLAG_LINE));
       if (!flagCleats.has(side)) { flagCleats.add(side); const cm = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.09, 0.02), STEEL); cm.position.copy(cleat); parent.add(cm); }
@@ -1304,7 +1323,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // the burgee, or on the same halyard just below it
   const burgee = b.burgee ? burgeeCanvas(b.burgee) : null, officer = b.special ? flagArtCanvas(b.special) : null;
   const below = !!officer && officerRule(b.burgee) === 'below';
-  const flagBlock = (side: number) => new THREE.Vector3(side * (STRUT.x - 0.04), STRUT.y - 0.06, STRUT.z); // (the flag halyard's block under the strut's tip)
+  const flagBlock = (side: number) => raked(new THREE.Vector3(side * (STRUT.x - 0.04), STRUT.y - 0.06, STRUT.z)); // (the flag halyard's block under the strut's tip)
   const clubHoist = (side: number) => {
     if (!below) { hoist(officer ?? burgee, flagBlock(side), 0.3, rig); return; }
     hoist(burgee, flagBlock(side), 0.3, rig, false); hoist(officer, flagBlock(side).add(new THREE.Vector3(0, -0.36, 0)), 0.3, rig);
@@ -1334,14 +1353,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   hoist(pc, new THREE.Vector3(0, 3, 3), 0.2, grp, false);
   const protest = flags[flags.length - 1].mesh; protest.visible = false;
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
-  const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
+  const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); onMast.add(windex);
   { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });
     const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.55, 5), blk); rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.12, -0.05); windex.add(rod);
     const head = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.08, 6), red); head.rotation.x = -Math.PI / 2; head.position.set(0, 0.12, -0.35); windex.add(head);
     const fin = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.09), red); fin.rotation.y = Math.PI / 2; fin.position.set(0, 0.12, 0.2); windex.add(fin);
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 5), blk); post.position.set(0, 0.06, 0); windex.add(post);
     // the fixed reference tabs, set to the close-hauled apparent wind angle either side of the bow
-    for (const sx of [-1, 1]) { const tab = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.03, 0.22), blk); const a = sx * 28 * Math.PI / 180; tab.position.set(Math.sin(a) * 0.14, 0.05, -Math.cos(a) * 0.14).add(windex.position); tab.rotation.y = -a; windexTabs.push(tab); rig.add(tab); }
+    for (const sx of [-1, 1]) { const tab = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.03, 0.22), blk); const a = sx * 28 * Math.PI / 180; tab.position.set(Math.sin(a) * 0.14, 0.05, -Math.cos(a) * 0.14).add(windex.position); tab.rotation.y = -a; windexTabs.push(tab); onMast.add(tab); }
   }
   // a compass card behind the glass of the bulkhead compass
   const cc = document.createElement('canvas'); cc.width = cc.height = 256; const g = cc.getContext('2d')!;
@@ -1376,7 +1395,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // her lights: the bicolour on the stemhead, the sternlight on the transom to port of the rudder head (clear of the
   // tiller, the backstay's bridle and the ensign staff), or the tricolour just above the masthead, under the windex
   const sternY = sheer(1) - 0.07;
-  const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z) },
+  const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: raked(V3(0, MAST_TOP + 0.05, MAST_Z)) },
     b.paint?.navLights ?? 'deck');
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
@@ -1601,10 +1620,10 @@ function syncRig(m: BoatMesh, b: Boat, jibSgn: number, load: number, dt: number)
     const at = (h: number) => mastFwd(h - DECK_AT_MAST, d.bow, d.topAft);
     m.windex.position.z = r.windexZ - at(MAST_TOP);
     r.windexTabs.forEach((t, k) => { t.position.z = r.tabZ[k] - at(MAST_TOP); });
-    m.boomPivot.position.z = MAST_AFT_Z - at(BOOM_TOP);
+    m.boomPivot.position.z = GOOSENECK.z - at(BOOM_TOP) * Math.cos(MAST_RAKE);
     for (const { l, base } of m.lines.mastLines) { // (the lines up the mast's after side follow it)
       const q = l.geometry.attributes.position as THREE.BufferAttribute;
-      for (let i = 0; i < q.count; i++) { const y = base[i * 3 + 1], z = base[i * 3 + 2]; q.setZ(i, z - (y > DECK_AT_MAST + 0.06 && Math.abs(z - MAST_Z) < 0.15 ? at(y) : 0)); }
+      for (let i = 0; i < q.count; i++) { const y = base[i * 3 + 1], z = base[i * 3 + 2]; q.setZ(i, z - (y > DECK_AT_MAST + 0.06 && Math.abs(z - MAST_Z - (y - DECK_AT_MAST) * Math.tan(MAST_RAKE)) < 0.15 ? at(y) : 0)); } // (near the raked mast's axis at that height)
       q.needsUpdate = true;
     }
     for (const jl of r.jumperLines) { const q = jl.geometry.attributes.position as THREE.BufferAttribute; q.setZ(0, MAST_FRONT_Z - at(JUMPER_TOP)); q.setZ(2, MAST_FRONT_Z - at(JUMPER_FOOT)); q.needsUpdate = true; }
@@ -1617,7 +1636,7 @@ function syncRig(m: BoatMesh, b: Boat, jibSgn: number, load: number, dt: number)
   const st = r.forestay.geometry.attributes.position as THREE.BufferAttribute, v = sagDir(r.sag);
   for (let i = 0; i < STAY_PTS; i++) {
     const u = i / (STAY_PTS - 1), k = 4 * u * (1 - u);
-    st.setXYZ(i, FORESTAY_DECK.x + (HOUNDS.x - FORESTAY_DECK.x) * u + v.x * k, FORESTAY_DECK.y + (HOUNDS.y - FORESTAY_DECK.y) * u + v.y * k, FORESTAY_DECK.z + (HOUNDS.z - FORESTAY_DECK.z) * u + v.z * k);
+    st.setXYZ(i, FORESTAY_DECK.x + (HOUNDS_R.x - FORESTAY_DECK.x) * u + v.x * k, FORESTAY_DECK.y + (HOUNDS_R.y - FORESTAY_DECK.y) * u + v.y * k, FORESTAY_DECK.z + (HOUNDS_R.z - FORESTAY_DECK.z) * u + v.z * k);
   }
   st.needsUpdate = true;
   return { sag: r.sag, bow: d.bow, topAft: d.topAft };
@@ -1679,7 +1698,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // (from the lower block's sheave on the car up to the upper block's under the boom)
   // (four parts between the car's block and the two blocks under the boom, the after one then the forward one, then the
   // tail from the car's block aft to the helmsman's hand)
-  { const ux = Math.cos(a), uz = -Math.sin(a), lo = tmpC.set(cx, L2.travCar.position.y + 0.06, TRAV_Z), boomZ = m.boomPivot.position.z, hy = BOOM_END.y - BOOM_R - 0.075;
+  { const ux = Math.cos(a), uz = -Math.sin(a), lo = tmpC.set(cx, L2.travCar.position.y + 0.06, TRAV_Z), boomZ = m.boomPivot.position.z, hy = BOOM_END.y - BOOM_R - 0.075 + m.boomPivot.position.y;
     for (let i = 0; i <= 4; i++) {
       const o = (i - 2) * 0.007;
       if (i % 2) { const r = MS_R + (i === 1 ? MS_GAP / 2 : -MS_GAP / 2); p.setXYZ(i, Math.sin(a) * r + ux * o, hy, boomZ + Math.cos(a) * r + uz * o); }
@@ -1688,7 +1707,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
-    const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
+    const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y + m.boomPivot.position.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
     for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.012, at = i % 2 ? top : VANG_FOOT; q.setXYZ(i, at.x + ux * o, at.y, at.z + uz * o); } // (the four parts a sheave's width apart, so they read as a tackle)
     q.needsUpdate = true; }
   // the Cunninghams' cringles come down with their sails as they're struck (the tack stays put)
