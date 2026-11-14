@@ -51,8 +51,8 @@ That's about 55–90 h to "dialed in".
 | **Cheating, protests and hearings** | Boats that bend the rules, hails of "Protest", a hearing that finds facts and decides under the RRS | The skipper model (belief and temperament); criterion 2's foul rate | 8–12 h |
 | **Training tool 1: the wind indicator** | Arrows in the air showing true and apparent wind at several heights (owner's first) | Nothing | 2–4 h |
 | **Training tool 2: the flow view** | Flow over the sails and hull: attached and stalled flow, the slot, what the telltales mean | The sail-shape model settled (1.3) | 8–14 h |
-| **Learn to sail** (owner, 13 Nov; unranked, design to the owner first) | Guided lessons on the water for a first-timer: parts of the boat, the tiller, points of sail, telltales, tacking and gybing, heaving to, docking. Checked against a recognized syllabus (US Sailing Basic Keelboat). The only place step-by-step instructions belong; the sailing screen stays clear of them | The Drill section; the coach's on-water cues | 12–20 h |
-| **Next training tools** (proposals) | A start-line drill (timed runs at the line); tack-and-gybe drills scored on speed lost; a rules trainer that replays real WS Cases on the water; a VMG and polar trainer; a coach's replay comparing you with the winner (begun in v147) | The rules and debrief already in place | 3–6 h each |
+| **Learn to sail** (owner, 13 Nov; unranked, design to the owner first) | Guided lessons on the water for a first-timer: parts of the boat, the tiller, points of sail, telltales, tacking and jibing, heaving to, docking. Checked against a recognized syllabus (US Sailing Basic Keelboat). The only place step-by-step instructions belong; the sailing screen stays clear of them | The Drill section; the coach's on-water cues | 12–20 h |
+| **Next training tools** (proposals) | A start-line drill (timed runs at the line); tack-and-jibe drills scored on speed lost; a rules trainer that replays real WS Cases on the water; a VMG and polar trainer; a coach's replay comparing you with the winner (begun in v147) | The rules and debrief already in place | 3–6 h each |
 
 Why it serves the mission: these are how the sim *teaches*. A season gives the reason to come back. The training tools
 turn the physics into understanding.
@@ -157,6 +157,6 @@ multiplayer mode." The priority still holds: physics and racing first. Community
 
 1. Are the fleet's protest and penalty rates recorded anywhere (results with DSQs, protest committee minutes)? This
    would settle criterion 2.
-2. Could the owner's crew time a few routines on Josephine (a tack, a gybe, setting the pole)? This would settle crew
+2. Could the owner's crew time a few routines on Josephine (a tack, a jibe, setting the pole)? This would settle crew
    timings.
 3. Are the criteria in section 1 the right bar for "dialed in"? Should anything be added, or tightened?

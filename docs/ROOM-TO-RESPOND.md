@@ -11,7 +11,7 @@ rules of Part 2 and rule 31, while maneuvering promptly in a seamanlike way." *K
 course with no need to take avoiding action".
 
 **What WS Case 105 says** (Case Book 2025–2028, p.235). Two boats are running on opposite tacks, side by side, after a long time
-on parallel courses. S luffs, and P doesn't respond, although she could have kept clear (by gybing). P broke 10,
+on parallel courses. S luffs, and P doesn't respond, although she could have kept clear (by jibing). P broke 10,
 and S didn't break 16.1: P had room.
 
 **What the engine does today.** src/rules/pairs.ts `turnedToward` reads a turn of 12° or more toward the other boat within 3 s
@@ -56,8 +56,8 @@ her course). For each one she:
   reached through the first-order yaw lag `yawLag(v)` (src/boat/physics.ts), as physics.ts already steps it;
 - **loses speed** in the turn, from the rudder drag physics.ts applies (`rudderDrag`). If that is too heavy for a predictor,
   a fitted decay per degree turned will do;
-- **gybes** if the turn passes the wind astern. That is allowed, with no extra cost over the turn itself. Case 105 counts
-  gybing as a way to keep clear, and the crew's gybe timing (Crew Model, 9057d28) can limit the rate later;
+- **jibes** if the turn passes the wind astern. That is allowed, with no extra cost over the turn itself. Case 105 counts
+  jibing as a way to keep clear, and the crew's jibe timing (Crew Model, 9057d28) can limit the rate later;
 - **tacks** if the turn passes head to wind. That is allowed, at the tack's own speed loss.
 
 The function steps every candidate at 0.1 s over the horizon, and gets the gap from src/rules/geometry.ts `hullGap` on the
@@ -102,13 +102,13 @@ proposal's rule: "rule-reading errors are applied to the `rights()` answer she a
 ## Tests
 
 - **Case 105:** turn its `it.fails` into a plain test. The luff is slow and the boats start a beam's width apart, so P can
-  gybe or luff away, and P broke 10.
+  jibe or luff away, and P broke 10.
 - **Case 92 (16.2)** and the 16.1 tests in tests/rules.test.ts must still hold. Those turns were sharp and late, and left no
   room.
 - **New unit tests for `escapes()`:**
   - straight-line encounters with known answers;
   - turn rates matching physics at 1, 2 and 3 m/s;
-  - a gybe escape on a run.
+  - a jibe escape on a run.
 - **The AI's avoidance tests** (tests/ai-avoid, sim-fleet) as Skipper Model wires it in.
 
 ## Who does what

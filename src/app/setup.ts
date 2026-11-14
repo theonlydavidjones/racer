@@ -3,8 +3,10 @@
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
 import { PREP_MEANING } from '../sim/signals';
+import { LESSONS, type LessonId } from '../sim/lessons';
+import { lessonGridHtml } from '../ui/lessons';
 import { describeSea } from '../environment/sea';
-import { CURRENTS } from '../environment/current';
+import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
@@ -56,7 +58,7 @@ function prepare(seed = randomSeed()): void {
   const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
   // (the practice drills, alone, in the setup's day and conditions: the tack and gybe drill off the Cityfront; the
   // mark-rounding drill round the practice course's marks, so its file is forced to the practice course)
-  const soloDrill = (app.S.mode === 'manoeuvres' || app.S.mode === 'roundings') && !shown;
+  const soloDrill = (app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') && !shown;
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSd, seed,
@@ -73,6 +75,7 @@ function prepare(seed = randomSeed()): void {
       : new LocalHost(facts, app.SIM_GUARD);
   }
   app.w = app.host.view; app.shownDest = app.w.dest; app.speedSet = app.w.speed; app.drillShown = false; app.resultsShown = false;
+  warmBasinsIdle(() => app.w);
   document.documentElement.dataset.sim = app.host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   app.unshown = true; document.documentElement.dataset.prepared = String(++app.prepared);
 }
@@ -135,11 +138,12 @@ function courseCard(): void {
     document.querySelectorAll<HTMLButtonElement>('#hostSeg [data-host]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.host === host)));
     document.querySelectorAll<HTMLButtonElement>('#courseMode [data-cm]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.cm === 'rc') === rc)));
     $('courseMode').hidden = host === 'practice';
+    $('judgingField').hidden = host === 'practice'; // (the practice area is always umpired)
     $('courseSel').hidden = host === 'practice' || rc;
     if (!rc && host !== 'practice') ($('courseSel') as HTMLSelectElement).value = app.S.course;
     const flag = app.S.prepFlag === 'black' ? 'black flag' : `${app.S.prepFlag ?? 'P'} flag`;
     const line = C.biasAdjustable ? ` · line ${app.S.bias ? (app.S.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(app.S.bias) + '°' : 'square'}` : '';
-    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${app.S.seq}-min sequence · ${flag} · ${app.S.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${line}`;
+    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${app.S.seq}-min sequence · ${flag} · ${app.S.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${app.S.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
   }
   $('lengthField').hidden = app.S.mode === 'sail' || app.S.course !== RC_COURSE;
   $('biasField').hidden = !C.biasAdjustable;
@@ -278,7 +282,7 @@ function drawTideGraph(): void {
     ctx.fillText(inside ? 'arrive' : `arrive ${sfClock(pn.eta)} →`, !inside ? W - 12 : close ? xd + 4 : xd, 10);
   }
   const day = new Date(app.w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
+  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} jibe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
   if (pn?.eta != null) strip.arrive = sfClock(pn.eta);
   condStrip(strip, rows); sunsetNow = strip.sunset ?? '';
   $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(app.w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
@@ -303,7 +307,7 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { app.S[k] = Number(v) as 0 | 1; (app.w.settings as Settings)[k] = app.S[k]; saveSettings(app.S); paintSeg(); return; }
   if (k === 'windKind') { chooseWindKind(app.S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
-  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
+  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'judging' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
   paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 }));
 /**
@@ -449,7 +453,7 @@ $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLEl
 $('drillSoloSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds]'); if (!b) return; app.S.drillSolo = b.dataset.ds === '1'; saveSettings(app.S); paintDrillPage(); });
 function openSetupNow(view: 'setup' | 'drill' = 'setup'): void {
   app.replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
-  if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings') { app.S.mode = 'race'; prepare(); }
+  if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') { app.S.mode = 'race'; prepare(); }
   // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
   // and is sent nothing until it starts)
   setStill(true); rowOpen = null; setupHeads();
@@ -463,8 +467,12 @@ function beginRaceNow(seed?: number): void {
   app.realRaceHolds();
   saveSettings(app.S);
   newGame(seed);
-  if (app.S.mode === 'manoeuvres') { logMessage('— Tacks and gybes'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
-    toast(`Tacks and gybes: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
+  if (app.S.mode === 'manoeuvres') { logMessage('— Tacks and jibes'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
+    toast(`Tacks and jibes: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and jibe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
+  if (app.S.mode === 'lesson') { // (Learn to sail: its cue is in the coach's places, sim/lessons.ts)
+    const L = LESSONS.find(l => l.id === app.w.lesson?.id);
+    logMessage(`— Learn to sail · ${L ? `${L.no} ${L.title}` : ''}`); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
+    return; }
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
@@ -514,5 +522,27 @@ $('bCondClose').onclick = () => {
   }
 };
 
-return { beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
+/** Learn to sail's lesson tiles (ui/lessons.ts): the ones passed ticked; a tile starts its lesson. */
+function openLessons(): void {
+  $('lessonGrid').innerHTML = lessonGridHtml(app.S.lessonsPassed ?? []);
+  $('lessons').hidden = false;
+}
+$('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLElement).closest<HTMLElement>('[data-lesson]')?.dataset.lesson as LessonId | undefined; if (id) { $('lessons').hidden = true; beginLesson(id); } });
+$('bLessonsX').onclick = () => { $('lessons').hidden = true; };
+/** Start a Learn to sail lesson (its tile, in the Drill section). */
+function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView']) $(el).hidden = true; beginRace(); }
+return { beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
+}
+
+/**
+ * The page's own copy of the harbors' still-water grids (environment/current.ts), worked on in its idle time round the
+ * boats, so the chart and the water have them before they're looked at, and a race in the page's own thread (?inproc,
+ * or a worker that wouldn't start) never stops to build one. Started once; it naps a second when there's nothing near.
+ */
+let basinsWarming = false;
+function warmBasinsIdle(view: () => { boats: readonly { x: number; y: number }[] } | undefined): void {
+  if (basinsWarming) return; basinsWarming = true;
+  const idle = (cb: (ms: number) => void) => typeof requestIdleCallback === 'function' ? requestIdleCallback(d => cb(Math.max(0, d.timeRemaining() - 1)), { timeout: 1000 }) : setTimeout(() => cb(4), 50);
+  const tick = (ms: number) => { const w = view(), more = !!w && warmBasins(w.boats, 3000, ms); if (more) idle(tick); else setTimeout(() => idle(tick), 1000); };
+  idle(tick);
 }
