@@ -295,6 +295,12 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
+   screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
+   through the mast (and likely the windward shroud and spreader). As in real life, a backed jib bellies to windward
+   and comes up against the shroud and spreader, draping round them, never through the mast. So the jib's shape needs
+   the mast, the shroud and the spreader as obstacles, on both tacks, hove to and when backed in a tack. Check from both
+   sides.
 8w. **The crew's places on the rail, and moving through the cockpit** (owner, 14 November; accuracy; next; 3–5 h; Crew
    Figures, with a physics review since the stations feed the trim):
    - Moving fore and aft: "they tend to squat-crawl along the side of the hull, between the coaming and the toe rail, to
