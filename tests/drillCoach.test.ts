@@ -38,12 +38,19 @@ describe('The drills\' coach by the boat (app/drillCoach.ts)', () => {
     o = co.tick(view(0, 200, 230, full, 47, { drill }), 'manoeuvres');
     expect(o.cue?.sub).toMatch(`Rep 2 of ${SET}`);
   });
-  it('roundings: Hold on the layline, Wide in at the zone, Bear away at the mark, Close out past it', () => {
+  it('the windward mark: Hold on the layline, Bear away at the mark, Close out once round (no "Wide in": she can\'t go wide close-hauled)', () => {
     const co = new DrillCoach(), beat = FOLKBOAT.beatAngle(12), hS = 270 - beat, s = { x: Math.sin(hS * D2R), y: Math.cos(hS * D2R) };
-    const rounding = { marks: [{ p: { x: 0, y: 0 } }, { p: { x: 800, y: 0 } }], leg: 0, list: [] };
-    const at = (k: number, h = hS) => co.tick(view(-s.x * k, -s.y * k, h, 4.5, 0, { rounding }), 'roundings').cue?.word;
-    expect(at(150)).toBe('Hold'); expect(at(30)).toBe('Wide in'); expect(at(8)).toBe('Bear away');
-    expect(co.tick(view(25, -4, 90, 4.5, 0, { rounding }), 'roundings').cue?.word).toBe('Close out'); // (been by the mark: now leaving it)
+    const rounding = { marks: [{ p: { x: 0, y: 0 } }, { p: { x: 800, y: 0 } }], leg: 0, list: [] as never[] };
+    const at = (k: number) => co.tick(view(-s.x * k, -s.y * k, hS + 4, 4.5, 0, { rounding }), 'roundings').cue;
+    expect(at(150)).toMatchObject({ word: 'Hold', sub: 'on the layline' }); expect(at(30)?.word).toBe('Hold'); expect(at(8)?.word).toBe('Bear away');
+    rounding.leg = 1; // (round: the tracker's on to the next mark; the windward mark's guides stay up)
+    const o = co.tick(view(20, -5, 90, 4.5, 0, { rounding }), 'roundings');
+    expect(o.cue?.word).toBe('Close out'); expect(o.spec?.zone).toEqual({ x: 0, y: 0 });
+  });
+  it('the leeward mark: Wide in at the zone, Head up at the mark; the phase never steps back', () => {
+    const co = new DrillCoach(), rounding = { marks: [{ p: { x: 0, y: 0 } }, { p: { x: 800, y: 0 } }], leg: 1, list: [] as never[] };
+    const at = (x: number) => co.tick(view(x, 0, 90, 4.5, 0, { rounding }), 'roundings').cue?.word;
+    expect(at(600)).toBe('Hold'); expect(at(775)).toBe('Wide in'); expect(at(795)).toBe('Head up'); expect(at(775)).toBe('Head up');
   });
   it('the start: Hold while she\'d be early, Build speed while late, Go as her time to the line meets the gun', () => {
     const co = new DrillCoach(), start = { pin: { x: -100, y: 0 }, committee: { x: 100, y: 0 } };

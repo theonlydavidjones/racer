@@ -511,16 +511,20 @@ export class World {
     const F = isUser ? FLEET[0] : FLEET[pick && pick.startsWith('stock:') ? +pick.slice(6) : 0] ?? FLEET[((i - 1) % 5) + 1];
     const place = (d: number, a: number) => ({ x: this.center.x - this.N.x * d + this.L.x * a, y: this.center.y - this.N.y * d + this.L.y * a });
     const lineH = brg(this.L.x, this.L.y);
-    let p: Vec, h: number, startStill = false, docked: Boat['docked'];
+    let p: Vec, h: number, startStill = false, docked: Boat['docked'], v0: number | null = null;
     if (isUser && this.fromSlip) {
       // in her slip, bow in (boats nose in here, never back in), made fast: push off to leave
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
     } else if (isUser && this.rounding) {
       // the mark-rounding drill: on the approach with the mark ahead (the owner: "there should be a mark in front of me"),
-      // 200 m down the starboard layline to the windward mark and close-hauled on it, the lane drawn in (app/drillCoach.ts)
-      const W = this.rounding.marks[0].p, beat = beatAngle(this.windModel.kt), hS = n360(this.windModel.base - beat), sS = V(hS);
-      p = { x: W.x - sS.x * 200, y: W.y - sS.y * 200 }; h = hS;
+      // 200 m out on the starboard layline over the ground, the lane drawn in (app/drillCoach.ts). Her course through the
+      // water is close-hauled (the polar's beat angle is her course's, physics.ts), steered her leeway higher (about 3° in
+      // light air to 6° in a breeze: README, Leeway; the pilot's own allowance, autopilot.ts), and the stream sets her
+      // along: the line she makes good over the ground is the one that fetches the mark. At her polar speed.
+      const W = this.rounding.marks[0].p, kt = this.windModel.kt, beat = beatAngle(kt), cS = n360(this.windModel.base - beat), lw = clamp(3 + (kt - 6) * 0.25, 3, 6);
+      const vw = polar(kt, beat), cw = V(cS), cur = this.currentAt(W), g = { x: cw.x * vw + cur.x, y: cw.y * vw + cur.y }, gl = Math.hypot(g.x, g.y) || 1;
+      p = { x: W.x - g.x / gl * 200, y: W.y - g.y / gl * 200 }; h = n360(cS + lw); v0 = vw;
     } else if (isUser && this.freeSail) {
       // where you chose to start, on a beam reach (close-hauled for the drill): whichever way has more open water ahead
       const at = getPlace(this.settings.sailFrom)?.p;
@@ -560,7 +564,7 @@ export class World {
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
       ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor } } : { paint: F.paint }),
       ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
-      x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : isUser && this.startAt < 120 ? 2 : 1.5, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
+      x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : v0 ?? (isUser && this.startAt < 120 ? 2 : 1.5), vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
