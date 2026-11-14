@@ -29,7 +29,7 @@ import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink, keepClearMove, poleMustCome, poleRefused } from '../ai/ai';
+import { OPEN_GAP, aiThink, keepClearMove, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
@@ -995,18 +995,57 @@ export class World {
     L.cue = R.result === 'clear' ? 'Sailed it clear ✓' : `Foul: ${foulTitle(R.fouls[0])}`;
   }
   private caseSeen: World['userIncident'] = null;
-  /** A Case's boats sailing free: the course each was on when she was freed, her helm's course from then on. */
+  /** A Case's boats sailing free: the course each was on when she was freed, and her helm's last call (held a moment). */
   private freeCourse = new Map<number, number>();
+  private freeCall = new Map<number, { h: number; luff: boolean; until: number }>();
   /**
-   * A Case's boat sailing free is a boat, helmed: her course, and the rules as the race AI keeps them (ai.ts keepClearMove):
-   * keeping clear of a boat she must (Rules 10–13), and avoiding contact when she has right of way and can (Rule 14).
+   * A Case's boat sailing free is a boat, helmed: her course (as she can sail it in the wind now, and off any shore
+   * ahead), and the racing rules as the race AI keeps them (ai.ts keepClearMove), each other boat taken nearest first.
+   * Required to keep clear (Rules 10–13): already drawing away she sails on; else the race AI's keep-clear. With right of
+   * way: Rule 14 has her avoid contact once it's clear the other isn't keeping clear, so with the hulls closing within
+   * OPEN_GAP she bears off from her (the race AI's own swerve waits on the closest approach of the centres, seconds off,
+   * and two boats converging side by side never get there before they touch); and Rule 16.1: while a boat that must keep
+   * clear of her is within two lengths she doesn't turn back toward her to her course, holding her heading, which gives
+   * the room. No
+   * easing to luff below steerage way (she'd stop and couldn't turn), and a call held a second, as a helmsman's is,
+   * unless the hulls are about to touch.
    */
   private freeHelm(): void {
     const R = this.caseRun!;
     for (const b of this.boats) if (b.script && R.free.includes(b.script)) {
-      let mv: { h: number; luff: boolean } | null = null;
-      for (const o of this.boats) if (o !== b && (mv = keepClearMove(this, b, o))) break;
-      b.desired = mv ? mv.h : this.freeCourse.get(b.id) ?? b.h; b.luff = mv?.luff ?? false;
+      const v = b.v + (b.astern ?? 0);
+      // (no shore within 150 m ahead, across a swath 15° either side: straight ahead alone, a shore she closes at a fine
+      // angle is seen only once she's on it)
+      const clear = (h: number) => [0, 15, -15].every(k => landAlong(b, { x: b.x + V(h + k).x * 150, y: b.y + V(h + k).y * 150 }) === Infinity);
+      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them: a heading on the other
+      // tack only by a jibe, the wind behind her; else close-hauled on her own)
+      const mine = (h: number) => { const t = sailable(b, h), rel = wrap(b.ww.from - t); return (rel >= 0 ? 'S' : 'P') === b.tack || Math.abs(rel) > 90 ? t : n360(b.ww.from + (b.tack === 'S' ? -1 : 1) * (beatAngle(b.ww.kt) + 1)); };
+      const c0 = mine(this.freeCourse.get(b.id) ?? b.h);
+      const course = clear(c0) ? c0 : [30, -30, 60, -60, 90, -90, 135, -135].map(k => mine(c0 + k)).find(clear) ?? c0;
+      if (course !== c0) this.freeCourse.set(b.id, course); // (a shore ahead: her course from now on, not back to it after)
+      let call: { h: number; luff: boolean } | null = null, room = false, urgent = false;
+      const others = this.boats.filter(o => o !== b).sort((p, q) => hullGap(b, p) - hullGap(b, q));
+      for (const o of others) {
+        const dx = o.x - b.x, dy = o.y - b.y, g = hullGap(b, o);
+        if (dx * dx + dy * dy > 60 * 60) break; // (the rest further: none near enough to sail by, the race AI's own reach)
+        const r = this.rights(b, o);
+        const side = Math.sign(dot(V(b.h + 90), { x: dx, y: dy })) || 1; // (+1: the other boat's to starboard of her)
+        const rate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
+        if (rate < 0 && g < CONTACT_GAP + 1) urgent = true;
+        if (r.kc === b && rate > 0.05) { call = { h: mine(b.h), luff: false }; break; } // (drawing away: she is keeping clear)
+        call = keepClearMove(this, b, o); if (call) call = { h: mine(call.h), luff: call.luff };
+        if (!call && r.kc === o && rate < 0 && g < OPEN_GAP) { // (bearing off 30° from her side)
+          call = { h: mine(b.h - side * 30), luff: false };
+        }
+        if (call) break;
+        if (r.kc === o && Math.hypot(dx, dy) < 2 * LOA && Math.sign(wrap(course - b.h)) === side) room = true;
+      }
+      const want = call ? { h: call.h, luff: call.luff && v > 1 && !urgent } : { h: room ? mine(b.h) : course, luff: false };
+      const held = this.freeCall.get(b.id);
+      const same = held && Math.abs(wrap(want.h - held.h)) < 5 && want.luff === held.luff;
+      const now = held && !same && this.t < held.until && !urgent ? held : same ? { ...want, until: held!.until } : { ...want, until: this.t + 1 };
+      this.freeCall.set(b.id, now);
+      b.desired = now.h; b.luff = now.luff;
     }
   }
 

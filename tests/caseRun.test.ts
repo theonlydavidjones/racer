@@ -79,6 +79,21 @@ describe('Sail it yourself: a Case on the water', () => {
     expect(gap).toBeGreaterThan(8); // (well round you: held on her course, she'd pass about 4 m off, a length's turn too late)
   });
 
+  it('freed with right of way, she bears off from a boat closing on her alongside (Rule 14), and doesn\'t luff back into her (16.1)', () => {
+    // (Cases 14 and 23, you on the Case's course after the contact: held on her heading, she was bumped again and again,
+    // 490 and 736 steps touching in the minute after)
+    for (const n of [14, 23]) {
+      const w = caseWorld(n), R = w.caseRun!, u = w.user;
+      let freed = -1, touching = 0;
+      while (w.t < 200 && (freed < 0 || w.t < freed + 60)) {
+        u.h = n360(R.pose(R.helm, w.t).h); w.step(DT); if (w.paused) w.paused = false;
+        if (freed < 0 && R.free.length) freed = w.t;
+        if (freed >= 0) for (const b of w.boats) if (b.script && R.free.includes(b.script) && hullGap(u, b) < 0.05) touching++;
+      }
+      expect(freed).toBeGreaterThan(0); expect(touching).toBeLessThan(30);
+    }
+  }, 60_000);
+
   it('a Case\'s boat on its track, not steered, that breaks a rule: the card says so, and she owes no penalty', () => {
     const w = caseWorld(7), R = w.caseRun!, u = w.user, L = w.boats.find(b => b.name === 'L')!;
     for (let i = 0; i < 60; i++) w.step(DT);
