@@ -55,7 +55,7 @@ describe('Rule 11 · windward/leeward', () => {
     const blue = boat('Blue', { at: [0, 6], heading: 270 });
     const p = pair(red, blue);
     expect(p.at(10).foul).toBeNull();
-    moveTo(red, [-2, 2.5], 300, 295); // Red has been heading up gradually toward Blue (a sudden turn would be Rule 16.1)
+    moveTo(red, [-2, 4], 300, 295); // Red has been heading up gradually toward Blue, hull to hull with her now (a sudden turn would be Rule 16.1)
     expect(p.at(11).foul).toEqual({ by: 'Blue', rule: '11', kind: 'contact', why: null });
   });
 
@@ -303,7 +303,7 @@ describe('Rule 18.3 · tacking in the zone', () => {
     const { blue, p } = scene({ redAt: ahead(12, 0) }); // Red tacks dead ahead of Blue, a length and a half clear
     expect(p.at(103)).toMatchObject({ keepsClear: 'Blue', rule: '12', foul: null });
     p.at(107);
-    moveTo(blue, ahead(4.2, 0)); // Blue's bow into Red's stern, still clear astern
+    moveTo(blue, ahead(4.3, 0)); // Blue's bow into Red's stern (6 cm off: touching), still clear astern
     expect(p.at(107.5).foul).toMatchObject({ by: 'Blue', rule: '12' });
   });
 
@@ -449,7 +449,7 @@ describe('Rule 16.1 · changing course', () => {
     const blue = boat('Blue', { at: [0, 6], heading: 270 });
     const p = pair(red, blue);
     expect(p.at(30).foul).toBeNull();
-    moveTo(red, [-2, 3.5], 305, 270); // was heading 270 three seconds ago, now 305: turned toward Blue
+    moveTo(red, [-2, 4], 305, 270); // was heading 270 three seconds ago, now 305: turned toward Blue
     expect(p.at(31).foul).toEqual({ by: 'Red', rule: '16.1', kind: 'contact', why: null });
   });
 
@@ -458,7 +458,7 @@ describe('Rule 16.1 · changing course', () => {
     const blue = boat('Blue', { at: [0, 6], heading: 270 });
     const p = pair(red, blue);
     p.at(30);
-    moveTo(red, [-2, 3.5], 305, 298); // only 7° in the last three seconds: Blue had time
+    moveTo(red, [-2, 4], 305, 298); // only 7° in the last three seconds: Blue had time
     expect(p.at(40).foul).toEqual({ by: 'Blue', rule: '11', kind: 'contact', why: null });
   });
 
@@ -467,7 +467,7 @@ describe('Rule 16.1 · changing course', () => {
   //    ↗ Red (P)
   it('on a beat, a starboard boat that bears away onto a port boat ducking her breaks 16.2', () => {
     const red = boat('Red', { at: [0, 0], heading: 60 }); // port, footing to duck
-    const blue = boat('Blue', { at: [3, 3.5], heading: 260, headingAgo: 315 }); // was close-hauled, bore away 55°
+    const blue = boat('Blue', { at: [2.5, 3], heading: 260, headingAgo: 315 }); // was close-hauled, bore away 55°, and touched her
     expect(pair(red, blue).at(60).foul).toMatchObject({ by: 'Blue', rule: '16.2' });
   });
 

@@ -44,7 +44,7 @@ that would act on a finding.
 | 6 | balance.ts RUDDER (area 0.42 m², arm 2.6 m), CHORD (2.4, 2.0 m), IDEAL_HELM 2.5°, FULL_RUDDER 30° | Weather helm, and how much rudder she needs: the feel of the boat, and the rudder's drag | Class plans (rudder dimensions), the ORC rig for chords; sailing texts for ideal helm (2–4° is the usual advice) | Deep Physics |
 | 7 | controls.ts CONTROL_RATE (11 lines), trim.ts crewRate/handRate | How fast lines are worked: how quickly a crew answers a puff or rounds a mark | Timed routines (the owner can time them next season); until then published timings for small keelboats | Crew Model |
 | 8 | physics.ts HOIST (30/15/15/10 s), POLE (8/5/8 s), CREW_LAG 0.8 s, PENALTY_TURN_RATE 10°/s | Crew timings for the sails and the pole, and the penalty turns | As 7 | Crew Model |
-| 9 | rules/pairs.ts RULE15_GRACE 3.5 s, HAIL_RESPONSE 5 s, REPLY_ROOM 25 s, CONTACT_GAP 2.2 m, ROOM_GAP 3.5 m, JUST_TACKED, INCIDENT_COOLDOWN; world.ts SAME_INCIDENT, COMPELLED_WINDOW; ai.ts MARK_ROOM 5 m | When the sim calls a foul. The RRS name the rule, not the number | World Sailing Cases and Calls, judges' manuals and Perry's book: what time and distance a jury takes as "room" and "as soon as possible" | Rules |
+| 9 | rules/pairs.ts RULE15_GRACE 3.5 s, HAIL_RESPONSE 5 s, REPLY_ROOM 25 s, CONTACT_GAP 0.15 m, ROOM_GAP 1.3 m (hull to hull: docs/HULL-CONTACT.md), JUST_TACKED, INCIDENT_COOLDOWN; world.ts SAME_INCIDENT, COMPELLED_WINDOW; ai.ts MARK_ROOM 5 m | When the sim calls a foul. The RRS name the rule, not the number | World Sailing Cases and Calls, judges' manuals and Perry's book: what time and distance a jury takes as "room" and "as soon as possible" | Rules |
 | 10 | controls.ts SAIL_WEAR (mid and old rows) | How much an old sail costs: depth, draft aft, twist, drag | Sailmakers' figures on cloth stretch and draft creep with age (Dacron mains) | Deep Physics |
 
 Next, lower: traffic.ts VESSEL and shadows.ts SHIP_AIR (ship particulars, easy to source from AIS and the operators),
@@ -687,7 +687,7 @@ physics, ranked like the ten above:
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| CONTACT_GAP | 2.2 | 7 | unsourced | RRS names the rule, not the number |
+| CONTACT_GAP | 0.15 | 13 | unsourced | RRS names the rule, not the number (hull to hull: docs/HULL-CONTACT.md) |
 | RULE15_GRACE | 3.5 | 9 | unsourced | RRS names the rule, not the number |
 | JUST_TACKED | 2 | 11 | unsourced | RRS names the rule, not the number |
 | INCIDENT_COOLDOWN | 6 | 13 | unsourced | RRS names the rule, not the number |
@@ -697,7 +697,7 @@ physics, ranked like the ten above:
 | TACK_BEGUN | 15 | 33 | estimate | modeling threshold, flagged |
 | BEGUN_TWA | 30 | 36 | unsourced | RRS names the rule, not the number |
 | THROUGH_WIND | 15 | 42 | estimate | modeling threshold, flagged |
-| ROOM_GAP | 3.5 | 95 | unsourced | RRS names the rule, not the number |
+| ROOM_GAP | 1.3 | 129 | unsourced | RRS names the rule, not the number; Cases 35 and 88's clearances |
 | REPLY_ROOM | 25 | 130 | unsourced | RRS names the rule, not the number |
 
 ### src/sim/routing.ts

@@ -1371,7 +1371,7 @@ export class World {
       if (incident) found.push({ A, B, incident });
       // (a breach against one of them still going on, by its own signs, whoever has right of way now (a right-of-way
       // boat's luff, 16.1, squeezes too): touching, the boat she's fouled by still making her swerve, or inside room-to-
-      // keep-clear distance and still closing. Only giving room again, overlapped round the mark, isn't one)
+      // keep-clear distance (ROOM_GAP) and still closing. Only giving room again, overlapped round the mark, isn't one)
       const fA = this.fouledAt.get(A.id), fB = this.fouledAt.get(B.id);
       if ((fA && fA.by === B.id) || (fB && fB.by === A.id)) {
         const g = hullGap(A, B), closing = (B.x - A.x) * (B.vx - A.vx) + (B.y - A.y) * (B.vy - A.vy) < 0;

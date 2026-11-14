@@ -6,10 +6,10 @@ import { flowTurnRate } from '../src/boat/dynamics';
 const best = (c: { minGap: number }[]) => Math.max(...c.map(k => k.minGap));
 
 describe('escapes(): room to respond (docs/ROOM-TO-RESPOND.md)', () => {
-  it('holding on parallel to a boat 10 m abeam stays 10 m off', () => {
+  it('holding on parallel to a boat 10 m abeam (centerline to centerline) stays 10 m off: 7.8 m of water between the hulls', () => {
     const c = escapes({ x: 0, y: 0, h: 90, v: 2 }, [straightOn({ x: 0, y: 10, h: 90, v: 2 })], 0, { delay: 1, horizon: 6 });
     const hold = c.find(k => k.turn === 0)!;
-    expect(hold.minGap).toBeCloseTo(10, 0);
+    expect(hold.minGap).toBeCloseTo(10 - 2.2, 1);
     expect(hold.heading).toBeCloseTo(90, 5);
   });
 

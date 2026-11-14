@@ -78,4 +78,16 @@ describe('the World Sailing Cases as data (src/rules/cases.ts): the engine answe
       for (const l of c.pair) expect(c.boats.some(b => b.letter === l)).toBe(true);
     }
   });
+
+  it('Case 11 comes out the same, PL\'s 19.2(b), with PW and PL 3 to 4 m apart; from 4.5 m PW touches PL with over 3 m of water still to S, more than room, and it\'s hers (11)', () => {
+    const c = CASES.find(k => k.case === 11)!;
+    const at = (sep: number) => {
+      const cc = JSON.parse(JSON.stringify(c)) as RulesCase, PL = cc.boats.find(b => b.letter === 'PL')!;
+      const d = sep - 3.4; // (PL moved square to the boats' heading, 045°, from where the Case draws her)
+      for (const f of PL.frames) { f.x += d * Math.SQRT1_2; f.y -= d * Math.SQRT1_2; }
+      return sailCase(cc).foul;
+    };
+    for (const sep of [3, 3.4, 3.8, 4]) expect(at(sep), `${sep} m`).toMatchObject({ by: 'PL', rule: '19.2(b)' });
+    for (const sep of [4.5, 5]) expect(at(sep), `${sep} m`).toMatchObject({ by: 'PW', rule: '11' });
+  });
 });

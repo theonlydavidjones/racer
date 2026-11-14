@@ -73,7 +73,7 @@ describe('Protests: the hail and the red flag (RRS 60.2(a)(1))', () => {
 
 describe('Protests: the AI boats take their turns, or not, and protest (ai/conduct.ts fallbacks)', () => {
   const sailed = (judging: 'protests' | 'umpired') => {
-    const w = new World(SS2, settings({ fleet: 7, judging }), 4);
+    const w = new World(SS2, settings({ fleet: 7, judging }), 2); // (a race with AI boats fouled: four incidents in its first 8 minutes)
     for (let i = 0; i < 60 * 60 * 8; i++) { w.step(DT); w.drainEvents(); }
     return w;
   };

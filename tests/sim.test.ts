@@ -5,6 +5,7 @@ import type { CourseFile } from '../src/courses/course';
 import { buildCourse } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
+import { INCIDENT_COOLDOWN, newPairRecord } from '../src/rules';
 import { V, brg } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
 import { inBasin } from '../src/geo/marina';
@@ -378,11 +379,13 @@ describe('The committee boat (Rule 31) and penalties in one incident (Rule 44.1(
     const m = w.C.marks[0], h = w.wind.from + 180, back = V(w.wind.from), side = V(w.wind.from + 90);
     const engine = how === 'over' || how === 'closing', start = engine ? 16 : 12;
     Object.assign(u, { x: m.p.x + back.x * start, y: m.p.y + back.y * start, h: h % 360, v: 2, desired: h % 360 });
-    const off = how === 'far' ? 200 : how === 'closing' ? 4.3 : 9, ahead = how === 'markSide' ? -4 : 3, oh = (how === 'closing' ? h + 15 : h) % 360;
+    const off = how === 'far' ? 200 : how === 'closing' ? 3.4 : 9, ahead = how === 'markSide' ? -4 : 3, oh = (how === 'closing' ? h + 15 : h) % 360;
     const place = () => { o.x = u.x + side.x * off + back.x * ahead; o.y = u.y + side.y * off + back.y * ahead; o.h = o.desired = oh; };
     Object.assign(o, { v: 2, started: true, ocs: false, leg: 0 }); place();
     const fa = (w as unknown as { fouledAt: Map<number, { by: number; t: number; on: number; x: number; y: number }> }).fouledAt;
     const t0 = w.t; fa.set(u.id, { by: o.id, t: t0, on: t0, x: u.x, y: u.y }); // o has just fouled her, here near the mark
+    // (and, as a foul called by the engine would, the pair's incident cooldown started: no new call between them at once)
+    w.pairs[`${Math.min(u.id, o.id)}-${Math.max(u.id, o.id)}`] = { ...newPairRecord(), cool: t0 + INCIDENT_COOLDOWN };
     let toasts = '';
     for (let i = 0; i < 60 * 8; i++) {
       w.step(DT); const r = fa.get(u.id)!; if (!engine) r.on = how === 'stale' ? t0 : w.t; place();

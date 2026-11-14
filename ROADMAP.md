@@ -158,6 +158,13 @@ What's planned, roughly in order. Done work is described in the README.
        option.
    - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
      committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
+   - **AI-on-AI forced swerves go uncalled** (the hull-contact review, #355, 14 November; Skipper Model with Rules): an AI
+     right-of-way boat that has to swerve to avoid an AI keep-clear boat is never called a foul (ai/ai.ts: only the
+     user's boat's swerves are). Keep Clear (a) and WS Case 88 make those fouls. The old early "contact" caught some of
+     these by accident; measured hull to hull, a pass at 0.15–0.65 m between two AI boats now goes uncalled.
+   - **Rule 21.2 from "taking a penalty", not from owing one** (the same review; Rules): rightOfWay.ts applies 21.2 from
+     `penalty > 0`, so a boat that owes turns but hasn't begun them (still getting clear, 44.2) is already the keep-clear
+     boat. 21.2 says "a boat taking a penalty".
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
    Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
    (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
@@ -199,7 +206,10 @@ What's planned, roughly in order. Done work is described in the README.
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
-   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
+   Still there on 14 November (owner: "still have backwards arms", a second screenshot): both crew in the cockpit, the
+   blue jacket at the piano and the orange jacket by the compass, have forearms bent backwards at the elbow, hands
+   pointing behind them. No fix has gone in yet. The owner doesn't
    remember the conditions it happened in, so the check covers every pose and wind.
 8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
@@ -295,6 +305,14 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8z. **Now — the cruise setup's map is blank** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
+   no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
+   (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
+   picking on a blank map. Suspects: the setup now builds the World only at Start (cca5f47), so the map has nothing to
+   draw; the app.ts split (src/app/setup.ts); the chart's tiles or canvas not sized when the panel opens. "Plan on the
+   big chart" should be checked too. Add a check that the setup's map draws the chart.
+   Done on claude/cruise-map: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
+   panel was laid out, it had no size and nothing redrew it. The big chart was fine. scripts/check/setup-map.cjs.
 8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
    screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
    through the mast (and likely the windward shroud and spreader). As in real life, a backed jib bellies to windward
