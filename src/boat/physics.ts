@@ -897,8 +897,10 @@ function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, hit: Ve
   // it's the same spell. And told again at once if it has got worse: touching gently, then set on them, then damage)
   const told = pileTold.get(b) ?? -99, at = pileAt.get(b), kind = level === 'damage' ? 2 : closing >= PIN_V ? 1 : 0, worse = !!at && kind > at.kind && t - told < SAME_SPELL;
   const still = !!at && t - told < SAME_SPELL && Math.hypot(b.x - at.x, b.y - at.y) < 2 && !worse;
-  pileTold.set(b, t); if (!still) pileAt.set(b, { x: b.x, y: b.y, kind });
-  if (b.isUser && (t - told > PINNED_GAP || worse) && !(still && told > -99)) emit({ type: 'toast', ms: 6000, msg: level === 'damage' ? `Hit the piles of ${pier} hard: damage. Get way on and steer off.` : closing < PIN_V ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: held there, she'll be worked in under it. Get way on and steer off.` });
+  const tell = b.isUser && (t - told > PINNED_GAP || worse);
+  // (sliding along them untold, the worst she's been told of this spell is kept: not told again every couple of meters)
+  pileTold.set(b, t); if (!still) pileAt.set(b, { x: b.x, y: b.y, kind: tell || !at || t - told >= SAME_SPELL ? kind : Math.max(kind, at.kind) });
+  if (tell && !still) emit({ type: 'toast', ms: 6000, msg: level === 'damage' ? `Hit the piles of ${pier} hard: damage. Get way on and steer off.` : closing < PIN_V ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: held there, she'll be worked in under it. Get way on and steer off.` });
 }
 /** Below this speed through the water (m/s), about a knot, her rudder barely bites and she goes where the stream and wind
  * set her (ESTIMATE: no source found for a Folkboat; a long keel's rudder needs some way to answer) */

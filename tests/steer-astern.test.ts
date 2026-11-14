@@ -19,7 +19,7 @@ function shoved(astern: number, helm: (b: Helm) => void, secs = 10) {
 const key = (b: Helm) => { b.steer = 1; }, tiller = (b: Helm) => { b.tiller = 1; b.steer = 0; b.handsOff = true; };
 
 describe('steering astern, shoved off under bare poles', () => {
-  it('at the crew\'s gentlest shove (0.5 m/s) she answers her helm: over 10° in ten seconds, by a held key or the tiller in your hand, and still has most of her way', () => {
+  it('at a gentle shove (0.5 m/s) she answers her helm: over 10° in ten seconds, by a held key or the tiller in your hand, and still has most of her way', () => {
     for (const helm of [key, tiller]) {
       const r = shoved(0.5, helm);
       expect(Math.abs(r.turned)).toBeGreaterThan(10); expect(Math.abs(r.turned)).toBeLessThan(30);
