@@ -164,9 +164,10 @@ function courseCard(): void {
     const spot = app.S.mode !== 'sail' && app.S.raceFrom === 'spot';
     if (spot) app.S.raceSpot ??= 'cityfront';
     const lead = Math.round((app.w.startAt - app.S.seq * 60) / 60);
-    $('raceFromNote').textContent = app.S.mode === 'sail' || lead <= 0 ? ''
+    $('raceFromNote').textContent = app.S.mode === 'sail' || (lead <= 0 && !(spot && app.w.spotTooFar)) ? ''
       : app.S.raceFrom === 'slip' && app.w.fromSlip ? `In her slip ${lead} min before the warning signal, to sail out to the line.`
-        : spot && app.w.fromSpot ? `There ${lead} min before the warning signal, to sail to the line.` : '';
+        : spot && app.w.fromSpot ? `There ${lead} min before the warning signal, to sail to the line.`
+          : spot && app.w.spotTooFar ? 'Too far to make the start from there: pick a spot nearer the line.' : '';
     const wf = $('whereField');
     if (!whereHome) { whereHome = document.createComment('whereField'); wf.before(whereHome); }
     if (spot) { if (wf.parentElement !== $('raceFromBox')) $('raceFromNote').before(wf); } else if (wf.parentElement === $('raceFromBox')) whereHome.after(wf);
