@@ -225,7 +225,7 @@ export class LessonTracker {
       // the meeting (held more than a couple of degrees off it on her tack, or no intercept, and the range opening), if
       // there's land ahead of her, or if it's taken twice what was planned (with half a minute's grace for the lulls)
       const rate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(1, d);
-      const letGo = () => { this.approach = null; this.away = o.h; this.cue = a.ask; this.pause = M.letGoS; };
+      const letGo = () => { this.approach = null; this.away = o.h; this.awayT = 0; this.cue = a.ask; this.pause = M.letGoS; };
       if (b.tack !== (this.step === 0 ? 'P' : 'S') || ((tau === Infinity || Math.abs(wrap(hd - want)) > 2) && rate > 0) || E.landAhead(o.desired) || a.t > 2 * a.plan + 30) { letGo(); return; }
       if (d > a.callM) return;
       // called only with the encounter as its rule has it, now: risk of collision (the closest approach, on your courses
@@ -243,7 +243,8 @@ export class LessonTracker {
       const kt = b.v / KT, twa = b.twa;
       const yours = kt > 1.5 && (a.kind === 'windward' ? twa >= 120 - M.callSlack : a.kind === 'stand' ? twa <= M.standTwa : true);
       if (!crossing || (a.kind === 'windward' && !leeward) || !yours) { letGo(); return; }
-      if (!(cp.t > 0 && cp.t < 2 * M.meetS && cp.d < M.callLoa * LOA)) return;
+      const held = tau === Infinity || Math.abs(wrap(hd - want)) > 2; // (she can't steer for the meeting: held off it)
+      if (!(cp.t > 0 && cp.t < 2 * M.meetS && cp.d < M.callLoa * LOA)) { if (held && cp.d >= M.callLoa * LOA) letGo(); return; } // (and can't close the miss)
       this.approach = null;
       this.enc = { kind: a.kind, h: o.h, course: b.h, v: b.v, tack: b.tack, gap: Infinity, spoiled: false, acted: false, openS: 0 };
       this.step++; this.progress = 0;
