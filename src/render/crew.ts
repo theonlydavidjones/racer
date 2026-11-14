@@ -988,7 +988,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const go = f.going = travelling(f, a, x);
     // (in the tack while it's under way, and until they're across; a job elsewhere, the mast or the car, comes first)
     const busy = pose === 'mast' || pose === 'car' || pose === 'piano' || pose === 'bow' || pose === 'fore';
-    f.tack = !busy && (tackOn || (!!f.tack && go));
+    // (but only once the physics brings them in off the rail: a roll tack holds them out on the old high side as she comes
+    // up and through the wind (crewPhys.ts roll), and drawn down in the cockpit from its start, they were 0.9 m from where
+    // their weight was, and were carried there at 3.7 m/s as it began; then back out to the new rail)
+    const inboard = !a || Math.abs(a.x) < benchEdge(a.z) || pose === 'cross';
+    f.tack = !busy && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go));
     const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
     const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z);
     // (on the way along the side deck, and settling into the new place after it)
