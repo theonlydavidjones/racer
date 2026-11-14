@@ -295,6 +295,13 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
+   Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
+   Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
+   - the pictures are kept between visits, so empty ones may have been saved and are now reused;
+   - the boat model not built yet when the picture is taken (the setup now builds lazily, and the page is split);
+   - the camera framing.
+   Fix the cause, throw away any saved empty pictures, and add a check that each card's picture has the boat in it.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
