@@ -151,7 +151,8 @@ function courseCard(): void {
     btn.disabled = !sl; btn.textContent = sl ? `From her slip (${slipPlace(sl)})` : 'From her slip (she has none)';
     if (!sl && app.S.raceFrom === 'slip') app.S.raceFrom = 'water';
     app.S.raceFrom ??= 'water';
-    $('raceFromNote').textContent = app.S.raceFrom === 'slip' && app.w.fromSlip
+    // (racing only: cruising, she leaves her slip at the time you set, and there's no warning signal to be early for)
+    $('raceFromNote').textContent = app.S.mode !== 'sail' && app.S.raceFrom === 'slip' && app.w.fromSlip && app.w.startAt > app.S.seq * 60
       ? `She starts in her slip in ${harborOf(sl!.marina)?.short ?? 'her marina'}, ${Math.round((app.w.startAt - app.S.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
       : '';
   }
@@ -390,6 +391,10 @@ document.addEventListener('click', e => {
   const head = (e.target as HTMLElement).closest<HTMLElement>('.srow-head'); if (!head) return;
   const row = head.closest<HTMLElement>('.srow')!.dataset.row!;
   rowOpen = rowOpen === row ? null : row; drawHeads();
+  // the date's calendar opens downward: the When row, last on the screen, is brought up so it has room (the owner: "date
+  // picker gets cropped at bottom of screen"); the panel gets room below it to scroll into (styles: .whenroom)
+  if (rowOpen === 'when') { const r = $('row-when'); r.closest('.panel')?.classList.add('whenroom'); r.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+  else document.querySelectorAll('.panel.whenroom').forEach(p => p.classList.remove('whenroom'));
 });
 document.addEventListener('keydown', e => {
   const k = e as KeyboardEvent, head = (k.target as HTMLElement).closest<HTMLElement>('.srow-head');
