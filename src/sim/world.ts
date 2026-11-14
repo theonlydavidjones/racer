@@ -1775,8 +1775,10 @@ export class World {
           const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, holdPivot(P.hold.off), P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
         } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
       } else {
-        // shoved off astern: enough to coast her into the fairway on the water's drag
-        let lo = 0, hi = 1.5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
+        // shoved off astern by her crew, gauged to the room (the Coordinator's ruling on #317): enough to coast her the plan's
+        // `coast` m into the fairway on her hull's own sternway drag (physics.ts asternCoast, ASTERN), and no harder than one
+        // person shoves (SHOVE). Shoved at full SHOVE she'd carry some 37 m, onto the far side of most fairways
+        let lo = 0, hi = SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
         this.letGo(b, P.h, 0, lo);
       }
     }
