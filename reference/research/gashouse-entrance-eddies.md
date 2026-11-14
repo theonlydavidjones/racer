@@ -42,3 +42,16 @@ from general results, flagged as estimates.
 tidesandcurrents.noaa.gov (the website; the API works), www.bcdc.ca.gov, www.nps.gov, dolphinclub.org,
 sfmarinaharbor.org (DNS); core.ac.uk, bopc.ca.gov, www2.sfmx.org (403). The BCDC project PDF and the Recreation and Park
 FAQ (sfrecpark.org/DocumentCenter/View/20896) may hold bathymetry or hydrodynamics.
+
+## Corrections from the physics review (14 Nov 2026; Bijvelds 1-97 and Langendoen 8-89 read in full)
+- The layer's spread: 0.17 and 0.23 are one measurement of Booij's in two definitions of width (b between his marks,
+  B = 1.39·b = ΔU/(dU/dy)max), not a range. Bijvelds' computed layers gave 0.13 (k-ε) and 0.20 (TLS).
+- The gyre's 0.25·Ur is "a first guess" (Bijvelds §3); the Booij case he compares has about 0.11·Ur at the layer's inner side.
+- "Three layer-widths" is the size the largest eddies can reach (Tukker 1997), not their spacing; Bijvelds carries them
+  at half the stream's speed.
+- The response time for the cove's own gyre (73 m pool behind a 37 m mouth, β 0.59) is 1½–3 hours at the streams this
+  mouth sees, not 20 minutes: the earlier figure took the pool as 36 m. Langendoen asks for a tidal period of 4·Te or
+  more before a gyre may be taken as steady; pp. 4–5 describe the old gyre after slack drawing the new stream in while
+  a new one starts at the upstream corner.
+- Not settled: whether the flood leaves the breakwater at its knuckle 64 m west of the tip (the last leg runs 27° off
+  the stream) and whether the ebb piles on that leg and pushes in through the gap. Asked of the owner.

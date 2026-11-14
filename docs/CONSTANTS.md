@@ -478,14 +478,17 @@ physics, ranked like the ten above:
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| MOUTH.gyre | 0.25 | 56 | sourced | Booij 1986, in Bijvelds 1997 §3 |
-| MOUTH.peak, rim | 0.75, 1.25 | 58 | estimate | the gyre's shape: assumed |
-| MOUTH.spread | 0.2 | 60 | sourced | measured in a harbor's mouth, 0.17–0.23 (Bijvelds 1997) |
-| MOUTH.B0 | 1 | 60 | estimate | the layer's width at the corner |
-| MOUTH.spacing | 3 | 62 | sourced | Bijvelds 1997 |
-| MOUTH.u, v | 0.2, 0.1 | 62 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one train of eddies (upper bound) |
-| MOUTH.free | 0.18 | 64 | sourced | Brown & Roshko 1974, via Bijvelds eq. 3.6 |
-| MOUTH.slack | 0.02 | 66 | estimate |  |
+| MOUTH.gyre | 0.25 | 71 | sourced | "a first guess": Bijvelds 1997 §3, after Booij 1986 (nearer 0.1 in the case he checks) |
+| MOUTH.peak, rim | 0.75, 1.25 | 73 | estimate | the gyre's shape: assumed |
+| MOUTH.beta | 0.59 | 75 | estimate | Booij's β, 0.4–1 (in Langendoen 1989 ch. 2); our researcher's reading |
+| MOUTH.spread | 0.23 | 78 | sourced | Booij's measurement in a harbor's mouth as B = ΔU/(dU/dy)max (Bijvelds 1997 §4) |
+| MOUTH.B0 | 1 | 78 | estimate | the layer's width at the corner |
+| MOUTH.spacing | 3 | 81 | estimate | the largest eddies' size (Tukker 1997, in Bijvelds), taken as their spacing |
+| MOUTH.carry | 0.5 | 81 | sourced | Bijvelds 1997 |
+| MOUTH.u, v | 0.2, 0.1 | 81 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one row of eddies (upper bound) |
+| MOUTH.free | 0.18 | 83 | sourced | Brown & Roshko 1974, Bijvelds eq. 3.6 |
+| (the pile lee's reach) | 1–2 pier-heads | | estimate | not derived: see the module's comment |
+| (the layer's head start through the piles) | the pier's width | | estimate | nothing found on shear layers through pile fields |
 
 ### src/environment/pierWakes.ts
 

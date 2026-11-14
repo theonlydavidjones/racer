@@ -33,7 +33,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
-import { MOUTH_REFS, withHarborMouths } from '../environment/harborMouth';
+import { mouthState, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
@@ -636,13 +636,13 @@ export class World {
     return this.flows;
   }
   private flowsC: Vec | null = null;
-  /** The stream crossing each harbor mouth (environment/harborMouth.ts), refreshed with the piers'. */
-  private mouthT = NaN; private mouthC: Vec | null = null; private mouths: Vec[] = [];
-  private mouthFlows(): Vec[] {
-    if (!(Math.abs(this.t - this.mouthT) < 30) || (!this.tide && this.mouthC !== this.cvec)) {
-      this.mouthT = this.t; this.mouthC = this.cvec; this.mouths = MOUTH_REFS.map(q => this.streamAt(q, false));
-    }
-    return this.mouths;
+  /** The harbor mouths' water (environment/harborMouth.ts): the stream crossing each, its gyre and its eddies' phase, brought up to date every half minute. */
+  private mouthS: MouthState = mouthState(); private mouthC: Vec | null = null;
+  private mouthFlows(): MouthState {
+    const S = this.mouthS;
+    if (!this.tide && this.mouthC !== this.cvec) { S.t = NaN; this.mouthC = this.cvec; } // (another preset: its water from the start)
+    if (!(this.t - S.t >= 0 && this.t - S.t < 30)) refreshMouths(S, this.t, q => this.streamAt(q, false));
+    return S;
   }
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
@@ -1897,7 +1897,7 @@ export class World {
     const n = new World(this.file, { ...s, fleet: 0, opponents: [] }, this.seed, { ...this.opts, startAt: this.startAt });
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
-    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; // (the piers' wakes from the new stream at once)
+    this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; this.mouthS.t = NaN; // (the piers' wakes, and the harbor mouths' water, from the new stream at once)
     this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
