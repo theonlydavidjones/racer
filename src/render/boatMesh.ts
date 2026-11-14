@@ -1317,7 +1317,64 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  mergeStatic(grp, out);
+  return out;
+}
+
+/**
+ * The boat's fixed parts, merged: every mesh straight under the boat's group that never moves on its own (the hull's
+ * fittings, rails, cleats, blocks, the cockpit's linings...) joined into one mesh per material, so a boat is a few dozen
+ * draw calls, not a few hundred (ROADMAP 8x: the detailed boat, eight to a fleet, doubled the scene's time a frame).
+ * Left as they are: anything the boat's state moves or shows and hides (whatever the BoatMesh or the group's userData
+ * holds), groups, lines, skinned and see-through meshes, and anything drawn in a set order. The look is the same.
+ */
+function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
+  const keep = new Set<unknown>();
+  const hold = (v: unknown, depth: number): void => {
+    if (!v || typeof v !== 'object' || keep.has(v)) return; keep.add(v);
+    if ((v as THREE.Object3D).isObject3D || depth > 3) return;
+    for (const x of Array.isArray(v) ? v : Object.values(v as object)) hold(x, depth + 1);
+  };
+  hold(held, 0); hold(grp.userData, 0);
+  // the fixed little assemblies first (a block on its strap, a winch on its pedestal, a car on its track...): groups
+  // nothing moves, made only of meshes, their meshes brought up to the boat's group as they stand, to be merged below
+  grp.updateMatrixWorld(true);
+  const inv = grp.matrixWorld.clone().invert();
+  for (const c of [...grp.children]) {
+    if (!(c as THREE.Group).isGroup || keep.has(c) || c.name || Object.keys(c.userData).length || !c.visible) continue;
+    let ok = true, any = false;
+    c.traverse(o => { if (o === c) return; const m = o as THREE.Mesh; if (keep.has(o) || o.name || !o.visible || Object.keys(o.userData).length) ok = false; else if (m.isMesh && !(m as THREE.SkinnedMesh).isSkinnedMesh) any = true; else if (!(o as THREE.Group).isGroup) ok = false; });
+    if (!ok || !any) continue;
+    const ms: THREE.Mesh[] = []; c.traverse(o => { if ((o as THREE.Mesh).isMesh) ms.push(o as THREE.Mesh); });
+    for (const m of ms) { const mw = m.matrixWorld.clone().premultiply(inv); m.parent!.remove(m); mw.decompose(m.position, m.quaternion, m.scale); grp.add(m); }
+    grp.remove(c);
+  }
+  const buckets = new Map<string, THREE.Mesh[]>();
+  for (const c of grp.children) {
+    const m = c as THREE.Mesh;
+    if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || keep.has(m) || m.name || m.children.length || !m.visible || m.renderOrder !== 0 || Array.isArray(m.material)) continue;
+    const mat = m.material as THREE.Material;
+    if (mat.transparent || m.morphTargetInfluences || Object.keys(m.userData).length) continue;
+    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',');
+    if (!g.getAttribute('position') || !g.getAttribute('normal')) continue;
+    (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(m);
+  }
+  for (const [key, ms] of buckets) {
+    if (ms.length < 2) continue;
+    const names = key.split('|')[1].split(',');
+    const geos = ms.map(m => {
+      m.updateMatrix();
+      const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
+      for (const a of Object.keys(g.attributes)) if (!names.includes(a)) g.deleteAttribute(a);
+      g.morphAttributes = {}; g.clearGroups(); return g;
+    });
+    const merged = mergeGeometries(geos, false); if (!merged) continue;
+    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms.some(m => m.castShadow); one.receiveShadow = ms.some(m => m.receiveShadow);
+    for (const m of ms) { grp.remove(m); m.geometry.dispose(); }
+    for (const g of geos) g.dispose();
+    grp.add(one);
+  }
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -1646,7 +1703,15 @@ function syncLines(m: BoatMesh, b: Boat): void {
  */
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
+/** (each sail's picture drawn once for its cloth, number and inks, and shared: drawing it is a canvas full of lettering,
+ * and the boat editor rebuilds her on every change, ROADMAP 8v) */
+const sailPicCache = new Map<string, THREE.CanvasTexture>();
 function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
+  const key = JSON.stringify([color, no, side, main, inks.no ?? '', inks.f ?? '']), hit = sailPicCache.get(key);
+  if (hit) return hit;
+  const t = sailTextureDraw(color, no, side, main, inks); sailPicCache.set(key, t); return t;
+}
+function sailTextureDraw(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
   // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
   // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture
