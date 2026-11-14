@@ -126,15 +126,19 @@ const ESC_TURNS = [-90, -60, -30, 30, 60, 90];
  * a helm's small correction lasts about as long; carried the whole 8 s, a boat mid-tack was predicted circling 150° and
  * a 2°/s correction put her 2.8 m off by the end, the size of the gap kept. */
 const ESC_TURN_FOR = 2;
-/** A tack's cost beyond the turn, m per knot of wind (her track falls short of escapes()' by this much by the time the
- * turn is done, the sails flogging through the wind, which arcs.ts leaves out): stepped against physics.ts's startTack,
- * the boat was 1.0 m behind the prediction at 7 s in 6 kt, 2.2 m in 12 and 3.2 m in 18 (the physics review, November
- * 2026), about 0.18 m a knot. Added to the gap a candidate through the wind must keep. */
-const TACK_SHORT_M_PER_KT = 0.18;
 /** Held off a tack of her own choosing this long (s) by a boat close by, she eases to drop back behind it. */
 const TACK_HELD_EASE = 15;
 /** Below this speed through the water (m/s) she keeps her sails drawing to steer, rather than ease them to slow. */
 const SLOW_TO_STEER = 1.2;
+/** Through a tack she sags to leeward of the prediction's path, which keeps her on her heading's line (arcs.ts
+ * leaves leeway out): 1–1.5 m by the time the tack's done, at low speed through the wind where leeway is large
+ * (Deep Physics, stepped against the boat's own moveBoat, November 2026). Added to the gap a tack must keep. */
+const TACK_SAG_M = 1;
+/** Heading `h` is a tack from where she is: upwind both, on the other side of the wind (a gybe is no tack). */
+function isTack(b: Boat, h: number): boolean {
+  const from = b.ww.from;
+  return Math.sign(wrap(from - h)) !== Math.sign(wrap(from - b.h)) && Math.abs(wrap(from - h)) < 90 && Math.abs(wrap(from - b.h)) < 90;
+}
 /** A boat sailing on as she is: her present turn for ESC_TURN_FOR s, then straight on. */
 function onward(o: Boat): (t: number) => Pose {
   const arc = straightOn({ x: o.x, y: o.y, h: o.h, v: o.v + (o.astern ?? 0) }, o.turnRate ?? 0), end = arc(ESC_TURN_FOR), line = straightOn(end, 0);
@@ -188,33 +192,31 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   const delay = threats.every(o => seen.has(String(o.id))) ? 0.2 : ai.kn.reactS;
   const toCourse = Math.round(wrap(aimH - b.h)), turns = [...(Math.abs(toCourse) > 3 ? [toCourse] : []), ...ESC_TURNS];
   const me = { x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 };
-  const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT }) : null;
-  const gK = run(kc), gR = run(row);
+  // (one prediction for all the boats of a kind, her gap to each read separately: boat/arcs.ts Candidate.gaps)
+  const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT, windKt: b.ww.kt }) : null;
+  const threatsG = run(threats);
   // (the boats beside the threats, only when her own course won't do: most of the time it will, and they cost as much)
-  let gO: Candidate[] | null = null, gX: Candidate[] | null = null;
-  const tackShort = TACK_SHORT_M_PER_KT * b.ww.kt, side = (h: number) => Math.sign(wrap(b.ww.from - h));
-  // her slack on candidate i (m: her least gap less the gap she needs, the worst of the groups). The boats beside the
-  // threats: with `all`, each given the gap it's owed; otherwise only kept from touching (whatever else gives way,
-  // she mustn't turn into a boat to escape another: rule 14)
+  let othersG: Candidate[] | null = null, owedRoom: boolean[] = [];
+  // her slack on candidate i (m: her least gap less the gap she needs, the worst over the boats). The boats beside the
+  // threats: with `all`, each given the gap it's owed; otherwise only kept from touching (whatever else gives way, she
+  // mustn't turn into a boat to escape another: rule 14). (A tack's loss through the wind is in the prediction itself:
+  // arcs.ts turnSpeed, the boat's own surge law.)
   const slack = (i: number, all: boolean) => {
-    const extra = side(gK?.[i].heading ?? gR![i].heading) !== side(b.h) ? tackShort : 0; // (through the wind: a tack's loss)
     let m = Infinity;
-    if (gK) m = Math.min(m, gK[i].minGap - needKc - extra);
-    if (gR) m = Math.min(m, gR[i].minGap - needRow - extra);
-    if (gO) m = Math.min(m, gO[i].minGap - (all ? needKc : needRow) - extra);
-    if (gX) m = Math.min(m, gX[i].minGap - needRow - extra);
+    const ex = isTack(b, threatsG![i].heading) ? TACK_SAG_M : 0;
+    threatsG![i].gaps.forEach((g, j) => { m = Math.min(m, g - ex - (j < kc.length ? needKc : needRow)); });
+    if (othersG) othersG[i].gaps.forEach((g, j) => { m = Math.min(m, g - ex - (all && owedRoom[j] ? needKc : needRow)); });
     return m;
   };
-  const cands = (gK ?? gR)!;
+  const cands = threatsG!;
   // (a heading she can sail: one inside the wind's no-go zone she can't hold, so its gap is no escape)
   const ok = (c: Candidate) => Math.abs(wrap(sailable(b, c.heading) - c.heading)) < 5;
   const ownI = cands.findIndex(c => c.turn === (Math.abs(toCourse) > 3 ? toCourse : 0));
   let heading: number | null = null, luff = false;
   // (her own course is no change of course, as far as the others are concerned: only the boats she's keeping clear of)
-  const ownSlack = Math.min(gK ? gK[ownI].minGap - needKc : Infinity, gR ? gR[ownI].minGap - needRow : Infinity);
+  const ownSlack = slack(ownI, false);
   if (!(ownSlack >= 0 && ok(cands[ownI]))) {
-    const ownRow = others.filter(o => w.rights(b, o).kc === o), rest = others.filter(o => !ownRow.includes(o));
-    gO = run(ownRow); gX = run(rest);
+    othersG = run(others); owedRoom = others.map(o => w.rights(b, o).kc === o);
     const nearest = (is: number[]) => is.reduce((p, q) => Math.abs(wrap(cands[q].heading - aimH)) < Math.abs(wrap(cands[p].heading - aimH)) ? q : p);
     const idx = cands.map((_, i) => i).filter(i => i !== ownI && ok(cands[i]));
     const good = idx.filter(i => slack(i, true) >= 0);
@@ -902,7 +904,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // a boat spinning her penalty turns she gives room whatever her course, as a sailor does: where it will be in a few
     // seconds is anyone's guess, and the boat she'd fouled a moment before, holding on beside it, hit it again
     else if (r.kc === o && b.started && (o.penalty > 0 || (b.aboveProper && o.leg !== b.leg && o.started && !o.finished)) && cp.t < ai.kn.keepClearS / 2 && cp.d < ai.kn.keepClearM / 2 + lagM) kcThreats.push(o);
-    else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
+    // (Rule 14 only for a boat closing on her: one sailing alongside at a steady distance, side by side, is keeping
+    // clear as she must, and a right-of-way boat holds her course for it)
+    else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < -0.15 * Math.hypot(dx, dy)) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       rowThreats.push(o);
       if (cp.t < lagT + 1) ai.urgent = true; // (about to touch: before even finishing a tack, physics.ts midTack)
@@ -959,8 +963,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const close = w.boats.filter(o => o !== b && !o.finished && dist(o, b) < 40);
     if (close.length) {
       const [c] = escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 },
-        close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT }).filter(q => q.turn !== 0);
-      if (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SHORT_M_PER_KT * ww.kt) {
+        close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT, windKt: ww.kt }).filter(q => q.turn !== 0);
+      if (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SAG_M) {
         desired = b.tack === 'S' ? csS : csP; tackHeld = true;
         ai.tackHeldT = (ai.tackHeldT ?? 0) + dt;
         if (ai.tackHeldT > TACK_HELD_EASE) luff = true;
