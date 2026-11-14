@@ -247,7 +247,7 @@ export class BoatPanel {
         <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood (spruce)']], b.perf.boom)}</div>
         ${rigTuneFields(b, seg)}
         <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}
-          ${b.perf.outboard !== 'none' ? seg('outboardHp', [['2.5', '2.5 hp (no reverse)'], ['3.5', '3.5 hp'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5)) : ''}</div>
+          ${b.perf.outboard !== 'none' ? seg('outboardHp', [['2.5', '2.5 hp (no reverse)'], ['3.5', '3.5 hp (no reverse)'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5)) : ''}</div>
         <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label></div>
         <div class="bpreport" id="bpReport"></div>
       </section>
