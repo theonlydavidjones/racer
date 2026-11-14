@@ -346,16 +346,8 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
   for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
   // with your mainsheet held, the traveller is how the crew puts the boom where they want it (up to windward in light
-  // air with your sheet eased; never below their depowering floor), aimed at their angle, not yours: it doesn't run away.
-  // But not against your ease in a breeze: North Sails' Folkboat guide has the car in the middle from 6 to 14 kt and eased
-  // to leeward above, so from 6 kt the crew never pull it to windward of the middle, and above 14 kt never to windward of
-  // where it is (they may ease it to help you; they don't haul it up while you're easing the sheet to spill power)
-  if (fixed.mainsheet != null && fixed.traveller == null) {
-    let tr = travellerFor(mainAngle, fixed.mainsheet, lo('traveller'));
-    if (tws >= 6) tr = Math.max(tr, 0);
-    if (tws > 14 && from?.traveller != null) tr = Math.max(tr, from.traveller);
-    fixed = { ...fixed, traveller: tr };
-  }
+  // air with your sheet eased; never below their depowering floor), aimed at their angle, not yours: it doesn't run away
+  if (fixed.mainsheet != null && fixed.traveller == null) fixed = { ...fixed, traveller: travellerFor(mainAngle, fixed.mainsheet, lo('traveller')) };
   if (fixed.traveller != null) x.traveller = fixed.traveller;
   const carMin = fixed.carFore ?? Math.min(CAR_FORE_PINS - 1, 3 + lim.carAft), carMax = fixed.carFore ?? CAR_FORE_PINS - 1;
   x.carFore = clamp(x.carFore, carMin, carMax); if (fixed.carIn != null) x.carIn = fixed.carIn;
