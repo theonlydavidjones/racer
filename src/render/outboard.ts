@@ -189,7 +189,7 @@ export function buildOutboard(hp: number): OutboardMesh {
   swivel.add(new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.02, 0.09).rotateX(0.5).translate(D.cowlW / 2 * 0.95, y0 + 0.04, cz - 0.05), DARK));
   swivel.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.022, 0.025).translate(0, y0 + D.cowlH * 0.55, cz - D.cowlL / 2 * 0.98 - 0.008), DARK));
   // its wash: churned water astern of the prop, on the surface (drawn in the boat's frame, below)
-  const wash = new THREE.Mesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2).scale(0.16, 1, 0.5), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+  const wash = new THREE.Mesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2).scale(0.16, 1, 0.5), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }) /* (lit: white water by day, dim at night) */);
   wash.visible = false; group.add(wash);
   // (each moving part's pieces merged, one mesh a material: about eight draw calls for the whole motor and bracket)
   for (const g of [board, swivel, prop]) mergeByMaterial(g);
@@ -221,7 +221,7 @@ export function syncOutboard(o: OutboardMesh, m: OutboardState | undefined, dt: 
   o.at.spin = (o.at.spin + (m?.gear === 'R' ? -1 : 1) * 2 * Math.PI * revs * dt) % (2 * Math.PI);
   o.prop.rotation.z = -o.at.spin;
   // its wash: a patch of churned water astern, brighter and longer with the throttle (only with the prop down in the water)
-  const w = inGear && down && o.at.tilt < 0.1 ? 0.25 + 0.75 * power : 0, mat = o.wash.material as THREE.MeshBasicMaterial;
+  const w = inGear && down && o.at.tilt < 0.1 ? 0.25 + 0.75 * power : 0, mat = o.wash.material as THREE.MeshLambertMaterial;
   mat.opacity = ease(mat.opacity, 0.3 * w, 1.5); o.wash.visible = mat.opacity > 0.01;
   const astern = (m?.gear === 'R') !== !!m?.swivel;
   o.wash.position.set(MOUNT_X, 0.02, o.board.position.z + (astern ? -1 : 1) * (0.25 + 0.35 * w)); o.wash.scale.set(1, 1, 0.5 + 0.8 * w); // (thrown forward, under her quarter, going astern)
