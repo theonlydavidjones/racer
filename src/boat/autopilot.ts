@@ -3,7 +3,7 @@ import { maxTurnRate } from './dynamics';
 import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
-import { landAlong } from '../geo/shore';
+import { landAlong, wharfNearest } from '../geo/shore';
 import { detour } from '../ai/ai';
 import { routeAround } from '../sim/routing';
 
@@ -122,13 +122,15 @@ function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
  * a metre or two wide is in the way, however far ahead it is); Infinity when there's none that near. */
 const landDist = (b: Boat, h: number, d: number) => {
   const u = V(h), n = { x: u.y, y: -u.x };
-  // (her track and 8 m either side: a pier lying at a shallow angle to her course is ahead of her too)
+  // (her track and SIDE either side: a pier lying at a shallow angle to her course is ahead of her too)
   return Math.min(...[0, -SIDE, SIDE].map(k => landAlong({ x: b.x + n.x * k, y: b.y + n.y * k }, { x: b.x + n.x * k + u.x * d, y: b.y + n.y * k + u.y * d })));
 };
-/** How far either side of her track the shore look-ahead looks (m): her half-beam and a berth. */
-const SIDE = 8;
+/** How far either side of her track the shore look-ahead looks (m): the 10 m berth the route keeps, and her half-beam. */
+const SIDE = 12;
 /** Under this much water ahead on both tacks (m), about two lengths, she's boxed in: the pilot can't tack her out. */
 const BOXED = 15;
+/** On a beat, tack away from a pier or breakwater that comes this close (m): the route's 10 m berth. */
+const BERTH = 10;
 
 /** How far ahead along the direct line land has to be before Nav plans a way round it (m): nearer the destination's
  * own approach, or a pier on the way, not the shore across the Bay. */
@@ -139,6 +141,9 @@ const PLAN_AHEAD = 400;
 const REPLAN = 60, OFF_ROUTE = 40;
 /** Never plan more often than this (s), whatever's asking: a plan that finds no way, or one she's just left, waits. */
 const MIN_REPLAN = 5;
+/** On to the next turn early only with this much clear water either side of the way to it (m): the route's 10 m berth
+ * and a few metres for her leeway, which on a close reach sets her a few metres to leeward of the line she steers. */
+const ADVANCE_CLEAR = 15;
 /** How far she is off the leg from a to b (m): her distance from the segment. */
 function offLeg(q: Vec, a: Vec, b: Vec): number {
   const vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1, t = Math.max(0, Math.min(1, ((q.x - a.x) * vx + (q.y - a.y) * vy) / L2));
@@ -174,9 +179,9 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   }
   if (!p.route) return clearLine(b, ahead, 20) || landAlong(b, dest) === Infinity ? 'clear' : 'none';
   const r = p.route;
-  // on to the next turn when the way to it is clear of land 12 m either side, so she never cuts the corner of a pier
-  // head turning into a gap; or at the turn itself (8 m), so she can't circle it
-  while (p.ri < r.length - 1 && (clearLine(b, r[p.ri + 1], 12) || Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 8)) p.ri++;
+  // on to the next turn when the way to it is clear of land ADVANCE_CLEAR either side, so she never cuts the corner of a
+  // pier head or a breakwater's end; or at the turn itself (8 m), so she can't circle it
+  while (p.ri < r.length - 1 && (clearLine(b, r[p.ri + 1], ADVANCE_CLEAR) || Math.hypot(r[p.ri].x - b.x, r[p.ri].y - b.y) < 8)) p.ri++;
   if (p.ri >= r.length - 1) { p.route = null; return 'clear'; } // (on the last leg: straight for it)
   return r[p.ri];
 }
@@ -222,7 +227,11 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
       if (dOther > dCur) { p.lastTackT = t; p.goTack = other; return close(other); }
       return cur;
     }
-    if ((fetch(other) && !fetch(b.tack)) || shore) { p.lastTackT = t; p.goTack = other; return close(other); }
+    // a pier or a breakwater come within a berth of her, to leeward as she sags down on it or abeam: tack away from it,
+    // as a sailor does, not just for land dead ahead
+    const wn = wharfNearest(b, BERTH);
+    const away = !!wn && wn.d > 0 && dot(V(close(other)), wn.n) > dot(V(cur), wn.n) + 0.2;
+    if ((fetch(other) && !fetch(b.tack)) || shore || away) { p.lastTackT = t; p.goTack = other; return close(other); }
   }
   return cur;
 }

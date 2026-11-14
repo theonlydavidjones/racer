@@ -375,9 +375,11 @@ export const WHARF_CLEAR = 10;
 /** In a marina's fairways (20–30 m between its docks), where WHARF_CLEAR won't fit: down the middle, half of it (m). */
 const MARINA_CLEAR = 5;
 /** Clear of the Wharf's structures by WHARF_CLEAR along a to b, sampled every 4 m, except within that of `free` (where
- * she is now, or where she's going: a slip or a dock may be closer). */
+ * she is now, or where she's going) when that's itself closer to one: a slip, or alongside a dock. */
 function wharfClear(a: Vec, b: Vec, free: Vec[] = [], clear = WHARF_CLEAR): boolean {
   const L = dist(a, b); if (!wharfNearest(a, L + clear) && !wharfNearest(b, L + clear)) return true;
+  // (an end lets the leg in close only if it's close itself, in a slip or alongside: from open water, the whole berth)
+  free = free.filter(f => !!wharfNearest(f, clear));
   const n = Math.max(1, Math.ceil(L / 4));
   for (let k = 0; k <= n; k++) {
     const q = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
