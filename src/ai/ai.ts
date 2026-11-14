@@ -154,9 +154,11 @@ export function sailable(b: Boat, desired: number): number {
   return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
 }
 
-/** Lying to beam-on with her sails let fly she still forereaches and drifts, 0.4–1.2 m/s in the abandon-home traces (the
- * sim's own boat, 20–26 kt): faster than that, a boat is sailing with way on, not lying to. */
-const LYING_DRIFT = 1.2;
+/** Lying to beam-on with her sails let fly she still forereaches and drifts: 0.4–1.2 m/s in the abandon-home traces (the
+ * sim's own boat, 20–26 kt), as a real boat hove to or lying a-hull drifts at 1–2 kt (Cunliffe, "Heaving To"), where
+ * sheeted in she sails at 2.5–3.5 m/s. Faster than this, m/s, she's sailing with way on, not lying to: between the two,
+ * with room for a lying boat's surge in a gust or a sea. */
+const LYING_DRIFT = 1.5;
 /**
  * Racing called off for the day (N over A, or AP over A: "no more racing today", RRS Race Signals), as it is in a breeze
  * over the fleet's limit (sim/signals.ts): she sails home, to the racing harbour nearest the course (geo/marina.ts), by
