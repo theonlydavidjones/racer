@@ -6,7 +6,7 @@ import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
-import { defaultControls } from '../boat/controls';
+import { BOOM_STOP, defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
@@ -35,6 +35,7 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
+import { sunPosition } from '../environment/sun';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
@@ -439,7 +440,9 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
-    if (settings.mode === 'lesson') { this.lessonField = this.fieldAt(this.boats[0]).k; this.windModel.kt = this.lessonKt(this.windModel.kt); }
+    // (a sheltered start, a slip, doesn't raise the mean: out on the Bay she'd have it all)
+    // (from a slip, the lesson's wind is taken where she'll sail it, out on the Bay off the Cityfront, not in the basin's lee)
+    if (settings.mode === 'lesson') { const at = this.fromSlip ? getPlace('cityfront')?.p ?? this.boats[0] : this.boats[0]; this.lessonField = this.fieldAt(at).k; this.windModel.kt = this.lessonKt(this.windModel.kt); }
     // a lesson: its buoy (the tiller's, steered for; stop, go and irons', stopped by) 250 m off, 20° to leeward of her
     // heading (TWA about 110°, just abaft the beam), where there's water
     this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
@@ -448,6 +451,8 @@ export class World {
       for (const d of [120, 60]) { const q = { x: u.x + V(u.h).x * d, y: u.y + V(u.h).y * d }; if (!onLand(q)) return q; }
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
+    if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
+    if (this.lesson?.id === 'before') this.boats[0].lightsOff = true; // (Before you go: switching them on is a step)
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
@@ -871,10 +876,13 @@ export class World {
   }
   private seaNodes?: { d: number; u: number }[];
 
+  /** After sunset or before sunrise (Rule 20: navigation lights on): the sun's center below the horizon. */
+  isNight(): boolean { return sunPosition(this.clockUtc * 60000).el < 0; }
+
   /** A lesson's mean wind held to the standard's range (sim/lessons.ts LESSON_WIND); any other sail's as it is. */
   // (the range is for the wind she sails in, so the mean is held to it over the field's factor where the lesson is: the
   // Cityfront's is about 1.2, which put a lesson's own wind near 18 kt with the mean at 15)
-  private lessonKt(kt: number): number { const f = this.lessonField ?? 1; return this.settings.mode === 'lesson' ? clamp(kt, LESSON_WIND[0] / f, LESSON_WIND[1] / f) : kt; }
+  private lessonKt(kt: number): number { const f = this.lessonField ?? 1, lo = this.settings.lesson === 'breeze' ? LESSON_WIND[1] : LESSON_WIND[0]; return this.settings.mode === 'lesson' ? clamp(kt, lo / f, LESSON_WIND[1] / f) : kt; } // (a breeze: the top of the range)
   private lessonField: number | null = null;
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
@@ -1847,7 +1855,8 @@ export class World {
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); if (b.twa < 176 && b.twa > 4) b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true; // sails up at the dock weathervane, let fly
-    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
+    // (the boom out to the shroud; the main down: its boom sheeted in amidships, clear of the dock and the boats either side)
+    b.boom += ((up ? side * BOOM_STOP : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
     // the main down, tied up: the mainsheet hauled in and made fast, the traveller car in the middle, so the boom lies on
     // the centerline, clear of the dock and the boats either side (8q, the owner: "when in a slip, boom should be at
     // centerline (when starting) or brought to centerline (when finishing a sail and docking)")

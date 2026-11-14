@@ -35,7 +35,7 @@ export function impactEnergy(closing: number, m1: number, m2 = Infinity): number
 }
 
 /** The grade of a blow of `energy` J to a boat of `mass` kg (her displacement with her crew aboard, crewPhys.ts
- * displacement(b): the band edges stay at DAMAGE_V's speeds whoever's aboard), by what she struck: against the bands' energies at her
+ * displacement(spec), as physics.ts uses it: the band edges stay at DAMAGE_V's speeds whoever's aboard), by what she struck: against the bands' energies at her
  * mass (the energy she'd take hitting a fixed hard object square on at DAMAGE_V's speeds). */
 export function damageOf(energy: number, struck: Struck, mass: number): DamageLevel {
   if (struck === 'mud' || energy <= 0) return 'none';
@@ -46,6 +46,8 @@ export function damageOf(energy: number, struck: Struck, mass: number): DamageLe
   // them, the rig comes down on the deck's edge: a wreck whatever the speed, which the caller decides, Marinas)
   const band: DamageLevel = energy < lo ? 'scrape' : energy <= hi ? 'damage' : 'wreck';
   // (between two boats alike the reduced mass is half hers, so it takes about 2.1 m/s of closing for 'serious', the same
-  // blow as 1.5 m/s into a wall: right by the physics, both hulls give. A scrape isn't damage: 43.1(c) still exonerates)
+  // energy as 1.5 m/s into a wall. That reads the blow as a stiff stem into the other's topsides, the side taking it all,
+  // as in a T-bone; were both to give alike, each would take half. A scrape is marks that rub out: not damage, so 43.1(c)
+  // still exonerates; a gouge that needs a repair is damage, WS Case 19's 'impairing the value')
   return struck === 'boat' && band === 'wreck' ? 'serious' : band;
 }

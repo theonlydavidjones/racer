@@ -56,6 +56,8 @@ export type Command =
   | { k: 'ensign'; struck: boolean }
   /** Navigation lights off or on. */
   | { k: 'lights'; off: boolean }
+  /** Learn to sail, Before you go: the dock card done (the gear checked, the float plan left): on to the lights. */
+  | { k: 'lessonReady' }
   /** Hoist or strike a sail. */
   | { k: 'sail'; sail: 'main' | 'jib'; up: boolean }
   /** The tiller pilot. */
@@ -124,6 +126,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'pole': w.poleCall(c.want); return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
+    case 'lessonReady': w.lesson?.ready(w.isNight()); return;
     case 'sail': w.setSail(c.sail, c.up); return;
     case 'pilot':
       if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);
