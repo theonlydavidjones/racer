@@ -9,8 +9,12 @@ import * as THREE from 'three';
  * geometry (sheets, telltales, flags: drawn whatever their bounds say). Parts are hidden by their render layer, not
  * `visible`, so the boat's own show-and-hide (the pole, the jib bag, the helm in the cockpit view) is untouched.
  */
-const SMALL = 0.5; // m: the largest part (its bounding sphere's radius) ever left out
+export const SMALL = 0.5; // m: the largest part (its bounding sphere's radius) ever left out
 const MIN_PX = 1; // the least it must cover on the screen (its diameter, in device pixels)
+/** The parts (bounding radius, m) boatMesh merges into a set of their own, left out as its largest would be: cleats,
+ *  blocks, shackles, the winches' handles. (Larger fittings are few triangles and seen from far off: merged with the hull's
+ *  parts, drawn always; a set for each size costs more draw calls than it saves triangles.) */
+export const PART_SMALL = 0.08;
 interface Item { o: THREE.Mesh; r: number; c: THREE.Vector3; mask: number }
 const v = new THREE.Vector3();
 export class FittingCull {
@@ -26,7 +30,11 @@ export class FittingCull {
         if (!m.isMesh || m.frustumCulled === false || !m.geometry) return;
         if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
         const s = m.geometry.boundingSphere!, r = s.radius * m.matrixWorld.getMaxScaleOnAxis() / gs;
-        if (r <= SMALL) this.items.push({ o: m, r: s.radius, c: s.center.clone(), mask: m.layers.mask });
+        // (a set of parts merged into one mesh, or what's seen only through a small opening (the cabin's inside, through
+        // its windows and companionway): left out as the part, or the opening, would be, wherever the whole spans)
+        const cullR = m.userData.cullR as number | undefined;
+        if (cullR !== undefined) this.items.push({ o: m, r: cullR / (m.matrixWorld.getMaxScaleOnAxis() / gs || 1), c: s.center.clone(), mask: m.layers.mask });
+        else if (r <= SMALL) this.items.push({ o: m, r: s.radius, c: s.center.clone(), mask: m.layers.mask });
       });
     }
   }
