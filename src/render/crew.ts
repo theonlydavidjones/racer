@@ -734,7 +734,17 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
     }
   }
   const y0 = c.hip.y;
-  v.addScaledVector(_s.copy(aim).sub(c.hip), W * W * dt).multiplyScalar(Math.max(0, 1 - 2 * W * dt)); c.hip.addScaledVector(v, dt);
+  // (the spring, held to a person's pace: no faster than HIP.speed along the deck and HIP.up up or down, setting off and
+  // pulling up at no more than HIP.acc. On the spring alone, the pose jumping to a new place took the hips 1 m in a
+  // quarter of a second, at up to 5 m/s, setting off at up to 136 m/s²)
+  { const vx = v.x, vy = v.y, vz = v.z;
+    v.addScaledVector(_s.copy(aim).sub(c.hip), W * W * dt).multiplyScalar(Math.max(0, 1 - 2 * W * dt));
+    const ax = v.x - vx, az = v.z - vz, ah = Math.hypot(ax, az), lim = HIP.acc * dt;
+    if (ah > lim) { v.x = vx + ax * lim / ah; v.z = vz + az * lim / ah; }
+    v.y = vy + Math.max(-HIP.upAcc * dt, Math.min(HIP.upAcc * dt, v.y - vy));
+    const sh = Math.hypot(v.x, v.z); if (sh > HIP.speed) { v.x *= HIP.speed / sh; v.z *= HIP.speed / sh; }
+    v.y = Math.max(-HIP.up, Math.min(HIP.up, v.y)); }
+  c.hip.addScaledVector(v, dt);
   // (getting up, off the rail or a seat, takes a moment: the hips rise no faster than about 1.2 m/s)
   if (c.hip.y > y0 + 1.2 * dt) { c.hip.y = y0 + 1.2 * dt; if (v.y > 1.2) v.y = 1.2; }
   if (rising) c.hip.y = Math.min(aim.y, Math.max(c.hip.y, c.hip.y + 1.0 * dt)); // (pushing up off the seat: briskly)
@@ -858,6 +868,13 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
 const _s = V(0, 0, 0), _t = V(0, 0, 0), _u = V(0, 0, 0), _sh = V(0, 0, 0), _v = V(0, 0, 0), _w = V(0, 0, 0);
 /** How fast a hand or a foot moves to its new place at most (m/s): briskly, as a sailor's do (an estimate). */
 const LIMB_SPEED = 2.2;
+/**
+ * The hips' pace about the boat: at most `speed` (m/s), setting off and pulling up at `acc` (m/s²); up and down, `up`
+ * and `upAcc`. Estimates: a crew crosses the cockpit in a tack at about 1 m/s (crewPhys.ts), a little quicker
+ * crouched for a short hop; a walk from standing reaches its pace in a step or two, about 1.5 to 2 m/s²; sit-to-stand,
+ * the hips rise at 0.6 to 1 m/s at most.
+ */
+const HIP = { speed: 2.0, acc: 8, up: 1.6, upAcc: 8 };
 /** Ease `p` toward `q` by the share `a`, but no further than `max`. */
 function toward(p: THREE.Vector3, q: THREE.Vector3, a: number, max: number): void {
   const d = _s.copy(q).sub(p).multiplyScalar(a), l = d.length(); if (l > max) d.multiplyScalar(max / l); p.add(d);
