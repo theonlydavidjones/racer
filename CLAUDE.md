@@ -83,6 +83,9 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   A PR that changes how boats sail or are judged (src/ai, src/rules) uses `--ai` instead, the mean over ten races: it
   changes the race itself, and one race's ratio then lands anywhere in ±3% of the mean (#276 against turning: 0.986 to
   1.067 over the ten, 1.032 the mean; docs/CAPACITY.md §8).
+- World.step (Capacity, 14 Nov 2026): don't add per-step lines to World.step itself, even ones that return at once:
+  the paddle's two cost every step 1.3% with the race unchanged. New per-step work goes behind one cheap test, in a
+  method of its own (docs/CAPACITY.md §8a), and a PR that adds lines to World.step runs perf-pair however free they look.
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
