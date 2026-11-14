@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { escapes, straightOn } from '../src/boat/arcs';
-import { flowTurnRate } from '../src/boat/dynamics';
+import { flowTurnRate } from '../src/boat/turning';
 
 // Wind from the north (0°). Headings: 0 north, 90 east.
 const best = (c: { minGap: number }[]) => Math.max(...c.map(k => k.minGap));
@@ -49,12 +49,19 @@ describe('escapes(): room to respond (docs/ROOM-TO-RESPOND.md)', () => {
     expect(c[1].heading).toBeGreaterThan(200); // from port tack (175) through 180 onto starboard
   });
 
-  it('turning bleeds speed (physics\' own turnBleed): held in a steady turn, her circle shrinks as she slows', () => {
+  it('turning costs her speed (physics\' own turnSpeed): held in a steady turn, her circle shrinks as she slows', () => {
     // at a steady 15°/s and 2.5 m/s she'd sail a circle of radius v/ω, reaching the point 2R to starboard after half of
     // it; slowing as the turn bleeds her speed, she turns inside it
     const R = 2.5 / (15 * Math.PI / 180), post = straightOn({ x: 2 * R, y: 0, h: 0, v: 0 });
     const c = escapes({ x: 0, y: 0, h: 0, v: 2.5, turnRate: 15 }, [post], 0, { delay: 99, horizon: 13, turns: [] })[0];
     expect(c.minGap).toBeGreaterThan(1);
     expect(c.heading).toBeGreaterThan(180); // (and she did come round past the half circle)
+  });
+
+  it('a tack loses more speed than the same turn bearing away: through the no-go zone her sails give no drive', () => {
+    // close-hauled on starboard (wind from 0°), 2.5 m/s: 90° up through the wind onto port, or 90° down onto a reach
+    const [tack] = escapes({ x: 0, y: 0, h: 315, v: 2.5 }, [], 0, { delay: 0, horizon: 8, turns: [90], windKt: 12 }).slice(1);
+    const [bear] = escapes({ x: 0, y: 0, h: 315, v: 2.5 }, [], 0, { delay: 0, horizon: 8, turns: [-90], windKt: 12 }).slice(1);
+    expect(tack.v).toBeLessThan(bear.v - 0.3);
   });
 });

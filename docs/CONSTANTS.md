@@ -37,11 +37,11 @@ that would act on a finding.
 | # | Constants | What they do | What would settle it | Owner |
 |---|---|---|---|---|
 | 1 | trim.ts SAILS.aoa (main 22°, jib 18°), LUFF_START 2, LUFF_SPAN 10, STALL_START 4 | The best angle of attack and how fast trim error costs drive: every boat's speed, every trim lesson | Sail aerodynamics (wind-tunnel or VPP data for a main and jib: angle of best drive, the width of the "groove") | Deep Physics |
-| 2 | dynamics.ts HANDLING.turnRadius 9 m, maxTurnRate 22°/s, turnDrag 0.15 | How fast she turns and what a tack or a jibe costs in speed. routing.ts MANOEUVRE_LOSS is measured from the sim's own boat, so it inherits these | Tack-loss measurements for long-keel boats (GPS tracks of Folkboats tacking; published tack-loss studies) | Deep Physics |
-| 3 | dynamics.ts HANDLING.formFactor 1.15, windageCdA 2.0 m², flogCdA 3 m² | Hull resistance beyond friction, and the rig's windage: speed at every angle, and upwind most | Form factors for full-bodied keelboats (ITTC/Delft series); windage of a rig and hull (Marchaj, ORC VPP windage terms) | Deep Physics |
+| 2 | turning.ts RUDDER_STALL 15°, the post-stall plate; HOVE.rudderFlow 0.4 (tuned); SCULL (the stroke: 60°, 1 Hz, a hand's 180°/s) | How she turns: her turning circle, what a tack or a jibe costs, sculling. The fixed radius, rate cap and flat bleed are gone: she turns by the class blade's lift and drag (CR 5.20, Helmbold), her hull's damping and her yaw inertia. routing.ts MANOEUVRE_LOSS is measured from the sim's own boat, so it inherits these | Whicker & Fehlner's rudder data (stall of a keel-hung blade); the owner's timed 720, weather helm and how she sculls; GPS tracks of Folkboats tacking | Deep Physics |
+| 3 | dynamics.ts HANDLING.formFactor 1.15, flogCdA 3 m² (windage is sourced now: WINDAGE, below) | Hull resistance beyond friction, and the rig's windage: speed at every angle, and upwind most | Form factors for full-bodied keelboats (ITTC/Delft series); windage of a rig and hull (Marchaj, ORC VPP windage terms) | Deep Physics |
 | 4 | balance.ts CREW.kg 240, CREW.reach 1.05 m (estimate) | The crew's righting moment hiking: heel, and so speed, in every breeze | Sailor weights for the SF fleet (the owner); hiking reach from the deck plan and anthropometry | Crew Model |
 | 5 | polar.ts NO_GO 25° | Below this true wind angle, no drive at all: pinching and luffing behavior | Folkboat polars (ORC certificates' beat angles) and sail-model stall | Deep Physics |
-| 6 | balance.ts RUDDER (area 0.42 m², arm 2.6 m), CHORD (2.4, 2.0 m), IDEAL_HELM 2.5°, FULL_RUDDER 30° | Weather helm, and how much rudder she needs: the feel of the boat, and the rudder's drag | Class plans (rudder dimensions), the ORC rig for chords; sailing texts for ideal helm (2–4° is the usual advice) | Deep Physics |
+| 6 | balance.ts RUDDER (the class blade: 0.562 m², aspect 4.16, CR 5.20; arm 2.6 m, an estimate), CHORD (2.4, 2.0 m), IDEAL_HELM 2.5°, FULL_RUDDER 30° | Weather helm, and how much rudder she needs: the feel of the boat, and the rudder's drag | Class plans (rudder dimensions), the ORC rig for chords; sailing texts for ideal helm (2–4° is the usual advice) | Deep Physics |
 | 7 | controls.ts CONTROL_RATE (11 lines), trim.ts crewRate/handRate | How fast lines are worked: how quickly a crew answers a puff or rounds a mark | Timed routines (the owner can time them next season); until then published timings for small keelboats | Crew Model |
 | 8 | physics.ts HOIST (30/15/15/10 s), POLE (8/5/8 s), CREW_LAG 0.8 s, PENALTY_TURN_RATE 10°/s | Crew timings for the sails and the pole, and the penalty turns | As 7 | Crew Model |
 | 9 | rules/pairs.ts RULE15_GRACE 3.5 s, HAIL_RESPONSE 5 s, REPLY_ROOM 25 s, CONTACT_GAP 2.2 m, ROOM_GAP 3.5 m, JUST_TACKED, INCIDENT_COOLDOWN; world.ts SAME_INCIDENT, COMPELLED_WINDOW; ai.ts MARK_ROOM 5 m | When the sim calls a foul. The RRS name the rule, not the number | World Sailing Cases and Calls, judges' manuals and Perry's book: what time and distance a jury takes as "room" and "as soon as possible" | Rules |
@@ -267,12 +267,8 @@ physics, ranked like the ten above:
 | NU | 1.19e-6 | 15 | standard |  |
 | G | 9.81 | 15 | standard |  |
 | HANDLING.formFactor | 1.15 | 27 | unsourced |  |
-| HANDLING.windageCdA | 2.0 | 29 | unsourced |  |
+| WINDAGE hull, mast, wire, crew (windFore, windSide) | ORC VPP 2023 Table 5.10 sizes; the hull between bow-on and beam-on by Blendermann 1994 |  | sourced | estimates within it: freeboard 0.65 m, δ 0.6 (ships' hulls), wire 0.19 m², crew 0.5 m² a head, the mast's mean section |
 | HANDLING.flogCdA | 3 | 32 | unsourced |  |
-| HANDLING.turnRadius | 9 | 34 | unsourced |  |
-| HANDLING.minTurnRate | 4 | 36 | unsourced |  |
-| HANDLING.maxTurnRate | 22 | 38 | unsourced |  |
-| HANDLING.turnDrag | 0.15 | 40 | unsourced |  |
 | HANDLING.luffFactor | 0.12 | 42 | unsourced |  |
 | HANDLING.luffFlog | 1 | 44 | unsourced |  |
 | RES_STEP | 0.001 | 76 | numerical |  |
@@ -359,8 +355,6 @@ physics, ranked like the ten above:
 | HOVE.swayAdded | 0.9 | 389 | estimate |  |
 | HOVE.yawAdded | 0.4 | 389 | estimate |  |
 | HOVE.gyration | 0.25 | 391 | estimate |  |
-| HOVE.windSide | 5.5 | 393 | estimate |  |
-| HOVE.windLever | 0.3 | 393 | estimate |  |
 | HOVE.rudderFlow | 0.5 | 395 | estimate |  |
 | HOVE.Hoerner | 1.17 | 396 | sourced | Hoerner, Fluid-Dynamic Drag |
 | HOVE.cnBacked | 1.2 | 397 | sourced | Hoerner, Fluid-Dynamic Drag |

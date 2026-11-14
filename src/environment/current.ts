@@ -30,6 +30,14 @@ export function currentVector(c: CurrentPreset): Vec {
  * and 0.8 on the ebb (the 2027 mean peaks against PCT0281 in the Gate channel: 0.22 and 0.57). So the flood's relief
  * here fits, and the ebb's is stronger than the water does. Near a station the station's own prediction wins
  * (tide.ts atShore fades this out within 600 m of one), so PCT0286 already carries that asymmetry off Crissy Field.
+ * Not a flood/ebb factor here, though: the asymmetry is Crissy's own. In the sim's station field at the peaks of
+ * 14 Nov 2026, mid-channel (PCT0281) runs 2.28 kt flooding and 2.68 ebbing (ebb ÷ flood 1.2), off Crissy (PCT0286, 509 m
+ * out) 0.28 and 1.03 (3.7), and north of Pier 35 (SFB1205, a harmonic station 429 m out) 1.82 and 2.17 (1.19): along
+ * the Cityfront the near-shore water floods and ebbs in the channel's proportion, and Crissy Field is the exception, in
+ * Fort Point's lee on the flood (the headland upstream of it then, not on the ebb). The profile itself (25% at the beach,
+ * full by 350 m) is an ESTIMATE; what would settle it is the speed going as the depth to the 2/3 power (Manning) from
+ * the chart's depths against the water just offshore (spot check: 2.7 m against 13.6 m gives 0.34; this gives 0.34 at
+ * 40 m off), which wants finer depths than the ENC's bands and a grid to read them from each step.
  */
 export const shoreRelief = (p: Vec, lattice = false): number => {
   const k = clamp(0.25 + 0.75 * (lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 350, 0.25, 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)

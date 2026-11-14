@@ -9,7 +9,7 @@
 // close-hauled, 045 = port close-hauled, 180 = a dead run. A Folkboat is 7.64 m; the zone is 3 lengths (22.9 m).
 import { describe, expect, it } from 'vitest';
 import { V } from '../src/core/math';
-import { duckingAstern } from '../src/rules/pairs';
+import { couldAvoid, duckingAstern, recordPose } from '../src/rules/pairs';
 import { hailBreach, newPairRecord, notRacing, rightOfWay, type RulesBoat, type RulesContext, type RulesMark } from '../src/rules';
 import { boat, ctx, moveTo, pair } from './diagram';
 
@@ -398,5 +398,32 @@ describe('Rules 19–24 · obstructions, room to tack, Section D', () => {
     expect(clean(p, 50)).toMatchObject({ keepsClear: 'B', rule: '21.2' });
     moveTo(B, [6.5, -8], 0); // she luffs to keep clear
     expect(p.at(51).foul).toBeNull();
+  });
+});
+
+describe('Rule 43.1(a) · compelled, judged by whether she could still keep clear', () => {
+  // three boats sailed straight through 0.1 s steps (their poses recorded as the World records them)
+  const run = (setup: [ReturnType<typeof boat>, number, number][], t0: number, t1: number) => {
+    for (let t = t0; t <= t1 + 1e-9; t += 0.1) for (const [b, h, v] of setup) { const u = V(h); b.h = h; b.v = v; b.vx = u.x * v; b.vy = u.y * v; b.x += u.x * v * 0.1; b.y += u.y * v * 0.1; recordPose(b, t); }
+  };
+  it('Appeal 19 / Case 3: by the time Zed\'s breach comes, Vic is close to leeward and converging: too late for any turn to keep her clear: compelled', () => {
+    const Vic = boat('Vic', { at: [0, 0], heading: 315 }), Fox = boat('Fox', { at: off([0, 0], 315, 1, 3), heading: 300 });
+    const Zed = boat('Zed', { at: off([0, 0], 315, 6, 6.5), heading: 225 }); // port, reaching down across Fox's bow
+    run([[Vic, 315, 2.5], [Fox, 300, 2.5], [Zed, 225, 2.5]], 50, 50.8);
+    expect(couldAvoid(Fox, Vic, Zed, 50.2, ctx(50.8))).toBe(false);
+  });
+  it('Appeal 2: brushed by Zed, she sails on 7 s and runs into Vic, 25 m off at the time: she could have kept clear: not compelled', () => {
+    const Vic = boat('Vic', { at: [0, 0], heading: 315 }), Fox = boat('Fox', { at: off([0, 0], 315, 2, 22), heading: 290 });
+    const Zed = boat('Zed', { at: off([0, 0], 315, 4, 23.5), heading: 45 });
+    run([[Vic, 315, 2.5], [Fox, 290, 2.5], [Zed, 45, 2.5]], 50, 57);
+    expect(couldAvoid(Fox, Vic, Zed, 50, ctx(57))).toBe(true);
+  });
+  it('the rings sampled out of phase (a boat whose history restarted): each track runs on from that boat\'s own newest pose, so the answer stands', () => {
+    const Vic = boat('Vic', { at: [0, 0], heading: 315 }), Fox = boat('Fox', { at: off([0, 0], 315, 1, 3), heading: 300 }), Zed = boat('Zed', { at: off([0, 0], 315, 6, 6.5), heading: 225 });
+    for (let t = 50; t <= 50.8 + 1e-9; t += 0.1) {
+      for (const [b, h] of [[Vic, 315], [Fox, 300], [Zed, 225]] as const) { const u = V(h); b.h = h; b.v = 2.5; b.vx = u.x * 2.5; b.vy = u.y * 2.5; b.x += u.x * 0.25; b.y += u.y * 0.25; }
+      recordPose(Fox, t); recordPose(Zed, t); recordPose(Vic, t - 0.07); // (Vic's samples 0.07 s behind)
+    }
+    expect(couldAvoid(Fox, Vic, Zed, 50.2, ctx(50.8))).toBe(false);
   });
 });

@@ -73,8 +73,17 @@ describe("Fort Mason's piers", () => {
     const u = w.user, along = brg(-edge.x, -edge.y); // (out along the face, toward the pier's end)
     Object.assign(u, { docked: undefined, x: face.x + out.x * 1.25, y: face.y + out.y * 1.25, h: (brg(edge.x, edge.y) + 0) % 360, v: 1, astern: 0, sway: 0, turnRate: 0, steer: 0, tiller: 0, turnTarget: null });
     void along; u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
-    let worst = 0;
-    for (let i = 0; i < 60 / DT; i++) { w.step(DT); w.drainEvents(); if (onLand(u)) worst = 99; worst = Math.max(worst, Math.hypot(u.x - face.x, u.y - face.y)); }
-    expect(onLand(u)).toBe(false); expect(worst).toBeLessThan(150); // (her middle never on land, and nowhere near the city)
+    // (every step: her middle never on land, and never on the pier's side of its face while she's abreast of it, as she
+    // would be coming out through it. This was "within 150 m of the face", a stand-in for the same thing that sat right
+    // where a free boat gets to: at 2.5 m/s she sails 150 m in the minute. Restated 14 Nov 2026, the Coordinator's ruling)
+    const half = Math.hypot(pier3.pts[2].x - pier3.pts[1].x, pier3.pts[2].y - pier3.pts[1].y) / 2;
+    let ashore = 0, through = 0;
+    for (let i = 0; i < 60 / DT; i++) {
+      w.step(DT); w.drainEvents();
+      if (onLand(u)) ashore++;
+      const dx = u.x - face.x, dy = u.y - face.y;
+      if (Math.abs(dx * edge.x + dy * edge.y) < half && dx * out.x + dy * out.y < 0) through++;
+    }
+    expect(ashore).toBe(0); expect(through).toBe(0);
   }, 60000);
 });

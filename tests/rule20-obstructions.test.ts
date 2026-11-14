@@ -262,7 +262,7 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
     const L = mk(0, 315), M = mk(1, 335), rec = newPairRecord();
     rec.hail = { by: L.id, at: 50, kind: 'room', headAt: { 0: { h: 315, wind: 0 }, 1: { h: 315, wind: 0 } } };
     expect(hailBreach(rec, L, M, 51, 0)).toBeNull();
-    expect(hailBreach(rec, L, M, 66.5, 0)).toMatchObject({ boat: M, role: 'hailed' });
+    expect(hailBreach(rec, L, M, 76.5, 0)).toMatchObject({ boat: M, role: 'hailed' }); // (THROUGH_WIND, 25 s, from 51)
   });
   const mk = (id: number, h: number) => ({ id, h, x: 0, y: 0, vx: 0, vy: 0, tack: 'S' as 'S' | 'P', tacking: false, lastTackT: -999, penalty: 0, ocs: false, started: true, leg: 0, ww: { from: 0 } });
   const hail = (o: Partial<NonNullable<ReturnType<typeof newPairRecord>['hail']>> = {}) => {
@@ -272,8 +272,8 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
     const L = mk(0, 315), M = mk(1, 315), rec = hail({ replyAt: 51 });
     expect(hailBreach(rec, L, M, 52, 0)).toBeNull();
     L.h = 335; expect(hailBreach(rec, L, M, 54, 0)).toBeNull(); // she luffs within the 5 s
-    expect(hailBreach(rec, L, M, 68, 0)).toBeNull();
-    expect(hailBreach(rec, L, M, 69.5, 0)).toMatchObject({ boat: L, role: 'hailer' }); // and holds it, never tacking
+    expect(hailBreach(rec, L, M, 78, 0)).toBeNull();
+    expect(hailBreach(rec, L, M, 79.5, 0)).toMatchObject({ boat: L, role: 'hailer' }); // and holds it, never tacking (25 s from 54)
   });
   it('a shift that frees her mid-luff does not undo her start', () => {
     const L = mk(0, 315), M = mk(1, 333), rec = hail();
@@ -290,9 +290,9 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
     expect(hailBreach(rec, L, M, 69.5, 0)).toBeNull();
     // (through assessPair, which also retires stale hails: 30 s after the hail itself would have dropped it at 80)
     M.x = 40; const cx = (t: number) => ({ t, windFrom: 0, marks: [] });
-    for (let t = 70; t <= 84; t += 0.5) expect(assessPair(rec, L, M, cx(t), { swerve: false }).incident).toBeNull();
+    for (let t = 70; t <= 94; t += 0.5) expect(assessPair(rec, L, M, cx(t), { swerve: false }).incident).toBeNull();
     expect(rec.hail).not.toBeNull();
-    expect(assessPair(rec, L, M, cx(84.6), { swerve: false }).incident).toMatchObject({ kind: 'hail', fouler: L, hailRole: 'hailer' });
+    expect(assessPair(rec, L, M, cx(94.6), { swerve: false }).incident).toMatchObject({ kind: 'hail', fouler: L, hailRole: 'hailer' });
   });
   it('the hailed boat that luffs and bears away again has not responded', () => {
     const L = mk(0, 315), M = mk(1, 335), rec = hail();
@@ -313,8 +313,8 @@ describe('Rule 20.2(c): the hailed boat responds by starting to tack, however sl
     rec.hail!.passedOn = { to: 2, at: 51.5 }; // then sees W to windward and passes it on
     expect(hailBreach(rec, L, M, 70, 0)).toBeNull(); // W not through yet: M can't tack
     rec.hail!.passedOn.respondedAt = 71;
-    expect(hailBreach(rec, L, M, 85, 0)).toBeNull();
-    expect(hailBreach(rec, L, M, 86.5, 0)).toMatchObject({ boat: M, role: 'hailed' }); // 15 s from W through, still not
+    expect(hailBreach(rec, L, M, 95, 0)).toBeNull();
+    expect(hailBreach(rec, L, M, 96.5, 0)).toMatchObject({ boat: M, role: 'hailed' }); // THROUGH_WIND (25 s) from W through, still not
   });
   for (const [name, seed] of [PLACES[0], PLACES[3]] as const) for (const v0 of [0.9, 2.4]) {
     it(`two AI boats off ${name}, the hailed one at ${v0} m/s: both tack and stay tacked`, () => {

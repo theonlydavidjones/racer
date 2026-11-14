@@ -125,6 +125,10 @@ export interface Boat {
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
   /** Sculling (rule 42.3(d)): the way she's being sculled round (+ to starboard), held until she's close-hauled (SCULL 2). */
   scullDir?: number;
+  /** The running balance of the tiller's own pushes, worked by hand, over a couple of strokes: N·m·s, + to starboard (physics.ts: sculling). */
+  scullNet?: number;
+  /** ... and their mean moment over a few strokes, N·m, + to starboard: which way she's being sculled. */
+  scullMean?: number;
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;
@@ -177,6 +181,12 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** When she last touched the shore, a dock or a pier (race time, s): for some seconds after, her crew may get her
+   * off by any means, sculling included, on any point of sail (physics.ts; RRS 42.3(h)). */
+  groundT?: number;
+  /** What turns her by itself, N·m, + to starboard: her sails' moment about the keel and the wind's on her topsides, rig
+   * and crew, from the last step's forces (physics.ts; turning.ts takes it with the rudder's and the hull's). */
+  turnM?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */

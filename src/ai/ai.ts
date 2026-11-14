@@ -1,7 +1,8 @@
 import type { PrepFlag } from '../sim/signals';
 import { bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
-import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
+import { coastDistance, timeToCover } from '../boat/dynamics';
+import { maxTurnRate } from '../boat/turning';
 import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';

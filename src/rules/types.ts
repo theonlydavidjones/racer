@@ -29,7 +29,13 @@ export interface RulesBoat {
   leg: number; // index of her next mark
   /** The wind she's sailing in (the true wind over the water where she is: her tack is judged from it). Omitted: the
    * course's wind (RulesContext.windFrom). */
-  ww?: { from: number };
+  ww?: { from: number; kt?: number };
+  /** Her steady leeway, deg (physics.ts; the room-to-respond prediction's course angle; omitted in diagrams). */
+  leeway?: number;
+  /** Her sternway, m/s (physics.ts; omitted in diagrams). */
+  astern?: number;
+  /** Her rudder blade's angle, -1..1 of its throw, + turning her to starboard (physics.ts; omitted in diagrams). */
+  helm?: number;
   /** Her heading RULE16_WINDOW seconds ago (for Rule 16.1). Omit if unknown. */
   headingAgo?: number;
   /** She is sailing above her proper course (for Rules 17 and 23). Omit if unknown. */
@@ -66,6 +72,8 @@ export interface RulesContext {
   marks: RulesMark[]; // the course's mark sequence
   /** Close-hauled true wind angle, deg (for "fetching" a mark). Default 42. */
   beat?: number;
+  /** The true wind's speed, kt (the room-to-respond prediction's polar speeds, src/boat/arcs.ts). Default 12. */
+  windKt?: number;
   /**
    * The nearest obstruction to a point (Rule 19): the shore, and after the start the committee boat. Distance (m) and
    * a unit vector pointing from it toward the water, or null if none is near. `committee`: include the committee boat.
