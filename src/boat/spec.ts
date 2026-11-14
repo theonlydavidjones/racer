@@ -147,6 +147,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
       .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // (her crew's seats, from the Yacht Club's members: at most two, ids only)
+    ...(typeof x.laidUpUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.laidUpUntil) ? { laidUpUntil: x.laidUpUntil } : {}), // (laid up for repairs: WRECK-PROPOSAL)
     ...(Array.isArray(x.crewIds) ? { crewIds: x.crewIds.filter((id: unknown): id is string => typeof id === 'string').slice(0, 2) } : {}),
     // her slip is `<marina>:<slip>` (older saves: a bare slip, in West Harbor); her marina is the slip's. West Harbor's and
     // Gashouse Cove's slips had the sim's letters (A12) before the marina's own numbers (651): she follows her berth
