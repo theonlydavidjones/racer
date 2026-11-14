@@ -399,21 +399,33 @@ function kneel(x: number, z: number, yaw: number, reach: [THREE.Vector3, THREE.V
 function moving(fig: Figure, x: number, z: number, yaw: number, k: number): PoseT {
   const g = groundNear(x, z, 0.22), f = fwd(yaw), r = right(yaw), ph = fig.gait;
   if (!inCockpit(Math.abs(x), z) && z < COCK1) {
-    // forward of the cockpit (along the side deck, over the cabin top): on hands and knees, a knee and a hand at a time
+    // forward of the cockpit (along the side deck, on the foredeck): a low crouch, the knees bent and the weight over the
+    // feet, stepping, a foot at a time lifted clear of the deck; one hand for the boat: the inboard hand on the cabin top's
+    // edge beside the cabin (its handrail), on the mast going past it; the other on the shroud by its chainplate, or
+    // steadying on the knee. (On hands and knees with the shins trailing flat behind, the owner: "the way the head forward
+    // looks like they're dragging their legs like paralyzed people")
     // (round the mast, not through it)
     if (Math.abs(z - MAST_Z) < 0.35 && Math.abs(x) < 0.32) x = (x >= 0 ? 1 : -1) * 0.32;
-    const p = kneel(x, z, yaw, [V(0, 0, 0), V(0, 0, 0)], k);
-    p.hip.y = g + 0.45 * k; p.pitch = -1.05;
-    // (beside the cabin, the knees and feet on the side deck outboard of its side too, not trailing in over it: its side
-    // stands up to 0.38 m above the deck aft, hull.ts cabinSideH, and the shins would go into it)
+    const s = x >= 0 ? 1 : -1, hip = V(x, g + 0.55 * k, z);
+    // (beside the cabin, the feet on the side deck outboard of its side, not in over it: its side stands up to 0.38 m
+    // above the deck aft, hull.ts cabinSideH)
     const ch = (q: number) => q > CAB0 - 0.1 && q < COCK0 + 0.05 ? cabinHalf(uAtZ(q)) : 0;
-    const outside = Math.abs(p.hip.x) > ch(p.hip.z);
-    if (outside) for (const ft of p.feet) { const e = ch(ft.z) + 0.12; if (e > 0.12 && Math.abs(ft.x) < e) { ft.x = Math.sign(p.hip.x) * e; ft.y = ground(ft.x, ft.z) + 0.07; } }
-    p.hands = [0, 1].map(j => { const h = p.hip.clone().addScaledVector(f, (0.42 + 0.08 * Math.sin(ph + j * Math.PI)) * k).addScaledVector(r, (j ? 1 : -1) * 0.16 * k);
-      // (and the hands on the deck clear of the cabin's side as well, the forearms not across its corner)
-      if (outside) { const e = ch(h.z) + 0.1; if (e > 0.1 && Math.abs(h.x) < e) h.x = Math.sign(p.hip.x) * e; }
-      return h.setY(ground(h.x, h.z) + 0.05); }) as [THREE.Vector3, THREE.Vector3];
-    p.look = p.hip.clone().addScaledVector(f, 2).setY(p.hip.y + 0.4); p.step = true;
+    const outside = Math.abs(hip.x) > ch(hip.z);
+    // (a stride of about a third of a metre, the feet a hand's width either side of the hips, each a step ahead in turn:
+    // the stepping itself, lifting each clear and down again, is ease()'s)
+    const feet = [0, 1].map(j => { const ft = hip.clone().addScaledVector(f, 0.17 * k * Math.sin(ph + j * Math.PI)).addScaledVector(r, (j ? 1 : -1) * 0.1 * k);
+      if (outside) { const e = ch(ft.z) + 0.12; if (e > 0.12 && Math.abs(ft.x) < e) ft.x = s * e; }
+      const e2 = halfBeam(uAtZ(ft.z)) - 0.05; if (Math.abs(ft.x) > e2) ft.x = Math.sign(ft.x) * e2;
+      return ft.setY(ground(ft.x, ft.z) + 0.07); }) as [THREE.Vector3, THREE.Vector3];
+    const zh = z + f.z * 0.2 * k; // (a little ahead, the way they're going)
+    const inb = ch(zh) > 0.05 && outside ? V(s * (ch(zh) - 0.05), cabinTopAt(uAtZ(zh), ch(zh) - 0.05) + 0.04, zh) // (the cabin top's edge: its handrail)
+      : Math.abs(z - MAST_Z) < 0.6 ? V(s * 0.07, g + 0.75 * k, MAST_Z) // (the mast)
+      : V(hip.x - s * 0.18 * k, 0, zh).setY(ground(hip.x - s * 0.18 * k, zh) + 0.05); // (the deck ahead, inboard)
+    const shroudZ = MAST_Z + 0.1, nearShroud = Math.abs(z - shroudZ) < 0.5;
+    const out = nearShroud ? V(s * (halfBeam(uAtZ(shroudZ)) - 0.08), deckY(uAtZ(shroudZ), halfBeam(uAtZ(shroudZ))) + 0.75 * k, shroudZ) // (the shroud, above its chainplate)
+      : hip.clone().addScaledVector(f, 0.3 * k).addScaledVector(r, s * Math.sign(r.x || 1) * 0.12 * k).setY(hip.y - 0.12 * k); // (on the knee)
+    const rightIsIn = Math.sign(r.x) === -s;
+    const p: PoseT = { hip, yaw, pitch: -0.55, roll: 0, feet, hands: rightIsIn ? [out, inb] : [inb, out], look: hip.clone().addScaledVector(f, 2).setY(hip.y + 0.4), step: true };
     return p;
   }
   // in the cockpit (or across the after deck): crouched under the boom, stepping over the seats and the thwart (with
@@ -505,11 +517,17 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     return moving(fig, px, zz, inC ? (aftNow ? Math.PI : 0) : along, k);
   }
   if (job === 'bow') {
-    // deep downwind with the pole out: sitting astride the bow just forward of the forestay, a leg over each side, hands
-    // on the deck beside them (the owner: "one crew will sit in front of the forestay with both legs dangling over")
-    const u = uAtZ(z), e = halfBeam(u), d = deckY(u, 0), hip = V(0, d + 0.09 * k, z);
-    const feet = [-1, 1].map(sx => V(sx * (e + 0.1), d - 0.38, z - 0.06)) as [THREE.Vector3, THREE.Vector3];
-    return { hip, yaw: 0, pitch: 0.12, roll: 0, feet, hands: [V(-0.13, deckY(u, 0.13) + 0.03, z + 0.06), V(0.13, deckY(u, 0.13) + 0.03, z + 0.06)], look: V(0, 1, z - 6) };
+    // deep downwind with the pole out: sitting on the foredeck forward of the forestay, facing forward, the thighs along
+    // the deck to the stemhead and the lower legs hanging down over the bow, one either side of the stem, knees bent
+    // (the owner: "hang his legs over the front"). Where the physics has the weight (crewPhys.ts Z.bow, 0.5 m aft of the
+    // stem): the stem rakes aft below the deck (render/hull.ts canoe), so the shins hang in clear air in front of it,
+    // half a metre above the water. Hands on the deck beside the hips. Before, the legs stuck straight out sideways along
+    // the deck's edge, knees locked: "look at this dork".
+    const u = uAtZ(z), d = deckY(u, 0), hip = V(0, d + 0.09 * k, z);
+    const zk = Math.max(-L / 2 + 0.05, z - 0.4 * k), dk = deckY(uAtZ(zk), 0);
+    const feet = [-1, 1].map(sx => V(sx * 0.12 * k, dk + 0.06 - 0.44 * k, zk + 0.05)) as [THREE.Vector3, THREE.Vector3];
+    const hand = (sx: number) => V(sx * 0.17, deckY(u, 0.17) + 0.03, z + 0.06);
+    return { hip, yaw: 0, pitch: 0.1, roll: 0, feet, hands: [hand(-1), hand(1)], look: V(0, 1, z - 6), knee: V(0, 0.2, -1), kneeW: 1 };
   }
   if (job === 'fore') {
     // on the foredeck between the mast and the forestay, knees up, feet on the deck ahead, watching the jib on its pole
@@ -816,7 +834,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         // (and a high step's lift at a foot's pace: over 1.3 s a metre of it at least. The sole to the side deck, 0.9 m up,
         // in a quarter of a second, the foot left the sole at 13 m/s)
         const pk = Math.max(sw.top, sw.from.y, sw.to.y) + 0.07 - (sw.from.y + sw.to.y) / 2;
-        sw.t = Math.min(1, sw.t + dt / Math.max(0.22, (sw.from.distanceTo(sw.to) + 0.6 * Math.max(0, sw.top - Math.min(sw.from.y, sw.to.y))) / 1.4, 1.3 * pk));
+        sw.t = Math.min(1, sw.t + dt / Math.max(0.22, (sw.from.distanceTo(sw.to) + 0.6 * Math.max(0, sw.top - Math.min(sw.from.y, sw.to.y))) / 1.4 / (1 - (sw.hold ?? 0)), 1.3 * pk)); // (and longer by the share spent lifting first: the way along at the same pace, not squeezed into the rest)
         // (along: eased out and in; with something high right where it starts, the coaming beside a foot on the bench, up
         // first and then along, not along into it and popped up onto it in a frame)
         const h0 = sw.hold ?? 0, th = Math.max(0, (sw.t - h0) / (1 - h0)), e = th * th * (3 - 2 * th), wasY = foot.y;
