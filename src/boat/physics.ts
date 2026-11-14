@@ -287,9 +287,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   countPenalty(b, dh, emit);
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel);
   b.rel = rel; b.twa = twa;
-  let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
-  if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
-  if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); } // (head to wind: a tack; a gybe passes the wind astern)
+  tackStep(b, rel, twa, t, emit, b.isUser);
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beat - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
   crewPole(b, dt, emit);
@@ -614,8 +612,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const deltaTw = helm * toWind * FULL_RUDDER * D; // rudder angle, rad, + turning her toward the wind
   // tack and sails, as when sailing
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel); b.rel = rel; b.twa = twa;
-  let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P'; if (twa > 176) tk = b.tack;
-  if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); }
+  tackStep(b, rel, twa, t, emit, true);
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
   crewRig(b, dt, emit); crewPole(b, dt, emit);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
@@ -960,15 +957,46 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
+/**
+ * Which tack she's on (b.tack), by the Racing Rules' definitions (RRS 2025–2028, Definitions: Tack, Starboard or Port;
+ * Leeward and Windward): "A boat is on the tack, starboard or port, corresponding to her windward side", and her
+ * leeward side "is the side that is or, when she is head to wind, was away from the wind. However, when sailing by the
+ * lee or directly downwind, her leeward side is the side on which her mainsail lies."
+ *  - With the wind forward of dead astern on one side, that side is her windward side. Through head to wind she keeps
+ *    the tack she had until the wind is on her other side: a tack.
+ *  - Dead downwind and by the lee, her tack is her mainsail's, whatever side the wind is on. Within 4° of dead downwind
+ *    the main stays where it is (so she can sail a little by the lee); further by the lee the main goes across (the
+ *    crew gybes it, or the wind does), and her tack changes when the boom has crossed her centerline, not before:
+ *    until then b.gybeTo holds the tack she's gybing to and the boom is on its way (sailVisuals).
+ *  - With no mainsail set there's none to go by: the wind's side.
+ * `rel` the wind's bearing off her bow (deg, + over her starboard side), `twa` its size; `sheets`: her jib sheets change
+ * over with it (the player's boat, and anyone hove to).
+ */
+function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, sheets: boolean): void {
+  const mainUp = b.rig?.mainUp ?? true;
+  let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
+  if (twa > 176 && mainUp) tk = b.tack; // dead downwind: the tack she had, her main where it lies
+  if (tk === b.tack) { b.gybeTo = undefined; return; } // (or the wind has come back before the boom crossed)
+  if (twa < 90) { b.tacking = true; b.headToWindT = t; } // head to wind: a tack (a gybe passes the wind astern)
+  else if (mainUp) {
+    // by the lee past where the main will stay: it's going across, and she's on her old tack until it has
+    b.gybeTo = tk;
+    const across = tk === 'S' ? -1 : 1; // (the boom's side on the new tack: to port on starboard)
+    if (Math.sign(b.boom) !== across && Math.abs(b.boom) >= 1) return;
+  }
+  b.tack = tk; b.gybeTo = undefined; b.lastTackT = t; if (sheets) jibSheetsAtTack(b, emit);
+}
+
 /** Where the boom and jib are drawn: easing toward their sheet angles. */
 function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
-  // The main goes to leeward for the tack the boat is on (so sailing a little by the lee it stays put).
-  const side = b.tack === 'S' ? -1 : 1;
+  // The main goes to leeward for the tack the boat is on (so sailing a little by the lee it stays put), or for the
+  // tack she's gybing to: the boom goes across first, and her tack with it (tackStep)
+  const jibSide = b.tack === 'S' ? -1 : 1, side = b.gybeTo ? -jibSide : jibSide; // (the jib, and its pole, by her tack: they follow once she has gybed)
   // The sails sit at their sheet angles; easing to luff lets them right out.
   const boomT = b.luff ? SAILS.main.max : b.sheets.main;
   // Jib: to leeward normally (to windward when backed); poled out square to windward when wing-on-wing; hanging
   // centred while the crew works the pole.
-  const jibT = plan === 'wing' ? -side * 82 : plan === 'main' ? side * 10 : side * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
+  const jibT = plan === 'wing' ? -jibSide * 82 : plan === 'main' ? jibSide * 10 : jibSide * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
   b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4);
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }

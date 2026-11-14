@@ -181,6 +181,9 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** The tack she's gybing to, while her boom is on its way across: by the lee her tack is her mainsail's side (RRS
+   * Definitions), so it changes when the boom has crossed (physics.ts tackStep). */
+  gybeTo?: 'S' | 'P';
   /** When she last touched the shore, a dock or a pier (race time, s): for some seconds after, her crew may get her
    * off by any means, sculling included, on any point of sail (physics.ts; RRS 42.3(h)). */
   groundT?: number;
