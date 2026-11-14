@@ -119,9 +119,10 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
   }
   // hauling the jib sheet in (after a tack): at the leeward winch, or in a breeze from the windward side of the cockpit
   // (keeping their weight up), cranking across; easing and small tweaks from where they sit. The traveller and
-  // backstay are reached from the windward side deck, where the crew sits. They work it from just aft of the winch
-  // (Z.winchAft), facing forward with the handle swung forward of the pedestal, as a small keelboat's coaming winch is
-  // worked, where the trimmer sees the jib's leech and telltales
+  // backstay are reached from the windward side deck, where the crew sits. The winch is turned from below the side deck,
+  // in the cockpit, its crank lying aft at rest (render/boatMesh.ts, the owner's photo of Josephine): they work it abreast
+  // the crank's grip (Z.winchAft). To leeward, the arm is still out at the coaming (-0.75) as before: whether they'd sit
+  // inside on the bench there (about -0.45) is the owner's to say (the physics review)
   if (line === 'jibsheet' && big && who !== 0) return breeze ? { arm: 0.45, z: Z.winchAft, pose: 'winch' } : { arm: -0.75, z: Z.winchAft, pose: 'winch' };
   return null;
 }

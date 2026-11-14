@@ -223,7 +223,8 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, 
  * jib winch, never on it: the winch stands on its pedestal on the side deck against the coaming at 1.64 (render/hull.ts
  * JIB_WINCH_Z, Boat Detail's, the owner's true position: 0.58 m aft of the cabin, 0.39 m forward of the thwart), the
  * pedestal 0.119 m in radius fore and aft at the deck. So a seat forward of it at about 1.40 (`Z.deckFwd`, beside the
- * cabin's after end), and aft of it from about 1.88 (`Z.winchAft`, the pedestal's radius and half a hip, about 0.12, clear),
+ * cabin's after end), and aft of it from about 1.88 (`Z.winchAft`, the pedestal's radius and about 0.12 clear: tight, half a seated hip's
+ * breadth is nearer 0.18, as the owner says the after seat has "a little less room"; further aft is the thwart),
  * just short of the thwart; going from one to the other they step in off the deck round it. On the benches inside the
  * coaming, in the middle, they're clear of it.
  */
@@ -664,7 +665,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   });
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
   // while the other stays put would otherwise put them in each other's laps)
-  // (and none of them out on a side deck forward of the winch there, held or not; and clear of a crewmate working the
+  // (and none of them out on a side deck within the jib winch's reach, held or not; and clear of a crewmate working the
   // cabin-top lines from that side deck, whose place is fixed by the job)
   const seated = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
   const onDeckI = (i: number) => i > 0 && !!tgt[i] && Math.abs(tgt[i].arm) > DECK_ARM;
@@ -777,9 +778,14 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
 const TWO_DWELL = 120;
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const n = c.spec.crew.length; if (!n) return 0.5;
-  // (for the speed she's sailing at, over about a gust-lull cycle (c.vAvg), not a tack's slow few seconds: there it took
-  // them to the forward end, as in light air, and the dwell below kept them there for a minute back up to speed in 25 kt)
-  const v = Math.max(0.5, c.vAvg ?? k.v), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
+  // (for the speed she sails at in the wind there's been over the last minute, at this angle: polar.ts, as chooseLayout
+  // has it with the pole out; and not re-thought through a tack and its settling after (HOLD.settle), where the angle
+  // passes head to wind. On this moment's speed, a tack's slow few seconds took them to the forward end, as in light
+  // air, and the dwell below kept them there for a minute back up to speed in 25 kt; on her own speed averaged over a
+  // minute, after a slow spell in a breeze, a start or in irons, they sat at the light-air seats for four minutes (the
+  // physics review))
+  if (c.fore01 != null && (c.roll || (c.clock ?? 0) - (c.settleT ?? -1e9) < HOLD.settle)) return c.fore01;
+  const v = Math.max(0.5, polar(c.twsAvg ?? k.tws, k.twa)), sea = k.sea ?? 0, m0 = k.extraMoment ?? 0, w = c.wind ?? 1;
   // Where along the cockpit is fastest, all told (physics review): the trim's effect on the hull's resistance
   // (hullTrim.ts trimSpeedFactor) and, sitting out to windward, the deck's half-breadth where they sit, narrower aft
   // (deckHalf), which is their righting arm. Hiking flat out they can't make that up, so it's heel: the moment lost over
