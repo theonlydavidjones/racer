@@ -918,7 +918,6 @@ export class World {
     return this.settings.mode === 'lesson' ? clamp(kt, lo / f, hi / f) : kt;
   } // (a breeze: the top of the range; a Case: a breeze she sails at the Cases' own speed in)
   private lessonField: number | null = null;
-  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
   /** Rules of the road (sim/lessons.ts): the other boat, and what the lesson asks of the World for her. */
   private roadEnv: RoadEnv | null = null;
   private makeRoadEnv(o: Boat): RoadEnv {
@@ -941,6 +940,7 @@ export class World {
       gap: () => hullGap(this.user, o)
     };
   }
+  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
   private readonly mobEnv: MobEnv = { current: p => this.currentAt(p), wind: p => this.windHere(p, undefined, false) };
 
   /** Sail it yourself: each boat set at her pose in the Case at its start, the others to sail its track (their letters

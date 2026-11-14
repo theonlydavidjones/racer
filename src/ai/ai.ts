@@ -797,7 +797,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (racing called off, the boat she must keep clear of lying to, stopped: she sails round her with way on, as a
       // sailor would, not luffs and eases alongside, where she'd stop and drift down onto her)
       if (w.cancelled && o.v + (o.astern ?? 0) < 0.5) { desired = away; luff = false; }
-      else if (r.rule === '10') { desired = duckUnder(b); luff = false; } // keep way on to steer
+      else if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') {
         // head up from her heading, but no more than 35° above her course: turned up afresh from wherever she'd got to
         // each time she thought, she ratcheted on up to close-hauled with her sails eased, and stalled
@@ -812,7 +812,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
-      desired = swerveFrom(b, dx, dy); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
+      desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
       if (cp.t < lagT + 1) ai.urgent = true; // (about to touch: before even finishing a tack, physics.ts midTack)
       if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
     }
@@ -850,14 +850,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   crewPoleCall(w, b);
 }
 
-/**
- * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
- * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
- * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
- * from doing it over and over as she wanders about a deep run. The AI boats' crews only: never inside a harbor's basin.
- * Yours never sets it on their own (the owner: "pole-out should only ever be on my command"): poleMustCome.
- */
-/** Rule 10's keep-clear, crossing: she bears away 32° to pass astern of the starboard boat, keeping way on to steer. */
+/** (as aiThink's own, written out there: a call in the race's hottest function costs the step) Rule 10's keep-clear, crossing: she bears away 32° to pass astern of the starboard boat, keeping way on to steer. */
 function duckUnder(b: Boat): number { return sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); }
 /** Rule 14 (and the Navigation Rules' 17(b)): contact a moment off, she turns away from the boat (dx, dy off her). */
 function swerveFrom(b: Boat, dx: number, dy: number): number { return sailable(b, brg(-dx, -dy)); }
@@ -884,6 +877,13 @@ export function keepClearMove(w: World, b: Boat, o: Boat, standOn = false): { h:
   return null;
 }
 
+/**
+ * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
+ * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
+ * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
+ * from doing it over and over as she wanders about a deep run. The AI boats' crews only: never inside a harbor's basin.
+ * Yours never sets it on their own (the owner: "pole-out should only ever be on my command"): poleMustCome.
+ */
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
