@@ -37,6 +37,8 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** Stopped or going astern: sheets in, and off the wind if she's in irons, until she has way on again (ai.ts). */
+  gather?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
   /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
