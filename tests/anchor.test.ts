@@ -128,4 +128,14 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     a.chart = 3; run(w, 3);
     expect(a.aground ?? null).toBeNull();
   });
+  it('for the rules (rule 22): the World marks her anchored while she lies to it, and not once it\'s breaking out', { timeout: 60000 }, () => {
+    const w = world(1, 'flood'), u = w.user;
+    expect(u.anchored ?? false).toBe(false);
+    applyCommand(w, { k: 'anchor' }); run(w, 90);
+    expect(u.anchored).toBe(true); expect(u.aground ?? false).toBe(false);
+    applyCommand(w, { k: 'anchor' });
+    let sawBreaking = false;
+    for (let i = 0; i < 60 * 150 && u.anchor; i++) { w.step(DT); if (u.anchor?.phase === 'breaking') { sawBreaking = true; w.step(DT); expect(u.anchored).toBe(false); break; } }
+    expect(sawBreaking).toBe(true);
+  });
 });

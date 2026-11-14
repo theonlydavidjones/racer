@@ -81,6 +81,13 @@ export interface AnchorState {
   aground?: Vec | null;
 }
 
+/** Lying to her anchor (rule 22's "anchored", for the rules: sim/world.ts sets b.anchored each step): the anchor on the
+ * bottom holding her, with the rode out to it: paying out once it's reached the bottom, down, or being hauled in; not
+ * breaking it out (she's getting under way). */
+export function lyingToAnchor(b: Pick<Boat, 'anchor'>): boolean {
+  const a = b.anchor; return !!a?.at && (a.phase === 'paying' || a.phase === 'down' || a.phase === 'hauling') && a.out > (a.depth ?? 0) + ANCHOR.bowH;
+}
+
 /** How fast the forward hand works (a slower crewmate takes longer). */
 export const anchorPace = (b: Boat): number => Math.max(0.3, workPace(b, paddler(b)));
 

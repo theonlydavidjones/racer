@@ -14,7 +14,7 @@ import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, depthBand, nextSaturday, sfClock, sfLocalToUtcMin, sfTide, stationsFor, wetBand } from '../environment/tide';
-import { ANCHOR, anchorPace, holding, rodeLine, stemHead } from '../boat/anchor';
+import { ANCHOR, anchorPace, holding, lyingToAnchor, rodeLine, stemHead } from '../boat/anchor';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
 import { waveMotion } from '../boat/seaway';
@@ -1260,6 +1260,8 @@ export class World {
     this.log?.step(this, dt);
     this.trackCourses();
     this.shipEncounters();
+    // (rule 22's states for the rules: anchored, aground; the World's own grounding is a bump, not a state she stays in)
+    for (const b of this.boats) { const an = lyingToAnchor(b), ag = !!b.anchor?.aground; if (b.anchored !== an) b.anchored = an; if (b.aground !== ag) b.aground = ag; }
     this.checkPairs();
     if (this.protestsOn) this.protestsStep();
     if (!this.freeSail) this.signals(prevT);

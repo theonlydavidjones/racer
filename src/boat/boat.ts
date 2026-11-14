@@ -105,6 +105,8 @@ export interface Boat {
   paddleOff?: boolean;
   /** Her anchor going down, down, or coming up (boat/anchor.ts). */
   anchor?: import('./anchor').AnchorState | null;
+  /** For the rules (rule 22): lying to her anchor (boat/anchor.ts lyingToAnchor), and aground; set by the World each step. */
+  anchored?: boolean; aground?: boolean;
   /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
   lastHitT?: number;
   /**
