@@ -312,13 +312,13 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
-8z. **Now — the cruise setup's map is blank** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
+8z. ~~**The cruise setup's map is blank**~~ **Done, published in v194 (#343).** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
    no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
    (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
    picking on a blank map. Suspects: the setup now builds the World only at Start (cca5f47), so the map has nothing to
    draw; the app.ts split (src/app/setup.ts); the chart's tiles or canvas not sized when the panel opens. "Plan on the
    big chart" should be checked too. Add a check that the setup's map draws the chart.
-   Done on claude/cruise-map: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
+   Fixed: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
    panel was laid out, it had no size and nothing redrew it. The big chart was fine. scripts/check/setup-map.cjs.
 8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
    screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
