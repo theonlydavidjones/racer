@@ -53,7 +53,10 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
     for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
     m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
-    m.trips.forEach((t, j) => expect(t, `crew ${j % 2 + 1}: trips a minute`).toBeLessThan(j % 2 === 0 ? 0.1 : 1.4));
+    // (each boat's two crew together, and each of them: the jib hand has the cabin-top lines at their stations, the main
+    // trimmer has them once both are forward of the winch, with the helm on the main: crewWork.ts ownerOf)
+    m.trips.forEach((t, j) => expect(t, `crew ${j % 2 + 1}: trips a minute`).toBeLessThan(1.4));
+    for (let k = 0; k < m.trips.length; k += 2) expect(m.trips[k] + m.trips[k + 1], `boat ${k / 2 + 1}: both crew's trips a minute`).toBeLessThan(1.4);
   }, 600_000);
 });
 
@@ -72,7 +75,8 @@ describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', (
   for (const kt of [5, 9]) it(`placed forward in ${kt} kt: the front hand on the cabin top's edge, never inside the cabin, and they stay put`, () => {
     const { b, seats, inside } = beat(kt, 240, { across: null, fore: 'fwd' });
     expect(inside, 'steps with the front hand inside the cabin').toBe(0);
-    expect(b.crew!.people[1].z).toBeCloseTo(Z.cabinSide, 1); expect(b.crew!.people[2].z).toBeCloseTo(Z.deckFwd, 1);
+    // (the jib hand, people[2], forward on the cabin's edge; the main trimmer beside the winch: crewPhys.ts slotOf)
+    expect(b.crew!.people[2].z).toBeCloseTo(Z.cabinSide, 1); expect(b.crew!.people[1].z).toBeCloseTo(Z.deckFwd, 1);
     for (const s of seats) expect(s.length, `seats taken: ${s}`).toBeLessThanOrEqual(2); // (where they start, and there)
   }, 120_000);
   it('on their own: forward of the winch after minutes of light air upwind, never in a breeze', () => {

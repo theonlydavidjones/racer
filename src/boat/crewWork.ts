@@ -120,11 +120,15 @@ export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, layout: Fo
   // still in the cockpit: a Folkboat's jib sheets lead aft to the cockpit winches, out of reach from the mast (the middle
   // crew with the bow hand at the mast; the helm, with both sheets, when everyone else is forward)
   if (line === 'jibsheet' || line === 'jibsheetW') return forward ? (layout === 'mast' && nCrew >= 2 ? 1 : 0) : nCrew === 1 ? 1 - main : nCrew;
+  // (both forward of the winch, the middle crew, beside it with no sheet now the helm has the main, has the cabin-top
+  // lines: the dual-ended ones worked from the cockpit's forward end beside them, the piano's a reach forward; the jib
+  // hand, on the cabin's edge forward of them, keeps the jib)
+  if (fwdOfWinch && nCrew === 2 && PIANO.has(line)) return 1;
   return nCrew; // the forward hand: the cabin-top lines, the cars, the pole, the halyards
 }
 
 /** Where working a line puts a person (null: they work it from where they are). */
-function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false): Station | null {
+function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
   if (line === 'car') return { arm: CAR_ARM, z: Z.car, pose: 'car' };
   if (line === 'pole' || line === 'hoist') return { arm: 0.25, z: Z.mast, pose: 'mast' };
   if (PIANO.has(line)) {
@@ -150,7 +154,10 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
   // in the cockpit, its crank lying aft at rest (render/boatMesh.ts, the owner's photo of Josephine): they work it abreast
   // the crank's grip (Z.winchAft). To leeward, the arm is still out at the coaming (-0.75) as before: whether they'd sit
   // inside on the bench there (about -0.45) is the owner's to say (the physics review)
-  if (line === 'jibsheet' && big && who !== 0) return breeze ? { arm: 0.45, z: Z.winchAft, pose: 'winch' } : { arm: -0.75, z: Z.winchAft, pose: 'winch' };
+  // (the jib hand of two, whose seat is forward of the winch (crewPhys.ts slotOf), works it from there, the crank swept
+  // round from its forward side: not a walk aft past the winch to where the main trimmer sits after every tack)
+  const zw = front ? Z.deckFwd : Z.winchAft;
+  if (line === 'jibsheet' && big && who !== 0) return breeze ? { arm: 0.45, z: zw, pose: 'winch' } : { arm: -0.75, z: zw, pose: 'winch' };
   return null;
 }
 
@@ -308,7 +315,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (k === 'jibsheet' && a.job.station && PIANO.has(a.job.line) && e < JIB_HAUL && !placed) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
-    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze);
+    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze, n === 2 && who === 2);
     // the sheets are in hand: no walk unless they're away from them
     const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
@@ -387,7 +394,7 @@ function carJob(b: Boat, dt: number): void {
   // (and at the cabin top, the lines there they still want come first: one stop for all of them, then the car on the
   // way forward, not to the car and back again. The cabin-top jobs are handed out 20 times a second, this every step)
   const ctl = b.ctl as unknown as Record<string, number>, lw = c.lineWant ?? {};
-  if (!yours && a.pose === 'piano' && [...PIANO].some(k => lw[k] != null && ownerOf(k, n, c.spec, c.layout ?? 'cockpit') === who && Math.abs(lw[k] - ctl[k]) >= startThreshold(k, skill, lw[k]))) return;
+  if (!yours && a.pose === 'piano' && [...PIANO].some(k => lw[k] != null && ownerOf(k, n, c.spec, c.layout ?? 'cockpit', n === 2 && foreOf(c) >= TWO_FWD) === who && Math.abs(lw[k] - ctl[k]) >= startThreshold(k, skill, lw[k]))) return;
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side, target: { ...want } };
 }
 
