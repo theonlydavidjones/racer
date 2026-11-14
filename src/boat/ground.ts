@@ -1,4 +1,4 @@
-import { V, n360 } from '../core/math';
+import { V, n360, type Vec } from '../core/math';
 import type { Emit } from '../sim/events';
 import { waterOver } from '../environment/bottom';
 import { HAZARDS, hazardAt } from '../environment/hazards';
