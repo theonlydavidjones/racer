@@ -8,6 +8,7 @@ body.tiller-held #gl{cursor:ew-resize}
 .tg-cur{position:absolute;top:26%;bottom:26%;width:4px;margin-left:-2px;border-radius:2px;background:var(--accent);left:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .tg-l,.tg-r{position:absolute;top:calc(78% + 6px);font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
 .tg-l{right:calc(50% + 12px)}.tg-r{left:calc(50% + 12px)}
+body:not(.learning) #tillerGuide .tg-l,body:not(.learning) #tillerGuide .tg-r{display:none} /* the words: Learn to sail only */
 /* tiller bar */
 .tiller{position:relative;flex:2 1 220px;min-width:0;height:64px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);touch-action:none;cursor:ew-resize}
 .tiller.held{border-color:var(--accent)}
