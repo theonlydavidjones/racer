@@ -216,9 +216,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (ai && !midTack && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
-      const toWind = wrap(b.ww.from - b.h);
-      const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      ai.turnCommit = bigTurnWay(b, err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
@@ -438,6 +436,23 @@ export const HOVE = {
   /** Backed sail: normal-force coefficient at 90° (Hoerner: 1.17 for a flat plate, more for a cupped sail). */
   cnBacked: 1.2
 };
+
+/** Which way the helm takes a big turn of err degrees (−1 to port, +1 to starboard): the short way, unless that's
+ * through the wind and she's too slow to tack (SLOW_TACK), when she'd be left in irons, so she gybes round instead. */
+export function bigTurnWay(b: Boat, err: number): number {
+  const toWind = wrap(b.ww.from - b.h);
+  const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
+  return throughWind && b.v < SLOW_TACK && !b.ai?.tackNow ? -Math.sign(err) : Math.sign(err);
+}
+/** Which way she's turning for desired: the way the helm's committed to while that still holds (physics step: a
+ * commitment lasts while the course stays within 45° of the one it was made for), else the short way. (Not the way
+ * it would choose for a turn not yet begun: that flips at SLOW_TACK, and a choice made on that edge before she's
+ * started the turn is noise, not where she's going.) */
+export function helmWay(b: Boat, desired: number): number {
+  const ai = b.ai;
+  if (ai && ai.turnCommit !== 0 && Math.abs(wrap(desired - ai.commitFor)) <= 45) return ai.turnCommit;
+  return Math.sign(wrap(desired - b.h));
+}
 
 /**
  * The fraction of her speed a turn bleeds away per second (physics.ts's own step, and src/boat/arcs.ts's prediction):

@@ -5,7 +5,7 @@ import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
-import { SLOW_TACK, yawLag } from '../boat/physics';
+import { SLOW_TACK, helmWay, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
@@ -746,15 +746,36 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // away: holding her course gives the room. Two boats running side by side zigzagged together and touched: the one
   // keeping clear gybed away, became the leeward boat on the same tack, and at once steered back toward the boat that
   // now had to keep clear of her.) Not while she sails within the mark-room she's entitled to: rounding is her room
-  // (Rule 21: exonerated for 15 and 16 there).
+  // (rule 43.1(b): exonerated for 15 and 16 there).
+  // Except into the land. Held on her heading until the other boat's clear (cp.t), and then given two and a half lengths
+  // to turn and get clear of it (sim/obstruction.ts hailRange, the same allowance as for a hail), she'd be on the shore:
+  // then she turns off it before the other boat's through. That breaks 16.1 (nothing in the rules excuses it, and rule
+  // 43.1(b) only exonerates a boat sailing within room she's entitled to); it's seamanship over the rules, as a real
+  // helm would, to save the boat. She takes the least turn toward her course that clears the land, closing on the other
+  // boat as little as she can. (Held so, a boat on starboard with another close by sailed on into a breakwater at
+  // 1.7 m/s and lay pinned against it for the rest of the race.) Close-hauled, the rule 20 hail (above) comes first.
+  // Along her heading, not her track: a current setting her onto the land isn't counted. blocked() also sees the
+  // start/finish line mid-race where it's an obstruction. And the room's checked the way the helm will actually turn
+  // (physics.ts helmWay): a slow boat gybes round, away from a boat to windward, not up through the wind toward it.
   for (const { o, dx, dy, r, cp } of near) {
     if (r.mr && !r.mr.ended && (r.mr.inside === b.id || r.mr.ahead === b.id)) continue;
     if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
     const ROOM = 8, need = Math.min(ROOM, clearanceOn(w, b, b.h, o));
     if (clearanceOn(w, b, desired, o) >= need) continue;
-    const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
-    let ok = b.h;
-    for (let i = 1; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
+    let sweep = wrap(desired - b.h);
+    const way = helmWay(b, desired);
+    if (way !== 0 && Math.sign(sweep) !== way) sweep += way * 360; // (the long way round, as the helm will take her)
+    const n = Math.min(Math.ceil(Math.abs(sweep) / 5), 18); // (5° steps; the long way round, a gybe of 250°, in 18)
+    let ok = b.h, i = 1;
+    for (; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
+    if (i <= n) {
+      const hold = Math.max(0, b.v) * (cp.t + Math.min(1.5, yawLag(Math.max(0, b.v)))) + 2.5 * LOA;
+      if (blocked(w, b, ok, hold)) {
+        // (the room would hold her on into the land: on round to the first heading clear of it, or her course)
+        for (; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); ok = h; if (!blocked(w, b, h, hold)) break; }
+        if (i > n) ok = desired;
+      }
+    }
     desired = ok;
   }
   // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
