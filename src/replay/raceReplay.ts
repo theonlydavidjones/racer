@@ -145,9 +145,9 @@ export class RaceReplay {
   private listHtml(): string {
     const D = this.D!, total = D.findings.reduce((a, f) => a + f.lost, 0);
     const has = (key: string) => D.moments.some(m => m.key === key);
-    const items = D.findings.map((f, i) => `<li class="${has(f.key) ? 'rrPick' : ''}" data-key="${f.key}" ${has(f.key) ? 'tabindex="0"' : ''}>
+    const items = D.findings.map((f, i) => `<li class="${has(f.key) ? 'rrPick' : ''}" data-key="${f.key}" ${has(f.key) ? 'tabindex="0"' : ''} title="${esc(f.tip).replace(/"/g, '&quot;')}">
       <div class="dbHead"><b>${badge(f.key, i + 1)}${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div>
-      <p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
+      <p>${esc(f.detail)}</p></li>`).join(''); // (the tip on hover: one line on the screen)
     const rules = D.moments.filter(m => m.key === 'rule').map(m => `<li class="rrPick" data-at="${m.t1}" tabindex="0">
       <div class="dbHead"><b>${badge('rule', '!')}${esc(m.text)}</b><span class="dbLost">${mmss(m.t1)}</span></div></li>`).join('');
     return `${this.D!.tactics ? '<div class="eyebrow">Tactics, leg by leg</div><div class="tacHost"></div>' : ''}${this.vsHtml()}<p class="lede">${D.findings.length ? `What cost you time, most first: about ${total} s in all. Pick one to see it on the water.` : 'Nothing cost you more than a couple of seconds.'}</p>
@@ -167,7 +167,7 @@ export class RaceReplay {
     const rows = V.legs.map(L => `<li class="rrPick rrLeg" data-leg="${L.i}" tabindex="0">
       <div class="dbHead"><b><span class="rrNo rrVs ${L.lost > 0.5 ? 'lost' : L.lost < -0.5 ? 'won' : ''}">${L.i ? `L${L.i}` : 'S'}</span>${L.i ? `To ${esc(L.name)}, ${kindW[L.kind]}` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div>
       <p>${esc(legWords(L, V.rivalName))}</p>${mom(L)}</li>`).join('');
-    return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Their track is drawn beside yours; pick a leg, or a moment under it, to sail it side by side. The meters are ground made good up or down the course, less your plain speed difference.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
+    return `${real}<div class="eyebrow">Against ${esc(V.rivalName)}, ${who}</div><p class="lede">${lede} Pick a leg to sail it side by side.</p><ol>${rows}</ol><div class="eyebrow">What cost you time</div>`;
   }
 
   /** Jump to one of the moments against her: follow you from a little before it. */
