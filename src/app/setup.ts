@@ -13,6 +13,7 @@ import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
+import { place as getPlace } from '../sim/places';
 import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
 import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
@@ -154,14 +155,22 @@ function courseCard(): void {
   $('fleetField').hidden = app.S.mode === 'sail';
   { // racing from her slip: sail out to the line from her marina
     const sl = slipById(app.S.boat.slip), btn = $<HTMLButtonElement>('raceFromSlip');
-    $('raceFromField').hidden = app.S.mode === 'sail';
+    $('raceFromBox').hidden = app.S.mode === 'sail';
     btn.disabled = !sl; btn.textContent = sl ? `From her slip (${slipPlace(sl)})` : 'From her slip (she has none)';
     if (!sl && app.S.raceFrom === 'slip') app.S.raceFrom = 'water';
     app.S.raceFrom ??= 'water';
     // (racing only: cruising, she leaves her slip at the time you set, and there's no warning signal to be early for)
-    $('raceFromNote').textContent = app.S.mode !== 'sail' && app.S.raceFrom === 'slip' && app.w.fromSlip && app.w.startAt > app.S.seq * 60
-      ? `She starts in her slip in ${harborOf(sl!.marina)?.short ?? 'her marina'}, ${Math.round((app.w.startAt - app.S.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
-      : '';
+    // somewhere else: a spot on the water picked on the chart (the cruise's, brought into this row), timed to sail to the line
+    const spot = app.S.mode !== 'sail' && app.S.raceFrom === 'spot';
+    if (spot) app.S.raceSpot ??= 'cityfront';
+    const lead = Math.round((app.w.startAt - app.S.seq * 60) / 60);
+    $('raceFromNote').textContent = app.S.mode === 'sail' || (lead <= 0 && !(spot && app.w.spotTooFar)) ? ''
+      : app.S.raceFrom === 'slip' && app.w.fromSlip ? `In her slip ${lead} min before the warning signal, to sail out to the line.`
+        : spot && app.w.fromSpot ? `There ${lead} min before the warning signal, to sail to the line.`
+          : spot && app.w.spotTooFar ? 'Too far to make the start from there: pick a spot nearer the line.' : '';
+    const wf = $('whereField');
+    if (!whereHome) { whereHome = document.createComment('whereField'); wf.before(whereHome); }
+    if (spot) { if (wf.parentElement !== $('raceFromBox')) $('raceFromNote').before(wf); } else if (wf.parentElement === $('raceFromBox')) whereHome.after(wf);
   }
   { // her slip, if she has one (Marina)
     const slip = slipById(app.S.boat.slip);
@@ -175,8 +184,8 @@ function courseCard(): void {
   }
   const cruise = app.S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
-  $('whereField').hidden = !cruise;
-  if (cruise) app.setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
+  $('whereField').hidden = !cruise && app.S.raceFrom !== 'spot';
+  if (!$('whereField').hidden) app.setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
   const sp = cruise ? null : app.seasonPick; // (a season race: its own name on the button, and its brief over the rows)
   $('bGo').textContent = cruise ? 'Cast off' : sp ? `Sail Race ${sp.no}` : 'Start the sequence';
   $('seasonBrief').hidden = !sp;
@@ -394,7 +403,11 @@ function drawHeads(): void {
   const seat = (i: number, label: string) => seats[i] ? tile(initials(name(seats[i])), name(seats[i]), CLUB_TILE, { round: true }) : emptyTile(label, false, { round: true });
   const kg = ($('crewSum').textContent!.match(/([\d,]+)\s*lb/) || [])[1];
   set('boat', tile(bn, boat.name || 'Unnamed', boat.hull.upper, { country: bc, on: true }),
-    `<span class="t-group">${tile(initials(you), 'Helm', '#ffb627', { round: true })}${seat(0, 'Main')}${seat(1, 'Jib')}</span><span class="t-text">${kg ? `<span class="t-s">${kg} lb aboard</span>` : ''}${cruise || !$('drillView').hidden ? '' : `<span class="t-s">${S.raceFrom === 'slip' ? 'From her slip' : 'Starts at the line'}</span>`}</span>`);
+    `<span class="t-group">${tile(initials(you), 'Helm', '#ffb627', { round: true })}${seat(0, 'Main')}${seat(1, 'Jib')}</span><span class="t-text">${kg ? `<span class="t-s">${kg} lb aboard</span>` : ''}</span>`);
+  // where she starts: by the line (the default), or in her slip, said plainly so a choice kept from last time is seen
+  { const sl = slipById(boat.slip), slip = S.raceFrom === 'slip' && !!sl;
+    const where = S.raceFrom === 'spot' ? `Somewhere else · ${esc(getPlace(S.raceSpot)?.name ?? 'pick a spot')}` : slip ? `From her slip · ${esc(slipPlace(sl!))}` : 'By the line';
+    set('start', '<span class="t-lab">Start</span>', `<span class="t-text"><span class="t-h">${where}</span></span>`); }
   // when: the day, and the gun (or when she leaves)
   const day = new Date(w.raceDate + 'T12:00');
   set('when', `<span class="t-date"><b>${day.getDate()}</b><small>${day.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</small></span>`,
@@ -462,9 +475,10 @@ function toSetup(): void { if (app.nav.here.k === 'drill') app.showPlace(app.nav
  */
 const DOCKED = ['row-boat', 'row-when', 'condHead', 'condStrip', 'tideGraph', 'condMore', 'bCond'];
 /** The season's overview shows the race chosen the same way: its course, its day, the day's strip, her and her crew. */
-const DOCKED_SEASON = ['row-course', 'row-when', 'condStrip', 'row-boat'];
+const DOCKED_SEASON = ['row-course', 'row-when', 'condStrip', 'row-boat', 'row-start'];
 /** The rows a season race locks (the series sets them). */
 const LOCKED = ['course', 'fleet', 'when'];
+let whereHome: Comment | null = null; // (the cruise's Where field's own place, when it's lent to the Start row)
 const dockHome = new Map<string, Comment>();
 function dockSetup(view: 'setup' | 'drill' | 'season'): void {
   const here = view === 'drill' ? DOCKED : view === 'season' ? DOCKED_SEASON : [];

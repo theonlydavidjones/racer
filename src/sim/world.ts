@@ -13,6 +13,7 @@ import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
+import { routeAround } from './routing';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
@@ -26,7 +27,7 @@ import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNe
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
 import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import type { RuleId } from '../rules/types';
-import { beatAngle, polar, runAngle } from '../boat/polar';
+import { FOLKBOAT, beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
 import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
@@ -184,6 +185,31 @@ function windSwing(kt: number, rel: number): number {
 export function slipLeadTime(slip: Slip, line: Vec): number {
   const d = Math.hypot(line.x - slip.p.x, line.y - slip.p.y) * 1.4 + 250; // not a straight line: the fairways, the entrance, tacking
   return Math.min(120, Math.max(15, Math.ceil((d / 1.8 / 60 + 8) / 5) * 5)) * 60; // at about 3.5 kt, plus pushing off and getting the sails up (up to two hours: from South Beach or Tiburon it's 5–7 km)
+}
+
+/**
+ * Racing from a spot picked on the chart (the owner, 14 Nov 2026: "start in slip or somewhere else"): her speed made good
+ * through the water along a course `off` degrees off the wind (0 dead upwind … 180 dead downwind), m/s. On a reach, the
+ * polar's; closer to the wind than her beat angle, she tacks at it, so along the line of sight it's the polar's VMG over
+ * the cosine of the angle off the wind (resolving the course onto the two tacks); likewise downwind, jibing at her run
+ * angle. Downwind she sails her jib-only run (no pole set to start a race, and not by the lee: at least 150°).
+ */
+export function madeGood(kt: number, off: number): number {
+  const k = Math.max(kt, 1), beat = beatAngle(k), run = Math.max(150, FOLKBOAT.runAngle(k, 'jib'));
+  if (off < beat) return polar(k, beat) * Math.cos(beat * D2R) / Math.cos(off * D2R);
+  if (off > run) return polar(k, run, 'jib') * Math.cos((180 - run) * D2R) / Math.cos((180 - off) * D2R);
+  return polar(k, off, off > 120 ? 'jib' : 'best');
+}
+/** The longest lead from a spot: two hours before the warning signal (as from a slip); farther, she can't make the start. */
+export const SPOT_MAX = 120 * 60;
+/**
+ * A first guess at the lead from a spot (s before the warning signal), on the straight line in one wind: the distance a
+ * fifth longer (the tacks or jibes, the stream), three minutes to get going, rounded up to 5 minutes. Not capped. The
+ * World then times the real passage, in its own wind and current, around the land (World.spotPassage).
+ */
+export function spotLeadTime(p: Vec, line: Vec, windFrom: number, kt: number): number {
+  const d = Math.hypot(line.x - p.x, line.y - p.y), off = Math.abs(wrap(brg(line.x - p.x, line.y - p.y) - windFrom));
+  return Math.max(5, Math.ceil((d * 1.2 / Math.max(0.3, madeGood(kt, off)) / 60 + 3) / 5) * 5) * 60;
 }
 
 /**
@@ -373,6 +399,10 @@ export class World {
   arrivedT: number | null = null;
   /** You start in her slip (Cruise, or Race with time to sail out to the line). */
   readonly fromSlip: boolean = false;
+  /** Racing from a spot picked on the chart (settings.raceFrom 'spot'): where she starts, or null. */
+  fromSpot: Vec | null = null;
+  /** The spot picked is too far to sail to the line in two hours: she starts by the line instead (the setup says so). */
+  spotTooFar = false;
   /** How far you've sailed, over the ground, m. */
   sailedM = 0;
 
@@ -409,7 +439,13 @@ export class World {
     this.homeSlip = slipById(settings.boat?.slip);
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
-    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
+    // or from a spot on the chart, on the water: long enough before the warning signal to sail from there to the line
+    // (on the water, out of the harbors, and within 20 km of the line: a hand-edited save's 'at:0,0' isn't)
+    const spot = !this.freeSail && opts.startAt == null && settings.raceFrom === 'spot' ? getPlace(settings.raceSpot)?.p ?? null : null;
+    this.fromSpot = spot && !onLand(spot) && !inBasin(spot) && dist(spot, this.C.center) < 20000 ? spot : null;
+    // (from a spot, the longest lead for now, so the tide's predictions cover any passage: timed once the wind and the
+    // current are in place, timeSpotStart)
+    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, this.C.center) : this.fromSpot ? SPOT_MAX : 0);
     this.t = -this.startAt;
     this.prepFlag = settings.prepFlag ?? 'P';
     this.sequence = this.freeSail ? [] : startSequence(settings.seq, this.prepFlag);
@@ -432,18 +468,26 @@ export class World {
     this.windModel = { base: this.C.base, kt: this.lessonKt(settings.windKt || 12), phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
     // cruising: from a place on the water or her slip in her marina, to another place or back to her slip
     if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(this.homeSlip)}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
-    { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
-      const from = (settings.sailFrom === 'slip' ? this.homeSlip?.p : null) ?? getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.dest?.p ?? from;
-      const c = this.freeSail ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
-      const half = this.freeSail ? Math.max(3000, dist(from, to) / 2 + 1500) : 3000;
-      this.puffs = new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2));
-      this.fieldArea = { c, half: half + 600 };
-    }
+    // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
+    // (racing from a spot: over her passage to the line as well)
+    const puffsOver = (): [Puffs, { c: Vec; half: number }] => {
+      const from = this.fromSpot ?? (settings.sailFrom === 'slip' ? this.homeSlip?.p : null) ?? getPlace(settings.sailFrom)?.p ?? this.C.center, to = this.fromSpot ? this.C.center : this.dest?.p ?? from;
+      const wide = this.freeSail || !!this.fromSpot, c = wide ? { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } : this.C.center;
+      const half = wide ? Math.max(3000, dist(from, to) / 2 + 1500) : 3000;
+      return [new Puffs(makeRng((seed ^ 0x5eed5) >>> 0), c, half, Math.round(170 * (half / 3000) ** 2)), { c, half: half + 600 }];
+    };
+    [this.puffs, this.fieldArea] = puffsOver();
     this.updateBreeze();
+    // (from a spot: the passage timed in the mean wind, as the race's own with its shifts, not the old oscillation)
+    this.windModel.shifted = true;
+    if (this.fromSpot) {
+      this.startAt = this.timeSpotStart(settings.seq);
+      if (this.spotTooFar) { [this.puffs, this.fieldArea] = puffsOver(); this.updateBreeze(); this.clockWhileBuilt(-this.startAt); } // (the by-the-line race's own puffs, exactly)
+      this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (the sea grown against the final clock)
+    }
     // the wind's shifts: on a past day, the record's own; otherwise a field with Fort Point's statistics for this kind of
     // day and strength, carried down the course with the wind (environment/shifts.ts; its own random numbers, so the
     // rest of the race draws what it did)
-    this.windModel.shifted = true;
     if (this.weather.source !== 'observed') this.shifts = new ShiftField(makeRng((seed ^ 0x5517f7) >>> 0), this.windModel.base, this.windModel.kt * KT, this.fieldArea.c, shiftStats(this.windKind, this.windModel.kt));
     this.gusts = new GustField(makeRng((seed ^ 0x6a57) >>> 0), this.windModel.base, this.windModel.kt * KT);
     this.courseWind();
@@ -539,6 +583,16 @@ export class World {
       // in her slip, bow in (boats nose in here, never back in), made fast: push off to leave
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
+    } else if (isUser && this.fromSpot) {
+      // at the spot you picked, sailing in the wind on the water there: headed for the line where she can lay it, else
+      // a few degrees free of close-hauled, or on her jib-only run, on the side nearer it; the other side if that one
+      // has land within 300 m ahead. At the polar's speed for that angle.
+      const at = this.fromSpot, ww = windOnWater(this.windHere(at, undefined, false), this.currentAt(at, true)), kt = Math.max(ww.kt, 1);
+      const off = wrap(brg(this.C.center.x - at.x, this.C.center.y - at.y) - ww.from), a = Math.abs(off);
+      const beat = beatAngle(kt), run = Math.max(150, FOLKBOAT.runAngle(kt, 'jib')), twa = a < beat + 3 ? beat + 3 : a > run ? run : a;
+      const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 300 && !onLand({ x: at.x + u.x * (d + 20), y: at.y + u.y * (d + 20) })) d += 20; return d; };
+      const near = n360(ww.from + (off < 0 ? -1 : 1) * twa), far = n360(ww.from - (off < 0 ? -1 : 1) * twa);
+      p = { ...at }; h = room(near) >= 300 || room(near) >= room(far) ? near : far; v0 = polar(kt, twa, twa > 120 ? 'jib' : 'best');
     } else if (isUser && this.rounding) {
       // the mark-rounding drill: on the approach with the mark ahead (the owner: "there should be a mark in front of me"),
       // 200 m out on the starboard layline over the ground, the lane drawn in (app/drillCoach.ts). Her course through the
@@ -731,6 +785,59 @@ export class World {
     const w = windAt(this.windModel, this.t);
     if (this.shifts) { this.shiftRef = this.shifts.at(this.fieldArea.c); w.from = n360(w.from + this.shiftRef.turn); w.kt *= this.shiftRef.k; }
     this.wind = w;
+  }
+
+  /**
+   * Racing from a spot: the lead before the warning signal that she needs to sail from there to the line, in the race's
+   * own wind and current (World.spotPassage), timed at the middle of the passage (the sea breeze builds through the
+   * morning: twice, from a first guess). Past two hours she can't make the start from there: she starts by the line.
+   */
+  private timeSpotStart(seq: number): number {
+    const at = this.fromSpot!, line = this.C.center;
+    let lead = spotLeadTime(at, line, this.windModel.base, this.windModel.kt);
+    for (let k = 0; k < 2; k++) { this.clockWhileBuilt(-(seq * 60 + Math.min(lead, SPOT_MAX) / 2)); lead = this.spotPassage(at, line); }
+    if (lead > SPOT_MAX) { this.fromSpot = null; this.spotTooFar = true; lead = 0; }
+    this.clockWhileBuilt(-(seq * 60 + lead));
+    return seq * 60 + lead;
+  }
+  /** The clock set while the World is built: the flags, the tide, the wind and its field for that time. */
+  private clockWhileBuilt(t: number): void {
+    this.t = t; this.flags = flagsAt(this.sequence, t);
+    if (this.tide) this.updateTide();
+    this.updateBreeze(); this.courseWind(); this.buildField();
+    this.sea.duration = this.seaDurationAt(this.clockUtc);
+  }
+  /**
+   * The time to sail from a spot to the line (s, before rounding): around the land (routing.ts routeAround), every
+   * 200 m the wind on the water there (the field's lees, the current's own wind) and the stream. Through the water at
+   * her speed made good for that course (madeGood), short of the polar's (0.6–0.9 of it, less in light air; 0.85 more
+   * tacking or jibing); over the ground, with a fair stream crabbed across it (sin δ = c⊥ / v) and carried along
+   * (v·cos δ + c∥), against a foul one stemming all of it, blended between by how foul it is. Then a tenth more, three minutes to get going, and up to the next 5 minutes: being late for your
+   * own start costs more than waiting.
+   */
+  spotPassage(a: Vec, b: Vec): number {
+    const pts = routeAround(a, b, 150); let s = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i - 1], q = pts[i], L = dist(p, q); if (L < 1) continue;
+      const u = { x: (q.x - p.x) / L, y: (q.y - p.y) / L }, course = brg(u.x, u.y), n = Math.ceil(L / 200), dl = L / n;
+      for (let j = 0; j < n; j++) {
+        const m = { x: p.x + u.x * dl * (j + 0.5), y: p.y + u.y * dl * (j + 0.5) };
+        const cur = this.currentAt(m, true), ww = windOnWater(this.windHere(m, undefined, false), cur);
+        // (her speed through the water short of the polar's: a helm that isn't the polar's; in light air a learner makes
+        // about two thirds of it, from 8 kt up nine tenths (the review's passages sailed: 0.82 in 4 kt, 0.96–0.98 in 8–18).
+        // Tacking or jibing, a further 0.85 of the VMG: the tacks themselves, the shifts, a helm a few degrees free)
+        const off = Math.abs(wrap(course - ww.from)), k = Math.max(ww.kt, 1), turning = off < beatAngle(k) || off > Math.max(150, FOLKBOAT.runAngle(k, 'jib'));
+        const v = madeGood(ww.kt, off) * clamp(0.4 + 0.0625 * ww.kt, 0.6, 0.9) * (turning ? 0.85 : 1);
+        const along = cur.x * u.x + cur.y * u.y, across = cur.x * u.y - cur.y * u.x, c = Math.hypot(along, across);
+        // a fair stream: crabbed across it and carried along; a foul one: set down by it as well as stemming it (a helm
+        // pointed at the line, not crabbed, ends up stemming the whole stream); blended by how foul it is, so a stream
+        // square to her course costs what crabbing across it does
+        const crabbed = v > Math.abs(across) ? Math.sqrt(v * v - across * across) + along : 0, f = c > 0 ? clamp(-along / c, 0, 1) : 0;
+        const vg = (1 - f) * crabbed + f * (v - c);
+        s += dl / Math.max(0.15, vg);
+      }
+    }
+    return Math.max(5, Math.ceil((s * 1.1 / 60 + 3) / 5) * 5) * 60;
   }
 
   /* ---------- the wind across the course (environment/weather.ts), cached on a grid ---------- */

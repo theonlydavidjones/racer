@@ -18,6 +18,8 @@ export interface SetupPicks {
   /** her start or her destination: a place id (sim/places.ts), 'slip', a spot ('at:lat,lon'), or '' (nowhere in particular) */
   set(which: 'from' | 'to', id: string): void;
   get(which: 'from' | 'to'): string;
+  /** a race's start picked on the chart (Start: Somewhere else): only her start, on open water */
+  race?(): boolean;
 }
 
 export class SetupChart {
@@ -57,15 +59,17 @@ export class SetupChart {
 
   /** Shown again (the setup opened, or the world rebuilt): the switch, the read-back, and the chart framed on both pins. */
   sync(refit = false): void {
-    const w = this.picks.world(), slip = w.homeSlip;
+    const w = this.picks.world(), slip = w.homeSlip, race = !!this.picks.race?.();
+    if (race) this.which = 'from';
+    $('setupPinSeg').hidden = race; $('bPlanOpen').hidden = race; $('setupPins').hidden = race;
     for (const b of $('setupPinSeg').querySelectorAll<HTMLButtonElement>('[data-pin]')) b.setAttribute('aria-pressed', String(b.dataset.pin === this.which));
     const name = (id: string) => id === 'slip' ? (slip ? `her slip (${slipPlace(slip)})` : 'her slip') : id ? place(id)?.name ?? '?' : 'nowhere in particular';
     $('setupPins').innerHTML = `<b>Start:</b> ${name(this.picks.get('from'))} · <b>To:</b> ${name(this.picks.get('to'))}`;
     const s = $('bPinSlip') as HTMLButtonElement;
-    s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
+    s.hidden = race; s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
     s.textContent = this.which === 'from' ? 'Start from her slip' : 'Back to her slip';
-    $('bPinNone').hidden = this.which !== 'to';
-    $('setupChartHint').textContent = this.which === 'from' ? 'Tap the water, a place or her slip to start there.' : 'Tap the water, a place or her slip to sail there.';
+    $('bPinNone').hidden = race || this.which !== 'to';
+    $('setupChartHint').textContent = race ? '' : this.which === 'from' ? 'Tap the water, a place or her slip to start there.' : 'Tap the water, a place or her slip to sail there.';
     if (refit || !this.fitted) this.fit();
     this.draw();
   }
@@ -83,11 +87,11 @@ export class SetupChart {
     const w = this.picks.world(), r = this.c.getBoundingClientRect(), sx = clientX - r.left, sy = clientY - r.top, q = this.at(sx, sy);
     const px = (p: Vec) => [r.width / 2 + (p.x - this.cx) * this.scale, r.height / 2 - (p.y - this.cy) * this.scale];
     // her slip, or a place, near the tap: by name
-    const slip = w.homeSlip;
+    const race = !!this.picks.race?.(), slip = race ? null : w.homeSlip; // (a race from her slip is the Start row's own choice)
     if (slip) { const [x, y] = px(slip.p); if (Math.hypot(x - sx, y - sy) < 16 || Math.hypot(slip.p.x - q.x, slip.p.y - q.y) < 60) { this.put('slip'); return; } }
     let best: string | null = null, bd = 16;
     for (const pl of PLACES) { const [x, y] = px(pl.p), d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; best = pl.id; } }
-    if (best) { this.put(best); return; }
+    if (best && !(race && (onLand(place(best)!.p) || inBasin(place(best)!.p)))) { this.put(best); return; }
     if (onLand(q)) { this.note('That\'s land. Pick a spot on the water.'); return; }
     if (inBasin(q)) { this.note(slip ? 'Inside a harbor: tap her slip, or pick open water outside.' : 'Inside a harbor: pick open water outside (or give her a slip in the Fleet).'); return; }
     this.put(spotId(q));
