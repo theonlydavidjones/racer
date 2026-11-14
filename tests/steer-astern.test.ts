@@ -32,6 +32,18 @@ describe('steering astern, shoved off under bare poles', () => {
     sail(b, 5, () => key(b));
     expect(Math.sign(wrap(b.h))).toBe(-Math.sign(back)); expect(Math.abs(wrap(b.h))).toBeGreaterThan(5);
   });
+  it('a tiller held over near head to wind keeps turning her the same way as her sternway dies: no swing back the other way while she has any way on', () => {
+    // (it used to steer her by the flow above 0.2 m/s and scull her the other way, four times as fast, below it)
+    for (const off of [15, -15, 0]) {
+      const b = testBoat({ heading: (270 + off + 360) % 360, kt: 0, windKt: 4, windFrom: 270 }) as Helm; b.isUser = true;
+      b.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; b.v = 0; b.astern = 0.3;
+      let dir = 0, flips = 0, lowest = 1;
+      sail(b, 150, () => { tiller(b); const a = b.astern ?? 0, r = b.turnRate ?? 0; if (a < 0.06 || b.v > 0) return; lowest = Math.min(lowest, a);
+        if (Math.abs(r) > 0.05) { if (dir && Math.sign(r) !== dir) flips++; dir = Math.sign(r); } });
+      expect(lowest, `${off}° off the wind: her sternway did fall through 0.2 m/s`).toBeLessThan(0.15);
+      expect(flips, `${off}° off the wind`).toBe(0);
+    }
+  });
   it('her turn goes with her sternway: a few degrees at 0.2 m/s, under 3° at 0.08', () => {
     const fast = Math.abs(shoved(0.5, key).turned), slow = Math.abs(shoved(0.2, key).turned), creep = Math.abs(shoved(0.08, key).turned);
     expect(slow).toBeGreaterThan(1.5); expect(slow).toBeLessThan(fast / 2);

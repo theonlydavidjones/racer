@@ -49,9 +49,10 @@ export const CREW_LAG = 0.8;
  * meters more: in still water a hull does creep on like that, and any wind or stream soon outweighs it.
  */
 export const ASTERN = 2;
-/** Going astern faster than this, m/s, the water past her rudder steers her (about 0.9 deg/s with the helm hard over): a held
- * tiller is steering her then, not sculling (an ESTIMATE). */
-export const STEERS_ASTERN = 0.2;
+/** Going astern faster than this, m/s, a held tiller steers her by the water past her rudder, however little; it is
+ * sculling only once she has lost her way (asternCoast's WAY_LOST). Higher, and a helm held over near head to wind
+ * turned her one way above it and sculled her the other below it: at 0.2 m/s, 0.9 deg/s one way against 4 the other. */
+export const STEERS_ASTERN = 0.05;
 /** How fast the water slows her sternway (m/s²) at `v` m/s astern (at her design displacement: her crew's weight isn't in it yet). */
 export const asternDrag = (v: number): number => ASTERN * hullResistance(v) / HANDLING.mass;
 /** Below this (m/s) she has lost her way, for a coast's length: the water's drag alone takes minutes more to stop her. */
@@ -399,7 +400,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
   // equation would take below zero becomes sternway, which the water's drag then slows (asternDrag, in travel). Head to
-  // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against her hull's drag stern first)
+  // wind in 15 kt on bare poles that comes to about 1 m/s (rig windage 2.0 m² against her hull's drag stern first)
   // (with her sails up and flogging, in irons, the same: their windage on top of the rig's, so she gathers sternway
   // faster, and the rudder then works backwards; the way out is to bear away, the tiller pushed the way she's to go)
   const v1 = b.v + a * dt;
@@ -420,7 +421,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     const Fy = side * (q * HOVE.windSide * Math.sin(awaR) ** 2 + (b.luff ? 0 : Fside));
     const sw = b.sway ?? 0, aL = Math.PI * HOVE.aspect / 2, Fw = -0.5 * 1025 * HOVE.latArea * (aL * Math.max(0, b.v) * sw + HOVE.crossCd * sw * Math.abs(sw));
     b.sway = sw + (Fy + Fw) / (disp * (1 + HOVE.swayAdded)) * dt;
-    if (Math.abs(b.sway) < 1e-4) b.sway = 0;
+    if (Math.abs(b.sway) < 1e-6) b.sway = 0; // (a micron a second: nothing. Not higher: under bare poles in 4 kt the wind's push is less than a tenth of a millimeter a second a step, and she never began to drift)
   }
   travel(b, dt, t, emit, groundToast);
   sailVisuals(b, plan, dt);
@@ -932,11 +933,8 @@ const motorDrives = (b: Boat) => !!b.motor?.running && b.motor.down && b.motor.g
 function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   const u = V(b.h), ww = b.ww;
   // sternway (pushed off astern): she coasts back, slowing on the water's drag, which is slight at a walking pace (a
-  // two-tonne boat glides a long way: from a shove, three or four lengths in most of a minute)
+  // two-tonne boat glides a long way: from a shove of 0.5 m/s, five lengths in four minutes)
   const ast = b.astern ?? 0;
-  // (the coast's law at a walk; faster, her hull's resistance going through the water, the same as ahead, which rises with
-  // the square of the speed and more; the drag's constant part stops her in a finite time, and the wind's push astern
-  // builds a little a step)
   // (her hull's resistance going through the water, and twice it stern first: ASTERN, an estimate. It falls away with
   // her speed, so her last way dies slowly; under a tenth of a millimeter a second she's taken as stopped)
   if (ast > 0) { const left = ast - asternDrag(ast) * dt; b.astern = left > 1e-4 ? left : 0; }

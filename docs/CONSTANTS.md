@@ -343,8 +343,8 @@ physics, ranked like the ten above:
 | PENALTY_TURN_RATE | 10 | 22 | unsourced |  |
 | SLOW_TACK | 1.3 | 24 | unsourced |  |
 | CREW_LAG | 0.8 | 27 | unsourced |  |
-| ASTERN_DRAG.c0 | 0.005 | 30 | unsourced |  |
-| ASTERN_DRAG.c1 | 0.035 | 30 | unsourced |  |
+| ASTERN | 2 | | estimate | her drag stern first over her hull's resistance ahead at the same speed (NACA TN 3361: a 0012 section's drag at 180° about twice that at 0°; a section, not a hull); replaces the unsourced ASTERN_DRAG law |
+| STEERS_ASTERN | 0.05 m/s | | estimate | above it a held tiller steers by the flow going astern; below, it sculls |
 | POLE.set | 8 | 35 | unsourced |  |
 | POLE.stow | 5 | 35 | unsourced |  |
 | POLE.jibe | 8 | 35 | unsourced |  |
