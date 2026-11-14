@@ -101,8 +101,9 @@ export const LESSON_MARKS = {
    * same tack, till she's EARLY_M off (closer, 17(b) has you act too). An encounter is over once they're PAST_M apart and
    * opening. */
   meetS: 45, clearLoa: 2, standDeg: 15, standV: 0.6, pastM: 40, steadyS: 5, steadyDeg: 5, steadyV: 0.25, awayM: 300, actDeg: 20, earlyM: 30,
-  /** Rules of the road: the other boat giving way to you alters from GIVE_M off, for a point GIVE_LOA lengths astern of you. */
-  giveM: 100, giveLoa: 3
+  /** Rules of the road: the other boat giving way to you alters from GIVE_M off, for a point GIVE_LOA lengths astern of you
+   * and GIVE_SIDE out to her side of your track. */
+  giveM: 100, giveLoa: 3, giveSide: 2
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
@@ -203,8 +204,9 @@ export class LessonTracker {
       // between encounters she sails away from you, keeping the racing rules' right of way (the race AI's keep-clear) and
       // off the land (the first way clear of it, from straight away to beam on); the next is set only once she's well
       // away (AWAY_M), where a boat is a speck on the water
+      // (the way she's chosen kept while it's still away from you and clear, so she doesn't swap about between them)
       const mv = E.helm(true), off = Math.atan2(dx, dy) * 180 / Math.PI;
-      this.away = E.sailable([0, 45, -45, 90, -90].map(a => off + a).find(h => !E.landAhead(E.sailable(h))) ?? off + 180);
+      if (Math.abs(wrap(this.away - off)) > 100 || E.landAhead(this.away)) this.away = E.sailable([0, 45, -45, 90, -90].map(a => off + a).find(h => !E.landAhead(E.sailable(h))) ?? off + 180);
       o.desired = mv ? mv.h : this.away; o.luff = mv?.luff ?? false;
     }
     if (e) {
@@ -214,7 +216,10 @@ export class LessonTracker {
       // air it touched); either way a last-moment swerve when contact is a few seconds off (in place of Rule 17(b): the race
       // AI's Rule 14 move)
       const mv = E.helm(false), closing0 = dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0;
-      const astern = { x: b.x - V(b.h).x * M.giveLoa * LOA - o.x, y: b.y - V(b.h).y * M.giveLoa * LOA - o.y };
+      // (and GIVE_SIDE lengths out to her own side of your track, so meeting nearly head-on or on a reach her turn is as
+      // plain as one asked of you)
+      const side = Math.sign(dx * V(b.h + 90).x + dy * V(b.h + 90).y) || 1, sv = V(b.h + 90);
+      const astern = { x: b.x - V(b.h).x * M.giveLoa * LOA + sv.x * side * M.giveSide * LOA - o.x, y: b.y - V(b.h).y * M.giveLoa * LOA + sv.y * side * M.giveSide * LOA - o.y };
       const give = e.kind === 'stand' && closing0 && d < M.giveM ? Math.atan2(astern.x, astern.y) * 180 / Math.PI : e.h;
       o.desired = mv ? mv.h : E.sailable(give); o.luff = mv?.luff ?? false;
       const gap = E.gap(); e.gap = Math.min(e.gap, gap);
