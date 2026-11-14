@@ -1388,7 +1388,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
   already tune the luff (both halyards, both Cunninghams) by the wind as North Sails' Nordic Folkboat guide does (none
   in light air, the wrinkles just out in medium, hard on above 15 kt), a skilled crew more finely. But they re-plan every
   line each second for the wind of the moment, so they retune the luff in every gust, where the sources answer a gust
-  with the quick lines (sheets, traveller, vang, backstay) and retune the luff for a lasting change. Tried: the luff set
+  with the quick lines (sheets, traveler, vang, backstay) and retune the luff for a lasting change. Tried: the luff set
   for the wind steadied over about a minute (an estimate), looked at every 10 s, the quick lines worked around it. It
   isn't small: the crew move a line only when it's worth the trip (minGain), so with the luff no longer jumping with the
   gusts its gains get small and its lines stay where earlier winds left them. The same conditions ended with the
