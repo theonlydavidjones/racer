@@ -1,4 +1,4 @@
-# Real docking: design note for the owner (13 Nov 2026, nothing built)
+# Real docking (approved by the owner 13 Nov 2026; built: boat/dockLines.ts, sim/world.ts mooringStep)
 
 Today only her home slip, as Home's destination, makes her fast, and it does so automatically: she's within 2.5 m, under 0.6 m/s and bow in (`world.ts intoSlip`). The plan is to dock anywhere, done by the crew, with real forces.
 

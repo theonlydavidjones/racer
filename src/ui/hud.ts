@@ -602,7 +602,7 @@ export class Hud {
     if (nav) { // the navigator's view: how far she has to sail, and when she'd get there
       const y = h - 34 - (fog ? 12 : 0), turns = nav.tacks.length + nav.gybes.length;
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif';
-      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} GYBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
+      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} JIBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
       ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say('TAP FOR THE PASSAGE PLAN', w / 2, y + 12, 'center');
     } else if (kind) {
       const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
