@@ -55,12 +55,53 @@ export const firstLeg = (a: P, b: P) => { const r = routeAround(a, b, 30), q = r
 const CONTACT = /^Collision: |^Bump: |^Aground!|touched bottom|been set sideways onto/;
 export const bumped = (w: World) => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && CONTACT.test(e.msg));
 /**
- * The most a single plan may cost, in the route search's own count of land and pier tests (sim/routing.ts routeWork):
- * the 500 ms a step this test allowed, at the costliest rate measured (Hyde Street from the west, 16.6 µs a test, on a
- * quiet host, 14 Nov 2026). A count rather than a clock, so a loaded machine can't fail it, and a costlier search can't
- * hide on a fast one. (Her ordinary step's speed is perf-pair's: scripts/check/perf-pair.mjs.)
+ * The most work one step may do, per case, in the route search's own count of land and pier tests (sim/routing.ts
+ * routeWork): what the 500 ms a step this test allowed bought that case's costliest search. Each search was re-timed
+ * alone (the fastest of 5) on a quiet host, 14 Nov 2026 (the cloud session's 4-core container, load under 1.3): its
+ * tests and ms beside it. A case that never searched gets the costliest rate measured (17.9 µs a test), the strictest.
+ * A count rather than a clock, so a loaded machine can't fail it. (Her ordinary step's speed is perf-pair's:
+ * scripts/check/perf-pair.mjs.)
  */
-export const PLAN_WORK = 30000;
+const PLAN_WORK: Record<string, number> = {
+  'into the basin from the west, wind from 270°': 80400, // 2720 tests in 16.9 ms
+  'into the basin from the east, wind from 270°': 61100, // 4392 tests in 35.9 ms
+  'out of the basin to the west, wind from 270°': 56500, // 2388 tests in 21.1 ms
+  'out of the basin to the north, wind from 270°': 51100, // 2015 tests in 19.7 ms
+  'past the pier, west to east, wind from 270°': 27900, // no search: at the costliest rate, 17.9 µs
+  'past the pier, east to west (a beat), wind from 270°': 136500, // 3331 tests in 12.2 ms
+  'out of the basin, northwest toward Sausalito, wind from 270°': 143100, // 7528 tests in 26.3 ms
+  'out of the Pier 39 marina to the west, wind from 270°': 66500, // 16876 tests in 126.7 ms
+  'into Hyde Street harbor from the east, wind from 270°': 46700, // 16160 tests in 173.0 ms
+  'into Hyde Street harbor from the west, wind from 270°': 41700, // 16159 tests in 193.3 ms
+  'into the basin from the west, wind from 300°': 73500, // 2720 tests in 18.5 ms
+  'into the basin from the east, wind from 300°': 70500, // 5529 tests in 39.2 ms
+  'out of the basin to the west, wind from 300°': 63100, // 2388 tests in 18.9 ms
+  'out of the basin to the north, wind from 300°': 51600, // 2015 tests in 19.5 ms
+  'past the pier, west to east, wind from 300°': 27900, // no search: at the costliest rate, 17.9 µs
+  'past the pier, east to west (a beat), wind from 300°': 27900, // no search: at the costliest rate, 17.9 µs
+  'out of the basin, northwest toward Sausalito, wind from 300°': 130200, // 7528 tests in 28.9 ms
+  'out of the Pier 39 marina to the west, wind from 300°': 54900, // 16876 tests in 153.5 ms
+  'into Hyde Street harbor from the east, wind from 300°': 43400, // 16160 tests in 185.9 ms
+  'into Hyde Street harbor from the west, wind from 300°': 46100, // 16158 tests in 175.2 ms
+  'into the basin from the west, wind from 0°': 84400, // 2720 tests in 16.1 ms
+  'into the basin from the east, wind from 0°': 59100, // 3574 tests in 30.2 ms
+  'out of the basin to the west, wind from 0°': 54100, // 3333 tests in 30.8 ms
+  'out of the basin to the north, wind from 0°': 41100, // 4267 tests in 51.8 ms
+  'past the pier, west to east, wind from 0°': 27900, // no search: at the costliest rate, 17.9 µs
+  'past the pier, east to west (a beat), wind from 0°': 27900, // no search: at the costliest rate, 17.9 µs
+  'out of the basin, northwest toward Sausalito, wind from 0°': 94800, // 9787 tests in 51.6 ms
+  'out of the Pier 39 marina to the west, wind from 0°': 52500, // 16904 tests in 160.8 ms
+  'into Hyde Street harbor from the east, wind from 0°': 32800, // 11576 tests in 176.1 ms
+  'into Hyde Street harbor from the west, wind from 0°': 50800, // 10927 tests in 107.5 ms
+  'out of the basin to the east, wind from 90°': 99500, // 5199 tests in 26.1 ms
+  'out of the basin to the east, wind from 30°': 94100, // 5199 tests in 27.6 ms
+  'out of the basin to the east, wind from 0° at 22 kt': 91800, // 5199 tests in 28.3 ms
+  'out of the basin to the north, wind from 350° at 18 kt': 39200, // 3631 tests in 46.2 ms
+  'into Hyde Street harbor from the west, wind from 150°': 40200, // 13792 tests in 171.2 ms
+  'into Hyde Street harbor from the west, wind from 180°': 38500, // 16141 tests in 209.4 ms
+  'past the pier, east to west (a beat), wind from 270° at 6 kt': 119700, // 6349 tests in 26.5 ms
+  'out of the basin to the north, wind from 0° at 5 kt': 27900, // 2464 tests in 44.1 ms
+};
 
 /** Sail one case under the navigator and check it all. */
 export function sailCase([name, a, b, from, berth0 = 5.5, kt = 12]: Case): void {
@@ -88,7 +129,9 @@ export function sailCase([name, a, b, from, berth0 = 5.5, kt = 12]: Case): void 
   expect(w.pilot.plans, 'times the way was worked out').toBeLessThan(40);
   // (a route's worked out now and then, a tenth of a second or so among the Wharf's docks: not every step, and never
   // more than a plan's worth in one)
-  expect(costliest, 'the costliest step, in land and pier tests').toBeLessThan(PLAN_WORK);
+  const cap = PLAN_WORK[caseTitle([name, a, b, from, berth0, kt])];
+  expect(cap, 'a cap measured for this case').toBeGreaterThan(0);
+  expect(costliest, 'the costliest step, in land and pier tests (what 500 ms bought it)').toBeLessThanOrEqual(cap);
   expect(searching, 'steps that searched for a way: no more than the plans').toBeLessThanOrEqual(w.pilot.plans);
   expect(tackGap, 'the shortest time between two tacks, s').toBeGreaterThan(10);
 }
