@@ -42,6 +42,16 @@ for (const H of HAZARDS) {
   for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(y0 / CELL); j <= Math.floor(y1 / CELL); j++) { const k = i * 65536 + j; (GRID.get(k) ?? GRID.set(k, []).get(k)!).push(H); }
 }
 const inside = (p: Vec, P: Vec[]) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+/** The shallowest-topped hazard within `r` m of p (0: under it), or null. */
+export function hazardNear(p: Vec, r: number): Hazard | null {
+  const R = r + ROCK_R; let best: Hazard | null = null;
+  for (let i = Math.floor((p.x - r) / CELL); i <= Math.floor((p.x + r) / CELL); i++) for (let j = Math.floor((p.y - r) / CELL); j <= Math.floor((p.y + r) / CELL); j++) for (const H of GRID.get(i * 65536 + j) ?? []) {
+    if (best && H.top >= best.top) continue;
+    const near = H.p ? (p.x - H.p.x) ** 2 + (p.y - H.p.y) ** 2 <= R * R : inside(p, H.area!) || H.area!.some(q => (q.x - p.x) ** 2 + (q.y - p.y) ** 2 <= r * r);
+    if (near) best = H;
+  }
+  return best;
+}
 /** The shallowest-topped hazard under p, or null. */
 export function hazardAt(p: Vec): Hazard | null {
   const l = GRID.get(Math.floor(p.x / CELL) * 65536 + Math.floor(p.y / CELL)); if (!l) return null;

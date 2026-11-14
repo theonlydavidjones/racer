@@ -75,3 +75,13 @@ describe('shoal: too shallow for her, for the planner', () => {
     const w = waterOver(p, tHi)!; expect(shoal(p, tHi, w - SHOAL_MARGIN / 2)).toBe(true);
   });
 });
+
+describe('shoal: the charted rocks too', () => {
+  it('the rocks off Lime Point by the bridge\'s north tower, which cover and uncover, are shoal for her at any tide; looked for 30 m round', async () => {
+    const { HAZARDS } = await import('../src/environment/hazards');
+    const R = HAZARDS.find(H => H.kind === 'rock' && H.p && H.top < 0 && Math.hypot(H.p.x + 3000, H.p.y - 1640) < 400)!; // (near the north tower, the Marin side)
+    expect(R).toBeDefined();
+    const day = Date.UTC(2026, 10, 14, 8), off = { x: R.p!.x + 25, y: R.p!.y };
+    for (let m = 0; m < 1440; m += 60) { expect(shoal(R.p!, day + m * 60e3, 1.141)).toBe(true); expect(shoal(off, day + m * 60e3, 1.141, 30)).toBe(true); }
+  });
+});
