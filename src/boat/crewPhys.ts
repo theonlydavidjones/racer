@@ -115,6 +115,8 @@ export interface Job {
   big?: boolean;
   /** a big lasting change of a cabin-top line (crewWork.ts LINE_URGENT): seen through, a jib tweak waits */
   urgent?: boolean;
+  /** (A cabin-top line) her true wind angle when they chose where to set it (crewWork.ts LINE_MOVED). */
+  refTwa?: number;
 }
 /** Where a job puts a person: across (m, + to windward), fore-and-aft (m), and how they're posed. */
 export interface Station { arm: number; z: number; pose: Pose }
@@ -132,7 +134,7 @@ export interface CrewState {
   /** Where you've put them (absent: the crew's own call). */
   place?: CrewPlace;
   /** A roll tack in progress: holding the old high side, then flattening; and its clock. */
-  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number } | null;
+  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number; heel0?: number } | null;
   /** The windward side last step (+1 starboard), to see a tack or gybe. */
   wind: number;
   // summaries, for the figures, the coach and tests
@@ -164,7 +166,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** and their wish for it over a gust-lull cycle then (crewWork.ts LINE_MOVED) */ lineRef?: Record<string, number>; /** the wind and angle when each jib car was last set (crewWork.ts CAR_WIND) */ carSet?: Partial<Record<'S' | 'P', { tws: number; twa: number }>>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -250,7 +252,7 @@ export const stationZ = (j: number, count: number, f: number, deck: boolean) => 
 };
 /** Within the jib winch's pedestal's reach on the side deck, fore and aft (between the seats either side of it). */
 /** Two crew forward of the winch together from this far along (stationZ's f): the band's Fwd and the foredeck. */
-const TWO_FWD = 0.999;
+export const TWO_FWD = 0.999;
 /** Sitting on the cabin top's edge beside its after end (z 0.90), the hips this far out (m): the cabin's side is at about
  * 0.7 there; outboard of DECK_ARM, so they're on the deck's side of the boat. An estimate. */
 const CABIN_EDGE = 0.62;
@@ -346,6 +348,15 @@ export interface CrewCall {
  */
 export const ROLL_HOLD = 2;
 /**
+ * And they go across at once when she has heeled this much more (deg) onto the new tack since she came through the
+ * wind: the new side's sails have filled, and the low side they're on is the leeward one now. Measured from her heel
+ * as she came through, which their own weight on the old rail already gives her (5 to 8°). In light air the sails
+ * heel her little and the hold runs on, as a roll tack does; in a breeze she heeled 20° in a second or so with them
+ * still on the low side (Crew Figures, watching a 14 kt race's tacks). Practice: in light air keep still and time the
+ * roll; in a breeze get to the new rail fast (North Sails, Sailing World, Yachting World on keelboat tacks). An estimate.
+ */
+export const ROLL_HEEL = 5;
+/**
  * How often a crew moves. A real crew moves on a puff, a lull, a tack or a job, and otherwise sits still: coaches have
  * the crew hold a steady angle of heel, not a precise one (weight first in light to moderate air, and once the boat is
  * set up only small, smooth moves: Sailing World, North Sails, Yachting World on keelboat heel), and the main is played
@@ -422,7 +433,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
-    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    // (her heel as she came through, read on the hold's first step after the tack: on the step they see the tack it can
+    // still be to leeward of the old one, and read the next step on the new, a jump of twice the roll that ended the hold)
+    else if (c.roll.phase === 'hold' && c.roll.heel0 == null && !tacked) c.roll.heel0 = k.heel ?? 0;
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (c.roll.heel0 != null && (k.heel ?? 0) - c.roll.heel0 > ROLL_HEEL))) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }

@@ -5,6 +5,7 @@ import { DT, World } from '../src/sim/world';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_CREW, Z, atWinch, newCrew, type CrewPlace, type CrewSpec } from '../src/boat/crewPhys';
 import { testBoat, sail } from './helpers/testBoat';
+import { ownerOf } from '../src/boat/crewWork';
 import { beatAngle } from '../src/boat/polar';
 
 /**
@@ -77,6 +78,15 @@ describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', (
   it('on their own: forward of the winch after minutes of light air upwind, never in a breeze', () => {
     expect(beat(5, 300).b.crew!.fore01).toBe(1);
     expect(beat(16, 300).b.crew!.fore01).toBe(0);
+  }, 120_000);
+  it('forward of the winch, the helm takes the main (the owner): its sheet comes to the thwart behind them', () => {
+    expect(ownerOf('mainsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(0);
+    expect(ownerOf('jibsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(2);
+    const { b } = beat(5, 300), c = b.crew!;
+    expect(c.fore01).toBe(1);
+    // (no crew holding the mainsheet from up forward, and the main still trimmed: the helm has it)
+    expect(c.people.slice(1).some(p => p.job?.line === 'mainsheet')).toBe(false);
+    expect(Math.abs(b.ctl.mainsheet - (b.ctlTarget?.mainsheet ?? b.ctl.mainsheet))).toBeLessThan(0.05);
   }, 120_000);
 });
 

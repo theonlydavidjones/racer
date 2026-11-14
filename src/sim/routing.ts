@@ -87,10 +87,12 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * (manoeuvreS's `hs`). The 25 kt tack re-measured with tests/manoeuvre.test.ts's measure() once the crew sat either side of
  * the jib winch at its true place (crewPhys.ts Z.deckFwd, winchAft): 4.3 to 5.0 s. The tack itself cost about 5.0 s
  * before as well: the 4.3 was her creeping back on her twin over the next few minutes after the crew's shuffle forward
- * and back re-trimmed her, which is gone (the physics review).
+ * and back re-trimmed her, which is gone (the physics review). And 4.0 since the crew cross as soon as the new side
+ * fills (crewPhys.ts ROLL_HEEL), rather than sitting on the low side while she heels 20° and more: 3.98 measured (4.29
+ * with it off); in 20 kt 2.82 (3.11), within the table's 2.9; light air unchanged.
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 5.0]],
+  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 4.0]],
   gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
 };
 /**

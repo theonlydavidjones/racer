@@ -728,7 +728,8 @@ function setPlace(part: 'across' | 'fore', v: PlaceAcross | PlaceFore): void {
 }
 function stepCrew(part: 'across' | 'fore', d: number): void {
   const c = w.user.crew; if (!c) return;
-  const list: string[] = part === 'across' ? ACROSS : FORE, cur = c.place?.[part] ?? (part === 'across' ? autoAcross(w.user) : 'mid');
+  // (two crew have no Aft: their stations are as far aft as they go, crewWords.ts showCrewRow)
+  const list: string[] = part === 'across' ? ACROSS : c.spec.crew.length === 2 ? FORE.filter(f => f !== 'aft') : FORE, cur = c.place?.[part] ?? (part === 'across' ? autoAcross(w.user) : 'mid');
   setPlace(part, list[Math.max(0, Math.min(list.length - 1, list.indexOf(cur) + d))] as PlaceAcross | PlaceFore);
 }
 const showCrewPlace = () => showCrewRow(w.user);

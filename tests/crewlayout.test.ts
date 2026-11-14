@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newCrew } from '../src/boat/crewPhys';
-import { polar } from '../src/boat/polar';
+import { polar, beatAngle } from '../src/boat/polar';
 import { settleTrim } from '../src/boat/physics';
-import { KT } from '../src/core/math';
+import { KT, n360 } from '../src/core/math';
 import { testBoat, sail } from './helpers/testBoat';
 
 // The bow hand to the mast downwind without the pole (crewPhys.ts chooseLayout): judged at the speed she sails in the
@@ -30,5 +30,18 @@ describe('The bow hand to the mast, without the pole (crewPhys.ts chooseLayout)'
     const r = layouts(polar(6, 160, 'jib') / KT, 6, 200, () => 160);
     expect(r.last).toBe('mast');
     expect(r.mastS).toBeGreaterThan(120);
+  }, 300_000);
+  it('with the bow hand gone to the mast, the sheets are still trimmed: the helm takes them (crewWork.ts ownerOf)', () => {
+    // (bearing away from a beat to a run in 6 kt: as the bow hand went forward holding the mainsheet, the helm on the
+    // jib, neither sheet was trimmed again: 58/64 for minutes, against 70/68 with two crew)
+    const sheets = (n: number) => {
+      const W = 6, bt = beatAngle(W), b = testBoat({ heading: n360(bt), kt: 3, windKt: W }); b.crew = newCrew(spec(n), 'S'); settleTrim(b, b.ww.from, b.ww.kt);
+      sail(b, 200, t => { b.h = n360(t < 60 ? bt : Math.min(160, bt + (t - 60) * 8)); });
+      return { layout: b.crew!.layout, main: b.sheets.main, jib: b.sheets.jib };
+    };
+    const one = sheets(1), two = sheets(2);
+    expect(one.layout).toBe('mast');
+    expect(Math.abs(one.main - two.main), 'main').toBeLessThan(3);
+    expect(Math.abs(one.jib - two.jib), 'jib').toBeLessThan(3);
   }, 300_000);
 });
