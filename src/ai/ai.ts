@@ -191,7 +191,7 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   const seen = new Set([...(ai.esc?.ids.split(',').map(k => k.slice(1)) ?? []), ...expected.map(String)]);
   const delay = threats.every(o => seen.has(String(o.id))) ? 0.2 : ai.kn.reactS;
   const toCourse = Math.round(wrap(aimH - b.h)), turns = [...(Math.abs(toCourse) > 3 ? [toCourse] : []), ...ESC_TURNS];
-  const me = { x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 };
+  const me = { x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 };
   // (one prediction for all the boats of a kind, her gap to each read separately: boat/arcs.ts Candidate.gaps)
   const run = (bs: Boat[]) => bs.length ? escapes(me, bs.map(onward), b.ww.from, { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT, windKt: b.ww.kt }) : null;
   const threatsG = run(threats);
@@ -962,7 +962,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     && Math.abs(wrap(desired - b.h)) > 20 && Math.abs(wrap(ww.from - b.h)) > beatFor(b) - 5 && !blocked(w, b, b.h, 45)) {
     const close = w.boats.filter(o => o !== b && !o.finished && dist(o, b) < 40);
     if (close.length) {
-      const [c] = escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0 },
+      const [c] = escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 },
         close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT, windKt: ww.kt }).filter(q => q.turn !== 0);
       if (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SAG_M) {
         desired = b.tack === 'S' ? csS : csP; tackHeld = true;
