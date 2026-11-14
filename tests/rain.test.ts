@@ -20,7 +20,7 @@ describe('Real rain from the record (environment/rain.ts)', () => {
     expect(at('2026-11-13', '12:15').level).toBe(2);
   });
   it('the same day: light early, dry by mid-afternoon', () => {
-    expect(at('2026-11-13', '08:15').level).toBe(1);
+    expect(at('2026-11-13', '07:10').level).toBe(1); expect(at('2026-11-13', '08:15').level).toBe(0); // (07:00 measured 0.3 mm; 08:00, -RA that measured nothing)
     expect(at('2026-11-13', '15:00').level).toBe(0);
   });
   it('a dry day in the record is dry, observed (the archive from 2021)', () => {

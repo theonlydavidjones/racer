@@ -21,7 +21,8 @@ const wetter = (a, b) => a === 255 ? b : b === 255 ? a : RANK[a] >= RANK[b] ? a 
 export function remarkEvents(raw, ms) {
   const rmk = (raw ?? '').split(' RMK ')[1]; if (!rmk) return [];
   const out = [], t = new Date(ms), hh = t.getUTCHours(), mi = t.getUTCMinutes();
-  for (const m of rmk.matchAll(/\b(?:SH|TS|FZ)?(RA|DZ)((?:[BE]\d{2}(?:\d{2})?)+)\b/g)) {
+  // (groups run together, "DZE20RAB20", "TSB18RAB12": no word boundaries)
+  for (const m of rmk.matchAll(/(RA|DZ)((?:[BE]\d{2}(?:\d{2})?)+)/g)) {
     for (const e of m[2].matchAll(/([BE])(\d{2})(\d{2})?/g)) {
       // (two digits: the minute, in the hour up to the report; four: the UTC hour and minute, on or before it)
       const back = e[3] != null ? ((hh * 60 + mi) - (+e[2] * 60 + +e[3]) + 1440) % 1440 : (mi - +e[2] + 60) % 60;
@@ -61,10 +62,11 @@ export function encodeDays(reports) {
   return days;
 }
 
-/** Merge two encodings of a day: `keep` wins where it has a report, `fill` fills its gaps. */
+/** Merge two encodings of a day: the weather, `keep`'s where it has a report, `fill`'s in its gaps; each hour's rain, the
+ * more of the two (one may have missed the hour's routine report, which carries its total). */
 export function mergeDay(keep, fill) {
   if (!fill || fill.length !== keep.length) return keep;
-  return keep.map((x, i) => x === 255 ? fill[i] : x);
+  return keep.map((x, i) => x === 255 ? fill[i] : i < 24 && fill[i] !== 255 ? Math.max(x, fill[i]) : x);
 }
 export const b64 = a => Buffer.from(a).toString('base64');
 export const unb64 = s => s ? new Uint8Array(Buffer.from(s, 'base64')) : null;
@@ -78,8 +80,11 @@ export function slotLevel(a, s) {
   let anyCode = false; for (let k = 0; k < 4; k++) { const c = a[24 + h * 4 + k]; if (c !== 255 && c > 0) anyCode = true; }
   const byAmount = () => mm == null ? null : mm >= MODERATE_SPLIT_MM ? 2 : mm >= MEASURABLE_MM ? 1 : 0;
   if (code === 255) return anyCode ? null : byAmount();
-  if (code === 0) return anyCode ? 0 : byAmount();
-  if (code === 4) return mm != null && mm >= MEASURABLE_MM ? 1 : 0; // (drizzle: rain only when the hour's fall was measurable)
+  if (code === 0) return anyCode || mm == null ? 0 : byAmount(); // (reported dry: dry, its amount missing or not)
+  // (drizzle, or light rain in an hour that measured less than 0.01 in: the fog's drizzle and drip, which the automated
+  // sensor reports as light rain, not the scene's rain; light rain with the hour's amount missing stays rain)
+  if (code === 4) return mm != null && mm >= MEASURABLE_MM ? 1 : 0;
+  if (code === 1 && mm != null && mm < MEASURABLE_MM) return 0;
   if (code === 3) return 2;
   if (code === 2) return mm != null && mm >= MODERATE_SPLIT_MM ? 2 : 1;
   return 1;

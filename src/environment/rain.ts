@@ -54,8 +54,11 @@ export function slotLevel(a: Uint8Array, s: number): RainLevel | null {
   let anyCode = false; for (let k = 0; k < 4; k++) { const c = a[24 + h * 4 + k]; if (c !== 255 && c > 0) anyCode = true; }
   const byAmount = (): RainLevel | null => mm == null ? null : mm >= MODERATE_SPLIT_MM ? 2 : mm >= MEASURABLE_MM ? 1 : 0;
   if (code === 255) return anyCode ? null : byAmount();
-  if (code === 0) return anyCode ? 0 : byAmount();
+  if (code === 0) return anyCode || mm == null ? 0 : byAmount(); // (reported dry: dry, its amount missing or not)
+  // (drizzle, or light rain in an hour that measured less than 0.01 in: the fog's drizzle and drip, which the automated
+  // sensor reports as light rain, not the scene's rain; light rain with the hour's amount missing stays rain)
   if (code === 4) return mm != null && mm >= MEASURABLE_MM ? 1 : 0;
+  if (code === 1 && mm != null && mm < MEASURABLE_MM) return 0;
   if (code === 3) return 2;
   if (code === 2) return mm != null && mm >= MODERATE_SPLIT_MM ? 2 : 1;
   return 1;
