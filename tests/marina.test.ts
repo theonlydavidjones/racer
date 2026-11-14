@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
 import { DT, SHOVE, World, slipLeadTime } from '../src/sim/world';
 import { n360 } from '../src/core/math';
+import { BOOM_STOP } from '../src/boat/controls';
 
 describe('West Harbor', () => {
   it('a basin you can sail in, with its docks and breakwaters solid', () => {
@@ -105,6 +106,16 @@ describe('West Harbor', () => {
     for (const b of w.boats.slice(1)) expect(inBasin(b)).toBe(false);
     for (let i = 0; i < 60 * 30; i++) w.step(DT); // half a minute: no flags yet, still made fast
     expect(w.flags.length).toBe(0); expect(u.docked).toBeTruthy();
+  });
+  it('made fast with her sails up, both weathervane: the boom out to the shroud and the jib let fly, to leeward', () => {
+    const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
+    const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'race', raceFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14' };
+    const w = new World(COURSES[0], S, 1), u = w.user;
+    u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
+    for (let i = 0; i < 60 * 10; i++) w.step(DT);
+    expect(u.docked).toBeTruthy();
+    const lee = u.tack === 'S' ? -1 : 1;
+    expect(u.boom * lee).toBeCloseTo(BOOM_STOP, 0); expect(u.jib * lee).toBeCloseTo(35, 0);
   });
 });
 

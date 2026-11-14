@@ -14,7 +14,8 @@ import { outlookFor } from '../sim/outlook';
 import { beatAngle } from '../boat/polar';
 import { bigMoments, gapWords, legWords, rivalWho, versus, type VsInput } from '../replay/versus';
 import { V, brg, dist, wrap } from '../core/math';
-import { ptsText, raceScores, scoreOrder, type ScoreOut } from '../rules';
+import { RULES, hearings, ptsText, raceScores, scoreOrder, type Decision, type ScoreOut } from '../rules';
+import { ReplayView } from '../replay/replayView';
 import { keepSeasonRace } from '../club/season';
 import { placeAmong, realRace } from '../sim/realRaces';
 import type { Boat } from '../boat/boat';
@@ -40,7 +41,7 @@ function vsInput(log: NonNullable<typeof app.w.log>): VsInput {
   const off = Math.abs(wrap(brg(C.center.x - last.x, C.center.y - last.y) - wind)), fin = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
   return {
     frames: app.w.track, you: app.w.user.id, startTimes: app.w.startTimes, marks: log.boatMarks, from: C.center, finishLine: [C.pin, C.committee],
-    boats: (sc => app.w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD', points: sc.get(b.id)!.points })))(scores()),
+    boats: (sc => app.w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD' || sc.get(b.id)!.code === 'DSQ', points: sc.get(b.id)!.points })))(scores()),
     legs: [...C.marks.map(m => ({ name: m.name, to: m.p, kind: m.leg })), { name: 'the finish', to: C.center, kind: fin as 'beat' | 'reach' | 'run' }]
   };
 }
@@ -128,9 +129,9 @@ function realLine(): string | undefined {
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; app.send({ k: 'pause', on: false }); };
 $('bRestart').onclick = () => { $('pause').hidden = true; app.beginRace(); };
-$('bSettings').onclick = () => { $('pause').hidden = true; app.openSetup(); };
+$('bSettings').onclick = () => { $('pause').hidden = true; app.toSetup(); };
 $('bAgain').onclick = () => { $('results').hidden = true; app.beginRace(); };
-$('bSet2').onclick = () => { $('results').hidden = true; app.openSetup(); };
+$('bSet2').onclick = () => { $('results').hidden = true; app.toSetup(); };
 
 
 /** The tactics debrief: what cost you time, most first, and your place at each mark. */
@@ -179,7 +180,7 @@ function outing(b: BoatSpec, isUser: boolean): Omit<LogEntry, 'kind' | 'title'> 
   };
 }
 /** The settings a race was sailed in, kept with your entry so you can sail it again (Run a past race). */
-const REPLAY_KEYS = ['tideTime', 'opponents', 'realRace', 'raceLength', 'windKind', 'windKt', 'windDir', 'windTurn', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'bias', 'raceFrom', 'crew', 'sea'] as const;
+const REPLAY_KEYS = ['tideTime', 'opponents', 'realRace', 'raceLength', 'windKind', 'windKt', 'windDir', 'windTurn', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'judging', 'bias', 'raceFrom', 'crew', 'sea'] as const;
 function raceSetup(): RaceSetup {
   const s: Record<string, unknown> = { tideDate: app.w.raceDate };
   for (const k of REPLAY_KEYS) if (app.S[k] !== undefined) s[k] = structuredClone(app.S[k]);
@@ -192,7 +193,7 @@ function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
   const title = `${app.w.C.title}${app.w.courseSignal ? ` (course ${app.w.courseSignal.no})` : ''}`, out: LogEntry[] = [];
   rows.forEach(b => {
     const spec = b.isUser ? app.S.boat : b.spec && app.S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
-    const dsq = b.scoring === 'UFD' || b.scoring === 'BFD';
+    const dsq = b.scoring === 'UFD' || b.scoring === 'BFD' || sc.get(b.id)?.code === 'DSQ';
     const entry: LogEntry = { ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
       ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) };
     out.push(entry);
@@ -213,6 +214,10 @@ function logOuting(): void {
     // racing called off for the wind: no result, but the outing goes in her logbook
     app.send({ k: 'shown', logged: true });
     stage([{ ...outing(app.S.boat, true), kind: 'race', title: app.w.C.title, code: 'CXL', of: app.w.boats.length, setup: raceSetup() }]);
+  } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.userFinishT != null && heard().decisions.some(owesAnswer)) {
+    // you left with a protest against you unanswered: heard in your absence (RRS 63.1(b)), and the race logged so
+    for (const d of heard().decisions) if (owesAnswer(d)) answered.set(`${d.protest.vs}@${d.protest.t}`, 'hearing');
+    const sc = scores(); logRace(scoreOrder([...sc.values()], id => app.w.boats[id].finished ? app.w.boats[id].finishT : null).map(s => app.w.boats[s.id]), sc);
   } else if (app.S.mode === 'race' && !app.w.freeSail && app.w.t > 0 && app.w.userFinishT == null) {
     // you left the race before finishing: retired
     app.send({ k: 'shown', logged: true });
@@ -252,30 +257,91 @@ function settleLog(next: () => void): void {
 onSaveTrouble(msg => toast(msg, 6000));
 
 /** The race's scores (Low Point, with the Z flag's 20% added in points: rules/scoring.ts), by boat id. */
+/** Protests against you you've answered after the race (retired, RET, or chose the hearing), for this race's World. */
+const answered = new Map<string, 'retire' | 'hearing'>();
+let answeredFor: unknown = null, hearingView: ReplayView | null = null;
+/**
+ * The results' Protests section (the owner's design, 13 Nov 2026): each protest you're a party to. One against you:
+ * Retire (RET) or go to the hearing. Heard: the validity ticks (RRS 60.2), the facts found as tiles, and the decision.
+ */
+function protestSection(): void {
+  const w = app.w;
+  if (answeredFor !== w) { answered.clear(); answeredFor = w; }
+  const el = $('resProtests'), u = w.user, nm = (id: number) => id === u.id ? 'You' : `${w.boats[id].name} <span style="color:var(--muted)">${w.boats[id].no.replace(/^US\s+/, 'USA ')}</span>`;
+  const mine = heard().decisions.filter(d => d.protest.by === u.id || d.protest.vs === u.id);
+  el.hidden = !mine.length; if (!mine.length) { el.innerHTML = ''; return; }
+  const tick = (ok: boolean, what: string) => `<span class="${ok ? 'ok' : 'no'}">${ok ? '✔' : '✘'}</span> ${what}`;
+  const OUT: Record<Decision['outcome'], string> = { invalid: 'Protest invalid: not hailed and flagged at the first reasonable opportunity (Rule 60.4)', dismissed: 'Dismissed: no rule broken', exonerated: 'No penalty: exonerated (Rule 43.1)', penaltyTaken: 'Penalty taken: no further penalty (Rule 60.5(c)(2))', notRacing: 'No penalty: not racing (Part 2 preamble)', DSQ: 'Disqualified (Rule 60.5(c))', pending: 'Still racing: her turns still to do', retired: 'Retired (RET): nothing to decide' };
+  const clipOf = (t: number) => app.incidentClips.find(c => c.t != null && Math.abs(c.t - t) < 1.5);
+  el.innerHTML = '<h3>Protests</h3>' + mine.map((d, i) => {
+    const p = d.protest, key = `${p.vs}@${p.t}`, rule = d.rule && d.rule in RULES ? RULES[d.rule as keyof typeof RULES][0] : d.rule ? `Rule ${d.rule}` : 'no rule found';
+    const head = `<div class="pHead"><span>${nm(p.by)} protest${p.by === u.id ? '' : 's'} ${p.vs === u.id ? 'you' : nm(p.vs)} · ${rule}</span></div>`;
+    if (owesAnswer(d)) return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" class="ghost" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
+    const turns = p.owed == null ? '–' : !p.owed ? 'Declined' : p.turnsT != null ? 'Taken' : 'Not taken';
+    const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
+    return head + `<div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}${clipOf(p.t) ? ` &nbsp; <a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</div>`
+      + `<div class="pTiles">${tiles.map(([k, v]) => `<div class="pTile">${k}<b>${v}</b></div>`).join('')}</div>`
+      + `<div class="pDec${d.outcome === 'DSQ' ? ' bad' : ''}">${d.outcome === 'DSQ' ? `${p.vs === u.id ? 'You' : w.boats[p.vs].name}: ` : ''}${OUT[d.outcome]}</div>`;
+  }).join('');
+  el.querySelectorAll<HTMLButtonElement>('[data-pr]').forEach(b => b.onclick = () => {
+    const key = b.dataset.key!, how = b.dataset.pr as 'retire' | 'hearing'; answered.set(key, how);
+    if (how === 'hearing') { showResults(); return; }
+    // (retired once the worker has it: the results then show RET)
+    app.send({ k: 'retire', why: ', answering a protest', afterFinish: true });
+    const t0 = performance.now(), wait = () => { if (app.w.user.retired || performance.now() - t0 > 3000) showResults(); else requestAnimationFrame(wait); }; wait();
+  });
+  el.querySelectorAll<HTMLAnchorElement>('[data-pclip]').forEach(a => a.onclick = e => {
+    e.preventDefault(); const c = clipOf(mine[Number(a.dataset.pclip)].protest.t);
+    // (in its own small canvas in the section: the incident overlay's Continue would let the finished race run on)
+    let cv = el.querySelector<HTMLCanvasElement>('canvas.pClip');
+    if (!cv) { cv = document.createElement('canvas'); cv.className = 'pClip'; a.closest('div')!.after(cv); }
+    if (c) { hearingView?.stop(); hearingView = new ReplayView(cv); hearingView.play(w, c.clip); }
+  });
+}
+
+/** A protest against you that would cost you (a DSQ, or not decided yet) that you haven't answered: Retire or Hearing. */
+function owesAnswer(d: Decision): boolean {
+  if (answeredFor !== app.w) { answered.clear(); answeredFor = app.w; }
+  const p = d.protest;
+  return p.vs === app.w.user.id && (d.outcome === 'DSQ' || d.outcome === 'pending') && !answered.has(`${p.vs}@${p.t}`);
+}
+
+/** The protest hearings, on the facts as they are now (rules/hearing.ts): the decisions and the boats disqualified
+ * (not you, until you've chosen the hearing over retiring). */
+function heard(): ReturnType<typeof hearings> {
+  // (a boat that has finished is through with her turns: 44.2, before she finishes; so not 'pending' once across)
+  const w = app.w, h = hearings(w.protests, id => { const b = w.boats[id]; return { id, racing: w.racing(b) && !b.finished, retired: !!b.retired }; });
+  if (h.decisions.some(owesAnswer)) h.dsq.delete(w.user.id);
+  return h;
+}
+
 function scores(): Map<number, ScoreOut> {
   // the boats still racing, in the order they're in now (most marks rounded, then nearest the next), to project them
   const C = app.w.C, toGo = (b: Boat) => { const m = app.w.nextMark(b); return dist(b, m ? m.p : C.center); };
   const out = app.w.boats.filter(b => !b.finished && !b.retired).sort((a, b) => b.leg - a.leg || toGo(a) - toGo(b));
-  return new Map(raceScores(app.w.boats.map(b => ({ id: b.id, finishT: b.finished ? b.finishT : null, code: b.retired ? 'RET' : b.scoring ?? null, ahead: out.indexOf(b) }))).map(s => [s.id, s]));
+  const dsq = heard().dsq;
+  return new Map(raceScores(app.w.boats.map(b => ({ id: b.id, finishT: b.finished ? b.finishT : null, code: b.retired ? 'RET' : dsq.has(b.id) ? 'DSQ' : b.scoring ?? null, ahead: out.indexOf(b) }))).map(s => [s.id, s]));
 }
 
 function showResults(): void {
   app.send({ k: 'shown', finishShown: true }); app.resultsShown = true;
   // in order of points (RRS A4, 44.3(c)), then of time across the line for the boats still racing
   const sc = scores(), rows = scoreOrder([...sc.values()], id => app.w.boats[id].finished ? app.w.boats[id].finishT : null).map(s => app.w.boats[s.id]);
-  logRace(rows, sc);
+  if (!heard().decisions.some(owesAnswer)) logRace(rows, sc); // (your logbook entry once you've answered any protest against you)
   const mine = sc.get(app.w.user.id)!, place = mine.rank ?? rows.indexOf(app.w.user) + 1, tied = rows.filter(b => sc.get(b.id)!.rank === place && sc.get(b.id)!.points === mine.points).length > 1;
   const nth = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
   // a Z-flag place waits on the boats still racing: any of them finishing on fewer points beats her (44.3(c))
-  $('resTitle').textContent = mine.code === 'UFD' || mine.code === 'BFD' ? 'You were disqualified'
+  $('resTitle').textContent = mine.code === 'UFD' || mine.code === 'BFD' || mine.code === 'DSQ' ? 'You were disqualified' : mine.code === 'RET' ? 'You retired'
     : !mine.final ? `On points, you're likely ${nth(place)}: boats still racing can finish ahead of your ${ptsText(mine.points!)}`
     : place === 1 ? (tied ? 'You tied for first' : 'You won the race') : `You finished ${tied ? 'equal ' : ''}${nth(place)}`;
   const sr = app.w.startReport;
   $('resStart').textContent = sr ? `Your start: crossed ${sr.delay.toFixed(1)} s after the gun at ${sr.kt.toFixed(1)} kt, ${Math.round(sr.frac * 100)}% of the way from ${app.w.C.pinLabel} to ${app.w.C.committeeLabel}.` : 'No clean start recorded.';
-  const code = (b: Boat) => { const s = sc.get(b.id)!; return b.scoring === 'ZFP' ? ` · ZFP: ${Number.isInteger(s.across!) ? nth(s.across!) : `tied ${nth(Math.floor(s.across!))}`} across the line, +${ptsText(s.penalty)} points (Rule 30.2, 44.3(c))${s.final ? '' : '; her place waits on the boats still racing'}` : b.scoring ? ` · ${b.scoring}: disqualified (Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'})` : ''; };
-  const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
+  const code = (b: Boat) => { const s = sc.get(b.id)!; return b.scoring === 'ZFP' ? ` · ZFP: ${Number.isInteger(s.across!) ? nth(s.across!) : `tied ${nth(Math.floor(s.across!))}`} across the line, +${ptsText(s.penalty)} points (Rule 30.2, 44.3(c))${s.final ? '' : '; her place waits on the boats still racing'}` : b.scoring ? ` · ${b.scoring}: disqualified (${b.scoring === 'DSQ' ? 'turns not taken, Appendix UF3.4(a)(5)' : `Rule ${b.scoring === 'UFD' ? '30.3' : '30.4'}`})` : ''; };
+  const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' || s.code === 'DSQ' ? 'DSQ' : s.code === 'RET' && b.finished ? 'RET' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
   $('resBody').innerHTML = rows.map(b => `<tr><td>${rankOf(b)}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no.replace(/^US\s+/, 'USA ')}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td><td>${sc.get(b.id)!.points != null ? ptsText(sc.get(b.id)!.points!) : ''}</td></tr>`).join('');
-  $('resFouls').textContent = `Fouls you committed: ${app.w.fouls}. Fouls against you: ${app.w.fouledBy}.`;
+  $('resFouls').textContent = `Fouls you committed: ${app.w.fouls}. Fouls against you: ${app.w.fouledBy}.`
+    + (app.w.user.scoring === 'DSQ' ? ' You finished with your penalty turns not done: the umpire disqualified you (Appendix UF3.4(a)(5)).' : '');
+  protestSection();
   { const rr = app.realResults(); $('resReal').innerHTML = rr; $('resReal').hidden = !rr; }
   { const sl = app.seasonLine(); $('resSeason').innerHTML = sl; $('resSeason').hidden = !sl; }
   const db = debriefHtml('Your race, debriefed');

@@ -256,8 +256,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
     // (an urgent one is set right through to where they want it now: set to the lagging wish it was still well off after,
-    // and they were back for it seconds later)
-    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}) };
+    // and they were back for it seconds later. A trip to the foredeck (big: the line's PLACED_TRIP off) sets the line where
+    // it's wanted, not partway along the lagging wish: one trip, not two)
+    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo && !big ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}) };
     if (PIANO.has(k) && placed) (c.lineSet ??= {})[k] = c.clock ?? 0; // (placed by you: as before, from setting off)
   }
   // work: whoever's at their line works it
@@ -306,6 +307,10 @@ function carJob(b: Boat, dt: number): void {
   // she needs their weight on the rail (nor while you've put them somewhere: they stay where you put them)
   const worth = yours || (b.carOff > CAR.hold(skill) && off >= (skill > 0.4 ? 1 : 2) && (c.people[who].lean < 0.5) && (b.heelMag ?? 0) < 20 && c.place?.across == null);
   if (!worth || a.job) return;
+  // (their own wish waits while they're up on the foredeck on a run, forward of the mast: a lazy car's pin isn't worth the
+  // trip back aft and forward again; they set it on their way back, the car being aft of the mast. From the mast it's a
+  // step aft. Your call, they come for)
+  if (!yours && a.z < Z.mast - 0.5) return;
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
 }
 

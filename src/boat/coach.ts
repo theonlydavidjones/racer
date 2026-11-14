@@ -1,4 +1,5 @@
-import type { Boat, LineKey } from './boat';
+import { setOntoPier } from '../geo/fortMason';
+import { bow, stern, type Boat, type LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
 import { boomAngle, crewSolve, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerFor, type Controls } from './controls';
 import { crewMass, crewMoment, displacement } from './crewPhys';
@@ -8,7 +9,8 @@ import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
 import { byHand, crewMainAngle, leeDrift, sailPlan, sailPush, sailWind } from './physics';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
-import { KT, clamp } from '../core/math';
+import { KT, V, clamp } from '../core/math';
+import { inBasin } from '../geo/marina';
 import { TUNE_PRESETS, forestayTension, presetFor, tuneName, tuneWords } from './rigTune';
 
 /**
@@ -175,6 +177,11 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
   switch (k) {
     case 'mainsheet': {
       const was = b.sheets.main, will = clamp(boomAngle(withCrew(b, 'mainsheet', to)), SAILS.main.min, SAILS.main.max), n = Math.abs(will - was);
+      // the boom on the shroud and the main stalled (a broad reach): no sheet will ease it further. The vang lets the top
+      // twist off, or her course changes the angle
+      if (more && n < 1.5 && was >= SAILS.main.max - 0.5 && b.trim.main.flow === 'stalled') return { ...base, kind: 'info' as const, head: 'The boom\'s on the shroud: it can\'t go out any further.',
+        why: 'On this broad reach the main is still sheeted tighter than the wind angle wants, and the shroud stops the boom: the flow breaks off its back.',
+        look: 'ease the vang to let the top twist off, or bear away (or come up) until the leech telltales stream', done: 'main drawing' };
       // the boom barely moves (it's at its stop, or the crew's traveller keeps it where they want it): the sheet is the leech
       if (n < 1.5 && s.awa < 110) return more
         ? { ...base, head: `Ease the mainsheet ${easeAmount(d)}: open the leech.`, why: `The leech is closed tighter than ${tws} kt wants: the top of the main needs a little twist.`,
@@ -399,9 +406,19 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
 function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   const base = { id: 'ok', who: 'you', gain: 0, kind: 'ok' as const };
   if (b.docked) return { ...base, head: 'In her slip. Push off when you\'re ready.', why: '', look: '' };
+  // pushed off with no sail up and stopped in a harbor: no way on, so the rudder can't turn her (8m, the owner at Gashouse
+  // Cove). The ways out a sailor has: a sail up for way (the jib goes up at any angle but head to wind), the main hoisted at
+  // the dock held head to wind, or a paddle (Crew Controls' 8c, to add here when it lands)
+  if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && Math.hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
+    return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way.', why: '', look: 'which way the wind is setting her' };
+  // set toward Fort Mason's piers with little way on (the Gashouse Cove entrance, 8n): the stream or the wind carries her
+  // onto the piles in seconds (physics.ts piles); way on, and steer off
+  { const u = V(b.h), st = V(b.h + 90), hull = [bow(b), stern(b), ...[1, -1].flatMap(sg => [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + st.x * sg * 1.1, y: b.y + u.y * a + st.y * sg * 1.1 })))];
+    const set = !b.docked && !b.handled && !b.pushing ? setOntoPier(hull, b.vx ?? 0, b.vy ?? 0) : null;
+    if (set) return { ...base, kind: 'info', head: `Being set onto ${set.pier.name}: ${Math.max(1, Math.round(set.s))} s to the piles. Get way on and steer off.`, why: '', look: 'the pier\'s piles against the water: is the gap closing?' }; }
   if (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) return { ...base, head: 'Sails going up (or down): the coach waits until they\'re set.', why: '', look: '' };
   if (b.luff) return { ...base, kind: 'info', head: 'Sails eased right out: she\'s slowing.', why: 'Easing both sails until they flog is the brake: she coasts to a stop.', look: 'the speedo; trim back in to go' };
-  if (b.tacking || b.turnTarget != null) return { ...base, kind: 'info', head: s.twa < 90 ? 'Through the tack: the crew is changing the jib over.' : 'Through the gybe: the boom is coming across.', why: '', look: s.twa < 90 ? 'the new jib telltales once she\'s settled on the new tack' : 'the boom: duck' };
+  if (b.tacking || b.turnTarget != null) return { ...base, kind: 'info', head: s.twa < 90 ? 'Through the tack: the crew is changing the jib over.' : 'Through the jibe: the boom is coming across.', why: '', look: s.twa < 90 ? 'the new jib telltales once she\'s settled on the new tack' : 'the boom: duck' };
   if (ctx.preStart) return { ...base, kind: 'info', head: `Pre-start: trim's set. ${s.speedKt.toFixed(1)} kt; ease to slow, trim to go.`, why: '', look: 'the line and the clock' };
   // the crew's sheets a moment behind a change of course, or she's still getting going: not "right" yet
   // (not the main eased on purpose in a breeze: that's the crew depowering)

@@ -252,6 +252,57 @@ export function hullClear(c: Vec, h: number): boolean {
   return true;
 }
 
+
+/**
+ * The boats lying in the marinas' slips: which slips have one, and the boat (kind, length, colours). Chosen here, once, the
+ * same way for the sim and the drawing (render/marina.ts), so a slip that looks empty is empty: she can berth in it, and her
+ * hull can't pass through a boat that's drawn. Drawn from a fixed seed per harbor, so every session has the same boats.
+ *
+ * How many slips are taken: the San Francisco Marina "only about 87% occupied" (Latitude 38, "With Expansion of San
+ * Francisco Marina Now Scrapped, the Financial Futures of East and West Harbor Are Uncertain", 2024, from the city's Budget
+ * and Legislative Analyst's report of January 2024); elsewhere 78%, an estimate (no figure found). The share of powerboats is
+ * an estimate too (the harbors' own figures weren't found: the city's fee analysis on sfbos.org wasn't reachable).
+ */
+const OCCUPIED: Record<string, number> = { 'west-harbor': 0.87, 'gashouse-cove': 0.87 };
+const POWER_SHARE = 0.2;
+export type MooredKind = 'sail' | 'power';
+export interface MooredBoat { slip: Slip; kind: MooredKind; len: number; colour: number; cover: number }
+const mooredCache = new Map<string, MooredBoat[]>();
+function seeded(seed: number) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
+/** The boats in a harbor's slips (bow in, a little under the finger's length; hulls mostly white, some dark). */
+export function mooredIn(harborId: string): MooredBoat[] {
+  let out = mooredCache.get(harborId); if (out) return out;
+  const H = harborOf(harborId); out = [];
+  if (H) {
+    const r = seeded(11 + HARBORS.indexOf(H));
+    const HULLS = [0xf6f4ee, 0xf6f4ee, 0xf6f4ee, 0xefece2, 0xefece2, 0xe4e0d4, 0x1f3550, 0x2b4a3a, 0x8a2a24], COVERS = [0x1f4f7a, 0x1f4f7a, 0x16314f, 0xb59a6a, 0x6e2a2a, 0x3d5c47];
+    for (const s of SLIPS) {
+      if (s.marina !== H.id) continue;
+      const keep = r() <= (OCCUPIED[H.id] ?? 0.78), len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = HULLS[Math.floor(r() * HULLS.length)], cover = COVERS[Math.floor(r() * COVERS.length)];
+      const kind: MooredKind = r() < POWER_SHARE ? 'power' : 'sail';
+      if (keep) out.push({ slip: s, kind, len, colour: kind === 'power' ? HULLS[Math.floor(r() * 6)] : colour, cover }); // (powerboats in white gelcoat)
+    }
+  }
+  mooredCache.set(harborId, out); return out;
+}
+const takenCache = new Map<string, Set<string>>();
+/** Whether a boat lies in this slip (her own home slip aside: that's hers, kept for her). */
+export function slipTaken(s: Slip): boolean {
+  let t = takenCache.get(s.marina); if (!t) takenCache.set(s.marina, t = new Set(mooredIn(s.marina).map(b => b.slip.id)));
+  return t.has(s.id);
+}
+
+/** Whether a point is inside a boat lying in a slip (one that has a boat: mooredIn), as drawn: for her hull at the dock. */
+export function hitsMooredBoat(p: Vec, except?: Slip): boolean {
+  const H = harborAt(p); if (!H) return false;
+  for (const o of slipsNear(p, H.id)) {
+    if (!slipTaken(o) || o === except) continue;
+    const dx = p.x - o.p.x, dy = p.y - o.p.y; if (dx * dx + dy * dy > 64) continue;
+    const u = { x: Math.sin(o.heading * Math.PI / 180), y: Math.cos(o.heading * Math.PI / 180) }, b = boatIn(o);
+    if (Math.abs(dx * u.x + dy * u.y) < b.half && Math.abs(dx * u.y - dy * u.x) < b.beam) return true;
+  }
+  return false;
+}
 /** Where the boat in another slip lies (a little under the length of its finger, as drawn: render/marina.ts), for keeping clear of her. */
 const boatIn = (o: Slip) => { const len = o.kind === 'alongside' ? 7 : Math.min(13, Math.max(7, o.finger * 1.05)); return { half: len / 2, beam: 0.17 * len }; }; // (as drawn, at their longest: render/marina.ts)
 /** The slips filed in 10 m cells, per harbor, each in its own cell and the eight round it (no boat reaches more than 7 m from her slip's middle). */
@@ -277,7 +328,10 @@ function cornersNear(q: Vec, marina: string): Vec[] {
   }
   return g.get(cellKey(q.x, q.y)) ?? [];
 }
-/** Clear of the boats lying in the other slips (all of them: most have a boat in them)? */
+/**
+ * Clear of the boats lying in the other slips? The push-off planner takes every other slip as full (most are: mooredIn), so
+ * she's never swung into a neighbor's berth, and never through a boat that's drawn.
+ */
 function clearOfBoats(q: Vec, except: Slip): boolean {
   for (const o of slipsNear(q, except.marina)) {
     if (o === except) continue;
@@ -294,9 +348,12 @@ const HALF_L = 3.8, HALF_B = 1.1;
  * finger is wide (0.95 m along her, 0.55 m across), and the other way round too: no corner of a dock or of a moored boat
  * inside her outline.
  */
-export function berthClear(c: Vec, h: number, except: Slip): boolean {
+export function berthClear(c: Vec, h: number, except: Slip, fine = false): boolean {
   const u = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }, n = { x: u.y, y: -u.x };
-  for (let a = -3.7; a <= 3.71; a += 0.925) for (let b = -1.05; b <= 1.06; b += 0.525) {
+  // (her hull sampled about every 0.9 m along and 0.5 m across; `fine`, twice as closely, so a thin dock or finger edge
+  // can't slip between the samples as she turns: the physics review)
+  const da = fine ? 0.4625 : 0.925, db = fine ? 0.2625 : 0.525;
+  for (let a = -3.7; a <= 3.71; a += da) for (let b = -1.05; b <= 1.06; b += db) {
     const q = { x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b };
     if (!inBasin(q) || hitsHarbor(q) || !clearOfBoats(q, except)) return false;
   }
@@ -344,6 +401,38 @@ const BOW = 3.8;
  * her bow is about 50 N·m, which a crew member could still hold; but by then they're aboard, holding the line, not pushing.
  */
 export const WIND_SWINGS = 4;
+/**
+ * Where she's turned as she's let go from head to wind: pushed off for the main, about her bow on the bow line. (Winding
+ * her round on a stern line to point downwind was tried and taken out, from the physics review, 14 Nov 2026: on the
+ * sim's own dock-line physics she turns about her middle, her stern swinging 3–4.5 m sideways, in a time the wind sets,
+ * not a pivot about her stern. To come back through boat/dockLines.ts, with a real stern line.)
+ */
+export const holdPivot = (_off: number): number => BOW;
+/** How far the World lets her follow the wind while she's held head to wind on the line (deg, either way: world.ts). */
+export const HOLD_FOLLOW = 20;
+/**
+ * Her hold and release from head to wind clear of everything: held, anywhere she may follow the wind to (HOLD_FOLLOW,
+ * about her bow on the line), and let go from any of those, turned by `off` about holdPivot; every 2 degrees, the hull
+ * sampled finely (berthClear's `fine`), from the pose she starts in. Choosing among the ways, a quick look (`coarse`).
+ */
+function releaseClear(c0: Vec, h0: number, off: number, s: Slip, coarse = false): boolean {
+  const piv = holdPivot(off), sweep = (f: number, step: number, fine: boolean) => {
+    const q0 = about(c0, h0, BOW, f), n = Math.ceil(Math.abs(off) / step);
+    for (let k = 0; k <= n; k++) { const q = about(q0.c, q0.h, piv, off * k / n); if (!berthClear(q.c, q.h, s, fine)) return false; }
+    return true;
+  };
+  if (coarse) return sweep(0, 10, false);
+  // (held: the arc she may follow the wind through, about her bow)
+  for (let f = -HOLD_FOLLOW; f <= HOLD_FOLLOW; f += 2) { const q = about(c0, h0, BOW, f); if (!berthClear(q.c, q.h, s, true)) return false; }
+  // (let go: from where she came to, and from either end of the follow; between them the review found nothing these miss)
+  return sweep(0, 10, false) && sweep(0, 2, true) && sweep(-HOLD_FOLLOW, 2, true) && sweep(HOLD_FOLLOW, 2, true);
+}
+/** Let go held off the wind by `off`, after following it by `f`: the room ahead to gather way (10 m), along her path as
+ * she rounds up (WANDER) and as she sags to leeward (LEE_SAG). */
+function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
+  const q0 = about(c0, h0, BOW, f), e = about(q0.c, q0.h, holdPivot(off), off);
+  return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(off) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(off) * LEE_SAG);
+}
 const plans = new Map<string, PushOff>();
 export function pushOffPlan(s: Slip, windFrom?: number, windKt = 0): PushOff {
   const from = windFrom == null ? undefined : Math.round(windFrom / 10) * 10, kt = from == null ? 0 : Math.round(windKt / 2) * 2; // (the wind to 10 degrees, 2 knots)
@@ -411,7 +500,7 @@ export function pushOffPoses(s: Slip, p: PushOff): { c: Vec; h: number }[] {
   if (p.kind === 'astern') { for (let d = p.back + 0.5; d < p.back + p.coast; d += 0.5) out.push({ c: at(d), h: s.heading }); out.push({ c: at(p.back + p.coast), h: s.heading }); }
   if (p.kind === 'swing') {
     for (let k = 1; k <= 24; k++) out.push(about(at(p.back), s.heading, BOW, p.turn * k / 24));
-    if (p.hold) { const last = out[out.length - 1]; for (let k = 1; k <= 8; k++) out.push(about(last.c, last.h, BOW, p.hold.off * k / 8)); }
+    if (p.hold) { const last = out[out.length - 1], piv = holdPivot(p.hold.off), n = Math.ceil(Math.abs(p.hold.off) / 2); for (let k = 1; k <= n; k++) out.push(about(last.c, last.h, piv, p.hold.off * k / n)); } // (every 2 degrees)
   }
   return out;
 }
@@ -479,45 +568,53 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // which way the wind swings her stern: downwind, so her bow comes round toward the wind
   const fromBow = windFrom == null ? 0 : Math.abs(wrap180(windFrom - s.heading)); // (0: the wind blowing straight out of the slip, already on her bow)
   const windTurn = windFrom == null ? 0 : Math.sign(wrap180(windFrom - s.heading)) || 1;
-  const swings = windFrom != null && windKt >= WIND_SWINGS && fromBow < 165; // (the wind has the say; blowing straight into the slip from astern, it could swing her either way: the crew's choice)
+  const windSwings = windFrom != null && windKt >= WIND_SWINGS && fromBow < 165; // (the wind has the say; blowing straight into the slip from astern, it could swing her either way: the crew's choice)
   // her bow held on a short bow line by a crew member on the finger's end, half a metre to two and a half past it (the boats
   // in the slips either side overhang their fingers' ends: her bow has to clear their sterns as she swings)
   type Way = { back: number; turn: number; h: number; gain: number; run: number; hold?: { off: number } };
   const ways: Way[] = [];
   // (the turns searched in 12 steps; the one taken, checked in 24, and its push off the wind if she's held head to wind)
-  const fine = (w: Way) => { for (let k = 1; k <= 24; k++) { const q = about(at(w.back), s.heading, BOW, w.turn * k / 24); if (!berthClear(q.c, q.h, s)) return false; } if (w.hold) { const c0 = about(at(w.back), s.heading, BOW, w.turn); for (let k = 1; k <= 16; k++) { const q = about(c0.c, c0.h, BOW, w.hold.off * k / 16); if (!berthClear(q.c, q.h, s)) return false; } } return true; };
-  for (const gap of [0.5, 1, 1.5, 2, 2.5]) {
-    const back = tip + BOW + gap; if (back > reach) break;
-    const sweepClear = (turn: number, steps = 12) => { for (let k = 1; k <= steps; k++) { const q = about(at(back), s.heading, BOW, turn * k / steps); if (!berthClear(q.c, q.h, s)) return false; } return true; };
-    for (const sign of swings ? [windTurn] : [1, -1]) for (const sq of [90, 75, 105, 60, 120, 45, 135]) {
-      let turn = sign * sq;
-      // the wind swinging her: she comes round no further than head to wind (where she lies to the bow line)
-      let hold: { off: number } | undefined;
-      if (swings) {
-        const toWind = wrap180(windFrom! - s.heading) * sign; // (degrees to come round to point at the wind, the way she's swinging)
-        if (toWind >= 0 && toWind <= sq + 10) { // (0: already head to wind, the wind straight out of the slip: no swing to speak of, held there for the main)
-          turn = sign * toWind;
-          // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
-          // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
-          // and she falls back; and with the room ahead to gather way (GATHER), along her path as she rounds up (WANDER) and as
-          // she sags to leeward (LEE_SAG))
-          const c0 = about(at(back), s.heading, BOW, turn);
-          const offs = [60, -60, 50, -50, 40, -40].filter(o => { for (let k = 1; k <= 8; k++) { const q = about(c0.c, c0.h, BOW, o * k / 8); if (!berthClear(q.c, q.h, s)) return false; } const e = about(c0.c, c0.h, BOW, o); return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(o) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(o) * LEE_SAG); });
-          if (!offs.length) continue;
-          const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
-          hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
+  const fine = (w: Way) => { for (let k = 1; k <= 24; k++) { const q = about(at(w.back), s.heading, BOW, w.turn * k / 24); if (!berthClear(q.c, q.h, s)) return false; } if (w.hold) { const c0 = about(at(w.back), s.heading, BOW, w.turn); if (!releaseClear(c0.c, c0.h, w.hold.off, s)) return false; for (const f of [-HOLD_FOLLOW, HOLD_FOLLOW]) if (!letGoClear(c0.c, c0.h, w.hold.off, s, f)) return false; } return true; };
+  const search = (swings: boolean): void => {
+    for (const gap of [0.5, 1, 1.5, 2, 2.5]) { // (her bow past the finger's end on the bow line; no further: a line only pulls, and across the wind she'd lie down along the finger ends, not out in the fairway)
+      const back = tip + BOW + gap; if (back > reach) break;
+      const sweepClear = (turn: number, steps = 12) => { for (let k = 1; k <= steps; k++) { const q = about(at(back), s.heading, BOW, turn * k / steps); if (!berthClear(q.c, q.h, s)) return false; } return true; };
+      for (const sign of swings ? [windTurn] : [1, -1]) for (const sq of [90, 75, 105, 60, 120, 45, 135]) {
+        let turn = sign * sq;
+        // the wind swinging her: she comes round no further than head to wind (where she lies to the bow line)
+        let hold: { off: number } | undefined;
+        if (swings) {
+          const toWind = wrap180(windFrom! - s.heading) * sign; // (degrees to come round to point at the wind, the way she's swinging)
+          if (toWind >= 0 && toWind <= sq + 10) { // (0: already head to wind, the wind straight out of the slip: no swing to speak of, held there for the main)
+            turn = sign * toWind;
+            // held head to wind while the main goes up; then the crew pushes her bow off until the main fills (60 degrees off the
+            // wind; less, if that would point her into the docks, but never under 40: nearer the wind than that the main won't fill
+            // and she falls back; and with the room ahead to gather way (GATHER), along her path as she rounds up (WANDER) and as
+            // she sags to leeward (LEE_SAG))
+            const c0 = about(at(back), s.heading, BOW, turn);
+            // (or, with no room for that, wound round on a stern line to point downwind out of it: holdPivot)
+            const ok = (o: number) => {
+              // (pushed off for the main: about her bow, held on the line; the room ahead from where she came to: fine checks the rest)
+              return releaseClear(c0.c, c0.h, o, s, true) && letGoClear(c0.c, c0.h, o, s);
+            };
+            const offs = [60, -60, 50, -50, 40, -40].filter(ok);
+            if (!offs.length) continue;
+            const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
+            hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
+          }
+          if (sq !== 90 && !hold) continue; // (the wind takes her a quarter-turn round: no choosing the angle)
         }
-        if (sq !== 90 && !hold) continue; // (the wind takes her a quarter-turn round: no choosing the angle)
+        if (!sweepClear(turn)) continue;
+        const c1 = about(at(back), s.heading, BOW, turn), end = hold ? about(c1.c, c1.h, holdPivot(hold.off), hold.off) : c1, h = (end.h + 720) % 360;
+        const v = dirOf(h), run = runAhead(end.c, h, s);
+        const gain = togo({ x: end.c.x - v.x * 12, y: end.c.y - v.y * 12 }) - togo({ x: end.c.x + v.x * 12, y: end.c.y + v.y * 12 }); // (how much nearer the way out, along the water, she's pointed)
+        if (run >= (hold ? 8 : 12)) ways.push({ back, turn, h, gain: Number.isFinite(gain) ? gain : 0, run, hold });
+        if (swings) break; // (one way round, by the wind)
       }
-      if (!sweepClear(turn)) continue;
-      const end = about(at(back), s.heading, BOW, turn + (hold?.off ?? 0)), h = (end.h + 720) % 360;
-      const v = dirOf(h), run = runAhead(end.c, h, s);
-      const gain = togo({ x: end.c.x - v.x * 12, y: end.c.y - v.y * 12 }) - togo({ x: end.c.x + v.x * 12, y: end.c.y + v.y * 12 }); // (how much nearer the way out, along the water, she's pointed)
-      if (run >= (hold ? 8 : 12)) ways.push({ back, turn, h, gain: Number.isFinite(gain) ? gain : 0, run, hold });
-      if (swings) break; // (one way round, by the wind)
+      if (ways.some(w => w.gain > 15 && fine(w))) break; // (pointed well toward the way out: no need to hold her any further off)
     }
-    if (ways.some(w => w.gain > 15 && fine(w))) break; // (pointed well toward the way out: no need to hold her any further off)
-  }
+  };
+  search(windSwings);
   // the best: pointed most toward the way out (to within a couple of metres); then the shortest bow line and squarest turn (found first)
   const best = [...ways].sort((a, b) => Math.round(b.gain / 3) - Math.round(a.gain / 3)).find(fine);
   if (best) return { kind: 'swing', back: best.back, turn: best.turn, h: best.h, ...(best.hold ? { hold: best.hold } : {}), ...(headUp(best.h, windFrom) ? { headToWind: true } : {}) };

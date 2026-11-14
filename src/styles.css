@@ -9,3 +9,6 @@
 @import './styles/07-band.css'; /* the sail controls band */
 @import './styles/08-chase.css'; /* the chase-view layout, the flow view, real past races */
 @import './styles/09-audit.css'; /* the surface audit and after: menus, the field picker, the tactical debrief, the Members and Season tabs, Settings */
+@import './styles/10-setup-tight.css'; /* the setup's rows and tiles, the Drill page */
+@import './styles/11-lessons.css'; /* Learn to sail's lesson tiles (after UI's 10-setup-tight.css) */
+@import './styles/12-rules.css'; /* the Rules trainer (after Learn to sail's 11) */
