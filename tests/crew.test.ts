@@ -385,9 +385,10 @@ describe('A puff with someone away at a job (physics review)', () => {
 describe('The crew\'s places fore and aft and the trim the polar is sailed within', () => {
   it('hullTrim.ts TRIM.reach is the trim a standard crew gives her at their stations (crewPhys.ts stationZ), on the benches or the side deck', async () => {
     const { TRIM, trimFromMoment } = await import('../src/boat/hullTrim');
-    const { DEFAULT_CREW, stationZ } = await import('../src/boat/crewPhys');
-    const ref = [1.2, 1.8], at = (f: number, deck = false) => trimFromMoment(DEFAULT_CREW.crew.reduce((m, p, j) => m + p.w * (ref[j] - stationZ(j, 2, f, deck)), 0));
-    expect(TRIM.reach[0]).toBeCloseTo(at(0, true), 3); expect(TRIM.reach[1]).toBeCloseTo(at(0), 3);
+    const { DEFAULT_CREW, stationZ, slotOf } = await import('../src/boat/crewPhys');
+    // (each by their own slot, slotOf: the jib hand forward, the main trimmer aft; their reference places follow, 1.2 and 1.8)
+    const ref = [1.2, 1.8], at = (f: number, deck = false) => trimFromMoment(DEFAULT_CREW.crew.reduce((m, p, j) => m + p.w * (ref[slotOf(j, 2)] - stationZ(slotOf(j, 2), 2, f, deck)), 0));
+    expect(TRIM.reach[0]).toBeCloseTo(at(0, true), 4); expect(TRIM.reach[1]).toBeCloseTo(at(0), 4);
     // (their stations, wherever between Aft and Mid: they don't slide along; both forward of the winch is beyond it)
     expect(at(0.5)).toBeCloseTo(at(0), 6); expect(at(1)).toBeGreaterThan(TRIM.reach[1] + 0.02);
   });

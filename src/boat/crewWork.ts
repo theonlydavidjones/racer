@@ -167,7 +167,8 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
   // the crank's grip (Z.winchAft). To leeward, the arm is still out at the coaming (-0.75) as before: whether they'd sit
   // inside on the bench there (about -0.45) is the owner's to say (the physics review)
   // (the jib hand of two, whose seat is forward of the winch (crewPhys.ts slotOf), works it from there, the crank swept
-  // round from its forward side: not a walk aft past the winch to where the main trimmer sits after every tack)
+  // round from its forward side: not a walk aft past the winch to where the main trimmer sits after every tack. Both
+  // forward of the winch, the main trimmer sits there: then from aft of it, which is free, as before)
   const zw = front ? Z.deckFwd : Z.winchAft;
   if (line === 'jibsheet' && big && who !== 0) return breeze ? { arm: 0.45, z: zw, pose: 'winch' } : { arm: -0.75, z: zw, pose: 'winch' };
   return null;
@@ -367,7 +368,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (k === 'jibsheet' && a.job.station && PIANO.has(a.job.line) && e < JIB_HAUL && !placed) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
-    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze, n === 2 && who === 2);
+    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze, n === 2 && who === 2 && !ahead);
     // the sheets are in hand: no walk unless they're away from them
     const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold

@@ -720,7 +720,8 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
   // (in their order along the cockpit, front to back: the one whose place is forward keeps it. By their places, not
   // their numbers: with two crew the jib hand, people[2], is the forward one, slotOf)
-  out.sort((i, j) => tgt[i].z - tgt[j].z);
+  // (level, in their slots' order: the jib hand forward)
+  out.sort((i, j) => tgt[i].z - tgt[j].z || slotOf(i - 1, c.spec.crew.length) - slotOf(j - 1, c.spec.crew.length));
   for (let q = 1; q < out.length; q++) for (let r = 0; r < q; r++) {
     const a = tgt[out[r]], b = tgt[out[q]];
     // (and if there's no room aft for the one behind, the one ahead goes forward, as far as the winch lets them)

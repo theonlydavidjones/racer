@@ -1111,7 +1111,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet);
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)));
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
       const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
@@ -1128,7 +1128,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // (the crew's lines and the traveller, in that order (CREW_LINES, then 'traveller'), written out by name: the same values put in the same order, but each line's
   // reads its own, where a loop over the names made every read look up a different one: about 1% of the step)
   // (and the small ones together when they add up to a trip's worth: controls.ts worthTogether)
-  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, also = W && ready ? worthTogether(W, minGain) : null;
+  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, also = W && ready ? worthTogether(W) : null;
     const pick = (w: number | undefined, k: string) => (w ?? 1) >= minGain || !ready || !!also?.has(k);
     if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang, 'vang') ? t.vang : c.vang;
     if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
