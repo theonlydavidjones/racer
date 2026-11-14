@@ -831,7 +831,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // mast's foot and aft to the piano.
   { const ub = sheaveBlock(0.025, -0.05); ub.position.copy(VANG_SPAN).setY(VANG_SPAN.y + 0.05); boomPivot.add(ub);
     const under = BOOM_TOP - 2 * BOOM_R;
-    for (const z of VANG_LEGS) boomPivot.add(line([new THREE.Vector3(0, under, z), VANG_SPAN.clone().setY(VANG_SPAN.y + 0.05)], MAT.wire)); // the span's wire legs
+    for (const z of VANG_LEGS) {
+      boomPivot.add(line([new THREE.Vector3(0, under, z), VANG_SPAN.clone().setY(VANG_SPAN.y + 0.05)], MAT.wire)); // the span's wire legs
+      // each leg shackled to a stainless eye riveted under the boom
+      const eye = new THREE.Mesh(new THREE.TorusGeometry(0.01, 0.003, 6, 12), STEEL); eye.position.set(0, under - 0.008, z); boomPivot.add(eye);
+    }
     const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb);
     const jam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.05), BLACK); jam.position.copy(VANG_FOOT).add(new THREE.Vector3(0.03, -0.02, 0.02)); grp.add(jam); } // (the jammer on the lower block)
   const vang = line(Array.from({ length: 5 }, () => VANG_FOOT.clone()), 'main', 'vang'); grp.add(vang);

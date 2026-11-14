@@ -92,6 +92,7 @@ const { chromium } = require('playwright');
         for (let i = 0; i < pos.count; i++) {
           if (!o.isLineSegments && i > 0 && i < pos.count - 1) continue;
           q.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld); g.worldToLocal(q);
+          if (o.userData.inside && depth(q.x, q.y, q.z) > 0) continue; // (a line run inside her by design ends at a fitting below the deck, not drawn)
           if (!meets(q, o)) loose.push({ name, at: [+q.x.toFixed(2), +q.y.toFixed(2), +q.z.toFixed(2)] });
         }
         let run = null;
