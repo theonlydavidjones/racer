@@ -177,7 +177,21 @@
     <h1>Race</h1>
     <div class="modes">
       <button type="button" class="modecard" data-home="create"><b>Create a race</b><span>Your club, course, fleet, crew and start time, on any day: past days sail in their observed conditions</span></button>
+      <button type="button" class="modecard" id="bSeasonCard" data-home="season"><b>Season</b><span id="seasonCardSub"></span></button>
       <button type="button" class="modecard" id="bPast" data-home="past"><b>Past races</b><span>A real San Francisco Folkboat race on its day, or one of yours again: the same course, fleet, day and start</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- the season's overview (the owner approved design/season-flow): the calendar, the race chosen, the standings -->
+<div class="overlay" id="seasonView" hidden>
+  <div class="panel wide home seasonpage">
+    <button type="button" class="linkbtn back" id="seasonBack" data-home="back">‹ Race</button>
+    <div class="sv-head" id="svHead"></div>
+    <div class="sv-cal" id="svCal"></div>
+    <div class="sv-grid">
+      <div class="sv-card"><h3 id="svNextH"></h3><div id="svDock"></div><div class="sv-go"><button class="cta" id="bSailSeason" type="button">Sail</button></div></div>
+      <div class="sv-card"><h3 id="svStandH"></h3><div class="sv-tbl" id="svTable"></div></div>
     </div>
   </div>
 </div>
@@ -224,6 +238,7 @@
     <div class="sethead"><button type="button" class="linkbtn back" id="setupBack" data-home="back">‹ Race</button><h1 id="setupTitle">Create a race</h1></div>
     <div class="setgrid">
       <div class="steps">
+        <div class="sv-brief" id="seasonBrief" hidden></div>
         <!-- four rows on one grid (the owner OKd design/setup-tight): each a line of tiles and words, its controls open in place -->
         <section class="srow" id="row-course" data-row="course">
           <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
