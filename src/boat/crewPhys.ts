@@ -404,14 +404,17 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   if (!tacked && k.tackComing && canRoll && !c.roll) c.roll = { phase: 'lead', t: 0 };
   if (tacked) {
     const through = k.twa < 90;
-    c.roll = through && canRoll ? { phase: 'hold', t: 0, heel0: k.heel ?? 0 } : null;
+    c.roll = through && canRoll ? { phase: 'hold', t: 0 } : null;
     c.wind = w; c.side = k.tack;
   }
   if (c.roll) {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
-    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (k.heel ?? 0) - (c.roll.heel0 ?? 0) > ROLL_HEEL)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    // (her heel as she came through, read on the hold's first step after the tack: on the step they see the tack it can
+    // still be to leeward of the old one, and read the next step on the new, a jump of twice the roll that ended the hold)
+    else if (c.roll.phase === 'hold' && c.roll.heel0 == null && !tacked) c.roll.heel0 = k.heel ?? 0;
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (c.roll.heel0 != null && (k.heel ?? 0) - c.roll.heel0 > ROLL_HEEL))) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }
