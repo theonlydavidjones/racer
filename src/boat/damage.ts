@@ -34,14 +34,16 @@ export function impactEnergy(closing: number, m1: number, m2 = Infinity): number
   return 0.5 * mu * closing * closing;
 }
 
-/** The grade of a blow of `energy` J to a boat of `mass` kg, by what she struck: against the bands' energies at her
+/** The grade of a blow of `energy` J to a boat of `mass` kg (her displacement with her crew aboard, crewPhys.ts
+ * displacement(b): the band edges stay at DAMAGE_V's speeds whoever's aboard), by what she struck: against the bands' energies at her
  * mass (the energy she'd take hitting a fixed hard object square on at DAMAGE_V's speeds). */
 export function damageOf(energy: number, struck: Struck, mass: number): DamageLevel {
   if (struck === 'mud' || energy <= 0) return 'none';
   if (struck === 'ship') return 'wreck'; // (at any speed: WRECK-PROPOSAL §1)
   const lo = 0.5 * mass * DAMAGE_V.scrape ** 2, hi = 0.5 * mass * DAMAGE_V.wreck ** 2;
-  if (struck === 'dock') return 'scrape'; // (fendered: a hard bump, a note only)
-  if (struck === 'piles') return 'wreck'; // (set in under a pier's deck among its piles: the rig comes down on the deck's edge; a bow-first hit on a pier face is 'concrete')
+  if (struck === 'dock') return 'scrape'; // (fendered: a hard bump above 0.5 m/s, a note only; never damage)
+  // (piles graded as concrete by the blow: lying against them at a few cm/s is nothing. Set in under a pier's deck among
+  // them, the rig comes down on the deck's edge: a wreck whatever the speed, which the caller decides, Marinas)
   const band: DamageLevel = energy < lo ? 'scrape' : energy <= hi ? 'damage' : 'wreck';
   return struck === 'boat' && band === 'wreck' ? 'serious' : band;
 }
