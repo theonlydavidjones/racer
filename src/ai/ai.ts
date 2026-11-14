@@ -45,9 +45,8 @@ const SHORE_TURN = 15;
 /** Half a Folkboat's beam, m (2.20 m: NFIA class rules, principal dimensions). */
 const HALF_BEAM = 1.1;
 /** Overlapped and already parting, with at least 3 m of water between the hulls (about a beam and a half), a boat that
- * must keep clear is doing so: she holds on rather than ease and head up further. Measured between the centrelines
- * (rules hullGap), so the two half-beams are added. */
-const OPEN_GAP = 3 + 2 * HALF_BEAM;
+ * must keep clear is doing so: she holds on rather than ease and head up further. (rules hullGap: hull to hull.) */
+const OPEN_GAP = 3;
 /** Out of another boat's wind shadow on a run, she heads up this far (deg) onto a broad reach: it brings the apparent
  * wind forward and sends her sideways at about 0.4 of her speed, clear of a shadow a few metres wide (sim/world.ts
  * shadowAt, the wake model) in a few seconds; it costs her 1 − cos 25° ≈ 9% of her speed toward a mark downwind,

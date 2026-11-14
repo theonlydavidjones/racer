@@ -5,12 +5,12 @@ import { returning, rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, PoseRing, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
 
 /**
- * Hulls closer than this count as contact, m: measured centreline to centreline (geometry.ts hullGap), so exact for two
- * boats side by side at their widest (2 × 1.1 m half-beam), and early for a bow into a side (about 1.1 m there). No
- * published distance: rule 14's "contact" includes booms, rigging and crew (WS Case Book 2025–2028, Cases 7 and 49),
- * which touch before hulls do, so a margin is defensible.
+ * Hulls closer than this count as contact, m: between their outlines (geometry.ts hullGap, from the class's construction
+ * plan), so a bow into a stern touches when it does. A little more than none: a boat at 3 m/s moves 5 cm a step, and
+ * rule 14's "contact" includes booms, rigging and crew (WS Case Book 2025–2028, Cases 7 and 49), which reach past the
+ * hull; crew's hands and fenders are within this, a boom squared out on a run is not (docs/HULL-CONTACT.md).
  */
-export const CONTACT_GAP = 2.2;
+export const CONTACT_GAP = 0.15;
 /** When she last passed head to wind (a tack). Rule 20's hails are about tacking: a gybe neither answers "Room to tack"
  * nor does the hailing boat's duty to tack, so the hail logic reads this, not lastTackT (any change of tack). */
 const htw = (b: { headToWindT?: number }) => b.headToWindT ?? -Infinity;
@@ -124,9 +124,11 @@ export function hailBreach<B extends RulesBoat>(rec: PairRecord, A: B, B: B, t: 
  * Room for a Folkboat to pass between a boat and a mark or obstruction: her beam and a little, m. No metric figure in the
  * rules ("the space a boat needs ... while manoeuvring promptly in a seamanlike way", the definition Room; Case 103: a
  * "competent, but not expert, crew"). The cases' own clearances: a stern passed by 1 m or more was room (Case 35); one
- * passed within 0.6 m at hard-over helm wasn't keeping clear (Case 88). Her 2.2 m beam plus 1.3 m fits them.
+ * passed within 0.6 m at hard-over helm wasn't keeping clear (Case 88). 1.3 m between the hulls (geometry.ts hullGap) fits them.
  */
-export const ROOM_GAP = 3.5;
+export const ROOM_GAP = 1.3;
+/** A Folkboat's beam, m (2.20 m: NFIA class rules, principal dimensions), and half of it. */
+const BEAM = 2.2, HALF_BEAM = BEAM / 2;
 /** Rule 19: a boat this close to an obstruction (m) is at it, and needs room to pass it. */
 export const AT_OBSTRUCTION = 1.5 * LOA;
 
@@ -238,8 +240,7 @@ function poseAt(r: PoseRing, t: number): Pose {
  * Room; WS Case 103's "competent, but not expert" crew), s. A modelling choice (docs/ROOM-TO-RESPOND.md): human
  * reaction to a visual cue is about 0.7–1.5 s. */
 export const RESPOND_DELAY = 1;
-/** The gap that counts as having kept clear, m: hull to hull, a half metre more than touching (CONTACT_GAP is beam to
- * beam). Definitions, Keep Clear (b): the right-of-way boat "can also change course in both directions without
+/** The gap that counts as having kept clear, m: hull to hull, a half meter more than touching. Definitions, Keep Clear (b): the right-of-way boat "can also change course in both directions without
  * immediately making contact"; and the room is to be "seamanlike". A modelling choice. */
 export const KEEP_CLEAR_GAP = CONTACT_GAP + 0.5;
 /** Turns are judged over this long a window, s: long enough to see through the yaw a seaway gives her every wave. */
@@ -384,12 +385,12 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     let insideMark: number | null = null, markUnable = false, insideObst: number | null = null, obstUnable = false;
     if (!out && A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
       const mk = ctx.marks[A.leg], ins = markDist(A, mk) < markDist(B, mk) ? A : B, out = ins === A ? B : A;
-      insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP;
+      insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP + BEAM; // (from the outside boat's centerline to the mark's side: less her half-beam, the inside boat's beam and room)
     }
     const [oA, oB] = obstructionsFor(A, B, ctx, rec);
-    // (could the outside boat give room then: the space between the inside boat and the obstruction plus what lies between
-    // the two hulls, less her half-beam, against the room the inside boat needs: the old outside-distance test, whichever is nearer)
-    if (oA && oB) { const ins = insideAt(A, B, oA, oB), oi = ins === A ? oA : oB; insideObst = ins.id; obstUnable = oi.d + hullGap(A, B) - 1.1 < ROOM_GAP; }
+    // (could the outside boat give room then: the water between the inside boat's side and the obstruction (its distance
+    // is from her center, so less her half-beam) and between the two hulls, against the room she needs beyond her own beam)
+    if (oA && oB) { const ins = insideAt(A, B, oA, oB), oi = ins === A ? oA : oB; insideObst = ins.id; obstUnable = oi.d - HALF_BEAM + hullGap(A, B) < ROOM_GAP; }
     rec.ovStart = { t: ctx.t, astern, tacker, insideMark, markUnable, insideObst, obstUnable };
   } else if (!overlapped) rec.ovStart = null;
   rec.wasOverlapped = overlapped;
@@ -562,7 +563,8 @@ function boatObstruction<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec
     const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, wx = C.vx - (A.vx + B.vx) / 2, wy = C.vy - (A.vy + B.vy) / 2, ww = wx * wx + wy * wy;
     const tc = ww > 1e-4 ? clamp(-((C.x - mx) * wx + (C.y - my) * wy) / ww, 0, 15) : 0, cx = C.x + wx * tc, cy = C.y + wy * tc;
     const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - cx) * u.x + (X.y - cy) * u.y, -LOA / 2, LOA / 2), dx = X.x - cx - u.x * k, dy = X.y - cy - u.y * k, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
-    best = [{ d: dA, n: toward(A), continuing: false }, { d: dB, n: toward(B), continuing: false }]; bd = Math.min(dA, dB);
+    // (each from her center, as a shore's is: her half-beam on to her hull's gap)
+    best = [{ d: dA + HALF_BEAM, n: toward(A), continuing: false }, { d: dB + HALF_BEAM, n: toward(B), continuing: false }]; bd = Math.min(dA, dB);
   }
   return best;
 }

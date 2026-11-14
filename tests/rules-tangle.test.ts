@@ -52,9 +52,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   return got.length;
 }
 
-// (NEAR: over a metre wider than touching, so parted, and under a length; JUST: within a metre of touching, not parted,
-// though over a metre wider than the overlapped touch's g0 = 0; FAR: more than a length apart)
-const NEAR = CONTACT_GAP + 1.5, JUST = CONTACT_GAP + 0.5, FAR = LOA + 2;
+// (`apart` is between the centerlines, side by side: the 2.2 m beam plus the water between the hulls. NEAR: over a meter
+// wider than touching, so parted, and under a length; JUST: within a meter of touching, not parted, though over a meter
+// wider than the overlapped touch's g0 = 0; FAR: more than a length apart)
+const BEAM = 2.2, NEAR = BEAM + CONTACT_GAP + 1.5, JUST = BEAM + CONTACT_GAP + 0.5, FAR = BEAM + LOA + 2;
 describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appeal 65)', () => {
   it('a boat turning, without steerage way, touching the same boat again inside a length: one incident, AI or you', () => {
     expect(tangle({ vA: 0.3, apart: NEAR })).toBe(1);

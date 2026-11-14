@@ -77,7 +77,7 @@ describe('A boat as the obstruction (Definitions, Obstruction; rule 19, WS Case 
     const { PW, PL, extra } = setup();
     const p = pair(PL, PW, [], extra);
     expect(p.at(50)).toMatchObject({ keepsClear: 'PW', rule: '11', foul: null });
-    moveTo(PL, [10.3, 7.2], 20, 45); // PL luffs up into PW, toward S
+    moveTo(PL, [10, 7.5], 20, 45); // PL luffs up into PW, toward S
     expect(p.at(51).foul).toMatchObject({ by: 'PL', rule: '19', part: '19.2(b)' });
   });
   it('a boat neither of them has to keep clear of is no obstruction to them', () => {
