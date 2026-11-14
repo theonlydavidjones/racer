@@ -291,7 +291,14 @@
           <div class="t-pickrow"><span class="t-lab">Boat</span><span class="t-group"><span class="t-group" id="boatTiles"></span><button type="button" class="t-av" id="bBoat" title="Your boats, in the Yacht Club"><span class="t-tile t-add">+</span><small>Yacht Club</small></button></span></div>
           <select id="boatPick" class="pick" aria-label="The boat you'll sail" hidden></select><small id="boatSum" hidden></small><small id="crewSum" hidden></small>
           <div class="crewrows" id="crewRows"></div>
-          <div class="t-pickrow" id="raceFromRow"><span class="t-lab">Start</span><div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">Start by the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div></div>
+        </div>
+          </div>
+        </section>
+        <section class="srow" id="row-start" data-row="start">
+          <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
+          <div class="srow-body">
+        <div class="field step" id="raceFromBox">
+          <div class="seg" data-k="raceFrom" id="raceFromField"><button type="button" data-v="water">By the line</button><button type="button" data-v="slip" id="raceFromSlip">From her slip</button></div>
           <small id="raceFromNote"></small></div>
           </div>
         </section>

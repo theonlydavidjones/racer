@@ -75,6 +75,5 @@ button.t-av.dim:hover{opacity:.8}
 .drillpage .dsets .seg button{padding:7px 12px}
 .drillpage .dgo{padding:10px 20px;font-size:14px}
 #drillSide{display:flex;flex-direction:column;gap:12px}
-#drillView #raceFromRow,#drillView #raceFromNote{display:none}
 /* room under the When row while it's open, so it can scroll up and the date's calendar opens in full below it */
 .panel.whenroom{margin-bottom:380px}
