@@ -2,7 +2,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { addHarborLee } from '../environment/harborLee';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, apparent, asternCoast, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { defaultControls } from '../boat/controls';
@@ -22,7 +22,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { CONTACT_GAP, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
@@ -34,9 +34,11 @@ import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
-import { berthClear, harborOf, hitsHarbor, inBasin, pushOffPlan, slipById, slipPlace, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
+import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
+import { skillOf } from '../boat/crewPhys';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
@@ -288,7 +290,10 @@ export class World {
    * (44.2), and her turns there don't excuse the touches; the AI gets clear before it turns. */
   private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }>();
   private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
-  private fouledAt = new Map<number, { by: number; t: number }>();
+  /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
+   * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
+   * after the first sign of it; at most TANGLE_MAX after `t`). */
+  private fouledAt = new Map<number, { by: number; t: number; on: number; x: number; y: number }>();
   /** Recent headings per boat, one every 0.1 s, oldest first (for Rule 16.1). */
   private hHist: number[][] = [];
 
@@ -450,6 +455,9 @@ export class World {
 
   private emit = (e: SimEvent) => { this.events.push(e); };
   drainEvents(): SimEvent[] { const e = this.events; this.events = []; return e; }
+  /** Every rule incident, between any two boats, as it's judged (the AI's among themselves too, which raise no event):
+   * for the foul census (tests/calib/census.ts, npm run census). Not used by the game. */
+  onIncident?: (A: Boat, B: Boat, incident: Incident<Boat>) => void;
 
   private makeBoat(i: number): Boat {
     const isUser = i === 0, r = this.rng;
@@ -888,6 +896,7 @@ export class World {
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
+      if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
@@ -897,6 +906,7 @@ export class World {
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
+      if (b.mooring) this.mooringStep(b, dt); // (coming in: the hand at the shrouds, waiting to step)
     }
     // the waves: the field eased to its reference sea (waveRef) and turning with the course's mean wind about your boat,
     // and every boat's heave and pitch on it (boat/seaway.ts waveMotion)
@@ -1034,16 +1044,36 @@ export class World {
         const lf = this.lastFoul.get(b.id), lv = this.lastFoulVs.get(b.id);
         const atMark = !!lf && solidGap(lf, lf, touching) - touching.r < ENGAGED;
         const sameIncident = !!lf && this.t - lf.t < TANGLE_MAX && !b.penaltyDir && ((!!lv && lv.vs === lf.vs && !lv.clear) || atMark);
-        if (!sameIncident) {
+        // Rule 43.1: a boat that touches the mark as a consequence of another boat's breach against her is exonerated: under
+        // (a) "compelled" by it (WS Case 28: P's breaches made the mark bounce onto S), and under (b), entitled to mark-room
+        // or room, touching it "as a consequence of an incident with a boat required to give her that room or mark-room"
+        // (Case 95: Freebird, squeezed by Jagga, touched it and was exonerated). The sim's sign of either, a proxy for the
+        // rules' "as a consequence": a breach against her, here at this mark (within ENGAGED of it), still going on within
+        // COMPELLED_WINDOW of the touch (a squeeze can last), with the boat that broke it still on her and on her far side
+        // from the mark, pushing her toward it, not away. (Approximate both ways: 43.1(b) needs no breach by the other boat,
+        // so a squeeze the engine didn't flag goes unexcused; and it doesn't check she was sailing within her mark-room.)
+        const by = this.fouledAt.get(b.id), byBoat = by ? this.boats.find(o => o.id === by.by) : undefined;
+        // (the mark's nearest point to her: on the committee boat, a segment, its nearest point along the hull)
+        let mp: Vec = touching.p;
+        if (touching.q) {
+          const qx = touching.q.x - touching.p.x, qy = touching.q.y - touching.p.y;
+          const k = Math.max(0, Math.min(1, ((b.x - touching.p.x) * qx + (b.y - touching.p.y) * qy) / (qx * qx + qy * qy || 1)));
+          mp = { x: touching.p.x + qx * k, y: touching.p.y + qy * k };
+        }
+        const pushed = !!byBoat && (byBoat.x - b.x) * (mp.x - b.x) + (byBoat.y - b.y) * (mp.y - b.y) < 0;
+        const exonerated = !sameIncident && !!by && !!byBoat && this.t - by.on < COMPELLED_WINDOW && hullGap(b, byBoat) < ENGAGED
+          && pushed && solidGap(by, by, touching) - touching.r < ENGAGED;
+        if (!sameIncident && !exonerated) {
           addPenalty(b, ONE_TURN);
           this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id) });
         }
         if (b.isUser) {
-          if (!sameIncident) this.fouls++;
+          if (!sameIncident && !exonerated) this.fouls++;
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
             ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
-            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a gybe.` });
-        } else if (!sameIncident) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+            : exonerated ? `You touched ${touching.name}, forced onto it by ${byBoat!.name}'s foul: no penalty (Rule 43.1).`
+            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a jibe.` });
+        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
       }
       b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }
@@ -1178,9 +1208,19 @@ export class World {
         if (hailer.isUser) this.emit({ type: 'toast', ms: 3500, msg: `${hailed.name} is tacking to give you room. Tack now (Rule 20.2(d)).` });
       }
       if (incident) found.push({ A, B, incident });
+      // (a breach against one of them still going on, by its own signs, whoever has right of way now (a right-of-way
+      // boat's luff, 16.1, squeezes too): touching, the boat she's fouled by still making her swerve, or inside room-to-
+      // keep-clear distance and still closing. Only giving room again, overlapped round the mark, isn't one)
+      const fA = this.fouledAt.get(A.id), fB = this.fouledAt.get(B.id);
+      if ((fA && fA.by === B.id) || (fB && fB.by === A.id)) {
+        const g = hullGap(A, B), closing = (B.x - A.x) * (B.vx - A.vx) + (B.y - A.y) * (B.vy - A.vy) < 0;
+        for (const [V, F, fa] of [[A, B, fA], [B, A, fB]] as const) {
+          if (fa && fa.by === F.id && this.t - fa.t < TANGLE_MAX && (g < CONTACT_GAP || V.forced14 === F.id || (g < ROOM_GAP && closing))) fa.on = this.t;
+        }
+      }
     }
     // who fouled whom this step, before deciding penalties (Rule 43.1(a) needs the whole picture)
-    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t }); }
+    for (const { A, B, incident } of found) if (incident.kind !== 'hail') { const v = incident.fouler === A ? B : A; this.fouledAt.set(v.id, { by: incident.fouler.id, t: this.t, on: this.t, x: v.x, y: v.y }); }
     // (each boat's speed, and her velocity, before any contact this step takes her way off: a jam is judged on how they
     // were sailing, not on what the touch did to them)
     const pre = found.length ? new Map(this.boats.map(b => [b.id, { v: b.v, vx: b.vx, vy: b.vy }])) : null; // (only when there's something to judge)
@@ -1224,6 +1264,7 @@ export class World {
       if (incident.kind !== 'hail' && incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B) });
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
+      this.onIncident?.(A, B, incident);
       if (A.isUser || B.isUser) {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
@@ -1359,6 +1400,161 @@ export class World {
         else this.emit({ type: 'toast', ms: 3000, msg: `${b.name} was in the triangle in the last minute: ${b.scoring}.` });
       }
     }
+  }
+
+
+  /* ---------------- docking: coming in to any free berth, the lines going ashore (docs/DOCKING-PROPOSAL.md) ---------------- */
+  /** How far her rail is from the dock at `at` m forward of her middle, on `side`: stepping out until it's dock, up to 3 m (Infinity beyond). */
+  private gapAt(b: Boat, at: number, side: 1 | -1): number {
+    const s = Math.sin(b.h * D2R), c = Math.cos(b.h * D2R), r0 = cleatOf(b, { at, side });
+    for (let d = 0; d <= 3; d += 0.05) if (hitsHarbor({ x: r0.x + c * side * d, y: r0.y - s * side * d })) return d;
+    return Infinity;
+  }
+  /** The dock point abeam her cleat (a cleat on the dock's edge there), or null. */
+  private dockPointAbeam(b: Boat, at: number, side: 1 | -1): Vec | null {
+    const g = this.gapAt(b, at, side); if (!Number.isFinite(g)) return null;
+    const s = Math.sin(b.h * D2R), c = Math.cos(b.h * D2R), r0 = cleatOf(b, { at, side });
+    return { x: r0.x + c * side * (g + 0.15), y: r0.y - s * side * (g + 0.15) };
+  }
+  /**
+   * Where a line goes ashore: lined up with her berth, to the dock beside where that cleat of hers will lie once she's in
+   * it (the hand walks along the finger to the cleat there, so the line stops her in her berth); otherwise, abeam where the
+   * cleat is now.
+   */
+  private dockCleat(b: Boat, berth: Slip | null | undefined, at: number, side: 1 | -1, spring = false): Vec | null {
+    // (led at an angle, as dock lines are: the bow line forward, the stern line aft, a spring from amidships to a cleat
+    // well aft, so between them they hold her fore and aft as well as in; where the dock doesn't reach that far, abeam)
+    const lead = spring ? -3.0 : at > 2 ? 1.2 : at < -2 ? -1.2 : 0;
+    if (lead) { const q = this.dockCleatAt(b, berth, at + lead, side); if (q) return q; }
+    return this.dockCleatAt(b, berth, at, side);
+  }
+  private dockCleatAt(b: Boat, berth: Slip | null | undefined, at: number, side: 1 | -1): Vec | null {
+    if (berth && dist(b, berth.p) < 14) {
+      const lined = berth.kind === 'alongside' ? Math.abs(Math.abs(wrap(b.h - berth.heading)) - 90) > 55 : Math.abs(wrap(b.h - berth.heading)) < 35;
+      if (lined) {
+        const rev = berth.kind === 'alongside' && Math.abs(wrap(b.h - berth.heading)) > 90;
+        const pose = { x: berth.p.x, y: berth.p.y, h: rev ? n360(berth.heading + 180) : berth.heading } as Boat;
+        const q = this.dockPointAbeam(pose, at, side); if (q) return q;
+      }
+    }
+    return this.dockPointAbeam(b, at, side);
+  }
+  /** The free berths near her: empty slips, end ties and guest docks (her own slip is always hers), nearest first. */
+  freeBerthsNear(p: Vec, within = 16): Slip[] {
+    const H = harborAt(p); if (!H) return [];
+    const mine = this.homeSlip?.id;
+    return slipsIn(H.id).filter(s => (s.id === mine || !slipTaken(s)) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
+  }
+  /**
+   * Lines ready (the Crew panel, or G coming in): a hand goes to the shrouds on the dock's side with the line coiled (the bow
+   * line; sailing alone, you, with the midships line), to step off when she's close and slow enough. Again: stand down.
+   */
+  linesReady(): boolean {
+    const u = this.user;
+    if (u.docked || u.handled || (!this.cruising && !this.freeSail)) return false;
+    if (u.mooring && u.mooring.phase === 'ready') { u.mooring = undefined; this.emit({ type: 'toast', msg: 'Lines stood down.', ms: 2000 }); return true; }
+    if (u.mooring) return false;
+    const berth = this.freeBerthsNear(u)[0];
+    if (!berth) { this.emit({ type: 'toast', msg: 'No free berth here: come in by an empty slip, an end tie or a guest dock.', ms: 4000 }); return false; }
+    const gs = { 1: this.gapAt(u, 0.6, 1), [-1]: this.gapAt(u, 0.6, -1) } as Record<number, number>;
+    const side: 1 | -1 = gs[1] <= gs[-1] ? 1 : -1, solo = (u.crew?.spec.crew.length ?? 0) === 0;
+    u.mooring = { phase: 'ready', berth: berth.id, side, t: 0, lines: [], solo };
+    this.emit({ type: 'toast', msg: solo ? `Lines ready: you'll step off at the shrouds, ${side > 0 ? 'starboard' : 'port'} side, with the midships line.` : `Lines ready: your crew's at the ${side > 0 ? 'starboard' : 'port'} shrouds with the bow line.`, ms: 3500 });
+    return true;
+  }
+  /** Let go: her lines cast off and taken aboard (lying to her lines along a dock, away from a berth's lie). */
+  letGoLines(): boolean {
+    const u = this.user, m = u.mooring; if (!m || !m.lines.length) return false;
+    u.mooring = undefined; this.emit({ type: 'toast', msg: 'Lines cast off.', ms: 2000 }); return true;
+  }
+  private cue(m: NonNullable<Boat['mooring']>, word: string): void { if (m.cue !== word) { m.cue = word; m.cueT = this.t; } }
+  /** Coming in: the hand stepping off, the first line snubbed round a cleat, the rest going on, and made fast. */
+  private mooringStep(b: Boat, dt: number): void {
+    const m = b.mooring!; m.t += dt;
+    const berth = slipById(m.berth), sp = Math.hypot(b.vx, b.vy);
+    const hand = m.solo ? b.crew?.spec.helm : b.crew?.spec.crew[0], skill = hand ? skillOf(hand) : 0.6;
+    if (m.phase === 'ready') {
+      // (the hand goes to whichever side the dock comes up on: from outside a slip there's none yet either side)
+      const gp = this.gapAt(b, 0.6, 1), gs = this.gapAt(b, 0.6, -1);
+      if (Number.isFinite(Math.min(gp, gs))) m.side = gp <= gs ? 1 : -1;
+      const gap = Math.min(gp, gs);
+      if (gap > stepGap(skill)) { this.cue(m, 'Closer'); return; }
+      if (sp > STEP_SPEED) { this.cue(m, 'Too fast'); return; }
+      // step: the line from her bow cleat (alone: her midships cleat), round the dock cleat abeam her shrouds
+      const at = m.solo ? 0 : 3.4, to = this.dockCleat(b, berth, at, m.side); if (!to) return;
+      const p = cleatOf(b, { at, side: m.side });
+      m.lines.push({ role: m.solo ? 'midships' : 'bow', at, side: m.side, to, len: Math.hypot(to.x - p.x, to.y - p.y) + 0.5, state: 'held', goal: this.goalLen(b, berth, to, at, m.side) ?? 0.6 });
+      m.phase = 'ashore'; m.t = 0; this.cue(m, 'Step');
+      if (m.solo) { b.lashed = null; b.tiller = 0; b.steer = 0; b.turnTarget = null; } // (you're ashore: nobody on the tiller)
+      return;
+    }
+    // a line ashore: the dock lines' physics (boat/dockLines.ts), the wind on her bare rig, the current
+    const out = lineStep(b, m.lines, b.ww, b.cur, dt, q => hitsHarbor(q) || hitsMooredBoat(q));
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
+    const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true;
+    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
+    if (out.bump != null && out.bump > HARD_BUMP && this.t - (m.cueT ?? -9) > 2) { this.cue(m, 'Bump'); this.emit({ type: 'toast', msg: `Hard bump against the dock, at ${(out.bump / 0.5144).toFixed(1)} kn.`, ms: 3000 }); }
+    if (out.parted) this.emit({ type: 'toast', msg: `The ${out.parted.role === 'midships' ? 'midships line' : `${out.parted.role} line`} parted.`, ms: 4000 });
+    const first = m.lines[0];
+    // a held line run out through the hand to its end (12 m of line), or every line gone: let go, and she's off
+    if (!first || (first.state === 'held' && first.len > 12)) {
+      b.mooring = undefined; this.emit({ type: 'toast', msg: first ? 'Lost her: the line ran out through their hands. Come round and try again, slower.' : 'Lost her: no line left holding her.', ms: 5000 });
+      return;
+    }
+    // the hands warp her in: each line taken toward where it'll lie with her in her berth, hauled in while it's no more than
+    // they can pull, eased out freely (one hand alone, two crewed: 250 N each; at 0.15 m/s, an ESTIMATE of hand-over-hand on a dock line)
+    const pull = HAND_N * (m.solo ? 1 : 2);
+    for (const L of m.lines) {
+      if (L.goal == null) continue;
+      if (L.len > L.goal && (L.T ?? 0) < pull) L.len = Math.max(L.goal, L.len - 0.15 * dt); // (hauled in, as far as they can pull)
+      else if (L.len < L.goal) L.len = Math.min(L.goal, L.len + 0.15 * dt); // (eased out: a spring made where she lay, let her go on into her berth)
+    }
+    if (m.phase === 'ashore') {
+      // a few seconds snubbed, and she's lost her way: made fast (a figure eight and a hitch)
+      if (m.t > 5 && sp < 0.15) { first.state = 'made'; m.phase = 'stern'; m.t = 0; }
+      return;
+    }
+    if (m.phase === 'stern' && m.t > (m.solo ? 6 : 4)) {
+      // the next line: crewed, the stern line (the hand walks aft, or the helm hands it across); alone, the bow line
+      this.addLine(b, berth, m, m.solo ? 'bow' : 'stern', m.solo ? 3.4 : -3.4);
+      m.phase = 'springs'; m.t = 0; return;
+    }
+    if (m.phase === 'springs' && m.t > 4) {
+      // the spring (and alone, the stern line): her lines are on
+      this.addLine(b, berth, m, m.solo ? 'stern' : 'spring', m.solo ? -3.4 : 0);
+      m.phase = 'fast'; m.t = 0; this.cue(m, 'Made fast');
+      this.emit({ type: 'toast', msg: 'Made fast to the dock, on her lines.', ms: 3000 });
+      return;
+    }
+    if (m.phase === 'fast' && berth && this.inBerth(b, berth, 0.3, 5)) {
+      // warped in, lying in her berth (bow in at a slip; either way alongside an end tie or guest dock): made fast there, as
+      // in her own slip (the last few centimetres and degrees taken up by the lines)
+      const rev = berth.kind === 'alongside' && Math.abs(wrap(b.h - berth.heading)) > 90;
+      Object.assign(b, { x: berth.p.x, y: berth.p.y, h: rev ? n360(berth.heading + 180) : berth.heading, v: 0, vx: 0, vy: 0, astern: 0, sway: 0, turnRate: 0 });
+      b.docked = { slip: berth.id }; b.mooring = undefined;
+      this.emit({ type: 'toast', msg: `In her berth and made fast: ${slipPlace(berth)}.`, ms: 4000 });
+    }
+  }
+  /** Lying in this berth, to within `d` m and `deg` of its lie (bow in at a slip; either way alongside)? */
+  private inBerth(b: Boat, berth: Slip, d: number, deg: number): boolean {
+    if (dist(b, berth.p) > d) return false;
+    const off = wrap(b.h - berth.heading);
+    return berth.kind === 'alongside' ? Math.min(Math.abs(off), 180 - Math.abs(off)) < deg : Math.abs(off) < deg;
+  }
+  /** Another line ashore, made fast: to where it'll lie with her in her berth if she's lined up with it (warped in to that), else abeam where she is. */
+  private addLine(b: Boat, berth: Slip | null | undefined, m: NonNullable<Boat['mooring']>, role: DockLine['role'], at: number): void {
+    const to = this.dockCleat(b, berth, at, m.side, role === 'spring'); if (!to) return;
+    const p = cleatOf(b, { at, side: m.side }), len = Math.hypot(to.x - p.x, to.y - p.y) + 0.1;
+    m.lines.push({ role, at, side: m.side, to, len, state: 'made', goal: this.goalLen(b, berth, to, at, m.side) ?? len });
+  }
+  /** How long a line from her cleat at `at` to `to` will be with her lying in her berth (null if she isn't lined up with it). */
+  private goalLen(b: Boat, berth: Slip | null | undefined, to: Vec, at: number, side: 1 | -1): number | null {
+    if (!berth || dist(b, berth.p) > 14) return null;
+    const lined = berth.kind === 'alongside' ? Math.abs(Math.abs(wrap(b.h - berth.heading)) - 90) > 55 : Math.abs(wrap(b.h - berth.heading)) < 35;
+    if (!lined) return null;
+    const rev = berth.kind === 'alongside' && Math.abs(wrap(b.h - berth.heading)) > 90, pose = { x: berth.p.x, y: berth.p.y, h: rev ? n360(berth.heading + 180) : berth.heading };
+    const q = cleatOf(pose, { at, side }); return Math.hypot(to.x - q.x, to.y - q.y); // (made up just taut with her in her berth)
   }
 
   /** In her slip and stopped, bow in? Then the crew steps onto the finger and makes her fast. */
@@ -1556,11 +1752,14 @@ export class World {
   /** A boat in her slip: made fast, she stays put; her crew can hoist or strike sail there. */
   private dockStep(b: Boat, dt: number): void {
     b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
-    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    // (her tack by the wind's side, held dead downwind (or head to wind in her slip) as moveBoat holds it: a wind
+    // wandering either side of her stern or bow lying in a slip doesn't send the helm across the cockpit each time)
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); if (b.twa < 176 && b.twa > 4) b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
-    const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2); // sails up at the dock weathervane, let fly
-    b.boom += (side * 75 - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
+    const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true; // sails up at the dock weathervane, let fly
+    b.boom += ((up ? side * 75 : 0) - b.boom) * k; // (the main down: its boom sheeted in amidships, clear of the dock and the boats either side) b.jib += (side * 35 - b.jib) * k;
     crewRig(b, dt, this.emit);
+    crewAtDock(b, dt); // (the crew sit centred at the dock and through the push-off, not hiked or to leeward)
   }
 
   /** Just sail: a new destination, a place or a spot picked on the chart. */

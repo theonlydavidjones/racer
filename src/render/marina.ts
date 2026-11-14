@@ -1,20 +1,13 @@
 import './three-setup';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BREAKWATER_W, FINGER_W, HARBORS, SLIPS, WALKWAY_W, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
+import { BREAKWATER_W, FINGER_W, HARBORS, WALKWAY_W, mooredIn, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
 import type { Vec } from '../core/math';
 import { P3 } from './coords';
-import { MAX_BEAM, MOORED, powerParts, sailParts, type MooredKind } from './mooredBoats';
+import { MAX_BEAM, MOORED, powerParts, sailParts } from './mooredBoats';
+import type { MooredKind } from '../geo/marina';
 
-/** The share of the slips' boats that are powerboats: an estimate still (the harbors' own figures weren't found: the city's
- * fee analysis on sfbos.org, the likeliest source, wasn't reachable). */
-const POWER_SHARE = 0.2;
-/**
- * How many of a marina's slips have a boat in them: the San Francisco Marina "only about 87% occupied" (Latitude 38, "With
- * Expansion of San Francisco Marina Now Scrapped, the Financial Futures of East and West Harbor Are Uncertain", 2024, from the
- * city's Budget and Legislative Analyst's report of January 2024); elsewhere, the sim's 78% (no figure found).
- */
-const OCCUPIED: Record<string, number> = { 'west-harbor': 0.87, 'gashouse-cove': 0.87 };
+// (which slips have a boat, and the boats: geo/marina.ts mooredIn, shared with the sim)
 
 /**
  * The marinas in 3D (geo/marina.ts: West Harbor, Gashouse Cove, South Beach, the Corinthian): floating wooden docks (main
@@ -228,14 +221,8 @@ export class Harbor {
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
     // (hulls mostly white or off-white gelcoat, some dark; the main's cover in the usual canvas colours; the share of powerboats
     // is an estimate (POWER_SHARE): the harbors' own figures weren't found)
-    const r = rng(11 + HARBORS.indexOf(H)), fleet: Record<MooredKind, { slip: Slip; len: number; colour: number; cover: number }[]> = { sail: [], power: [] };
-    const HULLS = [0xf6f4ee, 0xf6f4ee, 0xf6f4ee, 0xefece2, 0xefece2, 0xe4e0d4, 0x1f3550, 0x2b4a3a, 0x8a2a24], COVERS = [0x1f4f7a, 0x1f4f7a, 0x16314f, 0xb59a6a, 0x6e2a2a, 0x3d5c47];
-    for (const s of SLIPS) {
-      if (s.marina !== H.id) continue;
-      const keep = r() <= (OCCUPIED[H.id] ?? 0.78), len = Math.min(Math.max(7, s.finger * (0.85 + 0.2 * r())), 13), colour = HULLS[Math.floor(r() * HULLS.length)], cover = COVERS[Math.floor(r() * COVERS.length)];
-      const kind: MooredKind = r() < POWER_SHARE ? 'power' : 'sail';
-      if (keep) fleet[kind].push({ slip: s, len, colour: kind === 'power' ? HULLS[Math.floor(r() * 6)] : colour, cover }); // (powerboats in white gelcoat)
-    }
+    const fleet: Record<MooredKind, { slip: Slip; len: number; colour: number; cover: number }[]> = { sail: [], power: [] };
+    for (const m of mooredIn(H.id)) fleet[m.kind].push(m);
     for (const k of ['sail', 'power'] as const) this.boats.push(new SlipBoats(this.group, k, fleet[k]));
   }
 
