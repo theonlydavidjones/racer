@@ -81,7 +81,7 @@ export function showCrewRow(u: Boat): void {
   // (two crew at their stations, either side of the winch, isn't Aft: no outline; forward of the winch is Fwd)
   const fore = c?.fore01 ?? 0.5, two = c?.spec.crew.length === 2, autoFore = fore > 0.7 ? 'fwd' : fore < 0.3 && !two ? 'aft' : null, autoA = c ? autoAcross(u) : null;
   // (this runs every frame: touch the page only when something has changed)
-  const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}|${u.tack}|${open}`; if (key === lastRow) return; lastRow = key;
+  const key = `${pl?.across}|${pl?.fore}|${autoA}|${autoFore}|${u.tack}|${open}|${two}`; if (key === lastRow) return; lastRow = key;
   const { ww, lw, wwS, lwS } = sides(u);
   document.querySelectorAll<HTMLButtonElement>('#tpCrewRow [data-ca]').forEach(bt => {
     const p = bt.dataset.ca!;
@@ -97,6 +97,8 @@ export function showCrewRow(u: Boat): void {
     bt.classList.toggle('at', !pl?.fore && autoFore === bt.dataset.cf);
     bt.setAttribute('aria-pressed', String(pl?.fore === bt.dataset.cf));
     bt.title = PLACE_TIP[bt.dataset.cf!];
+    // (two crew: no Aft, their stations either side of the winch are as far aft as they go, so it did nothing: the owner)
+    bt.hidden = two && bt.dataset.cf === 'aft';
   });
   const wind = document.getElementById('tpWind'); if (wind) wind.textContent = `Wind over the ${ww} side: ${ww} is windward, ${lw} is leeward`;
   const box = document.getElementById('tpCrewOpen'), line = document.getElementById('tpCrewLine');

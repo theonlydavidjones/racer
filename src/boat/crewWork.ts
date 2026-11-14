@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -106,10 +106,14 @@ export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): numbe
 }
 /** Where the crew are along the deck (crewPhys.ts chooseLayout): in the cockpit, the bow hand at the mast, or both up on the foredeck. */
 export type Forward = 'cockpit' | 'mast' | 'foredeck';
+/** How far forward the crew sit (0 aft … 1 forward of the winch): where you've put them, else their own call (crewPhys.ts chooseFore). */
+const foreOf = (c: CrewState): number => c.place?.fore ? { fwd: 1, mid: 0.5, aft: 0, deck: 1 }[c.place.fore] : c.fore01 ?? 0.5;
 /** Who works a line (an index into [helm, crew…]): by the number of crew, who has the main (mainHand), and who's forward. */
-export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, layout: Forward = 'cockpit'): number {
+export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, layout: Forward = 'cockpit', fwdOfWinch = false): number {
   if (nCrew === 0) return 0;
-  const forward = layout !== 'cockpit', main = mainHand(nCrew, spec, forward);
+  // (two crew both forward of the jib winch, light air upwind: the helm takes the main, its sheet led to the thwart
+  // behind them; the jib stays the forward crew's, its winch beside them. The owner's call, 14 Nov 2026)
+  const forward = layout !== 'cockpit', main = mainHand(nCrew, spec, forward || fwdOfWinch);
   if (line === 'mainsheet' || line === 'traveller') return main;
   if (line === 'backstay') return 0;
   // the jib: the forward crew (with one crew, whichever of the two hasn't the main). With crew gone forward, whoever's
@@ -168,8 +172,9 @@ const DONE = 1e-4;
 export function workPace(b: Boat, who: number): number {
   const c = b.crew; if (!c) return 1;
   const p = allAboard(c.spec)[who];
-  // (and the helm with the sheets while the crew are forward on a run: a hand on the tiller, one on the sheet)
-  return pace(p) * (who === 0 && (c.spec.crew.length === 0 || (c.layout ?? 'cockpit') !== 'cockpit') ? 0.6 : 1);
+  // (and the helm with a sheet while the crew are forward: a hand on the tiller, one on the sheet)
+  const n = c.spec.crew.length, helmSheets = (c.layout ?? 'cockpit') !== 'cockpit' || (n === 2 && foreOf(c) >= TWO_FWD);
+  return pace(p) * (who === 0 && (n === 0 || helmSheets) ? 0.6 : 1);
 }
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
@@ -192,12 +197,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
-  const fwdL: Forward = c.layout ?? 'cockpit';
+  const fwdL: Forward = c.layout ?? 'cockpit', ahead = n === 2 && foreOf(c) >= TWO_FWD;
   const worker = (k: string) => {
-    const o = ownerOf(k, n, c.spec, fwdL);
+    const o = ownerOf(k, n, c.spec, fwdL, ahead);
     if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
       const j = c.people[o]?.job;
-      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && (!c.people[m]?.job?.station || c.people[m]!.job!.line === 'jibsheet')) return m; }
+      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL, ahead); if (m !== o && (!c.people[m]?.job?.station || c.people[m]!.job!.line === 'jibsheet')) return m; }
     }
     return o;
   };
@@ -208,7 +213,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     // (a sheet that's no longer theirs, as the crew go forward and the helm takes the main: let go. A sheet follows the
     // wind, so it's never done; held, the bow hand at the mast kept the main, the helm the jib, and neither was trimmed)
     // (the jib held for the forward hand while they're at the cabin top is the middle crew's until they're back: worker)
-    if (sheetOf(j.line) && worker(j.line) !== i && ownerOf(j.line, n, c.spec, fwdL) !== i) { a.job = null; return; }
+    if (sheetOf(j.line) && worker(j.line) !== i && ownerOf(j.line, n, c.spec, fwdL, ahead) !== i) { a.job = null; return; }
     // (placed by you: they leave a tweak they'd have to leave their place for, and work the dual-ended lines from there)
     if (waits.includes(j.line) && !j.big) { a.job = null; return; }
     if (placed && BOTH_SIDES.has(j.line)) j.station = null;

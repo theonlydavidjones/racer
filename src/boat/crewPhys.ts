@@ -252,7 +252,7 @@ export const stationZ = (j: number, count: number, f: number, deck: boolean) => 
 };
 /** Within the jib winch's pedestal's reach on the side deck, fore and aft (between the seats either side of it). */
 /** Two crew forward of the winch together from this far along (stationZ's f): the band's Fwd and the foredeck. */
-const TWO_FWD = 0.999;
+export const TWO_FWD = 0.999;
 /** Sitting on the cabin top's edge beside its after end (z 0.90), the hips this far out (m): the cabin's side is at about
  * 0.7 there; outboard of DECK_ARM, so they're on the deck's side of the boat. An estimate. */
 const CABIN_EDGE = 0.62;
