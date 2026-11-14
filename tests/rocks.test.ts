@@ -47,3 +47,23 @@ describe('a charted hazard under the keel', () => {
     expect(struck).toBe(false); expect(past).toBe(true); expect(u.damage).toBeUndefined();
   }, 120_000);
 });
+
+describe('the submerged ruins and the rocky bottoms', () => {
+  it('the ruined piers always under water (SLCONS, WATLEV 3) are hazards along their line, at their area\'s shoal edge', async () => {
+    const { HAZARDS: H, hazardAt: at } = await import('../src/environment/hazards');
+    const ruins = H.filter(h => h.line);
+    expect(ruins.length).toBeGreaterThan(100);
+    const R = ruins.find(h => h.line!.length >= 2 && Math.hypot(h.line![1].x - h.line![0].x, h.line![1].y - h.line![0].y) > 20)!;
+    const a = R.line![0], b = R.line![1], mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, L = Math.hypot(b.x - a.x, b.y - a.y), n = { x: -(b.y - a.y) / L, y: (b.x - a.x) / L };
+    expect(at({ x: mid.x + n.x * 2, y: mid.y + n.y * 2 })?.top).toBeLessThanOrEqual(R.top); // (2 m off its line: on it)
+    for (const r of ruins) expect(Number.isFinite(r.top) && r.top < 3).toBe(true);
+  });
+  it('the chart\'s rocky bottom samples read as rock; Richardson Bay\'s flats, mud', async () => {
+    const { rockyBottom } = await import('../src/environment/hazards');
+    const { LL } = await import('../src/geo/geo');
+    const enc = (await import('../src/geo/data/enc-chart.json')).default as unknown as { bottom: { n: number[]; p?: number[] }[] };
+    const rock = enc.bottom.find(b => b.n.includes(9) && b.p)!;
+    expect(rockyBottom(LL(rock.p![1] / 1e5, rock.p![0] / 1e5))).toBe(true);
+    expect(rockyBottom(LL(37.880, -122.505))).toBe(false);
+  });
+});

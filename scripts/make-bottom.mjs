@@ -138,11 +138,25 @@ enc.hazards.forEach((h, k) => {
   if (i < 0 || j < 0 || i >= nx || j >= ny) return;
   const v = d1[j * nx + i]; if (!Number.isNaN(v) && v < SHOAL) hazardTop[k] = v;
 });
-console.log(`${nx}×${ny} cells, ${tiles.length} tiles; ${shoal} shoal cells (${(shoal * CELL * CELL / 1e6).toFixed(0)} km²); ${Object.keys(hazardTop).length} hazards of unknown depth at their area's shoal edge`);
+// the constructions always under water (SLCONS with WATLEV 3: ruined piers, mostly, CONDTN 2): the chart gives no depth,
+// so, as the other dangers of unknown depth, at the shoal edge of the depth area they lie in, the shoalest along them
+// (Marinas' shore kinds hand these to the bottom: they aren't the shore's edge)
+const ruinTop = {};
+(enc.shoreKinds ?? []).forEach((s, k) => {
+  if (s.wl !== 3) return;
+  const lines = s.o ?? (s.f ?? []).map(poly => poly[0]); let top = Infinity;
+  for (const L of lines) for (const [lon, lat] of dec(L)) {
+    const i = Math.floor((lon - B.west) * MLON / CELL), j = Math.floor((B.north - lat) * MLAT / CELL);
+    if (i < 0 || j < 0 || i >= nx || j >= ny) continue;
+    const v = d1[j * nx + i]; if (!Number.isNaN(v)) top = Math.min(top, v);
+  }
+  if (top < SHOAL) ruinTop[k] = top;
+});
+console.log(`${nx}×${ny} cells, ${tiles.length} tiles; ${shoal} shoal cells (${(shoal * CELL * CELL / 1e6).toFixed(0)} km²); ${Object.keys(hazardTop).length} hazards of unknown depth at their area's shoal edge; ${Object.keys(ruinTop).length} submerged constructions`);
 await writeFile(new URL('../src/environment/data/bottom.json', import.meta.url), JSON.stringify({
   source: 'NOAA ENC (S-57) depth areas (DEPARE) and soundings (SOUNDG), src/geo/data/enc-chart.json; m below MLLW',
   made: 'scripts/make-bottom.mjs',
   note: `shoal water only (a band's shoal edge under ${SHOAL} m): the soundings within ${SOUND_R} m (inverse square of distance) held inside the depth area's band, else its middle; byte 0 known deep, ${255} no depth area (land, or unsounded); each a run packed (the byte, then how many); else (byte − 1) × step + offset m below MLLW; ${CELL} m cells from the box's north-west corner, rows north to south, in ${TILE} × ${TILE} tiles [ti, tj, base64]`,
   box: B, cell: CELL, tile: TILE, nx, ny, step: STEP, offset: OFF, tiles,
-  hazards: enc.hazards.length, hazardTop
+  hazards: enc.hazards.length, hazardTop, shoreKinds: (enc.shoreKinds ?? []).length, ruinTop
 }) + '\n');

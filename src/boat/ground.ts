@@ -1,7 +1,7 @@
 import { V, n360, type Vec } from '../core/math';
 import type { Emit } from '../sim/events';
 import { waterOver } from '../environment/bottom';
-import { HAZARDS, hazardAt } from '../environment/hazards';
+import { HAZARDS, hazardAt, rockyBottom } from '../environment/hazards';
 import { tideHeightAt } from '../environment/tide';
 import { KT } from '../core/math';
 import { hurt } from './physics';
@@ -64,6 +64,10 @@ export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: {
   const mx = b.vx, my = b.vy; // (what travel moved her by this step)
   const was = b.aground;
   b.aground = into;
+  // (onto a rocky bottom, by the chart's bottom samples: as she first touches, the blow graded as rock at her speed
+  // over the ground, as a charted rock's; then held as on the mud. Rock rarely lies under the flats: its grade is the
+  // exception)
+  if (was === undefined && rockyBottom(b)) hurt(b, { kind: 'rock', name: 'a rocky bottom' }, g, { x: b.x, y: b.y }, emit);
   // (her keel in the mud holds her heading too: the turn she made this step, and her rate of turn, kept only by the
   // share of her weight the water still carries; with all of it on the bottom she pivots no more than she slides. An
   // estimate, as the friction is: the mud's moment on a keel of her length against the helm's and the sails')
