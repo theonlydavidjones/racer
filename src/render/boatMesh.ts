@@ -20,6 +20,7 @@ import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLant
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 import { PART_SMALL } from './fittings';
+import { buildOutboard, syncOutboard, type OutboardMesh } from './outboard';
 const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
 const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
@@ -368,14 +369,10 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
   grp.add(rud);
-  // an outboard on its transom bracket, tilted up (port quarter, clear of the rudder, the tiller and the ensign staff)
-  if (b.spec?.perf.outboard === 'bracket') {
-    const ob = new THREE.Group(), grey = new THREE.MeshPhongMaterial({ color: 0x9aa0a6, specular: 0x666666, shininess: 50 }), blk = MAT.dark;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.34), blk); head.position.set(0, 0.13, 0.12); ob.add(head);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.62), grey); leg.position.set(0, 0.0, -0.2); ob.add(leg); // tilted up: the leg lies forward along the bracket
-    const brk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.04), grey); brk.position.set(0, -0.05, -0.12); ob.add(brk);
-    ob.position.set(-0.42, sheer(1) - 0.12, L / 2 + 0.12); ob.rotation.x = 0.35; grp.add(ob);
-  }
+  // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
+  // prop turning, from the motor's state (syncBoatMesh)
+  // (and its bracket alone, empty and raised, while it's stowed below: Crew Controls' Stow / Ship)
+  if (b.spec?.perf.outboard === 'bracket' || b.motor) { const ob = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
   // her name on both sides, where the boats carry it: on the cabin side and the coaming, aft of the window and
   // forward of the winch (there's no room for it on the topsides under the low sheer); hand-lettered script
   if (paint.boatName) {
@@ -434,6 +431,8 @@ export interface BoatMesh {
   nav: NavLights;
   /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
   lantern: LanternSwing;
+  /** Her outboard and its bracket (outboard.ts), when she carries it on the bracket. */
+  outboard?: OutboardMesh;
   /** The companionway's sliding hatch and washboards, moved by syncCompanionway. */
   companionway: Companionway;
 }
@@ -1381,7 +1380,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern, outboard: grp.userData.outboard };
   mergeStatic(grp, out);
   return out;
 }
@@ -1459,6 +1458,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
   syncCompanionway(m.companionway, b);
+  // her outboard: let down or tilted up, the prop turning (the motor's state: boat/motor.ts, b.motor)
+  if (m.outboard) syncOutboard(m.outboard, b.motor, Math.max(0, dt));
   // the footrest: slid out while the helm sits on the after deck (their feet on it), slid back under the deck when they
   // stand to steer (the owner). b.footrest (0 out … 1 back) is set by whoever poses the helm (crew.ts): out by default,
   // as the helm sits. It slides there by hand, about half a metre a second, not in a jump.
