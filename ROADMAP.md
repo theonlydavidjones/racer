@@ -143,7 +143,8 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Deep Physics
+   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Sculling comes
+   from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
@@ -211,6 +212,9 @@ What's planned, roughly in order. Done work is described in the README.
    centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
    slip at Gas House Cove. I've tried over and over and over again. I just can't get pushed back far enough, and I
    can't seem to get the nose around."
+   - Batch 34: at the dock and under bare poles the crew now sit centered; and Deep Physics' test of leaving under bare
+     poles on the real tide, beam wind both ways, finds she goes to leeward, so the windward drift didn't reproduce. If
+     it's still seen, the owner's exact case (time, tide, wind) is needed. The push-off and getting the nose round stay open.
    - **Drifting to windward with no sails up is a bug.** A boat with no way on and no sail up is set to leeward by
      the wind on her hull and rig, plus or minus the current. Nothing drives her upwind. Look at the bare-pole windage
      force's sign or direction, the hove-to and in-irons models acting with the sails down, the shelter field inside
@@ -221,13 +225,48 @@ What's planned, roughly in order. Done work is described in the README.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
-   - **The place** (owner's chart screenshot): Josephine's real slip, at the west end of a Gashouse Cove fairway close to
+   - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
      the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
      literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
      crew would. It's hard but possible, as in real life.
    - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
      Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
      Gashouse Cove with the wind on the beam both ways.
+8o. **Hoisting at the mast, finishing at the piano** (owner, 13 November; next; 2–3 h). First ask: "when sails are down,
+   hoisting the halyards does not hoist the sail… we can probably use the lines instead of the hoist buttons, no?" Then
+   the owner's correction: "there is some difference. the sails are hoisted from the mast. the piano controls use a
+   block and tackle to finalize the last several inches of hoisting. so having the piano halyard control fully 'on'
+   isn't the same distance as the actual hoisting distance." As on Josephine:
+   - **The hoist is done at the mast:** a crew member (or you) goes to the mast and hauls the sail up, taking the real
+     time and moving the crew's weight forward. It's started from inside an existing element (the band's crew tab,
+     or the key), not a new button. Both sails are hoisted at the mast (owner confirmed).
+   - **The piano's halyard controls finish it:** the main halyard's tackle and the jib halyard take up only the last
+     several inches, then set the luff tension. Their range is that short distance, not the whole hoist. With the sail
+     down they show as slack and idle.
+   - **The routine** (owner): "one of the first steps after raising sails and getting underway is tensioning the
+     halyards from the piano. they usually stay untouched for the rest of the sail, unless there's need to fine tune
+     (which better sailors than I may do often; I'm not sure)." So the crew tension the halyards at the piano soon
+     after getting under way, then leave them; a skilled crew may fine-tune them as the wind changes (to source).
+   - **Lowering:** let the halyard go at the mast, and the sail comes down fast.
+   - The sails, flags, telltales and physics answer the hoist as it happens: half-hoisted sails draw badly, luff and
+     flog.
+8q. **The boom on the centerline in the slip** (owner, 13 November; <1 h): "when in a slip, boom should be at
+   centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
+   with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
+   tied up.
+8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (bug; 2–3 h): owner, "at aquatic park, auto
+   nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
+   curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
+   geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
+   of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
+8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
+   intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
+   Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
+   really lies: rolled or flaked into a long, narrow sausage along the foredeck from the stemhead aft, its luff still on
+   the forestay at its forward end (so the stay meets it, not passes through), tied with a sail tie or two. Check from
+   both sides.
+8p. **Bug: with the sails down, the jib cars show as loaded** (owner, 13 November; <1 h): "with sails down, neither jib
+   car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
 8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
@@ -244,7 +283,8 @@ What's planned, roughly in order. Done work is described in the README.
       barnacles." So:
       - the pier's pile field is solid to the boat;
       - the current runs through and under the piles, while the shed above blocks the wind;
-      - getting set under it is a real wreck, with damage and the sail over, not a bounce;
+      - getting set under it is a real wreck, not a bounce. Until the wreck design below is agreed, contact with the piles
+        just stops her;
       - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
         of the pier, and pick the tide.
    4. Eddies in the entrance (owner: "There are also frequent eddies in the entry. Have the physics session model the
@@ -252,7 +292,7 @@ What's planned, roughly in order. Done work is described in the README.
       into the gap, which turn the current across the entrance and back on itself. Deep Physics models the water there
       carefully, from the flood and ebb past the breakwater and through the pier's piles, sourced where it can be
       (NOAA's SFBOFS currents, shallow-water eddy shedding behind a breakwater). The eddies should be visible on the
-      water as the other eddies are.
+      water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
@@ -339,6 +379,7 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
      no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
@@ -359,12 +400,12 @@ What's planned, roughly in order. Done work is described in the README.
      4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
         signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
         saying.
-   - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
+   - ~~**A Save button on the Yacht Club's member page**~~ (done, batch 34: Save, and "Save changes?" on leaving, on a member's page, a boat's crew and the boat editor) (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
      save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
      stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
      editor, the Yacht Club's boats) in the audit. Owner's decision: leaving with unsaved edits asks "Save changes?" with Save and Discard.
-   - **The pause menu redesigned** (owner, 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
+   - **The pause menu redesigned** (approved by the owner, "fine for now"; 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
      too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
      Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
      Proposed: one narrow column (about a third of the screen's width), grouped by what you're doing:
@@ -1104,6 +1145,10 @@ traveling over the hull and sails to help players learn about sail shape and lam
   instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
   coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
 
+- **Badges along the ASA ladder** (owner, 13 November): the learn-to-sail mode's lessons and badges follow the American
+  Sailing Association's course ladder, with ASA 101 Basic Keelboat as Learn to Sail. Each badge has a hover saying it
+  isn't the certification. ASA's permission is needed before any public release.
+
 ## Next up
 
 - ~~Real SF Bay currents and tide timing~~ (done: NOAA stations, any date, offline). Later: eddies behind points, using NOAA's SFBOFS model output for the spatial detail between stations.
@@ -1240,6 +1285,16 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **Wrecks: an open design** (owner, 13 November: "we need to work through the broader logic and plan for wrecks. I
+  don't know yet."; Marinas drafts a proposal): what counts as a wreck (piles, rocks, a ship, a seawall, grounding),
+  the damage and what it does to her, whether she retires or is towed, and how the logbook and the season score it.
+  For now, contact with the Fort Mason piles just stops her.
+
+- **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
+  whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's
+  scored and saved. That covers RET or DNF in the season and the results, the ghost and the logbook kept or not, and
+  practice against a season race.
 
 - **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
   getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the
