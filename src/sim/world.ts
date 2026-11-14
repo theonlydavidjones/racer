@@ -1,5 +1,4 @@
 import { damageOf, impactEnergy } from '../boat/damage';
-import { HANDLING } from '../boat/dynamics';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
@@ -49,7 +48,7 @@ import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
-import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
+import { DEFAULT_CREW, DEFAULT_SKILL, displacement, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
@@ -1244,11 +1243,14 @@ export class World {
       const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
       // the contact's damage (src/boat/damage.ts): the energy of their closing along the line between them, before the
-      // touch took their way off (the reduced mass of two boats alike)
-      if (incident.kind === 'contact') {
+      // touch took their way off, on their displacements with their crews aboard; graded for the lighter (the worse off).
+      // For now only your boat can be damaged (the Coordinator's call, docs/WRECK-PROPOSAL.md §7): AI-on-AI contacts
+      // aren't graded, so rule 14 (43.1(c)) and 44.1(b) bite only where you're one of the two
+      if (incident.kind === 'contact' && (A.isUser || B.isUser)) {
         const nx = B.x - A.x, ny = B.y - A.y, nl = Math.hypot(nx, ny) || 1;
         const closing = Math.max(0, ((pA.vx - pB.vx) * nx + (pA.vy - pB.vy) * ny) / nl);
-        incident.damage = damageOf(impactEnergy(closing, HANDLING.mass, HANDLING.mass), 'boat', HANDLING.mass);
+        const disp = (b: Boat) => displacement(b.crew?.spec ?? DEFAULT_CREW) + (b.cond?.extraKg ?? 0), mA = disp(A), mB = disp(B);
+        incident.damage = damageOf(impactEnergy(closing, mA, mB), 'boat', Math.min(mA, mB));
       }
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35;

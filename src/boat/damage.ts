@@ -35,7 +35,7 @@ export function impactEnergy(closing: number, m1: number, m2 = Infinity): number
 }
 
 /** The grade of a blow of `energy` J to a boat of `mass` kg (her displacement with her crew aboard, crewPhys.ts
- * displacement(b): the band edges stay at DAMAGE_V's speeds whoever's aboard), by what she struck: against the bands' energies at her
+ * displacement(spec), as physics.ts uses it: the band edges stay at DAMAGE_V's speeds whoever's aboard), by what she struck: against the bands' energies at her
  * mass (the energy she'd take hitting a fixed hard object square on at DAMAGE_V's speeds). */
 export function damageOf(energy: number, struck: Struck, mass: number): DamageLevel {
   if (struck === 'mud' || energy <= 0) return 'none';
