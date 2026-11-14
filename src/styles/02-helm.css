@@ -119,5 +119,6 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 #controls .pilot{flex-wrap:nowrap;width:max-content}
 #controls .pilot .tp-btn{min-width:0;height:38px}
 #controls .pl-read{min-width:150px}
-/* (the pilot's row only while the pilot steers: otherwise the helm's buttons sit on the bottom edge, level with the view's) */
-.row2:not(:has(.pilot:not([hidden]))){display:none}
+/* (the pilot's row only while the pilot steers: otherwise the helm's buttons sit on the bottom edge, level with the view's;
+   only the helm's own row: unscoped, it hid every .row2, among them the boat editor's sail number and home country, 8u) */
+#controls .row2:not(:has(.pilot:not([hidden]))){display:none}

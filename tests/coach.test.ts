@@ -42,6 +42,12 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     expect(v.top.line).toBe('jibsheet');
     for (const l of v.more) expect(l.gain).toBeLessThanOrEqual(v.top.gain);
   });
+  it('the boom on the shroud on a broad reach: it never says to ease a main that can\'t go out further', () => {
+    for (const [h, w] of [[130, 12], [120, 20], [130, 20]]) {
+      const b = boat({ heading: h, windKt: w });
+      for (const l of [teach(b).top, ...teach(b).more]) expect(l.head).not.toMatch(/^Ease the main/);
+    }
+  });
   it('with the crew trimming, it says trim is right instead of padding', () => {
     for (const [h, w] of [[318, 8], [318, 14], [270, 12], [215, 16]]) {
       const v = teach(boat({ heading: h, windKt: w }));
