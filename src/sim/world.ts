@@ -810,9 +810,9 @@ export class World {
   /**
    * The time to sail from a spot to the line (s, before rounding): around the land (routing.ts routeAround), every
    * 200 m the wind on the water there (the field's lees, the current's own wind) and the stream. Through the water at
-   * her speed made good for that course (madeGood), short of the polar's (0.6–0.8 of it, less in light air); over the
-   * ground, with a fair stream crabbed across it (sin δ = c⊥ / v) and carried along (v·cos δ + c∥), against a foul one
-   * stemming all of it. Then a tenth more, three minutes to get going, and up to the next 5 minutes: being late for your
+   * her speed made good for that course (madeGood), short of the polar's (0.6–0.9 of it, less in light air; 0.85 more
+   * tacking or jibing); over the ground, with a fair stream crabbed across it (sin δ = c⊥ / v) and carried along
+   * (v·cos δ + c∥), against a foul one stemming all of it, blended between by how foul it is. Then a tenth more, three minutes to get going, and up to the next 5 minutes: being late for your
    * own start costs more than waiting.
    */
   spotPassage(a: Vec, b: Vec): number {
@@ -823,13 +823,17 @@ export class World {
       for (let j = 0; j < n; j++) {
         const m = { x: p.x + u.x * dl * (j + 0.5), y: p.y + u.y * dl * (j + 0.5) };
         const cur = this.currentAt(m, true), ww = windOnWater(this.windHere(m, undefined, false), cur);
-        // (her speed through the water short of the polar's: a helm that isn't the polar's, the tacks or jibes; more so
-        // in light air, where a learner makes about three quarters of it)
-        const v = madeGood(ww.kt, Math.abs(wrap(course - ww.from))) * clamp(0.45 + 0.05 * ww.kt, 0.6, 0.8);
-        const along = cur.x * u.x + cur.y * u.y, across = cur.x * u.y - cur.y * u.x;
+        // (her speed through the water short of the polar's: a helm that isn't the polar's; in light air a learner makes
+        // about two thirds of it, from 8 kt up nine tenths (the review's passages sailed: 0.82 in 4 kt, 0.96–0.98 in 8–18).
+        // Tacking or jibing, a further 0.85 of the VMG: the tacks themselves, the shifts, a helm a few degrees free)
+        const off = Math.abs(wrap(course - ww.from)), k = Math.max(ww.kt, 1), turning = off < beatAngle(k) || off > Math.max(150, FOLKBOAT.runAngle(k, 'jib'));
+        const v = madeGood(ww.kt, off) * clamp(0.4 + 0.0625 * ww.kt, 0.6, 0.9) * (turning ? 0.85 : 1);
+        const along = cur.x * u.x + cur.y * u.y, across = cur.x * u.y - cur.y * u.x, c = Math.hypot(along, across);
         // a fair stream: crabbed across it and carried along; a foul one: set down by it as well as stemming it (a helm
-        // pointed at the line, not crabbed, ends up stemming the whole stream)
-        const vg = along >= 0 ? (v > Math.abs(across) ? Math.sqrt(v * v - across * across) + along : 0) : v - Math.hypot(along, across);
+        // pointed at the line, not crabbed, ends up stemming the whole stream); blended by how foul it is, so a stream
+        // square to her course costs what crabbing across it does
+        const crabbed = v > Math.abs(across) ? Math.sqrt(v * v - across * across) + along : 0, f = c > 0 ? clamp(-along / c, 0, 1) : 0;
+        const vg = (1 - f) * crabbed + f * (v - c);
         s += dl / Math.max(0.15, vg);
       }
     }

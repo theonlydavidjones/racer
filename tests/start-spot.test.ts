@@ -63,9 +63,11 @@ describe('Start: somewhere else', () => {
     ['a reach in 12 kt with the ebb across', { windKt: 12, current: 'bigebb' }, 0, 2500],
     ['a reach off Sausalito in 12 kt against a 2.5 kt ebb', { windKt: 12, current: 'bigebb' }, 332, 5400],
     ['from south of Alcatraz on a real sea-breeze day, in light air', { windKt: 0 }, 60, 2600],
+    // (the reviewer's late one: a light-air beat with three tacks, 2.3 km off; given as a point, 37.8225, -122.4220)
+    ['a light-air beat from south of Alcatraz with three tacks', { windKt: 0 }, NaN, 0],
   ] as [string, Partial<Settings>, number, number][]) {
     it(`sailed to the line by a learner's helm, she gets there before the warning signal: ${name}`, () => {
-      const at = from(o, bearing, m); expect(onLand(at)).toBe(false);
+      const at = Number.isNaN(bearing) ? LL(37.8225, -122.4220) : from(o, bearing, m); expect(onLand(at)).toBe(false);
       const S = race({ ...o, raceFrom: 'spot', raceSpot: spotId(at) }), w = new World(COURSES[0], S, 1);
       expect(w.fromSpot).not.toBeNull();
       const r = sailToLine(w, S);
