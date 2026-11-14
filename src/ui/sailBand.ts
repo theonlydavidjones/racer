@@ -5,7 +5,7 @@ import { LINES, byHand } from '../boat/physics';
 import { poleRefused } from '../ai/ai';
 import type { BoatView } from '../sim/host';
 import type { Command } from '../sim/commands';
-import { CAR, workPace } from '../boat/crewWork';
+import { CAR, carFree, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
@@ -50,6 +50,9 @@ export interface BandHost {
   hail(): void;
   /** The key bound to Hail, for its tab. */
   hailKey(): string;
+  /** Hoisting or dropping a sail at the mast (the crew's forward hand, or you): the tab's words now, or null to hide it. */
+  hoistTab(sail: 'main' | 'jib'): string | null;
+  halyard(sail: 'main' | 'jib'): void;
   /** What a control does, for the Coach card (null: nothing to say). */
   help(text: string | null): void;
 }
@@ -189,7 +192,7 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="Paddle: one of your crew fetches the boom crutch from the cabin and paddles over the side you choose, pushing her along and swinging her bow away from that side: about a knot and a half in a calm. Tap the side again to stop. Racing, rule 42.1 forbids it, except to get clear after hitting something (42.3(h)) or to help someone in danger (42.3(g)). A good crew does it unasked when there's no wind and she's being set onto something."><span>Paddle</span><button type="button" data-act="padP">P</button><button type="button" data-act="padS">S</button></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="Paddle: one of your crew fetches the boom crutch from the cabin and paddles over the side you choose, pushing her along and swinging her bow away from that side: about a knot and a half in a calm. Tap the side again to stop. Racing, rule 42.1 forbids it, except to get clear after hitting something (42.3(h)) or to help someone in danger (42.3(g)). A good crew does it unasked when there's no wind and she's being set onto something."><span>Paddle</span><button type="button" data-act="padP">P</button><button type="button" data-act="padS">S</button></span></span>
 <span class="sb-tillerslot"></span>
 <span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
@@ -317,6 +320,7 @@ export class SailBand {
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
     if (act === 'padP' || act === 'padS') { this.host.paddle(act === 'padP' ? 'P' : 'S'); return; }
+    if (act === 'hoist') { this.host.halyard((t.closest<HTMLElement>('[data-sail]')!.dataset.sail as 'main' | 'jib')); return; }
     if (act === 'hail') { this.host.hail(); this.hailT = 0; return; } // (look again at once: the hail's been made)
     if (act === 'jless' || act === 'jmore') { this.turnJumpers(act === 'jmore' ? 0.5 : -0.5); return; }
     if (act !== 'name' || !d) return;
@@ -346,11 +350,11 @@ export class SailBand {
     const u = this.host.world().user, ins = side === 'P' ? CAR_IN_PINS - 1 - col : col; // (inboard toward the band's middle)
     // the leeward car carries the working jib sheet: its pin can't be pulled under that load, so it stays till a tack
     // takes the load off it (it's then the windward car, and yours to set for the tack after)
-    if (side !== windSide(u)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
+    if (!carFree(u, side)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
     // (the hole itself is sent, not a move from where the car seems to be: the page sees the race a frame late, and two
     // quick clicks must leave the car in the second hole)
-    this.host.send({ k: 'lazyCarTo', fore: row, ins }); this.host.changed();
+    this.host.send({ k: 'lazyCarTo', fore: row, ins, side }); this.host.changed();
     // (where you asked for, worked out here: the sim may answer a frame later, once it runs apart from the page)
     this.carAsked = { side, fore: Math.max(0, Math.min(CAR_FORE_PINS - 1, row)), ins: Math.max(0, Math.min(CAR_IN_PINS - 1, ins)), t: performance.now(), seen: false }; this.carNote(u);
   }
@@ -362,9 +366,9 @@ export class SailBand {
     if (u.carCmd) a.seen = true;
     // done (or a tack loaded it first: then it stays where it was); not before the sim has taken the call, unless it
     // never does (the car was already there)
-    if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || a.side !== windSide(u)) {
+    if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || !carFree(u, a.side)) {
       const set = car.fore === a.fore && car.ins === a.ins;
-      this.note = { text: set ? `${name}: set at ${at}. It takes over at the next tack.` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
+      this.note = { text: set ? `${name}: set at ${at}. ${a.side === windSide(u) ? 'It takes over at the next tack.' : 'It takes the sheet when the jib goes up.'}` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
       this.carAsked = null; return;
     }
     const people = u.crew?.people ?? [], i = people.findIndex(p => p.job?.line === 'car'), j = i >= 0 ? people[i].job! : null;
@@ -414,6 +418,12 @@ export class SailBand {
     const pos = pointOfSailWord(u); put(wx.querySelector('.sb-pos')!, pos);
     attr(wx, 'aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
     { const help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`; if (wx.dataset.help !== help) wx.dataset.help = help; }
+    // hoisting and dropping the sails at the mast: a tab for a sail that's down, on its way, or (in a harbor) to drop
+    this.el.querySelectorAll<HTMLElement>('.sb-hoist').forEach(tab => {
+      const txt = this.host.hoistTab(tab.dataset.sail as 'main' | 'jib');
+      if (tab.hidden !== !txt) tab.hidden = !txt;
+      if (txt && tab.textContent !== txt) { tab.textContent = txt; tab.classList.toggle('dim', txt.endsWith('…')); }
+    });
     // who trims: Auto-Trim while the crew has every line; Hand Back (amber, as the lines you hold) once any is yours
     const all = this.el.querySelector<HTMLElement>('.sb-all')!, word = trimTab(u);
     if (all.textContent !== word) {
@@ -493,7 +503,7 @@ export class SailBand {
     strip.dataset.k = key;
   }
   update(): void {
-    const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal, ws = windSide(u);
+    const w = this.host.world(), u = w.user, c = u.ctl, ideal = u.crewIdeal;
     this.tabs(w, u);
     this.colours(u.spec);
     this.carNote(u);
@@ -536,7 +546,7 @@ export class SailBand {
     // the jib cars: the crossbar on its row, the car on its pin; the leeward one is loaded
     const carMine = byHand(u, 'car');
     this.el.querySelectorAll<HTMLElement>('.sb-jc').forEach(d => {
-      const side = d.dataset.side as Side, car = c.car[side], col = side === 'P' ? CAR_IN_PINS - 1 - car.ins : car.ins, loaded = side !== ws;
+      const side = d.dataset.side as Side, car = c.car[side], col = side === 'P' ? CAR_IN_PINS - 1 - car.ins : car.ins, loaded = !carFree(u, side); // (with the jib down, neither: no sheet load)
       const xb = d.querySelector<HTMLElement>('.sb-xbar')!, jc = d.querySelector<HTMLElement>('.sb-jcar')!;
       xb.style.gridRow = String(car.fore + 1); jc.style.gridRow = String(car.fore + 1); jc.style.gridColumn = String(col + 1);
       d.querySelectorAll<HTMLElement>('.sb-hole').forEach(h => h.classList.toggle('row', Number(h.dataset.r) === car.fore));
@@ -544,10 +554,10 @@ export class SailBand {
       const pin = (el: HTMLElement, p: { fore: number; ins: number } | null | undefined) => {
         hide(el, !p); if (p) { el.style.gridRow = String(p.fore + 1); el.style.gridColumn = String((side === 'P' ? CAR_IN_PINS - 1 - p.ins : p.ins) + 1); }
       };
-      pin(d.querySelector<HTMLElement>('.sb-jwant')!, !loaded && u.carCmd && (u.carCmd.fore !== car.fore || u.carCmd.ins !== car.ins) ? u.carCmd : null);
+      pin(d.querySelector<HTMLElement>('.sb-jwant')!, !loaded && u.carCmd && (u.carCmd.side ?? u.tack) === side && (u.carCmd.fore !== car.fore || u.carCmd.ins !== car.ins) ? u.carCmd : null);
       pin(d.querySelector<HTMLElement>('.sb-jideal')!, !loaded && carMine && ideal ? { fore: ideal.carFore, ins: ideal.carIn } : null);
       d.classList.toggle('loaded', loaded); d.classList.toggle('mine', carMine && !loaded);
-      put(d.querySelector<HTMLElement>('.sb-tag')!, loaded ? 'loaded' : !loaded && u.carCmd ? 'crew…' : '');
+      put(d.querySelector<HTMLElement>('.sb-tag')!, loaded ? 'loaded' : u.carCmd && (u.carCmd.side ?? u.tack) === side ? 'crew…' : '');
     });
   }
 }
