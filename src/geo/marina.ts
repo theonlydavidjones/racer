@@ -359,9 +359,10 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false, grow =
   // (her hull sampled about every 0.9 m along and 0.5 m across; `fine`, twice as closely, so a thin dock or finger edge
   // can't slip between the samples as she turns: the physics review)
   const da = fine ? 0.4625 : 0.925, db = fine ? 0.2625 : 0.525;
-  const A = 3.7 + grow, B = 1.05 + grow;
-  for (let a = -A; a <= A + 0.01; a += da) for (let b = -B; b <= B + 0.01; b += db) {
-    const q = { x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b };
+  // (an even grid from end to end and side to side, however much she's grown: as many steps as fill her at that spacing)
+  const A = 3.7 + grow, B = 1.05 + grow, na = Math.ceil(2 * A / da - 1e-9), nb = Math.ceil(2 * B / db - 1e-9);
+  for (let i = 0; i <= na; i++) for (let j = 0; j <= nb; j++) {
+    const a = -A + 2 * A * i / na, b = -B + 2 * B * j / nb, q = { x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b };
     if (!inBasin(q) || hitsHarbor(q) || !clearOfBoats(q, except)) return false;
   }
   const inside = (q: Vec) => { const dx = q.x - c.x, dy = q.y - c.y; return Math.abs(dx * u.x + dy * u.y) < HALF_L + grow && Math.abs(dx * n.x + dy * n.y) < HALF_B + grow; };
@@ -449,7 +450,7 @@ function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
 export const ASTERN_RUN = 12;
 /** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one: what a
  * shove of ASTERN_STEERAGE carries her (world.ts: steering for 10 s and more). */
-export const ASTERN_ENOUGH = 8; // (world.ts ASTERN_STEERAGE coasts her a little further: tests/pushoff-astern.test.ts)
+export const ASTERN_ENOUGH = 9; // (world.ts ASTERN_STEERAGE coasts her a little further: tests/pushoff-astern.test.ts)
 /** The most she's turned stern first before she's straightened up, deg: her stern pointing down the fairway. */
 const ASTERN_TURN = 90;
 /**
@@ -669,17 +670,18 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
   const b0 = Math.min(reach, tip + BOW), c0 = at(b0);
   // (clear all the way across the band from straight back to the helm hard over: she turns less than the full circle as her
   // yaw lags and her way falls off, and a helmsman's hand isn't exact; and a hand's breadth to spare all round, sampled finely)
-  // (each way's poses every 0.25 m, worked out once; each pose checked once, quickly first)
+  // (each way's poses every 0.5 m, worked out once; each pose checked once, quickly first)
   const STEP = 0.5, N = Math.round(ASTERN_RUN / STEP), arcs = new Map<number, { c: Vec; h: number }[]>(), okAt = new Map<string, boolean>();
   const arc = (hf: number) => { let a = arcs.get(hf); if (!a) { a = []; for (let k = 0; k <= N; k++) a.push(asternArc(c0, s.heading, hf, k * STEP)); arcs.set(hf, a); } return a; };
   // (the wind sets her to leeward as she goes, until sail's on her: each pose checked where she'd have drifted to as well,
-  // at about the shove's pace; and with a margin that grows with her run, the sim's own scatter about the plan)
+  // at about the shove's pace; and with a margin that grows with her run, the sim's own scatter about the plan: 0.12 m
+  // and 3 cm a meter, to 0.6 m, ESTIMATES from the physics review's measured scatter, 14 Nov 2026)
   const dw = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180), drift = DRIFT_PER_KT * windKt;
   const wide = (q: { c: Vec; h: number }, d: number) => {
     const g = Math.min(0.6, 0.12 + 0.03 * d), off = drift * Math.min(SAIL_ON, d / 0.5), r = { x: q.c.x + dw.x * off, y: q.c.y + dw.y * off };
-    return berthClear(q.c, q.h, s, false, g) && (!off || berthClear(r, q.h, s, false, g)) && (d > 14 || berthClear(q.c, q.h, s, true, 0.12));
+    return berthClear(q.c, q.h, s, false, g) && (!off || berthClear(r, q.h, s, false, g)) && berthClear(q.c, q.h, s, true, 0.12);
   };
-  // (finely near her slip, among the boats and fingers; further out in the fairway, as everywhere else)
+  // (and finely, all along her run: it's never more than ASTERN_RUN, among the boats and fingers)
   const ok = (hf: number, k: number) => { const key = `${hf}:${k}`; let v = okAt.get(key); if (v == null) okAt.set(key, v = wide(arc(hf)[k], k * STEP)); return v; };
   const run = (helm: number) => { let k = 0; while (k < N && [1, 0.75, 0.5, 0.25, 0].every(f => ok(helm * f, k + 1))) k++; return k * STEP; };
   // (which way the stern goes toward the way out: where it's got to on each arc, along the water)
@@ -702,7 +704,7 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
   const steered = opts.filter(o => o.helm && o.rest >= 2);
   const go = opts.find(o => o.rest >= ASTERN_ENOUGH) ?? (steered.length ? [...steered].sort((a, b) => b.rest - a.rest)[0] : [...opts].sort((a, b) => b.rest - a.rest)[0]);
   // (as far as the shove carries her, or to where there's room to turn her, if that's less: berthClear keeps its margins;
-  // nowhere with room past a couple of metres, straight back as far as her slip's clear)
+  // nowhere with room past a couple of meters, straight back as far as her slip's clear)
   const way: PushOff = go.rest < 2 ? { kind: 'astern', back: b0, coast: Math.min(ASTERN_RUN, Math.max(0, reach - b0)), helm: 0, h: s.heading } : { kind: 'astern', back: b0, coast: go.rest, helm: go.helm, h: s.heading };
   astern.set(id, way); return way;
 }
@@ -723,7 +725,11 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
  * Cove's docks, by the seawall and the shore; two by Horseshoe Bay's L dock): with no engine there's no getting out. Kept
  * up to date by tests/pushoff-all.test.ts.
  */
-export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-cove:82', 'gashouse-cove:2', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
+export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-cove:82', 'gashouse-cove:2', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4', // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
+  // (and where, shoved off astern in a 12 kt westerly, she can't be got half a fairway out with 10 s of steerage, or her plan's
+  // clear water doesn't hold: tests/pushoff-astern.test.ts's bar, every berth swept, 14 Nov 2026. A walk-out on a stern line, next,
+  // may open them again)
+  'south-beach:G88', 'horseshoe-bay:C22', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2'];
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();
