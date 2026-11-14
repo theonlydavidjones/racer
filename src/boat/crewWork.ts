@@ -1,5 +1,5 @@
 import { clamp } from '../core/math';
-import type { Boat } from './boat';
+import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
@@ -304,6 +304,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   return out;
 }
 
+/** Whether a jib car is free to move: the windward (lazy) one, or either with the jib down and no sheet load on them
+ * (ROADMAP 8p; the owner: "with sails down, neither jib car should show as loaded"). */
+export const carFree = (b: Boat, side: Tack): boolean => side === b.tack || (b.rig?.jib ?? 1) <= 0.05;
+
 /** The lazy car the crew wants (from its plan) and how long they've wanted it; or your call (`b.carCmd`). */
 export const CAR = {
   /** How long a change has to have lasted before a crew bothers (s): an expert sooner, a novice later (estimates). */
@@ -315,11 +319,14 @@ export const CAR = {
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
 function carJob(b: Boat, dt: number): void {
   const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, c.layout ?? 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
-  const lazy = b.ctl.car[b.tack];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
-  // a job under way: on the car the boat has tacked onto, it's loaded now and can't be moved
+  // (your call for a car that's loaded now, the jib hoisted or a tack: it can't be carried out; dropped, never moved to the other car)
+  if (yours?.side && !carFree(b, yours.side)) { b.carCmd = null; if (a.job?.line === 'car') a.job = null; return; }
+  const side: Tack = yours?.side ?? b.tack, lazy = b.ctl.car[side];
+  // a job under way: on a car that's loaded now (the boat tacked onto it, or the jib went up), it can't be moved
   if (a.job?.line === 'car') {
-    if (a.job.side !== b.tack) { a.job = null; return; }
+    if (!carFree(b, a.job.side as Tack)) { a.job = null; return; }
+    const lazy = b.ctl.car[a.job.side as Tack];
     if (a.job.reach > 0) { a.job.reach -= dt; return; }
     a.job.work -= dt * workPace(b, who);
     if (a.job.work <= 0) {
@@ -348,7 +355,7 @@ function carJob(b: Boat, dt: number): void {
   // way forward, not to the car and back again. The cabin-top jobs are handed out 20 times a second, this every step)
   const ctl = b.ctl as unknown as Record<string, number>, lw = c.lineWant ?? {};
   if (!yours && a.pose === 'piano' && [...PIANO].some(k => lw[k] != null && ownerOf(k, n, c.spec, c.layout ?? 'cockpit') === who && Math.abs(lw[k] - ctl[k]) >= startThreshold(k, skill, lw[k]))) return;
-  a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
+  a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side, target: { ...want } };
 }
 
 
