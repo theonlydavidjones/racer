@@ -32,6 +32,7 @@ import { Harbor } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
+import { MOUTH_REFS } from '../environment/harborMouth';
 import { N_WAVES, WAVE_GLSL, boatOnWaves, packWaves, waterGrid } from './waves';
 import { waveTime } from '../environment/waveField';
 import type { SeaHere } from '../environment/sea';
@@ -58,6 +59,12 @@ const PUFF_N = 160, PUFF_SPAN = 3200;
 const SEA_N = 24;
 /** Current map resolution (samples per side), for the flowing texture and tidelines. */
 const CUR_N = 56;
+/**
+ * The current round a harbor's mouth, drawn finer: the map above has its points some 58 m apart, and Gashouse Cove's
+ * mouth is 37 m wide, its eddies a couple of dozen meters across (environment/harborMouth.ts), so they'd fall between
+ * them. Within FINE_FAR m of a mouth, the water there reads a patch FINE_N × FINE_N of FINE_CELL m round it.
+ */
+const FINE_N = 64, FINE_CELL = 4, FINE_FAR = 1500;
 
 /**
  * Water colour from the wind on it. Stronger wind roughens the surface: denser, higher-contrast ripples and a
@@ -75,6 +82,10 @@ const WATER_FRAGMENT = `
   vec2 cuv = ((vWaveP - uCurO) / uCurCell + 0.5) / ${CUR_N}.0;
   float cIn = smoothstep(0.0, 0.08, min(min(cuv.x, 1.0 - cuv.x), min(cuv.y, 1.0 - cuv.y)));
   vec4 cs = texture2D(uCur, clamp(cuv, 0.0, 1.0));
+  // (round a harbor's mouth, the finer patch, faded in over its outer eighth so its edge never shows)
+  vec2 fcuv = ((vWaveP - uCurFO) / ${FINE_CELL}.0 + 0.5) / ${FINE_N}.0;
+  float fIn = uCurFOn * smoothstep(0.0, 0.12, min(min(fcuv.x, 1.0 - fcuv.x), min(fcuv.y, 1.0 - fcuv.y)));
+  if (fIn > 0.0) cs = mix(cs, texture2D(uCurF, clamp(fcuv, 0.0, 1.0)), fIn);
   vec2 dflow = (mix(uCurMean, (cs.rg - 0.5) * 4.0, cIn) - uCurMean) * 6.0;
   vec2 fuv = (uFlowM * vec3(dflow, 0.0)).xy;
   float ph0 = fract(uTime / 6.0), ph1 = fract(uTime / 6.0 + 0.5);
@@ -102,8 +113,9 @@ const WATER_FRAGMENT = `
   diffuseColor.rgb *= 1.0 - 0.34 * max(gust, 0.0) + 0.26 * max(-gust, 0.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.95, 1.08), max(gust, 0.0) * 0.6);
   // tidelines: where the current converges, a smooth slick band collects foam and debris (thinned to its ridge)
-  float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0;
+  float tlI = cs.b * cIn, tdx = 1.0 / ${CUR_N}.0, fdx = 1.0 / ${FINE_N}.0;
   float tlG = length(vec2(texture2D(uCur, cuv + vec2(tdx, 0.0)).b - texture2D(uCur, cuv - vec2(tdx, 0.0)).b, texture2D(uCur, cuv + vec2(0.0, tdx)).b - texture2D(uCur, cuv - vec2(0.0, tdx)).b));
+  if (fIn > 0.0) tlG = mix(tlG, length(vec2(texture2D(uCurF, fcuv + vec2(fdx, 0.0)).b - texture2D(uCurF, fcuv - vec2(fdx, 0.0)).b, texture2D(uCurF, fcuv + vec2(0.0, fdx)).b - texture2D(uCurF, fcuv - vec2(0.0, fdx)).b)), fIn);
   // the front: a thin line where the convergence crosses ~4.5e-4 /s (distance to that level, in texels, from the
   // local slope), a few meters of foam and debris; inside it the water is a little smoother (a slick)
   float tlD = (tlI - 0.28) / max(0.5 * tlG, 1e-3), far = 1.0 - smoothstep(800.0, 2500.0, length(vPuffXZ - cameraPosition.xz));
@@ -285,7 +297,10 @@ export class SceneView {
   /** Current map: the current (m/s) and where it converges (tidelines), around the focus. */
   private curData = new Uint8Array(CUR_N * CUR_N * 4);
   private curTex = new THREE.DataTexture(this.curData, CUR_N, CUR_N, THREE.RGBAFormat);
-  private curUni = { uCur: { value: this.curTex as THREE.Texture }, uCurO: { value: new THREE.Vector2() }, uCurCell: { value: 50 }, uCurMean: { value: new THREE.Vector2() }, uFlowM: { value: new THREE.Matrix3() } };
+  private fineData = new Uint8Array(FINE_N * FINE_N * 4);
+  private fineTex = new THREE.DataTexture(this.fineData, FINE_N, FINE_N, THREE.RGBAFormat);
+  private curUni = { uCur: { value: this.curTex as THREE.Texture }, uCurO: { value: new THREE.Vector2() }, uCurCell: { value: 50 }, uCurMean: { value: new THREE.Vector2() }, uFlowM: { value: new THREE.Matrix3() },
+    uCurF: { value: this.fineTex as THREE.Texture }, uCurFO: { value: new THREE.Vector2() }, uCurFOn: { value: 0 } };
   /** The race committee's signal flags, and the heading of whatever they're mounted on. */
   private signal: { mast: SignalMast; heading: number } | null = null;
   /** Marks, to lean and trail a wake in the current. */
@@ -351,11 +366,12 @@ export class SceneView {
     wtex.center.set(0.5, 0.5);
     this.puffTex.magFilter = this.puffTex.minFilter = THREE.LinearFilter;
     this.curTex.magFilter = this.curTex.minFilter = THREE.LinearFilter;
+    this.fineTex.magFilter = this.fineTex.minFilter = THREE.LinearFilter;
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM; uniform sampler2D uCurF; uniform vec2 uCurFO; uniform float uCurFOn;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -609,6 +625,31 @@ export class SceneView {
     }
     this.curTex.needsUpdate = true;
     this.curUni.uCurO.value.set(cx0, cy0); this.curUni.uCurCell.value = cc;
+    // round a harbor's mouth near you, the finer patch: which mouth (its rows are read a few a frame: fineStep)
+    let m: { x: number; y: number } | null = null, best = FINE_FAR;
+    for (const r of MOUTH_REFS) { const d = Math.hypot(r.x - at.x, r.y - at.y); if (d < best) { best = d; m = r; } }
+    if (!m) { this.curUni.uCurFOn.value = 0; this.fine = null; return; }
+    const fx0 = Math.round(m.x / FINE_CELL) * FINE_CELL - (FINE_N / 2) * FINE_CELL, fy0 = Math.round(m.y / FINE_CELL) * FINE_CELL - (FINE_N / 2) * FINE_CELL;
+    if (!this.fine || this.fine.x0 !== fx0 || this.fine.y0 !== fy0) this.fine = { x0: fx0, y0: fy0, row: 0, F: new Float32Array(FINE_N * FINE_N * 2), shown: false };
+  }
+  /** The finer patch round a harbor's mouth (updateSeaMap): read a row a frame, as reading the current there all at once
+   * would hold a frame up (some 60 ms); when the last row is in, its current and convergence go to the texture and the
+   * next pass starts. Its water changes over minutes (the eddies pass every few), so a pass a second or two is plenty. */
+  private fine: { x0: number; y0: number; row: number; F: Float32Array; shown: boolean } | null = null;
+  private fineStep(w: SimView): void {
+    const f = this.fine; if (!f) return;
+    const j = f.row;
+    for (let i = 0; i < FINE_N; i++) { const c = w.currentDrawn({ x: f.x0 + i * FINE_CELL, y: f.y0 + j * FINE_CELL }); f.F[(j * FINE_N + i) * 2] = c.x; f.F[(j * FINE_N + i) * 2 + 1] = c.y; }
+    if (++f.row < FINE_N) return;
+    f.row = 0;
+    const F = f.F, fa = (i: number, j: number, k: number) => F[(Math.min(FINE_N - 1, Math.max(0, j)) * FINE_N + Math.min(FINE_N - 1, Math.max(0, i))) * 2 + k], fd = this.fineData;
+    for (let j = 0; j < FINE_N; j++) for (let i = 0; i < FINE_N; i++) {
+      const o = (j * FINE_N + i) * 4, conv = -((fa(i + 1, j, 0) - fa(i - 1, j, 0)) + (fa(i, j + 1, 1) - fa(i, j - 1, 1))) / (2 * FINE_CELL);
+      fd[o] = Math.round(Math.min(1, Math.max(0, 0.5 + fa(i, j, 0) / 4)) * 255); fd[o + 1] = Math.round(Math.min(1, Math.max(0, 0.5 + fa(i, j, 1) / 4)) * 255);
+      fd[o + 2] = Math.round(Math.min(1, Math.max(0, conv / 1.6e-3)) * 255); fd[o + 3] = 255;
+    }
+    this.fineTex.needsUpdate = true;
+    this.curUni.uCurFO.value.set(f.x0, f.y0); this.curUni.uCurFOn.value = 1; f.shown = true;
   }
 
   /** Rasterize the wind strength (terrain × puffs) around a point into the water shader's wind map. */
@@ -823,6 +864,7 @@ export class SceneView {
       this.seaAcc = 0; this.seaRef = w.seaHere(focus);
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
     }
+    this.fineStep(w); // (a row of the harbor mouth's finer current a frame)
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
