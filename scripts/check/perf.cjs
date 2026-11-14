@@ -60,7 +60,7 @@ const VIEWS = [
   // (PERF_URL: another server's page, as scripts/check/perf-ab.cjs runs it against a second version)
   await p.goto(process.env.PERF_URL || 'http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => { window.__reseed(); document.querySelector('[data-home="create"]').click(); }); await p.waitForTimeout(1500);
-  await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
+  await p.evaluate(() => { window.__reseed(); document.getElementById('bGo').click(); }); await p.waitForTimeout(4000); // (again at Go: the setup may make its race again, on its debounce, before)
   // the sim's steps and the scene's update/draw, timed inside the frame
   await p.evaluate(() => {
     const w = window.sim(), v = window.__view, acc = window.__acc = { step: 0, render: 0 };
