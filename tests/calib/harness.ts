@@ -34,7 +34,7 @@ const lengthFor = (s: number): Settings['raceLength'] => {
 
 /** Race one real day with each seed; returns the finishes, and writes them to calib-out/<date>.json. */
 export function raceDay(day: typeof REAL_DAYS[number], seeds: number[]): RaceResult[] {
-  const S: Settings = { ...DEFAULT_SETTINGS, mode: 'race', windKind: 'auto', windKt: 0, current: 'real', tideDate: day.date, tideTime: day.start, raceLength: lengthFor(day.winnerS), opponents: FLEET, fleet: FLEET.length };
+  const S: Settings = { ...DEFAULT_SETTINGS, judging: 'umpired', mode: 'race', windKind: 'auto', windKt: 0, current: 'real', tideDate: day.date, tideTime: day.start, raceLength: lengthFor(day.winnerS), opponents: FLEET, fleet: FLEET.length };
   const pick = chooseCourse(COURSES, S);
   if (!pick) throw new Error('no course');
   const out: (RaceResult & { course: number; dnf: number; seed: number; meanKt: number; abandoned: boolean })[] = [];
