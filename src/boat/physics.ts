@@ -194,6 +194,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (midTack) err = wrap(ai!.commitFor - b.h);
     // a commitment ends when the turn is nearly done or she wants to go somewhere else
     if (ai && !midTack && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
+    // (and once she's turned past the heading she set out for, the turn is done: a new course a little behind her is
+    // reached the short way back, not the long way on round. Held to it, a boat that had luffed past north to keep clear,
+    // asked to come back 30° to port, bore away instead through a gybe and on round into the boat she was keeping clear
+    // of: abandon-home, a 26 kt westerly)
+    if (ai && !midTack && ai.turnCommit !== 0 && !(ai.tackNow && ai.commitHail) && Math.sign(wrap(ai.commitFor - b.h)) !== ai.turnCommit && Math.abs(wrap(ai.commitFor - b.h)) < 90) ai.turnCommit = 0;
     if (ai && !midTack && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
