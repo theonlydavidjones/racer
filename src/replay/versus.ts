@@ -249,7 +249,7 @@ function legMoments(F: Frame[], me: number, r: number, name: string, leg: number
     const base = hb != null && yb != null ? (hb - yb) / (t0 - p0) : 0;
     return h - y - base * (t1 - t0);
   };
-  const verb = (g: boolean) => g ? 'gybed' : 'tacked';
+  const verb = (g: boolean) => g ? 'jibed' : 'tacked';
   const side = (t: string) => t === 'S' ? 'starboard' : 'port', other = (t: string) => side(t === 'S' ? 'P' : 'S');
   // where your winds differed enough to say so (the shifts move across the water: you may not have had hers)
   // (by the wind each felt, its direction: the header/lift sign flips with the tack, so two boats on opposite tacks in
