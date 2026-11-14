@@ -45,5 +45,7 @@ export function damageOf(energy: number, struck: Struck, mass: number): DamageLe
   // (piles graded as concrete by the blow: lying against them at a few cm/s is nothing. Set in under a pier's deck among
   // them, the rig comes down on the deck's edge: a wreck whatever the speed, which the caller decides, Marinas)
   const band: DamageLevel = energy < lo ? 'scrape' : energy <= hi ? 'damage' : 'wreck';
+  // (between two boats alike the reduced mass is half hers, so it takes about 2.1 m/s of closing for 'serious', the same
+  // blow as 1.5 m/s into a wall: right by the physics, both hulls give. A scrape isn't damage: 43.1(c) still exonerates)
   return struck === 'boat' && band === 'wreck' ? 'serious' : band;
 }
