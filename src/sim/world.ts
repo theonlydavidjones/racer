@@ -517,10 +517,10 @@ export class World {
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
     } else if (isUser && this.rounding) {
-      // the mark-rounding drill: on port tack, coming in below the starboard layline to the windward mark, 120 m short
-      // of it and 250 m out: tack onto it when you judge you'll fetch the mark
-      const W = this.rounding.marks[0].p, beat = beatAngle(this.windModel.kt), sS = V(n360(this.windModel.base - beat)), hP = n360(this.windModel.base + beat), pP = V(hP);
-      p = { x: W.x - sS.x * 250 - pP.x * 120, y: W.y - sS.y * 250 - pP.y * 120 }; h = hP;
+      // the mark-rounding drill: on the approach with the mark ahead (the owner: "there should be a mark in front of me"),
+      // 200 m down the starboard layline to the windward mark and close-hauled on it, the lane drawn in (app/drillCoach.ts)
+      const W = this.rounding.marks[0].p, beat = beatAngle(this.windModel.kt), hS = n360(this.windModel.base - beat), sS = V(hS);
+      p = { x: W.x - sS.x * 200, y: W.y - sS.y * 200 }; h = hS;
     } else if (isUser && this.freeSail) {
       // where you chose to start, on a beam reach (close-hauled for the drill): whichever way has more open water ahead
       const at = getPlace(this.settings.sailFrom)?.p;

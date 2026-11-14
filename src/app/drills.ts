@@ -27,11 +27,8 @@ function drillTick(): void {
     if (!b || Math.max(0, s.lostM) < b.lostM) { app.S.practiceBest = { ...(app.S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(app.S); }
   }
   drillSeen = list.length;
-  const s = list[list.length - 1], best = app.S.practiceBest?.[drillKey(s)];
-  el.hidden = false;
-  if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
-  el.innerHTML = `<b>${drillName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
-  el.querySelector('.tp-dcoach')!.textContent = s.coach;
+  // (the rep's short score is by the boat now, app/drillCoach.ts; the full advice in the Pause list: not in this card)
+  el.hidden = true;
 }
 /* ---- the mark-rounding drill (sim/roundings.ts): the same Coach card and Pause slot, one drill at a time ---- */
 const roundName = (k: 'windward' | 'leeward') => (k === 'windward' ? 'Windward mark' : 'Leeward mark');
@@ -47,11 +44,8 @@ function roundTick(): void {
     if (!b || Math.max(0, s.lostM) < b.lostM) { app.S.practiceBest = { ...(app.S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(app.S); }
   }
   roundSeen = list.length;
-  const s = list[list.length - 1], best = app.S.practiceBest?.[roundingKey(s)];
-  el.hidden = false;
-  if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
-  el.innerHTML = `<b>${roundName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b>${s.provisional ? ' (provisional: first lap)' : ''} (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
-  el.querySelector('.tp-dcoach')!.textContent = s.coach;
+  // (the rounding's short score is by the boat now, app/drillCoach.ts; the full advice in the Pause list)
+  el.hidden = true;
 }
 /** The Pause screen's list for the rounding drill: every rounding, its numbers, and your bests. */
 function roundHtml(): string {

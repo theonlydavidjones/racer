@@ -56,6 +56,8 @@ import type { PilotMode } from './boat/autopilot';
 import { Nav, type Place } from './ui/nav';
 import { installDevHandles } from './app/devHandles';
 import { mountDrills } from './app/drills';
+import { DrillCoach } from './app/drillCoach';
+import { DrillGuides } from './render/drillGuides';
 import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
 
@@ -561,6 +563,16 @@ function windShow(on: boolean): void {
 }
 windShow(!!S.windLadder);
 const drills = mountDrills(ctx); // (src/app/drills.ts)
+/* The drills' coach by the boat (app/drillCoach.ts, render/drillGuides.ts): the guides on the water and the word or two
+ * above her masthead, in the tack and gybe drill, the mark-rounding drill and the start practice. */
+const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera);
+function drillCues(): void {
+  const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
+  if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
+  const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
+  const out = coach.tick({ t: w.t, user: u, drill: w.drill, rounding: R, start: mode === 'start' ? { pin: w.C.pin, committee: w.C.committee } : null }, mode);
+  guides.set(out.spec, out.key); guides.wake(out.wake); guides.cue(out.cue); guides.place(u);
+}
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
 function windTick(): void {
   const on = !!S.windLadder && w.running && !w.user.docked;
@@ -1226,6 +1238,7 @@ function frame(now: number): void {
   else view.render(w, dt, now, viewMode, look, over);
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
+  drillCues();
   hud.update(w, dt);
   if (w.running) flowPanel.update(w.user, now, { preStart: !w.freeSail && w.t < 0 }); // (as the coach has it)
   if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer);
