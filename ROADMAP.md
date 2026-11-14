@@ -301,6 +301,8 @@ What's planned, roughly in order. Done work is described in the README.
    picking on a blank map. Suspects: the setup now builds the World only at Start (cca5f47), so the map has nothing to
    draw; the app.ts split (src/app/setup.ts); the chart's tiles or canvas not sized when the panel opens. "Plan on the
    big chart" should be checked too. Add a check that the setup's map draws the chart.
+   Done on claude/cruise-map: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
+   panel was laid out, it had no size and nothing redrew it. The big chart was fine. scripts/check/setup-map.cjs.
 8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
    screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
    through the mast (and likely the windward shroud and spreader). As in real life, a backed jib bellies to windward
