@@ -1365,7 +1365,7 @@ const fleet: Fleet = new Fleet(S, {
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
   // (her page already has her on show, in the same World: the editor opens on it, no new one; ROADMAP 8v)
-  edit: id => { const same = !!w && w.user?.spec?.id === id && fleet?.showing?.id === id; showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
+  edit: id => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();

@@ -150,7 +150,8 @@ export class Fleet {
         const nb = newBoat(n); nb.sails.number = freeNumber(this.S.boats, 100); delete nb.slip; delete nb.marina;
         this.S.boats.push(nb); this.hooks.changed(); this.close(); this.hooks.edit(nb.id); return;
       }
-      case 'edit': this.guard(() => { this.close(); this.hooks.edit(this.boatId); }); return;
+      // (into her editor: her page hidden, but the showroom left on, so the editor opens on her as she's shown; ROADMAP 8v)
+      case 'edit': this.guard(() => { this.list.hidden = true; this.page.hidden = true; this.hooks.edit(this.boatId); }); return;
       case 'del': this.confirmDelete = true; this.drawBoat(); return;
       case 'delNo': this.confirmDelete = false; this.drawBoat(); return;
       case 'delYes': {
