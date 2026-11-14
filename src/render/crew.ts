@@ -840,6 +840,14 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         let near = 0; for (let q = 1; q < 12; q++) { _t.copy(foot).lerp(to, q / 12); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= 4) near = Math.max(near, g); }
         f.swing![i] = { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
       }
+    } else if (!rising && !f.going && !f.swing![1 - i] && Math.abs(want.feet[i].y - foot.y) < 0.15 && foot.distanceTo(want.feet[i]) > 0.5 * f.scale && !outOfReach(c.hip, want.feet[i], f.scale)) {
+      // (a foot left well behind, half a metre and more from its place (out on the far bench after a crossing, its owner
+      // already sat on the cabin top's edge), is picked up and put down there, not slid across the cockpit at 2 m/s. Along
+      // the level only, once they've arrived, and to a place the hips can reach: a leap across the cockpit to where they
+      // weren't yet, or lifted in an arc to a kneeling place up a step, the leg went into the cabin's after end)
+      const to = want.feet[i].clone(); let top = Math.max(foot.y, to.y), near = 0;
+      for (let q = 1; q < 12; q++) { _t.copy(foot).lerp(to, q / 12); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= 4) near = Math.max(near, g); }
+      f.swing![i] = { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
     } else {
       f.swing![i] = null;
       // (on its way, it clears what it passes over; once there, it rests on what's under it)
@@ -900,6 +908,8 @@ const LIMB_SPEED = 2.2;
  * through is what brings it down to a person's pace.
  */
 const HIP = { speed: 2.0, acc: 8, up: 1.6, upAcc: 8 };
+/** A foot's place further from the hips than the leg reaches, near enough (both bones nearly straight). */
+const outOfReach = (hip: THREE.Vector3, foot: THREE.Vector3, k: number) => hip.distanceTo(foot) > 0.92 * (BONE.thigh + BONE.shin) * k;
 /** Ease `p` toward `q` by the share `a`, but no further than `max`. */
 function toward(p: THREE.Vector3, q: THREE.Vector3, a: number, max: number): void {
   const d = _s.copy(q).sub(p).multiplyScalar(a), l = d.length(); if (l > max) d.multiplyScalar(max / l); p.add(d);
