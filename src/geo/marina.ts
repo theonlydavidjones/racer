@@ -164,11 +164,14 @@ export function harborIndex(H: Harbor): HarborIndex {
 }
 /** A dock, a pier or a breakwater here (solid: a boat stops against it)? Only meaningful in or by a harbor. */
 export function hitsHarbor(p: Vec): boolean {
-  for (const H of HARBORS) {
+  // (indexed loops: asked for every boat several times a step, and a for...of's iterator isn't always optimized away)
+  for (let h = 0; h < HARBORS.length; h++) {
+    const H = HARBORS[h];
     if (!inBox(p, H.reach)) continue;
     const ix = harborIndex(H), i = Math.floor((p.x - ix.x0) / ix.C), j = Math.floor((p.y - ix.y0) / ix.C);
     if (i < 0 || j < 0 || i >= ix.nx || j >= ix.ny) continue;
-    for (const s of ix.cells[j * ix.nx + i]) if (s.poly ? inPoly(p, s.pts) : nearLine(p, s.pts, s.half)) return true;
+    const cell = ix.cells[j * ix.nx + i];
+    for (let k = 0; k < cell.length; k++) { const s = cell[k]; if (s.poly ? inPoly(p, s.pts) : nearLine(p, s.pts, s.half)) return true; }
   }
   return false;
 }
