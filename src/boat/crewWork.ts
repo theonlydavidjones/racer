@@ -236,6 +236,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
       // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
       const there = a.job?.station?.pose === 'piano' || a.pose === 'piano';
+      // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the
+      // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed)
+      if (there && !a.job) {
+        const zOf = (l: string) => stationFor(l, who, windward, false)?.z ?? a.z, here = (l: string) => Math.abs(zOf(l) - a.z) < 0.3;
+        if (!here(k) && [...PIANO].some(l => l !== k && here(l) && l in want && worker(l) === who && Math.abs((lw[l] ?? want[l as Ctl]!) - b.ctl[l as Ctl]) >= startThreshold(l, skill, want[l as Ctl]))) continue;
+      }
       // (the waits are for the walk: a line they reach from where they sit, placed by you, they work when it's off)
       // (and none of it for a line knocked off, or wanted well away from where it is, now and lately both: a new point of
       // sail as she bears away, which has come to stay, not a puff's swing of the outhaul)
