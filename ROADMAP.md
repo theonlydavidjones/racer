@@ -772,6 +772,12 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   ~~Also in the showroom~~ (done: the showroom's Time of day and Conditions…) (later; 1–2 h, shares the conditions control with (2)): owner, "I want to be able to change the
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
+- **Later — your crew's looks and character** (the owner, 14 November 2026; Crew Figures with Crew Model; community and
+  fun, after physics and racing): set each crew member's outfit when you configure them in the Yacht Club's Members tab:
+  foul-weather gear, jackets, life jackets, hats and caps, sunglasses, gloves, boots, and their colors (club colors
+  and burgees among them). Plus other fun attributes: hair, beards, a nickname, a favorite position aboard, a lucky
+  item. Looks only, no effect on the physics; anything that would change the boat (weight, height, skill) stays where
+  it is set today. In the members' own pictures and on the water.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
   - From Marinas, the motor: the outboard's thrust is off her centerline (about 0.45 m out on the bracket, some 180 N·m at full
     throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
