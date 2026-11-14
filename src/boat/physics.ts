@@ -437,13 +437,6 @@ export const HOVE = {
   cnBacked: 1.2
 };
 
-/**
- * The fraction of her speed a turn bleeds away per second (physics.ts's own step, and src/boat/arcs.ts's prediction):
- * dv/dt = −turnBleed·v. Turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what
- * the sails' own turning moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward
- * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
- * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
- */
 /** Which way the helm takes a big turn of err degrees (−1 to port, +1 to starboard): the short way, unless that's
  * through the wind and she's too slow to tack (SLOW_TACK), when she'd be left in irons, so she gybes round instead. */
 export function bigTurnWay(b: Boat, err: number): number {
@@ -461,6 +454,13 @@ export function helmWay(b: Boat, desired: number): number {
   return Math.sign(wrap(desired - b.h));
 }
 
+/**
+ * The fraction of her speed a turn bleeds away per second (physics.ts's own step, and src/boat/arcs.ts's prediction):
+ * dv/dt = −turnBleed·v. Turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what
+ * the sails' own turning moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward
+ * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
+ * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
+ */
 export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
   let bleed = 1;
   if (Math.abs(rate) > 0.5) {
