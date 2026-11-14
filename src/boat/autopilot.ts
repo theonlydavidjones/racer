@@ -236,11 +236,14 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   const canTack = b.v > Math.max(TACK_V, TACK_V_FRAC * targetFor(b, beat)) && t - p.lastTackT > 12 && !b.tacking;
   if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) {
     const r = wrap(from - cts);
-    // (a course on the other tack, below 150° off the wind, turns her through it: that's a tack, and waits for the way
-    // and the time to make one, close-hauled on this tack till then; a jibe is the rudder's business, not a tack's)
-    const through = Math.abs(r) < 150 && (r > 0) !== onS;
+    // (a course on the other tack that turns her through the wind is a tack, and waits for the way and the time to make
+    // one, close-hauled on this tack till then; a jibe is the rudder's business, not a tack's)
+    // (through the wind only if the short way round crosses it: from 100° off on one side to 100° off on the other, the
+    // rudder takes her round by the stern, a jibe)
+    const rNow = wrap(from - b.h), through = (r > 0) !== (rNow > 0) && Math.abs(r) + Math.abs(rNow) < 180;
     if (!through) return Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts;
-    if (canTack) { p.lastTackT = t; return n360(cts + Math.sign(r) * lw); }
+    // (once begun, she goes through with it: the new tack's close-hauled course till she's round, as for any tack)
+    if (canTack) { p.lastTackT = t; p.goTack = other; return close(other); }
     return cur;
   }
   // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
