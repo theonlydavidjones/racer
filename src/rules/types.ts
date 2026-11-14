@@ -18,6 +18,9 @@ export interface RulesBoat {
    *  rules 18.2(b) and 18.3 turn on it). Undefined: never. */
   headToWindT?: number;
   penalty: number; // degrees of penalty turn still to do
+  /** The direction she's turning her penalty (+1 starboard, −1 port), once her turns have begun (boat/physics.ts: 30° one
+   * way, not counting her getting clear first); 0 while she owes them but hasn't begun. Omitted: taken as begun. */
+  penaltyDir?: number;
   ocs: boolean; // over early and not yet returned
   /**
    * Rule 21.1: after her starting signal, sailing towards the pre-start side of the starting line or one of its
