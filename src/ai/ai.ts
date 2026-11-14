@@ -134,6 +134,12 @@ const SLOW_TO_STEER = 1.2;
  * leaves leeway out): 1–1.5 m by the time the tack's done, at low speed through the wind where leeway is large
  * (Deep Physics, stepped against the boat's own moveBoat, November 2026). Added to the gap a tack must keep. */
 const TACK_SAG_M = 1;
+/** How much more gap (m) her own course must keep across a boat she must keep clear of than a turn away would: holding
+ * on is a bet that the other boat's course holds too, and close-hauled it wanders a few degrees with the wind's shifts
+ * and her helm, about a metre over the few lengths a crossing takes. Without it a port boat saw her course clear by a
+ * hand's breadth at 30 m, then not at 20, too late to duck (fouls-start.test.ts: 32 rule-10-led penalties in 16 starts,
+ * 25 with it, 29 with 2 m). */
+const OWN_COURSE_EXTRA_M = 1;
 /** Heading `h` is a tack from where she is: upwind both, on the other side of the wind (a gybe is no tack). */
 function isTack(b: Boat, h: number): boolean {
   const from = b.ww.from;
@@ -221,7 +227,7 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   const ownI = cands.findIndex(c => c.turn === (Math.abs(toCourse) > 3 ? toCourse : 0));
   let heading: number | null = null, luff = false;
   // (her own course is no change of course, as far as the others are concerned: only the boats she's keeping clear of)
-  const ownSlack = slack(ownI, false);
+  const ownSlack = slack(ownI, false) - (kc.length ? OWN_COURSE_EXTRA_M : 0);
   if (!(ownSlack >= 0 && ok(cands[ownI]))) {
     othersG = run(others); owedRoom = others.map(o => w.rights(b, o).kc === o);
     const nearest = (is: number[]) => is.reduce((p, q) => Math.abs(wrap(cands[q].heading - aimH)) < Math.abs(wrap(cands[p].heading - aimH)) ? q : p);
