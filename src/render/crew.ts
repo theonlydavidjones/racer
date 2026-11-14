@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
@@ -785,22 +785,31 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // ahead, one foot at a time, about a quarter of a second a step: no foot slides on the deck
       if (sw) {
         // (a step over something high takes longer: the foot goes up and over it, not just along)
-        sw.t = Math.min(1, sw.t + dt / Math.max(0.22, (sw.from.distanceTo(sw.to) + 0.6 * Math.max(0, sw.top - Math.min(sw.from.y, sw.to.y))) / 1.4));
-        const e = sw.t * sw.t * (3 - 2 * sw.t), wasY = foot.y;
+        // (and a high step's lift at a foot's pace: over 1.3 s a metre of it at least. The sole to the side deck, 0.9 m up,
+        // in a quarter of a second, the foot left the sole at 13 m/s)
+        const pk = Math.max(sw.top, sw.from.y, sw.to.y) + 0.07 - (sw.from.y + sw.to.y) / 2;
+        sw.t = Math.min(1, sw.t + dt / Math.max(0.22, (sw.from.distanceTo(sw.to) + 0.6 * Math.max(0, sw.top - Math.min(sw.from.y, sw.to.y))) / 1.4, 1.3 * pk));
+        // (along: eased out and in; with something high right where it starts, the coaming beside a foot on the bench, up
+        // first and then along, not along into it and popped up onto it in a frame)
+        const h0 = sw.hold ?? 0, th = Math.max(0, (sw.t - h0) / (1 - h0)), e = th * th * (3 - 2 * th), wasY = foot.y;
         foot.copy(sw.from).lerp(sw.to, e);
         // (lifted clear of whatever it passes over, highest mid-step)
         const peak = Math.max(sw.top, sw.from.y, sw.to.y) + 0.07 - (sw.from.y + sw.to.y) / 2;
         // (lifted a little early, so what it steps over near either end, the thwart, a seat's edge, is cleared on the way)
-        foot.y += Math.max(0, peak) * Math.sin(Math.PI * sw.t) ** 0.6; foot.y = Math.max(foot.y, ground(foot.x, foot.z) + 0.06);
+        foot.y += Math.max(0, peak) * Math.sin(Math.PI * sw.t) ** 0.6; 
+        // (never down inside what's under it; but brought up out of it at a foot's pace if it was in it, not in a frame: a
+        // foot left inside the thwart's edge went up 0.67 m at once)
+        foot.y = Math.max(foot.y, Math.min(ground(foot.x, foot.z) + 0.06, wasY + 1.5 * LIMB_SPEED * dt));
         // (coming down off something it stepped over: at a foot's pace, not dropped in a frame; the step's done when it's down)
-        foot.y = Math.max(foot.y, wasY - 2 * LIMB_SPEED * dt);
+        foot.y = Math.max(foot.y, wasY - LIMB_SPEED * dt); // (at twice it, a step down off the cabin top came down at 4.4 m/s)
         if (sw.t >= 1 && foot.y <= sw.to.y + 0.01) f.swing![i] = null;
       } else if (want.step && foot.distanceTo(want.feet[i]) > 0.16 * f.scale && (!f.swing![1 - i] || (want.deck && inCockpit(Math.abs(foot.x), foot.z)))) {
         // (one at a time; but setting off along the side deck, a foot still down in the cockpit comes up out of it at once)
         const ahead = want.feet[i].clone().addScaledVector(_s.copy(want.feet[i]).sub(foot).setY(0).normalize(), 0.08 * f.scale);
         const to = want.deck ? ahead.setX(want.feet[i].x).setY(ground(want.feet[i].x, ahead.z) + 0.06) : onGround(ahead); let top = Math.max(foot.y, to.y); // (on the side deck, as far out as it's meant to be)
-        for (let q = 1; q < 6; q++) { _t.copy(foot).lerp(to, q / 6); top = Math.max(top, ground(_t.x, _t.z) + 0.06); }
-        f.swing![i] = { from: foot.clone(), to, t: 0, top };
+        // (finely enough not to step over the coaming's own width between two looks; and what's within the first third of the way)
+        let near = 0; for (let q = 1; q < 12; q++) { _t.copy(foot).lerp(to, q / 12); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= 4) near = Math.max(near, g); }
+        f.swing![i] = { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
       }
     } else {
       f.swing![i] = null;
