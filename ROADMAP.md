@@ -199,7 +199,10 @@ What's planned, roughly in order. Done work is described in the README.
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
-   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
+   Still there on 14 November (owner: "still have backwards arms", a second screenshot): both crew in the cockpit, the
+   blue jacket at the piano and the orange jacket by the compass, have forearms bent backwards at the elbow, hands
+   pointing behind them. No fix has gone in yet. The owner doesn't
    remember the conditions it happened in, so the check covers every pose and wind.
 8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
@@ -295,6 +298,12 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8z. **Now — the cruise setup's map is blank** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
+   no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
+   (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
+   picking on a blank map. Suspects: the setup now builds the World only at Start (cca5f47), so the map has nothing to
+   draw; the app.ts split (src/app/setup.ts); the chart's tiles or canvas not sized when the panel opens. "Plan on the
+   big chart" should be checked too. Add a check that the setup's map draws the chart.
 8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
    screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
    through the mast (and likely the windward shroud and spreader). As in real life, a backed jib bellies to windward
@@ -1164,6 +1173,12 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colors, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colors are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
+  **Grounding on depth** (Coordinator, 14 November; Bay East, after bay-east-17; physics review; with Skipper Model for
+  the AI's routing): today a boat runs aground only on the coastline, so at low water she sails over drying flats and
+  shoals with her 1.20 m draft (Folkboat, class rules). San Rafael's and San Leandro's flats, Richardson Bay and the
+  Berkeley flats are where Folkboats really go aground. The chart's depth plus the tide's height there (tide.ts
+  tideHeightAt) against her draft: soft mud, so she's aground, not wrecked, and stuck until the tide lifts her or she
+  kedges off (the anchor); the AI's routes keep to water deep enough.
   ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
@@ -1353,7 +1368,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
-- **Wrecks** (designed: docs/WRECK-PROPOSAL.md, the owner's answers 14 November; Marinas; after #292; not urgent; 6–10 h):
+- **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
   short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
   lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,
