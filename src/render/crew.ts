@@ -26,7 +26,7 @@ export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
-  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
+  hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
 export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
@@ -439,7 +439,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // through a tack, down in the cockpit and across under the boom (the owner): the forward crew on one knee working
     // the jib sheets at the leeward winch, the middle crew up in a crouch tacking the main from the thwart
     // (the jib hand forward by the winches, the main hand aft by the thwart, clear of each other)
-    const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.1, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
+    const zz = tackRole === 'jib' ? COCK0 + 0.5 : THWART.z - THWART.half - 0.6, lim = benchEdge(zz) - (tackRole === 'jib' ? 0.2 : 0.1), px = Math.max(-lim, Math.min(lim, x));
     if (tackRole === 'jib') {
       // (on one knee on the leeward locker lid beside the winch, which stands out on its pedestal past the coaming:
       // within arm's reach of it, the sheet in the inboard hand. Just forward of it, abreast: the winch between the cabin
@@ -450,8 +450,12 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
       // would lie along the coaming and through it)
       return kneelOne(bx, wz, yaw, ws > 0 ? 0 : 1, ws > 0 ? [hold, w] : [w, hold], k, w);
     }
-    const sheet = V(px * 0.4, 0.9, THWART.z - 0.08);
-    return crouch(px, zz, 0, [sheet.clone().add(V(-0.07, 0.05, 0)), sheet.clone().add(V(0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, -1)));
+    // (facing aft, the mainsheet on the thwart in front of them, as anyone tacks the main from forward of it: facing forward
+    // with their hands on it behind them, the arms went back through the elbows, the owner's "backwards arms"; and back from
+    // it far enough that, bent over in the crouch toward it, their hands are in front of the chest and their knees clear of
+    // the thwart)
+    const sheet = V(px * 0.4, 0.9, THWART.z - 0.25); // (the tail hauled in front of the thwart, not over it: an elbow below the hands lay on its top)
+    return crouch(px, zz, Math.PI, [sheet.clone().add(V(0.07, 0.05, 0)), sheet.clone().add(V(-0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, 0.4)));
   }
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
   // (somewhere forward of the cockpit with no job there, as after setting the pole, waiting to see where they go next:
@@ -765,6 +769,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
     // the test's sign flipped each frame, so they turned a step one way and a step back for ever, the knees with them, 70
     // rad a minute, sat on the cabin top's edge)
     if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < -0.3) d -= Math.sign(d) * 2 * Math.PI;
+    // (a turn given its way round, back from facing aft at the mainsheet after a tack (syncCrew): on that way until it's
+    // nearly done)
+    if (f.turnDir != null) { if (Math.abs(d) < 0.6) f.turnDir = undefined; else if (Math.sign(d) !== f.turnDir) d += f.turnDir * 2 * Math.PI; }
     const dy = d * a; c.yaw += Math.max(-3 * dt, Math.min(3 * dt, dy));
   }
   // the lean on a slower spring (leaning out as a puff comes, in as it goes: about a third of a second, never a snap)
@@ -1041,7 +1048,12 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // up and through the wind (crewPhys.ts roll), and drawn down in the cockpit from its start, they were 0.9 m from where
     // their weight was, and were carried there at 3.7 m/s as it began; then back out to the new rail)
     const inboard = !a || Math.abs(a.x) < benchEdge(a.z) || pose === 'cross';
+    const wasTack = !!f.tack;
     f.tack = !busy && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go));
+    // (back from facing aft at the mainsheet, round through facing inboard, away from the bench they're going to: round the
+    // other way, the knee of a foot planted on the sole swung out over the bench, the shin through its edge)
+    // (the side they're going to, the physics' own: at the role's end they can be just across the middle from it)
+    if (wasTack && !f.tack && f.cur && Math.cos(f.cur.yaw) < -0.3) f.turnDir = -Math.sign(x) || -Math.sign(f.cur.hip.x) || 1;
     const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
     const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z);
     // (on the way along the side deck, and settling into the new place after it)
