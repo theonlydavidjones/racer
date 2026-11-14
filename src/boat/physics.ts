@@ -892,7 +892,10 @@ const STEERAGE = 0.5;
 /** Her outboard driving her: running, down and in gear (idling in neutral it gives no steerage). */
 const motorDrives = (b: Boat) => !!b.motor?.running && b.motor.down && b.motor.gear !== 'N';
 /** Move her over the ground (through the water plus the current), and stop her on a dock or the shore. */
+/** Whether travel knocked the boat it last moved against something (the shore, a dock, a pier): ground.ts reads it straight after. */
+export const KNOCK = { on: false };
 function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
+  KNOCK.on = false;
   const u = V(b.h), ww = b.ww;
   // sternway (pushed off astern): she coasts back, slowing on the water's drag, which is slight at a walking pace (a
   // two-tonne boat glides a long way: from a shove, three or four lengths in most of a minute)
@@ -944,6 +947,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   if (!touched && !b.pushing && Math.abs(side) > 0.005 && (Math.abs(side) > 0.5 * Math.abs(ahead) || onLand({ x: b.x + stb.x * sgn * 1.1, y: b.y + stb.y * sgn * 1.1 }))) {
     const hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
     if (hit) {
+      KNOCK.on = true;
       const what = whatHit(hit), closing = closingAt(b, hit), piles = underPier(hit);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
       if (piles) onPiles(b, piles.name, closing, false, hit, emit, t);
@@ -951,6 +955,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
       offLand();
     }
   }
+  if (touched) KNOCK.on = true;
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)
   // (in the frame the sails are trimmed in, the wind across her course through the water: step(), apF)

@@ -2,6 +2,7 @@ import type { Vec } from '../core/math';
 import { LL } from '../geo/geo';
 import enc from '../geo/data/enc-chart.json';
 import bayTides from './data/bay-tides.json';
+import bottom from './data/bottom.json';
 
 /**
  * The charted rocks, wrecks and obstructions a keel can strike (NOAA's ENC: UWTROC, WRECKS, OBSTRN, in
@@ -9,29 +10,36 @@ import bayTides from './data/bay-tides.json';
  * Each has its top at some depth below MLLW (negative: above it, drying), and she strikes it where the tide leaves less
  * water over it than she draws (boat/ground.ts).
  *
- * The top, from the chart:
+ * The top, from the chart (S-57's WATLEV: 1 partly submerged at high water, 2 always dry, 3 always under water, 4 covers
+ * and uncovers, 5 awash):
  *  - VALSOU, the depth over it, where the chart gives one (141 of the 1,051);
- *  - a rock awash (WATLEV 5): at the datum;
- *  - a rock that covers and uncovers (WATLEV 4, 226 of them, no VALSOU): dry at low water and covered at high, so its
- *    top is between the two. Taken halfway up the tide's range, MHHW / 2 above MLLW (San Francisco's: about 0.9 m), an
- *    ESTIMATE: the chart gives no height.
- * Left out: the ones always under water of unknown depth (WATLEV 3 with no VALSOU: 34 rocks, 549 obstructions, many of
- * them foul ground, CATOBS 6–7), since their top could be anywhere; and the ones always dry (WATLEV 2), which stand above
- * every tide as the shore does. A point hazard is taken as ROCK_R across (the chart marks a point; the rock has some
- * size: an ESTIMATE); an area one (an obstruction's or a wreck's outline) as its outline.
+ *  - awash (5): at the datum;
+ *  - covers and uncovers (4), with no VALSOU: dry at low water and covered at high, so its top is between the two. Taken
+ *    halfway up the tide's range, MHHW / 2 above MLLW (San Francisco's: about 0.9 m), an ESTIMATE: the chart gives no
+ *    height;
+ *  - always dry (2) or partly submerged at high water (1): at MHHW, standing out of every tide but the highest;
+ *  - always under water (3) with no VALSOU: at the shoal edge of the depth area it lies in (DRVAL1), as a chart display
+ *    takes such a danger (S-52's DEPVAL02): baked with the bottom (scripts/make-bottom.mjs, bottom.json hazardTop), and
+ *    only where that's shoal water. Not foul ground (CATOBS 7), a danger only to anchoring.
+ * A point hazard is taken as ROCK_R across (the chart marks a point; the rock has some size: an ESTIMATE); an area one
+ * (an obstruction's or a wreck's outline) as its outline.
  */
 export interface Hazard { id: number; kind: 'rock' | 'wreck' | 'obstn'; top: number; p?: Vec; area?: Vec[]; c: Vec; name: string }
 /** A point hazard's radius (m): an ESTIMATE. */
 export const ROCK_R = 3;
 const MHHW = (bayTides as unknown as { refMhhw: number }).refMhhw;
 const NAME = { rock: 'a charted rock', wreck: 'a charted wreck', obstn: 'a charted obstruction' } as const;
-type Raw = { k: 'rock' | 'wreck' | 'obstn'; wl: number; d?: number; p?: number[]; f?: number[][][] };
+type Raw = { k: 'rock' | 'wreck' | 'obstn'; wl: number; d?: number; p?: number[]; f?: number[][][]; o?: number[][] };
+const BJ = bottom as unknown as { hazards: number; hazardTop: Record<string, number> };
 const dec = (a: number[]): Vec[] => { const out: Vec[] = []; let x = 0, y = 0; for (let i = 0; i < a.length; i += 2) { x += a[i]; y += a[i + 1]; out.push(LL(y / 1e5, x / 1e5)); } return out; };
-export const HAZARDS: Hazard[] = ((enc as unknown as { hazards: Raw[] }).hazards).flatMap((h): Hazard[] => {
-  const top = h.d != null ? h.d : h.wl === 5 ? 0 : h.wl === 4 && h.k === 'rock' ? -MHHW / 2 : null;
+const RAW = (enc as unknown as { hazards: Raw[] }).hazards;
+if (BJ.hazards !== RAW.length) throw new Error('bottom.json was made from another chart: node scripts/make-bottom.mjs');
+export const HAZARDS: Hazard[] = RAW.flatMap((h, k): Hazard[] => {
+  const top = h.d != null ? h.d : h.wl === 5 ? 0 : h.wl === 4 ? -MHHW / 2 : h.wl === 1 || h.wl === 2 ? -MHHW : BJ.hazardTop[k] ?? null;
   if (top === null) return [];
   if (h.p) { const p = LL(h.p[1] / 1e5, h.p[0] / 1e5); return [{ id: 0, kind: h.k, top, p, c: p, name: NAME[h.k] }]; }
-  if (h.f) return h.f.map(poly => { const area = dec(poly[0]), c = { x: area.reduce((s, q) => s + q.x, 0) / area.length, y: area.reduce((s, q) => s + q.y, 0) / area.length }; return { id: 0, kind: h.k, top, area, c, name: NAME[h.k] }; });
+  const rings = h.f ? h.f.map(poly => poly[0]) : h.o ?? []; // (an area's outline; a line's, for those given only as one)
+  if (rings.length) return rings.map(ring => { const area = dec(ring), c = { x: area.reduce((s, q) => s + q.x, 0) / area.length, y: area.reduce((s, q) => s + q.y, 0) / area.length }; return { id: 0, kind: h.k, top, area, c, name: NAME[h.k] }; });
   return [];
 });
 HAZARDS.forEach((H, i) => { H.id = i + 1; });
@@ -42,12 +50,14 @@ for (const H of HAZARDS) {
   for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(y0 / CELL); j <= Math.floor(y1 / CELL); j++) { const k = i * 65536 + j; (GRID.get(k) ?? GRID.set(k, []).get(k)!).push(H); }
 }
 const inside = (p: Vec, P: Vec[]) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
+/** How far p is from an outline's nearest edge (m). */
+const edgeDist = (p: Vec, P: Vec[]) => { let m = Infinity; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy, t = L2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2)) : 0; m = Math.min(m, Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy)); } return m; };
 /** The shallowest-topped hazard within `r` m of p (0: under it), or null. */
 export function hazardNear(p: Vec, r: number): Hazard | null {
   const R = r + ROCK_R; let best: Hazard | null = null;
   for (let i = Math.floor((p.x - r) / CELL); i <= Math.floor((p.x + r) / CELL); i++) for (let j = Math.floor((p.y - r) / CELL); j <= Math.floor((p.y + r) / CELL); j++) for (const H of GRID.get(i * 65536 + j) ?? []) {
     if (best && H.top >= best.top) continue;
-    const near = H.p ? (p.x - H.p.x) ** 2 + (p.y - H.p.y) ** 2 <= R * R : inside(p, H.area!) || H.area!.some(q => (q.x - p.x) ** 2 + (q.y - p.y) ** 2 <= r * r);
+    const near = H.p ? (p.x - H.p.x) ** 2 + (p.y - H.p.y) ** 2 <= R * R : inside(p, H.area!) || edgeDist(p, H.area!) <= r;
     if (near) best = H;
   }
   return best;

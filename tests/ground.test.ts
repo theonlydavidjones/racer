@@ -7,6 +7,7 @@ import { n360 } from '../src/core/math';
 import { sfTide } from '../src/environment/tide';
 import { bottomDepth, waterOver } from '../src/environment/bottom';
 import { GROUND, groundStep, keelDepth } from '../src/boat/ground';
+import { KNOCK } from '../src/boat/physics';
 
 /**
  * Running aground on depth (boat/ground.ts): Richardson Bay's flats off Strawberry, half a meter below the chart's
@@ -56,7 +57,9 @@ describe('aground on the mud', () => {
   it('knocked against the shore on the mud, she stays stopped: the mud doesn\'t give her back the speed the knock took', () => {
     // (as travel leaves her after her bow hits the shore: no speed through the water, but b.vx, b.vy still her speed before)
     const lo = extreme(-1), b = { x: FLAT.x, y: FLAT.y, h: 0, v: 0, astern: 0, sway: 0, vx: 0, vy: 2.5, cur: { x: 0, y: 0 }, heel: 0, isUser: false } as never as Parameters<typeof groundStep>[0];
+    KNOCK.on = true; // (as travel leaves it, having knocked her)
     groundStep(b, day + lo * 60e3, 1 / 60, () => {}, { t: -99 }, 0);
+    KNOCK.on = false;
     expect(b.aground).toBeGreaterThan(0);
     expect(b.v).toBe(0); expect(Math.hypot(b.vx, b.vy)).toBe(0);
     expect(b.x).toBe(FLAT.x); expect(b.y).toBe(FLAT.y); // (where travel put her)

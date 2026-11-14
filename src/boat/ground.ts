@@ -1,7 +1,8 @@
-import { V, type Vec } from '../core/math';
+import { V, n360, type Vec } from '../core/math';
 import type { Emit } from '../sim/events';
 import { waterOver } from '../environment/bottom';
 import { displacement, newCrew, DEFAULT_CREW } from './crewPhys';
+import { KNOCK } from './physics';
 import { TRIM } from './hullTrim';
 import type { Boat } from './boat';
 import orc from './data/nordic-folkboat-orc.json';
@@ -64,14 +65,14 @@ export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: {
   const free = 1 - load / (mass * GROUND.g);
   if (free < 1) {
     let dh = b.h - h0; dh -= 360 * Math.round(dh / 360);
-    b.h = h0 + dh * free;
+    b.h = n360(h0 + dh * free);
     if (b.yawRate != null) b.yawRate *= free;
     if (b.turnRate != null) b.turnRate *= free;
   }
   // her motion over the ground, slowed (stopped, if the friction takes all of it), and where that leaves her this step
   const k = g > dv ? (g - dv) / g : 0, nx = vx * k, ny = vy * k;
   // (knocked against the shore this step, travel has already put her where she ends it: only her motion is the mud's)
-  const knocked = Math.abs(mx - vx) + Math.abs(my - vy) > 1e-9;
+  const knocked = KNOCK.on; // (travel says so: inferring it from her speeds read every step astern as a knock)
   if (!knocked) { b.x += (nx - mx) * dt; b.y += (ny - my) * dt; }
   b.vx = nx; b.vy = ny;
   // through the water: her motion over the ground less the stream's (held fast, the water runs past her)
