@@ -88,10 +88,22 @@ const MAIN_DEF: SailDef = {
   tack: V3(0, BOOM_TOP, 0), head: V3(0, BOOM_TOP + P, 0), clew: V3(0, BOOM_TOP, E), depth: 0.42, rows: 18, cols: 10,
   // the roach square to the straight leech, from the width it adds square to the luff
   roach: t => (MAIN_GIRTH(t) - E * (1 - t)) * MAIN_LEECH / P,
-  windows: [{ t0: 0.3 / P, t1: 0.65 / P, s0: 0.18, s1: 0.18 + 1.8 / E }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
-  battens: [{ t: 0.2, len: 1.0 }, { t: 0.41, len: 1.0 }, { t: 0.61, len: 1.0 }, { t: 0.82, len: 0.6 }], battenLines: false,
+  // (the windows: the class allows two, 0.5 m² between them, none nearer than 150 mm to an edge, CR 9.13: the long one
+  // low down, 1.1 m by 0.35 m, and the small spreader window up the luff, about 0.49 m² together)
+  windows: [{ t0: 0.3 / P, t1: 0.65 / P, s0: 0.18, s1: 0.18 + 1.1 / E }, { t0: 0.3, t1: 0.355, s0: 0.07, s1: 0.16 }],
+  battenLines: false,
   footOnSpar: true // the foot's bolt-rope in the boom's groove, the clew lashed at its end
 };
+/** The height fraction at which a sail's leech is the fraction f of its length down from the head (along the drawn leech). */
+function leechT(d: SailDef, f: number): number {
+  const N = 400, pts = [...Array(N + 1)].map((_, i) => sailEdges(d, i / N)[1]), cum = [0];
+  for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  const want = cum[N] * (1 - f); let i = 1; while (i < N && cum[i] < want) i++;
+  return (i - 1 + (want - cum[i - 1]) / (cum[i] - cum[i - 1])) / N;
+}
+// the main's four battens, each where the class puts it: at the points dividing the leech into five equal parts (CR 9.23,
+// within 100 mm), the top one no longer than 800 mm and the others 1050 mm, measured outside the pocket (CR 9.24)
+MAIN_DEF.battens = [0.8, 0.6, 0.4, 0.2].map((f, i) => ({ t: leechT(MAIN_DEF, f), len: i < 3 ? 1.0 : 0.6 }));
 /** The forestay: the jib swings around it, so its luff stays on the stay. */
 const JIB_AXIS = HOUNDS.clone().sub(FORESTAY_DECK).normalize();
 /**
@@ -111,7 +123,8 @@ const JIB_DEF: SailDef = (() => {
     tack, head: tack.clone().addScaledVector(a, JIB_LUFF), clew: tack.clone().addScaledVector(n, JIB_LP).addScaledVector(a, f), depth: 0.36, rows: 14, cols: 8,
     roach: t => JIB_ROACH * Math.sin(Math.PI * t) ** 1.5,
     windows: [{ t0: 0.14, t1: 0.21, s0: 0.17, s1: 0.56 }],
-    battens: [{ t: 0.25, len: 0.7 }, { t: 0.51, len: 0.47 }, { t: 0.76, len: 0.37 }], battenLines: false
+    // (three battens dividing the leech into equal parts, inside lengths 600, 400 and 300 mm at most, bottom to top: CR 9.35)
+    battens: [{ t: 0.25, len: 0.6 }, { t: 0.51, len: 0.4 }, { t: 0.76, len: 0.3 }], battenLines: false
   };
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
@@ -402,7 +415,7 @@ export interface BoatMesh {
   pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
   /** The mast (bent by syncRig: its unbent vertices kept) and the forestay (sagging), with the bend last drawn. */
-  rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
+  rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; bands: THREE.Mesh; bandsBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
   /** The racing instrument on the cabin top (her heading and speed on its face), on your own boat. */
@@ -1109,6 +1122,19 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const mast = new THREE.Mesh(alu ? new THREE.CylinderGeometry(0.5, 0.5, mastH, 14, MAST_SEGS) : new THREE.CylinderGeometry(0.34, 0.5, mastH, 10, MAST_SEGS), spar);
   mast.scale.set(MAST_ATH, 1, MAST_FA); mast.position.set(0, DECK_AT_MAST + mastH / 2, MAST_Z); rig.add(mast);
   const mastBase = (mast.geometry.attributes.position.array as Float32Array).slice();
+  // the class's measurement bands (CR 6.1.11: each at least 13 mm wide, "clearly discernible while racing"; dark, as the
+  // class's spar drawing, Dwg 11, has them): No. I right round the mast with its upper edge at the Lower Mast Point, the
+  // boom's top; No. II on the mast's fore side only, its lower edge at the Forestay Height Point, where the stay meets it;
+  // No. III right round, its lower edge at the upper band, the head's limit, P above No. I. One mesh, bent with the mast.
+  const BAND = 0.025, bandGeos: THREE.BufferGeometry[] = [];
+  const ringAt = (y0: number, arc: number, start: number) => {
+    const u = (y0 + BAND / 2 - DECK_AT_MAST) / mastH, r = (alu ? 0.5 : 0.5 - 0.16 * u) + 0.012; // (the mast's own radius there, tape-thick proud of it)
+    const g = new THREE.CylinderGeometry(r, r, BAND, alu ? 14 : 10, 1, true, start, arc);
+    g.scale(MAST_ATH, 1, MAST_FA); g.translate(0, y0 + BAND / 2, MAST_Z); bandGeos.push(g.toNonIndexed());
+  };
+  ringAt(BOOM_TOP - BAND, Math.PI * 2, 0); ringAt(HOUNDS.y, Math.PI, Math.PI / 2); ringAt(BOOM_TOP + P, Math.PI * 2, 0); // (three.js's arc starts at +z, aft: π/2 to 3π/2 is the fore half)
+  const bands = new THREE.Mesh(mergeGeometries(bandGeos, false)!, BLACK); bands.userData.bends = true; rig.add(bands); // (bent each time the mast is: syncRig)
+  const bandsBase = (bands.geometry.attributes.position.array as Float32Array).slice();
   // the mast's foot on deck (Josephine, the owner's photos): a round stainless plate on the deck; a black rubber boot
   // round the mast from the deck about 0.4 m up, where it goes down through the deck to its step on the keel; and a
   // stainless horseshoe over the plate, which the lines from the mast thread under or are made fast to before running aft (MAST_RING, for Rigging). Sizes read off the photos, estimates.
@@ -1137,6 +1163,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // the mainsheet's upper block, hung from a strap under the boom's end
   { for (const dz of [-MS_GAP / 2, MS_GAP / 2]) { const ub = sheaveBlock(0.03, -0.075); ub.position.set(0, BOOM_END.y - BOOM_R, MS_R + dz); boomPivot.add(ub); } } // (two blocks on bails, fore and aft)
   const boom = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R, BOOM_R, E + 0.12, aluBoom ? 10 : 5), boomMat); boom.rotation.x = Math.PI / 2; boom.position.set(0, BOOM_TOP - BOOM_R, (E + 0.12) / 2); boomPivot.add(boom);
+  // the boom band (CR 6.3.3: the Boom Point, its forward edge no more than 3380 mm from the mast's after side; the clew
+  // may not go aft of it), dark like the mast's
+  { const bb = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R + 0.0015, BOOM_R + 0.0015, 0.025, aluBoom ? 10 : 5, 1, true), BLACK); bb.rotation.x = Math.PI / 2; bb.position.set(0, BOOM_TOP - BOOM_R, E + 0.0125); boomPivot.add(bb); }
   if (aluBoom) { // the extrusion's black moulded end fitting, at its after end (as CircleSea's)
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(BOOM_R * 1.05, BOOM_R * 1.05, 0.06, 10), MAT.dark); cap.rotation.x = Math.PI / 2; cap.position.set(0, BOOM_TOP - BOOM_R, E + 0.12 - 0.02); boomPivot.add(cap);
   }
@@ -1352,7 +1381,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
   mergeStatic(grp, out);
   return out;
 }
@@ -1563,6 +1592,9 @@ function syncRig(m: BoatMesh, b: Boat, jibSgn: number, load: number, dt: number)
     const g = r.mast.geometry, a = g.attributes.position.array as Float32Array, base = r.mastBase, half = (MAST_TOP - DECK_AT_MAST) / 2;
     for (let i = 0; i < a.length; i += 3) a[i + 2] = base[i + 2] - mastFwd(base[i + 1] + half, d.bow, d.topAft) / MAST_FA; // (the mesh is scaled by MAST_FA fore and aft)
     g.attributes.position.needsUpdate = true;
+    { const ba = r.bands.geometry.attributes.position.array as Float32Array, bb = r.bandsBase; // (the bands, in the rig's frame)
+      for (let i = 0; i < ba.length; i += 3) ba[i + 2] = bb[i + 2] - mastFwd(bb[i + 1] - DECK_AT_MAST, d.bow, d.topAft);
+      r.bands.geometry.attributes.position.needsUpdate = true; }
     // what's fixed to the mast goes with it: the windex and its tabs at the head, the gooseneck (and the boom), the
     // jumper stays' ends (their struts are at the hounds, which don't move)
     const at = (h: number) => mastFwd(h - DECK_AT_MAST, d.bow, d.topAft);
