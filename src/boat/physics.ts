@@ -46,11 +46,12 @@ export function sailPlan(b: Boat): SailPlan {
 }
 
 /**
- * Hoisting and striking (dropping) the sails, at a crew's pace: the main takes about half a minute to hoist and the
- * jib about 15 s; short-handed, longer. The main goes up easily head to wind; off the wind it fills, presses on the
- * spreaders and shrouds and the slides bind, so it goes up far more slowly.
+ * Hoisting and striking (dropping) the sails at the mast, at a crew's pace: each sail goes up in about 5 s (the owner,
+ * aboard Josephine, 14 Nov 2026: "maybe five seconds each sail if nothing goes wrong"); short-handed, longer. Head to
+ * wind it goes up easily; off the wind it fills, presses on the spreaders and shrouds and the slides bind, so it goes up
+ * far more slowly. Struck, the halyard let run, it comes down in a few seconds (an estimate: the owner's figure asked for).
  */
-export const HOIST = { main: 30, jib: 15, strikeMain: 6, strikeJib: 4 };
+export const HOIST = { main: 5, jib: 5, strikeMain: 6, strikeJib: 4 };
 /** How far up each sail is (0..1 of its luff): hauled up at the mast (b.rig), then its last inches taken up by the halyard
  * at the piano (controls.ts HALYARD). A boat with no b.rig has both hauled up. */
 export const sailUp = (b: Boat, k: 'main' | 'jib'): number => (b.rig ? hoistedShare(b.rig[k], (k === 'main' ? b.rig.mainTaut : b.rig.jibTaut) ?? 1, k) : 1);
