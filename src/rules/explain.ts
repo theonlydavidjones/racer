@@ -34,7 +34,7 @@ export interface ExplainInput {
   userTack: Tack;
   rule: RuleId;
   kind: IncidentKind;
-  byWhy: 'tack' | 'overlap' | 'rule21' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | 'weighed' | null;
   markName?: string; // for 18.2(a)
   markOverlapped?: boolean;
   turned?: number; // for 16.1 and 16.2
@@ -66,7 +66,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       tip = you ? 'Before tacking near a boat, make sure you will be close-hauled with clear water. About three boat lengths is a safe rule of thumb.' : 'A boat that is mid-tack has no rights. Hold your course.';
       break;
     case '15':
-      what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing your penalty turns)' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing their penalty turns)' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
+      what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing your penalty turns)' : e.byWhy === 'weighed' ? 'getting under way again (anchor up, or afloat)' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing their penalty turns)' : e.byWhy === 'weighed' ? 'getting under way again (anchor up, or afloat)' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
       tip = you ? 'Right of way you have just acquired is not enforceable straight away. Leave the other boat time and space to get clear.' : 'You were the boat that had to keep clear, but the other boat changed the situation too suddenly for you to respond.';
       break;
     case '16.1':
@@ -143,7 +143,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       break;
     case '22':
       what = you ? `${o} was anchored or aground, and you had to avoid her if you could.` : `You were anchored or aground, and ${o} had to avoid you.`;
-      tip = you ? 'Give an anchored or grounded boat a wide berth: she can\'t get out of your way.' : 'Anchored or aground, you have nothing to do: the others must avoid you.';
+      tip = you ? 'Give an anchored or grounded boat a wide berth: she can\'t get out of your way.' : 'Anchored or aground, the others must avoid you. You still avoid contact if you reasonably can (rule 14).';
       break;
     case '23':
       if (e.part === '23.1') {

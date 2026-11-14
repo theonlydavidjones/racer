@@ -112,8 +112,10 @@ export interface PairRecord {
   rule: RuleId | null;
   grace: number; // Rule 15 grace lasts until this time
   by: number | null; // id of the boat that just acquired right of way
-  byWhy: 'tack' | 'overlap' | 'rule21' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | 'weighed' | null;
   cool: number; // no new incident for this pair until this time
+  /** Rule 22: when one of the two became anchored or aground (the boat under way's time to respond, RULE15_GRACE). */
+  held22?: number;
   mark: MarkRoomState | null;
   /** Rule 17: id of the boat that became overlapped to leeward from clear astern within two lengths. */
   r17: number | null;
@@ -180,7 +182,7 @@ export interface Incident<B> {
   kind: IncidentKind;
   fouler: B;
   rule: RuleId;
-  byWhy: 'tack' | 'overlap' | 'rule21' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | 'weighed' | null;
   /** Rule 16.1: how far (deg) the right-of-way boat turned toward the other boat just before. */
   turned?: number;
   /** Rule 20 hail incidents: whether the fouler was the hailed boat (didn't respond) or the hailing boat (didn't tack after the response). */
