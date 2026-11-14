@@ -1,5 +1,5 @@
 import type { Boat } from '../boat/boat';
-import { KT, V, wrap, type Vec } from '../core/math';
+import { KT, LOA, V, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
 import { DrillTracker } from './drill';
 import { byHand } from '../boat/physics';
@@ -20,7 +20,7 @@ import { inBasin } from '../geo/marina';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'mob' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
+export type LessonId = 'road' | 'mob' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
@@ -31,6 +31,7 @@ export const LESSONS: { id: LessonId; no: number; title: string; icon: string; a
   { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', asa: '5, 33' },
   { id: 'jibing', no: 7, title: 'Jibing', icon: '↪️', asa: '5, 34' },
   { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' },
+  { id: 'road', no: 9, title: 'Rules of the road', icon: '⚓', asa: '6–8, 14' },
   { id: 'mob', no: 10, title: 'Crew overboard', icon: '🆘', asa: '36' },
   { id: 'breeze', no: 11, title: 'A breeze', icon: '💨', asa: '—' },
   { id: 'home', no: 12, title: 'Home to the slip', icon: '🏁', asa: '23, 38' }
@@ -87,13 +88,19 @@ export const LESSON_MARKS = {
    * separated from rescuers"); victims set 2 kt as the upper limit, and "the rule at Annapolis is 1 knot": 1 kt held 4 s
    * is stopped alongside, where at 2 kt she'd slide past them (the report counts boats that "sailed by" as failures).
    * Faster than MOB_STRIKE_KT her hull hitting them runs them down; her stem coming onto them at any speed is a strike. */
-  reachS: 15, alongsideM: 1.5, mobKt: 1, mobHoldS: 4, mobStrikeKt: 2
+  reachS: 15, alongsideM: 1.5, mobKt: 1, mobHoldS: 4, mobStrikeKt: 2,
+  /** Rules of the road (the Navigation Rules, 33 CFR 83; ASA 101 knowledge 6–8, 14): the other boat is set on a collision
+   * course MEET_S ahead (she and you arriving at the same spot then). Giving way, you keep "well clear" (Rule 16): she
+   * goes by with CLEAR_LOA of her lengths or more between the hulls. Standing on, you "keep [your] course and speed"
+   * (Rule 17(a)(i)): within STAND_DEG of the heading you had and at least STAND_V of the speed, on the same tack, till
+   * she's past. An encounter is over once they're PAST_M apart and opening. */
+  meetS: 45, clearLoa: 2, standDeg: 15, standV: 0.6, pastM: 40
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
   tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
-  mob: 'Sail a beam reach', breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
+  mob: 'Sail a beam reach', road: 'Sail on port tack: the wind over your left side', breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -138,6 +145,13 @@ export class LessonTracker {
   mobTime: number | null = null;
   /** Crew overboard: the person was against her hull last step (so a stem coming onto them is told from lying alongside). */
   private mobIn = false;
+  /** Rules of the road: the encounter being sailed (its kind, her heading, your course and speed as it began, the
+   * closest the hulls have come, m), and the buoys (red to starboard coming in, the way in, deg). */
+  enc: { kind: 'port' | 'windward' | 'stand'; h: number; course: number; v: number; tack: 'S' | 'P'; gap: number; spoiled: boolean } | null = null;
+  gate: { red: Vec; green: Vec; inbound: number } | null = null;
+  /** Rules of the road: the real buoys the lesson ends at (the World gives them: sim/places.ts, the North Channel's 1 and 2). */
+  channel: { red: Vec; green: Vec } | null = null;
+  private gateSide = 0;
 
   constructor(id: LessonId, buoy: Vec | null) {
     this.id = id; this.buoy = BUOY_LESSONS.has(id) ? buoy : null;
@@ -145,7 +159,7 @@ export class LessonTracker {
     this.turns = id === 'tacking' || id === 'jibing' ? new DrillTracker() : null;
   }
 
-  update(b: Boat, t: number, dt: number, hs = 0, env?: MobEnv): void {
+  update(b: Boat, t: number, dt: number, hs = 0, env?: MobEnv, road?: RoadEnv): void {
     if (this.passed) return;
     if (this.id === 'tiller') this.tiller(b, dt);
     else if (this.id === 'points') this.points(b, dt);
@@ -155,8 +169,90 @@ export class LessonTracker {
     else if (this.id === 'home') this.home(b);
     else if (this.id === 'before') this.before(b);
     else if (this.id === 'mob') this.overboard(b, t, dt, env);
+    else if (this.id === 'road') { if (road) this.road(b, dt, road); }
     else this.turning(b, t, dt, hs);
     if (this.passed) { const s = Math.round(this.mobTime ?? 0); this.passedT = t; this.cue = this.mobTime != null ? `Alongside in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} ✓` : 'Lesson passed ✓'; this.progress = 1; }
+  }
+
+  /**
+   * Rules of the road: the Navigation Rules' sailing-vessel encounters, each with another Folkboat (ASA 101 knowledge 7
+   * and 8; its 6, the look-out, is yours throughout), then the lateral buoys (its 14). Steps: 0 on port tack, 1 a
+   * starboard boat crossing (Rule 12(a)(i): "the vessel which has the wind on the port side shall keep out of the way"),
+   * 2 on starboard, on a reach, 3 a boat to leeward coming up close-hauled (12(a)(ii): "the vessel which is to windward
+   * shall keep out of the way of the vessel which is to leeward"), 4 still on starboard, 5 a port boat crossing (you stand
+   * on: Rule 17(a)(i), "the other shall keep her course and speed"), 6 the buoys. The other boat stands on as Rule 17 has
+   * it, holding her course (her last-moment swerve, Rule 17(b), is the race AI's Rule 14 move); giving way, she keeps
+   * clear as the race AI does (ai.ts keepClearMove).
+   */
+  private road(b: Boat, dt: number, E: RoadEnv): void {
+    const M = LESSON_MARKS, o = E.other, kt = b.v / KT, from = b.ww.from;
+    // (her heading close-hauled on a tack: the wind on her right on starboard)
+    const hauled = (tack: 'S' | 'P') => tack === 'S' ? from - beatFor(o) - 3 : from + beatFor(o) + 3;
+    const sailing = (lo: number, hi: number) => kt > 1.5 && b.twa >= lo && b.twa <= hi;
+    const e = this.enc;
+    if (e) {
+      // her helm: on her course, or keeping clear (the race AI's moves), or Rule 17(b)'s last-moment swerve
+      const mv = E.keepClear();
+      o.desired = mv ? mv.h : e.h; o.luff = mv?.luff ?? false;
+      e.gap = Math.min(e.gap, E.gap());
+      if (e.kind === 'stand' && !e.spoiled && (b.tack !== e.tack || Math.abs(wrap(b.h - e.course)) > M.standDeg || b.v < M.standV * e.v)) {
+        e.spoiled = true; this.cue = 'Hold your course and speed: she\'s keeping clear of you';
+      }
+      const dx = o.x - b.x, dy = o.y - b.y, d = Math.hypot(dx, dy), opening = dx * (o.vx - b.vx) + dy * (o.vy - b.vy) > 0;
+      this.progress = Math.min(1, e.gap / (M.clearLoa * LOA));
+      if (d < M.pastM || !opening) return;
+      // past and clear: how did it go
+      const ok = e.kind === 'stand' ? !e.spoiled : e.gap >= M.clearLoa * LOA;
+      this.enc = null; this.progress = 0;
+      if (!ok) {
+        this.step--; // (the same again)
+        if (e.kind !== 'stand') this.cue = e.gap < 0.3 ? 'You hit her. Keep clear: alter early and plainly' : 'Too close: alter early and plainly to keep well clear';
+        return;
+      }
+      this.step++;
+      this.cue = this.step === 2 ? 'Now starboard tack, on a beam reach' : this.step === 4 ? 'Stay on starboard: close-hauled or a reach' : 'Now in by the North Channel: between buoys 1 and 2, red right returning';
+      if (this.step === 6) this.layGate(b);
+      return;
+    }
+    if (this.step === 6) { this.buoys(b); return; }
+    // ready for the next encounter: on the tack and point it needs, sailing, for a few seconds; then she's set
+    const want = this.step === 0 ? b.tack === 'P' && sailing(35, 150) : this.step === 2 ? b.tack === 'S' && sailing(65, 120) : b.tack === 'S' && sailing(35, 120);
+    if (!this.hold(want, dt, 3)) return;
+    const kind = this.step === 0 ? 'port' : this.step === 2 ? 'windward' : 'stand';
+    // she: starboard close-hauled to your port tack; close-hauled to leeward of you on the same tack; port close-hauled
+    const h = kind === 'stand' ? hauled('P') : hauled('S');
+    // a collision course: both at the same spot in MEET_S, as you are now, she at her own speed for her heading
+    const meet = { x: b.x + V(b.h).x * b.v * M.meetS, y: b.y + V(b.h).y * b.v * M.meetS }, v = E.speed(h), u = V(h);
+    const at = { x: meet.x - u.x * v * M.meetS, y: meet.y - u.y * v * M.meetS };
+    if (!E.place(at, h, v)) return; // (land in the way: try again in a moment)
+    this.enc = { kind, h, course: b.h, v: b.v, tack: b.tack, gap: Infinity, spoiled: false };
+    this.step++;
+    this.cue = kind === 'port' ? 'Starboard boat! You\'re on port: keep clear of her' : kind === 'windward' ? 'A boat to leeward: you\'re to windward, keep clear' : 'A port boat: you\'re on starboard. Stand on: hold your course and speed';
+  }
+
+  /** The channel's buoys, the real pair (the World's): the red to starboard as she comes in, the green to port (33 CFR
+   * 62.25(b): red marks the starboard side of the channel "when proceeding in the Conventional Direction of Buoyage",
+   * from seaward). Coming in is square to the line from the green to the red, the red on the right. */
+  private layGate(b: Boat): void {
+    const c = this.channel; if (!c) return;
+    const dx = c.red.x - c.green.x, dy = c.red.y - c.green.y;
+    this.gate = { red: c.red, green: c.green, inbound: Math.atan2(dx, dy) * 180 / Math.PI - 90 };
+    this.gateSide = this.gateAlong(b).ahead;
+  }
+  /** Where she is against the buoys' line: across it (m, from the green toward the red; 0 … the gap between them) and
+   * which side (−1 to seaward, +1 inside). */
+  private gateAlong(b: Vec): { across: number; ahead: number; gap: number } {
+    const g = this.gate!, u = V(g.inbound), r = V(g.inbound + 90), dx = b.x - g.green.x, dy = b.y - g.green.y;
+    return { across: dx * r.x + dy * r.y, ahead: Math.sign(dx * u.x + dy * u.y) || -1, gap: Math.hypot(g.red.x - g.green.x, g.red.y - g.green.y) };
+  }
+  private buoys(b: Boat): void {
+    const { across, ahead, gap } = this.gateAlong(b), was = this.gateSide;
+    this.gateSide = ahead;
+    if (ahead === was) return;
+    // she's crossed the line the buoys lie on (or its extension): between them coming in, red to starboard, is the pass
+    if (ahead > 0 && across > 0 && across < gap) { this.passed = true; return; }
+    if (across < 0 || across > gap) this.cue = 'Between the buoys: red on your right coming in';
+    else this.cue = 'That was going out. Come round and sail in: red right returning';
   }
 
   /**
@@ -340,6 +436,10 @@ export class LessonTracker {
   }
 }
 
+/** What the rules of the road need of the World: the other boat, set where the lesson asks (false where that's ashore), her
+ * speed for a heading, the race AI's keep-clear move for her this moment (ai.ts keepClearMove; null: her own course), and
+ * the gap between your hulls (m). */
+export interface RoadEnv { other: Boat; place(p: Vec, h: number, v: number): boolean; speed(h: number): number; keepClear(): { h: number; luff: boolean } | null; gap(): number }
 /** What crew overboard needs of the World: the surface current (m/s, as a vector) and the wind (10 m) where the person is. */
 export interface MobEnv { current(p: Vec): Vec; wind(p: Vec): { from: number; kt: number } }
 /**

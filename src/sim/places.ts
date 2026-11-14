@@ -38,6 +38,11 @@ export const PLACES: Place[] = [
   P('m-17', '17 · Harding Rock', 37.83824, -122.44599, { shape: 'lighted', look: 'RGR' }),
   P('m-4', '4 · Knox (Angel Island)', 37.853333, -122.441667, { shape: 'lighted', look: 'R' }),
   P('m-18', '18 · Blossom Rock', 37.81838, -122.40345, { shape: 'lighted', look: 'GRG' }),
+  // the North Channel's entrance pair, east of Alcatraz (NOAA ENC US5CA13M, BOYLAT and LIGHTS, read 14 Nov 2026: pillar
+  // buoys, 1 green Fl G 6s, 2 red Fl R 6s; the numbers rise northward, so coming in is northbound, red 2 to starboard)
+  P('nc-1', 'North Channel Lighted Buoy 1', 37.83201, -122.40863, { shape: 'lighted', look: 'G' }),
+  P('nc-2', 'North Channel Lighted Buoy 2', 37.83331, -122.39642, { shape: 'lighted', look: 'R' }),
+  P('northchannel', 'South of the North Channel buoys', 37.8255, -122.4025),
   P('m-21', '21 · North Channel G "1"', 37.83202, -122.40865, { shape: 'lighted', look: 'G' }),
   P('m-7', '7 · North Channel R "2"', 37.83332, -122.39644, { shape: 'lighted', look: 'R' }),
   P('m-8', '8 · North Channel R "4"', 37.84704, -122.39647, { shape: 'lighted', look: 'R' }),

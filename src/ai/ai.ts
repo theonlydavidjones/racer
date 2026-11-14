@@ -797,7 +797,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (racing called off, the boat she must keep clear of lying to, stopped: she sails round her with way on, as a
       // sailor would, not luffs and eases alongside, where she'd stop and drift down onto her)
       if (w.cancelled && o.v + (o.astern ?? 0) < 0.5) { desired = away; luff = false; }
-      else if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
+      else if (r.rule === '10') { desired = duckUnder(b); luff = false; } // keep way on to steer
       else if (r.rule === '11') {
         // head up from her heading, but no more than 35° above her course: turned up afresh from wherever she'd got to
         // each time she thought, she ratcheted on up to close-hauled with her sails eased, and stalled
@@ -812,7 +812,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
-      desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
+      desired = swerveFrom(b, dx, dy); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
       if (cp.t < lagT + 1) ai.urgent = true; // (about to touch: before even finishing a tack, physics.ts midTack)
       if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
     }
@@ -857,6 +857,31 @@ export function aiThink(w: World, b: Boat, dt: number): void {
  * from doing it over and over as she wanders about a deep run. The AI boats' crews only: never inside a harbor's basin.
  * Yours never sets it on their own (the owner: "pole-out should only ever be on my command"): poleMustCome.
  */
+/** Rule 10's keep-clear, crossing: she bears away 32° to pass astern of the starboard boat, keeping way on to steer. */
+function duckUnder(b: Boat): number { return sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); }
+/** Rule 14 (and the Navigation Rules' 17(b)): contact a moment off, she turns away from the boat (dx, dy off her). */
+function swerveFrom(b: Boat, dx: number, dy: number): number { return sailable(b, brg(-dx, -dy)); }
+
+/**
+ * The race AI's keep-clear for one other boat, alone (Learn to sail's rules of the road sails her by it, sim/lessons.ts):
+ * the moves aiThink makes for that boat, when it makes them. Required to keep clear, with the closest approach inside her
+ * keep-clear time and distance: on her heading if she's already opening with room between the hulls, else Rule 10's duck,
+ * or turning away and easing for the others. With right of way and contact a few seconds off: Rule 14's swerve. Else
+ * null: she sails her own course.
+ */
+export function keepClearMove(w: World, b: Boat, o: Boat): { h: number; luff: boolean } | null {
+  const r = w.rights(b, o), cp = cpa(b, o), dx = o.x - b.x, dy = o.y - b.y, v = b.v + (b.astern ?? 0);
+  const lagT = Math.min(1.5, yawLag(v)), lagM = v * yawLag(v);
+  if (r.kc === b && cp.t < b.ai!.kn.keepClearS && cp.d < b.ai!.kn.keepClearM + lagM) {
+    const rangeRate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
+    if (rangeRate > -0.15 && hullGap(b, o) >= OPEN_GAP) return { h: sailable(b, b.h), luff: false };
+    if (r.rule === '10') return { h: duckUnder(b), luff: false };
+    return { h: sailable(b, brg(-dx, -dy)), luff: b.twa <= 110 };
+  }
+  if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) return { h: swerveFrom(b, dx, dy), luff: true };
+  return null;
+}
+
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
