@@ -47,6 +47,9 @@ const out = process.argv[2] || '.';
   await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(400);
   await click('.fcard'); await page.waitForTimeout(2000);
   await click('[data-f="edit"]'); await page.waitForTimeout(2500);
+  // (8u: her sail number and home country are there to change, in Particulars; a stray .row2 rule once hid them)
+  const shown = () => page.evaluate(() => ['country', 'number'].every(k => { const e = document.querySelector(`#boatPanel [data-k="${k}"]`); return !!e && e.getBoundingClientRect().width > 0; }));
+  if (!(await shown())) fail('the editor hides her sail number or home country');
   const hull0 = (await stored()).boats?.[0]?.hull?.upper;
   const pick = async () => page.evaluate(h => { const b = [...document.querySelectorAll('[data-act="upper"]')].find(x => x.dataset.v !== h); b.click(); return b.dataset.v; }, hull0);
   const newHull = await pick(); await page.waitForTimeout(800);
@@ -63,6 +66,13 @@ const out = process.argv[2] || '.';
   await page.screenshot({ path: out + '/save-boat-ask.png' });
   await click('#boatPanel [data-act="askDiscard"]'); await page.waitForTimeout(800);
   if ((await stored()).boats?.[0]?.hull?.upper !== newHull) fail('Discard in the editor changed what was saved');
+  // 3. a new boat: the editor opens on her, her sail number and home country there to set (8u)
+  if (await page.evaluate(() => !document.getElementById('boatPanel').hidden)) { await click('#boatPanel [data-act="done"]'); await page.waitForTimeout(800); }
+  await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(400);
+  await click('[data-f="new"]'); await page.waitForTimeout(2500);
+  if (await page.evaluate(() => document.getElementById('boatPanel').hidden)) await click('[data-f="edit"]').catch(() => {}), await page.waitForTimeout(2500);
+  if (!(await shown())) fail('a new boat\'s editor hides her sail number or home country');
+  await page.screenshot({ path: out + '/save-boat-new.png' });
   console.log('ERRORS:', errs.join('\n') || 'none'); await browser.close();
   if (errs.length) process.exit(1);
 })();
