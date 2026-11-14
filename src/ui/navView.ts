@@ -5,7 +5,7 @@ import { ROUTES } from '../sim/traffic';
 import type { SimView } from '../sim/host';
 import { briefHtml } from './briefView';
 import { $ } from './dom';
-import { drawCurrentArrows, drawLand, fitCanvas, makeTf } from './draw2d';
+import { ARROW_MIN, drawCurrentArrows, drawLand, fitCanvas, makeTf } from './draw2d';
 
 type P = [number, number];
 
@@ -56,7 +56,7 @@ export class NavView {
     const scale = Math.min((cw - 80) / Math.max(600, Math.max(...xs) - Math.min(...xs)), (ch - 80) / Math.max(600, Math.max(...ys) - Math.min(...ys)));
     const tf = makeTf(cx, cy, 0, scale, cw, ch), S = (p: Vec): P => tf(p.x, p.y);
     drawLand(ctx, tf);
-    { const half = Math.max(cw, ch) / scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentDrawn(p), cx, cy, half, Math.max(150, half / 6), 14, onLand); }
+    { const half = Math.max(cw, ch) / scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentDrawn(p), cx, cy, half, Math.max(ARROW_MIN, half / 6), 14, onLand); }
     // the ship and ferry routes, faint
     ctx.setLineDash([3, 6]); ctx.lineWidth = 1.5;
     for (const [id, r] of Object.entries(ROUTES)) {
