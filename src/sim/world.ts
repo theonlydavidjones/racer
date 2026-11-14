@@ -4,7 +4,7 @@ import { RoundingTracker } from './roundings';
 import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
@@ -976,6 +976,8 @@ export class World {
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
+      // wrecked (physics.ts wreck): held where she is, while you choose ashore, a tow or carrying on (the page)
+      if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
       const x0 = b.x, y0 = b.y;
@@ -985,6 +987,7 @@ export class World {
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
+      if (b.wrecked && b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); // (in a season race, RET only: the Coordinator)
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
       if (b.mooring) this.mooringStep(b, dt); // (coming in: the hand at the shrouds, waiting to step)
@@ -1459,7 +1462,8 @@ export class World {
           const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
           const cx = hv.a.x + (hv.b.x - hv.a.x) * k, cy = hv.a.y + (hv.b.y - hv.a.y) * k, l = Math.hypot(b.x - cx, b.y - cy) || 1;
           b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0;
-          if (b.isUser && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
+          if (b.isUser) wreck(b, `hit by the ${ty.name.toLowerCase()}`, b, this.emit); // (a ship: a wreck at any speed, WRECK-PROPOSAL section 1)
+          if (b.isUser && !b.wrecked && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
         }
       }
       if (!v.moving) continue;
@@ -1892,6 +1896,8 @@ export class World {
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
+  /** Wrecked, carry on anyway: she sails again, marked wrecked (the owner's answers, WRECK-PROPOSAL section 7). */
+  carryOn(): void { const u = this.user; if (u.wrecked) u.wrecked.carryOn = true; }
   /** Racing, before she's finished: she retires (RET, RRS A5.1), and she's no longer racing. False if she isn't racing. */
   retire(why = '', afterFinish = false): boolean {
     const u = this.user;
