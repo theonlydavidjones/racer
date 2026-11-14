@@ -1912,24 +1912,27 @@ const teakCache = new Map<string, THREE.CanvasTexture>();
 /** Laid teak: planks with black caulked seams and grain; weathered silver-grey, or oiled and polished. */
 /**
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
- * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
+ * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks, sixteen to the texture's tile (teakTexture).
  */
 function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   if (!g.attributes.normal) g.computeVertexNormals();
   const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];
   for (let i = 0; i < p.count; i++) {
     const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
-    if (ny > 0.7) uv.push(p.getX(i) / 0.28, p.getZ(i) / 2.4);
-    else if (nx >= nz) uv.push(p.getY(i) / 0.28, p.getZ(i) / 2.4);
-    else uv.push(p.getY(i) / 0.28, p.getX(i) / 2.4);
+    if (ny > 0.7) uv.push(p.getX(i) / 1.12, p.getZ(i) / 2.4);
+    else if (nx >= nz) uv.push(p.getY(i) / 1.12, p.getZ(i) / 2.4);
+    else uv.push(p.getY(i) / 1.12, p.getX(i) / 2.4);
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
 function teakTexture(silver: boolean, seams = true): THREE.CanvasTexture {
   const key = `${silver}${seams}`, hit = teakCache.get(key); if (hit) return hit;
-  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d')!, planks = 4, pw = W / planks;
+  // (a laid deck: sixteen planks across a tile, each with its butt joint at its own place, so the joints scatter as a real
+  // deck's do; a tile of four repeated every 0.28 m across her, and the same plank's joint on every fourth plank lined up
+  // across the deck into dark bands, the owner's "odd black seams". The trim's pieces, without joints, need only four.)
+  const W = seams ? 1024 : 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!, planks = W / 64, pw = W / planks;
   let seed = silver ? 7 : 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < planks; i++) {
     const base = silver ? [168, 163, 152] : [176, 116, 62], k = 0.9 + rnd() * 0.18;
