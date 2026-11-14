@@ -158,6 +158,13 @@ What's planned, roughly in order. Done work is described in the README.
        option.
    - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
      committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
+   - **AI-on-AI forced swerves go uncalled** (the hull-contact review, #355, 14 November; Skipper Model with Rules): an AI
+     right-of-way boat that has to swerve to avoid an AI keep-clear boat is never called a foul (ai/ai.ts: only the
+     user's boat's swerves are). Keep Clear (a) and WS Case 88 make those fouls. The old early "contact" caught some of
+     these by accident; measured hull to hull, a pass at 0.15–0.65 m between two AI boats now goes uncalled.
+   - **Rule 21.2 from "taking a penalty", not from owing one** (the same review; Rules): rightOfWay.ts applies 21.2 from
+     `penalty > 0`, so a boat that owes turns but hasn't begun them (still getting clear, 44.2) is already the keep-clear
+     boat. 21.2 says "a boat taking a penalty".
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
    Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
    (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
