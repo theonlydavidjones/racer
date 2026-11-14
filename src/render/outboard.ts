@@ -53,14 +53,22 @@ const BOARD_W = 0.3, BOARD_H = 0.24, BOARD_T = 0.032;
 
 // (made when the first motor is: a material made as the module loads would shift the page's random numbers before the
 // race is set up, three.js drawing one for each object's id, and change the race scripts/check/perf.cjs sails)
-let mats: { GREY: THREE.Material; DARK: THREE.Material; PROP: THREE.Material; STEEL: THREE.Material; BOARD: THREE.Material } | null = null;
-const materials = () => mats ??= {
-  GREY: new THREE.MeshPhongMaterial({ color: 0x8e949b, specular: 0x777777, shininess: 60 }), // Tohatsu's gray cowl and leg
-  DARK: new THREE.MeshPhongMaterial({ color: 0x2b2e32, specular: 0x333333, shininess: 30 }), // the tiller grip, the lower cowl's seal, the cord's handle
-  PROP: new THREE.MeshPhongMaterial({ color: 0x5d6268, specular: 0x999999, shininess: 70, side: THREE.DoubleSide }), // its aluminum prop
+const mats = new Map<boolean, { COWL: THREE.Material; BODY: THREE.Material; DARK: THREE.Material; PROP: THREE.Material; STEEL: THREE.Material; BOARD: THREE.Material }>();
+/**
+ * Tohatsu's colors, sampled from its own product photos (tohatsu.com: the MFS3.5C's and MFS2.5C's, both black; the MFS6D's
+ * page shows it black and white, and the Sail Pro, the 6 sold for sailboats, comes in white only: onlineoutboards.com's
+ * MFS6DWDSPROUL listing): the 2.5 and 3.5 a navy-tinted black all over, the cowl glossy and the leg, case and tiller arm
+ * satin; the 6 Sail Pro white, the same way round. On both, the twist grip, the belt between the cowls, the cord's handle
+ * and the prop are black. (The photos' sampled values are lit: the colors here a little darker for the scene's light.)
+ */
+const materials = (white: boolean) => mats.get(white) ?? mats.set(white, {
+  COWL: white ? new THREE.MeshPhongMaterial({ color: 0xd9dbe0, specular: 0x9a9a9a, shininess: 90 }) : new THREE.MeshPhongMaterial({ color: 0x1a1f2c, specular: 0x8a94a8, shininess: 90 }), // the cowl, glossy
+  BODY: white ? new THREE.MeshPhongMaterial({ color: 0xbfc2c7, specular: 0x444444, shininess: 25 }) : new THREE.MeshPhongMaterial({ color: 0x14171f, specular: 0x3a4252, shininess: 25 }), // the leg, case, plate, skeg, tiller arm, clamp: satin
+  DARK: new THREE.MeshPhongMaterial({ color: 0x1c1e24, specular: 0x222222, shininess: 12 }), // the rubber grip, the belt between the cowls, the cord's handle
+  PROP: new THREE.MeshPhongMaterial({ color: 0x191d28, specular: 0x666a72, shininess: 50, side: THREE.DoubleSide }), // its prop, black
   STEEL: new THREE.MeshPhongMaterial({ color: 0xc9cdd1, specular: 0xffffff, shininess: 90 }), // the bracket's stainless
-  BOARD: new THREE.MeshPhongMaterial({ color: 0x6e4a2c, specular: 0x222222, shininess: 20 }), // its hardwood board
-};
+  BOARD: new THREE.MeshPhongMaterial({ color: 0x6e4a2c, specular: 0x222222, shininess: 20 }) // its hardwood board
+}).get(white)!;
 
 /**
  * A skin through closed rings of equal length (each a loop of points), capped at both ends: the cowl, the leg, the
@@ -141,7 +149,7 @@ export interface OutboardMesh {
 
 /** The outboard (2.5, 3.5 or 6 hp) and its lifting bracket, on her port quarter. */
 export function buildOutboard(hp: number): OutboardMesh {
-  const { GREY, DARK, PROP, STEEL, BOARD } = materials();
+  const { COWL, BODY: GREY, DARK, PROP, STEEL, BOARD } = materials(hp >= 5);
   const D = hp >= 5 ? SIX : SMALL, group = new THREE.Group(); group.name = 'outboard';
   // the bracket's fixed part: two vertical rails, held off the raked transom by a short arm at the top and a long one low down
   const deckY = sheer(1), zRail = aftLineZ(deckY) + 0.07, yLo = BOARD_DOWN - BOARD_H - 0.02, yHi = BOARD_UP + 0.04;
@@ -186,7 +194,7 @@ export function buildOutboard(hp: number): OutboardMesh {
   const cowlAt: [number, number, number][] = [[0, 0.92, 3], [0.04, 0.96, 3.1], [0.1, 0.985, 3.25], [0.3, 1, 3.4], [0.55, 1, 3.4]];
   for (let k = 1; k <= 9; k++) { const t = k / 9, f = 0.55 + 0.45 * Math.sin(t * Math.PI / 2); cowlAt.push([f, Math.pow(Math.max(0, 1 - t ** 2.6), 1 / 2.6) * 0.96 + 0.04 * (1 - t), 3.4 - 1.2 * t]); }
   for (const [f, k, e] of cowlAt) rings.push(ring(0, y0 + f * D.cowlH, cz, D.cowlW / 2 * Math.max(k, 0.06), D.cowlL / 2 * Math.max(k, 0.06), e, 44));
-  swivel.add(new THREE.Mesh(loft(rings), GREY));
+  swivel.add(new THREE.Mesh(loft(rings), COWL));
   swivel.add(new THREE.Mesh(loft([ring(0, y0 - 0.005, cz, D.cowlW / 2 * 0.93, D.cowlL / 2 * 0.93, 3), ring(0, y0 + 0.012, cz, D.cowlW / 2 * 0.94, D.cowlL / 2 * 0.94, 3)]), DARK)); // the seal between the cowls
   // the leg: a streamlined strut from under the cowl down to the plate, a touch fuller at the top
   const plateY = -D.shaft, legRings: THREE.Vector3[][] = [];
