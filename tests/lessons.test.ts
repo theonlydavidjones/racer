@@ -144,4 +144,21 @@ describe('Learn to sail: the lessons\' checks', () => {
     const w = new World(COURSES[0], S({ windKt: 8, lesson: 'breeze' }), 3, { freeSail: true });
     expect(w.wind.kt).toBeGreaterThan(12);
   });
+
+  it('before you go: the dock card done, lights on, both sails up and off the dock', () => {
+    const L = new LessonTracker('before', null); L.slip = { x: 0, y: 0 };
+    const b = (o: { x?: number; lightsOff?: boolean; up?: boolean; docked?: boolean }) => ({ ...boat({ x: o.x ?? 0 }), lightsOff: o.lightsOff ?? false, docked: o.docked ? { slip: 's' } : undefined,
+      rig: { main: o.up ? 1 : 0, jib: o.up ? 1 : 0, mainUp: !!o.up, jibUp: !!o.up } }) as unknown as Boat;
+    L.update(b({ lightsOff: true, docked: true }), 0, 1); expect(L.step).toBe(0);
+    L.ready(); expect(L.step).toBe(1);
+    L.update(b({ lightsOff: true, docked: true }), 1, 1); expect(L.step).toBe(1);
+    L.update(b({ docked: true }), 2, 1); expect(L.step).toBe(2);
+    L.update(b({ x: 50 }), 3, 1); expect(L.passed).toBe(false); // (off the dock, sails still down)
+    L.update(b({ x: 50, up: true }), 4, 1); expect(L.passed).toBe(true);
+  });
+
+  it('in the World: Before you go starts with her lights off', () => {
+    const w = new World(COURSES[0], S({ lesson: 'before' }), 3, { freeSail: true });
+    expect(w.user.lightsOff).toBe(true); expect(w.lesson!.cue).toMatch(/float plan/);
+  });
 });

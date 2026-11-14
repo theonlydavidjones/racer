@@ -58,6 +58,7 @@ import { installDevHandles } from './app/devHandles';
 import { mountDrills } from './app/drills';
 import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
+import { dockCardHtml } from './ui/lessons';
 
 /**
  * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
@@ -617,9 +618,25 @@ function coachTick(dt: number): void {
 /** A lesson (sim/lessons.ts): its one cue in the coach's own places (the trim panel's headline, and on the water for a few
  * seconds when it's new), with how far through the check you are; passed, it's kept with your settings. */
 let lessonCue = '', lessonOf: unknown = null;
+/** Before you go's dock card (ui/lessons.ts dockCardHtml): the gear tapped, then Cast off sends the lesson on. */
+let dockFor: unknown = null;
+const dockGear = new Set<string>();
+const paintDock = () => { $('dockCard').innerHTML = dockCardHtml(dockGear, 1 + (S.crew?.people?.length ?? 0)); };
+$('dockCard').addEventListener('click', e => {
+  const el = e.target as HTMLElement, g = el.closest<HTMLElement>('[data-gear]')?.dataset.gear;
+  if (g) { if (dockGear.has(g)) dockGear.delete(g); else dockGear.add(g); paintDock(); return; }
+  if (el.closest('[data-dock="go"]')) {
+    // the float plan, left with the club (your settings): where, back by when, who's aboard
+    const v = (k: string) => (document.querySelector<HTMLInputElement>(`#dockCard [data-fp="${k}"]`)?.value ?? '').trim();
+    S.floatPlan = { where: v('where'), back: v('back'), aboard: +v('aboard') || 1 }; saveSettings(S);
+    $('lessonCard').hidden = true; send({ k: 'lessonReady' }); send({ k: 'pause', on: false });
+  }
+});
 function lessonTick(): void {
   const L = w.lesson!, tip = $('coachTip');
   if (L !== lessonOf) { lessonOf = L; lessonCue = ''; } // (a new lesson, or the same one again: its first cue shows)
+  // Before you go: at the dock, its card first (the gear, the float plan), the lesson paused behind it
+  if (L.id === 'before' && L.step === 0 && dockFor !== L) { dockFor = L; dockGear.clear(); send({ k: 'pause', on: true }); paintDock(); $('lessonCard').hidden = false; }
   $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
   $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
   if (L.cue !== lessonCue) {

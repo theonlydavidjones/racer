@@ -11,3 +11,9 @@
 .lsTile.done{border-color:#1fbf8f}
 .lsTile.soon{opacity:.4;cursor:default}
 .lsSum{color:var(--muted);font-size:12px}
+/* Before you go: the gear tiles and the float plan */
+.lsGear{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
+.lsPlan{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;align-items:end;margin-bottom:12px}
+.lsPlan .eyebrow{grid-column:1 / -1;margin:0}
+.lsPlan label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.lsPlan.off{opacity:.4;pointer-events:none}
