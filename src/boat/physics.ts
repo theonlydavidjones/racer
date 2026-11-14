@@ -451,12 +451,14 @@ export function bigTurnWay(b: Boat, err: number): number {
   const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
   return throughWind && b.v < SLOW_TACK && !b.ai?.tackNow ? -Math.sign(err) : Math.sign(err);
 }
-/** Which way she'll turn for desired: the way the helm's already committed to while that still holds (physics step: a
- * commitment lasts while the course stays within 45° of the one it was made for), else the way it would choose. */
+/** Which way she's turning for desired: the way the helm's committed to while that still holds (physics step: a
+ * commitment lasts while the course stays within 45° of the one it was made for), else the short way. (Not the way
+ * it would choose for a turn not yet begun: that flips at SLOW_TACK, and a choice made on that edge before she's
+ * started the turn is noise, not where she's going.) */
 export function helmWay(b: Boat, desired: number): number {
-  const err = wrap(desired - b.h), ai = b.ai;
+  const ai = b.ai;
   if (ai && ai.turnCommit !== 0 && Math.abs(wrap(desired - ai.commitFor)) <= 45) return ai.turnCommit;
-  return Math.abs(err) > 30 ? bigTurnWay(b, err) : Math.sign(err);
+  return Math.sign(wrap(desired - b.h));
 }
 
 export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
