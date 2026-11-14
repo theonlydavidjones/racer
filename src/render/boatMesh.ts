@@ -549,7 +549,7 @@ const NS_MARGIN = 0.05, NS_PLAN = { x0: -1.15, x1: 1.15, z0: -L / 2, z1: L / 2 }
 export const GELCOAT = '#f0eadc';
 /** The grit's look: 'walnut' (fine, soft, low contrast), 'sand' (finer, flatter still), 'coarse' (the first try). */
 export type GritStyle = 'walnut' | 'sand' | 'coarse';
-export let GRIT: GritStyle = 'walnut';
+const GRIT: GritStyle = 'walnut'; // (the owner's choice: crushed walnut shells)
 export const setGrit = (g: GritStyle) => { GRIT = g; };
 const nsMasks = new Map<string, THREE.CanvasTexture>(), nsGrits = new Map<string, THREE.CanvasTexture>();
 function nsMask(which: 'deck' | 'top'): THREE.CanvasTexture {
