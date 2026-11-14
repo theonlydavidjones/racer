@@ -425,9 +425,10 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // on top the long white pier shed, nearly flush with the deck's edge, rows of red-framed windows, and FORT MASON lettered
   // along Pier 3's west face toward the Gashouse Cove entrance. The sheds' heights are OpenStreetMap's (Bay East's
   // pile-piers data: Pier 1 17 m, Pier 2 16 m, Pier 3 13 m). ESTIMATES (from the photos; no survey found): the deck's top
-  // about 3 m above the water and its edge beam 1 m deep; the columns about 1.1 m across, some 6 m apart each way.
+  // about 4 m above the water and its edge beam 1 m deep; the columns about 1.4 m across, some 7.5 m apart each way, weathered
+  // dark toward the waterline.
   {
-    const deckMat = lam(0x9d968a), colMat = lam(0x8a8478), D = 1.0, R = 0.55, PITCH = 6, HEIGHT: Record<string, number> = { "Fort Mason's Pier 1": 17, "Fort Mason's Pier 2": 16, "Fort Mason's Pier 3": 13 };
+    const deckMat = lam(0x9d968a), colMat = new THREE.MeshLambertMaterial({ vertexColors: true }), D = 1.0, R = 0.7, PITCH = 7.5, HEIGHT: Record<string, number> = { "Fort Mason's Pier 1": 17, "Fort Mason's Pier 2": 16, "Fort Mason's Pier 3": 13 };
     const decks: THREE.BufferGeometry[] = [], at: THREE.Vector3[] = [];
     for (const f of FORT_MASON_PILES) {
       const sh = new THREE.Shape(); f.pts.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y));
@@ -454,7 +455,9 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     grp.add(new THREE.Mesh(mergeGeometries(decks), deckMat));
     // a column and its flared cap, from 4 m below the surface to the deck's underside
     const colH = PIER_DECK - D + 4, capH = 0.9;
-    const col = mergeGeometries([new THREE.CylinderGeometry(R, R, colH - capH, 12).translate(0, (colH - capH) / 2 - 4, 0), new THREE.CylinderGeometry(R * 2.2, R, capH, 12).translate(0, colH - capH / 2 - 4, 0)]);
+    const col = mergeGeometries([new THREE.CylinderGeometry(R, R, colH - capH, 14, 6).translate(0, (colH - capH) / 2 - 4, 0), new THREE.CylinderGeometry(R * 2, R, capH, 14).translate(0, colH - capH / 2 - 4, 0)]);
+    // (pale concrete, darker and greener toward the water: the photos' tide line and weed)
+    { const pos = col.getAttribute('position'), cols: number[] = []; for (let i = 0; i < pos.count; i++) { const y = pos.getY(i), k = Math.max(0, Math.min(1, (y + 0.2) / 1.6)); cols.push(0.36 + 0.42 * k, 0.37 + 0.40 * k, 0.33 + 0.38 * k); } col.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); }
     const piles = new THREE.InstancedMesh(col, colMat, at.length), m = new THREE.Matrix4();
     at.forEach((v, i) => piles.setMatrixAt(i, m.makeTranslation(v.x, 0, v.z)));
     grp.add(piles);
@@ -609,7 +612,7 @@ export const bridgeLights: THREE.Object3D[] = [];
  */
 export const sutroBeacons: { red?: THREE.Object3D; white?: THREE.Object3D } = {};
 /** Fort Mason's pier decks' top above the water, m (ESTIMATE: no survey found). */
-const PIER_DECK = 3;
+const PIER_DECK = 4;
 
 /**
  * The Golden Gate Bridge from its published dimensions: a 1,280 m main span between towers 227 m above the
@@ -787,10 +790,16 @@ function shedWall(len: number, ht: number, lettered: boolean): THREE.Material {
   const s = W / len; // (pixels a metre)
   c.fillStyle = '#ebe8e0'; c.fillRect(0, 0, W, H);
   for (const [y0, wh] of [[0.5, 0.16], [0.3, 0.12], [0.12, 0.1]] as const) for (let x = 2; x < len - 3; x += 6) { // (three rows, the top one below the lettering's band, as in the photo)
-    c.fillStyle = '#7c3a2c'; c.fillRect(x * s, H - (y0 + wh) * H, 4 * s, wh * H);
-    c.fillStyle = '#4c5458'; c.fillRect(x * s + 3, H - (y0 + wh) * H + 3, 4 * s - 6, wh * H - 6);
+    const x0 = x * s, y1 = H - (y0 + wh) * H, ww = 4 * s, hh = wh * H;
+    c.fillStyle = '#5a6266'; c.fillRect(x0, y1, ww, hh); // (the glass)
+    c.strokeStyle = '#8a3a2a'; c.lineWidth = Math.max(2, s * 0.12); c.strokeRect(x0, y1, ww, hh); // (the red frame)
+    c.lineWidth = Math.max(1, s * 0.05); c.beginPath(); for (let k = 1; k < 6; k++) { c.moveTo(x0 + ww * k / 6, y1); c.lineTo(x0 + ww * k / 6, y1 + hh); } for (let k = 1; k < 3; k++) { c.moveTo(x0, y1 + hh * k / 3); c.lineTo(x0 + ww, y1 + hh * k / 3); } c.stroke(); // (the panes' mullions)
   }
-  if (lettered) { c.fillStyle = '#1c1c1c'; c.font = `bold ${Math.round(H * 0.22)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; const letters = 'FORT MASON'.split(''), step = W * 0.7 / letters.length; letters.forEach((ch, i) => c.fillText(ch, W * 0.15 + step * (i + 0.5), H * 0.18)); } // (big, along the top, between the roof and the windows)
+  if (lettered) { // (big, a floor tall, along the top between the roof and the windows, tightly set)
+    c.fillStyle = '#1c1c1c'; c.font = `bold ${Math.round(H * 0.26)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    (c as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = `${Math.round(H * 0.1)}px`; c.fillText('FORT MASON', W / 2, H * 0.18);
+  }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  return new THREE.MeshLambertMaterial({ map: tex });
+  // (a little of its own light: white paint in the shade still reads white under the sky, not grey)
+  return new THREE.MeshLambertMaterial({ map: tex, emissive: 0x404040, emissiveMap: tex });
 }

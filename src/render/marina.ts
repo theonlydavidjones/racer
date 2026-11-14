@@ -222,12 +222,16 @@ export class Harbor {
       const aid = chartedLight(bc.p), lit = aid?.lit?.[0], h = lit?.h ?? 6.5;
       if (H.id === 'gashouse-cove' && red && aid && aid.top == null) {
         const conc = new THREE.MeshLambertMaterial({ color: 0xb9b3a6 }), steel = new THREE.MeshLambertMaterial({ color: 0x6f5a48 });
-        const deck = new THREE.Mesh(new THREE.BoxGeometry(3, 0.35, 3), conc); deck.position.y = 2.6; g.add(deck); // (the platform, about the seawall's top)
-        for (const [x, z] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 4.4, 8), steel); pl.position.set(x, 0.4, z); g.add(pl); }
-        for (const [x, z, w, d] of [[0, -1.45, 3, 0.05], [0, 1.45, 3, 0.05], [-1.45, 0, 0.05, 3], [1.45, 0, 0.05, 3]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), new THREE.MeshLambertMaterial({ color: 0xd8d6d0 })); r.position.set(x, 3.75, z); g.add(r); }
-        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, h - 2.8, 6), steel); mast.position.set(0.9, 2.8 + (h - 2.8) / 2, 0.9); g.add(mast);
-        for (const ry of [0, Math.PI]) { const sgn = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.3), noWakeBoard()); sgn.position.y = 3.4; sgn.rotation.y = ry; sgn.translateZ(1.55); g.add(sgn); }
-        const lamp = lampOf(red, lit); lamp.position.set(0.9, h, 0.9); g.add(lamp);
+        // (the platform level with the seawall's top, on its own pile cluster at the wall's end; a railing on posts round it)
+        const top = H.breakwaters.find(b => b.seawall)?.seawall?.top ?? 1.8, rail = new THREE.MeshLambertMaterial({ color: 0xd8d6d0 });
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(3, 0.35, 3), conc); deck.position.y = top - 0.175; g.add(deck);
+        for (const [x, z] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2], [0, -1.3], [1.3, 0]]) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, top + 4, 8), steel); pl.position.set(x, (top - 4) / 2 - 0.35, z); g.add(pl); }
+        for (const [x, z] of [[-1.45, -1.45], [1.45, -1.45], [-1.45, 1.45], [1.45, 1.45], [0, -1.45], [0, 1.45], [-1.45, 0], [1.45, 0]]) { const po = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.05, 0.06), rail); po.position.set(x, top + 0.52, z); g.add(po); }
+        for (const yy of [0.55, 1.05]) for (const [x, z, w, d] of [[0, -1.45, 2.96, 0.05], [0, 1.45, 2.96, 0.05], [-1.45, 0, 0.05, 2.96], [1.45, 0, 0.05, 2.96]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), rail); r.position.set(x, top + yy, z); g.add(r); }
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, h - top, 6), steel); mast.position.set(-0.9, top + (h - top) / 2, -0.9); g.add(mast);
+        // (the sign on the railing on the channel's side, facing the boats both ways along it)
+        for (const ry of [Math.PI / 2, -Math.PI / 2]) { const sgn = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.3), noWakeBoard()); sgn.position.set(1.5, top + 1.35, 0); sgn.rotation.y = ry; sgn.translateZ(0.03); g.add(sgn); }
+        const lamp = lampOf(red, lit); lamp.position.set(-0.9, h, -0.9); g.add(lamp);
       } else {
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, h - 0.1, 8), new THREE.MeshLambertMaterial({ color: 0xd9d6cf })); post.position.y = (h - 0.1) / 2; g.add(post);
         if (!aid || aid.top != null) { // (a daymark only where the chart has one, or where there's no charted light to say)
