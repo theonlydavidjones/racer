@@ -36,6 +36,26 @@ export const CREW_LAG = 0.8;
 export const ASTERN_DRAG = { c0: 0.005, c1: 0.035 };
 /** How far she coasts astern from `v0` m/s (to a stop) with that drag, m. */
 export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c1) * Math.log(1 + ASTERN_DRAG.c1 * v0 / ASTERN_DRAG.c0)) / ASTERN_DRAG.c1;
+/**
+ * Her glide stern first under bare poles from `v0` m/s in the wind there is, her heading held: for planning a push-off.
+ * The step's own working, a step at a time: the wind on her bare hull and rig from forward of the beam pushes her astern
+ * (dynamics.ts airDrag, on the wind she feels: going astern she runs with a wind on her bow), a wind abaft the beam
+ * drifts her ahead (the bare-poles drift, a tenth of the wind), and the water slows her sternway (ASTERN_DRAG). So a
+ * wind on her stern shortens the glide and a wind on her bow carries her on, perhaps without stopping. Returns how far
+ * she goes astern in `secs` (m), how long she keeps `steerage` m/s of sternway (s), and whether she's still going
+ * astern at the end. Her set to leeward across the wind isn't in it.
+ */
+export function asternGlide(v0: number, heading: number, windFrom: number, windKt: number, secs = 60, steerage = 0.3): { dist: number; steerable: number; going: boolean } {
+  const twa = Math.abs(wrap(windFrom - heading)), drift = 0.1 * windKt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)), dt = 1 / 60;
+  let ast = v0, dist = 0, steerable = 0;
+  for (let t = 0; t < secs && ast > 0; t += dt) {
+    const ap = sailWind(windFrom, windKt, heading, -ast);
+    ast -= surgeAccel(0, drift, airDrag(ap.aws, ap.awa, 1, 0)) * dt; // (what would be headway comes off her sternway: one motion)
+    if (ast > 0) ast = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
+    if (ast > 0) { dist += ast * dt; if (ast > steerage) steerable += dt; }
+  }
+  return { dist, steerable, going: ast > 0 };
+}
 /** Going astern faster than this, m/s, a held tiller steers her by the water past her rudder, however little; it is
  * sculling only once she has lost her way (under it). Higher, and a helm held over near head to wind
  * turned her one way above it and sculled her the other below it: at 0.2 m/s, 0.9 deg/s one way against 4 the other. */

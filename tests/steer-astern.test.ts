@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { wrap } from '../src/core/math';
 import type { Boat } from '../src/boat/boat';
+import { asternGlide } from '../src/boat/physics';
 
 /**
  * Steering her going astern, shoved off with no sail set (the owner, 14 Nov 2026: "check the boat steers when pushed
@@ -49,5 +50,22 @@ describe('steering astern, shoved off under bare poles', () => {
     const fast = Math.abs(shoved(0.5, key).turned), slow = Math.abs(shoved(0.2, key).turned), creep = Math.abs(shoved(0.08, key).turned);
     expect(slow).toBeGreaterThan(1.5); expect(slow).toBeLessThan(fast / 2);
     expect(creep).toBeLessThan(3); expect(creep).toBeLessThan(slow);
+  });
+  // (the planner's glide in the wind there is, physics.ts asternGlide, against her sailed: the same working, so they
+  // agree closely; 15% is the bar the planner is held to)
+  for (const [from, kt] of [[0, 20], [90, 20], [180, 20], [180, 12], [45, 12], [135, 20]] as const) it(`the planned glide agrees with her sailed, bare poles, wind ${kt} kt from ${from}° off her bow: within 15%`, () => {
+    for (const v0 of [0.55, 0.64]) {
+      const b = testBoat({ heading: 0, kt: 0, windKt: kt, windFrom: from }) as Helm; b.isUser = true;
+      b.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; b.v = 0; b.astern = v0;
+      let dist = 0, steerable = 0; for (let i = 0; i < 300; i++) { sail(b, 0.1); const a = b.astern ?? 0; dist += a * 0.1; if (a > 0.3) steerable += 0.1; }
+      const g = asternGlide(v0, 0, from, kt, 30);
+      expect(g.dist / dist, `distance from ${v0} m/s`).toBeGreaterThan(0.85); expect(g.dist / dist).toBeLessThan(1.15);
+      expect(Math.abs(g.steerable - steerable), `steerage from ${v0} m/s`).toBeLessThan(Math.max(1, 0.15 * steerable));
+    }
+  });
+  it('a wind on her stern shortens the glide, a wind on her bow carries her on', () => {
+    const calm = asternGlide(0.64, 0, 90, 0), stern = asternGlide(0.64, 0, 180, 20), bow = asternGlide(0.64, 0, 0, 20);
+    expect(stern.dist).toBeLessThan(0.7 * calm.dist); expect(stern.going).toBe(false);
+    expect(bow.dist).toBeGreaterThan(2 * calm.dist); expect(bow.going).toBe(true);
   });
 });
