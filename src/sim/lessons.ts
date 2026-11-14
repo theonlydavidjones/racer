@@ -20,7 +20,8 @@ import { inBasin } from '../geo/marina';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'road' | 'mob' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
+export type LessonId = 'road' | 'mob' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before'
+  | 'case'; // (not a lesson of the grid: the Rules trainer's Sail it yourself, sim/caseRun.ts, sailed the same way; the World calls it)
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
@@ -100,7 +101,7 @@ export const LESSON_MARKS = {
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
   tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
-  mob: 'Sail a beam reach', road: 'Sail on port tack: the wind over your left side', breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
+  mob: 'Sail a beam reach', road: 'Sail on port tack: the wind over your left side', breeze: 'Take the mainsheet: it\'s blowing 15', case: 'Sail it without breaking a rule', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -160,7 +161,7 @@ export class LessonTracker {
   }
 
   update(b: Boat, t: number, dt: number, hs = 0, env?: MobEnv, road?: RoadEnv): void {
-    if (this.passed) return;
+    if (this.passed || this.id === 'case') return;
     if (this.id === 'tiller') this.tiller(b, dt);
     else if (this.id === 'points') this.points(b, dt);
     else if (this.id === 'irons') this.irons(b, t, dt);
