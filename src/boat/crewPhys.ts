@@ -153,7 +153,7 @@ export interface CrewState {
   fore01?: number; foreT?: number;
   /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
    * whether, with the pole out, both crew right forward on the foredeck pays more: `layout`, and seconds since it changed. */
-  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; twsAvg?: number; poleWas?: boolean;
+  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; twsAvg?: number; twaAvg?: number; poleWas?: boolean;
   /** With the pole out: whether best practice has them forward, how long it's said so (s), and what they're doing about
    * it, in the status line's terms (ui/crewWords.ts). */
   poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'soonMast' | 'stay' | 'aft' | 'late' | 'wrong';
@@ -435,6 +435,9 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.layoutT = (c.layoutT ?? 1e9) + Math.max(dt, 0.05);
     // (the wind over about a gust-lull cycle, a minute: the layout is for the wind there is, not each puff)
     c.twsAvg = c.twsAvg == null ? k.tws : c.twsAvg + (k.tws - c.twsAvg) * Math.min(1, Math.max(dt, 0.05) / 60);
+    // (and the angle she's been sailing over the same minute: through a gybe the angle passes 180, where the jib's
+    // blanketed and the polar's slowest, and a helm wanders a few degrees; neither is the course she's on (physics review))
+    c.twaAvg = c.twaAvg == null ? k.twa : c.twaAvg + (k.twa - c.twaAvg) * Math.min(1, Math.max(dt, 0.05) / 60);
     // (without the pole only a good crew thinks of the mast; with it out everyone decides, as well as their skill lets them)
     const canGo = n > 0 && downwind && !pl?.fore && (skill > 0.5 || (k.pole && n >= 2));
     if (!k.pole || !canGo) c.poleWhy = undefined;
@@ -726,11 +729,11 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
     return go(now);
   }
   // no pole: the bow hand to the mast when the hull's trim says it pays (at the speed she sails in the wind
-  // there's been over the last minute, polar.ts, as with the pole out: on her own speed averaged over a minute, after a
+  // and at the angle there's been over the last minute, polar.ts, as with the pole out: on her own speed averaged over a minute, after a
   // slow start or gybe they judged a breeze as light air, as the physics review found in chooseFore), for a real
   // gain (0.1%), not within LAYOUT_STAY of the last move (and off the foredeck at once when the pole's stowed: there's
   // nothing for them up there)
-  const v = Math.max(0.5, polar(c.twsAvg ?? k.tws, k.twa, 'jib'));
+  const v = Math.max(0.5, polar(c.twsAvg ?? k.tws, c.twaAvg ?? k.twa, 'jib'));
   const cockpit = dragAt(v, j => cockpitZ(j, n)), mast = dragAt(v, j => j === n - 1 ? Z.mast : cockpitZ(j, n - 1));
   if (now === 'foredeck') return go(mast < cockpit ? 'mast' : 'cockpit');
   const cur = now === 'mast' ? mast : cockpit, best = Math.min(mast, cockpit), bestL = mast < cockpit ? 'mast' : 'cockpit';
