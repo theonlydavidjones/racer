@@ -1473,11 +1473,12 @@ export class World {
       this.emit({ type: 'toast', msg: 'Made fast to the dock, on her lines.', ms: 3000 });
       return;
     }
-    if (m.phase === 'fast' && berth && this.inBerth(b, berth, 0.3, 5)) {
-      // warped in, lying in her berth (bow in at a slip; either way alongside an end tie or guest dock): made fast there, as
-      // in her own slip (the last few centimetres and degrees taken up by the lines)
-      const rev = berth.kind === 'alongside' && Math.abs(wrap(b.h - berth.heading)) > 90;
-      Object.assign(b, { x: berth.p.x, y: berth.p.y, h: rev ? n360(berth.heading + 180) : berth.heading, v: 0, vx: 0, vy: 0, astern: 0, sway: 0, turnRate: 0 });
+    // warped in, lying in her berth (bow in at a slip; either way alongside an end tie or guest dock): made fast there, as in
+    // her own slip. In her berth to a few tens of centimeters, or every line warped in to its length with her lying to them
+    // (pressed onto her fender by the wind, as a boat tied up lies: the lines can't push her off it)
+    const warped = m.lines.length > 1 && m.lines.every(L => L.state === 'made' && L.goal != null && L.len <= L.goal + 0.05);
+    if (m.phase === 'fast' && berth && (this.inBerth(b, berth, 0.3, 5) || (warped && this.inBerth(b, berth, 0.6, 6)))) {
+      Object.assign(b, { v: 0, vx: 0, vy: 0, astern: 0, sway: 0, turnRate: 0 }); // (the lines settle her into her berth's lie: dockStep)
       b.docked = { slip: berth.id }; b.mooring = undefined;
       this.emit({ type: 'toast', msg: `In her berth and made fast: ${slipPlace(berth)}.`, ms: 4000 });
     }
@@ -1700,6 +1701,11 @@ export class World {
   /** A boat in her slip: made fast, she stays put; her crew can hoist or strike sail there. */
   private dockStep(b: Boat, dt: number): void {
     b.v = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.steer = 0; b.turnTarget = null;
+    // made fast just now, a little off her berth's lie (lying to her lines against her fender): her lines settle her into it
+    // over a couple of seconds, not in a jump (bow in at a slip; alongside, whichever way she lies)
+    { const s = b.docked ? slipById(b.docked.slip) : null;
+      if (s) { const k = Math.min(1, dt * 1.5), rev = s.kind === 'alongside' && Math.abs(wrap(b.h - s.heading)) > 90, h = rev ? s.heading + 180 : s.heading;
+        b.x += (s.p.x - b.x) * k; b.y += (s.p.y - b.y) * k; b.h = n360(b.h + wrap(h - b.h) * k); } }
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true; // sails up at the dock weathervane, let fly
