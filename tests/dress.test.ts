@@ -41,6 +41,7 @@ describe("The crew dress for the day's weather (render/crewBody.ts dressWarm, ki
     expect(heads(2).every(h => h === 'hood')).toBe(true);
     const light = heads(1).filter(h => h === 'hood').length / 60, dry = heads(0).filter(h => h === 'hood').length / 60;
     expect(light).toBeGreaterThan(0.6); expect(dry).toBeLessThan(0.35);
+    dress.wet = 2; expect(Array.from({ length: 20 }, (_, i) => kitFor(2000 + i, 0, 'all').shorts).some(Boolean)).toBe(false); dress.wet = 0; // (no shorts in the rain, even everyone-in-shorts)
   });
   it('the owner\'s rainy morning (13 Nov 2026, 11:00): heavy rain at the gun, so no shorts and every hood up', () => {
     const rain = rainLevel('real', sfLocalToUtcMin('2026-11-13', '11:00'));

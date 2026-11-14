@@ -776,7 +776,8 @@ export function kitFor(seed: number, team: number, warm: boolean | 'all' = dress
     badge: head !== 'beanie' && hash(seed, 18) < 0.6 ? { c: pick([0xd8611f, 0xe8e4d8, 0xc8372d, 0xd4a017], seed, 19), r: 0.7 } : undefined,
     logo: hash(seed, 20) < 0.6 ? { c: 0xd8d8d2, r: 0.6 } : undefined,
     // (a warm, dry day: about half in shorts and sneakers, as in the owner's photo; the rest keep their salopettes)
-    ...(warm === 'all' || (warm && hash(seed, 21) < 0.5) ? (() => { const [up, so] = pick(SNEAKERS, seed, 22), sc = pick(SHORTS, seed, 23); return { shorts: true, pants: { c: sc, r: 0.85 }, patch: { c: darker(sc, 0.7), r: 0.85 }, boots: up, sole: so }; })() : {})
+    // (never in the rain, the crew lab's ?summer=all too)
+    ...(!dress.wet && (warm === 'all' || (warm && hash(seed, 21) < 0.5)) ? (() => { const [up, so] = pick(SNEAKERS, seed, 22), sc = pick(SHORTS, seed, 23); return { shorts: true, pants: { c: sc, r: 0.85 }, patch: { c: darker(sc, 0.7), r: 0.85 }, boots: up, sole: so }; })() : {})
   };
 }
 
