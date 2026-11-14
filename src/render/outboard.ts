@@ -53,6 +53,41 @@ const BOARD_W = 0.3, BOARD_H = 0.24, BOARD_T = 0.032;
 
 // (made when the first motor is: a material made as the module loads would shift the page's random numbers before the
 // race is set up, three.js drawing one for each object's id, and change the race scripts/check/perf.cjs sails)
+/** A material whose color is in its pieces' vertex colors (each piece its own: `base` where a piece gives none, mergeByMaterial). */
+function tinted(base: number, specular: number, shininess: number): THREE.MeshPhongMaterial {
+  const m = new THREE.MeshPhongMaterial({ color: 0xffffff, specular, shininess, vertexColors: true }); m.userData.base = base; return m;
+}
+/** A piece's vertex colors: one color, or by position (a function of its point, giving a hex). */
+function paint(g: THREE.BufferGeometry, c: number | ((p: THREE.Vector3) => number)): THREE.BufferGeometry {
+  const p = g.attributes.position, col = new Float32Array(p.count * 3), v = new THREE.Vector3(), cc = new THREE.Color();
+  for (let i = 0; i < p.count; i++) { cc.set(typeof c === 'number' ? c : c(v.fromBufferAttribute(p, i))); col.set([cc.r, cc.g, cc.b], i * 3); }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+}
+/**
+ * The cowl's markings, multiplied over its color (u round it from starboard, aft, port to forward; v up it), from Tohatsu's
+ * photos of the MFS3.5C and the 6: the graphics band round its lower part (matte, a shade darker; on the white 6 barely
+ * darker), the thin parting line where the top cowl lifts off, the latch's lever at the back under it, and the vent slots
+ * high at the back. No lettering.
+ */
+function cowlTexture(white: boolean): THREE.CanvasTexture | null {
+  if (typeof document === 'undefined') return null; // (no page: the tests')
+  const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!, shade = (k: number) => { const v = Math.round(255 * k); return `rgb(${v},${v},${v})`; };
+  const y = (v: number) => H * (1 - v), x = (u: number) => W * u;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = shade(white ? 0.9 : 0.6); g.fillRect(0, y(0.5), W, y(0.3) - y(0.5)); // the graphics band
+  g.fillStyle = shade(0.25); g.fillRect(0, y(0.32) - 1.5, W, 3); // the parting line
+  g.fillStyle = shade(white ? 0.35 : 0.5); g.fillRect(x(0.25) - 14, y(0.29), 28, y(0.2) - y(0.29)); // the latch's lever, at the back
+  g.fillStyle = shade(0.15); for (let k = 0; k < 4; k++) g.fillRect(x(0.25) - 34, y(0.86 - k * 0.045), 68, 5); // the vent slots
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+}
+/** The cowl's texture coordinates: round it (u, from its axis) and up it (v), wrapped where u comes round again. */
+function cowlUV(g: THREE.BufferGeometry, cz: number, y0: number, h: number): THREE.BufferGeometry {
+  const p = g.attributes.position, uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) { uv[i * 2] = (Math.atan2(p.getZ(i) - cz, p.getX(i)) / (2 * Math.PI) + 1) % 1; uv[i * 2 + 1] = (p.getY(i) - y0) / h; }
+  for (let t = 0; t < p.count; t += 3) { const u = [uv[t * 2], uv[t * 2 + 2], uv[t * 2 + 4]]; if (Math.max(...u) - Math.min(...u) > 0.5) for (let k = 0; k < 3; k++) if (u[k] < 0.5) uv[(t + k) * 2] += 1; }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); return g;
+}
 const mats = new Map<boolean, { COWL: THREE.Material; BODY: THREE.Material; DARK: THREE.Material; PROP: THREE.Material; STEEL: THREE.Material; BOARD: THREE.Material }>();
 /**
  * Tohatsu's colors, sampled from its own product photos (tohatsu.com: the MFS3.5C's and MFS2.5C's, both black; the MFS6D's
@@ -62,9 +97,9 @@ const mats = new Map<boolean, { COWL: THREE.Material; BODY: THREE.Material; DARK
  * and the prop are black. (The photos' sampled values are lit: the colors here a little darker for the scene's light.)
  */
 const materials = (white: boolean) => mats.get(white) ?? mats.set(white, {
-  COWL: white ? new THREE.MeshPhongMaterial({ color: 0xd9dbe0, specular: 0x9a9a9a, shininess: 90 }) : new THREE.MeshPhongMaterial({ color: 0x1a1f2c, specular: 0x8a94a8, shininess: 90 }), // the cowl, glossy
-  BODY: white ? new THREE.MeshPhongMaterial({ color: 0xbfc2c7, specular: 0x444444, shininess: 25 }) : new THREE.MeshPhongMaterial({ color: 0x14171f, specular: 0x3a4252, shininess: 25 }), // the leg, case, plate, skeg, tiller arm, clamp: satin
-  DARK: new THREE.MeshPhongMaterial({ color: 0x1c1e24, specular: 0x222222, shininess: 12 }), // the rubber grip, the belt between the cowls, the cord's handle
+  COWL: white ? new THREE.MeshPhongMaterial({ color: 0xd9dbe0, specular: 0x9a9a9a, shininess: 90, map: cowlTexture(true) }) : new THREE.MeshPhongMaterial({ color: 0x1a1f2c, specular: 0x8a94a8, shininess: 90, map: cowlTexture(false) }), // the cowl, glossy, its band, parting line, latch and vents (cowlTexture)
+  BODY: tinted(white ? 0xbfc2c7 : 0x14171f, white ? 0x444444 : 0x3a4252, 25), // the leg, case, plate, skeg, tiller arm, clamp: satin (the waterline's wear in its vertex colors)
+  DARK: tinted(0x1c1e24, 0x222222, 12), // the rubber grip, the belt between the cowls, the cord's handle, the knobs (the kill cord red: vertex colors)
   PROP: new THREE.MeshPhongMaterial({ color: 0x191d28, specular: 0x666a72, shininess: 50, side: THREE.DoubleSide }), // its prop, black
   STEEL: new THREE.MeshPhongMaterial({ color: 0xc9cdd1, specular: 0xffffff, shininess: 90 }), // the bracket's stainless
   BOARD: new THREE.MeshPhongMaterial({ color: 0x6e4a2c, specular: 0x222222, shininess: 20 }) // its hardwood board
@@ -117,9 +152,13 @@ function mergeByMaterial(g: THREE.Group): void {
   const by = new Map<THREE.Material, THREE.Mesh[]>();
   for (const c of g.children) { const m = c as THREE.Mesh; if (m.isMesh) (by.get(m.material as THREE.Material) ?? by.set(m.material as THREE.Material, []).get(m.material as THREE.Material)!).push(m); }
   for (const [mat, ms] of by) {
+    // (a material colored by its pieces: a piece without colors of its own takes the material's base)
+    const base = (mat as THREE.Material).userData.base as number | undefined;
+    if (base !== undefined) for (const m of ms) if (!m.geometry.attributes.color) paint(m.geometry, base);
     if (ms.length < 2) continue;
+    const keep = ['position', 'normal', ...(['uv', 'color'] as const).filter(a => ms.every(m => m.geometry.attributes[a]))];
     const geos = ms.map(m => { m.updateMatrix(); const q = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
-      for (const a of Object.keys(q.attributes)) if (a !== 'position' && a !== 'normal') q.deleteAttribute(a); return q; });
+      for (const a of Object.keys(q.attributes)) if (!keep.includes(a)) q.deleteAttribute(a); return q; });
     const one = new THREE.Mesh(mergeGeometries(geos)!, mat);
     for (const m of ms) { g.remove(m); m.geometry.dispose(); } geos.forEach(q => q.dispose()); g.add(one);
   }
@@ -194,12 +233,17 @@ export function buildOutboard(hp: number): OutboardMesh {
   const cowlAt: [number, number, number][] = [[0, 0.92, 3], [0.04, 0.96, 3.1], [0.1, 0.985, 3.25], [0.3, 1, 3.4], [0.55, 1, 3.4]];
   for (let k = 1; k <= 9; k++) { const t = k / 9, f = 0.55 + 0.45 * Math.sin(t * Math.PI / 2); cowlAt.push([f, Math.pow(Math.max(0, 1 - t ** 2.6), 1 / 2.6) * 0.96 + 0.04 * (1 - t), 3.4 - 1.2 * t]); }
   for (const [f, k, e] of cowlAt) rings.push(ring(0, y0 + f * D.cowlH, cz, D.cowlW / 2 * Math.max(k, 0.06), D.cowlL / 2 * Math.max(k, 0.06), e, 44));
-  swivel.add(new THREE.Mesh(loft(rings), COWL));
+  swivel.add(new THREE.Mesh(cowlUV(loft(rings), cz, y0, D.cowlH), COWL));
   swivel.add(new THREE.Mesh(loft([ring(0, y0 - 0.005, cz, D.cowlW / 2 * 0.93, D.cowlL / 2 * 0.93, 3), ring(0, y0 + 0.012, cz, D.cowlW / 2 * 0.94, D.cowlL / 2 * 0.94, 3)]), DARK)); // the seal between the cowls
   // the leg: a streamlined strut from under the cowl down to the plate, a touch fuller at the top
   const plateY = -D.shaft, legRings: THREE.Vector3[][] = [];
-  for (const f of [0, 0.25, 0.5, 0.75, 1]) { const y = y0 - 0.01 + (plateY - y0 + 0.01) * f, c = D.legC * (1.15 - 0.15 * f); legRings.push(foil(y, -c * 0.38, c, D.legT * (1.1 - 0.1 * f))); }
-  swivel.add(new THREE.Mesh(loft(legRings), GREY));
+  // (the waterline on it, let down: the plate BOARD_DOWN under the clamp's top's height; a band of wear and growth there, the
+  // paint dulled and scuffed, the leg's rings closer round it so the band's edges are drawn)
+  const wl = plateY + (D.shaft - BOARD_DOWN), fOf = (y: number) => (y - (y0 - 0.01)) / (plateY - y0 + 0.01);
+  const legF = [...new Set([0, 0.25, 0.5, 0.75, 1, ...[-0.04, -0.015, 0.015, 0.035].map(d => fOf(wl + d))].filter(f => f >= 0 && f <= 1))].sort((a, b) => a - b);
+  for (const f of legF) { const y = y0 - 0.01 + (plateY - y0 + 0.01) * f, c = D.legC * (1.15 - 0.15 * f); legRings.push(foil(y, -c * 0.38, c, D.legT * (1.1 - 0.1 * f))); }
+  const body = (GREY.userData.base as number), wear = hp >= 5 ? 0x9a9c8e : 0x3a4038;
+  swivel.add(new THREE.Mesh(paint(loft(legRings), q => Math.abs(q.y - wl + 0.0025) < 0.026 ? wear : body), GREY));
   // the anti-ventilation plate
   const pz = D.plateL * 0.12;
   swivel.add(new THREE.Mesh(loft([ring(0, plateY - 0.004, pz, D.plateW / 2, D.plateL / 2, 3.2), ring(0, plateY + 0.004, pz, D.plateW / 2, D.plateL / 2, 3.2)]), GREY));
@@ -224,6 +268,15 @@ export function buildOutboard(hp: number): OutboardMesh {
   swivel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, D.tiller * 0.3, 10).rotateX(Math.PI / 2 - 0.14).translate(0, ty + D.tiller * 0.85 * Math.sin(0.14), tz - D.tiller * 0.85), DARK));
   swivel.add(new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.02, 0.09).rotateX(0.5).translate(D.cowlW / 2 * 0.95, y0 + 0.04, cz - 0.05), DARK));
   swivel.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.022, 0.025).translate(0, y0 + D.cowlH * 0.55, cz - D.cowlL / 2 * 0.98 - 0.008), DARK));
+  // on the cowl's front, low: the choke's knob and the stop switch, its kill cord's clip on it (red), the cord coiling down to
+  // the helm's wrist by the tiller; the gear lever's knob
+  const fz = cz - D.cowlL / 2 * 0.95 - 0.006, ky = y0 + 0.075;
+  swivel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.018, 10).rotateX(Math.PI / 2).translate(0.035, ky, fz), DARK)); // (the choke)
+  swivel.add(new THREE.Mesh(paint(new THREE.CylinderGeometry(0.011, 0.011, 0.016, 10).rotateX(Math.PI / 2).translate(-0.035, ky, fz), 0xb3201c), DARK)); // (the stop switch's red clip)
+  { const a = new THREE.Vector3(-0.035, ky, fz - 0.01), b = new THREE.Vector3(-0.03, ty + D.tiller * 0.7 * Math.sin(0.14) - 0.02, tz - D.tiller * 0.7), pts: THREE.Vector3[] = [];
+    for (let k = 0; k <= 8; k++) { const t = k / 8; pts.push(a.clone().lerp(b, t).add(new THREE.Vector3(0, -0.07 * Math.sin(Math.PI * t), 0))); }
+    swivel.add(new THREE.Mesh(paint(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.0028, 5), 0xb3201c), DARK)); }
+  swivel.add(new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8).translate(D.cowlW / 2 * 0.95, y0 + 0.04 + 0.045 * Math.sin(0.5), cz - 0.05 - 0.045 * Math.cos(0.5)), DARK)); // (the gear lever's knob)
   // its wash: churned water astern of the prop, on the surface (drawn in the boat's frame, below)
   const wash = new THREE.Mesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2).scale(0.16, 1, 0.5), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }) /* (lit: white water by day, dim at night) */);
   wash.visible = false; group.add(wash);
