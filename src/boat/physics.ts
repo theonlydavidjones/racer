@@ -973,11 +973,12 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
  * over with it (the player's boat, and anyone hove to).
  */
 function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, sheets: boolean): void {
+  const mainUp = b.rig?.mainUp ?? true;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
-  if (twa > 176) tk = b.tack; // dead downwind: the tack she had, her main where it lies
+  if (twa > 176 && mainUp) tk = b.tack; // dead downwind: the tack she had, her main where it lies
   if (tk === b.tack) { b.gybeTo = undefined; return; } // (or the wind has come back before the boom crossed)
   if (twa < 90) { b.tacking = true; b.headToWindT = t; } // head to wind: a tack (a gybe passes the wind astern)
-  else if (b.rig?.mainUp ?? true) {
+  else if (mainUp) {
     // by the lee past where the main will stay: it's going across, and she's on her old tack until it has
     b.gybeTo = tk;
     const across = tk === 'S' ? -1 : 1; // (the boom's side on the new tack: to port on starboard)
@@ -990,12 +991,12 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
 function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   // The main goes to leeward for the tack the boat is on (so sailing a little by the lee it stays put), or for the
   // tack she's gybing to: the boom goes across first, and her tack with it (tackStep)
-  const side = (b.gybeTo ?? b.tack) === 'S' ? -1 : 1;
+  const jibSide = b.tack === 'S' ? -1 : 1, side = b.gybeTo ? -jibSide : jibSide; // (the jib, and its pole, by her tack: they follow once she has gybed)
   // The sails sit at their sheet angles; easing to luff lets them right out.
   const boomT = b.luff ? SAILS.main.max : b.sheets.main;
   // Jib: to leeward normally (to windward when backed); poled out square to windward when wing-on-wing; hanging
   // centred while the crew works the pole.
-  const jibT = plan === 'wing' ? -side * 82 : plan === 'main' ? side * 10 : side * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
+  const jibT = plan === 'wing' ? -jibSide * 82 : plan === 'main' ? jibSide * 10 : jibSide * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
   b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4);
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
