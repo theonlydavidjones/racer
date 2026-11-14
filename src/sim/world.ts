@@ -455,7 +455,7 @@ export class World {
       this.caseRun = new CaseRun(rc, windOnWater(this.windHere(o, undefined, false), this.currentAt(o, true)).from, o); // (the wind on the water, the current's in it: what she sails by)
     }
     // (the rules of the road lesson: one other boat, a club Folkboat, the lesson sails her)
-    const road = settings.mode === 'lesson' && settings.lesson === 'road';
+    const road = this.freeSail && settings.mode === 'lesson' && settings.lesson === 'road';
     for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : road ? 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     if (this.caseRun) this.placeCase();
     this.startTimes = this.boats.map(() => null);
@@ -471,9 +471,12 @@ export class World {
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
-    if (this.lesson?.id === 'road') {
+    if (this.lesson?.id === 'road' && road) {
       this.roadEnv = this.makeRoadEnv(this.boats[1]);
-      const red = getPlace('nc-2')?.p, green = getPlace('nc-1')?.p; if (red && green) this.lesson.channel = { red, green }; // (sim/places.ts)
+      // (the North Channel's entrance pair, east of Alcatraz, sim/places.ts marks 7 and 21: NOAA ENC US5CA13M has them as
+      // pillar buoys, 1 green Fl G 6s at 37.83201 N 122.40863 W, 2 red Fl R 6s at 37.83331 N 122.39642 W, read 14 Nov 2026;
+      // the numbers rise northward, so coming in is northbound, red 2 to starboard)
+      const red = getPlace('m-7')?.p, green = getPlace('m-21')?.p; if (red && green) this.lesson.channel = { red, green };
     }
     if (this.lesson && this.caseRun) this.lesson.cue = `You're ${this.caseRun.helm}: sail it without breaking a rule`;
     if (this.lesson?.id === 'before') this.boats[0].lightsOff = true; // (Before you go: switching them on is a step)
@@ -915,7 +918,6 @@ export class World {
     return this.settings.mode === 'lesson' ? clamp(kt, lo / f, hi / f) : kt;
   } // (a breeze: the top of the range; a Case: a breeze she sails at the Cases' own speed in)
   private lessonField: number | null = null;
-  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
   /** Rules of the road (sim/lessons.ts): the other boat, and what the lesson asks of the World for her. */
   private roadEnv: RoadEnv | null = null;
   private makeRoadEnv(o: Boat): RoadEnv {
@@ -924,18 +926,21 @@ export class World {
     o.x = u.x + up.x * 600; o.y = u.y + up.y * 600; o.h = o.desired = n360(this.windModel.base + 90); o.v = 0;
     return {
       other: o,
-      place: (p, h, v) => {
-        if (onLand(p) || onLand({ x: (p.x + u.x) / 2, y: (p.y + u.y) / 2 })) return false;
+      place: (p, h, v, meet) => {
+        if ([p, meet, { x: (p.x + u.x) / 2, y: (p.y + u.y) / 2 }, { x: (p.x + meet.x) / 2, y: (p.y + meet.y) / 2 }].some(q => onLand(q) || inBasin(q))) return false;
         o.x = p.x; o.y = p.y; o.h = o.desired = n360(h); o.v = v; o.turnRate = 0; o.tacking = false; o.turnTarget = null;
         const g = V(o.h); o.vx = g.x * v + o.cur.x; o.vy = g.y * v + o.cur.y;
         o.ww = windOnWater(this.windHere(o, o), o.cur); settleTrim(o, o.ww.from, o.ww.kt);
         return true;
       },
       speed: h => speedInChop(o.ww.kt, Math.abs(wrap(o.ww.from - h)), o.sea.hsW, o.sea.tpW),
-      keepClear: () => keepClearMove(this, o, this.user),
+      helm: give => keepClearMove(this, o, this.user, !give),
+      sailable: h => sailable(o, h),
+      landAhead: h => landAlong(o, { x: o.x + V(h).x * 300, y: o.y + V(h).y * 300 }) < Infinity,
       gap: () => hullGap(this.user, o)
     };
   }
+  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
   private readonly mobEnv: MobEnv = { current: p => this.currentAt(p), wind: p => this.windHere(p, undefined, false) };
 
   /** Sail it yourself: each boat set at her pose in the Case at its start, the others to sail its track (their letters
@@ -1460,7 +1465,7 @@ export class World {
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       this.onIncident?.(A, B, incident);
-      if (A.isUser || B.isUser) {
+      if ((A.isUser || B.isUser) && !this.roadEnv) { // (the rules of the road lesson: the Navigation Rules, and the lesson says what happened)
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         const other = A.isUser ? B : A;
