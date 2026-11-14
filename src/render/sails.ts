@@ -2,9 +2,10 @@ import './three-setup';
 import * as THREE from 'three';
 import { LEECH_CURL, type SailTrim } from '../boat/trim';
 import { depowerOf, powerUpOf, targetShape } from '../boat/controls';
-const smoothstep = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 import { CE_ABOVE_WL, RIG as BAL } from '../boat/balance';
 import type { Boat } from '../boat/boat';
+
+const smoothstep = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 
 /**
  * A sail as a live surface: camber, twist toward the head, a luff bubble when it's under-trimmed, and
@@ -305,8 +306,10 @@ const TOP_CLEAR_LIGHT = 2, TOP_CLEAR_DEPOWERED = 4;
  *   it (the leech closed by a hard sheet or the vang) the upper sections' angles climb; past it (eased) they fall.
  * - The fast trim's top section, upwind: North Sails' Nordic Folkboat guide reads the top leech telltale for twist ("In
  *   light winds the mainsheet is eased so that the top tell-tale flies straight"; in medium winds and flat water the
- *   main is "sheeted tight" and "the leech will close"). North's general rule of thumb in its class guides (the Thistle
- *   guide, for one) has the top leech telltale flowing about half the time when sheeted for height. So in the
+ *   main is "sheeted tight" and "the leech will close"). North's guides for other classes put numbers to it: the Elliott
+ *   5.9's has the top batten telltale "flying nearly all the time" eased in light air and, sheeted harder once the crew's
+ *   on the side, "flying 50% of the time"; the Thistle's has it "stalled most of the time when the sail is trimmed
+ *   properly when sailing upwind" (northsails.com, the Elliott 5.9 and Thistle tuning guides). So in the
  *   powered-up middle of the range the fast trim puts the top section on its curl line; in a drifter a couple of degrees
  *   short of it (TOP_CLEAR_LIGHT: sheeting hard or closing the leech still curls it, easing flies it); and as she
  *   depowers and the leech opens, clear of it (TOP_CLEAR_DEPOWERED). Both margins are estimates. Sheeting for height is a

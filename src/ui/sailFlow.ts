@@ -167,13 +167,13 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
     const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
     const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
-    const topLeech = st.cuts[st.cuts.length - 1]?.sections.find(x => x.sail === 'main')?.tells.leech; // (the top cut's: the twist gauge)
+    const topLeech = leechTellAt(b.trim.main, b.awa, !!b.luff, leechFlow(b, 0), leechFlow(b, 0).fTop); // (the top batten's, the twist gauge: steady, at its mean)
     const stallTell = main ? (t.amount > 0.12 ? 'the leech telltale hiding' : 'the flow breaking away before the leech') : 'leeward telltales drooping';
     // (at its sheet's stop and well past its best angle: the sim's trim blends to downwind from 105° apparent and counts
     // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
     const pastStop = s.atMax && t.err > 4;
     const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
-      : t.flow === 'good' ? (main ? (topLeech === 'curl' ? 'attached, but the top leech telltale stalling: the leech closed. Ease a touch till it flies, or keep it for height in a breeze'
+      : t.flow === 'good' ? (main ? (topLeech === 'curl' ? 'attached, but the top leech telltale stalling: the leech closed. Ease a touch till it flies, or keep it for height in medium air and flat water'
         : 'attached: the leech telltales streaming') : 'attached: both telltales streaming')
       : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
         : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveler on purpose to keep her on her feet; the lifting luff is the price`
