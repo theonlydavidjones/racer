@@ -325,10 +325,10 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
  */
 function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
   isGoal?: (q: Vec) => boolean, lean = 1): Vec[] | null {
-  // (the grid fixed to the world, not to her: a route worked out again a few metres on takes the same cells, not a new set
-  // shifted under her that breaks A*'s ties another way, so the turn she's steering for doesn't jump about)
-  const x0 = Math.floor((Math.min(a.x, b.x) - pad) / cell) * cell, y0 = Math.floor((Math.min(a.y, b.y) - pad) / cell) * cell;
-  const nx = Math.ceil((Math.max(a.x, b.x) + pad - x0) / cell) + 1, ny = Math.ceil((Math.max(a.y, b.y) + pad - y0) / cell) + 1;
+  // (the grid anchored at her: snapped to the world, a start among a marina's docks could fall in a cell boxed in by them;
+  // the pilot keeps a route once it has one, so a re-plan's slightly different turns don't make it jump about)
+  const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
+  const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
   const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
   const idx = (q: Vec) => Math.round((q.y - y0) / cell) * nx + Math.round((q.x - x0) / cell);
   const block = new Int8Array(nx * ny).fill(-1); // -1 not yet worked out
