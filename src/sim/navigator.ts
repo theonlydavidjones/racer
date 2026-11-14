@@ -6,7 +6,7 @@ import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
 import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
-import { groundLaylines, landDist, routeAround, sailLeg, type SailResult } from './routing';
+import { groundLaylines, landDist, routeAround, sailLeg, type Plan, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
@@ -31,7 +31,7 @@ const ROUTE_NAME: Record<string, string> = {
 };
 
 /** A passage from a to b leaving at t: round the land, each stretch sailed up the middle (tacking on a lane either side). */
-function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] } {
+function passage(o: Outlook, route: Vec[], t: number, runs = true, board: Plan = 'middle'): { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] } {
   let tt = t, ok = true, why: 'land' | 'time' | undefined;
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
   // each stretch from where the last one really ended (she counts as round a turn within 120 m of it, and cuts the
@@ -39,11 +39,11 @@ function passage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'lan
   let at = route[0];
   for (let i = 1; i < route.length; i++) {
     const arrive = i === route.length - 1 ? 30 : 120;
-    let r = sailLeg(o, at, route[i], tt, 'middle', undefined, arrive, 360);
+    let r = sailLeg(o, at, route[i], tt, board, undefined, arrive, 360, runs);
     // run ashore up the middle (its lanes either side of the course meet the shore): a navigator would sail it the other
     // ways, the long board first to one side or the other, and take whichever gets there soonest
-    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) {
-      const q = sailLeg(o, at, route[i], tt, pl, undefined, arrive, 360);
+    if (!r.ok && r.why === 'land') for (const pl of (['left', 'right'] as const).filter(q => q !== board)) {
+      const q = sailLeg(o, at, route[i], tt, pl, undefined, arrive, 360, runs);
       if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q;
     }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
@@ -96,9 +96,15 @@ export function passageNow(w: SimView): PassageNow | null {
   const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
   const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
   // (and the conditions it was worked in: changed from the pause menu, World.applyConditions, they're new objects)
-  const refs = [w.weather, w.tide, w.windModel, w.sea];
+  // (with the tiller pilot steering on Nav, its own route round the land, so the course drawn is the way it's going; it's
+  // kept, and re-planned, by the pilot: boat/autopilot.ts followRoute; and downwind, straight for it, as the pilot runs,
+  // not jibing down the run's laylines, which it doesn't do yet; and upwind, on the board she's on to its layline, as
+  // the pilot beats (it tacks when the other tack fetches), not up a lane either side of the course)
+  const pp = w.pilot, navOn = pp?.mode === 'nav' && w.arrivedT == null, piloted = navOn && pp.route ? pp.route : null;
+  // (her tack picks the board drawn under Nav; under power it flips about and draws nothing: not a key then)
+  const refs = [w.weather, w.tide, w.windModel, w.sea, piloted, navOn, navOn && !pp.direct && u.tack];
   const m = nowMemo.get(w); if (m && m.key === key && m.refs.every((r, i) => r === refs[i])) return m.v;
-  const o = outlookFor(w), route = routeAround(from, dest.p), r = passage(o, route, t0);
+  const o = outlookFor(w), route = piloted ? [from, ...piloted.slice(pp.ri)] : routeAround(from, dest.p), r = passage(o, route, t0, !navOn, navOn ? (u.tack === 'S' ? 'left' : 'right') : 'middle');
   const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
   const turns = r.legs.flatMap(l => l.turns), last = r.legs[r.legs.length - 1];
   const lk: 'beat' | 'run' | null = !last ? null : last.turns.length ? (last.turns[last.turns.length - 1].kind === 'gybe' ? 'run' : 'beat') : last.kind === 'reach' ? null : last.kind;

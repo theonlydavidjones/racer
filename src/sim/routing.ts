@@ -124,7 +124,7 @@ function crabTo(u: Vec, c: Vec, v: number): number {
  * Sail from a to b starting at minute t0, by a plan. `arrive`: how close counts as there (m; an island mark's
  * rounding distance). Gives up after `maxMin` minutes (a leg she can't sail: becalmed against the tide).
  */
-export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
+export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240, runs = true): SailResult {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
   const turns: SailResult['turns'] = [];
@@ -172,10 +172,13 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       }
       forced = next;
     } else forced = null;
+    // (runs false: downwind she steers straight for it, through the current, as the tiller pilot does (it doesn't yet
+    // jibe down the run's laylines): no run's angles, no gybes)
+    if (!runs && mode === 'run') { mode = 'reach'; forced = null; }
     let h: number, v: number;
     if (mode === 'reach') {
       v = sp(off); h = crabTo(u, c, v);
-      const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, Math.min(run, twa)));
+      const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, runs ? Math.min(run, twa) : twa));
     } else {
       const ang = mode === 'beat' ? beat : run, vb = sp(ang), sgn = mode === 'beat' ? -1 : 1;
       const hd = (T: 'S' | 'P') => w.from + (T === 'S' ? -ang : ang);
@@ -268,6 +271,16 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
 }
 
 /**
+ * The route search's work, counted: every test of a point or a line against the land and the Wharf's piers made while
+ * working out a way round them (tests read it). A count, not a clock, so a test of how much a plan costs doesn't depend on
+ * how loaded the machine is. Only the planner adds to it, never the ordinary step.
+ */
+export const routeWork = { n: 0 };
+const onLandW = (q: Vec) => (routeWork.n++, onLand(q));
+const landAlongW = (p: Vec, q: Vec) => (routeWork.n++, landAlong(p, q));
+const wharfNearestW = (q: Vec, r: number) => (routeWork.n++, wharfNearest(q, r));
+
+/**
  * A way round the land from a to b for a cruise, as you'd draw it on the chart: the straight line if it keeps `clear`
  * metres off the land, or else the shortest way through the water on a 50 m grid (10 m by the Wharf; A*), pulled straight between the
  * turns. Near either end (a slip, a cove) it may come closer, as it has to.
@@ -275,37 +288,44 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
 export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   const nearEnd = (q: Vec) => dist(q, a) < 400 || dist(q, b) < 400;
   const blocked = (q: Vec) => {
-    if (onLand(q)) return true;
+    if (onLandW(q)) return true;
     if (nearEnd(q)) return false;
-    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLandW({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
   // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
   // the line itself is tested exactly)
-  const visible = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
+  const visible = (p: Vec, q: Vec) => { if (landAlongW(p, q) < Infinity || !wharfClear(p, q, [a, b])) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   if (visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.
-  const ea = wharfNearest(a, 150) ? escapeWharf(a) : [a];
-  const eb = wharfNearest(b, 150) ? escapeWharf(b).reverse() : [b];
+  const ea = wharfNearestW(a, 150) ? escapeWharf(a) : [a];
+  const eb = wharfNearestW(b, 150) ? escapeWharf(b).reverse() : [b];
   const A = ea[ea.length - 1], B = eb[0];
   const near2 = (q: Vec) => dist(q, A) < 400 || dist(q, B) < 400 || nearEnd(q);
+  const ends = [a, b, A, B];
   const blocked2 = (q: Vec) => {
-    if (onLand(q)) return true;
+    if (onLandW(q)) return true;
+    // (and off the Wharf's piers by WHARF_CLEAR, as the route's straight legs are, except right at its ends)
+    if (wharfNearestW(q, WHARF_CLEAR) && !ends.some(e => dist(q, e) < WHARF_CLEAR + 2)) return true;
     if (near2(q)) return false;
-    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLandW({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
     return false;
   };
   // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier)
-  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
+  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => landAlongW(p, q) === Infinity);
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
   const out = [a];
   let i = 0;
+  // (where nothing in sight keeps WHARF_CLEAR off the piers, a marina's fairways, the farthest point in sight keeping
+  // MARINA_CLEAR off them, rather than the grid's every 10 m step)
+  const seen = (p: Vec, q: Vec) => { if (landAlongW(p, q) < Infinity || !wharfClear(p, q, [a, b], MARINA_CLEAR)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
   while (i < pts.length - 1) {
     let j = pts.length - 1;
     while (j > i + 1 && !visible(pts[i], pts[j])) j--;
+    if (j === i + 1 && !visible(pts[i], pts[j])) { j = pts.length - 1; while (j > i + 1 && !seen(pts[i], pts[j])) j--; }
     out.push(pts[j]); i = j;
   }
   return out;
@@ -318,6 +338,8 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
  */
 function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
   isGoal?: (q: Vec) => boolean, lean = 1): Vec[] | null {
+  // (the grid anchored at her: snapped to the world, a start among a marina's docks could fall in a cell boxed in by them;
+  // the pilot keeps a route once it has one, so a re-plan's slightly different turns don't make it jump about)
   const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
   const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
   const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
@@ -356,7 +378,39 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
   return path;
 }
 
-/** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid. */
+/**
+ * How far off the Wharf's piers, breakwaters and docks a route keeps (m): her half-length and a few metres for the
+ * helm, so she passes a pier head, or threads Aquatic Park's 57 m entrance, without her hull touching. A route that
+ * only kept off the piers themselves ran her along their faces (the owner: "auto nav failed to navigate around the
+ * seawall").
+ */
+export const WHARF_CLEAR = 10;
+/** In a marina's fairways (20–30 m between its docks), where WHARF_CLEAR won't fit: down the middle, half of it (m). */
+const MARINA_CLEAR = 5;
+/** Clear of the Wharf's structures by WHARF_CLEAR along a to b, sampled every 4 m, except within that of `free` (where
+ * she is now, or where she's going) when that's itself closer to one: a slip, or alongside a dock. */
+function wharfClear(a: Vec, b: Vec, free: Vec[] = [], clear = WHARF_CLEAR): boolean {
+  const L = dist(a, b); if (!wharfNearestW(a, L + clear) && !wharfNearestW(b, L + clear)) return true;
+  // (an end lets the leg in close only if it's close itself, in a slip or alongside: from open water, the whole berth)
+  free = free.filter(f => !!wharfNearestW(f, clear));
+  const n = Math.max(1, Math.ceil(L / 4));
+  for (let k = 0; k <= n; k++) {
+    const q = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
+    if (free.some(f => dist(q, f) < clear + 2)) continue;
+    if (wharfNearestW(q, clear)) return false;
+  }
+  return true;
+}
+/** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid, keeping
+ * WHARF_CLEAR off them. */
 function escapeWharf(p: Vec): Vec[] {
-  return gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0) ?? [p];
+  const out = (q: Vec) => wharfNearestW(q, 150) === null;
+  // (a marina's fairways, 20–30 m between its docks, leave no room for the whole clearance: there, half of it, down the
+  // middle of the fairway; and only failing that, as before, the docks alone)
+  for (const c of [WHARF_CLEAR, MARINA_CLEAR]) {
+    const blocked = (q: Vec) => onLandW(q) || (dist(q, p) > c + 2 && !!wharfNearestW(q, c));
+    const r = gridPath(p, p, 10, 700, blocked, (u, v) => landAlongW(u, v) === Infinity && wharfClear(u, v, [p], c), out, 0);
+    if (r) return r;
+  }
+  return gridPath(p, p, 10, 700, onLandW, (u, v) => landAlongW(u, v) === Infinity, out, 0) ?? [p];
 }

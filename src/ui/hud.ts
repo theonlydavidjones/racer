@@ -583,7 +583,10 @@ export class Hud {
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
-    this.insetPlan = nav; // (chartBody draws her course with it: drawSailing)
+    // (her course with it, drawSailing; and on the map view too while the pilot steers on Nav: the course it will sail, its
+    // tacks, jibes and the current's set, not just the line to the destination (the owner, v188: "course is just showing
+    // a straight line; no accounting for obstacles or jibing or current"))
+    this.insetPlan = wd.pilot.mode === 'nav' && wd.pilot.direct ? null : nav ?? (wd.cruising && wd.pilot.mode === 'nav' && wd.arrivedT == null ? this.navPassage(wd) : null); // (motoring straight for it under Nav: no sailed course to draw, on the map or the Nav view)
     this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
     this.insetPlan = null;
     const day = (wd.settings.chartPal ?? 'day') === 'day', I = INK[day ? 'day' : 'dusk'];
@@ -794,7 +797,10 @@ export class Hud {
     if (flowHere) this.flowField.chart.draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     if (wd.freeSail) {
-      drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
+      // (under the pilot on Nav, the way it's steering: its own route's turns still ahead; the owner, v188, "I don't see my
+      // course plotted correctly in auto-nav", with the pilot steering one way and the map drawing another)
+      const pp = wd.pilot, piloted = pp.mode === 'nav' && wd.arrivedT == null && pp.route ? pp.route.slice(pp.ri) : null;
+      drawSailing(ctx, tf, wd.dest, u, w, h, I, plan, piloted);
       // a lesson's buoy (the tiller: steer for it), a filled yellow dot while it's the one to reach
       if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
     } else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
@@ -865,7 +871,7 @@ export function navRoute(u: { x: number; y: number }, dest: CourseMark): Vec[] {
  * Just sailing, on the map: the buoys around you, and where you're heading, by the navigator's route. If that's off the map, an arrow at the
  * edge points to it.
  */
-function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink, plan: PassageNow | null = null): void {
+function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | null, u: Boat, w: number, h: number, I: Ink, plan: PassageNow | null = null, piloted: Vec[] | null = null): void {
   // the racing marks and buoys the sim knows (the chart draws the real ones under them): small orange rings
   for (const pl of PLACES) if (pl.buoy) {
     const s = tf(pl.p.x, pl.p.y);
@@ -875,7 +881,8 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
   // the navigator's route there (the passage plan's: round the land, sim/navigator.ts), from where she is now
-  const legs = navRoute(u, dest).map(q => tf(q.x, q.y)); legs[0] = a;
+  // (or, with the pilot steering a route of its own, that route: what she'll actually do)
+  const legs = (piloted ? [u, ...piloted] : navRoute(u, dest)).map(q => tf(q.x, q.y)); legs[0] = a;
   const path = () => { ctx.beginPath(); legs.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
   ctx.save(); ctx.lineJoin = 'round';
   ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();

@@ -262,6 +262,20 @@ What's planned, roughly in order. Done work is described in the README.
    curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
    geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
    of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
+   Done on claude/aquatic-park-nav: the pilot follows the passage planner's route turn by turn, gets off the wall when
+   pinned, tacks only with the way to, and the map draws the course it sails. tests/aquaticPark-sweep.test.ts is the
+   measured baseline (48 runs over six seeds: all arrive, 42 clean, 6 known touches). Follow-ups:
+   - 8s-1. **No re-plans mid-maneuver in a gap** (1–2 h): beating out of the 57 m entrance in 18 kt from 350°, a plan made in
+     the gap swings her across the pier end (seeds 4, 5, 7: 3.7 m off to touching; 4 of 9 seeds tried, with seed 9). Hold the route through a tack, and
+     re-plan only once she's clear of the gap.
+   - 8s-2. **The Hyde Street and Pier 39 approaches** (2–3 h): reaching into Hyde Street harbor at 150° she touches by its
+     breakwater (seeds 1, 3; at 180°, seed 9 passes 3.2 m off); beating out of the Pier 39 marina's fairways in a northerly she's set onto the shore
+     (seed 3).
+   - 8s-3. **The pilot jibes downwind for VMG** (2–3 h; the Coordinator): on the run's laylines when it clearly pays, with
+     the same hysteresis as the tacks, never in a harbor or close to land; then the drawn course jibes with it
+     (sim/navigator.ts passageNow runs=true under Nav).
+   - 8s-4. **Under power near land, follow the route's turns** (1 h; review): with land within 150 m of the direct line
+     the motoring pilot still beats (and the map draws the beat). A boat under power should motor the route's legs.
 8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
    intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
    Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
@@ -298,13 +312,13 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
-8z. **Now — the cruise setup's map is blank** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
+8z. ~~**The cruise setup's map is blank**~~ **Done, published in v194 (#343).** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
    no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
    (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
    picking on a blank map. Suspects: the setup now builds the World only at Start (cca5f47), so the map has nothing to
    draw; the app.ts split (src/app/setup.ts); the chart's tiles or canvas not sized when the panel opens. "Plan on the
    big chart" should be checked too. Add a check that the setup's map draws the chart.
-   Done on claude/cruise-map: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
+   Fixed: the chart is drawn whenever its size changes (a ResizeObserver): opened before the setup's
    panel was laid out, it had no size and nothing redrew it. The big chart was fine. scripts/check/setup-map.cjs.
 8y. **The mast passes through the jib when she's hove to** (bug, visual; 2–3 h; Boat Detail or Rigging): owner, with a
    screenshot of USA 122 hove to, "mast penetrates jib when hove to." With the jib backed to windward, its cloth is drawn
