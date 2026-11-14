@@ -60,16 +60,23 @@ export class RulesTrainer {
     this.play();
   }
 
-  private play(): void {
+  /** The Case's last frame (the end of the sailing it shows). */
+  private get endT(): number { return Math.max(...this.c.boats.map(b => b.frames[b.frames.length - 1].t)); }
+  /** Where it stops to ask: who broke a rule, at the moment before it; who must keep clear, once it has all happened (the
+   * Rules session's data: `ask`). */
+  private get askT(): number { return this.c.ask === 'keepsClear' ? this.endT : this.c.momentT; }
+
+  /** Sail it up to `until` (by default where it asks), from a few seconds before the moment, a little faster than real time. */
+  private play(until = this.askT, from?: number): void {
     cancelAnimationFrame(this.raf);
     this.t0 = Math.min(...this.c.boats.map(b => b.frames.find(f => f.look !== false)?.t ?? b.frames[0].t));
-    this.t = Math.max(this.t0, this.c.momentT - 12); this.last = performance.now();
+    this.t = from ?? Math.max(this.t0, this.c.momentT - 12); this.last = performance.now();
     const tick = (now: number) => {
-      const dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
-      this.t = Math.min(this.c.momentT, this.t + dt * 1.5); // (a little faster than real time)
+      const dt = Math.min(0.5, (now - this.last) / 1000); this.last = now; // (a slow frame still moves on: a tab in the background, a slow machine)
+      this.t = Math.min(until, this.t + dt * 1.5);
       this.draw();
-      if (this.t < this.c.momentT) this.raf = requestAnimationFrame(tick);
-      else this.el.querySelectorAll<HTMLButtonElement>('.rtChoice').forEach(b => { b.disabled = !!this.picked; }); // paused at the moment: ask
+      if (this.t < until) this.raf = requestAnimationFrame(tick);
+      else if (!this.picked) this.el.querySelectorAll<HTMLButtonElement>('.rtChoice').forEach(b => { b.disabled = false; }); // paused: ask
     };
     this.raf = requestAnimationFrame(tick);
   }
@@ -77,7 +84,10 @@ export class RulesTrainer {
   /** The water from above: every boat where she is at t, her track so far faint, the marks, the wind. */
   private draw(): void {
     const c = this.c, g = this.cv.getContext('2d')!, W = this.cv.width, H = this.cv.height;
-    const pts = c.boats.flatMap(b => b.frames.filter(f => f.t <= c.momentT + 6).map(f => ({ x: f.x, y: f.y }))).concat((c.marks ?? []).map(m => m.p));
+    // (fitted to the boats over what's shown, from a few seconds before the moment to the end, and the marks near them: a
+    // Case's far mark would shrink the boats to specks)
+    const near = c.boats.flatMap(b => b.frames.filter(f => f.t >= c.momentT - 12 && f.t <= this.endT).map(f => ({ x: f.x, y: f.y })));
+    const pts = near.concat((c.marks ?? []).map(m => m.p).filter(p => near.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 60)));
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
     const span = Math.max(40, Math.max(...xs) - Math.min(...xs) + 2 * LOA, (Math.max(...ys) - Math.min(...ys) + 2 * LOA) * W / H);
     const s = W / span, P = (x: number, y: number): [number, number] => [W / 2 + (x - cx) * s, H / 2 - (y - cy) * s]; // (north up: the wind from the top)
@@ -119,13 +129,14 @@ export class RulesTrainer {
     const head = c.answer.who === 'neither' ? 'Neither broke a rule.' : `${c.answer.who}${c.answer.rule ? `: rule ${c.answer.rule}` : ''}.`;
     a.innerHTML = `<b>${esc(head)}</b> ${esc(c.answer.line)}<div class="rtRules">${c.rules.map(r => `<span class="rtRule${c.answer.rule && c.answer.rule.startsWith(r) ? ' key' : ''}">${esc(r)}</span>`).join('')}</div>`;
     a.className = 'rtAnswer ' + (ok ? 'ok' : 'no'); a.hidden = false;
+    if (this.t < this.endT) this.play(this.endT, this.t); // (then the rest of it: what happened)
   }
 
   /** Clicks inside the trainer. */
   click(e: Event): void {
     const el = e.target as HTMLElement, who = el.closest<HTMLElement>('[data-who]')?.dataset.who, act = el.closest<HTMLElement>('[data-rt]')?.dataset.rt;
     if (who) this.answer(who);
-    else if (act === 'again') this.play();
+    else if (act === 'again') this.play(this.picked ? this.endT : this.askT);
     else if (act === 'next') this.show(this.k + 1);
     else if (act === 'close') this.close();
   }
