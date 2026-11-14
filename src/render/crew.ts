@@ -774,7 +774,8 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (only over something on its way that's higher than both ends, the coaming between the deck and the cockpit: not
       // whatever's merely near it, which held a hand up beside the coaming on its way down to a locker lid)
       let clear = 0;
-      if (far && !inTo) { let top = 0; // (not going in under the side deck: that's below the coaming, not over it) for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
+      // (not going in under the side deck: that's below the coaming, not over it)
+      if (far && !inTo) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
       hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
