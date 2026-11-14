@@ -385,7 +385,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     let insideMark: number | null = null, markUnable = false, insideObst: number | null = null, obstUnable = false;
     if (!out && A.leg === B.leg && A.leg < n && ctx.marks[A.leg].type === 'round') {
       const mk = ctx.marks[A.leg], ins = markDist(A, mk) < markDist(B, mk) ? A : B, out = ins === A ? B : A;
-      insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 < ROOM_GAP + BEAM; // (from the outside boat's centerline to the mark's side: less her half-beam, the inside boat's beam and room)
+      insideMark = ins.id; markUnable = gapTo(out, mk.p) - 1 - HALF_BEAM < BEAM + ROOM_GAP; // (the water between the outside boat's hull and the mark's side, against the inside boat's beam and room)
     }
     const [oA, oB] = obstructionsFor(A, B, ctx, rec);
     // (could the outside boat give room then: the water between the inside boat's side and the obstruction (its distance
@@ -613,10 +613,15 @@ function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord,
   if (Math.min(oA.d, oB.d) > AT_OBSTRUCTION) return null; // (at it: either of them near it, Rule 19.1)
   const ov = rec.ovStart, unable = !!ov && ov.insideObst === I.id && ov.obstUnable;
   if (oI.continuing && unable && ov!.astern === I.id) return { fouler: I, part: '19.2(c)' };
-  // squeezing: the outside boat moving in toward the obstruction (and the inside boat), more than the inside boat is
-  // moving out toward her
+  // not giving room: the outside boat moving in toward the obstruction (and the inside boat), more than the inside boat is
+  // moving out toward her (squeezing); or holding on, making no room, while the inside boat bears away from the
+  // obstruction to pass it (WS Case 11: PW bearing away to pass astern of S, PL holding her course) and the water between
+  // them closes. Room is "the space a boat needs ... while manoeuvring promptly in a seamanlike way" (Definitions, Room):
+  // turning off the obstruction is within it, up to her moving away from it at half her speed (about 30° off its line, a
+  // modeling choice); more than that, she's taking more than room
   const inward = -dot({ x: O.vx, y: O.vy }, oI.n), outward = dot({ x: I.vx, y: I.vy }, oI.n);
   const squeeze = inward > 0.15 && inward > outward;
-  if (squeeze && !unable) return { fouler: O, part: '19.2(b)' };
+  const holdsOn = inward > -0.15 && outward > 0 && outward <= 0.5 * Math.hypot(I.vx, I.vy) && inward + outward > 0.15;
+  if ((squeeze || holdsOn) && !unable) return { fouler: O, part: '19.2(b)' };
   return null;
 }

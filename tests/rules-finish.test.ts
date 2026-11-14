@@ -10,7 +10,7 @@ import { V, n360, type Vec } from '../src/core/math';
 import { LL } from '../src/geo/geo';
 import { onLand } from '../src/geo/shore';
 import { beatAngle } from '../src/boat/polar';
-import { CONTACT_GAP, hullGap, assessPair, hailBreach, newPairRecord, rightOfWay, type RulesBoat, type RulesContext } from '../src/rules';
+import { KEEP_CLEAR_GAP, hullGap, assessPair, hailBreach, newPairRecord, rightOfWay, type RulesBoat, type RulesContext } from '../src/rules';
 import { WIND, boat, ctx, moveTo, pair } from './diagram';
 
 describe('Rule 20.2(e): 18.2 stays off until the hailing boat has tacked and avoided the hailed boat', () => {
@@ -199,7 +199,7 @@ describe('in the world', () => {
     for (let t = 0; t < 20; t += DT) { w.step(DT); minGap = Math.min(minGap, hullGap(A, S), hullGap(A, W)); }
     expect(W.lastTackT).toBeGreaterThan(t0 - 3);
     expect(A.lastTackT).toBeGreaterThanOrEqual(W.lastTackT);
-    expect(minGap).toBeGreaterThan(CONTACT_GAP);
+    expect(minGap).toBeGreaterThan(KEEP_CLEAR_GAP); // (kept clear: half a meter more than touching, hull to hull)
   });
 
   it('if her hail goes unanswered (passed on to a boat that never responds), the AI still ducks the starboard boat in time', () => {
@@ -216,7 +216,7 @@ describe('in the world', () => {
       let relayed = false;
       for (let t = 0; t < 20; t += DT) { u.h = hP; u.desired = hP; w.step(DT); minGap = Math.min(minGap, hullGap(A, S)); relayed ||= !!w.pairRecord(A, W)?.hail?.passedOn; }
       expect(relayed, `starting ${gap} m off: W passed the hail on to you`).toBe(true);
-      expect(minGap, `starting ${gap} m off`).toBeGreaterThan(CONTACT_GAP);
+      expect(minGap, `starting ${gap} m off`).toBeGreaterThan(KEEP_CLEAR_GAP);
     }
   });
 

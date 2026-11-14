@@ -83,12 +83,12 @@ function nearest(): boolean {
     return true;
   }
   // a triangle: the origin inside it means the hulls overlap
-  const cr = (i: number, j: number) => SW[2 * i] * SW[2 * j + 1] - SW[2 * i + 1] * SW[2 * j];
-  const c01 = cr(0, 1), c12 = cr(1, 2), c20 = cr(2, 0);
+  const c01 = SW[0] * SW[3] - SW[1] * SW[2], c12 = SW[2] * SW[5] - SW[3] * SW[4], c20 = SW[4] * SW[1] - SW[5] * SW[0];
   if ((c01 >= 0 && c12 >= 0 && c20 >= 0) || (c01 <= 0 && c12 <= 0 && c20 <= 0)) return false;
-  // else the nearest of its three edges
+  // else the nearest of its three edges (0-1, 1-2, 2-0)
   let bi = 0, bj = 1, bt = 0, bd = Infinity;
-  for (const [i, j] of [[0, 1], [1, 2], [2, 0]]) {
+  for (let e = 0; e < 3; e++) {
+    const i = e, j = e === 2 ? 0 : e + 1;
     const t = segT(i, j), x = SW[2 * i] + (SW[2 * j] - SW[2 * i]) * t, y = SW[2 * i + 1] + (SW[2 * j + 1] - SW[2 * i + 1]) * t, d = x * x + y * y;
     if (d < bd) { bd = d; bi = i; bj = j; bt = t; }
   }
@@ -126,7 +126,9 @@ function gjk(A: Hull, B: Hull): number {
 }
 
 /** Where two hulls come closest: the gap between their outlines (0 if they overlap), the nearest point on each, and
- * the unit normal from A's toward B's (for an overlap, from A's center toward B's). */
+ * the unit normal from A's toward B's. For an overlap it gives no depth: the two centers as the points and the normal
+ * from A's center toward B's, mostly fore and aft for a glancing overlap along her length (a contact response wanting
+ * the overlap's own normal needs more: EPA, the expanding polytope). */
 export interface HullContact { gap: number; a: Vec; b: Vec; n: Vec }
 export function hullContact(A: Hull, B: Hull): HullContact {
   const gap = gjk(A, B);

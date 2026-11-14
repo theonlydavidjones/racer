@@ -123,9 +123,9 @@ export const CASES: RulesCase[] = [
     case: 11, title: 'Two port boats meet a starboard boat', rules: ['19', '10'], fleet: true,
     // (sailed, beating at 2.5 m/s: S on starboard crossing ahead through the origin at 52 s; PW and PL on port, overlapped
     // 3.4 m apart, center to center (1.2 m of water between the hulls), PW aimed a little astern of S's track; from 49 s PW
-    // bears away 8°/s to pass astern of her and PL holds on: PL's 19.2(b), the same from 3 to 3.8 m apart; at 4 m PW, by
-    // the time she touches PL, is turning away from S faster than PL closes, and the answer turns, so the Case keeps them
-    // close, as on the water)
+    // bears away 8°/s to pass astern of her and PL holds on: PL's 19.2(b), the same from 3 to 4 m apart; from 4.5 m PW
+    // touches PL with over 3 m of water still between her and S, taking more than room, and the answer turns (her 11),
+    // so the Case keeps them close, as on the water: tests/rules-cases-data.test.ts)
     boats: [
       { letter: 'S', frames: [at(45.9, S11, 315, { look: false }), ...sail(S11, () => 315, 2.5, 46, 58)] },
       { letter: 'PW', frames: [at(45.9, PW11, 45, { look: false }), ...sail(PW11, hPW11, 2.5, 46, 58)] },

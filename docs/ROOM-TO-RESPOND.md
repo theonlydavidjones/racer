@@ -81,7 +81,7 @@ which is rare. The AI would call it per threatened pair, about once a second (Sk
    and what "seamanlike" margin protest committees accept):
    - `delay` = 1.0 s ("promptly": a helmsman watching the other boat);
    - `horizon` = until the predicted closest point of approach has passed, at most 8 s;
-   - `clearance` = CONTACT_GAP (2.2 m), the gap the engine already calls contact. "Keep clear" also needs the right-of-way
+   - `clearance` = CONTACT_GAP (0.15 m between the hulls since docs/HULL-CONTACT.md; 2.2 m between the centerlines when this was written), the gap the engine already calls contact. "Keep clear" also needs the right-of-way
      boat to have no need to take avoiding action. A slightly larger margin, such as 3 m, could stand for that, to be
      tested against Cases 50 and 88, where she bore away for fear of contact.
 5. **Unchanged:** rule 15's grace (finding 5 covers turns away), 17, 18 and 19. Those are about room for other things; this is
