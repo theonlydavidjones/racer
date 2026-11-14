@@ -91,13 +91,14 @@ describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', (
     const seats: number[][] = [[], []], pianoT = [0, 0]; let inside = 0, tWas = 0;
     const PIANO_SIT = 2; // (s: sat at the piano a moment after its job, before the walk back)
     sail(b, secs, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: kt + 1.5 * Math.sin(t * 2 * Math.PI / 30) };
-      b.crew!.people.slice(1).forEach((a, j) => { const g = a.goal?.z ?? a.z; if (!a.job && !atWinch(g) && !seats[j].includes(+g.toFixed(2))) seats[j].push(+g.toFixed(2));
-        // (settled at their place, not on the way: the walk round the winch and up beside the cabin are a trip's)
+      b.crew!.people.slice(1).forEach((a, j) => { const g = a.goal?.z ?? a.z; if (!a.job && !atWinch(g) && Math.abs(g - Z.piano) > 0.02 && !seats[j].includes(+g.toFixed(2))) seats[j].push(+g.toFixed(2)); // (not the piano's own place: its job's)
+        // (settled at their place, not on the way, along the boat or across it: the walk round the winch and up beside
+        // the cabin, and out from the piano to the cabin's edge, are a trip's)
         // (not at the piano, Z.piano, kneeling on the cockpit sole's forward end to work its lines, or sat there a moment
         // before the walk back: that's the job's place, not a seat inside the cabin)
         // (and not long: a couple of seconds there after the job, before the walk back, PIANO_SIT)
         const atPiano = Math.abs(a.z - Z.piano) <= 0.02 && !a.job; pianoT[j] = atPiano ? pianoT[j] + (t - tWas) : 0;
-        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02 && !a.job && (!atPiano || pianoT[j] > PIANO_SIT)) inside++; }); tWas = t; });
+        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02 && Math.abs(a.x - (a.goal?.x ?? a.x)) < 0.02 && !a.job && (!atPiano || pianoT[j] > PIANO_SIT)) inside++; }); tWas = t; });
     return { b, seats, inside };
   };
   for (const kt of [5, 9]) it(`placed forward in ${kt} kt: the front hand on the cabin top's edge, never inside the cabin, and they stay put`, () => {
@@ -113,7 +114,9 @@ describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', (
   }, 120_000);
   it('forward of the winch, the helm takes the main (the owner): its sheet comes to the thwart behind them', () => {
     expect(ownerOf('mainsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(0);
-    expect(ownerOf('jibsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(2);
+    // (the jib to the one beside its winch, the middle crew; the cabin-top lines stay the forward crew's: the Coordinator)
+    expect(ownerOf('jibsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(1);
+    expect(ownerOf('cunningham', 2, DEFAULT_CREW, 'cockpit', true)).toBe(2);
     const { b } = beat(5, 300), c = b.crew!;
     expect(c.fore01).toBe(1);
     // (no crew holding the mainsheet from up forward, and the main still trimmed: the helm has it)

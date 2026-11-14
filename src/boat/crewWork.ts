@@ -131,11 +131,10 @@ function ownerWith(line: string, nCrew: number, main: number, layout: Forward, f
   // the jib: the forward crew (with one crew, whichever of the two hasn't the main). With crew gone forward, whoever's
   // still in the cockpit: a Folkboat's jib sheets lead aft to the cockpit winches, out of reach from the mast (the middle
   // crew with the bow hand at the mast; the helm, with both sheets, when everyone else is forward)
-  if (line === 'jibsheet' || line === 'jibsheetW') return forward ? (layout === 'mast' && nCrew >= 2 ? 1 : 0) : nCrew === 1 ? 1 - main : nCrew;
-  // (both forward of the winch, the middle crew, beside it with no sheet now the helm has the main, has the cabin-top
-  // lines: the dual-ended ones worked from the cockpit's forward end beside them, the piano's a reach forward; the jib
-  // hand, on the cabin's edge forward of them, keeps the jib)
-  if (fwdOfWinch && nCrew === 2 && PIANO.has(line)) return 1;
+  // (both forward of the winch, the helm on the main: the jib to the one beside its winch, the middle crew at Z.deckFwd,
+  // where its sheet leads and they can tail and grind; the forward crew on the cabin's edge keeps the cabin-top lines and
+  // the mast. The jib goes to whoever is at its winch, not by who sits forward: the Coordinator, 14 Nov 2026)
+  if (line === 'jibsheet' || line === 'jibsheetW') return forward ? (layout === 'mast' && nCrew >= 2 ? 1 : 0) : nCrew === 2 && fwdOfWinch ? 1 : nCrew === 1 ? 1 - main : nCrew;
   return nCrew; // the forward hand: the cabin-top lines, the cars, the pole, the halyards
 }
 
@@ -168,7 +167,7 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
   // inside on the bench there (about -0.45) is the owner's to say (the physics review)
   // (the jib hand of two, whose seat is forward of the winch (crewPhys.ts slotOf), works it from there, the crank swept
   // round from its forward side: not a walk aft past the winch to where the main trimmer sits after every tack. Both
-  // forward of the winch, the main trimmer sits there: then from aft of it, which is free, as before)
+  // forward of the winch, the jib is the middle crew's, sitting there: from their seat too)
   const zw = front ? Z.deckFwd : Z.winchAft;
   if (line === 'jibsheet' && big && who !== 0) return breeze ? { arm: 0.45, z: zw, pose: 'winch' } : { arm: -0.75, z: zw, pose: 'winch' };
   return null;
@@ -199,8 +198,17 @@ const helmSheetsOf = (c: CrewState, n: number) => (c.layout ?? 'cockpit') !== 'c
 const paceOf = (p: Person, who: number, n: number, helmSheets: boolean) => pace(p) * (who === 0 && (n === 0 || helmSheets) ? 0.6 : 1);
 const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
 /** Who works a line now (crewJobs): its owner, or with the forward hand away at the cabin top or a car, the middle crew on the jib sheet meanwhile. */
+/** The jib winch along the boat (m: render/hull.ts JIB_WINCH_Z), and how far from it fore and aft a crew member can tail and grind. */
+const WINCH_Z = 1.64, WINCH_REACH = 0.5;
+const nearWinch = (a: Aboard | undefined) => !!a && Math.abs(a.z - WINCH_Z) <= WINCH_REACH;
 function workerOf(c: CrewState, n: number, fwdL: Forward, ahead: boolean, main: number, k: string): number {
   const o = ownerWith(k, n, main, fwdL, ahead);
+  // (the jib to whoever is at its winch: its owner away from it, at the cabin top or on the way back, and the other of
+  // two beside it and free, they trim it meanwhile. The Coordinator: the sheet goes where it leads, to whoever's there)
+  if ((k === 'jibsheet' || k === 'jibsheetW') && n === 2 && o >= 1) {
+    const m = 3 - o, am = c.people[m];
+    if (!nearWinch(c.people[o]) && nearWinch(am) && !am!.job?.station) return m;
+  }
   if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
     const j = c.people[o]?.job;
     if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ahead ? 3 - o : ownerWith('mainsheet', n, main, fwdL, ahead); if (m !== o && (!c.people[m]?.job?.station || c.people[m]!.job!.line === 'jibsheet')) return m; }
@@ -368,7 +376,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       if (k === 'jibsheet' && a.job.station && PIANO.has(a.job.line) && e < JIB_HAUL && !placed) continue;
     }
     const hauling = (want[k] ?? 0) < b.ctl[k], breeze = (b.heelMag ?? 0) > 12 || c.hike > 0.2;
-    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && hauling && e > JIB_HAUL, breeze, n === 2 && who === 2 && !ahead);
+    // (a crew member away from the jib winch goes to it to trim: not from the cabin top, 0.8 m off)
+    const toWinch = k === 'jibsheet' && who !== 0 && !nearWinch(a) && !placed;
+    const st = placed && BOTH_SIDES.has(k) ? null : stationFor(k, who, windward, k === 'jibsheet' && ((hauling && e > JIB_HAUL) || toWinch), breeze, n === 2 && who === (ahead ? 1 : 2));
     // the sheets are in hand: no walk unless they're away from them
     const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
