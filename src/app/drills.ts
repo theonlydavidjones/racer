@@ -126,7 +126,7 @@ $('bDReplay').onclick = () => { if (drillClip) app.drillView.play(app.w, drillCl
 $('bDAgain').onclick = () => { closeDrill(); app.beginRace(app.w.seed); };
 $('bDNew').onclick = () => { closeDrill(); app.beginRace(); };
 $('bDKeep').onclick = () => { closeDrill(); app.send({ k: 'pause', on: false }); };
-$('bDSetup').onclick = () => { closeDrill(); app.openSetup(); };
+$('bDSetup').onclick = () => { closeDrill(); app.toSetup(); };
 
 return { drillHtml, drillTick, roundHtml, roundTick, showDrill };
 }
