@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { LESSON_MARKS, LessonTracker } from '../src/sim/lessons';
 import { onLand } from '../src/geo/shore';
+import { slipsIn } from '../src/geo/marina';
 import { KT } from '../src/core/math';
 import type { Boat } from '../src/boat/boat';
 import { testBoat, sail, startTack } from './helpers/testBoat';
@@ -120,5 +121,89 @@ describe('Learn to sail: the lessons\' checks', () => {
     const w = new World(COURSES[0], S({ windKt: 25 }), 3, { freeSail: true }); let sum = 0, n = 0;
     for (let i = 0; i < 120 * 60; i++) { w.step(DT); if (i % 30 === 0) { sum += w.user.ww.kt; n++; } }
     expect(sum / n).toBeLessThan(16.5);
+  });
+
+  it('a breeze: three puffs answered by easing the main and trimming back in the lulls; sat through, pumped blindly, eased and never trimmed, or the crew\'s sheet, they don\'t count', () => {
+    const mk = () => {
+      const L = new LessonTracker('breeze', null); let t = 0;
+      const b = { ...boat({ twa: 42, v: 4 * KT }), isUser: true, hand: { mainsheet: true }, heelMag: 18, ww: { kt: 15, from: 0 }, sheets: { main: 12, jib: 10 }, ctl: { mainsheet: 0.3, traveller: 0 } } as unknown as Boat & { ww: { kt: number }; heelMag: number; hand: Record<string, boolean> };
+      const run = (s: number, f?: (t: number) => void) => { for (let k = 0; k < s * 10; k++) { f?.(t); L.update(b, t, 0.1); t += 0.1; } };
+      run(30); expect(L.step).toBe(1);
+      return { L, b, run };
+    };
+    const IN = 0.3, OUT = 0.36; // the boom at 13° and 17° (80·s^1.5)
+    { // sat through
+      const { L, b, run } = mk();
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(7); b.ww.kt = 15; run(20); }
+      expect(L.good).toBe(0);
+    }
+    { // eased in each puff, trimmed back in each lull: three puffs, passed
+      const { L, b, run } = mk();
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); b.ctl.mainsheet = OUT; run(6); b.ww.kt = 15; b.ctl.mainsheet = IN; run(20); }
+      expect(L.good).toBe(3); expect(L.passed).toBe(true);
+    }
+    { // pumped in and out every 1.5 s, whatever the wind
+      const { L, b, run } = mk(); const pump = (t: number) => { b.ctl.mainsheet = Math.floor(t / 1.5) % 2 ? OUT : IN; };
+      run(10, pump);
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(7, pump); b.ww.kt = 15; run(20, pump); }
+      expect(L.good).toBe(0);
+    }
+    { // eased in each puff and never trimmed back: one puff, then nothing till she's trimmed
+      const { L, b, run } = mk(); let s = IN;
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); s += 0.06; b.ctl.mainsheet = s; run(6); b.ww.kt = 15; run(20); }
+      expect(L.good).toBe(1);
+    }
+    { // the crew has the sheet: their easing isn't yours
+      const { L, b, run } = mk(); b.hand.mainsheet = false;
+      for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); b.ctl.mainsheet = OUT; run(6); b.ww.kt = 15; b.ctl.mainsheet = IN; run(20); }
+      expect(L.good).toBe(0);
+    }
+  });
+
+  it('home to the slip: out past the harbor, then back in her slip and made fast', () => {
+    const L = new LessonTracker('home', null); L.slip = { x: 0, y: 0 };
+    L.update({ ...boat({ x: 0 }), docked: { slip: 's' } } as unknown as Boat, 0, 1); expect(L.step).toBe(0);
+    L.update(boat({ x: 200 }), 1, 1); expect(L.step).toBe(1);
+    L.update({ ...boat({ x: 0 }), docked: { slip: 's' } } as unknown as Boat, 2, 1); expect(L.passed).toBe(true);
+  });
+
+  it('a breeze is sailed at the top of the range; home starts in her own slip', () => {
+    const w = new World(COURSES[0], S({ windKt: 8, lesson: 'breeze' }), 3, { freeSail: true });
+    expect(w.wind.kt).toBeGreaterThan(12);
+  });
+
+  it('before you go: the dock card done, lights on, both sails up and off the dock', () => {
+    const L = new LessonTracker('before', null); L.slip = { x: 0, y: 0 };
+    const b = (o: { x?: number; lightsOff?: boolean; up?: boolean; docked?: boolean }) => ({ ...boat({ x: o.x ?? 0 }), lightsOff: o.lightsOff ?? false, docked: o.docked ? { slip: 's' } : undefined,
+      rig: { main: o.up ? 1 : 0, jib: o.up ? 1 : 0, mainUp: !!o.up, jibUp: !!o.up } }) as unknown as Boat;
+    L.update(b({ lightsOff: true, docked: true }), 0, 1); expect(L.step).toBe(0);
+    L.ready(true); expect(L.step).toBe(1); // (after dark: lights first)
+    L.update(b({ lightsOff: true, docked: true }), 1, 1); expect(L.step).toBe(1);
+    L.update(b({ docked: true }), 2, 1); expect(L.step).toBe(2);
+    L.update(b({ x: 50 }), 3, 1); expect(L.passed).toBe(false); // (off the dock, sails still down)
+    L.update(b({ x: 50, up: true }), 4, 1); expect(L.passed).toBe(true);
+  });
+
+  it('in the World: Before you go starts with her lights off', () => {
+    const w = new World(COURSES[0], S({ lesson: 'before' }), 3, { freeSail: true });
+    expect(w.user.lightsOff).toBe(true); expect(w.lesson!.cue).toMatch(/float plan/);
+  });
+
+  it('before you go by day skips the lights', () => {
+    const L = new LessonTracker('before', null); L.ready(false); expect(L.step).toBe(2);
+  });
+
+  it('in the World: home to the slip, out of the harbor and back in, docks her and passes', () => {
+    const slip = slipsIn('gashouse-cove').find(s => s.kind !== 'alongside')!;
+    const w = new World(COURSES[0], S({ lesson: 'home', sailFrom: 'slip', sailTo: 'slip', boat: { ...DEFAULT_SETTINGS.boat!, slip: slip.id } }), 3, { freeSail: true }), u = w.user;
+    expect(u.docked).toBeTruthy(); expect(w.lesson!.slip).toBeTruthy();
+    // out on the Bay, past the basin
+    Object.assign(u, { docked: undefined, x: slip.p.x, y: slip.p.y + 600, v: 2 }); w.step(DT);
+    expect(w.lesson!.step).toBe(1);
+    // back: a metre short of her berth on its heading, nearly stopped
+    const back = { x: slip.p.x - Math.sin(slip.heading * Math.PI / 180) * 1, y: slip.p.y - Math.cos(slip.heading * Math.PI / 180) * 1 };
+    Object.assign(u, { x: back.x, y: back.y, h: slip.heading, v: 0.4, astern: 0 });
+    for (let i = 0; i < 60 * 20 && !w.lesson!.passed; i++) w.step(DT);
+    expect(u.docked).toBeTruthy(); expect(w.lesson!.passed).toBe(true);
   });
 });

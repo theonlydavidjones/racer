@@ -15,3 +15,15 @@ the one before.
 
 Each PR has origin/main merged in and passes the full `npm test` before it's opened. None adds an on-screen button:
 the tiles live in the Drill section, the cue in the coach box, and the cards on the lesson's own result screen.
+
+## Lesson 1 (The boat): notes from Boat Detail and Rigging, 14 Nov 2026
+
+It's its own PR after PR 3, and lands after bow-lines. It adds one read-only `projectPart()` to scene.ts.
+
+- **Rig:** RIG's names don't change. carPos keeps its signature, but after #236 and bow-lines it returns Josephine's car, 53–63 cm off the centerline, so read it live, not cached.
+- **Vang:** Rigging will add RIG.VANG_FOOT and RIG.VANG_SPAN on #274 if asked.
+- **Horseshoe:** MAST_RING (boatMesh.ts) gives the horseshoe at the mast foot.
+- **Lines** (halyards, sheets, Cunningham) have no fixed point: use the live line meshes in `boatMeshes[0].grp`, by `userData.key` ('mainsheet', 'jibsheet'…).
+- **Cabin:** CABIN.u0 = zU(−0.79), and CABIN_NOSE is 0.208.
+- **Jib car:** JOSEPHINE_CAR moves to src/boat/controls.ts.
+- **Keel and rudder:** use hull.ts HEEL and RUDDER_RAKE, not mesh vertices.

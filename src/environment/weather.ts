@@ -313,6 +313,8 @@ const CELL_REACH = 1800;
 export const SET_VIS = { fog: [Infinity, 3000, 450], rain: [Infinity, 7500, 3100] } as const;
 export function setVisibility(s: { fog?: 'real' | 0 | 1 | 2; rain?: 0 | 1 | 2 }): { m: number; fogSet: boolean } {
   const fogSet = s.fog != null && s.fog !== 'real';
+  // (`rain`, the rain falling: set, or the record's, environment/rain.ts rainLevel; the airports' visibility in the heavy
+  // rain of 13 Nov 2026, 1½–3 statute miles, agrees with the 3.1 km here)
   return { m: Math.min(fogSet ? SET_VIS.fog[s.fog as 0 | 1 | 2] : Infinity, SET_VIS.rain[s.rain ?? 0]), fogSet };
 }
 

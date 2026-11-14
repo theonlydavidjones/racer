@@ -3,7 +3,7 @@ import type { CourseMark } from '../courses/course';
 import { laylinesFor } from '../sim/laylines';
 import type { SimView } from '../sim/host';
 import { $ } from './dom';
-import { drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
+import { ARROW_MIN, drawCurrentArrows, drawLand, drawPuffs, drawLaylines, fitCanvas, makeTf, type Tf } from './draw2d';
 import { onLand } from '../geo/shore';
 import { raceBrief, type RaceBrief } from '../sim/strategist';
 import type { Plan } from '../sim/routing';
@@ -184,7 +184,7 @@ export class CourseView {
     ctx.fillStyle = '#0c2534'; ctx.fillRect(0, 0, cw, ch);
     drawPuffs(ctx, tf, w.puffs.cells, w.puffs.dir, w.puffs.gustiness);
     drawLand(ctx, tf);
-    { const half = Math.max(cw, ch) / this.view.scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentDrawn(p), this.view.cx, this.view.cy, half, Math.max(80, half / 6), 14, onLand); }
+    { const half = Math.max(cw, ch) / this.view.scale * 0.6; drawCurrentArrows(ctx, tf, p => w.currentDrawn(p), this.view.cx, this.view.cy, half, Math.max(ARROW_MIN, half / 6), 14, onLand); }
 
     // start/finish line
     const pin = S(C.pin), com = S(C.committee), lc = S(C.center);

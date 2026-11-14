@@ -124,6 +124,12 @@ export function drawLaylines(ctx: CanvasRenderingContext2D, tf: Tf, L: Laylines 
  * Small arrows showing the current across the water, on a grid `spacing` metres apart around (cx, cy).
  * Length grows with speed; land and the shore relief come from `at`, the sim's own current field.
  */
+/**
+ * The closest the current's arrows come together (m), zoomed right in: about 15 m, so a harbor mouth's eddies and gyres
+ * (tens of metres across) show on the map as they run on the water. Zoomed out, the spacing is a sixth of the view's
+ * half-width, as before.
+ */
+export const ARROW_MIN = 15;
 export function drawCurrentArrows(ctx: CanvasRenderingContext2D, tf: Tf, at: (p: { x: number; y: number }) => { x: number; y: number },
   cx: number, cy: number, half: number, spacing: number, pxPerKt: number, onLand: (p: { x: number; y: number }) => boolean, ink: OverlayInk = {}): void {
   ctx.save();
