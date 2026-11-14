@@ -56,7 +56,8 @@ body.pilot-on #bHome{display:none}
 .sb-tab[hidden]{display:none}
 button.sb-tab:hover{color:var(--text)!important}
 .sb-pole{color:var(--text)!important}
-.sb-pole.mine{color:var(--accent)!important}
+.sb-pole.mine,.sb-all.mine{color:var(--accent)!important}
+.sb-all.mine{border-color:var(--accent)!important}
 .sb-pole.dim{opacity:.45}
 .sb-hail{background:var(--accent)!important;border-color:var(--accent)!important;color:#1a1205!important;font-size:11px!important}
 .sb-hail:hover{color:#1a1205!important;filter:brightness(1.1)}
@@ -69,7 +70,7 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-top{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
 .sb-div{width:1px;align-self:stretch;background:var(--rule);margin:4px 2px}
 .sb-slot{width:30px}
-/* a vertical line: name, ▲ (eases), the cleat, the rope below it (how much is on), ▼ (pulls on) */
+/* a vertical line: name, ▲ (eases), the rope below it (how much is on), ▼ (pulls on) */
 .sb-v{display:flex;flex-direction:column;align-items:center;gap:2px;width:32px;border-radius:5px;padding:1px 0}
 .sb-v.sel,.sb-h.sel,.sb-trk.sel{background:rgba(255,255,255,.07)}
 .sb-nm{font:700 8.5px/1.05 var(--f-inst)!important;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)!important;text-align:center;min-height:18px}
@@ -77,10 +78,6 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-a{display:block;width:16px;height:12px;color:var(--muted)!important}
 .sb-a svg{width:12px;height:12px;display:block;margin:0 auto;fill:currentColor}
 .sb-a:hover,.sb-a:active{color:var(--text)!important}
-.sb-cleat{width:18px;height:6px;border-radius:2px;background:#2fae6c;position:relative}
-.sb-cleat.clam,.sb-cleat.block,.sb-cleat.winch{background:#8b98a3}
-.sb-cleat.block{width:10px;height:8px;border-radius:3px}
-.ww .sb-cleat{box-shadow:0 0 0 2px #fff}
 .sb-well{position:relative;width:12px;height:46px;background:#0a141c;border:1px solid #22384a;border-radius:3px;overflow:hidden}
 .sb-rope{position:absolute;left:1px;right:1px;top:0;height:0;border-radius:2px;
   background:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px)}
@@ -101,8 +98,6 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-h .sb-well{width:52px;height:12px}
 .sb-h .sb-rope{top:1px;bottom:1px;height:auto;width:0}
 .sb-h .sb-mark{top:-1px;bottom:-1px;width:2px;height:auto;left:auto}
-.sb-h .sb-cleat{display:none}
-.sb-h.ww .sb-well{box-shadow:0 0 0 2px #fff}
 /* the thwart: the mainsheet's boom marker over the traveller's car, port end left */
 .sb-thwart{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
 .sb-trk{display:grid;grid-template-columns:70px 10px 16px 1fr 16px 10px;align-items:center;gap:3px;border-radius:5px}
@@ -156,3 +151,4 @@ body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 /* (the messages stop above the band while it is open) */
 body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
 
+.sb-pos{fill:#ffffff;font:700 10.5px var(--f-inst);letter-spacing:.04em;paint-order:stroke;stroke:#08141e;stroke-width:3px} /* the windex's point of sail (ROADMAP 8j) */
