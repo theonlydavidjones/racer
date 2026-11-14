@@ -419,40 +419,44 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // north seawall, facing the Bay (the start line's inner end: see the Seaweed Soup course files)
   place(block(22, 25, 8, lam(0xf4f1ea)), 37.80773, -122.44259, 79, 2.3);
   place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80799, -122.44260, 0, 2.3);
-  // Fort Mason's piers, with the long pier sheds: each on its own pier's centerline (geo/fortMason.ts), its north end a
-  // few meters short of the pier's
-  for (const f of FORT_MASON_PILES) {
-    const n = f.pts.length, base = { x: (f.pts[0].x + f.pts[n - 1].x) / 2, y: (f.pts[0].y + f.pts[n - 1].y) / 2 };
-    const far = [...f.pts].sort((p, q) => Math.hypot(q.x - base.x, q.y - base.y) - Math.hypot(p.x - base.x, p.y - base.y)).slice(0, 2);
-    const end = { x: (far[0].x + far[1].x) / 2, y: (far[0].y + far[1].y) / 2 };
-    // (along the pier's longest side, so the shed runs parallel to its edges; the bulkhead end is cut on the skew)
-    const side = f.pts.map((p, i) => [p, f.pts[(i + 1) % n]]).sort(([a, b], [c2, d]) => Math.hypot(d.x - c2.x, d.y - c2.y) - Math.hypot(b.x - a.x, b.y - a.y))[0];
-    const sl = Math.hypot(side[1].x - side[0].x, side[1].y - side[0].y), sg = Math.sign((side[1].x - side[0].x) * (end.x - base.x) + (side[1].y - side[0].y) * (end.y - base.y)) || 1;
-    const u = { x: sg * (side[1].x - side[0].x) / sl, y: sg * (side[1].y - side[0].y) / sl }, c = { x: end.x - u.x * 80, y: end.y - u.y * 80 }; // (its middle 80 m back from the end)
-    const shed = group(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK)); shed.position.copy(P3(c.x, c.y, 0)); shed.rotation.y = -Math.atan2(u.x, u.y); grp.add(shed);
-  }
-  // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
-  // through: a boat set onto them is caught (boat/physics.ts onPiles). The deck's height and the piles' size and spacing are
-  // ESTIMATES (no survey found): a deck about 3 m above the water and 0.7 m thick, piles 0.6 m across about 4.5 m apart
-  // each way, drawn down to 4 m below the surface; the sheds 18 × 140 × 13 m (Pier 3's Festival Pavilion is listed at
-  // 483 × 110 ft, wider than OSM's 25 m deck there: one of the two is off, unresolved).
+  // Fort Mason's three piers, as in the owner's photos (reference/photos/fort-mason-pier-piles-gashouse-exit.jpg,
+  // gashouse-cove-exit-breakwater-and-fort-mason.jpg): each a deck on its own outline (geo/fortMason.ts, the same the
+  // physics stops a boat on), on rows of massive round concrete columns with flared caps and the water running through, and
+  // on top the long white pier shed, nearly flush with the deck's edge, rows of red-framed windows, and FORT MASON lettered
+  // along Pier 3's west face toward the Gashouse Cove entrance. The sheds' heights are OpenStreetMap's (Bay East's
+  // pile-piers data: Pier 1 17 m, Pier 2 16 m, Pier 3 13 m). ESTIMATES (from the photos; no survey found): the deck's top
+  // about 3 m above the water and its edge beam 1 m deep; the columns about 1.1 m across, some 6 m apart each way.
   {
-    const deckMat = lam(0x9d968a), pileMat = lam(0x6f6a60), PITCH = 4.5, R = 0.3, D = 0.7;
+    const deckMat = lam(0x9d968a), colMat = lam(0x8a8478), D = 1.0, R = 0.55, PITCH = 6, HEIGHT: Record<string, number> = { "Fort Mason's Pier 1": 17, "Fort Mason's Pier 2": 16, "Fort Mason's Pier 3": 13 };
     const decks: THREE.BufferGeometry[] = [], at: THREE.Vector3[] = [];
     for (const f of FORT_MASON_PILES) {
       const sh = new THREE.Shape(); f.pts.forEach((p, i) => i ? sh.lineTo(p.x, p.y) : sh.moveTo(p.x, p.y));
       const g = new THREE.ExtrudeGeometry(sh, { depth: D, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, PIER_DECK - D, 0); decks.push(g);
-      // the piles on a grid along the pier (from its bulkhead end toward its end), kept a little inside the deck's edge
-      const a = f.pts[0], e = f.pts.reduce((m, p) => Math.hypot(p.x - a.x, p.y - a.y) > Math.hypot(m.x - a.x, m.y - a.y) ? p : m, a);
-      const L = Math.hypot(e.x - a.x, e.y - a.y), u = { x: (e.x - a.x) / L, y: (e.y - a.y) / L }, n = { x: -u.y, y: u.x };
-      for (let s = -10; s <= L + 10; s += PITCH) for (let t = -20; t <= 20; t += PITCH) {
-        const q = { x: a.x + u.x * s + n.x * t, y: a.y + u.y * s + n.y * t };
-        if (inPoly(q, f.pts) && f.pts.every((p, i) => segPt(q, p, f.pts[(i + 1) % f.pts.length]) > 0.6)) at.push(P3(q.x, q.y, 0));
+      // the pier's own axis: along its longest side, toward its end; across it, its own width
+      const n0 = f.pts.length, side = f.pts.map((p, i) => [p, f.pts[(i + 1) % n0]]).sort(([a1, b1], [a2, b2]) => Math.hypot(b2.x - a2.x, b2.y - a2.y) - Math.hypot(b1.x - a1.x, b1.y - a1.y))[0];
+      const sl = Math.hypot(side[1].x - side[0].x, side[1].y - side[0].y); let u = { x: (side[1].x - side[0].x) / sl, y: (side[1].y - side[0].y) / sl };
+      const cen = f.pts.reduce((m, p) => ({ x: m.x + p.x / n0, y: m.y + p.y / n0 }), { x: 0, y: 0 });
+      if (u.y < 0) u = { x: -u.x, y: -u.y }; // (toward the Bay, north)
+      const nrm = { x: u.y, y: -u.x }, along = f.pts.map(p => (p.x - cen.x) * u.x + (p.y - cen.y) * u.y), across = f.pts.map(p => (p.x - cen.x) * nrm.x + (p.y - cen.y) * nrm.y);
+      const a0 = Math.min(...along), a1 = Math.max(...along), c0 = Math.min(...across), c1 = Math.max(...across), mid = (c0 + c1) / 2;
+      // the columns: rows along the pier, the outer rows a little in from the deck's edge
+      for (let s2 = a0 + 2; s2 <= a1 - 1; s2 += PITCH) for (let t = c0 + 1.2; t <= c1 - 1.1; t += Math.max(4, (c1 - c0 - 2.3) / Math.max(1, Math.round((c1 - c0 - 2.3) / PITCH)))) {
+        const q = { x: cen.x + u.x * s2 + nrm.x * t, y: cen.y + u.y * s2 + nrm.y * t };
+        if (inPoly(q, f.pts) && f.pts.every((p, i) => segPt(q, p, f.pts[(i + 1) % n0]) > 0.8)) at.push(P3(q.x, q.y, 0));
       }
+      // the shed: its own width less a metre a side, from a few metres in from the shore end to 6 m short of the pier's end
+      const w = c1 - c0 - 2, len = a1 - a0 - 12, cS = a0 + 6 + len / 2, c = { x: cen.x + u.x * cS + nrm.x * mid, y: cen.y + u.y * cS + nrm.y * mid };
+      const ht = HEIGHT[f.name] ?? 13, wall = shedWall(len, ht, false), sign = f.name === "Fort Mason's Pier 3" ? shedWall(len, ht, true) : wall, end = shedWall(w, ht, false), roof = lam(0x8e8c86);
+      // (BoxGeometry's faces: +x, −x, +y, −y, +z, −z; turned to the pier, −x faces west)
+      const shed = new THREE.Mesh(new THREE.BoxGeometry(w, ht, len), [wall, sign, roof, roof, end, end]);
+      shed.position.copy(P3(c.x, c.y, PIER_DECK + ht / 2)); shed.rotation.y = -Math.atan2(u.x, u.y); grp.add(shed);
     }
     grp.add(new THREE.Mesh(mergeGeometries(decks), deckMat));
-    const piles = new THREE.InstancedMesh(new THREE.CylinderGeometry(R, R, PIER_DECK - D + 4, 8), pileMat, at.length), m = new THREE.Matrix4();
-    at.forEach((v, i) => piles.setMatrixAt(i, m.makeTranslation(v.x, (PIER_DECK - D - 4) / 2, v.z))); // (from 4 m down to the deck's underside)
+    // a column and its flared cap, from 4 m below the surface to the deck's underside
+    const colH = PIER_DECK - D + 4, capH = 0.9;
+    const col = mergeGeometries([new THREE.CylinderGeometry(R, R, colH - capH, 12).translate(0, (colH - capH) / 2 - 4, 0), new THREE.CylinderGeometry(R * 2.2, R, capH, 12).translate(0, colH - capH / 2 - 4, 0)]);
+    const piles = new THREE.InstancedMesh(col, colMat, at.length), m = new THREE.Matrix4();
+    at.forEach((v, i) => piles.setMatrixAt(i, m.makeTranslation(v.x, 0, v.z)));
     grp.add(piles);
   }
 
@@ -773,4 +777,20 @@ function mergeByMaterial(g: THREE.Group, mats: THREE.Material[]): void {
     for (const m of parts) { m.parent!.remove(m); m.geometry.dispose(); }
     const one = new THREE.Mesh(merged, mat); one.castShadow = false; one.receiveShadow = false; g.add(one);
   }
+}
+
+/** A Fort Mason shed's wall, `len` m long and `ht` m high: white, three rows of red-framed windows (the photos), and on
+ * Pier 3's west face FORT MASON along its top. */
+function shedWall(len: number, ht: number, lettered: boolean): THREE.Material {
+  const px = 8, W = Math.min(4096, Math.round(len * px)), H = Math.round(ht * px * 2) / 2 * 2;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d')!;
+  const s = W / len; // (pixels a metre)
+  c.fillStyle = '#ebe8e0'; c.fillRect(0, 0, W, H);
+  for (const [y0, wh] of [[0.5, 0.16], [0.3, 0.12], [0.12, 0.1]] as const) for (let x = 2; x < len - 3; x += 6) { // (three rows, the top one below the lettering's band, as in the photo)
+    c.fillStyle = '#7c3a2c'; c.fillRect(x * s, H - (y0 + wh) * H, 4 * s, wh * H);
+    c.fillStyle = '#4c5458'; c.fillRect(x * s + 3, H - (y0 + wh) * H + 3, 4 * s - 6, wh * H - 6);
+  }
+  if (lettered) { c.fillStyle = '#1c1c1c'; c.font = `bold ${Math.round(H * 0.22)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; const letters = 'FORT MASON'.split(''), step = W * 0.7 / letters.length; letters.forEach((ch, i) => c.fillText(ch, W * 0.15 + step * (i + 0.5), H * 0.18)); } // (big, along the top, between the roof and the windows)
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  return new THREE.MeshLambertMaterial({ map: tex });
 }

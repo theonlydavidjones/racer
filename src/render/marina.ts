@@ -4,6 +4,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { BREAKWATER_W, FINGER_W, HARBORS, WALKWAY_W, mooredIn, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
 import type { Vec } from '../core/math';
 import { P3 } from './coords';
+import enc from '../geo/data/enc-chart.json';
+import { LL } from '../geo/geo';
 import { MAX_BEAM, MOORED, powerParts, sailParts } from './mooredBoats';
 import type { MooredKind } from '../geo/marina';
 
@@ -131,6 +133,7 @@ export class Harbor {
   private boats: SlipBoats[] = [];
 
   constructor(scene: THREE.Scene) {
+    harborLights.length = 0; // (this scene's lights only)
     const deck = new THREE.MeshLambertMaterial({ map: deckTexture(), side: THREE.DoubleSide });
     const fascia = new THREE.MeshLambertMaterial({ color: 0x6b5442, side: THREE.DoubleSide });
     const rock = new THREE.MeshLambertMaterial({ color: 0x8a8176 });
@@ -209,16 +212,30 @@ export class Harbor {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
       this.group.add(new THREE.Mesh(g, paved));
     }
-    // the entrance beacons: a red triangle (Q R) or a green square on a post, with its light
+    // the entrance beacons, as NOAA's chart has them (enc-chart.json aids: the nearest charted beacon with a light): a post with
+    // its daymark where the chart gives one (TOPSHP: a red triangle, a green square), and its light, flashing at night in its
+    // charted character (lightOn). Gashouse Cove's, San Francisco East Yacht Harbor Light 2 (Iso R 6s, 4 m, no topmark), stands
+    // on a small platform on piles at its seawall's end with the harbor's IDLE SPEED / NO WAKE ZONE sign (the owner's photo,
+    // reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg)
     for (const bc of H.beacons) {
       const g = new THREE.Group(), red = bc.colour === 'red', mat = new THREE.MeshLambertMaterial({ color: red ? 0xc8302a : 0x2e8a4a, side: THREE.DoubleSide });
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 6.4, 8), new THREE.MeshLambertMaterial({ color: 0xd9d6cf })); post.position.y = 3.2; g.add(post);
-      const mark = new THREE.Mesh(red ? new THREE.CircleGeometry(0.75, 3) : new THREE.PlaneGeometry(1.1, 1.1), mat); mark.position.y = 5.4; if (red) mark.rotation.z = Math.PI / 2; g.add(mark);
-      const mark2 = mark.clone(); mark2.rotation.y = Math.PI / 2; g.add(mark2);
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: red ? 0xff4a3a : 0x4aff7a })); lamp.position.y = 6.5; g.add(lamp);
-      // Gashouse Cove's (the East Harbor's) red beacon, on its seawall's end: the harbor's IDLE SPEED / NO WAKE board on the
-      // post below the daymark, both ways, to the boats coming in and going out
-      if (H.id === 'gashouse-cove' && red) for (const ry of [0, Math.PI]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.9), noWakeBoard()); b.position.y = 3.4; b.rotation.y = ry; b.translateZ(0.16); g.add(b); }
+      const aid = chartedLight(bc.p), lit = aid?.lit?.[0], h = lit?.h ?? 6.5;
+      if (H.id === 'gashouse-cove' && red && aid && aid.top == null) {
+        const conc = new THREE.MeshLambertMaterial({ color: 0xb9b3a6 }), steel = new THREE.MeshLambertMaterial({ color: 0x6f5a48 });
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(3, 0.35, 3), conc); deck.position.y = 2.6; g.add(deck); // (the platform, about the seawall's top)
+        for (const [x, z] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) { const pl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 4.4, 8), steel); pl.position.set(x, 0.4, z); g.add(pl); }
+        for (const [x, z, w, d] of [[0, -1.45, 3, 0.05], [0, 1.45, 3, 0.05], [-1.45, 0, 0.05, 3], [1.45, 0, 0.05, 3]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), new THREE.MeshLambertMaterial({ color: 0xd8d6d0 })); r.position.set(x, 3.75, z); g.add(r); }
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, h - 2.8, 6), steel); mast.position.set(0.9, 2.8 + (h - 2.8) / 2, 0.9); g.add(mast);
+        for (const ry of [0, Math.PI]) { const sgn = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.3), noWakeBoard()); sgn.position.y = 3.4; sgn.rotation.y = ry; sgn.translateZ(1.55); g.add(sgn); }
+        const lamp = lampOf(red, lit); lamp.position.set(0.9, h, 0.9); g.add(lamp);
+      } else {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, h - 0.1, 8), new THREE.MeshLambertMaterial({ color: 0xd9d6cf })); post.position.y = (h - 0.1) / 2; g.add(post);
+        if (!aid || aid.top != null) { // (a daymark only where the chart has one, or where there's no charted light to say)
+          const mark = new THREE.Mesh(red ? new THREE.CircleGeometry(0.75, 3) : new THREE.PlaneGeometry(1.1, 1.1), mat); mark.position.y = h - 1.1; if (red) mark.rotation.z = Math.PI / 2; g.add(mark);
+          const mark2 = mark.clone(); mark2.rotation.y = Math.PI / 2; g.add(mark2);
+        }
+        const lamp = lampOf(red, lit); lamp.position.y = h; g.add(lamp);
+      }
       g.position.copy(P3(bc.p.x, bc.p.y, 0)); this.group.add(g);
     }
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
@@ -236,14 +253,60 @@ export class Harbor {
   }
 }
 
-/** The harbor's IDLE SPEED / NO WAKE board: black letters on white in an orange border (the US regulatory-marker look). */
+/** The harbor's sign, as in the owner's photo: IDLE SPEED in white on red, over NO WAKE ZONE in black on white. */
 let noWake: THREE.Material | null = null;
 function noWakeBoard(): THREE.Material {
   if (noWake) return noWake;
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 192; const c = cv.getContext('2d')!;
-  c.fillStyle = '#f4f2ea'; c.fillRect(0, 0, 256, 192); c.strokeStyle = '#e06a12'; c.lineWidth = 12; c.strokeRect(6, 6, 244, 180);
-  c.fillStyle = '#111'; c.font = 'bold 48px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText('IDLE SPEED', 128, 68); c.fillText('NO WAKE', 128, 126);
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 280; const c = cv.getContext('2d')!;
+  c.fillStyle = '#f4f2ea'; c.fillRect(0, 0, 256, 280);
+  c.fillStyle = '#c8261e'; c.fillRect(8, 8, 240, 124);
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 50px Arial, sans-serif';
+  c.fillStyle = '#ffffff'; c.fillText('IDLE', 128, 46); c.fillText('SPEED', 128, 98);
+  c.fillStyle = '#111111'; c.font = 'bold 44px Arial, sans-serif'; c.fillText('NO WAKE', 128, 180); c.fillText('ZONE', 128, 232);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
   return noWake = new THREE.MeshLambertMaterial({ map: tex });
+}
+
+/** A charted light's character (S-57 LIGHTS: LITCHR, SIGGRP, SIGPER, HEIGHT above MHW). */
+type ChartLight = { chr: number; col?: number[]; grp?: string; per?: number; h?: number };
+type ChartAid = { k: string; p: [number, number]; name?: string; top?: number; lit?: ChartLight[] };
+const BEACONS = ((enc as unknown as { aids: ChartAid[] }).aids).filter(a => a.k === 'beacon' && a.lit?.length).map(a => ({ a, v: LL(a.p[1] / 1e5, a.p[0] / 1e5) }));
+/** The charted beacon with a light nearest a harbor's beacon, within 40 m (OpenStreetMap's and NOAA's positions differ by metres). */
+function chartedLight(p: Vec): ChartAid | null {
+  let best: ChartAid | null = null, bd = 40;
+  for (const { a, v } of BEACONS) { const d = Math.hypot(v.x - p.x, v.y - p.y); if (d < bd) { bd = d; best = a; } }
+  return best;
+}
+/** The harbors' lights, shown at night in their charted character (scene.ts: harborLights, lightOn). */
+export const harborLights: { obj: THREE.Object3D; lit: ChartLight | null }[] = [];
+function lampOf(red: boolean, lit: ChartLight | undefined): THREE.Object3D {
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: red ? 0xff4a3a : 0x4aff7a }));
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), new THREE.MeshBasicMaterial({ color: red ? 0xff2a1a : 0x2aff5a, transparent: true, opacity: 0.85, depthWrite: false }));
+  const g = new THREE.Group(); g.add(lamp, glow); harborLights.push({ obj: glow, lit: lit ?? null });
+  return g;
+}
+/**
+ * Whether a light with this charted character is lit at time t (s): the US Light List's characters (S-57 LITCHR: 1 fixed,
+ * 2 flashing, 3 long-flashing, 4 quick, 5 very quick, 7 isophase, 8 occulting), its period (SIGPER) and group (SIGGRP,
+ * e.g. "(2)", "(2+1)"). Flash lengths are ESTIMATES within the Light List's definitions: a flash 0.5 s (long flash 2 s),
+ * a quick flash 0.3 s of each second, very quick 0.2 of each half second; isophase half its period lit; an occulting
+ * light's eclipse a quarter of its period.
+ */
+export function lightOn(lit: ChartLight | null, t: number): boolean {
+  if (!lit) return true;
+  const per = lit.per ?? 4, ph = ((t % per) + per) % per;
+  const groups = (lit.grp?.match(/\(([^)]*)\)/)?.[1] ?? '1').split('+').map(Number).filter(n => n > 0);
+  switch (lit.chr) {
+    case 1: return true;
+    case 4: return (t % 1) < 0.3;
+    case 5: return (t % 0.5) < 0.2;
+    case 7: return ph < per / 2;
+    case 8: return ph > per / 4;
+    case 2: case 3: {
+      const len = lit.chr === 3 ? 2 : 0.5, gap = 1; let at = 0;
+      for (const n of groups) { for (let i = 0; i < n; i++) { if (ph >= at && ph < at + len) return true; at += len + gap; } at += gap; }
+      return false;
+    }
+    default: return true;
+  }
 }
