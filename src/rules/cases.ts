@@ -71,6 +71,8 @@ function sail(from: [number, number], hOf: (t: number) => number, v: number, t0:
   }
   return out;
 }
+/** Where a boat on heading h at 2.5 m/s was `dt` seconds before she reaches the origin. */
+const back = (h: number, dt: number, v = 2.5): [number, number] => off([0, 0], h, -v * dt);
 const mark = (side: 's' | 'p', beat: boolean, p: [number, number] = [0, 0]): RulesMark => ({ name: 'M', p: { x: p[0], y: p[1] }, type: 'round', side, beat });
 
 const W14 = off([0, 0], 200, -1, -6), hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
@@ -153,14 +155,16 @@ export const CASES: RulesCase[] = [
     momentT: 50, ask: 'foul', answer: { who: 'AS', rule: '13', line: 'AS tacked too close: past head to wind and not yet close-hauled, she keeps clear (13).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
   },
   {
-    case: 43, title: 'Along a bank, meeting a starboard boat', rules: ['10', '19'], bank: { d: 2, n: { x: -1, y: 0 } },
+    case: 43, title: 'Along a bank, meeting a starboard boat', rules: ['10', '19'], bank: { d: 2, n: { x: Math.SQRT1_2, y: -Math.SQRT1_2 } },
+    // (sailed: both at 2.5 m/s on their headings, meeting at the origin at 52 s; P along the bank, 2 m off her port side)
     boats: [
-      { letter: 'S', frames: [at(50, [0, 0], 315)] },
-      { letter: 'P', frames: [at(50, [-7, -8], 45), at(52, [-2.5, -2.5], 45)] },
+      { letter: 'S', frames: [at(45.9, back(315, 52 - 45.9), 315, { look: false }), ...sail(back(315, 52 - 45.9), () => 315, 2.5, 46, 54)] },
+      { letter: 'P', frames: [at(45.9, back(45, 52 - 45.9), 45, { look: false }), ...sail(back(45, 52 - 45.9), () => 45, 2.5, 46, 54)] },
     ],
-    pair: ['S', 'P'], checks: [{ t: 50, keepsClear: 'P', rule: '10' }],
-    momentT: 50, ask: 'foul', answer: { who: 'P', rule: '10', line: 'Port keeps clear (10). Beating on opposite tacks they aren\'t overlapped, so the bank gives her no room under 19.2(b).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['S', 'P'], checks: [{ t: 46, keepsClear: 'P', rule: '10' }],
+    momentT: 48, ask: 'foul', answer: { who: 'P', rule: '10', line: 'Port keeps clear (10). Beating on opposite tacks they aren\'t overlapped, so the bank gives her no room under 19.2(b).' }, teach: true,
   },
+
   {
     case: 53, title: 'Overlapped from astern, a boat nearly stopped', rules: ['15', '11'],
     boats: [
@@ -177,8 +181,9 @@ export const CASES: RulesCase[] = [
       { letter: 'P', frames: [at(50, [-2, -10], 60), at(52, [-2.5, -2.3], 80)] },
     ],
     pair: ['S', 'P'], checks: [{ t: 50, keepsClear: 'P', rule: '10' }],
-    momentT: 50, ask: 'foul', answer: { who: 'S', rule: '16.2', line: 'On a beat, once port is ducking her, starboard mustn\'t bear away so that port has to change course at once (16.2).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    momentT: 50, ask: 'foul', answer: { who: 'S', rule: '16.2', line: 'On a beat, once port is ducking her, starboard mustn\'t bear away so that port has to change course at once (16.2).' }, teach: false, why: 'sailed, the 16.2 answer holds only within a meter or so of this geometry (else port\'s 10): not a clear lesson yet',
   },
+
   {
     case: 105, title: 'Running side by side, starboard luffs', rules: ['10', '16.1'],
     boats: [
