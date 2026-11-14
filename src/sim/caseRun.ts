@@ -14,8 +14,9 @@ import type { RuleId } from '../rules/types';
  * of its pair. */
 export const caseHelm = (c: RulesCase): string => c.boats.some(b => b.letter === c.answer.who) ? c.answer.who : c.pair[0];
 
-/** Seconds sailed before the moment: enough to feel her and settle on the course (the trainer shows 12). */
-export const CASE_LEAD = 20;
+/** Seconds sailed before the moment, as the trainer shows it: time to feel her and settle (much longer, and her own speed
+ * against the diagram's carries her off its geometry). */
+export const CASE_LEAD = 12;
 /** Seconds after the Case's last frame before it's called: the boats sail on as they were. */
 export const CASE_AFTER = 10;
 
@@ -43,7 +44,7 @@ export class CaseRun {
   constructor(c: RulesCase, readonly turn: number, readonly origin: Vec) {
     this.c = c; this.helm = caseHelm(c);
     const first = Math.min(...c.boats.map(b => b.frames.find(f => f.look !== false)?.t ?? b.frames[0].t));
-    this.t0 = Math.max(first, c.momentT - CASE_LEAD);
+    this.t0 = Math.min(first, c.momentT - CASE_LEAD); // (before her first frame she sails in from where her first heading and speed had her)
     this.endT = Math.max(...c.boats.map(b => b.frames[b.frames.length - 1].t)) + CASE_AFTER;
   }
 
@@ -56,8 +57,8 @@ export class CaseRun {
   /** A boat of the Case at the World's time t: where she is, her heading and speed (m/s), and the frame she's sailing to
    * (for what it says of her: sailing above her proper course). After her last frame she sails on as she was. */
   pose(letter: string, t: number): { p: Vec; h: number; v: number; f: CaseFrame } {
-    const F = this.c.boats.find(b => b.letter === letter)!.frames, ct = this.t0 + t, last = F[F.length - 1];
-    const q = ct > last.t ? { x: last.x + V(last.h).x * (last.v ?? speedAt(F, last.t)) * (ct - last.t), y: last.y + V(last.h).y * (last.v ?? speedAt(F, last.t)) * (ct - last.t), h: last.h } : poseAt(F, ct);
+    const F = this.c.boats.find(b => b.letter === letter)!.frames, ct = this.t0 + t, last = F[F.length - 1], f0 = F[0];
+    const q = ct < f0.t ? { x: f0.x - V(f0.h).x * speedAt(F, f0.t) * (f0.t - ct), y: f0.y - V(f0.h).y * speedAt(F, f0.t) * (f0.t - ct), h: f0.h } : ct > last.t ? { x: last.x + V(last.h).x * (last.v ?? speedAt(F, last.t)) * (ct - last.t), y: last.y + V(last.h).y * (last.v ?? speedAt(F, last.t)) * (ct - last.t), h: last.h } : poseAt(F, ct);
     const f = F.find(k => k.t >= ct) ?? last;
     return { p: this.at(q), h: (q.h + this.turn + 360) % 360, v: speedAt(F, ct), f };
   }
@@ -76,8 +77,21 @@ function speedAt(F: CaseFrame[], t: number): number {
 }
 
 export const caseById = (n: number | undefined): RulesCase | undefined => CASES.find(c => c.case === n);
-/** The Cases you can sail: taught ones without marks or a bank (the World's own marks and shore aren't the Case's yet). */
-export const sailable = (c: RulesCase): boolean => c.teach && !c.marks?.length && !c.bank;
+/** Cases not yet sailable, and why (the hover on the trainer's button): sailed as drawn, they don't come out as the Case
+ * does, over seeds and tides (tests/caseRun.test.ts). A real Folkboat isn't the diagram's: in 13 she reaches at 2.9 m/s
+ * where W is drawn at 2.0, and L's luff finds her elsewhere; in 11 her leeway against the pinned tracks shifts the
+ * three-boat touch it turns on; in 105 she's dead downwind and her tack, taken from her heading (boat/physics.ts), flips
+ * with each shift where the rules take it from her mainsail's side (Definitions, Leeward and Windward). */
+export const NOT_YET: Record<number, string> = {
+  11: 'Not yet: the three boats\' timing is too fine for a real boat',
+  13: 'Not yet: a real boat reaches faster than the Case\'s W',
+  105: 'Not yet: dead downwind, her tack needs her mainsail\'s side'
+};
+/** The Cases you can sail: taught ones without marks or a bank (the World's own marks and shore aren't the Case's yet),
+ * that come out as the Case does when sailed as drawn. */
+export const sailable = (c: RulesCase): boolean => c.teach && !c.marks?.length && !c.bank && !(c.case in NOT_YET);
+/** Why a Case can't be sailed yet: one short line for the button's hover. */
+export const notSailableWhy = (c: RulesCase): string => NOT_YET[c.case] ?? 'Not yet: this Case needs its marks or shore on the water';
 
 /** A foul as a race's incident card titles it (rules/explain.ts): 'Rule 11 · Same tack, overlapped'. */
 export const foulTitle = (f: { rule: RuleId; part?: string }): string => RULES[f.rule]?.[0] ?? `Rule ${f.part ?? f.rule}`;

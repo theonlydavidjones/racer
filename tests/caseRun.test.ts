@@ -47,11 +47,6 @@ describe('Sail it yourself: a Case on the water', () => {
     expect(sail(caseWorld(7), (t, h) => t > 44 ? h + 25 : h)).toMatchObject({ result: 'clear', fouls: [] });
   });
 
-  it('Case 105: P keeping clear of S\'s luff sails it clear; turning toward her doesn\'t', () => {
-    expect(sail(caseWorld(105), (t, h) => t > 49 ? h - 25 : h).result).toBe('clear');
-    expect(sail(caseWorld(105), (t, h) => t > 49 ? h + 25 : h).result).toBe('foul');
-  });
-
   it('touched, the Case\'s boat is a boat, not a pinned wall: she sails free from the contact, and it\'s said so', () => {
     const w = caseWorld(7), R = w.caseRun!, u = w.user;
     let touched = -1;
@@ -71,10 +66,20 @@ describe('Sail it yourself: a Case on the water', () => {
     expect(sail(caseWorld(11), (_t, h) => h).aiPenalty).toBe(0);
   });
 
-  it('sailable: taught Cases without marks or a bank; the helm is a boat of the Case', () => {
-    const s = CASES.filter(sailable).map(c => c.case);
-    expect(s).toEqual(expect.arrayContaining([7, 11, 13, 14, 23, 27, 53, 105]));
+  it('sailable: taught Cases without marks or a bank that come out as the Case does; the helm is a boat of the Case', () => {
+    expect(CASES.filter(sailable).map(c => c.case).sort((a, b) => a - b)).toEqual([7, 14, 23, 27, 53]);
     for (const c of CASES.filter(c => c.marks?.length || c.bank)) expect(sailable(c)).toBe(false);
     for (const c of CASES) expect(c.boats.some(b => b.letter === caseHelm(c))).toBe(true);
+  });
+
+  it('each sailable Case, sailed as drawn (the helm on her Case course), comes out as the Case does: her foul, under its rule, or clear', () => {
+    for (const c of CASES.filter(sailable)) for (const seed of [3, 7]) {
+      const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'lesson', lesson: 'case', rulesCase: c.case, sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0 }, seed, { freeSail: true });
+      const r = sail(w, (_t, h) => h), f = r.fouls[0], got = f ? f.part ?? f.rule : 'clear';
+      // (Case 27: tacking too close, she's called while still tacking, 13, or just done, 15, by how her own speed times it:
+      // the Case's point, AS keeps clear, either way)
+      const want = c.answer.who === 'neither' ? ['clear'] : c.case === 27 ? ['13', '15'] : [c.answer.rule];
+      expect(want, `Case ${c.case}, seed ${seed}`).toContain(got);
+    }
   });
 });

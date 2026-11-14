@@ -1,5 +1,5 @@
 import { CASES, poseAt, type RulesCase } from '../rules/cases';
-import { caseHelm, sailable } from '../sim/caseRun';
+import { caseHelm, notSailableWhy, sailable } from '../sim/caseRun';
 
 /**
  * The Rules trainer (the owner's go, 13 Nov 2026; design/rules-trainer-mockup.png): a World Sailing Case (The Case Book
@@ -52,7 +52,7 @@ export class RulesTrainer {
         <div class="rtChoices">${who.map(w => `<button type="button" class="rtChoice" data-who="${w}" disabled>${w === 'neither' ? 'Neither' : w}</button>`).join('')}</div>
         <div class="rtAnswer" hidden></div>
         <div class="rtSailed" hidden></div>
-        <div class="btnrow"><button type="button" class="ghost" data-rt="again">Watch again</button><button type="button" class="ghost" data-rt="sail" disabled${sailable(c) ? ` title="You helm ${caseHelm(c)}"` : ' title="Not yet: this Case needs its marks or shore on the water"'}>Sail it yourself</button><button type="button" class="cta" data-rt="next">Next Case</button></div>
+        <div class="btnrow"><button type="button" class="ghost" data-rt="again">Watch again</button><button type="button" class="ghost" data-rt="sail" disabled${sailable(c) ? ` title="You helm ${caseHelm(c)}"` : ` title="${notSailableWhy(c)}"`}>Sail it yourself</button><button type="button" class="cta" data-rt="next">Next Case</button></div>
         <details class="thow"><summary>The source</summary><p>World Sailing, The Case Book for 2025–2028, Case ${c.case}; the boats placed from its diagram.</p></details>
       </div>`;
     this.cv = this.el.querySelector('canvas')!;

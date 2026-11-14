@@ -445,7 +445,7 @@ export class World {
     const rc = settings.mode === 'lesson' && settings.lesson === 'case' ? caseById(settings.rulesCase) : undefined;
     if (rc) { // (the Case laid out where she'd start, turned to the wind there)
       const o = getPlace(settings.sailFrom)?.p ?? this.C.center;
-      this.caseRun = new CaseRun(rc, this.windHere(o, undefined, false).from, o);
+      this.caseRun = new CaseRun(rc, windOnWater(this.windHere(o, undefined, false), this.currentAt(o, true)).from, o); // (the wind on the water, the current's in it: what she sails by)
     }
     for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     if (this.caseRun) this.placeCase();
@@ -923,6 +923,11 @@ export class World {
       d.x += b.cur.x * dt; d.y += b.cur.y * dt;
       b.x = q.p.x + d.x; b.y = q.p.y + d.y; b.h = q.h; b.desired = q.h; b.v = q.v;
       b.vx = u.x * q.v + b.cur.x; b.vy = u.y * q.v + b.cur.y; b.turnRate = 0;
+      // running, within 30° of dead downwind, her tack is her mainsail's side (Definitions, Leeward and Windward: "when sailing
+      // by the lee or directly downwind, her leeward side is the side on which her mainsail lies"), the Case's: a shift of a
+      // few degrees across her stern doesn't jibe her
+      const rel = wrap(R.turn - q.h);
+      if (Math.abs(rel) > 150) b.tack = q.f.tack ?? (rel >= 0 ? 'S' : 'P');
     }
   }
   /** After the rules have looked: your fouls, and the Case called once its sailing's over. */
@@ -1042,7 +1047,7 @@ export class World {
     this.trackCourses();
     this.shipEncounters();
     // (a Case's boat sails above her proper course where the Case says so, rule 17: the Case's call, not the sim's)
-    if (this.caseRun) for (const b of this.boats) if (b.script && !this.caseRun.free.includes(b.script)) b.aboveProper = !!this.caseRun.pose(b.script, this.t).f.aboveProper;
+    if (this.caseRun) for (const b of this.boats) if (b.script && !this.caseRun.free.includes(b.script)) b.aboveProper = b.started && !!this.caseRun.pose(b.script, this.t).f.aboveProper; // (before her start she has none: Definitions, Proper Course)
     this.checkPairs();
     if (this.caseRun) this.caseStep();
     if (this.protestsOn) this.protestsStep();
