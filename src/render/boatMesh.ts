@@ -18,7 +18,7 @@ import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
-import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailShape } from './sails';
+import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 
 const V3 = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /**
@@ -1011,6 +1011,27 @@ const TOPMAST = MAST_TOP - DECK_AT_MAST - IG;
 const mastFwd = (h: number, bow: number, topAft: number) => h <= IG ? bow * Math.sin(Math.PI * Math.max(0, h) / IG)
   : -(Math.PI * bow / IG) * (h - IG) - topAft * ((h - IG) / TOPMAST) ** 2;
 const JIB_CLEW = JIB_DEF.clew; // in the jib pivot's frame
+/**
+ * What the jib's cloth lies against when the wind presses it toward the middle of the boat (backed, hove to or aback in
+ * a tack; its leech on a close-hauled jib): the mast, bent as it is, up to the hounds, and the two shrouds, chainplate
+ * to mast (a Folkboat has no spreaders: CR 7.10; the jumper struts are above the jib's head). Rods in the boat's frame,
+ * each radius the spar's or wire's half-width and the cloth's own few millimetres.
+ */
+export function jibRods(bow = 0, topAft = 0): SailObstacle[] {
+  const r = Math.max(MAST_FA, MAST_ATH) / 2 + 0.008, top = HOUNDS.y - DECK_AT_MAST, out: SailObstacle[] = [];
+  for (let i = 0; i < 3; i++) {
+    const h0 = top * i / 3, h1 = top * (i + 1) / 3;
+    out.push({ a: V3(0, DECK_AT_MAST + h0, MAST_Z - mastFwd(h0, bow, topAft)), b: V3(0, DECK_AT_MAST + h1, MAST_Z - mastFwd(h1, bow, topAft)), r });
+  }
+  for (const sx of [-1, 1]) out.push({ a: V3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), b: V3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z), r: 0.012 });
+  return out;
+}
+const jibInv = new THREE.Matrix4(), jibPose = new THREE.Matrix4();
+/** The jib's rods in the cloth's own frame: the pivot on the forestay turned by q, then the mesh's own matrix (its mirror to its side, and the hoist's squeeze along the stay). */
+export function jibObstacles(q: THREE.Quaternion, local: THREE.Matrix4, bow = 0, topAft = 0): SailObstacle[] {
+  jibInv.copy(jibPose.compose(FORESTAY_DECK, q, V3(1, 1, 1)).multiply(local)).invert();
+  return jibRods(bow, topAft).map(o => ({ a: o.a.applyMatrix4(jibInv), b: o.b.applyMatrix4(jibInv), r: o.r }));
+}
 // Cassette-tape telltales: old audio tape tied to the shrouds, about 1.4 m above the deck (low enough to
 // see from the cockpit). Dark brown and shiny, like the real thing.
 const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
@@ -1368,7 +1389,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     const jt0 = JIB_DEF.tack.length();
     jibShape.luff = { x: v.x * jibSgnNow, z: v.z, f: tt => { const u = (jt0 + tt * JIB_LUFF) / STAY_LEN; return 4 * u * (1 - u); } };
   }
-  m.main.update(mainShape); m.jib.update(jibShape);
+  m.main.update(mainShape);
   m.main.mesh.scale.x = Math.sign(b.boom || 1);
   // a backed jib lies to windward, but the wind still presses its belly to leeward, toward the mast
   const jibSgn = (b.jibBacked ?? 0) > 0 ? Math.sign(b.boom || 1) : Math.sign(b.jib || 1);
@@ -1384,6 +1405,9 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     jm.matrix.set(sx * (1 + k * a.x * a.x), k * a.x * a.y, k * a.x * a.z, 0, sx * k * a.y * a.x, 1 + k * a.y * a.y, k * a.y * a.z, 0, sx * k * a.z * a.x, k * a.z * a.y, 1 + k * a.z * a.z, 0, 0, 0, 0, 1);
     jm.matrixWorldNeedsUpdate = true;
   }
+  // (now its frame is known: the cloth against the mast and shrouds where the wind presses it onto them)
+  jibShape.obstacles = jibObstacles(m.jibPivot.quaternion, m.jib.mesh.matrix, rd.bow, rd.topAft);
+  m.jib.update(jibShape);
   // the cloth's front face looks along the mesh's +x, which the mirroring turns to starboard (+1) or port (−1)
   for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, jibSgn]] as const) {
     const mats = sail.mesh.material as THREE.MeshLambertMaterial[], pr = sailPics.get(mats[0]);
