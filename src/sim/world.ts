@@ -418,6 +418,7 @@ export class World {
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
+    if (this.lesson?.id === 'before') this.boats[0].lightsOff = true; // (Before you go: switching them on is a step)
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);

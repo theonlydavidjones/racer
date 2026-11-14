@@ -18,10 +18,11 @@ import { byHand } from '../boat/physics';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home';
+export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
+  { id: 'before', no: 2, title: 'Before you go', icon: '🦺', asa: '16, 17, 18, 21' },
   { id: 'tiller', no: 3, title: 'The tiller', icon: '🧭', asa: '24, 26, 27' },
   { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', asa: '22, 28–32' },
   { id: 'irons', no: 5, title: 'Stop, go, irons', icon: '🛑', asa: '25' },
@@ -75,7 +76,7 @@ export const LESSON_MARKS = {
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
   tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
-  breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor'
+  breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -123,6 +124,7 @@ export class LessonTracker {
     else if (this.id === 'heaveto') this.heaveTo(b, dt);
     else if (this.id === 'breeze') this.breeze(b, dt);
     else if (this.id === 'home') this.home(b);
+    else if (this.id === 'before') this.before(b);
     else this.turning(b, t, dt, hs);
     if (this.passed) { this.passedT = t; this.cue = 'Lesson passed ✓'; this.progress = 1; }
   }
@@ -209,6 +211,18 @@ export class LessonTracker {
     if (this.step === 0) { if (byHand(b, 'mainsheet')) { this.step = 1; this.cue = 'Close-hauled: keep her heel under 25°. Ease the main in the puffs'; } return; }
     const [lo, hi] = POINTS[0].band(b);
     if (this.hold(b.twa >= lo && b.twa <= hi && (b.heelMag ?? 0) < LESSON_MARKS.breezeHeel && b.v / KT > LESSON_MARKS.breezeKt, dt, LESSON_MARKS.breezeS)) this.passed = true;
+  }
+
+  /** Before you go: the dock card done (the page's command: the gear checked and the float plan left). */
+  ready(): void { if (this.id === 'before' && this.step === 0) { this.step = 1; this.cue = 'Navigation lights on'; } }
+
+  /** Before you go: at the dock, the gear and the float plan (the page's card), lights on (ASA 101 K17; she starts with
+   * them off), then both sails hoisted and off the dock. */
+  private before(b: Boat): void {
+    if (this.step === 1) { if (!b.lightsOff) { this.step = 2; this.cue = 'Hoist both sails and push off'; } return; }
+    if (this.step !== 2) return;
+    const up = !b.rig || (b.rig.mainUp && b.rig.jibUp && b.rig.main > 0.95 && b.rig.jib > 0.95);
+    if (up && !b.docked && this.slip && Math.hypot(b.x - this.slip.x, b.y - this.slip.y) > 30) this.passed = true;
   }
 
   /** Home to the slip: from her slip out past the harbor, and back in, made fast (world.ts intoSlip: stopped, bow in). */

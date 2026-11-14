@@ -24,3 +24,29 @@ export function lessonGridHtml(passed: readonly LessonId[]): string {
       + `<span class="lsNo">${l.no}</span><span class="lsIc">${l.icon}</span><b>${esc(l.title)}</b>${done ? '<span class="lsOk">✓</span>' : ''}</button>`;
   }).join('')}</div><div class="lsSum">${n} of 12</div>`;
 }
+
+/**
+ * Before you go (lesson 2; ASA 101 K16, K18, S21): the federally required gear for a 25 ft sailboat with an outboard on
+ * coastal waters, each a picture and a word, tapped to check it's aboard; then a three-field float plan, left with the
+ * club. The list follows the USCG's "A Boater's Guide to the Federal Requirements for Recreational Boats" (33 CFR 175:
+ * life jackets 175.15, a throwable at 16 ft and over; visual distress signals, day and night, on coastal waters 175.110;
+ * 33 CFR 83 Rule 33, a sound signal; a fire extinguisher, a boat with a closed cabin 175.300).
+ * TO VERIFY against uscgboating.org and ecfr.gov before this ships (the hosts are being allowed): the researcher's list
+ * came from memory, 14 Nov 2026.
+ */
+export const GEAR: { key: string; icon: string; name: string; tip: string }[] = [
+  { key: 'pfd', icon: '🦺', name: 'Life jackets', tip: 'One for each person aboard (33 CFR 175.15)' },
+  { key: 'throw', icon: '🛟', name: 'Throwable', tip: 'A ring or cushion to throw, at 16 ft and over (33 CFR 175.15)' },
+  { key: 'sound', icon: '📯', name: 'Horn', tip: 'A sound signal (33 CFR 83, Rule 33)' },
+  { key: 'flares', icon: '🧨', name: 'Flares', tip: 'Visual distress signals, day and night, on coastal waters (33 CFR 175.110)' },
+  { key: 'fire', icon: '🧯', name: 'Extinguisher', tip: 'A boat with a closed cabin (33 CFR 175.300)' }
+];
+export function dockCardHtml(checked: ReadonlySet<string>, crew: number): string {
+  const all = GEAR.every(g => checked.has(g.key));
+  return `<div class="lsGear">${GEAR.map(g => `<button type="button" class="lsTile lsG${checked.has(g.key) ? ' done' : ''}" data-gear="${g.key}" title="${esc(g.tip)}"><span class="lsIc">${g.icon}</span><b>${esc(g.name)}</b>${checked.has(g.key) ? '<span class="lsOk">✓</span>' : ''}</button>`).join('')}</div>
+    <div class="lsPlan${all ? '' : ' off'}"><div class="eyebrow">Float plan</div>
+      <label>Where<input data-fp="where" class="pick" placeholder="Angel Island and back"></label>
+      <label>Back by<input data-fp="back" class="pick" type="time" value="17:00"></label>
+      <label>Aboard<input data-fp="aboard" class="pick" type="number" min="1" max="6" value="${crew}"></label></div>
+    <div class="btnrow"><button type="button" class="cta" data-dock="go" ${all ? '' : 'disabled'}>Cast off</button></div>`;
+}
