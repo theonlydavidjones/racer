@@ -26,6 +26,6 @@ body.inLesson #coachTip{display:block!important;top:calc(env(safe-area-inset-top
   padding:10px 16px 14px;border-left:0;border-bottom:0;overflow:hidden}
 body.inLesson #coachTip.on{opacity:1}
 body.inLesson #coachTip::after{content:'';position:absolute;left:0;bottom:0;height:5px;width:calc(var(--p,0) * 100%);
-  background:#ffb35c;transition:width .45s linear}
-body.inLesson #coachTip.done::after{background:#3fd197}
+  background:var(--accent);transition:width .45s linear}
+body.inLesson #coachTip.done::after{background:var(--row)}
 body.inLesson #coachTip.flash{animation:msgflash 2s ease-out}
