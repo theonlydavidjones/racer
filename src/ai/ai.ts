@@ -269,6 +269,9 @@ function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
   return taken;
 }
 
+/** A right-of-way boat isn't held to her heading for another boat's room (Rule 16.1) with the land this close ahead on
+ * it, m: about 20 s at a Folkboat's 1.5 m/s close-hauled in a light breeze, time to tack before she's on it. */
+const SHORE_HOLD_M = 30;
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
  * a few metres wide is in the way even if the water beyond it is clear. */
 function blocked(w: World, b: Boat, h: number, d: number): boolean {
@@ -747,7 +750,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // keeping clear gybed away, became the leeward boat on the same tack, and at once steered back toward the boat that
   // now had to keep clear of her.) Not while she sails within the mark-room she's entitled to: rounding is her room
   // (Rule 21: exonerated for 15 and 16 there).
+  // (but not held on a heading that puts her on the land: holding on there isn't room she can give, and the room the
+  // rule asks for is room to keep clear, which the boat keeping clear still has; a boat held on starboard by a port
+  // boat close by sailed on into a breakwater at 1.7 m/s and lay pinned against it for the rest of the race)
+  const shoreAhead = blocked(w, b, b.h, SHORE_HOLD_M);
   for (const { o, dx, dy, r, cp } of near) {
+    if (shoreAhead) break;
     if (r.mr && !r.mr.ended && (r.mr.inside === b.id || r.mr.ahead === b.id)) continue;
     if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
     const ROOM = 8, need = Math.min(ROOM, clearanceOn(w, b, b.h, o));
