@@ -164,7 +164,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number;
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number;
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -198,7 +198,7 @@ export function deckHalf(z: number): number {
  * Sails' Nordic Folkboat tuning guide: the cabin-top lead 2.65 m from the forestay pin, the track centred 58 cm off the
  * centreline: on the cabin top about 0.6 m aft of the mast).
  */
-export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, cockpitAft: 2.5, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
+export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, cockpitAft: 1.88, cabinSide: 0.90, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
 /**
  * Deep downwind with the pole out in light air, the crew go right forward to put her bow down (the owner, who races
  * them: "normally people sit all the way up on the foredeck. usually one crew will sit in front of the forestay with both
@@ -208,12 +208,14 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, 
  */
 /**
  * Where the free crew sit fore and aft (the owner's choice, on the cockpit to the construction plan, render/hull.ts
- * COCKPIT_FIT): on the side benches (the bulkhead at 1.06 to St. 4¾ at 1.945) or the side deck beside them, and on aft
- * along the side deck past the thwart beside the after shelf, legs into the footwell or on the shelf: from the cockpit's
- * forward end (`Z.cockpitFwd`, the hips 1.35, half a shoulder's width clear of the bulkhead; out on the side deck, either
- * side of the jib winch: forward of it at `Z.deckFwd`, aft of it from `Z.winchAft`) to about 2.5 (`Z.cockpitAft`), short
- * of the helm at 2.95; two of
- * them a shoulder's width apart (`Z.gap`, 0.5 m). Their hiking arms are by the deck's half-breadth where each one is
+ * COCKPIT_FIT): on the side benches (the bulkhead at 1.06 to St. 4¾ at 1.945) or the side deck beside them, all forward
+ * of the thwart (its front face at 2.025): "front crew would be between the aft cabin wall and the winch, middle crew
+ * between the winch and the thwart, and the skipper behind the thwart. the area behind the thwart is pretty exclusively
+ * reserved for the skipper" (the owner, 14 Nov 2026). So from the cockpit's forward end (`Z.cockpitFwd`, the hips 1.35,
+ * half a shoulder's width clear of the bulkhead; out on the side deck, either side of the jib winch: forward of it at
+ * `Z.deckFwd`, aft of it at `Z.winchAft`) to the seat between the winch and the thwart (`Z.cockpitAft`, the same 1.88):
+ * weight aft, downwind and in light air, is the helm's, and the crew's only as far as that. Two of
+ * them a shoulder's width apart (`Z.gap`, 0.5 m), so two crew sit either side of the winch. Their hiking arms are by the deck's half-breadth where each one is
  * (`crewEdge`): narrower aft.
  */
 /**
@@ -236,11 +238,18 @@ export const DECK_ARM = 0.5;
  * (on a side deck, either side of the winch, never on it: a place within its pedestal's reach goes to the nearer side).
  * Two crew at most (settings.ts). */
 export const stationZ = (j: number, count: number, f: number, deck: boolean) => {
+  // two crew: their stations either side of the winch, or both forward of it when the weight's really wanted forward
+  // (f = 1: the front hand beside the cabin's after end, `Z.cabinSide`, the middle hand at `Z.deckFwd`). Nothing between:
+  // they don't slide along the boat (the owner, 14 Nov 2026: "mostly it'll be a, but in some cases when forward weight
+  // is really needed it can be b ... the fore/aft movement has been a key source of the jitteriness of the crew")
+  if (count === 2) return f >= TWO_FWD ? (j === 0 ? Z.cabinSide : Z.deckFwd) : j === 0 ? (deck ? Z.deckFwd : Z.cockpitAft - Z.gap) : Z.cockpitAft;
   const za = Z.cockpitAft - (count - 1 - j) * Z.gap, zf = Math.min(za, (deck ? Z.deckFwd : Z.cockpitFwd) + j * Z.gap);
   const z = za + (zf - za) * f;
   return deck && z > Z.deckFwd && z < Z.winchAft ? (z - Z.deckFwd < Z.winchAft - z ? Z.deckFwd : Z.winchAft) : z;
 };
 /** Within the jib winch's pedestal's reach on the side deck, fore and aft (between the seats either side of it). */
+/** Two crew forward of the winch together from this far along (stationZ's f): the band's Fwd and the foredeck. */
+const TWO_FWD = 0.999;
 export const atWinch = (z: number) => z > Z.deckFwd + 1e-6 && z < Z.winchAft - 1e-6;
 /** Whether crew member `i` (1…) is out on a side deck now. */
 const outOnDeck = (c: CrewState, i: number) => Math.abs(c.people[i]?.x ?? 1) > DECK_ARM;
@@ -472,7 +481,9 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     free.forEach(i => {
       const lo = leeArm(ppl[i], edges[i]);
       const arm = placed == null ? (crewFull ? maxOf(i) : clamp(crewArm, lo, maxOf(i))) : clamp(Number.isNaN(placed) ? sitOf(i) : placed, lo, maxOf(i));
-      tgt[i] = { arm, z: stationZ(seats.indexOf(i), seats.length, foreF, Math.abs(arm) > DECK_ARM), pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
+      // (two crew: each keeps their own station while the other is away, at the mast or a job: they don't shift along)
+      const deck = Math.abs(arm) > DECK_ARM, z = c.spec.crew.length === 2 ? stationZ(i - 1, 2, foreF, deck) : stationZ(seats.indexOf(i), seats.length, foreF, deck);
+      tgt[i] = { arm, z, pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
     });
     // the roll tack: as she luffs up they're out on the windward side (in light air, from sitting to leeward), so she rolls
     // to windward through the wind and comes out heeled on the new tack; they hold there, then everyone out hard
@@ -647,7 +658,8 @@ export const LAYOUT_STAY = 60;
  */
 function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 'cockpit' | 'mast' | 'foredeck' {
   const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, sea = k.sea ?? 0;
-  const cockpitZ = (j: number, count: number) => stationZ(j, count, foreF, outOnDeck(c, j + 1));
+  // (two crew: the one left in the cockpit keeps their own station: stationZ)
+  const cockpitZ = (j: number, count: number) => stationZ(j, n === 2 ? 2 : count, foreF, outOnDeck(c, j + 1));
   const dragAt = (v: number, zOf: (j: number) => number) => {
     let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
     return trimDrag(v, trimFromMoment(m0 + m), sea);
@@ -707,6 +719,8 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
 }
 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a crew good at trim. */
+/** Two crew move forward of the winch, or back to their stations, once it's been worth it this long (s): an estimate. */
+const TWO_DWELL = 120;
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   const n = c.spec.crew.length; if (!n) return 0.5;
   // (for the speed she's sailing at, over about a gust-lull cycle (c.vAvg), not a tack's slow few seconds: there it took
@@ -734,6 +748,17 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
     }
     return s;
   };
+  if (n === 2) {
+    // two crew: their stations, or both forward of the winch only when it has paid for minutes (light air upwind, say),
+    // never for a lull or a puff: they go once forward has been worth 0.1% for two minutes running, and come back once
+    // it hasn't for two minutes (estimates of practice; the owner: "I just don't see crew leaving the cabin very often")
+    const t = c.clock ?? 0, now = c.fore01 ?? 0, gain = score(1) - score(0), sk = smoothSkill(skill);
+    const better = sk > 0.5 && gain > 0.001;
+    if (better !== (now >= TWO_FWD)) { c.foreWantT ??= t; if (t - c.foreWantT >= TWO_DWELL) { c.fore01 = better ? 1 : 0; c.foreWantT = undefined; } }
+    else c.foreWantT = undefined;
+    c.fore01 ??= 0;
+    return c.fore01;
+  }
   let f = 0.5, top = -Infinity;
   for (let x = 0; x <= 1.0001; x += 0.125) { const sc = score(x); if (sc > top + 1e-9) { top = sc; f = x; } }
   const sk = smoothSkill(skill), want = 0.5 + (f - 0.5) * sk;
