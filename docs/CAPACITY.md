@@ -513,6 +513,43 @@ comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from o
 - **The owner's budget:** perf.test, and `--budget`, against v168 (425a5eb, the commit 43.1 was set on). v168 measured
   42.31 in the old units, so 43.1 is v168 × 43.1 / 42.31 = **v168 × 1.019**: the same budget, measured without the drift.
 
+## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
+
+v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):
+
+- **Not the worker's step.** Every step of 2 × 300 s of the perf race in Node: p50 0.82 / 0.84 ms, p99 3.7 / 3.7, p99.9
+  6.0 / 6.3, 12 steps over 8 ms in each. In the built page the worker's tasks peak at 20–32 ms in both.
+- **Not garbage collection.** The built page, 60 s of a race, two runs each, Chromium's trace: the page's minor GC pauses
+  2–5 ms at most, two major GCs a minute (longest 16 ms in v186, 22 ms in v188), the worker's at most 6 ms in both. The
+  heap starts about 25 MB higher in v188 (the new boat model).
+- **The frame's own cost.** perf.cjs's views: triangles +7–9% in six views, shader programs 205 → 215, the JS a frame
+  +10–25% in most views (the night start 20 → 41 ms by the Coordinator's run). A laptop runs the JS about 3× faster
+  than this host's headless page, so 40 ms here is about 13 ms there: with the GPU's share on top, past 16.7 ms, and
+  frames drop steadily, which reads as stutter everywhere.
+- **One older hitch, fixed:** the wind field's rebuild every 30 s of race time (World.buildField: 41 × 41 points, the
+  shore's distance to each) was an 18–40 ms step at each mark in the first race after load (the player's), before the
+  compiler warms. The distance is now kept per point (wind.ts shoreDistAt, exact): 2–4 ms. Also in the first race,
+  while the compiler warms (the pre-start's first 20 s): the very first step about 100 ms, the once-a-second work
+  15–30 ms.
+
+**What headless Chromium can and can't see.** It draws with SwiftShader, 1.4–2 s a frame, nearly all of it the page's
+thread waiting on the software GPU: frame times, and their 95th and 99th percentiles, mean nothing here. What holds: the
+renderer's counts (draw calls, triangles, programs), the same run to run, the best measure here of what the GPU is asked
+to do; the JS a frame, noisy (±5 ms; a run's outlier can double a view), paired back to back so the drift lands on both;
+and the heap. The real machine's frame times are the readout's (ui/perfMeter.ts: the ` key, F9 from v190).
+
+**The gate** (scripts/check/perf-ab.cjs): this tree's page and another version's, each from its own dev server, measured
+by perf.cjs's seven views alternately, two rounds, at half size (the same shape). It fails on draw calls or triangles
++5%, programs +5, the JS a frame +15% and 3 ms in two views or more (each side's least over the rounds), or the heap
++15 MB. v188 against v186 fails it on all four; v188 against itself passes (the counts and the heap identical, one
+view's JS +17% under load, which is why one view alone doesn't count). v189 (#313, the boat model's meshes merged)
+against v186 fails it on the GPU's side only: draw calls 1–11% fewer and the JS a frame 7–17% less, but triangles
++12–26% in six views (the night start 1.99 million, at perf.cjs's budget), programs 205 → 217, the heap +26 MB.
+Kept strict (the Coordinator, 14 Nov 2026): whether that many more triangles stutters on a laptop's GPU is for the
+readout on a real machine to say; if it doesn't, the triangles may count only near the budget. About 30 minutes; on a quiet host (a test
+suite beside it slows one side's runs more than the other's). Before publishing, the Coordinator runs it
+against the published version's commit (CLAUDE.md, Workflow).
+
 ## Method (to repeat these numbers)
 
 - The budget test: `npx vitest run tests/perf.test.ts --silent=false` (the ratio is in the log line: the median of three races, each one's after it).

@@ -5,14 +5,15 @@
  * the cockpit, the time she's shown at), each timed from the click to the end of the work it starts on the page's
  * thread: the handler and everything it queues, up to the next frame's start (the frame's own drawing, slow in the
  * software renderer, is the GPU's work on a real machine and isn't counted). Fails if any click's handler passes the
- * budget: 1500 ms here by default (headless, the software renderer sharing the cores: about 3× a laptop), which catches
- * the 8v regression (11–22 s a click here) with room for the noise. Each change still starts a new game and rebuilds every
- * boat (setup.newGame), 0.6–0.9 s here; the 50 ms the owner's editor wants needs it to rebuild only the boat edited.
+ * budget: 150 ms here by default, the owner's 50 ms a click on a real machine (headless, the software renderer sharing
+ * the cores, runs about 3× a laptop's time). A look-only change restyles her where she lies (app.ts lookOnly: only her
+ * mesh built again) and the time of day moves the showroom's clock; the work they hand on, once the race has taken the
+ * change, is timed by the page itself (performance.measure 'editor: …') and counted here.
  *   npm run build:artifact && node scripts/check/editor-perf.cjs [out-dir] [--budget=ms] [--profile]
  */
 const { chromium } = require('playwright'); const path = require('path'); const fs = require('fs');
 const root = path.join(__dirname, '../..'), out = process.argv.find((a, i) => i > 1 && !a.startsWith('--')) || '.';
-const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 1500), profile = process.argv.includes('--profile');
+const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 150), profile = process.argv.includes('--profile');
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } }); page.setDefaultTimeout(180000);
@@ -35,10 +36,15 @@ const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 
       const t0 = performance.now(); (0, eval)(src); const sync = performance.now() - t0;
       let work = 0; const lt = new PerformanceObserver(l => { for (const e of l.getEntries()) work += e.duration; }); lt.observe({ type: 'longtask', buffered: false });
       await new Promise(r => setTimeout(r, 1500)); lt.disconnect();
-      return { sync, after: work };
+      // (the work the click hands on, once the race has taken it: the restyled boat's mesh, or the new hour's light,
+      // measured by the page itself, app.ts)
+      const later = performance.getEntriesByType('measure').filter(e => e.name.startsWith('editor:') && e.startTime >= t0).reduce((a, e) => a + e.duration, 0);
+      performance.clearMeasures();
+      return { sync: sync + later, handler: sync, later, after: work };
     }, act);
     let prof = null; if (profile) { prof = (await cdp.send('Profiler.stop')).profile; fs.writeFileSync(path.join(out, `editor-${name}.cpuprofile`), JSON.stringify(prof)); }
-    console.log(`${name}: ${r.sync.toFixed(0)} ms in the click's handler; long tasks after it ${r.after.toFixed(0)} ms (frames included)`);
+    await page.screenshot({ path: path.join(out, `editor-${name}.png`) });
+    console.log(`${name}: ${r.sync.toFixed(0)} ms (${r.handler.toFixed(0)} in the click's handler, ${r.later.toFixed(0)} once the race took it); long tasks after it ${r.after.toFixed(0)} ms (frames included)`);
     return { name, ...r };
   };
   const res = [];
@@ -48,7 +54,7 @@ const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 
   res.push(await timed('cockpit', `(() => { const b = [...document.querySelectorAll('#boatPanel [data-act="cockpit"]')].find(x => x.getAttribute('aria-pressed') !== 'true'); b?.click(); })()`));
   res.push(await timed('time', `(() => { const e = document.getElementById('showTime'); e.value = String((+e.value + 180) % 1440); e.dispatchEvent(new Event('change', { bubbles: true })); })()`));
   const over = res.filter(r => r.sync > budget);
-  for (const r of over) console.log(`FAIL: ${r.name} took ${r.sync.toFixed(0)} ms in its handler (budget ${budget} ms)`);
+  for (const r of over) console.log(`FAIL: ${r.name} took ${r.sync.toFixed(0)} ms of the page's work (budget ${budget} ms)`);
   if (errs.length) console.log('page errors:', errs.slice(0, 3));
   await browser.close(); process.exit(over.length || errs.length ? 1 : 0);
 })();

@@ -224,6 +224,31 @@ export const BAYS: Bay[] = [
 const bayIn = (B: Bay, p: Vec): number => (p.x - B.q.x) * B.into.x + (p.y - B.q.y) * B.into.y;
 const inPolyV = (P: Vec[], p: Vec): boolean => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
 const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly, p)) return B; return null; };
+/**
+ * The tide's height (m above MLLW) at p and a time (ms UTC), for the water's depth over the chart's soundings. On each
+ * bay's depth grid (depthBand) it's that bay's own station's, the one the bay's stream fills it by (BAYS), so the water
+ * over a flat is the same to a boat's keel as to the current: Point San Quentin (9414873) on San Rafael Bay's (Corte
+ * Madera Creek's, 9414874, at the creek's mouth on the grid's south-west, has datums within a centimeter of it), and San
+ * Leandro Channel (9414724, inside the grid) on San Leandro Bay's. Both come 42–52 minutes after San Francisco, at
+ * 0.93–1.16 of its height (bay-tides.json, NOAA's offsets). Over a whole grid, to its edges: the tide just outside them
+ * isn't San Francisco's either (Point Orient's, Point San Pedro's, Oakland Airport's are as late), and off a grid the
+ * chart's depth comes from elsewhere anyway. Elsewhere, San Francisco's (9414290).
+ */
+export function tideHeightAt(p: Vec, ms: number): number {
+  const station = gridStation(p);
+  return station ? bayTide(station, ms).h : sfTide(ms);
+}
+/** Each depth grid's bay's tide station. */
+const GRID_STATIONS = DGRIDS.map(G => { const B = BAYS.find(b => b.name === G.name); if (!B) throw new Error(`depth grid ${G.name}: no bay`); return B.station; });
+/** The tide station of the depth grid p is on (as depthBand finds it), or null. */
+function gridStation(p: Vec): string | null {
+  const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
+  for (let k = 0; k < DGRIDS.length; k++) { const G = DGRIDS[k];
+    const i = Math.floor((lon - G.west) / (G.east - G.west) * G.nx), j = Math.floor((G.north - lat) / (G.north - G.south) * G.ny);
+    if (i >= 0 && j >= 0 && i < G.nx && j < G.ny) return GRID_STATIONS[k];
+  }
+  return null;
+}
 /** A flow-only station's stream (kt, + its flood) at a time (minutes UTC), from its harmonic constants. */
 function inflowSpeed(id: string, tMin: number): number {
   const d = DEFS.find(x => x.id === id) as HarmonicDef | undefined;

@@ -12,10 +12,12 @@ import type { Controls } from '../boat/controls';
 import type { LineKey, Boat } from '../boat/boat';
 import type { PlaceAcross, PlaceFore } from '../boat/crewPhys';
 import { allToCrew, moveLazyCar, takeLine } from '../boat/physics';
+import { carFree } from '../boat/crewWork';
 import { wantJumpers } from '../boat/condition';
 import { guideTune } from '../boat/rigTune';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from '../boat/autopilot';
 import type { Settings } from '../settings';
+import type { BoatSpec } from '../boat/spec';
 import type { Moment } from './debrief';
 import type { Vec } from '../core/math';
 import type { World } from './world';
@@ -47,7 +49,7 @@ export type Command =
   /** A half turn more or less on the jumpers, from where they're going (or where they are): worked out with the race's own numbers. */
   | { k: 'jumpersBy'; d: number }
   /** The lazy jib car to a hole (taking the cars), from wherever it is or was going: the band's click on a hole. */
-  | { k: 'lazyCarTo'; fore: number; ins: number }
+  | { k: 'lazyCarTo'; fore: number; ins: number; side?: 'P' | 'S' }
   /** Where the crew sit: your choice across and fore and aft (null: theirs), or null to put them back on auto. */
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
   /** Set or stow the whisker pole (always yours: your call only). */
@@ -83,10 +85,16 @@ export type Command =
   | { k: 'moveHere'; p: Vec; name: string }
   | { k: 'dest'; p: Vec; name: string }
   | { k: 'retire'; why?: string; afterFinish?: boolean }
+  /** Wrecked: carry on anyway, marked wrecked. */
+  | { k: 'carryOn' }
   /** Take a penalty (by boat id): after an incident's replay. */
   | { k: 'penalty'; boat: number }
   /** New conditions for the sail that's running (the conditions panel from the pause menu). */
   | { k: 'conditions'; settings: Settings }
+  /** Your boat restyled in the boat editor (look only: her paint, hatch, cockpit, lettering), taken as she lies. */
+  | { k: 'look'; spec: BoatSpec }
+  /** The showroom's clock: the time of day she's shown at (local, hh:mm). */
+  | { k: 'clock'; tideTime: string }
   /** The page's own settings the World keeps a copy of (the chart's colours, the map's layers): they don't touch the race. */
   | { k: 'settings'; patch: Pick<Partial<Settings>, 'chartPal' | 'mapLayers'> }
   /** A note in the race's log (a rule incident, for the debrief and the race replay). */
@@ -121,8 +129,9 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'jumpersBy': wantJumpers(u, (u.jumperTarget ?? (u.tune ?? guideTune(u.ww.kt)).jumperTurns) + c.d); return;
     case 'lazyCarTo': {
       // (as the band did it: from where she'd been asked to put the car, or where the lazy car is; moveLazyCar works from the same)
-      const lazy = u.ctl.car[u.tack], from = u.carCmd ?? { fore: lazy.fore, ins: lazy.ins };
-      takeLine(u, 'car'); moveLazyCar(u, c.fore - from.fore, c.ins - from.ins); return;
+      // (a side: the leeward car too, with the jib down and no load on it, crewWork.ts carFree)
+      const side = c.side && carFree(u, c.side) ? c.side : u.tack, car = u.ctl.car[side], from = u.carCmd && (u.carCmd.side ?? u.tack) === side ? u.carCmd : { fore: car.fore, ins: car.ins };
+      takeLine(u, 'car'); moveLazyCar(u, c.fore - from.fore, c.ins - from.ins, side); return;
     }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
     case 'pole': w.poleCall(c.want); return;
@@ -155,8 +164,11 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'moveHere': return w.moveHere(c.p, c.name);
     case 'dest': w.setDest(c.p, c.name); return;
     case 'retire': return w.retire(c.why, c.afterFinish);
+    case 'carryOn': w.carryOn(); return;
     case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
+    case 'look': w.applyLook(c.spec); return;
+    case 'clock': w.setClock(c.tideTime); return;
     case 'settings': Object.assign(w.settings, c.patch); return;
     case 'logNote': w.log?.note(c.note); return;
     case 'running': w.running = c.on; return;
