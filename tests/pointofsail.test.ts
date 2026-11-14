@@ -18,7 +18,7 @@ describe('the point of sail', () => {
   });
   it('is drawn with the windex in the band and on the dial', () => {
     expect(band).toContain('class="sb-pos"');
-    expect(band).toMatch(/\.sb-pos'\)!\.textContent = pos/);
-    expect(hud).toMatch(/const pos = pointOfSailWord\(u\)[^\n]*\n[^\n]*fillText\(pos/);
+    expect(band).toMatch(/put\(wx\.querySelector\('\.sb-pos'\)!, pos\)/);
+    expect(hud).toMatch(/const pos = pointOfSailWord\(u\)/); expect(hud).toMatch(/fillText\(pos, cx/);
   });
 });

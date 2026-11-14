@@ -43,10 +43,13 @@ export class Labels {
 
   private place(el: HTMLElement, camera: THREE.Camera, x: number, y: number, z: number): void {
     const v = this.tmp.copy(P3(x, y, z)).project(camera);
-    if (v.z > 1 || v.z < -1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) { el.hidden = true; return; }
-    el.hidden = false;
-    el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px';
-    el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+    // (moved by transform, which the page composites without a layout, and each value written only when it changes:
+    // a write a frame, even of the same value, has the page restyle every frame)
+    const off = v.z > 1 || v.z < -1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1;
+    if (el.hidden !== off) el.hidden = off;
+    if (off) return;
+    const t = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(1)}px,${((1 - v.y) / 2 * innerHeight).toFixed(1)}px) translate(-50%,-100%)`;
+    if (el.style.transform !== t) el.style.transform = t;
   }
 
   update(w: SimView, camera: THREE.Camera, viewMode: number): void {
@@ -56,12 +59,13 @@ export class Labels {
       this.place(el, camera, b.x, b.y, viewMode === 2 ? 2 : 10.2);
       if (el.hidden) return;
       const r = w.rights(u, b), kc = r.kc === u, near = dist(u, b) < 70;
-      el.className = 'tag' + (near ? (kc ? ' kc' : ' row') : '');
-      el.lastChild!.textContent = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? ' · turns' : '');
+      const cls = 'tag' + (near ? (kc ? ' kc' : ' row') : ''), txt = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? ' · turns' : '');
+      if (el.className !== cls) el.className = cls;
+      if (el.lastChild!.textContent !== txt) el.lastChild!.textContent = txt;
     });
     for (const mt of this.markTags) { this.place(mt.el, camera, mt.p.x, mt.p.y, mt.z); mt.el.classList.toggle('next', mt.idx.includes(u.leg) && w.t > 0); }
     // the cue while it's news (a few seconds), or for as long as it holds while the hand waits at the shrouds
     const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
-    if (c) { if (!word) c.hidden = true; else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
+    if (c) { if (!word) { if (!c.hidden) c.hidden = true; } else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
   }
 }
