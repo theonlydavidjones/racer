@@ -29,10 +29,11 @@ import type { AppCtx } from '../app';
 export function mountResults(app: AppCtx) {
 $('bPause').onclick = () => {
   if (!app.w.running) return; app.send({ k: 'pause', on: true }); app.setControlsIdle(); $('pause').hidden = false;
-  $('bRestart').textContent = app.w.drill || app.w.rounding ? 'Restart the drill' : app.w.freeSail ? 'Restart this cruise' : 'Restart this race';
+  $('bRestart').textContent = app.w.drill || app.w.rounding ? 'Restart Drill' : app.w.freeSail ? 'Restart Cruise' : 'Restart Race';
   const d = $('pauseDebrief'), html = app.w.drill ? app.drills.drillHtml() : app.w.rounding ? app.drills.roundHtml() : app.w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
   mountDebriefTactics(d);
-  $('pauseWatch').hidden = !html || app.w.track.length < 2;
+  $('bWatch2').hidden = !html || app.w.track.length < 2;
+  $('pause').querySelector('.panel')!.classList.toggle('nodeb', !html); // (no debrief: the column alone)
 };
 /** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
 function vsInput(log: NonNullable<typeof app.w.log>): VsInput {

@@ -494,7 +494,7 @@ function beginRaceNow(seed?: number): void {
   // (the pause menu's and the results' Back to setup: the setup you sailed from, or the Drill page for a drill)
   const drilling = app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings', sp = app.S.mode === 'race' ? app.seasonPick : null;
   app.nav.reset(...(drilling ? [{ k: 'drill' } as const] : sp ? [{ k: 'race' } as const, { k: 'season', id: sp.series.id } as const, { k: 'setup' } as const] : [{ k: 'setup' } as const]));
-  for (const id of ['bSettings', 'bSet2', 'bDSetup']) $(id).textContent = drilling ? 'Back to Drill' : 'Back to setup';
+  for (const id of ['bSettings', 'bSet2', 'bDSetup']) $(id).textContent = drilling ? 'Back to Drill' : 'Back to Setup';
   app.realRaceHolds();
   saveSettings(app.S);
   newGame(seed);

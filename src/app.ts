@@ -909,9 +909,8 @@ let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
 let resultsShown = false;
 $('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
-$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); $('bSound2').textContent = `Sound: ${sound.on ? 'on' : 'off'}`; };
-// Sound and Exit live in the pause menu (the surface audit, owner 13 Nov: Pause and Speed stay on the surface)
-$('bSound2').onclick = () => $('bSound').click();
+$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
+// Sound and Exit sit with Pause and Speed, top right, Exit outermost (the owner, 13 Nov 2026)
 const results = mountResults(ctx); // (src/app/results.ts)
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
@@ -1014,7 +1013,7 @@ function keysHint(): void {
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
     ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
-  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off';
+  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
 keysHint();
 hud.hailKey = () => keymap.label('hail');
@@ -1038,7 +1037,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('seasonView').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('leaveAsk').hidden || !$('seasonView').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -1048,6 +1047,7 @@ addEventListener('keydown', e => {
   if (!$('keepAsk').hidden) return; // save or discard first
   if (!$('motorAsk').hidden) { if (e.key === 'Escape') $('bMotorNo').click(); return; }
   if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
+  if (!$('leaveAsk').hidden) { if (e.key === 'Escape') $('bLeaveNo').click(); return; } // leave or keep racing first
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
@@ -1379,7 +1379,7 @@ function openHomeNow(): void {
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
-  for (const id of ['motorAsk', 'homeAsk', 'seasonView', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'coachPanel', 'lessonCard', 'lessons']) $(id).hidden = true;
+  for (const id of ['motorAsk', 'homeAsk', 'leaveAsk', 'seasonView', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'coachPanel', 'lessonCard', 'lessons']) $(id).hidden = true;
   seasonPick = null;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
@@ -1399,8 +1399,16 @@ document.addEventListener('click', e => {
   else if (where === 'past') { seasonPick = null; nav.go({ k: 'past' }); }
   else if (where === 'drill') { seasonPick = null; nav.go({ k: 'drill' }); }
 });
-$('bExit').onclick = () => openHome();
-$('bExit2').onclick = () => openHome();
+/** Mid-race (or a drill), the corner's Exit asks first: a misclick shouldn't throw the race away. The sail waits meanwhile. */
+const leaving = () => w.running && $('results').hidden && (w.drill || w.rounding || (!w.freeSail && w.userFinishT == null));
+$('bExit').onclick = () => {
+  if (!leaving() || !$('pause').hidden) { openHome(); return; }
+  $('leaveTitle').textContent = w.drill || w.rounding ? 'Leave drill?' : 'Leave race?';
+  send({ k: 'pause', on: true }); $('leaveAsk').hidden = false; $('bLeaveNo').focus();
+};
+$('bLeaveNo').onclick = () => { $('leaveAsk').hidden = true; if ($('pause').hidden) send({ k: 'pause', on: false }); };
+$('bLeaveYes').onclick = () => { $('leaveAsk').hidden = true; openHome(); };
+$('bExit2').onclick = $('bExit3').onclick = () => openHome();
 $('bKeys0').onclick = () => keysView.open();
 /* Real past races (sim/realRaces.ts; docs/VISION-ROADMAP.md near term 7): a day the San Francisco Folkboat fleet raced,
    sailed in that day's observed wind and NOAA's tide, on the course they sailed, against the real boats (by name and sail
