@@ -12,7 +12,7 @@ import { LOA, V } from '../src/core/math';
 // incident if they haven't parted, or she's had no steerage way since; a new breach if she has, so could have kept
 // clear. Built by hand, so it doesn't hang on how one race sails (Crew Model's crew-stations race, 14 Nov 2026: the hulls
 // overlapped at a touch (g0 = 0), a metre's drift read as parting, and a second touch 12 s on counted anew).
-function tangle(o: { user?: boolean; vA: number; apart: number }) {
+function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number }) {
   const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', fleet: 2, current: 'slack' } as Settings, 7);
   w.t = 60; w.exactPairs = true;
   const A = o.user ? w.user : w.boats[1], B = w.boats[2];
@@ -35,6 +35,7 @@ function tangle(o: { user?: boolean; vA: number; apart: number }) {
   // (a touch with the hulls overlapping, then held off `apart` m for 4.5 s (past COMPELLED_WINDOW), then together again
   // as the pair's incident cooldown runs out, so that's what's judged: three touches in 13 s, inside TANGLE_MAX)
   off = 0; run(0.5);
+  if (o.pressed) { run(o.pressed); return got.length; } // (kept pressed together, touching all along)
   for (let k = 0; k < 2; k++) { off = o.apart; run(4.5); off = 0; run(INCIDENT_COOLDOWN - 4.5 + 0.5); }
   expect(got.every(g => g.kind === 'contact'), JSON.stringify(got)).toBe(true);
   return got.length;
@@ -55,6 +56,10 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
   it('but not parted (within a metre of touching), one collision going on: one incident, AI or you', () => {
     expect(tangle({ vA: 1.5, apart: JUST })).toBe(1);
     expect(tangle({ user: true, vA: 1.5, apart: JUST })).toBe(1);
+  }, 60000);
+  it('pressed together, touching all along, for longer than TANGLE_MAX: one incident while they stay in contact', () => {
+    expect(tangle({ vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
+    expect(tangle({ user: true, vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
   }, 60000);
   it('and once they have been a length apart, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.3, apart: FAR })).toBe(3);

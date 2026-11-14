@@ -1319,14 +1319,15 @@ export class World {
       const pk = pairKey(A, B), prior = this.tangles.get(pk);
       // (how long: TANGLE_MAX from the first contact; but while the two are jammed (in the ebb at a mark a fleet can sit at a
       // few tenths of a knot inside a length of each other for minutes) neither can do anything new, and it runs on from
-      // the last contact, up to JAM_MAX from the first)
+      // the last contact, up to JAM_MAX from the first; and while they've never parted since the last touch, pressed
+      // together, it's one collision going on however long it lasts: it runs on from the last contact, without a cap)
       // (and once her turns have begun: rule 44.2 has her take them "after getting well clear of other boats", and while
       // taking a penalty rule 21.2 has her keep clear of all others; a contact then, next to the boat she fouled, with way
       // enough to steer since the last, is her own choice, not "the inevitable result of the first" (US Appeal 65): a new
       // breach, the user's or the AI's alike. Unless she hasn't had steerage way since, or they haven't parted (one
       // collision still going on), or both are jammed below steerage way: drifting together in the ebb, neither can
       // choose anything)
-      if (incident.kind !== 'hail' && prior && !prior.clear && (!f.penaltyDir || jammed || (prior.fouler === f.id && !prior.steered) || !prior.parted) && (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX) && (prior.fouler === f.id || jammed || !prior.parted)) {
+      if (incident.kind !== 'hail' && prior && !prior.clear && (!f.penaltyDir || jammed || (prior.fouler === f.id && !prior.steered) || !prior.parted) && (!prior.parted ? this.t - prior.t < TANGLE_MAX : jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX) && (prior.fouler === f.id || jammed || !prior.parted)) {
         prior.t = this.t; prior.parted = false; prior.steered = false; prior.wayT = null; prior.g0 = hullGap(A, B); // (the tangle goes on)
         if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).` });
         continue;
