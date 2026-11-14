@@ -1030,7 +1030,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   m.jib.mesh.scale.x = jibSgn;
   { // hoisting and striking: the main's head comes down its track to the boom; the jib's head down the forestay
     // (with the last inches the piano's: a halyard short of its take-up leaves the head a few inches down, controls.ts)
-    const hm = hoistedShare(b.rig?.main ?? 1, b.ctl.downhaul, 'main'), hj = hoistedShare(b.rig?.jib ?? 1, b.ctl.jibHalyard ?? 0.3, 'jib');
+    const hm = hoistedShare(b.rig?.main ?? 1, b.rig?.mainTaut ?? 1, 'main'), hj = hoistedShare(b.rig?.jib ?? 1, b.rig?.jibTaut ?? 1, 'jib');
     m.main.mesh.visible = hm > 0.02; m.main.mesh.scale.y = Math.max(0.02, hm); m.main.mesh.position.y = MAIN_DEF.tack.y * (1 - hm);
     m.mainFurl.visible = hm < 0.98; m.mainFurl.scale.set(0.3 + 0.7 * (1 - hm), 1, 0.3 + 0.7 * (1 - hm));
     m.jib.mesh.visible = hj > 0.02; m.jibBag.visible = hj < 0.98; m.jibBag.scale.set(0.2 * (0.4 + 0.6 * (1 - hj)), 0.12 * (0.4 + 0.6 * (1 - hj)), 0.45);

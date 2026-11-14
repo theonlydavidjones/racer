@@ -53,7 +53,7 @@ export function sailPlan(b: Boat): SailPlan {
 export const HOIST = { main: 30, jib: 15, strikeMain: 6, strikeJib: 4 };
 /** How far up each sail is (0..1 of its luff): hauled up at the mast (b.rig), then its last inches taken up by the halyard
  * at the piano (controls.ts HALYARD). A boat with no b.rig has both hauled up. */
-export const sailUp = (b: Boat, k: 'main' | 'jib'): number => hoistedShare(b.rig ? b.rig[k] : 1, k === 'main' ? b.ctl.downhaul : b.ctl.jibHalyard ?? 0.3, k);
+export const sailUp = (b: Boat, k: 'main' | 'jib'): number => (b.rig ? hoistedShare(b.rig[k], (k === 'main' ? b.rig.mainTaut : b.rig.jibTaut) ?? 1, k) : 1);
 /**
  * At the dock (and walked or pushed off it): the crew sit centred on the benches, not hiked or to leeward for a heel she
  * isn't sailing at (the owner); their weight still moves only her heel, never her across the water. (placeCrew, placed
@@ -81,17 +81,20 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
       r[k] = Math.min(1, was + dt * hands * (k === 'main' ? offWind : 1) / HOIST[k]);
       if (k === 'main' && was === 0 && offWind < 0.7) say('Hoisting the main off the wind: it fills and catches on the spreaders. It goes up much more easily head to wind.');
       // up at the mast: the last inches are the piano's (the crew take them up, or you, if the halyard's yours)
-      if (r[k] === 1) say(byHand(b, k === 'main' ? 'downhaul' : 'jibHalyard') && (k === 'main' ? b.ctl.downhaul : b.ctl.jibHalyard ?? 0) < HALYARD.takeUp
-        ? `${k === 'main' ? 'Main' : 'Jib'} up at the mast: take up the ${k === 'main' ? 'main' : 'jib'} halyard at the piano.` : k === 'main' ? 'Main up.' : 'Jib up.');
+      if (r[k] === 1) say(byHand(b, k === 'main' ? 'downhaul' : 'jibHalyard') ? `${k === 'main' ? 'Main' : 'Jib'} up at the mast: take up the ${k === 'main' ? 'main' : 'jib'} halyard at the piano.` : k === 'main' ? 'Main up.' : 'Jib up.');
     } else if (!up && was > 0) {
       r[k] = Math.max(0, was - dt * hands / (k === 'main' ? HOIST.strikeMain : HOIST.strikeJib));
       if (r[k] === 0) say(k === 'main' ? 'Main down and flaked on the boom.' : 'Jib down and bagged on the foredeck.');
     }
   };
   step('main'); step('jib');
-  // a sail down (or coming down): its halyard at the piano is slack, with nothing to take up (the owner, 14 Nov 2026)
-  if (!r.mainUp && r.main < 1) { b.ctl.downhaul = 0; if (b.ctlTarget) delete b.ctlTarget.downhaul; }
-  if (!r.jibUp && r.jib < 1) { b.ctl.jibHalyard = 0; if (b.ctlTarget) delete b.ctlTarget.jibHalyard; }
+  // the last inches: short of the top the halyard's tackle is slack, nothing taken up (the owner, 14 Nov 2026); up at
+  // the mast, the crew come back to the piano and take it up (a halyard you hold, you do: trimSails)
+  for (const k of ['main', 'jib'] as const) {
+    const line = k === 'main' ? 'downhaul' : 'jibHalyard', tk = k === 'main' ? 'mainTaut' : 'jibTaut';
+    if (r[k] < 1) { r[tk] = 0; b.ctl[line] = 0; if (b.ctlTarget) delete b.ctlTarget[line]; }
+    else if ((r[tk] ?? 1) < 1 && !byHand(b, line)) r[tk] = Math.min(1, (r[tk] ?? 0) + dt / HALYARD.crewS);
+  }
   if (r.jib < 1 && b.poleWant) { b.poleWant = false; say('The pole goes out on the jib: hoist the jib first.'); }
 }
 
@@ -926,6 +929,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const move = (k: Ctl, to: number, rate = CONTROL_RATE[k]) => { const j = on[k], d = (j ? j.to : to) - c[k]; c[k] += Math.sign(d) * Math.min(Math.abs(d), rate * (j?.pace ?? 1) * dt); };
   const hand = (k: Ctl, rate = CONTROL_RATE[k]) => {
     const cmd = b.ctlCmd[k] ?? 0, tg = b.ctlTarget?.[k];
+    // a halyard with its last inches not yet taken up (controls.ts HALYARD): a pull takes them up first, then tensions
+    const tk = k === 'downhaul' ? 'mainTaut' : k === 'jibHalyard' ? 'jibTaut' : null, r = b.rig;
+    if (tk && r && r[tk === 'mainTaut' ? 'main' : 'jib'] >= 1 && (r[tk] ?? 1) < 1 && (cmd > 0 || (cmd === 0 && tg != null && tg > c[k]))) { r[tk] = Math.min(1, (r[tk] ?? 0) + rate * dt / HALYARD.takeUp); return; }
     if (cmd === 0 && tg != null) { // dragged to a setting: work the line there at the usual pace
       const d = tg - c[k];
       if (Math.abs(d) < 0.003) { delete b.ctlTarget![k]; return; }
