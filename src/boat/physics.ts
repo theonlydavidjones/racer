@@ -49,6 +49,9 @@ export const CREW_LAG = 0.8;
  * meters more: in still water a hull does creep on like that, and any wind or stream soon outweighs it.
  */
 export const ASTERN = 2;
+/** Going astern faster than this, m/s, the water past her rudder steers her (about 0.9 deg/s with the helm hard over): a held
+ * tiller is steering her then, not sculling (an ESTIMATE). */
+export const STEERS_ASTERN = 0.2;
 /** How fast the water slows her sternway (m/s²) at `v` m/s astern (at her design displacement: her crew's weight isn't in it yet). */
 export const asternDrag = (v: number): number => ASTERN * hullResistance(v) / HANDLING.mass;
 /** Below this (m/s) she has lost her way, for a coast's length: the water's drag alone takes minutes more to stop her. */
@@ -189,7 +192,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (b.hove) { heaveTo(b, dt, t, emit, groundToast); return; }
   const ww = b.ww;
   // turn rate falls off at low speed: a Folkboat needs water flowing over the rudder, ahead or astern (going astern it
-  // works backwards, and less well: 0.7 of it). Nearly stopped, she turns only by sculling, which RRS 2025–2028 rule
+  // works backwards, and less well: HANDLING.asternRudder of it). Nearly stopped, she turns only by sculling, which RRS 2025–2028 rule
   // 42.3(d) allows in one case: "When a boat is above a close-hauled course and either stationary or moving slowly, she
   // may scull to turn to a close-hauled course". World Sailing's rule 42 interpretations: "on either tack" (SCULL 1), so
   // from above close-hauled she may be sculled round onto either tack's close-hauled course, through the wind too; but
@@ -197,7 +200,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // offset a backed sail's steering (SCULL 3: none with the jib aback), and never below close-hauled
   // (42.2(d): sculling "that ... prevents her from moving astern" is banned; she drifts astern while she turns)
   const toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, astern = b.astern ?? 0, aheadK = b.v + astern > 0 ? b.v / (b.v + astern) : 1;
-  const flow = flowTurnRate(b.v) * aheadK + flowTurnRate(astern) * 0.7 * (1 - aheadK); // (with way on both ways at once, by which way the water mostly flows past the rudder)
+  const flow = flowTurnRate(b.v) * aheadK + flowTurnRate(astern) * HANDLING.asternRudder * (1 - aheadK); // (with way on both ways at once, by which way the water mostly flows past the rudder)
   const aboveCH = Math.abs(wrap(ww.from - b.h)) < beatAngle(ww.kt) - 2;
   if (!aboveCH) b.scullDir = undefined; // (close-hauled or below: the sculling's done)
   const scullOK = (dir: number) => aboveCH && !((b.jibBacked ?? 0) > 0) && (b.scullDir == null || b.scullDir === dir);
@@ -223,7 +226,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // going astern the rudder works backwards: the bow goes the way you push the tiller. Sculled (where that turns her
       // faster than the flow does), she turns the way the tiller's pumped, as with way on, whichever way she's drifting
       const sternFirst = astern > b.v, dirFlow = Math.sign(helm) * (sternFirst ? -1 : 1), d = Math.sign(helm);
-      const byFlow = dirFlow * Math.abs(helm) * flow, sculled = d && scullOK(d) ? d * Math.abs(helm) * HANDLING.minTurnRate : 0;
+      // (a tiller held over with sternway turns her by the flow, the bow toward the tiller: sculling is pumping it, and with
+      // steerage way astern, STEERS_ASTERN, a held helm is steering, not sculling, whatever her heading to the wind)
+      const sculls = !(sternFirst && astern > STEERS_ASTERN);
+      const byFlow = dirFlow * Math.abs(helm) * flow, sculled = sculls && d && scullOK(d) ? d * Math.abs(helm) * HANDLING.minTurnRate : 0;
       rate = Math.abs(sculled) > Math.abs(byFlow) ? sculled : byFlow;
       if (sternFirst && rate === byFlow) bladeFlip = true;
     }
@@ -593,11 +599,11 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const leeway = Math.atan2(Math.abs(d0), Math.max(0.05, uf));
   const inducedX = -0.5 * Math.abs(lift) * leeway * (u0 >= 0 ? 1 : -1); // (against her motion)
   // the rudder, behind the keel: going astern the water meets it from aft, so the same blade angle pushes the other way
-  // (the bow goes the way the tiller's pushed), and less well (0.7, as when sailing)
+  // (the bow goes the way the tiller's pushed), and less well (HANDLING.asternRudder, as when sailing)
   const back = u0 < 0, vyR = HOVE.rudderFlow * (d0 + r0 * RUDDER.arm), vR2 = u0 * u0 + vyR * vyR;
   // (its push from the blade's angle reverses; its lift against the sideways flow past it opposes that flow either way)
   const aoaR = (back ? -deltaTw : deltaTw) - Math.atan2(vyR, Math.max(0.01, uf));
-  const clR = clamp(RUDDER.slope * aoaR, -1.05, 1.05) * (back ? 0.7 : 1);
+  const clR = clamp(RUDDER.slope * aoaR, -1.05, 1.05) * (back ? HANDLING.asternRudder : 1);
   const rudY = 0.5 * RHO * vR2 * RUDDER.area * clR, rudX = -0.5 * RHO * vR2 * RUDDER.area * (0.02 + clR * clR / (Math.PI * RUDDER.aspect)) * (back ? -1 : 1);
   // heel, from the side forces, against the hull and the crew (as when sailing)
   const cs = b.crew ??= newCrew(DEFAULT_CREW, b.tack), cond = b.spec ? (b.cond ??= condition(b.spec)) : null;

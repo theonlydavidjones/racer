@@ -170,6 +170,19 @@ export const SHOVE = 0.5;
 /** How fast the crew walks her back by hand, m/s; and the slowest they swing her round about her bow, deg/s, in no wind. */
 const WALK = 0.45, CREW_TURN = 2;
 /**
+ * The shove astern as the crew steps aboard at the finger's end, m/s: she's already going astern at their walk, and the last
+ * push, a hand's HAND_N (boat/dockLines.ts) over about a metre of reach, adds its work to that: ½·m·v² = ½·m·WALK² + F·d.
+ * About 0.63 m/s, a little more than a slow walk (ESTIMATES: the push and its reach are unsourced). Only where there's
+ * less room than that carries her (geo/marina.ts ASTERN_RUN) is she shoved more gently, down to ASTERN_STEERAGE.
+ */
+export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * HAND_N * 1 / HANDLING.mass);
+/**
+ * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more (the helm hard over turns her
+ * about 1.7 deg/s at it: physics.ts). Her glide from it (about 30 m on physics.ts's drag) runs on past the clear water the
+ * planner found at most berths: the rest is the helmsman's, steering her on down the fairway, or a bump at a crawl.
+ */
+export const ASTERN_STEERAGE = 0.38;
+/**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
  * ½·ρ·Cd·∫r³dA along her length (the lateral area spread evenly over it: A·L³/4). About 1×10⁵: at 3°/s about 300 N·m.
  */
@@ -1780,7 +1793,7 @@ export class World {
         ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'
-        ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. She's going astern: steer with the tiller (the bow goes the way you push it), then get sail on her.${hoist}`
+        ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. ${plan.helm ? `Push the tiller to ${plan.helm > 0 ? 'starboard' : 'port'}: her stern swings round toward the way out (going astern, the bow goes the way you push it).` : 'Steer her straight back (going astern, the bow goes the way you push the tiller).'} Then get sail on her.${hoist}`
         : plan.setBack
           ? plan.h !== slip.heading
             ? plan.headToWind
@@ -1803,7 +1816,7 @@ export class World {
     // with no floor: nothing at rest). Swinging about the bow line, or pushed off sideways, the water crosses the blade
     // broadside: whichever way it's put over it only adds a little to the stern's resistance, the same both ways, so it
     // neither hurries nor slows the swing. Held head to wind, stopped: nothing.
-    const astern = (vWater: number) => -helm * 0.7 * Math.min(HANDLING.maxTurnRate, vWater / HANDLING.turnRadius / D2R);
+    const astern = (vWater: number) => -helm * HANDLING.asternRudder * Math.min(HANDLING.maxTurnRate, vWater / HANDLING.turnRadius / D2R);
     if (P.kind === 'off') {
       // pushed out over about three seconds; then, if need be, her bow pushed off about her stern quarter
       if (H.s < 1) { H.s = Math.min(1, H.s + dt / 3); b.x = H.from.x + (P.out.x - H.from.x) * H.s; b.y = H.from.y + (P.out.y - H.from.y) * H.s; }
@@ -1850,9 +1863,9 @@ export class World {
           const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, holdPivot(P.hold.off), P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
         } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
       } else {
-        // shoved off astern: enough to coast her into the fairway on the water's drag
-        let lo = 0, hi = 1.5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
-        this.letGo(b, P.h, 0, lo);
+        // shoved off astern into the fairway, as hard as the crew shoves, or less if the room she has ahead of her stern is short
+        let lo = 0, hi = ASTERN_SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
+        this.letGo(b, P.h, 0, Math.max(ASTERN_STEERAGE, lo));
       }
     }
     if (b.pushing && b.pushing.jump > 0) { b.pushing.jump += dt / 0.7; if (b.pushing.jump >= 1) b.pushing = undefined; }
