@@ -76,6 +76,7 @@ export type Command =
   | { k: 'motor'; op: 'throttle'; v: number }
   | { k: 'castOff' }
   | { k: 'pushOff' }
+  | { k: 'turn' }
   /** Coming in to a berth: lines ready (again: stand down), or let go her lines lying along a dock (sim/world.ts). */
   | { k: 'lines' } | { k: 'letGo' }
   | { k: 'hail' }
@@ -154,6 +155,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'castOff': return w.castOff();
     case 'pushOff': return w.pushOff();
+    case 'turn': return w.callTurn();
     case 'lines': return w.linesReady();
     case 'letGo': return w.letGoLines();
     case 'hail': w.userHail(); return;

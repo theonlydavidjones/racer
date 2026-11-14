@@ -6,7 +6,7 @@ import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
+import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
@@ -619,7 +619,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, gybeTo: undefined, turnCalledT: undefined, boomFree: undefined, boomFrom: undefined, crashT: undefined, boomFreeT: undefined, steerSince: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, gybeTo: undefined, turnCalledT: undefined, boomFree: undefined, boomFrom: undefined, crashT: undefined, boomFreeT: undefined, steerSince: undefined, steerWas: 0, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -1964,6 +1964,19 @@ export class World {
    * From an end tie they push her off the dock and forward. Then she's under her own way (a slow walk, slowing on the
    * water's drag) and answers the tiller.
    */
+  /**
+   * "Ready about… hard alee" or "Ready to jibe… jibe-ho": the helm calls the turn and her crew work it. Close-hauled or
+   * reaching she's taken through the wind onto the other tack; off the wind, round her stern onto the other jibe, her
+   * crew handing the main across (physics.ts tackTarget, gybeMeant). By the lee already, the main comes across and her
+   * heading's held. Not at the dock, hove to, or with the tiller lashed.
+   */
+  callTurn(): boolean {
+    const u = this.user;
+    if (!this.running || u.docked || u.handled || u.hove || u.lashed != null || u.atAnchor || u.mooring) return false;
+    const to = tackTarget(u);
+    u.turnDir = to.dir; u.turnTarget = to.target; u.turnCalledT = this.t;
+    return true;
+  }
   pushOff(): boolean {
     const u = this.user, H = u.handled;
     // held head to wind on the bow line: let her go now, her bow pushed off
