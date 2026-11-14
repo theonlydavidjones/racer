@@ -393,8 +393,14 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     z = at(z); if (dest >= COCK0 - 0.3) dest = at(dest);
   }
   const sideways = Math.abs(motion) > 0.6 && Math.abs(motion) < 2.5, alongside = z > COCK0 && z < COCK1 && ax > chz(z) - 0.2;
-  // (moving fore and aft along the side deck within the cockpit's length: they slide along it sitting, not walk the coaming)
-  if (isMoving && !sideways && alongside && z >= ZC_FWD - 0.01 && job !== 'car' && job !== 'mast') return onDeck(s, deckZ(z), 0, k);
+  // (moving fore and aft from a place on the side deck to another within the cockpit's length: down into the footwell,
+  // along it crouched, and back up, as anyone gets round in a cockpit: not squat-crawling along the deck between the
+  // coaming and the toe rail, the owner: "any human crew would step into the cockpit to get around". Up the deck past the
+  // cabin to the mast or the car, and back, the side deck's the only way)
+  if (isMoving && !sideways && alongside && z >= ZC_FWD - 0.01 && dest >= ZC_FWD - 0.01 && dest < COCK1 && job !== 'car' && job !== 'mast') {
+    const fx = s * Math.max(0.12, soleHalf(z) - 0.12);
+    return moving(fig, fx, z, Math.cos(motion) >= 0 || !fig.cur || Math.cos(fig.cur.yaw) >= 0 ? 0 : Math.PI, k);
+  }
   if (isMoving && !(alongside && sideways)) {
     // (across the cockpit they shuffle sideways facing forward, under the boom; fore and aft, the way they're going)
     // (on the way to the cabin-top lines, which they work from the cockpit's forward end: through the cockpit)
