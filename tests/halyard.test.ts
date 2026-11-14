@@ -62,3 +62,23 @@ describe('Halyards (ROADMAP 8o): hauled up at the mast, the last inches taken up
     }
   });
 });
+
+describe('Jib cars with the jib down (ROADMAP 8p): no sheet load, so neither is loaded and either can be moved', () => {
+  it('with the jib up only the windward car is free; struck, both are, and the crew move the leeward one when asked', async () => {
+    const { carFree } = await import('../src/boat/crewWork');
+    const { applyCommand } = await import('../src/sim/commands');
+    const { World } = await import('../src/sim/world');
+    const { courseFile } = await import('../src/courses/registry');
+    const { DEFAULT_SETTINGS } = await import('../src/settings');
+    const S = { ...DEFAULT_SETTINGS, mode: 'sail' as const, windKt: 8, windKind: 'west' as const, current: 'slack', sea: 'flat' as const, traffic: 0 as const, fleet: 0, opponents: [] };
+    const w = new World(courseFile('train'), S, 4242, { freeSail: true }), u = w.user, lee = u.tack === 'S' ? 'P' : 'S';
+    u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
+    expect(carFree(u, u.tack)).toBe(true); expect(carFree(u, lee)).toBe(false);
+    w.setSail('jib', false); for (let i = 0; i < 60 * 8; i++) w.step(1 / 60);
+    expect(u.rig.jib).toBe(0); expect(carFree(u, lee)).toBe(true);
+    const was = { ...u.ctl.car[lee] }, to = { fore: was.fore === 0 ? 2 : 0, ins: was.ins };
+    applyCommand(w, { k: 'lazyCarTo', fore: to.fore, ins: to.ins, side: lee });
+    for (let i = 0; i < 60 * 60; i++) w.step(1 / 60);
+    expect(u.ctl.car[lee].fore).toBe(to.fore);
+  });
+});

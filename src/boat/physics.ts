@@ -2,7 +2,7 @@ import { hitsHarbor } from '../geo/marina';
 import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
 import type { Emit } from '../sim/events';
-import { bow, stern, type Boat, type LineKey } from './boat';
+import { bow, stern, type Boat, type LineKey, type Tack } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce } from './motor';
@@ -1048,9 +1048,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
  * Ask for the lazy (windward) jib car one pin further: fore–aft (+1 aft) or athwartships (+1 outboard). The crew goes
  * forward and moves it (crewWork.ts): it takes a while, and their weight goes with them. Nobody can move the loaded one.
  */
-export function moveLazyCar(b: Boat, fore: number, ins: number): void {
-  const lazy = b.ctl.car[b.tack], from = b.carCmd ?? { fore: lazy.fore, ins: lazy.ins };
-  b.carCmd = { fore: clamp(from.fore + fore, 0, CAR_FORE_PINS - 1), ins: clamp(from.ins + ins, 0, CAR_IN_PINS - 1) };
+export function moveLazyCar(b: Boat, fore: number, ins: number, side: Tack = b.tack): void {
+  // (the windward car, or either with the jib down: crewWork.ts carFree; the caller checks)
+  const car = b.ctl.car[side], asked = b.carCmd && (b.carCmd.side ?? b.tack) === side ? b.carCmd : null, from = asked ?? { fore: car.fore, ins: car.ins };
+  b.carCmd = { fore: clamp(from.fore + fore, 0, CAR_FORE_PINS - 1), ins: clamp(from.ins + ins, 0, CAR_IN_PINS - 1), side };
 }
 
 /** Apparent wind: wind over the water minus the boat's motion through it. aws in m/s, arel signed (+ from starboard). */

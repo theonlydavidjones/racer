@@ -231,7 +231,7 @@ export interface Boat {
   /** The crew has set her up (the first time they trim, their lines start where they want them). */
   crewReady?: boolean;
   /** The lazy jib car you've asked the crew to move to (pins), until it's done (crewWork.ts). */
-  carCmd?: { fore: number; ins: number } | null;
+  carCmd?: { fore: number; ins: number; side?: Tack } | null;
   /** The lazy jib car the crew's own plan wants, and how long (s) the car has been off it. */
   carPlan?: { fore: number; ins: number } | null; carOff?: number;
   /** Heel rate (deg/s, + rolling to port) and the boat's roll: heel follows its equilibrium as a damped oscillator (balance.ts rollStep). */

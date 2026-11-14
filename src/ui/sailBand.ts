@@ -3,7 +3,7 @@ import { CAR_FORE_PINS, CAR_IN_PINS, boomAngle } from '../boat/controls';
 import { byHand } from '../boat/physics';
 import type { BoatView } from '../sim/host';
 import type { Command } from '../sim/commands';
-import { CAR, workPace } from '../boat/crewWork';
+import { CAR, carFree, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
@@ -339,11 +339,11 @@ export class SailBand {
     const u = this.host.world().user, ins = side === 'P' ? CAR_IN_PINS - 1 - col : col; // (inboard toward the band's middle)
     // the leeward car carries the working jib sheet: its pin can't be pulled under that load, so it stays till a tack
     // takes the load off it (it's then the windward car, and yours to set for the tack after)
-    if (side !== windSide(u)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
+    if (!carFree(u, side)) { this.note = { text: `${side === 'P' ? 'Port' : 'Starboard'} jib car: it's loaded, under the working jib sheet, and its pin can't be pulled till a tack takes the load off it. Set the windward car now: it takes over at the tack.`, until: performance.now() + 9000 }; this.showHelp(); return; }
     // (moving a car takes the crew forward to it: a call already made counts as where it's going)
     // (the hole itself is sent, not a move from where the car seems to be: the page sees the race a frame late, and two
     // quick clicks must leave the car in the second hole)
-    this.host.send({ k: 'lazyCarTo', fore: row, ins }); this.host.changed();
+    this.host.send({ k: 'lazyCarTo', fore: row, ins, side }); this.host.changed();
     // (where you asked for, worked out here: the sim may answer a frame later, once it runs apart from the page)
     this.carAsked = { side, fore: Math.max(0, Math.min(CAR_FORE_PINS - 1, row)), ins: Math.max(0, Math.min(CAR_IN_PINS - 1, ins)), t: performance.now(), seen: false }; this.carNote(u);
   }
@@ -355,9 +355,9 @@ export class SailBand {
     if (u.carCmd) a.seen = true;
     // done (or a tack loaded it first: then it stays where it was); not before the sim has taken the call, unless it
     // never does (the car was already there)
-    if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || a.side !== windSide(u)) {
+    if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || !carFree(u, a.side)) {
       const set = car.fore === a.fore && car.ins === a.ins;
-      this.note = { text: set ? `${name}: set at ${at}. It takes over at the next tack.` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
+      this.note = { text: set ? `${name}: set at ${at}. ${a.side === windSide(u) ? 'It takes over at the next tack.' : 'It takes the sheet when the jib goes up.'}` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
       this.carAsked = null; return;
     }
     const people = u.crew?.people ?? [], i = people.findIndex(p => p.job?.line === 'car'), j = i >= 0 ? people[i].job! : null;
@@ -517,7 +517,7 @@ export class SailBand {
     // the jib cars: the crossbar on its row, the car on its pin; the leeward one is loaded
     const carMine = byHand(u, 'car');
     this.el.querySelectorAll<HTMLElement>('.sb-jc').forEach(d => {
-      const side = d.dataset.side as Side, car = c.car[side], col = side === 'P' ? CAR_IN_PINS - 1 - car.ins : car.ins, loaded = side !== ws;
+      const side = d.dataset.side as Side, car = c.car[side], col = side === 'P' ? CAR_IN_PINS - 1 - car.ins : car.ins, loaded = !carFree(u, side); // (with the jib down, neither: no sheet load)
       const xb = d.querySelector<HTMLElement>('.sb-xbar')!, jc = d.querySelector<HTMLElement>('.sb-jcar')!;
       xb.style.gridRow = String(car.fore + 1); jc.style.gridRow = String(car.fore + 1); jc.style.gridColumn = String(col + 1);
       d.querySelectorAll<HTMLElement>('.sb-hole').forEach(h => h.classList.toggle('row', Number(h.dataset.r) === car.fore));
@@ -525,10 +525,10 @@ export class SailBand {
       const pin = (el: HTMLElement, p: { fore: number; ins: number } | null | undefined) => {
         el.hidden = !p; if (p) { el.style.gridRow = String(p.fore + 1); el.style.gridColumn = String((side === 'P' ? CAR_IN_PINS - 1 - p.ins : p.ins) + 1); }
       };
-      pin(d.querySelector<HTMLElement>('.sb-jwant')!, !loaded && u.carCmd && (u.carCmd.fore !== car.fore || u.carCmd.ins !== car.ins) ? u.carCmd : null);
+      pin(d.querySelector<HTMLElement>('.sb-jwant')!, !loaded && u.carCmd && (u.carCmd.side ?? u.tack) === side && (u.carCmd.fore !== car.fore || u.carCmd.ins !== car.ins) ? u.carCmd : null);
       pin(d.querySelector<HTMLElement>('.sb-jideal')!, !loaded && carMine && ideal ? { fore: ideal.carFore, ins: ideal.carIn } : null);
       d.classList.toggle('loaded', loaded); d.classList.toggle('mine', carMine && !loaded);
-      d.querySelector<HTMLElement>('.sb-tag')!.textContent = loaded ? 'loaded' : !loaded && u.carCmd ? 'crew…' : '';
+      d.querySelector<HTMLElement>('.sb-tag')!.textContent = loaded ? 'loaded' : u.carCmd && (u.carCmd.side ?? u.tack) === side ? 'crew…' : '';
     });
   }
 }
