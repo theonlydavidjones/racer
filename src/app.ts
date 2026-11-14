@@ -64,6 +64,7 @@ import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
 import { dockCardHtml } from './ui/lessons';
 import { RulesTrainer } from './ui/rulesTrainer';
+import { foulTitle } from './sim/caseRun';
 
 /**
  * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
@@ -591,7 +592,7 @@ windShow(!!S.windLadder);
 const drills = mountDrills(ctx); // (src/app/drills.ts)
 /** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
  * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
-const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); });
+const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); }, n => { S.rulesCase = n; setup.beginLesson('case'); });
 $('rulesTrainer').addEventListener('click', e => rulesTrainer.click(e));
 $('bRules').onclick = () => rulesTrainer.open();
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
@@ -675,9 +676,11 @@ function lessonTick(): void {
   if (L.cue !== lessonCue) {
     lessonCue = L.cue;
     if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
-    if (L.passed && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
-    // passed: a moment to see it, then paused on the lessons, this one ticked
-    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); setup.openLessons(); } }, 3000);
+    if (L.passed && L.id !== 'case' && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
+    // passed: a moment to see it, then paused on the lessons, this one ticked (a Case sailed: back on it in the Rules
+    // trainer, with how it came out)
+    const R = w.caseRun;
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', `${w.user.name} (${w.user.no})`, R.fouls[0] ? foulTitle(R.fouls[0]) : '', R.free.map(l => `${l} (${w.boats.find(b => b.name === l)?.no ?? ''}) sailed free after the contact`).join(' · ')); } else setup.openLessons(); } }, 3000);
   }
   tipFade();
 }

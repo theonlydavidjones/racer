@@ -266,6 +266,8 @@ export interface Boat {
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;
+  /** A Case's boat (Sail it yourself, sim/caseRun.ts): her letter; she sails the Case's track, not the AI's. */
+  script?: string;
   /** The club burgee she flies (an id from render/burgees.ts), if any. */
   burgee?: string;
   /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */
