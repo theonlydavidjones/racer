@@ -2,6 +2,7 @@
  * The setup and the start of a sail: a new World for the setup's choices (prepare, newGame, setupChanged), the setup screen (the course picker and its card, the tide, the crew, the choices), the conditions dialog, and beginning a race or a cruise.
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
+import { rainLevel } from '../environment/rain';
 import { PREP_MEANING } from '../sim/signals';
 import { LESSONS, type LessonId } from '../sim/lessons';
 import { lessonGridHtml } from '../ui/lessons';
@@ -59,7 +60,9 @@ function prepare(seed = randomSeed()): void {
   // (the practice drills, alone, in the setup's day and conditions: the tack and gybe drill off the Cityfront; the
   // mark-rounding drill round the practice course's marks, so its file is forced to the practice course)
   const soloDrill = (app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') && !shown;
-  const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
+  // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
+  // checkArrival, intoSlip)
+  const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSd, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
@@ -273,8 +276,9 @@ function drawTideGraph(): void {
     rows.unshift(['Wind', `${WIND_KIND_LABEL[app.w.windKind]} ${Math.round(b.kt * k)} kt from ${app.S.windDir != null ? `${degAndPoint(app.S.windDir)} (an older setting)` : app.w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (app.S.windTurn ? ` (${turnWords(app.S.windTurn)} from the usual ${compassPoint(b.from - app.S.windTurn)})` : '')}, ${trend} over 90 min${app.w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
   } else { strip.windKt = Math.round(app.w.wind.kt); strip.windFrom = app.w.wind.from; rows.unshift(['Wind', `${Math.round(app.w.wind.kt)} kt from ${degAndPoint(app.w.wind.from)}, as you set it`]); }
   if (!app.w.tide) rows.push(['Current', CURRENTS[app.S.current]?.label ?? app.S.current]);
+  const rainNow = rainLevel(app.S.rain, app.w.clockUtc); // (set, or the record's then)
   if (app.w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (app.w.sea.swell) { strip.sea = `${Math.round(app.w.sea.swell.hs / 0.3048)} ft`; strip.seaSub = `${Math.round(app.w.sea.swell.tp)} s swell`; }
-  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${app.w.sea.swell ? `${Math.round(app.w.sea.swell.hs / 0.3048)} ft, ${Math.round(app.w.sea.swell.tp)} s swell outside the Gate${app.w.sea.swell.total ? ` (the buoy reads ${Math.round(app.w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${app.S.rain ? `, ${app.S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
+  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${app.w.sea.swell ? `${Math.round(app.w.sea.swell.hs / 0.3048)} ft, ${Math.round(app.w.sea.swell.tp)} s swell outside the Gate${app.w.sea.swell.total ? ` (the buoy reads ${Math.round(app.w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(app.w.gunUtc * 60000), sp = sunPosition(app.w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';
@@ -311,7 +315,7 @@ $<HTMLInputElement>('tideTime').addEventListener('change', e => { app.S.tideTime
 function paintSeg(): void {
   document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
     const k = seg.dataset.k as keyof Settings;
-    const cur = String(app.S[k]);
+    const cur = String(app.S[k] ?? (k === 'fog' || k === 'rain' ? 'real' : undefined)); // (fog and rain unset: the real record's)
     seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
   });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (app.S[c.dataset.t as 'aids' | 'windDial' | 'camRide'] ?? 0) === 1; });
 }
@@ -324,7 +328,7 @@ document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEve
   const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
   if (k === 'aids' || k === 'windDial') { app.S[k] = Number(v) as 0 | 1; (app.w.settings as Settings)[k] = app.S[k]; saveSettings(app.S); paintSeg(); return; }
   if (k === 'windKind') { chooseWindKind(app.S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
-  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'judging' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
+  (app.S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'judging' || k === 'raceLength' || k === 'raceFrom' || ((k === 'fog' || k === 'rain') && v === 'real')) ? v : Number(v);
   paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
 }));
 /**
@@ -531,6 +535,8 @@ function beginRaceNow(seed?: number): void {
 $('bGo').onclick = () => { if (app.S.mode === 'drill') app.S.mode = 'race'; app.courseView.close(); app.navView.close(); $('setup').hidden = true; beginRace(); };
 $('bDrill').onclick = () => { app.S.mode = 'drill'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
 $('bManoeuvres').onclick = () => { app.S.mode = 'manoeuvres'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
+// (Learn to sail's lessons and the Rules trainer: overlays of their own, over the Drill page, which Back returns to)
+$('bLessons').onclick = () => openLessons();
 $('bRoundings').onclick = () => { app.S.mode = 'roundings'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
 /* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
 const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
@@ -558,13 +564,13 @@ $('bCondClose').onclick = () => {
 
 /** Learn to sail's lesson tiles (ui/lessons.ts): the ones passed ticked; a tile starts its lesson. */
 function openLessons(): void {
-  $('lessonGrid').innerHTML = lessonGridHtml(app.S.lessonsPassed ?? []);
+  $('lessonGrid').innerHTML = lessonGridHtml(app.S.lessonsPassed ?? [], !!slipById(app.S.boat?.slip));
   $('lessons').hidden = false;
 }
 $('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLElement).closest<HTMLElement>('[data-lesson]')?.dataset.lesson as LessonId | undefined; if (id) { $('lessons').hidden = true; beginLesson(id); } });
 $('bLessonsX').onclick = () => { $('lessons').hidden = true; };
 /** Start a Learn to sail lesson (its tile, in the Drill section). */
-function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'seasonView']) $(el).hidden = true; beginRace(); }
+function beginLesson(id: LessonId): void { app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons', 'seasonView']) $(el).hidden = true; beginRace(); }
 return { noRealWind, beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
 }
 

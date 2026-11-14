@@ -29,7 +29,7 @@ import type { Boat, LineKey } from './boat/boat';
 import { CONDITION_KEYS } from './sim/world';
 import { WorkerHost, type SimHost, type SimView } from './sim/host';
 import type { Command, CtlKey } from './sim/commands';
-import { POLE, byHand, linesByHand } from './boat/physics';
+import { byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
 import { ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
@@ -62,6 +62,8 @@ import { installDevHandles } from './app/devHandles';
 import { mountDrills } from './app/drills';
 import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
+import { dockCardHtml } from './ui/lessons';
+import { RulesTrainer } from './ui/rulesTrainer';
 
 /**
  * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
@@ -82,6 +84,7 @@ const ctx = {
   get DRILL_FROM() { return DRILL_FROM; },
   get S() { return S; },
   get beginRace() { return setup.beginRace; },
+  get rulesTrainer() { return rulesTrainer; },
   get beginLesson() { return setup.beginLesson; },
   get openLessons() { return setup.openLessons; },
   get drillRuns() { return drillRuns; },
@@ -569,6 +572,11 @@ function windShow(on: boolean): void {
 }
 windShow(!!S.windLadder);
 const drills = mountDrills(ctx); // (src/app/drills.ts)
+/** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
+ * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
+const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); });
+$('rulesTrainer').addEventListener('click', e => rulesTrainer.click(e));
+$('bRules').onclick = () => rulesTrainer.open();
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
 function windTick(): void {
   const on = !!S.windLadder && w.running && !w.user.docked;
@@ -625,9 +633,26 @@ function coachTick(dt: number): void {
 /** A lesson (sim/lessons.ts): its one cue in the coach's own places (the trim panel's headline, and on the water for a few
  * seconds when it's new), with how far through the check you are; passed, it's kept with your settings. */
 let lessonCue = '', lessonOf: unknown = null;
+/** Before you go's dock card (ui/lessons.ts dockCardHtml): the gear tapped, then Cast off sends the lesson on. */
+let dockFor: unknown = null;
+const dockGear = new Set<string>();
+const paintDock = () => { $('dockCard').innerHTML = dockCardHtml(dockGear, 1 + (S.crew?.people?.length ?? 0), (S.boat?.perf?.outboard ?? 'none') !== 'none'); };
+$('bDockX').onclick = () => { $('lessonCard').hidden = true; setup.openLessons(); }; // (back to the lessons: this one left)
+$('dockCard').addEventListener('click', e => {
+  const el = e.target as HTMLElement, g = el.closest<HTMLElement>('[data-gear]')?.dataset.gear;
+  if (g) { if (dockGear.has(g)) dockGear.delete(g); else dockGear.add(g); paintDock(); return; }
+  if (el.closest('[data-dock="go"]')) {
+    // the float plan, left with the club (your settings): where, back by when, who's aboard
+    const v = (k: string) => (document.querySelector<HTMLInputElement>(`#dockCard [data-fp="${k}"]`)?.value ?? '').trim();
+    S.floatPlan = { where: v('where'), back: v('back'), aboard: +v('aboard') || 1 }; saveSettings(S);
+    $('lessonCard').hidden = true; send({ k: 'lessonReady' }); send({ k: 'pause', on: false });
+  }
+});
 function lessonTick(): void {
   const L = w.lesson!, tip = $('coachTip');
   if (L !== lessonOf) { lessonOf = L; lessonCue = ''; } // (a new lesson, or the same one again: its first cue shows)
+  // Before you go: at the dock, its card first (the gear, the float plan), the lesson paused behind it
+  if (L.id === 'before' && L.step === 0 && dockFor !== L) { dockFor = L; dockGear.clear(); send({ k: 'pause', on: true }); paintDock(); $('lessonCard').hidden = false; }
   $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
   $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
   if (L.cue !== lessonCue) {
@@ -681,8 +706,9 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant; send({ k: 'pole', want }); // (the pole is always yours: your call only)
-  toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  // (the pole is always yours: your call only. The race answers, setting it or saying why not: sim/commands.ts, so the
+  // message is what the crew actually do, never the page's guess from its mirror)
+  send({ k: 'pole', want: !w.user.poleWant });
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it
@@ -1012,7 +1038,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('seasonView').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('seasonView').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -1196,7 +1222,7 @@ $('bShowReal').onclick = () => { showMin = null; showCond = null; setup.newGame(
 // mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; setup.tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
-  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
+  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 'real', fog: 'real' });
   saveSettings(S); setup.paintSeg(); setup.setupChanged(() => { setup.courseCard(); setup.tideBox(); });
 };
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
@@ -1353,7 +1379,7 @@ function openHomeNow(): void {
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
-  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'seasonView', 'coachPanel']) $(id).hidden = true;
+  for (const id of ['motorAsk', 'homeAsk', 'seasonView', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'coachPanel', 'lessonCard', 'lessons']) $(id).hidden = true;
   seasonPick = null;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
@@ -1398,7 +1424,7 @@ $('realRows').addEventListener('click', e => {
   const r = realRace(b.dataset.real!); if (!r) return;
   // the day as it was: its observed wind and NOAA's tide, the sea it made, the fleet's own start; the real boats that started
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.id });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.id });
   replayPin = null;
   S.opponents = realFleetIds(r, S.boat.sails.number, MAX_OPPONENTS);
   S.fleet = S.opponents.length;
@@ -1467,7 +1493,7 @@ const burgeeUrl = () => { if (ggycBurgee == null) { try { ggycBurgee = burgeeCan
 function seasonApply(series: Series, no: number): boolean {
   const r = series.races.find(x => x.no === no); if (!r || r.abandoned) return false;
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.realId ?? undefined });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.realId ?? undefined });
   replayPin = null; ghostNext = null;
   S.opponents = [...series.fleet]; S.fleet = S.opponents.length;
   if (!S.boat.slip) S.raceFrom = 'water';
@@ -1591,7 +1617,7 @@ function adjustUi(): void {
     if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = k === 'windTurn' ? 'as usual' : 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
   }
   if (S.current !== 'real') real.push('current');
-  if (S.rain) real.push('rain');
+  if (typeof S.rain === 'number' && S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
   const names: Record<string, string> = { windKt: 'wind speed', windTurn: 'wind turned', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');

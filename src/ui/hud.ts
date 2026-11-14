@@ -21,7 +21,7 @@ import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
 import { transitOffset } from '../sim/transits';
-import { targetShape, type Shape } from '../boat/controls';
+import { BOOM_STOP, targetShape, type Shape } from '../boat/controls';
 
 /** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
 function shapeWords(u: Boat): string {
@@ -52,6 +52,7 @@ import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
+import { rainAt, rainLevel } from '../environment/rain';
 import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
@@ -292,7 +293,10 @@ export class Hud {
       luffing: 'Luffing: eased too far, or she\'s pointing too high, so the front of the sail lifts. Trim in, or if it\'s already in hard, bear away until it stops.',
       stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the leeward and leech telltales stream.',
       backed: 'Aback: the jib is sheeted to windward and pushes her bow away (heaving to).', off: '' };
-    tm.title = why[mc] ?? ''; tj.title = why[jc] ?? '';
+    // (the boom on the shroud, stalled on a broad reach: it can't be eased any further, so not "ease")
+    const onShroud = mc === 'stalled' && u.sheets.main >= BOOM_STOP - 0.5;
+    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Ease the vang to let the top of the main twist off, or bear away (or come up) until the leech telltales stream.' : why[mc] ?? '';
+    tj.title = why[jc] ?? '';
     // the sails' shape against the best shape for the conditions, and which line fixes it
     const sw = shapeWords(u);
     $('tpShape').innerHTML = sw;
@@ -720,8 +724,12 @@ export class Hud {
   fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
     // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
-    const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
-    const here = (m: number) => short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`;
+    // (the rain falling: the panel's, or the record's, environment/rain.ts)
+    const rl = rainLevel(wd.settings.rain, wd.clockUtc), rainReal = typeof wd.settings.rain !== 'number';
+    const set = setVisibility({ fog: wd.settings.fog, rain: rl }), why = set.fogSet && rl ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
+    const here = (m: number) => rainReal && !set.fogSet
+      ? (short ? `VIS ${nm(m).toUpperCase()} HERE · RAIN` : `Visibility ${nm(m)} here, in the ${rainAt(wd.clockUtc).says}.`)
+      : (short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`);
     if (set.fogSet) return here(set.m);
     const v = visibilityFor(wd.raceDate, wd.clockUtc);
     if (Number.isFinite(set.m)) { const real = 'none' in v || v.source === 'outlook' ? Infinity : v.source === 'observed' ? v.points[0].m : v.at(wd.user); if (!(real < set.m)) return here(set.m); }

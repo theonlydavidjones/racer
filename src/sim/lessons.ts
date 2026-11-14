@@ -2,6 +2,9 @@ import type { Boat } from '../boat/boat';
 import { KT, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
 import { DrillTracker } from './drill';
+import { byHand } from '../boat/physics';
+import { TRAVELLER_SWING } from '../boat/controls';
+import { inBasin } from '../geo/marina';
 
 /**
  * Learn to sail (the owner's go, 13 Nov 2026; design/learn-to-sail-mockup.png and design/LEARN-TO-SAIL-PLAN.md): lessons
@@ -17,16 +20,19 @@ import { DrillTracker } from './drill';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto';
+export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
+  { id: 'before', no: 2, title: 'Before you go', icon: '🦺', asa: '16, 17, 18, 21' },
   { id: 'tiller', no: 3, title: 'The tiller', icon: '🧭', asa: '24, 26, 27' },
   { id: 'points', no: 4, title: 'Points of sail', icon: '🎏', asa: '22, 28–32' },
   { id: 'irons', no: 5, title: 'Stop, go, irons', icon: '🛑', asa: '25' },
   { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', asa: '5, 33' },
   { id: 'jibing', no: 7, title: 'Jibing', icon: '↪️', asa: '5, 34' },
-  { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' }
+  { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' },
+  { id: 'breeze', no: 11, title: 'A breeze', icon: '💨', asa: '—' },
+  { id: 'home', no: 12, title: 'Home to the slip', icon: '🏁', asa: '23, 38' }
 ];
 /** The lessons that start by a buoy (the tiller's, steered for; stop, go and irons', stopped by). */
 export const BUOY_LESSONS: ReadonlySet<LessonId> = new Set(['tiller', 'irons']);
@@ -60,12 +66,22 @@ export const LESSON_MARKS = {
   /** Heave to: hove to (the physics' own state: the jib aback, boat/physics.ts heaveTo) and forereaching no faster than
    * HOVE_KT, for HOVE_S. A hove-to Folkboat forereaches about 1–1.5 kt (physics.ts: 0.7 kn in 8 kt, 1.5 in 20; peaks
    * near 2), so the mark is 2 kt. */
-  hoveKt: 2, hoveS: 60
+  hoveKt: 2, hoveS: 60,
+  /** A breeze (the Coordinator's call for the owner, 14 Nov 2026: check the easing itself): in the top of the lesson range
+   * (15 kt where she sails), close-hauled with the mainsheet in your own hand, PUFFS puffs answered: a puff is her wind
+   * PUFF_KT over its 20 s mean (in a 15 kt lesson they come every 15–30 s, the sim's own gusts), answered when within
+   * EASE_S of it your own lines (sheet, and the traveler if it's yours) have eased the boom EASE_DEG or more from where it
+   * was settled (within SETTLED_DEG over the 3–10 s before), she's kept sailing (over BREEZE_MIN_KT, close-hauled) and
+   * not laid over past BREEZE_HEEL (coach.ts calls 20° overpowered; 25° is laid over). The next puff counts only once her
+   * wind's back within LULL_KT of its mean and you've trimmed back to within TRIM_BACK_DEG: ease in the puff, trim in the
+   * lull. */
+  puffs: 3, puffKt: 1.5, easeS: 4, easeDeg: 3, settledDeg: 1.5, breezeMinKt: 2.5, breezeHeel: 25, lullKt: 0.5, trimBackDeg: 2
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
-  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward'
+  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
+  breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -91,11 +107,19 @@ export class LessonTracker {
   passed = false; passedT: number | null = null;
   /** The tiller: the buoy to steer for, and then the course to hold (deg, by the compass). */
   readonly buoy: Vec | null;
+  /** Home to the slip: where her slip is. */
+  slip: Vec | null = null;
   course: number | null = null;
   /** Tacking and jibing: the good ones so far, scored by the tack and gybe drill's own tracker. */
   good = 0;
   readonly turns: DrillTracker | null;
   private held = 0; private seen = 0; private ironsT = 0; private lastTwa = 0;
+  /** A breeze: her wind's 20 s mean, and the puff being answered (since when, the sheet and traveler as it came). */
+  private puffMean: number | null = null;
+  private hist: number[] = [];
+  private sampleT = 0;
+  private rearm: { ref: number } | null = null;
+  private puff: { t: number; ref: number; eased: boolean; over: boolean } | null = null;
 
   constructor(id: LessonId, buoy: Vec | null) {
     this.id = id; this.buoy = BUOY_LESSONS.has(id) ? buoy : null;
@@ -109,6 +133,9 @@ export class LessonTracker {
     else if (this.id === 'points') this.points(b, dt);
     else if (this.id === 'irons') this.irons(b, t, dt);
     else if (this.id === 'heaveto') this.heaveTo(b, dt);
+    else if (this.id === 'breeze') this.breeze(b, dt);
+    else if (this.id === 'home') this.home(b);
+    else if (this.id === 'before') this.before(b);
     else this.turning(b, t, dt, hs);
     if (this.passed) { this.passedT = t; this.cue = 'Lesson passed ✓'; this.progress = 1; }
   }
@@ -189,5 +216,70 @@ export class LessonTracker {
     const on = !!b.hove && b.v / KT < LESSON_MARKS.hoveKt;
     if (on && this.step === 0) { this.step = 1; this.cue = 'Hove to: sit there a minute'; }
     if (this.hold(on, dt, LESSON_MARKS.hoveS)) this.passed = true;
+  }
+
+  private breeze(b: Boat, dt: number): void {
+    const M = LESSON_MARKS, kt = b.ww.kt;
+    this.puffMean = this.puffMean == null ? kt : this.puffMean + (kt - this.puffMean) * dt / 20;
+    const mine = byHand(b, 'mainsheet');
+    if (this.step === 0) { if (mine) { this.step = 1; this.cue = `Close-hauled: ease the main in each puff (0 of ${M.puffs})`; } return; }
+    // the boom as your own lines set it (the crew's traveler doesn't count as your ease): the sheet's part, and the car's
+    // when you have the traveler too (controls.ts boomAngle)
+    const own = 80 * Math.pow(b.ctl.mainsheet, 1.5) + (byHand(b, 'traveller') ? TRAVELLER_SWING * b.ctl.traveller : 0);
+    // a sample every quarter second, the last 10 s
+    this.sampleT += dt;
+    if (this.sampleT >= 0.25) { this.sampleT = 0; this.hist.push(own); if (this.hist.length > 40) this.hist.shift(); }
+    const [lo, hi] = POINTS[0].band(b), sailing = mine && b.twa >= lo - 5 && b.twa <= hi + 5 && b.v / KT > M.breezeMinKt;
+    if (this.rearm) {
+      // the next puff counts once this one's passed (her wind back near its mean) and you've trimmed back in for the lull
+      if (kt < this.puffMean + M.lullKt && own <= this.rearm.ref + M.trimBackDeg) this.rearm = null;
+      return;
+    }
+    const P = this.puff;
+    if (!P) {
+      // a puff arriving: the sheet must have been settled before it (3–10 s ago, within SETTLED_DEG), so pumping it in and
+      // out blindly doesn't answer anything; an ease begun in the last 3 s, as the puff darkens the water ahead, counts
+      if (!sailing || kt <= this.puffMean + M.puffKt || this.hist.length < 40) return;
+      const before = this.hist.slice(0, 28), ref = Math.min(...before);
+      if (Math.max(...before) - ref > M.settledDeg) return;
+      this.puff = { t: 0, ref, eased: false, over: false };
+      return;
+    }
+    P.t += dt;
+    if (!sailing) { this.puff = null; return; } // sheet let go, off the wind or stopped: that puff doesn't count
+    if (P.t <= M.easeS && own - P.ref >= M.easeDeg) P.eased = true;
+    if ((b.heelMag ?? 0) >= M.breezeHeel) P.over = true;
+    if (P.t < M.easeS + 2) return;
+    if (P.eased && !P.over) this.good++;
+    this.puff = null; this.rearm = { ref: P.ref };
+    this.progress = this.good / M.puffs;
+    if (this.good >= M.puffs) { this.passed = true; return; }
+    this.cue = `Close-hauled: ease the main in each puff, trim in the lulls (${this.good} of ${M.puffs})`;
+  }
+
+  /** Before you go: the dock card done (the page's command: the gear checked and the float plan left). After dark the
+   * lights go on before leaving (Rule 20: sunset to sunrise); by day that step is skipped. */
+  ready(night = false): void {
+    if (this.id !== 'before' || this.step !== 0) return;
+    if (night) { this.step = 1; this.cue = 'It\'s dark: navigation lights on'; } else { this.step = 2; this.cue = 'Hoist both sails and push off'; }
+  }
+
+  /** Before you go: at the dock, the gear and the float plan (the page's card), after dark the lights on (ASA 101 K17;
+   * she starts with them off), then both sails hoisted and off the dock. */
+  private before(b: Boat): void {
+    if (this.step === 1) { if (!b.lightsOff) { this.step = 2; this.cue = 'Hoist both sails and push off'; } return; }
+    if (this.step !== 2) return;
+    const up = !b.rig || (b.rig.mainUp && b.rig.jibUp && b.rig.main > 0.95 && b.rig.jib > 0.95);
+    if (up && !b.docked && this.slip && Math.hypot(b.x - this.slip.x, b.y - this.slip.y) > 30) this.passed = true;
+  }
+
+  /** Home to the slip: from her slip out of the harbor, and back in, made fast (world.ts intoSlip: stopped, bow in). */
+  private home(b: Boat): void {
+    if (this.step === 0) {
+      // (out of the harbor: out of its basin, whatever the slip's depth in it or the marina)
+      if (this.slip && !b.docked && !inBasin(b)) { this.step = 1; this.cue = 'Now home: sail in and stop in your slip, bow in'; }
+      return;
+    }
+    if (b.docked) this.passed = true;
   }
 }
