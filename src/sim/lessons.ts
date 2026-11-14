@@ -1,5 +1,5 @@
 import type { Boat } from '../boat/boat';
-import { KT, wrap, type Vec } from '../core/math';
+import { KT, V, wrap, type Vec } from '../core/math';
 import { beatFor } from '../boat/seaway';
 import { DrillTracker } from './drill';
 import { byHand } from '../boat/physics';
@@ -20,7 +20,7 @@ import { inBasin } from '../geo/marina';
  * numbers for them, which an instructor judges by eye.
  */
 
-export type LessonId = 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
+export type LessonId = 'mob' | 'tiller' | 'points' | 'irons' | 'tacking' | 'jibing' | 'heaveto' | 'breeze' | 'home' | 'before';
 /** The lessons, each with the ASA 101 standard's items it practices (design/ASA-101-CHECK.md; "—": beyond 101, from US
  * Sailing's Basic Keelboat). */
 export const LESSONS: { id: LessonId; no: number; title: string; icon: string; asa: string }[] = [
@@ -31,6 +31,7 @@ export const LESSONS: { id: LessonId; no: number; title: string; icon: string; a
   { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', asa: '5, 33' },
   { id: 'jibing', no: 7, title: 'Jibing', icon: '↪️', asa: '5, 34' },
   { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' },
+  { id: 'mob', no: 10, title: 'Crew overboard', icon: '🆘', asa: '36' },
   { id: 'breeze', no: 11, title: 'A breeze', icon: '💨', asa: '—' },
   { id: 'home', no: 12, title: 'Home to the slip', icon: '🏁', asa: '23, 38' }
 ];
@@ -75,13 +76,22 @@ export const LESSON_MARKS = {
    * not laid over past BREEZE_HEEL (coach.ts calls 20° overpowered; 25° is laid over). The next puff counts only once her
    * wind's back within LULL_KT of its mean and you've trimmed back to within TRIM_BACK_DEG: ease in the puff, trim in the
    * lull. */
-  puffs: 3, puffKt: 1.5, easeS: 4, easeDeg: 3, settledDeg: 1.5, breezeMinKt: 2.5, breezeHeel: 25, lullKt: 0.5, trimBackDeg: 2
+  puffs: 3, puffKt: 1.5, easeS: 4, easeDeg: 3, settledDeg: 1.5, breezeMinKt: 2.5, breezeHeel: 25, lullKt: 0.5, trimBackDeg: 2,
+  /** Crew overboard (ASA 101 skill 36: "the correct actions … from the time a person falls overboard until safely
+   * recovered"): a reach held REACH_S, then the person goes over; recovered once she's stopped alongside them, the person
+   * within ALONGSIDE_M of her side and her speed through the water under MOB_KT, for MOB_HOLD_S. US Sailing's 2005 Crew
+   * Overboard Rescue Symposium, sailed on San Francisco Bay (J. Rousmaniere, final report, 26 June 2006,
+   * https://www.ussailing.org/wp-content/uploads/2018/03/2005_Crew_Overboard_Symposium.pdf): the approach ends "on a
+   * close reach … with the boat at low speed", "controlled and low, but not so low that the boat loses steerageway";
+   * victims "set a 2-knot upper limit" (one took 3; Annapolis's rule is 1). Faster than that alongside, she'd run them
+   * down. Its measure of success is contact within MOB_GOOD_S (87% of 179 sailboat tests). */
+  reachS: 15, alongsideM: 1.5, mobKt: 2, mobHoldS: 2, mobGoodS: 240
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
   tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
-  breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
+  mob: 'Sail a beam reach', breeze: 'Take the mainsheet: it\'s blowing 15', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -120,6 +130,10 @@ export class LessonTracker {
   private sampleT = 0;
   private rearm: { ref: number } | null = null;
   private puff: { t: number; ref: number; eased: boolean; over: boolean } | null = null;
+  /** Crew overboard: the person in the water (where, since when, and the side their crosswind leeway takes them: +1 to the
+   * right of downwind), and how long they were in when she came alongside (s). */
+  mob: { x: number; y: number; t: number; side: number } | null = null;
+  mobTime: number | null = null;
 
   constructor(id: LessonId, buoy: Vec | null) {
     this.id = id; this.buoy = BUOY_LESSONS.has(id) ? buoy : null;
@@ -127,7 +141,7 @@ export class LessonTracker {
     this.turns = id === 'tacking' || id === 'jibing' ? new DrillTracker() : null;
   }
 
-  update(b: Boat, t: number, dt: number, hs = 0): void {
+  update(b: Boat, t: number, dt: number, hs = 0, env?: MobEnv): void {
     if (this.passed) return;
     if (this.id === 'tiller') this.tiller(b, dt);
     else if (this.id === 'points') this.points(b, dt);
@@ -136,8 +150,38 @@ export class LessonTracker {
     else if (this.id === 'breeze') this.breeze(b, dt);
     else if (this.id === 'home') this.home(b);
     else if (this.id === 'before') this.before(b);
+    else if (this.id === 'mob') this.overboard(b, t, dt, env);
     else this.turning(b, t, dt, hs);
-    if (this.passed) { this.passedT = t; this.cue = 'Lesson passed ✓'; this.progress = 1; }
+    if (this.passed) { this.passedT = t; this.cue = this.mobTime != null ? `Alongside in ${Math.floor(this.mobTime / 60)}:${String(Math.round(this.mobTime % 60)).padStart(2, '0')} ✓` : 'Lesson passed ✓'; this.progress = 1; }
+  }
+
+  /**
+   * Crew overboard. The person (in a life jacket) goes over the side at her stern, and from then on drifts with the
+   * surface current and their own leeway in the wind (MOB_LEEWAY): you turn back and stop alongside them. As a school
+   * drills it, the one in the water is the drill's dummy in a life jacket (her crew stay aboard, so she sails as she was).
+   */
+  private overboard(b: Boat, t: number, dt: number, env?: MobEnv): void {
+    const M = LESSON_MARKS, kt = Math.abs(b.v - (b.astern ?? 0)) / KT;
+    if (this.step === 0) {
+      if (!this.hold(b.twa >= 70 && b.twa <= 110 && kt > 2, dt, M.reachS)) return;
+      // over the side at the stern quarter, on the side the crew sit (to windward: the wind's side of her), just clear of the transom
+      const up = b.tack === 'P' ? -1 : 1, aft = V(b.h + 180), side = V(b.h + 90 * up);
+      this.mob = { x: b.x + aft.x * 4.2 + side.x * 0.9, y: b.y + aft.y * 4.2 + side.y * 0.9, t, side: Math.floor(t * 7) % 2 ? 1 : -1 }; // (which side their leeway keeps to: chance, here the moment's)
+      this.step = 1; this.progress = 0; this.cue = 'Crew overboard! Turn back and stop alongside them';
+      return;
+    }
+    const p = this.mob!;
+    if (env) { const d = mobDrift(env.current(p), env.wind(p), p.side); p.x += d.x * dt; p.y += d.y * dt; }
+    // where they are from her: along her (+ ahead) and across (+ to starboard), her hull a box 7.6 m by 2.2
+    const dx = p.x - b.x, dy = p.y - b.y, f = V(b.h), s = V(b.h + 90), along = dx * f.x + dy * f.y, across = dx * s.x + dy * s.y;
+    const inHull = Math.abs(along) < 3.8 && Math.abs(across) < 1.1;
+    if (inHull) {
+      // her hull pushes them aside (they don't pass through her); at speed she's run them down
+      const out = (across >= 0 ? 1 : -1) * 1.15 - across; p.x += s.x * out; p.y += s.y * out;
+      if (kt > M.mobKt) { this.cue = 'Too fast: you ran them down. Come round and stop alongside'; this.held = 0; return; }
+    }
+    const alongside = Math.abs(along) < 3.8 && Math.abs(across) < 1.1 + M.alongsideM;
+    if (this.hold(alongside && kt < M.mobKt, dt, M.mobHoldS)) { this.mobTime = t - p.t; this.passed = true; }
   }
 
   private tiller(b: Boat, dt: number): void {
@@ -282,4 +326,22 @@ export class LessonTracker {
     }
     if (b.docked) this.passed = true;
   }
+}
+
+/** What crew overboard needs of the World: the surface current (m/s, as a vector) and the wind (10 m) where the person is. */
+export interface MobEnv { current(p: Vec): Vec; wind(p: Vec): { from: number; kt: number } }
+/**
+ * A person in the water's leeway: their drift through the water in the wind, as the US Coast Guard's leeway table gives
+ * it for a person in water, vertical, in a type III life jacket (Allen & Plourde 1999, "Review of Leeway: Field Experiments
+ * and Implementation", CG-D-08-99; read as OpenDrift's copy of the table, OBJECTPROP.DAT, PIW-2,
+ * https://github.com/OpenDrift/opendrift/blob/master/opendrift/models/OBJECTPROP.DAT): downwind 0.48% of the 10 m wind,
+ * crosswind 0.15% to one side (which side an object keeps is chance). About 0.05 kt in 10 kt of wind: with them in a
+ * life jacket it's the current that carries them, and her.
+ */
+export const MOB_LEEWAY = { down: 0.0048, cross: 0.0015 };
+/** The person's drift over the ground (m/s): the current plus their leeway ("the motion of the object induced by wind …
+ * relative to the ambient current", Breivik et al. 2013, arXiv 1211.0805). */
+export function mobDrift(cur: Vec, wind: { from: number; kt: number }, side: number): Vec {
+  const u = wind.kt * KT, dn = V(wind.from + 180), cr = V(wind.from + 180 + 90 * side);
+  return { x: cur.x + u * (MOB_LEEWAY.down * dn.x + MOB_LEEWAY.cross * cr.x), y: cur.y + u * (MOB_LEEWAY.down * dn.y + MOB_LEEWAY.cross * cr.y) };
 }
