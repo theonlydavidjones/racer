@@ -474,6 +474,19 @@ physics, ranked like the ten above:
 |---|---:|---:|---|---|
 | P1 | 283.2 | 50 | sourced |  |
 
+### src/environment/harborMouth.ts
+
+| Constant | Value | Line | Class | Note |
+|---|---:|---:|---|---|
+| MOUTH.gyre | 0.25 | 56 | sourced | Booij 1986, in Bijvelds 1997 §3 |
+| MOUTH.peak, rim | 0.75, 1.25 | 58 | estimate | the gyre's shape: assumed |
+| MOUTH.spread | 0.2 | 60 | sourced | measured in a harbor's mouth, 0.17–0.23 (Bijvelds 1997) |
+| MOUTH.B0 | 1 | 60 | estimate | the layer's width at the corner |
+| MOUTH.spacing | 3 | 62 | sourced | Bijvelds 1997 |
+| MOUTH.u, v | 0.2, 0.1 | 62 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one train of eddies (upper bound) |
+| MOUTH.free | 0.18 | 64 | sourced | Brown & Roshko 1974, via Bijvelds eq. 3.6 |
+| MOUTH.slack | 0.02 | 66 | estimate |  |
+
 ### src/environment/pierWakes.ts
 
 | Constant | Value | Line | Class | Note |

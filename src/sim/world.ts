@@ -33,6 +33,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
+import { MOUTH_REFS, withHarborMouths } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
@@ -608,7 +609,7 @@ export class World {
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
     const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
-    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    return withHarborMouths(p, c, k, this.mouthFlows(), this.t); // (and the gyre and eddies in a harbor's mouth: environment/harborMouth.ts)
   }
   /** The stream at a point as if no breakwater stood there: the sea's look upwind for the water its waves came
    * through (environment/sea.ts), which is never a harbor's still basin (no waves come to open water through one). */
@@ -616,7 +617,7 @@ export class World {
    * waiting on a harbor's still-water grid not built yet (the open stream there until it is, a moment later). */
   currentDrawn(p: Vec): Vec {
     const c = withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t), k = basinCalmIfBuilt(p) ?? 1;
-    return k === 1 ? c : { x: c.x * k, y: c.y * k };
+    return withHarborMouths(p, c, k, this.mouthFlows(), this.t);
   }
   openStreamAt(p: Vec): Vec { return withPierWakes(p, this.streamAt(p, false), this.pierFlows(), this.t); }
   /** (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear: only for a boat's own current,
@@ -635,6 +636,14 @@ export class World {
     return this.flows;
   }
   private flowsC: Vec | null = null;
+  /** The stream crossing each harbor mouth (environment/harborMouth.ts), refreshed with the piers'. */
+  private mouthT = NaN; private mouthC: Vec | null = null; private mouths: Vec[] = [];
+  private mouthFlows(): Vec[] {
+    if (!(Math.abs(this.t - this.mouthT) < 30) || (!this.tide && this.mouthC !== this.cvec)) {
+      this.mouthT = this.t; this.mouthC = this.cvec; this.mouths = MOUTH_REFS.map(q => this.streamAt(q, false));
+    }
+    return this.mouths;
+  }
   /**
    * The true wind at a point: the course-wide wind (with its oscillating shifts), stronger in the slot and
    * lighter near the shore, plus whatever puff or lull is passing.
