@@ -251,7 +251,7 @@ describe('in the world', () => {
     // (the eddies' beat and the gyre carry on through a change of the wind's setting)
     const before = at4.currentAt(deep); at4.applyConditions({ ...at4.settings, windKt: 16 } as Settings); const after = at4.currentAt(deep);
     expect(Math.hypot(after.x - before.x, after.y - before.y)).toBeLessThan(0.002);
-  });
+  }, 60_000); // (it builds several Worlds under the real tide: 4 to 5 s on a slow host, at the default limit)
   it('is smooth to sail through: no step in the water between one half-meter and the next, either tide', () => {
     for (const cur of ['flood', 'bigebb']) {
       const w = world(cur), U = Math.abs(alongOf(w.currentAt({ x: M.ref.x, y: M.ref.y + 80 })));
