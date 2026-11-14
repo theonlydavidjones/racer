@@ -46,54 +46,56 @@ function cubic(t: number, o: Float64Array): void {
   const t2 = t * t, t3 = t2 * t;
   o[0] = (-t3 + 2 * t2 - t) / 2; o[1] = (3 * t3 - 5 * t2 + 2) / 2; o[2] = (-3 * t3 + 4 * t2 + t) / 2; o[3] = (t3 - t2) / 2;
 }
-/**
- * The table's rows (up to 16) that a wind and an angle read, and each one's weight, into rows/ws/ks; returns how many.
- * Points beyond the table's edge (2 and 40 kt, 30° and 180°) are its edge repeated. A point with no weight is left out:
- * on a whole knot and a whole 5°, the one row.
- */
-function taps(tws: number, twa: number, rows: Int32Array, ks: Float64Array): number {
-  const w = clamp(tws, 2, 40), a = clamp(twa, 30, 180) / 5;
-  const w0 = Math.floor(w), a0 = Math.floor(a);
-  cubic(w - w0, W); cubic(a - a0, WA);
-  let n = 0;
-  for (let i = 0; i < 4; i++) {
-    if (W[i] === 0) continue;
-    const wi = clamp(w0 + i - 1, 2, 40);
-    for (let j = 0; j < 4; j++) {
-      const k = W[i] * WA[j];
-      if (k === 0) continue;
-      const aj = clamp(a0 + j - 1, 6, 36);
-      rows[n] = (wi * 64 + aj) * 32; ks[n] = k; n++;
-    }
-  }
-  return n;
-}
-const ROWS = new Int32Array(16), KS = new Float64Array(16);
 /** Drive at speed v over drive at the polar's speed vt (both m/s), for tws kt at the course's angle twa. 1 at v = vt. */
-export function driveRatio(tws: number, twa: number, v: number, vt: number): number {
-  if (vt <= 0.05) return 1;
-  const n = taps(tws, twa, ROWS, KS), x = clamp(v / vt * 20, 0, 29.999), q = Math.floor(x), f = x - q;
-  let s0 = 0, s1 = 0;
-  for (let i = 0; i < n; i++) { s0 += KS[i] * row(ROWS[i], q); s1 += KS[i] * row(ROWS[i], q + 1); }
-  return s0 * (1 - f) + s1 * f;
-}
+export const driveRatio = (tws: number, twa: number, v: number, vt: number): number => driveCurveFor(tws, twa, vt)(v);
 /**
- * driveRatio as a curve for one wind, angle and polar speed: the rows and their weights worked out once, and each
- * look a few multiplies and reads (the AI's predictions step a speed along it hundreds of times).
+ * driveRatio as a curve for one wind, angle and polar speed. Read from FINE, a finer table (a quarter knot by 1°) of
+ * the cubic blend, worked out the first time each of its points is asked for and read straight-line between them. Its
+ * corners are a fifth as far apart as the coarse table's and smaller (at 45°, 6 kt, the slope steps −0.0061 to −0.0033 a
+ * degree, where the straight-line blend of the coarse table stepped −0.0084 to −0.0008), too small to make a second peak
+ * of her speed made good; and a look is four reads where the cubic itself took sixteen (it's made for every boat
+ * several times a step: read in full, the step was 3% slower).
  */
 export function driveCurveFor(tws: number, twa: number, vt: number): (v: number) => number {
   if (vt <= 0.05) return () => 1;
-  const n = taps(tws, twa, ROWS, KS), rows = ROWS.slice(0, n), ks = KS.slice(0, n), s = 20 / vt;
-  const col = (q: number) => { let t = 0; for (let i = 0; i < n; i++) t += ks[i] * row(rows[i], q); return t; };
+  const w = (clamp(tws, 2, 40) - 2) * 4, a = clamp(twa, 30, 180) - 30, s = 20 / vt;
+  const i = Math.min(Math.floor(w), FW - 2), j = Math.min(Math.floor(a), FA - 2), fw = w - i, fa = a - j;
+  const k00 = (1 - fw) * (1 - fa), k01 = (1 - fw) * fa, k10 = fw * (1 - fa), k11 = fw * fa;
+  const r00 = (i * FA + j) * 32, r01 = r00 + 32, r10 = r00 + FA * 32, r11 = r10 + 32;
   return (v: number) => {
     const x = clamp(v * s, 0, 29.999), q = Math.floor(x), f = x - q;
-    return col(q) * (1 - f) + col(q + 1) * f;
+    return (k00 * fine(r00, q) + k01 * fine(r01, q) + k10 * fine(r10, q) + k11 * fine(r11, q)) * (1 - f)
+      + (k00 * fine(r00, q + 1) + k01 * fine(r01, q + 1) + k10 * fine(r10, q + 1) + k11 * fine(r11, q + 1)) * f;
   };
 }
-/** One table entry by its row's base and the speed's twentieth: cached, else worked out. */
-function row(r: number, q: number): number {
-  const k = cache[r + q];
-  return k !== 0 ? k : fill(r, q);
+/** The fine table's size: 2–40 kt by quarters, 30–180° by degrees. */
+const FW = 153, FA = 151;
+const FINE = new Float32Array(FW * FA * 32); // (3 MB, filled as asked for: single precision, a part in ten million, is far finer than the table)
+/** One point of the fine table (r: its row's start, q: the speed's twentieth): cached, else the cubic blend there. */
+function fine(r: number, q: number): number {
+  const k = FINE[r + q];
+  if (k !== 0) return k;
+  const ij = r / 32, i = Math.floor(ij / FA), j = ij - i * FA;
+  FINE[r + q] = cubicBlend(2 + i / 4, 30 + j, q);
+  return FINE[r + q]; // (as stored, rounded to single precision: the same whoever asked first)
+}
+/** The coarse table blended by Catmull-Rom at a wind and an angle, at a speed's twentieth q. */
+export function cubicBlend(tws: number, twa: number, q: number): number {
+  const w = clamp(tws, 2, 40), a = clamp(twa, 30, 180) / 5, w0 = Math.floor(w), a0 = Math.floor(a);
+  cubic(w - w0, W); cubic(a - a0, WA);
+  const b0 = clamp(w0 - 1, 2, 40) * 2048 + q, b1 = w0 * 2048 + q, b2 = Math.min(w0 + 1, 40) * 2048 + q, b3 = Math.min(w0 + 2, 40) * 2048 + q;
+  const c0 = Math.max(a0 - 1, 6) * 32, c1 = a0 * 32, c2 = Math.min(a0 + 1, 36) * 32, c3 = Math.min(a0 + 2, 36) * 32;
+  const A0 = WA[0], A1 = WA[1], A2 = WA[2], A3 = WA[3];
+  return W[0] * line(b0, c0, c1, c2, c3, A0, A1, A2, A3) + W[1] * line(b1, c0, c1, c2, c3, A0, A1, A2, A3) + W[2] * line(b2, c0, c1, c2, c3, A0, A1, A2, A3) + W[3] * line(b3, c0, c1, c2, c3, A0, A1, A2, A3);
+}
+/** One wind's row of the blend at one speed: its four angles, weighed. */
+function line(b: number, c0: number, c1: number, c2: number, c3: number, A0: number, A1: number, A2: number, A3: number): number {
+  return A0 * at(b + c0) + A1 * at(b + c1) + A2 * at(b + c2) + A3 * at(b + c3);
+}
+/** One table entry by its index: cached, else worked out. */
+function at(i: number): number {
+  const k = cache[i];
+  return k !== 0 ? k : fill(i - (i & 31), i & 31);
 }
 function fill(r: number, q: number): number {
   // (r is (w·64 + a/5)·32: w ≤ 40, a/5 ≤ 36, q ≤ 30, each in its own field, no two conditions share a key)

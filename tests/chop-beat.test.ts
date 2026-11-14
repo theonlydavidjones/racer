@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { beatInChop, speedInChop } from '../src/boat/seaway';
 import { polar } from '../src/boat/polar';
-import { driveRatio, driveCurveFor } from '../src/boat/driveCurve';
+import { cubicBlend, driveRatio, driveCurveFor } from '../src/boat/driveCurve';
 import { HULL, hullResistance, resistanceParts } from '../src/boat/dynamics';
 import { D2R, KT } from '../src/core/math';
 
@@ -57,16 +57,22 @@ describe('the beat angle in chop', () => {
 describe('the sails\' drive against her speed, between the table\'s knots and angles', () => {
   it('is the table\'s own figure on a whole knot and a whole 5°, and blended between its neighbors off them', () => {
     const vt = polar(12, 45), at = (w: number, a: number) => driveRatio(w, a, 0.6 * polar(w, a), polar(w, a));
-    // (halfway between two knots, halfway between two angles: Catmull-Rom's halfway, (−p₋₁ + 9p₀ + 9p₁ − p₂)/16, of the
-    // points either side and one beyond each, at the same share of her speed)
-    const r = (w: number, a: number) => driveRatio(w, a, 0.6 * vt, vt);
+    // (the cubic blend, halfway between two knots, halfway between two angles: Catmull-Rom's halfway,
+    // (−p₋₁ + 9p₀ + 9p₁ − p₂)/16, of the table's points either side and one beyond each)
+    const q = 12, cb = (w: number, a: number) => cubicBlend(w, a, q);
     const half = (f: (i: number) => number) => (-f(-1) + 9 * f(0) + 9 * f(1) - f(2)) / 16;
-    expect(r(12.5, 45)).toBeCloseTo(half(i => r(12 + i, 45)), 9);
-    expect(r(12, 47.5)).toBeCloseTo(half(i => r(12, 45 + 5 * i)), 9);
-    expect(r(12.5, 47.5)).toBeCloseTo(half(i => half(j => r(12 + i, 45 + 5 * j))), 9);
-    // (its slope runs on through a table angle: no corner at 45°, where the straight-line blend turned one)
+    expect(cb(12.5, 45)).toBeCloseTo(half(i => cb(12 + i, 45)), 12);
+    expect(cb(12, 47.5)).toBeCloseTo(half(i => cb(12, 45 + 5 * i)), 12);
+    expect(cb(12.5, 47.5)).toBeCloseTo(half(i => half(j => cb(12 + i, 45 + 5 * j))), 12);
+    // (driveRatio reads it from the finer table: on its points (quarter knots, whole degrees) the cubic itself, and
+    // between them within a part in ten thousand)
+    const r = (w: number, a: number) => driveRatio(w, a, 0.6 * vt, vt);
+    expect(r(12.25, 47)).toBeCloseTo(cb(12.25, 47), 6);
+    for (const [w, a] of [[12.1, 47.5], [12.6, 43.3], [7.4, 61.7]]) expect(Math.abs(r(w, a) - cb(w, a))).toBeLessThan(1e-4);
+    // (the straight-line blend's corner at 45°, 6 kt, −0.0084 to −0.0008 a degree, is down to the fine table's own:
+    // under half the slope, where it was nine tenths)
     const v6 = polar(6, 45), sl = (a: number) => (driveRatio(6, a + 0.01, 0.8 * v6, v6) - driveRatio(6, a - 0.01, 0.8 * v6, v6)) / 0.02;
-    expect(Math.abs(sl(45.03) - sl(44.97))).toBeLessThan(0.1 * Math.abs(sl(44.97))); // (straight-line, it went from −0.0084 to −0.0008 a degree)
+    expect(Math.abs(sl(45.03) - sl(44.97))).toBeLessThan(0.5 * Math.abs(sl(44.97)));
     expect(at(12, 45)).toBeGreaterThan(0.5); expect(at(12, 45)).toBeLessThan(1.05); // (slowed to 0.6 of her speed close-hauled she has less drive, not more)
     // (no step at a bin's edge, where the nearest knot and the nearest 5° used to change)
     for (const [w, a] of [[12.5, 45], [12, 42.5], [12, 47.5], [7.5, 40]]) for (const [dw, da] of [[0.01, 0], [0, 0.01]]) expect(Math.abs(r(w + dw, a + da) - r(w - dw, a - da))).toBeLessThan(0.002);
