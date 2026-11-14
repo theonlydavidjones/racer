@@ -650,6 +650,12 @@ export function inPilePier(p: Vec, pad = 0): boolean {
   for (const P of PILE_PIERS) { if (inPoly(p, P.pts)) return true; if (pad > 0) for (let i = 0; i < P.pts.length; i++) if (segPt(p, P.pts[i], P.pts[(i + 1) % P.pts.length]) < pad) return true; }
   return false;
 }
+/** How far p is from the nearest pile pier's shed (m, 0 inside one). */
+export function pilePierDist(p: Vec): number {
+  let m = Infinity;
+  for (const P of PILE_PIERS) { if (inPoly(p, P.pts)) return 0; for (let i = 0; i < P.pts.length; i++) m = Math.min(m, segPt(p, P.pts[i], P.pts[(i + 1) % P.pts.length])); }
+  return m;
+}
 /** The coastline's run round each pile pier: its deck's edge, within 15 m of the shed's walls. */
 export const PILE_FACE = 15;
 const FLOW = (() => {

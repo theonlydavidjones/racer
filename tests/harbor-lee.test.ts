@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { harborLeeDeficit } from '../src/environment/harborLee';
-import { groundHeight, terrainLee } from '../src/environment/shadows';
+import { terrainLee } from '../src/environment/shadows';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { World } from '../src/sim/world';
 import { COURSES } from '../src/courses/registry';
 import { LL } from '../src/geo/geo';
-import { harborAt, slipById } from '../src/geo/marina';
-import { PILE_PIERS, onLand } from '../src/geo/shore';
+import { harborAt, hitsWall, slipById } from '../src/geo/marina';
+import { PILE_PIERS, inPilePier, onLand } from '../src/geo/shore';
 import { KT } from '../src/core/math';
 
 /**
@@ -15,23 +15,35 @@ import { KT } from '../src/core/math';
  * seams (Charts' wind-shadow layer, #261).
  */
 describe('the lee of the harbors\' walls and Fort Mason\'s sheds', () => {
-  it('a westerly behind Gashouse Cove\'s west seawall: lighter just off it, back to the whole wind within about 30 heights', () => {
+  it('a westerly off Gashouse Cove\'s west seawall (a step down from the Marina Green): lighter close in, gone within about 15 step heights', () => {
     const row = Array.from({ length: 60 }, (_, i) => ({ x: 650 + i * 3, y: -359 })).filter(p => !onLand(p) && harborAt(p));
     const first = row[0], at = (d: number) => harborLeeDeficit({ x: first.x + d, y: first.y }, 270);
-    expect(at(5)).toBeGreaterThan(0.15); // (a third of the rig in the wall's cavity, 70% slower there)
-    expect(at(40)).toBeLessThan(at(5));
-    expect(harborLeeDeficit({ x: first.x + 150, y: first.y }, 270)).toBeLessThan(0.01);
+    expect(at(3)).toBeGreaterThan(0.15); // (the lowest third of the rig in the step's bubble)
+    expect(at(60)).toBeLessThan(0.02);
   });
-  it('the sheds on Fort Mason\'s piers (13–17 m, OSM) shelter the whole rig behind them; a wind along the shore of the cove, none', () => {
-    const P1 = PILE_PIERS.find(p => p.name === 'Pier 1')!, xe = Math.max(...P1.pts.map(q => q.x)), ym = P1.pts.reduce((a, q) => a + q.y, 0) / P1.pts.length;
-    expect(harborLeeDeficit({ x: xe + 20, y: ym }, 270)).toBeGreaterThan(0.5); // (in the shed's cavity)
-    expect(harborLeeDeficit({ x: xe - 60, y: ym }, 270)).toBeLessThan(0.2); // (upwind of it, in the cove: only the low walls' lee)
-  });
-  it('Josephine\'s slip (572), 85 m in from the west seawall, has a lee of a few percent in the westerly', () => {
+  it('Josephine\'s slip (572): next to nothing from the seawall 85 m upwind in a westerly; a NNW wind over the breakwater 55 m off, a little', () => {
     const s = slipById('gashouse-cove:572')!;
-    expect(harborLeeDeficit(s.p, 270)).toBeGreaterThan(0.02);
-    expect(harborLeeDeficit(s.p, 270)).toBeLessThan(0.2);
+    expect(harborLeeDeficit(s.p, 270)).toBeLessThan(0.02);
+    const nnw = harborLeeDeficit(s.p, 340);
+    expect(nnw).toBeGreaterThan(0.05); expect(nnw).toBeLessThan(0.18); // (Perera's fence at 22 heights, over the rig: about 0.1)
   });
+  it('the sheds on Fort Mason\'s piers (13–17 m, OSM) shelter the whole rig behind them, and nothing upwind of them', () => {
+    const P1 = PILE_PIERS.find(p => p.name === 'Pier 1')!, xe = Math.max(...P1.pts.map(q => q.x)), ym = P1.pts.reduce((a, q) => a + q.y, 0) / P1.pts.length;
+    const behind = harborLeeDeficit({ x: xe + 15, y: ym }, 270), before = harborLeeDeficit({ x: xe - 60, y: ym }, 270);
+    expect(behind).toBeGreaterThan(0.5); // (in the shed's cavity)
+    expect(before).toBeLessThan(behind / 2); // (upwind of it, in the cove: only the breakwater's east arm's lee)
+  });
+  it('no seams: anywhere in and round the cove and the piers, a meter apart, the lee within a few percent, whatever the wind', () => {
+    let worst = 0, where = '';
+    for (const from of [0, 45, 90, 135, 180, 225, 270, 315, 340]) for (let y = -560; y < -100; y += 7) for (let x = 640; x < 1250; x += 1) {
+      const p = { x, y }, q = { x: x + 1, y };
+      const solid = (r: { x: number; y: number }) => onLand(r) || hitsWall(r), nearLand = (r: { x: number; y: number }) => solid(r) || solid({ x: r.x + 2, y: r.y }) || solid({ x: r.x - 2, y: r.y }) || solid({ x: r.x, y: r.y + 2 }) || solid({ x: r.x, y: r.y - 2 });
+      if (nearLand(p) || nearLand(q) || inPilePier(p, 10) || inPilePier(q, 10)) continue; // (at a wall's own face the step is real; beside a shed's corner its wake's edge, the shear layer leaving it, is steep too)
+      const d = Math.abs(harborLeeDeficit(p, from) - harborLeeDeficit(q, from));
+      if (d > worst) { worst = d; where = `${x},${y} from ${from}`; }
+    }
+    expect(worst, where).toBeLessThan(0.08); // (the steepest left: the shear layer off a wall's end close in, a wall height wide; the review's steps were 0.7 in a meter)
+  }, 120_000);
   it('the current runs under Fort Mason\'s piers, and comes back within a few boat lengths of the cove\'s mouth', () => {
     const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00', current: 'bigebb' } as Settings, 1);
     const kt = (p: { x: number; y: number }) => Math.hypot(w.currentAt(p).x, w.currentAt(p).y) / KT;
@@ -53,10 +65,5 @@ describe('the land\'s lee without seams', () => {
       const a = terrainLee(LL(37.8150 + 0.00002, lon), from), b = terrainLee(LL(37.8150 - 0.00002, lon), from);
       expect(Math.abs(a - b), `${lon} from ${from}`).toBeLessThan(0.02);
     }
-  });
-  it('the hills\' heights change smoothly, not in 200 m steps', () => {
-    let worst = 0;
-    for (let i = 0; i < 400; i++) { const p = LL(37.84 + (i % 20) * 0.002, -122.50 + Math.floor(i / 20) * 0.002), q = { x: p.x + 5, y: p.y }; worst = Math.max(worst, Math.abs(groundHeight(p) - groundHeight(q))); }
-    expect(worst).toBeLessThan(15); // (5 m apart: a 200 m cell's step was up to its whole height difference)
   });
 });

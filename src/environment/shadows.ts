@@ -123,7 +123,9 @@ export function bluffDeficit(x: number, y: number, H: number, W: number, L: numb
   // L/H < 1; for L/H ≥ 1, A = 1.75 and B = 0.25. The short form taken past L/H = 1 turns negative and runs away)
   const lH = Math.max(0.3, L / H), lh = Math.min(1, lH) ** (-1 / 3), A = lH >= 1 ? 1.75 : -2 + 3.7 * lh, B = lH >= 1 ? 0.25 : -0.15 + 0.305 * lh, wh = W / H;
   const xr = Math.max(1.5 * H, H * A * wh / (1 + B * wh)); // the recirculating cavity (Hosker 1984)
-  const xx = Math.max(0, x), d = xx < xr ? 0.7 : 0.65 * (xr / xx) ** (xx < W ? 1 : pExp);
+  // (in the cavity 0.65, as just past it; past x = W the decay steepens from 1/x, a 2-D wake's, to pExp, a 3-D one's,
+  // carried on from its value at W, so neither change is a step)
+  const xx = Math.max(0, x), d = xx < xr ? 0.65 : xx < W || W <= xr ? 0.65 * (xr / xx) ** (xx < W ? 1 : pExp) : 0.65 * (xr / W) * (W / xx) ** pExp;
   const s = 0.25 * H + 0.1 * xx, out = Math.max(0, Math.abs(y) - W / 2);
   return d * Math.exp(-(out * out) / (2 * s * s));
 }
@@ -168,12 +170,12 @@ const GATE_X = (-122.474 - LON0) * MLON;
 export function groundHeight(p: Vec): number {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
   if (lat > CITYFRONT.south && lat < CITYFRONT.north && lon > CITYFRONT.west && lon < CITYFRONT.east) return 0;
-  // (each cell is 4 × 4 of the terrain's samples, which sit at grid nodes; read between the cells' middles, bilinearly,
-  // so a hill's height, and the lee it casts, changes smoothly rather than in 200 m steps: Charts' wind-shadow layer)
-  const fi = ((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block - 0.5, fj = ((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block - 0.5;
-  const i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j;
-  const at = (a: number, b: number) => a < 0 || b < 0 || a >= HM.nx || b >= HM.ny ? 0 : HGRID[b * HM.nx + a];
-  return ((at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v) * HM.step;
+  // (each cell is 4 × 4 of the terrain's samples, which sit at grid nodes. Read cell by cell: read bilinearly, a valley
+  // between two crests filled in and the lee ray took the two as one hill, from the nearer shore (the review, bay-east-16).
+  // The 200 m steps in the lee this leaves want the rays to part islands at their crests, not smoother heights)
+  const i = Math.floor(((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block), j = Math.floor(((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block);
+  if (i < 0 || j < 0 || i >= HM.nx || j >= HM.ny) return 0;
+  return HGRID[j * HM.nx + i] * HM.step;
 }
 /** How far inside the Cityfront box p is (m, 0 or less outside it). */
 function cityfrontDepth(p: Vec): number {

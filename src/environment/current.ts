@@ -1,5 +1,5 @@
 import { KT, V, brg, clamp, type Vec } from '../core/math';
-import { PILE_FACE, flowShoreDist, flowShoreDistNear, inPilePier, onLand, wharfDist, wharfShelter } from '../geo/shore';
+import { PILE_PIERS, flowShoreDist, flowShoreDistNear, inPilePier, pilePierDist, onLand, wharfDist, wharfShelter } from '../geo/shore';
 import { BREAKWATER_W, HARBORS, SHORE_W, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import type { Wind } from './wind';
 
@@ -32,11 +32,16 @@ export function currentVector(c: CurrentPreset): Vec {
  * (tide.ts atShore fades this out within 600 m of one), so PCT0286 already carries that asymmetry off Crissy Field.
  */
 /**
- * Under a pier on open piles (Fort Mason's: geo/shore.ts PILE_PIERS) the stream runs on, a little slowed by the piles
- * (about 0.6 m concrete columns some 5 m apart in the owner's photo: a tenth or so of the way blocked). The 0.85 is an
- * estimate: no measurement of the flow under these piers was found.
+ * Under a pier on open piles (Fort Mason's: geo/shore.ts PILE_PIERS) the stream runs on, slowed by the piles: concrete
+ * columns about 1–1.5 m across with flared caps, some 4 m apart, row behind row (the owner's photo, Pier 1's south
+ * side): a quarter or so of the way blocked at each row. The 0.6 is an estimate (the review's 0.4–0.7): no measurement
+ * of the flow under these piers was found. No boat sails under them; it's the water beside them it shapes.
  */
-export const PILE_FLOW = 0.85;
+export const PILE_FLOW = 0.6;
+/** The pier deck's overhang past its shed's walls (m): about a meter or two in the owner's photo. */
+const DECK = 2;
+/** Across the piles, the stream under the pier and the still water beside it mix over this (m): an estimate. */
+const PILE_MIX = 12;
 export const shoreRelief = (p: Vec, lattice = false): number => {
   // (the distance to the real bank: the coastline's run round a pile pier isn't shore to the water, which runs under it)
   const k = clamp(0.25 + 0.75 * (lattice ? flowShoreDistNear(p) : flowShoreDist(p)) / 350, 0.25, 1) * (inPilePier(p) ? PILE_FLOW : 1), w = wharfShelter(p); // (`lattice`: off the 10 m lattice, geo/shore.ts, for a boat's own current each step)
@@ -191,16 +196,30 @@ function calmIn(c: Calm, p: Vec): number {
   return w > 0 ? s / w : c.floor[Math.max(0, Math.min(c.ny - 1, j)) * c.nx + Math.max(0, Math.min(c.nx - 1, i))];
 }
 /** How much of the stream reaches p (1 in open water): the most open of the harbor grids it's on. */
+/**
+ * The slots between Fort Mason's piers: open to the Bay at their north ends, piles down both sides, so the stream that
+ * runs under the piers crosses them too (no harbor's still water: they aren't a basin, and they aren't walled off).
+ */
+const SLOTS = (() => { const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), ys = PILE_PIERS.flatMap(P => P.pts.map(q => q.y));
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; })();
+const inPileSlots = (p: Vec) => p.x > SLOTS.x0 && p.x < SLOTS.x1 && p.y > SLOTS.y0 && p.y < SLOTS.y1 && !inBasin(p);
 /** As basinCalm, for drawing only: undefined where the grid isn't built yet (it never builds one). */
 export function basinCalmIfBuilt(p: Vec): number | undefined {
-  if (inPilePier(p, PILE_FACE)) return 1;
-  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return g.calm ? calmIn(g.calm, p) : undefined;
+  if (inPileSlots(p)) return 1;
+  const pd = pilePierDist(p); if (pd <= DECK) return 1;
+  for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) { if (!g.calm) return undefined; const k = calmIn(g.calm, p); return pd < DECK + PILE_MIX ? k + (1 - k) * (1 - (pd - DECK) / PILE_MIX) : k; }
   return 1;
 }
 export function basinCalm(p: Vec): number {
   // (under a pier on open piles the stream runs on, as the shore relief has it: the harbor beside it keeps its still water,
-  // the pier's piles and its shed between them: geo/shore.ts PILE_PIERS)
-  if (inPilePier(p, PILE_FACE)) return 1;
+  // the pier's piles and its shed between them: geo/shore.ts PILE_PIERS. Across the piles the two mix, over a few meters)
+  if (inPileSlots(p)) return 1;
+  const pd = pilePierDist(p); if (pd <= DECK) return 1;
+  const k = basinCalmGrid(p);
+  return pd < DECK + PILE_MIX ? k + (1 - k) * (1 - (pd - DECK) / PILE_MIX) : k;
+}
+/** The harbors' grids' own calm at p (basinCalm, without the piers). */
+function basinCalmGrid(p: Vec): number {
   for (const g of GROUPS) if (p.x > g.box.x0 && p.x < g.box.x1 && p.y > g.box.y0 && p.y < g.box.y1) return calmIn(calmOf(g), p);
   return 1;
 }
