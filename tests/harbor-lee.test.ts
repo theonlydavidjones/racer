@@ -8,6 +8,7 @@ import { LL } from '../src/geo/geo';
 import { harborAt, hitsWall, slipById } from '../src/geo/marina';
 import { PILE_PIERS, inPilePier, onLand } from '../src/geo/shore';
 import { KT } from '../src/core/math';
+import { basinCalm } from '../src/environment/current';
 
 /**
  * The Gashouse Cove exit, as the owner sails it (ROADMAP 8n): sheltered inside, then the Bay's wind and stream all at once
@@ -47,6 +48,12 @@ describe('the lee of the harbors\' walls and Fort Mason\'s sheds', () => {
   it('the wind blowing down the slots between Fort Mason\'s piers isn\'t in the sheds\' lee', () => {
     // (along the piers, 351°: the slot between Piers 1 and 2 at y = −340, its middle, a dozen meters clear of each)
     for (const x of [995, 1000, 1005]) expect(harborLeeDeficit({ x, y: -340 }, 351), `${x}`).toBeLessThan(0.1);
+  });
+  it('the slot beside Pier 1 has no step at its edge (the pier\'s wall where it crosses each latitude, not its box)', () => {
+    for (let y = -300; y <= -280; y += 2) for (let x = 976; x < 1000; x += 0.5) {
+      const a = basinCalm({ x, y }), b = basinCalm({ x: x + 0.5, y });
+      if (!onLand({ x, y }) && !onLand({ x: x + 0.5, y })) expect(Math.abs(a - b), `${x},${y}`).toBeLessThan(0.05);
+    }
   });
   it('the current runs under Fort Mason\'s piers, and comes back within a few boat lengths of the cove\'s mouth', () => {
     const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', tideTime: '16:00', current: 'bigebb' } as Settings, 1);

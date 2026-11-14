@@ -62,7 +62,7 @@ export function stepDeficit(x: number, h: number): number {
 }
 
 type Kind = 'fence' | 'step' | 'shed';
-interface Body { kind: Kind; pts: Vec[]; H: number; box: { x0: number; x1: number; y0: number; y1: number }; /** the whole wall a piece belongs to */ wall?: Vec[] }
+interface Body { kind: Kind; pts: Vec[]; H: number; box: { x0: number; x1: number; y0: number; y1: number }; /** the whole wall a piece belongs to */ wall?: Vec[]; /** (its width across the wind, last asked) */ wKey?: number; wVal?: number; /** (its outline in the wind's frame, for the last wind asked: along and across, and the extents) */ eFrom?: number; pa?: Float64Array; pn?: Float64Array; a0?: number; a1?: number; n0?: number; n1?: number; cross?: number }
 const reach = (k: Kind, H: number) => k === 'fence' ? 80 * H : k === 'step' ? 15 * H : 50 * H;
 const BODIES: Body[] = (() => {
   const out: Body[] = [];
@@ -104,11 +104,13 @@ function cellBodies(p: Vec): Body[] {
 }
 /** Each breakwater's width across the wind, by wind direction (a tenth of a degree): it's asked for every piece, every boat. */
 const WALL_W = new Map<Vec[], Map<number, number>>();
-function wallWidth(wall: Vec[], from: number): number {
-  let m = WALL_W.get(wall); if (!m) { m = new Map(); WALL_W.set(wall, m); }
-  const key = Math.round(from * 10); let w = m.get(key);
+function wallWidth(B: Body, from: number): number {
+  const key = Math.round(from * 10);
+  if (B.wKey === key) return B.wVal!; // (one wind direction for the whole step: every boat, every piece, the same answer)
+  const wall = B.wall!; let m = WALL_W.get(wall); if (!m) { m = new Map(); WALL_W.set(wall, m); }
+  let w = m.get(key);
   if (w == null) { const e = V(key / 10 + 180); let n0 = Infinity, n1 = -Infinity; for (const q of wall) { const n = q.x * e.y - q.y * e.x; n0 = Math.min(n0, n); n1 = Math.max(n1, n); } w = Math.max(1, n1 - n0); if (m.size > 3600) m.clear(); m.set(key, w); }
-  return w;
+  B.wKey = key; B.wVal = w; return w;
 }
 const BOX = BODIES.reduce((a, b) => ({ x0: Math.min(a.x0, b.box.x0), x1: Math.max(a.x1, b.box.x1), y0: Math.min(a.y0, b.box.y0), y1: Math.max(a.y1, b.box.y1) }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity });
 
@@ -117,20 +119,36 @@ const BOX = BODIES.reduce((a, b) => ({ x0: Math.min(a.x0, b.box.x0), x1: Math.ma
  * the line upwind from p crosses it) and, past the piece's end, how far to the side. Beyond an end the lee fades as the
  * wake spreads (over about a fifth of the distance downwind); where two pieces meet, the other one's lee carries on.
  */
-function wallLee(B: Body, p: Vec, e: Vec, f: (x: number, h: number) => number): number {
+/** Body B's outline in the wind's frame for the wind from `from` (blowing toward e), worked out once a wind: every boat
+ * asks in the same step's wind. */
+function frame(B: Body, from: number, e: Vec): void {
+  if (B.eFrom === from) return;
+  const n = B.pts.length, pa = B.pa ?? (B.pa = new Float64Array(n)), pn = B.pn ?? (B.pn = new Float64Array(n));
+  let a0 = Infinity, a1 = -Infinity, n0 = Infinity, n1 = -Infinity;
+  for (let i = 0; i < n; i++) { const q = B.pts[i], a = q.x * e.x + q.y * e.y, c = q.x * e.y - q.y * e.x; pa[i] = a; pn[i] = c; a0 = Math.min(a0, a); a1 = Math.max(a1, a); n0 = Math.min(n0, c); n1 = Math.max(n1, c); }
+  B.a0 = a0; B.a1 = a1; B.n0 = n0; B.n1 = n1; B.eFrom = from;
+  if (n === 2) { const dx = B.pts[1].x - B.pts[0].x, dy = B.pts[1].y - B.pts[0].y; B.cross = e.x * dy - e.y * dx; }
+}
+let GX = 0, GMISS = 0; // (wallGeom's answer: no allocation, it's asked for every wall piece near every boat, every step)
+/** Where p lies behind a wall piece: GX downwind of it, GMISS to the side past an end; false if p isn't behind it. */
+function wallGeom(B: Body, p: Vec, e: Vec): boolean {
   const a = B.pts[0], b = B.pts[1], dx = b.x - a.x, dy = b.y - a.y;
-  const cross = e.x * dy - e.y * dx; // (the piece's length across the wind)
-  if (Math.abs(cross) < 1e-6) return 0; // (lying along the wind: it stops none of it)
+  const cross = B.cross!; // (the piece's length across the wind: frame())
+  if (Math.abs(cross) < 1e-6) return false; // (lying along the wind: it stops none of it)
   // p − x·e = a + s·(b − a): x downwind of the line, s along the piece
   const px = p.x - a.x, py = p.y - a.y, x = (px * dy - py * dx) / cross, s = (px * e.y - py * e.x) / -cross;
   // beside it, past an end: how far downwind of that end, and how far to the side of it (from the end itself: measured
   // to the piece's line, a piece lying nearly along the wind put far-off water just behind it)
   let X = x, miss = 0;
   if (s < 0 || s > 1) { const q = s < 0 ? a : b, qx = p.x - q.x, qy = p.y - q.y; X = qx * e.x + qy * e.y; miss = Math.abs(qx * e.y - qy * e.x); }
-  if (X <= 0) return 0;
-  // (coming in over the first height and a half behind the wall, the slack recirculating air close in: no step where the lee begins)
-  const d = f(X, B.H) * Math.min(1, X / (1.5 * B.H)); if (d <= 0) return 0;
-  return miss > 0 ? d * Math.exp(-((miss / (0.2 * X + B.H)) ** 2)) : d; // (the air closing in round an end: over about a wall height close in, wider on)
+  if (X <= 0) return false;
+  GX = X; GMISS = miss; return true;
+}
+/** A wall piece's lee d0 at GX, made up: coming in over the first height and a half behind the wall (the slack
+ * recirculating air close in: no step where the lee begins), and round an end, over about a wall height close in, wider on. */
+function wallShape(B: Body, d0: number): number {
+  const d = d0 * Math.min(1, GX / (1.5 * B.H)); if (d <= 0) return 0;
+  return GMISS > 0 ? d * Math.exp(-((GMISS / (0.2 * GX + B.H)) ** 2)) : d;
 }
 
 const insideP = (p: Vec, P: Vec[]) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
@@ -140,64 +158,65 @@ const insideP = (p: Vec, P: Vec[]) => { let c = false; for (let i = 0, j = P.len
  * wind. Null inside the shed. (By its extents, not edge by edge: a line up the wind that just clips a corner would make
  * a step in the field.)
  */
-function shedFace(pts: Vec[], p: Vec, e: Vec): { x: number; miss: number } | null {
-  if (insideP(p, pts)) return null;
+let SX = 0, SMISS = 0; // (shedFace's answer)
+function shedFace(B: Body, p: Vec, e: Vec): boolean {
+  const pts = B.pts, PA = B.pa!, PN = B.pn!, n = pts.length;
+  if (insideP(p, pts)) return false;
   // x: downwind of the lee face's line (its most downwind point along the wind). miss: how far across the wind p's line
   // up the wind passes the part of the shed that's upwind of p (0 where it meets it), so as the line comes round a corner
   // the miss runs smoothly down to nothing: no step where it first clips the shed
   const pa = p.x * e.x + p.y * e.y, pn = p.x * e.y - p.y * e.x;
-  let a1 = -Infinity, miss = Infinity;
-  for (let i = 0; i < pts.length; i++) {
-    const A = pts[i], B = pts[(i + 1) % pts.length];
-    let aa = A.x * e.x + A.y * e.y, an = A.x * e.y - A.y * e.x, ba = B.x * e.x + B.y * e.y, bn = B.x * e.y - B.y * e.x;
-    a1 = Math.max(a1, aa);
+  let miss = Infinity;
+  for (let i = 0; i < n; i++) {
+    const j = i + 1 === n ? 0 : i + 1;
+    let aa = PA[i], an = PN[i], ba = PA[j], bn = PN[j];
     if (aa > pa && ba > pa) continue; // (wholly downwind of p)
     // clip the edge to its part upwind of p
     if (aa > pa) { const t = (pa - ba) / (aa - ba); an = bn + t * (an - bn); aa = pa; }
     else if (ba > pa) { const t = (pa - aa) / (ba - aa); bn = an + t * (bn - an); ba = pa; }
-    const lo = Math.min(an, bn), hi = Math.max(an, bn), g = pn < lo ? lo - pn : pn > hi ? pn - hi : 0;
+    const lo = an < bn ? an : bn, hi = an < bn ? bn : an, g = pn < lo ? lo - pn : pn > hi ? pn - hi : 0;
     if (g < miss) miss = g;
   }
-  if (miss === Infinity) return null; // (all of it downwind of p: p is upwind of it)
-  return { x: pa - a1, miss };
+  if (miss === Infinity) return false; // (all of it downwind of p: p is upwind of it)
+  SX = pa - B.a1!; SMISS = miss; return true;
 }
 
 /** The deficit at p (a fraction of the wind, over the rig) behind the walls and sheds, the wind from `from`: the strongest one's. */
+let lastFrom = NaN, lastE: Vec = { x: 0, y: 0 };
 export function harborLeeDeficit(p: Vec, from: number): number {
   if (p.x < BOX.x0 || p.x > BOX.x1 || p.y < BOX.y0 || p.y > BOX.y1) return 0;
   const list = cellBodies(p); if (!list.length) return 0;
-  const e = V(from + 180); let best = 0;
+  if (from !== lastFrom) { lastFrom = from; lastE = V(from + 180); }
+  const e = lastE; let best = 0;
   {
   for (const B of list) {
     if (p.x < B.box.x0 || p.x > B.box.x1 || p.y < B.box.y0 || p.y > B.box.y1) continue;
     let d: number;
+    frame(B, from, e);
     if (B.kind === 'shed') {
-      // in the wind's frame: its extent along (a0..a1) and across (n0..n1); the wake from its middle across, its lee face along
-      let a0 = Infinity, a1 = -Infinity, n0 = Infinity, n1 = -Infinity;
-      for (const q of B.pts) { const a = q.x * e.x + q.y * e.y, n = q.x * e.y - q.y * e.x; a0 = Math.min(a0, a); a1 = Math.max(a1, a); n0 = Math.min(n0, n); n1 = Math.max(n1, n); }
-      const W = Math.max(1, n1 - n0), L = Math.max(1, a1 - a0);
-      // from the shed itself, not the box round it: back up the wind from p to its lee face (where that line leaves the
-      // shed); if the line misses it, how far it passes to the side of the shed's nearest corner upwind
-      const face = shedFace(B.pts, p, e);
-      if (!face) { d = 0; } else {
+      const W = Math.max(1, B.n1! - B.n0!), L = Math.max(1, B.a1! - B.a0!);
+      // from the shed itself, not the box round it: how far downwind of its lee face, and how far the line up the wind
+      // from p passes to the side of it (shedFace)
+      if (!shedFace(B, p, e)) { d = 0; } else {
         // (bluffDeficit's x from the lee face, as Hosker's cavity is measured; beside the shed, level with it, the lee
         // comes in over its last third, from nothing level with its windward part)
-        const r = reach('shed', B.H), beside = face.x < 0 ? Math.min(1, Math.max(0, 1 + face.x / (0.3 * L))) : 1;
+        const fx = SX, r = reach('shed', B.H), beside = fx < 0 ? Math.min(1, Math.max(0, 1 + fx / (0.3 * L))) : 1;
         // (its sides: a shed many times longer than wide has the separated air back on its side walls within a few widths,
         // so level with it the lee beside it is a thin layer along the wall, a few meters; behind its lee face the wake
         // spreads from the lee corners, 0.25 H + 0.1 x, as bluffDeficit has it. Blended over the shed's last fifth)
-        const t = Math.min(1, Math.max(0, (face.x + 0.2 * L) / (0.2 * L)));
-        const miss = face.miss, sw = (1 - t) * 3 + t * (0.25 * B.H + 0.1 * Math.max(0, face.x));
+        const t = Math.min(1, Math.max(0, (fx + 0.2 * L) / (0.2 * L)));
+        const miss = SMISS, sw = (1 - t) * 3 + t * (0.25 * B.H + 0.1 * Math.max(0, fx));
         const side = Math.exp(-(miss * miss) / (2 * sw * sw));
-        d = bluffDeficit(Math.max(0, face.x), 0, B.H, W, L) * side * beside * Math.min(1, Math.max(0, (r - face.x) / (0.3 * r))); // (faded out over its reach's last 30%)
+        d = bluffDeficit(Math.max(0, fx), 0, B.H, W, L) * side * beside * Math.min(1, Math.max(0, (r - fx) / (0.3 * r))); // (faded out over its reach's last 30%)
       }
     } else if (B.kind === 'fence') {
       // Perera's fence is endless; a breakwater W wide across the wind has ends, and its lee thins as the air closes in
       // round them, halved about W downwind (a rule of thumb, 1/(1 + x/W): no measured end correction was found). W is
       // the whole breakwater's, so a wall drawn in many short pieces shelters as the one wall it is
-      const Wall = wallWidth(B.wall!, from), r = reach('fence', B.H);
-      d = wallLee(B, p, e, (x, h) => fenceDeficit(x, h) / (1 + x / Wall) * Math.min(1, Math.max(0, (r - x) / (0.25 * r))));
-    } else d = wallLee(B, p, e, stepDeficit);
+      if (!wallGeom(B, p, e)) continue;
+      const Wall = wallWidth(B, from), r = reach('fence', B.H), x = GX;
+      d = wallShape(B, fenceDeficit(x, B.H) / (1 + x / Wall) * Math.min(1, Math.max(0, (r - x) / (0.25 * r))));
+    } else { if (!wallGeom(B, p, e)) continue; d = wallShape(B, stepDeficit(GX, B.H)); }
     if (d > best) best = d;
   }
   }
