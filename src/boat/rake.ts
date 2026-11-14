@@ -25,3 +25,10 @@
  */
 export const MAST_RAKE_DEG = 5.6;
 export const MAST_RAKE = MAST_RAKE_DEG * Math.PI / 180;
+/**
+ * How far aft the rake carries the gooseneck (m): it sits on the mast's after side at the boom's top, 1.00 m up the mast
+ * (the lower band, CR 6.1.11), half the mast's 133 mm fore-and-aft section (CR 6.1.4, 6.1.6) aft of its centre, and the
+ * mast turns about its centre at the deck. The boom, and so the mainsheet's blocks on it, move aft with it (controls.ts
+ * SHEET_POINT, render/boatMesh.ts MS_R and GOOSENECK).
+ */
+export const GOOSENECK_AFT = 1.0 * Math.sin(MAST_RAKE) + 0.133 / 2 * (Math.cos(MAST_RAKE) - 1);

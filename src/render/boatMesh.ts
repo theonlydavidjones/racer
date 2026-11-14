@@ -148,7 +148,7 @@ const JIB_DEF: SailDef = (() => {
   };
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
-export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS: HOUNDS_R, GOOSENECK, MAST_RAKE, raked, MAIN_LEECH, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
+export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS: HOUNDS_R, GOOSENECK, MAST_RAKE, raked, MAIN_LEECH, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - GOOSENECK.z};
 const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
 
 /** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
@@ -1054,7 +1054,7 @@ const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Ve
  * about an eighth of the boom from its end (0.42 m of E: Josephine hauled out, from starboard), so the sheet comes straight down to the
  * car upwind. And the vang's block under the boom, about a quarter of the way out (the same photo).
  */
-const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z;
+const MS_R = COCKPIT_FIT.thwart.z - GOOSENECK.z; // (the mainsheet's blocks over the traveller: the thwart's distance aft of the raked gooseneck)
 /** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
 const MS_GAP = 0.15;
 /** The vang's lower block: shackled at the base of the mast, abaft it, its sheave 5 cm above whatever the mast stands

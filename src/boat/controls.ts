@@ -19,6 +19,7 @@
  * Missing the best shape costs a few percent of drive: on top of the sheet angle (angle of attack), which
  * matters most.
  */
+import { GOOSENECK_AFT } from './rake';
 import type { Tack } from './boat';
 import { jibTune, mainTune, type TuneEffect } from './rigTune';
 
@@ -55,13 +56,15 @@ export const defaultControls = (): Controls => ({
 /* ---------- from controls to sheet angles ---------- */
 
 /** The traveller car's travel either side of the middle (m) on Josephine's thwart, and the mainsheet's blocks' distance
- * aft of the gooseneck (m: the thwart's from the mast's after side), as the boat is drawn (render/boatMesh.ts TRAV_HALF
- * and MS_R, from the owner's photos; tests/rig.test.ts holds them together). */
-export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957;
+ * aft of the gooseneck (m: the thwart is 2.957 m aft of the mast's after side at the deck, and the raked mast carries the
+ * gooseneck GOOSENECK_AFT of that aft, boat/rake.ts), as the boat is drawn (render/boatMesh.ts TRAV_HALF and MS_R, from
+ * the owner's photos; tests/rig.test.ts holds them together). */
+export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957 - GOOSENECK_AFT;
 /**
  * How far the traveller alone swings the boom (deg, the car from the middle to either end): the sheet's blocks on the
  * boom stand over the car, which runs on a straight track across the thwart, so atan(TRAVELLER_HALF / SHEET_POINT):
- * 9.6°. The car's travel is read off the photos, good to a few centimetres (±0.03 m is ±0.6°), so 9.5° is within it and
+ * 9.9° with the mast raked (9.6° upright). The car's travel is read off the photos, good to a few centimetres (±0.03 m is
+ * ±0.6°), so 9.5° is within it and
  * stays until the track's measured: the AI's homing after racing's called off (tests/abandon-home.test.ts) turns on a
  * tenth of a degree here, which is flagged. (North Sails' guide moves the cars 15–20 cm to windward in light air: −0.3
  * to −0.4 of the travel.)
