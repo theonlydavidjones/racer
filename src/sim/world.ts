@@ -1017,10 +1017,11 @@ export class World {
       // (no shore within 150 m ahead, across a swath 15° either side: straight ahead alone, a shore she closes at a fine
       // angle is seen only once she's on it)
       const clear = (h: number) => [0, 15, -15].every(k => landAlong(b, { x: b.x + V(h + k).x * 150, y: b.y + V(h + k).y * 150 }) === Infinity);
-      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them, and on port jibes for
-      // none with a boat within two lengths, where onto starboard she'd take the right of way at close quarters (Rule 15;
-      // from starboard onto port she gives it up, which Rule 14's avoiding contact may need: a starboard boat on a run with
-      // a port boat closing on her windward quarter has no other way clear): judged on the turn
+      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them, and jibes for none
+      // with a boat within two lengths: on port, onto starboard she'd take the right of way at close quarters (Rule 15);
+      // on starboard she'd give it up, becoming the boat that must keep clear, so only when the hulls are about to touch
+      // and it's the way clear (Rule 14: a starboard boat on a run with a port boat closing on her windward quarter has no
+      // other): judged on the turn
       // she'd make, the short way round from her heading as her helm takes her (physics.ts), not on where it ends. Through
       // the wind: close-hauled on her own tack; with a boat that near, short of dead downwind on her own tack by more than
       // the wind's swing second to second, 3–5°, so a degree's veer doesn't carry her across)
@@ -1033,7 +1034,7 @@ export class World {
       // or heading up as far as BEAR_CAP above it (close-hauled at most) and easing to slow. A boat keeping clear of one
       // ahead goes round her without tacking, and never turns down onto a boat to leeward of her, Rule 11)
       const BEAR_CAP = 40, RUN_OFF = 5, base = this.freeCourse.get(b.id) ?? b.h, hauled = n360(from + own * (beatAngle(b.ww.kt) + 1));
-      let ease = false;
+      let ease = false, urgent = false; // (urgent: the hulls about to touch, set below for each boat in turn)
       const mine = (h: number, away: { x: number; y: number; vx: number; vy: number } | null = null) => {
         let t = sailable(b, h);
         if (away && (through(t, from) || Math.abs(wrap(t - base)) > BEAR_CAP)) {
@@ -1047,13 +1048,13 @@ export class World {
         }
         if (through(t, from)) return hauled;
         const relOwn = -own * wrap(from - t);
-        if (crowded && b.tack === 'P' && (relOwn > 180 - RUN_OFF || (relOwn < 0 && Math.abs(relOwn) > 90))) return n360(from + own * (180 - RUN_OFF));
+        if (crowded && (b.tack === 'P' || !urgent) && (relOwn > 180 - RUN_OFF || (relOwn < 0 && Math.abs(relOwn) > 90))) return n360(from + own * (180 - RUN_OFF));
         return t;
       };
       const c0 = mine(base);
       const course = clear(c0) ? c0 : [30, -30, 60, -60, 90, -90, 135, -135].map(k => mine(c0 + k)).find(clear) ?? c0;
       if (course !== c0) this.freeCourse.set(b.id, course); // (a shore ahead: her course from now on, not back to it after)
-      let call: { h: number; luff: boolean } | null = null, room = false, urgent = false;
+      let call: { h: number; luff: boolean } | null = null, room = false;
       const others = this.boats.filter(o => o !== b).sort((p, q) => hullGap(b, p) - hullGap(b, q));
       for (const o of others) {
         const dx = o.x - b.x, dy = o.y - b.y, g = hullGap(b, o);
