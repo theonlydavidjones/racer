@@ -121,7 +121,7 @@ export const PERF_INFO = {
   finish: 'A burnished racing bottom has about 3% less skin friction than antifouling as it was rolled on (Schultz 2002). Worth a fraction of a percent; most in light air.',
   sails: 'Old Dacron sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
   spars: 'The class built the aluminum mast to bend like an average wooden one; wooden masts vary. A soft mast flattens the main and opens its leech by itself in a gust (good in a gusty breeze) but has less power in moderate air; a stiff one keeps its power but heels more in the gusts. A wooden rig is also about 9 kg heavier aloft. The boom makes no measured difference.',
-  outboard: 'Tohatsu-class four-strokes: 2.5 hp (about 13 kg, no reverse gear: it swivels to push astern), 3.5 hp (about 18 kg) or 6 hp (about 26 kg). On the bracket you can motor (the Motor button); it\'s weight at the very stern, and the class rules don\'t allow racing with it mounted aft (NFIA, 2006, rule 1.11): race setup stows it. Stowed below it costs less.',
+  outboard: 'Tohatsu-class four-strokes: 2.5 hp (about 13 kg) or 3.5 hp (about 18 kg), neither with a reverse gear (they swivel round to push astern), or 6 hp (about 26 kg). On the bracket you can motor (the Motor button); it\'s weight at the very stern, and the class rules don\'t allow racing with it mounted aft (NFIA, 2006, rule 1.11): race setup stows it. Stowed below it costs less.',
   gear: 'Gear and stores, or an old wooden hull\'s soaked planking, over the class minimum of 1930 kg (wooden and fiberglass alike). Slower in light air; a little more stable in a breeze.'
 };
 

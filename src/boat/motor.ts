@@ -5,6 +5,11 @@
  * (gear ratio 2.15:1, full throttle 5,000–6,000 rpm, its standard prop 7.4 in across by 7.0 in pitch, three blades, about
  * 18.4 kg) and the 2.5's gearbox (forward and neutral only: no reverse, the motor swivels round to go astern) are from
  * Tohatsu's specifications as summarised by retailers (tohatsu.com itself wasn't reachable from the session that wrote this).
+ * The 3.5's gearbox is the same, forward and neutral only, with the motor swiveled right round for astern: so two
+ * summaries have it (Boat Detail's reading of the MFS3.5B owner's manual as summarized, a dog clutch shifting F–N; and
+ * Tohatsu's North American specification for the MFS3.5C as a search summary gave it, "Forward-Neutral"). NOT read from
+ * the manual itself (tohatsu.com wasn't reachable, 14 Nov 2026), and one retailer's listing is said to show F–N–R: to
+ * check against Tohatsu's own table when it can be read. The 6 has a reverse gear (as summarized; to check likewise).
  * The 2.5's and the 6's props are assumed the 3.5's, and the 6's weight (26 kg) is Tohatsu's, as summarised: to check.
  *
  * Thrust: no published bollard pull for these motors was found, so it's worked out from the prop's size and the motor's
@@ -26,7 +31,7 @@ export interface Outboard { hp: OutboardHp; kg: number; reverse: boolean; propD:
 /** The motors on offer (see above for where the figures come from). */
 export const OUTBOARDS: Record<OutboardHp, Outboard> = {
   2.5: { hp: 2.5, kg: 13, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
-  3.5: { hp: 3.5, kg: 18.4, reverse: true, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
+  3.5: { hp: 3.5, kg: 18.4, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
   6: { hp: 6, kg: 26, reverse: true, propD: 7.8 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.08 }
 };
 /** A small outboard's prop: how much of the ideal disc's thrust it gets at rest (an estimate: small props do 0.5–0.7). */
@@ -50,7 +55,7 @@ export interface MotorState {
   gear: 'F' | 'N' | 'R';
   /** 0 (tick-over) … 1 (full) */
   throttle: number;
-  /** the 2.5, with no reverse gear, turned round on its bracket to push astern */
+  /** the 2.5 or the 3.5, with no reverse gear, turned round on its bracket to push astern */
   swivel?: boolean;
   /** pulling the starter cord: seconds left of this pull, and whether it'll catch */
   pulling?: { left: number; catches: boolean };
