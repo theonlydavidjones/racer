@@ -115,7 +115,7 @@ export function passageNow(w: SimView): PassageNow | null {
 
 /** Why a passage can't be sailed, in words: the planner's course ran ashore, or it took too long. */
 export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
-  ? 'the planner\'s course runs ashore on the way (its tacks or gybes don\'t fit between the shores there): pick a spot a little further out, or sail that part by eye'
+  ? 'the planner\'s course runs ashore on the way (its tacks or jibes don\'t fit between the shores there): pick a spot a little further out, or sail that part by eye'
   : 'it takes too long, becalmed or against a foul tide somewhere on the way';
 
 export function passagePlan(w: SimView): PassagePlan | null {
@@ -132,7 +132,7 @@ export function passagePlan(w: SimView): PassagePlan | null {
   /* ---------- the passage, and when to leave ---------- */
   const items: BriefItem[] = [];
   const nm = (m: number) => `${(m / 1852).toFixed(1)} nm`;
-  items.push({ head: 'The way', src: 'model', text: `${nm(routeLen)} to ${dest.name.replace(/^Off /, 'off ')}${route.length > 2 ? ` round the land (${nm(straight)} as the crow flies)` : ''}. ${now.ok ? `Leaving at ${clockOf(t0)}, about ${mins(now.minutes)} at the Folkboat's polar speeds, arriving ${clockOf(t0 + now.minutes)}.` : `Leaving now she can't get there: ${cant}.`} ${pn.tacks.length ? `Part of it is a beat: ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''} or so.` : ''}${pn.gybes.length ? ` ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''} downwind.` : ''}` });
+  items.push({ head: 'The way', src: 'model', text: `${nm(routeLen)} to ${dest.name.replace(/^Off /, 'off ')}${route.length > 2 ? ` round the land (${nm(straight)} as the crow flies)` : ''}. ${now.ok ? `Leaving at ${clockOf(t0)}, about ${mins(now.minutes)} at the Folkboat's polar speeds, arriving ${clockOf(t0 + now.minutes)}.` : `Leaving now she can't get there: ${cant}.`} ${pn.tacks.length ? `Part of it is a beat: ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''} or so.` : ''}${pn.gybes.length ? ` ${pn.gybes.length} jibe${pn.gybes.length > 1 ? 's' : ''} downwind.` : ''}` });
   // the same passage leaving later: the tide and the wind change under it
   const horizon = (o.stations ? w.tide!.to : t0 + 600) - 10; // (the end of the span every station is predicted over)
   const rows: string[][] = [];
