@@ -216,9 +216,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (ai && !midTack && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
-      const toWind = wrap(b.ww.from - b.h);
-      const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      ai.turnCommit = bigTurnWay(b, err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
@@ -446,6 +444,21 @@ export const HOVE = {
  * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
  * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
  */
+/** Which way the helm takes a big turn of err degrees (−1 to port, +1 to starboard): the short way, unless that's
+ * through the wind and she's too slow to tack (SLOW_TACK), when she'd be left in irons, so she gybes round instead. */
+export function bigTurnWay(b: Boat, err: number): number {
+  const toWind = wrap(b.ww.from - b.h);
+  const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
+  return throughWind && b.v < SLOW_TACK && !b.ai?.tackNow ? -Math.sign(err) : Math.sign(err);
+}
+/** Which way she'll turn for desired: the way the helm's already committed to while that still holds (physics step: a
+ * commitment lasts while the course stays within 45° of the one it was made for), else the way it would choose. */
+export function helmWay(b: Boat, desired: number): number {
+  const err = wrap(desired - b.h), ai = b.ai;
+  if (ai && ai.turnCommit !== 0 && Math.abs(wrap(desired - ai.commitFor)) <= 45) return ai.turnCommit;
+  return Math.abs(err) > 30 ? bigTurnWay(b, err) : Math.sign(err);
+}
+
 export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
   let bleed = 1;
   if (Math.abs(rate) > 0.5) {
