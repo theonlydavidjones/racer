@@ -44,7 +44,7 @@ export interface Controls {
   car: Record<Tack, { fore: number; ins: number }>;
 }
 
-/** Pin positions on the cabin-top tracks (an estimate until counted: 25 mm apart). */
+/** Pin positions on the cabin-top tracks (an estimate until counted: 25 mm apart fore and aft, JOSEPHINE_CAR.pin across). */
 export const CAR_FORE_PINS = 7, CAR_IN_PINS = 5;
 
 export const defaultControls = (): Controls => ({
@@ -67,6 +67,14 @@ export const TRAVELLER_HALF = 0.5, SHEET_POINT = 2.957;
  * to −0.4 of the travel.)
  */
 export const TRAVELLER_SWING = 9.5;
+/**
+ * The boom's stop, eased right out (deg off the centreline): where its side meets the shroud. At boom height the shroud
+ * is about 0.83 m out and 0.26 m aft of the gooseneck (NFIA Class Rules 2025–28, 7.20: the chainplates at least 0.90 m
+ * out and 280–360 mm aft of the mast's after edge; 7.60: the hounds 5.30–5.50 m up; the drawn chainplate 0.98 m out),
+ * so about 70° (about 66° at the class's limits; less with the vang off, the boom lifting). Not 85°: on a run that let
+ * the main out further than a Folkboat's boom can go, through the shroud. (reference/design/sheet-geometry.md, Rigging.)
+ */
+export const BOOM_STOP = 70;
 /** Boom angle off the centreline (deg) from the traveller and mainsheet. */
 export function boomAngle(c: Controls): number {
   // the traveller is on a wooden thwart across the cockpit, in front of the helmsman, under the end of the boom:
@@ -75,7 +83,7 @@ export function boomAngle(c: Controls): number {
   // (the sheet's 0–1 to the boom's angle, 80·s^1.5: a feel scale, not the rope's geometry. Real rope swings the boom
   // out fast for the first of the ease: 10° for 6% of it, where this takes 25%. Whether the band should read rope eased
   // is the owner's call: reference/design/sheet-geometry.md)
-  return Math.min(85, Math.max(-2, car + 80 * Math.pow(c.mainsheet, 1.5)));
+  return Math.min(BOOM_STOP, Math.max(-2, car + 80 * Math.pow(c.mainsheet, 1.5)));
 }
 /** Sheet length that puts the boom at an angle, for a traveller position (inverse of boomAngle). */
 export function mainsheetFor(angle: number, traveller: number): number {
@@ -83,11 +91,34 @@ export function mainsheetFor(angle: number, traveller: number): number {
 }
 /** Where the traveller puts the boom at `angle` with the mainsheet at `sheet` (inverse of boomAngle), within [floor, 1]. */
 export const travellerFor = (angle: number, sheet: number, floor = -1) => Math.min(1, Math.max(floor, (angle - 80 * Math.pow(sheet, 1.5)) / TRAVELLER_SWING));
-/** The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins`. */
-export const carLead = (ins: number) => 8 + 1.25 * ins;
+/**
+ * Josephine's jib cars, the one source for the lead (render/boatMesh.ts draws them from it): the athwartships bar's
+ * middle hole `centre` m off the centreline, its holes `pin` m apart, and the middle fore–aft hole `aft` m behind the
+ * forestay's pin on the deck. The centre and the tape are North Sails' Nordic Folkboat tuning guide's ("the jib-lead
+ * track is placed with its centre 58 cm from the boat's centreline"; "2.65 m from the pin in the forestay"): 12.65° at
+ * the middle hole, which puts the jib at its best trim close-hauled (the beat's apparent wind, about 30–31° in 10–12 kt,
+ * less trim.ts's 18°).
+ * Until the owner measures Josephine: the drawing (Boat Detail, from a photo) reads 0.66 m, within a photo's error of
+ * it; the holes' 24 mm is the drawing's. (reference/design/sheet-geometry.md, Rigging.)
+ */
+export const JOSEPHINE_CAR = { centre: 0.58, pin: 0.024, tape: 2.65, rise: 0.06 };
+/** How far aft of the forestay's pin the middle hole is, fore and aft (m): North's 2.65 m is a tape from the pin to the
+ * block ("measure 2.65 m from the pin in the forestay to the centre of the block"), across the 58 cm and up the car's
+ * `rise` above the pin (about 6 cm on the drawn cabin top), so 2.585 m. */
+export const CAR_AFT = Math.sqrt(JOSEPHINE_CAR.tape ** 2 - JOSEPHINE_CAR.centre ** 2 - JOSEPHINE_CAR.rise ** 2);
+/**
+ * The jib sheet's lead angle (deg off the centreline, seen from the tack) for a car on athwartships pin `ins` (0 inboard
+ * .. CAR_IN_PINS−1 outboard): atan(out / CAR_AFT), 11.6° to 13.7°, 12.65° at the middle hole, half a degree a hole.
+ */
+const leadAt = (ins: number) => Math.atan((JOSEPHINE_CAR.centre + JOSEPHINE_CAR.pin * (ins - (CAR_IN_PINS - 1) / 2)) / CAR_AFT) * 180 / Math.PI;
+/** (the holes' leads worked out once: the sheet's angle is asked for every boat every step) */
+const LEADS = Array.from({ length: CAR_IN_PINS }, (_, i) => leadAt(i));
+export const carLead = (ins: number) => LEADS[ins] ?? leadAt(ins);
+/** The outermost athwartships pin whose lead is no wider than `angle` deg (the innermost if none is). */
+export const carInFor = (angle: number) => { let k = 0; for (let i = 1; i < CAR_IN_PINS; i++) if (carLead(i) <= angle) k = i; return k; };
 /** Jib sheet angle (deg) from the sheet and the car's athwartships position (the lead angle). The sheet's 0–1 to the
  * angle, lead + 70·s^1.4, is a feel scale, like the mainsheet's: with a 12.3° lead, reaching 20° takes 5% of real
- * rope's ease, where this takes 21% (24% at the middle hole's 10.5°: reference/design/sheet-geometry.md). */
+ * rope's ease, where this takes 21% (reference/design/sheet-geometry.md). */
 export function jibAngle(c: Controls, tack: Tack): number {
   const lead = carLead(c.car[tack === 'S' ? 'P' : 'S'].ins); // the loaded car is the leeward one
   return Math.min(68, lead + 70 * Math.pow(c.jibsheet, 1.4));
@@ -340,9 +371,11 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   const free = fixed.mainsheet != null ? depowerLimits(depower ?? 0, awa) : null;
   const lo = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? free.min.traveller : lim.min[k]) ?? (k === 'traveller' ? -1 : 0);
   const hi = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? 1 : lim.max[k]) ?? 1;
-  // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle
-  const carIn = clamp(Math.floor((jibAng - 1 - 8) / 1.25), 0, CAR_IN_PINS - 1);
-  const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, jibHalyard: 0.3, carFore: 3, carIn, ...from };
+  // inboard as the sheeting angle allows (points higher), never so far in the jib can't reach its angle (a quarter of a
+  // degree in hand: half a hole); worked out afresh each time, not carried over from the last plan, which froze it at
+  // the first one's
+  const carIn = carInFor(jibAng - 0.25);
+  const x: CrewSettings = { traveller: 0, vang: 0.3, outhaul: 0.5, cunningham: 0.3, downhaul: 0.3, backstay: 0.3, jibCunningham: 0.3, jibHalyard: 0.3, carFore: 3, ...from, carIn };
   const keys = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
   for (const k of keys) x[k] = clamp(x[k], lo(k), hi(k)); // the depowering steps first, then the best shape within them
   // with your mainsheet held, the traveller is how the crew puts the boom where they want it (up to windward in light
