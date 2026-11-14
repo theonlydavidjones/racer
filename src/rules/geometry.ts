@@ -38,6 +38,13 @@ export function hullGapEnds(E: Float64Array, k: number, B: Hull): number {
   if (side(p1x, p1y, p2x, p2y, q1.x, q1.y) * side(p1x, p1y, p2x, p2y, q2.x, q2.y) < 0 && side(q1.x, q1.y, q2.x, q2.y, p1x, p1y) * side(q1.x, q1.y, q2.x, q2.y, p2x, p2y) < 0) return 0;
   return Math.min(segXY(p1x, p1y, q1.x, q1.y, q2.x, q2.y), segXY(p2x, p2y, q1.x, q1.y, q2.x, q2.y), segXY(q1.x, q1.y, p1x, p1y, p2x, p2y), segXY(q2.x, q2.y, p1x, p1y, p2x, p2y));
 }
+/** hullGap with both hulls' ends given as numbers (hullEndsInto's): A's from `k`, B's from `k2`. The same arithmetic. */
+export function hullGapEnds2(E: Float64Array, k: number, F: Float64Array, k2: number): number {
+  const p1x = E[k], p1y = E[k + 1], p2x = E[k + 2], p2y = E[k + 3], q1x = F[k2], q1y = F[k2 + 1], q2x = F[k2 + 2], q2y = F[k2 + 3];
+  const side = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+  if (side(p1x, p1y, p2x, p2y, q1x, q1y) * side(p1x, p1y, p2x, p2y, q2x, q2y) < 0 && side(q1x, q1y, q2x, q2y, p1x, p1y) * side(q1x, q1y, q2x, q2y, p2x, p2y) < 0) return 0;
+  return Math.min(segXY(p1x, p1y, q1x, q1y, q2x, q2y), segXY(p2x, p2y, q1x, q1y, q2x, q2y), segXY(q1x, q1y, p1x, p1y, p2x, p2y), segXY(q2x, q2y, p1x, p1y, p2x, p2y));
+}
 /** core/math.ts segPt on numbers: the same arithmetic. */
 function segXY(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const abx = bx - ax, aby = by - ay;

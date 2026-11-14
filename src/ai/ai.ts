@@ -208,7 +208,8 @@ function keepClear(w: World, b: Boat, kc: Boat[], row: Boat[], aimH: number, oth
   const seen = new Set([...(ai.esc?.ids.split(',').map(k => k.slice(1)) ?? []), ...expected.map(String)]);
   const delay = threats.every(o => seen.has(String(o.id))) ? 0.2 : ai.kn.reactS;
   const toCourse = Math.round(wrap(aimH - b.h)), turns = [...(Math.abs(toCourse) > 3 ? [toCourse] : []), ...ESC_TURNS];
-  const me = { x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 };
+  // (making sternway, from a standstill: the prediction is of headway only, and she has none: Deep Physics)
+  const me = { x: b.x, y: b.y, h: b.h, v: Math.max(0, b.v - (b.astern ?? 0)), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4 };
   // (one prediction for all the boats of a kind, her gap to each read separately: boat/arcs.ts Candidate.gaps)
   const eo = { delay, horizon: ESC_HORIZON, turns, dt: ESC_DT, windKt: b.ww.kt };
   let paths: EscapePaths | undefined; // (her own paths, once for both runs: they don't depend on the other boats)
@@ -989,8 +990,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // is looked at afresh each time, so she never tacks on an old look)
     const was = ai.tackHeldAt != null && w.t - ai.tackHeldAt < TACK_LOOK_S;
     if (close.length) {
-      const [c] = was ? [null] : escapes({ x: b.x, y: b.y, h: b.h, v: b.v + (b.astern ?? 0), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4, luff }, // (her tack as she'd sail it: with her sheets flying if she's easing now, Deep Physics' turnSpeed)
-        close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT, windKt: ww.kt }).filter(q => q.turn !== 0);
+      const [c] = was ? [null] : escapes({ x: b.x, y: b.y, h: b.h, v: Math.max(0, b.v - (b.astern ?? 0)), turnRate: b.turnRate ?? 0, helmNeed: b.helmNeed ?? 0, leeway: b.leeway ?? 4, luff }, // (her tack as she'd sail it: with her sheets flying if she's easing now, Deep Physics' turnSpeed)
+        close.map(onward), ww.from, { delay: 0, horizon: ESC_HORIZON, turns: [Math.round(wrap(desired - b.h))], dt: ESC_DT, windKt: ww.kt, hold: false });
       if (was || (c && c.minGap < CONTACT_GAP + ai.kn.clearGapM + TACK_SAG_M)) {
         if (!was) ai.tackHeldAt = w.t;
         desired = b.tack === 'S' ? csS : csP; tackHeld = true;
