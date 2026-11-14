@@ -7,7 +7,7 @@ import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey, type Tack } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
-import { motorForce } from './motor';
+import { motorForce, motorYaw } from './motor';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
@@ -175,6 +175,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const maxRate = Math.max(1e-3, flow);
   // helm balance: with weather helm she turns toward the wind unless the rudder holds her (balance.ts)
   const balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * toWind;
+  // her outboard, off her centerline on the port quarter, turns her too (motor.ts motorYaw): the rate its moment holds
+  // against the water's damping of her turn (yawLag's own: I / yawLag). Slow, that's more than her rudder can hold, so
+  // she swings as she gathers way; at speed it's a touch of helm
+  const motRate = b.motor ? motorYaw(b) / yawDamping(b.v + astern) / D2R : 0;
   let rate: number, rudder: number; // rudder: fraction of full, in the turn-rate sense (+ turns to starboard)
   // she answers the helm over a moment, not at once: her yaw inertia against the water's damping (yawLag); a helmsman
   // (and the AI) eases the helm before the heading he wants, by what she'll still turn once it's amidships
@@ -197,7 +201,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       if (sternFirst && rate === byFlow) bladeFlip = true;
     }
     rudder = clamp(rate / Math.max(1e-6, maxRate), -1, 1);
-    if (b.turnTarget == null) rate += balRate; // let go of the tiller and she rounds up (or bears away)
+    if (b.turnTarget == null) rate += balRate + motRate; // let go of the tiller and she rounds up (or bears away), or the motor swings her
   } else if (b.penalty > 0 && !b.ai?.clearing) {
     // penalty turns: the crew backs the sails to spin the boat even when slow
     rate = Math.max(maxRate, PENALTY_TURN_RATE); rudder = 1;
@@ -229,10 +233,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // 42.3(d) allows sculling only to turn toward close-hauled)
     const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? rateFor(Math.sign(lead)) : flow;
     rate = clamp(lead * 1.6, -lim, lim);
-    rudder = clamp((rate - balRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
+    rudder = clamp((rate - balRate - motRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
   }
   // (sculling in use: she's turning faster than the flow alone would turn her; latched to that way until close-hauled)
-  if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate : 0)) > flow + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
+  if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flow + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
   if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
   b.helm = clamp(bladeFlip ? -rudder : rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
   b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
@@ -473,6 +477,10 @@ export function yawLag(u: number): number {
     yawK = I / perU;
   }
   return yawK / Math.max(0.25, u);
+}
+/** The water's damping of her turn at `u` m/s, N·m per rad/s: what a steady turning moment is held against (yawLag's own). */
+export function yawDamping(u: number): number {
+  return HULL.displacement * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded) / yawLag(u);
 }
 
 /**

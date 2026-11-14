@@ -26,6 +26,7 @@
  * For the 3.5 that's about 400 N at rest (90 lbf), falling to nothing at about 7.6 m/s (15 kt).
  */
 import type { Boat } from './boat';
+import { OUTBOARD_PROP } from './outboardMount';
 
 const RHO = 1025; // sea water, kg/m³
 const HP = 745.7; // W
@@ -101,4 +102,27 @@ export function motorForce(b: Boat): number {
   const m = b.motor; if (!m) return 0;
   const vAhead = b.v - (b.astern ?? 0);
   return thrust(m, vAhead) - Math.sign(vAhead) * legDrag(m, Math.abs(vAhead));
+}
+
+/**
+ * Prop walk: the side push of a turning prop, as a share of its thrust (ESTIMATES, small). A right-handed prop (clockwise
+ * seen from astern, as these motors' are) pushing ahead walks her stern to starboard; pushing astern, to port, whether
+ * by the 6's reverse gear (the prop turning the other way) or by the small motors turned round on the bracket (the same
+ * push, pointed the other way). It's a real effect on an inboard, whose prop works under the hull on a sloping shaft;
+ * an outboard's works level, clear astern of her, under its anti-ventilation plate, and walks very little.
+ */
+export const PROP_WALK = { ahead: 0.02, astern: 0.04 };
+
+/**
+ * The motor's turning moment on her (N·m, + turns her bow to starboard), from where it sits (outboardMount.ts: on the
+ * port quarter, OUTBOARD_PROP): its thrust pushes off her centerline, so ahead it shoves her port quarter forward and
+ * her bow swings to starboard, and astern the other way; the leg's drag when it's down and not driving pulls that
+ * quarter back; and the prop's walk pushes her stern sideways, well aft of her middle.
+ */
+export function motorYaw(b: Boat): number {
+  const m = b.motor; if (!m || !m.down) return 0;
+  const at = OUTBOARD_PROP[m.hp], vAhead = b.v - (b.astern ?? 0), T = thrust(m, vAhead);
+  const along = T - Math.sign(vAhead) * legDrag(m, Math.abs(vAhead)); // (N, + ahead, acting at x = at.x)
+  const walk = T > 0 ? PROP_WALK.ahead * T : PROP_WALK.astern * T; // (N, + her stern to starboard, acting at.z aft of her middle)
+  return -at.x * along - walk * at.z;
 }
