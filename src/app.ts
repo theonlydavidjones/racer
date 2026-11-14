@@ -60,6 +60,7 @@ import { installDevHandles } from './app/devHandles';
 import { mountDrills } from './app/drills';
 import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
+import { RulesTrainer } from './ui/rulesTrainer';
 
 /**
  * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
@@ -80,6 +81,7 @@ const ctx = {
   get DRILL_FROM() { return DRILL_FROM; },
   get S() { return S; },
   get beginRace() { return setup.beginRace; },
+  get rulesTrainer() { return rulesTrainer; },
   get beginLesson() { return setup.beginLesson; },
   get openLessons() { return setup.openLessons; },
   get drillRuns() { return drillRuns; },
@@ -566,6 +568,10 @@ function windShow(on: boolean): void {
 }
 windShow(!!S.windLadder);
 const drills = mountDrills(ctx); // (src/app/drills.ts)
+/** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
+ * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
+const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); });
+$('rulesTrainer').addEventListener('click', e => rulesTrainer.click(e));
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
 function windTick(): void {
   const on = !!S.windLadder && w.running && !w.user.docked;

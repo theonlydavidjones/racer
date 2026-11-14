@@ -33,6 +33,8 @@ export interface Settings {
   seq: number; // start sequence, minutes
   /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
   drillFrom?: number; drillSolo?: boolean;
+  /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
+  rulesRight?: number[];
   /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
   lesson?: LessonId; lessonsPassed?: LessonId[];
   aids: 0 | 1; // line, zones and laylines drawn
