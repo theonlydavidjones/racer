@@ -15,6 +15,14 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
   // Rule 21.1: a boat sailing back toward the pre-start side after her starting signal, to start or to comply with rule
   // 30.1, keeps clear of one not doing so, until her hull is completely on the pre-start side. (Over early but sailing on
   // away from the line, she keeps her rights until she turns back: the World's `returning`.)
+  // Rule 22: "If possible, a boat shall avoid a boat that is capsized or has not regained control after capsizing, is
+  // anchored or aground, or is trying to help a person or vessel in danger." Between the two, Section A doesn't apply
+  // (Part 2, Section D preamble): whatever their tacks, the boat under way avoids her. (Not modelled: capsizing and
+  // rescuing, which the sim doesn't have; "if possible", beyond what the incident tests already ask; and rule 19 room
+  // for two boats passing her, an obstruction to them by the definition's last sentence)
+  const held = (b: RulesBoat) => !!(b.anchored || b.aground);
+  if (held(A) && !held(B)) return { kc: B, rule: '22' };
+  if (held(B) && !held(A)) return { kc: A, rule: '22' };
   const ret = returning(A), retB = returning(B);
   if (after && ret && !retB) return { kc: A, rule: '21.1' };
   if (after && retB && !ret) return { kc: B, rule: '21.1' };

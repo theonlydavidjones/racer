@@ -36,6 +36,9 @@ export interface RulesBoat {
   aboveProper?: boolean;
   /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
   backing?: boolean;
+  /** Lying to her anchor, or aground (her keel on the bottom): rule 22 has other boats avoid her if possible. Set by the
+   * World (boat/anchor.ts lyingToAnchor; Crew Controls). An anchored boat is still racing (WS Case 5). */
+  anchored?: boolean; aground?: boolean;
   /** She has finished (crossed the finishing line). */
   finished?: boolean;
   /**
@@ -81,7 +84,7 @@ export interface RulesContext {
   keepsClearOf?: (a: RulesBoat, c: RulesBoat) => boolean;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '22' | '23';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
