@@ -298,6 +298,14 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
+   Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
+   Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
+   josephine-confirmed.md, "Open: the hull's bow profile"): the class construction plan (SSA / NFIA: profile, half-breadths,
+   midsection), an older lines drawing, and a photo of a clinker Folkboat on its trailer; the stem a long, fine, nearly
+   straight rake from a cut-away forefoot to the stemhead, the forward sections fine and V'd. A lines job in render/hull.ts
+   (the stations, the stem's profile, the forefoot), with a physics review after: the bow's shape feeds the hull's
+   resistance and wetted area, and boat/hullPlan.ts's deck outline (the rules' touching shape) if the deck line moves.
 8z. **Now — the cruise setup's map is blank** (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
    no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
    (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
