@@ -304,7 +304,7 @@ export class RaceLog {
       tip: 'In the puffs, depower before she lays over: backstay on, traveler down, ease the main a little. A Folkboat is fastest at about 15–20° of heel.' });
     if (this.trim.lost > 1) out.push({ key: 'trim', title: 'Sail trim', lost: this.trim.lost,
       detail: 'Your sheets and controls, against the best trim for the conditions.',
-      tip: 'Watch the telltales, and open the Trim coach for what to change.' });
+      tip: 'Upwind and reaching, watch the jib\'s luff telltales, windward and leeward, and the main\'s leech telltales; open the Trim coach for what to change.' });
     const u = w.user;
     if (u.tune && this.tune.lost > 1 && this.tune.n) {
       const kt = this.tune.kt / this.tune.n, want = presetFor(kt);
