@@ -152,3 +152,7 @@ body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
 
 .sb-pos{fill:#ffffff;font:700 10.5px var(--f-inst);letter-spacing:.04em;paint-order:stroke;stroke:#08141e;stroke-width:3px} /* the windex's point of sail (ROADMAP 8j) */
+/* the pilot refused, or sounded its alarm: the reason in a word on its button (or its readout), in the caution color, for
+   3 s (app.ts pilotRefused) */
+#bPilot.refused,.sb-tillerslot #bPilot.refused{border-color:var(--caution);color:var(--caution)}
+#helmBar #pilot.refused .pl-read{color:var(--caution)}
