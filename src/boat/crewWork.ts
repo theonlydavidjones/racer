@@ -249,8 +249,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     let urgentTo = false;
     if (PIANO.has(k)) {
       // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
+      // (each against its own threshold: the fine one for a line wanted right to its stop is for setting it there, not for
+      // a trip to move it 2% because this moment's wish is at the stop and the lasting one isn't)
       const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
-      if (Math.abs(dl) < th || Math.abs(dn) < th || dl * dn <= 0) continue;
+      if (Math.abs(dl) < startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
       // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
       const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
       // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
