@@ -17,7 +17,7 @@ import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, boomAngle, depowerLimits, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -995,7 +995,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // Folkboat guide sets it by the wind: 15-20 cm up below 6 kt, the middle to 14 kt, eased to leeward above), and don't
     // chase the boom angle they'd want against your sheet (Debrief's review: easing in a 15 kt puff had them haul the car
     // right up to windward; trimming, drop it to leeward: a crew does neither while the helm plays the main)
-    if (fixed.mainsheet != null && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
+    // (held there, but inside the band for the wind and their depowering floor, controls.ts depowerLimits, which doesn't
+    // depend on your sheet: the car still goes down as the breeze builds, up in a drifter, and from the start when you
+    // trim the sheets from the off)
+    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, tws); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
