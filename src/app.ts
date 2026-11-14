@@ -531,6 +531,7 @@ const band = new SailBand({
   toast: (m, ms) => toast(m, ms),
   allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Hand Back: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
+  flow: () => openFlow(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
   hailKey: () => keymap.label('hail'),
@@ -575,6 +576,8 @@ let refreshMenus = () => {};
 const flowPanel = new FlowPanel(document.body, () => openFlow(false));
 function openFlow(open = !flowPanel.open): void {
   flowPanel.show(open);
+  // (the band's flow button: lit while it's open, its hover with the key)
+  const fb = document.querySelector<HTMLElement>('.sb-flowbtn'); if (fb) { fb.classList.toggle('on', open); fb.setAttribute('aria-pressed', String(open)); }
   refreshMenus();
   document.body.classList.toggle('flow-open', open);
   look.panelShift = open ? -(flowPanel.el.getBoundingClientRect().width + 16) / 2 : 0;
@@ -1046,6 +1049,7 @@ $('msgRecent').addEventListener('click', openLog); // (a message's whole text is
 $('bLogClose').onclick = () => { $('logView').hidden = true; };
 
 const keymap = new KeyMap();
+{ const fb = document.querySelector<HTMLElement>('.sb-flowbtn'); if (fb) fb.title = `Flow over the sails (${keymap.label('flowView')})`; } // (the band's flow button: its key on hover)
 const keysView = new KeysView(keymap, () => keysHint());
 const held = new Set<Action>();
 function keysHint(): void {

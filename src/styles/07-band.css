@@ -158,3 +158,7 @@ body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
    3 s (app.ts pilotRefused) */
 #bPilot.refused,.sb-tillerslot #bPilot.refused{border-color:var(--caution);color:var(--caution)}
 #helmBar #pilot.refused .pl-read{color:var(--caution)}
+/* the flow view's button (the owner: "an on-screen button for the wind-over-sails view"): a picture, the band's tab size */
+.sb-tab.sb-flowbtn{padding:0 6px!important}
+.sb-tab.sb-flowbtn:hover{color:var(--text)!important}
+.sb-tab.sb-flowbtn.on{color:#1a1205!important;background:var(--accent)!important;border-color:var(--accent)!important}

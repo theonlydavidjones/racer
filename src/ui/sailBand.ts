@@ -43,6 +43,8 @@ export interface BandHost {
   allBack(): void;
   /** Set or stow the whisker pole (it becomes yours). */
   pole(): void;
+  /** The flow view (the air over the sails): open or shut it (the owner: "we need an on-screen button for the wind-over-sails view"). */
+  flow(): void;
   /** The hail you could make now (world.ts hailOption), and making it. */
   hailWords(): string | null;
   hail(): void;
@@ -190,7 +192,7 @@ export class SailBand {
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
     el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
 <span class="sb-tillerslot"></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-flowbtn" data-act="flow" aria-label="Flow over the sails" aria-pressed="false" title="Flow over the sails"><svg viewBox="0 0 22 16" width="22" height="16" aria-hidden="true"><path d="M7 2 L7 14 L14 14 Z" fill="currentColor" opacity=".35"/><path d="M1 4.5 C6 3 9 4 12 5.5 S18 7 21 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M1 8.5 C6 7 9 8 12 9.5 S18 11 21 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M1 12.5 C6 11 9 12 12 13.5 S18 15 21 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
@@ -312,6 +314,7 @@ export class SailBand {
   }
   private click(e: MouseEvent): void {
     const t = e.target as HTMLElement, act = t.closest<HTMLElement>('[data-act]')?.dataset.act, d = t.closest<HTMLElement>('[data-line]');
+    if (act === 'flow') { this.host.flow(); return; } // (a view, not a line: any time the band is up)
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
