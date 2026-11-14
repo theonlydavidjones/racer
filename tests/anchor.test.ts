@@ -6,6 +6,7 @@ import { courseFile } from '../src/courses/registry';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { applyCommand } from '../src/sim/commands';
 import { chartDepth } from '../src/environment/sea';
+import { tideHeightAt } from '../src/environment/tide';
 import { onLand } from '../src/geo/shore';
 import type { Vec } from '../src/core/math';
 
@@ -62,8 +63,9 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     expect(dist(stemHead(u), a.at!)).toBeLessThan(a.out + 0.5);
   });
   it('on a scope too short to hold, in a breeze, the anchor drags (at a good scope, a Folkboat\'s pull is a small share of what it holds)', () => {
-    const w = world(30, 'flood'), u = w.user;
-    applyCommand(w, { k: 'anchor' }); run(w, 90);
+    const w = world(30, 'flood'), u = w.user, p0 = { x: u.x, y: u.y };
+    // (held where she is while the hand goes forward: in 30 kt she'd blow off into deeper water before it's let go)
+    applyCommand(w, { k: 'anchor' }); for (let i = 0; i < 60 * 90; i++) { if (u.anchor?.phase === 'fetch') { u.x = p0.x; u.y = p0.y; u.v = 0; u.astern = 0; } w.step(DT); }
     const a = u.anchor!; expect(a.phase).toBe('down');
     expect(a.dragging).toBe(false);
     a.out = 1.45 * ((a.depth ?? 0) + ANCHOR.bowH); // (all but straight up and down: it barely holds)
@@ -117,25 +119,39 @@ describe('Anchoring in the World: down, lying to it, and weighing it', () => {
     w.moveHere({ x: u.x + 200, y: u.y }, 'here');
     expect(u.anchor ?? null).toBeNull(); expect(u.atAnchor).toBeFalsy();
   });
-  it('the tide falling below her draft leaves her aground where she lies; rising, she floats', { timeout: 60000 }, () => {
-    const w = world(1, 'flood', 'sail', [2, 3]), u = w.user; toasts(w);
+  it('the tide falling below her draft leaves her aground where she lies; weighing it doesn\'t float her; rising, she floats', { timeout: 120000 }, () => {
+    const w = world(1, 'slack', 'sail', [0.4, 1]), u = w.user, W = w as unknown as { chartAt(p: Vec): number; gunUtc: number };
+    // (a flat the chart has under a foot of water at MLLW: anchorable at high water, dry enough at low water to hold her keel)
+    const P = { x: u.x, y: u.y }, h = (min: number) => tideHeightAt(P, (W.gunUtc + min) * 60e3);
+    let hi = 0, lo = 0; for (let m = 0; m < 25 * 60; m += 10) { if (h(m) > h(hi)) hi = m; if (h(m) < h(lo)) lo = m; }
+    const gun0 = W.gunUtc; W.gunUtc = gun0 + hi; toasts(w);
+    expect(W.chartAt(P) + h(hi), 'water enough at high water').toBeGreaterThan(ANCHOR.minDepth + 0.05);
     applyCommand(w, { k: 'anchor' }); run(w, 90);
     const a = u.anchor!; expect(a.phase).toBe('down');
-    a.chart = -1.8; // (as if she'd swung over a flat the ebb uncovers: the chart's highest drying band)
-    run(w, 3);
+    W.gunUtc = gun0 + lo - w.t / 60; run(w, 3); // (the clock on to low water)
     expect(a.aground, 'aground').toBeTruthy(); expect(toasts(w).some(m => /Aground/.test(m))).toBe(true);
-    const p0 = { x: u.x, y: u.y }; run(w, 20); expect(dist(p0, u)).toBeLessThan(0.01);
-    a.chart = 3; run(w, 3);
-    expect(a.aground ?? null).toBeNull();
+    expect(u.aground).toBe(true); expect(u.anchored).toBe(true);
+    const p0 = { x: u.x, y: u.y, h: u.h }; run(w, 20); expect(dist(p0, u)).toBeLessThan(0.01); expect(u.h).toBe(p0.h);
+    // weighed while she's on the bottom: hauled in, it stays in the mud, and she stays where she sits
+    applyCommand(w, { k: 'anchor' }); run(w, 150);
+    expect(u.anchor?.phase).toBe('hauling'); expect(dist(p0, u)).toBeLessThan(0.01); expect(u.aground).toBe(true);
+    W.gunUtc = gun0 + hi - w.t / 60; run(w, 3); // (and on to high water)
+    expect(a.aground ?? null).toBeNull(); expect(u.aground).toBe(false);
   });
-  it('for the rules (rule 22): the World marks her anchored while she lies to it, and not once it\'s breaking out', { timeout: 60000 }, () => {
+  it('the depth is the water\'s where it\'s let go: carried on into deep water while the way comes off, it stays below', () => {
+    const w = world(1, 'slack'), u = w.user, deep = world(1, 'slack', 'sail', [20, 60]).user; toasts(w);
+    applyCommand(w, { k: 'anchor' }); expect(u.anchor?.phase).toBe('fetch');
+    u.x = deep.x; u.y = deep.y; u.v = 0; run(w, 20);
+    expect(u.anchor ?? null).toBeNull(); expect(toasts(w).some(m => /Too deep/.test(m))).toBe(true);
+  });
+  it('for the rules (rule 22): the World marks her anchored while she lies to it, the anchor in the mud till it\'s broken out, and not after', { timeout: 60000 }, () => {
     const w = world(1, 'flood'), u = w.user;
     expect(u.anchored ?? false).toBe(false);
     applyCommand(w, { k: 'anchor' }); run(w, 90);
     expect(u.anchored).toBe(true); expect(u.aground ?? false).toBe(false);
     applyCommand(w, { k: 'anchor' });
     let sawBreaking = false;
-    for (let i = 0; i < 60 * 150 && u.anchor; i++) { w.step(DT); if (u.anchor?.phase === 'breaking') { sawBreaking = true; w.step(DT); expect(u.anchored).toBe(false); break; } }
-    expect(sawBreaking).toBe(true);
+    for (let i = 0; i < 60 * 150 && u.anchor; i++) { w.step(DT); if (u.anchor?.phase === 'breaking') { if (sawBreaking) expect(u.anchored, 'held by it while it breaks out').toBe(true); sawBreaking = true; } if (u.anchor?.phase === 'stowing') { w.step(DT); expect(u.anchored).toBe(false); break; } }
+    expect(sawBreaking).toBe(true); expect(u.anchor?.phase).toBe('stowing');
   });
 });

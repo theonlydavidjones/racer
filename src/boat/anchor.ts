@@ -77,15 +77,22 @@ export interface AnchorState {
   charted?: Vec;
   /** the way the haul pulls her (unit, over the ground: toward the anchor as hauling began), for rule 42 */
   haulDir?: Vec;
-  /** her keel on the bottom: the tide's left her less water than her draft; and where she sits */
-  aground?: Vec | null;
+  /** her keel on the bottom: the tide's left her less water than her draft; where she sits, and her heading (a keel in the
+   * mud doesn't swing) */
+  aground?: { x: number; y: number; h: number } | null;
+  /** told the anchor stays down while she's aground */
+  waitTide?: boolean;
 }
 
-/** Lying to her anchor (rule 22's "anchored", for the rules: sim/world.ts sets b.anchored each step): the anchor on the
- * bottom holding her, with the rode out to it: paying out once it's reached the bottom, down, or being hauled in; not
- * breaking it out (she's getting under way). */
+/** Lying to her anchor: the anchor on the bottom holding her, with the rode out to it (paying out once it's reached the
+ * bottom, down, being hauled in, or up and down while it's broken out of the mud), or aground at anchor. The World steps
+ * her on the rode while it holds (sim/world.ts anchorStep), and it's rule 22's "anchored" for the rules (b.anchored): one
+ * test for both, so she's never held by the anchor and treated as free to keep clear, or the other way round. */
 export function lyingToAnchor(b: Pick<Boat, 'anchor'>): boolean {
-  const a = b.anchor; return !!a?.at && (a.phase === 'paying' || a.phase === 'down' || a.phase === 'hauling') && a.out > (a.depth ?? 0) + ANCHOR.bowH;
+  const a = b.anchor; if (!a?.at) return false;
+  if (a.aground) return true;
+  if (a.phase === 'hauling' || a.phase === 'breaking') return true; // (hauled to up and down, it's still in the mud till it's broken out)
+  return (a.phase === 'paying' || a.phase === 'down') && a.out > (a.depth ?? 0) + ANCHOR.bowH; // (paying out: once it's reached the bottom)
 }
 
 /** How fast the forward hand works (a slower crewmate takes longer). */

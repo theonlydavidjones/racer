@@ -55,7 +55,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
-import { chartDepth, landAt, soundingNear } from '../environment/sea';
+import { chartBand, landAt, soundingNear } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
@@ -993,11 +993,10 @@ export class World {
   anchorCall(): void {
     const u = this.user, a = u.anchor;
     if (u.docked || u.handled || u.mooring || u.pushing) { this.emit({ type: 'toast', msg: 'She\'s alongside: there\'s nothing to anchor for.' }); return; }
+    if (u.wrecked) return; // (wrecked: the page's choices, not the anchor)
     if (!a) {
       const depth = this.waterDepth(stemHead(u));
-      // (the class's 25 m of rode: at least 3:1 for it to set, ANCHOR.minScope; and water enough to float her)
-      if (depth + ANCHOR.bowH > ANCHOR.rodeM / ANCHOR.minScope) { this.emit({ type: 'toast', ms: 4000, msg: `Too deep to anchor here: ${Math.round(depth)} m of water, and ${ANCHOR.rodeM} m of rode.` }); return; }
-      if (depth < ANCHOR.minDepth) { this.emit({ type: 'toast', ms: 4000, msg: `Too shallow to anchor: ${depth.toFixed(1)} m of water.` }); return; }
+      if (!this.anchorable(u, depth)) return;
       if (u.paddle) this.paddle(null, false, true); // (the forward hand: the crutch goes below)
       if (this.pilot.mode !== 'off') this.pilot.mode = 'off';
       u.anchor = { phase: 'fetch', t: 0, out: 0, depth, want: Math.min(ANCHOR.rodeM, ANCHOR.scopeWant * (depth + ANCHOR.bowH)) };
@@ -1013,6 +1012,14 @@ export class World {
       this.emit({ type: 'toast', msg: 'Weighing anchor: hauling in the rode.' });
     }
   }
+  /** Water she can anchor in (`depth` m), or the crew say why not: the class's 25 m of rode, at least 3:1 for it to set
+   * (ANCHOR.minScope); and water enough to float her. */
+  private anchorable(b: Boat, depth: number): boolean {
+    const say = (msg: string) => { if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg }); return false; };
+    if (depth + ANCHOR.bowH > ANCHOR.rodeM / ANCHOR.minScope) return say(`Too deep to anchor here: ${Math.round(depth)} m of water, and ${ANCHOR.rodeM} m of rode.`);
+    if (depth < ANCHOR.minDepth) return say(`Too shallow to anchor: ${depth.toFixed(1)} m of water.`);
+    return true;
+  }
   /** The water's depth (m) at `p`, with the tide's height there (environment/tide.ts tideHeightAt: on San Rafael's and
    * San Leandro's grids their own stations', elsewhere San Francisco's, 9414290): in those Bays the 50 m sounding grid (environment/tide.ts depthBand); elsewhere NOAA's chart, its depth areas and soundings
    * (environment/sea.ts chartDepth). */
@@ -1021,9 +1028,15 @@ export class World {
     if (d1 !== 0 || d2 !== 0) return Math.max(0, wetBand(d1, d2, h).depth);
     return Math.max(0, (chart ?? this.chartAt(p)) + h);
   }
-  /** The chart's depth below MLLW at `p` (m): the nearest sounding within 150 m (the chart's own figure for the spot),
-   * else the middle of its depth area's band (sea.ts chartDepth); off the chart, deep water (outside the Gate). */
-  private chartAt(p: Vec): number { return soundingNear(p, 150) ?? chartDepth(p) ?? 30; }
+  /** The chart's depth below MLLW at `p` (m). Its depth area (sea.ts chartBand) says what band the water's in there; the
+   * nearest sounding within 150 m only refines that, held within the band (a sounding a channel's edge away, across in
+   * the next area, isn't this spot's depth); with no sounding, the band's middle. Off the depth areas, the nearest
+   * sounding; off the chart, deep water (outside the Gate). */
+  private chartAt(p: Vec): number {
+    const B = chartBand(p), s = soundingNear(p, 150);
+    if (!B) return s ?? 30;
+    return s == null ? (B.d + B.deep) / 2 : Math.min(B.deep, Math.max(B.d, s));
+  }
   /** The forward hand at the bow with the anchor, until it's stowed. */
   private anchorJob(b: Boat, on: boolean): void {
     const c = b.crew; if (!c) return;
@@ -1032,9 +1045,7 @@ export class World {
     a.job = { line: 'anchor', reach: 0, work: 1, station: { arm: 0, z: Z.bow, pose: 'bow' } };
   }
   /** The anchor on the bottom, with rode out to it: she lies to it. */
-  private onRode(b: Boat): boolean {
-    const a = b.anchor; return !!a?.at && (a.phase === 'paying' || a.phase === 'down' || a.phase === 'hauling' || a.phase === 'breaking') && a.out > (a.depth ?? 0) + ANCHOR.bowH;
-  }
+  private onRode(b: Boat): boolean { return lyingToAnchor(b); }
   /** Each step: the crew's work on the anchor (boat/anchor.ts's times, at the forward hand's pace). */
   private anchorWork(b: Boat, dt: number): void {
     const a = b.anchor; if (!a) return;
@@ -1042,7 +1053,10 @@ export class World {
     if (a.phase === 'fetch' && a.t >= ANCHOR.fetchS / pace) {
       // lowered straight down from the stem head (Perry: never thrown ahead), once the way's off her: round up, let fly
       if (Math.abs(b.v - (b.astern ?? 0)) > ANCHOR.wayOff) { if (!a.waited) { a.waited = true; this.emit({ type: 'toast', msg: 'Crew: take the way off her and I\'ll let it go.' }); } return; }
-      a.at = stemHead(b); a.drop = { x: b.x, y: b.y }; a.chart = this.chartAt(a.at); a.depth = this.waterDepth(a.at, a.chart); a.t0 = this.t; a.phase = 'paying'; a.t = 0;
+      // (the water where it's let go, which may not be where you called it: she's carried on while the way came off)
+      const at = stemHead(b), chart = this.chartAt(at), depth = this.waterDepth(at, chart);
+      if (b.wrecked || !this.anchorable(b, depth)) { b.anchor = null; this.anchorJob(b, false); return; }
+      a.at = at; a.drop = { x: b.x, y: b.y }; a.chart = chart; a.depth = depth; a.want = Math.min(ANCHOR.rodeM, ANCHOR.scopeWant * (depth + ANCHOR.bowH)); a.t0 = this.t; a.phase = 'paying'; a.t = 0;
       if (b.isUser) { b.steer = 0; b.turnTarget = null; }
     } else if (a.phase === 'paying') {
       a.out = Math.min(a.want, a.out + ANCHOR.payOut * pace * dt);
@@ -1051,13 +1065,19 @@ export class World {
       // hand over hand while the rode's tension is no more than they can pull (two hands crewed, one alone)
       const hands = (b.crew?.spec.crew.length ?? 0) === 0 ? 1 : 2;
       if ((a.line?.T ?? 0) < ANCHOR.pull * hands) a.out = Math.max(d, a.out - ANCHOR.haul * pace * dt);
-      if (a.out <= d + 0.05) { a.phase = 'breaking'; a.t = 0; }
+      // (aground, it stays in the mud: getting it up doesn't float her, and she waits for the tide)
+      if (a.out <= d + 0.05) {
+        if (!a.aground) { a.phase = 'breaking'; a.t = 0; }
+        else if (!a.waitTide) { a.waitTide = true; if (b.isUser) this.emit({ type: 'toast', msg: 'Crew: she\'s on the bottom. The anchor stays down until the tide floats her.' }); }
+      }
     } else if (a.phase === 'breaking' && a.t >= ANCHOR.breakS / pace) {
-      // broken out: she's free. Rule 45, Case 5: hauling in may bring her back to where it went down, but not gather way
-      // over the ground past it: her way over the ground the way the haul pulled her (not through the water: in a foul
-      // stream she's held still; nor being blown back as it breaks out, which isn't propulsion)
-      const hd = a.haulDir, pulled = hd ? b.vx * hd.x + b.vy * hd.y : 0;
-      if (pulled > 0.5 && this.racing(b)) this.rule42(b, 'anchor');
+      // broken out: she's free. Rule 45, Case 5: hauling in may bring her back to where it went down, but if it "clearly
+      // propels her to a different position" it breaks rule 42.1: where she is against where she was as it went down,
+      // along the way the haul pulled her (more than her length's half: a rode up and down puts her stem head over the
+      // anchor, her middle about where she was when it was let go). The crew haul to up and down and no further, so it
+      // doesn't happen today; it's here for a haul that would
+      const hd = a.haulDir, past = hd && a.drop ? (b.x - a.drop.x) * hd.x + (b.y - a.drop.y) * hd.y : 0;
+      if (past > 3 && this.racing(b)) this.rule42(b, 'anchor');
       a.phase = 'stowing'; a.t = 0; a.line = undefined; a.at = undefined; a.dragging = false; b.atAnchor = false; b.luff = false;
       this.emit({ type: 'toast', msg: 'Anchor\'s aweigh.' });
     } else if (a.phase === 'stowing' && a.t >= ANCHOR.stowS / pace) {
@@ -1080,16 +1100,16 @@ export class World {
     }
     if (this.steps % 60 === 0) {
       a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
-      // the water under her keel where she lies (the shallower of the nearest sounding there and the anchor's ground, a
-      // rode's length off): the tide falling below her draft leaves her on the bottom, and rising again floats her
-      const here = this.waterDepth(b, Math.min(soundingNear(b, 150) ?? Infinity, a.chart ?? Infinity));
+      // the water under her keel where she lies (the chart there: chartAt): the tide falling below her draft leaves her
+      // on the bottom, and rising again floats her
+      const here = this.waterDepth(b, this.chartAt(b));
       if (!a.aground && here < ANCHOR.draft) {
-        a.aground = { x: b.x, y: b.y }; b.lastHitT = this.t; // (aground: 42.3(h) lets her get clear of it)
+        a.aground = { x: b.x, y: b.y, h: b.h }; b.lastHitT = this.t; // (aground: 42.3(h) lets her get clear of it)
         if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: `Aground: the tide's fallen to ${here.toFixed(1)} m and left her keel on the bottom. She floats again as it rises.` });
-      } else if (a.aground && here >= ANCHOR.draft + 0.05) { a.aground = null; if (b.isUser) this.emit({ type: 'toast', msg: 'She\'s afloat again.' }); }
+      } else if (a.aground && here >= ANCHOR.draft + 0.05) { a.aground = null; a.waitTide = false; if (b.isUser) this.emit({ type: 'toast', msg: 'She\'s afloat again.' }); }
     }
     // (aground she sits where she touched: no swinging to her anchor, no drift)
-    if (a.aground) { b.x = a.aground.x; b.y = a.aground.y; b.v = 0; b.astern = 0; b.sway = 0; b.turnRate = 0; b.vx = 0; b.vy = 0; }
+    if (a.aground) { b.x = a.aground.x; b.y = a.aground.y; b.h = a.aground.h; b.v = 0; b.astern = 0; b.sway = 0; b.turnRate = 0; b.vx = 0; b.vy = 0; }
     // (head to wind or stream with her sails let fly she lies upright: her heel eases off as the hull's damping lets it)
     b.heel = (b.heel ?? 0) * Math.exp(-dt / 3); b.heelMag = Math.abs(b.heel);
     // her sheets let fly (the sails luffing, drawn so), and her crew where they're placed as at a dock: the forward hand at

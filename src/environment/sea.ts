@@ -250,9 +250,9 @@ export function soundingNear(p: Vec, r: number): number | null {
   for (const s of SOUNDINGS) { const d = Math.hypot(s.p.x - p.x, s.p.y - p.y); if (d < bd) { bd = d; best = s.d; } }
   return best;
 }
-/** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
-export function chartDepth(p: Vec): number | null {
-  const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[]; soundings: number[] };
+/** NOAA's chart's depth area at a point: its band's shallow and deep edges below MLLW (m), or null off the depth areas. */
+export function chartBand(p: Vec): { d: number; deep: number } | null {
+  const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[] };
   const bands = E.depth.map(b => b.d).filter((d, i, a) => a.indexOf(d) === i).sort((a, b) => a - b);
   for (const band of E.depth) {
     for (const poly of band.p) {
@@ -262,12 +262,15 @@ export function chartDepth(p: Vec): number | null {
         for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; ring.push(LL(y / 1e5, x / 1e5)); }
         for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
       }
-      if (inside) { const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10; return Math.max(0, (band.d + deep) / 2); }
+      if (inside) return { d: band.d, deep: band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10 };
     }
   }
-  let best: number | null = null, bd = 200;
-  for (let i = 0; i < E.soundings.length; i += 3) { const q = LL(E.soundings[i + 1] / 1e5, E.soundings[i] / 1e5), d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = E.soundings[i + 2] / 10; } }
-  return best;
+  return null;
+}
+/** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
+export function chartDepth(p: Vec): number | null {
+  const B = chartBand(p); if (B) return Math.max(0, (B.d + B.deep) / 2);
+  return soundingNear(p, 200);
 }
 
 /** A harbor's entrance: its middle, its width (m), the way into the harbor (unit), and the water's depth there (m). */
