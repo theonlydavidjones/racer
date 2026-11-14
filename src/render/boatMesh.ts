@@ -792,7 +792,19 @@ function sheaveBlock(r: number, dy: number): THREE.Mesh {
 
 /** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
 const sideMatFor = (g: THREE.Group): THREE.Material => g.userData.sideMat ?? MAT.cream;
+/** Merges the still meshes added to `parent` (not in `had`, not `moving`), with the shared black and steel, into one mesh per material. */
+function bakeFittings(parent: THREE.Object3D, had: Set<THREE.Object3D>, moving: Set<THREE.Object3D>): void {
+  for (const mat of [BLACK, STEEL]) {
+    const still = parent.children.filter(o => !had.has(o) && !moving.has(o) && o instanceof THREE.Mesh && o.material === mat && o.children.length === 0) as THREE.Mesh[];
+    if (still.length < 2) continue;
+    const geos = still.map(o => { o.updateMatrix(); const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.applyMatrix4(o.matrix); });
+    const merged = mergeGeometries(geos, false); if (!merged) continue;
+    for (const o of still) parent.remove(o);
+    const baked = new THREE.Mesh(merged, mat); baked.userData.fittings = true; parent.add(baked); // (line-clash.cjs: lines may end on these)
+  }
+}
 function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
+  const had = new Set([...grp.children, ...boomPivot.children]);
   // traveller: the thwart, a deep varnished beam across the cockpit in front of the helm, on its post (hull.ts
   // COCKPIT_FIT), the track on its top, and the car
   const tu = uAtZ(TRAV_Z), tw = cockpitHalf(tu), ty = thwartTop();
@@ -823,12 +835,21 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     { const l = line([foot, new THREE.Vector3(side * (tw - 0.04), ty - 0.04, (TRAV_Z + foot.z) / 2), new THREE.Vector3(x, ty + 0.03, TRAV_Z)], 'backstay', 'backstay'); l.userData.inside = true; grp.add(l); }
     grp.add(line([new THREE.Vector3(x, ty + 0.03, TRAV_Z - 0.03), new THREE.Vector3(x - side * 0.03, ty - 0.25, TRAV_Z - 0.06)], 'backstay', 'backstay')); // the tail
   }
-  // vang: a rope tackle from a block under the boom, about a quarter of the way out, down to a block on a fitting at the
-  // foot of the mast, four parts (Josephine's photos: hauled out from starboard, and the mast foot from forward; CR 8.60
-  // only limits what may hold the boom up, so a rope vang is legal). Its tail comes down to the turning blocks at the
-  // mast's foot and aft to the piano. (The part count is read off the photo: an estimate.)
-  { const ub = sheaveBlock(0.025, -0.05); ub.position.set(0, BOOM_TOP - 2 * BOOM_R, VANG_R); boomPivot.add(ub);
-    const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb); }
+  // vang: a rope tackle from a block hung under the boom on a two-legged wire span, down to a block shackled at the base
+  // of the mast with the jammer on it (Josephine: the owner's photo of the vang to the mast base, from the cabin top
+  // looking forward at the mast's starboard side; CR 8.60 only limits what may hold the boom up, so a rope vang is legal).
+  // The span's forward leg goes to an eye on the boom just aft of the gooseneck, the other further aft; the tackle's four
+  // parts and the legs' positions are read off the photo (estimates). Its tail comes down to the turning blocks at the
+  // mast's foot and aft to the piano.
+  { const ub = sheaveBlock(0.025, -0.05); ub.position.copy(VANG_SPAN).setY(VANG_SPAN.y + 0.05); boomPivot.add(ub);
+    const under = BOOM_TOP - 2 * BOOM_R;
+    for (const z of VANG_LEGS) {
+      // each leg shackled to a stainless eye riveted under the boom
+      const eye = new THREE.Mesh(new THREE.TorusGeometry(0.01, 0.003, 6, 12), STEEL); eye.position.set(0, under - 0.008, z); boomPivot.add(eye);
+    }
+    boomPivot.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(VANG_LEGS.flatMap(z => [new THREE.Vector3(0, under, z), VANG_SPAN.clone().setY(VANG_SPAN.y + 0.05)])), MAT.wire)); // the span's wire legs
+    const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb);
+    const jam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.05), BLACK); jam.position.copy(VANG_FOOT).add(new THREE.Vector3(0.03, -0.02, 0.02)); grp.add(jam); } // (the jammer on the lower block)
   const vang = line(Array.from({ length: 5 }, () => VANG_FOOT.clone()), 'main', 'vang'); grp.add(vang);
   // winches on the cockpit coamings, near the forward end
   const winches = {} as Record<Tack, THREE.Vector3>, cars = {} as Record<Tack, THREE.Mesh>, carBars = {} as Record<Tack, THREE.Mesh>, handles = {} as Record<Tack, THREE.Group>;
@@ -897,13 +918,13 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   //    each to a small block-and-tackle on the mast's side by its foot, the tackle's fall to the foot block and aft to the
   //    piano (the owner, on Josephine). The tackle's purchase and exact height aren't known: drawn as a 2:1, its moving
   //    block on the halyard's end about 0.4 m up, its standing part and fall at the foot block (estimates).
-  const mastLines: Lines['mastLines'] = [], deckAt = (x: number, z: number) => deckY(uAtZ(z), Math.abs(x));
+  const mastLines: Lines['mastLines'] = [];
   // (a line lying on the boat from a to b: straight in plan, following the cabin top, over its forward edge and down its
-  // face to the deck; a point every 20 cm, and points at the edge, so it lies on the surface)
+  // face to the deck; a point every 5 cm, so it follows the cabin's curved nose and crown, and points at the edge)
   const zFront = -L / 2 + CABIN.u0 * L;
   const surf = (x: number, z: number) => { const u = uAtZ(z); return (u > CABIN.u0 && u < CABIN.u1 && Math.abs(x) < cabinHalf(u) ? cabinTopAt(u, x) : deckY(u, Math.abs(x))) + 0.012; };
   const lay = (a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3[] => {
-    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.2)), out: THREE.Vector3[] = [];
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.05)), out: THREE.Vector3[] = [];
     for (let i = 1; i <= n; i++) {
       const t = i / n, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, zPrev = a.z + (b.z - a.z) * (i - 1) / n;
       // (crossing the cabin's forward edge: a point on the edge, so the line goes over it and down the face)
@@ -913,8 +934,15 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     return out;
   };
   const fixed = (l: THREE.Line) => { l.userData.fixed = true; grp.add(l); return l; }; // (never moves: syncRopes lays it once)
-  const footZ = MAST_AFT_Z + 0.06;
-  const footBlock = (x: number) => { const fb = sheaveBlock(0.016, 0.03); fb.position.set(x, deckAt(x, footZ), footZ); fb.rotation.y = Math.PI / 2; grp.add(fb); return new THREE.Vector3(x, deckAt(x, footZ) + 0.03, footZ); };
+  // the turning blocks at the mast's foot, shackled under the stainless horseshoe that arches round the mast's after side
+  // (Boat Detail's MAST_RING, from the owner's photos: "the lines from the mast attach to, or thread under" it), each
+  // at its own angle round the arch from dead aft, in the piano's order outward and spread along it, the sheave hanging below the rod and
+  // facing aft so the line turns from the mast to the deck
+  const footBlock = (side: number, i: number) => {
+    const t = side * (20 + 22 * i) * Math.PI / 180, rod = horseshoeAt(t); // (spread from 20° to 108° round the arch, a block's width and more apart)
+    const fb = sheaveBlock(0.016, -0.03); fb.position.copy(rod); grp.add(fb);
+    return rod.clone().setY(rod.y - 0.03);
+  };
   const upMast = (pts: THREE.Vector3[], role: Rope, key: LineColorKey) => { const l = line(pts, role, key); grp.add(l); mastLines.push({ l, base: (l.geometry.attributes.position.array as Float32Array).slice() }); return l; };
   // the jib's luff tensioner (Josephine's, the owner's photos; on the sail band the jib Cunningham): a tackle down the
   // mast's starboard side, its top block clipped into an eye in the jib halyard once the jib is up (into a ring on the
@@ -932,7 +960,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const cl = new THREE.Mesh(key === 'cunningham' ? new THREE.BoxGeometry(0.035, 0.025, 0.06) : new THREE.BoxGeometry(0.05, 0.035, 0.05), BLACK); cl.position.copy(cp).setY(cp.y - 0.008); grp.add(cl);
     // (straight forward along the cabin top outboard of the hatch, fanning a little inward, then straight in to its block
     // at the mast's foot, as the photo of her cabin top looking forward shows)
-    const fb = footBlock(side * (0.04 + 0.028 * i)), mid = new THREE.Vector3(x * 0.95, 0, zClear);
+    const fb = footBlock(side, i), mid = new THREE.Vector3(x * 0.95, 0, zClear);
     fixed(line([cp, ...lay(cp, mid), ...lay(mid, fb.clone())], role, key));
     // the tail: aft over the cabin's after edge and down its face into the cockpit (not through the cabin's corner)
     { const zE = -L / 2 + CABIN.u1 * L, top = cabinTopAt(uAtZ(zE - 0.004), x) + 0.012;
@@ -973,7 +1001,12 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
   }
-  return { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  // the fittings that never move on her (the blocks, cleats, eyes, the jammer): one mesh per material, not one each,
+  // so the rigging's dozens of small parts cost the GPU a couple of draw calls a boat
+  const moving = new Set<THREE.Object3D>(); for (const v of Object.values(out)) for (const o of (Array.isArray(v) ? v : [v])) if (o instanceof THREE.Object3D) moving.add(o);
+  bakeFittings(grp, had, moving); bakeFittings(boomPivot, had, moving);
+  return out;
 }
 /** Mainsheet: from the end of the boom (its height and distance from the gooseneck) down to the traveller. */
 const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Vector3(0, 0.78, 3.62);
@@ -982,11 +1015,21 @@ const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Ve
  * about an eighth of the boom from its end (0.42 m of E: Josephine hauled out, from starboard), so the sheet comes straight down to the
  * car upwind. And the vang's block under the boom, about a quarter of the way out (the same photo).
  */
-const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z, VANG_R = 0.85;
+const MS_R = COCKPIT_FIT.thwart.z - MAST_AFT_Z;
 /** The mainsheet's two upper blocks, on bails about 15 cm apart along the boom (the photo, as measured in the physics review). */
 const MS_GAP = 0.15;
-/** The vang's lower block: on its fitting at the foot of the mast, abaft it (fixed to the mast: the tackle swings to the boom's block). */
-const VANG_FOOT = new THREE.Vector3(0, DECK_AT_MAST + 0.07 + 0.05, MAST_AFT_Z + 0.05);
+/** The vang's lower block: shackled at the base of the mast, abaft it, its sheave 5 cm above whatever the mast stands
+ * out of there (the owner's photo: the block at the mast base, with the jammer on it). */
+/** A point on the mast foot's stainless horseshoe (MAST_RING) at angle t (rad) round from dead aft: r out from the mast's
+ * centre, h·cos(90°·t/150°) up off the deck (its two ends on the deck either side just forward of the mast). */
+const horseshoeAt = (t: number) => new THREE.Vector3(MAST_RING.r * Math.sin(t), deckY(uAtZ(MAST_Z), 0) + MAST_RING.h * Math.cos(Math.PI / 2 * t / MAST_RING.ends), MAST_Z + MAST_RING.r * Math.cos(t));
+const VANG_FOOT = horseshoeAt(0).add(new THREE.Vector3(0, 0.05, 0)); // (shackled to the horseshoe's crown, dead aft, standing up toward the boom)
+/** Where the vang's span meets the boom (m aft of the gooseneck): about 0.9 m, scaled off the owner's side photo against
+ * the boom's 1.0 m over the deck, the tackle rising at about 42° from the mast's foot. The span's two legs reach the
+ * boom either side of it (VANG_LEGS), and its block hangs 0.3 m down the line toward the foot (VANG_SPAN, in the boom's
+ * frame). Estimates from the photos. */
+const VANG_BOOM = 0.9, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
+const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
 /** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
 const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
@@ -1299,7 +1342,64 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  mergeStatic(grp, out);
+  return out;
+}
+
+/**
+ * The boat's fixed parts, merged: every mesh straight under the boat's group that never moves on its own (the hull's
+ * fittings, rails, cleats, blocks, the cockpit's linings...) joined into one mesh per material, so a boat is a few dozen
+ * draw calls, not a few hundred (ROADMAP 8x: the detailed boat, eight to a fleet, doubled the scene's time a frame).
+ * Left as they are: anything the boat's state moves or shows and hides (whatever the BoatMesh or the group's userData
+ * holds), groups, lines, skinned and see-through meshes, and anything drawn in a set order. The look is the same.
+ */
+function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
+  const keep = new Set<unknown>();
+  const hold = (v: unknown, depth: number): void => {
+    if (!v || typeof v !== 'object' || keep.has(v)) return; keep.add(v);
+    if ((v as THREE.Object3D).isObject3D || depth > 3) return;
+    for (const x of Array.isArray(v) ? v : Object.values(v as object)) hold(x, depth + 1);
+  };
+  hold(held, 0); hold(grp.userData, 0);
+  // the fixed little assemblies first (a block on its strap, a winch on its pedestal, a car on its track...): groups
+  // nothing moves, made only of meshes, their meshes brought up to the boat's group as they stand, to be merged below
+  grp.updateMatrixWorld(true);
+  const inv = grp.matrixWorld.clone().invert();
+  for (const c of [...grp.children]) {
+    if (!(c as THREE.Group).isGroup || keep.has(c) || c.name || Object.keys(c.userData).length || !c.visible) continue;
+    let ok = true, any = false;
+    c.traverse(o => { if (o === c) return; const m = o as THREE.Mesh; if (keep.has(o) || o.name || !o.visible || Object.keys(o.userData).length) ok = false; else if (m.isMesh && !(m as THREE.SkinnedMesh).isSkinnedMesh) any = true; else if (!(o as THREE.Group).isGroup) ok = false; });
+    if (!ok || !any) continue;
+    const ms: THREE.Mesh[] = []; c.traverse(o => { if ((o as THREE.Mesh).isMesh) ms.push(o as THREE.Mesh); });
+    for (const m of ms) { const mw = m.matrixWorld.clone().premultiply(inv); m.parent!.remove(m); mw.decompose(m.position, m.quaternion, m.scale); grp.add(m); }
+    grp.remove(c);
+  }
+  const buckets = new Map<string, THREE.Mesh[]>();
+  for (const c of grp.children) {
+    const m = c as THREE.Mesh;
+    if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || keep.has(m) || m.name || m.children.length || !m.visible || m.renderOrder !== 0 || Array.isArray(m.material)) continue;
+    const mat = m.material as THREE.Material;
+    if (mat.transparent || m.morphTargetInfluences || Object.keys(m.userData).length) continue;
+    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',');
+    if (!g.getAttribute('position') || !g.getAttribute('normal')) continue;
+    (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(m);
+  }
+  for (const [key, ms] of buckets) {
+    if (ms.length < 2) continue;
+    const names = key.split('|')[1].split(',');
+    const geos = ms.map(m => {
+      m.updateMatrix();
+      const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
+      for (const a of Object.keys(g.attributes)) if (!names.includes(a)) g.deleteAttribute(a);
+      g.morphAttributes = {}; g.clearGroups(); return g;
+    });
+    const merged = mergeGeometries(geos, false); if (!merged) continue;
+    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms.some(m => m.castShadow); one.receiveShadow = ms.some(m => m.receiveShadow);
+    for (const m of ms) { grp.remove(m); m.geometry.dispose(); }
+    for (const g of geos) g.dispose();
+    grp.add(one);
+  }
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -1539,8 +1639,8 @@ function syncLines(m: BoatMesh, b: Boat): void {
     p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
-    const top = tmpG.set(Math.sin(a) * VANG_R, BOOM_TOP - 2 * BOOM_R - 0.05, boomZ + Math.cos(a) * VANG_R);
-    for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.006, at = i % 2 ? top : VANG_FOOT; q.setXYZ(i, at.x + ux * o, at.y, at.z + uz * o); }
+    const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
+    for (let i = 0; i <= 4; i++) { const o = (i - 2) * 0.012, at = i % 2 ? top : VANG_FOOT; q.setXYZ(i, at.x + ux * o, at.y, at.z + uz * o); } // (the four parts a sheave's width apart, so they read as a tackle)
     q.needsUpdate = true; }
   // the Cunninghams' cringles come down with their sails as they're struck (the tack stays put)
   for (const { l, sail } of L2.cringles) {
@@ -1612,9 +1712,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
     for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(13 + k, x, restOn(x, z) + 0.012, z); }
     at(17, fl.x, fl.y + 0.035, fl.z);
     const wv = L2.winches[tk]; at(18, wv.x, wv.y, wv.z);
-    // (the tail: off the winch's top, over the coaming and down onto the cockpit seat)
-    const u = uAtZ(wv.z), ci = cockpitHalf(u);
-    at(19, side * (ci - 0.01), wv.y + 0.02, wv.z + 0.04);
+    // (the tail: off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down
+    // onto the cockpit seat)
+    const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
+    at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
     at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
   }
   q.needsUpdate = true;
@@ -1630,7 +1731,15 @@ function syncLines(m: BoatMesh, b: Boat): void {
  */
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
+/** (each sail's picture drawn once for its cloth, number and inks, and shared: drawing it is a canvas full of lettering,
+ * and the boat editor rebuilds her on every change, ROADMAP 8v) */
+const sailPicCache = new Map<string, THREE.CanvasTexture>();
 function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
+  const key = JSON.stringify([color, no, side, main, inks.no ?? '', inks.f ?? '']), hit = sailPicCache.get(key);
+  if (hit) return hit;
+  const t = sailTextureDraw(color, no, side, main, inks); sailPicCache.set(key, t); return t;
+}
+function sailTextureDraw(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
   // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
   // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture

@@ -321,6 +321,16 @@ What's planned, roughly in order. Done work is described in the README.
    model ("really don't want to have to roll it back"): fix its render cost rather than roll it back. Merge its small
    meshes per material, use level of detail by distance, hide the interior and small fittings when unseen, share
    geometry and materials across the fleet, and limit shadow-casting. Any rollback is the owner's call first. Add a
+   Measured (Coordinator, 14 November, v186 against v188): the scene's JS per frame up 10–100%, worst at the night start
+   (20 → 41 ms) and the course map (24 → 34 ms); triangles +9%, with more geometries and shader programs, and +24 MB of
+   heap; the labels, HUD and maps up from 2 to 8–10 ms in two views. Cause: mainly the new boat model's render cost
+   (#291, v187). No rollback (owner). Assigned:
+   - Boat Detail: merge meshes per material, share across the fleet, level of detail and culling for the interior and
+     small fittings, back to v186's frame cost; then the editor clicks (8v).
+   - UI & Experience: the per-frame UI increase.
+   - Capacity: the hitches (garbage collection, worker spikes, the 95th percentile) and a release gate so a stuttering
+     build can't ship.
+   Batch 40 is held until the frame fix lands, so nothing adds load meanwhile.
    frame-time check to the release smoke test so a stuttering build
    can't ship.
 8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
