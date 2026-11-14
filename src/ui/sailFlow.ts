@@ -158,14 +158,14 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
     if (st.running) {
       // (the pole for the jib when she's nearly dead downwind; on a broad reach it stays to leeward)
       const how = main ? "Ease it till it's nearly square across the wind (the boom at the shrouds)" : st.awa > 155 ? 'Pole it out to windward (wing on wing)' : 'Keep it eased to leeward, just short of collapsing';
-      p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, the telltales hanging. ${how}.`); continue;
+      p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, its telltales hanging. ${how}.`); continue;
     }
     // (luffing because the crew's eased the boom down the traveller to depower, as far as that and no further, with
     // nobody else holding the sheet or the traveller: the price of keeping her on her feet, not a mistake)
     const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
     const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
-    const stallTell = main ? (t.amount > 0.12 ? 'its leech telltales hiding' : 'the flow breaking away before the leech') : 'its leeward luff telltales drooping';
+    const stallTell = main ? (t.amount > 0.12 ? 'its leech telltales curling behind the leech' : 'the flow breaking away before the leech') : 'its leeward luff telltales drooping';
     // (at its sheet's stop and well past its best angle: the sim's trim blends to downwind from 105° apparent and counts
     // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
     const pastStop = s.atMax && t.err > 4;

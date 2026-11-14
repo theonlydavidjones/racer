@@ -298,7 +298,7 @@ export class Hud {
       stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the main\'s leech telltales stream.' };
     // (the boom on the shroud, stalled on a broad reach: it can't be eased any further, so not "ease")
     const onShroud = mc === 'stalled' && u.sheets.main >= BOOM_STOP - 0.5;
-    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Ease the vang to let the top of the main twist off, or bear away (or come up) until the main\'s leech telltales stream.' : mainWhy[mc] ?? why[mc] ?? '';
+    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Come up until the main\'s leech telltales stream, or bear away to a run, where they hang and the main just pushes.' : mainWhy[mc] ?? why[mc] ?? '';
     tj.title = why[jc] ?? '';
     // the sails' shape against the best shape for the conditions, and which line fixes it
     const sw = shapeWords(u);
