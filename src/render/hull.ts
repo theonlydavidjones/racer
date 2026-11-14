@@ -71,28 +71,43 @@ export const aftLineZ = (y: number) => HEEL.z + (y - HEEL.y) * (TRANSOM_TOP.z - 
 /**
  * Bottom of the canoe body on the centreline: the spoon bow's stem, the hull bottom, rising aft. The stem meets the
  * water about 1.02 m aft of the bow at deck level, so with the raked transom's crossing (aftLineZ(0), 0.62 m forward
- * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem is straight
- * and raked, as the class drawing shows it, rounding into the forefoot below the water.
+ * of the transom, from the plan) she's 6.0 m on the waterline (class Appendix: LWL 6.00 m). The stem and the
+ * forefoot are one long, gentle curve (below).
  */
-const BOW = 0.144; // where the stem meets the forefoot (fraction of L)
-/** The stem's slope (m of height per unit of u): a straight, raked stem from the stemhead down to the forefoot. */
-const STEM_SLOPE = -1.06 / BOW;
-/** From y0 to y1 over s 0..1, leaving at `m` (dy/ds) and arriving level: the forefoot's round, picking up the stem's slope. */
-const turn = (y0: number, y1: number, m: number, s: number) => { const k = Math.max(1, m / (y1 - y0)); return y0 + (y1 - y0) * (1 - Math.pow(1 - Math.min(1, Math.max(0, s)), k)); };
-function canoe(u: number): number {
-  // the stem straight (the class drawing: a raked line from the stemhead to the forefoot, not bowed forward), then
-  // rounding into the hull's bottom without a knuckle
-  if (u < BOW) return 0.96 + STEM_SLOPE * u;
-  if (u < 0.45) return turn(-0.1, -0.62, STEM_SLOPE * (0.45 - BOW), (u - BOW) / (0.45 - BOW));
-  if (u < 0.62) return -0.62; // where the hollow garboards meet the keel amidships (the plan's main section at St. 8)
-  return -0.62 + 0.79 * ease((u - 0.62) / 0.38);
-}
-/** Keel bottom: cutaway forefoot, deepest at the heel (1.2 m draft with the keel band), where the sternpost rises. */
+const BOW = 0.144; // where the keel's thickness begins, just aft of the stem's foot (fraction of L)
+/**
+ * The bow's profile, from the stemhead to the keel's bottom, as one long, flat, gentle S with no straight stretch and no
+ * corner anywhere (the owner, from Josephine's haul-out photos and the lines plans): steep at the stemhead and easing
+ * all the way down through the waterline, steepening again a little into the ballast keel's leading edge, then easing
+ * out into the keel's bottom about 4.2 m aft of the stemhead, which runs on nearly level to the heel at 1.2 m. It's drawn
+ * by its slope (m of height per unit of u), eased between its values by cosines so the curvature changes smoothly too,
+ * and summed up from the stemhead. It meets the water about 0.97 m aft of the stemhead (the class's 6.00 m waterline).
+ * The canoe body, the hull's bottom above the keel, leaves it at U_SPLIT and eases out to its depth amidships, 0.62 m
+ * (the plan's main section at St. 8).
+ */
 const U_HEEL = (HEEL.z + L / 2) / L;
-function keel(u: number): number {
-  if (u <= BOW) return canoe(u);
-  if (u < 0.33) return turn(-0.1, -0.95, STEM_SLOPE * (0.33 - BOW), (u - BOW) / (0.33 - BOW)); // the cutaway forefoot, rounding down from the stem
-  return Math.max(-1.2, -0.95 - 0.25 * (u - 0.33) / (U_HEEL - 0.33));
+const ease2 = (a: number, b: number, t: number) => a + (b - a) * (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, t)))) / 2;
+const SLOPE_KNOTS: [number, number][] = [[0, -8.5], [0.3, -2.2], [0.43, -3.0], [0.55, -0.3]];
+const profileSlope = (u: number) => {
+  let i = 0; while (i < SLOPE_KNOTS.length - 2 && u > SLOPE_KNOTS[i + 1][0]) i++;
+  const [u0, m0] = SLOPE_KNOTS[i], [u1, m1] = SLOPE_KNOTS[i + 1]; return ease2(m0, m1, (u - u0) / (u1 - u0));
+};
+const U_SPLIT = 0.2, U_CANOE = 0.33, DU = 0.001, PROFILE: number[] = [0.96], CANOE: number[] = [0.96];
+for (let k = 1; k * DU <= 0.62 + 1e-9; k++) {
+  const um = (k - 0.5) * DU;
+  PROFILE.push(PROFILE[k - 1] + profileSlope(Math.min(um, 0.55)) * DU);
+  CANOE.push(CANOE[k - 1] + (um < U_SPLIT ? profileSlope(um) : ease2(profileSlope(U_SPLIT), 0, (um - U_SPLIT) / (U_CANOE - U_SPLIT))) * DU);
+}
+const table = (t: number[], u: number) => { const f = Math.min(t.length - 1.001, Math.max(0, u / DU)), i = Math.floor(f); return t[i] + (t[i + 1] - t[i]) * (f - i); };
+const Y_KEEL = table(PROFILE, 0.55);
+export function canoe(u: number): number {
+  if (u < 0.62) return Math.min(table(CANOE, u), 0.96);
+  return table(CANOE, 0.62) + (0.17 - table(CANOE, 0.62)) * ease((u - 0.62) / 0.38);
+}
+/** Keel bottom: the bow's profile, then the ballast keel's bottom, deepest at the heel (1.2 m with the keel band). */
+export function keel(u: number): number {
+  const y = u < 0.55 ? table(PROFILE, u) : Y_KEEL + (-1.2 - Y_KEEL) * Math.min(1, (u - 0.55) / (U_HEEL - 0.55));
+  return Math.max(-1.2, Math.min(y, canoe(u)));
 }
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
@@ -105,19 +120,18 @@ function keelHalf(u: number): number {
  * Half-breadth = keel + (deck − keel) · F(q), q the height from the keel's side (0) to the sheer (1), with
  * F(q) = (1 − (1 − q)^α)^β: α sets how long the topsides stay upright, β > 1 the hollow into the keel. Fitted to the
  * St. 8 section (within about 3 cm at the waterline, the turn of the bilge and the garboards); finer and more V-shaped
- * forward, and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
+ * forward (the topsides still rounding out at the bow, as on Josephine: the owner), and aft the same wineglass narrowing to the sternpost, which gives the flat transom its shape: wide and
  * nearly upright-sided at the deck, curving in to meet the sternpost near the waterline (the owner's photos).
  */
 function sectionShape(u: number): { al: number; be: number } {
   // toward the transom the hollow gives way to a full, round run (Josephine hauled out: the owner's photo), so the
   // transom's foot is a broad, nearly flat U at about the waterline, not a point
   const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.78) / 0.18);
-  return { al: 1.6 + 2.4 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
+  return { al: 1.7 + 2.3 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
 }
 
-const NU = 72, NF = 5, STRAKES = 9, LAP = 0.016;
-/** Where strake k's top edge is (p; the last strake, the garboard, ends on the keel's side at 0.8). */
-const strakeP = (k: number) => (k >= STRAKES ? 0.8 : 0.8 * k / STRAKES);
+/** 16 planks a side (CR 2.207.5: no fewer than 16 at station 8; 2.207.6: none but the keel plank over 130 mm wide), each lapping 13 mm over the one below (about the plank's thickness, CR 2.207.2) */
+const NU = 72, NF = 5, STRAKES = 16, LAP = 0.013;
 /**
  * How far the plank stands out at fraction t down strake k: clinker, so each plank's lower edge laps over the outside
  * of the plank below and the plank lies at a slight angle, out toward its lower edge. The garboard's lower edge isn't
@@ -152,6 +166,44 @@ function uMax(p: number): number {
 }
 function hullPoint(u: number, p: number): THREE.Vector3 { const q = sectionPoint(u, p); return new THREE.Vector3(q.x, q.y, zAt(u)); }
 
+/**
+ * The planks' widths. A clinker plank keeps nearly its width the whole length of the hull, narrowing only a little toward
+ * the ends (to about 80%), so where the hull's section is shorter than the planks' sum, toward the bow and the stern, the
+ * lower planks run out one after another on the stem, the forefoot and the keel, rather than all narrowing to a point at
+ * the stemhead (the owner's photos: Josephine, and Inga hauled out). So the plank edges are laid off down each section
+ * by girth (distance round the section from the sheer): edge k at k plank widths, up to the section's whole girth; the
+ * garboard, the lowest, takes up what's left down to the keel.
+ */
+const GIRTH_N = 48, girthCache = new Map<number, Float64Array>();
+/** The section's girth from the sheer (p = 0) to each of GIRTH_N + 1 points down to the keel's side (p = 0.8). */
+function girthTable(u: number): Float64Array {
+  const key = Math.round(u * 1e6), c = girthCache.get(key); if (c) return c;
+  const t = new Float64Array(GIRTH_N + 1); let prev = sectionPoint(u, 0);
+  for (let i = 1; i <= GIRTH_N; i++) { const q = sectionPoint(u, 0.8 * i / GIRTH_N); t[i] = t[i - 1] + Math.hypot(q.x - prev.x, q.y - prev.y); prev = q; }
+  girthCache.set(key, t); return t;
+}
+/** p at girth g down the section at u. */
+function pAtGirth(u: number, g: number): number {
+  const t = girthTable(u), G = t[GIRTH_N]; if (g <= 0) return 0; if (g >= G - 0.002) return 0.8; // (within 2 mm of the keel's side: on it, so a plank that's all but run out ends exactly on the keel)
+  let i = 0; while (i < GIRTH_N - 1 && t[i + 1] < g) i++;
+  return 0.8 * (i + (g - t[i]) / Math.max(1e-9, t[i + 1] - t[i])) / GIRTH_N;
+}
+/** The girth down to p at u. */
+function girthAtP(u: number, p: number): number {
+  const t = girthTable(u), f = Math.min(GIRTH_N, Math.max(0, p / 0.8 * GIRTH_N)), i = Math.min(GIRTH_N - 1, Math.floor(f));
+  return t[i] + (t[i + 1] - t[i]) * (f - i);
+}
+/** A plank's width at u: the widest section's girth shared among the planks, narrowing a little toward the ends. */
+let plankRef = 0;
+const plankW = (u: number) => { if (!plankRef) plankRef = girthTable(0.52)[GIRTH_N] / STRAKES; return plankRef * (1 - 0.2 * ((u - 0.52) / 0.52) ** 2); };
+/** Plank edge k's girth at u (0 the sheer … STRAKES the keel's side). */
+function edgeGirth(u: number, k: number): number {
+  const G = girthTable(u)[GIRTH_N];
+  return k >= STRAKES ? G : Math.min(G, k * plankW(u));
+}
+/** Plank k's width at u (0 where it has run out on the stem or keel). */
+const plankWidthAt = (u: number, k: number) => edgeGirth(u, k + 1) - edgeGirth(u, k);
+
 export interface HullPaint { topsides: THREE.Color; boot: THREE.Color; bottom: THREE.Color }
 
 /** The hull shell (both sides), clinker planked, painted: bottom paint below the waterline, a boot stripe, topsides. */
@@ -166,29 +218,46 @@ export const paintLines = (z: number) => { const e = (2 * z / L) ** 2; return { 
 export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const white = new THREE.Color(1, 1, 1), colorAt = (_y: number) => white;
-  // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel
-  type Row = { p: number; lap: number; shade?: number; land?: boolean }[];
+  // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel. Each entry
+  // is a line along the hull: a place across plank `k` (t 0 its top edge … 1 its lower), or a fixed p on the keel.
+  type Entry = { k?: number; t?: number; dg?: number; p?: number; pl?: number; lap: number; shade?: number; land?: boolean };
+  type Row = Entry[];
   const strips: Row[] = [];
   for (let k = 0; k < STRAKES; k++) {
-    const p0 = strakeP(k), p1 = strakeP(k + 1), row: Row = [];
-    if (k > 0) row.push({ p: p0 - 0.02, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
-    for (let j = 0; j <= 3; j++) row.push({ p: j === 3 ? p1 : p0 + (p1 - p0) * j / 3, lap: strakeLap(k, j / 3), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
+    const row: Row = [];
+    if (k > 0) row.push({ k, t: 0, dg: -0.025, pl: k, lap: 0, shade: 1, land: true }); // the land: this plank's top edge, hidden behind the plank above
+    for (let j = 0; j <= 3; j++) row.push({ k, t: j / 3, pl: k, lap: strakeLap(k, j / 3), shade: j === 0 && k > 0 ? 0.82 : 1 }); // in the shadow of the lap above
     strips.push(row);
-    if (k < STRAKES - 1) strips.push([{ p: p1, lap: LAP }, { p: p1, lap: 0 }]); // the lap's edge, facing down
+    if (k < STRAKES - 1) strips.push([{ k: k + 1, t: 0, pl: k, lap: LAP }, { k: k + 1, t: 0, pl: k, lap: 0 }]); // the lap's edge, facing down
   }
   // the keel, from the garboard's lower edge (the same vertices: the garboard lands in the keel's rabbet, no gap)
   { const row: Row = []; for (let j = 0; j <= NF; j++) row.push({ p: j === 0 ? 0.8 : 0.8 + 0.2 * j / NF, lap: 0 }); strips.push(row); }
+  /** An entry's p at u. */
+  const pOf = (r: Entry, u: number) => {
+    if (r.p != null) return r.p;
+    const g = edgeGirth(u, r.k!) + (r.t ? (edgeGirth(u, r.k! + 1) - edgeGirth(u, r.k!)) * r.t : 0) + (r.dg ?? 0);
+    return pAtGirth(u, Math.max(0, g));
+  };
+  /** Where an entry's line meets the raked transom / sternpost plane. */
+  const endCache = new Map<string, number>();
+  const uEnd = (r: Entry) => {
+    if (r.p != null) return uMax(r.p);
+    const key = `${r.k},${r.t},${r.dg ?? 0}`, c = endCache.get(key); if (c != null) return c;
+    let lo = 0.6, hi = 1;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, q = sectionPoint(m, pOf(r, m)); if (zAt(m) < aftLineZ(q.y)) lo = m; else hi = m; }
+    endCache.set(key, lo); return lo;
+  };
   for (const side of [1, -1]) {
     for (const row of strips) {
       const base = pos.length / 3;
       for (let i = 0; i <= NU; i++) for (const r of row) {
-        const f = i / NU, u = f * uMax(r.p), pt = hullPoint(u, r.p);
-        // push the lap outward across the section (along the section's outward normal); the planks run out
-        // flush at the stem and the transom
-        const lap = r.lap * Math.min(1, f / 0.04, (1 - f) / 0.03);
-        if (lap > 0) lapOut(pt, u, r.p, lap);
+        const f = i / NU, u = f * uEnd(r), p = pOf(r, u), pt = hullPoint(u, p);
+        // push the lap outward across the section (along the section's outward normal); it runs out flush where its
+        // plank runs out on the stem or the keel, and at the transom
+        const lap = r.lap * (r.pl != null ? Math.min(1, plankWidthAt(u, r.pl) / (0.5 * plankW(u))) : 1) * Math.min(1, (1 - f) / 0.03);
+        if (lap > 0) lapOut(pt, u, p, lap);
         pos.push(pt.x * side, pt.y, pt.z);
-        const c = colorAt(pt.y), k = row.length === 2 && row[0].p === row[1].p ? 0.55 : r.shade ?? 1; col.push(c.r * k, c.g * k, c.b * k);
+        const c = colorAt(pt.y), k = row.length === 2 && row[0].k === row[1].k && row[0].t === row[1].t ? 0.55 : r.shade ?? 1; col.push(c.r * k, c.g * k, c.b * k);
       }
       // (a plank's faces look outboard; a lap's edge, running from the plank's outer face in to the plank below, faces
       // down into its own shadow: the same winding does both)
@@ -204,9 +273,9 @@ export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
   // from a centre, and each face turned to look aft, out of the hull.
   // Its outline runs through the planks' own end points (no others, and not the lands hidden behind them), so the hull
   // and the transom share every vertex along their join and no crack opens between them.
-  { const ps = [...new Set(strips.flatMap(row => row.filter(r => !r.land).map(r => r.p)))].sort((a, b) => a - b), outline: THREE.Vector3[] = [];
-    for (const p of ps) outline.push(hullPoint(uMax(p), p));
-    for (let j = ps.length - 2; j >= 0; j--) { const pt = hullPoint(uMax(ps[j]), ps[j]); outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
+  { const ends = strips.flatMap(row => row.filter(r => !r.land)).map(r => { const u = uEnd(r), p = pOf(r, u); return { p, pt: hullPoint(u, p) }; }).sort((a, b) => a.p - b.p);
+    const ps = ends.map(e => e.pt), outline: THREE.Vector3[] = [...ps];
+    for (let j = ps.length - 2; j >= 0; j--) { const pt = ps[j]; outline.push(new THREE.Vector3(-pt.x, pt.y, pt.z)); }
     const ring = outline.filter((q, i) => i === 0 || q.distanceTo(outline[i - 1]) > 1e-4);
     const base = pos.length / 3; transomFrom = base; transomTo = base + ring.length;
     for (const q of ring) { pos.push(q.x, q.y, q.z); const c = colorAt(q.y); col.push(c.r, c.g, c.b); }
@@ -250,7 +319,7 @@ const zU = (z: number) => (z + L / 2) / L;
 export const SIDE_DECK = 0.30;
 /** The line of the cabin sides and the coamings' outer face: the sheer less the side deck. */
 export const sideLine = (u: number) => halfBeam(u) - SIDE_DECK;
-export const CABIN = { u0: zU(-0.79), u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
+export const CABIN = { u0: zU(-0.79) /* (the front's foot a strip of deck aft of the mast foot's horseshoe, the owner; and CR 3.11's least deck-line length, 1850 mm, to u1, so no further aft) */, u1: zU(1.06), w: 0.79, h: 0.20, crown: 0.17 };
 export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
 /**
  * The cockpit's furniture, from the construction plan's profile and cockpit section (1:10; the arrangement is free,
@@ -263,6 +332,25 @@ export const COCKPIT = { u0: zU(1.06), u1: zU(L / 2 - 2 * 0.5), sole: -0.08 };
  * at its ends (the owner, from Josephine).
  */
 const stZ = (st: number) => L / 2 - 2 * 0.5 - (st - 3) * 0.5;
+/**
+ * The hollow under the after deck (Josephine, the owner): open to the cockpit at its after end and open under the
+ * plank, it runs aft to z1, its floor the cockpit sole's level carried aft (or the hull's inside, where that rises
+ * higher), its sides the hull's own inside; storage, and room for the footrest to slide back
+ * into. The footrest: one teak plank right across the cockpit's after end, about 2 ft (`len`) fore and aft, its top
+ * level with the seats. (On Josephine it rides on two slim metal rails screwed flat to the hull's inside; they aren't
+ * drawn, for simplicity: the owner.) Slid out, its forward edge is halfway between the thwart's after edge
+ * and the cockpit's after end (`out` m forward of it), a footrest for the helm sitting on the after deck; slid back,
+ * flush with the cockpit's after end under the deck, so they can stand to steer (the owner): out while the helm sits, back when they stand. It's cut to the hull's
+ * shape where it slides back to (footrestEdge), so slid out, where she's wider, it stands a little clear of the hull.
+ * (The hollow's size is an estimate from the photo.)
+ */
+export const HOLLOW = { z1: L / 2 - 0.41 };
+/** `y`: the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
+export const FOOTREST = { y: COCKPIT.sole + 0.30 - 0.025, len: 0.61, out: 0.35, rail: 0.022 };
+/** The hull's lining's half-breadth at the footrest's rails, at z (the lining stands 30 mm in from hullInnerHalf). */
+export const footrestWall = (z: number) => hullInnerHalf(uAtZ(z), FOOTREST.y) - 0.03;
+/** The plank's half-width at z, slid back: cut to the hull there, as far out as the rails' middle. */
+export const footrestEdge = (z: number) => footrestWall(z) - FOOTREST.rail / 2 - 0.004;
 export const COCKPIT_FIT = {
   seat: -0.08 + 0.30, soleHalf: 0.35,
   benchAft: stZ(4.75), shelfFwd: stZ(4.05),
@@ -271,6 +359,12 @@ export const COCKPIT_FIT = {
 /** The coaming's height above the deck along the cockpit (z): CR 3.22's least heights, 200 mm aft of the cabin, 140 at St. 4½, 80 at St. 3, a little over. */
 export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.5 * 0.5, 0.15], [L / 2 - 2 * 0.5, 0.09]]);
 /** The thwart's top (m over the waterline). */
+/**
+ * Where the jib winches stand fore and aft (m aft of amidships): about a third of the way aft along the cockpit, 0.58 m
+ * aft of the cabin's after end and 0.39 m forward of the thwart's front face, so a crew sits on the rail between it and
+ * the cabin, and another, with a little less room, between it and the thwart (the owner, and Josephine's profile photo).
+ */
+export const JIB_WINCH_Z = 1.64;
 export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
 /** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
 export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
@@ -282,7 +376,7 @@ export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.sea
  * estimated. Inside, the companionway's well and its steps down to the cabin floor, 1230 mm under the cabin top
  * (CR 3.14, at least, at St. 8); `well` how far forward of the bulkhead the well is drawn (m).
  */
-export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.15, headroom: 1.23, well: 0.5 };
+export const COMPANIONWAY = { hw: 0.275, len: 0.46, sill: COCKPIT.sole + 0.03, /* (a slight sill just above the cockpit floor: Josephine, the owner) */ headroom: 1.23, well: 0.5 };
 /** The coaming's thickness (m): the cockpit opening is its inside face. */
 export const COAMING_T = 0.025;
 /** Cockpit half-width: inside the coaming, which follows the side line, narrowing aft with the hull. */
@@ -329,16 +423,74 @@ export function cabinHalf(u: number): number {
 /** How far the cabin sides lean in over their height (m). */
 export const CABIN_LEAN = 0.015;
 /**
- * The long cabin light each side (as on Josephine; portholes' shape is free, CR 3.19): centred at station uc, `len` m
- * long, from h0 to h1 above the deck at the cabin side. Its glass is cut through the cabin side between hole0 and hole1
- * (short of its rounded ends, which the frame covers), so the cabin's inside is seen through it.
+ * The long cabin light each side, as on Josephine (the owner's answers and photos; portholes' shape is free, CR 3.19):
+ * about 1 m of glass from about half a metre aft of the cabin's front edge to just forward of the name (z0..z1), its
+ * bottom edge straight, h0 above the deck at the cabin side, and its top tapering down toward the bow, the glass hAft
+ * tall at its after end and hFwd at its forward end; both ends rounded; in a brushed aluminium frame about 3/4 in wide
+ * (frame), riveted all round. The glass's heights are read off the owner's side photo (an estimate, within a cm).
+ * Its opening is cut through the cabin side between hole0 and hole1 (the frame covers its rounded ends), and the
+ * cabin's inside is seen through it. h1 is the glass's top at its tallest, the after end.
  */
-export const WINDOW = { uc: zU(-0.05), len: 0.95, h0: CABIN.h * 0.32, h1: CABIN.h * 0.72, hole0: zU(-0.05) - (0.95 / 2 - 0.045) / L, hole1: zU(-0.05) + (0.95 / 2 - 0.045) / L };
+const WIN = { z0: -0.35, z1: 0.65, h0: 0.085, hAft: 0.095, hFwd: 0.06, frame: 0.019 };
+export const WINDOW = { ...WIN, uc: zU((WIN.z0 + WIN.z1) / 2), len: WIN.z1 - WIN.z0, h1: WIN.h0 + WIN.hAft, hole0: zU(WIN.z0 + 0.025), hole1: zU(WIN.z1 - 0.03) };
+/** The window glass's top edge (m above the deck at the cabin side) at station u: tapering down toward the bow. */
+export const winTop = (u: number) => WIN.h0 + WIN.hFwd + (WIN.hAft - WIN.hFwd) * Math.min(1, Math.max(0, (u - zU(WIN.z0)) / (zU(WIN.z1) - zU(WIN.z0))));
 
 /** Height of the cabin sides' top edge at station u. */
-export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + CABIN.h;
+/**
+ * The cabin top's edge rises toward its after end (Josephine's profile, the owner's photo: the roof slants up aft while the
+ * sheer falls), so the cabin side stands CABIN.h above the deck at its front and CABIN_RISE more at the main bulkhead
+ * (an estimate from the photo, within a few centimetres).
+ */
+export const CABIN_RISE = 0.18;
+export const cabinTopY = (u: number) => deckY(u, cabinHalf(u)) + cabinSideH(u);
+/** The cabin side's height above the deck at station u. */
+export const cabinSideH = (u: number) => { const h = rawSideH(u), c = AFT_ROUND.coaming; return h <= c ? h : c + (h - c) * aftRound(u, 1); };
+/** The cabin side's height before its after corner is rounded off (below). */
+const rawSideH = (u: number) => (CABIN.h + CABIN_RISE * Math.min(1, Math.max(0, (u - CABIN.u0) / (CABIN.u1 - CABIN.u0)))) * cabinNose(u);
+/**
+ * The cabin's after outboard corners are rounded off, down to the coaming (Josephine, the owner's photo from the
+ * starboard quarter): seen from the cockpit, the after end's outline sweeps down from the roof in a big curve to the
+ * coaming's top; seen from the side, the cabin side's top edge bends down into the coaming the same way as it reaches the
+ * after end. A rounded corner: across it reaches about `across` m in from the side; fore and aft, about `along` m forward
+ * of the after end (both read off the photo, estimates); the coaming itself is unchanged. aftRound(u, b) is how much of
+ * the height over the coaming is left (1 untouched … 0 down to the coaming), b how far across the rounding (0 at its
+ * inner edge … 1 at the side).
+ */
+const AFT_ROUND = { across: 0.2, along: 0.3, coaming: 0.22 };
+function aftRound(u: number, b: number): number {
+  const a = Math.min(1, Math.max(0, 1 - (CABIN.u1 - u) * L / AFT_ROUND.along)), bb = Math.min(1, Math.max(0, b));
+  return Math.sqrt(Math.max(0, 1 - (a * bb) ** 2));
+}
+/**
+ * The cabin's front is a raked face, not an upright one (Josephine: the owner's side photo, as Rigging measured it,
+ * about 700 px/m; CR 3.11 agrees, the roof at least 1785 mm long against at least 1850 mm at the deck line): from the
+ * deck a strip aft of the mast foot's horseshoe (MAST_RING, the owner) it rises to the cabin side's height over about
+ * CABIN_NOSE m, about 45° to the deck, steepest at its foot and easing round onto the roof, which it reaches where the
+ * side photo shows. The roof's crown comes down with it in the same proportion: the
+ * side photo can't show the centreline's height at the front, so that much is an estimate.
+ */
+export const CABIN_NOSE = 0.208;
+function cabinNose(u: number): number { const d = Math.max(0, (u - CABIN.u0) * L); return d >= CABIN_NOSE ? 1 : Math.sin(Math.PI / 2 * d / CABIN_NOSE); }
 /** The cabin top's surface at station u, x across: arched from the sides' top edges up to the centreline. */
-export const cabinTopAt = (u: number, x: number) => { const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN); return cabinTopY(u) + CABIN.crown * Math.max(0, 1 - (x / w) ** 2); };
+/**
+ * The cabin top is a slice of a cone lying on its side, its point toward the bow (the owner, of Josephine): each section
+ * across it is a circular arc whose radius goes with the roof's width (CONE_K the radius over the half-width), so it
+ * narrows with the trunk forward. How high the arc stands over the sides' top edges grows from nothing at the cabin's
+ * front to about 13 cm halfway aft and stays so: the roof's outline, seen from the side, falls away forward in one long
+ * slope (Josephine's profile photo, the roof's outline measured over the deck at about 147 px/m: 19, 27, 34, 42, 46 and
+ * 51 cm at 0.1, 0.38, 0.65, 1.0, 1.3 and 1.8 m aft of its front; within a few cm, the photo being a little oblique).
+ */
+const CONE_K = 1.9;
+const CROWN = fairCurve([[-0.79, 0], [-0.6, 0.012], [-0.47, 0.035], [-0.2, 0.08], [0.14, 0.12], [0.6, 0.13], [1.1, 0.13]]);
+export const cabinTopAt = (u: number, x: number) => {
+  const w = Math.max(0.05, cabinHalf(u) - CABIN_LEAN), r = CONE_K * w, xc = Math.min(Math.abs(x), w), full = r - Math.sqrt(r * r - w * w);
+  const arch = (Math.sqrt(r * r - xc * xc) - Math.sqrt(r * r - w * w)) / full; // (0 at the sides' top edges … 1 on the centreline)
+  const deck = deckY(u, cabinHalf(u)), raw = deck + rawSideH(u) + arch * Math.max(0, CROWN(zAt(u)));
+  // (the after corners rounded off down to the coaming: no higher than the rounding allows there)
+  const c = deck + AFT_ROUND.coaming, cap = c + (deck + rawSideH(u) + arch * Math.max(0, CROWN(zAt(u))) - c) * aftRound(u, (xc - (w - AFT_ROUND.across)) / AFT_ROUND.across);
+  return raw <= c ? raw : Math.min(raw, cap);
+};
 
 /** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
 export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } {
@@ -353,8 +505,8 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   // four rows up each side: from below the deck, the window's sill and head, the top edge; the window's band is open
   const R = 4;
   for (const o of ring) {
-    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, d + WINDOW.h0, d + WINDOW.h1, t];
-    for (const y of hs) { const f = Math.max(0, (y - d) / (t - d)); sides.push(o.x - Math.sign(o.x) * CABIN_LEAN * f, y, zAt(o.u)); }
+    const d = deckY(o.u, Math.abs(o.x)), t = topY(o.u), hs = [0.45, Math.min(d + WINDOW.h0, t), Math.min(d + winTop(o.u), t), t]; // (where the nose is lower than the window's band, the rows close up under the top)
+    for (const y of hs) { const f = t - d > 1e-4 ? Math.max(0, (y - d) / (t - d)) : 1; sides.push(o.x - Math.sign(o.x) * CABIN_LEAN * f, y, zAt(o.u)); }
   }
   // (all round but the after end: that's the bulkhead, with the companionway in it)
   const aftSeg = outline.length - 1;
@@ -368,7 +520,7 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sides, 3)); sg.setIndex(sIdx); sg.computeVertexNormals();
   // the top, open over the companionway aft of where the sliding hatch's opening begins (its edges are grid lines)
-  const top: number[] = [], tIdx: number[] = [], NX = 8, hw = COMPANIONWAY.hw, uSlot = CABIN.u1 - COMPANIONWAY.len / L;
+  const top: number[] = [], tIdx: number[] = [], NX = 24, hw = COMPANIONWAY.hw, uSlot = CABIN.u1 - COMPANIONWAY.len / L;
   const rows = [...outline.map(o => o.u), uSlot].sort((a, b) => a - b), NC = NX + 2;
   for (const u of rows) {
     const w = cabinHalf(u) - CABIN_LEAN, h = Math.min(hw, w * 0.99);
@@ -385,8 +537,8 @@ export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.Buffe
   // the after end: from the deck up the sides and over the arch of the top, facing aft into the cockpit
   const u1 = CABIN.u1, w1 = cabinHalf(u1), z1 = zAt(u1) + 0.002, rim: THREE.Vector2[] = [new THREE.Vector2(w1, COCKPIT.sole)];
   // over the arch, with the companionway's opening cut down from the top to its sill
-  for (let j = 0; j <= 16; j++) {
-    const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 16), xn = (w1 - CABIN_LEAN) * (1 - 2 * (j + 1) / 16);
+  for (let j = 0; j <= 48; j++) {
+    const x = (w1 - CABIN_LEAN) * (1 - 2 * j / 48), xn = (w1 - CABIN_LEAN) * (1 - 2 * (j + 1) / 48);
     if (Math.abs(x) >= hw) rim.push(new THREE.Vector2(x, cabinTopAt(u1, x)));
     if (x > hw && xn <= hw) rim.push(new THREE.Vector2(hw, cabinTopAt(u1, hw)), new THREE.Vector2(hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, COMPANIONWAY.sill), new THREE.Vector2(-hw, cabinTopAt(u1, -hw)));
   }
@@ -434,27 +586,45 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   };
   out.push(strip(span(z0, zA, 16).map(u => [V(-sh(u), sole, zAt(u)), V(sh(u), sole, zAt(u))]))); // the sole
   for (const s of [1, -1]) {
-    const bench = span(z0, benchAft), well = span(benchAft, shelfFwd, 4), shelf = span(shelfFwd, zA, 6);
+    const bench = span(z0, benchAft), well = span(benchAft, zA, 8), WELL_K = 14; void shelfFwd; // (WELL_K: steps up the hull's curve, fine enough to follow it) // (no after shelf: the footwell runs to the cockpit's after end, where the sliding footrest comes out from under the after deck)
     // the bench is a lazarette, a solid locker: its front a varnished panel up to the lid, and the lid on top, 25 mm
     // thick, its edge standing a little proud of the front
     const lid = 0.025;
     panel.push(strip(bench.map(u => [V(s * sh(u), sole, zAt(u)), V(s * sh(u), seat - lid, zAt(u))]))); // the locker's front
     panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat - lid, zAt(u)), V(s * (sh(u) - 0.012), seat, zAt(u))]))); // the lid's edge
     panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the lid: a solid varnished panel
-    for (const segs of [bench, shelf]) lining.push(strip(segs.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
+    lining.push(strip(bench.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
     // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
     const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
-      for (let k = 0; k <= 5; k++) { const y = sole + (top - sole) * k / 5; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
+      for (let k = 0; k <= WELL_K; k++) { const y = sole + (top - sole) * k / WELL_K; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
       return pts; };
-    for (let k = 0; k < 6; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
-    out.push(strip(shelf.map(u => [V(s * sh(u), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the shelf's top, outboard
+    for (let k = 0; k <= WELL_K; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
     const ub = zU(benchAft); panel.push(face(benchAft, [[s * (sh(ub) - 0.012), sole], ...hullSide(ub, s, true), [s * (sh(ub) - 0.012), seat]])); // the locker's end, out to the hull
   }
-  const us = zU(shelfFwd), wsh = sh(us);
-  out.push(strip(span(shelfFwd, zA, 6).map(u => [V(-sh(u), seat, zAt(u)), V(sh(u), seat, zAt(u))]))); // the after shelf's top
-  panel.push(face(shelfFwd, [...hullSide(us, 1, true), ...hullSide(us, -1, false)])); void wsh; // its front, a solid panel out to the hull each side
-  const w1 = benchOut(u1), ya = deckY(u1, 0);
-  lining.push(quad(V(-w1, seat, zA), V(w1, seat, zA), V(w1, ya, zA), V(-w1, ya, zA))); // the after wall, over the shelf
+  // the cockpit's after end, and under the after deck a hollow (Josephine, the owner's photo): open to the cockpit and
+  // open under the footrest plank, its floor the cockpit sole's level carried on aft until the hull's own inside rises
+  // above that (the hull lifting towards the transom), running aft to HOLLOW.z1, lined; the plank slides in and out of it
+  // (boatMesh)
+  { const { z1 } = HOLLOW, zs = span(zA - 0.04, z1, 10); // (begun a little forward of the after end, under the well's lining, so the two meet without a seam)
+    const floorY = (u: number) => { let y = sole; while (y < sole + 0.4 && hullInnerHalf(u, y) - 0.03 < 0.1) y += 0.005; return y; };
+    const wF = (u: number) => Math.max(0.07, hullInnerHalf(u, floorY(u)) - 0.03);
+    lining.push(strip(zs.map(u => [V(-wF(u), floorY(u), zAt(u)), V(wF(u), floorY(u), zAt(u))]))); // its floor
+    // its sides: the hull's inside, from the floor up to the deck over it
+    const profOf = (s: number) => (u: number) => { const f = floorY(u), top = deckY(u, halfBeam(u)) - 0.02, q: THREE.Vector3[] = [];
+        for (let k = 0; k <= 14; k++) { const y = f + (top - f) * k / 14; q.push(V(s * Math.max(wF(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
+        return q; };
+    // the step up from the sole into it, where the hull's bottom rises above the sole's level: the well's lining at the
+    // cockpit's after end (upright at the sole's edge, then the hull's inside) below the hollow's floor
+    const ua = zU(zA), fa = floorY(ua), wa = wF(ua), sa = sh(ua);
+    if (fa > sole + 0.005) {
+      const side: number[][] = [];
+      for (let k = 1; k <= 24; k++) { const y = sole + (fa - sole) * k / 24; side.push([Math.min(wa, Math.max(sa, Math.min(hullInnerHalf(ua, y), halfBeam(ua)) - 0.03)), y]); }
+      lining.push(face(zA, [[-sa, sole], [sa, sole], ...side, ...side.slice().reverse().map(([x, y]) => [-x, y])])); }
+    for (const s of [1, -1]) { const prof = profOf(s); for (let k = 0; k < 14; k++) lining.push(strip(zs.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; }))); }
+    // its after end, closing it off from the floor to the deck, hull side to hull side
+    const ub = zU(z1), sb = profOf(1)(ub), pt = profOf(-1)(ub), top: number[][] = [];
+    for (let i = 1; i < 8; i++) { const x = sb[14].x - (sb[14].x - pt[14].x) * i / 8; top.push([x, deckY(ub, Math.abs(x)) - 0.01]); }
+    lining.push(face(z1, [...sb.map(q => [q.x, q.y]), ...top, ...pt.reverse().map(q => [q.x, q.y])])); }
   return { teak: out, lining, panel };
 }
 
@@ -540,8 +710,9 @@ export function hullFrame(u: number, p: number): { pos: THREE.Vector3; normal: T
 export function lappedPoint(u: number, p: number): THREE.Vector3 {
   const pt = hullPoint(u, p);
   if (p >= 0.8) return pt;
-  const k = Math.min(STRAKES - 1, Math.floor(p / 0.8 * STRAKES)), p0 = strakeP(k), p1 = strakeP(k + 1);
-  const f = u / Math.max(0.01, uMax(p)), lap = strakeLap(k, (p - p0) / (p1 - p0)) * Math.min(1, f / 0.04, (1 - f) / 0.03);
+  const g = girthAtP(u, p); let k = 0; while (k < STRAKES - 1 && edgeGirth(u, k + 1) <= g) k++;
+  const g0 = edgeGirth(u, k), g1 = edgeGirth(u, k + 1), f = u / Math.max(0.01, uMax(p));
+  const lap = strakeLap(k, (g - g0) / Math.max(1e-6, g1 - g0)) * Math.min(1, plankWidthAt(u, k) / (0.5 * plankW(u)), (1 - f) / 0.03);
   if (lap > 0) lapOut(pt, u, p, lap);
   return pt;
 }
@@ -589,54 +760,35 @@ export function companionwayLid(): THREE.BufferGeometry {
     V(-hw, yc, z1), V(hw, yc, z1), V(hw, yc, zS), V(-hw, yc, z1), V(hw, yc, zS), V(-hw, yc, zS)]; // the hatch's opening
   return new THREE.BufferGeometry().setFromPoints(pts);
 }
-/** The sliding hatch, slid forward its own length onto its runners: a board arched like the cabin top, with its edges. */
-export function slidingHatch(closed = false): THREE.BufferGeometry {
-  // open: slid forward its own length; closed: slid aft over the opening, its after edge flush with the bulkhead
-  const hw = COMPANIONWAY.hw + 0.03, lift = 0.05, uA = closed ? CABIN.u1 + 0.01 / L : CABIN.u1 - COMPANIONWAY.len / L + 0.02 / L, uF = uA - (COMPANIONWAY.len + 0.04) / L;
-  const NXh = 8, pos: number[] = [], idx: number[] = [];
+/**
+ * The sliding hatch at `t` (0 shut, slid aft over the opening, its after edge flush with the top washboard; 1 slid
+ * forward its own length): a board lying on the cabin top's curve both ways (across the arch, and along the roof as it
+ * rises aft), a skirt down to the roof all round, and a thick rounded after edge that follows the arch (the owner's
+ * photos of Josephine).
+ */
+export function slidingHatch(t = 1): THREE.BufferGeometry {
+  const hw = COMPANIONWAY.hw + 0.03, lift = 0.05, uShut = CABIN.u1 + 0.01 / L, uOpen = CABIN.u1 - COMPANIONWAY.len / L + 0.02 / L;
+  const uA = uShut + (uOpen - uShut) * Math.min(1, Math.max(0, t)), uF = uA - (COMPANIONWAY.len + 0.04) / L;
+  const NXh = 10, NZ = 8, pos: number[] = [], idx: number[] = [];
   const P = (u: number, x: number, dy: number) => pos.push(x, cabinTopAt(u, x) + dy, zAt(u));
-  // the top (rows at the two ends), then a skirt down to the cabin top all round
-  for (const u of [uF, uA]) for (let j = 0; j <= NXh; j++) P(u, -hw + 2 * hw * j / NXh, lift);
-  for (let j = 0; j < NXh; j++) idx.push(j, NXh + 1 + j, j + 1, j + 1, NXh + 1 + j, NXh + 2 + j); // (facing up)
+  // the top: a grid over the roof's curve, forward to aft
+  for (let i = 0; i <= NZ; i++) for (let j = 0; j <= NXh; j++) P(uF + (uA - uF) * i / NZ, -hw + 2 * hw * j / NXh, lift);
+  for (let i = 0; i < NZ; i++) for (let j = 0; j < NXh; j++) { const a = i * (NXh + 1) + j, c = a + NXh + 1; idx.push(a, c, a + 1, a + 1, c, c + 1); } // (facing up)
+  // the skirt down to the roof all round
   const ring: [number, number][] = [];
   for (let j = 0; j <= NXh; j++) ring.push([uA, -hw + 2 * hw * j / NXh]);
-  for (let j = NXh; j >= 0; j--) ring.push([uF, -hw + 2 * hw * j / NXh]);
-  ring.push(ring[0]);
+  for (let i = NZ - 1; i >= 0; i--) ring.push([uF + (uA - uF) * i / NZ, hw]);
+  for (let j = NXh - 1; j >= 0; j--) ring.push([uF, -hw + 2 * hw * j / NXh]);
+  for (let i = 1; i <= NZ; i++) ring.push([uF + (uA - uF) * i / NZ, -hw]);
   const b0 = pos.length / 3;
   for (const [u, x] of ring) { P(u, x, lift); P(u, x, 0.005); }
   for (let i = 0; i < ring.length - 1; i++) { const a = b0 + 2 * i; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  // the thick rounded after edge, following the arch: a half-round 3 cm across along the after edge
+  const b1 = pos.length / 3, NR = 6;
+  for (let j = 0; j <= NXh; j++) { const x = -hw + 2 * hw * j / NXh, y = cabinTopAt(uA, x) + lift - 0.025, z = zAt(uA);
+    for (let k = 0; k <= NR; k++) { const a = -Math.PI / 2 + Math.PI * k / NR; pos.push(x, y + 0.03 * Math.sin(a), z + 0.03 * Math.cos(a)); } }
+  for (let j = 0; j < NXh; j++) for (let k = 0; k < NR; k++) { const a = b1 + j * (NR + 1) + k, c = a + NR + 1; idx.push(a, a + 1, c, a + 1, c + 1, c); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
-}
-
-/**
- * The companionway's doors, shut (CR 3.18: carried while racing): a pair of varnished leaves meeting on the centreline,
- * hinged at the doorway's posts, from the sill up under the closed hatch (their tops following the cabin top's arch),
- * each with a raised panel on its face. In the bulkhead's plane, in the boat's frame.
- */
-export function companionwayDoors(): THREE.BufferGeometry[] {
-  const { hw, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), out: THREE.BufferGeometry[] = [], t = 0.022;
-  for (const s of [1, -1]) {
-    // (each leaf's outline drawn on its own side, counter-clockwise, so its faces look outward)
-    const x0 = 0.003, x1 = hw - 0.004, N = 6, ring: THREE.Vector2[] = [new THREE.Vector2(x0, sill), new THREE.Vector2(x1, sill)];
-    for (let k = 0; k <= N; k++) { const x = x1 + (x0 - x1) * k / N; ring.push(new THREE.Vector2(x, cabinTopAt(CABIN.u1, x) + 0.045)); }
-    const pts = s > 0 ? ring : ring.map(p => new THREE.Vector2(-p.x, p.y)).reverse();
-    out.push(new THREE.ExtrudeGeometry(new THREE.Shape(pts), { depth: t, bevelEnabled: false }).translate(0, 0, z1 - t / 2));
-    // the panel: set in from the leaf's face, inside its stiles and rails (drawn darker: companionwayDoorPanels)
-    void x1;
-  }
-  return out;
-}
-
-/** The doors' panels, each set into its leaf inside the stiles and rails, and their hinges and the latch. */
-export function companionwayDoorPanels(): { panels: THREE.BufferGeometry[]; metal: THREE.BufferGeometry[] } {
-  const { hw, sill } = COMPANIONWAY, z1 = zAt(CABIN.u1), t = 0.022, x0 = 0.003, x1 = hw - 0.004, panels: THREE.BufferGeometry[] = [], metal: THREE.BufferGeometry[] = [];
-  const py0 = sill + 0.09, py1 = cabinTopAt(CABIN.u1, hw) - 0.05, pw = (x1 - x0) - 0.11;
-  for (const s of [1, -1]) {
-    panels.push(new THREE.BoxGeometry(pw, py1 - py0, 0.004).translate(s * (x0 + x1) / 2, (py0 + py1) / 2, z1 + t / 2 + 0.001));
-    for (const y of [sill + 0.1, py1 - 0.02]) metal.push(new THREE.BoxGeometry(0.03, 0.06, 0.006).translate(s * (x1 - 0.008), y, z1 + t / 2 + 0.003)); // the hinges at the posts
-  }
-  metal.push(new THREE.BoxGeometry(0.05, 0.02, 0.012).translate(0, (sill + py1) / 2 + 0.05, z1 + t / 2 + 0.006)); // the latch across the meeting stiles
-  return { panels, metal };
 }
 
 /** Station u for a z position (m, aft positive). */
@@ -654,7 +806,7 @@ export function sidePatch(uc: number, width: number, h0: number, h1: number, nu 
   const pos: number[] = [], uv: number[] = [], idx: number[] = [];
   for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
     const u = uc + (i / nu - 0.5) * width / L, h = h0 + (h1 - h0) * j / nv, w = sideLine(u);
-    const x = w - (u < CABIN.u1 ? CABIN_LEAN * h / CABIN.h : 0) + 0.012; // a hair off the surface
+    const x = w - (u < CABIN.u1 ? CABIN_LEAN * h / cabinSideH(u) : 0) + 0.012; // a hair off the surface
     pos.push(x, deckY(u, w) + h, zAt(u)); uv.push(1 - i / nu, j / nv);
   }
   for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, b, c, b, d, c); }

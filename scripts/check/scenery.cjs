@@ -56,6 +56,11 @@ const VIEWS = {
   over_ryc: [LL(37.9085, -122.3830, 500), LL(37.9085, -122.38301, 0)], // overhead: Brickyard Cove, Richmond YC's harbor
   over_encinal: [LL(37.7830, -122.2625, 400), LL(37.7830, -122.26251, 0)], // overhead: Encinal YC on the Estuary
   over_estuary: [LL(37.7820, -122.2600, 1800), LL(37.7820, -122.26001, 0)], // overhead: the Estuary's harbors, Marina Village to Alameda Marina
+  // Fort Mason's piers on their piles and the Gashouse Cove entrance (8n, November 2026)
+  fm_piles: [LL(37.8082, -122.4335, 2.2), LL(37.8078, -122.4318, 1.5)], // in the Gashouse entrance, under Pier 3's deck from a boat's deck
+  fm_entrance: [LL(37.8090, -122.4300, 6), LL(37.8079, -122.4329, 2)], // the entrance from the Bay: Light 2 and its sign, Pier 3's end
+  fm_sign: [LL(37.80812, -122.43270, 2.2), LL(37.80798, -122.43291, 3.4)], // the sign close, from the entrance channel
+  over_fm: [LL(37.8082, -122.4315, 260), LL(37.8082, -122.43151, 0)], // overhead: the three piers and Gashouse Cove
   // the Ferry Building (November 2026)
   ferry_bay: [LL(37.7990, -122.3890, 6), LL(37.7955, -122.3937, 30)], // the Bay face, the gates and the sign, from off Pier 7
   ferry_street: [LL(37.7940, -122.3968, 120), LL(37.7954, -122.3936, 20)], // the tower and the Embarcadero arcade from above Market Street

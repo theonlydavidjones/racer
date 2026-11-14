@@ -98,10 +98,15 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
       // sail on into it), pass it on the other side, bearing away. Once she's chosen a side she holds to it until she's
       // clear (her course swinging as she turns would swap them back and forth, and she'd hold on into it)
       const keep = n360(desired + (rel > 0 ? -(need - rel) : need + rel)), other = n360(desired + (rel > 0 ? need + rel : -(need - rel)));
-      const prev = b.ai?.passing?.key === key ? b.ai.passing.side : 0;
+      // (the mark she's rounding she passes on its rounding side, whichever side it happens to be on now: kept on the
+      // side it was on, after penalty turns beside it had left it to port of a mark to be left to starboard, she sailed
+      // round and round it the wrong way, never rounding it, for the rest of the race)
+      const nm = b.started ? w.nextMark(b) : null;
+      const rounding = nm && nm.type === 'round' && !nm.reach && `${nm.p.x.toFixed(0)},${nm.p.y.toFixed(0)}` === key ? (nm.side === 's' ? 1 : -1) : 0;
+      const prev = rounding || (b.ai?.passing?.key === key ? b.ai.passing.side : 0);
       const useKeep = prev ? Math.sign(rel || 1) === prev : Math.abs(wrap(sailable(b, keep) - keep)) < 1;
       desired = useKeep ? keep : other;
-      near = key; if (b.ai && !prev) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
+      near = key; if (b.ai && (!prev || rounding)) b.ai.passing = { key, side: useKeep ? Math.sign(rel || 1) : -Math.sign(rel || 1) };
     }
   }
   if (b.ai?.passing && b.ai.passing.key !== near && !w.touchableMarks(b).some(m => `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}` === b.ai!.passing!.key && dist(b, m.p) < 30)) b.ai.passing = null;
@@ -863,13 +868,25 @@ export function crewPoleCall(w: World, b: Boat): void {
  * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts
  * jibEfficiency; between there and 154.5 it does less than the jib would to leeward, and that's your call, with the
  * coach's cue), the jib is down, penalty turns, a harbor's basin, or the dock. Null when it may stay out. (Gybing it end
- * for end with her, as she gybes, is still your pole going across.)
+ * for end with her, as she gybes, is still your pole going across.) `highS`: how long she's been at 145° or higher with it
+ * wanted: a crew doesn't strip the pole for a shift of a few seconds, only once she's stayed up there 3 s, or at once
+ * when she's higher than 135°, where it's plainly aback (estimates of practice). The World keeps that clock (b.poleHighAt).
  */
-export function poleMustCome(b: Boat): string | null {
+export function poleMustCome(b: PoleBoat, highS = 0): string | null {
+  return poleBlocked(b) ?? (b.twa < 135 || (b.twa <= 145 && highS >= 3) ? POLE_TOO_HIGH : null);
+}
+/** Why your crew won't set the pole on a new call (none at 145° true and higher, or where it must come in), or null. The
+ * band's Pole tab shows only when this is null (or the pole is out, or going out or in); a call it refuses says why. */
+export function poleRefused(b: PoleBoat): string | null {
+  return poleBlocked(b) ?? (b.twa <= 145 ? POLE_TOO_HIGH : null);
+}
+const POLE_TOO_HIGH = 'she\'s too high for it: the poled-out jib won\'t fill';
+/** What the pole's rules read (the page's mirror of your boat will do). */
+type PoleBoat = Readonly<Pick<Boat, 'docked' | 'x' | 'y' | 'penalty' | 'twa'>> & { readonly rig?: Readonly<NonNullable<Boat['rig']>> };
+function poleBlocked(b: PoleBoat): string | null {
   if (b.docked) return 'at the dock';
   if (inBasin(b)) return 'not in the harbor: no room to pole out in a marina';
   if (b.penalty > 0) return 'in for the penalty turns';
   if (!!b.rig && (b.rig.jib < 1 || !b.rig.jibUp)) return 'the jib is down';
-  if (b.twa <= 145) return 'she\'s too high for it: the poled-out jib is aback';
   return null;
 }
