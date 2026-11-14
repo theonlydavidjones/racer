@@ -134,7 +134,7 @@ export class Chart {
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);
     const twa = Math.abs(wrap(w.wind.from - b)), beat = beatFor(u);
     const kind = twa < beat ? 'upwind of you: a beat, tacking' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'downwind: a run';
-    const cur = w.currentAt(p), ckt = Math.hypot(cur.x, cur.y) / KT;
+    const cur = w.currentDrawn(p), ckt = Math.hypot(cur.x, cur.y) / KT;
     const nm = d / 1852;
     el.innerHTML = `<p><b>${this.pick.name}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
       + `<p>Current there now: ${ckt < 0.1 ? 'slack' : `${ckt.toFixed(1)} kt setting ${String(Math.round(brg(cur.x, cur.y)) % 360).padStart(3, '0')}°`}.</p>`;
