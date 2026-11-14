@@ -1294,6 +1294,19 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
     for (const x of Array.isArray(v) ? v : Object.values(v as object)) hold(x, depth + 1);
   };
   hold(held, 0); hold(grp.userData, 0);
+  // the fixed little assemblies first (a block on its strap, a winch on its pedestal, a car on its track...): groups
+  // nothing moves, made only of meshes, their meshes brought up to the boat's group as they stand, to be merged below
+  grp.updateMatrixWorld(true);
+  const inv = grp.matrixWorld.clone().invert();
+  for (const c of [...grp.children]) {
+    if (!(c as THREE.Group).isGroup || keep.has(c) || c.name || Object.keys(c.userData).length || !c.visible) continue;
+    let ok = true, any = false;
+    c.traverse(o => { if (o === c) return; const m = o as THREE.Mesh; if (keep.has(o) || o.name || !o.visible || Object.keys(o.userData).length) ok = false; else if (m.isMesh && !(m as THREE.SkinnedMesh).isSkinnedMesh) any = true; else if (!(o as THREE.Group).isGroup) ok = false; });
+    if (!ok || !any) continue;
+    const ms: THREE.Mesh[] = []; c.traverse(o => { if ((o as THREE.Mesh).isMesh) ms.push(o as THREE.Mesh); });
+    for (const m of ms) { const mw = m.matrixWorld.clone().premultiply(inv); m.parent!.remove(m); mw.decompose(m.position, m.quaternion, m.scale); grp.add(m); }
+    grp.remove(c);
+  }
   const buckets = new Map<string, THREE.Mesh[]>();
   for (const c of grp.children) {
     const m = c as THREE.Mesh;

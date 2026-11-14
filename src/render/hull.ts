@@ -145,12 +145,16 @@ function lapOut(pt: { x: number; y: number }, u: number, p: number, lap: number)
 }
 
 /** The section point at station u: p from 0 at the sheer to 0.8 at the keel's side (canoe body), 1 at the keel bottom. */
+/** (the station's own figures, kept for the last station asked: the searches along a section ask the same u again and
+ * again, the crew's footing every frame among them, ROADMAP 8x) */
+let secU = NaN, secB = 0, secS = 0, secKc = 0, secWk = 0, secKb = 0, secAl = 0, secBe = 0;
 function sectionPoint(u: number, p: number): { x: number; y: number } {
-  const b = halfBeam(u), s = sheer(u), kc = canoe(u), wk = keelHalf(u), kb = Math.min(keel(u), kc);
+  if (u !== secU) { secU = u; secB = halfBeam(u); secS = sheer(u); secKc = canoe(u); secWk = keelHalf(u); secKb = Math.min(keel(u), secKc); const sh = sectionShape(u); secAl = sh.al; secBe = sh.be; }
+  const b = secB, s = secS, kc = secKc, wk = secWk, kb = secKb;
   if (p <= 0.8) {
     // heights spread down the section (the strakes a little closer near the keel), the breadth from the wineglass curve
     const a = (p / 0.8) * Math.PI / 2, g = Math.pow(Math.sin(a), 1.15), ys = s - (s - kc) * g;
-    const { al, be } = sectionShape(u), w = Math.min(wk, b), F = Math.pow(1 - Math.pow(g, al), be);
+    const al = secAl, be = secBe, w = Math.min(wk, b), F = Math.pow(1 - Math.pow(g, al), be);
     return { x: w + (b - w) * F, y: ys };
   }
   const f = (p - 0.8) / 0.2;
