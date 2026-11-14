@@ -189,5 +189,8 @@ export interface Incident<B> {
   /** Part 2 preamble: the boat that broke the rule wasn't racing (before her preparatory signal, after a postponement or
    * abandonment, or finished and clear, or retired), so she isn't penalized for it. */
   notRacing?: boolean;
+  /** Sail it yourself (sim/caseRun.ts): the boat that broke the rule is one of the Case's, sailing its track, not steered,
+   * so she couldn't keep clear: the rules' call stands, but no penalty for her. */
+  scripted?: boolean;
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }

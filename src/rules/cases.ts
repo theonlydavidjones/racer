@@ -7,7 +7,7 @@
 // The diagrams: wind from the top of the page (000°), x east, y north, meters. 315 = starboard close-hauled, 045 = port
 // close-hauled, 180 = a dead run. A Folkboat is 7.64 m; the zone is three lengths (22.9 m).
 
-import { V } from '../core/math';
+import { V, wrap } from '../core/math';
 import type { RulesMark } from './types';
 
 /** A boat at one moment. Between frames she sails on (the trainer interpolates); the engine looks at each frame. */
@@ -54,6 +54,16 @@ export interface RulesCase {
   answer: { who: string; rule: string | null; line: string };
   /** Fit to show a learner: its frames are a sailed track (speed and track true to her heading), not test snapshots. */
   teach: boolean; why?: string;
+}
+
+/** A boat at time t: between her keyframes she sails on in a straight line, turning evenly. */
+export function poseAt(F: CaseFrame[], t: number): { x: number; y: number; h: number } {
+  if (t <= F[0].t) return F[0];
+  for (let i = 1; i < F.length; i++) if (t <= F[i].t) {
+    const a = F[i - 1], b = F[i], f = (t - a.t) / Math.max(1e-6, b.t - a.t);
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, h: a.h + wrap(b.h - a.h) * f };
+  }
+  return F[F.length - 1];
 }
 
 /** The point `along` meters ahead of p on heading h and `across` meters to her starboard. */

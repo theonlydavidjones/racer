@@ -64,8 +64,11 @@ npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost race
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
 npm run dev & node scripts/check/save-pattern.cjs <out-dir> # ~2 min: Save and "Save changes?" on a member, a boat's crew and the boat editor
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
+npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in the page (the statement, a tow, her logbook, laid up, carry on)
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
+node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
+                                              # this tree and the published one back to back; fails on a clear regression
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
                                               # discarding one function's code (docs/CAPACITY.md, "The compiler's thrown-away work")
 ```
@@ -85,6 +88,10 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   tier the batch needs. A batch touching src/boat, src/environment, src/sim, src/ai, src/rules, src/core, tests or the
   data under src/ gets the full `npm test`. A batch touching only src/ui, src/render, styles, index.html, scripts or docs
   gets test:fast + smoke + simguard. Either way the built page is smoke-tested before publishing.
+- The frame's release gate (ROADMAP 8x; docs/CAPACITY.md §9): before publishing, the Coordinator runs
+  `node scripts/check/perf-ab.cjs --against <the published version's commit>`. It fails on a clear regression in any of
+  perf.cjs's views (draw calls or triangles +5%, programs +5, the JS a frame +15% and 3 ms in two views, the heap +15
+  MB): a stuttering build doesn't ship (v187/v188 did). Run it with nothing else on the host.
 - Publish by republishing artifact/folkboat-racing-sim.html to the existing artifact
   (https://claude.ai/artifact/9svTjdwuUY2oSrZ3GMRy1m), never as a new one.
   Don't pass `capabilities` when publishing: the artifact already declares `db` and `user` (players' saves,
