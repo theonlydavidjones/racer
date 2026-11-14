@@ -429,9 +429,12 @@ function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (i
 function takeTiller(x?: number): void {
   if (!w.running || w.paused || tillerHeld) return;
   pilotOff('Pilot on standby: you have the tiller.'); unlash();
-  tillerHeld = true; document.body.classList.add('tiller-held'); $('tiller').classList.add('held');
+  // the tiller's words (which way it turns her) only in the Learn to sail lessons (the owner, 14 Nov 2026: no on-screen
+  // tiller instructions elsewhere; the Rules trainer's case sails as a lesson but isn't one)
+  const learning = !!w.lesson && w.lesson.id !== 'case';
+  tillerHeld = true; document.body.classList.add('tiller-held'); document.body.classList.toggle('learning', learning); $('tiller').classList.add('held');
   if (x != null) tillerFromCursor(x);
-  if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's center line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
+  if (learning && !toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's center line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
 }
 function releaseTiller(): void {
   if (!tillerHeld) return;
