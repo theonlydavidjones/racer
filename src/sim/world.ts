@@ -3,7 +3,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
+import { HOVE, POLE, apparent, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { windSide } from '../boat/dynamics';
 import { flowTurnRate } from '../boat/turning';
@@ -1775,9 +1775,10 @@ export class World {
           const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, holdPivot(P.hold.off), P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
         } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
       } else {
-        // shoved off astern: enough to coast her into the fairway on the water's drag
-        let lo = 0, hi = 1.5; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (asternCoast(m) < P.coast) lo = m; else hi = m; }
-        this.letGo(b, P.h, 0, lo);
+        // shoved off astern by her crew, as hard as one person shoves (SHOVE): a crew's shove is what it is, not a push sized
+        // to fetch up at the fairway's middle. On her hull's own sternway drag (physics.ts ASTERN) she carries a good way, so
+        // the helm takes her from there: steering astern, then sail or motor to stop her and get way on ahead
+        this.letGo(b, P.h, 0, SHOVE);
       }
     }
     if (b.pushing && b.pushing.jump > 0) { b.pushing.jump += dt / 0.7; if (b.pushing.jump >= 1) b.pushing = undefined; }

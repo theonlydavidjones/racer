@@ -12,11 +12,21 @@ describe('dock lines', () => {
     // the bow line led aft to a dock cleat abeam her shrouds: going ahead at a walk, she strains it and stops
     const b = boat(0.5), L: DockLine = { role: 'bow', at: 3.6, side: 1, to: { x: 1.4, y: 2.4 }, len: 0, state: 'made' };
     const p0 = cleatOf(b, L); L.len = Math.hypot(L.to.x - p0.x, L.to.y - p0.y);
-    let maxT = 0, maxY = 0; for (let i = 0; i < 900; i++) { dockStep(b, [L], calm, still, 1 / 60, open); maxT = Math.max(maxT, L.T ?? 0); maxY = Math.max(maxY, b.y); }
+    // (her energy, as a share of what she came in with, every step for a minute)
+    let maxT = 0, maxY = 0, at3 = 1, swing1 = 0, swing2 = 0;
+    for (let i = 0; i < 3600; i++) {
+      dockStep(b, [L], calm, still, 1 / 60, open); maxT = Math.max(maxT, L.T ?? 0); maxY = Math.max(maxY, b.y);
+      const e = (b.vx ** 2 + b.vy ** 2) / 0.25; if (i === 180) at3 = e; if (i > 180 && i < 1800) swing1 = Math.max(swing1, e); if (i >= 1800) swing2 = Math.max(swing2, e);
+    }
     expect(maxY).toBeLessThan(1.2); // (she goes on no more than a metre or so while the line takes her way off)
-    // (on one line she swings about it like a pendulum, the keel's broadside drag damping it slowly, as a boat on a single
-    // line does: the reason the stern line and springs follow; after 15 s most of her way is gone)
-    expect(Math.hypot(b.vx, b.vy)).toBeLessThan(0.5 * Math.sqrt(0.1));
+    // the line takes her way: nine tenths of her energy within 3 s (the snub itself)
+    expect(at3).toBeLessThan(0.1);
+    // then on one line she swings about it like a pendulum, slowly (about 45 s a swing, out to some 55 degrees), the keel's
+    // broadside drag and the line's own damping taking it down, as a boat on a single line does: the reason the stern line
+    // and springs follow. Each swing smaller: the second's peak no more than half the first's. (Measured on her real
+    // sternway drag, physics.ts ASTERN: 10.9% then 3.1%. The old law's sternway drag, 3–20 times her hull's own at a walk,
+    // had taken the swing out too, so it once read "most of her way gone after 15 s")
+    expect(swing1).toBeLessThan(0.15); expect(swing2).toBeLessThan(0.5 * swing1);
     expect(maxT).toBeGreaterThan(200); expect(maxT).toBeLessThan(LINE_BREAK / 2);
     expect(Number.isFinite(b.x) && Number.isFinite(b.h)).toBe(true);
   });
