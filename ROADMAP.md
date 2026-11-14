@@ -379,6 +379,12 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **Bugs in the race setup's "When" section** (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
+     - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
+       off after the first week. It should open fully visible, flipping upward or scrolling the panel.
+     - Starting from her slip at Gashouse Cove with "Leave at 1:35 PM", equal to the 13:35 gun, the line reads "She
+       starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
+       plainly that she can't make the start from there.
    - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
