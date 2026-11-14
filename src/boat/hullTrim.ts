@@ -55,11 +55,13 @@ export const TRIM = {
    * so a light-air chop doesn't outweigh the wetted surface (the guides put light-air crews forward upwind, chop or not),
    * while a breeze's steep sea does (the Year Book's weight aft upwind in heavy weather). */
   seaK: 0.1,
-  /** The trim a standard crew (two, 150 kg) can give her from the cockpit, aft end to forward end (m): the polar is the boat sailed well, within this.
-   * (From crewPhys.ts stationZ: the crew from the benches' forward end aft along the side deck to beside the after
-   * shelf; a test keeps the two together. Out on the side deck, aft of the jib winch, the forward end is -0.022: in
-   * light air that's within 0.03% of the speed, so the polar's reach stands.) */
-  reach: [-0.0413, -0.0056] as [number, number]
+  /** The trim a standard crew (two, 150 kg) gives her at their stations (m): the polar is the boat sailed well, there.
+   * (crewPhys.ts stationZ: either side of the jib winch, the front hand between the cabin and the winch, the middle hand
+   * between the winch and the thwart, on the benches or out on the side deck; aft of the thwart is the skipper's: the
+   * owner, 14 Nov 2026. A test keeps the two together. Both forward of the winch, when the weight's really wanted
+   * forward, +0.019, pays its little beyond the polar in light air, as the foredeck does. Before the stations the
+   * crew's reach ran along the side deck to beside the after shelf, -0.041 to -0.006.) */
+  reach: [-0.0078, -0.0073] as [number, number]
 };
 
 /** Moment to change trim one centimetre (kg·m/cm) at displacement `disp` kg. */
