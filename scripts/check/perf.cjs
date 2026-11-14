@@ -6,6 +6,9 @@
  * climb. Needs the dev server (npm run dev) on :5173 (it uses the dev-only handles sim(), __view, __renderer, __cam).
  *
  *   node scripts/check/perf.cjs [out-dir]     → the table, and out-dir/perf_<view>.png; exits 1 if over the budget
+ *   (PERF_URL another server's page; PERF_SCALE a smaller page of the same shape; PERF_FRAMES frames a view, default 6; PERF_RACES races in the leak check, default 6;
+ *   PERF_JSON a file for the results as data; PERF_ONLY=view,view a few views. The release gate, two versions paired,
+ *   is scripts/check/perf-ab.cjs)
  *
  * Headless Chromium here draws with SwiftShader (software GL), a few seconds a frame, so its frame times mean nothing
  * for a laptop's GPU: the GPU side is judged by the counts, the CPU side by the JS time, which the software GL doesn't
@@ -36,7 +39,9 @@ const VIEWS = [
 (async () => {
   const out = process.argv[2] || '.';
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-precise-memory-info', '--js-flags=--expose-gc'] });
-  const p = await b.newPage({ viewport: { width: 1280, height: 760 } });
+  // (PERF_SCALE: a smaller page of the same shape, as perf-ab.cjs draws it: the same view through the same frustum, so the
+  // same counts, and the software GL's frames come several times faster)
+  const sc = +(process.env.PERF_SCALE || 1), p = await b.newPage({ viewport: { width: Math.round(1280 * sc), height: Math.round(760 * sc) } });
   p.setDefaultTimeout(180000);
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   // time every animation-frame callback (the whole frame's JS)
@@ -49,7 +54,8 @@ const VIEWS = [
   // the same race each run (the seed, the wildlife, the fleet's colours all come from Math.random): a fixed sequence
   await p.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
   await p.addInitScript(() => { if (!localStorage.getItem('fbsim-settings-v2')) localStorage.setItem('fbsim-settings-v2', JSON.stringify({ opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], windDay: 2, traffic: 1 })); });
-  await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
+  // (PERF_URL: another server's page, as scripts/check/perf-ab.cjs runs it against a second version)
+  await p.goto(process.env.PERF_URL || 'http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1500);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
   // the sim's steps and the scene's update/draw, timed inside the frame
@@ -85,7 +91,7 @@ const VIEWS = [
     await measure(3); // (a few frames first: the first frames in a new view upload what it hasn't drawn before)
     let cdp = null;
     if (process.env.PERF_PROFILE === V.name) { cdp = await p.context().newCDPSession(p); await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
-    const r = await measure(cdp ? 12 : 6);
+    const r = await measure(cdp ? 12 : +(process.env.PERF_FRAMES || 6));
     if (cdp) { const { profile } = await cdp.send('Profiler.stop'); require('fs').writeFileSync(`${out}/perf_${V.name}.cpuprofile`, JSON.stringify(profile)); }
     await p.screenshot({ path: `${out}/perf_${V.name}.png` });
     if (V.map) await p.keyboard.press('m');
@@ -102,7 +108,7 @@ const VIEWS = [
     window.__view.scene.traverse(o => { if (o.geometry) g.add(o.geometry); });
     return { geo: i.geometries, scene: g.size, tex: i.textures, heap: performance.memory ? performance.memory.usedJSHeapSize / 1e6 : NaN }; });
   const seen = [];
-  for (let k = 0; k < (only.length ? 0 : 6); k++) {
+  for (let k = 0; k < (only.length ? 0 : +(process.env.PERF_RACES || 6)); k++) {
     await p.evaluate(() => { document.getElementById('bAgain').click(); }); await p.waitForTimeout(2500);
     await measure(2); seen.push(await mem());
   }
@@ -111,6 +117,8 @@ const VIEWS = [
     const extra = Math.max(...seen.map(m => m.geo - m.scene)), growT = seen[seen.length - 1].tex - seen[1].tex, growH = seen[seen.length - 1].heap - seen[1].heap;
     if (extra > 50 || growT > 4 || growH > 30) { over = true; console.log(`LEAK: ${extra} geometries on the GPU beyond the scene's, textures +${growT}, heap +${growH.toFixed(0)} MB over ${seen.length - 2} races`); }
   }
+  // (PERF_JSON: the rows and the races' memory as data, for perf-ab.cjs)
+  if (process.env.PERF_JSON) require('fs').writeFileSync(process.env.PERF_JSON, JSON.stringify({ rows, races: seen, errs }));
   console.log('ERRORS:', errs.join('\n') || 'none'); await b.close();
   process.exit(over || errs.length ? 1 : 0);
 })();
