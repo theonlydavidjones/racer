@@ -792,7 +792,19 @@ function sheaveBlock(r: number, dy: number): THREE.Mesh {
 
 /** Fittings and lines: traveller, backstay with its bridle, vang, winches, jib cars and sheets, and the piano. */
 const sideMatFor = (g: THREE.Group): THREE.Material => g.userData.sideMat ?? MAT.cream;
+/** Merges the still meshes added to `parent` (not in `had`, not `moving`), with the shared black and steel, into one mesh per material. */
+function bakeFittings(parent: THREE.Object3D, had: Set<THREE.Object3D>, moving: Set<THREE.Object3D>): void {
+  for (const mat of [BLACK, STEEL]) {
+    const still = parent.children.filter(o => !had.has(o) && !moving.has(o) && o instanceof THREE.Mesh && o.material === mat && o.children.length === 0) as THREE.Mesh[];
+    if (still.length < 2) continue;
+    const geos = still.map(o => { o.updateMatrix(); const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g.applyMatrix4(o.matrix); });
+    const merged = mergeGeometries(geos, false); if (!merged) continue;
+    for (const o of still) parent.remove(o);
+    const baked = new THREE.Mesh(merged, mat); baked.userData.fittings = true; parent.add(baked); // (line-clash.cjs: lines may end on these)
+  }
+}
 function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
+  const had = new Set([...grp.children, ...boomPivot.children]);
   // traveller: the thwart, a deep varnished beam across the cockpit in front of the helm, on its post (hull.ts
   // COCKPIT_FIT), the track on its top, and the car
   const tu = uAtZ(TRAV_Z), tw = cockpitHalf(tu), ty = thwartTop();
@@ -832,10 +844,10 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   { const ub = sheaveBlock(0.025, -0.05); ub.position.copy(VANG_SPAN).setY(VANG_SPAN.y + 0.05); boomPivot.add(ub);
     const under = BOOM_TOP - 2 * BOOM_R;
     for (const z of VANG_LEGS) {
-      boomPivot.add(line([new THREE.Vector3(0, under, z), VANG_SPAN.clone().setY(VANG_SPAN.y + 0.05)], MAT.wire)); // the span's wire legs
       // each leg shackled to a stainless eye riveted under the boom
       const eye = new THREE.Mesh(new THREE.TorusGeometry(0.01, 0.003, 6, 12), STEEL); eye.position.set(0, under - 0.008, z); boomPivot.add(eye);
     }
+    boomPivot.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(VANG_LEGS.flatMap(z => [new THREE.Vector3(0, under, z), VANG_SPAN.clone().setY(VANG_SPAN.y + 0.05)])), MAT.wire)); // the span's wire legs
     const lb = sheaveBlock(0.025, 0.05); lb.position.copy(VANG_FOOT).setY(VANG_FOOT.y - 0.05); grp.add(lb);
     const jam = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, 0.05), BLACK); jam.position.copy(VANG_FOOT).add(new THREE.Vector3(0.03, -0.02, 0.02)); grp.add(jam); } // (the jammer on the lower block)
   const vang = line(Array.from({ length: 5 }, () => VANG_FOOT.clone()), 'main', 'vang'); grp.add(vang);
@@ -989,7 +1001,12 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
   }
-  return { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  // the fittings that never move on her (the blocks, cleats, eyes, the jammer): one mesh per material, not one each,
+  // so the rigging's dozens of small parts cost the GPU a couple of draw calls a boat
+  const moving = new Set<THREE.Object3D>(); for (const v of Object.values(out)) for (const o of (Array.isArray(v) ? v : [v])) if (o instanceof THREE.Object3D) moving.add(o);
+  bakeFittings(grp, had, moving); bakeFittings(boomPivot, had, moving);
+  return out;
 }
 /** Mainsheet: from the end of the boom (its height and distance from the gooseneck) down to the traveller. */
 const BOOM_END = { y: BOOM_TOP - BOOM_R, r: E - 0.05 }, TRAVELLER = new THREE.Vector3(0, 0.78, 3.62);

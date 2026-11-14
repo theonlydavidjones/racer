@@ -53,7 +53,7 @@ const { chromium } = require('playwright');
       g.traverse(o => {
         if (!o.isMesh || !o.visible || !o.geometry?.attributes?.position) return;
         o.geometry.computeBoundingSphere?.(); const r = o.geometry.boundingSphere?.radius ?? 9, sail = o === m.main?.mesh || o === m.jib?.mesh;
-        if (r > 0.6 && !sail) return;
+        if (r > 0.6 && !sail && !o.userData.fittings) return; // (boatMesh bakes her still fittings into one mesh per material)
         const pa = o.geometry.attributes.position, w = new V();
         for (let i = 0; i < pa.count; i++) { w.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld); g.worldToLocal(w); fit.push(w.x, w.y, w.z); }
       });
