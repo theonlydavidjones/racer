@@ -126,11 +126,29 @@ export function landLee(p: Vec, from: number): number {
 /** How much the wind comes in through the Gate (the slot): all of a westerly, none of a northerly or southerly. */
 export const slotFlow = (from: number): number => Math.max(0, Math.cos((from - 255) * Math.PI / 180)) ** 2;
 
+/**
+ * anyShoreDist at p, kept by p's exact coordinates: the same number, worked out once. World.buildField asks for the same
+ * grid's points every 30 s of race time, twice each, and the distance to every shore is nearly all of its cost: done
+ * afresh in one step it was a 20–60 ms step every 30 s, a hitch the player sees (docs/CAPACITY.md §9).
+ */
+const SHORE_AT = new Map<number, Map<number, number>>();
+let shoreAtN = 0;
+function shoreDistAt(p: Vec): number {
+  let row = SHORE_AT.get(p.x), d = row?.get(p.y);
+  if (d === undefined) {
+    d = anyShoreDist(p);
+    if (shoreAtN >= 50000) { SHORE_AT.clear(); shoreAtN = 0; row = undefined; } // (the map asks for anywhere it's drawn: kept bounded)
+    if (!row) { row = new Map(); SHORE_AT.set(p.x, row); }
+    row.set(p.y, d); shoreAtN++;
+  }
+  return d;
+}
+
 export function windTerrain(p: Vec, from = 255, lattice = false): number {
   const slot = slotWeight(p) * slotFlow(from);
   // (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear, a few metres out at most, so
   // under 0.3% of the wind here, typically 0.005% (the review's measure over the water within 420 m of a shore): for a boat's own wind every step, as for her current; the map keeps the exact one)
-  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : anyShoreDist(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
+  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : shoreDistAt(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
   return (1 + SLOT_BOOST * slot) * shore;
 }
 
