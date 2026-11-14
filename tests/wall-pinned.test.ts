@@ -35,7 +35,7 @@ describe('a boat pinned against a harbor wall', () => {
     const S = { ...DEFAULT_SETTINGS, mode: 'sail', windKind: 'west', windKt: 14, windDir: 270, windTurn: 0, sailFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', traffic: 0 } as Settings;
     const time = (q: { x: number; y: number }) => {
       const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
-      u.docked = false; u.handled = false; u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false };
+      u.docked = undefined; u.handled = undefined; u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false };
       const put = () => { u.x = q.x; u.y = q.y; u.h = 0; u.v = 0; u.sway = 0; u.astern = 0; };
       put(); for (let k = 0; k < 120; k++) { put(); w.step(DT); } // (warm)
       const chunks: number[] = [];
