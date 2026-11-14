@@ -1,5 +1,6 @@
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
+import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
@@ -265,6 +266,8 @@ export class World {
   readonly drill: DrillTracker | null;
   /** The mark-rounding drill (sim/roundings.ts): laps of the practice course, W and the pin, each rounding scored; that mode only. */
   readonly rounding: RoundingTracker | null;
+  /** Learn to sail (sim/lessons.ts): the lesson you're sailing, its cue and its check; that mode only. */
+  readonly lesson: LessonTracker | null;
   /** Racing: the whole race once a second (the race replay), from just before the gun. */
   track: Frame[] = [];
   horns: Record<number, boolean> = {};
@@ -385,7 +388,7 @@ export class World {
       this.updateTide();
     }
     const r = this.rng;
-    this.windModel = { base: this.C.base, kt: settings.windKt || 12, phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
+    this.windModel = { base: this.C.base, kt: this.lessonKt(settings.windKt || 12), phase: [r() * 6.28, r() * 6.28, r() * 6.28], steady: atGun.steady };
     // cruising: from a place on the water or her slip in her marina, to another place or back to her slip
     if (this.freeSail) this.dest = settings.sailTo === 'slip' && this.homeSlip ? { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(this.homeSlip)}`, group: 'Spots', p: this.homeSlip.p })!, key: 'slip' } : destMark(getPlace(settings.sailTo));
     { // the puffs: over the race area, or for just sailing, over the water between where you start and where you're going
@@ -407,6 +410,15 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    if (settings.mode === 'lesson') { this.lessonField = this.fieldAt(this.boats[0]).k; this.windModel.kt = this.lessonKt(this.windModel.kt); }
+    // a lesson: its buoy (the tiller's, steered for; stop, go and irons', stopped by) 250 m off, 20° to leeward of her
+    // heading (TWA about 110°, just abaft the beam), where there's water
+    this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
+      const u = this.boats[0], lee = wrap(this.windModel.base - u.h) > 0 ? -20 : 20;
+      for (const a of [lee, 0, -lee]) { const q = { x: u.x + V(u.h + a).x * 250, y: u.y + V(u.h + a).y * 250 }; if (!onLand(q)) return q; }
+      for (const d of [120, 60]) { const q = { x: u.x + V(u.h).x * d, y: u.y + V(u.h).y * d }; if (!onLand(q)) return q; }
+      return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
+    })()) : null;
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
@@ -487,7 +499,7 @@ export class World {
         p = { ...at };
         const room = (hh: number) => { const u = V(hh); let d = 0; while (d < 600 && !onLand({ x: p.x + u.x * (d + 20), y: p.y + u.y * (d + 20) })) d += 20; return d; };
         // (the tack and gybe drill: close-hauled, ready to tack)
-        const off = this.settings.mode === 'manoeuvres' ? 45 : 90, a = n360(this.windModel.base + off), b = n360(this.windModel.base - off);
+        const off = this.settings.mode === 'manoeuvres' || (this.settings.mode === 'lesson' && (this.settings.lesson === 'tacking' || this.settings.lesson === 'heaveto')) ? 45 : 90, a = n360(this.windModel.base + off), b = n360(this.windModel.base - off);
         h = room(a) >= room(b) ? a : b;
       } else {
         p = place(-220, 0); h = n360(lineH + 180);
@@ -830,6 +842,12 @@ export class World {
   }
   private seaNodes?: { d: number; u: number }[];
 
+  /** A lesson's mean wind held to the standard's range (sim/lessons.ts LESSON_WIND); any other sail's as it is. */
+  // (the range is for the wind she sails in, so the mean is held to it over the field's factor where the lesson is: the
+  // Cityfront's is about 1.2, which put a lesson's own wind near 18 kt with the mean at 15)
+  private lessonKt(kt: number): number { const f = this.lessonField ?? 1; return this.settings.mode === 'lesson' ? clamp(kt, LESSON_WIND[0] / f, LESSON_WIND[1] / f) : kt; }
+  private lessonField: number | null = null;
+
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
     const b = this.breeze = this.weather.at(this.clockUtc);
@@ -838,7 +856,7 @@ export class World {
       return;
     }
     this.windModel.steady = b.steady;
-    this.windModel.base = this.settings.windDir ?? b.from; this.windModel.kt = b.kt;
+    this.windModel.base = this.settings.windDir ?? b.from; this.windModel.kt = this.lessonKt(b.kt);
     this.puffs.setGust(b.gust);
   }
 
@@ -915,6 +933,7 @@ export class World {
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
+    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (a lesson: its check, on the boat as she sails)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);

@@ -1,8 +1,9 @@
+import type { LessonId } from './sim/lessons';
 import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 export interface Settings {
-  mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings'; // full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
+  mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings' | 'lesson'; // (and a Learn to sail lesson, open water, alone: sim/lessons.ts) full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
   /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
    * drill's are the fewest metres lost, by manoeuvre and wind band ('tack-medium'), with a good crew's then. */
   practiceBest?: Record<string, { lostM: number; goodM: number }>;
@@ -30,6 +31,8 @@ export interface Settings {
   seq: number; // start sequence, minutes
   /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
   drillFrom?: number; drillSolo?: boolean;
+  /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
+  lesson?: LessonId; lessonsPassed?: LessonId[];
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2;
