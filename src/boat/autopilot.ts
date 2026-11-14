@@ -143,9 +143,13 @@ const OFF_ROUTE = 40, RETRY_M = 30, RETRY_T = 60;
 /** The way to the turn must keep this clear of a pier either side (m), or it's planned again from where she is: the
  * route keeps 10 m off, and a sag to leeward that leaves her steering a chord past a pier head has lost it. */
 const LEG_CLEAR = 4;
-/** Tack for more room in a channel only onto a tack with this much water ahead (m), and only with way on (m/s): a
- * tack she can't complete, or one that only swaps a short board for another, leaves her in irons by the wall. */
-const ROOM = 25, ROOM_V = 1;
+/** Tack for more room in a channel only onto a tack with this much water ahead (m): a tack that only swaps a short
+ * board for another leaves her in irons by the wall. */
+const ROOM = 25;
+/** The way she needs to tack (m/s): the sim's tack costs her about 1 m/s (the physics review, 17-22 kt in the basin), so
+ * she must go in with that and some to come out sailing; and at least TACK_V_FRAC of her close-hauled speed. Short of
+ * it, she foots off to build speed first, unless the land dead ahead is closer than FOOT_ROOM. */
+const TACK_V = 1.6, TACK_V_FRAC = 0.6, FOOT_ROOM = 15, FOOT = 10;
 /** Never plan more often than this (s), whatever's asking: a plan that finds no way, or one she's just left, waits. */
 const MIN_REPLAN = 5;
 /** On to the next turn early only with this much clear water either side of the way to it (m): the route's 10 m berth
@@ -228,9 +232,20 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   const bP = brg(P.x - b.x, P.y - b.y), vs = Math.max(b.v, targetFor(b, Math.abs(wrap(from - bP))) * 0.8);
   const cts = courseToSteer(bP, vs, c);
   // she can lay it: steer the course that makes good the bearing (her leeway higher, toward the wind)
-  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) { const r = wrap(from - cts); return Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts; }
-  // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
   const onS = b.tack === 'S', other = onS ? 'P' : 'S', cur = close(b.tack);
+  const canTack = b.v > Math.max(TACK_V, TACK_V_FRAC * targetFor(b, beat)) && t - p.lastTackT > 12 && !b.tacking;
+  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) {
+    const r = wrap(from - cts);
+    // (a course on the other tack, below 150° off the wind, turns her through it: that's a tack, and waits for the way
+    // and the time to make one, close-hauled on this tack till then; a jibe is the rudder's business, not a tack's)
+    const through = Math.abs(r) < 150 && (r > 0) !== onS;
+    if (!through) return Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts;
+    if (canTack) { p.lastTackT = t; return n360(cts + Math.sign(r) * lw); }
+    return cur;
+  }
+  // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
+  // (bearing off FOOT degrees on this tack builds the way to tack)
+  const foot = n360(cur + (onS ? -FOOT : FOOT));
   if (t - p.lastTackT > 12 && !b.tacking) {
     const d = sub(P, b), vb = targetFor(b, beat);
     const fetch = (tk: 'S' | 'P') => {
@@ -246,7 +261,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
       // (boxed in by what's dead ahead on each tack, not the look-ahead's berth either side, which in a 57 m gap sees
       // the piers on both)
       if (Math.max(landDist(b, cur, look, 0), landDist(b, close(other), look, 0)) < BOXED) { p.alarm = 'Pilot alarm: land ahead on both tacks. Pilot on standby: you have the tiller.'; return cur; }
-      if (dOther > dCur && dOther > ROOM && b.v > ROOM_V) { p.lastTackT = t; p.goTack = other; return close(other); }
+      if (dOther > dCur && dOther > ROOM && canTack) { p.lastTackT = t; p.goTack = other; return close(other); }
       return cur;
     }
     // a pier or a breakwater come within a berth of her, to leeward as she sags down on it or abeam: tack away from it,
@@ -254,7 +269,10 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
     // (not down a marina's fairway, where a dock is always that close: there the route's line is the guide)
     const wn = inFairway(b) ? null : wharfNearest(b, BERTH);
     const away = !!wn && wn.d > 0 && dot(V(close(other)), wn.n) > dot(V(cur), wn.n) + 0.2;
-    if ((fetch(other) && !fetch(b.tack)) || shore || away) { p.lastTackT = t; p.goTack = other; return close(other); }
+    if ((fetch(other) && !fetch(b.tack)) || shore || away) {
+      if (canTack || landDist(b, cur, look, 0) < FOOT_ROOM) { p.lastTackT = t; p.goTack = other; return close(other); }
+      if (shore || away) return foot; // (no way to tack yet: foot off and build it, with the land not yet close ahead)
+    }
   }
   return cur;
 }

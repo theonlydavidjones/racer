@@ -31,13 +31,17 @@ const firstLeg = (a: typeof BASIN, b: typeof BASIN) => { const r = routeAround(a
 const CONTACT = /^Collision: |^Bump: |^Aground!|touched bottom|been set sideways onto/;
 const bumped = (w: World) => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && CONTACT.test(e.msg));
 describe('the navigator round Aquatic Park', () => {
-  // (and the winds a review found her short-tacking onto the breakwater or sagging onto a pier head in: an easterly
-  // and a north-northeasterly, out of the basin to the east)
-  const CASES: [string, typeof BASIN, typeof BASIN, number, number?][] = [
-    ...[270, 300, 0].flatMap(from => ROUTES.map(([n, a, b, berth]) => [n, a, b, from, berth] as [string, typeof BASIN, typeof BASIN, number, number?])),
-    ['out of the basin to the east', BASIN, EAST, 90], ['out of the basin to the east', BASIN, EAST, 30]];
-  for (const [name, a, b, from, berth = 5.5] of CASES) it(`${name}, wind from ${from}°`, () => {
-    const w = new World(COURSES[0], S({ windDir: from }), 4, { freeSail: true }), u = w.user;
+  // (and the winds the physics reviews found her in trouble in: sagging onto the breakwater's end out of the basin to the
+  // east in a northerly (1.0 m off before the fix), tacking with no way on in 22 kt till she lay in irons by the pier,
+  // and a southerly into Hyde Street, where a wind shift turned her back through the wind 7 m off the pier)
+  type Case = [string, typeof BASIN, typeof BASIN, number, number?, number?];
+  const CASES: Case[] = [
+    ...[270, 300, 0].flatMap(from => ROUTES.map(([n, a, b, berth]): Case => [n, a, b, from, berth])),
+    ['out of the basin to the east', BASIN, EAST, 90], ['out of the basin to the east', BASIN, EAST, 30],
+    ['out of the basin to the east', BASIN, EAST, 0, 5.5, 22], ['out of the basin to the north', BASIN, NORTH, 350, 5.5, 18],
+    ['into Hyde Street harbor from the west', WEST, HYDE, 150, 4], ['into Hyde Street harbor from the west', WEST, HYDE, 180, 4]];
+  for (const [name, a, b, from, berth = 5.5, kt = 12] of CASES) it(`${name}, wind from ${from}°${kt !== 12 ? ` at ${kt} kt` : ''}`, () => {
+    const w = new World(COURSES[0], S({ windDir: from, windKt: kt }), 4, { freeSail: true }), u = w.user;
     expect(w.moveHere(a, 'start')).toBe(true);
     w.setDest(b, 'there'); u.h = firstLeg(a, b); u.v = 2;
     engage(u, w.pilot, 'nav');
