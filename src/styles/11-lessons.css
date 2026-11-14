@@ -1,0 +1,13 @@
+/* Learn to sail: the lesson tiles (src/ui/lessons.ts) */
+#lessons .panel{max-width:760px}
+.lsGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 8px}
+.lsTile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:92px;padding:12px;border-radius:10px;
+  border:1px solid var(--rule);background:var(--pod);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.lsTile:hover:not([disabled]){border-color:var(--accent)}
+.lsTile b{font-size:14px}
+.lsTile .lsIc{font-size:22px;line-height:1}
+.lsTile .lsNo{position:absolute;right:10px;top:8px;font:700 18px/1 var(--f-inst);color:var(--muted);opacity:.5}
+.lsTile .lsOk{position:absolute;right:10px;bottom:8px;color:#1fbf8f;font-weight:700}
+.lsTile.done{border-color:#1fbf8f}
+.lsTile.soon{opacity:.4;cursor:default}
+.lsSum{color:var(--muted);font-size:12px}

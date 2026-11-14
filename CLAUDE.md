@@ -74,7 +74,7 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
-  practice, color, favor, meters, harbor, maneuver, center, gray, -ize. New code comments use it too.
+  practice, color, favor, meters, harbor, maneuver, center, gray, jibe ("Ready to jibe" … "Jibe-ho"; the owner, 13 Nov), -ize. New code comments use it too.
 - Before opening a PR (the owner, 13 Nov 2026, for faster releases): merge origin/main into your branch and run the
   full `npm test` on it, not only test:fast; say in the PR that it passed (or which load timeouts you reran alone).
 - How the Coordinator tests a batch (the owner, 13 Nov 2026): test:fast first on the merged batch (fail fast), then the

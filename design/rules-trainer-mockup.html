@@ -1,0 +1,86 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Rules trainer mock-up</title><style>
+body{margin:0;background:#06101a;color:#e9f2f5;font:14px/1.45 system-ui,sans-serif;width:1280px;height:800px;overflow:hidden}
+.stage{position:absolute;inset:0}
+.eyebrow{font:600 11px/1 system-ui;letter-spacing:.16em;text-transform:uppercase;color:#ffb627;margin-bottom:8px}
+.panel{position:absolute;right:24px;top:24px;width:380px;background:#0f2130;border:1px solid rgba(150,196,218,.22);border-radius:12px;padding:20px}
+h2{margin:0 0 6px;font-size:24px}
+.setup{color:#c7d6de;margin:0 0 14px}
+.choices{display:flex;gap:8px;margin-bottom:14px}
+.choice{flex:1;border:1px solid rgba(150,196,218,.35);border-radius:8px;padding:10px 0;text-align:center;font-weight:700;background:#0c2534}
+.choice.right{border-color:#1fbf8f;background:rgba(31,191,143,.16);color:#7df0c8}
+.choice.dim{opacity:.45}
+.answer{border-left:3px solid #1fbf8f;padding:4px 0 4px 12px;margin-bottom:14px}
+.answer b{font-size:16px}
+.rules{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.rule{font:600 12px/1 system-ui;border-radius:12px;padding:5px 9px;background:#16364a;color:#cfe3ec}
+.rule.key{background:#ffb627;color:#06101a}
+.btns{display:flex;gap:8px}
+.btn{border:1px solid rgba(150,196,218,.35);border-radius:8px;padding:8px 14px;font-weight:600;font-size:13px}
+.btn.cta{background:#ffb627;color:#06101a;border-color:#ffb627}
+.src{margin-top:14px;font-size:11px;color:#6f8a98}
+.score{position:absolute;left:24px;top:24px;display:flex;gap:10px}
+.tile{background:rgba(12,37,52,.92);border:1px solid rgba(150,196,218,.2);border-radius:10px;padding:8px 14px}
+.tile b{display:block;font-size:20px}.tile span{color:#94abb7;font-size:12px}
+.timeline{position:absolute;left:24px;right:428px;bottom:24px;height:54px;background:rgba(12,37,52,.92);border:1px solid rgba(150,196,218,.2);border-radius:10px;display:flex;align-items:center;gap:14px;padding:0 16px}
+.tl{position:relative;flex:1;height:6px;background:#16364a;border-radius:3px}
+.tl i{position:absolute;left:0;top:0;bottom:0;width:72%;background:#94abb7;border-radius:3px}
+.tl em{position:absolute;left:72%;top:-9px;width:3px;height:24px;background:#ffb627;border-radius:2px}
+.tl small{position:absolute;left:72%;top:16px;transform:translateX(-50%);font-size:11px;color:#ffb627;white-space:nowrap}
+.tlb{font-size:18px;color:#cfe3ec}
+.notes{position:absolute;left:24px;top:830px}
+</style></head><body><div class="stage">
+<svg width="1280" height="800" viewBox="0 0 1280 800" style="position:absolute;inset:0">
+ <defs>
+  <radialGradient id="sea" cx="40%" cy="45%" r="75%"><stop offset="0" stop-color="#123a52"/><stop offset="1" stop-color="#0a2233"/></radialGradient>
+  <marker id="ar" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#e9f2f5"/></marker>
+  <!-- a Folkboat from above, bow up: 7.68 m long, 2.2 m beam, drawn at 14 px a meter -->
+  <g id="hull"><path d="M0 -54 C10 -40 15 -18 15 6 C15 30 12 46 9 54 L-9 54 C-12 46 -15 30 -15 6 C-15 -18 -10 -40 0 -54Z"/></g>
+ </defs>
+ <rect width="1280" height="800" fill="url(#sea)"/>
+ <!-- faint wave texture -->
+ <g stroke="rgba(150,196,218,.06)" stroke-width="1.2" fill="none">
+  <path d="M0 120 q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/><path d="M0 260 q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+  <path d="M0 400 q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/><path d="M0 540 q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+  <path d="M0 680 q40 -8 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+ </g>
+ <!-- the wind, from the top of the picture -->
+ <g transform="translate(120 150)"><text x="0" y="-16" fill="#94abb7" font-size="11" font-weight="700" letter-spacing=".12em" text-anchor="middle">WIND</text>
+  <line x1="0" y1="-6" x2="0" y2="46" stroke="#e9f2f5" stroke-width="2.5" marker-end="url(#ar)"/></g>
+ <!-- both on starboard tack, reaching west (to the left); L has come from clear astern, to leeward -->
+ <!-- tracks: W straight; L from astern, then luffing -->
+ <path d="M900 330 L560 330" stroke="rgba(86,180,233,.55)" stroke-width="2" stroke-dasharray="2 5" fill="none"/>
+ <path d="M960 452 C800 452 700 450 610 420" stroke="rgba(255,106,42,.6)" stroke-width="2" stroke-dasharray="2 5" fill="none"/>
+ <!-- two of L's lengths around W: the zone where W must keep clear while L overlaps from astern (rule 17) -->
+ <circle cx="520" cy="330" r="215" fill="none" stroke="rgba(255,182,39,.35)" stroke-dasharray="6 6"/>
+ <text x="520" y="105" fill="rgba(255,182,39,.8)" font-size="11" text-anchor="middle">two hull lengths</text>
+ <!-- the overlap: a line abeam of W's stern -->
+ <line x1="574" y1="290" x2="574" y2="470" stroke="rgba(233,242,245,.35)" stroke-dasharray="4 4"/>
+ <text x="582" y="484" fill="#94abb7" font-size="11">overlapped</text>
+ <!-- W (blue), heading west -->
+ <g transform="translate(520 330) rotate(-90)" fill="#2f6fb3" stroke="#0c2534" stroke-width="2"><use href="#hull"/>
+  <line x1="0" y1="-6" x2="-30" y2="38" stroke="#f3f1ea" stroke-width="3"/></g>
+ <text x="520" y="292" fill="#9fd0f5" font-size="15" font-weight="800" text-anchor="middle">W</text>
+ <!-- L (orange), luffing: her bow turned up toward W -->
+ <g transform="translate(560 405) rotate(-68)" fill="#c8302a" stroke="#0c2534" stroke-width="2"><use href="#hull"/>
+  <line x1="0" y1="-6" x2="-26" y2="40" stroke="#f3f1ea" stroke-width="3"/></g>
+ <text x="612" y="448" fill="#ffb09a" font-size="15" font-weight="800" text-anchor="middle">L</text>
+ <!-- L's luff: an arc arrow -->
+ <path d="M492 398 q-14 -8 -16 -30" stroke="#ffb627" stroke-width="2.5" fill="none" marker-end="url(#ar)"/>
+ <text x="440" y="392" fill="#ffb627" font-size="12" font-weight="700">luffing</text>
+ <!-- her proper course, thin: she luffs up to it, no higher -->
+ <line x1="540" y1="397" x2="373" y2="330" stroke="rgba(255,182,39,.45)" stroke-width="1.5"/>
+ <text x="368" y="326" fill="rgba(255,182,39,.8)" font-size="11" text-anchor="end">L's proper course</text>
+</svg>
+<div class="score"><div class="tile"><b>7 / 9</b><span>Cases right</span></div><div class="tile"><b>Part 2</b><span>this set: rules 10–17</span></div></div>
+<div class="panel">
+ <div class="eyebrow">Rules trainer · Case 7</div>
+ <h2>Who broke a rule?</h2>
+ <p class="setup">L came from clear astern and luffs, no higher than her proper course.</p>
+ <div class="choices"><span class="choice right">W ✓</span><span class="choice dim">L</span><span class="choice dim">Neither</span></div>
+ <div class="answer"><b>W: rule 11.</b><br>Windward keeps clear. L stayed at her proper course (17).</div>
+ <div class="rules"><span class="rule key">11</span><span class="rule">15</span><span class="rule">16.1</span><span class="rule">17</span></div>
+ <div class="btns"><span class="btn">Watch again</span><span class="btn">Sail it yourself</span><span class="btn cta">Next Case</span></div>
+ <div class="src">World Sailing Case Book 2025–2028, Case 7 (p. 85)</div>
+</div>
+<div class="timeline"><span class="tlb">◀◀</span><span class="tlb">▶</span><div class="tl"><i></i><em></em><small>the moment</small></div><span style="color:#94abb7;font-size:12px">paused</span></div>
+</div></body></html>
