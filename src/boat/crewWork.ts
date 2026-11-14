@@ -337,6 +337,10 @@ function carJob(b: Boat, dt: number): void {
   // trip back aft and forward again; they set it on their way back, the car being aft of the mast. From the mast it's a
   // step aft. Your call, they come for)
   if (!yours && a.z < Z.mast - 0.5) return;
+  // (and at the cabin top, the lines there they still want come first: one stop for all of them, then the car on the
+  // way forward, not to the car and back again. The cabin-top jobs are handed out 20 times a second, this every step)
+  const ctl = b.ctl as unknown as Record<string, number>, lw = c.lineWant ?? {};
+  if (!yours && a.pose === 'piano' && [...PIANO].some(k => lw[k] != null && ownerOf(k, n, c.spec, c.layout ?? 'cockpit') === who && Math.abs(lw[k] - ctl[k]) >= startThreshold(k, skill, lw[k]))) return;
   a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
 }
 
