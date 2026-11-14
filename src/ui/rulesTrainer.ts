@@ -67,13 +67,13 @@ export class RulesTrainer {
   private get askT(): number { return this.c.ask === 'keepsClear' ? this.endT : this.c.momentT; }
 
   /** Sail it up to `until` (by default where it asks), from a few seconds before the moment, a little faster than real time. */
-  private play(until = this.askT, from?: number): void {
+  private play(until = this.askT, from?: number, speed = 1.5): void {
     cancelAnimationFrame(this.raf);
     this.t0 = Math.min(...this.c.boats.map(b => b.frames.find(f => f.look !== false)?.t ?? b.frames[0].t));
     this.t = from ?? Math.max(this.t0, this.c.momentT - 12); this.last = performance.now();
     const tick = (now: number) => {
       const dt = Math.min(0.5, (now - this.last) / 1000); this.last = now; // (a slow frame still moves on: a tab in the background, a slow machine)
-      this.t = Math.min(until, this.t + dt * 1.5);
+      this.t = Math.min(until, this.t + dt * speed);
       this.draw();
       if (this.t < until) this.raf = requestAnimationFrame(tick);
       else if (!this.picked) this.el.querySelectorAll<HTMLButtonElement>('.rtChoice').forEach(b => { b.disabled = false; }); // paused: ask
@@ -138,7 +138,7 @@ export class RulesTrainer {
     const head = c.answer.who === 'neither' ? 'Neither broke a rule.' : `${c.answer.who}${c.answer.rule ? `: rule ${c.answer.rule}` : ''}.`;
     a.innerHTML = `<b>${esc(head)}</b> ${esc(c.answer.line)}<div class="rtRules">${c.rules.map(r => `<span class="rtRule${c.answer.rule && c.answer.rule.startsWith(r) ? ' key' : ''}">${esc(r)}</span>`).join('')}</div>`;
     a.className = 'rtAnswer ' + (ok ? 'ok' : 'no'); a.hidden = false;
-    if (this.t < this.endT) this.play(this.endT, this.t); // (then the rest of it: what happened)
+    if (this.t < this.endT) this.play(this.endT, this.t, 4); // (then the rest of it, quicker: what happened, up to 16 s on to the contact)
   }
 
   /** Clicks inside the trainer. */
