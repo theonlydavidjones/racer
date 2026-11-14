@@ -317,7 +317,11 @@ What's planned, roughly in order. Done work is described in the README.
    (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare
    frame time and the worker's step against v178 (perf-pair.mjs, and the frame-time readout), and look first at what
    the latest batches added to every frame or step (the protests batch, the basin grids warmed between frames, the app
-   split, new per-frame water or crew work). Add a frame-time check to the release smoke test so a stuttering build
+   split, new per-frame water or crew work). The prime suspect is v187's boat detail (#291). The owner loves the new
+   model ("really don't want to have to roll it back"): fix its render cost rather than roll it back. Merge its small
+   meshes per material, use level of detail by distance, hide the interior and small fittings when unseen, share
+   geometry and materials across the fleet, and limit shadow-casting. Any rollback is the owner's call first. Add a
+   frame-time check to the release smoke test so a stuttering build
    can't ship.
 8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
