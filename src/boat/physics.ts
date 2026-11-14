@@ -130,11 +130,16 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
 }
 
 /** Penalty turns count only in one direction, so each full turn includes a tack and a gybe (Rule 44.2). The direction
- * is settled once she has turned 30° one way; nothing counts while she sails clear first. */
+ * is settled once she has turned 30° one way; nothing counts while she sails clear first. The 30° is the sim's sign that
+ * her turns have begun, so rule 21.2 binds her (rightOfWay.ts takingPenalty): "the moment it is obvious to other boats
+ * that you are clearly beginning to make a penalty turn" (Perry, Understanding the Racing Rules of Sailing 2025–2028,
+ * rule 21). A course change she then comes back from (a duck while getting clear) wasn't the turns: back within 10° of
+ * where she began, it's undone. */
 function countPenalty(b: Boat, dh: number, emit: Emit): void {
   if (!(b.penalty > 0)) return;
   if (!b.ai?.clearing) b.penaltyTurned += dh;
   if (!b.penaltyDir && Math.abs(b.penaltyTurned) > 30) b.penaltyDir = Math.sign(b.penaltyTurned);
+  else if (b.penaltyDir && b.penaltyTurned * b.penaltyDir < 10) { b.penaltyDir = 0; b.penaltyTurned = 0; b.penalty = b.penaltyTotal; }
   if (b.penaltyDir) b.penalty = Math.max(0, b.penaltyTotal - Math.max(0, b.penaltyTurned * b.penaltyDir));
   if (b.penalty <= 0) { b.penalty = 0; if (b.isUser) emit({ type: 'toast', msg: 'Penalty turns done. Back to racing.' }); }
 }

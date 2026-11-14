@@ -405,7 +405,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   // Rule 15: right of way just changed hands because of a tack or an overlap from astern.
   // (Not when the change comes from the other boat's own action: a tack into the zone.)
   if (rec.kc != null && r.kc.id !== rec.kc && r.rule !== '18.3') {
-    const newRow = r.kc === A ? B : A, tacked = ctx.t - newRow.lastTackT < JUST_TACKED;
+    // (right of way passing because the other boat began returning or her penalty turns, rule 21: by that boat's action,
+    // so no rule 15 duty for the new right-of-way boat, even if she had just tacked)
+    const newRow = r.kc === A ? B : A, tacked = ctx.t - newRow.lastTackT < JUST_TACKED && r.rule !== '21.1' && r.rule !== '21.2';
     // (or by her own doing, coming out from under rule 21: her hull back below the line, or her penalty turns done; if the
     // other boat began returning or taking a penalty, she got right of way by the other boat's actions, so no grace)
     const out21 = (rec.rule === '21.1' || rec.rule === '21.2') && rec.kc === newRow.id;
@@ -509,7 +511,10 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
-  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || takingPenalty(kc) || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0))) {
+  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0)
+    || (takingPenalty(kc) && (ctx.t > 0 ? !!row.aboveProper : true) && turnedToward(row, kc) > 0))) {
+    // (a boat taking a penalty: only one that turned toward her interfered. A boat that had luffed to keep clear of her
+    // before her turns began, and holds that course as she begins them, didn't: 44.2 had her get well clear first)
     // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper
     // course. "However, after the starting signal this rule does not apply when the boat is sailing her proper course": so
     // after the start only leaving it counts (the sim's sign: sailing above it), not merely turning toward the other boat,
