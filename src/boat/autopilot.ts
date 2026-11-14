@@ -150,6 +150,8 @@ const ROOM = 25;
  * she must go in with that and some to come out sailing; and at least TACK_V_FRAC of her close-hauled speed. Short of
  * it, she foots off to build speed first, unless the land dead ahead is closer than FOOT_ROOM. */
 const TACK_V = 1.6, TACK_V_FRAC = 0.6, FOOT_ROOM = 15, FOOT = 10;
+/** Pinned: under PINNED_V m/s with land within PINNED_M m of her centre (her half-length and a little), any way round. */
+const PINNED_V = 0.5, PINNED_M = 6;
 /** Never plan more often than this (s), whatever's asking: a plan that finds no way, or one she's just left, waits. */
 const MIN_REPLAN = 5;
 /** On to the next turn early only with this much clear water either side of the way to it (m): the route's 10 m berth
@@ -244,6 +246,10 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
     if (!through) return Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts;
     // (once begun, she goes through with it: the new tack's close-hauled course till she's round, as for any tack)
     if (canTack) { p.lastTackT = t; p.goTack = other; return close(other); }
+    // (short of the way, with land close ahead on this tack, or stopped against the land, aground or on a pier, where
+    // holding a course builds no way at all: turn for the course now, as she's worked off)
+    const pinned = b.v < PINNED_V && [0, 45, 90, 135, 180, 225, 270, 315].some(a => { const n = V(a); return landAlong(b, { x: b.x + n.x * PINNED_M, y: b.y + n.y * PINNED_M }) < Infinity; });
+    if (pinned || landDist(b, cur, FOOT_ROOM, 0) < FOOT_ROOM) return n360(cts + Math.sign(r) * lw);
     return cur;
   }
   // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
