@@ -3,8 +3,8 @@
 // being pushed back with no sail." The crew's shove carries her well out into the fairway, with way enough to steer her
 // stern first, and the tiller turns her the right way going astern.
 import { describe, expect, it } from 'vitest';
-import { ASTERN_ENOUGH, ASTERN_RUN, HARBORS, NO_WAY_OUT, SLIPS, berthClear, slipById, slipsIn } from '../src/geo/marina';
-import { asternCoast } from '../src/boat/physics';
+import { ASTERN_ENOUGH, ASTERN_RUN, HARBORS, NO_ASTERN_WEST, NO_WAY_OUT, SLIPS, berthClear, slipById, slipsIn } from '../src/geo/marina';
+import { asternCoast, asternGlide } from '../src/boat/physics';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
 import { ASTERN_SHOVE, ASTERN_STEERAGE, DT, World } from '../src/sim/world';
@@ -25,13 +25,13 @@ describe('pushed off astern', () => {
     expect(asternCoast(ASTERN_SHOVE)).toBeGreaterThan(ASTERN_RUN - 3); expect(asternCoast(ASTERN_SHOVE)).toBeLessThanOrEqual(ASTERN_RUN);
   });
 
-  for (const kt of [12, 4, 0]) it(`in a ${kt} kt westerly, at every harbor, steered stern first as the plan says: well out of her slip, steerable for 10 s and more, touching nothing`, () => {
+  for (const kt of [12, 4, 0]) it(`in a ${kt} kt westerly (270°), at every harbor, steered stern first as the plan says: well out of her slip, steerable for 10 s and more, touching nothing`, () => {
     const bad: string[] = []; let n = 0;
     for (const H of HARBORS) {
       const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
-      const k = Math.min(20, all.length); // (each berth once: no repeats in a small harbor)
-      for (let i = 0; i < k; i++) {
-        const s = all[Math.floor(i * all.length / k)];
+      const k = Math.min(20, all.length); // (each berth once: no repeats in a small harbor; and the five kept with no shove astern in a westerly, every run)
+      const pick = [...new Set([...Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]), ...all.filter(s => NO_ASTERN_WEST.includes(s.id))])];
+      for (const s of pick) {
         const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
         const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: Math.max(kt, 0.01), windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
         const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
@@ -77,6 +77,42 @@ describe('pushed off astern', () => {
     expect(bad).toEqual([]);
   }, 600_000);
 
+
+  // (the berths she can't be shoved off astern from in a westerly, kept: the owner, 14 Nov 2026)
+  const sail = (id: string, from: number, kt: number) => {
+    const s = slipById(id)!, boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
+    const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, windDir: from, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
+    return new World(COURSES[0], S, 1, { freeSail: true });
+  };
+  it('the five berths kept with no shove off astern in a westerly: each a berth, a save naming it loads it; in a 12 kt westerly her crew keeps her fast, and says so', () => {
+    for (const id of NO_ASTERN_WEST) {
+      expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
+      const w = sail(id, 270, 12), u = w.user; for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
+      expect(u.docked?.slip, `${id}: a save naming it puts her there`).toBe(id);
+      const went = w.pushOff(), msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
+      if (!went) { expect(u.docked, id).toBeTruthy(); expect(msgs.some(m => /in a westerly/.test(m)), id).toBe(true); }
+      else expect(u.handled?.plan.kind, `${id}: pushed off in a westerly, so not astern`).not.toBe('astern');
+    }
+  });
+  // (the planner's and the shove's glide, from physics.ts asternGlide, against what she sails: a breeze along her line)
+  for (const [from, name] of [[0, 'northerly'], [90, 'easterly']] as const) it(`in a 20 kt ${name}, the glide she's shoved for is the glide she sails: within 15% over 30 s, stern first, the helm amidships`, () => {
+    const bad: string[] = []; let n = 0;
+    for (const H of HARBORS) {
+      const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
+      const k = Math.min(6, all.length);
+      for (let i = 0; i < k; i++) {
+        const s = all[Math.floor(i * all.length / k)], w = sail(s.id, from, 20), u = w.user;
+        w.pushOff(); const plan = u.handled?.plan; if (plan?.kind !== 'astern') continue;
+        for (let j = 0; j < 60 * 60 && u.handled; j++) w.step(DT);
+        const v0 = u.astern ?? 0, h = u.h, ww = (w as unknown as { windHere: (a: unknown, b: unknown, c: boolean) => { from: number; kt: number } }).windHere(u, u, false);
+        const want = asternGlide(v0, h, ww.from, ww.kt, 30).dist; let went = 0, blocked = false;
+        for (let t = 0; t < 30; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.abs((u.x - x) * hu.x + (u.y - y) * hu.y); if (!berthClear(u, u.h, s)) { blocked = true; break; } }
+        if (blocked) continue; // (stopped by a dock or a boat: no glide to compare)
+        n++; if (Math.abs(went - want) > 0.15 * want) bad.push(`${s.id}: sailed ${went.toFixed(1)} m against ${want.toFixed(1)}`);
+      }
+    }
+    expect(n).toBeGreaterThanOrEqual(3); expect(bad).toEqual([]);
+  }, 600_000);
   // (headings in a westerly: the wind abeam, and her bow within a beat of it, where a held tiller once counted as sculling: the physics review)
   for (const h0 of [0, 270, 300, 230]) for (const til of [1, -1]) it(`the tiller going astern at 0.5 m/s with no sail up, heading ${h0} in a westerly, pushed to ${til > 0 ? 'starboard' : 'port'}: her bow goes that way (the rudder works backwards), by 10 deg and more in 10 s`, () => {
     const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 8, windDir: 270, mode: 'sail', tideDate: '2026-11-14', current: 'slack' } as Settings;
