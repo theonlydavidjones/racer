@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bottomDepth, waterOver } from '../src/environment/bottom';
+import { SHOAL_MARGIN, bottomDepth, shoal, waterOver } from '../src/environment/bottom';
 import { depthBand, sfTide } from '../src/environment/tide';
 import { LL } from '../src/geo/geo';
 import { onLand } from '../src/geo/shore';
@@ -44,5 +44,17 @@ describe('the Bay\'s shoal bottom, from the chart', () => {
       const d = Math.abs(a - b); if (d > worst) { worst = d; where = `${la}, ${lo}`; }
     }
     expect(worst, where).toBeLessThan(0.08);
+  });
+});
+
+describe('shoal: too shallow for her, for the planner', () => {
+  it('Richardson Bay\'s flat at the day\'s low water and not at its high; the race water never', () => {
+    const p = LL(37.880, -122.505), day = Date.UTC(2026, 10, 14, 8);
+    let lo = Infinity, hi = -Infinity, tLo = 0, tHi = 0;
+    for (let m = 0; m < 1440; m += 5) { const t = day + m * 60e3, h = sfTide(t); if (h < lo) { lo = h; tLo = t; } if (h > hi) { hi = h; tHi = t; } }
+    expect(shoal(p, tLo, 1.141)).toBe(true); expect(shoal(p, tHi, 1.141)).toBe(false);
+    expect(shoal(LL(37.812, -122.44), tLo, 1.141)).toBe(false);
+    // (just deep enough for her keel, but not for her keel and the margin: shoal)
+    const w = waterOver(p, tHi)!; expect(shoal(p, tHi, w - SHOAL_MARGIN / 2)).toBe(true);
   });
 });

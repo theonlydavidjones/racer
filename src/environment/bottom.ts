@@ -70,3 +70,13 @@ export function waterOver(p: Vec, ms: number): number | null {
   const z = bottomDepth(p);
   return z === null ? null : Math.max(0, z + tideHeightAt(p, ms));
 }
+/** The water a boat's planner keeps under her keel (m): the chart's bands smoothed into 50 m cells, and the waves' troughs. */
+export const SHOAL_MARGIN = 0.3;
+/**
+ * Too shallow for her at p at a time (ms UTC): less water than `draft` (m: her keel upright, boat/ground.ts GROUND.draft)
+ * and SHOAL_MARGIN. For the AI's routes, as onLand is for the shore. False in deep water (and off the chart).
+ */
+export function shoal(p: Vec, ms: number, draft: number): boolean {
+  const w = waterOver(p, ms);
+  return w !== null && w < draft + SHOAL_MARGIN;
+}
