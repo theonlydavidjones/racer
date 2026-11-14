@@ -833,9 +833,11 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // the beam, amidships and at the quarters, half her beam (1.1 m) out on the side she's going; she stops going into it,
   // as against a fender, and keeps her way along it
   // (her sideways motion over the ground: her slip through the water and the current's set across her)
-  const side = b.vx * stb.x + b.vy * stb.y;
-  if (!b.pushing && Math.abs(side) > 0.005) {
-    const sgn = Math.sign(side), hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
+  // (her side checked in full while she's going more sideways than ahead; going ahead, only once her side amidships is
+  // on something, sliding along a face, so the check costs one look a step: the perf budget)
+  const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y, sgn = Math.sign(side);
+  if (!b.pushing && Math.abs(side) > 0.005 && (Math.abs(side) > 0.5 * Math.abs(ahead) || onLand({ x: b.x + stb.x * sgn * 1.1, y: b.y + stb.y * sgn * 1.1 }))) {
+    const hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
     if (hit) {
       const pier = pierNear(hit, 6), piles = underPier(hit);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
