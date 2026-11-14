@@ -2,9 +2,9 @@
 // node redo.cjs <out> [tack|round] [yaw pitch dist]
 const { chromium } = require('playwright');
 const [out, which = 'tack,round', yaw = '0.5', pitch = '0.32', dist = '38'] = process.argv.slice(2);
-const steps = (page, s) => page.evaluate(async s => { const w = window.sim(); const aim = () => { const P = window.__path; if (!P) return; const u = w.user; if (window.__pk == null || window.__pkP !== P) { window.__pk = 0; window.__pkP = P; } let k = window.__pk, bd = Infinity; for (let i = window.__pk; i < Math.min(P.length, window.__pk + 6); i++) { const d = Math.hypot(P[i].x - u.x, P[i].y - u.y); if (d < bd) { bd = d; k = i; } } window.__pk = k; let j = k; while (j < P.length - 1 && Math.hypot(P[j].x - u.x, P[j].y - u.y) < 14) j++; const q = P[j]; window.__helm = (Math.atan2(q.x - u.x, q.y - u.y) * 180 / Math.PI + 360) % 360; };
+const steps = (page, s) => page.evaluate(async s => { const w = window.sim(); const aim = () => { const P = window.__path; if (!P) return; const u = w.user; if (window.__pk == null || window.__pkP !== P) { window.__pk = 0; window.__pkP = P; } let k = window.__pk, bd = Infinity; for (let i = window.__pk; i < Math.min(P.length, window.__pk + 6); i++) { const d = Math.hypot(P[i].x - u.x, P[i].y - u.y); if (d < bd) { bd = d; k = i; } } window.__pk = k; let j = Math.min(P.length - 1, k + 1); while (j < P.length - 1 && Math.hypot(P[j].x - u.x, P[j].y - u.y) < 14) j++; const q = P[j]; window.__helm = (Math.atan2(q.x - u.x, q.y - u.y) * 180 / Math.PI + 360) % 360; };
   const helm = () => { if (window.__helm == null) return; const u = w.user, e = ((window.__helm - u.h + 540) % 360) - 180; u.tiller = Math.max(-0.8, Math.min(0.8, -e * 0.04)); };
-  for (let c = 0; c < s; c++) { for (let i = 0; i < 60; i++) { if (i % 10 === 0) aim(); helm(); w.step(1 / 60); } window.__trk?.push({ x: w.user.x, y: w.user.y }); await new Promise(r => setTimeout(r, 0)); } }, s);
+  for (let c = 0; c < s; c++) { for (let i = 0; i < 60; i++) { if (i % 10 === 0) aim(); helm(); w.step(1 / 60); } window.__trk?.push({ x: w.user.x, y: w.user.y, h: Math.round(w.user.h) }); await new Promise(r => setTimeout(r, 0)); } }, s);
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   for (const kind of which.split(',')) {
@@ -59,7 +59,7 @@ const steps = (page, s) => page.evaluate(async s => { const w = window.sim(); co
       const G = await page.evaluate(() => {
         const w = window.sim(), u = w.user, D = window.__dg, from = u.ww.from, kt = u.ww.kt ?? 12, beat = D.beat(kt);
         const M = w.rounding.marks[0].p, L2 = w.rounding.marks[1].p, d = h => ({ x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) });
-        const hS = (from - beat + 360) % 360, hE = (Math.atan2(L2.x - M.x, L2.y - M.y) * 180 / Math.PI + 360) % 360, LOA = 7.64;
+        const hS = (from - beat + 360) % 360, hE = (from - 150 + 360) % 360, LOA = 7.64; void L2; // (a broad reach off the mark, 150° off the wind: a dead run gybes her by accident)
         const a = d(hS), ra = d(hS + 90), e = d(hE), re = d(hE + 90);
         // wide in: her approach on the starboard layline 2½ lengths outside the mark; close out: the exit a length off it
         const P0 = { x: M.x + ra.x * 2.5 * LOA - a.x * 3 * LOA, y: M.y + ra.y * 2.5 * LOA - a.y * 3 * LOA };
@@ -86,9 +86,9 @@ const steps = (page, s) => page.evaluate(async s => { const w = window.sim(); co
       await D({ ...base, cue: { word: 'Bear away', tone: 'go', sub: 'ease the main' } }); await shot('3-bear-away');
             await steps(page, 14); await look(2.4, 0.75, 60);
       await D({ ...base, wake: await page.evaluate(() => window.__trk), cue: { word: 'Close out', sub: 'mark right by you' } }); await shot('4-close-out');
-      await steps(page, 25);
+      await steps(page, 45);
       const s = await page.evaluate(() => { const l = window.sim().rounding?.list ?? []; const s = l[l.length - 1]; return s ? { lost: Math.max(0, Math.round(s.lostM)), good: Math.round(s.goodM), scored: s.scored } : null; });
-      await D({ ...base, wake: await page.evaluate(() => window.__trk), cue: { word: s?.scored ? `${s.lost} m lost` : 'Rounding 2', sub: `a good crew ${s?.good ?? 6} m`, tone: 'done' } }); await shot('5-score');
+      await D({ ...base, wake: await page.evaluate(() => window.__trk), cue: { word: s?.scored ? `${s.lost} m lost` : 'Rounding 2', sub: s?.scored ? `a good crew ${s.good} m` : `scored 100 m past the mark`, tone: 'done' } }); await shot('5-score');
     }
     console.log(kind, 'ERR', errs.join('|') || 'none'); await ctx.close();
   }
