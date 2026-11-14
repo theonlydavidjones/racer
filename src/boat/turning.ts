@@ -10,7 +10,7 @@
 import orc from './data/nordic-folkboat-orc.json';
 import { D2R, clamp } from '../core/math';
 import { FULL_RUDDER, RUDDER } from './balance';
-import { HANDLING, HULL } from './dynamics';
+import { HULL } from './dynamics';
 import { HOVE } from './physics';
 
 const RHO = 1025;
@@ -134,12 +134,53 @@ export function steadyTurnRate(u: number): number {
 
 /** The steady turn her rudder can hold at speed `v` (m/s), deg/s: nothing without way on. */
 export const flowTurnRate = (v: number): number => steadyTurnRate(Math.max(0, v)) / D2R;
-/** The fastest she can be turned at speed `v`, deg/s: by her rudder, or sculled when that's faster (HANDLING.minTurnRate). */
-export const maxTurnRate = (v: number): number => Math.max(HANDLING.minTurnRate, flowTurnRate(v));
+/** The fastest she can be turned at speed `v`, deg/s: by her rudder, or sculled when that's faster (scullTurnRate). */
+export const maxTurnRate = (v: number): number => Math.max(scullTurnRate(), flowTurnRate(v));
 
 /** The blade's drag sailing straight with the little weather helm the polar's speeds have in them (N), at speed u (m/s). */
 let cdIdeal = 0;
 export function rudderDragIdeal(u: number, idealDeg: number): number {
   if (!cdIdeal) cdIdeal = rudderCoef(idealDeg * D2R).cd;
   return 0.5 * RHO * u * u * RUDDER.area * cdIdeal;
+}
+
+/**
+ * Sculling: working the tiller to turn her with no way on. The blade swung about its hinge through still water is a
+ * plate moving broadside-on: its force is square to it, against its motion, F = ρ·Cd·b·ω²·c³/6 for a plate of span b and
+ * chord c turning about its leading edge at ω (Cd 1.2, Hoerner's flat plate, as the stalled blade's: each strip's speed
+ * is ω times its distance from the hinge). It goes as the square of the swing's rate, so a symmetric wag nets nothing,
+ * and a fast stroke one way with a slow return leaves a net push at her stern: that is the sculling stroke.
+ * (The blade's added mass gives a larger force through the stroke, but it nets to nothing over it. Thrust: this term
+ * nets none fore and aft either; the pitching-foil thrust scalings, Floryan et al. 2017, JFM, are fitted far from a
+ * standstill and give more than anyone's sculled speed implies, so no propulsion is taken from it.
+ * reference/research/sculling.md.)
+ *
+ * The stroke a helmsman sculls with (`SCULL`) is an estimate: no measured stroke for a keelboat was found. 60° of blade
+ * once a second, the fast stroke a third of it; and a hand can't swing the blade faster than `maxSwing` (that stroke's
+ * fast half: about 150 N at the tiller by the blade's hinge moment, heavy work).
+ */
+export const SCULL = { swing: 60 * D2R, period: 1, fast: 1 / 3, maxSwing: 180 * D2R };
+const bladeSpan = () => Math.sqrt(RUDDER.aspect * RUDDER.area), bladeChord = () => RUDDER.area / bladeSpan();
+/** The swung blade's force at her stern (N, with the sign of the swing: a swing that would turn her toward the wind
+ * pushes her stern to leeward, as that helm's lift does with way on). `omega` rad/s, `delta` the blade's angle. */
+export const bladeSwingForce = (omega: number, delta: number): number => RHO * 1.2 * bladeSpan() * bladeChord() ** 3 / 6 * omega * Math.abs(omega) * Math.cos(delta);
+/** The standard stroke's mean turning moment about her keel (N·m): the fast stroke's push less the slow return's, over
+ * the cycle (the blade within ±swing/2 of amidships: the mean of the cosine). About 65 N·m. */
+let scullM = 0;
+export function scullMoment(): number {
+  if (!scullM) {
+    const w = SCULL.swing / SCULL.period, half = SCULL.swing / 2;
+    scullM = bladeSwingForce(w, 0) * (1 / SCULL.fast - 1 / (1 - SCULL.fast)) * (Math.sin(half) / half) * RUDDER.arm;
+  }
+  return scullM;
+}
+/** The steady turn that stroke holds with no way on, against her hull and keel broadside to the water (deg/s): about 4. */
+let scullR = 0;
+export function scullTurnRate(): number {
+  if (!scullR) {
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (scullMoment() + hullSide(0, 0, mid).m > 0) lo = mid; else hi = mid; }
+    scullR = (lo + hi) / 2 / D2R;
+  }
+  return scullR;
 }

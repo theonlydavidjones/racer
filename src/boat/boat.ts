@@ -119,6 +119,8 @@ export interface Boat {
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
   /** Sculling (rule 42.3(d)): the way she's being sculled round (+ to starboard), held until she's close-hauled (SCULL 2). */
   scullDir?: number;
+  /** The net turning push of the tiller worked by hand over about a stroke, N·m, + to starboard (physics.ts: sculling). */
+  scullNet?: number;
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;

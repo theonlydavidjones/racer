@@ -33,8 +33,6 @@ export const HANDLING = {
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
    * edge-on to the wind: ~0.12 × 25.8 m² of main and jib. */
   flogCdA: 3,
-  /** Turn rate when nearly stopped, by sculling (physics.ts: only toward close-hauled from above it, rule 42.3(d)), deg/s. An estimate. */
-  minTurnRate: 4,
   /** Drive while luffing (sails eased until they lift), as a fraction of normal target speed. */
   luffFactor: 0.12,
   /** How much the sails flog while luffing (fully eased: they flog, and the boat coasts to a stop). */
@@ -212,6 +210,22 @@ export function windTurn(awa: number, crew = 3, bare = 0): number {
   const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s + WINDAGE.wire;
   const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
   return s * (WINDAGE.hullSide / hullDen(c, s) * (WIND_LEVER.hull + WIND_LEVER.shift * (Math.PI / 2 - a)) + mast * WIND_LEVER.mast + people * WIND_LEVER.crew);
+}
+
+/**
+ * How high her windage acts: the heeling moment of windSide's force, as a moment area (m³; times ½ρV² it's N·m, heeling
+ * her to leeward), about the hull's centre of lateral pressure 0.43 × draft below the waterline (ORC VPP Documentation
+ * 2025, eq. 4.29: 0.52 m, as balance.ts CE_HEIGHT takes it). ORC has the windage in the heeling moment (VPP 2023,
+ * eq. 5.56): the hull's at 0.66 × its freeboard (§5.3: 0.44 m above the waterline), the mast's at its middle (10 m of
+ * it from the deck, about 0.8 m up: 5.8 m), the wire's about 4 m up (the stays' middles: an estimate), the crew's about
+ * 0.9 m (sitting in the cockpit: an estimate). Beam-on under bare poles in 25 kt it heels her 3–4°.
+ */
+const WIND_HEIGHT = { hull: 0.44 + 0.52, mast: 5.8 + 0.52, wire: 4.0 + 0.52, crew: 0.9 + 0.52 };
+export function windHeel(awa: number, crew = 3, bare = 0): number {
+  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a), ac = Math.abs(c);
+  const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s;
+  const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
+  return s * (WINDAGE.hullSide / hullDen(c, s) * WIND_HEIGHT.hull + mast * WIND_HEIGHT.mast + WINDAGE.wire * WIND_HEIGHT.wire + people * WIND_HEIGHT.crew);
 }
 
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */
