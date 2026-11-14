@@ -92,7 +92,9 @@ describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', (
     sail(b, secs, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: kt + 1.5 * Math.sin(t * 2 * Math.PI / 30) };
       b.crew!.people.slice(1).forEach((a, j) => { const g = a.goal?.z ?? a.z; if (!a.job && !atWinch(g) && !seats[j].includes(+g.toFixed(2))) seats[j].push(+g.toFixed(2));
         // (settled at their place, not on the way: the walk round the winch and up beside the cabin are a trip's)
-        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02) inside++; }); });
+        // (not at the piano, Z.piano, kneeling on the cockpit sole's forward end to work its lines, or sat there a moment
+        // before the walk back: that's the job's place, not a seat inside the cabin)
+        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02 && !a.job && Math.abs(a.z - Z.piano) > 0.02) inside++; }); });
     return { b, seats, inside };
   };
   for (const kt of [5, 9]) it(`placed forward in ${kt} kt: the front hand on the cabin top's edge, never inside the cabin, and they stay put`, () => {

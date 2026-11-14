@@ -18,7 +18,7 @@ import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -1127,15 +1127,17 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
   // (the crew's lines and the traveller, in that order (CREW_LINES, then 'traveller'), written out by name: the same values put in the same order, but each line's
   // reads its own, where a loop over the names made every read look up a different one: about 1% of the step)
-  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, pick = (w: number | undefined) => (w ?? 1) >= minGain || !ready;
-    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang) ? t.vang : c.vang;
-    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul) ? t.outhaul : c.outhaul;
-    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham) ? t.cunningham : c.cunningham;
-    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul) ? t.downhaul : c.downhaul;
-    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) ? t.backstay : c.backstay;
-    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham) ? t.jibCunningham : c.jibCunningham;
-    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard) ? t.jibHalyard : c.jibHalyard;
-    if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller) ? t.traveller : c.traveller; }
+  // (and the small ones together when they add up to a trip's worth: controls.ts worthTogether)
+  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, also = W && ready ? worthTogether(W, minGain) : null;
+    const pick = (w: number | undefined, k: string) => (w ?? 1) >= minGain || !ready || !!also?.has(k);
+    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang, 'vang') ? t.vang : c.vang;
+    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
+    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham, 'cunningham') ? t.cunningham : c.cunningham;
+    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul, 'downhaul') ? t.downhaul : c.downhaul;
+    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay, 'backstay') ? t.backstay : c.backstay;
+    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
+    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
+    if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller, 'traveller') ? t.traveller : c.traveller; }
   if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
