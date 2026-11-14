@@ -1,5 +1,5 @@
 import type { PrepFlag } from '../sim/signals';
-import { bow, stern, type Boat } from '../boat/boat';
+import { bow, stern, type Boat, type Tack } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
@@ -154,10 +154,15 @@ export function sailable(b: Boat, desired: number): number {
   return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
 }
 
-/** Lying to beam-on with her sails let fly she still forereaches and drifts: 0.4–1.2 m/s in the abandon-home traces (the
- * sim's own boat, 20–26 kt), as a real boat hove to or lying a-hull drifts at 1–2 kt (Cunliffe, "Heaving To"), where
- * sheeted in she sails at 2.5–3.5 m/s. Faster than this, m/s, she's sailing with way on, not lying to: between the two,
- * with room for a lying boat's surge in a gust or a sea. */
+/** Lying to beam-on with her sails let fly she still forereaches and drifts: in the sim's own abandon-home runs (20–26 kt)
+ * a median of 0.01 m/s, 0.26 at the 90th percentile and 1.3 at the 99th, the gusts and the seas. A real boat hove to
+ * drifts far less than she'd sail: a heavy pilot cutter in Force 8 "little more than 12 miles per day", about 0.26 m/s
+ * (Tom Cunliffe, "Heaving To"), lighter modern boats more, 1–2 kt (0.5–1 m/s; Seabreeze, "Heaving To: Park the Boat in a
+ * Blow"; Kraken Yachts, "Heaving-To & Fore-Reaching"). (Hers is closer to lying a-hull than hove to proper, jib backed
+ * and helm lashed, but the drift is of the same order.) Sheeted in she sails at 2.5–3.5 m/s. Faster than this, m/s,
+ * she's sailing with way on, not lying to: between the two, with room for a lying boat's surge in a gust or a sea.
+ * (Not aiThink's 0.5 m/s for a boat to be sailed round as stopped: that's a boat that can't answer at all; this is
+ * whether she's lying to, which a boat surging along at a metre a second still is.) */
 const LYING_DRIFT = 1.5;
 /**
  * Racing called off for the day (N over A, or AP over A: "no more racing today", RRS Race Signals), as it is in a breeze
@@ -167,7 +172,8 @@ const LYING_DRIFT = 1.5;
  * her own (the fleet spread along the wind, not all on one point), with open water a long way to leeward for the drift
  * while she lies there, on the tack she came in on; drifted well off it, or with the land coming up to leeward, she
  * sails back. The rest is her ordinary sailing (aiThink): the shore, the marks, and the right-of-way rules, which still
- * apply between boats that have been racing (Part 2 preamble), though a boat not racing takes no penalty for breaking one.
+ * apply between boats that have been racing (Part 2 preamble), though a boat not racing takes no penalty for breaking one
+ * (except rule 14 where it brings injury or serious damage, and rule 24.1).
  */
 function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beating: boolean } {
   const ai = b.ai!, from = b.ww.from, beat = beatFor(b);
@@ -188,9 +194,15 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
     // (lying to beam-on she still forereaches, up to a metre a second in a breeze: on the tack that carries her away
     // from the fleet's spot, out along her own side of the line across the wind, not across her neighbours' lanes. The
     // boat on the fleet's spot itself lies to on the tack she came in on)
+    // (only with way enough to tack and clear water round her: slower than that a tack's a gybe right round (physics.ts
+    // SLOW_TACK), and close to a neighbour either one is a turn across her, under rule 13 or 15. Then she lies to on the
+    // tack she came in on, as a boat would)
     h.lying = true; h.tack = b.tack;
     const base = w.cancelled?.places?.[0], u = V(from - 90);
-    if (base && dist(base, h.at) > 20) h.tack = u.x * (h.at.x - base.x) + u.y * (h.at.y - base.y) > 0 ? 'S' : 'P';
+    if (base && dist(base, h.at) > 20) {
+      const away: Tack = u.x * (h.at.x - base.x) + u.y * (h.at.y - base.y) > 0 ? 'S' : 'P';
+      if (away !== b.tack && b.v > SLOW_TACK * 1.15 && !w.boats.some(o => o !== b && dist(o, b) < 30)) h.tack = away;
+    }
   }
   if (h.lying) {
     // (another boat lying to, or stopped, within a couple of lengths: they'd drift down together side by side, stopped,
