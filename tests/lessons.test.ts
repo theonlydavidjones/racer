@@ -66,7 +66,7 @@ describe('Learn to sail: the lessons\' checks', () => {
     run({ x: 10, v: 0.1 }, 4); expect(L.step).toBe(1);
     run({ v: 3 * KT }, 4); expect(L.step).toBe(2);
     run({ twa: 10, v: 0.1 }, 4); expect(L.step).toBe(3);
-    run({ twa: 10, v: 0.1 }, LESSON_MARKS.outS + 5); expect(L.step).toBe(2); expect(L.cue).toMatch(/^Again/);
+    run({ twa: 10, v: 0.1 }, LESSON_MARKS.outS + 2); expect(L.step).toBe(2); expect(L.cue).toMatch(/^Again/);
     run({ twa: 10, v: 0.1 }, 4); expect(L.step).toBe(3);
     run({ twa: 70, v: 3 * KT }, 4); expect(L.passed).toBe(true);
   });
@@ -74,9 +74,9 @@ describe('Learn to sail: the lessons\' checks', () => {
   it('heave to: hove to (the physics\' own state) and nearly stopped, for a minute', () => {
     const L = new LessonTracker('heaveto', null);
     let t = 0;
-    for (let k = 0; k < 30; k++) L.update(boat({ hove: true, v: 2 * KT }), t++, 1);
-    expect(L.step).toBe(0); // (forereaching at 2 kt: not hove to)
-    for (let k = 0; k < LESSON_MARKS.hoveS; k++) L.update(boat({ hove: true, v: 0.4 * KT }), t++, 1);
+    for (let k = 0; k < 30; k++) L.update(boat({ hove: true, v: 2.6 * KT }), t++, 1);
+    expect(L.step).toBe(0); // (forereaching at 2.6 kt: sailing, not hove to)
+    for (let k = 0; k < LESSON_MARKS.hoveS; k++) L.update(boat({ hove: true, v: 1.3 * KT }), t++, 1); // (a Folkboat's own forereach)
     expect(L.passed).toBe(true);
   });
 
@@ -103,5 +103,22 @@ describe('Learn to sail: the lessons\' checks', () => {
     expect(new World(COURSES[0], S({ windKt: 25 }), 3, { freeSail: true }).wind.kt).toBeLessThanOrEqual(15.01);
     expect(new World(COURSES[0], S({ windKt: 3 }), 3, { freeSail: true }).wind.kt).toBeGreaterThanOrEqual(4.99);
     expect(new World(COURSES[0], S({ windKt: 25, mode: 'sail' }), 3, { freeSail: true }).wind.kt).toBeGreaterThan(20);
+  });
+
+  it('a broad reach counts with the jib eased as far as it goes (it reads stalled there); sternway isn\'t stopped', () => {
+    const L = new LessonTracker('points', null);
+    let t = 0;
+    for (const twa of [42, 60, 90]) for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa }), t++, 1);
+    for (let k = 0; k < LESSON_MARKS.pointS; k++) L.update(boat({ twa: 125, jib: 'stalled', eff: 0.9 }), t++, 1);
+    expect(L.step).toBe(4);
+    const I = new LessonTracker('irons', { x: 0, y: 0 });
+    for (let k = 0; k < 10; k++) I.update({ ...boat({ v: 0 }), astern: 1.2 } as Boat, k, 1);
+    expect(I.step).toBe(0); // (going astern at 2.3 kt by the buoy: not stopped)
+  });
+
+  it('the lesson\'s wind is the one she sails in: the Cityfront\'s own, held near 15 kt with the mean at the top', () => {
+    const w = new World(COURSES[0], S({ windKt: 25 }), 3, { freeSail: true }); let sum = 0, n = 0;
+    for (let i = 0; i < 120 * 60; i++) { w.step(DT); if (i % 30 === 0) { sum += w.user.ww.kt; n++; } }
+    expect(sum / n).toBeLessThan(16.5);
   });
 });

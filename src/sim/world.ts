@@ -403,6 +403,7 @@ export class World {
     this.avgFrom = this.windModel.base;
     for (let i = 0; i <= (this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     this.startTimes = this.boats.map(() => null);
+    if (settings.mode === 'lesson') { this.lessonField = this.fieldAt(this.boats[0]).k; this.windModel.kt = this.lessonKt(this.windModel.kt); }
     // a lesson: its buoy (the tiller's, steered for; stop, go and irons', stopped by) 250 m off, 20° to leeward of her
     // heading (TWA about 110°, just abaft the beam), where there's water
     this.lesson = settings.mode === 'lesson' ? new LessonTracker(settings.lesson ?? 'tiller', (() => {
@@ -819,7 +820,10 @@ export class World {
   private seaNodes?: { d: number; u: number }[];
 
   /** A lesson's mean wind held to the standard's range (sim/lessons.ts LESSON_WIND); any other sail's as it is. */
-  private lessonKt(kt: number): number { return this.settings.mode === 'lesson' ? clamp(kt, LESSON_WIND[0], LESSON_WIND[1]) : kt; }
+  // (the range is for the wind she sails in, so the mean is held to it over the field's factor where the lesson is: the
+  // Cityfront's is about 1.2, which put a lesson's own wind near 18 kt with the mean at 15)
+  private lessonKt(kt: number): number { const f = this.lessonField ?? 1; return this.settings.mode === 'lesson' ? clamp(kt, LESSON_WIND[0] / f, LESSON_WIND[1] / f) : kt; }
+  private lessonField: number | null = null;
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {

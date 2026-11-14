@@ -43,22 +43,29 @@ export const LESSON_MARKS = {
   /** Points of sail: each point held this long (s) with both sails drawing (telltales streaming, or a run's full sails);
    * a moment off (a puff or a shift flicks the flow) takes back twice its length, not the whole hold. On a run the
    * telltales just hang (boat/trim.ts calls any run's flow good), so there the sails must be eased to draw: each sail's
-   * efficiency at least RUN_EFF (a sheet pinned in gives 0.8–0.9). */
-  pointS: 15, runEff: 0.95,
-  /** Stop, go, irons: stopped (under STOP_KT) within STOP_M of the buoy for STOP_S; going again (over GO_KT); in irons
-   * (bow within IRONS_TWA of the wind, under STOP_KT) for STOP_S; and out of irons, sailing (TWA over OUT_TWA, over GO_KT)
-   * within OUT_S of getting in. */
-  stopM: 25, stopKt: 0.5, stopS: 3, goKt: 2, ironsTwa: 25, outTwa: 50, outS: 30,
-  /** Tacking and jibing: this many good ones (scored by the tack and gybe drill's own measure, sim/drill.ts: from a steady
-   * course, back to speed within its time); a jibe also without rounding up past GYBE_OVER (deg) after it. */
-  turns: 3, gybeOver: 25,
-  /** Heave to: hove to (the physics' own state: the jib aback, boat/physics.ts heaveTo) and under HOVE_KT for HOVE_S. */
-  hoveKt: 1, hoveS: 60
+   * efficiency at least RUN_EFF (a sheet pinned in gives 0.8–0.9). On a broad reach the jib, at its sheet's full ease,
+   * still reads stalled until the apparent wind is about 112° (boat/trim.ts), so there it counts when it draws at
+   * BROAD_JIB_EFF or better and the main's flow is good. */
+  pointS: 15, runEff: 0.95, broadJibEff: 0.85,
+  /** Stop, go, irons: stopped (under STOP_KT through the water, ahead or astern) within STOP_M of the buoy for STOP_S;
+   * going again (over GO_KT); in irons (bow within IRONS_TWA of the wind, stopped) for STOP_S; and out of irons, sailing
+   * (TWA over OUT_TWA, over OUT_KT) within OUT_S. From a standing start a Folkboat takes 15–30 s to make way in 5–12 kt
+   * and the bow comes round slowly as she gathers sternway (the physics review's measure, 14 Nov 2026), so OUT_S is
+   * generous, and while she's coming round and gathering way the clock doesn't send her back. */
+  stopM: 25, stopKt: 0.5, stopS: 3, goKt: 2, ironsTwa: 25, outTwa: 50, outKt: 1.2, outS: 120,
+  /** Tacking and jibing: this many good ones (scored by the tack and jibe drill's own measure, sim/drill.ts: from a steady
+   * course, back to speed within its time); a jibe ending still off the wind (TWA at least JIBE_TWA when it's scored),
+   * not rounded up to a reach. */
+  turns: 3, jibeTwa: 120,
+  /** Heave to: hove to (the physics' own state: the jib aback, boat/physics.ts heaveTo) and forereaching no faster than
+   * HOVE_KT, for HOVE_S. A hove-to Folkboat forereaches about 1–1.5 kt (physics.ts: 0.7 kn in 8 kt, 1.5 in 20; peaks
+   * near 2), so the mark is 2 kt. */
+  hoveKt: 2, hoveS: 60
 };
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
-  tiller: 'Steer for the buoy', points: '', irons: 'Sail to the buoy and stop by it: ease both sheets',
-  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: tack, leave the jib aback, tiller to leeward'
+  tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
+  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward'
 };
 
 /** The five points of sail ASA 101 asks a sailor to sail (its skills 28–32: close hauled, close reach, beam reach,
@@ -68,10 +75,11 @@ const FIRST: Record<LessonId, string> = {
  * few degrees below; a close reach is between that and a beam reach; a broad reach the wind on the quarter; a run the
  * wind from astern, 160° to 180°. */
 const POINTS: { key: 'close' | 'closeReach' | 'beam' | 'broad' | 'run'; band: (b: Boat) => [number, number]; cue: string }[] = [
-  { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 7]; }, cue: 'Close-hauled: trim till both telltales stream' },
-  { key: 'closeReach', band: b => [beatFor(b) + 12, 70], cue: 'Bear away a little to a close reach, and ease to match' },
-  { key: 'beam', band: () => [80, 100], cue: 'Bear away to a beam reach: the wind on the side' },
-  { key: 'broad', band: () => [115, 150], cue: 'Bear away to a broad reach: the wind on the quarter' },
+  // (the bands meet, so no angle between two points drains the hold unseen)
+  { key: 'close', band: b => { const a = beatFor(b); return [a - 3, a + 8]; }, cue: 'Close-hauled: trim till both telltales stream' },
+  { key: 'closeReach', band: b => [beatFor(b) + 8, 75], cue: 'Bear away a little to a close reach, and ease to match' },
+  { key: 'beam', band: () => [75, 105], cue: 'Bear away to a beam reach: the wind on the side' },
+  { key: 'broad', band: () => [105, 160], cue: 'Bear away to a broad reach: the wind on the quarter' },
   { key: 'run', band: () => [160, 180], cue: 'Bear away to a run: sheets out, wind from astern' }
 ];
 
@@ -87,7 +95,7 @@ export class LessonTracker {
   /** Tacking and jibing: the good ones so far, scored by the tack and gybe drill's own tracker. */
   good = 0;
   readonly turns: DrillTracker | null;
-  private held = 0; private seen = 0; private ironsT = 0;
+  private held = 0; private seen = 0; private ironsT = 0; private lastTwa = 0;
 
   constructor(id: LessonId, buoy: Vec | null) {
     this.id = id; this.buoy = BUOY_LESSONS.has(id) ? buoy : null;
@@ -125,8 +133,9 @@ export class LessonTracker {
   private points(b: Boat, dt: number): void {
     const P = POINTS[this.step], twa = b.twa, [lo, hi] = P.band(b);
     // drawing: on the point, under way, and each sail's flow good; on a run, each sail eased to draw (see LESSON_MARKS)
-    const good = (t: { flow: string; eff: number } | null) => !t || (P.key === 'run' ? t.eff >= LESSON_MARKS.runEff : t.flow === 'good');
-    const drawing = twa >= lo && twa <= hi && b.v > 0.8 * KT && good(b.trim.main) && good(b.trim.jib);
+    const good = (t: { flow: string; eff: number } | null, jib: boolean) => !t || (P.key === 'run' ? t.eff >= LESSON_MARKS.runEff
+      : t.flow === 'good' || (jib && P.key === 'broad' && t.eff >= LESSON_MARKS.broadJibEff));
+    const drawing = twa >= lo && twa <= hi && b.v > 0.8 * KT && good(b.trim.main, false) && good(b.trim.jib, true);
     this.held = drawing ? this.held + dt : Math.max(0, this.held - 2 * dt);
     this.progress = Math.min(1, this.held / LESSON_MARKS.pointS);
     if (this.held < LESSON_MARKS.pointS) return;
@@ -144,19 +153,22 @@ export class LessonTracker {
   }
 
   private irons(b: Boat, t: number, dt: number): void {
-    const M = LESSON_MARKS, kt = b.v / KT, twa = b.twa;
+    // (her speed through the water either way: going astern counts as moving, not stopped)
+    const M = LESSON_MARKS, kt = Math.abs(b.v - (b.astern ?? 0)) / KT, twa = b.twa;
     if (this.step === 0) {
       const d = this.buoy ? Math.hypot(b.x - this.buoy.x, b.y - this.buoy.y) : 0;
       if (this.hold(d <= M.stopM && kt < M.stopKt, dt, M.stopS)) { this.step = 1; this.cue = 'Get going again: trim in'; }
     } else if (this.step === 1) {
       if (this.hold(kt > M.goKt, dt, M.stopS)) { this.step = 2; this.cue = 'Turn head to wind and stop: you\'re in irons'; }
     } else if (this.step === 2) {
-      if (this.hold(twa < M.ironsTwa && kt < M.stopKt, dt, M.stopS)) { this.step = 3; this.ironsT = t; this.cue = 'Back the jib to get out of irons'; }
+      if (this.hold(twa < M.ironsTwa && kt < M.stopKt, dt, M.stopS)) { this.step = 3; this.ironsT = t; this.cue = 'Back the jib, tiller the way you want the bow'; this.lastTwa = twa; }
     } else {
-      // out: sailing on either tack, and in time; too long, and it's back into irons to try again
-      if (this.hold(twa > M.outTwa && kt > M.goKt, dt, M.stopS)) { this.passed = true; return; }
-      this.progress = Math.max(0, 1 - (t - this.ironsT) / M.outS);
-      if (t - this.ironsT > M.outS + M.stopS) { this.step = 2; this.held = 0; this.cue = 'Again: head to wind and stop'; }
+      // out: sailing on either tack (going ahead, not astern), in time; too long, and it's back into irons to try again,
+      // but never while she's coming round (the bow opening from the wind)
+      const ahead = (b.astern ?? 0) < 0.1 && b.v / KT > M.outKt;
+      if (this.hold(twa > M.outTwa && ahead, dt, M.stopS)) { this.passed = true; return; }
+      const opening = twa > this.lastTwa + 0.02 * dt * 60 || twa > M.outTwa; this.lastTwa = twa;
+      if (t - this.ironsT > M.outS && !opening) { this.step = 2; this.held = 0; this.cue = 'Again: head to wind and stop'; }
     }
   }
 
@@ -165,7 +177,7 @@ export class LessonTracker {
     D.step(b, t, dt, hs);
     for (; this.seen < D.list.length; this.seen++) {
       const s = D.list[this.seen];
-      if (s.kind === kind && s.scored && s.backS != null && (kind === 'tack' || s.overshoot < LESSON_MARKS.gybeOver)) this.good++;
+      if (s.kind === kind && s.scored && s.backS != null && (kind === 'tack' || b.twa >= LESSON_MARKS.jibeTwa)) this.good++;
     }
     this.progress = this.good / LESSON_MARKS.turns;
     if (this.good >= LESSON_MARKS.turns) { this.passed = true; return; }
