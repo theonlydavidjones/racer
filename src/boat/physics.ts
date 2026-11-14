@@ -1,6 +1,7 @@
-import { hitsHarbor } from '../geo/marina';
-import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
-import { onLand, pierNear } from '../geo/shore';
+import { harborNear, hitsHarbor, hitsWall } from '../geo/marina';
+import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage';
+import { KT, V, clamp, wrap, n360, D2R, type Vec } from '../core/math';
+import { hitsWharf, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
@@ -777,17 +778,61 @@ function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number)
   b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
 
-/** Fort Mason's piers stand on close-set concrete piles under a deck lower than her masthead: set onto them by the
- * stream or the wind with no way on to steer off, or set sideways onto them, she's caught against them, and in real
- * life that's very likely the end of the boat (the owner, 13 Nov 2026). What a wreck means in the sim is still to be
- * worked out (docs/WRECK-PROPOSAL.md); for now she's stopped against them (end on: dead; sideways: her way into them,
- * keeping her way along them), and told so once each time she comes onto them, by how hard. */
-const pileTouch = new WeakMap<Boat, number>();
-function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, emit: Emit, t: number): void {
+/** What she hit at `hit`, for the harm it does (boat/damage.ts) and for the words. (The open shore, outside the harbors'
+ * walls, counts as mud and sand for now, aground with no damage: which stretches are seawall, riprap or beach isn't in the
+ * sim's data yet (the NOAA chart's shoreline construction and coastline kinds would say), nor are the charted rocks;
+ * ROADMAP's wreck item.) */
+function whatHit(hit: Vec): { kind: Struck; name: string } {
+  const piles = underPier(hit); if (piles) return { kind: 'piles', name: `the piles of ${piles.name}` };
+  const pier = pierNear(hit, 6); if (pier) return { kind: 'concrete', name: `the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}` };
+  if (hitsWall(hit)) return { kind: 'concrete', name: 'the breakwater' };
+  if (hitsHarbor(hit)) return { kind: 'dock', name: 'the dock' };
+  if (hitsWharf(hit)) return { kind: 'concrete', name: 'the wharf' };
+  return { kind: 'mud', name: 'the shore' };
+}
+const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];
+/**
+ * The harm a blow does her (boat/damage.ts: the energy of her closing speed into it, at her displacement with her crew,
+ * graded by what she hit), kept as the worst this outing; a wreck, for your boat only (the owner's answers, WRECK-PROPOSAL
+ * section 7), ends it unless you carry on. Returns the grade.
+ */
+function hurt(b: Boat, what: { kind: Struck; name: string }, closing: number, hit: Vec, emit: Emit): DamageLevel {
+  const m = displacement((b.crew ??= newCrew(DEFAULT_CREW, b.tack)).spec), level = damageOf(impactEnergy(closing, m), what.kind, m);
+  if (!b.isUser) return level; // (the AI boats aren't wrecked or marked: the Coordinator's call, for now)
+  if (RANK.indexOf(level) > RANK.indexOf(b.damage?.level ?? 'none')) b.damage = { level, what: what.name };
+  if (level === 'wreck') wreck(b, `hit ${what.name} at ${(closing / KT).toFixed(1)} kn`, hit, emit);
+  return level;
+}
+/** Your boat wrecked: how, and where (the harbor she was at, or the Cityfront); she's held there (World) until you choose. */
+export function wreck(b: Boat, how: string, hit: Vec, emit: Emit): void {
+  if (!b.isUser || b.wrecked) return;
+  const H = harborNear(hit), where = H ? H.name : 'the Cityfront';
+  b.wrecked = { how, where }; b.v = 0; b.sway = 0; b.astern = 0;
+  emit({ type: 'wrecked', how, where });
+}
+/**
+ * Fort Mason's piers stand on close-set concrete piles under a deck lower than her masthead (the owner, 13 Nov 2026).
+ * Against them she stops (end on: dead; sideways: her way into them, keeping her way along them), the blow graded as any
+ * other. Held on them by the stream or the wind (every touch within PINNED_GAP s of the last) for PINNED s: end on, her
+ * bow or stern goes in between the piles and she's worked in under the deck, the rig coming down on its edge, a wreck
+ * (WRECK-PROPOSAL section 1); beam on she lies across two of them (she's 7.64 m, the bays about 4.5 m: an ESTIMATE, as
+ * drawn), grinding her topsides on the concrete: damage.
+ */
+const pileTouch = new WeakMap<Boat, { last: number; since: number; endOn: boolean }>();
+/** ESTIMATES: how long pinned on the piles (s) before she's in under the deck, and the longest gap between touches that's
+ * still pinned (pushed off a little each touch, the stream and the wind set her straight back on). */
+const PINNED = 30, PINNED_GAP = 20;
+function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, hit: Vec, emit: Emit, t: number): void {
   if (endOn) { b.v = 0; b.astern = 0; }
   b.sway = 0;
-  const last = pileTouch.get(b) ?? -99; pileTouch.set(b, t);
-  if (b.isUser && t - last > 3) emit({ type: 'toast', ms: 6000, msg: closing < 0.15 ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: in real life, likely the end of your boat.` });
+  const p = pileTouch.get(b), first = !p || t - p.last > PINNED_GAP, since = first ? t : p.since, endOnAny = (!first && p.endOn) || endOn; pileTouch.set(b, { last: t, since, endOn: endOnAny });
+  const level = hurt(b, { kind: 'piles', name: `the piles of ${pier}` }, closing, hit, emit);
+  if (b.wrecked) return;
+  if (t - since > PINNED) {
+    if (endOnAny) { wreck(b, `set in under ${pier}, among its piles`, hit, emit); return; }
+    if (b.isUser && RANK.indexOf(b.damage?.level ?? 'none') < RANK.indexOf('damage')) { b.damage = { level: 'damage', what: `the piles of ${pier}` }; emit({ type: 'toast', ms: 6000, msg: `Grinding on the piles of ${pier}: damage to her topsides. Get way on and steer off.` }); }
+  }
+  if (b.isUser && first) emit({ type: 'toast', ms: 6000, msg: level === 'damage' ? `Hit the piles of ${pier} hard: damage. Get way on and steer off.` : closing < 0.15 ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: held there, she'll be worked in under it. Get way on and steer off.` });
 }
 /** Below this speed through the water (m/s), about a knot, her rudder barely bites and she goes where the stream and wind
  * set her (ESTIMATE: no source found for a Folkboat; a long keel's rudder needs some way to answer) */
@@ -816,17 +861,19 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
     const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit), piles = underPier(hit); // (where her bow struck, before she's pushed back off it)
     const closing = Math.max(0, b.vx * u.x + b.vy * u.y);
     b.x -= u.x * 0.6; b.y -= u.y * 0.6;
-    if (piles && b.v < STEERAGE && !motorDrives(b)) onPiles(b, piles.name, closing, true, emit, t);
+    if (piles && b.v < STEERAGE && !motorDrives(b)) onPiles(b, piles.name, closing, true, hit, emit, t);
     else {
       b.v = 0; b.sway = 0;
-      bump(piles ? `Collision: you hit the piles of ${piles.name}. Bear away and give it room.` : pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+      const level = hurt(b, whatHit(hit), closing, hit, emit);
+      if (level === 'damage') bump(`Damage: you hit ${whatHit(hit).name} at ${(closing / KT).toFixed(1)} kn. Bear away and give it room.`);
+      else if (level !== 'wreck') bump(piles ? `Collision: you hit the piles of ${piles.name}. Bear away and give it room.` : pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
     }
     offLand();
   } else if (onLand(stern(b)) && (ast > 0 || b.vx * u.x + b.vy * u.y < -0.02)) { // (going astern, or carried stern first by the stream)
     const hit = stern(b), pier = pierNear(hit, 6), piles = underPier(hit), closing = Math.max(0, -(b.vx * u.x + b.vy * u.y));
     b.x += u.x * 0.4; b.y += u.y * 0.4;
-    if (piles) onPiles(b, piles.name, closing, true, emit, t); // (going astern she has no steerage: on the piles)
-    else { b.astern = 0; bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.'); }
+    if (piles) onPiles(b, piles.name, closing, true, hit, emit, t); // (going astern she has no steerage: on the piles)
+    else if (hurt(b, whatHit(hit), closing, hit, emit) !== 'wreck') { b.astern = 0; bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.'); }
     offLand();
   }
   // set sideways onto something (the wind on her bare rig across her, at a dock, her leeway, or the stream): her side at
@@ -841,8 +888,8 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
     if (hit) {
       const pier = pierNear(hit, 6), piles = underPier(hit);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
-      if (piles) onPiles(b, piles.name, Math.abs(side), false, emit, t);
-      else bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
+      if (piles) onPiles(b, piles.name, Math.abs(side), false, hit, emit, t);
+      else if (hurt(b, whatHit(hit), Math.abs(side), hit, emit) !== 'wreck') bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
       offLand();
     }
   }
