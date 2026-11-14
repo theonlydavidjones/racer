@@ -24,23 +24,38 @@ the speed it's worth), for a boat close-hauled in about 6 kt with the jib eased 
 - This is a change to `CoachMemory` (`coach.ts`), which already holds a lesson against small changes; it gets the
   12 s hold, the 2× rule and the settle wait.
 
-## 2. Pause: Trim Notes (`2-pause.jpg`)
+## 2. Where Trim Notes lives (the owner: "Trim notes in the menu doesn't make sense")
 
-Opened from the pause menu, where Trim Notes sits first beside Change Conditions. It also opens by clicking the band's
-windex, which pauses her. No new on-screen button.
+The pause-menu entry is gone. Two options follow; Option 1 is the pick.
 
-## 3. Trim Notes: the band, line by line (`3-notes.jpg`)
+### Option 1 (the pick): in the band, where the lines are (`4-opt1-closed.jpg`, `5-opt1-open.jpg`)
 
-- **The band's own layout, enlarged.** Its top row is port to starboard: jib car, jib sheet, main halyard, jib
-  Cunningham, main Cunningham, outhaul, vang, (the windex: point of sail, angle, how many to fix), jib halyard. Its bottom
-  row: backstay, mainsheet, traveler. The dual-ended lines appear once.
-- **Each line's track**, with where it is now (white) and, if it's not right, the target (teal ◆) and the way to it.
-- **Lines to fix are numbered by what they're worth** (amber). Each has three short parts:
-  - **NOW:** what it's doing to her ("Off: the top of the main twists away");
-  - **SHOULD:** the step to take, in the band's own words ("Vang on, a good pull");
-  - **WHY:** one reason ("With the sheet eased, only the vang holds the leech.").
-- **Lines that are right get a green ✓** and a few words ("Foot right for 6 kt").
-- **The header gives the situation and her speed against the polar's** (2.2 of 3.8 kt). Back, or Esc, returns to the pause menu.
+- **Ways in:**
+  - a **Notes** tab in the band's own tab row, beside Hand back;
+  - **All notes ›** in the live coach note;
+  - a key (N, rebindable in Keys).
+
+  No new on-screen button: both doors are in elements that are already there.
+- **The notes grow up out of the band.** One card per line, in the band's own order. A leader runs from each card
+  down to its line's column, amber for the lines to fix. The fix's teal ◆ sits on its track.
+- **The band stays live underneath.** You work the line right under its note, and the card turns green when it's right.
+- **Time slows to ¼ rather than stopping,** so a change has an effect you can see (the telltales, the speed). Space
+  pauses fully if you want, and Notes or Esc closes it.
+- **Why this one:**
+  - **Proximity:** each note sits over the control it's about, joined by a line, so there's nothing to map in your head.
+  - **Direct manipulation with immediate feedback:** you fix a line under its note and watch the note go green.
+  - **Progressive disclosure:** the live note gives one thing; All notes gives everything, from the same card.
+  - **No modal for a task you'll do often:** the boat stays in view and the race carries on, slowly.
+  - **Consistency:** Notes sits in the same tab row as Hand back, the band's other whole-band action.
+
+### Option 2: the coach note opens a sheet (`6-opt2-sheet.jpg`)
+
+- **The way in:** All notes › in the live coach note (and the key) opens the sheet from the first mock-up, the band
+  laid out large, and pauses.
+- **Clearer to read at length, but weaker on three counts:**
+  - it's modal and covers the boat;
+  - the notes are away from the controls, which is the mapping the owner asked to see;
+  - you can't work a line and watch its note change.
 
 ## The words come from the physics
 
