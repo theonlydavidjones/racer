@@ -438,7 +438,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     b.luff = false; return;
   }
   ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
-  const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
+  const home = (w.cancelled || b.retired) && !b.finished ? homeCourse(w, b) : null; // (no more racing today, or she's retired: she sails home, out of the racing boats' way, rule 23.1)
   if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % (2 * AI_EVERY) === 0; // heavy predictions 10× a second (every other think outside close quarters, as before the speed pass)

@@ -350,20 +350,30 @@ export function couldAvoid(f: RulesBoat, victim: RulesBoat, by: RulesBoat, since
   return got.gaps[0] >= KEEP_CLEAR_GAP; // (kept clear of the victim: Definitions, Keep Clear, as rule 16.1's room)
 }
 
+/** Rule 14 (WS Case 123): it is "clear" that the other boat isn't keeping clear once a competent, but not expert, helmsman
+ * would see a substantial risk of contact: both carrying on as she sees them, touching within this many seconds. A
+ * modelling choice, set by the Case itself: two boats alike, close-hauled on opposite tacks at the same speed, and S (who
+ * could still have borne away, the Case finds) able to clear at 4 s and not at 3 in a Folkboat at 2.5 m/s (she turns
+ * slower than the Case's 5 m dinghies), so 4: about a length and a half short of the contact. */
+export const RISK_T = 4;
+
 /**
  * Rule 14 for the boat with right of way (or entitled to room): she "need not act to avoid contact until it is clear that
- * the other boat is not keeping clear"; from then, she shall avoid contact if reasonably possible. It's clear once the
- * keep-clear boat, turning away promptly, could no longer keep clear (escapes(), from the recorded poses: the same
- * question as 16.1's room). From that moment, with a prompt helmsman's reaction, could `row` have avoided touching `kc`
- * by any turn (against `kc`'s actual track)? No history, or the keep-clear boat able to keep clear right up to the
- * contact: no (she had no time). Whether it matters is 43.1(c)'s: only if the contact caused damage or injury.
+ * the other boat is not keeping clear"; from then she shall avoid it if reasonably possible (WS Case 123: S, who could
+ * still have borne away when P's bow crossed hers, broke 14(a)). It's clear from the start of the unbroken stretch before
+ * the contact in which, both carrying on as she saw them, they'd touch within RISK_T. From then, reacting promptly
+ * (RESPOND_DELAY), she turns the way that what she could see then said would clear (the other carrying on), and that turn
+ * is scored against the other boat's actual track: no hindsight about a late turn of hers (the same standard as 16.1's
+ * room and 43.1(a), WS Case 92). Did it avoid touching? No history: no (nothing to show she had time).
  */
-export function rowCouldAvoid(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): boolean {
+export function rowCouldAvoid(row: RulesBoat, kc: RulesBoat, ctx: RulesContext, riskT = RISK_T): boolean {
   const R = RINGS.get(row), K = RINGS.get(kc);
   if (!R || !K || R.n < 2 || K.n < 2) return false;
   const newest = (r: PoseRing) => r.t[at(r, 0)], oldestOf = (r: PoseRing) => r.t[at(r, r.n - 1)];
   const now = Math.max(newest(R), newest(K)), oldest = Math.max(oldestOf(R), oldestOf(K));
   if (now - oldest < 0.5) return false;
+  const rate = (r: PoseRing, t: number) => { const w = Math.min(TURN_WINDOW, t - oldestOf(r)); return w > 0.2 ? wrap(poseAt(r, t).h - poseAt(r, t - w).h) / w : 0; };
+  const seen = (r: PoseRing, t: number) => straightOn(poseAt(r, t), rate(r, t));
   // a boat's actual track from t0: her recorded poses, then on from her newest sample
   const trackFrom = (r: PoseRing, b: RulesBoat, t0: number) => {
     const v = b.v ?? Math.hypot(b.vx, b.vy), tn = newest(r), last = poseAt(r, tn);
@@ -374,21 +384,16 @@ export function rowCouldAvoid(row: RulesBoat, kc: RulesBoat, ctx: RulesContext):
       return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
     };
   };
-  const start = (r: PoseRing, b: RulesBoat, t0: number) => {
-    const p = poseAt(r, t0), w = Math.min(TURN_WINDOW, t0 - oldestOf(r));
-    return { ...p, turnRate: w > 0.2 ? wrap(p.h - poseAt(r, t0 - w).h) / w : 0, leeway: b.leeway };
-  };
-  const best = (me: RulesBoat, r: PoseRing, other: PoseRing, ob: RulesBoat, t0: number) => {
-    const o = { delay: RESPOND_DELAY, horizon: now - t0 + 1, windKt: me.ww?.kt ?? ctx.windKt };
-    return Math.max(...escapes(start(r, me, t0), [trackFrom(other, ob, t0)], me.ww?.from ?? ctx.windFrom, o).map(c => c.minGap));
-  };
-  // when it became clear: just after the last moment (in half-second steps back from the contact) the keep-clear boat
-  // could still have kept clear
+  // the risk as she'd see it at t: both carrying on, do they touch within RISK_T?
+  const risk = (t: number) => escapes({ ...poseAt(R, t), turnRate: rate(R, t), leeway: row.leeway }, [seen(K, t)], row.ww?.from ?? ctx.windFrom, { delay: 99, horizon: riskT, turns: [] })[0].minGap < CONTACT_GAP;
   let tClear: number | null = null;
-  for (let t = now - 0.5; t >= oldest - 1e-9; t -= 0.5) if (best(kc, K, R, row, t) >= KEEP_CLEAR_GAP) { tClear = t + 0.5; break; }
-  if (tClear == null) tClear = oldest; // (never able, as far back as the history goes)
-  if (now - tClear < 0.2) return false;
-  return best(row, R, K, kc, tClear) >= CONTACT_GAP;
+  for (let t = now - 0.25; t >= oldest - 1e-9 && risk(t); t -= 0.25) tClear = t;
+  if (tClear == null || now - tClear < RESPOND_DELAY) return false; // (no time even to react)
+  // her prompt turn, by what she could see then, scored against the other's actual track
+  const o = { delay: RESPOND_DELAY, horizon: now - tClear + 1, windKt: row.ww?.kt ?? ctx.windKt }, me = { ...poseAt(R, tClear), turnRate: rate(R, tClear), leeway: row.leeway };
+  const wind = row.ww?.from ?? ctx.windFrom, choices = escapes(me, [seen(K, tClear)], wind, o);
+  const choice = choices.reduce((a, b) => b.minGap > a.minGap + 0.05 || (Math.abs(b.minGap - a.minGap) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
+  return escapes(me, [trackFrom(K, kc, tClear)], wind, { ...o, turns: choice.turn ? [choice.turn] : [] }).find(q => q.turn === choice.turn)!.minGap >= CONTACT_GAP;
 }
 
 /**

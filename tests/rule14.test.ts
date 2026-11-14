@@ -21,11 +21,17 @@ describe('rule 14: could the right-of-way boat have avoided contact once it was 
     const { S, P } = meet(2.5, 1);
     expect(rowCouldAvoid(S, P, ctx(60))).toBe(true);
   });
-  it('a port boat as fast as the starboard boat: once it was clear, it was too late for S', () => {
+  it('WS Case 123: alike, the same speed, opposite tacks: once it was clear (substantial risk), S could still bear away: she broke 14', () => {
     const { S, P } = meet(2.5, 2.5);
-    expect(rowCouldAvoid(S, P, ctx(60))).toBe(false);
+    expect(rowCouldAvoid(S, P, ctx(60))).toBe(true);
+  });
+  it('a slow starboard boat against a faster port boat: once it was clear, it was too late for her', () => {
     const slow = meet(1.5, 2.5);
     expect(rowCouldAvoid(slow.S, slow.P, ctx(60))).toBe(false);
+  });
+  it('the moment it\'s clear matters: were it only 3 s before the contact, the same S could not', () => {
+    const { S, P } = meet(2.5, 2.5);
+    expect(rowCouldAvoid(S, P, ctx(60), 3)).toBe(false);
   });
   it('no history: no (she had no time we can show)', () => {
     expect(rowCouldAvoid(boat('S', { at: [0, 0], heading: 315 }), boat('P', { at: [5, 5], heading: 45 }), ctx(60))).toBe(false);
@@ -46,5 +52,22 @@ describe('damage in the World: serious damage, the fouler retires (44.1(b))', ()
     for (let i = 0; i < 60 * 3 && !u.retired; i++) { w.step(DT); w.drainEvents(); }
     expect(damage).toBe('serious');
     expect(u.retired).toBe(true);
+  });
+});
+
+describe('the blow: along the line where the hulls touch (contactNormal), not between their centres', () => {
+  it('a sideswipe on reciprocal courses: the normal is athwartships, so the passing speed is no blow', async () => {
+    const { contactNormal } = await import('../src/rules/geometry');
+    const A = boat('A', { at: [0, 0], heading: 0 }), B = boat('B', { at: [2.0, 3], heading: 180 }); // (passing 2 m apart)
+    const c = contactNormal(A, B);
+    expect(Math.abs(c.n.x)).toBeGreaterThan(0.95); // (east-west: across both hulls)
+  });
+  it('a bow into the other\'s side: the normal is the struck side\'s, wherever along her it lands', async () => {
+    const { contactNormal } = await import('../src/rules/geometry');
+    const S = boat('S', { at: [0, 0], heading: 90 }); // (struck: her side faces north and south)
+    for (const along of [0, 3]) {
+      const P = boat('P', { at: [along, -3.8], heading: 0 }); // (P's bow just touching S's side, `along` m from her middle)
+      expect(Math.abs(contactNormal(P, S).n.y)).toBeGreaterThan(0.95);
+    }
   });
 });
