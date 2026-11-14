@@ -1,6 +1,7 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
+import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
@@ -817,6 +818,7 @@ export class World {
     }
     if (this.C.committeeKind === 'boat' && !this.freeSail) addCommitteeWake(sum, from, this.C.committee, p);
     addPierWakes(sum, from, p);
+    addHarborLee(sum, from, p); // (the harbors' walls and Fort Mason's sheds: environment/harborLee.ts)
     const r = sum.result(from);
     return { k: r.k * lee, shift: r.shift };
   }
