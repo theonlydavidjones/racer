@@ -123,15 +123,15 @@ describe('Learn to sail: the lessons\' checks', () => {
     expect(sum / n).toBeLessThan(16.5);
   });
 
-  it('a breeze: the mainsheet in hand, then close-hauled a minute with the heel under 25°', () => {
+  it('a breeze: the mainsheet in hand, then three puffs answered by easing it, the heel held; puffs sat through don\'t count', () => {
     const L = new LessonTracker('breeze', null); let t = 0;
-    const b = (o: Parameters<typeof boat>[0] & { heel?: number; hand?: boolean }) => ({ ...boat(o), isUser: true, hand: o.hand ? { mainsheet: true } : {}, heelMag: o.heel ?? 15 }) as unknown as Boat;
-    for (let k = 0; k < 5; k++) L.update(b({ twa: 42 }), t++, 1);
-    expect(L.step).toBe(0); // (the crew has the sheet: not yet)
-    for (let k = 0; k < 30; k++) L.update(b({ twa: 42, hand: true, heel: 30 }), t++, 1);
-    expect(L.step).toBe(1); expect(L.progress).toBe(0); // (laid over at 30°: no)
-    for (let k = 0; k < LESSON_MARKS.breezeS; k++) L.update(b({ twa: 42, hand: true, heel: 18, v: 3 * KT }), t++, 1);
-    expect(L.passed).toBe(true);
+    const b = { ...boat({ twa: 42, v: 4 * KT }), isUser: true, hand: { mainsheet: true }, heelMag: 18, ww: { kt: 15, from: 0 }, sheets: { main: 12, jib: 10 }, ctl: { traveller: 0 } } as unknown as Boat & { ww: { kt: number }; sheets: { main: number }; heelMag: number };
+    const run = (s: number, f?: () => void) => { for (let k = 0; k < s * 10; k++) { f?.(); L.update(b, t, 0.1); t += 0.1; } };
+    run(30); expect(L.step).toBe(1);
+    // a puff sat through: the sheet left where it is
+    b.ww.kt = 18; run(7); b.ww.kt = 15; run(20); expect(L.good).toBe(0);
+    for (let k = 0; k < 3; k++) { b.ww.kt = 18; run(1); b.sheets.main = 18; run(6); b.ww.kt = 15; b.sheets.main = 12; run(20); }
+    expect(L.good).toBe(3); expect(L.passed).toBe(true);
   });
 
   it('home to the slip: out past the harbor, then back in her slip and made fast', () => {

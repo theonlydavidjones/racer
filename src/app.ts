@@ -573,6 +573,7 @@ const drills = mountDrills(ctx); // (src/app/drills.ts)
  * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
 const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); });
 $('rulesTrainer').addEventListener('click', e => rulesTrainer.click(e));
+$('bRules').onclick = () => rulesTrainer.open();
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
 function windTick(): void {
   const on = !!S.windLadder && w.running && !w.user.docked;
