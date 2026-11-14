@@ -206,7 +206,7 @@ export class LessonTracker {
       // away (AWAY_M), where a boat is a speck on the water
       // (the way she's chosen kept while it's still away from you and clear, so she doesn't swap about between them)
       const mv = E.helm(true), off = Math.atan2(dx, dy) * 180 / Math.PI;
-      if (Math.abs(wrap(this.away - off)) > 100 || E.landAhead(this.away)) this.away = E.sailable([0, 45, -45, 90, -90].map(a => off + a).find(h => !E.landAhead(E.sailable(h))) ?? off + 180);
+      if (Math.abs(wrap(this.away - off)) > 50 || E.landAhead(this.away)) this.away = E.sailable([0, 45, -45, 90, -90].map(a => off + a).find(h => !E.landAhead(E.sailable(h))) ?? off + 180);
       o.desired = mv ? mv.h : this.away; o.luff = mv?.luff ?? false;
     }
     if (e) {
