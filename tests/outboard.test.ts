@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
+import { OUTBOARD_PROP } from '../src/boat/outboardMount';
 import { buildOutboard, syncOutboard, BOARD_DOWN, BOARD_UP, TILT_UP } from '../src/render/outboard';
 
 /** Run the motor's drawing toward a state for t seconds. */
@@ -34,6 +36,13 @@ describe('the outboard as drawn follows the motor', () => {
     syncOutboard(o, { ...off, shifting: { to: 'bracket', left: 20 } }, 0.05); expect(o.tilt.visible).toBe(false);
     syncOutboard(o, { ...off }, 0.05); expect(o.tilt.visible).toBe(true); expect(o.tilt.position.y).toBeCloseTo(o.tiltY);
     run(o, { ...off, down: true, stowed: true }, 5); expect(o.at.board).toBeCloseTo(BOARD_UP); // (stowed, nothing lets it down)
+  });
+  it('draws the prop, let down, where the physics has it (boat/outboardMount.ts)', () => {
+    for (const hp of [2.5, 3.5, 6] as const) {
+      const o = buildOutboard(hp); run(o, { down: true, running: false, gear: 'N', throttle: 0 }, 10);
+      o.group.updateMatrixWorld(true); const p = o.prop.getWorldPosition(new THREE.Vector3()), want = OUTBOARD_PROP[hp];
+      expect(Math.hypot(p.x - want.x, p.y - want.y, p.z - want.z)).toBeLessThan(0.01);
+    }
   });
   it('costs a handful of draw calls (each moving part one mesh a material)', () => {
     let n = 0; buildOutboard(3.5).group.traverse(c => { if ((c as { isMesh?: boolean }).isMesh) n++; });

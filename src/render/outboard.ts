@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { aftLineZ, sheer } from './hull';
 import { IDLE, OUTBOARDS, type OutboardHp } from '../boat/motor';
+import { MOUNT_X } from '../boat/outboardMount';
 
 /**
  * Her outboard on its transom bracket, drawn from the motor's state (boat/motor.ts MotorState: tilted up or down, running,
@@ -48,7 +49,7 @@ export const TILT_UP = 75 * Math.PI / 180;
 export const BOARD_UP = sheer(1) + 0.3, BOARD_DOWN = 0.42;
 /** The lower arm's foot: the transom's no wider than the mount's offset below about 0.17 m (its half-width 0.62 m at 0.25). */
 const TRANSOM_LOW = 0.25;
-const MOUNT_X = -0.42, BOARD_W = 0.3, BOARD_H = 0.24, BOARD_T = 0.032;
+const BOARD_W = 0.3, BOARD_H = 0.24, BOARD_T = 0.032;
 
 // (made when the first motor is: a material made as the module loads would shift the page's random numbers before the
 // race is set up, three.js drawing one for each object's id, and change the race scripts/check/perf.cjs sails)
