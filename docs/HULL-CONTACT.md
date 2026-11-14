@@ -1,7 +1,7 @@
 # Touching by the hulls' own outlines
 
-The Rules session's design note, 14 Nov 2026, for the Coordinator's review. It's internal geometry: no rule reads differently
-to a sailor. Not built yet.
+The Rules session's design note, 14 Nov 2026, approved by the Coordinator and built on branch rules-hull. It's internal
+geometry: no rule reads differently to a sailor. "As built", at the end, says where the build differs from the plan.
 
 ## The problem
 
@@ -73,3 +73,31 @@ points) don't change.
   squared out on a run is a meter or more beyond the hull. That's a later addition: the boom as a segment from the
   gooseneck at the trim's angle.
 - Heel: left out first (6%).
+
+## As built
+
+- **The outline**: 27 corners, stem to transom and back (rules/geometry.ts `OUTLINE`), from `halfBeam` in the new pure
+  module src/boat/hullPlan.ts (render/hull.ts imports it and re-exports it, so the drawn deck line and the touching one
+  are the same curve). The deck line is a hair hollow in its first 0.4 m (under a millimeter); the outline leaves that
+  out, so it's convex.
+- **The distance**: GJK (Gilbert, Johnson and Keerthi 1988), from the outlines' support points, for every pair within
+  two lengths plus both half-breadths by the centerlines. It agrees with a brute-force corner-to-edge distance to a tenth
+  of a millimeter over 3,000 pairs, overlaps included (tests/hull-contact.test.ts). Beyond that it isn't measured: the
+  centerline gap less both half-breadths is under the true gap and over two lengths, more than any distance the rules
+  judge by.
+- **Cost**: about 1.7 µs a call measured, against 0.5 for the centerline segments. A full fleet asks about 21 times a
+  step, under 2 of them within two lengths.
+- **`hullContact(A, B)`**: the gap, the nearest point on each, and the normal from A toward B, for rule 14's damage and
+  the contact physics.
+- **Rule 19, corrected from the table above**: a shore's distance (`obstacle().d`) is from her center, not her side, so
+  the room test keeps her half-beam: `oi.d − 1.1 + hullGap < ROOM_GAP`. A boat as the obstruction now gives her distance
+  from the center too (her hull gap plus 1.1 m), as a shore does; before, it was a centerline gap, 1.1 m more.
+- **Mark-room's "unable"** (`markUnable`) measures from the outside boat's centerline to the mark, so it keeps the beam:
+  `gapTo − 1 < ROOM_GAP + 2.2`, the same number as before.
+- **A squeeze still going on** (world.ts, for 43.1's exoneration): `SQUEEZE_GAP` 2.2 m of water and closing. It's a
+  modeling choice, in the range the centerline measure gave (1.3 m abeam, 2.4 m bow to side). `ROOM_GAP` alone would
+  have narrowed it to the abeam figure.
+- **Case 11** is drawn 3.4 m apart, center to center (1.2 m of water), not 4: it comes out PL's 19.2(b) from 3 to 3.8 m.
+  At 4 m, by the time PW's bow reaches PL's side (later now, as it really is), PW is turning away from S faster than PL
+  closes, and rule 19's squeeze test (inward against outward motion) no longer reads it as PL's. That test doesn't ask
+  whether the inside boat is using room she's entitled to, which is a known limit, as before.

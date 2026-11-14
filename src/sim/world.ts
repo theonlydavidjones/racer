@@ -104,7 +104,7 @@ const STEERAGE = 0.5, JAM_CLOSING = 0.4;
  * contact response (boat/contact.ts) holds boats lying together at touching, give or take the step's motion. */
 const PRESSED_SLACK = 0.3;
 /** A squeeze still going on: the boat that broke a rule against her within this much water of her hull (m) and still
- * closing (43.1's "compelled", for a touch on the mark or another boat). A beam's width: a modelling choice, in the range
+ * closing (43.1's "compelled", for a touch on the mark or another boat). A beam's width: a modeling choice, in the range
  * the earlier centerline measure gave (1.3 m abeam to 2.4 m bow to side). */
 const SQUEEZE_GAP = 2.2;
 /** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modelling cap). */
