@@ -295,6 +295,13 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8u. **Now — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
+   editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
+   in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
+   input), so something hides them on screen. Suspects: the new Save banner or the turning boat's panel pushing
+   Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
+   published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
+   ensign.
 8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
    Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
    Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
