@@ -185,7 +185,10 @@ function userCrew(s: Settings): CrewSpec {
   return { helm: c.helm, crew: c.people.slice(0, c.n) };
 }
 
-const pairKey = (A: Boat, B: Boat) => A.id < B.id ? A.id + '-' + B.id : B.id + '-' + A.id;
+/** A pair's key in World.pairs, "lo-hi" by the boats' ids: each made once and kept (checkPairs asks for every pair, every
+ *  step, and a new string each time was most of what that cost). */
+const PAIR_KEYS: string[][] = [];
+const pairKey = (A: Boat, B: Boat) => { const lo = Math.min(A.id, B.id), hi = Math.max(A.id, B.id); return (PAIR_KEYS[lo] ??= [])[hi] ??= lo + '-' + hi; };
 
 /** The settings the conditions panel sets: what applyConditions takes mid-sail (windDir, a replay's legacy pin, isn't one: it stays the sail's). */
 export const CONDITION_KEYS = ['windKt', 'windKind', 'windTurn', 'windDay', 'chop', 'swellHs', 'swellDay', 'sea', 'current', 'rain', 'fog', 'traffic'] as const;
@@ -1184,7 +1187,8 @@ export class World {
       const A = bs[i], B = bs[j], key = pairKey(A, B);
       const rec = this.pairs[key] ??= newPairRecord();
       // (Rule 44.1's tangle: once a boat that fouled has been a length clear of the boat she fouled, it's over)
-      for (const [X, Y] of [[A, B], [B, A]] as const) { const lf = this.lastFoulVs.get(X.id); if (lf && lf.vs === Y.id && !lf.clear && hullGap(X, Y) > LOA) lf.clear = true; }
+      const untangle = (X: Boat, Y: Boat) => { const lf = this.lastFoulVs.get(X.id); if (lf && lf.vs === Y.id && !lf.clear && hullGap(X, Y) > LOA) lf.clear = true; };
+      untangle(A, B); untangle(B, A); // (each way round, as before; no arrays a pair a step)
       const tg = this.tangles.get(key);
       if (tg && !tg.clear) { const g = hullGap(A, B); if (g > LOA) tg.clear = true; if (g > tg.g0 + 1) tg.parted = true; }
       if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
@@ -1348,8 +1352,12 @@ export class World {
     const u = this.user;
     for (const v of this.vessels) {
       const ty = VESSEL[v.kind], hv = vesselHull(v), uv = V(v.h);
-      // contact with a vessel: for any boat, pushed clear and stopped
+      // contact with a vessel: for any boat, pushed clear and stopped. (A boat outside the box about the vessel's line,
+      // widened by her hull's half-beam and 12 m more, more than her own half-length and the 0.8 m, is clear of her: the
+      // three distances are only worked out near her, the same answer for the rest)
+      const pad = hv.r + 12, x0 = Math.min(hv.a.x, hv.b.x) - pad, x1 = Math.max(hv.a.x, hv.b.x) + pad, y0 = Math.min(hv.a.y, hv.b.y) - pad, y1 = Math.max(hv.a.y, hv.b.y) + pad;
       for (const b of this.boats) {
+        if (b.x < x0 || b.x > x1 || b.y < y0 || b.y > y1) continue;
         const gap = Math.min(segPt(bow(b), hv.a, hv.b), segPt(stern(b), hv.a, hv.b), segPt(b, hv.a, hv.b)) - hv.r - 0.8;
         if (gap < 0) {
           const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
