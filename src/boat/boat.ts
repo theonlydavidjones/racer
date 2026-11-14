@@ -51,6 +51,12 @@ export interface AiState {
   commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
+  /** How long she's been in another boat's wind shadow running, s (it eases off twice as fast once she's clear). */
+  dirtyRunT?: number;
+  /** Headed up out of a wind shadow on a run: she holds the higher course until this time. */
+  dirtyRunUntil?: number;
+  /** Getting out of an island's lee after rounding it: the side she chose (+1: to the right of the wind's direction). */
+  leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
@@ -126,6 +132,10 @@ export interface Boat {
   tiller: number; // −1..1: your tiller handle, port .. starboard (pushing it to starboard turns the boat to port)
   /** Sculling (rule 42.3(d)): the way she's being sculled round (+ to starboard), held until she's close-hauled (SCULL 2). */
   scullDir?: number;
+  /** The running balance of the tiller's own pushes, worked by hand, over a couple of strokes: N·m·s, + to starboard (physics.ts: sculling). */
+  scullNet?: number;
+  /** ... and their mean moment over a few strokes, N·m, + to starboard: which way she's being sculled. */
+  scullMean?: number;
   turnTarget: number | null;
   turnDir: number;
   luff: boolean;
@@ -178,6 +188,9 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** What turns her by itself, N·m, + to starboard: her sails' moment about the keel and the wind's on her topsides, rig
+   * and crew, from the last step's forces (physics.ts; turning.ts takes it with the rudder's and the hull's). */
+  turnM?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
@@ -266,6 +279,8 @@ export interface Boat {
   ensign?: string; special?: string;
   /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
   ensignStruck?: boolean;
+  /** Coming in to a berth: the crew's lines going ashore (boat/dockLines.ts, sim/world.ts mooringStep). */
+  mooring?: import('./dockLines').Mooring;
   /** The ensign down for its hours: outside 0800–sunset, unless she's entering or leaving a harbour (boat/colours.ts). */
   ensignNight?: boolean;
   /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */

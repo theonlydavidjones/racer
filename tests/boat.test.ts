@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import orc from '../src/boat/data/nordic-folkboat-orc.json';
 import { FOLKBOAT, Polar, jibOnlyDeadRun, type OrcPolarData } from '../src/boat/polar';
-import { coastDistance, maxTurnRate, timeToCover } from '../src/boat/dynamics';
+import { coastDistance, timeToCover } from '../src/boat/dynamics';
+import { maxTurnRate, scullTurnRate } from '../src/boat/turning';
 import { D2R, KT, LOA } from '../src/core/math';
 import { kt, sail, startTack, testBoat, upwindProgress } from './helpers/testBoat';
 
@@ -110,7 +111,8 @@ describe('handling: turning and tacking', () => {
   it('turn rate depends on speed: ~15°/s at full speed, only a few °/s when nearly stopped', () => {
     expect(maxTurnRate(2.4)).toBeGreaterThan(13);
     expect(maxTurnRate(2.4)).toBeLessThan(18);
-    expect(maxTurnRate(0.2)).toBeLessThanOrEqual(4);
+    // (nearly stopped: sculled, at the steady turn the standard stroke holds against her hull broadside, turning.ts)
+    expect(maxTurnRate(0.2)).toBeCloseTo(scullTurnRate(), 6); expect(scullTurnRate()).toBeGreaterThan(3); expect(scullTurnRate()).toBeLessThan(6);
   });
 
   //   wind ↓     ↖ close-hauled on starboard → tack → ↗ close-hauled on port

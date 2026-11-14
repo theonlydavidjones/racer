@@ -30,27 +30,9 @@ export const HANDLING = {
    * directly comparable: this one and the RESIDUARY table below have to be checked together.
    */
   formFactor: 1.15,
-  /**
-   * Drag area of hull, mast and rigging, m². ORC's windage model (VPP Documentation 2023, §5.3, Table 5.10: hull Cd 0.816
-   * on freeboard × beam bow-on and on freeboard × LOA beam-on; mast 0.4 front, 0.6 side; rigging wire 1.0 × 1.2) gives
-   * about 1.9 m² for her with the wind dead ahead (0.65 m freeboard, 2.2 m beam, a 9.5 m mast, the crew's 0.27), which
-   * fits; but beam-on it's about 4.8 m², and blended between the two (its eq. 5.26) about 4 m² close-hauled. Here it
-   * stays 2.0 at every angle. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
-   */
-  windageCdA: 2.0,
   /** Drag area of the sails when they flog (luffing or head to wind). A flogging sail lies mostly
    * edge-on to the wind: ~0.12 × 25.8 m² of main and jib. */
   flogCdA: 3,
-  /** Turning radius with the helm hard over, m (about 1.2 boat lengths for a long keel). An uncited estimate: it sets
-   * the penalty turns' pace too (physics.ts PENALTY_TURN_RATE, where the sim's 720 is compared with a real one). */
-  turnRadius: 9,
-  /** Turn rate when nearly stopped, by sculling (physics.ts: only toward close-hauled from above it, rule 42.3(d)), deg/s. An estimate. */
-  minTurnRate: 4,
-  /** Hard limit on turn rate, deg/s. */
-  maxTurnRate: 22,
-  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). An uncited estimate (with turnRadius it
-   * sets how long penalty turns take: physics.ts PENALTY_TURN_RATE). */
-  turnDrag: 0.15,
   /** Drive while luffing (sails eased until they lift), as a fraction of normal target speed. */
   luffFactor: 0.12,
   /** How much the sails flog while luffing (fully eased: they flog, and the boat coasts to a stop). */
@@ -154,7 +136,96 @@ export function airDrag(aws: number, awa: number, flog: number, hoisted = 1): nu
   const bare = Math.max(flog, 1 - hoisted), cloth = Math.min(flog, hoisted);
   if (awa >= 90 || bare <= 0) return 0;
   const q = 0.5 * RHO_AIR * aws * aws;
-  return q * (HANDLING.windageCdA * bare + HANDLING.flogCdA * cloth) * Math.cos(awa * D2R);
+  return q * (windFore(awa, 3, 1 - hoisted) * bare + HANDLING.flogCdA * cloth * Math.cos(awa * D2R)); // (struck, her mast is bare)
+}
+
+/**
+ * Windage: the wind on her hull, mast and crew, as drag areas (Cd × area, m²) at apparent wind angle `awa` (deg): the
+ * fore-and-aft part (`windFore`: positive pushes her astern, negative, the wind abaft the beam, ahead) and the sideways
+ * part (`windSide`, to leeward). Each times ½ρV² is the force.
+ *
+ * The sizes bow-on and beam-on are ORC's windage model's (VPP Documentation 2023, §5.3, Table 5.10):
+ *  - hull: Cd 0.816 on freeboard × beam bow-on, freeboard × LOA beam-on (0.65 m freeboard, an estimate; 2.20 m beam,
+ *    7.64 m LOA, the class's);
+ *  - mast: 0.4 bow-on and 0.6 side-on behind its sail, 0.8 either way bare (`bare`: the share of the main that's
+ *    down), on its section × 10.0 m above the deck (NFIA Class Rules 2025–28, 6.1.10–11: the bands 1.00 and 9.75 m up,
+ *    the top 0.25–0.30 m above; 6.2.1, the aluminium section: 100–112 mm across to the upper band's taper, 100–130 mm
+ *    fore and aft, tapering to 60–100 mm at the top: taken as 0.10 m across and 0.115 m fore and aft, a mean);
+ *  - rigging wire: Cd 1.0 on about 0.19 m², the same from any side (class rule 7.10's least diameters: 7 mm shrouds
+ *    and forestay, 5 mm jumpers, 3 mm backstay; their lengths from the hounds 5.4 m up and the masthead, about 17 m,
+ *    7 m and 10.6 m: an estimate);
+ *  - crew: 1.08 on 0.25 m² bow-on and 0.5 m² a person beam-on (ORC's "0.5·Mvblcrew", read as a head count: an
+ *    estimate; three aboard unless told).
+ * So about 2.0 m² bow-on and 6.6 m² beam-on with three aboard and her sails set (the sim had 2.0 fore and aft at
+ * every angle, and 5.5 side-on).
+ *
+ * Between bow-on and beam-on:
+ *  - mast and crew are bluff: their drag lies along the apparent wind, ORC's blend between the two (eq. 5.26,
+ *    Cd·A = Cd_front·A_front·|cos β| + Cd_side·A_side·sin β), its parts cos and sin of the angle, as ORC resolves it.
+ *  - the hull is a slab: the wind on its side pushes it sideways, not astern. ORC's blend, all of it along the wind,
+ *    gives her more drag astern with the wind 70° off the bow than dead ahead (a VPP's shortcut, close enough on the
+ *    wind with sails drawing; wrong for a boat under bare poles, hove to or motoring). Measured ships' hulls don't:
+ *    their fore-and-aft force holds about level to 30–45° and falls to nothing beam-on. So the hull's parts follow
+ *    Blendermann's fit to wind-tunnel loads (Blendermann 1994, "Parameter identification of wind loads on ships",
+ *    J. Wind Eng. Ind. Aerodyn. 51, 339–351, as in Fossen's Handbook of Marine Craft Hydrodynamics §10.1 and his MSS
+ *    library's blendermann94.m; read from that code, the paper itself not reached): fore-and-aft front·cos γ / den,
+ *    sideways side·sin γ / den, den = 1 − ½δ(1 − front/side)·sin² 2γ. δ, the cross-force parameter, is 0.6: his speed
+ *    boat's (0.60) and tender's (0.65), the smallest craft in his table (ships' hulls, not a yacht's: an estimate).
+ */
+const WINDAGE = {
+  hullFront: 0.816 * 0.65 * 2.2, hullSide: 0.816 * 0.65 * 7.64, delta: 0.6,
+  mastFront: 0.10 * 10.0, mastSide: 0.115 * 10.0, wire: 1.0 * 0.19, crewFront: 1.08 * 0.25, crewSide: 1.08 * 0.5
+};
+/** Mast, wire and crew: their drag area along the apparent wind (ORC's blend; the mast's Cd from behind its sail to bare). */
+const bluffCdA = (c: number, s: number, crew: number, bare: number) =>
+  (WINDAGE.mastFront * (0.4 + 0.4 * bare) + WINDAGE.crewFront) * Math.abs(c) + (WINDAGE.mastSide * (0.6 + 0.2 * bare) + WINDAGE.crewSide * crew) * s + WINDAGE.wire;
+/** The hull's share of Blendermann's denominator (1 bow-on and beam-on, least at 45°). */
+const hullDen = (c: number, s: number) => 1 - 2 * WINDAGE.delta * (1 - WINDAGE.hullFront / WINDAGE.hullSide) * s * s * c * c;
+export function windFore(awa: number, crew = 3, bare = 0): number {
+  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a);
+  return (WINDAGE.hullFront / hullDen(c, s) + bluffCdA(c, s, crew, bare)) * c;
+}
+export function windSide(awa: number, crew = 3, bare = 0): number {
+  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a);
+  return (WINDAGE.hullSide / hullDen(c, s) + bluffCdA(c, s, crew, bare)) * s;
+}
+
+/**
+ * Where her windage acts fore and aft: the turning moment of windSide's force about her centre of lateral resistance,
+ * as a moment area (m³; times ½ρV² it's N·m), + turning her bow away from the wind (its centre ahead of the keel's).
+ * Under bare poles this is what swings her.
+ *  - the hull: its side area's centre, 0.12 m ahead of the centre of lateral resistance (the drawn sheer and cabin,
+ *    render/hull.ts, from the class's construction plan: 5.6 m² centred 0.28 m ahead of amidships; the keel's centre
+ *    0.165 m ahead of amidships, where balance.ts LEVER puts it), moving toward whichever end the wind comes from by
+ *    0.18 × LOA a radian off the beam (Blendermann 1994's yaw moment, CN = (sL/LOA − 0.18(γ − π/2))·CY, by Fossen's
+ *    MSS code: 2.2 m forward with the wind on the bow, as far aft with it on the quarter; measured on ships);
+ *  - the mast and wire: at the mast, 0.79 m ahead (2.80 m from the stem, CR 7.21, 6.1.7);
+ *  - the crew: in the cockpit, about 2.4 m aft (crewPhys.ts Z: the helm 2.95 m and the crew 1.35–2.5 m aft of
+ *    amidships). With three aboard they're a quarter of her side windage and the furthest from the keel: an estimate
+ *    as their area is (ORC's 0.5 m² a head).
+ */
+const WIND_LEVER = { hull: 0.12, shift: 0.18 * 7.64, mast: 0.79, crew: -2.4 };
+export function windTurn(awa: number, crew = 3, bare = 0): number {
+  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a), ac = Math.abs(c);
+  const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s + WINDAGE.wire;
+  const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
+  return s * (WINDAGE.hullSide / hullDen(c, s) * (WIND_LEVER.hull + WIND_LEVER.shift * (Math.PI / 2 - a)) + mast * WIND_LEVER.mast + people * WIND_LEVER.crew);
+}
+
+/**
+ * How high her windage acts: the heeling moment of windSide's force, as a moment area (m³; times ½ρV² it's N·m, heeling
+ * her to leeward), about the hull's centre of lateral pressure 0.43 × draft below the waterline (ORC VPP Documentation
+ * 2025, eq. 4.29: 0.52 m, as balance.ts CE_HEIGHT takes it). ORC has the windage in the heeling moment (VPP 2023,
+ * eq. 5.56): the hull's at 0.66 × its freeboard (§5.3: 0.44 m above the waterline), the mast's at its middle (10 m of
+ * it from the deck, about 0.8 m up: 5.8 m), the wire's about 4 m up (the stays' middles: an estimate), the crew's about
+ * 0.9 m (sitting in the cockpit: an estimate). Beam-on under bare poles in 25 kt it heels her 3–4°.
+ */
+const WIND_HEIGHT = { hull: 0.44 + 0.52, mast: 5.8 + 0.52, wire: 4.0 + 0.52, crew: 0.9 + 0.52 };
+export function windHeel(awa: number, crew = 3, bare = 0): number {
+  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a), ac = Math.abs(c);
+  const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s;
+  const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
+  return s * (WINDAGE.hullSide / hullDen(c, s) * WIND_HEIGHT.hull + mast * WIND_HEIGHT.mast + WINDAGE.wire * WIND_HEIGHT.wire + people * WIND_HEIGHT.crew);
 }
 
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */
@@ -168,12 +239,6 @@ export function surgeAccel(v: number, vt: number, windageN: number, dispKg = HUL
   return (drive(v, vt, k) - hullResistance(v) - windageN) / (HANDLING.mass * dispKg / HULL.displacement);
 }
 
-/** Fastest the helm can turn the boat at speed v (m/s), deg/s. Rudder authority comes from water flow. */
-export function maxTurnRate(v: number): number {
-  return Math.min(HANDLING.maxTurnRate, Math.max(HANDLING.minTurnRate, v / HANDLING.turnRadius / D2R));
-}
-/** The turn rate the rudder alone gives at speed v (m/s) through the water, deg/s: none without water flowing past it. */
-export const flowTurnRate = (v: number): number => Math.min(HANDLING.maxTurnRate, Math.max(0, v) / HANDLING.turnRadius / D2R);
 
 /**
  * Time (s) to make `dist` metres of progress in some direction if the boat sheets in now and

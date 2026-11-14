@@ -50,16 +50,17 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     expect(slow.coach).toMatch(/Too slow through the eye|Stuck in irons/);
     if (slow.scored) { expect(slow.deadS).toBeGreaterThan(good.deadS * 1.6); expect(slow.lostM).toBeGreaterThan(good.lostM); }
   });
-  it('full helm through a tack turns at least as hard, overshoots the new course, and costs at least the crew\'s tack', () => {
-    // (the sim's boat doesn't stall in a hard turn: its rudder's braking at full helm decides how much a spin costs,
-    // and today it costs little more than the crew's tack)
+  it('full helm through a tack turns no faster than the crew\'s, overshoots the new course, and costs more', () => {
+    // (hard over, the blade is past its stall: it brakes her more than it turns her, turning.ts; the crew hold it just
+    // short of the stall)
     const good = drill('tack', 10)!, fast = drill('tack', 10, { tiller: -1 })!;
-    expect(fast.peakRate).toBeGreaterThan(good.peakRate - 0.5); // (the crew already tack at about full helm)
+    expect(fast.peakRate).toBeLessThan(good.peakRate + 0.5);
     expect(fast.overshoot).toBeGreaterThan(good.overshoot + 3);
-    expect(fast.lostM).toBeGreaterThanOrEqual(good.lostM * 0.98);
+    expect(fast.lostM).toBeGreaterThan(good.lostM);
   });
-  it('a half-hearted tack (half helm) is slow through the eye, loses more and is told so', () => {
-    const half = drill('tack', 10, { tiller: -0.4 })!;
+  it('a timid tack (a quarter helm) is slow through the eye, loses more and is told so', () => {
+    // (a quarter helm, 7.5° of blade: half helm is 12°, near the blade's best angle, and a good tack now)
+    const half = drill('tack', 10, { tiller: -0.25 })!;
     expect(half.lostM).toBeGreaterThan(2 * half.goodM);
     expect(half.coach).toMatch(/Too slow through the eye/);
   });
@@ -118,7 +119,7 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
     run(b, d, 40); takeLine(b, 'jibsheet'); takeLine(b, 'jibsheetW'); startTack(b);
     run(b, d, 60, () => { if (b.tack === 'P') { b.ctl.jibsheetW = 0; b.ctl.jibsheet = 1; } });
     expect(b.hove).toBe(true);
-    expect(d.list.length).toBe(0);
+    expect(d.list.filter(x => x.scored).length).toBe(0); // (noted as hove to, if the drill has got to it: never scored)
   });
   it("a good tack with the jib sheets yours is still a good tack (no 'too early' line without an honest signal for it)", () => {
     const s = drill('tack', 12)!;

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt } from './helpers/testBoat';
 import { KT, wrap } from '../src/core/math';
 import { allToCrew, byHand, crewMainAngle, leeDrift, linesByHand, takeLine } from '../src/boat/physics';
-import { jibClew, shapeEfficiency, targetShape } from '../src/boat/controls';
-import { polar } from '../src/boat/polar';
+import { asWindwardSheet, jibClew, shapeEfficiency, targetShape } from '../src/boat/controls';
+import { beatAngle, polar } from '../src/boat/polar';
 import type { Boat } from '../src/boat/boat';
 
 /* ---------- 2a: one line at a time ---------- */
@@ -77,13 +77,35 @@ describe('the two jib sheets', () => {
     expect(jibClew({ ...c, jibsheetW: 0.9 }, 'S')).toBeGreaterThan(60);
     expect(jibClew({ ...c, jibsheetW: 0 }, 'S')).toBeLessThan(-8);
   });
+  for (const W of [5, 8, 12, 15, 20]) it(`tacked in ${W} kt with the jib sheet left made fast, the jib is aback and she heaves to (Debrief, 13 Nov 2026)`, () => {
+    const twa = beatAngle(W), b = testBoat({ heading: 360 - twa, kt: polar(W, twa, 'jib') / KT, windKt: W });
+    sail(b, 20, () => { b.h = 360 - twa + (b.leeway ?? 0); });
+    takeLine(b, 'jibsheet'); takeLine(b, 'jibsheetW');
+    const clewWas = b.sheets.jib; // (where the made-fast sheet held the clew, to leeward)
+    b.turnDir = 1; b.turnTarget = twa; sail(b, 20, () => { if (b.turnTarget == null) return true; });
+    expect(b.tack).toBe('P');
+    sail(b, 5);
+    // the same sheet through the same car: the clew as far inboard of that car as it was outboard of it, to windward now
+    expect(b.sheets.jib).toBeLessThan(0); expect(b.sheets.jib).toBeGreaterThan(-Math.abs(clewWas));
+    expect(b.jibBacked).toBeGreaterThan(0.5); expect(b.hove).toBe(true);
+    // then the rest of heaving to: the main eased until its front lifts and the tiller lashed to leeward (port tack
+    // now: the tiller to starboard). She settles, the jib still aback on the sheet that was never touched
+    takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = 0.55; sail(b, 15);
+    b.lashed = (W < 10 ? 0.6 : 0.7); sail(b, 150);
+    const off = Math.abs(wrap(b.ww.from - b.h));
+    expect(b.hove).toBe(true); expect(b.jibBacked).toBe(1);
+    expect(kt(b)).toBeLessThan(2.2);
+    // (in 8 kt and up she lies as the hove-to tests below have her; in 5 kt there's too little in her sails to hold a
+    // steady angle, and she lies beam-on or wanders, stopped all the same)
+    if (W >= 8) { expect(off).toBeGreaterThan(35); expect(off).toBeLessThan(75); }
+  });
   it('tack holding both sheets and the jib is aback on the new tack (the classic way to heave to)', () => {
     const b = testBoat({ heading: 318, kt: 5, windKt: 12 }); sail(b, 15, () => { b.h = 318 + (b.leeway ?? 0); }); // (close-hauled: her course 42°)
     takeLine(b, 'jibsheet'); takeLine(b, 'jibsheetW');
     const trimmed = b.ctl.jibsheet;
     b.turnDir = 1; b.turnTarget = 42; sail(b, 12, () => { if (b.turnTarget == null) return true; });
     expect(b.tack).toBe('P');
-    expect(b.ctl.jibsheetW).toBeCloseTo(trimmed, 5); // the sheet you'd trimmed is now the windward one
+    expect(b.ctl.jibsheetW).toBeCloseTo(asWindwardSheet(trimmed), 5); // the sheet you'd trimmed is now the windward one, the same length of it
     expect(b.jibBacked).toBeGreaterThan(0.5);
   });
   it('tack holding both sheets with a tack called: she carries through the turn, not stuck head to wind, and lies with the jib aback', () => {

@@ -63,9 +63,12 @@ export const TACK_BEGUN = 15;
 /** ... and is above any course she'd sail close-hauled: no more than this far off the wind (a Folkboat's beat is 40–45°,
  * polar.ts beatAngle), so a boat footing when hailed gets no credit for merely coming up to close-hauled. */
 const BEGUN_TWA = 30;
+/** The helm put down to tack: this much of the blade's throw toward the wind (half: 15° of the 30°; a modeling threshold,
+ * well beyond a helmsman's steering corrections), with her bow already this many degrees up from her heading at the hail. */
+const HELM_DOWN = 0.5, HELM_UP = 2;
 /**
  * Begun to tack, she's through head to wind within this many seconds, or she didn't really tack. (In the sim a boat
- * keeps turning at the rudder's least authority, dynamics.ts HANDLING.minTurnRate, so even at 1 m/s she's through in
+ * keeps turning at least at the sculled rate, turning.ts scullTurnRate, so even at 1 m/s she's through in
  * well under 15 s: a modelling allowance, not a number from the rules.)
  */
 export const THROUGH_WIND = 15;
@@ -86,7 +89,12 @@ export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number,
   const now = b.ww?.from ?? windFrom, then = Number.isFinite(at.wind) ? at.wind : now;
   const up = Math.sign(wrap(then - at.h)) * wrap(b.h - at.h);
   // (once started, she's still at it while she stays turned up: a shift that frees her mid-luff doesn't undo it)
-  return up >= TACK_BEGUN && (started || Math.abs(wrap(now - b.h)) <= BEGUN_TWA);
+  if (up >= TACK_BEGUN && (started || Math.abs(wrap(now - b.h)) <= BEGUN_TWA)) return true;
+  // Or the helm put down: rule 20 asks her to "respond ... by tacking as soon as possible", and the response is the helm
+  // going over. Slow, against her yaw inertia, she can take 5 s to turn TACK_BEGUN (Deep Physics' turning model, 14 Nov
+  // 2026: 0.9 m/s, 15° up at about 5 s), but her blade is hard over within a few steps. HELM_DOWN of its throw toward the
+  // wind, with her bow already coming up, is a tack begun; a sea's or a gust's correction is a few degrees of blade
+  return Math.sign(wrap(then - at.h)) * (b.helm ?? 0) >= HELM_DOWN && up > HELM_UP;
 }
 
 /**
@@ -222,7 +230,8 @@ const at = (r: PoseRing, k: number) => (r.i + RING - 1 - k) % RING;
  * nothing between them. */
 function poseAt(r: PoseRing, t: number): Pose {
   const n0 = at(r, 0);
-  let a = at(r, r.n - 1), b = a, f = 0;
+  // (after her newest sample, her newest; before her oldest, her oldest: never a stale pose for a recent time)
+  let a = t >= r.t[n0] ? n0 : at(r, r.n - 1), b = a, f = 0;
   for (let k = 0; k < r.n - 1; k++) {
     const p = at(r, k + 1), q = at(r, k);
     if (r.t[p] <= t && t <= r.t[q]) { a = p; b = q; f = r.t[q] > r.t[p] ? (t - r.t[p]) / (r.t[q] - r.t[p]) : 1; break; }
@@ -287,10 +296,45 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): numbe
   const seenRate = sw > 0.2 ? wrap(seen.h - poseAt(R, tr - sw).h) / sw : 0;
   const ahead = straightOn(seen, seenRate);
   const predicted = (tau: number): Pose => t0 + tau <= tr ? actual(tau) : ahead(t0 + tau - tr);
-  const wind = kc.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 2 };
+  const wind = kc.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 2, windKt: kc.ww?.kt ?? ctx.windKt };
   const choices = escapes(kc0, [predicted], wind, o);
   const choice = choices.reduce((a, b) => b.minGap > a.minGap + 0.05 || (Math.abs(b.minGap - a.minGap) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
   return escapes(kc0, [actual], wind, { ...o, turns: choice.turn ? [choice.turn] : [] }).find(q => q.turn === choice.turn)!.minGap;
+}
+
+/**
+ * Rule 43.1(a): could `f`, once `by`'s breach against her came at time `since`, have kept clear of `victim` (and of `by`)
+ * by turning away promptly? From the boats' recorded poses at `since` (the water's frame, as for 16.1), the turn a
+ * prompt helmsman would choose then against both carrying on as they were, scored against their actual tracks. No
+ * history: taken as unable (the old proxy's answer).
+ */
+export function couldAvoid(f: RulesBoat, victim: RulesBoat, by: RulesBoat, since: number, ctx: RulesContext): boolean {
+  const F = RINGS.get(f), Vr = RINGS.get(victim), B = RINGS.get(by);
+  if (!F || !Vr || !B || F.n < 2) return false;
+  const newest = (R: PoseRing) => R.t[at(R, 0)], oldestOf = (R: PoseRing) => R.t[at(R, R.n - 1)];
+  const now = Math.max(newest(F), newest(Vr), newest(B)), t0 = Math.max(since, oldestOf(F), oldestOf(Vr), oldestOf(B));
+  if (now - t0 < 0.05) return false;
+  // each boat's actual track from t0: her recorded poses, then on from her own newest sample
+  const track = (R: PoseRing, b: RulesBoat) => {
+    const v = b.v ?? Math.hypot(b.vx, b.vy), tn = newest(R), last = poseAt(R, tn);
+    return (tau: number): Pose => {
+      const t = t0 + tau;
+      if (t <= tn) return poseAt(R, t);
+      const u = V(last.h), d = t - tn;
+      return { x: last.x + u.x * v * d, y: last.y + u.y * v * d, h: last.h, v };
+    };
+  };
+  const seen = (R: PoseRing) => { const p = poseAt(R, t0), w = Math.min(TURN_WINDOW, t0 - oldestOf(R)); return straightOn(p, w > 0.2 ? wrap(p.h - poseAt(R, t0 - w).h) / w : 0); };
+  const f0 = poseAt(F, t0), fw = Math.min(TURN_WINDOW, t0 - oldestOf(F));
+  const kc0 = { ...f0, turnRate: fw > 0.2 ? wrap(f0.h - poseAt(F, t0 - fw).h) / fw : 0 };
+  const wind = f.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 1, windKt: f.ww?.kt ?? ctx.windKt };
+  // the turn a prompt helmsman would choose then: clearest of the boat she must keep clear of (the victim), making things
+  // no worse with the boat that fouled her than holding on would (she has right of way over that one, owing only rule 14)
+  const choices = escapes(kc0, [seen(Vr), seen(B)], wind, o), hold = choices[0];
+  const ok = choices.filter(c => c.gaps[1] >= Math.min(hold.gaps[1], CONTACT_GAP) - 0.1);
+  const choice = (ok.length ? ok : [hold]).reduce((a, b) => b.gaps[0] > a.gaps[0] + 0.05 || (Math.abs(b.gaps[0] - a.gaps[0]) <= 0.05 && Math.abs(b.turn) < Math.abs(a.turn)) ? b : a);
+  const got = escapes(kc0, [track(Vr, victim), track(B, by)], wind, { ...o, turns: choice.turn ? [choice.turn] : [] }).find(q => q.turn === choice.turn)!;
+  return got.gaps[0] >= KEEP_CLEAR_GAP; // (kept clear of the victim: Definitions, Keep Clear, as rule 16.1's room)
 }
 
 /**

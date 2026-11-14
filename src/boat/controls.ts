@@ -106,6 +106,17 @@ export function jibClew(c: Controls, tack: Tack): number {
   const lee = jibAngle(c, tack), wlead = carLead(c.car[tack].ins); // the windward car is on the tack's own side
   return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
 }
+/**
+ * The same sheet, the same length of it, as the other side's setting: the windward sheet's 0–1 covers twice the clew's
+ * travel that the leeward sheet's does (jibClew: 140 against jibAngle's 70; it has the mast to go round), and a sheet of
+ * one length reaches as far either side of its car's bearing (the clew swings about the tack, the car is a fixed point:
+ * the triangle is the same either way). So a leeward sheet at s, left made fast through a tack, is the windward sheet at
+ * s / 2^(1/1.4): sheeted 18° to leeward before, it holds the clew 7° to windward after, aback (how a boat is hove to by
+ * tacking). And back the other way.
+ */
+const SHEET_SIDE = Math.pow(2, 1 / 1.4);
+export const asWindwardSheet = (leeSetting: number) => clamp(leeSetting / SHEET_SIDE, 0, 1);
+export const asLeewardSheet = (windwardSetting: number) => clamp(windwardSetting * SHEET_SIDE, 0, 1);
 /** Windward-sheet setting that holds the clew `angle` deg to windward (inverse of jibClew's windward stop). */
 export function jibsheetWFor(angle: number, c: Controls, tack: Tack): number {
   const wlead = carLead(c.car[tack].ins);

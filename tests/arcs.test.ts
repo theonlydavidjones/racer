@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { escapes, straightOn } from '../src/boat/arcs';
-import { flowTurnRate } from '../src/boat/dynamics';
+import { flowTurnRate } from '../src/boat/turning';
 
 // Wind from the north (0°). Headings: 0 north, 90 east.
 const best = (c: { minGap: number }[]) => Math.max(...c.map(k => k.minGap));
@@ -56,5 +56,12 @@ describe('escapes(): room to respond (docs/ROOM-TO-RESPOND.md)', () => {
     const c = escapes({ x: 0, y: 0, h: 0, v: 2.5, turnRate: 15 }, [post], 0, { delay: 99, horizon: 13, turns: [] })[0];
     expect(c.minGap).toBeGreaterThan(1);
     expect(c.heading).toBeGreaterThan(180); // (and she did come round past the half circle)
+  });
+
+  it('a tack loses more speed than the same turn bearing away: through the no-go zone her sails give no drive', () => {
+    // close-hauled on starboard (wind from 0°), 2.5 m/s: 90° up through the wind onto port, or 90° down onto a reach
+    const [tack] = escapes({ x: 0, y: 0, h: 315, v: 2.5 }, [], 0, { delay: 0, horizon: 8, turns: [90], windKt: 12 }).slice(1);
+    const [bear] = escapes({ x: 0, y: 0, h: 315, v: 2.5 }, [], 0, { delay: 0, horizon: 8, turns: [-90], windKt: 12 }).slice(1);
+    expect(tack.v).toBeLessThan(bear.v - 0.3);
   });
 });
