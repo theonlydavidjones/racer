@@ -68,3 +68,27 @@ describe('the traveller: the physics and the drawing agree', () => {
     expect(Math.abs(TRAVELLER_SWING - Math.atan(TRAVELLER_HALF / SHEET_POINT) * 180 / Math.PI)).toBeLessThan(0.6);
   });
 });
+
+/** The drawn sails against the class's sail rules (NFIA CR 2025–2028, section 9, and its drawings 8 and 9). */
+describe('the sails as the class allows them', () => {
+  const leech = (d: typeof RIG.MAIN_DEF) => { const N = 2000, p = [...Array(N + 1)].map((_, i) => sailEdges(d, i / N)[1]), cum = [0]; for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + p[i].distanceTo(p[i - 1])); return { p, cum, L: cum[N] }; };
+  /** How far down the leech from the head (as a fraction of it) the leech point at height fraction t is. */
+  const fromHead = (d: typeof RIG.MAIN_DEF, t: number) => { const { p, cum, L } = leech(d), q = sailEdges(d, t)[1]; let k = 0; for (let i = 0; i < p.length; i++) if (p[i].distanceTo(q) < p[k].distanceTo(q)) k = i; return { f: (L - cum[k]) / L, m: L - cum[k], L }; };
+  /** A sail's windows' area (m²), from their outlines across the chord and up the luff. */
+  const windowArea = (d: typeof RIG.MAIN_DEF) => { let a = 0; const luff = d.head.distanceTo(d.tack); for (const w of d.windows ?? []) for (let k = 0, K = 60; k < K; k++) { const t = w.t0 + (w.t1 - w.t0) * (k + 0.5) / K, [lu, le] = sailEdges(d, t); a += lu.distanceTo(le) * (w.s1 - w.s0) * luff * (w.t1 - w.t0) / K; } return a; };
+  it('the main\'s four battens divide its leech into five equal parts, within 100 mm (CR 9.23); top 800 mm, the rest 1050 at most (CR 9.24)', () => {
+    const b = RIG.MAIN_DEF.battens!;
+    expect(b.length).toBe(4);
+    [0.8, 0.6, 0.4, 0.2].forEach((want, i) => { const { f, L } = fromHead(RIG.MAIN_DEF, b[i].t); expect(Math.abs(f - want) * L).toBeLessThan(0.1); });
+    expect(b[3].len).toBeLessThanOrEqual(0.8); for (const x of b.slice(0, 3)) expect(x.len).toBeLessThanOrEqual(1.05);
+  });
+  it('the jib\'s three battens divide its leech into four equal parts (within 100 mm), inside lengths 600, 400, 300 mm at most (CR 9.35)', () => {
+    const b = RIG.JIB_DEF.battens!;
+    [0.75, 0.5, 0.25].forEach((want, i) => { const { f, L } = fromHead(RIG.JIB_DEF, b[i].t); expect(Math.abs(f - want) * L).toBeLessThan(0.1); });
+    [0.6, 0.4, 0.3].forEach((max, i) => expect(b[i].len).toBeLessThanOrEqual(max));
+  });
+  it('each sail\'s windows total 0.5 m² at most (CR 9.13)', () => {
+    expect(windowArea(RIG.MAIN_DEF)).toBeLessThanOrEqual(0.5);
+    expect(windowArea(RIG.JIB_DEF)).toBeLessThanOrEqual(0.5);
+  });
+});
