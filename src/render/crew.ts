@@ -28,7 +28,9 @@ export interface Figure extends Body {
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number } | null)[];
 }
-export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number }
+export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number;
+  /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
+   * +x), for boatMesh.ts to draw the handle where the hand has it */ winch?: { side: 1 | -1; turn: number } }
 type Limb = Body['arm'][number];
 
 /** A sailor (crewBody.ts): their body, and the state the posing keeps. */
@@ -61,6 +63,26 @@ const SEAT_Y = COCKPIT_FIT.seat, { benchAft: BENCH_AFT } = COCKPIT_FIT;
  * under the deck when they stand to steer. `footrestBack` 0 out (as boatMesh draws it by default) … 1 back: how far it's
  * slid back, as b.footrest. Its front edge, and over it the plank's top; under the deck behind it, the sole carries on.
  */
+/** The race's clock as the figures are posed (s): a winch's strokes go by it, not the page's. */
+let poseClock = 0;
+/** The winch someone is cranking this frame, if anyone (Crew.winch). */
+let cranked: { side: 1 | -1; turn: number } | undefined;
+/**
+ * The jib winch handle's grip at `turn` (boatMesh.ts winchHandle and WINCH_HANDLE, Boat Detail's: a 10-inch handle in the
+ * winch's socket, its spindle under the side deck's edge, the grip on its end, 0 pointing aft). The middle of the grip,
+ * where the hand closes on it.
+ */
+const WH = { drop: 0.05, len: 0.254, grip: 0.1 };
+export function winchGrip(side: number, turn: number): THREE.Vector3 {
+  const u = uAtZ(JIB_WINCH_Z), x = side * (cockpitHalf(u) + COAMING_T + 0.075), under = deckY(u, Math.abs(x)) - 0.03;
+  return V(x + WH.len * Math.sin(turn), under - WH.drop - WH.grip / 2 - 0.005, JIB_WINCH_Z + WH.len * Math.cos(turn));
+}
+/**
+ * The handle's swing for a short pull (rad either side of pointing aft): the handle under the deck's edge can't go round,
+ * so the sheet's ground in with short strokes, ratcheting, back and forth about 45 degrees, about one a second
+ * (Lewmar's ratchet handles: worked in part-turns where a full sweep is blocked). An estimate of the stroke's pace.
+ */
+const SHORT_PULL = { swing: 0.38, hz: 0.9 };
 let footrestBack = 0;
 export function setFootrest(back: number): void { footrestBack = Math.max(0, Math.min(1, back)); }
 const footrestOut = () => FOOTREST.out * (1 - footrestBack);
@@ -489,10 +511,15 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   else p = onSole(x, zc, k);
   if (job === 'winch') {
     // cranking the jib sheet in on the winch at the coaming's forward end (on the leeward side), one hand on the handle
-    const ws = -windward, w = winchAt(ws, 0.04);
-    const a = performance.now() / 1000 * 5 + idx; // (about a turn a second)
-    p.hands = [w.clone().add(V(Math.cos(a) * 0.16, 0.05, Math.sin(a) * 0.16)), w.clone().add(V(-ws * 0.12, -0.05, 0.25))];
-    p.pitch = -0.35; p.look = w;
+    // (the handle in its socket under the side deck's edge: short pulls, the hand on the grip, the handle drawn there with
+    // it, boatMesh.ts by Crew.winch; the other hand tailing the sheet off the drum)
+    // (the winch on the side they're on: to leeward in light air, to windward in a breeze, the jib cross-sheeted there so
+    // the trimmer can sit out to it (crewWork.ts stationFor's winch))
+    const ws = (Math.abs(x) > 0.3 ? Math.sign(x) : windward > 0 ? -1 : 1) as 1 | -1, w = winchAt(ws, 0.04);
+    const turn = SHORT_PULL.swing * Math.sin(2 * Math.PI * SHORT_PULL.hz * poseClock + idx);
+    cranked = { side: ws, turn };
+    p.hands = [winchGrip(ws, turn), w.clone().add(V(-ws * 0.12, -0.05, 0.25))];
+    p.pitch = -0.35; p.look = winchGrip(ws, 0);
   } else if (idx === 0 && lean <= 0.15) {
     // the jib trimmer: the sheet in the forward hand, led from the leeward winch
     const w = winchAt(-windward);
@@ -833,6 +860,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const ppl = c?.people;
   // (the time the race moved since the last frame, for their walking: track)
   const clk = c?.clock, sdt = clk == null || cr.clock == null || clk < cr.clock ? dt : clk - cr.clock; cr.clock = clk;
+  poseClock = clk ?? poseClock + dt; cranked = undefined;
   // (two of them on the same side don't sit in each other's laps: at least a shoulder's width apart fore and aft)
   // (out on a side deck, not forward of the winch there; in the middle, on the benches, on forward)
   const ZMAX = DECK_AFT, inC = (z: number) => z > COCK0 - 0.1 && z < COCK1;
@@ -898,6 +926,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     apply(f, ease(f, routed ?? want, dt), upright(f, against(pose), dt), dt);
     f.root.visible = true;
   });
+  cr.winch = cranked; // (boatMesh.ts turns the handle with the hand)
   // the helm
   const hp = ppl?.[0], h = cr.helm, x = hp ? hp.x : windward * 0.55, z = hp?.z ?? 2.95;
   cr.helmSide = Math.abs(x) > 0.05 ? Math.sign(x) : windward;
