@@ -768,7 +768,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
     // (only when the one way round is clearly out over the water: facing straight inboard, both ways pass fore or aft, and
     // the test's sign flipped each frame, so they turned a step one way and a step back for ever, the knees with them, 70
     // rad a minute, sat on the cabin top's edge)
-    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > 0.3 && Math.sin(c.yaw + d / 2) * sx < -0.3) d -= Math.sign(d) * 2 * Math.PI;
+    // (out on the deck only, outboard of the coaming: kneeling in the cockpit at the cabin top's lines, half a metre off its
+    // middle, a turn to walk forward went the long way round, 320 degrees)
+    if (Math.abs(d) > 2.6 && Math.abs(c.hip.x) > chz(c.hip.z) - 0.05 && Math.sin(c.yaw + d / 2) * sx < -0.3) d -= Math.sign(d) * 2 * Math.PI;
     // (a turn given its way round, back from facing aft at the mainsheet after a tack (syncCrew): on that way until it's
     // nearly done)
     if (f.turnDir != null) { if (Math.abs(d) < 0.6) f.turnDir = undefined; else if (Math.sign(d) !== f.turnDir) d += f.turnDir * 2 * Math.PI; }
