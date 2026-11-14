@@ -8,7 +8,7 @@ import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { loadLog, type LogEntry } from './boat/logbook';
 import { harborAt, inBasin } from './geo/marina';
-import { HULL_COLORS, BRIGHT_FINISH, sailNo } from './boat/spec';
+import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
@@ -42,7 +42,7 @@ import { WIND_KIND_LABEL, type WindKind } from './environment/wind';
 import { sunPosition } from './environment/sun';
 import { type StartStats } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
-import { $ } from './ui/dom';
+import { $, setAttr, setHidden, setText, setTitle } from './ui/dom';
 import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } from './ui/feedback';
 import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
@@ -279,7 +279,7 @@ let setupTimer = 0;
 /* ---------------- sim events → UI ---------------- */
 function handle(e: SimEvent): void {
   switch (e.type) {
-    case 'toast': toast(e.msg, e.ms); break;
+    case 'toast': toast(e.msg, e.ms); if (e.msg.startsWith('Pilot alarm')) pilotNote('Alarm'); break;
     case 'horn': if (e.delayMs) setTimeout(() => horn(e.dur), e.delayMs); else horn(e.dur); break;
     case 'incident': showIncident(e.a, e.b, e.incident, { frames: e.frames, focus: [e.a.id, e.b.id], wind: e.wind, kind: 'incident' }); break;
     case 'finished': break;
@@ -378,9 +378,9 @@ function showTiller(): void {
   const t = w.user.tiller; showLash();
   $('tillerHandle').style.left = `${50 + t * 44}%`;
   if (tillerHeld) $('tgCur').style.left = `${50 + t * TILLER_SPAN * 100}%`;
-  $('tiller').setAttribute('aria-valuenow', String(Math.round(t * 100)));
-  $('tillerLab').textContent = w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
-    : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
+  setAttr($('tiller'), 'aria-valuenow', String(Math.round(t * 100)));
+  setText($('tillerLab'), w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
+    : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`);
 }
 // Tiller bar: drag the handle left/right. Let go and it springs back to centre.
 let barDrag = false;
@@ -461,8 +461,8 @@ const btnCmd: Partial<Record<CtlKey, number>> = {};
  * where it is. */
 function showTrimOwner(): void {
   const mine = linesByHand(w.user), n = mine.length, names = mine.map(k => LINE_NAME[k]);
-  $('tpWho').textContent = n === 0 ? 'Crew trims every line' : n <= 2 ? `You have the ${names.join(' and the ')}` : `You have ${n} lines`;
-  $('tpWho').title = n === 0 ? 'The crew trims every line. Work any line in the sail controls and that one is yours.' : `Yours: ${names.join(', ')}. The crew trims the rest. Tap a line's amber name to give it back.`;
+  setText($('tpWho'), n === 0 ? 'Crew trims every line' : n <= 2 ? `You have the ${names.join(' and the ')}` : `You have ${n} lines`);
+  setTitle($('tpWho'), n === 0 ? 'The crew trims every line. Work any line in the sail controls and that one is yours.' : `Yours: ${names.join(', ')}. The crew trims the rest. Tap a line's amber name to give it back.`);
   $('tpWho').parentElement!.classList.toggle('mine', n > 0);
 }
 function giveBack(k: LineKey): void { send({ k: 'line', key: k, mine: false }); showTrimOwner(); }
@@ -761,13 +761,30 @@ for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
 /* The tiller pilot (boat/autopilot.ts): cruising only, since RRS 52 says a racing boat's rudder is worked by her
  * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
 function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
-  if (!w.running || w.paused) return;
-  if (!w.cruising) { toast('No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.', 5000); return; }
+  if (!w.running) return;
+  // (every refusal says why, on the button itself, where the player is looking, as well as in Messages: the owner, v188,
+  // "the button won't engage", with the reason only in the Messages card across the screen)
+  if (w.paused) { pilotRefused('Paused', 'The sail is paused: resume it, then engage the pilot.'); return; }
+  if (!w.cruising) { pilotRefused('Racing', 'No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.'); return; }
   const u = w.user;
-  if (u.docked || u.pushing || (u.astern ?? 0) > 0.1 || u.v < 0.5) { toast('Get her sailing first: a tiller pilot needs way on to steer.', 3500); return; }
-  unlash();
-  if (mode === 'nav' && (!w.dest || w.arrivedT != null)) { toast('Nav needs somewhere to go: tap the map and pick a destination.', 4000); return; }
-  releaseTiller(); send({ k: 'pilot', op: 'engage', mode });
+  if (u.docked || u.pushing) { pilotRefused('Alongside', 'She\'s alongside: cast off and get her sailing, then engage the pilot.'); return; }
+  if ((u.astern ?? 0) > 0.1) { pilotRefused('Going astern', 'She\'s going astern: a tiller pilot can\'t steer backwards. Get her moving ahead first.'); return; }
+  if (u.v < 0.5) { pilotRefused('Needs way on', `Get her sailing first: a tiller pilot needs way on to steer (she's making ${(u.v * 1.944).toFixed(1)} kt; it needs 1).`); return; }
+  if (mode === 'nav' && (!w.dest || w.arrivedT != null)) { pilotRefused('No destination', 'Nav needs somewhere to go: tap the map and pick a destination.'); return; }
+  unlash(); releaseTiller(); send({ k: 'pilot', op: 'engage', mode });
+}
+/** A refusal: its reason in Messages, and a short word on the pilot's button (or its panel's readout) for a few seconds. */
+let pilotNoteT = 0, pilotNoteUntil = 0;
+function pilotRefused(word: string, msg: string): void {
+  toast(msg, 4000); pilotNote(word);
+}
+function pilotNote(word: string): void {
+  pilotNoteUntil = performance.now() + 3000;
+  const chip = $('bPilot'), lab = chip.querySelector<HTMLElement>('.w')!, read = $('pilotRead');
+  // (on both: the button, if the pilot's off, and the panel's readout, if it's steering)
+  lab.textContent = word; read.textContent = word; pilotShown = word; chip.classList.add('refused'); $('pilot').classList.add('refused');
+  const my = ++pilotNoteT;
+  setTimeout(() => { if (my !== pilotNoteT) return; lab.textContent = 'Autopilot'; pilotShown = ''; chip.classList.remove('refused'); $('pilot').classList.remove('refused'); }, 3000);
 }
 function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
@@ -788,7 +805,7 @@ function pilotTick(dt: number): void {
     const d = w.dest; const nm = d ? Math.hypot(d.p.x - u.x, d.p.y - u.y) / 1852 : 0;
     txt = d ? `→ ${d.name.replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
   }
-  if (txt !== pilotShown) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
+  if (txt !== pilotShown && performance.now() > pilotNoteUntil) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
 }
 /** The ghost race's pacing: how far ahead or behind your ghost you are, in seconds (replay/ghost.ts ghostGap). */
@@ -1046,7 +1063,6 @@ addEventListener('keydown', e => {
   if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
   if (!$('leaveAsk').hidden) { if (e.key === 'Escape') $('bLeaveNo').click(); return; } // leave or keep racing first
   const a = keymap.actionFor(e.key);
-  if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
     if (!$('flagIndex').hidden) { hud.flagIndex(w, false); return; }
     if (raceReplay.isOpen) { raceReplay.close(); return; }
@@ -1101,6 +1117,7 @@ addEventListener('keydown', e => {
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
     case 'windLadder': windShow(!S.windLadder); break;
+    case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: F9 unless rebound; ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
     case 'recentre': recentre(); break;
@@ -1190,9 +1207,9 @@ function keyLook(dt: number): void {
 function lookLabel(): void {
   const el = $('bLook'), deg = Math.round(-look.yaw * 180 / Math.PI);
   const off = Math.abs(deg) > 8 || Math.abs(look.pitch) > 0.15;
-  el.hidden = !off || viewMode === 2;
-  if (off) el.title = `${Math.abs(deg) <= 8 ? 'Looking up or down' : `Looking ${Math.abs(deg)}° to ${deg > 0 ? 'starboard' : 'port'}`}: look ahead again (${keymap.label('lookAhead')})`;
-  $('bRecentre').hidden = viewMode !== 2 || Math.hypot(over.off.x, over.off.y) < 5;
+  setHidden(el, !off || viewMode === 2);
+  if (off) setTitle(el, `${Math.abs(deg) <= 8 ? 'Looking up or down' : `Looking ${Math.abs(deg)}° to ${deg > 0 ? 'starboard' : 'port'}`}: look ahead again (${keymap.label('lookAhead')})`);
+  setHidden($('bRecentre'), viewMode !== 2 || Math.hypot(over.off.x, over.off.y) < 5);
 }
 addEventListener('pointerup', () => { drag = null; });
 addEventListener('pointercancel', () => { drag = null; });
@@ -1207,7 +1224,13 @@ function showBar(): void {
   $('bShowReal').hidden = showMin == null && showCond == null;
 }
 $('showTime').addEventListener('input', () => { const m = Number(($('showTime') as HTMLInputElement).value); $('showTimeV').textContent = hhmm(m); });
-$('showTime').addEventListener('change', () => { showMin = Number(($('showTime') as HTMLInputElement).value); setup.newGame(); showBar(); });
+$('showTime').addEventListener('change', () => {
+  showMin = Number(($('showTime') as HTMLInputElement).value);
+  // (the showroom's clock: the boat on show lit for the new hour, the same World; ROADMAP 8v: a new World was seconds)
+  if (w && (boatPanel?.open || fleet?.showing)) void host.ask({ k: 'clock', tideTime: hhmm(showMin + S.seq) }).then(() => { const t0 = performance.now(); view.conditionsChanged(w); performance.measure('editor: clock', { start: t0 }); });
+  else setup.newGame();
+  showBar();
+});
 $('bShowCond').onclick = () => {
   // the same panel; while it's open your conditions take the showroom's, and they're put back when it closes
   const saved: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
@@ -1250,7 +1273,7 @@ function frame(now: number): void {
   if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
+  setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1264,6 +1287,18 @@ function frame(now: number): void {
 
 /* Your boat: the panel, with the boat in the showroom view beside it. */
 let boatPanel: BoatPanel;
+/** Whether two specs of a boat differ only in how she looks (paint, hatch, cockpit, lettering, sail numbers, line colors):
+ * none of it touches how she sails, so the showroom can restyle her where she lies. */
+function lookOnly(a: BoatSpec, b: BoatSpec): boolean {
+  const strip = (x: BoatSpec) => {
+    const y = structuredClone(x) as BoatSpec & Record<string, unknown>;
+    for (const k of ['name', 'nameColor', 'deck', 'cabinTop', 'hatch', 'cockpit', 'navLights', 'poleSide', 'lineColors']) delete y[k];
+    y.hull = { ...y.hull, upper: '', lower: '', stripe: '' };
+    y.sails = { ...y.sails, color: 'white', number: '', numberColor: undefined, insigniaColor: undefined }; // (her country's her ensign too: a new World)
+    return JSON.stringify(y);
+  };
+  return strip(a) === strip(b);
+}
 function boatSummary(): void {
   const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '', p = b.perf;
   const pick = $('boatPick') as HTMLSelectElement;
@@ -1317,7 +1352,15 @@ $('oppList').addEventListener('click', e => {
   S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);
   fleetChanged();
 });
-boatPanel = new BoatPanel(S, save => { S.fleet = S.opponents.length; if (save) saveSettings(S); setup.newGame(); boatSummary(); oppRows(); }, saved => {
+boatPanel = new BoatPanel(S, save => {
+  S.fleet = S.opponents.length; if (save) saveSettings(S);
+  // a change to how she looks only (her paint, hatch, cockpit, lettering): restyled where she lies, only her mesh built
+  // again; anything that changes how she sails (her rig, her bottom, her crew...) puts her in the water afresh (ROADMAP 8v)
+  const next = boatPanel.editing, was = w?.user?.spec;
+  if (was && was.id === next.id && lookOnly(was, next)) void host.ask({ k: 'look', spec: structuredClone(next) }).then(() => { const t0 = performance.now(); view.rebuildBoat(w, w.boats.indexOf(w.user)); performance.measure('editor: restyle', { start: t0 }); }); // (timed: scripts/check/editor-perf.cjs)
+  else setup.newGame();
+  boatSummary(); oppRows();
+}, saved => {
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
   if (saved) fleet.flashSaved();
 });
@@ -1338,7 +1381,8 @@ const fleet: Fleet = new Fleet(S, {
   // (a member changed: saved, and your boat's race crew drawn again from her seats)
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
-  edit: id => { showroom(true); boatPanel.show(id); setup.newGame(); },
+  // (her page already has her on show, in the same World: the editor opens on it, no new one; ROADMAP 8v)
+  edit: id => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
