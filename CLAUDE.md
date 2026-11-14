@@ -79,6 +79,9 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   step within v168 × 1.019 (the same 43.1 as before, now without the drift). A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
+- World.step (Capacity, 14 Nov 2026): don't add per-step lines to World.step itself, even ones that return at once:
+  the paddle's two cost every step 1.3% with the race unchanged. New per-step work goes behind one cheap test, in a
+  method of its own (docs/CAPACITY.md §8a), and a PR that adds lines to World.step runs perf-pair however free they look.
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
