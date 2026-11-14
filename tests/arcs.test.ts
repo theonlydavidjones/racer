@@ -49,7 +49,7 @@ describe('escapes(): room to respond (docs/ROOM-TO-RESPOND.md)', () => {
     expect(c[1].heading).toBeGreaterThan(200); // from port tack (175) through 180 onto starboard
   });
 
-  it('turning bleeds speed (physics\' own turnBleed): held in a steady turn, her circle shrinks as she slows', () => {
+  it('turning costs her speed (physics\' own turnSpeed): held in a steady turn, her circle shrinks as she slows', () => {
     // at a steady 15°/s and 2.5 m/s she'd sail a circle of radius v/ω, reaching the point 2R to starboard after half of
     // it; slowing as the turn bleeds her speed, she turns inside it
     const R = 2.5 / (15 * Math.PI / 180), post = straightOn({ x: 2 * R, y: 0, h: 0, v: 0 });

@@ -26,3 +26,16 @@ describe('rule 20: a tack begun, by the helm', () => {
     expect(begunTack(B, hail(B), 0)).toBe(true);
   });
 });
+
+describe('rule 20: the helm signal, the review\'s cases', () => {
+  const hail = (B: ReturnType<typeof boat>, h: number) => ({ at: 50, headAt: { [B.id]: { h, wind: 0 } } });
+  it('a boat on a reach rounding up with the helm hard over is not tacking (no further off the wind than about close-hauled)', () => {
+    const B = boat('B', { at: [0, 0], heading: 275 }); B.helm = 0.9; // hailed at 270, a beam reach: 85° off
+    expect(begunTack(B, hail(B, 270), 0)).toBe(false);
+  });
+  it('once started, a dip of the blade mid-tack doesn\'t stop her tacking while her bow stays up', () => {
+    const B = boat('B', { at: [0, 0], heading: 322 }); B.helm = 0.2;
+    expect(begunTack(B, hail(B, 315), 0, true)).toBe(true);
+    expect(begunTack(B, hail(B, 315), 0, false)).toBe(false);
+  });
+});

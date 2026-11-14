@@ -1,5 +1,7 @@
 import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec } from '../core/math';
 import { escapes, straightOn, type Pose } from '../boat/arcs';
+import { FULL_RUDDER } from '../boat/balance';
+import { RUDDER_STALL } from '../boat/turning';
 import { clearAstern, cpa, hullGap } from './geometry';
 import { returning, rightOfWay } from './rightOfWay';
 import type { Incident, PairRecord, PoseRing, RulesBoat, RulesContext, RulesMark, Verdict } from './types';
@@ -57,21 +59,26 @@ export const HAIL_RESPONSE = 5;
  * maxTurnRate): at 1.5 m/s she takes 4–5 s from close-hauled to head to wind, so judging her by when she passes head to
  * wind would call a breach on a boat that put her helm down at once. Turned this many degrees toward the wind from her
  * heading at the hail, she has begun to tack. (A modelling threshold, not a number from the rules: well above the few
- * degrees the sea knocks a close-hauled boat's bow about, and reached in about a second at the sim's turn rates.)
+ * degrees the sea knocks a close-hauled boat's bow about; reached in under 2 s at 2.4 m/s, but 4-10 s when slow, against
+ * her yaw inertia: so the helm put down counts too, below.)
  */
 export const TACK_BEGUN = 15;
 /** ... and is above any course she'd sail close-hauled: no more than this far off the wind (a Folkboat's beat is 40–45°,
  * polar.ts beatAngle), so a boat footing when hailed gets no credit for merely coming up to close-hauled. */
 const BEGUN_TWA = 30;
-/** The helm put down to tack: this much of the blade's throw toward the wind (half: 15° of the 30°; a modeling threshold,
- * well beyond a helmsman's steering corrections), with her bow already this many degrees up from her heading at the hail. */
-const HELM_DOWN = 0.5, HELM_UP = 2;
+/** The helm put down to tack: four fifths of the angle the helmsman holds the blade at, just short of its stall (turning.ts
+ * RUDDER_STALL of balance.ts FULL_RUDDER: 0.4 of the throw), so a turn the sails help along still reads as one; well
+ * beyond a helmsman's steering corrections. With her bow already HELM_UP° up from her heading at the hail, and no further
+ * off the wind than HELM_TWA (close-hauled, a Folkboat's 40-45°, and a little: a boat rounding up on a reach isn't tacking). */
+const HELM_DOWN = 0.8 * (RUDDER_STALL * 180 / Math.PI) / FULL_RUDDER, HELM_UP = 2, HELM_TWA = 50;
 /**
- * Begun to tack, she's through head to wind within this many seconds, or she didn't really tack. (In the sim a boat
- * keeps turning at least at the sculled rate, turning.ts scullTurnRate, so even at 1 m/s she's through in
- * well under 15 s: a modelling allowance, not a number from the rules.)
+ * Begun to tack, she's through head to wind within this many seconds, or she didn't really tack. (A modelling allowance,
+ * not a number from the rules. With the helm down counting as begun, the clock starts 1-4 s after the hail; against her
+ * yaw inertia (Deep Physics' turning model) an AI boat hailed at 0.9 m/s was head to wind 8-11 s after it in 6-12 kt, 19 s
+ * in 20 kt on starboard; at 0.6 m/s, 12-22 s: the physics-reviewer's measures, 14 Nov 2026. A boat nearly stopped, 0.3 m/s,
+ * may not get through at all: she can't tack, and that is hers to answer.)
  */
-export const THROUGH_WIND = 15;
+export const THROUGH_WIND = 25;
 
 /**
  * Is `b` tacking (in the act of it) since the hail `h`: through head to wind, or turned TACK_BEGUN° up from her heading
@@ -93,8 +100,11 @@ export function begunTack(b: RulesBoat, h: { at: number; headAt?: Record<number,
   // Or the helm put down: rule 20 asks her to "respond ... by tacking as soon as possible", and the response is the helm
   // going over. Slow, against her yaw inertia, she can take 5 s to turn TACK_BEGUN (Deep Physics' turning model, 14 Nov
   // 2026: 0.9 m/s, 15° up at about 5 s), but her blade is hard over within a few steps. HELM_DOWN of its throw toward the
-  // wind, with her bow already coming up, is a tack begun; a sea's or a gust's correction is a few degrees of blade
-  return Math.sign(wrap(then - at.h)) * (b.helm ?? 0) >= HELM_DOWN && up > HELM_UP;
+  // wind, with her bow already coming up and close-hauled or above, is a tack begun; a sea's or a gust's correction is a
+  // few degrees of blade. Once started, she's still at it while her bow stays up (the blade eases as the sails help her
+  // round, and a dip below HELM_DOWN mid-tack mustn't read as stopping)
+  if (Math.abs(wrap(now - b.h)) > HELM_TWA) return false;
+  return up > HELM_UP && (started || Math.sign(wrap(then - at.h)) * (b.helm ?? 0) >= HELM_DOWN);
 }
 
 /**
