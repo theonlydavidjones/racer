@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { rainAt, rainLevel } from '../src/environment/rain';
+import { rainAt, rainLevel, slotLevel } from '../src/environment/rain';
+// @ts-expect-error (a plain script, no types)
+import { slotLevel as scriptSlotLevel } from '../scripts/rain-days.mjs';
 import { setVisibility } from '../src/environment/weather';
 import { sfLocalToUtcMin } from '../src/environment/tide';
 import { loadSettings } from '../src/settings';
@@ -43,6 +45,21 @@ describe('Real rain from the record (environment/rain.ts)', () => {
       if (r.source !== 'forecast') continue;
       if (r.level) expect((f.pop[h] ?? 0) >= 50 || !!f.likely?.[h]).toBe(true);
     }
+  });
+  it('the page reads the record as the scripts wrote it: the two slotLevels agree on every quarter hour on file', () => {
+    const D = data as unknown as { stations: Record<string, { days: Record<string, string> }> };
+    let n = 0;
+    for (const st of Object.values(D.stations)) for (const b of Object.values(st.days)) {
+      const a = Uint8Array.from(atob(b), c => c.charCodeAt(0));
+      for (let q = 0; q < 96; q++) { if (slotLevel(a, q) !== scriptSlotLevel(a, q)) throw new Error(`differ at ${q}`); n++; }
+    }
+    expect(n).toBeGreaterThan(10000);
+  });
+  it('drizzle alone (a summer morning off the fog) is no rain; light rain stays light whatever the hour\'s total', () => {
+    const a = new Uint8Array(120).fill(0); a[24] = 4; expect(slotLevel(a, 0)).toBe(0);
+    a[0] = 3; expect(slotLevel(a, 0)).toBe(1); // (0.3 mm: measurable)
+    a[0] = 80; a[24] = 1; expect(slotLevel(a, 0)).toBe(1);
+    a[24] = 2; expect(slotLevel(a, 0)).toBe(2); a[24] = 3; a[0] = 20; expect(slotLevel(a, 0)).toBe(2);
   });
   it('the conditions panel: a set rain is that rain; real (or unset) is the record\'s', () => {
     const t = sfLocalToUtcMin('2026-11-13', '11:00');
