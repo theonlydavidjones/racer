@@ -1292,10 +1292,11 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
-- **Wrecks: an open design** (owner, 13 November: "we need to work through the broader logic and plan for wrecks. I
-  don't know yet."; Marinas drafts a proposal): what counts as a wreck (piles, rocks, a ship, a seawall, grounding),
-  the damage and what it does to her, whether she retires or is towed, and how the logbook and the season score it.
-  For now, contact with the Fort Mason piles just stops her.
+- **Wrecks** (designed: docs/WRECK-PROPOSAL.md, the owner's answers 14 November; Marinas; after #292; not urgent; 6–10 h):
+  the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
+  short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
+  lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,
+  contact with the Fort Mason piles just stops her.
 
 - **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
   whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's

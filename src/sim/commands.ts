@@ -121,7 +121,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       takeLine(u, 'car'); moveLazyCar(u, c.fore - from.fore, c.ins - from.ins); return;
     }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
-    case 'pole': u.poleWant = c.want; u.poleMine = true; return;
+    case 'pole': w.poleCall(c.want); return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
     case 'lessonReady': w.lesson?.ready(w.isNight()); return;

@@ -18,7 +18,9 @@ export interface Settings {
   band?: 0 | 1;
   chop?: number; // conditions adjuster: the wind's chop × this (1 = real, 0 = glassy)
   swellHs?: number | null; // conditions adjuster: the ocean swell outside the Gate, m; null = real
-  rain?: 0 | 1 | 2; // none, light, heavy
+  rain?: 'real' | 0 | 1 | 2; // the real record's (environment/rain.ts), or none, light, heavy
+  /** 1 once a save from before real rain has been moved on (there, rain 0 meant nothing set: now it's real) */
+  rainV?: 1;
   fog?: 'real' | 0 | 1 | 2; // the real summer fog bank, or none, patchy, thick
   windDay: 0 | 1 | 2; // with the westerly: a light, typical or windy day (25th, 50th, 75th percentile)
   current: string; // 'real' (NOAA predictions for tideDate/tideTime) or a uniform preset id
@@ -31,6 +33,8 @@ export interface Settings {
   seq: number; // start sequence, minutes
   /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
   drillFrom?: number; drillSolo?: boolean;
+  /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
+  rulesRight?: number[];
   /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
   lesson?: LessonId; lessonsPassed?: LessonId[];
   /** The last float plan left with the club (Before you go): where, back by (hh:mm), how many aboard. */
@@ -68,7 +72,7 @@ export interface Settings {
 
 /** On-the-water judging for a race, by default: Protests (the owner, 13 Nov 2026). */
 export const DEFAULT_JUDGING: NonNullable<Settings['judging']> = 'protests';
-export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, judging: DEFAULT_JUDGING, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, camRide: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
+export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt: 0, windTurn: 0, windDay: 1, current: 'real', tideDate: '', tideTime: '12:00', bias: 0, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'], seq: 3, aids: 1, manualTrim: 0, penaltyTurns: 2, judging: DEFAULT_JUDGING, sea: 'real', swellDay: 1, prepFlag: 'P', traffic: 1, windDial: 0, camRide: 0, sailFrom: 'cityfront', sailTo: '', boats: [DEFAULT_BOAT], boatId: DEFAULT_BOAT.id, rain: 'real', boat: DEFAULT_BOAT, crew: { n: 2, helm: { h: 1.78, w: 80 }, people: [{ h: 1.75, w: 78 }, { h: 1.72, w: 72 }] } };
 
 const KEY = 'fbsim-settings-v2';
 /** The most boats you can race against. */
@@ -85,6 +89,8 @@ export function loadSettings(): Settings {
   boats = structuredClone(boats).map(b => fixSpec({ ...b, skipper: b.skipper ?? (b.id === s.boatId ? 'you' : 'ai') }));
   const seen = new Set<string>(); for (const b of boats) { if (seen.has(b.id)) b.id += '-' + seen.size; seen.add(b.id); }
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
+  // (before real rain, rain 0 was the only "nothing set": an older save's 0 becomes the real record's, once)
+  if (!s.rainV) { if (!s.rain) s.rain = 'real'; s.rainV = 1; }
   // your opponents: older saves had only a number of stock boats
   const ids = new Set(boats.map(b => b.id));
   const opp = Array.isArray(s.opponents) && s.opponents !== DEFAULT_SETTINGS.opponents ? s.opponents : Array.from({ length: Math.max(0, Math.min(5, s.fleet ?? 3)) }, (_, i) => `stock:${i + 1}`);

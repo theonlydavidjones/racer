@@ -52,6 +52,7 @@ import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
+import { rainAt, rainLevel } from '../environment/rain';
 import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
@@ -720,8 +721,12 @@ export class Hud {
   fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
     // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
-    const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
-    const here = (m: number) => short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`;
+    // (the rain falling: the panel's, or the record's, environment/rain.ts)
+    const rl = rainLevel(wd.settings.rain, wd.clockUtc), rainReal = typeof wd.settings.rain !== 'number';
+    const set = setVisibility({ fog: wd.settings.fog, rain: rl }), why = set.fogSet && rl ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
+    const here = (m: number) => rainReal && !set.fogSet
+      ? (short ? `VIS ${nm(m).toUpperCase()} HERE · RAIN` : `Visibility ${nm(m)} here, in the ${rainAt(wd.clockUtc).says}.`)
+      : (short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`);
     if (set.fogSet) return here(set.m);
     const v = visibilityFor(wd.raceDate, wd.clockUtc);
     if (Number.isFinite(set.m)) { const real = 'none' in v || v.source === 'outlook' ? Infinity : v.source === 'observed' ? v.points[0].m : v.at(wd.user); if (!(real < set.m)) return here(set.m); }

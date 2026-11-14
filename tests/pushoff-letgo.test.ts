@@ -10,7 +10,10 @@ import { COURSES } from '../src/courses/registry';
 describe('let go with the main alone, hands off (Marinas, #78)', () => {
   it('from every West Harbor slip held head to wind in 14 kt from 270, she sails her first 18 m without touching anything', () => {
     const held = SLIPS.filter(s => s.marina === 'west-harbor' && (() => { const p = pushOffPlan(s, 270, 14); return p?.kind === 'swing' && !!p.hold; })());
-    expect(held.length).toBeGreaterThan(20);
+    // (16 today, 14 Nov 2026, from over 20: a hold is now taken only where she's clear across the whole 20 degrees she may
+    // follow the wind while held, and has room ahead let go from either end of it (marina.ts releaseClear, letGoClear: the
+    // physics review). No fewer than that)
+    expect(held.length).toBeGreaterThanOrEqual(16);
     const bumps: string[] = [];
     for (const s of held) {
       const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
