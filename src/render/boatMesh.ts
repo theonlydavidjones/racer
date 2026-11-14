@@ -1017,20 +1017,24 @@ const JIB_CLEW = JIB_DEF.clew; // in the jib pivot's frame
  * to mast (a Folkboat has no spreaders: CR 7.10; the jumper struts are above the jib's head). Rods in the boat's frame,
  * each radius the spar's or wire's half-width and the cloth's own few millimetres.
  */
+const rods = (): SailObstacle[] => Array.from({ length: 5 }, () => ({ a: new THREE.Vector3(), b: new THREE.Vector3(), r: 0 }));
+const JIB_RODS = rods(), JIB_OBS = rods();
+/** The rods in the boat's frame (filled in place each frame, nothing allocated: every boat in the fleet calls it). */
 export function jibRods(bow = 0, topAft = 0): SailObstacle[] {
-  const r = Math.max(MAST_FA, MAST_ATH) / 2 + 0.008, top = HOUNDS.y - DECK_AT_MAST, out: SailObstacle[] = [];
+  const r = Math.max(MAST_FA, MAST_ATH) / 2 + 0.008, top = HOUNDS.y - DECK_AT_MAST;
   for (let i = 0; i < 3; i++) {
-    const h0 = top * i / 3, h1 = top * (i + 1) / 3;
-    out.push({ a: V3(0, DECK_AT_MAST + h0, MAST_Z - mastFwd(h0, bow, topAft)), b: V3(0, DECK_AT_MAST + h1, MAST_Z - mastFwd(h1, bow, topAft)), r });
+    const h0 = top * i / 3, h1 = top * (i + 1) / 3, o = JIB_RODS[i];
+    o.a.set(0, DECK_AT_MAST + h0, MAST_Z - mastFwd(h0, bow, topAft)); o.b.set(0, DECK_AT_MAST + h1, MAST_Z - mastFwd(h1, bow, topAft)); o.r = r;
   }
-  for (const sx of [-1, 1]) out.push({ a: V3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), b: V3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z), r: 0.012 });
-  return out;
+  [-1, 1].forEach((sx, k) => { const o = JIB_RODS[3 + k]; o.a.set(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z); o.b.set(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z); o.r = 0.012; });
+  return JIB_RODS;
 }
-const jibInv = new THREE.Matrix4(), jibPose = new THREE.Matrix4();
-/** The jib's rods in the cloth's own frame: the pivot on the forestay turned by q, then the mesh's own matrix (its mirror to its side, and the hoist's squeeze along the stay). */
+const jibInv = new THREE.Matrix4(), jibPose = new THREE.Matrix4(), ONE = new THREE.Vector3(1, 1, 1);
+/** The jib's rods in the cloth's own frame: the pivot on the forestay turned by q, then the mesh's own matrix (its mirror to its side, and the hoist's squeeze along the stay). Filled in place: use it before the next call. */
 export function jibObstacles(q: THREE.Quaternion, local: THREE.Matrix4, bow = 0, topAft = 0): SailObstacle[] {
-  jibInv.copy(jibPose.compose(FORESTAY_DECK, q, V3(1, 1, 1)).multiply(local)).invert();
-  return jibRods(bow, topAft).map(o => ({ a: o.a.applyMatrix4(jibInv), b: o.b.applyMatrix4(jibInv), r: o.r }));
+  jibInv.copy(jibPose.compose(FORESTAY_DECK, q, ONE).multiply(local)).invert();
+  jibRods(bow, topAft).forEach((o, i) => { const w = JIB_OBS[i]; w.a.copy(o.a).applyMatrix4(jibInv); w.b.copy(o.b).applyMatrix4(jibInv); w.r = o.r; });
+  return JIB_OBS;
 }
 // Cassette-tape telltales: old audio tape tied to the shrouds, about 1.4 m above the deck (low enough to
 // see from the cockpit). Dark brown and shiny, like the real thing.

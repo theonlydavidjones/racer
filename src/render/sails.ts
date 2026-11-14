@@ -173,7 +173,17 @@ export class Sail {
   /** Chord length at height fraction t, m. */
   chord(t: number): number { const [L, F] = this.edges(t); return L.distanceTo(F); }
 
+  /** The rods this update can meet (reused: nothing allocated per frame). */
+  private near: SailObstacle[] = [];
+
   update(sh: SailShape): void {
+    // only the rods on the belly's side of the sail can stop it (a drawing jib has the mast and both shrouds to
+    // windward: none), so the rest are dropped once here, not tested at every point
+    if (sh.obstacles) {
+      this.near.length = 0;
+      for (const o of sh.obstacles) if (Math.max(o.a.x, o.b.x) + o.r > -0.05) this.near.push(o);
+      sh = this.near.length ? { ...sh, obstacles: this.near } : { ...sh, obstacles: undefined };
+    }
     let k = 0;
     for (const t of this.tVals) for (const s of this.sVals) {
       this.point(t, s, sh, tmp);
