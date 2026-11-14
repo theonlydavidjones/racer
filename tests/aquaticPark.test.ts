@@ -31,7 +31,12 @@ const firstLeg = (a: typeof BASIN, b: typeof BASIN) => { const r = routeAround(a
 const CONTACT = /^Collision: |^Bump: |^Aground!|touched bottom|been set sideways onto/;
 const bumped = (w: World) => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && CONTACT.test(e.msg));
 describe('the navigator round Aquatic Park', () => {
-  for (const from of [270, 300, 0]) for (const [name, a, b, berth = 5.5] of ROUTES) it(`${name}, wind from ${from}°`, () => {
+  // (and the winds a review found her short-tacking onto the breakwater or sagging onto a pier head in: an easterly
+  // and a north-northeasterly, out of the basin to the east)
+  const CASES: [string, typeof BASIN, typeof BASIN, number, number?][] = [
+    ...[270, 300, 0].flatMap(from => ROUTES.map(([n, a, b, berth]) => [n, a, b, from, berth] as [string, typeof BASIN, typeof BASIN, number, number?])),
+    ['out of the basin to the east', BASIN, EAST, 90], ['out of the basin to the east', BASIN, EAST, 30]];
+  for (const [name, a, b, from, berth = 5.5] of CASES) it(`${name}, wind from ${from}°`, () => {
     const w = new World(COURSES[0], S({ windDir: from }), 4, { freeSail: true }), u = w.user;
     expect(w.moveHere(a, 'start')).toBe(true);
     w.setDest(b, 'there'); u.h = firstLeg(a, b); u.v = 2;

@@ -135,10 +135,17 @@ const BERTH = 10;
 /** How far ahead along the direct line land has to be before Nav plans a way round it (m): nearer the destination's
  * own approach, or a pier on the way, not the shore across the Bay. */
 const PLAN_AHEAD = 400;
-/** Re-plan the way at least this often (s), and at once when the turn she's steering for goes out of sight or she's
- * been set more than OFF_ROUTE metres off the leg to it: planning from among the Wharf's docks takes a tenth of a second
- * or more, so not every few seconds. */
-const REPLAN = 60, OFF_ROUTE = 40;
+/** Re-plan the way only when it's needed: a new destination, the turn she's steering for out of sight or not clear of
+ * the piers by a few metres, or she's been set more than OFF_ROUTE metres off the leg to it. Planning from among the
+ * Wharf's docks takes a tenth of a second or more, so not on a timer. A plan that found no way is tried again once
+ * she's sailed RETRY_M metres or RETRY_T seconds on. */
+const OFF_ROUTE = 40, RETRY_M = 30, RETRY_T = 60;
+/** The way to the turn must keep this clear of a pier either side (m), or it's planned again from where she is: the
+ * route keeps 10 m off, and a sag to leeward that leaves her steering a chord past a pier head has lost it. */
+const LEG_CLEAR = 4;
+/** Tack for more room in a channel only onto a tack with this much water ahead (m), and only with way on (m/s): a
+ * tack she can't complete, or one that only swaps a short board for another, leaves her in irons by the wall. */
+const ROOM = 25, ROOM_V = 1;
 /** Never plan more often than this (s), whatever's asking: a plan that finds no way, or one she's just left, waits. */
 const MIN_REPLAN = 5;
 /** On to the next turn early only with this much clear water either side of the way to it (m): the route's 10 m berth
@@ -167,7 +174,7 @@ function clearLine(a: Vec, b: Vec, side: number): boolean {
  * The turn Nav steers for: the direct way while it's clear (20 m either side) as far as PLAN_AHEAD; otherwise the
  * passage planner's route (sim/routing.ts routeAround, which threads the Wharf's piers keeping 10 m off them), kept and
  * followed turn by turn: on to the next turn once she can see it clear (or she's at this one), worked out again
- * every REPLAN seconds, for a new destination, or when the turn she's on goes out of sight or she's set off the leg. 'clear': steer for `dest`;
+ * for a new destination, or when the turn she's on goes out of sight or she's set off the leg. 'clear': steer for `dest`;
  * 'none': land's in the way and there's no route round it.
  */
 function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'none' {
@@ -180,8 +187,11 @@ function followRoute(b: Vec, p: Pilot, dest: Vec, t: number): Vec | 'clear' | 'n
   // (lost: the turn's out of sight, though not because she's touched the land herself, or she's been set off the leg she's
   // on, measured from where she was when it was planned for the first leg)
   const sight = p.route ? landAlong(b, p.route[p.ri]) : Infinity;
-  const lost = !!p.route && ((sight > 0 && sight < Infinity) || offLeg(b, p.ri > 1 ? p.route[p.ri - 1] : p.routeFrom ?? b, p.route[p.ri]) > OFF_ROUTE);
-  if ((!p.route || moved || lost || t - p.routeT > REPLAN) && (moved || t - p.routeT >= MIN_REPLAN)) {
+  const lost = !!p.route && ((sight > 0 && sight < Infinity) || offLeg(b, p.ri > 1 ? p.route[p.ri - 1] : p.routeFrom ?? b, p.route[p.ri]) > OFF_ROUTE
+    || (sight === Infinity && !inFairway(b) && !clearLine(b, p.route[p.ri], LEG_CLEAR)));
+  // (no route in hand: plan, unless the last plan, from near here and not long ago, found none)
+  const retry = !p.route && (!p.routeFrom || Math.hypot(b.x - p.routeFrom.x, b.y - p.routeFrom.y) > RETRY_M || t - p.routeT > RETRY_T);
+  if ((moved || lost || retry) && (moved || t - p.routeT >= MIN_REPLAN)) {
     const r = routeAround(b, dest, 30); p.plans++;
     p.route = r.length > 2 ? r : null; p.ri = 1; p.routeT = t; p.routeTo = { ...dest }; p.routeFrom = { x: b.x, y: b.y };
   }
@@ -236,7 +246,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
       // (boxed in by what's dead ahead on each tack, not the look-ahead's berth either side, which in a 57 m gap sees
       // the piers on both)
       if (Math.max(landDist(b, cur, look, 0), landDist(b, close(other), look, 0)) < BOXED) { p.alarm = 'Pilot alarm: land ahead on both tacks. Pilot on standby: you have the tiller.'; return cur; }
-      if (dOther > dCur) { p.lastTackT = t; p.goTack = other; return close(other); }
+      if (dOther > dCur && dOther > ROOM && b.v > ROOM_V) { p.lastTackT = t; p.goTack = other; return close(other); }
       return cur;
     }
     // a pier or a breakwater come within a berth of her, to leeward as she sags down on it or abeam: tack away from it,
@@ -265,7 +275,7 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
     p.asternT ??= t;
     // (under her motor going astern, it's yours at once, as it always was: only a drift back with no thrust astern, the
     // wind on a stopped boat, is the navigator's to ride out; and before it lets go, the tiller's back amidships)
-    const motorAstern = !!b.motor && thrust(b.motor, -ast) < -40;
+    const motorAstern = !!b.motor && thrust(b.motor, -ast) < 0;
     if (motorAstern || ast > ASTERN_MAX || t - p.asternT > ASTERN_WAIT) {
       p.alarm = 'Pilot alarm: she\'s going astern, and a pilot can\'t steer backwards. Pilot on standby: you have the tiller.';
       p.ram = 0; b.tiller = 0; return;
