@@ -29,6 +29,7 @@ import { setRestrictedVisibility } from './navLights';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
 import { Harbor } from './marina';
+import { L, deckY, halfBeam } from './hull';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
@@ -69,6 +70,13 @@ const VNOISE = `
 float vhash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(vhash(i), vhash(i + vec2(1.0, 0.0)), f.x), mix(vhash(i + vec2(0.0, 1.0)), vhash(i + vec2(1.0, 1.0)), f.x), f.y); }
+`;
+/** Her deck's half-breadth at HULL_N + 1 stations, stem to transom (hullUni): the outline the sea's kept out of. */
+const HULL_N = 24;
+const HULL_DECL = `uniform float uHullOn; uniform mat4 uHullInv; uniform float uHullHalf[${HULL_N + 1}];\n`;
+/** (the sea's world place, in her frame: inside her outline, with the camera down in her, it isn't drawn) */
+const HULL_CUT = `if (uHullOn > 0.5) { vec3 hl = (uHullInv * vec4(vPuffXZ.x, 0.0, vPuffXZ.y, 1.0)).xyz; float hu = (hl.z + ${(L / 2).toFixed(4)}) / ${L.toFixed(4)};
+  if (hu > 0.0 && hu < 1.0) { float hf = hu * ${HULL_N}.0; int hi = int(min(floor(hf), ${HULL_N - 1}.0)); if (abs(hl.x) < mix(uHullHalf[hi], uHullHalf[hi + 1], hf - float(hi))) discard; } }
 `;
 const WATER_FRAGMENT = `
   // the current where you are: the ripples drift with it (two-phase flow mapping), relative to the mean drift
@@ -271,6 +279,13 @@ export class SceneView {
   /** The waves: one set, drawn by the water shader and ridden by the boats. */
   private waveA = new Float32Array(N_WAVES * 4);
   private waveB = new Float32Array(N_WAVES * 4);
+  /**
+   * Her hull's inside, kept clear of the sea when the camera's down in it: her cabin sole is below the waterline (cabinInterior
+   * INTERIOR.sole), so from the cabin the sea's surface lies between the eye and the floor and was drawn over it (the lids
+   * at deck level only hide it from above). With the camera inside her hull below the deck, the water leaves out what falls
+   * inside her deck's outline, in her own frame (the waterline lies within it, at any heel she sails at).
+   */
+  private hullUni = { uHullOn: { value: 0 }, uHullInv: { value: new THREE.Matrix4() }, uHullHalf: { value: Array.from({ length: HULL_N + 1 }, (_, i) => halfBeam(i / HULL_N) + 0.02) } };
   private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
@@ -354,7 +369,7 @@ export class SceneView {
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni);
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni);
       const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
@@ -373,8 +388,8 @@ export class SceneView {
           vMapUv = (mapTransform * vec3(wuv, 1.0)).xy;
           vBumpMapUv = (bumpMapTransform * vec3(wuv, 1.0)).xy;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE)
-        .replace('#include <map_fragment>', WATER_FRAGMENT)
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE + HULL_DECL)
+        .replace('#include <map_fragment>', HULL_CUT + WATER_FRAGMENT)
         .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;')
         // the ripple texture's bumps (about 12 cm a texel) fade where a pixel covers more water than they can show, so
         // the far water doesn't alias into rows parallel to the horizon
@@ -430,6 +445,7 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
+  private hullCam = new THREE.Vector3();
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
@@ -941,6 +957,10 @@ export class SceneView {
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
+    // the camera down inside her hull (below her deck, within its outline): the sea kept out of her (hullUni, above)
+    { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
+      if (g) { const c = g.worldToLocal(this.hullCam.copy(camera.position)), uu = (c.z + L / 2) / L;
+        if (uu > 0 && uu < 1 && Math.abs(c.x) < halfBeam(uu) && c.y < deckY(uu, c.x)) { h.uHullOn.value = 1; h.uHullInv.value.copy(g.matrixWorld).invert(); } } }
     this.renderer.render(this.scene, camera);
   }
 }
