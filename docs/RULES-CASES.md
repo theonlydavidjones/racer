@@ -72,7 +72,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
 | 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered (finding 1, fixed) |
-| 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | partly: Jagga's 11 is tested; 18.3(b)'s mark-room duty and Freebird's 43.1(b) exoneration for the touch aren't modeled |
+| 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | covered: Jagga's 11 (18.3(b)'s mark-room is met by rule 11 here: she's to windward of the inside boat); Freebird's touch exonerated (43.1(b): forced onto the mark by Jagga's breach, tests/sim.test.ts) |
 | 114 | 253 | 16.1, 18.2(a)(1), 31 | Room owed through a middle boat; at a starting mark L luffs W onto it: L broke 16.1 | partly (three-boat chains; Q3 buildable) |
 | 118 | 260 | 18.2(a)(1) | "Room to sail to the mark" at a leeward mark: no breach | partly |
 | 132 | 289 | 16.2, 18.1(a)(1) | When boats on opposite tacks are "on a beat" | partly (the sim uses the leg's beat flag) |
@@ -107,7 +107,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 5 | 82 | Racing, 22, 42 | An anchored boat is racing | not modeled (anchoring, propulsion) |
 | 8, 69 | 87, 179 | 42 | Propulsion | not modeled |
 | 19, 141 | 104, 308 | 43.1(c), 44.1(b) | "Damage", "serious damage" | not modeled |
-| 28 | 119 | 28.1, 31, 43.1(a) | S compelled to touch the pin is exonerated, but must still start | partly (a compelled mark touch isn't exonerated) |
+| 28 | 119 | 28.1, 31, 43.1(a) | S compelled to touch the pin is exonerated, but must still start | covered for the touch (43.1(a): forced onto the mark by another boat's breach, tests/sim.test.ts); the start itself is the sim's own line crossing |
 | 31, 79, 96, 111, 136 | | 26, 29.1, 30 | Recall signals and their timing, redress, evidence | not modeled (race committee) |
 | 58, 90, 106, 112, 128, 129, 145, 148 | | 28, Finish, Sail the Course | The taut string; finishing | not modeled (the sim's own mark passing, not the string test) |
 | 65 | 175 | 2, 30.4 | Racing on after a black flag | not modeled (intent) |
@@ -121,10 +121,10 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 Order of work: no published counts of protests by rule were found (US Sailing, RYA, World Sailing, club logs searched, 13 Nov 2026). The qualitative guidance found: US Sailing's rule 18 notes (ussailing.org/wp-content/uploads/2024/12/18.2a2.pdf) name port-tackers tacking into the windward mark's zone near starboard boats on the layline as a frequent source of conflict, and US Sailing's rule 10 notes call no-contact port/starboard protests "very common"; coaching articles put most incidents at mark roundings and the start. So: the windward mark (18.3, 13), leeward marks (18.2), the start (11, 15, 16), then obstructions (19). The Cases added in that order: 25, 95, 14, 125, 117.
 
-- Covered, the test reaching the Case's answer: 22 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 43, 53, 59, 81, 92, 93, 101, 105, 117, 125).
+- Covered, the test reaching the Case's answer: 24 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 28, 43, 53, 59, 81, 92, 93, 95, 101, 105, 117, 125).
 - Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the gybe, found while checking
   Case 2) and 4–6 (Cases 27, 53, 101) are fixed.
-- Partly: 38.
+- Partly: 36.
 - Not modeled: 28.
 - 88 Cases in all (a Case listed under two rules is counted once).
 
