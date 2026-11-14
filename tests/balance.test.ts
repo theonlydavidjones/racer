@@ -5,7 +5,7 @@ import type { Controls } from '../src/boat/controls';
 import type { Boat } from '../src/boat/boat';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 import { netDrive } from '../src/boat/balance';
-import { takeLine } from '../src/boat/physics';
+import { poleEta, takeLine } from '../src/boat/physics';
 import { polar } from '../src/boat/polar';
 import { KT } from '../src/core/math';
 import { crewWords } from '../src/ui/crewWords';
@@ -134,10 +134,12 @@ describe('The crew', () => {
   it('go right up on the foredeck as the pole goes out on a run (one astride the bow, one between the mast and the forestay), in light and moderate air', () => {
     for (const W of [6, 8, 10]) {
       const b = testBoat({ heading: 195, kt: 4, windKt: W }); b.poleWant = true; b.crew = newCrew(EXPERT, 'S');
+      const eta = poleEta(b).set; // (an expert from the cockpit: about 20 s, the owner's "absolute fastest")
       let at = -1;
       sail(b, 40, t => { b.h = 195; if (at < 0 && b.crew?.people[2]?.pose === 'bow') at = t; });
-      // (straight there as the pole is set, not after a stop at the mast)
-      expect(at).toBeGreaterThan(0); expect(at).toBeLessThan(15);
+      // (up to the mast for the pole, then straight on to the bow once it's set)
+      expect(eta).toBeGreaterThan(19); expect(eta).toBeLessThan(22);
+      expect(at).toBeGreaterThan(0); expect(at).toBeLessThan(eta + 4);
       expect(b.crew!.mode).toBe('foredeck');
       const [, mid, bow] = b.crew!.people;
       expect(bow.pose).toBe('bow'); expect(bow.z).toBeLessThan(-3);

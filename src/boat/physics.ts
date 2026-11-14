@@ -11,8 +11,8 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs } from './crewWork';
+import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, allAboard, reactTime, type Person, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import { bodyJob, crewJobs, ownerFor, poleAt, poleTrip, workPace } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
@@ -35,8 +35,26 @@ export const ASTERN_DRAG = { c0: 0.005, c1: 0.035 };
 /** How far she coasts astern from `v0` m/s (to a stop) with that drag, m. */
 export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c1) * Math.log(1 + ASTERN_DRAG.c1 * v0 / ASTERN_DRAG.c0)) / ASTERN_DRAG.c1;
 
-/** Crew timings for the whisker pole, s. */
-export const POLE = { set: 8, stow: 5, gybe: 8 };
+/**
+ * Crew timings for the whisker pole (s) for a club crew; each person's pace scales them (crewPhys.ts pace: an expert's
+ * 1.3×, a novice's 0.55×). From the owner, who races a Folkboat: set from the foredeck by someone already there, "10
+ * seconds. But that's the bare minimum … the sky's the limit if something goes wrong"; from the cockpit, "getting to the
+ * foredeck, setting the pole and calling 'made' … 20 seconds would be about the absolute fastest". So an expert takes
+ * 10 s to set it and 10 s to get forward, a club crew 13 and 13 (`forward`: out of the cockpit and up to the mast, on
+ * top of their reaction time). Stowing it and gybing it end-for-end are scaled the same way from the sim's earlier
+ * times (5 and 8 s against 8 to set): estimates.
+ * All of these are estimates, not measurements. The owner, 13 Nov 2026: theirs are "a wild estimate and might have been
+ * too long; I don't really know, but ten seconds seems like the bare minimum", so 10 s is the floor (the best crew,
+ * already at the mast) and the 20 s from the cockpit may be on the long side. A search for published or video-timed
+ * pole sets, stows and gybes on small keelboats (Folkboat, Star, Dragon, Etchells, J/24; coaching texts, US Sailing,
+ * class sites) found none, 13 Nov 2026. Real tracks or timed video would anchor them.
+ */
+export const POLE = { set: 13, stow: 8, gybe: 13, forward: 13 };
+/** About how long (s) your crew will take to set the pole from where they are now, and to stow it. */
+export function poleEta(b: Boat): { set: number; stow: number } {
+  const hands = b.crew ? workPace(b, ownerFor(b.crew, 'pole')) : 1;
+  return { set: poleTrip(b, POLE.forward) + POLE.set / hands, stow: POLE.stow / hands };
+}
 
 /** How the jib is working right now, from the pole state. */
 export function sailPlan(b: Boat): SailPlan {
@@ -90,19 +108,38 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
 /** Crew work on the pole: set or stow on command, and gybe it end-for-end when the boat gybes. */
 function crewPole(b: Boat, dt: number, emit: Emit): void {
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg }); };
-  // the forward hand (or whoever there is) goes to the mast to set, stow or gybe it, at their own pace
-  const hands = bodyJob(b, 'pole', b.pole === 'setting' || b.pole === 'stowing' || (b.poleWant && b.pole === 'down') || (!b.poleWant && b.pole === 'set'));
-  if (b.poleWant && (b.pole === 'down' || b.pole === 'stowing')) { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
-  else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
-  else if (b.pole === 'set' && b.tack !== b.poleTack) {
-    b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack;
-    say('Gybing the pole end-for-end. The jib is down for a few seconds.');
-  }
+  // a seasoned forward hand goes up before the bear-away, ready (ai.ts crewPoleCall renews b.polePrepUntil, a few
+  // seconds ahead on the crew's clock, while it holds: so it lapses by itself once she's round, or when nothing renews it)
+  const prep = (b.polePrepUntil ?? -1) > (b.crew?.clock ?? 0) && b.pole === 'down' && !b.poleWant && !(b.penalty > 0);
+  // what the pole wants now: set it, stow it, or gybe it end-for-end (the boat gybed with it set)
+  const act = b.poleWant ? (b.pole === 'down' || b.pole === 'stowing' ? 'set' : b.pole === 'set' && b.tack !== b.poleTack ? 'gybe' : null)
+    : b.pole === 'set' || b.pole === 'setting' ? 'stow' : null;
+  const working = b.pole === 'setting' || b.pole === 'stowing';
+  // the forward hand (or whoever there is) goes to the mast for it, and works at their own pace
+  const hands = bodyJob(b, 'pole', prep || working || act != null);
+  if (working) {
+    // (they're at the mast: a change of mind turns the job round there and then)
+    b.poleWalk = undefined;
+    if (act === 'set' && b.pole === 'stowing') { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+    else if (act === 'stow' && b.pole === 'setting') { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
+  } else if (act) {
+    // first they get to the mast (the jib as it was meanwhile: drawing to leeward, or still poled out), and ready the pole:
+    // the trip's time from where they are, and not before they're really there (crewWork.ts poleTrip, poleAt)
+    b.poleWalk ??= poleTrip(b, POLE.forward);
+    b.poleWalk -= dt;
+    if (b.poleWalk <= 0 && (poleAt(b) || b.poleWalk < -15)) {
+      b.poleWalk = undefined;
+      if (act === 'set') { b.pole = 'setting'; b.poleT = POLE.set / hands; b.poleTack = b.tack; }
+      else if (act === 'stow') { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
+      else { b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack; say('Gybing the pole end-for-end. The jib is down while it goes across.'); }
+    }
+  } else b.poleWalk = undefined;
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
     b.poleT -= dt;
     if (b.poleT <= 0) {
-      if (b.pole === 'setting') { b.pole = 'set'; say('Pole set: jib out to windward, wing-on-wing.'); }
+      // ("made": the forward hand's call once it's on, so the aft crew or the helm can trim the jib sheet to it)
+      if (b.pole === 'setting') { b.pole = 'set'; say('“Made!” Pole set: jib out to windward, wing-on-wing.'); }
       else { b.pole = 'down'; say('Pole stowed: jib back to leeward.'); }
       bodyJob(b, 'pole', false);
     }
@@ -599,7 +636,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting' || (b.poleWant && b.pole === 'down'), tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -838,7 +875,7 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
 /** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step: up to about 7°). */
 export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? 7 * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
 /** The boom angle the crew is aiming for. */
-export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaSlow) + crewEaseBoom(b);
+export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaMain ?? b.awaSlow) + crewEaseBoom(b);
 
 /** Taking in a slack sheet by hand, full range per second (an arm's length of line a second, no load on it). */
 const SLACK_RATE = 0.6;
@@ -897,11 +934,34 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
  * comes in on a winch, slower as the breeze builds. Then work out each sail's angle of attack and shape.
  */
 type Ctl = Exclude<keyof Controls, 'car'>;
+
+/** Who trims a sheet (crewWork.ts ownerOf), as a Person; null without a crew (the benchmark's ideal boat). */
+function trimmerOf(b: Boat, line: 'mainsheet' | 'jibsheet'): Person | null {
+  const c = b.crew; if (!c) return null;
+  const ppl = c.ppl ??= allAboard(c.spec);
+  return ppl[ownerFor(c, line)] ?? null;
+}
+/** The club crew's reaction time: the reference CREW_LAG was set for. */
+const CLUB_REACT = reactTime({ h: 1.75, w: 75 });
+/**
+ * How long (s, a time constant) before a sheet's trimmer has answered a change in the apparent wind: CREW_LAG for a
+ * club crew (the sim's speeds are calibrated there), scaled by this trimmer's reaction time (crewPhys.ts reactTime:
+ * an expert's 0.4 s against a club crew's 0.88 and a novice's 1.6, estimates; simple visual reaction is 0.2–0.25 s and
+ * a choice between responses longer, the Hick–Hyman law). An expert follows a puff or a luff closely; a novice's
+ * sheet is still where it was a second later, and the telltales and the heel show it.
+ */
+function trimmerLag(b: Boat, line: 'mainsheet' | 'jibsheet'): number {
+  const p = trimmerOf(b, line);
+  return p ? CREW_LAG * (reactTime(p) / CLUB_REACT) : CREW_LAG;
+}
 // (the lines the crew works, as constants: trimSails runs every step for every boat)
 const CREW_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const, CREW_LINES_T = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const, FIXABLE_LINES = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
 function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
-  if (!b.crewReady) b.awaSlow = awa; // (set up before she sails: for the wind she has)
+  if (!b.crewReady) b.awaSlow = b.awaMain = b.awaJib = awa; // (set up before she sails: for the wind she has)
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
+  // each sheet's trimmer sees the wind change after their own lag (trimmerLag: a club crew's is CREW_LAG)
+  b.awaMain = (b.awaMain ?? b.awaSlow) + (awa - (b.awaMain ?? b.awaSlow)) * Math.min(1, dt / trimmerLag(b, 'mainsheet'));
+  b.awaJib = (b.awaJib ?? b.awaSlow) + (awa - (b.awaJib ?? b.awaSlow)) * Math.min(1, dt / trimmerLag(b, 'jibsheet'));
   const c = b.ctl, tws = b.ww.kt;
   // working a line takes that line, and only that line, off the crew
   if (b.isUser) for (const k of [...Object.keys(b.ctlCmd), ...Object.keys(b.ctlTarget ?? {})] as Ctl[]) if (b.ctlCmd[k] || b.ctlTarget?.[k] != null) takeLine(b, k);
@@ -944,7 +1004,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.depower = clamp(b.depower + over * dt / 30, 0, 1);
   // last of the steps, the traveller comes down to leeward: the boom eases out with it (up to about 7°)
   const easeBoom = crewEaseBoom(b);
-  const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
+  const wantMain = optimalSheet('main', b.awaMain!) + easeBoom, wantJib = optimalSheet('jib', b.awaJib!);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
   // (when a line changes hands the crew thinks again at once, starting from what it has set: its other lines stay put
@@ -1135,7 +1195,7 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
 export function settleTrim(b: Boat, from: number, windKt: number): void {
   const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), sw = sailWind(from, windKt, b.h, b.v), c = b.ctl;
   b.rel = rel; b.twa = Math.abs(rel); b.tack = rel >= 0 ? 'S' : 'P';
-  b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = sw.awa;
+  b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = b.awaMain = b.awaJib = sw.awa;
   const side = b.tack === 'S' ? -1 : 1;
   c.mainsheet = mainsheetFor(optimalSheet('main', sw.awa), c.traveller); c.jibsheet = jibsheetFor(optimalSheet('jib', sw.awa), c, b.tack);
   b.sheets.main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max);

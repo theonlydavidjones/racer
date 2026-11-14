@@ -27,7 +27,7 @@ import type { Boat, LineKey } from './boat/boat';
 import { CONDITION_KEYS } from './sim/world';
 import { WorkerHost, type SimHost, type SimView } from './sim/host';
 import type { Command, CtlKey } from './sim/commands';
-import { POLE, byHand, linesByHand } from './boat/physics';
+import { poleEta, byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
 import { ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
@@ -654,7 +654,8 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 function togglePole(): void {
   if (!w.running || w.paused) return;
   const want = !w.user.poleWant; send({ k: 'pole', want }); // (the pole is always yours: your call only)
-  toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  const eta = poleEta(w.user); // (the crew's own time, from the page's mirror: who goes, from where, at their pace; crewWork.ts poleTrip)
+  toast(want ? `Crew: setting the whisker pole (about ${Math.round(eta.set)} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${Math.round(eta.stow)} s).`, 3000);
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it

@@ -6,6 +6,7 @@ import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
+import { attrOf } from '../boat/crewPhys';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
@@ -418,6 +419,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   let desired = b.h, luff = false, beating = false;
   let aim: Vec | null = null; // (the point she's steering for, racing)
   ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
+  // (her crew's pole call first, whatever she does next: it reads only where she is and how she's sailing, and it has to
+  // run through penalty turns and after she's finished too, or a pole left out on the run stays out on the reach home)
+  crewPoleCall(w, b);
   if (b.penalty > 0) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
@@ -842,21 +846,42 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
   if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
   b.desired = desired; b.luff = luff;
-  crewPoleCall(w, b);
 }
 
 /**
  * The crew's call on the whisker pole: out for wing-on-wing when running deep, in before the next rounding mark, for
  * penalty turns, or once she comes up toward a reach. Poled out beats the jib to leeward from 154.5° true at every wind
- * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 5–8 s, so the gap keeps them
+ * speed (polar.ts); set at 157°, stowed at 150°: each set or stow leaves the jib dead for 10–25 s, by the crew, plus the
+ * trip forward (physics.ts POLE, the owner's timings), so the gap keeps them
  * from doing it over and over as she wanders about a deep run. The AI boats' crews only: never inside a harbor's basin.
  * Yours never sets it on their own (the owner: "pole-out should only ever be on my command"): poleMustCome.
  */
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
+  // a seasoned forward hand goes up to the mast before the bear-away at a mark when the next leg is a run, so the pole
+  // goes on as soon as she's down (the owner: from the foredeck, "already pre-positioned (which a seasoned crew member
+  // knows to do)", 10 s against 20 from the cockpit). Only in the last seconds before the bear-away (about 8 s out at
+  // her speed: off the rail any sooner costs her on the beat, and a tack with someone at the mast is slow), and not while
+  // she needs their weight hiking; not alone, not through a tack, and not where you've put them. Renewed while it holds,
+  // and held 10 s past (the leg moves on mid-rounding; she's still bearing away), then it lapses by itself. (An estimate
+  // of practice; the 0.7: "seasoned", above a club crew.)
+  const c = b.crew, fwd = c && c.spec.crew.length ? c.spec.crew[c.spec.crew.length - 1] : null;
+  const nextDeep = !!nm && nm.type === 'round' && Math.abs(wrap(b.ww.from - brg(nm.next.x - nm.p.x, nm.next.y - nm.p.y) - 180)) < 30;
+  // (once a prep has lapsed unused, she wasn't bearing away yet: short of the mark she needs them on the rail again, and
+  // they don't turn back for the mast the moment they've left it; not again for 15 s, an estimate)
+  const lapsed = b.polePrepUntil != null && (c?.clock ?? 0) > b.polePrepUntil && (c?.clock ?? 0) - b.polePrepUntil < 15;
+  if (!!fwd && c!.place?.across == null && attrOf(fwd, 'handling') >= 0.7 && nextDeep && markDist(b, nm!) < Math.max(12, 8 * b.v)
+    && (c!.hike ?? 0) < 0.3 && !lapsed && !b.tacking && w.t >= 0 && !b.docked && b.penalty <= 0) b.polePrepUntil = (c!.clock ?? 0) + 10;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0 || inBasin(b)) b.poleWant = false;
-  else if (twa > 157) b.poleWant = true;
+  // (and a crew commits: they call it once she's settled deep, a few seconds past 157°, not on every wander of the course;
+  // once it's called they see it through unless she comes up toward a reach (140°), and stow it after a few seconds
+  // above 150°: the set costs them 20–40 s of the jib, the trip forward included, so a false start is dear. Estimates.)
+  const busy = b.poleWant || b.pole !== 'down';
+  b.poleDeepT = twa > 157 ? (b.poleDeepT ?? w.t) : undefined;
+  b.poleHighT = twa < 150 ? (b.poleHighT ?? w.t) : undefined;
+  const high = twa < 140 || (b.poleHighT != null && w.t - b.poleHighT >= 3);
+  if (w.t < 0 || nearMark || jibDown || b.docked || b.penalty > 0 || (busy ? high : twa < 150) || inBasin(b)) b.poleWant = false;
+  else if (b.poleDeepT != null && w.t - b.poleDeepT >= 4) b.poleWant = true;
 }
 /**
  * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come

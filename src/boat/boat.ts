@@ -206,6 +206,8 @@ export interface Boat {
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
   trim: { main: SailTrim; jib: SailTrim | null };
   awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)
+  /** The apparent wind angle as the main's and the jib's trimmers see it, each after their own lag (physics.ts trimmerLag). */
+  awaMain?: number; awaJib?: number;
   /** Her steady leeway (deg, a few seconds' mean, at her polar speed here): her course through the water is this much further off the wind than her heading. */
   leeway?: number;
   /** The sails' frame's turn from her heading (deg, + to starboard: physics.ts sailFrame). */
@@ -218,6 +220,12 @@ export interface Boat {
   poleMine?: boolean;
   pole: PoleState;
   poleT: number; // seconds left in the current crew job
+  /** Seconds left of the forward hand's trip to the mast before they start setting the pole (the jib drawing meanwhile). */
+  poleWalk?: number;
+  /** Until when (the crew's clock, s) the forward hand stays up at the mast, ready to set the pole after the bear-away (ai.ts crewPoleCall renews it). */
+  polePrepUntil?: number;
+  /** Since when (race clock, s) she's been deep enough for the pole, and since when up past where it pays (ai.ts crewPoleCall). */
+  poleDeepT?: number; poleHighT?: number;
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
   heel: number; boom: number; jib: number;

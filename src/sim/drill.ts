@@ -238,7 +238,8 @@ export class DrillTracker {
  */
 export const SIM_CREW: Record<DrillKind, [number, number, number, number, number, number][]> = {
   tack: [[3, 7.9, 5.1, 0.65, 75, 8.6], [4, 5.8, 6.7, 0.64, 60, 9.2], [6, 4.1, 8.9, 0.67, 37, 7.7], [8, 3.5, 10.2, 0.67, 24, 6.0], [12, 3.0, 11.6, 0.66, 16, 4.6], [16, 2.8, 12.2, 0.62, 15, 5.4], [20, 2.8, 12.2, 0.58, 14, 5.8], [25, 3.0, 11.5, 0.46, 16, 9.1]],
-  gybe: [[3, 0, 4.1, 0.89, 55, 2.0], [4, 0, 5.2, 0.89, 47, 2.3], [6, 0, 6.9, 0.89, 33, 2.5], [8, 0, 8.1, 0.91, 25, 2.4], [12, 0, 9.0, 0.92, 18, 2.2], [16, 0, 7.5, 0.94, 13, 1.5], [20, 0, 8.0, 0.95, 11, 1.4], [25, 0, 8.2, 0.95, 10, 1.4]]
+  // (a gybe with the pole out: it goes end-for-end at the owner's 13 s for a club crew, physics.ts POLE, the jib dead meanwhile)
+  gybe: [[3, 0, 4.1, 0.89, 57, 2.2], [4, 0, 5.1, 0.89, 49, 2.6], [6, 0, 6.9, 0.89, 37, 3.1], [8, 0, 8.1, 0.91, 30, 3.2], [12, 0, 9.0, 0.92, 37, 5.8], [16, 0, 7.5, 0.93, 35, 5.6], [20, 0, 8.0, 0.95, 33, 4.8], [25, 0, 8.2, 0.95, 32, 4.9]]
 };
 /** The sim crew's figures at `tws`, between the winds measured. */
 export function simCrew(kind: DrillKind, tws: number): { dead: number; rate: number; minSpeed: number; back: number; lostM: number } {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
+import { poleTrip, startThreshold } from '../src/boat/crewWork';
+import { POLE, poleEta, sailPlan } from '../src/boat/physics';
 import { beatAngle } from '../src/boat/polar';
-import { ATTRS, DEFAULT_CREW, DEFAULT_SKILL, ENDURE, attrOf, crewAttr, hikingMoment, newCrew, pace, reactTime, specAttr, type Attr, type CrewSpec } from '../src/boat/crewPhys';
+import { ATTRS, Z, DEFAULT_CREW, DEFAULT_SKILL, ENDURE, attrOf, crewAttr, hikingMoment, newCrew, pace, reactTime, specAttr, type Attr, type CrewSpec } from '../src/boat/crewPhys';
 
 // The crew model (ROADMAP, the skipper and crew model): each person's skill split into attributes (crewPhys.ts Attr),
 // each falling back to their skill, so a crew given only a skill sails exactly as before the split.
@@ -74,4 +76,72 @@ describe('the crew model: attributes', () => {
     const unfit = beat(U, 22, 150), fit = beat(F, 22, 150), lean = (b: ReturnType<typeof beat>) => b.crew!.people[1].lean;
     expect(lean(unfit)).toBeLessThan(lean(fit));
   }, 180_000);
+});
+
+describe('the crew model, phase B: each trimmer\'s own eye and hand', () => {
+  /** Sailing at `twa` in 12 kt, steady; then the wind veers `d` degrees (a lift: the apparent wind goes aft): her main's
+   * angle of attack off its best (deg) `after` seconds later. */
+  function lift(spec: CrewSpec, twa: number, d: number, after: number) {
+    const b = testBoat({ heading: 360 - twa, kt: 5, windKt: 12 });
+    b.crew = newCrew(spec, 'S');
+    sail(b, 40, () => { b.h = 360 - twa; });
+    b.ww.from += d;
+    sail(b, after, () => { b.h = 360 - twa; });
+    return Math.abs(b.trim.main.err);
+  }
+  it('a quick trimmer has the main eased for a lift sooner than a slow one (reaction: an estimate, Hick–Hyman)', () => {
+    const quick = lift(crewOf(0.6, { react: 1 }), 70, 15, 1.2), slow = lift(crewOf(0.6, { react: 0.1 }), 70, 15, 1.2);
+    expect(slow).toBeGreaterThan(quick + 1);
+    // and both have caught up after a few seconds
+    expect(lift(crewOf(0.6, { react: 0.1 }), 70, 15, 8)).toBeLessThan(2.5);
+  }, 30_000);
+
+  it('a trimmer\'s tolerance band: an expert\'s finer than a club crew\'s (the calibration) and a novice\'s coarser', () => {
+    expect(startThreshold('mainsheet', 0.6)).toBe(0.006);
+    expect(startThreshold('mainsheet', 1)).toBeLessThan(0.0035);
+    expect(startThreshold('jibsheet', 0.25)).toBeGreaterThan(0.01);
+  });
+});
+
+describe('the crew model, phase B: the pole, by the owner\'s timings', () => {
+  const run = (spec: CrewSpec) => { const b = testBoat({ heading: 195, kt: 4, windKt: 10 }); b.crew = newCrew(spec, 'S'); return b; };
+  it('from the cockpit: an expert about 20 s, "the absolute fastest"; a club crew longer; a novice much longer', () => {
+    const ex = poleEta(run(crewOf(1))).set, club = poleEta(run(crewOf(0.6))).set, nov = poleEta(run(crewOf(0.25))).set;
+    expect(ex).toBeGreaterThan(19); expect(ex).toBeLessThan(22);
+    expect(club).toBeGreaterThan(ex + 4); expect(nov).toBeGreaterThan(club + 8);
+    // (the pace of the work is handling's: a fit, quick-eyed novice sets it no faster)
+    expect(poleEta(run(crewOf(0.25, { react: 1, fitness: 1, trim: 1 }))).set).toBeGreaterThan(club + 7);
+  });
+  it('pre-positioned at the mast: 10 s, "the bare minimum"', () => {
+    const b = run(crewOf(1)); b.crew!.people[2].z = Z.mast;
+    expect(poleTrip(b, POLE.forward)).toBe(0);
+    expect(poleEta(b).set).toBeCloseTo(10, 1);
+  });
+  it('the jib draws to leeward while the forward hand goes up; it\'s out of action only while the pole goes on', () => {
+    const b = run(crewOf(0.6)); b.poleWant = true;
+    sail(b, 5, () => { b.h = 195; });
+    expect(b.pole).toBe('down'); expect(sailPlan(b)).toBe('jib');
+    sail(b, poleEta(run(crewOf(0.6))).set + 2, () => { b.h = 195; });
+    expect(b.pole).toBe('set');
+  }, 30_000);
+  it('stowing pays the trip forward too, when the forward hand is back aft', () => {
+    const b = run(crewOf(0.6)); b.poleWant = true;
+    sail(b, 40, () => { b.h = 195; });
+    expect(b.pole).toBe('set');
+    // (sent back into the cockpit after the set: far aft of the mast)
+    const fwd = b.crew!.people[2]; const aft = fwd.z > 0;
+    b.poleWant = false; sail(b, 3, () => { b.h = 195; });
+    if (aft) expect(b.pole).toBe('set'); // still walking forward, the jib still poled out
+    sail(b, 40, () => { b.h = 195; });
+    expect(b.pole).toBe('down');
+  }, 30_000);
+  it('ready at the mast before the bear-away lapses by itself when nothing renews it (no forward hand stuck up there)', () => {
+    const b = run(crewOf(0.9)); b.h = 195;
+    sail(b, 2, () => { b.h = 195; });
+    b.polePrepUntil = (b.crew!.clock ?? 0) + 10;
+    sail(b, 6, () => { b.h = 195; });
+    expect(b.crew!.people[2].job?.line).toBe('pole'); expect(b.crew!.people[2].z).toBeLessThan(Z.mast + 0.6);
+    sail(b, 30, () => { b.h = 195; });
+    expect(b.crew!.people[2].job?.line).not.toBe('pole'); expect(b.pole).toBe('down');
+  }, 30_000);
 });

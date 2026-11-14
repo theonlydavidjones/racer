@@ -85,16 +85,26 @@ export function mainHand(nCrew: number, spec?: CrewSpec, forward = false): numbe
   const helm = skillOf(spec.helm), mid = skillOf(spec.crew[0]);
   return mid >= helm && mid >= NOVICE ? 1 : 0;
 }
-/** Who works a line (an index into [helm, crew…]): by the number of crew, and who has the main (mainHand). */
-export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = false): number {
+/**
+ * Who works a line (an index into [helm, crew…]): by the number of crew, and who has the main (mainHand). `forward`:
+ * the crew are away forward (at the mast or on the foredeck); `poleUp`: the forward hand has gone up to the mast for
+ * the pole, so the jib sheet is the aft crew's (the owner: once it's "made", "the aft crew member or skipper can reset
+ * the jib sheet").
+ */
+export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = false, poleUp = false): number {
   if (nCrew === 0) return 0;
-  const main = mainHand(nCrew, spec, forward);
+  const main = mainHand(nCrew, spec, forward || poleUp);
   if (line === 'mainsheet' || line === 'traveller') return main;
   if (line === 'backstay') return 0;
-  // the jib: the forward crew (with one crew, whichever of the two hasn't the main)
-  if (line === 'jibsheet' || line === 'jibsheetW') return nCrew === 1 ? 1 - main : nCrew;
+  // the jib: the forward crew (with one crew, whichever of the two hasn't the main); with the forward hand up at the
+  // mast for the pole, the middle crew (alone with the helm: the helm)
+  if (line === 'jibsheet' || line === 'jibsheetW') return poleUp ? (nCrew >= 2 ? 1 : 0) : nCrew === 1 ? 1 - main : nCrew;
   return nCrew; // the forward hand: the cabin-top lines, the cars, the pole, the halyards
 }
+/** The forward hand is up at the mast for the pole (going to set it, setting, stowing or gybing it, or ready for it). */
+const poleUp = (c: CrewState) => c.spec.crew.length > 0 && c.people[c.spec.crew.length]?.job?.line === 'pole';
+/** Who works a line on this boat now (ownerOf, from where the crew are). */
+export const ownerFor = (c: CrewState, line: string) => ownerOf(line, c.spec.crew.length, c.spec, (c.layout ?? 'cockpit') !== 'cockpit', poleUp(c));
 
 /** Where working a line puts a person (null: they work it from where they are). */
 function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false): Station | null {
@@ -126,10 +136,13 @@ function stationFor(line: string, who: number, windward: number, big: boolean, b
 
 /** How far off a line has to be (of its full range) before this person goes to fix it: a skilled crew makes finer adjustments. */
 export function startThreshold(line: string, skill: number, to?: number): number {
-  // (the sheets are in hand and the trimmer watches the leech: small changes move the leech, controls.ts mainShape)
-  if (line === 'jibsheet' || line === 'mainsheet') return 0.006;
+  // (the sheets are in hand and the trimmer watches the leech: small changes move the leech, controls.ts mainShape. A club
+  // trimmer's band, 0.006 of the sheet (about 0.3° of boom upwind), the sim's calibration; halving or doubling with
+  // every 0.3 of trim either side (an expert's 0.4×, a novice's at 0.25 2.2×): an estimate, no study measures a trimmer's error)
+  const band = Math.pow(2, (0.6 - skill) / 0.3);
+  if (line === 'jibsheet' || line === 'mainsheet') return 0.006 * band;
   // (the traveller is in the main trimmer's other hand on the thwart, played with the sheet: as fine, over its range of 2)
-  if (line === 'traveller') return 0.012;
+  if (line === 'traveller') return 0.012 * band;
   const range = line === 'traveller' ? 2 : 1;
   // a line wanted right on (or off) to its stop is pulled all the way: "backstay bar tight" is one clear action
   if (to != null && (to >= 0.98 || to <= (line === 'traveller' ? -0.98 : 0.02))) return 0.02;
@@ -185,7 +198,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
   const fwdL = (c.layout ?? 'cockpit') !== 'cockpit';
   const worker = (k: string) => {
-    const o = ownerOf(k, n, c.spec, fwdL);
+    const o = ownerFor(c, k); // (with the forward hand up at the mast for the pole, the jib is the aft crew's already)
     if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
       const j = c.people[o]?.job;
       if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
@@ -283,7 +296,7 @@ export const CAR = {
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
 function carJob(b: Boat, dt: number): void {
-  const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
+  const c = b.crew!, who = ownerFor(c, 'car'), a = c.people[who], p = allAboard(c.spec)[who];
   const lazy = b.ctl.car[b.tack];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
   // a job under way: on the car the boat has tacked onto, it's loaded now and can't be moved
@@ -311,9 +324,31 @@ function carJob(b: Boat, dt: number): void {
 
 
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
+/** The forward hand (or whoever has the pole) is at the mast or forward of it (no crew: the boat's own, always). */
+export function poleAt(b: Boat): boolean {
+  const c = b.crew; if (!c) return true;
+  const a = c.people[ownerFor(c, 'pole')];
+  return !a || a.z <= Z.mast + 0.6;
+}
+/** Where the forward hand sits in the cockpit (z, m): the start of the owner's "from the cockpit" trip. */
+const POLE_FROM = 1.85;
+/**
+ * How long (s) before the forward hand (or whoever has the pole) can start on it: nothing if they're at the mast or on
+ * the foredeck already; else their reaction time, then the trip out of the cockpit, along the side deck and round the
+ * shrouds, and the pole off its chocks: `forward` s for a club crew from the cockpit, at their pace, and in proportion
+ * from wherever they are (from the piano, a shorter way). Alone, the helm also has to leave the tiller: one-handed pace.
+ * (Their weight goes up the deck at a human pace meanwhile, crewPhys.ts; physics.ts waits for them to be there too.)
+ */
+export function poleTrip(b: Boat, forward: number): number {
+  const c = b.crew; if (!c) return 0;
+  const who = ownerFor(c, 'pole'), a = c.people[who];
+  if (!a || a.z <= Z.mast + 0.6) return 0;
+  const share = clamp((a.z - Z.mast) / (POLE_FROM - Z.mast), 0.2, 1.3);
+  return reactTime(allAboard(c.spec)[who]) + share * forward / workPace(b, who);
+}
 export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
   const c = b.crew; if (!c) return 1;
-  const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
+  const n = c.spec.crew.length, who = ownerFor(c, line), a = c.people[who];
   if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);

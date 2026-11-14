@@ -19,16 +19,20 @@ const world = (t = 60) => ({ t, nextMark: () => null }) as unknown as World;
 describe('The crew calls the whisker pole', () => {
   it('out running deep, in on a reach, with a gap between so they do not set and stow it over and over', () => {
     const b = testBoat({ heading: 0, kt: 4 });
-    b.twa = 165; crewPoleCall(world(), b); expect(b.poleWant).toBe(true);
-    b.twa = 153; crewPoleCall(world(), b); expect(b.poleWant).toBe(true); // (inside the gap: stays as it was)
-    b.twa = 148; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
-    b.twa = 155; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
-    b.twa = 160; crewPoleCall(world(), b); expect(b.poleWant).toBe(true);
+    const at = (t: number, twa: number) => { b.twa = twa; crewPoleCall(world(t), b); return b.poleWant; };
+    // (once she's settled deep, a few seconds past 157°: not on a moment's wander)
+    expect(at(60, 165)).toBe(false); expect(at(62, 165)).toBe(false); expect(at(64.5, 165)).toBe(true);
+    expect(at(65, 153)).toBe(true); // (inside the gap: stays as it was)
+    // (called, they see it through a moment above 150°, but not a few seconds of it, nor coming up toward a reach)
+    expect(at(66, 148)).toBe(true); expect(at(69.5, 148)).toBe(false);
+    expect(at(70, 155)).toBe(false);
+    expect(at(71, 160)).toBe(false); expect(at(75.5, 160)).toBe(true);
+    expect(at(76, 135)).toBe(false);
   });
   it('in for penalty turns: no crew spins circles with the pole out', () => {
     const b = testBoat({ heading: 0, kt: 4 });
-    b.twa = 170; crewPoleCall(world(), b); expect(b.poleWant).toBe(true);
-    b.penalty = 720; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
+    b.twa = 170; crewPoleCall(world(60), b); crewPoleCall(world(65), b); expect(b.poleWant).toBe(true);
+    b.penalty = 720; crewPoleCall(world(66), b); expect(b.poleWant).toBe(false);
   });
   it('never before the start, nor with the jib down', () => {
     const b = testBoat({ heading: 0, kt: 4 });
