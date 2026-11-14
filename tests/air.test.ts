@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { airTempC, warmDay } from '../src/environment/air';
+import { airTempC, dayWindOf, warmDay } from '../src/environment/air';
+import { dayWeather } from '../src/environment/weather';
 import { LL } from '../src/geo/geo';
+import climate from '../src/environment/data/sf-air-climate.json';
 
 /** Local time on the Bay (Pacific) as minutes since epoch, UTC. */
 const at = (iso: string, offsetH: number) => (Date.parse(iso + 'Z') + offsetH * 3600000) / 60000;
@@ -48,4 +50,23 @@ describe("The air temperature on the race area (environment/air.ts, NOAA CO-OPS'
     for (let y = 2030; y < 2080; y++) for (let d = 1; d <= 28; d++) { const date = `${y}-09-${String(d).padStart(2, '0')}`; if (warmDay(date, gate)) ga++; if (warmDay(date, alameda)) al++; }
     expect(al).toBeGreaterThan(2 * ga); // (Fort Point about one day in eight in September, Alameda nearly one in two)
   });
+  it("on climate-only days, warm with the day's wind as such days were (scripts/fit-warm-days.mjs): every station and month", () => {
+    const C = climate as unknown as { stations: Record<string, { name: string; lat: number; lon: number; warmDay: number[] }> };
+    const bad: string[] = [];
+    for (const st of Object.values(C.stations)) {
+      const p = LL(st.lat, st.lon);
+      for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, '0'), share = st.warmDay[m - 1];
+        const r = ([0, 1, 2] as const).map(wd => { let w = 0, n = 0; for (let y = 2030; y < 2090; y++) for (let d = 1; d <= 28; d++) { const date = `${y}-${mm}-${String(d).padStart(2, '0')}`; if (warmDay(date, p, dayWindOf(date, dayWeather(date, 'auto', wd)))) w++; n++; } return w / n; });
+        // (a typical day keeps the month's own rate: the wind says which days are warm, not how many)
+        if (Math.abs(r[1] - share) > 0.03 + 0.2 * share) bad.push(`${st.name} ${mm}: typical ${r[1].toFixed(3)} against the month's ${share}`);
+        // (along the east shore in summer, a windy day is warmer than a light one: the inland heat that drives the breeze)
+        if (st.name !== 'Fort Point' && m >= 5 && m <= 9 && !(r[2] > r[0] + 0.05)) bad.push(`${st.name} ${mm}: windy ${r[2].toFixed(2)} not warmer than light ${r[0].toFixed(2)}`);
+      }
+    }
+    expect(bad).toEqual([]);
+    // (at Fort Point, a light and variable autumn day is the warm one)
+    const fp = LL(37.806305, -122.46589), oct = (kind: 'auto' | 'light') => { let w = 0, n = 0; for (let y = 2030; y < 2130; y++) for (let d = 1; d <= 28; d++) { const date = `${y}-10-${String(d).padStart(2, '0')}`; if (warmDay(date, fp, dayWindOf(date, dayWeather(date, kind, 1)))) w++; n++; } return w / n; };
+    expect(oct('light')).toBeGreaterThan(2 * oct('auto'));
+  }, 120000);
 });

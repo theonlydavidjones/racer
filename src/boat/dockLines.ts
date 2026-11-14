@@ -133,8 +133,8 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
     const cloth = Math.min(1, ((b.rig?.main ?? 0) + (b.rig?.jib ?? 0)) / 2);
     // (dynamics.ts windFore, windSide, windTurn: the same windage as her own step's, by the angle the wind comes from)
     const awa = Math.atan2(Math.abs(across), -along) / D2R, side = Math.sign(across), bare = 1 - (b.rig?.main ?? 0);
-    const wy = side * q * windSide(awa, 3, bare);
-    X += q * (-windFore(awa, 3, bare) + HANDLING.flogCdA * cloth * along); Y += wy; M += side * q * windTurn(awa, 3, bare);
+    const wy = side * q * windSide(awa, b.crew?.people.length ?? 3, bare);
+    X += q * (-windFore(awa, b.crew?.people.length ?? 3, bare) + HANDLING.flogCdA * cloth * along); Y += wy; M += side * q * windTurn(awa, b.crew?.people.length ?? 3, bare);
   }
   // the lines
   for (const L of [...lines]) {
