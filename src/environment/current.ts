@@ -209,8 +209,15 @@ const SLOTS = (() => { const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), 
 const pileSlotDepth = (p: Vec): number => {
   if (!(p.x > SLOTS.x0 && p.x < SLOTS.x1 && p.y > SLOTS.y0 && p.y < SLOTS.y1) || inBasin(p)) return -1;
   let west = -Infinity, east = -Infinity;
-  for (const P of PILE_PIERS) { const xs = P.pts.map(q => q.x), ys = P.pts.map(q => q.y), top = Math.max(...ys); if (p.y < Math.min(...ys) || p.y > top) continue;
-    if (Math.max(...xs) <= p.x) west = Math.max(west, top); if (Math.min(...xs) >= p.x) east = Math.max(east, top); }
+  // (a pier to the west or east where its outline crosses p's latitude, not by its box: a slanted pier's widest corner
+  // would leave a strip beside its wall out of the slot, a step in the stream there)
+  for (const P of PILE_PIERS) {
+    const ys = P.pts.map(q => q.y), top = Math.max(...ys); if (p.y < Math.min(...ys) || p.y > top) continue;
+    let xMin = Infinity, xMax = -Infinity;
+    for (let i = 0; i < P.pts.length; i++) { const a = P.pts[i], b = P.pts[(i + 1) % P.pts.length];
+      if ((a.y - p.y) * (b.y - p.y) > 0 || a.y === b.y) continue; const x = a.x + (b.x - a.x) * (p.y - a.y) / (b.y - a.y); xMin = Math.min(xMin, x); xMax = Math.max(xMax, x); }
+    if (xMax === -Infinity) continue;
+    if (xMax <= p.x) west = Math.max(west, top); if (xMin >= p.x) east = Math.max(east, top); }
   return west > -Infinity && east > -Infinity ? Math.min(west, east) - p.y : -1;
 };
 /** In a slot the stream is the piles' (PILE_FLOW), from the open Bay's at its mouth over its first SLOT_IN meters. */
