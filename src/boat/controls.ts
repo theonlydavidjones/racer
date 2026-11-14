@@ -251,12 +251,20 @@ export function jibShape(c: Controls, tws: number, tack: Tack, wear: SailWear = 
   }, wear, aws), tune ? jibTune(tune, tws, c.backstay, aws) : null);
 }
 
+/**
+ * Upwind, how far into the powered-up middle of the wind range she is (0 in a drifter, 1 from about 10 kt), and how far
+ * she's depowered (from 12 kt, or by how overpowered she is, heel and helm, when known: a heavier crew or a stiffer boat
+ * carries full power longer); and how far off the wind the upwind shapes have faded (0 to 55° apparent, 1 from 100°).
+ * targetShape's sail shapes follow them, and so do the main's leech telltales (render/sails.ts).
+ */
+export const powerUpOf = (tws: number) => smooth((tws - 4) / 6);
+export const depowerOf = (tws: number, overpowered?: number) => overpowered ?? smooth((tws - 12) / 8);
+export const reachOf = (awa: number) => smooth((Math.abs(awa) - 55) / 45);
 /** The fastest shape for a sail in this wind (kt) and apparent wind angle. */
 export function targetShape(sail: 'main' | 'jib', tws: number, awa: number, overpowered?: number): Shape {
-  const a = Math.abs(awa), reach = smooth((a - 55) / 45), run = smooth((a - 120) / 40);
-  // upwind: power up to the middle of the range, then depower: by how overpowered she is (heel and helm, when known:
-  // a heavier crew or a stiffer boat carries full power longer), or else by the wind
-  const powerUp = smooth((tws - 4) / 6), depower = overpowered ?? smooth((tws - 12) / 8);
+  const a = Math.abs(awa), reach = reachOf(a), run = smooth((a - 120) / 40);
+  // upwind: power up to the middle of the range, then depower
+  const powerUp = powerUpOf(tws), depower = depowerOf(tws, overpowered);
   const base = sail === 'main'
     // (fully depowered, as flat as the rig will make them: the main to about 8% camber (the outhaul on its band from
     // 12 kt, then the backstay bending the mast, the luff and the vang), the jib about 7.5%)

@@ -1,6 +1,11 @@
 import './three-setup';
 import * as THREE from 'three';
-import type { SailTrim } from '../boat/trim';
+import { LEECH_CURL, type SailTrim } from '../boat/trim';
+import { depowerOf, powerUpOf, targetShape } from '../boat/controls';
+import { CE_ABOVE_WL, RIG as BAL } from '../boat/balance';
+import type { Boat } from '../boat/boat';
+
+const smoothstep = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 
 /**
  * A sail as a live surface: camber, twist toward the head, a luff bubble when it's under-trimmed, and
@@ -268,11 +273,63 @@ export class Telltale {
 /** The main's leech telltale: streaming off the leech while the flow leaves it cleanly, curling round behind it to
  * leeward once the main's stalled past a little (the flow's left the sail before the leech), hanging downwind or luffing. */
 export function leechTellState(trim: SailTrim, awa: number, luffing: boolean): TellState {
-  return awa > 115 || luffing ? 'hang' : trim.flow === 'stalled' && trim.amount > 0.12 ? 'curl' : 'stream';
+  return awa > 115 || luffing ? 'hang' : trim.flow === 'stalled' && trim.err > LEECH_CURL ? 'curl' : 'stream';
+}
+
+/** How the main's twist and the breeze set each leech telltale (for leechTellAt). */
+export interface LeechFlow {
+  twist: number; // the main's twist now (deg, head against foot: controls.ts mainShape)
+  target: number; // the fast twist for the breeze (controls.ts targetShape)
+  powerUp: number; depower: number; // controls.ts powerUpOf, depowerOf
+  beat: number; // 1 close-hauled (to 45° apparent), fading to 0 on a close reach (60°): where sheeting for height applies
+  fCE: number; // the height fraction up the luff (0 boom, 1 head) of the centre of effort, where the sim's one trim is taken
+  fTop: number; // the top batten's
+  time: number; // s, for the breeze's unsteadiness
+}
+/** The main's twist against the fast one now, for her leech telltales (the 3D boat's and the flow view's alike). `fTop`: the
+ * top batten's height fraction (render/boatMesh.ts MAIN_DEF: at the leech's upper fifth, CR 9.23, about 0.80 of the luff). */
+export function leechFlow(b: Boat, time: number, fTop = 0.8): LeechFlow {
+  const tws = b.ww.kt;
+  return { twist: b.shape.main.twist, target: targetShape('main', tws, b.awa, b.depower).twist, powerUp: powerUpOf(tws), depower: depowerOf(tws, b.depower),
+    beat: 1 - smoothstep((Math.abs(b.awa) - 45) / 15), fCE: (CE_ABOVE_WL - BAL.hbi - BAL.BAS) / BAL.P, fTop, time };
+}
+/** How far short of its curl line (deg) the top leech telltale sits at the fast trim upwind: in a drifter, and opened up as
+ * she depowers (estimates: see leechTellAt). */
+const TOP_CLEAR_LIGHT = 2, TOP_CLEAR_DEPOWERED = 4;
+/**
+ * One of the main's leech telltales, at height fraction f up its luff. The sim trims the main at one height (trim.err,
+ * taken at the centre of effort); each section of the sail sees its own angle of attack about that.
+ * - Twist: the main is a triangle, a strongly tapering wing, and an untwisted tapering wing works its tip sections
+ *   hardest (lifting-line theory: the local lift coefficient is highest near the tip); above the hounds it has no jib
+ *   ahead of it, and the mast is a bigger share of its short chord. So its head stalls first unless it's twisted off.
+ *   The twist against the fast one (targetShape's) changes each section's angle by (target − twist)·(f − fCE): short of
+ *   it (the leech closed by a hard sheet or the vang) the upper sections' angles climb; past it (eased) they fall.
+ * - The fast trim's top section, upwind: North Sails' Nordic Folkboat guide reads the top leech telltale for twist ("In
+ *   light winds the mainsheet is eased so that the top tell-tale flies straight"; in medium winds and flat water the
+ *   main is "sheeted tight" and "the leech will close"). North's guides for other classes put numbers to it: the Elliott
+ *   5.9's has the top batten telltale "flying nearly all the time" eased in light air and, sheeted harder once the crew's
+ *   on the side, "flying 50% of the time"; the Thistle's has it "stalled most of the time when the sail is trimmed
+ *   properly when sailing upwind" (northsails.com, the Elliott 5.9 and Thistle tuning guides). So in the
+ *   powered-up middle of the range the fast trim puts the top section on its curl line; in a drifter a couple of degrees
+ *   short of it (TOP_CLEAR_LIGHT: sheeting hard or closing the leech still curls it, easing flies it); and as she
+ *   depowers and the leech opens, clear of it (TOP_CLEAR_DEPOWERED). Both margins are estimates. Sheeting for height is a
+ *   beat's rule: once she's cracked off onto a close reach the rule is to ease till every leech telltale streams, so the
+ *   edge fades from 45° apparent to 60° (lf.beat).
+ * - The breeze isn't steady: the top section's angle wanders about ±1.5° (an estimate, the size of the apparent wind's
+ *   swing at the top batten as she rolls a few degrees a second in a seaway, sailFlow.ts windAt).
+ * Curling is past trim.ts's LEECH_CURL, the line the whole sail's own telltale used.
+ */
+export function leechTellAt(trim: SailTrim, awa: number, luffing: boolean, lf: LeechFlow, f: number, phase = 0): TellState {
+  if (awa > 115 || luffing) return 'hang';
+  const up = Math.min(1, Math.max(0, (f - lf.fCE) / (lf.fTop - lf.fCE))); // (0 at the centre of effort and below, 1 at the top batten)
+  const edge = (LEECH_CURL - TOP_CLEAR_LIGHT * (1 - lf.powerUp) - TOP_CLEAR_DEPOWERED * lf.depower) * lf.beat;
+  const wander = up * 1.5 * (Math.sin(lf.time * 0.9 + phase) * 0.6 + Math.sin(lf.time * 0.37 + phase * 2.1) * 0.4);
+  return trim.err + (lf.target - lf.twist) * (f - lf.fCE) + edge * up + wander > LEECH_CURL ? 'curl' : 'stream';
 }
 /** The boat's telltales as she has them: the jib's luff pair (none when it isn't on its sheet) and the main's leech one,
  * from the sails' trim and the apparent wind (deg off the bow); luffing on purpose, the jib's windward ones lift and the
- * rest hang. The 3D boat and the flow view both use this, so they can't disagree. */
+ * rest hang. The 3D boat and the flow view both use this, so they can't disagree. (The main's leech telltales by height:
+ * leechTellAt.) */
 export function boatTells(jib: SailTrim | null, main: SailTrim, awa: number, luffing: boolean): { jib: { windward: TellState; leeward: TellState }; leech: TellState } {
   return { jib: luffing ? { windward: 'lift', leeward: 'hang' } : luffTellStates(jib, awa), leech: leechTellState(main, awa, luffing) };
 }

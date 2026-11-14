@@ -3,7 +3,7 @@ import type { Boat } from '../boat/boat';
 import { byHand, crewEaseBoom, sailFrame } from '../boat/physics';
 import { SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
-import { boatTells, type TellState } from '../render/sails';
+import { boatTells, leechFlow, leechTellAt, type TellState } from '../render/sails';
 
 /*
  * The flow view's model (the owner's training tool #2): the sails cut across at three heights, each section where the
@@ -17,8 +17,9 @@ import { boatTells, type TellState } from '../render/sails';
  *    heading when she's hove to, as heaveTo has it). At the centre of effort's height it is the sim's own wind exactly;
  *    above it there's more wind and it comes from further aft, below it less and further forward;
  *  - each sail's flow (attached, luffing, stalled, and how much) and its telltales: the sim has one trim for each sail
- *    (b.trim: its wind at the centre of effort against its sheet), and that's what every cut shows, as the 3D telltales
- *    at every height do. The sim's forces see nothing else;
+ *    (b.trim: its wind at the centre of effort against its sheet), and that's what every cut shows; the main's leech
+ *    telltale at each cut is its own section's, the twist against the fast twist about that trim (render/sails.ts
+ *    leechTellAt, as the 3D telltales at the battens). The sim's forces see nothing else;
  *  - each sail's depth, draft and twist (b.shape);
  *  - leeway (b.leeway).
  * Our reading of the sim's numbers, drawn (the panel says so):
@@ -87,7 +88,7 @@ export interface FlowSection {
    * and draft (fraction of the chord from the luff). */
   angle: number; depth: number; draft: number;
   /** The sim's trim for the sail (its one trim: the same at every height), and its telltales as the 3D boat has them
-   * (render/sails.ts boatTells): the jib's on its luff, the main's on its leech. */
+   * (render/sails.ts boatTells): the jib's on its luff; the main's on its leech, at this cut's height (leechTellAt). */
   trim: SailTrim; tells: { windward?: TellState; leeward?: TellState; leech?: TellState };
 }
 
@@ -114,7 +115,8 @@ export function flowState(b: Boat): FlowState {
     sails.push({ sail, trim, awa, across: awa - b.sheets[sail], best: SAILS[sail].aoa, twist: shape.twist, sheet: b.sheets[sail], atMin: b.sheets[sail] <= SAILS[sail].min + 0.5, atMax: b.sheets[sail] >= SAILS[sail].max - 0.5 });
   }
   // (the telltales and whether she's off the wind: as the 3D boat has them, from the masthead's apparent wind b.awa)
-  const tells = boatTells(b.trim.jib, b.trim.main, b.awa, !!b.luff);
+  // (the leech telltales steady here, at their mean: the panel shows the trim, not the breeze's flicker the 3D ones have)
+  const tells = boatTells(b.trim.jib, b.trim.main, b.awa, !!b.luff), lf = leechFlow(b, 0);
   const cuts = FLOW_HEIGHTS.map(({ name, z }) => {
     const w = windAt(b, z), sections: FlowSection[] = [];
     for (const fs of sails) {
@@ -122,7 +124,7 @@ export function flowState(b: Boat): FlowState {
       if (!at) continue;
       sections.push({
         sail: fs.sail, luff: at.luff, chord: at.chord, angle: b.sheets[fs.sail] + shape.twist * fAt(fs.sail, z), depth: shape.depth, draft: shape.draft,
-        trim: fs.trim, tells: fs.sail === 'jib' ? tells.jib : { leech: tells.leech }
+        trim: fs.trim, tells: fs.sail === 'jib' ? tells.jib : { leech: leechTellAt(b.trim.main, b.awa, !!b.luff, lf, fAt('main', z)) } // (the leech telltale at this cut's height)
       });
     }
     return { name, z, aws: w.kt, awa: w.awa, sections };
@@ -143,8 +145,8 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 const deg = (x: number) => `${Math.round(x)}°`;
 
 /** What the flow and the telltales are saying, in words, from the sim's own trim for each sail (the same at every
- * height, as the 3D telltales show it): how it's drawing and what to do; its twist against the crew's target for the
- * wind; the slot; and the keel's leeway. */
+ * height) and the main's top leech telltale: how it's drawing and what to do; its twist against the crew's target for
+ * the wind; the slot; and the keel's leeway. */
 export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = {}): [string, string][] {
   const out: [string, string][] = [], p = (cls: string, html: string) => { out.push([cls, html]); };
   const name = { main: 'Main', jib: 'Jib' } as const, foot = { main: 'the boom', jib: "the jib's foot" } as const;
@@ -165,12 +167,14 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
     const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
     const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
+    const topLeech = leechTellAt(b.trim.main, b.awa, !!b.luff, leechFlow(b, 0), leechFlow(b, 0).fTop); // (the top batten's, the twist gauge: steady, at its mean)
     const stallTell = main ? (t.amount > 0.12 ? 'the leech telltale hiding' : 'the flow breaking away before the leech') : 'leeward telltales drooping';
     // (at its sheet's stop and well past its best angle: the sim's trim blends to downwind from 105° apparent and counts
     // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
     const pastStop = s.atMax && t.err > 4;
     const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
-      : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
+      : t.flow === 'good' ? (main ? (topLeech === 'curl' ? 'attached, but the top leech telltale stalling: the leech closed. Ease a touch till it flies, or keep it for height in medium air and flat water'
+        : 'attached: the leech telltales streaming') : 'attached: both telltales streaming')
       : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
         : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveler on purpose to keep her on her feet; the lifting luff is the price`
         : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
