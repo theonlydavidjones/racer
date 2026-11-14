@@ -175,7 +175,10 @@ export class DrillTracker {
       c.peakRate = Math.max(c.peakRate, s.quick); c.turned += s.dh; // (net: a wave's yaw cancels out)
       if (s.quick > TURNING) { c.lastTurning = s.t; if (s.t > c.tFlip) c.fastAfter = true; }
       // the turn's over once she's held her heading for a second after the flip (a wave's yaw can still it for a moment)
-      if (s.t > c.tFlip && s.rate < STEADY_RATE) { c.slowSince ??= s.t; if (s.t - c.slowSince >= 1) c.turnEnd = c.fastAfter ? Math.max(c.tFlip, Math.min(c.slowSince, c.lastTurning)) : c.slowSince; } // (a slow turn, never over TURNING after the flip, ends when it steadies) else c.slowSince = null; // (dated to when she last turned: the 2 s rate lags)
+      // (dated to when she last turned: the 2 s rate lags; a slow turn, never over TURNING after the flip, ends when it
+      // steadies; a pause shorter than that second, then more turn, starts the count again)
+      if (s.t > c.tFlip && s.rate < STEADY_RATE) { c.slowSince ??= s.t; if (s.t - c.slowSince >= 1) c.turnEnd = c.fastAfter ? Math.max(c.tFlip, Math.min(c.slowSince, c.lastTurning)) : c.slowSince; }
+      else c.slowSince = null;
     }
     if (c.kind === 'tack' && Math.abs(s.twa) < 20) c.deadS += dt;
     // on her new course: the turn finished, clear of the eye (within 5° of the new close-hauled heading, or past 30°: a

@@ -295,6 +295,20 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8u. **Now — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
+   editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
+   in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
+   input), so something hides them on screen. Not the Save banner (owner: there's none showing). Suspects: the turning boat's panel pushing
+   Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
+   published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
+   ensign.
+8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
+   Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
+   Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
+   - the pictures are kept between visits, so empty ones may have been saved and are now reused;
+   - the boat model not built yet when the picture is taken (the setup now builds lazily, and the page is split);
+   - the camera framing.
+   Fix the cause, throw away any saved empty pictures, and add a check that each card's picture has the boat in it.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
@@ -1292,10 +1306,11 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
-- **Wrecks: an open design** (owner, 13 November: "we need to work through the broader logic and plan for wrecks. I
-  don't know yet."; Marinas drafts a proposal): what counts as a wreck (piles, rocks, a ship, a seawall, grounding),
-  the damage and what it does to her, whether she retires or is towed, and how the logbook and the season score it.
-  For now, contact with the Fort Mason piles just stops her.
+- **Wrecks** (designed: docs/WRECK-PROPOSAL.md, the owner's answers 14 November; Marinas; after #292; not urgent; 6–10 h):
+  the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
+  short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
+  lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,
+  contact with the Fort Mason piles just stops her.
 
 - **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
   whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's

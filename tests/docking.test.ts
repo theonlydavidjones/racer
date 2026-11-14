@@ -100,4 +100,17 @@ describe('docking', () => {
     approach(w, home, 1.5, 0.2); for (let i = 0; i < 60 * 5 && !u.docked; i++) w.step(DT);
     expect(u.docked?.slip).toBe(home.id);
   }, 60000);
+  it('in her slip the boom lies on the centerline, the mainsheet hauled in and made fast (8q): at the start, and hauled in after docking', () => {
+    const w = cruise(); const u = w.user;
+    expect(u.docked).toBeTruthy(); expect(u.ctl.mainsheet).toBe(0); expect(u.ctl.traveller).toBe(0); expect(Math.abs(u.boom)).toBeLessThan(0.5);
+    // in from a sail with the sheet eased and the car down to leeward: made fast, the crew hauls it in
+    w.pushOff(); for (let i = 0; i < 60 * 150 && (u.handled || u.pushing); i++) { w.step(DT); if (u.handled?.held) w.pushOff(); }
+    u.ctl.mainsheet = 0.8; u.ctl.traveller = 1;
+    const s = free[0]; approach(w, s, 9, 0.4); w.linesReady();
+    for (let i = 0; i < 60 * 90 && !u.docked; i++) w.step(DT);
+    expect(u.docked?.slip).toBe(s.id);
+    for (let i = 0; i < 60 * 10; i++) w.step(DT);
+    expect(u.ctl.mainsheet).toBeLessThan(0.01); expect(Math.abs(u.ctl.traveller)).toBeLessThan(0.01); expect(Math.abs(u.boom)).toBeLessThan(0.5);
+  }, 120000);
 });
+
