@@ -53,7 +53,9 @@ describe('the navigator round Aquatic Park', () => {
     w.setDest(b, 'there'); u.h = firstLeg(a, b); u.v = 2;
     engage(u, w.pilot, 'nav');
     let closest = Infinity, touched = false, slowest = 0, slowSteps = 0, lastTackAt = -Infinity, tackGap = Infinity, wasTacking = false;
-    for (let t = 0; t < 45 * 60 && w.arrivedT == null; t += DT) {
+    // (45 min in 12 kt; longer in a light air, in proportion, to 90 min: at 6 kt in the city front's lee she makes 1-1.5 kt)
+    const limit = Math.min(90, 45 * 12 / Math.min(12, kt)) * 60;
+    for (let t = 0; t < limit && w.arrivedT == null; t += DT) {
       const t0 = performance.now(); w.step(DT); const ms = performance.now() - t0; slowest = Math.max(slowest, ms); if (ms > 50) slowSteps++;
       if (onLand(u) || bumped(w)) touched = true;
       if (Math.hypot(u.x - a.x, u.y - a.y) > 80 && Math.hypot(u.x - b.x, u.y - b.y) > 80) { const n = wharfNearest(u, 30); if (n) closest = Math.min(closest, n.d); }
