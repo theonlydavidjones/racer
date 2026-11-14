@@ -18,7 +18,7 @@ const W = 400, H = 300;
 /** The camera looks this way: from off her starboard bow, a little above her deck. */
 const VIEW = new THREE.Vector3(-17, -0.6, 16).normalize();
 /** Bump when the picture's drawing changes, so pictures kept from before are drawn again. */
-const LOOK_VERSION = 1;
+const LOOK_VERSION = 2; // (2: pictures saved before 8t's fix framed an empty sea; the new key drops them)
 const STORE = 'folkboat.thumbs', KEEP = 24;
 interface GL { renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; sea: THREE.Mesh; fog: THREE.Fog }
 let gl: GL | null = null;
@@ -95,14 +95,20 @@ function horizonHaze(g: GL): void {
 
 /** Pictures kept between visits (this browser only; any failure just means drawing her again). */
 type Kept = [string, string][]; // [key, data URL], newest last
-function kept(): Kept { try { const v = JSON.parse(localStorage.getItem(STORE) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+/** (only this LOOK_VERSION's: an older picture is dropped the next time the store is written, ROADMAP 8t) */
+const current = (e: unknown): e is [string, string] => Array.isArray(e) && typeof e[0] === 'string' && e[0].startsWith(`[${LOOK_VERSION},`);
+function kept(): Kept { try { const v = JSON.parse(localStorage.getItem(STORE) ?? '[]'); return Array.isArray(v) ? v.filter(current) : []; } catch { return []; } }
+/** Drop older versions' pictures now (once a visit), so a stale empty picture can't come back. */
+export function purgeOldThumbs(): void { try { const raw = localStorage.getItem(STORE); if (!raw) return; const v = JSON.parse(raw); if (Array.isArray(v) && v.some(e => !current(e))) localStorage.setItem(STORE, JSON.stringify(v.filter(current))); } catch { /* blocked: nothing kept anyway */ } }
 function keep(key: string, url: string): void {
   try { const k = kept().filter(e => e[0] !== key); k.push([key, url]); localStorage.setItem(STORE, JSON.stringify(k.slice(-KEEP))); } catch { /* full or blocked: memory only */ }
 }
 
+let purged = false;
 /** Her picture, as a data URL (kept by her looks). */
 export function boatThumb(spec: BoatSpec, S: Settings): string {
   const key = JSON.stringify([LOOK_VERSION, spec.hull, spec.deck, spec.cabinTop, spec.poleSide, spec.hatch, spec.sails, spec.club, spec.name, spec.nameColor, spec.companionway, spec.navLights, spec.lineColors, spec.perf.mast, spec.perf.boom, spec.perf.outboard]);
+  if (!purged) { purged = true; purgeOldThumbs(); }
   const hit = cache.get(key) ?? kept().find(e => e[0] === key)?.[1]; if (hit) { cache.set(key, hit); return hit; }
   gl ??= setup();
   // her, as the sim builds her: a quiet world with just her in it, sailing a gentle reach with her flags flying
@@ -117,7 +123,12 @@ export function boatThumb(spec: BoatSpec, S: Settings): string {
   m.grp.position.set(0, m.grp.position.y, 0); m.grp.rotation.y = 0; // turned to face the camera's way, at the origin
   gl.scene.add(m.grp);
   // framed to fit her: from a little water under her up to the masthead, with a margin
-  const box = new THREE.Box3().setFromObject(m.grp), lo = Math.max(box.min.y, 0) - 0.6;
+  // (only what's drawn: the crew, hidden here, are skinned figures whose bounds sit where their bones were last posed,
+  // which can be far from her: counted, they framed an empty sea, ROADMAP 8t)
+  m.grp.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  m.grp.traverseVisible(o => { const g = (o as THREE.Mesh).geometry; if (!g || !((o as THREE.Mesh).isMesh || (o as THREE.Line).isLine)) return; g.computeBoundingBox(); if (g.boundingBox) box.union(g.boundingBox.clone().applyMatrix4(o.matrixWorld)); });
+  const lo = Math.max(box.min.y, 0) - 0.6;
   const cam = gl.camera, tall = box.max.y - lo, mid = new THREE.Vector3((box.min.x + box.max.x) / 2, (lo + box.max.y) / 2, (box.min.z + box.max.z) / 2);
   cam.position.copy(mid).addScaledVector(VIEW, -(tall * 0.6) / Math.tan(cam.fov * Math.PI / 360)); cam.lookAt(mid);
   horizonHaze(gl);

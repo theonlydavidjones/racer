@@ -216,6 +216,9 @@ export class Harbor {
       const mark = new THREE.Mesh(red ? new THREE.CircleGeometry(0.75, 3) : new THREE.PlaneGeometry(1.1, 1.1), mat); mark.position.y = 5.4; if (red) mark.rotation.z = Math.PI / 2; g.add(mark);
       const mark2 = mark.clone(); mark2.rotation.y = Math.PI / 2; g.add(mark2);
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: red ? 0xff4a3a : 0x4aff7a })); lamp.position.y = 6.5; g.add(lamp);
+      // Gashouse Cove's (the East Harbor's) red beacon, on its seawall's end: the harbor's IDLE SPEED / NO WAKE board on the
+      // post below the daymark, both ways, to the boats coming in and going out
+      if (H.id === 'gashouse-cove' && red) for (const ry of [0, Math.PI]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.9), noWakeBoard()); b.position.y = 3.4; b.rotation.y = ry; b.translateZ(0.16); g.add(b); }
       g.position.copy(P3(bc.p.x, bc.p.y, 0)); this.group.add(g);
     }
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
@@ -231,4 +234,16 @@ export class Harbor {
     const set = new Set(ids.map(id => slipById(id)?.id).filter(Boolean)); // (older saves name West Harbor's slips without the marina)
     for (const b of this.boats) for (const [id, i] of b.index) b.place(i, !set.has(id));
   }
+}
+
+/** The harbor's IDLE SPEED / NO WAKE board: black letters on white in an orange border (the US regulatory-marker look). */
+let noWake: THREE.Material | null = null;
+function noWakeBoard(): THREE.Material {
+  if (noWake) return noWake;
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 192; const c = cv.getContext('2d')!;
+  c.fillStyle = '#f4f2ea'; c.fillRect(0, 0, 256, 192); c.strokeStyle = '#e06a12'; c.lineWidth = 12; c.strokeRect(6, 6, 244, 180);
+  c.fillStyle = '#111'; c.font = 'bold 48px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('IDLE SPEED', 128, 68); c.fillText('NO WAKE', 128, 126);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  return noWake = new THREE.MeshLambertMaterial({ map: tex });
 }
