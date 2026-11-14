@@ -10,7 +10,8 @@ import { WIND, boat, ctx, pair, type DiagramBoat } from './diagram';
 export function sailCase(c: RulesCase) {
   const bs = new Map<string, DiagramBoat>(c.boats.map(b => { const f = b.frames[0]; return [b.letter, boat(b.letter, { at: [f.x, f.y], heading: f.h, started: b.started, leg: b.leg, speed: f.v })]; }));
   const fleet = [...bs.values()];
-  const extra = { ...(c.fleet ? { fleet, keepsClearOf: (a: DiagramBoat, o: DiagramBoat) => rightOfWay(a, o, ctx(0)).kc.id === a.id } : {}), ...(c.bank ? { obstacle: () => ({ d: c.bank!.d, n: c.bank!.n, continuing: true }) } : {}) };
+  let now = 0; // (the frame's time, for who keeps clear of whom)
+  const extra = { ...(c.fleet ? { fleet, keepsClearOf: (a: DiagramBoat, o: DiagramBoat) => rightOfWay(a, o, ctx(now)).kc.id === a.id } : {}), ...(c.bank ? { obstacle: () => ({ d: c.bank!.d, n: c.bank!.n, continuing: true }) } : {}) };
   const p = pair(bs.get(c.pair[0])!, bs.get(c.pair[1])!, c.marks ?? [], extra as never);
   const times = [...new Set(c.boats.flatMap(b => b.frames.map(f => f.t)))].sort((a, b) => a - b);
   const seen: Record<number, { keepsClear: string; rule: string }> = {};
@@ -28,6 +29,7 @@ export function sailCase(c: RulesCase) {
       if (f.look !== false) look = true;
     }
     if (!look) continue;
+    now = t;
     const r = p.at(t, { swerve: !!c.swerveAt?.includes(t) });
     seen[t] = { keepsClear: r.keepsClear, rule: r.rule }; last = r;
     if (r.foul && !foul) { foul = { t, by: r.foul.by, rule: r.foul.part ?? r.foul.rule }; break; }
@@ -44,6 +46,25 @@ describe('the World Sailing Cases as data (src/rules/cases.ts): the engine answe
     else {
       expect(r.foul).toMatchObject({ by: c.answer.who, rule: c.answer.rule });
       expect(r.foul!.t, 'the trainer pauses before the incident').toBeGreaterThan(c.momentT);
+    }
+  });
+  it('a Case taught is a sailed track: frame to frame, each boat moves at a boat\'s speed along her heading', () => {
+    for (const c of CASES.filter(k => k.teach)) for (const b of c.boats) {
+      expect(b.frames.length, `Case ${c.case} ${b.letter}: one frame, she'd sit still`).toBeGreaterThan(1);
+      for (let i = 1; i < b.frames.length; i++) {
+        const a = b.frames[i - 1], f = b.frames[i], dt = f.t - a.t, d = Math.hypot(f.x - a.x, f.y - a.y), sp = d / dt;
+        expect(sp, `Case ${c.case} ${b.letter} ${a.t}→${f.t}`).toBeLessThan(4);
+        expect(sp, `Case ${c.case} ${b.letter} ${a.t}→${f.t}: parked`).toBeGreaterThan(0.5 * (f.v ?? 2.5));
+        const track = Math.atan2(f.x - a.x, f.y - a.y) * 180 / Math.PI;
+        expect(Math.abs(((track - f.h + 540) % 360) - 180), `Case ${c.case} ${b.letter} ${a.t}→${f.t}: sideways`).toBeLessThan(15);
+      }
+    }
+  });
+  it('a keepsClear question is asked after the trainer\'s pause: the answer differs from the verdict at momentT', () => {
+    for (const c of CASES.filter(k => k.ask === 'keepsClear')) {
+      const r = sailCase(c);
+      expect(r.seen[c.momentT]).toBeDefined();
+      expect(Math.max(...Object.keys(r.seen).map(Number))).toBeGreaterThan(c.momentT);
     }
   });
   it('every Case\'s frames are in time order and its letters match its pair', () => {
