@@ -199,7 +199,10 @@ What's planned, roughly in order. Done work is described in the README.
    arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
    past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
-   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down.
+   Still there on 14 November (owner: "still have backwards arms", a second screenshot): both crew in the cockpit, the
+   blue jacket at the piano and the orange jacket by the compass, have forearms bent backwards at the elbow, hands
+   pointing behind them. No fix has gone in yet. The owner doesn't
    remember the conditions it happened in, so the check covers every pose and wind.
 8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
