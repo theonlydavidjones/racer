@@ -46,7 +46,7 @@ describe('Sail it yourself: a Case on the water', () => {
   it('Case 7: W held on her Case course breaks rule 11, as the Case says; W luffing clear of L sails it clear', () => {
     expect(sail(caseWorld(7), (_t, h) => h)).toMatchObject({ result: 'foul', fouls: [{ rule: '11' }] });
     expect(sail(caseWorld(7), (t, h) => t > 44 ? h + 25 : h)).toMatchObject({ result: 'clear', fouls: [] });
-  });
+  }, 30_000); // (two runs of the Case in the World: up to 5 s on a busy machine)
 
   it('touched, the Case\'s boat is a boat, not a pinned wall: she sails free from the contact, and it\'s said so', () => {
     const w = caseWorld(7), R = w.caseRun!, u = w.user;
@@ -159,5 +159,5 @@ describe('Sail it yourself: a Case on the water', () => {
       const want = c.answer.who === 'neither' ? ['clear'] : c.case === 27 ? ['13', '15'] : [c.answer.rule];
       expect(want, `Case ${c.case}, seed ${seed}`).toContain(got);
     }
-  });
+  }, 30_000); // (sails every sailable Case twice in the World: about 5.5 s, over vitest's 5 s default)
 });

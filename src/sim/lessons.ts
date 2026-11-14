@@ -99,8 +99,13 @@ export const LESSON_MARKS = {
    * lengths), and she goes by with CLEAR_LOA of her lengths or more between the hulls. Standing on, you "keep [your]
    * course and speed" (Rule 17(a)(i)): within STAND_DEG of the heading you had and at least STAND_V of the speed, on the
    * same tack, till she's EARLY_M off (closer, 17(b) has you act too). An encounter is over once they're PAST_M apart and
-   * opening. */
-  meetS: 45, clearLoa: 2, standDeg: 15, standV: 0.6, pastM: 40, steadyS: 5, steadyDeg: 5, steadyV: 0.25, awayM: 300, actDeg: 20, earlyM: 30,
+   * opening. She's moved only well off, AWAY_M and more (the Coordinator's figure, 14 Nov 2026: a small boat far off),
+   * both where she leaves and where she's set: set on the collision course carried back that far, she sails in on it,
+   * and the encounter's called once she's MEET_S from the meeting with a risk of collision, her closest approach within
+   * CALL_LOA lengths. She's set FREE_DEG freer than close-hauled, so she can head up as well as bear away sailing in; let go, she's
+   * set again no sooner than LETGO_S. Called, the band's edge has CALL_SLACK; standing on, you're no deeper than
+   * STAND_TWA. An encounter is also over once opening PAST_S, nearer than PAST_M. */
+  meetS: 45, clearLoa: 2, standDeg: 15, standV: 0.6, pastM: 40, steadyS: 5, steadyDeg: 5, steadyV: 0.25, awayM: 400, actDeg: 20, earlyM: 30, callLoa: 4, freeDeg: 8, letGoS: 15, pastS: 10, callSlack: 10, standTwa: 150,
   /** Rules of the road: the other boat giving way to you alters from GIVE_M off, for a point GIVE_LOA lengths astern of you
    * and GIVE_SIDE out to her side of your track. */
   giveM: 100, giveLoa: 3, giveSide: 2
@@ -156,7 +161,7 @@ export class LessonTracker {
   private mobIn = false;
   /** Rules of the road: the encounter being sailed (its kind, her heading, your course and speed as it began, the
    * closest the hulls have come, m), and the buoys (red to starboard coming in, the way in, deg). */
-  enc: { kind: 'port' | 'windward' | 'stand'; h: number; course: number; v: number; tack: 'S' | 'P'; gap: number; spoiled: boolean; acted: boolean } | null = null;
+  enc: { kind: 'port' | 'windward' | 'stand'; h: number; course: number; v: number; tack: 'S' | 'P'; gap: number; spoiled: boolean; acted: boolean; openS: number } | null = null;
   gate: { red: Vec; green: Vec; inbound: number } | null = null;
   /** Rules of the road: the real buoys the lesson ends at (the World gives them: sim/places.ts, the North Channel's 1 and 2). */
   channel: { red: Vec; green: Vec } | null = null;
@@ -187,26 +192,80 @@ export class LessonTracker {
    * Rules of the road: the Navigation Rules' sailing-vessel encounters, each with another Folkboat (ASA 101 knowledge 7
    * and 8; its 6, the look-out, is yours throughout), then the lateral buoys (its 14). Steps: 0 on port tack, 1 a
    * starboard boat crossing (Rule 12(a)(i): "the vessel which has the wind on the port side shall keep out of the way"),
-   * 2 on starboard, on a reach, 3 a boat to leeward coming up close-hauled (12(a)(ii): "the vessel which is to windward
+   * 2 on starboard, on a broad reach (a beam reach and she, close-hauled, closes on you at a meter or two a second: four
+   * minutes from out of sight), 3 a boat to leeward coming up close-hauled (12(a)(ii): "the vessel which is to windward
    * shall keep out of the way of the vessel which is to leeward"), 4 still on starboard, 5 a port boat crossing (you stand
    * on: Rule 17(a)(i), "the other shall keep her course and speed"), 6 the buoys. The other boat stands on as Rule 17 has
    * it, holding her course (her last-moment swerve, Rule 17(b), is the race AI's Rule 14 move); giving way, she keeps
    * clear as the race AI does (ai.ts keepClearMove).
    */
   private road(b: Boat, dt: number, E: RoadEnv): void {
-    const M = LESSON_MARKS, o = E.other, kt = b.v / KT, from = b.ww.from;
+    const M = LESSON_MARKS, o = E.other, from = b.ww.from;
     // (her heading close-hauled on a tack: the wind on her right on starboard)
     const hauled = (tack: 'S' | 'P') => tack === 'S' ? from - beatFor(o) - 3 : from + beatFor(o) + 3;
-    const sailing = (lo: number, hi: number) => kt > 1.5 && b.twa >= lo && b.twa <= hi;
     const dx = o.x - b.x, dy = o.y - b.y, d = Math.hypot(dx, dy);
-    const e = this.enc;
+    const e = this.enc, a = this.approach;
+    if (a) {
+      // sailing in, out of sight at first: for where you'll be when she gets there (your course and speed as they are
+      // now: the intercept, |you + your velocity·t − her| = her speed·t), on her own tack: no higher than close-hauled,
+      // and across dead downwind no further than a run
+      const vo = Math.max(0.5, o.v), vb = { x: V(b.h).x * b.v, y: V(b.h).y * b.v }, rx = b.x - o.x, ry = b.y - o.y;
+      const qa = vb.x * vb.x + vb.y * vb.y - vo * vo, qb = 2 * (rx * vb.x + ry * vb.y), qc = rx * rx + ry * ry, disc = qb * qb - 4 * qa * qc;
+      const roots = disc < 0 ? [] : Math.abs(qa) < 1e-6 ? [-qc / qb] : [(-qb - Math.sqrt(disc)) / (2 * qa), (-qb + Math.sqrt(disc)) / (2 * qa)];
+      const tau = Math.min(...roots.filter(r => r > 0), Infinity);
+      let hd = tau < Infinity ? Math.atan2(rx + vb.x * tau, ry + vb.y * tau) * 180 / Math.PI : o.h;
+      const rel = wrap(from - hd), want = hd;
+      if ((rel >= 0 ? 'S' : 'P') !== a.tack) hd = Math.abs(rel) > 90 ? from + (a.tack === 'S' ? -179 : 179) : hauled(a.tack);
+      else if (Math.abs(rel) < beatFor(o) + 3) hd = hauled(a.tack);
+      const mv = E.helm(false); o.desired = mv ? mv.h : E.sailable(hd); o.luff = mv?.luff ?? false;
+      a.t += dt;
+      this.cue = 'Hold your course and keep a lookout';
+      // let go (she sails off, and is set again out of sight, after a pause: LETGO_S, not set and let go over and over) if
+      // you've gone about off the tack the encounter is for (a wobble in your point of sail doesn't), if she can't make
+      // the meeting (held more than a couple of degrees off it on her tack, or no intercept, and the range opening), if
+      // there's land ahead of her, or if it's taken twice what was planned (with half a minute's grace for the lulls)
+      const rate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(1, d);
+      const letGo = () => { this.approach = null; this.away = o.h; this.cue = a.ask; this.pause = M.letGoS; };
+      if (b.tack !== (this.step === 0 ? 'P' : 'S') || ((tau === Infinity || Math.abs(wrap(hd - want)) > 2) && rate > 0) || E.landAhead(o.desired) || a.t > 2 * a.plan + 30) { letGo(); return; }
+      if (d > a.callM) return;
+      // called only with the encounter as its rule has it, now: risk of collision (the closest approach, on your courses
+      // and speeds as they are, within CALL_LOA lengths, ahead, however far: not the rules' 12 s look); crossing, not
+      // overtaking (Rule 13(b)); for the windward encounter, she's to leeward of you; and you're on the tack and point it's
+      // for (the port and stand-on encounters at any point of sail, moving: Rules 12(a)(i) and 17 don't ask one; the
+      // windward one on its broad reach). The risk not yet there, she sails on in, within twice MEET_S; any other part
+      // wanting, she's let go at once, turning away while she's still well off
+      const wx = o.vx - b.vx, wy = o.vy - b.vy, ct = -(dx * wx + dy * wy) / Math.max(1e-6, wx * wx + wy * wy);
+      const cp = { t: ct, d: Math.hypot(dx + wx * Math.max(0, ct), dy + wy * Math.max(0, ct)) }, brgTo = (f: Vec, q: Vec) => Math.atan2(q.x - f.x, q.y - f.y) * 180 / Math.PI;
+      const crossing = Math.abs(wrap(brgTo(b, o) - b.h)) < 112.5 && Math.abs(wrap(brgTo(o, b) - o.h)) < 112.5;
+      const leeward = dx * V(from).x + dy * V(from).y < 0;
+      // (your side, with CALL_SLACK beyond the band she was set on, so an ordinary shift at the call doesn't cancel it;
+      // standing on, no deeper than STAND_TWA: on a run she'd fall in astern of you and never be past)
+      const kt = b.v / KT, twa = b.twa;
+      const yours = kt > 1.5 && (a.kind === 'windward' ? twa >= 120 - M.callSlack : a.kind === 'stand' ? twa <= M.standTwa : true);
+      if (!crossing || (a.kind === 'windward' && !leeward) || !yours) { letGo(); return; }
+      if (!(cp.t > 0 && cp.t < 2 * M.meetS && cp.d < M.callLoa * LOA)) return;
+      this.approach = null;
+      this.enc = { kind: a.kind, h: o.h, course: b.h, v: b.v, tack: b.tack, gap: Infinity, spoiled: false, acted: false, openS: 0 };
+      this.step++; this.progress = 0;
+      this.cue = a.kind === 'port' ? 'Starboard boat! You\'re on port: keep clear of her' : a.kind === 'windward' ? 'A boat to leeward: you\'re to windward, keep clear' : 'A port boat: you\'re on starboard. Stand on: hold your course and speed';
+      return;
+    }
     if (!e) {
       // between encounters she sails away from you, keeping the racing rules' right of way (the race AI's keep-clear) and
       // off the land (the first way clear of it, from straight away to beam on); the next is set only once she's well
       // away (AWAY_M), where a boat is a speck on the water
-      // (the way she's chosen kept while it's still away from you and clear, so she doesn't swap about between them)
       const mv = E.helm(true), off = Math.atan2(dx, dy) * 180 / Math.PI;
-      if (Math.abs(wrap(this.away - off)) > 50 || E.landAhead(this.away)) this.away = E.sailable([0, 45, -45, 90, -90].map(a => off + a).find(h => !E.landAhead(E.sailable(h))) ?? off + 180);
+      // (the way that opens the range fastest, your course and speed as they are: straight away from you, if you're
+      // sailing the same way, opens it only at the difference in your speeds; picked afresh every 5 s, so she doesn't
+      // swap about between them)
+      this.awayT -= dt;
+      if (this.awayT <= 0 || E.landAhead(this.away)) {
+        this.awayT = 5;
+        const u = { x: dx / Math.max(1, d), y: dy / Math.max(1, d) }, vb = V(b.h);
+        const opens = (h: number) => (V(h).x * E.speed(h) - vb.x * b.v) * u.x + (V(h).y * E.speed(h) - vb.y * b.v) * u.y;
+        const ways = [0, 45, -45, 90, -90, 135, -135].map(a => E.sailable(off + a)).filter(h => !E.landAhead(h));
+        this.away = ways.length ? ways.reduce((p, q) => opens(q) > opens(p) ? q : p) : E.sailable(off + 180);
+      }
       o.desired = mv ? mv.h : this.away; o.luff = mv?.luff ?? false;
     }
     if (e) {
@@ -232,7 +291,9 @@ export class LessonTracker {
         e.spoiled = true; this.cue = 'Hold your course and speed: she\'s keeping clear of you';
       }
       const opening = dx * (o.vx - b.vx) + dy * (o.vy - b.vy) > 0;
-      if (d < M.pastM || !opening) return;
+      // (or opening steadily PAST_S, nearer than that: sailing on the same way after, she may keep near a while)
+      e.openS = opening ? e.openS + dt : 0;
+      if (!opening || (d < M.pastM && e.openS < M.pastS)) return;
       // past and clear: how did it go
       const hit = e.gap < CONTACT_GAP, ok = e.kind === 'stand' ? !e.spoiled && !hit : !hit && e.gap >= M.clearLoa * LOA && e.acted;
       this.enc = null; this.progress = 0; this.away = o.h;
@@ -243,7 +304,7 @@ export class LessonTracker {
         return;
       }
       this.step++;
-      this.cue = this.step === 2 ? 'Now starboard tack, on a beam reach' : this.step === 4 ? 'Stay on starboard: close-hauled or a reach' : 'Now in by the North Channel: between buoys 1 and 2, red right returning';
+      this.cue = this.step === 2 ? 'Now starboard tack, on a broad reach' : this.step === 4 ? 'Stay on starboard: close-hauled or a reach' : 'Now in by the North Channel: between buoys 1 and 2, red right returning';
       if (this.step === 6) this.layGate(b);
       return;
     }
@@ -252,29 +313,44 @@ export class LessonTracker {
     // the collision course set on them holds), and the other boat well away
     const steady = Math.abs(wrap(b.h - this.ref.h)) < M.steadyDeg && Math.abs(b.v - this.ref.v) < M.steadyV;
     if (!steady) this.ref = { h: b.h, v: b.v };
-    const want = this.step === 0 ? b.tack === 'P' && sailing(35, 150) : this.step === 2 ? b.tack === 'S' && sailing(75, 110) : b.tack === 'S' && sailing(35, 120);
+    const want = this.wants(b);
+    if (this.pause > 0) { this.pause -= dt; return; }
     if (!this.hold(want && steady && (d > M.awayM || this.first), dt, M.steadyS)) return;
     this.held = M.steadyS; // (ready: set her as soon as there's open water for it)
     const kind = this.step === 0 ? 'port' : this.step === 2 ? 'windward' : 'stand';
     // she: starboard close-hauled to your port tack; close-hauled to leeward of you on the same tack; port close-hauled
-    const h = kind === 'stand' ? hauled('P') : hauled('S');
+    // (FREE_DEG freer than close-hauled, so sailing in she can head up as well as bear away to keep the course a
+    // collision course as you wander a little)
+    const h = kind === 'stand' ? hauled('P') + M.freeDeg : hauled('S') - M.freeDeg;
     // a collision course: both at the same spot in MEET_S, as you are now, she at her own speed for her heading
-    const meet = { x: b.x + V(b.h).x * b.v * M.meetS, y: b.y + V(b.h).y * b.v * M.meetS }, v = E.speed(h), u = V(h);
-    const at = { x: meet.x - u.x * v * M.meetS, y: meet.y - u.y * v * M.meetS };
+    const v = E.speed(h), u = V(h);
+    const pose = (T: number) => { const m = { x: b.x + V(b.h).x * b.v * T, y: b.y + V(b.h).y * b.v * T }; return { meet: m, at: { x: m.x - u.x * v * T, y: m.y - u.y * v * T } }; };
+    const { at } = pose(M.meetS); // (the encounter as it's called)
     // crossing, not overtaking: each forward of 22.5° abaft the other's beam (Rule 13(b)); else Rule 13 would make the
     // one coming up from astern the give-way boat whatever their tacks
     const brgTo = (f: Vec, q: Vec) => Math.atan2(q.x - f.x, q.y - f.y) * 180 / Math.PI;
     const crossing = Math.abs(wrap(brgTo(b, at) - b.h)) < 112.5 && Math.abs(wrap(brgTo(at, b) - h)) < 112.5;
-    if (!crossing) { this.cue = kind === 'windward' ? 'Trim and pick up speed: a steady beam reach' : 'Trim and pick up speed, and sail steadily'; return; }
-    if (!E.place(at, h, v, meet)) { this.cue = 'Head for open water'; return; } // (land in the way: try again in a moment)
+    if (!crossing) { this.cue = kind === 'windward' ? 'Trim and pick up speed: a steady broad reach' : 'Trim and pick up speed, and sail steadily'; return; }
+    // where she's set: the same collision course carried back till she's out of sight (AWAY_M off you)
+    let T = M.meetS; while (T < 300 && Math.hypot(pose(T).at.x - b.x, pose(T).at.y - b.y) < M.awayM) T += 5;
+    const far = pose(T);
+    if (Math.hypot(far.at.x - b.x, far.at.y - b.y) < M.awayM) { this.cue = 'Trim and pick up speed, and sail steadily'; return; }
+    if (!E.place(far.at, h, v, far.meet)) { this.cue = 'Head for open water'; return; } // (land in the way: try again in a moment)
     this.first = false;
-    this.enc = { kind, h, course: b.h, v: b.v, tack: b.tack, gap: Infinity, spoiled: false, acted: false };
-    this.step++; this.progress = 0;
-    this.cue = kind === 'port' ? 'Starboard boat! You\'re on port: keep clear of her' : kind === 'windward' ? 'A boat to leeward: you\'re to windward, keep clear' : 'A port boat: you\'re on starboard. Stand on: hold your course and speed';
+    this.approach = { kind, tack: kind === 'stand' ? 'P' : 'S', callM: Math.hypot(at.x - b.x, at.y - b.y), t: 0, plan: T - M.meetS, ask: this.cue };
   }
+  /** Rules of the road: the tack and point of sail the next encounter is for. */
+  private wants(b: Boat): boolean {
+    const kt = b.v / KT, ok = (lo: number, hi: number) => kt > 1.5 && b.twa >= lo && b.twa <= hi;
+    return this.step === 0 ? b.tack === 'P' && ok(35, 150) : this.step === 2 ? b.tack === 'S' && ok(120, 170) : b.tack === 'S' && ok(35, 120);
+  }
+  /** Rules of the road: the other boat sailing in for the next encounter, its kind, her tack, and how near she is when it's
+   * called (m: where she'd have been MEET_S off the meeting), how long she's been at it and was meant to be (s), and the
+   * cue it's for. */
+  approach: { kind: 'port' | 'windward' | 'stand'; tack: 'S' | 'P'; callM: number; t: number; plan: number; ask: string } | null = null;
   /** Rules of the road: her course between encounters, your heading and speed as last settled, and whether she's yet to
    * be set (she starts far off). */
-  private away = 0; private ref = { h: 0, v: 0 }; private first = true;
+  private away = 0; private ref = { h: 0, v: 0 }; private first = true; private pause = 0; private awayT = 0;
 
   /** The channel's buoys, the real pair (the World's): the red to starboard as she comes in, the green to port (33 CFR
    * 62.25(b): red marks the starboard side of the channel "when proceeding in the Conventional Direction of Buoyage",
@@ -372,7 +448,7 @@ export class LessonTracker {
   /** A check held for `need` seconds, a moment off taking back twice its length (as on the points of sail). */
   private hold(ok: boolean, dt: number, need: number): boolean {
     this.held = ok ? this.held + dt : Math.max(0, this.held - 2 * dt);
-    this.progress = Math.min(1, this.held / need);
+    this.progress = Math.max(0, Math.min(1, this.held / need)); // (none while a pause runs down: held below 0)
     if (this.held < need) return false;
     this.held = 0; return true;
   }
