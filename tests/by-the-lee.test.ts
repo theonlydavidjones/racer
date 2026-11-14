@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import type { Boat } from '../src/boat/boat';
 import { tackTarget } from '../src/boat/physics';
+import { adjust, engage, newPilot, pilotStep } from '../src/boat/autopilot';
 
 /**
  * Sailing by the lee, and the gybe the wind makes (physics.ts boomStep; the owner, 14 Nov 2026: the main holds 15 to
@@ -83,6 +84,13 @@ describe('a gybe that\'s meant', () => {
     const b = running(12); let across = NaN;
     sail(b, 20, t => { b.h = (170 + Math.min(60, 5 * t)) % 360; b.turnRate = t < 12 ? 5 : 0; b.desired = b.h; if (isNaN(across) && b.boom < 0) across = b.h - 180; });
     expect(b.tack).toBe('S'); expect(b.crashT).toBeUndefined(); expect(across).toBeGreaterThan(3); expect(across).toBeLessThan(15);
+  });
+  it('the tiller pilot turned 30° across her stern: its turn is a called one, her crew jibe the main, no crash', () => {
+    const b = running(12) as Boat & { handsOff?: boolean }, p = newPilot(); let across = 0, side = Math.sign(b.boom);
+    engage(b, p, 'auto'); adjust(b, p, 30); b.handsOff = true; b.pilotSteers = true;
+    sail(b, 40, t => { pilotStep(b, p, null, t, 1 / 60); if (Math.sign(b.boom) !== side && Math.abs(b.boom) > 1) { across++; side = Math.sign(b.boom); } });
+    expect(Math.abs(((b.h - 200 + 540) % 360) - 180)).toBeLessThan(5); // (on her new course, 20° past dead astern on the other jibe)
+    expect(b.tack).toBe('S'); expect(across).toBe(1); expect(b.crashT).toBeUndefined();
   });
   it('an AI boat doesn\'t sail by the lee: past 4° her crew gybe at once, as before', () => {
     const b = testBoat({ heading: 170, kt: 4, windKt: 12 }); b.isUser = false; sail(b, 30, () => held(b, 170));

@@ -171,6 +171,9 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
     want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
   }
   const err = wrap(want - b.h), rate = wrap(b.h - p.lastH) / Math.max(dt, 1e-6); p.lastH = b.h;
+  // (turning her onto a new course is a turn called: if her stern passes the wind in it, her crew jibe the main, as for a
+  // called jibe; held steady by the lee, they leave it, as with a helmsman: physics.ts gybeMeant)
+  if (Math.abs(err) > 5) b.turnCalledT = t;
   const mr = Math.max(1, maxTurnRate(b.v));
   // the turn it asks for, and the helm that should give it, plus what AutoTrim has learned she needs to go straight
   const ask = clamp(err * GAIN, -mr, mr), helm = clamp(ask / mr + p.trim, -1, 1);
