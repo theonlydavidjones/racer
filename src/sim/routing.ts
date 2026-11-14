@@ -124,7 +124,7 @@ function crabTo(u: Vec, c: Vec, v: number): number {
  * Sail from a to b starting at minute t0, by a plan. `arrive`: how close counts as there (m; an island mark's
  * rounding distance). Gives up after `maxMin` minutes (a leg she can't sail: becalmed against the tide).
  */
-export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
+export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240, runs = true): SailResult {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
   const turns: SailResult['turns'] = [];
@@ -172,10 +172,13 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       }
       forced = next;
     } else forced = null;
+    // (runs false: downwind she steers straight for it, through the current, as the tiller pilot does (it doesn't yet
+    // jibe down the run's laylines): no run's angles, no gybes)
+    if (!runs && mode === 'run') { mode = 'reach'; forced = null; }
     let h: number, v: number;
     if (mode === 'reach') {
       v = sp(off); h = crabTo(u, c, v);
-      const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, Math.min(run, twa)));
+      const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, runs ? Math.min(run, twa) : twa));
     } else {
       const ang = mode === 'beat' ? beat : run, vb = sp(ang), sgn = mode === 'beat' ? -1 : 1;
       const hd = (T: 'S' | 'P') => w.from + (T === 'S' ? -ang : ang);

@@ -87,6 +87,16 @@ describe('sailLeg (the review of the course estimate)', () => {
     }
   });
 
+  it('with runs off (the tiller pilot on Nav, which runs straight for it), a dead run has no gybes and goes straight', () => {
+    // 12 kt from 000; the mark 1500 m dead downwind, 180°, no current
+    const a = LL(37.8350, -122.4000), b = { x: a.x, y: a.y - 1500 };
+    expect(onLand(a) || onLand(b)).toBe(false);
+    const run = sailLeg(plain(12, 0, { kt: 0, to: 0 }), a, b, 0, 'middle'), straight = sailLeg(plain(12, 0, { kt: 0, to: 0 }), a, b, 0, 'middle', undefined, 30, 240, false);
+    expect(run.turns.some(q => q.kind === 'gybe')).toBe(true); // (the passage plan's own way: gybed down the run's laylines)
+    expect(straight.ok).toBe(true); expect(straight.turns.length).toBe(0);
+    for (const q of straight.path) expect(Math.abs(q.p.x - a.x), 'on the straight line').toBeLessThan(5);
+  });
+
   it('runs on from where she rounded each turn of the route: the track has no jumps', () => {
     const pn = passageNow(at({ sailTo: 'raccoon' }))!;
     expect(pn.route.length).toBeGreaterThan(2);
