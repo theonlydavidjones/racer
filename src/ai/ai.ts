@@ -10,7 +10,7 @@ import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCro
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
-import { routeAround, tooShoal } from '../sim/routing';
+import { routeAround } from '../sim/routing';
 import { HARBORS, inBasin } from '../geo/marina';
 import { AI_EVERY, type World } from '../sim/world';
 
@@ -302,67 +302,6 @@ export function aimPoint(w: World, b: Boat): Vec {
   return m.reach ? aroundIsland(m, b, P, w.wind.from) : P;
 }
 
-/** How far off the shore she works it (m), and how much more she must gain inshore to go there (a share of the time). */
-const SHORE_WORK_OFF = 100, SHORE_WORK_GAIN = 0.05;
-/**
- * Working the shore against a foul tide, as the planner does (sim/routing.ts shoreLeg): with the current against her
- * along the leg and a shore within reach to one side, she steers for a point off that shore ahead of her, out of the
- * stream, rather than straight at the mark through it, and comes out to the mark at the end. Weighed every few
- * seconds (`refresh`), each way's time reckoned from the current along it at her speed; held while it pays (a 5%
- * margin each way, so she doesn't swap in and out on a knot's difference).
- */
-function shoreAim(w: World, b: Boat, P: Vec, refresh: boolean): Vec {
-  const ai = b.ai!, D = dist(b, P), m = w.nextMark(b);
-  if (D < 400 || !m || m.reach) { ai.shoreWork = null; return P; }
-  const u = unit(sub(P, b)), along = (q: Vec) => dot(w.currentAt(q), u);
-  // (working the shore and not getting nearer the mark, 60 m in a minute and a half: she gives it up for the leg and
-  // sails straight. Off the beach the shore's own hazards can stop her: kept off a jetty, she reached up and down
-  // beside it for hours)
-  if (ai.shoreWork?.leg === b.leg && ai.shoreWork.side) {
-    const pr = ai.shoreWork.prog ??= { t: w.t, d: D };
-    if (D < pr.d - 60) ai.shoreWork.prog = { t: w.t, d: D };
-    else if (w.t - pr.t > 90) ai.shoreWork = { leg: b.leg, side: 0 };
-  }
-  if (ai.shoreWork?.leg === b.leg && !ai.shoreWork.side) return P; // (given up on this leg)
-  if (refresh || ai.shoreWork?.leg !== b.leg) {
-    // the current along the straight course (m/s, + helping), her speed through the water toward the mark
-    const cS = [0.2, 0.5, 0.8].reduce((a, f) => a + along({ x: b.x + u.x * D * f, y: b.y + u.y * D * f }), 0) / 3;
-    const v = Math.max(1, targetFor(b, Math.abs(wrap(brg(u.x, u.y) - b.ww.from))) * 0.8);
-    let pick: { s: number; W: Vec } | null = null;
-    if (cS < -SHORE_FOUL_AI) {
-      const ahead = { x: b.x + u.x * Math.min(300, D * 0.4), y: b.y + u.y * Math.min(300, D * 0.4) }, n = { x: -u.y, y: u.x };
-      let best = D / Math.max(0.2, v + cS) * (1 - SHORE_WORK_GAIN * (ai.shoreWork?.leg === b.leg ? -1 : 1));
-      // (the side, once chosen for the leg, held: close to the beach both sides can show shore near, and choosing afresh
-      // she swapped from one to the other and sailed back and forth along it for hours, never nearer the mark)
-      const held = ai.shoreWork?.leg === b.leg ? ai.shoreWork.side : 0;
-      for (const sd of held ? [held] : [1, -1]) {
-        let W: Vec | null = null;
-        for (let d = 0; d <= 1000; d += 25) { const q = { x: ahead.x + n.x * sd * d, y: ahead.y + n.y * sd * d }; if (anyShoreDist(q) <= SHORE_WORK_OFF || tooShoal(q)) { W = q; break; } }
-        // (and ahead of her along the course: a point beside or behind her is no way to the mark; and with clear water
-        // to it and on from it to the mark: inshore of the Marina's breakwaters a point off the beach lay behind the
-        // jetties, and she sailed up and down outside them for hours trying to reach it)
-        if (!W || dot(sub(W, b), u) < 100 || !clearRun(b, W) || !clearRun(W, P)) continue;
-        // in to it and on along the shore to the mark's beam, then out: each part at her speed plus the current there
-        const E = { x: P.x - u.x * Math.min(400, D * 0.2) + (W.x - ahead.x), y: P.y - u.y * Math.min(400, D * 0.2) + (W.y - ahead.y) };
-        const t = dist(b, W) / Math.max(0.2, v + along(W) * 0.5) + dist(W, E) / Math.max(0.2, v + (along(W) + along(E)) / 2) + dist(E, P) / Math.max(0.2, v + along(P));
-        if (t < best) { best = t; pick = { s: sd, W }; }
-      }
-    }
-    ai.shoreWork = pick ? { leg: b.leg, side: pick.s, prog: ai.shoreWork?.leg === b.leg ? ai.shoreWork.prog : undefined } : null;
-  }
-  if (!ai.shoreWork) return P;
-  // the point off the shore abeam of a point 250 m on along the course (her aim moves on as she goes), until the last
-  // 400 m: then the mark (found again with her other heavy predictions, `refresh`, and held between)
-  if (refresh || !ai.shoreWork.W) {
-    const n = { x: -u.y, y: u.x }, ahead = { x: b.x + u.x * Math.min(250, D - 400), y: b.y + u.y * Math.min(250, D - 400) };
-    ai.shoreWork.W = null;
-    for (let d = 0; d <= 1000; d += 25) { const q = { x: ahead.x + n.x * ai.shoreWork.side * d, y: ahead.y + n.y * ai.shoreWork.side * d }; if (anyShoreDist(q) <= SHORE_WORK_OFF || tooShoal(q)) { if (dot(sub(q, b), u) >= 100 && clearRun(b, q)) ai.shoreWork.W = q; break; } }
-  }
-  return ai.shoreWork.W ?? P;
-}
-/** How foul the current along the course must be (m/s against her) before she weighs working the shore: 0.4 kt. */
-const SHORE_FOUL_AI = 0.4 * 0.5144;
-
 const ISLAND_BERTH = 70;
 /**
  * How far off an island's shore to pass (m), in direction u from it: a good berth for the rocks all round, and
@@ -599,7 +538,6 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // just rounded an island: carry on round it the same way, with the same berth, until she's clear of it and its lee
       const prev = b.leg > 0 && b.leg <= w.C.marks.length ? w.C.marks[b.leg - 1] : null;
       if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from, true);
-      else if (b.started) P = shoreAim(w, b, P, refresh);
     }
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,

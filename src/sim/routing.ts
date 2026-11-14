@@ -311,10 +311,10 @@ export function shoreLeg(o: Outlook, a: Vec, b: Vec, t0: number, off: number, sc
 
 /** How foul the current must be along a leg (kt against her, on average over the straight course) before she weighs
  * working the shore: weaker than that, the slacker water near the beach isn't worth the way in and out. */
-const SHORE_FOUL_KT = 0.4;
+export const SHORE_FOUL_KT = 0.4;
 /** How far off the shore she works it, m: tried in turn, the fastest kept (closer is slacker water, but more distance
  * sailed in and out). */
-const SHORE_OFFS = [60, 120, 200];
+export const SHORE_OFFS = [60, 120, 200];
 /** All the plans for a leg (a reach has just the one way: straight there, or along the shore). */
 export function comparePlans(o: Outlook, a: Vec, b: Vec, t0: number, sc: Scenario = AS_FORECAST, arrive = 30): Record<Plan, SailResult> {
   const mid = sailLeg(o, a, b, t0, 'middle', sc, arrive);
@@ -323,10 +323,18 @@ export function comparePlans(o: Outlook, a: Vec, b: Vec, t0: number, sc: Scenari
     ? SHORE_OFFS.map(off => shoreLeg(o, a, b, t0, off, sc, arrive)).filter((r): r is SailResult => !!r).sort((x, y) => x.minutes - y.minutes)[0] ?? null
     : null;
   const none: SailResult = { ...mid, ok: false, why: undefined };
-  if (mid.kind === 'reach') return { left: mid, right: mid, middle: mid, shore: shore ?? none };
-  return { left: sailLeg(o, a, b, t0, 'left', sc, arrive), right: sailLeg(o, a, b, t0, 'right', sc, arrive), middle: mid, shore: shore ?? none };
+  const three = mid.kind === 'reach' ? { left: mid, right: mid, middle: mid } : { left: sailLeg(o, a, b, t0, 'left', sc, arrive), right: sailLeg(o, a, b, t0, 'right', sc, arrive), middle: mid };
+  // (the shore only when it's the call: SHORE_CALL quicker than the best of the others)
+  const others = [three.left, three.right, three.middle].filter(r => r.ok).map(r => r.minutes);
+  const called = !!shore && (!others.length || shore.minutes < Math.min(...others) * (1 - SHORE_CALL));
+  return { ...three, shore: called ? shore! : none };
 }
 
+/** How much quicker the way along the shore must be than the best of the others (a share of the time) before it's the
+ * call: the planner's own error is about that (the AI fleet sails the plan's legs some 15% slower, sim-fleet.test.ts,
+ * the same boat alone on a leg 15% slower than the plan has her), and a gain smaller than it isn't one to bank on
+ * over the beach's hazards. On 7 Nov 2026's ebb the Cityfront's runs gained 10% and 15% that way. */
+export const SHORE_CALL = 0.1;
 /** The fastest of the plans that get there. */
 export function bestPlan(r: Record<Plan, SailResult>): Plan {
   const ok = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => r[k].ok);
