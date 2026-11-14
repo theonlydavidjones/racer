@@ -52,11 +52,14 @@ const VIEWS = [
   });
   // the worst fleet: seven opponents (the most there can be), on a windy day, with the ships
   // the same race each run (the seed, the wildlife, the fleet's colours all come from Math.random): a fixed sequence
-  await p.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
+  // (started again just before the race is made, below: three.js draws a number from it for every object it makes, so a
+  // version that builds one more mesh while the page loads would otherwise sail a different race, and perf-ab would compare
+  // two different scenes)
+  await p.addInitScript(() => { let a = 12345; window.__reseed = () => { a = 12345; }; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
   await p.addInitScript(() => { if (!localStorage.getItem('fbsim-settings-v2')) localStorage.setItem('fbsim-settings-v2', JSON.stringify({ opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], windDay: 2, traffic: 1 })); });
   // (PERF_URL: another server's page, as scripts/check/perf-ab.cjs runs it against a second version)
   await p.goto(process.env.PERF_URL || 'http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
-  await p.evaluate(() => document.querySelector('[data-home="create"]').click()); await p.waitForTimeout(1500);
+  await p.evaluate(() => { window.__reseed(); document.querySelector('[data-home="create"]').click(); }); await p.waitForTimeout(1500);
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(4000);
   // the sim's steps and the scene's update/draw, timed inside the frame
   await p.evaluate(() => {
