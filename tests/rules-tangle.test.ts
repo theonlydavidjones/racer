@@ -12,7 +12,7 @@ import { LOA, V } from '../src/core/math';
 // incident if they haven't parted, or she's had no steerage way since; a new breach if she has, so could have kept
 // clear. Built by hand, so it doesn't hang on how one race sails (Crew Model's crew-stations race, 14 Nov 2026: the hulls
 // overlapped at a touch (g0 = 0), a metre's drift read as parting, and a second touch 12 s on counted anew).
-function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number }) {
+function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean }) {
   const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', fleet: 2, current: 'slack' } as Settings, 7);
   w.t = 60; w.exactPairs = true;
   const A = o.user ? w.user : w.boats[1], B = w.boats[2];
@@ -28,7 +28,8 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
     for (let i = 0; i < Math.round(s / DT); i++) {
       Object.assign(B, { x: B0.x, y: B0.y, h: (h + 180) % 360, desired: (h + 180) % 360, v: 0.3 });
       Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1 });
-      A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty);
+      if (o.retired) { A.retired = true; A.penalty = A.penaltyTotal = 0; A.penaltyDir = 0; } // (not racing: her contacts carry no penalty)
+      else { A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty); }
       w.step(DT); w.paused = false;
     }
   };
@@ -60,6 +61,12 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
   it('pressed together, touching all along, for longer than TANGLE_MAX: one incident while they stay in contact', () => {
     expect(tangle({ vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
     expect(tangle({ user: true, vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
+  }, 60000);
+  it('a contact with no penalty (she\'s retired, not racing) pressed together all along: one incident too, not one at every cooldown', () => {
+    expect(tangle({ vA: 1.5, apart: 0, pressed: 45, retired: true })).toBe(1);
+  }, 60000);
+  it('but once they\'ve parted, her next touch is judged afresh: such a tangle holds only while it\'s one collision', () => {
+    expect(tangle({ vA: 1.5, apart: NEAR, retired: true })).toBe(3);
   }, 60000);
   it('and once they have been a length apart, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.3, apart: FAR })).toBe(3);
