@@ -31,7 +31,7 @@ export const LESSONS: { id: LessonId; no: number; title: string; icon: string; a
   { id: 'tacking', no: 6, title: 'Tacking', icon: '↩️', asa: '5, 33' },
   { id: 'jibing', no: 7, title: 'Jibing', icon: '↪️', asa: '5, 34' },
   { id: 'heaveto', no: 8, title: 'Heave to', icon: '⚓', asa: '—' },
-  { id: 'road', no: 9, title: 'Rules of the road', icon: '⚓', asa: '6–8, 14' },
+  { id: 'road', no: 9, title: 'Rules of the road', icon: '🚦', asa: '6–8, 14' },
   { id: 'mob', no: 10, title: 'Crew overboard', icon: '🆘', asa: '36' },
   { id: 'breeze', no: 11, title: 'A breeze', icon: '💨', asa: '—' },
   { id: 'home', no: 12, title: 'Home to the slip', icon: '🏁', asa: '23, 38' }
