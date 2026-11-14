@@ -64,6 +64,7 @@ import { mountResults } from './app/results';
 import { mountSetup } from './app/setup';
 import { dockCardHtml } from './ui/lessons';
 import { RulesTrainer } from './ui/rulesTrainer';
+import { foulTitle } from './sim/caseRun';
 
 /**
  * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
@@ -329,12 +330,12 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   const notRacing = inc.part === '23.1';
   // (Part 2 preamble: before the preparatory signal, after a postponement or abandonment, or once finished or retired, a
   // boat breaking a rule of Part 2 isn't penalized for it, except rule 14 with injury or serious damage, and rule 23.1)
-  const preamble = !!inc.notRacing;
-  $('rPen').textContent = preamble ? `No penalty: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing${w.cancelled ? ' (racing was called off)' : ''}. The right-of-way rules still apply between boats out here, but a boat not racing isn't penalized for breaking them (Part 2 preamble).` : notRacing ? `No turns: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing, and a turns penalty is only for an incident while racing (Rule 44.1). ${youFault ? `${other.name} may protest you` : `You may protest ${inc.fouler.name}`} instead.` : exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
+  const preamble = !!inc.notRacing, scripted = !!inc.scripted;
+  $('rPen').textContent = scripted ? `No penalty: ${inc.fouler.name} (${inc.fouler.no}) was sailing the Case's track, not steering to keep clear.` : preamble ? `No penalty: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing${w.cancelled ? ' (racing was called off)' : ''}. The right-of-way rules still apply between boats out here, but a boat not racing isn't penalized for breaking them (Part 2 preamble).` : notRacing ? `No turns: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing, and a turns penalty is only for an incident while racing (Rule 44.1). ${youFault ? `${other.name} may protest you` : `You may protest ${inc.fouler.name}`} instead.` : exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
     ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a jibe (Rule 44.2).${w.protestsOn ? ` Skip them and ${other.name} may protest.` : ''}`
     : w.protestsOn ? `${other.name}'s ${turns} penalty is theirs to take (Rule 44.1). To protest, hail "Protest!" now (${keymap.label('hail')}).` : `${other.name} takes a ${turns} penalty.`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
-  pendingPenalty = exonerated || notRacing || preamble ? null : inc.fouler;
+  pendingPenalty = exonerated || notRacing || preamble || scripted ? null : inc.fouler;
   lastClip = clip;
   if (w.log) {
     const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
@@ -591,7 +592,7 @@ windShow(!!S.windLadder);
 const drills = mountDrills(ctx); // (src/app/drills.ts)
 /** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
  * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
-const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); });
+const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); }, n => { S.rulesCase = n; setup.beginLesson('case'); });
 $('rulesTrainer').addEventListener('click', e => rulesTrainer.click(e));
 $('bRules').onclick = () => rulesTrainer.open();
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
@@ -675,9 +676,11 @@ function lessonTick(): void {
   if (L.cue !== lessonCue) {
     lessonCue = L.cue;
     if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
-    if (L.passed && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
-    // passed: a moment to see it, then paused on the lessons, this one ticked
-    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); setup.openLessons(); } }, 3000);
+    if (L.passed && L.id !== 'case' && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
+    // passed: a moment to see it, then paused on the lessons, this one ticked (a Case sailed: back on it in the Rules
+    // trainer, with how it came out)
+    const R = w.caseRun;
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', `${w.user.name} (${w.user.no})`, R.fouls[0] ? foulTitle(R.fouls[0]) : '', R.free.map(l => `${l} (${w.boats.find(b => b.name === l)?.no ?? ''}) sailed free after the contact`).join(' · ')); } else setup.openLessons(); } }, 3000);
   }
   tipFade();
 }
