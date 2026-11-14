@@ -225,15 +225,25 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
     b.crew = newCrew(crewOf(0.6), 'S'); sail(b, 20);
     b.crew.place = { across: 'hike', fore: null };
     const c = b.crew, bad: string[] = []; let trips = 0;
+    // (after the tack, one settling trip is the crew's: the lull took the main halyard right off, and back in the breeze
+    // it goes on again once she's up to speed and it's worth it (on main the same trip fell in the tack itself, uncounted).
+    // One run of seconds by one hand to one line, not counted with the rest; any more is)
+    let settle: { who: number; line: string; from: number; to: number } | null = null, settled = false;
     // every second, outside the tack itself: still yours, everyone free out on the rail, nobody off at the cabin top
     const check = (when: string) => {
       if (c.place?.across !== 'hike') bad.push(`${when}: place lost`);
       c.people.forEach((p, i) => {
         if (p.job?.station && PIANO.includes(p.job.line) && !p.job.big) bad.push(`${when}: #${i} left the rail for the ${p.job.line}`);
-        if (p.job?.big) trips++;
+        if (p.job?.big) {
+          const t = Number(when.split(' ').pop()!.replace('s', ''));
+          if (when.startsWith('after the tack') && !settled && (!settle || (settle.who === i && settle.line === p.job.line && t - settle.to <= 1))) {
+            settle = settle ?? { who: i, line: p.job.line, from: t, to: t }; settle.to = t; settleV.push(b.v);
+          } else { if (settle) settled = true; trips++; }
+        } else if (settle && i === settle.who) settled = true;
         if (i > 0 && !p.job && c.tgt![i].pose !== 'hike' && !['piano', 'winch', 'car', 'mast'].includes(c.tgt![i].pose)) bad.push(`${when}: #${i} ${c.tgt![i].pose}`); // (a job just done: the plan catches up within 0.05 s)
       });
     };
+    const settleV: number[] = [];
     const leg = (secs: number, kt: number, label: string) => { b.ww.kt = kt; sail(b, secs, t => { if (t > 5 && Math.abs(t % 1) < 1 / 120) check(`${label} ${t.toFixed(0)}s`); }); };
     leg(30, W, 'steady'); leg(30, 18, 'puff'); leg(30, 6, 'lull');
     b.ww.kt = W; startTack(b); sail(b, 15); expect(b.tack).toBe('P');
@@ -241,6 +251,8 @@ describe('Placing the crew yourself: off auto until you give it back (owner, 11 
     expect(bad).toEqual([]);
     // (a big change of wind may take the bow hand in for the Cunningham or downhaul, briefly: seconds, not the minutes)
     expect(trips).toBeLessThan(30);
+    // (the settling trip: seconds, not minutes, and once she's back to speed after the tack, not while she's slow out of it)
+    if (settle) { const st = settle as { from: number; to: number }; expect(st.to - st.from).toBeLessThanOrEqual(12); expect(Math.min(...settleV)).toBeGreaterThan(0.95 * b.v); }
     // the weight is on the new windward side (port), as far out as they reach
     expect(c.side).toBe('P'); expect(c.mode).toBe('hike');
     // Auto: in a drifter a good crew goes back to their own call (to leeward or the middle, not hiking)
