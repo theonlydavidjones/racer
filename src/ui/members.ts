@@ -17,7 +17,7 @@ export const CREW_UI: [Attr, string, string][] = [
   ['trim', 'Trim', 'How close to the best they keep the sails and the boat: heel, weight, the lines'],
   ['react', 'Reactions', 'How quickly they start on a change: a puff, a call, a tack'],
   ['eyes', 'Eyes', 'How far off they see puffs and lulls coming, and how few they miss'],
-  ['handling', 'Boat handling', 'The pace of their work: tacks, gybes, the pole, the hatch'],
+  ['handling', 'Boat handling', 'The pace of their work: tacks, jibes, the pole, the hatch'],
   ['fitness', 'Fitness', 'How far out they hike and how long they last'],
   ['composure', 'Composure', 'How well they hold up under pressure: the start, the marks, close crosses'],
 ];

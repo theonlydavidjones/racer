@@ -212,6 +212,9 @@ What's planned, roughly in order. Done work is described in the README.
    centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
    slip at Gas House Cove. I've tried over and over and over again. I just can't get pushed back far enough, and I
    can't seem to get the nose around."
+   - Batch 34: at the dock and under bare poles the crew now sit centered; and Deep Physics' test of leaving under bare
+     poles on the real tide, beam wind both ways, finds she goes to leeward, so the windward drift didn't reproduce. If
+     it's still seen, the owner's exact case (time, tide, wind) is needed. The push-off and getting the nose round stay open.
    - **Drifting to windward with no sails up is a bug.** A boat with no way on and no sail up is set to leeward by
      the wind on her hull and rig, plus or minus the current. Nothing drives her upwind. Look at the bare-pole windage
      force's sign or direction, the hove-to and in-irons models acting with the sails down, the shelter field inside
@@ -376,6 +379,12 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **Bugs in the race setup's "When" section** (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
+     - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
+       off after the first week. It should open fully visible, flipping upward or scrolling the panel.
+     - Starting from her slip at Gashouse Cove with "Leave at 1:35 PM", equal to the 13:35 gun, the line reads "She
+       starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
+       plainly that she can't make the start from there.
    - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
@@ -397,7 +406,7 @@ What's planned, roughly in order. Done work is described in the README.
      4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
         signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
         saying.
-   - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
+   - ~~**A Save button on the Yacht Club's member page**~~ (done, batch 34: Save, and "Save changes?" on leaving, on a member's page, a boat's crew and the boat editor) (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
      save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
      stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
@@ -500,7 +509,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    c. ~~Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
       change with trim and heel) from a Folkboat lines plan, and the righting curve's shape past a few degrees (the
-      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll gybe; the help a roll
+      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll jibe; the help a roll
       tack: she now rolls through it (in light air too), the rig's sweep adds push while she rolls (quasi-steady, from the
       sail forces) and a turn costs speed by the rudder it needs net of her helm, but in a 2-tonne keelboat that adds
       up to nothing measurable; the only measured gains are a Laser's (Kogure et al. 2013, GPS: 5.3% faster through the
@@ -810,7 +819,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
    vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
    everywhere (off the Cityfront it should be about twice the slot's).
-4a. ~~**The AI's tacks aren't held**~~ (done: a tack or gybe she decides on is held until she's round; the rhumb-line test by
+4a. ~~**The AI's tacks aren't held**~~ (done: a tack or jibe she decides on is held until she's round; the rhumb-line test by
    her close-hauled course; clear of the whole committee boat) (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
    uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
    boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
@@ -818,11 +827,11 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
    38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
    only) and some never start.
-4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and gybing on the
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and jibing on the
    laylines downwind, headers from her own wind held 10 s; to do: the planner's 8 s a tack; and the AI fouls at the
    windward mark: 3–7 two-turn penalties among five boats in a 620 m race, the base code as much: mark-room and
    right-of-way handling there): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
-   she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
+   she ends up running), no run angle or jibing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 jibes on a
    620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
    and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
    US Sailing's 1–2 for keelboats).
@@ -850,7 +859,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
    ~~The AI's slow tack on a hail~~ (done, branch ai-hail-tack: a hailed boat that puts her helm down at once had been
    called in breach for not reaching head to wind in 5 s, and then fell back onto her old tack; starting to tack is now
-   her response under 20.2(c), and a slow AI boat tacks through rather than gybing round). The Delft resistance is
+   her response under 20.2(c), and a slow AI boat tacks through rather than jibing round). The Delft resistance is
    blocked by data: the Folkboat's hull form (waterline beam, canoe-body draft, Cp, Cm, LCB, LCF) isn't published in
    any source found, and the DSYHS coefficients only in a secondary source (a 2022–23 ULiège thesis reproducing
    Keuning & Sonnenberg 1999). It needs the class lines plan and offsets (NFIA Plan 1, 1961).
@@ -1121,7 +1130,7 @@ traveling over the hull and sails to help players learn about sail shape and lam
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labeled where it's illustrative.
 
-- **3. The tack and gybe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+- **3. The tack and jibe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
   the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
   "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
   also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
@@ -1138,7 +1147,7 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - **4. A learn-to-sail mode** (owner, 13 November: the on-screen tiller instructions don't need to be there, "except maybe
   in a 'learn to sail' mode, which we haven't even roadmapped yet"; not ranked; a design to the owner first). For
   someone who has never sailed: the parts of the boat, steering with the tiller, the points of sail, trimming to the
-  telltales, tacking and gybing, heaving to and docking, each as a short guided lesson on the water, with the
+  telltales, tacking and jibing, heaving to and docking, each as a short guided lesson on the water, with the
   instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
   coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
 
