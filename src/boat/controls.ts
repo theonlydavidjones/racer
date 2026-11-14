@@ -363,6 +363,38 @@ export function depowerLimits(depower: number, awa: number, tws?: number): { min
   return { min, max, carAft: Math.round(2 * st(0.4, 0.8)) };
 }
 
+/**
+ * The last of the hoist (ROADMAP 8o; the owner, 14 Nov 2026: "the sails are hoisted from the mast. the piano controls use
+ * a block and tackle to finalize the last several inches of hoisting"). Hauled up at the mast, a sail stops a few inches
+ * short of the top; the halyard's tackle at the piano (the main halyard, the sim's `downhaul`, and the jib halyard) takes
+ * those last inches up over the bottom of its travel, and only then puts tension on the luff. Short of that the luff hangs
+ * slack in scallops between the slides or hanks, its draft blown aft, and it flogs. The take-up is its own state (b.rig
+ * mainTaut, jibTaut): a pull on the halyard takes it up first, then tensions; the halyard's 0..1 is the luff tension as
+ * before, so the crew's settings and everything calibrated on them are unchanged.
+ * ESTIMATES until the owner measures Josephine (nothing published: the researcher found no figure for the throw, 14 Nov
+ * 2026): the piano takes up about 15 cm (6 in) of each luff, as much hauling as the first 15% of the halyard's travel; the
+ * crew are at it about 5 s after the hoist is done at the mast (back from the mast to the piano). The main's
+ * luff, about 8.75 m between the class bands (Folkboat class rules 6.1.10–11); the jib's, about 8.5 m (an estimate).
+ */
+export const HALYARD = { takeUpM: 0.15, luffM: { main: 8.75, jib: 8.5 }, takeUp: 0.15, crewS: 5 };
+/** How far up the sail is (0..1 of its luff): hauled up at the mast (`at`, 0..1, 1 = as far as the mast hand takes it),
+ * then the piano's take-up (`taut`, 0..1). */
+export function hoistedShare(at: number, taut: number, sail: 'main' | 'jib'): number {
+  const th = HALYARD.takeUpM / HALYARD.luffM[sail];
+  return at < 1 ? at * (1 - th) : 1 - th * (1 - clamp(taut, 0, 1));
+}
+/**
+ * How well a part-hoisted sail draws, per square metre it has up (1 when it's all the way up): with the last inches not
+ * taken up, a slack, scalloped luff, falling to 0.92 just up at the mast; below that, the head well down the track, a
+ * bunched sail with no luff to hold a shape, falling to 0.3 of a set sail's drive near the boom. ESTIMATES: nothing
+ * published measures a part-hoisted sail's drive (the researcher, 14 Nov 2026); the sail-shape model (mainShape, jibShape)
+ * already prices the luff tension once the sail is up.
+ */
+export function hoistDraw(h: number, sail: 'main' | 'jib'): number {
+  const th = HALYARD.takeUpM / HALYARD.luffM[sail];
+  return h >= 1 - th ? 1 - 0.08 * (1 - h) / th : 0.92 * (0.33 + 0.67 * h / (1 - th));
+}
+
 export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}): CrewSettings {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
   // lines you hold are fixed where you have them: the crew sets the rest around them

@@ -8,6 +8,7 @@ body.tiller-held #gl{cursor:ew-resize}
 .tg-cur{position:absolute;top:26%;bottom:26%;width:4px;margin-left:-2px;border-radius:2px;background:var(--accent);left:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .tg-l,.tg-r{position:absolute;top:calc(78% + 6px);font:600 11px/1.2 var(--f-inst);letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.7)}
 .tg-l{right:calc(50% + 12px)}.tg-r{left:calc(50% + 12px)}
+body:not(.learning) #tillerGuide .tg-l,body:not(.learning) #tillerGuide .tg-r{display:none} /* the words: Learn to sail only */
 /* tiller bar */
 .tiller{position:relative;flex:2 1 220px;min-width:0;height:64px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);touch-action:none;cursor:ew-resize}
 .tiller.held{border-color:var(--accent)}
@@ -122,3 +123,10 @@ kbd{font:700 12px/1 var(--f-inst);letter-spacing:.04em;padding:5px 7px;border-ra
 /* (the pilot's row only while the pilot steers: otherwise the helm's buttons sit on the bottom edge, level with the view's;
    only the helm's own row: unscoped, it hid every .row2, among them the boat editor's sail number and home country, 8u) */
 #controls .row2:not(:has(.pilot:not([hidden]))){display:none}
+/* the drills' cue above her masthead (render/drillGuides.ts): a word or two where you're already looking */
+.dg-cue{position:fixed;z-index:30;transform:translate(-50%,-100%);pointer-events:none;text-align:center;font:800 26px/1 var(--f-inst);letter-spacing:.06em;text-transform:uppercase;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.7)}
+.dg-cue[hidden]{display:none}
+.dg-cue .w{display:inline-block;padding:6px 14px;border-radius:8px;background:rgba(12,20,30,.62);border:2px solid #ffd84a}
+.dg-cue.go .w{background:#ffd84a;color:#14202c;text-shadow:none}
+.dg-cue.done .w{border-color:#6fe3ff}
+.dg-cue .s{margin-top:6px;font:700 13px/1.2 var(--f-body);letter-spacing:.04em;text-transform:none;color:#e8eef4}

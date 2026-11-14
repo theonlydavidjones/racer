@@ -64,6 +64,8 @@ npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost race
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
 npm run dev & node scripts/check/save-pattern.cjs <out-dir> # ~2 min: Save and "Save changes?" on a member, a boat's crew and the boat editor
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
+npm run dev & node scripts/check/setup-map.cjs <url> [<out-dir>]  # ~1 min: the cruise setup's chart and the big plan chart draw the chart
+npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in the page (the statement, a tow, her logbook, laid up, carry on)
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
 node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
