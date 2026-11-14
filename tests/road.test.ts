@@ -103,7 +103,7 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
   it('standing on, you bearing away to a run after she\'s set: the encounter still ends, it isn\'t left open astern of you', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
     L.step = 4; setOn(w, from - 90);
-    w.lesson = null; sail(w, 40); w.lesson = L; // (settled on her reach first)
+    const W = w as unknown as { lesson: unknown }; W.lesson = null; sail(w, 40); W.lesson = L; // (settled on her reach first)
     sail(w, 60, () => !!L.approach); expect(L.approach).not.toBeNull();
     steer(w, from - 160);
     sail(w, 400, () => L.step !== 4 && L.step !== 5);
