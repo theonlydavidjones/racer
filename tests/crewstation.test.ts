@@ -3,7 +3,9 @@ import train from '../src/courses/data/training-windward-return.json';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import type { CourseFile } from '../src/courses/course';
-import { atWinch } from '../src/boat/crewPhys';
+import { DEFAULT_CREW, Z, atWinch, newCrew, type CrewPlace, type CrewSpec } from '../src/boat/crewPhys';
+import { testBoat, sail } from './helpers/testBoat';
+import { beatAngle } from '../src/boat/polar';
 
 /**
  * The crew keep their stations (the owner, 14 Nov 2026: "the fore/aft movement has been a key source of the jitteriness
@@ -43,12 +45,38 @@ export function stationMoves(kt: number) {
 describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () => {
   // (on this race, before the stations (claude/crew-winch-seats) and now, a minute: changes of seat 0 and 0; the forward
   // hand's trips 1.5 and 1.27 in 12 kt, the other crew's 0.07 and 0; along the boat while at a seat, a few centimetres to
-  // 0.3 m, a little more now in light air, where both may go forward of the winch for minutes. Trips are jobs: the cabin
+  // 0.3 m, a little more now in light air, where both go forward of the winch once it's paid for two minutes. Trips are jobs: the cabin
   // top, the mast, the run's foredeck)
   for (const kt of [12, 6]) it(`in ${kt} kt: no changes of seat, few trips, little walking at the seats`, () => {
     const m = stationMoves(kt);
-    for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.05);
+    // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
+    for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
     m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
     m.trips.forEach((t, j) => expect(t, `crew ${j % 2 + 1}: trips a minute`).toBeLessThan(j % 2 === 0 ? 0.1 : 1.4));
   }, 600_000);
 });
+
+describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', () => {
+  const crewOf = (skill: number): CrewSpec => ({ helm: { ...DEFAULT_CREW.helm, skill }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill })) });
+  // (a puffy breeze, as the Bay's: the arms cross the deck's edge with the puffs)
+  const beat = (kt: number, secs: number, place?: CrewPlace, skill = 0.9) => {
+    const twa = beatAngle(kt), b = testBoat({ heading: 360 - twa, kt: 3, windKt: kt }); b.crew = newCrew(crewOf(skill), 'S'); if (place) b.crew.place = place;
+    const seats: number[][] = [[], []]; let inside = 0;
+    sail(b, secs, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: kt + 1.5 * Math.sin(t * 2 * Math.PI / 30) };
+      b.crew!.people.slice(1).forEach((a, j) => { const g = a.goal?.z ?? a.z; if (!a.job && !atWinch(g) && !seats[j].includes(+g.toFixed(2))) seats[j].push(+g.toFixed(2));
+        // (settled at their place, not on the way: the walk round the winch and up beside the cabin are a trip's)
+        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02) inside++; }); });
+    return { b, seats, inside };
+  };
+  for (const kt of [5, 9]) it(`placed forward in ${kt} kt: the front hand on the cabin top's edge, never inside the cabin, and they stay put`, () => {
+    const { b, seats, inside } = beat(kt, 240, { across: null, fore: 'fwd' });
+    expect(inside, 'steps with the front hand inside the cabin').toBe(0);
+    expect(b.crew!.people[1].z).toBeCloseTo(Z.cabinSide, 1); expect(b.crew!.people[2].z).toBeCloseTo(Z.deckFwd, 1);
+    for (const s of seats) expect(s.length, `seats taken: ${s}`).toBeLessThanOrEqual(2); // (where they start, and there)
+  }, 120_000);
+  it('on their own: forward of the winch after minutes of light air upwind, never in a breeze', () => {
+    expect(beat(5, 300).b.crew!.fore01).toBe(1);
+    expect(beat(16, 300).b.crew!.fore01).toBe(0);
+  }, 120_000);
+});
+
