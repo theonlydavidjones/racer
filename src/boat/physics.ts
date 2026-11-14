@@ -1125,7 +1125,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
   // the lazy (windward) jib car: the crew's plan for it (they move it only when it's worth it), or yours
-  if (byHand(b, 'car')) b.carPlan = null; else if (!b.carPlan || b.carPlan.fore !== t.carFore || b.carPlan.ins !== t.carIn) b.carPlan = { fore: t.carFore, ins: t.carIn };
+  // (a plan once made isn't revised for one hole across the track: half a degree of lead isn't worth a trip to the cabin
+  // top, and the plan mustn't go to and fro at a hole's edge, each move changing the jib's trim that chose it)
+  if (byHand(b, 'car')) b.carPlan = null;
+  else if (!b.carPlan || b.carPlan.fore !== t.carFore || Math.abs(b.carPlan.ins - t.carIn) > 1) b.carPlan = { fore: t.carFore, ins: t.carIn };
   // (the first time: she was set up before she sailed, so the crew's lines start where they want them)
   if (!b.crewReady) {
     b.crewReady = true;

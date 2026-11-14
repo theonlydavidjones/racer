@@ -86,7 +86,9 @@ describe('the two jib sheets', () => {
     expect(b.tack).toBe('P');
     sail(b, 5);
     // the same sheet through the same car: the clew as far inboard of that car as it was outboard of it, to windward now
-    expect(b.sheets.jib).toBeLessThan(0); expect(b.sheets.jib).toBeGreaterThan(-Math.abs(clewWas));
+    // (no further: sheeted hard in, block to block at the car's own lead as it is close-hauled on the cabin-top track,
+    // the clew sits at the windward car's lead, the same angle the other way)
+    expect(b.sheets.jib).toBeLessThan(0); expect(b.sheets.jib).toBeGreaterThanOrEqual(-Math.abs(clewWas) - 1e-9);
     expect(b.jibBacked).toBeGreaterThan(0.5); expect(b.hove).toBe(true);
     // then the rest of heaving to: the main eased until its front lifts and the tiller lashed to leeward (port tack
     // now: the tiller to starboard). She settles, the jib still aback on the sheet that was never touched

@@ -42,13 +42,19 @@ describe('the strategist\'s leg times against the fleet sailing them', () => {
    * Over nine races (seeds 11–19), each leg's median across them: one race's start, its penalties at the first mark, can
    * put a leg anywhere (the fleet's first beat ran 1.2–1.9 times the plan from seed to seed, November 13, 2026), and one
    * seed passed or failed by that luck. The median of nine is the fleet against the plan, not one race's traffic.
+   *
+   * Eighteen races (seeds 11–28) from November 14, 2026: nine weren't enough for the first beat. On main its nine seeds
+   * ran 1.45 1.27 1.32 1.98 1.51 1.33 1.79 1.21 1.52 (median 1.45), and with the jib car's real lead (no slower: the
+   * whole race 1.116 against 1.140) 1.64 1.60 1.15 1.85 1.81 1.40 1.45 1.21 1.60 (median 1.60): seed by seed the
+   * differences went both ways (mean +0.04, scatter 0.21), so the nine-seed median itself wandered by about 0.1 and sat
+   * on the bound by luck. The bound stays; twice the seeds halve the median's variance.
    */
-  it('each leg within the fleet\'s range, and the whole race within 15%, over nine races', async () => {
+  it('each leg within the fleet\'s range, and the whole race within 15%, over eighteen races', async () => {
     const median = (xs: number[]) => { const s = xs.slice().sort((a, b) => a - b); return s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
     const legR: number[][] = [], totals: number[] = [];
     let names: string[] = [];
-    // (the nine races sailed side by side on the race pool's threads: tests/helpers/races.ts fleetLegs; then seed by seed as before)
-    const seeds = [11, 12, 13, 14, 15, 16, 17, 18, 19], R = await sail('fleetLegs', seeds.map(seed => [seed] as [number]));
+    // (the races sailed side by side on the race pool's threads: tests/helpers/races.ts fleetLegs; then seed by seed as before)
+    const seeds = Array.from({ length: 18 }, (_, i) => 11 + i), R = await sail('fleetLegs', seeds.map(seed => [seed] as [number]));
     seeds.forEach((seed, k) => {
       const { perLeg, total } = R[k];
       names = perLeg.map(L => L.name);
@@ -65,5 +71,5 @@ describe('the strategist\'s leg times against the fleet sailing them', () => {
     });
     const t = median(totals), why = `the whole race, seed by seed ${totals.map(x => x.toFixed(2)).join(' ')}`;
     expect(t, why).toBeGreaterThan(0.9); expect(t, why).toBeLessThan(1.15);
-  }, 1_800_000);
+  }, 3_600_000);
 });
