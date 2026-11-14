@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FRICTION, RESTITUTION, collide } from '../src/boat/contact';
+import { FRICTION, RESTITUTION, collide, touchPoint } from '../src/boat/contact';
 import { contactNormal } from '../src/rules/geometry';
 import { HANDLING, HULL } from '../src/boat/dynamics';
 import { HOVE } from '../src/boat/physics';
@@ -26,7 +26,12 @@ const mom = (b: Boat) => {
   const px = M.mx * u * s + M.my * sw * c, py = M.mx * u * c - M.my * sw * s;
   return { px, py, L: b.x * py - b.y * px - M.I * (b.turnRate ?? 0) * D };
 };
-const hit = (A: Boat, B: Boat) => { const c = contactNormal(A, B); return { c, blow: collide(A, B, c.a, c.b, c.n) }; };
+const hit = (A: Boat, B: Boat) => { const c = contactNormal(A, B), at = touchPoint(A, B); return { c, at, blow: collide(A, B, at, c.n) }; };
+/** The velocity of the part of her at p (through the water): her own, and her turn's. */
+const velAt = (b: Boat, p: { x: number; y: number }) => {
+  const s = Math.sin(b.h * D), c = Math.cos(b.h * D), u = b.v - (b.astern ?? 0), sw = b.sway ?? 0, o = -(b.turnRate ?? 0) * D;
+  return { x: s * u + c * sw - o * (p.y - b.y), y: c * u - s * sw + o * (p.x - b.x) };
+};
 
 describe('a blow between two hulls', () => {
   it('a rear-ender, in line: momentum kept, they part at RESTITUTION of their closing, the one astern slowed and the one ahead sped up', () => {
@@ -73,6 +78,57 @@ describe('a blow between two hulls', () => {
     expect(Math.abs(blow.friction)).toBeLessThanOrEqual(FRICTION * blow.normal + 1e-9);
     expect(mom(A).px + mom(B).px).toBeCloseTo(p0.x, 6); expect(mom(A).py + mom(B).py).toBeCloseTo(p0.y, 6);
     expect(A.v).toBeLessThan(3); expect(A.v).toBeGreaterThan(2.8); expect(B.v).toBeGreaterThan(2); // (a rub, not a stop)
+  });
+  it('an oblique blow, sliding: friction against the slide, at its limit; their angular momentum together kept', () => {
+    // (A's bow into B's side forward of her middle, at 30° to her, both under way)
+    const A = boat(-4.0, -1.8, 30, 3.5), B = boat(0, 0, 0, 2);
+    const a0 = mom(A), b0 = mom(B), c = contactNormal(A, B), at = touchPoint(A, B), t = { x: -c.n.y, y: c.n.x };
+    const v0 = velAt(A, at), w0 = velAt(B, at), un = (v0.x - w0.x) * c.n.x + (v0.y - w0.y) * c.n.y, ut = (v0.x - w0.x) * t.x + (v0.y - w0.y) * t.y;
+    const blow = collide(A, B, at, c.n), a1 = mom(A), b1 = mom(B);
+    expect(un).toBeGreaterThan(1); expect(Math.abs(ut)).toBeGreaterThan(0.5); expect(blow.closing).toBeCloseTo(un, 9);
+    expect(Math.abs(blow.friction)).toBeCloseTo(FRICTION * blow.normal, 6); // (sliding)
+    expect(Math.sign(blow.friction)).toBe(Math.sign(ut)); // (on B, the way A's side of the touch was sliding along her: it drags her with it)
+    const v1 = velAt(A, at), w1 = velAt(B, at), ut1 = (v1.x - w1.x) * t.x + (v1.y - w1.y) * t.y;
+    expect(Math.sign(ut1)).toBe(Math.sign(ut)); // (still sliding the same way: friction at its limit didn't stop it. The blow's turn of each can add to the slide)
+    expect((v1.x - w1.x) * c.n.x + (v1.y - w1.y) * c.n.y).toBeCloseTo(-RESTITUTION * un, 9); // (parting, at the point)
+    expect(a1.px + b1.px).toBeCloseTo(a0.px + b0.px, 6); expect(a1.py + b1.py).toBeCloseTo(a0.py + b0.py, 6);
+    expect(a1.L + b1.L).toBeCloseTo(a0.L + b0.L, 5);
+    expect(blow.loss).toBeGreaterThan(0);
+  });
+  it('alongside, pressed together: the blow at the middle of where they lie together, each shoved bodily, neither turned; the same an inch ahead or astern', () => {
+    for (const ahead of [0, 0.01, -0.01, 1.5]) {
+      const A = boat(0, 0, 0, 2.5), B = boat(2.1, ahead, 0, 2.5); A.sway = 0.5; // (A setting down onto B, to starboard)
+      const { at, blow } = hit(A, B);
+      expect(at.y, `B ${ahead} m ahead`).toBeCloseTo(ahead / 2, 6); expect(at.x).toBeCloseTo(1.05, 6);
+      expect(blow.closing).toBeCloseTo(0.5, 6);
+      if (Math.abs(ahead) < 0.1) { expect(Math.abs(A.turnRate!)).toBeLessThan(0.05); expect(Math.abs(B.turnRate!)).toBeLessThan(0.05); }
+      expect(A.sway! + B.sway!).toBeCloseTo(0.5, ahead === 1.5 ? 1 : 3); // (alike in weight: what one loses the other gains)
+      expect(B.sway! - A.sway!).toBeGreaterThan(0); // (parting)
+      if (Math.abs(ahead) < 0.1) { expect(A.v).toBeCloseTo(2.5, 2); expect(B.v).toBeCloseTo(2.5, 2); } // (no slide along them: no friction)
+    }
+    const A = boat(0, 0, 0, 2.5), B = boat(2.1, 0, 0, 2.5); A.sway = 0.5; hit(A, B);
+    expect(A.sway).toBeCloseTo(0.25 - 0.25 * RESTITUTION, 6); expect(B.sway).toBeCloseTo(0.25 + 0.25 * RESTITUTION, 6);
+  });
+  it('any blow, with way, sway, sternway and spin already on: momentum and angular momentum kept, parting at RESTITUTION of the closing, friction within its limit and against the slide, no energy gained', () => {
+    let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+    let blows = 0, slides = 0;
+    for (let k = 0; k < 60000; k++) {
+      const A = boat((rnd() - 0.5) * 12, (rnd() - 0.5) * 12, rnd() * 360, rnd() * 4), B = boat(0, 0, 0, rnd() * 4);
+      for (const b of [A, B]) { b.sway = (rnd() - 0.5) * 1.2; b.turnRate = (rnd() - 0.5) * 50; if (rnd() < 0.2) { b.astern = rnd(); b.v = 0; } }
+      const c = contactNormal(A, B), g = Math.hypot(c.b.x - c.a.x, c.b.y - c.a.y); if (g > 2.2 || g < 0.5) continue;
+      const at = touchPoint(A, B), t = { x: -c.n.y, y: c.n.x }, a0 = mom(A), b0 = mom(B), v0 = velAt(A, at), w0 = velAt(B, at);
+      const un = (v0.x - w0.x) * c.n.x + (v0.y - w0.y) * c.n.y, ut = (v0.x - w0.x) * t.x + (v0.y - w0.y) * t.y;
+      const blow = collide(A, B, at, c.n);
+      if (!(un > 0)) { expect(blow.closing).toBe(0); continue; }
+      blows++; const a1 = mom(A), b1 = mom(B), v1 = velAt(A, at), w1 = velAt(B, at), why = `blow ${k}`;
+      expect(Math.abs(a1.px + b1.px - a0.px - b0.px), why).toBeLessThan(1e-6); expect(Math.abs(a1.py + b1.py - a0.py - b0.py), why).toBeLessThan(1e-6);
+      expect(Math.abs(a1.L + b1.L - a0.L - b0.L), why).toBeLessThan(1e-5);
+      expect(Math.abs((v1.x - w1.x) * c.n.x + (v1.y - w1.y) * c.n.y + RESTITUTION * un), why).toBeLessThan(1e-9);
+      expect(blow.normal, why).toBeGreaterThan(0); expect(Math.abs(blow.friction), why).toBeLessThanOrEqual(FRICTION * blow.normal + 1e-9);
+      if (Math.abs(blow.friction) > FRICTION * blow.normal - 1e-9) { slides++; if (Math.abs(ut) > 1e-9) expect(Math.sign(blow.friction), why).toBe(Math.sign(ut)); }
+      expect(blow.loss, why).toBeGreaterThan(-1e-6);
+    }
+    expect(blows).toBeGreaterThan(3000); expect(slides).toBeGreaterThan(500);
   });
   it('never adds energy, at any angle or place along her', () => {
     for (let h = 0; h < 360; h += 15) for (const along of [-3, -1.5, 0, 1.5, 3]) for (const v of [0.5, 2, 4]) {

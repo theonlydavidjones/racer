@@ -8,20 +8,35 @@
 // sway and yaw). A blow on her bow or quarter swings her as well as shoving her: off her center it meets less of her.
 //
 // The method is the usual one for ships (Pedersen & Zhang 1998, "On impact mechanics in ship collisions", Marine
-// Structures 11: an impulse at the contact point with the water as added mass, sticking or sliding by a friction
-// limit). Their paper could not be reached to quote (14 Nov 2026), so the algebra here is the textbook's: the 2×2
-// system of the two points' relative velocity against the impulse (Stronge, Impact Mechanics, Cambridge 2000: planar impact with friction).
+// Structures 11:429–449: an impulse at the contact point with the water as added mass, with friction and sliding).
+// Their paper could not be reached to quote (14 Nov 2026), so the algebra here is the textbook's: the 2×2 system of
+// the contact point's relative velocity against the impulse (Stronge, Impact Mechanics, Cambridge 2000: planar impact
+// with friction). It is the simple form: Newton's restitution (the points part at a share of their closing speed) and
+// friction in one direction for the whole blow. Stronge shows that form can, for some shapes and frictions, give back
+// more energy than went in; at these values it never did in 400 000 random blows with way, sway and spin on
+// (tests/contact.test.ts scans it).
+//
+// The blow is taken at ONE point, midway between the two hulls' nearest points, for both: equal and opposite impulses
+// at one point keep their angular momentum together as well as their momentum. Where the hulls lie alongside (the
+// nearest points a stretch, not a point), it is the middle of the stretch: two boats pressed side to side shove each
+// other bodily, with no turn.
+//
+// What it can't see: the hulls are their centerlines with half a beam round them (rules/pairs.ts CONTACT_GAP, the
+// rules' measure of touching), so bow to stern in line they "touch" with a beam's width of water between. Their real
+// outlines would put that right; the impulse would be the same.
 //
 // ESTIMATES, both: no measurement for small wooden or GRP hulls was found (the researcher, 14 Nov 2026).
-// - RESTITUTION 0.2: how much of their closing speed they part with. Ship-collision analysis takes the blow as plastic
-//   (none: damage.ts reads it so); two sound yacht hulls at a walking pace give and spring back a little.
-// - FRICTION 0.3: hull sliding on hull, wet paint or gelcoat. (Steel on steel in ship collisions is taken near 0.6.)
+// - RESTITUTION 0.2: how much of their closing speed they part with. Ship-collision analysis is said to take the blow
+//   as plastic (none; unverified, the papers unreachable; damage.ts reads it so); two sound yacht hulls at a walking
+//   pace give and spring back a little.
+// - FRICTION 0.3: hull sliding on hull, wet paint or gelcoat. (Steel on steel in ship collisions is said to be taken
+//   near 0.6; unverified.)
 import type { Boat } from './boat';
 import { HANDLING, HULL } from './dynamics';
 import { HOVE } from './physics';
 import { DEFAULT_CREW, displacement } from './crewPhys';
 import orc from './data/nordic-folkboat-orc.json';
-import type { Vec } from '../core/math';
+import { HALF, type Vec } from '../core/math';
 
 export const RESTITUTION = 0.2, FRICTION = 0.3;
 const D2R = Math.PI / 180;
@@ -50,16 +65,36 @@ function energy(b: Boat, m: { mx: number; my: number; I: number }): number {
 }
 
 /**
- * The blow between A and B touching at `a` (on A) and `b` (on B), along the unit line `n` from A toward B: changes each
- * one's headway or sternway, her sway and her turn, if the two points are closing. Their motion is through the water
- * (the stream carries both alike).
+ * Where two hulls touch: midway between the nearest points of their centerlines; where they lie alongside, so that
+ * the nearest is a stretch (every pairing within 5 cm of the least), the middle of it.
  */
-export function collide(A: Boat, B: Boat, a: Vec, b: Vec, n: Vec): Blow {
+export function touchPoint(A: { x: number; y: number; h: number }, B: { x: number; y: number; h: number }): Vec {
+  const sA = Math.sin(A.h * D2R) * HALF, cA = Math.cos(A.h * D2R) * HALF, sB = Math.sin(B.h * D2R) * HALF, cB = Math.cos(B.h * D2R) * HALF;
+  const p1x = A.x + sA, p1y = A.y + cA, p2x = A.x - sA, p2y = A.y - cA, q1x = B.x + sB, q1y = B.y + cB, q2x = B.x - sB, q2y = B.y - cB;
+  // (each end against the other hull's line: the point on it nearest, and how far)
+  const on = (px: number, py: number, ax: number, ay: number, bx: number, by: number, k: number) => {
+    const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+    NX[k] = ax + dx * t; NY[k] = ay + dy * t; PX[k] = px; PY[k] = py; ND[k] = Math.hypot(NX[k] - px, NY[k] - py);
+  };
+  on(p1x, p1y, q1x, q1y, q2x, q2y, 0); on(p2x, p2y, q1x, q1y, q2x, q2y, 1); on(q1x, q1y, p1x, p1y, p2x, p2y, 2); on(q2x, q2y, p1x, p1y, p2x, p2y, 3);
+  const least = Math.min(ND[0], ND[1], ND[2], ND[3]);
+  let x = 0, y = 0, k = 0;
+  for (let i = 0; i < 4; i++) if (ND[i] <= least + 0.05) { x += (NX[i] + PX[i]) / 2; y += (NY[i] + PY[i]) / 2; k++; }
+  return { x: x / k, y: y / k };
+}
+const NX = new Float64Array(4), NY = new Float64Array(4), PX = new Float64Array(4), PY = new Float64Array(4), ND = new Float64Array(4);
+
+/**
+ * The blow between A and B touching at `at`, along the unit line `n` from A toward B: changes each one's headway or
+ * sternway, her sway and her turn, if they are closing there. Their motion is through the water (the stream carries
+ * both alike).
+ */
+export function collide(A: Boat, B: Boat, at: Vec, n: Vec): Blow {
   const tx = -n.y, ty = n.x; // (along the hulls)
   // each one's axes, and her point's velocity: her own, and her turn's swinging it (+ turnRate is to starboard, clockwise)
   const sA = Math.sin(A.h * D2R), cA = Math.cos(A.h * D2R), sB = Math.sin(B.h * D2R), cB = Math.cos(B.h * D2R);
-  const uA = A.v - (A.astern ?? 0), wA = A.sway ?? 0, oA = -(A.turnRate ?? 0) * D2R, rAx = a.x - A.x, rAy = a.y - A.y;
-  const uB = B.v - (B.astern ?? 0), wB = B.sway ?? 0, oB = -(B.turnRate ?? 0) * D2R, rBx = b.x - B.x, rBy = b.y - B.y;
+  const uA = A.v - (A.astern ?? 0), wA = A.sway ?? 0, oA = -(A.turnRate ?? 0) * D2R, rAx = at.x - A.x, rAy = at.y - A.y;
+  const uB = B.v - (B.astern ?? 0), wB = B.sway ?? 0, oB = -(B.turnRate ?? 0) * D2R, rBx = at.x - B.x, rBy = at.y - B.y;
   const vAx = sA * uA + cA * wA - oA * rAy, vAy = cA * uA - sA * wA + oA * rAx;
   const vBx = sB * uB + cB * wB - oB * rBy, vBy = cB * uB - sB * wB + oB * rBx;
   const un = (vAx - vBx) * n.x + (vAy - vBy) * n.y, ut = (vAx - vBx) * tx + (vAy - vBy) * ty;

@@ -4,7 +4,7 @@ import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { collide } from '../boat/contact';
+import { collide, touchPoint } from '../boat/contact';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { windSide } from '../boat/dynamics';
@@ -1294,7 +1294,7 @@ export class World {
       }
       if (incident) found.push({ A, B, incident });
       // (hulls touching, whether or not it's a new incident: the blow between them, below)
-      if (!A.docked && !B.docked && (A.x - B.x) ** 2 + (A.y - B.y) ** 2 < (LOA + CONTACT_GAP) ** 2 && hullGap(A, B) < CONTACT_GAP) (touching ??= []).push(A, B);
+      if (!A.docked && !B.docked && !A.handled && !B.handled && (A.x - B.x) ** 2 + (A.y - B.y) ** 2 < (LOA + CONTACT_GAP) ** 2 && hullGap(A, B) < CONTACT_GAP) (touching ??= []).push(A, B);
       // (a breach against one of them still going on, by its own signs, whoever has right of way now (a right-of-way
       // boat's luff, 16.1, squeezes too): touching, the boat she's fouled by still making her swerve, or inside room-to-
       // keep-clear distance and still closing. Only giving room again, overlapped round the mark, isn't one)
@@ -1411,7 +1411,7 @@ export class World {
    */
   private blow(A: Boat, B: Boat): void {
     const c = contactNormal(A, B);
-    collide(A, B, c.a, c.b, c.n);
+    collide(A, B, touchPoint(A, B), c.n);
     const d = (CONTACT_GAP - hullGap(A, B)) / 2;
     if (d > 0) { A.x -= c.n.x * d; A.y -= c.n.y * d; B.x += c.n.x * d; B.y += c.n.y * d; }
   }
