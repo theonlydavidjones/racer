@@ -1,26 +1,27 @@
 #!/usr/bin/env node
 /**
- * Rain, day by day and hour by hour: what fell at the airports either side of the Bay (observed), and the National
+ * Rain, by the quarter hour: what fell at the airports either side of the Bay this past week (observed), and the National
  * Weather Service forecast for the coming week. The sim's real rain (environment/rain.ts): its look on the water, the
- * sky's murk, and what the crew wear.
+ * sky's murk and the visibility. Run it at least weekly (the API keeps about a week: a longer gap is a hole the
+ * archive's run, scripts/fetch-rain-history.mjs, fills).
  *
- *   NODE_USE_ENV_PROXY=1 node scripts/fetch-rain.mjs      # the last week's observations (added to those on file), and the forecast
+ *   NODE_USE_ENV_PROXY=1 node scripts/fetch-rain.mjs      (npm run data:rain)
  *
  * Sources (public domain):
  *  - Observed: the NWS's station observations (api.weather.gov, the airports' ASOS/METAR reports) at San Francisco
- *    International (KSFO) and Oakland International (KOAK): the precipitation in the last hour (the routine report just
- *    before the hour gives the hour's total) and the reported rain's intensity (light, moderate, heavy). The API keeps
- *    only the last week or so, so the file keeps what each run fetched: its record grows from when this was first run
- *    (November 2026). The years before need the ASOS archive (the Iowa Environmental Mesonet), not reachable from here yet.
- *  - Forecast: the NWS gridded forecast at the Cityfront cell (MTR 84,107, the cell the wind's forecast uses): the
- *    quantitative precipitation (mm over each period, spread evenly over its hours), the probability of precipitation,
- *    and the weather's own rain intensity, by local hour.
+ *    International (KSFO) and Oakland International (KOAK): the reported weather's rain and drizzle and their intensity
+ *    (not what's only "in the vicinity"), and the precipitation since the last routine report, from the METAR's own
+ *    P group in its remarks (the API's precipitationLastHour is often missing where the METAR has it).
+ *  - Forecast: the NWS gridded forecast at the Cityfront cell (MTR 84,107, the cell the wind's forecast uses), by local
+ *    hour: the quantitative precipitation (mm over each period, spread evenly over its hours: right for whether it
+ *    rains, but a period's mean can't show a heavy hour), the probability of precipitation, the forecast weather's own
+ *    intensity (and its "heavy rain" attribute), and whether its coverage word says rain is likely or surer.
  *
- * Stored per station and local date: base64 of 24 hours × 2 bytes, [the hour's rain in tenths of a mm (0–254), the
- * reported intensity (0 none, 1 light, 2 moderate, 3 heavy)], 255 = no report that hour.
- * Output: src/environment/data/sf-rain.json
+ * The days' encoding: scripts/rain-days.mjs. Output: src/environment/data/sf-rain.json (the archive's years, the climate
+ * and the stations' from..to are kept).
  */
 import { readFile, writeFile } from 'node:fs/promises';
+import { encodeDays, mergeDay, needed, localAt, localDate } from './rain-days.mjs';
 
 const OUT = new URL('../src/environment/data/sf-rain.json', import.meta.url);
 const UA = 'folkboat-racing-sim (personal project)';
@@ -29,6 +30,7 @@ const STATIONS = [
   { id: 'KOAK', name: 'Oakland International', lat: 37.72126, lon: -122.22115 }
 ]; // (positions: api.weather.gov/stations)
 const GRID = 'MTR/84,107';
+const BACK_DAYS = 8;
 
 async function get(url) {
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -41,12 +43,11 @@ async function get(url) {
   }
   throw new Error('Failed: ' + url);
 }
-const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit' });
-const local = ms => { const p = Object.fromEntries(fmt.formatToParts(new Date(ms)).map(x => [x.type, x.value])); return { date: `${p.year}-${p.month}-${p.day}`, hour: +p.hour % 24 }; };
-/** The reported intensity of the wet weather in an observation (0 none, 1 light, 2 moderate, 3 heavy): rain, drizzle,
- * showers or a thunderstorm; a METAR with no sign ("RA") is moderate. */
-const WET = ['rain', 'drizzle', 'rain_showers', 'showers', 'thunderstorms', 'freezing_rain', 'freezing_drizzle'];
-const intensity = pw => Math.max(0, ...(pw ?? []).filter(w => WET.includes(w.weather)).map(w => w.intensity === 'light' ? 1 : w.intensity === 'heavy' ? 3 : 2));
+/** An observation's wet weather (0 none, 1 light, 2 moderate, 3 heavy): rain or drizzle at the field (a METAR's "RA"
+ * with no sign is moderate; a thunderstorm counts only with its rain, which the API lists as rain). */
+const intensity = pw => Math.max(0, ...(pw ?? []).filter(w => (w.weather === 'rain' || w.weather === 'drizzle') && !w.inVicinity).map(w => w.intensity === 'light' ? 1 : w.intensity === 'heavy' ? 3 : 2));
+/** The METAR's P group (hundredths of an inch since the last routine report), mm; null if it has none. */
+const pGroup = raw => { const m = / RMK .*?\bP(\d{4})\b/.exec(raw ?? ''); return m ? +m[1] / 100 * 25.4 : null; };
 
 let prev = null;
 try { prev = JSON.parse(await readFile(OUT, 'utf8')); } catch { console.warn('No existing file: starting it.'); }
@@ -55,30 +56,31 @@ const now = Date.now();
 /* ---------- observed: the airports' reports ---------- */
 const stations = {};
 for (const st of STATIONS) {
-  const hours = new Map(); // 'date' → Uint8Array(48)
-  let url = `https://api.weather.gov/stations/${st.id}/observations?start=${new Date(now - 8 * 86400e3).toISOString().slice(0, 19)}Z&limit=500`, n = 0;
+  const reports = [];
+  let url = `https://api.weather.gov/stations/${st.id}/observations?start=${new Date(now - BACK_DAYS * 86400e3).toISOString().slice(0, 19)}Z&limit=500`;
   for (let page = 0; url && page < 10; page++) {
     const j = await get(url);
     for (const f of j.features ?? []) {
-      const p = f.properties, L = local(Date.parse(p.timestamp));
-      if (!hours.has(L.date)) hours.set(L.date, new Uint8Array(48).fill(255));
-      const a = hours.get(L.date), k = L.hour * 2;
-      const mm = p.precipitationLastHour?.value; // (mm: the hour to this report; most reports leave it out)
-      if (mm != null && Number.isFinite(mm)) a[k] = Math.max(a[k] === 255 ? 0 : a[k], Math.min(254, Math.round(mm * 10)));
-      a[k + 1] = Math.max(a[k + 1] === 255 ? 0 : a[k + 1], intensity(p.presentWeather));
-      n++;
+      const p = f.properties, L = localAt(Date.parse(p.timestamp));
+      const api = p.precipitationLastHour?.value; // (mm; often missing)
+      reports.push({ date: L.date, min: L.min, mm: pGroup(p.rawMessage) ?? (api != null && Number.isFinite(api) ? api : null), code: intensity(p.presentWeather) });
     }
     url = (j.features ?? []).length ? j.pagination?.next : null;
   }
-  // (an hour with reports but none giving its total: its rain unknown (255), its intensity known)
-  const days = { ...(prev?.stations?.[st.id]?.days ?? {}) };
-  for (const [date, a] of hours) {
-    const old = days[date] ? Buffer.from(days[date], 'base64') : null;
-    if (old) a.forEach((x, i) => { if (x === 255 && old[i] !== 255) a[i] = old[i]; });
-    days[date] = Buffer.from(a).toString('base64');
+  const old = prev?.stations?.[st.id] ?? {}, days = { ...(old.days ?? {}) };
+  const fetched = encodeDays(reports), first = localDate(now - (BACK_DAYS - 1) * 86400e3), yesterday = localDate(now - 86400e3);
+  for (const [date, a] of fetched) {
+    if (date < first) continue; // (the first day fetched only in part)
+    const b = mergeDay(a, days[date]);
+    if (needed(b) || date > yesterday) days[date] = Buffer.from(b).toString('base64'); else delete days[date];
   }
-  stations[st.id] = { name: st.name, lat: st.lat, lon: st.lon, days: Object.fromEntries(Object.entries(days).sort()) };
-  console.log(`${st.id}: ${n} reports, ${hours.size} days fetched, ${Object.keys(days).length} on file`);
+  // the record's span: on to yesterday, if this fetch reaches back to where it ended (else a hole: the archive's run fills it)
+  let { from, to } = old;
+  if (!from) { from = first; to = yesterday; }
+  else if (to >= localDate(now - (BACK_DAYS - 1) * 86400e3 - 86400e3)) to = yesterday > to ? yesterday : to;
+  else console.warn(`${st.id}: the record ends ${to}, more than a week ago: run scripts/fetch-rain-history.mjs ${to} to fill the gap.`);
+  stations[st.id] = { name: st.name, lat: st.lat, lon: st.lon, from, to, days: Object.fromEntries(Object.entries(days).sort()) };
+  console.log(`${st.id}: ${reports.length} reports, ${fetched.size} days fetched, record ${from}..${to}, ${Object.keys(days).length} days on file`);
 }
 
 /* ---------- forecast: the NWS grid at the Cityfront ---------- */
@@ -91,22 +93,29 @@ function hourly(series, conv, spread = false) {
     const [t0, dur] = v.validTime.split('/'), ms = Date.parse(t0);
     const m = dur.match(/P(?:(\d+)D)?T?(?:(\d+)H)?/), n = (+(m?.[1] ?? 0)) * 24 + +(m?.[2] ?? 0) || 1;
     for (let h = 0; h < n; h++) {
-      const L = local(ms + h * 3600e3); (out[L.date] ??= Array(24).fill(null))[L.hour] = v.value == null ? null : conv(spread ? v.value / n : v.value);
+      const L = localAt(ms + h * 3600e3); (out[L.date] ??= Array(24).fill(null))[L.hour] = v.value == null ? null : conv(spread ? v.value / n : v.value);
     }
   }
   return out;
 }
+const WET_FC = ['rain', 'rain_showers', 'drizzle', 'thunderstorms', 'freezing_rain', 'freezing_drizzle'];
+/** The forecast weather's rain intensity (0 none, 1 light or very light, 2 moderate or unsaid, 3 heavy, or the "heavy rain"
+ * attribute), and whether its coverage says likely or surer (likely, definite; numerous, widespread; periods, frequent). */
+const fcCode = ws => Math.max(0, ...(ws ?? []).filter(w => WET_FC.includes(w.weather)).map(w => w.intensity === 'heavy' || (w.attributes ?? []).includes('heavy_rain') ? 3 : w.intensity === 'light' || w.intensity === 'very_light' ? 1 : 2));
+const LIKELY = ['likely', 'definite', 'numerous', 'widespread', 'periods', 'frequent'];
+const fcLikely = ws => (ws ?? []).some(w => WET_FC.includes(w.weather) && LIKELY.includes(w.coverage)) ? 1 : 0;
 const r2 = x => Math.round(x * 100) / 100;
 const qpf = hourly(g.quantitativePrecipitation, v => r2(v), true), pop = hourly(g.probabilityOfPrecipitation, v => Math.round(v));
-const wx = hourly(g.weather, v => intensity((v ?? []).map(w => ({ weather: w.weather === 'rain_showers' ? 'rain_showers' : w.weather, intensity: w.intensity }))));
-const today = local(now).date, forecast = {};
-for (const date of Object.keys(qpf).sort()) if (date >= today) forecast[date] = { mm: qpf[date], pop: pop[date] ?? Array(24).fill(null), code: wx[date] ?? Array(24).fill(null) };
+const wx = hourly(g.weather, fcCode), cov = hourly(g.weather, fcLikely);
+const today = localAt(now).date, forecast = {}, none = () => Array(24).fill(null);
+for (const date of Object.keys(qpf).sort()) if (date >= today) forecast[date] = { mm: qpf[date], pop: pop[date] ?? none(), code: wx[date] ?? none(), likely: cov[date] ?? none() };
 console.log(`forecast: ${Object.keys(forecast).join(', ')} (issued ${g.updateTime})`);
 
 await writeFile(OUT, JSON.stringify({
-  source: `Observed: NWS station observations (api.weather.gov; the ASOS/METAR reports) at ${STATIONS.map(s => `${s.id} (${s.name})`).join(' and ')}, kept from each fetch (the API holds about a week). Forecast: NWS gridded forecast ${GRID} (quantitative precipitation spread over each period's hours, probability of precipitation, weather intensity).`,
+  ...(prev ?? {}),
+  source: `Observed: NWS station observations (api.weather.gov; the ASOS/METAR reports) at ${STATIONS.map(s => `${s.id} (${s.name})`).join(' and ')}, kept from each fetch (the API holds about a week). Forecast: NWS gridded forecast ${GRID} (quantitative precipitation spread over each period's hours, probability of precipitation, weather intensity and coverage).`,
   updated: new Date(now).toISOString(), forecastIssued: g.updateTime,
-  note: 'stations[id].days[date]: base64 of 24 local hours × 2 bytes [rain in the hour, tenths of a mm (0–254); intensity reported 0 none, 1 light, 2 moderate, 3 heavy]; 255 = no report. forecast[date]: mm (per hour), pop (%), code (intensity as above), by local hour 0–23.',
-  stations, forecast
+  note: 'stations[id].days[date]: base64 of 120 bytes, scripts/rain-days.mjs: 24 local hours\' rain (tenths of a mm), then 96 quarter hours\' reported wet weather (0 none, 1 light, 2 moderate, 3 heavy); 255 = no report. Within a station\'s from..to, a date not in days was dry, with every report. forecast[date]: mm (per hour), pop (%), code (intensity as above), likely (1: the coverage says likely or surer), by local hour 0–23.',
+  stations: { ...(prev?.stations ?? {}), ...stations }, forecast
 }) + '\n');
 console.log(`Wrote ${OUT.pathname}`);
