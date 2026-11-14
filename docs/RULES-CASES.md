@@ -4,6 +4,9 @@ Toward criterion 5 of docs/VISION-ROADMAP.md: the Racing Rules of Sailing covere
 the sim can judge. Source: World Sailing, *The Case Book for 2025–2028*, version 2025-07
 (https://media.sailing.org/sailing/wp-content/uploads/2025/07/31104846/WS-Case-Book-2025-2028-v2025-07.pdf); "p." is the PDF page.
 
+Twelve covered Cases are also kept as data, for the Rules trainer and their tests alike: src/rules/cases.ts (7, 11, 13, 14,
+15, 23, 25, 27, 43, 53, 92, 105), sailed through the engine in tests/rules-cases-data.test.ts.
+
 Every Case whose rules-referred list touches Part 2 (rules 10–24, 43, 44), marks and obstructions (18–20), starting and the course
 (28–31), or the Definitions those use. Cases are taken from each Case's own header; prose citations aren't counted.
 
@@ -37,7 +40,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 23 | 109 | 10, 19 | S runs between PL and PW: both P boats broke 10; rule 19 doesn't apply | covered |
 | 24 | 111 | 11, 12, 15 | B overlaps to leeward from astern close to A's stern: A must luff promptly; contact then is B's (15) | partly (whether A responded promptly) |
 | 27 | 117 | 13, 15 | AS tacks right in front of BP: AS broke 13 and 15 | covered (finding 4, fixed) |
-| 30 | 123 | 12, 19 | B astern blankets A, A gybes unintentionally: B broke 12 | partly (the unintended gybe) |
+| 30 | 123 | 12, 19 | B astern blankets A, A jibes unintentionally: B broke 12 | partly (the unintended jibe) |
 | 43 | 142 | 10, 13, 15, 19.2(b) | S tacks near a bank, P sails on: P broke 10; 19.2(b) and 20 don't apply | covered |
 | 46 | 147 | 11, 16.1, 17 | L luffs to her proper course after a leeward overlap from astern: W broke 11 | partly (proper course) |
 | 50 | 153 | 10 | No contact, S bore away for fear of it: P broke 10 | partly (only as a forced swerve) |
@@ -60,7 +63,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 
 | Case | p. | Rules | The Case's answer | Status |
 |---|---|---|---|---|
-| 2 | 77 | 12, 15, 18.2(a)(2) | B, clear astern, reached the zone first while A was outside it: A owes B mark-room and broke 12 and 18.2(a)(2) | covered, gybes included (finding 3, fixed) |
+| 2 | 77 | 12, 15, 18.2(a)(2) | B, clear astern, reached the zone first while A was outside it: A owes B mark-room and broke 12 and 18.2(a)(2) | covered, jibes included (finding 3, fixed) |
 | 12 | 93 | 11, 18.2(a)(1) | Overlapped when the first reached the zone, on courses 90° apart: OL broke 18.2(a)(1) | covered |
 | 15 | 99 | 12, 13, 18.2(a)(2), 18.2(b) | A clear ahead at the zone, upwind: B keeps clear and gives mark-room; once A tacks, 18.2(a) ends and B has right of way (13) | covered |
 | 21 | 105 | Mark-Room, Room | How much space mark-room is | not modeled (a judgment) |
@@ -69,7 +72,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 | 26 | 115 | 10, 14, 18.1(a) | Boats leaving the mark on different sides: no rule 18; P broke 10 | partly (one course: both boats always leave a mark on the same side) |
 | 59 | 167 | 18.2(a)(2) | D outside the zone when E reached it: D owes E mark-room | covered |
 | 63 | 172 | 18.2(a), 43.1(b) | C takes space freely given inside B: no breach | partly |
-| 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then gybes at the mark: no breach; P broke 10 | partly (proper course) |
+| 75 | 185 | 10, 16.1, 18.4 | S inside luffs, then jibes at the mark: no breach; P broke 10 | partly (proper course) |
 | 81 | 195 | 13, 15, 18.2(b) | A, clear ahead at the zone, tacks to round and B hits her: A broke 13 | covered |
 | 93 | 215 | 15, 16.1, 18.3 | W tacks in the zone; L overlaps from astern and luffs at once: L broke 15 and 16.1 | covered (finding 1, fixed) |
 | 95 | 218 | 18.1(a)(1), 18.3, 31 | Jagga tacks to windward of Freebird in the zone and luffs her onto the mark: Jagga broke 18.3(b) and 11 | covered: Jagga's 11 (18.3(b)'s mark-room is met by rule 11 here: she's to windward of the inside boat); Freebird's touch exonerated (43.1(b): forced onto the mark by Jagga's breach, tests/sim.test.ts) |
@@ -122,7 +125,7 @@ fouler per incident), damage, and the right-of-way boat's own rule 14 breach.
 Order of work: no published counts of protests by rule were found (US Sailing, RYA, World Sailing, club logs searched, 13 Nov 2026). The qualitative guidance found: US Sailing's rule 18 notes (ussailing.org/wp-content/uploads/2024/12/18.2a2.pdf) name port-tackers tacking into the windward mark's zone near starboard boats on the layline as a frequent source of conflict, and US Sailing's rule 10 notes call no-contact port/starboard protests "very common"; coaching articles put most incidents at mark roundings and the start. So: the windward mark (18.3, 13), leeward marks (18.2), the start (11, 15, 16), then obstructions (19). The Cases added in that order: 25, 95, 14, 125, 117.
 
 - Covered, the test reaching the Case's answer: 24 (2, 6, 7, 9, 11, 12, 13, 14, 15, 23, 25, 27, 28, 43, 53, 59, 81, 92, 93, 95, 101, 105, 117, 125).
-- Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the gybe, found while checking
+- Findings, the engine answering differently: none. Findings 1 (Case 93), 2 (Case 105), 3 (the jibe, found while checking
   Case 2) and 4–6 (Cases 27, 53, 101) are fixed.
 - Partly: 36.
 - Not modeled: 28.
@@ -152,21 +155,21 @@ start apart (`clean`): an opening contact starts the 6 s incident cooldown and w
    boat, reacting in 1 s, have turned away from where they were when the luff began? docs/ROOM-TO-RESPOND.md. 16.2 stays
    stricter: on a beat any bear-away that makes the ducking boat respond at once). **Case 105 (rule 16.1): the engine calls any turn toward the other boat a 16.1 breach, without asking whether she had room to
    keep clear.** Running on opposite tacks after a long time side by side, starboard luffs; port doesn't respond, though she could
-   have kept clear (by gybing), and they touch. The Case: port broke 10; starboard didn't break 16.1, because port had room. The
+   have kept clear (by jibing), and they touch. The Case: port broke 10; starboard didn't break 16.1, because port had room. The
    engine (src/rules/pairs.ts `turnedToward`): a right-of-way boat that turned 12° or more toward the other within 3 s before the
    contact broke 16.1, whatever the other boat could have done. 16.1 asks only that she "give the other boat room to keep clear":
-   a fix would judge that room (the keep-clear boat's distance and time to respond against how fast she could turn or gybe away),
+   a fix would judge that room (the keep-clear boat's distance and time to respond against how fast she could turn or jibe away),
    not the turn alone. Test: Case 105 (`it.fails`).
-3. **Fixed** (headToWindT, set by physics.ts only on a tack; read by 18.2(b), 18.2(d), 18.3 and rule 20's hails). **A gybe counted as passing head to wind (18.2(b), 18.3, 13).** The boats' `lastTackT` (src/rules/types.ts: "race time she last
-   passed head to wind") is set by src/boat/physics.ts on any change of tack, gybes too. So a boat entitled to mark-room under
-   18.2(a) that gybes in the zone loses it (src/rules/pairs.ts: 18.2(b) is taken as having happened), where 18.2(b) ends it only
-   when she "passes head to wind or leaves the zone"; and a gybe from port to starboard in the zone of a mark left to port starts
-   rule 18.3, which is about passing head to wind. It bites at leeward and gybe marks, so Cases 2, 59 and 75 are only right while
-   nobody gybes. Worse, at a leeward mark left to port a gybe from port to starboard in the zone starts 18.3 and makes the gybing boat
+3. **Fixed** (headToWindT, set by physics.ts only on a tack; read by 18.2(b), 18.2(d), 18.3 and rule 20's hails). **A jibe counted as passing head to wind (18.2(b), 18.3, 13).** The boats' `lastTackT` (src/rules/types.ts: "race time she last
+   passed head to wind") is set by src/boat/physics.ts on any change of tack, jibes too. So a boat entitled to mark-room under
+   18.2(a) that jibes in the zone loses it (src/rules/pairs.ts: 18.2(b) is taken as having happened), where 18.2(b) ends it only
+   when she "passes head to wind or leaves the zone"; and a jibe from port to starboard in the zone of a mark left to port starts
+   rule 18.3, which is about passing head to wind. It bites at leeward and jibe marks, so Cases 2, 59 and 75 are only right while
+   nobody jibes. Worse, at a leeward mark left to port a jibe from port to starboard in the zone starts 18.3 and makes the jibing boat
    keep clear. A fix: a separate head-to-wind time, set in physics.ts only when the change of tack is through the wind (her TWA under
-   90°), used by 18.2(b), 18.3 and 18.2(d)'s "tacker" (ovStart); rule 15's "just tacked" and the rest keep lastTackT, since a gybe
+   90°), used by 18.2(b), 18.3 and 18.2(d)'s "tacker" (ovStart); rule 15's "just tacked" and the rest keep lastTackT, since a jibe
    too can give the other boat right of way. physics.ts is Deep Physics'.
-   Test: "Case 2, with the gybes" (`it.fails`).
+   Test: "Case 2, with the jibes" (`it.fails`).
 4. **Fixed.** **Case 27 (rules 13, 15): rule 15's grace goes to the wrong boat when the boat ahead tacks.** AS, clear ahead and to leeward of BP
    on port, tacks; BP, faster, hits her while she is still turning. The Case: AS broke 13 (and 15). The engine: BP, under 15. In
    src/rules/pairs.ts the grace is given whenever right of way passes and the boat that had been keeping clear under 12 is the one

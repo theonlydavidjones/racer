@@ -34,7 +34,7 @@ export type Command =
   | { k: 'lash'; on: boolean }
   /** Take a line yourself (it stays where it is until you work it), or give it back to the crew. */
   | { k: 'line'; key: LineKey; mine: boolean }
-  /** Auto-trim: every line, both jib cars and the pole back to the crew. */
+  /** Hand Back (the band's tab): every line and both jib cars back to the crew (the pole stays yours). */
   | { k: 'allToCrew' }
   /** Move the lazy jib car (taking the cars): fore–aft and in–out steps. */
   | { k: 'lazyCar'; fore: number; ins: number }
@@ -50,7 +50,7 @@ export type Command =
   | { k: 'lazyCarTo'; fore: number; ins: number }
   /** Where the crew sit: your choice across and fore and aft (null: theirs), or null to put them back on auto. */
   | { k: 'crewPlace'; place: { across: PlaceAcross | null; fore: PlaceFore | null } | null }
-  /** Set or stow the whisker pole (it's yours until Auto-trim). */
+  /** Set or stow the whisker pole (always yours: your call only). */
   | { k: 'pole'; want: boolean }
   /** Strike or hoist the ensign. */
   | { k: 'ensign'; struck: boolean }
@@ -70,11 +70,13 @@ export type Command =
   | { k: 'motor'; op: 'throttle'; v: number }
   | { k: 'castOff' }
   | { k: 'pushOff' }
+  /** Coming in to a berth: lines ready (again: stand down), or let go her lines lying along a dock (sim/world.ts). */
+  | { k: 'lines' } | { k: 'letGo' }
   | { k: 'hail' }
   | { k: 'sendHome' }
   | { k: 'moveHere'; p: Vec; name: string }
   | { k: 'dest'; p: Vec; name: string }
-  | { k: 'retire'; why?: string }
+  | { k: 'retire'; why?: string; afterFinish?: boolean }
   /** Take a penalty (by boat id): after an incident's replay. */
   | { k: 'penalty'; boat: number }
   /** New conditions for the sail that's running (the conditions panel from the pause menu). */
@@ -117,7 +119,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       takeLine(u, 'car'); moveLazyCar(u, c.fore - from.fore, c.ins - from.ins); return;
     }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
-    case 'pole': u.poleWant = c.want; u.poleMine = true; return;
+    case 'pole': w.poleCall(c.want); return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
     case 'sail': w.setSail(c.sail, c.up); return;
@@ -137,12 +139,14 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'castOff': return w.castOff();
     case 'pushOff': return w.pushOff();
+    case 'lines': return w.linesReady();
+    case 'letGo': return w.letGoLines();
     case 'hail': w.userHail(); return;
     case 'sendHome': return w.sendHome();
     case 'moveHere': return w.moveHere(c.p, c.name);
     case 'dest': w.setDest(c.p, c.name); return;
-    case 'retire': return w.retire(c.why);
-    case 'penalty': w.assignPenalty(w.boats[c.boat]); return;
+    case 'retire': return w.retire(c.why, c.afterFinish);
+    case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
     case 'settings': Object.assign(w.settings, c.patch); return;
     case 'logNote': w.log?.note(c.note); return;

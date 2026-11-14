@@ -7,7 +7,7 @@ import { ghostGap, ghostsFor, loadGhost, setupKey, type Ghost } from './replay/g
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { loadLog, type LogEntry } from './boat/logbook';
-import { inBasin } from './geo/marina';
+import { harborAt, inBasin } from './geo/marina';
 import { HULL_COLORS, BRIGHT_FINISH, sailNo } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
@@ -27,7 +27,7 @@ import type { Boat, LineKey } from './boat/boat';
 import { CONDITION_KEYS } from './sim/world';
 import { WorkerHost, type SimHost, type SimView } from './sim/host';
 import type { Command, CtlKey } from './sim/commands';
-import { POLE, byHand, linesByHand } from './boat/physics';
+import { byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
 import { ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
@@ -78,6 +78,8 @@ const ctx = {
   get DRILL_FROM() { return DRILL_FROM; },
   get S() { return S; },
   get beginRace() { return setup.beginRace; },
+  get beginLesson() { return setup.beginLesson; },
+  get openLessons() { return setup.openLessons; },
   get drillRuns() { return drillRuns; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
@@ -278,7 +280,7 @@ function handle(e: SimEvent): void {
 
 let lastClip: ReplayClip | null = null;
 /** This race's rule incidents, for the race replay (by Moment.ref). */
-let incidentClips: { clip: ReplayClip; title: string; what: string }[] = [];
+let incidentClips: { clip: ReplayClip; title: string; what: string; t?: number }[] = [];
 function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): void {
   setControlsIdle();
   const user = A.isUser ? A : B, other = A.isUser ? B : A, youFault = inc.fouler.isUser;
@@ -303,15 +305,15 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   // boat breaking a rule of Part 2 isn't penalized for it, except rule 14 with injury or serious damage, and rule 23.1)
   const preamble = !!inc.notRacing;
   $('rPen').textContent = preamble ? `No penalty: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing${w.cancelled ? ' (racing was called off)' : ''}. The right-of-way rules still apply between boats out here, but a boat not racing isn't penalized for breaking them (Part 2 preamble).` : notRacing ? `No turns: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing, and a turns penalty is only for an incident while racing (Rule 44.1). ${youFault ? `${other.name} may protest you` : `You may protest ${inc.fouler.name}`} instead.` : exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
-    ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a gybe (Rule 44.2).`
-    : `${other.name} takes a ${turns} penalty.`;
+    ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a jibe (Rule 44.2).${w.protestsOn ? ` Skip them and ${other.name} may protest.` : ''}`
+    : w.protestsOn ? `${other.name}'s ${turns} penalty is theirs to take (Rule 44.1). To protest, hail "Protest!" now (${keymap.label('hail')}).` : `${other.name} takes a ${turns} penalty.`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
   pendingPenalty = exonerated || notRacing || preamble ? null : inc.fouler;
   lastClip = clip;
   if (w.log) {
     const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
     send({ k: 'logNote', note: { key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length } });
-    incidentClips.push({ clip, title, what: ex.what });
+    incidentClips.push({ clip, title, what: ex.what, t: w.t });
   }
   $('replay').hidden = false;
   replayView.play(w, clip);
@@ -495,7 +497,7 @@ const band = new SailBand({
   hold: (k, d) => { if (d == null) delete btnCmd[k]; else btnCmd[k] = d; applyHeld(); },
   changed: () => showTrimOwner(),
   toast: (m, ms) => toast(m, ms),
-  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
+  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Hand Back: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
@@ -592,6 +594,7 @@ $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLEleme
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(dt: number): void {
   if (!w.running) { $('coachTip').classList.remove('on'); return; }
+  if (w.lesson) { lessonTick(); return; }
   const u = w.user;
   if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
   coachT += dt; if (coachT < 0.5 && coachShown) { tipFade(); return; }
@@ -610,6 +613,23 @@ function coachTick(dt: number): void {
   if (open) coachTipUntil = 0;
   tipFade();
   if (!$('coachPanel').hidden) renderCoach();
+}
+/** A lesson (sim/lessons.ts): its one cue in the coach's own places (the trim panel's headline, and on the water for a few
+ * seconds when it's new), with how far through the check you are; passed, it's kept with your settings. */
+let lessonCue = '', lessonOf: unknown = null;
+function lessonTick(): void {
+  const L = w.lesson!, tip = $('coachTip');
+  if (L !== lessonOf) { lessonOf = L; lessonCue = ''; } // (a new lesson, or the same one again: its first cue shows)
+  $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
+  $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
+  if (L.cue !== lessonCue) {
+    lessonCue = L.cue;
+    if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
+    if (L.passed && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
+    // passed: a moment to see it, then paused on the lessons, this one ticked
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); setup.openLessons(); } }, 3000);
+  }
+  tipFade();
 }
 function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 function stepCar(k: 'carFore' | 'carIn', d: number): void {
@@ -653,8 +673,9 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant; send({ k: 'pole', want }); // (the pole is always yours: your call only)
-  toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  // (the pole is always yours: your call only. The race answers, setting it or saying why not: sim/commands.ts, so the
+  // message is what the crew actually do, never the page's guess from its mirror)
+  send({ k: 'pole', want: !w.user.poleWant });
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it
@@ -680,6 +701,25 @@ $('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
 function doHail(): void { if (w.running && !w.paused) send({ k: 'hail' }); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) send({ k: 'pushOff' }); }
+/**
+ * G, by the dock: push off when she's made fast (or being walked out); coming in, lines ready (again: stand down); lying to
+ * her lines along a dock, let go (sim/world.ts linesReady, letGoLines).
+ */
+function berthKey(): void {
+  const u = w.user; if (!w.running || w.paused) return;
+  if (u.docked || u.handled) pushOff(); else if (u.mooring?.lines.length) send({ k: 'letGo' }); else send({ k: 'lines' });
+}
+/** The Crew panel's dock row: shown in a harbor while cruising, its words by where she is in coming in. */
+function linesUi(): void {
+  const u = w.user, m = u.mooring, show = w.running && w.cruising && !u.docked && !u.handled && !!harborAt(u);
+  const row = $('tpDockRow'); if (row.hidden !== !show) row.hidden = !show;
+  if (!show) return;
+  const word = !m ? 'Lines ready' : m.phase === 'ready' ? 'Stand down' : m.lines.length ? 'Let go' : 'Lines ready';
+  const sub = !m ? (u.crew?.spec.crew.length ? 'G · crew steps off at the shrouds' : 'G · you step off with the midships line') : m.phase === 'ready' ? `G · ${m.cue ?? 'coming in'}` : 'G · cast off her lines';
+  if ($('bLinesW').textContent !== word) $('bLinesW').textContent = word;
+  if ($('bLinesS').textContent !== sub) $('bLinesS').textContent = sub;
+}
+$('bLines').onclick = berthKey;
 $('bPushOff').onclick = pushOff;
 /* Hoist or strike a sail (the crew does it at their pace: boat/physics.ts crewRig). */
 function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; send({ k: 'sail', sail, up: !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true) }); }
@@ -987,7 +1027,7 @@ addEventListener('keydown', e => {
     // the screens around the sailing (docs/UI-AUDIT.md §3 rule 5): Esc is back. A layer over one closes first, then a
     // sub-page (a member's page), then back to where you came from; on the start page, nothing
     if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
-    if (boatPanel.open) { $('boatPanel').querySelector<HTMLElement>('[data-act="done"]')?.click(); return; }
+    if (boatPanel.open) { boatPanel.requestDone(); return; }
     if (fleet.escape()) return;
     if (!$('raceChoose').hidden || !$('pastView').hidden || !$('setup').hidden || fleet.open) { nav.back(); return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
@@ -1022,7 +1062,7 @@ addEventListener('keydown', e => {
     case 'crewFwd': stepCrew('fore', 1); break;
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
-    case 'pushOff': pushOff(); break;
+    case 'pushOff': berthKey(); break;
     case 'navLights': { const off = !w.user.lightsOff; send({ k: 'lights', off }); toast(off ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break; }
     case 'jibHalyard': halyard('jib'); break;
     case 'mainHalyard': halyard('main'); break;
@@ -1149,7 +1189,7 @@ $('bShowReal').onclick = () => { showMin = null; showCond = null; setup.newGame(
 // mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
 $('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; setup.tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
-  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
+  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 'real', fog: 'real' });
   saveSettings(S); setup.paintSeg(); setup.setupChanged(() => { setup.courseCard(); setup.tideBox(); });
 };
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
@@ -1180,7 +1220,7 @@ function frame(now: number): void {
   if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
@@ -1243,8 +1283,9 @@ $('oppList').addEventListener('click', e => {
   S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);
   fleetChanged();
 });
-boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(S); setup.newGame(); boatSummary(); oppRows(); }, () => {
+boatPanel = new BoatPanel(S, save => { S.fleet = S.opponents.length; if (save) saveSettings(S); setup.newGame(); boatSummary(); oppRows(); }, saved => {
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
+  if (saved) fleet.flashSaved();
 });
 boatPanel.onSpin = () => (look.spin = !look.spin);
 $('bBoat').onclick = () => nav.go({ k: 'club' });
@@ -1295,6 +1336,7 @@ function showPlace(p: Place): void {
 }
 function openHome(): void { results.settleLog(openHomeNow); }
 function openHomeNow(): void {
+  if (boatPanel.open && boatPanel.edited) { boatPanel.leave(openHomeNow); if (boatPanel.edited) return; } // (her changes unsaved: Save or Discard first)
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
   setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
@@ -1340,7 +1382,7 @@ $('realRows').addEventListener('click', e => {
   const r = realRace(b.dataset.real!); if (!r) return;
   // the day as it was: its observed wind and NOAA's tide, the sea it made, the fleet's own start; the real boats that started
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.id });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.id });
   replayPin = null;
   S.opponents = realFleetIds(r, S.boat.sails.number, MAX_OPPONENTS);
   S.fleet = S.opponents.length;
@@ -1398,7 +1440,7 @@ const liveBoat = (sail: string) => {
 function sailSeason(id: string, no: number): void {
   const series = seasonById(id), r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.realId ?? undefined });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.realId ?? undefined });
   replayPin = null; ghostNext = null;
   S.opponents = [...series.fleet]; S.fleet = S.opponents.length;
   if (!S.boat.slip) S.raceFrom = 'water';
@@ -1474,7 +1516,8 @@ $('pastRows').addEventListener('click', e => {
   ghostNext = g && en.setup && g.key === setupKey(en.setup) ? g : null;
   // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
   // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
-  if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  // (a race saved before On-the-water judging was umpired)
+  if (en.setup) Object.assign(S, { windTurn: 0, judging: 'umpired' }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
@@ -1501,7 +1544,7 @@ function adjustUi(): void {
     if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = k === 'windTurn' ? 'as usual' : 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
   }
   if (S.current !== 'real') real.push('current');
-  if (S.rain) real.push('rain');
+  if (typeof S.rain === 'number' && S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
   const names: Record<string, string> = { windKt: 'wind speed', windTurn: 'wind turned', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');
