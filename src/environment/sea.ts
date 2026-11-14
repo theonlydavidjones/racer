@@ -91,10 +91,10 @@ const fineHarbor = (p: Vec): Harbor | null => harborAt(p) ?? HARBORS.find(h => p
  * of the fine map (`out`), from where they're open water again.
  */
 function basinRay(p: Vec, from: number, H = fineHarbor(p)!): { d: number; out: Vec | null } {
-  const u = V(from), m = wallMap(H);
+  const u = V(from), m = wallMap(H), q = { x: 0, y: 0 }; // (one point walked along the ray, not one every 2 m: walled only reads it)
   for (let d = 2; d < 4000; d += 2) {
-    const q = { x: p.x + u.x * d, y: p.y + u.y * d };
-    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: q };
+    q.x = p.x + u.x * d; q.y = p.y + u.y * d;
+    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: { x: q.x, y: q.y } };
     if (walled(H, q)) return { d, out: null };
   }
   return { d: 4000, out: null };
