@@ -44,7 +44,7 @@ Nothing new on screen. The marks go on what's already there:
    - The target is a teal band on the heading tape: the headings that put her on that point, from the real wind, ◆ at its
      middle.
    - The windex's point word is amber while she's off it.
-3. **Holding it** (`3-hold.jpg`). In the band, the line says what to hold ("hold it, both telltales streaming"). The fill
+3. **Holding it** (`3-hold.jpg`). In the band, the line says what to hold ("hold it: the jib's luff telltales streaming, windward and leeward"). The fill
    runs along its foot over the 15 s, and the windex word turns green.
 4. **Stuck** (`4-stuck.jpg`). After 20 s with no progress, the help:
    - a dashed teal way from her heading to the band on the tape;
@@ -87,3 +87,30 @@ Questions for the owner:
 - the stuck delay (20 s?);
 - ½× by default, or only offered;
 - whether the start card shows on every attempt, or only the first.
+
+## The points of sail on the water (`6-rose-before.jpg`, `7-rose-after-shift.jpg`)
+
+The owner, 14 Nov 2026: "in-situ wind indication … showing on the water where the wind is and the points of sail …
+if it could move with a wind shift to help teach the relativity of it all."
+
+- **What it is.** A rose of sectors flat on the water round her, 6–18 m out, laid out from the **true** wind where she
+  is, on both tacks:
+  - in irons (the no-go, faint red);
+  - close-hauled, close reach, beam reach, broad reach and run, from the lesson's own bands, close-hauled from her own
+    beat angle.
+
+  WIND chevrons come in from upwind beyond it.
+- **How the sectors are marked:**
+  - the sector her heading is in is lit amber, with its name at the rim;
+  - the lesson's target is teal (`--target`), named too;
+  - the rest show only as thin white lines between them, so the water shows through.
+- **It turns with every shift.** In the pair, her compass course is held at 295° and the wind backs 18° (190° → 172°).
+  The whole rose swings: she goes from a beam reach to a broad reach without touching the helm, and the teal close-hauled
+  sector moves off to the side. That's the relativity lesson: the point of sail is the angle to the wind, not a heading.
+- **When it shows.** In lessons, on by default. In ordinary sailing, off, but a layer the player can switch on in the
+  inset map's layer row (beside the others there), and a key in the Keys list. No new button.
+- **Building it.** The prototype is `render/windRose.ts` on branch design/wind-rose; the stills are from it.
+  - It's drawn as a sheet just above the water. Close to the hull the waves, raised in the water's own shader, cover
+    it, so in the stills it shows from about 10 m out.
+  - Built, it's drawn in the water's shader (a decal the waves carry), right up to her hull. The words at the rim are
+    in it too, out of frame in these stills.
