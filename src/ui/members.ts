@@ -71,6 +71,9 @@ function seat(m: Member, boats: BoatSpec[]): { line: string; kind: 'skipper' | '
  */
 const SEAT_CREW: Record<'middle' | 'forward' | 'free', Attr[]> = { middle: ['trim', 'eyes', 'react'], forward: ['handling', 'fitness', 'react'], free: ['trim', 'handling', 'react'] };
 const SEAT_SKIPPER: readonly SkipperAttr[] = ['start', 'speed', 'tactics'];
+/** Your own card: you're the helm, and how you sail is yours, not a rating, so it shows the ratings your page has, the
+ * crew's, three that matter at the helm too (the sails' trim, the boat's handling, and holding up at the start). */
+const YOUR_CARD: Attr[] = ['trim', 'handling', 'composure'];
 
 const bar = (label: string, v: number) =>
   `<span>${label}</span><div class="mbar"><i style="width:${Math.round(v * 100)}%"></i></div><span>${Math.round(v * 100)}</span>`;
@@ -79,8 +82,8 @@ const bar = (label: string, v: number) =>
 export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
   const card = (m: Member) => {
     const st = seat(m, boats);
-    const bars = st.kind === 'skipper' ? SKIPPER_UI.bars(m, SEAT_SKIPPER)
-      : `<div class="mbars">${CREW_UI.filter(([a]) => SEAT_CREW[st.kind as 'middle'].includes(a)).map(([a, l]) => bar(l, attrOf(m, a))).join('')}</div>`;
+    const crewBars = (as: Attr[]) => `<div class="mbars">${CREW_UI.filter(([a]) => as.includes(a)).map(([a, l]) => bar(l, attrOf(m, a))).join('')}</div>`;
+    const bars = m.id === YOU ? crewBars(YOUR_CARD) : st.kind === 'skipper' ? SKIPPER_UI.bars(m, SEAT_SKIPPER) : crewBars(SEAT_CREW[st.kind]);
     return `<button type="button" class="mcard" data-f="member" data-v="${esc(m.id)}"><b>${esc(m.name)}</b><span class="msub">${st.line} · ${fmtHeight(m.h)}, ${Math.round(m.w / LB)} lb</span>${bars}</button>`;
   };
   // (you first, then your boats' crews by seat, then the rest of yours; the club's own after)
