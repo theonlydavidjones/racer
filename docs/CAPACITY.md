@@ -496,7 +496,8 @@ arithmetic in the cache.
 
 **The method** (scripts/check/perf-pair.mjs): load two versions of the sim in one Node process (vite's runnerImport, two
 module graphs), sail them by turns in 10-second pieces, A, B, B, A, and time each piece on this thread's CPU clock.
-The host's drift lands on both alike. The second version loaded runs about 0.4% slower, so it runs twice, each version
+The host's drift lands on both alike. The second version loaded runs slower, by 0.4% on a quiet host and up to 3% on a busy one (14 Nov: main against v168,
+0.987–1.015 with main first, 1.022–1.047 with v168 first), so it runs twice, each version
 loaded first once, three races each, and the result is the geometric mean of the six ratios (about ±0.65%). The other version's `src/`
 comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from origin first if the clone hasn't got it.
 
@@ -510,6 +511,10 @@ comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from o
 
 **Two uses:**
 - **The PR gate:** `node scripts/check/perf-pair.mjs`, against origin/main. A PR that touches the step may be at most 1.5% slower.
+- **AI and rules PRs:** `--ai`, ten races (seeds 1–5 at 12 and 22 kt), each once, alternating the load order, the
+  geometric mean. A change to how boats sail changes the race: on the perf race's seed alone #276 read 1.023 against
+  turning, but over the ten its ratios ran 0.986–1.067 and their mean was 1.032; equal fouling in both versions still
+  cost 2–7%, so it was the code, not a more crowded race (14 Nov 2026).
 - **The owner's budget:** perf.test, and `--budget`, against v168 (425a5eb, the commit 43.1 was set on). v168 measured
   42.31 in the old units, so 43.1 is v168 × 43.1 / 42.31 = **v168 × 1.019**: the same budget, measured without the drift.
 
