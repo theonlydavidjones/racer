@@ -842,7 +842,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     const z = zs[i];
     // (aft of the thwart, the side they're sitting on until the physics has them clearly on the other: aftSide)
     if (a && a.z > THWART.z + 0.05 && a.z < COCK1 + 0.2) {
-      if (f.aftSide == null || Math.abs(x) > AFT_MID) f.aftSide = Math.sign(x) || windward;
+      // (clearly on one side by the physics, that side; about the middle, where the pose seats them by the wind, the side
+      // they're sat on: kept from before they came to the middle, it was the other side from the deck they sat on, and
+      // a step outboard sent them round by both side decks to the seat they were already beside)
+      if (Math.abs(x) > AFT_MID) f.aftSide = Math.sign(x);
+      else if (f.aftSide == null || Math.abs(x) <= 0.05) f.aftSide = Math.sign(f.cur?.hip.x ?? 0) || Math.sign(x) || windward;
       x = aftSide(f, x, a.z);
     } else f.aftSide = undefined;
     const dir = track(f, x, a?.z ?? z, sdt);

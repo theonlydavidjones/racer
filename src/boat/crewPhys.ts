@@ -600,6 +600,9 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
       // Followed out at their reaction time from that, they leaned out and in with every wave on a Bay beat in 14 kt; the
       // waves' heel taken out of the response instead, by a lag on the move, lagged every puff as well: physics review)
       h.want = h.want == null ? t.arm : h.want + (t.arm - h.want) * Math.min(1, step / HOLD.wave);
+      // (but a puff that comes at once, more than the dead band's worth, or one filling in after the move out for it
+      // (h.push, HOLD.urgent), straight through: a sailor's hiking harder within a second of the heel)
+      if (t.arm > h.want + dead || (h.push && h.since < HOLD.last && t.arm > h.want)) h.want = t.arm;
       const tau = h.want > h.arm ? reactTime(ppl[i]) : HOLD.body;
       h.arm = Math.min(h.arm + (h.want - h.arm) * Math.min(1, step / tau), maxOf(i)); h.z = t.z; t.arm = h.arm; return; // (no further out than they can reach now)
     }
