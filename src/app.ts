@@ -959,8 +959,10 @@ let chartDest: unknown = null;
 /** Cruise setup: the start and the destination, picked on the chart (ui/setupChart.ts); each pick rebuilds the world. */
 const cruisePicks: SetupPicks = {
   world: () => w,
-  get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); setup.setupChanged(setup.tideBox, 0); } // (the tide graph's Arrive moves with them; at once, for the chart that redraws from it)
+  get: which => (S.mode !== 'sail' ? S.raceSpot ?? '' : which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
+  // (racing, Start: Somewhere else: the chart picks her start only)
+  set: (which, id) => { if (S.mode !== 'sail') S.raceSpot = id; else if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); setup.setupChanged(S.mode !== 'sail' ? () => { setup.courseCard(); setup.tideBox(); } : setup.tideBox, 0); }, // (the tide graph's Arrive moves with them; at once, for the chart that redraws from it)
+  race: () => S.mode !== 'sail'
 };
 setupChart = new SetupChart(hud, cruisePicks);
 /** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
@@ -1416,7 +1418,7 @@ const fleet: Fleet = new Fleet(S, {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
     if (mode === 'cruise') { S.mode = 'sail'; S.sailFrom = fromSlip && b.slip ? 'slip' : S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom; }
-    else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
+    else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : S.raceFrom === 'slip' ? 'water' : S.raceFrom; }
     saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
   seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons(), liveBoat) : ''; },
@@ -1506,7 +1508,7 @@ $('realRows').addEventListener('click', e => {
   replayPin = null;
   S.opponents = realFleetIds(r, S.boat.sails.number, MAX_OPPONENTS);
   S.fleet = S.opponents.length;
-  if (!S.boat.slip) S.raceFrom = 'water';
+  if (!S.boat.slip && S.raceFrom === 'slip') S.raceFrom = 'water';
   saveSettings(S); boatSummary(); oppRows(); setup.crewRows(); setup.paintSeg();
   $('raceChoose').hidden = true;
   setup.beginRace();
@@ -1574,7 +1576,7 @@ function seasonApply(series: Series, no: number): boolean {
     chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.realId ?? undefined });
   replayPin = null; ghostNext = null;
   S.opponents = [...series.fleet]; S.fleet = S.opponents.length;
-  if (!S.boat.slip) S.raceFrom = 'water';
+  if (!S.boat.slip && S.raceFrom === 'slip') S.raceFrom = 'water';
   saveSettings(S); boatSummary(); oppRows(); setup.crewRows(); setup.paintSeg();
   seasonPick = { series, no, burgee: burgeeUrl() };
   return true;
@@ -1672,7 +1674,7 @@ $('pastRows').addEventListener('click', e => {
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
-  if (!S.boat.slip) S.raceFrom = 'water';
+  if (!S.boat.slip && S.raceFrom === 'slip') S.raceFrom = 'water';
   { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
   saveSettings(S); boatSummary(); oppRows(); setup.crewRows(); setup.paintSeg();
   $('raceChoose').hidden = true;

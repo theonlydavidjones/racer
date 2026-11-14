@@ -183,7 +183,7 @@ function outing(b: BoatSpec, isUser: boolean): Omit<LogEntry, 'kind' | 'title'> 
   };
 }
 /** The settings a race was sailed in, kept with your entry so you can sail it again (Run a past race). */
-const REPLAY_KEYS = ['tideTime', 'opponents', 'realRace', 'raceLength', 'windKind', 'windKt', 'windDir', 'windTurn', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'judging', 'bias', 'raceFrom', 'crew', 'sea'] as const;
+const REPLAY_KEYS = ['tideTime', 'opponents', 'realRace', 'raceLength', 'raceSpot', 'windKind', 'windKt', 'windDir', 'windTurn', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'judging', 'bias', 'raceFrom', 'crew', 'sea'] as const;
 function raceSetup(): RaceSetup {
   const s: Record<string, unknown> = { tideDate: app.w.raceDate };
   for (const k of REPLAY_KEYS) if (app.S[k] !== undefined) s[k] = structuredClone(app.S[k]);

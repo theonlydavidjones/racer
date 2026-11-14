@@ -13,6 +13,7 @@ import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
+import { place as getPlace } from '../sim/places';
 import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
 import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
@@ -159,9 +160,16 @@ function courseCard(): void {
     if (!sl && app.S.raceFrom === 'slip') app.S.raceFrom = 'water';
     app.S.raceFrom ??= 'water';
     // (racing only: cruising, she leaves her slip at the time you set, and there's no warning signal to be early for)
-    $('raceFromNote').textContent = app.S.mode !== 'sail' && app.S.raceFrom === 'slip' && app.w.fromSlip && app.w.startAt > app.S.seq * 60
-      ? `In her slip ${Math.round((app.w.startAt - app.S.seq * 60) / 60)} min before the warning signal, to sail out to the line.`
-      : '';
+    // somewhere else: a spot on the water picked on the chart (the cruise's, brought into this row), timed to sail to the line
+    const spot = app.S.mode !== 'sail' && app.S.raceFrom === 'spot';
+    if (spot) app.S.raceSpot ??= 'cityfront';
+    const lead = Math.round((app.w.startAt - app.S.seq * 60) / 60);
+    $('raceFromNote').textContent = app.S.mode === 'sail' || lead <= 0 ? ''
+      : app.S.raceFrom === 'slip' && app.w.fromSlip ? `In her slip ${lead} min before the warning signal, to sail out to the line.`
+        : spot && app.w.fromSpot ? `There ${lead} min before the warning signal, to sail to the line.` : '';
+    const wf = $('whereField');
+    if (!whereHome) { whereHome = document.createComment('whereField'); wf.before(whereHome); }
+    if (spot) { if (wf.parentElement !== $('raceFromBox')) $('raceFromNote').before(wf); } else if (wf.parentElement === $('raceFromBox')) whereHome.after(wf);
   }
   { // her slip, if she has one (Marina)
     const slip = slipById(app.S.boat.slip);
@@ -175,8 +183,8 @@ function courseCard(): void {
   }
   const cruise = app.S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
-  $('whereField').hidden = !cruise;
-  if (cruise) app.setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
+  $('whereField').hidden = !cruise && app.S.raceFrom !== 'spot';
+  if (!$('whereField').hidden) app.setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
   const sp = cruise ? null : app.seasonPick; // (a season race: its own name on the button, and its brief over the rows)
   $('bGo').textContent = cruise ? 'Cast off' : sp ? `Sail Race ${sp.no}` : 'Start the sequence';
   $('seasonBrief').hidden = !sp;
@@ -397,7 +405,8 @@ function drawHeads(): void {
     `<span class="t-group">${tile(initials(you), 'Helm', '#ffb627', { round: true })}${seat(0, 'Main')}${seat(1, 'Jib')}</span><span class="t-text">${kg ? `<span class="t-s">${kg} lb aboard</span>` : ''}</span>`);
   // where she starts: by the line (the default), or in her slip, said plainly so a choice kept from last time is seen
   { const sl = slipById(boat.slip), slip = S.raceFrom === 'slip' && !!sl;
-    set('start', '<span class="t-lab">Start</span>', `<span class="t-text"><span class="t-h">${slip ? `From her slip · ${esc(slipPlace(sl!))}` : 'By the line'}</span></span>`); }
+    const where = S.raceFrom === 'spot' ? `Somewhere else · ${esc(getPlace(S.raceSpot)?.name ?? 'pick a spot')}` : slip ? `From her slip · ${esc(slipPlace(sl!))}` : 'By the line';
+    set('start', '<span class="t-lab">Start</span>', `<span class="t-text"><span class="t-h">${where}</span></span>`); }
   // when: the day, and the gun (or when she leaves)
   const day = new Date(w.raceDate + 'T12:00');
   set('when', `<span class="t-date"><b>${day.getDate()}</b><small>${day.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</small></span>`,
@@ -468,6 +477,7 @@ const DOCKED = ['row-boat', 'row-when', 'condHead', 'condStrip', 'tideGraph', 'c
 const DOCKED_SEASON = ['row-course', 'row-when', 'condStrip', 'row-boat', 'row-start'];
 /** The rows a season race locks (the series sets them). */
 const LOCKED = ['course', 'fleet', 'when'];
+let whereHome: Comment | null = null; // (the cruise's Where field's own place, when it's lent to the Start row)
 const dockHome = new Map<string, Comment>();
 function dockSetup(view: 'setup' | 'drill' | 'season'): void {
   const here = view === 'drill' ? DOCKED : view === 'season' ? DOCKED_SEASON : [];

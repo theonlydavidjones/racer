@@ -62,7 +62,8 @@ export interface Settings {
   sailTo: string; // Just sail: where you're heading ('' = nowhere in particular)
   realRace?: string;
   insetView?: 'map' | 'nav'; // what the inset map shows cruising: the water round her, or the navigator's passage (chosen in the full chart's Layers menu) // a real past race being sailed (sim/realRaces.ts): its fleet raced as the real boats, your time set against theirs
-  raceFrom?: 'water' | 'slip'; // Race: start on the water by the line, or in her slip in time to sail out to it
+  raceFrom?: 'water' | 'slip' | 'spot'; // Race: start on the water by the line, in her slip, or at a spot on the chart, in time to sail to it
+  raceSpot?: string; // the spot for raceFrom 'spot': a place id, 'at:<lat>,<lon>' (sim/places.ts spotId)
   burgee?: string; // (older saves: your burgee, now in boat.flags)
   /** Your boats (boat/spec.ts), and the one you're sailing. `boat` is that one (the same object as its entry in `boats`). */
   boats: BoatSpec[];

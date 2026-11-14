@@ -187,6 +187,24 @@ export function slipLeadTime(slip: Slip, line: Vec): number {
 }
 
 /**
+ * Racing from a spot picked on the chart (the owner, 14 Nov 2026: "start in slip or somewhere else"): how long before the
+ * warning signal she starts there, to sail to the line. Her speed made good toward the line from the polar at the gun's
+ * wind: straight there on a reach; to windward or downwind, tacking or jibing at the polar's best angles, so her speed
+ * along the line of sight is the polar's VMG over the cosine of the angle off the wind. The distance is stretched by a
+ * tenth for the tacks or jibes and the current; two minutes are added to settle and get her going, and it's rounded up
+ * to the next 5 minutes (5 at least, two hours at most, as the slip's).
+ */
+export function spotLeadTime(p: Vec, line: Vec, windFrom: number, kt: number): number {
+  const d = Math.hypot(line.x - p.x, line.y - p.y), off = Math.abs(wrap(brg(line.x - p.x, line.y - p.y) - windFrom)); // 0 dead upwind … 180 dead downwind
+  const k = Math.max(kt, 1), beat = beatAngle(k), run = runAngle(k);
+  const v = off < beat ? polar(k, beat) * Math.cos(beat * D2R) / Math.max(0.2, Math.cos(off * D2R))
+    : off > run ? polar(k, run) * Math.cos((180 - run) * D2R) / Math.max(0.2, Math.cos((180 - off) * D2R))
+      : polar(k, off);
+  const min = (d * 1.1 / Math.max(0.3, v)) / 60 + 2;
+  return Math.min(120, Math.max(5, Math.ceil(min / 5) * 5)) * 60;
+}
+
+/**
  * How good each club boat's (generic AI) crew is, 0 novice … 1 expert (boat/crewPhys.ts): where they put their weight,
  * how quickly and how well they work the boat. Until the Yacht Club has crews of its own, a spread like a club fleet's.
  * Your own saved boats raced against you have a club-level crew.
@@ -373,6 +391,8 @@ export class World {
   arrivedT: number | null = null;
   /** You start in her slip (Cruise, or Race with time to sail out to the line). */
   readonly fromSlip: boolean = false;
+  /** Racing from a spot picked on the chart (settings.raceFrom 'spot'): where she starts, or null. */
+  readonly fromSpot: Vec | null = null;
   /** How far you've sailed, over the ground, m. */
   sailedM = 0;
 
@@ -409,7 +429,11 @@ export class World {
     this.homeSlip = slipById(settings.boat?.slip);
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
-    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
+    // or from a spot on the chart, on the water: long enough before the warning signal to sail from there to the line
+    const spot = !this.freeSail && opts.startAt == null && settings.raceFrom === 'spot' ? getPlace(settings.raceSpot)?.p ?? null : null;
+    this.fromSpot = spot && !onLand(spot) && !inBasin(spot) ? spot : null;
+    const lineAt = () => buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center;
+    this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, lineAt()) : this.fromSpot ? spotLeadTime(this.fromSpot, lineAt(), atGun.from, atGun.kt) : 0);
     this.t = -this.startAt;
     this.prepFlag = settings.prepFlag ?? 'P';
     this.sequence = this.freeSail ? [] : startSequence(settings.seq, this.prepFlag);
@@ -539,6 +563,13 @@ export class World {
       // in her slip, bow in (boats nose in here, never back in), made fast: push off to leave
       const slip = this.homeSlip!; p = { ...slip.p }; h = slip.heading; startStill = true;
       docked = { slip: slip.id };
+    } else if (isUser && this.fromSpot) {
+      // at the spot you picked, sailing: headed for the line where she can lay it, else close-hauled or on her best
+      // downwind angle on the tack nearer it, at the polar's speed
+      const kt = Math.max(this.windModel.kt, 1), wf = this.windModel.base, to = brg(this.center.x - this.fromSpot.x, this.center.y - this.fromSpot.y), off = wrap(to - wf);
+      const beat = beatAngle(kt), run = runAngle(kt), a = Math.abs(off), side = off < 0 ? -1 : 1;
+      const twa = a < beat ? beat : a > run ? run : a;
+      p = { ...this.fromSpot }; h = n360(wf + side * twa); v0 = polar(kt, twa);
     } else if (isUser && this.rounding) {
       // the mark-rounding drill: on the approach with the mark ahead (the owner: "there should be a mark in front of me"),
       // 200 m out on the starboard layline over the ground, the lane drawn in (app/drillCoach.ts). Her course through the
