@@ -129,9 +129,9 @@ function realLine(): string | undefined {
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; app.send({ k: 'pause', on: false }); };
 $('bRestart').onclick = () => { $('pause').hidden = true; app.beginRace(); };
-$('bSettings').onclick = () => { $('pause').hidden = true; app.openSetup(); };
+$('bSettings').onclick = () => { $('pause').hidden = true; app.toSetup(); };
 $('bAgain').onclick = () => { $('results').hidden = true; app.beginRace(); };
-$('bSet2').onclick = () => { $('results').hidden = true; app.openSetup(); };
+$('bSet2').onclick = () => { $('results').hidden = true; app.toSetup(); };
 
 
 /** The tactics debrief: what cost you time, most first, and your place at each mark. */
