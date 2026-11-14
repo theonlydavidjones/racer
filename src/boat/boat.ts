@@ -186,6 +186,10 @@ export interface Boat {
   gybeTo?: 'S' | 'P';
   /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
   turnCalledT?: number;
+  /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
+   * wind means the jibe; a tap doesn't (physics.ts gybeMeant). */
+  steerSince?: number;
+  steerWas?: number;
   /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
    * (physics.ts boomStep). Undefined while the sheet has it. */
   boomFree?: number;

@@ -80,10 +80,30 @@ describe('the main by the lee', () => {
 });
 
 describe('a gybe that\'s meant', () => {
-  it('the player turning her on round (5°/s): the crew hand the main across as her stern comes through the wind, no crash', () => {
+  // (the owner's ruling, 14 Nov 2026: the jibe key or a called turn; a steering key HELD as her stern passes the wind; not a
+  // tap; the tiller in your hand is literal)
+  const free = (b: Boat) => { (b as Boat & { handsOff?: boolean }).handsOff = true; };
+  it('the jibe key from a run: her crew hand the main across as her stern passes the wind, no crash', () => {
+    const b = running(12), t0 = tackTarget(b); b.turnDir = t0.dir; b.turnTarget = t0.target;
+    sail(b, 15);
+    expect(b.tack).toBe('S'); expect(b.boom).toBeLessThan(-40); expect(b.crashT).toBeUndefined();
+  });
+  it('a steering key held down as her stern passes the wind: meant, handed across within a few degrees, no crash', () => {
     const b = running(12); let across = NaN;
-    sail(b, 20, t => { b.h = (170 + Math.min(60, 5 * t)) % 360; b.turnRate = t < 12 ? 5 : 0; b.desired = b.h; if (isNaN(across) && b.boom < 0) across = b.h - 180; });
-    expect(b.tack).toBe('S'); expect(b.crashT).toBeUndefined(); expect(across).toBeGreaterThan(3); expect(across).toBeLessThan(15);
+    sail(b, 12, t => { b.steer = t < 8 ? 1 : 0; if (isNaN(across) && b.boom < 0) across = b.h - 180; });
+    expect(b.tack).toBe('S'); expect(b.crashT).toBeUndefined(); expect(across).toBeGreaterThan(3); expect(across).toBeLessThan(20);
+  });
+  it('taps of a steering key, nudging her 15° by the lee: not meant, the main stays where it lies', () => {
+    const b = running(12); free(b);
+    // (a fifth of a second every two seconds, until she's 15° by the lee; then left alone)
+    sail(b, 90, t => { const by = b.h - 180; b.steer = by < 15 && t % 2 < 0.2 ? 1 : 0; b.tiller = 0; if (by >= 15) { b.h = 195; b.turnRate = 0; } });
+    expect(b.h - 180).toBeGreaterThan(12); expect(b.tack).toBe('P'); expect(b.boom).toBeGreaterThan(60); expect(b.crashT).toBeUndefined();
+  });
+  it('steered slowly through by the tiller in your hand: literal, nobody jibes the main, and the wind takes it', () => {
+    const b = running(12); free(b); let rate = 0, n = 0;
+    sail(b, 150, () => { if (b.crashT != null) return; b.steer = 0; b.tiller = -0.04; rate += b.turnRate ?? 0; n++; });
+    expect(rate / n).toBeGreaterThan(0.2); expect(rate / n).toBeLessThan(2); // (a slow, steady turn to starboard)
+    expect(b.crashT).toBeDefined(); expect(b.tack).toBe('S');
   });
   it('the tiller pilot turned 30° across her stern: its turn is a called one, her crew jibe the main, no crash', () => {
     const b = running(12) as Boat & { handsOff?: boolean }, p = newPilot(); let across = 0, side = Math.sign(b.boom);

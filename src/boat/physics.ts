@@ -977,6 +977,8 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
 function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, sheets: boolean): void {
   const mainUp = b.rig?.mainUp ?? true;
   if (b.turnTarget != null) b.turnCalledT = t; // (a called turn under way: gybeMeant)
+  if (b.steer === 0) b.steerSince = undefined; else if (b.steerSince == null || b.steer !== b.steerWas) b.steerSince = t; // (how long a steering key has been held)
+  b.steerWas = b.steer;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176 && mainUp) tk = b.tack; // dead downwind: the tack she had, her main where it lies
   if (twa >= 90 && mainUp && tk !== b.tack) {
@@ -994,18 +996,19 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
 }
 
 /**
- * Is she being gybed on purpose, onto `to`? Then her crew bring the main across as her stern comes through the wind
- * (the boom handed over on the sheet, sailVisuals), as before. An AI boat never sails by the lee except to gybe; the
- * player's boat when a turn has been called (or was, within the last 3 s), or while her helm is taking her on round (turning further by the lee at
- * GYBE_TURN deg/s or more). Held steady by the lee, nobody touches the main: it stays until the wind takes it.
+ * Is she being jibed on purpose, onto `to`? Then her crew bring the main across as her stern comes through the wind
+ * (the boom handed over on the sheet, sailVisuals). An AI boat never sails by the lee except to jibe. On the player's
+ * boat (the owner's ruling, 14 Nov 2026): the jibe key or any called turn (and for 3 s after it ends: a turn called
+ * onto the other jibe ends only a few degrees past dead astern); or a steering key HELD down, KEY_HELD s or more, taking
+ * her on round as her stern passes the wind. A tap of a key isn't, and the tiller in your hand is literal: steered
+ * through by the tiller, or held steady by the lee, nobody touches the main, and it stays until the wind takes it.
  */
-const GYBE_TURN = 2;
+const KEY_HELD = 0.6;
 function gybeMeant(b: Boat, to: 'S' | 'P', t: number): boolean {
   if (!b.isUser) return true;
-  // (a called turn, and for a moment after she's reached its heading: a turn called onto the other gybe is a gybe
-  // called, though it ends only a few degrees past dead astern)
   if (b.turnCalledT != null && t - b.turnCalledT < 3) return true; // (tackStep keeps the time)
-  return (b.turnRate ?? 0) * (to === 'S' ? 1 : -1) >= GYBE_TURN; // (onto starboard she's turning to starboard: her stern through the wind, which comes round onto her starboard quarter)
+  // (onto starboard she's turning to starboard: her stern through the wind, which comes round onto her starboard quarter)
+  return b.steer === (to === 'S' ? 1 : -1) && b.steerSince != null && t - b.steerSince >= KEY_HELD;
 }
 
 /**
