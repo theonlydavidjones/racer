@@ -245,7 +245,7 @@ export const CLOSE_M = 4 * LOA;
  * compiling and throwing the result away, some 800 times in the first race after load on Bay East's waves branch (14 s
  * of the engine's compiler threads; docs/CAPACITY.md, "The compiler's thrown-away work"; scripts/check/deopt.cjs).
  * weatherHeld and carOff, given later and starting at 0, are declared undefined in makeBoat for the same reason; and
- * lastHitT and paddle (rule 42.3(h)'s contact time and the crutch), given mid-race, so a first bump doesn't add a field. (V8's
+ * lastHitT, paddle and the anchor's (rule 42.3(h)'s contact time, the crutch, the anchor and rule 22's flags), given mid-race, so a first bump doesn't add a field. (V8's
  * matter: Safari's engine keeps shapes its own way, and this costs it nothing.)
  */
 const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT'] as const;
@@ -606,7 +606,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, anchor: undefined, anchored: false, aground: false, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
