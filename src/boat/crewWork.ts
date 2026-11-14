@@ -187,7 +187,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const j = a.job; if (!j) return;
     // (a sheet that's no longer theirs, as the crew go forward and the helm takes the main: let go. A sheet follows the
     // wind, so it's never done; held, the bow hand at the mast kept the main, the helm the jib, and neither was trimmed)
-    if (sheetOf(j.line) && worker(j.line) !== i) { a.job = null; return; }
+    // (the jib held for the forward hand while they're at the cabin top is the middle crew's until they're back: worker)
+    if (sheetOf(j.line) && worker(j.line) !== i && ownerOf(j.line, n, c.spec, fwdL) !== i) { a.job = null; return; }
     // (placed by you: they leave a tweak they'd have to leave their place for, and work the dual-ended lines from there)
     if (waits.includes(j.line) && !j.big) { a.job = null; return; }
     if (placed && BOTH_SIDES.has(j.line)) j.station = null;
