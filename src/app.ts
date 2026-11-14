@@ -27,13 +27,12 @@ import type { Boat, LineKey } from './boat/boat';
 import { CONDITION_KEYS } from './sim/world';
 import { WorkerHost, type SimHost, type SimView } from './sim/host';
 import type { Command, CtlKey } from './sim/commands';
-import { POLE, byHand, linesByHand } from './boat/physics';
+import { byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
 import { ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
 installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said of her, her record)
 import { SailBand } from './ui/sailBand';
-import { poleRefused } from './ai/ai';
 import { WindLadder } from './render/windLadder';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
@@ -654,10 +653,9 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
 });
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant, why = want ? poleRefused(w.user) : null; // (the pole is always yours: your call only)
-  if (why) { toast(`Crew: no pole now, ${why}.`, 3000); return; } // (the race refuses it too: sim/commands.ts)
-  send({ k: 'pole', want });
-  toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  // (the pole is always yours: your call only. The race answers, setting it or saying why not: sim/commands.ts, so the
+  // message is what the crew actually do, never the page's guess from its mirror)
+  send({ k: 'pole', want: !w.user.poleWant });
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it

@@ -89,19 +89,23 @@ describe('your pole: your call only', () => {
     expect(u.poleWant).toBe(false); expect(u.pole).toBe('down');
   }, 60_000);
   // (the owner, v184: "pole out button isn't working": the tab showed from 140° true, where the crew refused it)
-  it('the Pole tab\'s call on a deep run, either gybe: the crew set it', () => {
+  it('cruising, the Pole tab\'s call on a deep run, either gybe: the crew say so and set it in their time', () => {
     for (const side of [1, -1]) {
       const { w, u } = deep(0, 0); for (let i = 0; i < 5 * 60; i++) { u.h = n360(u.ww.from + side * 165); w.step(DT); }
       expect(poleRefused(u)).toBeNull();
-      applyCommand(w, { k: 'pole', want: true });
-      for (let i = 0; i < 40 * 60; i++) { u.h = n360(u.ww.from + side * 165); w.step(DT); }
+      w.drainEvents(); applyCommand(w, { k: 'pole', want: true });
+      expect(w.drainEvents().some(e => e.type === 'toast' && /^Crew: setting the whisker pole/.test(e.msg))).toBe(true);
+      for (let i = 0; i < 20 * 60; i++) { u.h = n360(u.ww.from + side * 165); w.step(DT); }
       expect(u.pole, `side ${side}`).toBe('set');
     }
   }, 60_000);
   it('where the crew would refuse it, the tab isn\'t offered, and a call there sets nothing (and the page says why)', () => {
     const { w, u } = deep(142, 5);
     expect(poleRefused(u)).toMatch(/too high/);
-    applyCommand(w, { k: 'pole', want: true }); expect(u.poleWant).toBe(false);
+    w.drainEvents(); applyCommand(w, { k: 'pole', want: true }); expect(u.poleWant).toBe(false);
+    // (the race answers, not the page: never "setting" for a call the crew refuse)
+    const said = w.drainEvents().flatMap(e => e.type === 'toast' ? [e.msg] : []);
+    expect(said.some(m => /^Crew: no pole now, she's too high/.test(m))).toBe(true); expect(said.some(m => /setting/.test(m))).toBe(false);
     for (let i = 0; i < 10 * 60; i++) { u.h = n360(u.ww.from + 142); w.step(DT); }
     expect(u.pole).toBe('down');
     // (the rest of the rules refuse a new call too: here the jib down)

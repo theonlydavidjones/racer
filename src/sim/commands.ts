@@ -19,7 +19,6 @@ import type { Settings } from '../settings';
 import type { Moment } from './debrief';
 import type { Vec } from '../core/math';
 import type { World } from './world';
-import { poleRefused } from '../ai/ai';
 
 /** A line you can work (the jib cars are moved apart: lazyCar). */
 export type CtlKey = Exclude<keyof Controls, 'car'>;
@@ -120,7 +119,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       takeLine(u, 'car'); moveLazyCar(u, c.fore - from.fore, c.ins - from.ins); return;
     }
     case 'crewPlace': if (u.crew) u.crew.place = c.place ? { across: c.place.across, fore: c.place.fore } : undefined; return;
-    case 'pole': if (c.want && poleRefused(u)) return; u.poleWant = c.want; u.poleMine = true; return; // (a call the crew refuse: the page says why, app.ts togglePole)
+    case 'pole': w.poleCall(c.want); return;
     case 'ensign': u.ensignStruck = c.struck; return;
     case 'lights': u.lightsOff = c.off; return;
     case 'sail': w.setSail(c.sail, c.up); return;

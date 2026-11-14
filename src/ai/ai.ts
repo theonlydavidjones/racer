@@ -875,7 +875,7 @@ export function poleMustCome(b: PoleBoat, highS = 0): string | null {
 export function poleRefused(b: PoleBoat): string | null {
   return poleBlocked(b) ?? (b.twa <= 145 ? POLE_TOO_HIGH : null);
 }
-const POLE_TOO_HIGH = 'she\'s too high for it: the poled-out jib is aback';
+const POLE_TOO_HIGH = 'she\'s too high for it: the poled-out jib won\'t fill';
 /** What the pole's rules read (the page's mirror of your boat will do). */
 type PoleBoat = Readonly<Pick<Boat, 'docked' | 'x' | 'y' | 'penalty' | 'twa'>> & { readonly rig?: Readonly<NonNullable<Boat['rig']>> };
 function poleBlocked(b: PoleBoat): string | null {
