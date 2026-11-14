@@ -179,7 +179,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         a.job = null;
       }
     }
-    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
+    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist' && j.line !== 'paddle') a.job = null; // (the paddle's job ends when she stops paddling: world.ts paddleWork)
   });
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
@@ -188,7 +188,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const o = ownerOf(k, n, c.spec, fwdL);
     if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
       const j = c.people[o]?.job;
-      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
+      if (j?.station && (PIANO.has(j.line) || j.line === 'car' || j.line === 'paddle')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
     }
     return o;
   };
@@ -239,7 +239,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
-      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
+      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist' || a.job.line === 'paddle'; // (paddling: on the side deck with the crutch, not trimming)
       const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
       if (!sheet || committed || onSheet) continue;
       // (and not from a cabin-top line they're at, or on their way to, for a jib sheet's trim: a job of a few seconds,
