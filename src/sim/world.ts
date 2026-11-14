@@ -24,7 +24,7 @@ import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
 import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
-import { CONTACT_GAP, INCIDENT_COOLDOWN, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
+import { CONTACT_GAP, INCIDENT_COOLDOWN, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
@@ -103,6 +103,10 @@ const STEERAGE = 0.5, JAM_CLOSING = 0.4;
 /** Pressed together: never more than this past touching (CONTACT_GAP) since the last contact, m. A modelling choice: the
  * contact response (boat/contact.ts) holds boats lying together at touching, give or take the step's motion. */
 const PRESSED_SLACK = 0.3;
+/** A squeeze still going on: the boat that broke a rule against her within this much water of her hull (m) and still
+ * closing (43.1's "compelled", for a touch on the mark or another boat). A beam's width: a modelling choice, in the range
+ * the earlier centerline measure gave (1.3 m abeam to 2.4 m bow to side). */
+const SQUEEZE_GAP = 2.2;
 /** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modelling cap). */
 const JAM_MAX = 2 * TANGLE_MAX;
 
@@ -1371,12 +1375,12 @@ export class World {
       if (incident) found.push({ A, B, incident });
       // (a breach against one of them still going on, by its own signs, whoever has right of way now (a right-of-way
       // boat's luff, 16.1, squeezes too): touching, the boat she's fouled by still making her swerve, or inside room-to-
-      // keep-clear distance and still closing. Only giving room again, overlapped round the mark, isn't one)
+      // keep-clear distance (SQUEEZE_GAP) and still closing. Only giving room again, overlapped round the mark, isn't one)
       const fA = this.fouledAt.get(A.id), fB = this.fouledAt.get(B.id);
       if ((fA && fA.by === B.id) || (fB && fB.by === A.id)) {
         const g = hullGap(A, B), closing = (B.x - A.x) * (B.vx - A.vx) + (B.y - A.y) * (B.vy - A.vy) < 0;
         for (const [V, F, fa] of [[A, B, fA], [B, A, fB]] as const) {
-          if (fa && fa.by === F.id && this.t - fa.t < TANGLE_MAX && (g < CONTACT_GAP || V.forced14 === F.id || (g < ROOM_GAP && closing))) fa.on = this.t;
+          if (fa && fa.by === F.id && this.t - fa.t < TANGLE_MAX && (g < CONTACT_GAP || V.forced14 === F.id || (g < SQUEEZE_GAP && closing))) fa.on = this.t;
         }
       }
     }
