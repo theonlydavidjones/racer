@@ -592,7 +592,9 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     // moment's wanted then); easing in, lazily, over a few seconds. Followed instantly both ways, the target's swing with
     // every wave's heel had them flop out and in a body's length every few seconds: the owner's "flopping around", v162)
     if (h.arm > sa + 0.04 && t.arm > sa - 0.02 && Math.abs(t.z - h.z) <= HOLD.fore) {
-      const tau = t.arm > h.arm ? reactTime(ppl[i]) : HOLD.body;
+      // (out at once only for a puff: more than the dead band's worth. A wave's heel within a puff, a few centimetres'
+      // more lean for a second or two, is followed lazily too: at once, they leaned out and in with every wave)
+      const tau = t.arm > h.arm + dead ? reactTime(ppl[i]) : HOLD.body;
       h.arm = Math.min(h.arm + (t.arm - h.arm) * Math.min(1, step / tau), maxOf(i)); h.z = t.z; t.arm = h.arm; return; // (no further out than they can reach now)
     }
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
