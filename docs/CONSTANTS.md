@@ -599,6 +599,11 @@ physics, ranked like the ten above:
 | AS_FORECAST.kMul | 1 | 25 | numerical |  |
 | AS_FORECAST.early | 0 | 25 | numerical |  |
 | DT | 10 | 106 | numerical |  |
+| SAFE_DEPTH | 2.5 | 267 | estimate | a Folkboat draws 1.2 m (class rules); the rest is room for swell and chart error, judged. Read against the shoal edge of the chart's band |
+| SHORE_FOUL_KT | 0.4 | 321 | unsourced | foul stream along the course before the shore is weighed |
+| SHORE_OFFS | 80, 200 | 325 | unsourced | two offsets: the planner's current is on a 100 m lattice |
+| SHORE_CALL_ON | false | 351 | design | the shore's call stays off until shoreRelief is sourced |
+| SHORE_CALL | 0.1 | 345 | unsourced | the shore's margin to be the call; its gain rests on shoreRelief (top 10 #3) |
 
 ### src/sim/signals.ts
 

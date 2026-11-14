@@ -271,9 +271,10 @@ export class CourseView {
     if (w.settings.aids && this.tab === 'course') drawLaylines(ctx, tf, laylinesFor(w, u), 3000, 1.5);
     // the strategist's plans: each way of sailing the leg, the best one bold
     if (this.tab === 'brief' && this.brief?.w === w) {
-      const PC: Record<Plan, string> = { left: '#6fd0ff', right: '#ff9f43', middle: '#c9cdd4' };
+      const PC: Record<Plan, string> = { left: '#6fd0ff', right: '#ff9f43', middle: '#c9cdd4', shore: '#c9cdd4' };
       this.brief.b.legs.forEach(L => {
         if (!shown(L.i) || L.kind === 'reach') return;
+        // (along the shore is drawn only as the plan itself, bold: it's a way only when it's the call, routing.ts shoreCalled)
         for (const k of ['left', 'right', 'middle'] as Plan[]) {
           const r = L.plans[k]; if (!r.ok || k === L.best) continue;
           ctx.strokeStyle = PC[k]; ctx.globalAlpha = 0.95; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);

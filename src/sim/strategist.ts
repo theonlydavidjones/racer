@@ -53,7 +53,7 @@ const SCENARIOS: { label: string; sc: Scenario }[] = [
   { label: 'it blows a quarter lighter', sc: { ...AS_FORECAST, kMul: 0.75 } }
 ];
 
-const PLAN_WORD: Record<Plan, string> = { left: 'left', right: 'right', middle: 'up the middle' };
+const PLAN_WORD: Record<Plan, string> = { left: 'left', right: 'right', middle: 'up the middle', shore: 'along the shore' };
 const KIND_WORD: Record<LegKind, string> = { beat: 'a beat', run: 'a run', reach: 'a reach' };
 
 /** Where a leg really starts and ends: an island mark (Alcatraz) is rounded at a berth off its shore, not at its middle. */
@@ -72,11 +72,11 @@ export function planLegs(w: SimView, o: Outlook): LegPlan[] {
   for (let i = 0; i <= C.marks.length; i++) {
     const { from, to, extra } = legEnds(C, i);
     const plans = comparePlans(o, from, to, t), best = bestPlan(plans), kind = plans.middle.kind;
-    const sorted = (['left', 'middle', 'right'] as Plan[]).filter(k => plans[k].ok).map(k => plans[k].minutes).sort((a, b) => a - b);
+    const sorted = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => plans[k].ok && (k !== 'shore' || best === 'shore')).map(k => plans[k].minutes).sort((a, b) => a - b);
     const margin = sorted.length > 1 ? (sorted[1] - sorted[0]) / Math.max(1, sorted[0]) : 0;
     const flips: { label: string; plan: Plan }[] = [];
     if (kind !== 'reach') for (const s of SCENARIOS) {
-      const r = comparePlans(o, from, to, t, s.sc), b = bestPlan(r);
+      const r = comparePlans(o, from, to, t, s.sc), b = bestPlan(r, best);
       if (b !== best && (!r[best].ok || r[best].minutes - r[b].minutes > 0.01 * r[b].minutes)) flips.push({ label: s.label, plan: b });
     }
     const certainty = kind === 'reach' ? 'clear' : flips.length === 0 && margin > 0.04 ? 'clear' : flips.length <= 2 && margin > 0.015 ? 'likely' : 'open';
@@ -181,7 +181,7 @@ function daySection(w: SimView, o: Outlook, finishT: number): BriefSection {
     const shoreP = C.committeeKind === 'shore' ? C.committee : C.pinKind === 'shore' ? C.pin : C.center;
     const far = shoreP === C.committee ? C.pin : C.committee, dirOut = unit(sub(far, shoreP)), out = { x: shoreP.x + dirOut.x * 900, y: shoreP.y + dirOut.y * 900 };
     const cs = Math.hypot(o.current(shoreP, gun).x, o.current(shoreP, gun).y) / KT, co = Math.hypot(o.current(out, gun).x, o.current(out, gun).y) / KT;
-    if (co > 0.4 && co - cs > 0.2) items.push({ head: 'Relief along the shore', src: 'model', text: `Near the shore the current is weaker (${kt1(cs)} kt at ${C.committeeKind === 'shore' ? C.committeeLabel : 'the line'} against ${kt1(co)} kt 900 m out), because the water drags on the bottom and the shore. Sailing against the tide, the shore is relief; with it, the stream is a free ride. Racers on the Cityfront close-reach or short-tack along the beach to cheat a foul tide. (The sim's relief is a model fitted to the NOAA stations; real eddies near the shore are messier.)` });
+    if (co > 0.4 && co - cs > 0.2) items.push({ head: 'Relief along the shore', src: 'model', text: `Near the shore the current is weaker (${kt1(cs)} kt at ${C.committeeKind === 'shore' ? C.committeeLabel : 'the line'} against ${kt1(co)} kt 900 m out), because the water drags on the bottom and the shore. Sailing against the tide, the shore is relief; with it, the stream is a free ride. Racers on the Cityfront close-reach or short-tack along the beach to cheat a foul tide. (The sim's relief is a rule of thumb, not a measured profile of the shore; real eddies near the shore are messier.)` });
   }
   // wind against tide: steep chop
   const steep = times.map(t => ({ t, s: o.sea(C.center, t), c: o.current(C.center, t), w: o.wind(C.center, t) })).filter(x => dot(x.c, V(x.w.from)) / KT > 0.4 && x.s.hsW > 0.15);
@@ -230,14 +230,17 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
     return items;
   }
   const sides = (['left', 'right'] as Plan[]).filter(k => P[k].ok);
-  const name = (k: Plan) => k === 'middle' ? 'up the middle' : `${k} (${sideWords(L.from, L.to, P[k].path.map(q => q.p), L.kind === 'beat' ? k === 'left' : k === 'right')})`;
-  const times = (['left', 'middle', 'right'] as Plan[]).map(k => `${PLAN_WORD[k]} ${P[k].ok ? mins(P[k].minutes) : 'can\'t get there'}`).join(', ');
-  const second = (['left', 'middle', 'right'] as Plan[]).filter(k => k !== L.best && P[k].ok).sort((a, b) => P[a].minutes - P[b].minutes)[0];
+  const name = (k: Plan) => k === 'middle' ? 'up the middle' : k === 'shore' ? 'along the shore, in the slacker water near the beach' : `${k} (${sideWords(L.from, L.to, P[k].path.map(q => q.p), L.kind === 'beat' ? k === 'left' : k === 'right')})`;
+  const times = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => k !== 'shore' || L.best === 'shore').map(k => `${PLAN_WORD[k]} ${P[k].ok ? mins(P[k].minutes) : 'can\'t get there'}`).join(', ');
+  const second = (['left', 'middle', 'right', 'shore'] as Plan[]).filter(k => k !== L.best && P[k].ok && k !== 'shore').sort((a, b) => P[a].minutes - P[b].minutes)[0];
   const gain = second ? (P[second].minutes - best.minutes) * 60 : 0;
   const sure = L.certainty === 'clear' ? 'A clear call: it holds whichever way the forecast is off.' : L.certainty === 'likely' ? 'Likely, but not certain.' : 'An open leg: no side pays enough to bank on.';
   items.push({ head, src: 'model', text: `${when}. Going ${name(L.best)} is fastest by ${Math.round(gain)} s over going ${second ? PLAN_WORD[second] : '—'} (${times}). ${sure}` });
   // why: the current and the wind on each side
-  if (sides.length === 2 && L.best !== 'middle') {
+  if (L.best === 'shore') {
+    const b = P.shore, m = P.middle;
+    items.push({ head: 'Why', src: 'model', text: `The tide's against you on this leg, and it runs slower near the beach: on average ${kt1(-b.meanCurAlong)} kt against you on the way in, along the shore and out again, against ${kt1(-m.meanCurAlong)} kt on the straight course. Work in toward the shore, keep about ${Math.round(b.off ?? 100)} m off the beach and outside the chart's shoals, and come out to the mark at the end. (How much slacker the water is near the beach is the sim's estimate, not a measurement, so the size of the gain is too.)` });
+  } else if (sides.length === 2 && L.best !== 'middle') {
     const other: Plan = L.best === 'left' ? 'right' : 'left', b = P[L.best], a = P[other];
     const dc = b.meanCurAlong - a.meanCurAlong, dk = b.meanKt - a.meanKt, why: string[] = [];
     if (Math.abs(dc) > 0.08) why.push(dc > 0 ? `the current is ${kt1(Math.abs(dc))} kt kinder there (${b.meanCurAlong >= 0 ? `${kt1(b.meanCurAlong)} kt helping` : `${kt1(-b.meanCurAlong)} kt against`}, against ${a.meanCurAlong >= 0 ? `${kt1(a.meanCurAlong)} kt helping` : `${kt1(-a.meanCurAlong)} kt against`} on the ${other})` : `even though the current is ${kt1(-dc)} kt worse there`);
@@ -269,7 +272,7 @@ function courseSection(o: Outlook, legs: LegPlan[]): BriefSection {
   const items = legs.flatMap(L => { const it = legItems(o, L); if (L.island) it.push(it.shift()!); return it; });
   // ("about a tenth longer": the sim's own fleet sailing the same legs took 5–20% longer on the beats, 47 min planned
   // against about 50 sailed; tests/sim-fleet.test.ts holds the brief to that)
-  return { id: 'legs', title: 'The course: which way on each leg', lede: 'Each leg is sailed on paper three ways, at the Folkboat\'s polar speeds in the wind and current the day brings along the way: going left first and tacking (or jibing) on the layline, going right first, and staying near the middle. Left and right are looking upwind, as sailors say it; the direction in brackets says where on the water that is. The best plan is drawn on the map. Each is then tested against the forecast being off, to say how sure the call is. The times are for a perfect sail (each tack or jibe costing what the boat measured for the wind: about 3 s in a breeze, over 20 in a drifter): upwind, a race typically takes about a tenth longer, and more on the first beat and round the first mark, where the fleet is bunched.', items };
+  return { id: 'legs', title: 'The course: which way on each leg', lede: 'Each leg is sailed on paper three ways (four against a foul tide: along the shore, in the slacker water near the beach), at the Folkboat\'s polar speeds in the wind and current the day brings along the way: going left first and tacking (or jibing) on the layline, going right first, and staying near the middle. Left and right are looking upwind, as sailors say it; the direction in brackets says where on the water that is. The best plan is drawn on the map. Each is then tested against the forecast being off, to say how sure the call is. The times are for a perfect sail (each tack or jibe costing what the boat measured for the wind: about 3 s in a breeze, over 20 in a drifter): upwind, a race typically takes about a tenth longer, and more on the first beat and round the first mark, where the fleet is bunched.', items };
 }
 
 /** The other boats: what you know about them. */
