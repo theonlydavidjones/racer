@@ -1,7 +1,7 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
-import { LESSON_WIND, LessonTracker } from './lessons';
+import { LESSON_WIND, LessonTracker, type MobEnv, type RoadEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
@@ -16,7 +16,7 @@ import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, curren
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
-import { waveMotion } from '../boat/seaway';
+import { speedInChop, waveMotion } from '../boat/seaway';
 import { dayWeather, turnWeather, type DayWeather } from '../environment/weather';
 import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
 import { ShiftField, shiftStats } from '../environment/shifts';
@@ -29,7 +29,7 @@ import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
+import { aiThink, keepClearMove, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
@@ -454,7 +454,9 @@ export class World {
       const o = getPlace(settings.sailFrom)?.p ?? this.C.center;
       this.caseRun = new CaseRun(rc, windOnWater(this.windHere(o, undefined, false), this.currentAt(o, true)).from, o); // (the wind on the water, the current's in it: what she sails by)
     }
-    for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    // (the rules of the road lesson: one other boat, a club Folkboat, the lesson sails her)
+    const road = this.freeSail && settings.mode === 'lesson' && settings.lesson === 'road';
+    for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : road ? 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     if (this.caseRun) this.placeCase();
     this.startTimes = this.boats.map(() => null);
     // (a sheltered start, a slip, doesn't raise the mean: out on the Bay she'd have it all)
@@ -469,6 +471,13 @@ export class World {
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
+    if (this.lesson?.id === 'road' && road) {
+      this.roadEnv = this.makeRoadEnv(this.boats[1]);
+      // (the North Channel's entrance pair, east of Alcatraz, sim/places.ts marks 7 and 21: NOAA ENC US5CA13M has them as
+      // pillar buoys, 1 green Fl G 6s at 37.83201 N 122.40863 W, 2 red Fl R 6s at 37.83331 N 122.39642 W, read 14 Nov 2026;
+      // the numbers rise northward, so coming in is northbound, red 2 to starboard)
+      const red = getPlace('m-7')?.p, green = getPlace('m-21')?.p; if (red && green) this.lesson.channel = { red, green };
+    }
     if (this.lesson && this.caseRun) this.lesson.cue = `You're ${this.caseRun.helm}: sail it without breaking a rule`;
     if (this.lesson?.id === 'before') this.boats[0].lightsOff = true; // (Before you go: switching them on is a step)
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
@@ -909,6 +918,31 @@ export class World {
     return this.settings.mode === 'lesson' ? clamp(kt, lo / f, hi / f) : kt;
   } // (a breeze: the top of the range; a Case: a breeze she sails at the Cases' own speed in)
   private lessonField: number | null = null;
+  /** Rules of the road (sim/lessons.ts): the other boat, and what the lesson asks of the World for her. */
+  private roadEnv: RoadEnv | null = null;
+  private makeRoadEnv(o: Boat): RoadEnv {
+    // (she starts well off to windward, out of the way, till the first encounter sets her)
+    const u = this.boats[0], up = V(this.windModel.base);
+    o.x = u.x + up.x * 600; o.y = u.y + up.y * 600; o.h = o.desired = n360(this.windModel.base + 90); o.v = 0;
+    return {
+      other: o,
+      place: (p, h, v, meet) => {
+        if ([p, meet, { x: (p.x + u.x) / 2, y: (p.y + u.y) / 2 }, { x: (p.x + meet.x) / 2, y: (p.y + meet.y) / 2 }].some(q => onLand(q) || inBasin(q))) return false;
+        if (landAlong(p, { x: p.x + V(h).x * 300, y: p.y + V(h).y * 300 }) < Infinity) return false; // (and none ahead of her as she starts in: the lesson lets her go for that)
+        o.x = p.x; o.y = p.y; o.h = o.desired = n360(h); o.v = v; o.turnRate = 0; o.tacking = false; o.turnTarget = null;
+        const g = V(o.h); o.vx = g.x * v + o.cur.x; o.vy = g.y * v + o.cur.y;
+        o.ww = windOnWater(this.windHere(o, o), o.cur); settleTrim(o, o.ww.from, o.ww.kt);
+        return true;
+      },
+      speed: h => speedInChop(o.ww.kt, Math.abs(wrap(o.ww.from - h)), o.sea.hsW, o.sea.tpW),
+      helm: give => keepClearMove(this, o, this.user, !give),
+      sailable: h => sailable(o, h),
+      landAhead: h => landAlong(o, { x: o.x + V(h).x * 300, y: o.y + V(h).y * 300 }) < Infinity,
+      gap: () => hullGap(this.user, o)
+    };
+  }
+  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
+  private readonly mobEnv: MobEnv = { current: p => this.currentAt(p), wind: p => this.windHere(p, undefined, false) };
 
   /** Sail it yourself: each boat set at her pose in the Case at its start, the others to sail its track (their letters
    * for names: the Case's own, as the incident card and the labels then read). */
@@ -1019,7 +1053,7 @@ export class World {
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
     // boat answers her helm every step); in close quarters (World.closeQuarters: a boat or a mark within four lengths, about to
     // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
-    for (const b of this.boats) if (!b.isUser && !b.script) {
+    for (const b of this.boats) if (!b.isUser && !b.script && b !== this.roadEnv?.other) { // (a Case's boats sail its track; the lesson's boat, the lesson sails her)
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
@@ -1054,7 +1088,7 @@ export class World {
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
-    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (a lesson: its check, on the boat as she sails)
+    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0, this.mobEnv, this.roadEnv ?? undefined); // (a lesson: its check, on the boat as she sails)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);
@@ -1417,7 +1451,7 @@ export class World {
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       this.onIncident?.(A, B, incident);
-      if (A.isUser || B.isUser) {
+      if ((A.isUser || B.isUser) && !this.roadEnv) { // (the rules of the road lesson: the Navigation Rules, and the lesson says what happened)
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         const other = A.isUser ? B : A;
