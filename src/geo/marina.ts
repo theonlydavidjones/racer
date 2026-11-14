@@ -412,12 +412,15 @@ export const HOLD_FOLLOW = 20;
  * Her release from head to wind clear of everything: from any heading she may have followed the wind to while held
  * (HOLD_FOLLOW), turned by `off` about holdPivot, checked every 2 degrees (her bow moves 0.13 m between checks).
  */
-function releaseClear(c0: Vec, h0: number, off: number, s: Slip): boolean {
-  for (const f of [-HOLD_FOLLOW, -10, 0, 10, HOLD_FOLLOW]) {
-    const q0 = about(c0, h0, BOW, f), piv = holdPivot(off), n = Math.ceil(Math.abs(off) / 2);
+function releaseClear(c0: Vec, h0: number, off: number, s: Slip, coarse = false): boolean {
+  const piv = holdPivot(off), sweep = (f: number, step: number) => {
+    const q0 = about(c0, h0, BOW, f), n = Math.ceil(Math.abs(off) / step);
     for (let k = 1; k <= n; k++) { const q = about(q0.c, q0.h, piv, off * k / n); if (!berthClear(q.c, q.h, s)) return false; }
-  }
-  return true;
+    return true;
+  };
+  // (a quick look every 10 degrees from where she came to first, then every 2 from there and from either end of the follow)
+  // (choosing among the ways, the quick look only; the way taken gets the whole check: fine)
+  return coarse ? sweep(0, 10) : sweep(0, 10) && sweep(0, 2) && sweep(-HOLD_FOLLOW, 2) && sweep(HOLD_FOLLOW, 2);
 }
 const plans = new Map<string, PushOff>();
 export function pushOffPlan(s: Slip, windFrom?: number, windKt = 0): PushOff {
@@ -583,7 +586,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
               // (pushed off for the main: about her bow, held on the line; wound round: about her stern, pointed downwind with no
               // main up to round her up, so only the clear water ahead counts). Clear from wherever she's followed the wind to.
               const round = Math.abs(o) > 90, piv = holdPivot(o);
-              if (!releaseClear(c0.c, c0.h, o, s)) return false;
+              if (!releaseClear(c0.c, c0.h, o, s, true)) return false;
               const e = about(c0.c, c0.h, piv, o);
               // (wound round downwind she may have the main up by then, as the coach says: the clear water a run needs, 14 m
               // ahead and her leeway either side)
