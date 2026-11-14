@@ -317,7 +317,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       w.t = 300; Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 10, v: 0.2, astern: 0 }); w.step(DT);
       expect(w.arrivedT).not.toBeNull(); expect(u.docked).toBeTruthy();
     }
-  });
+  }, 60_000); // (each astern push-off is now sailed until her way is spent: about 7 s on a slow host, over the default 5)
   it('Race from her slip at South Beach or Tiburon: time enough to sail the 5–7 km to the line', () => {
     for (const id of ['south-beach', 'corinthian']) {
       const slip = slipsIn(id)[5], boat = { ...DEFAULT_BOAT, marina: id, slip: slip.id };
