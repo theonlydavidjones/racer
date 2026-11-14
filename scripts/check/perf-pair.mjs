@@ -4,15 +4,15 @@
  * another version's, both loaded in one process and sailed in alternating 10-second pieces (A, B, B, A, ...), each timed
  * on this thread's own CPU clock. A shared machine's speed drifts by several per cent within the hour; paired this way
  * the drift lands on both alike, and the ratio holds to about ±1–2% where the old single ratio wandered ±5–6%. Run twice,
- * once with each version loaded first (the second one loaded runs about 0.4% slower), and the two averaged.
+ * once with each version loaded first (the second one loaded runs about 0.4% slower), three races each, and averaged.
  *
  *   node scripts/check/perf-pair.mjs                 the PR gate: against origin/main (fetched), fails above 1.015
  *   node scripts/check/perf-pair.mjs --budget        the owner's budget: against v168 (425a5eb), fails above 1.019
- *   options: --against <ref>  --max <ratio>  --races <n per order, default 2>
+ *   options: --against <ref>  --max <ratio>  --races <n per order, default 3: the mean of six ratios, about ±0.65%>
  *
  * The race is perf.test's: Seaweed Soup course 10, a fleet of eight, west 22 kt, the real current for 14 Nov 2026,
  * seed 3, five minutes. The other version's src/ is taken from git into .cache/perf-pair/<commit>/ (nothing checked out,
- * no worktree), fetched from origin first if this clone hasn't got it. About 4–5 minutes.
+ * no worktree), fetched from origin first if this clone hasn't got it. About 6 minutes.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, symlinkSync, writeFileSync, rmSync } from 'node:fs';
@@ -73,7 +73,7 @@ async function child(A, B, races) {
 }
 
 /** This working tree against `ref`, both load orders: the ratio (here / ref, the geometric mean of every race) and the runs. */
-export function measure(ref, races = 2) {
+export function measure(ref, races = 3) {
   const other = treeOf(ref), runs = [];
   for (const [A, B, mine] of [[ROOT, other.dir, 0], [other.dir, ROOT, 1]]) {
     const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--child', A, B, String(races)], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
@@ -92,7 +92,7 @@ if (args[0] === '--child') {
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   const opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
   const budget = args.includes('--budget');
-  const ref = opt('--against') ?? (budget ? BUDGET_REF : 'origin/main'), max = +(opt('--max') ?? (budget ? BUDGET_MAX : GATE_MAX)), races = +(opt('--races') ?? 2);
+  const ref = opt('--against') ?? (budget ? BUDGET_REF : 'origin/main'), max = +(opt('--max') ?? (budget ? BUDGET_MAX : GATE_MAX)), races = +(opt('--races') ?? 3);
   const t0 = Date.now(), m = measure(ref, races);
   for (const r of m.runs) console.log(`  ${r.hereFirst ? 'this tree loaded first ' : `${ref} loaded first`}: this tree ${r.here.toFixed(0)} µs a step, ${ref} ${r.there.toFixed(0)}: ${(r.here / r.there).toFixed(4)}`);
   console.log(`perf-pair: this tree / ${ref} (${m.sha.slice(0, 8)}) = ${m.ratio.toFixed(4)}, limit ${max} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);

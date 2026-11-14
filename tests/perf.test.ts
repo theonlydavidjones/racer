@@ -38,13 +38,13 @@ describe('performance budget: the sim', () => {
   it('a full fleet of eight steps fast enough: paired against v168 in one process, at most 1.9% slower (the owner\'s 43.1)', () => {
     // The step's budget, measured without the machine's drift (scripts/check/perf-pair.mjs; the owner's method, 14 Nov
     // 2026): this tree's sim and v168's (425a5eb, the commit the budget was set on) loaded in one process and sailed in
-    // alternating 10-second pieces, timed on this thread, twice (each loaded first once), two races each. A shared
+    // alternating 10-second pieces, timed on this thread, twice (each loaded first once), three races each. A shared
     // machine's speed drifts by several per cent within the hour; paired, the drift lands on both alike.
     // The budget, unchanged: 43.1 in this thread's CPU time against the reference workload, and v168 measured 42.31 in the
     // same units (twelve runs), so 43.1 is v168 × 43.1 / 42.31 = v168 × 1.019. (Before: the ratio to a fixed arithmetic
     // workload in the same process, which a shared machine's memory and caches moved by ±5–6% within a day, more than
     // the room the budget leaves. The derivations of 54.7 and 43.1 are in docs/CAPACITY.md §1.1a.)
-    const m = measure(BUDGET_REF, 2);
+    const m = measure(BUDGET_REF, 3);
     console.log(`full fleet, paired against v168: ${m.runs.map((r: { here: number; there: number }) => `${r.here.toFixed(0)}/${r.there.toFixed(0)} µs`).join(', ')}: ratio ${m.ratio.toFixed(4)} (budget ${BUDGET_MAX})`);
     expect(m.ratio).toBeLessThan(BUDGET_MAX);
   }, 900_000);

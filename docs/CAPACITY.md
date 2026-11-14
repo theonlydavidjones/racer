@@ -497,7 +497,7 @@ arithmetic in the cache.
 **The method** (scripts/check/perf-pair.mjs): load two versions of the sim in one Node process (vite's runnerImport, two
 module graphs), sail them by turns in 10-second pieces, A, B, B, A, and time each piece on this thread's CPU clock.
 The host's drift lands on both alike. The second version loaded runs about 0.4% slower, so it runs twice, each version
-loaded first once, two races each, and the result is the geometric mean of the four ratios. The other version's `src/`
+loaded first once, three races each, and the result is the geometric mean of the six ratios (about ±0.65%). The other version's `src/`
 comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from origin first if the clone hasn't got it.
 
 | check | four ratios | result |
