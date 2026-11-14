@@ -79,12 +79,24 @@ export function speedInChop(kt: number, twa: number, hs: number, tp: number): nu
 const CHOP_MEMO = 16, chopMemo = Array.from({ length: CHOP_MEMO }, () => ({ kt: NaN, twa: NaN, hs: NaN, tp: NaN, v: 0 }));
 let chopNext = 0;
 
+/**
+ * The middle of her groove to windward: each angle (in quarter degrees) weighed by how far her speed made good there
+ * rises above GROOVE short of the best. In a chop the top is flat (at 6 kt in 0.6 m, 45–48° are within 0.06% of each
+ * other, far less than a helmsman can feel or a puff changes), and the single best angle on it jumped 3° between ends
+ * of the flat on a quarter-knot puff; the middle moves smoothly with the wind. It sits a little wide of the very best
+ * where the pinching side falls away faster, as a sailor in a chop footing for speed would steer.
+ */
+const GROOVE = 0.004;
 function beatSearch(kt: number, hs: number, tp: number): number {
-  let best = 40, bestV = -1;
-  for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
+  const vs: number[] = [];
+  let top = -Infinity;
+  for (let t = 30; t <= 65; t += 0.25) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); vs.push(v); if (v > top) top = v; }
   // (no headway at any angle, light air in a big chop: not "pinch hardest", as the first angle tried would say, but the
   // widest, footing off for speed being her only hope)
-  return bestV > 0 ? best : 65;
+  if (!(top > 0)) return 65;
+  let s = 0, w = 0;
+  for (let i = 0; i < vs.length; i++) { const k = vs[i] - (1 - GROOVE) * top; if (k > 0) { s += k * (30 + i * 0.25); w += k; } }
+  return s / w;
 }
 const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
