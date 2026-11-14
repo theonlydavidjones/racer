@@ -36,6 +36,8 @@ const WORDS = {
   totalled: 'totaled', channelled: 'channeled', tunnelled: 'tunneled', quarrelled: 'quarreled', counsellor: 'counselor', dialled: 'dialed', dialling: 'dialing',
   skilful: 'skillful', skilfully: 'skillfully', wilful: 'willful', fulfil: 'fulfill', fulfils: 'fulfills', enrol: 'enroll', instalment: 'installment',
   // assorted
+  // gybe → jibe (the owner, 13 Nov 2026: the US word, as ASA writes it); the commands "Ready to jibe" … "Jibe-ho"
+  gybe: 'jibe', gybes: 'jibes', gybed: 'jibed', gybing: 'jibing',
   grey: 'gray', greys: 'grays', greyed: 'grayed', greyish: 'grayish', draught: 'draft', draughts: 'drafts', mould: 'mold', moulded: 'molded', moulding: 'molding',
   aluminium: 'aluminum', programme: 'program', programmes: 'programs', ageing: 'aging', judgement: 'judgment', judgements: 'judgments', catalogue: 'catalog',
   anticlockwise: 'counterclockwise', artefact: 'artifact', artefacts: 'artifacts', sulphur: 'sulfur', speciality: 'specialty', plough: 'plow', sceptical: 'skeptical',

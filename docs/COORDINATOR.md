@@ -45,8 +45,8 @@ CLAUDE.md has the standing rules (science is prime, ask before big design change
 ## Overnight plan (owner, 13 Nov 2026, late)
 1. Crew fidgeting (top): Crew Figures leads with Crew Model and Crew Art; crewsettle extended to cruising and all points of sail; no crew-animation merges until calm; live clips to the owner in the morning. crew-anim (owner-approved look) lands on top after.
 2. Skipper Model: clear air downwind (the real Nov 1 race), then the avoidance-redesign design note.
-3. Rules: findings 4–6; the gybe-as-tack bug with Deep Physics.
+3. Rules: findings 4–6; the jibe-as-tack bug with Deep Physics.
 4. Deep Physics: #165 after #196, stand-off spacing, then car-lead, 105–115°, z0.
 5. Owner feedback: two mid-air lines at the mast (Rigging); slower streaks, none on the inset, separate wind/current choice (Charts); race-setup buttons' feedback (UI).
-6. New tonight: start-line drill (Debrief), tack and gybe drill (Crew Controls), constants audit (Bay East), ghost races (Marinas).
+6. New tonight: start-line drill (Debrief), tack and jibe drill (Crew Controls), constants audit (Bay East), ghost races (Marinas).
 Morning for the owner: the second probe (https://claude.ai/artifact/MrGSH6p7nzwa2M2RV9kWpJ), the crew clips, the band's ▾, the vang.

@@ -36,7 +36,7 @@ export const CAUSES: { key: Cause; label: string; color: string }[] = [
   { key: 'tide', label: 'Tide', color: '#1fbf8f' },
   { key: 'laylines', label: 'Laylines', color: '#c77dff' },
   { key: 'clearAir', label: 'Clear air', color: '#e69f00' },
-  { key: 'manoeuvres', label: 'Tacks & gybes', color: '#f0e442' },
+  { key: 'manoeuvres', label: 'Tacks & jibes', color: '#f0e442' },
   { key: 'penalty', label: 'Penalties', color: '#9a7b5f' }, // (brown: clear of the boats' own reds)
   { key: 'other', label: 'Speed & other', color: '#94abb7' }
 ];
@@ -109,7 +109,7 @@ const WORDS: Record<Cause, [string, string]> = {
   penalty: ['Penalty turns', 'Penalty turns'],
   laylines: ['Overstood the layline', 'Overstood the laylines'],
   clearAir: ['Sailed in dirty air', 'Time in dirty air'],
-  manoeuvres: ['Too many or slow tacks', 'Tacks and gybes'],
+  manoeuvres: ['Too many or slow tacks', 'Tacks and jibes'],
   other: ['Slower through the water', 'Speed and the rest']
 };
 const SHORT: Record<Cause, string> = { start: 'the start', shifts: 'headers', tide: 'the tide', laylines: 'the layline', clearAir: 'dirty air', manoeuvres: 'tacks', penalty: 'a penalty', other: 'speed' };
