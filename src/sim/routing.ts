@@ -265,7 +265,7 @@ export const SAFE_DEPTH = 2.5;
  * sounding), on a 25 m lattice. (The Coast Pilot: "Shoals with depths less than 10 feet extend up to 0.2 mile from the
  * shore" from the Golden Gate Bridge east to the waterfront, NOAA Coast Pilot 7 ch. 7, edition of 8 Nov 2026.) */
 const shoalCache = new Map<string, boolean>();
-const tooShoal = (p: Vec): boolean => {
+export const tooShoal = (p: Vec): boolean => {
   const [d1, d2] = depthBand(p);
   if (!(d1 === 0 && d2 === 0)) return (d1 + d2) / 2 < SAFE_DEPTH;
   const key = `${Math.round(p.x / 25)},${Math.round(p.y / 25)}`;

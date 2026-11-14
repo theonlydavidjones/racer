@@ -59,6 +59,9 @@ export interface AiState {
   leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
+  /** Working the shore against a foul tide (ai.ts shoreAim): on this leg, on this side of her course (+1 left). */
+  /** (side 0: given up on this leg; prog: when she was last 60 m nearer the mark, and how far off it then) */
+  shoreWork?: { leg: number; side: number; W?: Vec | null; prog?: { t: number; d: number } } | null;
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
