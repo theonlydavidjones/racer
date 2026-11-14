@@ -756,7 +756,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // Held so, a boat on starboard with another close by sailed on into a breakwater at 1.7 m/s and lay pinned against it
   // for the rest of the race. Any heading clear of the land that leaves the room, she takes; blocked() also sees the
   // start/finish line mid-race where it's an obstruction, and the same holds there)
-  const offShore = blocked(w, b, b.h, SHORE_HOLD_M) && !blocked(w, b, desired, SHORE_HOLD_M);
+  // (worked out only once a boat's room is actually holding her: two looks at the land, for every boat at every think, put the fleet over its perf budget)
+  let offShore: boolean | undefined;
   for (const { o, dx, dy, r, cp } of near) {
     if (r.mr && !r.mr.ended && (r.mr.inside === b.id || r.mr.ahead === b.id)) continue;
     if (r.kc !== o || Math.abs(wrap(desired - b.h)) <= 8 || dx * dx + dy * dy > 900 || cp.t >= 10) continue;
@@ -765,6 +766,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
     let ok = b.h;
     for (let i = 1; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
+    offShore ??= blocked(w, b, b.h, SHORE_HOLD_M) && !blocked(w, b, desired, SHORE_HOLD_M);
     if (offShore && blocked(w, b, ok, SHORE_HOLD_M)) continue; // (the room would hold her on into the land)
     desired = ok;
   }
