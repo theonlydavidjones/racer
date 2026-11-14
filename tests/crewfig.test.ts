@@ -6,6 +6,14 @@ import { DEFAULT_CREW, newCrew, type CrewPlace } from '../src/boat/crewPhys';
 import { buildCrew, ground, syncCrew, type Crew, type Figure } from '../src/render/crew';
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
+import { COURSES } from '../src/courses/registry';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { DEFAULT_BOAT } from '../src/boat/spec';
+import { DT, World } from '../src/sim/world';
+import { engage } from '../src/boat/autopilot';
+import { SLIPS } from '../src/geo/marina';
+import { LL } from '../src/geo/geo';
+import { n360 } from '../src/core/math';
 
 /** Points along every bone of a figure (the boat's frame): the hips to the knees and feet, the shoulders to the hands, the spine, the head. */
 function bones(f: Figure, step = 0.25): { name: string; p: THREE.Vector3 }[] {
@@ -206,4 +214,54 @@ describe('Two crew keep to themselves (render/crew.ts)', () => {
     expect(steady).toBe(0);
     expect(gybe).toBeLessThan(60); // (two seconds, as they change sides)
   });
+});
+
+/**
+ * No backwards arms, in whatever they're doing (the owner, twice, 13 and 14 Nov: "still have backwards arms", the crew's
+ * forearms pointing back past their bodies, fists behind them). Every figure, every frame of a race's start with its
+ * tacks on both tacks, cruises close-hauled, reaching and running, and at the dock:
+ * - no elbow forward of the line from the shoulder to the wrist (as elbows()), once they're in a pose and still in it
+ *   half a second on, not walking: an elbow swinging round as the hands go from one place to the next (up on the cabin
+ *   top's lines to the knees) passes forward for a tenth of a second, which isn't this (a follow-up);
+ * - no hand more than 0.2 m behind its shoulder, in the torso's own frame. The main hand tacking the main had their hands
+ *   on the mainsheet at the thwart behind them while facing forward, 0.31 m behind the shoulder: reached through the
+ *   elbow. A hiker's hand on the rail beside the hip, leaning out, is up to 0.16.
+ */
+describe('No backwards arms anywhere (render/crew.ts)', () => {
+  function watch(label: string, w: World, b: World['boats'][number], secs: number, bad: string[]): void {
+    const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1); new THREE.Group().add(cr.group);
+    const end = w.t + secs, held = [0, 1, 2].map(() => ({ pose: '', t: w.t }));
+    while (w.t < end) {
+      w.step(DT); syncCrew(cr, b.rel >= 0 ? 1 : -1, b.crew, DT, false, undefined, b.heel, b.tacking);
+      const at = `${label} t ${w.t.toFixed(2)}`;
+      [['helm', cr.helm], ...cr.crew.map((f, i) => [`crew${i + 1}`, f] as const)].forEach(([who, f], k) => {
+        const fig = f as Figure; if (!fig.root.visible) return; fig.root.updateMatrixWorld(true);
+        const pose = b.crew!.people[k].pose; if (pose !== held[k].pose || fig.going || fig.route) { held[k] = { pose, t: w.t }; }
+        const settled = w.t - held[k].t > 0.5;
+        const wv = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), fw = fig.root.localToWorld(new THREE.Vector3(0, 0, -1)).sub(wv(fig.root)).setY(0);
+        const tq = fig.torso.getWorldQuaternion(new THREE.Quaternion()).invert();
+        fig.arm.forEach((a, i) => {
+          const sh = wv(a.root), el = wv(a.mid), wr = wv(a.mid, -BONE.fore);
+          const rel = wr.clone().sub(sh).applyQuaternion(tq);
+          if (rel.z > 0.2) bad.push(`${at}: ${who} ${pose} arm${i} hand ${rel.z.toFixed(2)} m behind its shoulder`);
+          const line = wr.clone().sub(sh), t = el.clone().sub(sh).dot(line) / line.lengthSq(), off = el.clone().sub(sh.clone().addScaledVector(line, t)), ahead = off.dot(fw) / fw.length();
+          if (settled && ahead > 0.06 && -off.y < ahead) bad.push(`${at}: ${who} ${pose} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
+        });
+      });
+    }
+  }
+  it('racing (the start and its tacks, 16 kt), cruising (close-hauled, a reach, a run, 12 kt), at the dock', () => {
+    const bad: string[] = [];
+    { const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 16, tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0, mode: 'race', fleet: 2, opponents: ['stock:1', 'stock:2'] } as Settings;
+      const w = new World(COURSES[0], S, 3, {}); watch('race', w, w.boats.find(x => !x.isUser)!, 130, bad); } // (tacks on starboard and port before the gun)
+    for (const twa of [45, 90, 150]) {
+      const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
+      const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user, p = LL(37.835, -122.40); u.x = p.x; u.y = p.y;
+      w.step(DT); u.h = n360(u.ww.from + twa); u.v = 2.5; engage(u, w.pilot, 'auto'); watch(`cruise ${twa}`, w, u, 40, bad);
+    }
+    { const slip = SLIPS[40], boat = { ...DEFAULT_BOAT, slip: slip.id };
+      const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' };
+      const w = new World(COURSES[0], S, 1, { freeSail: true }); watch('dock', w, w.user, 15, bad); }
+    expect(bad.slice(0, 8)).toEqual([]);
+  }, 300_000);
 });
