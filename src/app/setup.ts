@@ -13,7 +13,7 @@ import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
-import { type BoatSpec } from '../boat/spec';
+import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
 import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
@@ -491,6 +491,8 @@ function openSetupNow(view: 'setup' | 'drill' | 'season' = 'setup'): void {
   app.courseView.close(); app.navView.close(); if (app.w.running) app.send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = app.S.course; paintSeg(); crewRows(); courseCard(); dockSetup(view); $('setup').hidden = view !== 'setup'; $('drillView').hidden = view !== 'drill'; $('seasonView').hidden = view !== 'season'; if (view === 'drill') { $('drillBack').textContent = app.nav.backLabel(); paintDrillPage(); } if (app.S.mode === 'sail') app.setupChart?.sync(true); tideBox(); }
 function beginRace(seed?: number): void { app.results.settleLog(() => beginRaceNow(seed)); }
 function beginRaceNow(seed?: number): void {
+  // laid up for repairs after a wreck or damage (docs/WRECK-PROPOSAL.md): she can't be taken out until then
+  { const until = app.S.boat.laidUpUntil; if (laidUp(app.S.boat)) { toast(`${app.S.boat.name} is laid up for repairs until ${until}: choose another boat.`, 4000); return; } }
   // (the pause menu's and the results' Back to setup: the setup you sailed from, or the Drill page for a drill)
   const drilling = app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings', sp = app.S.mode === 'race' ? app.seasonPick : null;
   app.nav.reset(...(drilling ? [{ k: 'drill' } as const] : sp ? [{ k: 'race' } as const, { k: 'season', id: sp.series.id } as const, { k: 'setup' } as const] : [{ k: 'setup' } as const]));
