@@ -100,6 +100,8 @@ export function ownerOf(line: string, nCrew: number, spec?: CrewSpec, forward = 
 function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false): Station | null {
   if (line === 'car') return { arm: CAR_ARM, z: Z.car, pose: 'car' };
   if (line === 'pole' || line === 'hoist') return { arm: 0.25, z: Z.mast, pose: 'mast' };
+  // the outboard (stowed or shipped, sim/world.ts motorStow): kneeling on the after deck at the bracket, aft of the helm
+  if (line === 'outboard') return { arm: 0.3, z: 3.3, pose: 'piano' };
   if (PIANO.has(line)) {
     // the helm, alone, has to leave the tiller's end to reach the cabin top
     if (who === 0) return { arm: 0.3, z: 1.6, pose: 'piano' };
@@ -179,7 +181,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         a.job = null;
       }
     }
-    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
+    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist' && j.line !== 'outboard') a.job = null;
   });
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
@@ -239,7 +241,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
-      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
+      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist' || a.job.line === 'outboard'; // (the outboard: aft at the bracket, both hands on it)
       const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
       if (!sheet || committed || onSheet) continue;
       // (and not from a cabin-top line they're at, or on their way to, for a jib sheet's trim: a job of a few seconds,
@@ -323,7 +325,7 @@ function carJob(b: Boat, dt: number): void {
 
 
 /** A job that isn't a line (the pole, a halyard): put the person at the mast until it's done. */
-export function bodyJob(b: Boat, line: 'pole' | 'hoist', on: boolean): number {
+export function bodyJob(b: Boat, line: 'pole' | 'hoist' | 'outboard', on: boolean): number {
   const c = b.crew; if (!c) return 1;
   const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who];
   if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }

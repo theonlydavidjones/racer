@@ -442,7 +442,7 @@ export class SailBand {
       // (off the bracket into the lazarette, or back on: stopped and tilted up first; racing, it stays below. world.ts motorStow)
       if (!m.stowed && (m.running || m.pulling)) { no('Stop it first', 'Stop the motor first, then it can come off the bracket.'); return; }
       if (!m.stowed && m.down) { no('Tilt it up first', 'Tilt the motor up first, then it can come off the bracket.'); return; }
-      if (m.stowed && this.host.racing()) { no('Not racing', 'Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
+      if (m.stowed && this.host.racing()) { no('Racing', 'Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
       pend(m.stowed ? 'Shipping…' : 'Stowing…', x => !!x.shifting); this.host.send({ k: 'motor', op: 'stow' });
     }
     this.motorTab(w.user as Boat);

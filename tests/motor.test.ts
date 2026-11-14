@@ -162,17 +162,29 @@ describe('Stowing it below and shipping it again (the owner: off the sliding bra
     w.motorTilt(); expect(m.down).toBe(true);
   }, 60_000);
   it('its weight goes with it: stowed, the same weight aboard but further forward and off the height of the bracket; shipped again, as before', () => {
-    const w = withMotor('sail'), u = w.user, m = u.motor!, on = u.cond!;
+    const w = withMotor('sail'), u = w.user, m = u.motor!, c = u.cond!;
+    // (her condition is written as it stands, the same object: its numbers taken at each stage)
+    const now = () => ({ kg: c.extraKg, moment: c.extraMoment, rd: c.rightingDelta(20) });
     const shift = () => { applyCommand(w, { k: 'motor', op: 'stow' }); const of = m.shifting!.of; for (let i = 0; i < 60 * (of + 1); i++) w.step(DT); };
-    expect(on.rightingDelta(20)).toBeLessThan(0); // (on the bracket it's weight up at deck level)
-    shift(); expect(m.stowed).toBe(true); const below = u.cond!;
-    expect(below.extraKg).toBe(on.extraKg);
-    expect(Math.abs(below.extraMoment)).toBeLessThan(Math.abs(on.extraMoment)); expect(below.extraMoment).toBeLessThan(0); // (still aft of her middle, less far)
-    expect(below.rightingDelta(20)).toBeGreaterThan(on.rightingDelta(20)); // (and no longer up on the bracket)
+    const on = now(); expect(on.rd).toBeLessThan(0); // (on the bracket it's weight up at deck level)
+    shift(); expect(m.stowed).toBe(true); expect(u.cond).toBe(c); const below = now();
+    expect(below.kg).toBe(on.kg);
+    expect(Math.abs(below.moment)).toBeLessThan(Math.abs(on.moment)); expect(below.moment).toBeLessThan(0); // (still aft of her middle, less far)
+    expect(below.rd).toBeGreaterThan(on.rd); // (and no longer up on the bracket)
     shift(); expect(m.stowed).toBe(false);
-    expect(u.cond!.extraMoment).toBeCloseTo(on.extraMoment, 9); expect(u.cond!.rightingDelta(20)).toBeCloseTo(on.rightingDelta(20), 9);
+    const back = now(); expect(back.moment).toBeCloseTo(on.moment, 9); expect(back.rd).toBeCloseTo(on.rd, 9);
   }, 60_000);
 
+  it('someone goes aft to the bracket to do it, their weight with them, and back again when it\'s done', { timeout: 60_000 }, () => {
+    const w = withMotor('sail'), u = w.user;
+    for (let i = 0; i < 60 * 5; i++) w.step(DT);
+    applyCommand(w, { k: 'motor', op: 'stow' });
+    for (let i = 0; i < 60 * 15; i++) w.step(DT);
+    const aft = u.crew!.people.find(p => p.job?.line === 'outboard');
+    expect(aft, 'a crewmate on the outboard').toBeTruthy(); expect(aft!.z).toBeGreaterThan(3);
+    for (let i = 0; i < 60 * 200 && u.motor!.shifting; i++) w.step(DT);
+    expect(u.motor!.stowed).toBe(true); expect(u.crew!.people.some(p => p.job?.line === 'outboard')).toBe(false);
+  });
   it('stowed below in her setup: cruising, it\'s aboard to ship; racing, it stays below with no motor to work', () => {
     const c = stowedSpec('sail'); expect(c.user.motor).toMatchObject({ stowed: true, down: false, running: false });
     expect(stowedSpec('race').user.motor ?? null).toBeNull();

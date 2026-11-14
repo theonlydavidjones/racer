@@ -72,10 +72,13 @@ export interface MotorState {
   shifting?: { to: 'stowed' | 'bracket'; left: number; of: number };
 }
 /**
- * The crew's time to stow it (unclamp it, lift it off the bracket, lower it into the lazarette) and to ship it again (the
- * reverse, and clamp it on): ESTIMATES, nothing published; a 3.5 weighs 18 kg (OUTBOARDS). A slower crewmate takes longer.
+ * The crew's time to stow it and to ship it again: ESTIMATES, nothing published. Stowing is the fuel cock shut and the
+ * tank vent closed, the safety lanyard and the two clamp screws off, an 18 kg motor (the 3.5, OUTBOARDS) lifted off the
+ * bracket and over the after deck, laid in the lazarette on its proper side (a four-stroke laid down must lie as its
+ * maker says), the hatch shut: about 45 s for a crew who've done it before. Shipping is the reverse, lining the clamps up
+ * on the bracket's board and screwing them down, about a minute. A slower crewmate takes longer (workPace).
  */
-export const MOTOR_STOW_S = 20, MOTOR_SHIP_S = 25;
+export const MOTOR_STOW_S = 45, MOTOR_SHIP_S = 60;
 
 /** The prop's static thrust at full power (N), from momentum theory and the figure of merit. */
 export function staticThrust(o: Outboard): number {
