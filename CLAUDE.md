@@ -54,7 +54,7 @@ come later, once the physics and racing are dialed in.
 
 ```bash
 npm run test:fast        # ~40 s: everything but the whole-race runs; use while iterating
-npm test                 # ~23 min: the full suite (run before publishing)
+npm test                 # ~29 min: the full suite (run before publishing; perf.test alone is ~12 min)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
 node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headless Chromium, both ways it loads (blob modules,
@@ -76,7 +76,8 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 
 - The step's speed (the owner, 14 Nov 2026): measured paired, both versions sailed by turns in one process, so the
   host's drift cancels (scripts/check/perf-pair.mjs, docs/CAPACITY.md §8). The budget holds: perf.test requires the
-  step within v168 × 1.019 (the same 43.1 as before, now without the drift). A PR that touches the step (src/boat,
+  step within v168 × 1.019 (the same 43.1 as before, now without the drift), on twelve ratios, six with each loaded
+  first (the owner, 14 Nov 2026). A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
