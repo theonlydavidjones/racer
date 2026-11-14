@@ -1,7 +1,8 @@
 import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
-import { landAlong, onLand, shoreDist, wharfNearest } from '../geo/shore';
+import { anyShoreDist, landAlong, onLand, shoreDist, wharfNearest } from '../geo/shore';
+import { depthBand } from '../environment/tide';
 import type { Outlook } from './outlook';
 
 /**
@@ -252,6 +253,48 @@ export function groundLaylines(o: Outlook, b: Vec, t: number, kind: 'beat' | 'ru
   const ang = kind === 'beat' ? (ch.hs < 0.02 ? beatAngle(w.kt) : beatInChop(w.kt, ch.hs, ch.tp)) : runAngle(w.kt), vb = chopSpeed(w.kt, ang, ch.hs, ch.tp);
   const g = (h: number) => { const d = V(h); return unit({ x: d.x * vb + c.x, y: d.y * vb + c.y }); };
   return [g(w.from - ang), g(w.from + ang)];
+}
+
+/** A Folkboat draws 1.2 m (class rules); inshore she keeps to water this deep below chart datum (MLLW: the tide's
+ * low water), with room under the keel for the swell and the chart's own error. */
+export const SAFE_DEPTH = 2.5;
+/** Shoaler than SAFE_DEPTH on the chart (its band's mid depth). Off the chart's grid (depthBand gives [0, 0]: the
+ * Cityfront's open water east of the Gate isn't on it), the shore distance alone keeps her off. */
+const tooShoal = (p: Vec): boolean => { const [d1, d2] = depthBand(p); return !(d1 === 0 && d2 === 0) && (d1 + d2) / 2 < SAFE_DEPTH; };
+/**
+ * Working the shore against a foul tide: in toward the nearer shore, along it in the slacker water there (the stream
+ * runs slower near the beach: environment/current.ts shoreRelief), and out to the mark, the way Bay sailors work the
+ * Cityfront on an ebb. `off`: how far off the shore (or the water too shallow) she keeps. The legs between are sailed
+ * as any leg is (sailLeg, up the middle); null if there's no shore within 1200 m of the course to work, or she can't
+ * get there that way.
+ */
+export function shoreLeg(o: Outlook, a: Vec, b: Vec, t0: number, off: number, sc: Scenario = AS_FORECAST, arrive = 30): SailResult | null {
+  const L = dist(a, b); if (L < 600) return null;
+  const u = unit(sub(b, a)), n = { x: -u.y, y: u.x }; // (n: left of the course, looking from a to b)
+  // the shore's side: the nearer one at the middle of the leg, out to 1200 m
+  const reach = (q: Vec, s: number) => { for (let d = 0; d <= 1200; d += 20) { const r = { x: q.x + n.x * s * d, y: q.y + n.y * s * d }; if (anyShoreDist(r) <= off || tooShoal(r)) return d; } return Infinity; };
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dl = reach(mid, 1), dr = reach(mid, -1), s = dl <= dr ? 1 : -1;
+  if (!isFinite(Math.min(dl, dr))) return null;
+  const wps: Vec[] = [];
+  for (const f of [0.2, 0.4, 0.6, 0.8]) {
+    const q = { x: a.x + u.x * L * f, y: a.y + u.y * L * f }, d = reach(q, s);
+    if (!isFinite(d)) continue;
+    wps.push({ x: q.x + n.x * s * d, y: q.y + n.y * s * d });
+  }
+  if (!wps.length) return null;
+  const pts = [a, ...wps, b];
+  let t = t0, tacks = 0; const path: SailResult['path'] = [], turns: SailResult['turns'] = [];
+  let sumKt = 0, sumCur = 0, maxLeft = 0, maxRight = 0, minShore = Infinity, kind: LegKind | null = null;
+  for (let i = 1; i < pts.length; i++) {
+    const r = sailLeg(o, pts[i - 1], pts[i], t, 'middle', sc, i === pts.length - 1 ? arrive : 40);
+    if (!r.ok) return null;
+    t += r.minutes; tacks += r.tacks; path.push(...r.path); turns.push(...r.turns);
+    sumKt += r.meanKt * r.minutes; sumCur += r.meanCurAlong * r.minutes; minShore = Math.min(minShore, r.minShore);
+    for (const q of r.path) { const xt = cross(u, sub(q.p, a)); maxLeft = Math.max(maxLeft, xt); maxRight = Math.max(maxRight, -xt); }
+    kind ??= r.kind;
+  }
+  const m = t - t0;
+  return { ok: true, minutes: m, kind: kind!, path, tacks, turns, meanKt: sumKt / m, meanCurAlong: sumCur / m, maxLeft, maxRight, minShore };
 }
 
 /** All three plans for a leg (a reach has just the one way: straight there). */
