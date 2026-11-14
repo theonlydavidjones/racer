@@ -228,8 +228,8 @@ export class Puffs {
  * rest give the 0 weight() would. The same sums, from a few puffs where it was all 170, for each boat every step.
  * Kept beside the puffs, not on them, so the page's mirror isn't sent them; made again each step (puffs.steps).
  */
-interface PuffBuckets { steps: number; near(x: number, y: number): number[] }
-interface Grid extends PuffBuckets { size: number; x0: number; y0: number; nx: number; ny: number; head: Int32Array; next: Int32Array; out: number[] }
+interface PuffBuckets { steps: number; near(x: number, y: number): Int32Array }
+interface Grid extends PuffBuckets { size: number; x0: number; y0: number; nx: number; ny: number; head: Int32Array; next: Int32Array; out: Int32Array }
 const BUCKETS = new WeakMap<Puffs, Grid>();
 function bucketPuffs(f: Puffs): void {
   let size = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -237,21 +237,24 @@ function bucketPuffs(f: Puffs): void {
   const nx = Math.max(1, Math.floor((x1 - x0) / size) + 1), ny = Math.max(1, Math.floor((y1 - y0) / size) + 1);
   let g = BUCKETS.get(f);
   if (!g) {
-    g = { steps: 0, size, x0, y0, nx, ny, head: new Int32Array(0), next: new Int32Array(0), out: [], near(x, y) {
-      const G = this as Grid, out = G.out; out.length = 0;
+    g = { steps: 0, size, x0, y0, nx, ny, head: new Int32Array(0), next: new Int32Array(0), out: new Int32Array(0), near(x, y) {
+      const G = this as Grid, out = G.out; let n = 0;
       const bx = Math.floor((x - G.x0) / G.size), by = Math.floor((y - G.y0) / G.size);
       for (let j = Math.max(0, by - 1); j <= Math.min(G.ny - 1, by + 1); j++)
-        for (let i = Math.max(0, bx - 1); i <= Math.min(G.nx - 1, bx + 1); i++) for (let k = G.head[j * G.nx + i]; k >= 0; k = G.next[k]) out.push(k);
-      return out.sort((a, b) => a - b); // (the puffs' own order: the sums add up as they did)
+        for (let i = Math.max(0, bx - 1); i <= Math.min(G.nx - 1, bx + 1); i++) for (let k = G.head[j * G.nx + i]; k >= 0; k = G.next[k]) out[n++] = k;
+      // (the puffs' own order, so the sums add up as they did: a typed array sorts its numbers as numbers, no comparator)
+      return out.subarray(0, n).sort();
     } };
     BUCKETS.set(f, g);
   }
   // (each square's puffs a chain through next[], the arrays kept from step to step: nothing new a step)
   if (g.head.length < nx * ny) g.head = new Int32Array(nx * ny * 2);
   if (g.next.length < f.cells.length) g.next = new Int32Array(f.cells.length);
+  if (g.out.length < f.cells.length) g.out = new Int32Array(f.cells.length); // (each puff once at most in near's nine squares)
   g.head.fill(-1, 0, nx * ny);
-  Object.assign(g, { steps: f.steps, size, x0, y0, nx, ny });
-  f.cells.forEach((c, i) => { const b = Math.floor((c.y - y0) / size) * nx + Math.floor((c.x - x0) / size); g!.next[i] = g!.head[b]; g!.head[b] = i; });
+  g.steps = f.steps; g.size = size; g.x0 = x0; g.y0 = y0; g.nx = nx; g.ny = ny;
+  const cells = f.cells, head = g.head, next = g.next;
+  for (let i = 0; i < cells.length; i++) { const c = cells[i], b = Math.floor((c.y - y0) / size) * nx + Math.floor((c.x - x0) / size); next[i] = head[b]; head[b] = i; }
 }
 
 /** windTerrain on a precomputed 50 m grid (for drawing the wind on the water, where it's needed at thousands of points). */

@@ -1035,7 +1035,7 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
  */
 type Ctl = Exclude<keyof Controls, 'car'>;
 // (the lines the crew works, as constants: trimSails runs every step for every boat)
-const CREW_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const, CREW_LINES_T = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard', 'traveller'] as const, FIXABLE_LINES = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
+const CREW_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const, FIXABLE_LINES = ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
 function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   if (!b.crewReady) b.awaSlow = awa; // (set up before she sails: for the wind she has)
   b.awaSlow += (awa - b.awaSlow) * Math.min(1, dt / CREW_LAG);
@@ -1125,7 +1125,17 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const want: Partial<Record<Ctl, number>> = {};
   // (a line is moved only if it's worth the trip: a skilled crew sees smaller gains, ~0.1% of drive; a novice ~0.4%)
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
-  for (const k of CREW_LINES_T) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
+  // (the crew's lines and the traveller, in that order (CREW_LINES, then 'traveller'), written out by name: the same values put in the same order, but each line's
+  // reads its own, where a loop over the names made every read look up a different one: about 1% of the step)
+  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, pick = (w: number | undefined) => (w ?? 1) >= minGain || !ready;
+    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang) ? t.vang : c.vang;
+    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul) ? t.outhaul : c.outhaul;
+    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham) ? t.cunningham : c.cunningham;
+    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul) ? t.downhaul : c.downhaul;
+    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) ? t.backstay : c.backstay;
+    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham) ? t.jibCunningham : c.jibCunningham;
+    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard) ? t.jibHalyard : c.jibHalyard;
+    if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller) ? t.traveller : c.traveller; }
   if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
