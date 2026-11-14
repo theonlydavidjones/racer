@@ -3,7 +3,7 @@ import { clearAstern } from './geometry';
 import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
 
 /** Who must keep clear, and under which rule (RRS 2025–2028). Rules are checked in order of precedence:
- * 21 (returning to start, taking a penalty, backing a sail: Section A doesn't apply), 20.2(c) (replied "You tack"),
+ * 22 (anchored or aground: avoided by a boat under way), 21 (returning to start, taking a penalty, backing a sail: Section A doesn't apply), 20.2(c) (replied "You tack"),
  * 18.3 (tacked in the zone), 18.2(a) and 18.2(c) mark-room (not while a hail for room to tack is under way: 20.2(e)), 13 (tacking), 10, 12, 11.
  * (Rule 19, room at an obstruction, is settled when there's an incident: see assessPair.) */
 /** Rule 21.1: is she returning to start (the World's judgement, or, if it hasn't made one, her being over early)? */
@@ -12,6 +12,13 @@ export const returning = (b: RulesBoat): boolean => b.returning ?? b.ocs;
 export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, rec?: PairRecord | null): Verdict<B> {
   const B = B_;
   const after = ctx.t > 0;
+  // Rule 22: "If possible, a boat shall avoid a boat that is capsized or has not regained control after capsizing, is
+  // anchored or aground, or is trying to help a person or vessel in danger." Between the two, Section A doesn't apply
+  // (Part 2, Section D preamble): whatever their tacks, the boat under way avoids her. Both held, neither can: rule 22
+  // still, and no incident between them (assessPair). A held boat is so an obstruction to two boats passing her
+  // (Definitions, Obstruction; World.keepsClearOf). (Not modelled: capsizing and rescuing, which the sim doesn't have)
+  const held = (b: RulesBoat) => !!(b.anchored || b.aground);
+  if (held(A) || held(B)) return { kc: held(A) && !held(B) ? B : A, rule: '22' };
   // Rule 21.1: a boat sailing back toward the pre-start side after her starting signal, to start or to comply with rule
   // 30.1, keeps clear of one not doing so, until her hull is completely on the pre-start side. (Over early but sailing on
   // away from the line, she keeps her rights until she turns back: the World's `returning`.)

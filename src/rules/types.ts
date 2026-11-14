@@ -36,6 +36,9 @@ export interface RulesBoat {
   aboveProper?: boolean;
   /** Moving astern, or sideways to windward, through the water by backing a sail (Rule 21.3). */
   backing?: boolean;
+  /** Lying to her anchor, or aground (her keel on the bottom): rule 22 has other boats avoid her if possible. Set by the
+   * World (boat/anchor.ts lyingToAnchor; Crew Controls). An anchored boat is still racing (WS Case 5). */
+  anchored?: boolean; aground?: boolean;
   /** She has finished (crossed the finishing line). */
   finished?: boolean;
   /**
@@ -81,7 +84,7 @@ export interface RulesContext {
   keepsClearOf?: (a: RulesBoat, c: RulesBoat) => boolean;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '22' | '23';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -109,8 +112,10 @@ export interface PairRecord {
   rule: RuleId | null;
   grace: number; // Rule 15 grace lasts until this time
   by: number | null; // id of the boat that just acquired right of way
-  byWhy: 'tack' | 'overlap' | 'rule21' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | 'weighed' | null;
   cool: number; // no new incident for this pair until this time
+  /** Rule 22: when one of the two became anchored or aground (the boat under way's time to respond, RULE15_GRACE). */
+  held22?: number;
   mark: MarkRoomState | null;
   /** Rule 17: id of the boat that became overlapped to leeward from clear astern within two lengths. */
   r17: number | null;
@@ -177,7 +182,7 @@ export interface Incident<B> {
   kind: IncidentKind;
   fouler: B;
   rule: RuleId;
-  byWhy: 'tack' | 'overlap' | 'rule21' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | 'weighed' | null;
   /** Rule 16.1: how far (deg) the right-of-way boat turned toward the other boat just before. */
   turned?: number;
   /** Rule 20 hail incidents: whether the fouler was the hailed boat (didn't respond) or the hailing boat (didn't tack after the response). */

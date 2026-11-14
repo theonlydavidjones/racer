@@ -795,8 +795,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       }
       const away = sailable(b, brg(-dx, -dy)), running = b.twa > 110;
       // (racing called off, the boat she must keep clear of lying to, stopped: she sails round her with way on, as a
-      // sailor would, not luffs and eases alongside, where she'd stop and drift down onto her)
-      if (w.cancelled && o.v + (o.astern ?? 0) < 0.5) { desired = away; luff = false; }
+      // sailor would, not luffs and eases alongside, where she'd stop and drift down onto her; so too a boat anchored or
+      // aground, rule 22: in the tide that has boats anchoring, a luffed boat up-current of her is set down onto her)
+      if ((w.cancelled && o.v + (o.astern ?? 0) < 0.5) || r.rule === '22') { desired = away; luff = false; }
       else if (r.rule === '10') { desired = sailable(b, b.tack === 'P' ? b.h + 32 : b.h - 32); luff = false; } // keep way on to steer
       else if (r.rule === '11') {
         // head up from her heading, but no more than 35° above her course: turned up afresh from wherever she'd got to

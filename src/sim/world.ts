@@ -622,7 +622,7 @@ export class World {
     let kc = this.kcMemo.m.get(key);
     if (kc === undefined) {
       const ctx: RulesContext = { t: this.t, windFrom: this.wind.from, marks: this.C.marks, beat: beatAngle(this.wind.kt) };
-      // only who is "required to keep clear" (rules 10–13, 21), not who owes room or mark-room: no pair record
+      // only who is "required to keep clear" (rules 10–13, 21) or to avoid her (22: Definitions, Obstruction), not who owes room or mark-room: no pair record
       kc = rightOfWay(A, C, ctx, null).kc.id; this.kcMemo.m.set(key, kc);
     }
     return kc === A.id;

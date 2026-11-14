@@ -19,6 +19,7 @@ export const RULES: Record<RuleId, [title: string, text: string]> = {
   '21.1': ['Rule 21.1 · Returning to start', 'After her starting signal, a boat sailing back toward the pre-start side of the starting line (or its extensions) to start keeps clear of boats that are not, until her hull is completely on the pre-start side.'],
   '21.2': ['Rule 21.2 · Taking a penalty', 'A boat taking a penalty keeps clear of boats that are not.'],
   '21.3': ['Rule 21.3 · Backing a sail', 'A boat moving astern, or sideways to windward, through the water by backing a sail keeps clear of one that is not.'],
+  '22': ['Rule 22 · Anchored or aground', 'If possible, a boat shall avoid a boat that is capsized or has not regained control after capsizing, is anchored or aground, or is trying to help a person or vessel in danger. Between them the right-of-way rules (Section A) don\'t apply. An anchored boat is still racing (WS Case 5).'],
   '23': ['Rule 23 · Interfering with another boat', 'If reasonably possible, a boat not racing (one that has retired, or finished and cleared the finishing line) shall not interfere with a boat that is racing (23.1). And, if reasonably possible, a boat shall not interfere with a boat taking a penalty, sailing on another leg, or returning to start under rule 21.1, except that after the starting signal she may sail her proper course (23.2). The rules don\'t define "interfere": by the owner\'s decision this sim calls rule 23 only for getting in her way, not for taking her wind, which is tactics.']
 };
 
@@ -33,7 +34,7 @@ export interface ExplainInput {
   userTack: Tack;
   rule: RuleId;
   kind: IncidentKind;
-  byWhy: 'tack' | 'overlap' | 'rule21' | null;
+  byWhy: 'tack' | 'overlap' | 'rule21' | 'weighed' | null;
   markName?: string; // for 18.2(a)
   markOverlapped?: boolean;
   turned?: number; // for 16.1 and 16.2
@@ -65,7 +66,7 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       tip = you ? 'Before tacking near a boat, make sure you will be close-hauled with clear water. About three boat lengths is a safe rule of thumb.' : 'A boat that is mid-tack has no rights. Hold your course.';
       break;
     case '15':
-      what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing your penalty turns)' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing their penalty turns)' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
+      what = you ? `You just gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing your penalty turns)' : e.byWhy === 'weighed' ? 'getting under way again (anchor up, or afloat)' : 'establishing a leeward overlap from astern'}, and ${o} had no time to respond.` : `${o} gained right of way by ${e.byWhy === 'tack' ? 'tacking' : e.byWhy === 'rule21' ? 'getting back below the starting line (or finishing their penalty turns)' : e.byWhy === 'weighed' ? 'getting under way again (anchor up, or afloat)' : 'overlapping from astern'} and didn't leave you room to keep clear.`;
       tip = you ? 'Right of way you have just acquired is not enforceable straight away. Leave the other boat time and space to get clear.' : 'You were the boat that had to keep clear, but the other boat changed the situation too suddenly for you to respond.';
       break;
     case '16.1':
@@ -140,6 +141,10 @@ export function explain(e: ExplainInput): { what: string; tip: string } {
       what = you ? `You were moving backwards (or sideways to windward) by backing a sail, so you had to keep clear of ${o}.` : `${o} was backing a sail and moving astern, and had to keep clear.`;
       tip = you ? 'Backing a sail to get out of irons or off the line is fine, but while you go backwards you have no rights.' : 'A boat backing down has no rights over you.';
       break;
+    case '22':
+      what = you ? `${o} was anchored or aground, and you had to avoid her if you could.` : `You were anchored or aground, and ${o} had to avoid you.`;
+      tip = you ? 'Give an anchored or grounded boat a wide berth: she can\'t get out of your way.' : 'Anchored or aground, the others must avoid you. You still avoid contact if you reasonably can (rule 14).';
+      break;
     case '23':
       if (e.part === '23.1') {
         what = you ? `You had finished or retired, so you were no longer racing, and you got in the way of ${o}, who was.` : `${o} had finished or retired and got in your way while you were still racing.`;
@@ -177,6 +182,7 @@ export function situationText(rule: RuleId, youKeepClear: boolean, other: string
     '21.1': kc ? `You're returning. Keep clear of everyone.` : `${nm} is returning and must keep clear.`,
     '21.2': kc ? `You're doing turns. Keep clear of everyone.` : `${nm} is doing turns and must keep clear.`,
     '21.3': kc ? `You're backing down. Keep clear of everyone.` : `${nm} is backing down and must keep clear.`,
+    '22': kc ? `${nm} is anchored or aground: avoid them.` : `You're anchored or aground: ${nm} must avoid you.`,
     '23': kc ? `Don't interfere with ${nm}.` : `${nm} must not interfere with you.`
   };
   return msgs[rule];

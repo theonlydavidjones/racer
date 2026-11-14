@@ -402,9 +402,15 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
     if (avoided || g > 6 * LOA) rec.r202e = null;
   }
   const r = rightOfWay(A, B, ctx, rec);
+  // Rule 22 (rightOfWay): no right of way is acquired by anchoring or going aground (Section A off), so no rule 15; a
+  // grace running ends. When it begins, the boat under way has her time to respond (RULE15_GRACE: "if possible").
+  // Getting under way again, the boat that was held acquires right of way by her own action: rule 15 is hers
+  const held22 = r.rule === '22', was22 = rec.rule === '22';
+  if (held22 && !was22) { rec.held22 = ctx.t; rec.grace = -Infinity; rec.by = null; }
+  if (was22 && !held22 && rec.kc != null && r.kc.id === rec.kc) { rec.grace = ctx.t + RULE15_GRACE; rec.by = (r.kc === A ? B : A).id; rec.byWhy = 'weighed'; }
   // Rule 15: right of way just changed hands because of a tack or an overlap from astern.
   // (Not when the change comes from the other boat's own action: a tack into the zone.)
-  if (rec.kc != null && r.kc.id !== rec.kc && r.rule !== '18.3') {
+  if (rec.kc != null && r.kc.id !== rec.kc && r.rule !== '18.3' && !held22 && !was22) {
     const newRow = r.kc === A ? B : A, tacked = ctx.t - newRow.lastTackT < JUST_TACKED;
     // (or by her own doing, coming out from under rule 21: her hull back below the line, or her penalty turns done; if the
     // other boat began returning or taking a penalty, she got right of way by the other boat's actions, so no grace)
@@ -452,6 +458,9 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   if (gap < CONTACT_GAP) kind = 'contact';
   else if (obs.swerve) kind = 'swerve';
   if (!kind) return { verdict: r, incident: null };
+  // Rule 22: broken only by touching her (passing close is avoiding her; she can't swerve), not between two held boats
+  // (neither can avoid the other), and not before the boat under way could respond ("if possible")
+  if (held22 && (kind === 'swerve' || ((A.anchored || A.aground) && (B.anchored || B.aground)) || ctx.t - (rec.held22 ?? -Infinity) < RULE15_GRACE)) return { verdict: r, incident: null };
   // Rule 15: a boat that has just got right of way and changes course to give the other boat room to keep clear is
   // complying with it, not being forced to swerve (WS Case 53)
   if (kind === 'swerve' && rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) return { verdict: r, incident: null };
@@ -509,7 +518,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
-  } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0))) {
+  } else if (!held22 && !done(row) && (((kc.leg !== row.leg && kc.started && row.started) || kc.penalty > 0 || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0))) {
     // Rule 23.2: she interfered with a boat taking a penalty, on another leg or returning to start, when not on her proper
     // course. "However, after the starting signal this rule does not apply when the boat is sailing her proper course": so
     // after the start only leaving it counts (the sim's sign: sailing above it), not merely turning toward the other boat,
