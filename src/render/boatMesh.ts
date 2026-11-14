@@ -1602,7 +1602,15 @@ function syncLines(m: BoatMesh, b: Boat): void {
  */
 /** Which picture goes on which face of a sail's cloth (by the front material). */
 const sailPics = new WeakMap<THREE.Material, { front: THREE.MeshLambertMaterial; back: THREE.MeshLambertMaterial; stbd: THREE.Texture; port: THREE.Texture }>();
+/** (each sail's picture drawn once for its cloth, number and inks, and shared: drawing it is a canvas full of lettering,
+ * and the boat editor rebuilds her on every change, ROADMAP 8v) */
+const sailPicCache = new Map<string, THREE.CanvasTexture>();
 function sailTexture(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
+  const key = JSON.stringify([color, no, side, main, inks.no ?? '', inks.f ?? '']), hit = sailPicCache.get(key);
+  if (hit) return hit;
+  const t = sailTextureDraw(color, no, side, main, inks); sailPicCache.set(key, t); return t;
+}
+function sailTextureDraw(color: string, no: string, side: 'stbd' | 'port', main: boolean, inks: { no?: string; f?: string } = {}): THREE.CanvasTexture {
   // the picture is in the sail's own coordinates: across from luff (u 0) to leech (u 1), up from foot (v 0) to head
   // (v 1), so everything is drawn where it physically is on the cloth, whichever side the picture is for. Seen from
   // starboard the leech is on your left, so the lettering on that side is drawn back to front in the picture
