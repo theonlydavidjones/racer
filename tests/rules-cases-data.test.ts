@@ -53,7 +53,8 @@ describe('the World Sailing Cases as data (src/rules/cases.ts): the engine answe
       expect(b.frames.length, `Case ${c.case} ${b.letter}: one frame, she'd sit still`).toBeGreaterThan(1);
       for (let i = 1; i < b.frames.length; i++) {
         const a = b.frames[i - 1], f = b.frames[i], dt = f.t - a.t, d = Math.hypot(f.x - a.x, f.y - a.y), sp = d / dt;
-        expect(sp, `Case ${c.case} ${b.letter} ${a.t}→${f.t}`).toBeLessThan(4);
+        // (no faster than a Folkboat sails: hull speed, 1.34·√(LWL 19.7 ft) ≈ 5.95 kt, 3.06 m/s; the polar tops out there)
+        expect(sp, `Case ${c.case} ${b.letter} ${a.t}→${f.t}: above hull speed`).toBeLessThan(3.1);
         expect(sp, `Case ${c.case} ${b.letter} ${a.t}→${f.t}: parked`).toBeGreaterThan(0.5 * (f.v ?? 2.5));
         const track = Math.atan2(f.x - a.x, f.y - a.y) * 180 / Math.PI;
         expect(Math.abs(((track - f.h + 540) % 360) - 180), `Case ${c.case} ${b.letter} ${a.t}→${f.t}: sideways`).toBeLessThan(15);

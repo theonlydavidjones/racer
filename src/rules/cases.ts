@@ -98,14 +98,14 @@ const hS105 = (t: number) => 181 + Math.min(30, Math.max(0, (t - 50) * 6));
 export const CASES: RulesCase[] = [
   {
     case: 7, title: 'Overlapped to leeward from clear astern', rules: ['11', '17'],
-    // (sailed: W close-hauled at 315°, 2.5 m/s, holding her course; L comes up from 12 m astern, 6 m to leeward, at 3.5 m/s,
-    // overlapping her within two lengths, slows to her speed and luffs slightly, 5° over 1 s at 50 s (no course change
+    // (sailed: W close-hauled at 315°, 2.5 m/s (the polar's 12-15 kt beat, src/boat/polar.ts), holding her course; L comes up
+    // from 12 m astern, 6 m to leeward, at 2.8 m/s (a puff hers first: under hull speed, about 3.1 m/s), overlapping her within two lengths, slows to her speed and luffs slightly, 5° over 1 s at 50 s (no course change
     // for 16.1, and no higher than her proper course for 17), closing on W until W's boom touches her)
     boats: [
-      { letter: 'W', frames: [at(39.9, [0, 0], 315, { look: false }), ...sail([0, 0], () => 315, 2.5, 40, 70)] },
-      { letter: 'L', frames: [at(39.9, off([0, 0], 315, -12, -6), 315, { look: false }), ...then(sail(off([0, 0], 315, -12, -6), () => 315, 3.5, 40, 47.9), hL7, 2.5, 48, 70)] },
+      { letter: 'W', frames: [at(21.1, [0, 0], 315, { look: false }), ...sail([0, 0], () => 315, 2.5, 21.2, 70)] },
+      { letter: 'L', frames: [at(21.1, off([0, 0], 315, -12, -6), 315, { look: false }), ...then(sail(off([0, 0], 315, -12, -6), () => 315, 2.8, 21.2, 47.9), hL7, 2.5, 48, 70)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: 40, keepsClear: 'L', rule: '12' }, { t: 48, keepsClear: 'W', rule: '11' }],
+    pair: ['W', 'L'], checks: [{ t: 22, keepsClear: 'L', rule: '12' }, { t: 48, keepsClear: 'W', rule: '11' }],
     momentT: 50, ask: 'foul', answer: { who: 'W', rule: '11', line: 'W, to windward, keeps clear (rule 11). L came from astern, but sailed no higher than her proper course (17).' }, teach: true,
   },
 
@@ -126,26 +126,28 @@ export const CASES: RulesCase[] = [
 
   {
     case: 13, title: 'Before the start, a luff to close-hauled', rules: ['11', '17'],
-    // (sailed, before the start: W reaching at 280°, 2 m/s; L comes up from 12 m astern, 5 m to leeward, at 3.5 m/s,
+    // (sailed, before the start: W reaching at 280°, 2 m/s; L comes up from 12 m astern, 5 m to leeward, at 2.9 m/s (a beam
+    // reach at full speed, the polar's 12-15 kt: under hull speed),
     // overlaps her, slows to her speed and luffs to close-hauled, 5°/s from -35 s: before the start no boat has a proper
     // course, so rule 17 doesn't limit her; W, slower to respond, is touched: W's 11. The same from 3 to 8°/s, 4 to 6 m)
     boats: [
-      { letter: 'W', started: false, frames: [at(-44.1, [0, 0], 280, { v: 2, look: false }), ...sail([0, 0], () => 280, 2, -44, -20)] },
-      { letter: 'L', started: false, frames: [at(-44.1, off([0, 0], 280, -12, -5), 280, { look: false }), ...then(sail(off([0, 0], 280, -12, -5), () => 280, 3.5, -44, -35.1), hL13, 2, -35, -20).map(f => f.t >= -35 ? { ...f, aboveProper: true } : f)] },
+      { letter: 'W', started: false, frames: [at(-50.1, [0, 0], 280, { v: 2, look: false }), ...sail([0, 0], () => 280, 2, -50, -20)] },
+      { letter: 'L', started: false, frames: [at(-50.1, off([0, 0], 280, -12, -5), 280, { look: false }), ...then(sail(off([0, 0], 280, -12, -5), () => 280, 2.9, -50, -35.1), hL13, 2, -35, -20).map(f => f.t >= -35 ? { ...f, aboveProper: true } : f)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: -44, keepsClear: 'L', rule: '12' }],
+    pair: ['W', 'L'], checks: [{ t: -49, keepsClear: 'L', rule: '12' }],
     momentT: -35, ask: 'foul', answer: { who: 'W', rule: '11', line: 'Before the start there\'s no proper course, so no rule 17: L may luff to close-hauled. W keeps clear (11).' }, teach: true,
   },
 
   {
     case: 14, title: 'A slow luff toward the shore', rules: ['11', '16.1', '17'],
-    // (sailed: W broad reaching at 200°, 2.5 m/s; L comes up from 12 m astern, 6 m to leeward, at 3.5 m/s, overlapping
+    // (sailed: W broad reaching at 200°, 2.5 m/s; L comes up from 12 m astern, 6 m to leeward, at 2.9 m/s (a puff hers
+    // first: the polar's 15 kt at 140°, under hull speed), overlapping
     // her from clear astern within two lengths (so rule 17 binds her), slows to W's speed, then luffs 4°/s from 50 s)
     boats: [
-      { letter: 'W', frames: [at(35.9, [0, 0], 200, { look: false }), ...sail([0, 0], () => 200, 2.5, 36, 80)] },
-      { letter: 'L', frames: [at(35.9, off([0, 0], 200, -12, -6), 200, { look: false }), ...then(sail(off([0, 0], 200, -12, -6), () => 200, 3.5, 36, 44.9), hL14, 2.5, 45, 80)] },
+      { letter: 'W', frames: [at(22.4, [0, 0], 200, { look: false }), ...sail([0, 0], () => 200, 2.5, 22.5, 80)] },
+      { letter: 'L', frames: [at(22.4, off([0, 0], 200, -12, -6), 200, { look: false }), ...then(sail(off([0, 0], 200, -12, -6), () => 200, 2.9, 22.5, 44.9), hL14, 2.5, 45, 80)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: 36, keepsClear: 'L', rule: '12' }, { t: 45, keepsClear: 'W', rule: '11' }],
+    pair: ['W', 'L'], checks: [{ t: 23, keepsClear: 'L', rule: '12' }, { t: 45, keepsClear: 'W', rule: '11' }],
     momentT: 50, ask: 'foul', answer: { who: 'W', rule: '11', line: 'L luffs slowly, to her proper course: W had room to keep clear and didn\'t (11). L broke neither 16.1 nor 17.' }, teach: true,
   },
 
