@@ -13,7 +13,7 @@ import { D2R, KT, V, brg, clamp, dist, dot, n360, sub, wrap, type Vec } from '..
 import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays } from '../sim/world';
 import type { SimView } from '../sim/host';
-import { $ } from './dom';
+import { $, setHidden, setHtml, setText, setTitle } from './dom';
 import { routeAround } from '../sim/routing';
 import { passageNow, type PassageNow } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
@@ -174,20 +174,20 @@ export class Hud {
     if (w.freeSail || u.finished || u.retired || !w.settings.aids) { el.hidden = true; return; }
     const C = w.C, deg = (o: number) => (Math.abs(o) < 0.8 ? '<span class="on">in line now</span>' : `${Math.abs(o).toFixed(0)}° ${o > 0 ? 'right' : 'left'} of it`);
     if (w.t < 0 || !u.started) {
-      const T = w.lineTransit; if (!T) { el.hidden = true; return; }
-      el.hidden = false;
-      el.innerHTML = `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`;
-      $('nextCard').title = (el.textContent ?? '') + ' · Click for the course and the strategist';
+      const T = w.lineTransit; if (!T) { setHidden(el, true); return; }
+      setHidden(el, false);
+      setHtml(el, `Line transit: <b>${C.pinLabel}</b> in line with <b>${T.name}</b> means you're on the line · ${C.pinLabel} is ${deg(transitOffset(u, C.pin, T.p))}`);
+      setTitle($('nextCard'), (el.textContent ?? '') + ' · Click for the course and the strategist');
       return;
     }
     const m = w.nextMark(u), L = laylinesFor(w, u);
-    if (!m || !L || L.kind !== 'up' || u.twa > 70) { el.hidden = true; return; }
+    if (!m || !L || L.kind !== 'up' || u.twa > 70) { setHidden(el, true); return; }
     const i = u.tack === 'S' ? 0 : 1, g = L.tracks[i], key = `${m.name}:${Math.round(Math.atan2(g.x, g.y) * 30)}`;
     if (key !== this.trCache.key) this.trCache = { key, t: w.laylineTransit(L.mark.p, g) };
-    const T = this.trCache.t; if (!T) { el.hidden = true; return; }
-    el.hidden = false;
-    el.innerHTML = `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`;
-    $('nextCard').title = (el.textContent ?? '') + ' · Click for the course and the strategist';
+    const T = this.trCache.t; if (!T) { setHidden(el, true); return; }
+    setHidden(el, false);
+    setHtml(el, `${u.tack === 'S' ? 'Starboard' : 'Port'} layline: <b>${m.name.split(' ')[0]}</b> in line with <b>${T.name}</b> · ${m.name.split(' ')[0]} is ${deg(transitOffset(u, L.mark.p, T.p))}`);
+    setTitle($('nextCard'), (el.textContent ?? '') + ' · Click for the course and the strategist');
   }
 
   private sigKey = '';
@@ -226,7 +226,7 @@ export class Hud {
     if (u.roundEnd) txt = 'I flag: go back round an end of the line.';
     else if (u.scoring) txt = u.scoring === 'ZFP' ? 'Z flag: you have a 20% penalty.' : `You're disqualified (${u.scoring}).`;
     else if (u.ocs && w.t >= 0) txt = 'X flag: you\'re over. Return and start.';
-    $('sigText').textContent = txt;
+    setText($('sigText'), txt);
   }
 
   update(w: SimView, dt: number): void {
