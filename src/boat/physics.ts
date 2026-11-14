@@ -4,7 +4,7 @@ import { onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
-import { RUDDER_STALL, SCULL, bladeSwingForce, hullSide, hullYawM, helmForMoment, rudderCoef, rudderDragIdeal, rudderForce, scullMoment, scullTurnRate, steadyTurnRate, turnDragN, yawInertia } from './turning';
+import { RUDDER_STALL, SCULL, bladeSwingForce, hullSide, hullYawM, helmForMoment, rudderCoef, rudderDragIdeal, rudderForce, rudderInto, RUD, scullMoment, scullTurnRate, steadyTurnRate, turnDragN, yawInertia } from './turning';
 import { HANDLING, HULL, airDrag, windFore, windSide, windTurn, windHeel, driveExponent, flogAmount, hullResistance, luffDriveFactor, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce } from './motor';
@@ -266,8 +266,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     mScull = toWind * push;
   } else if (b.scullNet || b.scullMean) b.scullNet = b.scullMean = 0;
   // the rudder's force on her stern, and her turn from all the moments
-  const rud = rudderForce(u0, 0, r0, delta);
-  let r1 = r0 + (mFree + rud.y * RUDDER.arm + mScull) / I * dt;
+  rudderInto(u0, 0, r0, delta); const rudX = RUD.x; // (her rudder's force, left in turning.ts RUD)
+  let r1 = r0 + (mFree + RUD.y * RUDDER.arm + mScull) / I * dt;
   // (spun by her backed sails: turned at least that fast, against the same inertia and damping)
   if (floor) {
     const got = toWind * r1 / D2R, lag = rDeg + (floor - rDeg) * (1 - Math.exp(-dt / tau)), dir = Math.sign(floor);
@@ -278,7 +278,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (what the turn costs her way: the blade's drag beyond what it has sailing straight with a little weather helm, which
   // the polar's speeds have in them, and her keel's drag making the side force that takes her round: turning.ts)
   // (against her motion, ahead or astern; her keel's load from her sails, to windward, as last step had it)
-  const turnDrag = Math.sign(u0) * (Math.max(0, Math.abs(rud.x) - rudderDragIdeal(u0, IDEAL_HELM)) + turnDragN(r1, u0, (b.forces?.heel ?? 0) * Math.cos((b.heelMag ?? 0) * D2R)));
+  const turnDrag = Math.sign(u0) * (Math.max(0, Math.abs(rudX) - rudderDragIdeal(u0, IDEAL_HELM)) + turnDragN(r1, u0, (b.forces?.heel ?? 0) * Math.cos((b.heelMag ?? 0) * D2R)));
   b.turnRate = toWind * r1 / D2R;
   let rate = b.turnRate;
   if (b.v > 0.2) rate += waveYaw(b.sea, b.h, b.v, t, b.id + 1); // the sea knocks her bow about
