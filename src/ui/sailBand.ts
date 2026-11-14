@@ -43,6 +43,10 @@ export interface BandHost {
   allBack(): void;
   /** Set or stow the whisker pole (it becomes yours). */
   pole(): void;
+  /** Paddle on that side (tapping the side she's paddling on stops it). */
+  paddle(side: 'P' | 'S'): void;
+  /** Drop the anchor, or weigh it. */
+  anchor(): void;
   /** The hail you could make now (world.ts hailOption), and making it. */
   hailWords(): string | null;
   hail(): void;
@@ -172,6 +176,8 @@ export class SailBand {
   private colorsOf: string | null = null;
   /** Whether the pole tab is showing (a deep run, or the pole out): kept between frames for its hysteresis. */
   private poleShown = false;
+  /** Whether the paddle tab is showing (barely moving, or paddling): kept between frames for its hysteresis. */
+  private paddleShown = false;
   /** When to look for a hail to make next (performance.now(), ms). */
   private hailT = 0;
   /** The control whose help the Coach card shows: under the mouse, or the one last touched (and when). */
@@ -188,7 +194,7 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><button type="button" class="sb-tab sb-anchor" data-act="anchor" hidden data-help="Anchor: the forward hand lowers it from the bow and pays out the rode, as much as 7 times the depth that the 25 m allows; tap again to weigh it. Racing, rule 45 lets you anchor (kedging against a foul tide in no wind), but you must recover it before you sail on."></button><span class="sb-tab sb-paddle" hidden data-help="Paddle: one of your crew fetches the boom crutch from the cabin and paddles over the side you choose, pushing her along and swinging her bow away from that side: about a knot and a half in a calm. Tap the side again to stop. Racing, rule 42.1 forbids it, except to get clear after hitting something (42.3(h)) or to help someone in danger (42.3(g)). A good crew does it unasked when there's no wind and she's being set onto something."><span>Paddle</span><button type="button" data-act="padP">P</button><button type="button" data-act="padS">S</button></span></span>
 <span class="sb-tillerslot"></span>
 <span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
@@ -315,6 +321,8 @@ export class SailBand {
     if (!this.ok()) return;
     if (act === 'all') { this.stopRun(null); this.host.allBack(); return; }
     if (act === 'pole') { this.host.pole(); return; }
+    if (act === 'padP' || act === 'padS') { this.host.paddle(act === 'padP' ? 'P' : 'S'); return; }
+    if (act === 'anchor') { this.host.anchor(); return; }
     if (act === 'hoist') { this.host.halyard((t.closest<HTMLElement>('[data-sail]')!.dataset.sail as 'main' | 'jib')); return; }
     if (act === 'hail') { this.host.hail(); this.hailT = 0; return; } // (look again at once: the hail's been made)
     if (act === 'jless' || act === 'jmore') { this.turnJumpers(act === 'jmore' ? 0.5 : -0.5); return; }
@@ -436,6 +444,25 @@ export class SailBand {
       const words = this.host.hailWords();
       hide(hail, !words);
       if (words && hail.dataset.words !== words) { hail.innerHTML = `Hail · ${words}<span class="k">${this.host.hailKey()}</span>`; hail.dataset.help = `Hail: "${words}" (or press ${this.host.hailKey()}).`; hail.dataset.words = words; }
+    }
+    // the paddle: when she's all but stopped (under half a knot, not alongside), or paddling; it goes once she's making
+    // over a knot again
+    const pt = this.el.querySelector<HTMLElement>('.sb-paddle')!, p = u.paddle;
+    this.paddleShown = !!p || (!u.docked && !u.handled && u.v < (this.paddleShown ? 0.55 : 0.25));
+    pt.hidden = !this.paddleShown;
+    pt.querySelector<HTMLElement>('[data-act="padP"]')!.classList.toggle('on', p?.side === 'P');
+    pt.querySelector<HTMLElement>('[data-act="padS"]')!.classList.toggle('on', p?.side === 'S');
+    pt.classList.toggle('mine', !!p && !p.auto);
+    // the anchor: shown with the paddle (all but stopped), or while it's out. Stowed: Anchor; going down: dimmed; down:
+    // Weigh, with her scope; dragging, in amber; coming up: dimmed
+    const at = this.el.querySelector<HTMLElement>('.sb-anchor')!, a = u.anchor;
+    at.hidden = !(a || this.paddleShown);
+    if (!at.hidden) {
+      const scope = a?.out ? `${(a.out / ((a.depth ?? 0) + 0.8)).toFixed(1)}:1` : '';
+      const word = !a ? 'Anchor' : a.phase === 'fetch' || a.phase === 'paying' ? `Anchoring ${scope}` : a.phase === 'down' ? (a.dragging ? `Dragging · ${scope}` : `Weigh · ${scope}`) : 'Weighing';
+      if (at.textContent !== word) at.textContent = word;
+      at.classList.toggle('dim', !!a && a.phase !== 'down');
+      at.classList.toggle('mine', !!a?.dragging);
     }
     // the pole: only where the crew would set it (ai.ts poleRefused: a deep run, past 145° true where a poled-out jib
     // fills, polar.ts jibEfficiency; not at the dock, in a basin, in penalty turns or with the jib down). It shows at 148°

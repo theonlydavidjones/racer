@@ -528,6 +528,8 @@ const band = new SailBand({
   toast: (m, ms) => toast(m, ms),
   allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Hand Back: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
+  paddle: (side: 'P' | 'S') => paddleSide(side),
+  anchor: () => send({ k: 'anchor' }),
   hailWords: () => w.hailOption()?.words ?? null,
   hail: () => doHail(),
   hailKey: () => keymap.label('hail'),
@@ -738,6 +740,16 @@ document.querySelectorAll<HTMLButtonElement>('#tpForeRow [data-cf]').forEach(bt 
   send({ k: 'crewPlace', place: pl.across == null ? null : { across: pl.across, fore: null } });
   showCrewPlace(); toast(pl.across != null ? 'Fore and aft back to the crew; where they sit across stays yours.' : 'Crew back on auto: they place their own weight again.', 2500);
 });
+/** Paddle on a side (the band's tab), or stop if she's paddling on it already. */
+function paddleSide(side: 'P' | 'S'): void {
+  if (!w.running || w.paused) return;
+  send({ k: 'paddle', side: w.user.paddle?.side === side ? null : side });
+}
+/** The paddle key: port, then starboard, then stop. */
+function cyclePaddle(): void {
+  if (!w.running || w.paused) return;
+  const p = w.user.paddle; send({ k: 'paddle', side: !p ? 'P' : p.side === 'P' ? 'S' : null });
+}
 function togglePole(): void {
   if (!w.running || w.paused) return;
   // (the pole is always yours: your call only. The race answers, setting it or saying why not: sim/commands.ts, so the
@@ -1131,6 +1143,8 @@ addEventListener('keydown', e => {
     case 'lashTiller': lash(); break;
     case 'autopilot': if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); break;
     case 'pole': togglePole(); break;
+    case 'paddle': cyclePaddle(); break;
+    case 'anchor': send({ k: 'anchor' }); break;
     case 'crewLee': stepCrew('across', -1); break;
     case 'crewUp': stepCrew('across', 1); break;
     case 'crewFwd': stepCrew('fore', 1); break;

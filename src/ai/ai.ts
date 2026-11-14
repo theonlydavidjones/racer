@@ -882,9 +882,10 @@ export function poleRefused(b: PoleBoat): string | null {
 }
 const POLE_TOO_HIGH = 'she\'s too high for it: the poled-out jib won\'t fill';
 /** What the pole's rules read (the page's mirror of your boat will do). */
-type PoleBoat = Readonly<Pick<Boat, 'docked' | 'x' | 'y' | 'penalty' | 'twa'>> & { readonly rig?: Readonly<NonNullable<Boat['rig']>> };
+type PoleBoat = Readonly<Pick<Boat, 'docked' | 'x' | 'y' | 'penalty' | 'twa'>> & { readonly rig?: Readonly<NonNullable<Boat['rig']>>; readonly anchor?: Readonly<{ phase: string }> | null };
 function poleBlocked(b: PoleBoat): string | null {
   if (b.docked) return 'at the dock';
+  if (b.anchor) return 'at anchor';
   if (inBasin(b)) return 'not in the harbor: no room to pole out in a marina';
   if (b.penalty > 0) return 'in for the penalty turns';
   if (!!b.rig && (b.rig.jib < 1 || !b.rig.jibUp)) return 'the jib is down';

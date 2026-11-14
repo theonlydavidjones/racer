@@ -1,5 +1,6 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
+import { paddlePower, paddler } from '../boat/paddle';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
@@ -13,7 +14,8 @@ import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
-import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
+import { CurrentField, depthBand, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor, tideHeightAt, wetBand } from '../environment/tide';
+import { ANCHOR, anchorPace, holding, lyingToAnchor, rodeLine, stemHead } from '../boat/anchor';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
 import { waveMotion } from '../boat/seaway';
@@ -42,7 +44,7 @@ import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, 
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
-import { skillOf } from '../boat/crewPhys';
+import { Z, skillOf } from '../boat/crewPhys';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
@@ -53,7 +55,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
-import { landAt } from '../environment/sea';
+import { chartBand, landAt, soundingNear } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
@@ -135,6 +137,9 @@ export interface Protest {
  * sign of it: the boat that broke a rule against her is still within ENGAGED of her when she breaks hers (she's still
  * dealing with that boat: swerving from her, or pushed by her), within COMPELLED_WINDOW. */
 
+/** After a rule 42 penalty, she has this long to stop paddling before going on counts as a fresh breach, s (a judgement). */
+const R42_STOP = 5;
+
 export interface StartReport { delay: number; frac: number; kt: number }
 
 /** Where a boat was at the start signal. */
@@ -178,6 +183,12 @@ const SWING_DRAG = 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3
 function windSwing(kt: number, rel: number): number {
   const vSide = kt * KT * Math.sin(rel * D2R), torque = 0.5 * 1.225 * HOVE.windSide * vSide * vSide * 3.8;
   return Math.sqrt(torque / SWING_DRAG) / D2R;
+}
+
+/** The nearest land within `r` m (bearings every 15°, 2 m steps), or null. */
+function nearestLand(p: Vec, r: number): Vec | null {
+  for (let d = 2; d <= r; d += 2) for (let a = 0; a < 360; a += 15) { const u = V(a), q = { x: p.x + u.x * d, y: p.y + u.y * d }; if (onLand(q)) return q; }
+  return null;
 }
 
 /** Racing from her slip: how long before the warning signal she's in it, s (time to push off, get out of the harbor and sail to the line). */
@@ -233,7 +244,8 @@ export const CLOSE_M = 4 * LOA;
  * race, after the rules' hottest functions (checkPairs, assessPair) had learnt the boats' old classes, that left them
  * compiling and throwing the result away, some 800 times in the first race after load on Bay East's waves branch (14 s
  * of the engine's compiler threads; docs/CAPACITY.md, "The compiler's thrown-away work"; scripts/check/deopt.cjs).
- * weatherHeld and carOff, given later and starting at 0, are declared undefined in makeBoat for the same reason. (V8's
+ * weatherHeld and carOff, given later and starting at 0, are declared undefined in makeBoat for the same reason; and
+ * lastHitT and paddle (rule 42.3(h)'s contact time and the crutch), given mid-race, so a first bump doesn't add a field. (V8's
  * matter: Safari's engine keeps shapes its own way, and this costs it nothing.)
  */
 const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT'] as const;
@@ -594,7 +606,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -822,6 +834,297 @@ export class World {
   }
 
   /** Definitions, Start: the boats whose hull has been entirely on the pre-start side of the line since the starting signal. */
+  /**
+   * Paddle her with the boom crutch on `side` (back: back-paddling), or stop (null): you calling it (auto false), or the
+   * crew of themselves in a jam (crewPaddleCall). Changing sides keeps the crutch out. Racing, rule 42.1 forbids it
+   * except to get clear after grounding or colliding (42.3(h)), or to help someone in danger (42.3(g)).
+   */
+  paddle(side: 'P' | 'S' | null, back: boolean, auto: boolean): void {
+    const u = this.user, was = u.paddle;
+    // (you stopping the crew's own paddling sticks: they don't start again until the jam has passed. crewPaddleCall)
+    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) { u.paddleOff = true; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
+    if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
+    if (u.anchor) { if (!auto) this.emit({ type: 'toast', msg: 'The forward hand is on the anchor.' }); return; } // (one forward hand: the anchor's job, or the crutch)
+    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t };
+    this.paddleJob(u, side);
+    const solo = (u.crew?.spec.crew.length ?? 0) === 0, who = solo ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
+    const verb = solo || auto ? (back ? 'back-paddle' : 'paddle') : (back ? 'back-paddles' : 'paddles'); // (agreeing with who)
+    const where = `on the ${side === 'P' ? 'port' : 'starboard'} side`, how = `${verb} ${where}`;
+    if (!was) this.emit({ type: 'toast', ms: 5000, msg: `${who} the boom crutch from the cabin and ${how}${auto ? ': she\'s being set onto something with no wind to sail clear.' : '.'}${this.racing(u) && !this.paddleAllowed(u) ? ' Racing, that breaks rule 42.1 unless you\'re getting clear after hitting something (42.3(h)).' : ''}` });
+    else if (was.side !== side || !!was.back !== back) this.emit({ type: 'toast', msg: `Now ${back ? 'back-paddling' : 'paddling'} ${where}.` });
+  }
+  /** Rule 42.3(h): paddling "to get clear after grounding or colliding": judged each moment, within 30 s of the contact
+   * (the rule gives no time; its purpose, getting clear, does: a judgement, as the crew's own call uses), so a spell
+   * begun to get clear doesn't stay legal for a whole calm leg. */
+  paddleAllowed(b: Boat): boolean {
+    const p = b.paddle, hit = b.lastHitT; if (!p || hit == null) return false;
+    return this.t - hit <= 30;
+  }
+  /** The paddler at the side deck on the paddling side, as long as she's paddling (crewPhys places them; render/crew.ts
+   * draws them kneeling there, as at the jib car). */
+  private paddleJob(b: Boat, side: 'P' | 'S' | null): void {
+    const c = b.crew; if (!c) return;
+    const a = c.people[paddler(b)]; if (!a) return;
+    if (!side) { if (a.job?.line === 'paddle') a.job = null; return; }
+    // (the station's arm is out to windward when +: worked for this tack, and again if she swings through the wind while
+    // paddling, so the paddler stays on the side they're paddling: paddleWork)
+    const windward = (b.tack === 'S') === (side === 'S') ? 1 : -1;
+    a.job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' }, side: b.tack };
+  }
+  /** Each step: the paddling ends with the motor driving her or once she's made fast; racing, a breach of rule 42 is
+   * flagged (rules: world.rule42, one penalty a spell). */
+  private paddleWork(b: Boat): void {
+    const p = b.paddle; if (!p) return;
+    if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
+    const job = b.crew?.people[paddler(b)]?.job; if (job?.line === 'paddle' && job.side !== b.tack) this.paddleJob(b, p.side);
+    if (!this.racing(b) || this.paddleAllowed(b)) return;
+    // the 42.3(h) window closing on a spell begun to get clear: the crew's own stops (they keep the rule); yours, a word
+    // and a few seconds' grace from it (as the penalty's own, R42_STOP), before it's a breach. Told at once, even while the
+    // crutch is still being fetched, so a spell called late in the window still gets its grace
+    const hit = b.lastHitT;
+    if (hit != null && p.t0 <= hit + 30) {
+      if (p.auto) { this.paddle(null, false, true); return; }
+      let w = this.r42warn.get(b.id);
+      if (!w || w.t0 !== p.t0) {
+        this.r42warn.set(b.id, w = { t0: p.t0, at: this.t });
+        if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Clear of it now: stop paddling, or it breaks rule 42.1 (42.3(h) covers only getting clear).' });
+      }
+      if (this.t - w.at <= R42_STOP) return;
+    }
+    if (paddlePower(b, this.t) > 0) this.rule42(b, 'paddle');
+  }
+  /**
+   * Rule 42 (propulsion): a boat racing that paddles breaks 42.1 unless an exception holds. Rules builds the incident and
+   * the penalty (DSQ, or Appendix P's two turns where the race applies it), once a spell; until then it's told.
+   */
+  rule42(b: Boat, why: 'paddle' | 'anchor'): void {
+    // (one penalty a spell of paddling, b.paddle.t0: switching sides is the same spell; stopping and starting again, a new one)
+    // (and paddling on past R42_STOP after the penalty is a fresh breach, as a judge would see it: one penalty doesn't buy
+    // a whole calm leg; under Appendix P that's her second, P2.2)
+    // (the spell: the paddling's, or the anchor's time on the bottom)
+    const t0 = why === 'paddle' ? b.paddle?.t0 : b.anchor?.t0;
+    if (t0 == null || b.retired || b.scoring === 'DSQ' || !this.racing(b)) return; // (disqualified already: nothing more to add)
+    const last = this.r42spell.get(b.id);
+    if (last && last.t0 === t0 && this.t - last.at < R42_STOP) return;
+    this.r42spell.set(b.id, { t0, at: this.t });
+    const n = (this.r42count.get(b.id) ?? 0) + 1; this.r42count.set(b.id, n);
+    const how = why === 'paddle' ? 'Paddling' : 'Hauling in the anchor rode so she carries on past where it went down';
+    if (this.settings.appendixP) {
+      // Appendix P (judges on the water): P2.1, a first penalty is a Two-Turns Penalty under 44.2; P2.2, a second in the
+      // event, she shall promptly retire
+      if (n === 1) {
+        addPenalty(b, 720);
+        if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `${how} while racing breaks rule 42.1 (propulsion). Appendix P applies: a Two-Turns Penalty (P2.1). Get clear and take it. A second rule 42 penalty means retiring (P2.2).` });
+      } else if (b.isUser) this.retire(': a second rule 42 penalty (Appendix P2.2)');
+      else { b.retired = true; b.penalty = 0; }
+    } else {
+      // no Appendix P: rule 44.1's turns are for Part 2 and rule 31 only, so a rule 42 breach is protested and disqualified
+      b.scoring = 'DSQ';
+      if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `${how} while racing breaks rule 42.1 (propulsion): she will be disqualified (DSQ). No penalty turns can exonerate it (rule 44.1 covers Part 2 and rule 31 only). Only getting clear after hitting something (42.3(h)) or helping someone in danger (42.3(g)) allows it.` });
+    }
+  }
+  /** Rule 42 penalties: the spell (b.paddle.t0) each boat was last penalized for, and how many this race (Appendix P2.2). */
+  private r42spell = new Map<number, { t0: number; at: number }>();
+  private r42count = new Map<number, number>();
+  /** The 42.3(h) window's closing told, for each boat's spell (its t0, kept through a change of sides): when. */
+  private r42warn = new Map<number, { t0: number; at: number }>();
+  /**
+   * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
+   * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons in a light air
+   * with the shore within 40 m. They paddle her away from it (back-paddling if it's ahead), on the side that turns her bow off it, and stop
+   * once she's clear with way on or wind to sail by, re-aiming if they're paddling her onto something else. Racing, only
+   * where rule 42 lets them (42.3(h)). Not while you're paddling her yourself, the motor's driving, or she's alongside;
+   * and if you stop them, not again until the jam has passed.
+   */
+  private crewPaddleCall(b: Boat): void {
+    const p = b.paddle, n = b.crew?.spec.crew.length ?? 0;
+    if ((p && !p.auto) || n === 0 || b.docked || b.handled || b.pushing || b.anchor || (b.motor?.running && b.motor.gear !== 'N')) return;
+    // (racing: only to get clear after a contact, 42.3(h), and they stop a little before that's over: paddleAllowed)
+    if (this.racing(b) && !(b.lastHitT != null && this.t - b.lastHitT <= 28)) { if (p) this.paddle(null, false, true); return; }
+    const ahead = b.v - (b.astern ?? 0), calm = b.ww.kt < 3, slow = Math.abs(ahead) < 0.25;
+    // what the stream alone sets her onto in the next minute (her own way she can stop or turn; the stream she can't), and
+    // while paddling, what she's heading for as she goes over the ground (the way they're paddling her)
+    const set = this.driftHazard(b, b.cur), going = p ? this.driftHazard(b, { x: b.vx, y: b.vy }) : null;
+    // in irons: stopped head to wind in a light air (in a breeze she backs the jib and sails out: physics.ts) near the shore
+    const headUp = b.ww.kt < 4 && Math.abs(wrap(b.ww.from - b.h)) < 30 && shoreDist(b) < 40, irons = slow && headUp;
+    const trouble = (calm && !!set) || headUp, jam = slow && trouble;
+    if (!p) {
+      if (!trouble) b.paddleOff = false; // (the jam has passed: next time they may paddle again)
+      if (!jam || b.paddleOff) return; // (you stopped them: they leave it to you)
+      // (off what the stream sets her onto; else land just ahead of her bow, which she backs off; else the nearest shore)
+      const f = V(b.h), close = [6, 10, 15].map(d => ({ x: b.x + f.x * d, y: b.y + f.y * d })).find(q => onLand(q));
+      const at = set ?? close ?? nearestLand(b, 40) ?? { x: b.x + f.x, y: b.y + f.y };
+      const a = this.paddleAim(b, at); this.paddle(a.side, a.back, true); return;
+    }
+    // paddling her into something (a second hazard, or the shore she started off): re-aim off it, given a fair spell
+    // on each side (the same spell: the crutch is in hand. If it's the stroke they're at, they keep at it)
+    if (going && this.t - (p.aimT ?? p.t0) > 10) {
+      const a = this.paddleAim(b, going);
+      if (a.side !== p.side || a.back !== !!p.back) this.paddle(a.side, a.back, true); else p.aimT = this.t;
+      return;
+    }
+    // clear: the stream no longer setting her onto anything, with way on (either way) or wind to sail by
+    // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
+    // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
+    if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
+    else if (this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
+  }
+  /** Where she'll be on land, or within 10 m of a mark, drifting at `vel` (m/s over the ground) in the next minute, looking
+   * every 5 s (at a 2 m/s Gate ebb, 10 m apart: a mark or a thin pier isn't stepped over). */
+  private driftHazard(b: Boat, vel: Vec): Vec | null {
+    for (let k = 1; k <= 12; k++) {
+      const q = { x: b.x + vel.x * 5 * k, y: b.y + vel.y * 5 * k };
+      if (onLand(q)) return q;
+      for (const m of [...this.C.marks, ...(this.rounding?.marks ?? [])]) if (m.shape !== 'island' && dist(q, m.p) < 10) return m.p;
+    }
+    return null;
+  }
+  /** Which side and which way to paddle to get her off `at`: back-paddling if it's ahead, else forward; on the side that
+   * swings her bow off it (forward on port swings her bow to starboard; back-paddling, the other way). */
+  private paddleAim(b: Boat, at: Vec): { side: 'P' | 'S'; back: boolean } {
+    const rel = wrap(brg(at.x - b.x, at.y - b.y) - b.h), back = Math.abs(rel) < 90, turn = -Math.sign(rel) || 1; // (+: bow to starboard)
+    return { side: back ? (turn > 0 ? 'S' : 'P') : (turn > 0 ? 'P' : 'S'), back };
+  }
+  /**
+   * Anchor (ROADMAP 8k; boat/anchor.ts): your call, the band's Anchor tab (or its key). Stowed, the forward hand takes it to
+   * the bow and lowers it; down, they weigh it. Racing, rule 45 lets her anchor; she must recover it before she continues
+   * (unless she can't), and hauling in may bring her back to where it went down, no further (Case 5).
+   */
+  anchorCall(): void {
+    const u = this.user, a = u.anchor;
+    if (u.docked || u.handled || u.mooring || u.pushing) { this.emit({ type: 'toast', msg: 'She\'s alongside: there\'s nothing to anchor for.' }); return; }
+    if (u.wrecked && !u.wrecked.carryOn) return; // (wrecked: the page's choices, not the anchor)
+    if (!a) {
+      const depth = this.waterDepth(stemHead(u));
+      if (!this.anchorable(u, depth)) return;
+      if (u.paddle) this.paddle(null, false, true); // (the forward hand: the crutch goes below)
+      if (this.pilot.mode !== 'off') this.pilot.mode = 'off';
+      u.anchor = { phase: 'fetch', t: 0, out: 0, depth, want: Math.min(ANCHOR.rodeM, ANCHOR.scopeWant * (depth + ANCHOR.bowH)) };
+      this.anchorJob(u, true);
+      const solo = (u.crew?.spec.crew.length ?? 0) === 0;
+      this.emit({ type: 'toast', msg: `${solo ? 'You take' : 'Your crew takes'} the anchor forward: ${Math.round(depth)} m of water.` });
+      return;
+    }
+    if (a.phase === 'fetch') { u.anchor = null; this.anchorJob(u, false); this.emit({ type: 'toast', msg: 'The anchor stays below.' }); return; }
+    if (a.phase === 'paying' || a.phase === 'down') {
+      a.phase = 'hauling'; a.t = 0;
+      if (a.at) { const p = stemHead(u), g = Math.hypot(a.at.x - p.x, a.at.y - p.y) || 1; a.haulDir = { x: (a.at.x - p.x) / g, y: (a.at.y - p.y) / g }; }
+      this.emit({ type: 'toast', msg: 'Weighing anchor: hauling in the rode.' });
+    }
+  }
+  /** Water she can anchor in (`depth` m), or the crew say why not: the class's 25 m of rode, at least 3:1 for it to set
+   * (ANCHOR.minScope); and water enough to float her. */
+  private anchorable(b: Boat, depth: number): boolean {
+    const say = (msg: string) => { if (b.isUser) this.emit({ type: 'toast', ms: 4000, msg }); return false; };
+    if (depth + ANCHOR.bowH > ANCHOR.rodeM / ANCHOR.minScope) return say(`Too deep to anchor here: ${Math.round(depth)} m of water, and ${ANCHOR.rodeM} m of rode.`);
+    if (depth < ANCHOR.minDepth) return say(`Too shallow to anchor: ${depth.toFixed(1)} m of water.`);
+    return true;
+  }
+  /** The water's depth (m) at `p`, with the tide's height there (environment/tide.ts tideHeightAt: on San Rafael's and
+   * San Leandro's grids their own stations', elsewhere San Francisco's, 9414290): in those Bays the 50 m sounding grid (environment/tide.ts depthBand); elsewhere NOAA's chart, its depth areas and soundings
+   * (chartAt, unless `chart` is given). */
+  private waterDepth(p: Vec, chart?: number): number {
+    const h = tideHeightAt(p, this.clockUtc * 60e3), [d1, d2] = depthBand(p);
+    if (d1 !== 0 || d2 !== 0) return Math.max(0, wetBand(d1, d2, h).depth);
+    return Math.max(0, (chart ?? this.chartAt(p)) + h);
+  }
+  /** The chart's depth below MLLW at `p` (m). Its depth area (sea.ts chartBand) says what band the water's in there; the
+   * nearest sounding within 150 m only refines that, held within the band (a sounding a channel's edge away, across in
+   * the next area, isn't this spot's depth); with no sounding, the band's middle. Off the depth areas, the nearest
+   * sounding; off the chart, deep water (outside the Gate). */
+  private chartAt(p: Vec): number {
+    const B = chartBand(p), s = soundingNear(p, 150);
+    if (!B) return s ?? 30;
+    return s == null ? (B.d + B.deep) / 2 : Math.min(B.deep, Math.max(B.d, s));
+  }
+  /** The forward hand at the bow with the anchor, until it's stowed. */
+  private anchorJob(b: Boat, on: boolean): void {
+    const c = b.crew; if (!c) return;
+    const a = c.people[paddler(b)]; if (!a) return;
+    if (!on) { if (a.job?.line === 'anchor') a.job = null; return; }
+    a.job = { line: 'anchor', reach: 0, work: 1, station: { arm: 0, z: Z.bow, pose: 'bow' } };
+  }
+  /** The anchor on the bottom, with rode out to it: she lies to it. */
+  private onRode(b: Boat): boolean { return lyingToAnchor(b); }
+  /** Each step: the crew's work on the anchor (boat/anchor.ts's times, at the forward hand's pace). */
+  private anchorWork(b: Boat, dt: number): void {
+    const a = b.anchor; if (!a) return;
+    a.t += dt; const pace = anchorPace(b), d = (a.depth ?? 0) + ANCHOR.bowH;
+    if (a.phase === 'fetch' && a.t >= ANCHOR.fetchS / pace) {
+      // lowered straight down from the stem head (Perry: never thrown ahead), once the way's off her: round up, let fly
+      if (Math.abs(b.v - (b.astern ?? 0)) > ANCHOR.wayOff) { if (!a.waited) { a.waited = true; this.emit({ type: 'toast', msg: 'Crew: take the way off her and I\'ll let it go.' }); } return; }
+      // (the water where it's let go, which may not be where you called it: she's carried on while the way came off)
+      const at = stemHead(b), chart = this.chartAt(at), depth = this.waterDepth(at, chart);
+      if (!this.anchorable(b, depth)) { b.anchor = null; this.anchorJob(b, false); return; }
+      a.at = at; a.drop = { x: b.x, y: b.y }; a.chart = chart; a.depth = depth; a.want = Math.min(ANCHOR.rodeM, ANCHOR.scopeWant * (depth + ANCHOR.bowH)); a.t0 = this.t; a.phase = 'paying'; a.t = 0;
+      if (b.isUser) { b.steer = 0; b.turnTarget = null; }
+    } else if (a.phase === 'paying') {
+      a.out = Math.min(a.want, a.out + ANCHOR.payOut * pace * dt); if (a.out > d) a.bottom = true;
+      if (a.out >= a.want) { a.phase = 'down'; a.t = 0; b.atAnchor = true; this.emit({ type: 'toast', msg: `Anchored: ${Math.round(a.out)} m of rode out, ${(a.out / d).toFixed(1)}:1.` }); }
+    } else if (a.phase === 'hauling') {
+      // hand over hand while the rode's tension is no more than they can pull (two hands crewed, one alone)
+      const hands = (b.crew?.spec.crew.length ?? 0) === 0 ? 1 : 2;
+      if ((a.line?.T ?? 0) < ANCHOR.pull * hands) a.out = Math.max(d, a.out - ANCHOR.haul * pace * dt);
+      // (aground, it stays in the mud: getting it up doesn't float her, and she waits for the tide)
+      if (a.out <= d + 0.05) {
+        if (!a.aground) { a.phase = 'breaking'; a.t = 0; }
+        else if (!a.waitTide) { a.waitTide = true; if (b.isUser) this.emit({ type: 'toast', msg: 'Crew: she\'s on the bottom. The anchor stays down until the tide floats her.' }); }
+      }
+    } else if (a.phase === 'breaking' && a.aground) {
+      a.phase = 'hauling'; a.t = 0; // (the tide's left her on the bottom as it broke out: it stays in the mud, and she waits for the tide)
+    } else if (a.phase === 'breaking' && a.t >= ANCHOR.breakS / pace) {
+      // broken out: she's free. Rule 45, Case 5: hauling in may bring her back to where it went down, but if it "clearly
+      // propels her to a different position" it breaks rule 42.1: where she is against where she was as it went down,
+      // along the way the haul pulled her (more than her length's half: a rode up and down puts her stem head over the
+      // anchor, her middle about where she was when it was let go). The crew haul to up and down and no further, so it
+      // doesn't happen today; it's here for a haul that would
+      const hd = a.haulDir, past = hd && a.drop ? (b.x - a.drop.x) * hd.x + (b.y - a.drop.y) * hd.y : 0;
+      if (past > 3 && this.racing(b)) this.rule42(b, 'anchor');
+      a.phase = 'stowing'; a.t = 0; a.line = undefined; a.at = undefined; a.dragging = false; b.atAnchor = false; b.luff = false;
+      this.emit({ type: 'toast', msg: 'Anchor\'s aweigh.' });
+    } else if (a.phase === 'stowing' && a.t >= ANCHOR.stowS / pace) {
+      b.anchor = null; this.anchorJob(b, false); this.emit({ type: 'toast', msg: 'Anchor stowed.' });
+    }
+  }
+  /** Lying to her anchor: her body on the rode (boat/dockLines.ts dockStep), the anchor dragging when it's pulled harder than
+   * it holds at that scope (boat/anchor.ts holding). */
+  private anchorStep(b: Boat, dt: number): void {
+    const a = b.anchor!, L = a.line = rodeLine(a);
+    L.holds = holding(a.out, a.depth ?? 0); // (the pull on her no more than the anchor holds: dockStep)
+    // (her sails, let fly: no rig state is both up, as boat.ts has it)
+    lineStep(b, [L], b.ww, b.cur, dt, q => onLand(q) || hitsHarbor(q) || hitsMooredBoat(q), Math.min(1, ((b.rig?.main ?? 1) + (b.rig?.jib ?? 1)) / 2));
+    a.dragging = (L.slip ?? 0) > 1e-5;
+    if (a.dragging) {
+      // the anchor slides along the bottom toward her, by as much as the rode was stretched past what it holds
+      const p = stemHead(b), g = Math.hypot(p.x - a.at!.x, p.y - a.at!.y) || 1e-6, s = Math.min(g, L.slip!);
+      a.at = { x: a.at!.x + (p.x - a.at!.x) / g * s, y: a.at!.y + (p.y - a.at!.y) / g * s };
+      const c0 = a.charted ?? a.drop; if (c0 && Math.hypot(a.at.x - c0.x, a.at.y - c0.y) > 20) { a.charted = { ...a.at }; a.chart = this.chartAt(a.at); } // (dragged to new ground: its chart depth)
+    }
+    if (this.steps % 60 === 0) {
+      a.depth = this.waterDepth(a.at!, a.chart); // (the tide rising and falling under her)
+      // the water under her keel where she lies (the chart there: chartAt): the tide falling below her draft leaves her
+      // on the bottom, and rising again floats her
+      // (read again only once she's moved 5 m: the chart's areas are a costly look-up, and aground she doesn't move)
+      if (a.under == null || !a.underAt || Math.hypot(b.x - a.underAt.x, b.y - a.underAt.y) > 5) { a.under = this.chartAt(b); a.underAt = { x: b.x, y: b.y }; }
+      const here = this.waterDepth(b, a.under);
+      if (!a.aground && here < ANCHOR.draft) {
+        a.aground = { x: b.x, y: b.y, h: b.h }; b.lastHitT = this.t; // (aground: 42.3(h) lets her get clear of it)
+        if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: `Aground: the tide's fallen to ${here.toFixed(1)} m and left her keel on the bottom. She floats again as it rises.` });
+      } else if (a.aground && here >= ANCHOR.draft + 0.05) { a.aground = null; a.waitTide = false; if (b.isUser) this.emit({ type: 'toast', msg: 'She\'s afloat again.' }); }
+    }
+    // (aground she sits where she touched: no swinging to her anchor, no drift)
+    if (a.aground) { b.x = a.aground.x; b.y = a.aground.y; b.h = a.aground.h; b.v = 0; b.astern = 0; b.sway = 0; b.turnRate = 0; b.vx = 0; b.vy = 0; }
+    // (head to wind or stream with her sails let fly she lies upright: her heel eases off as the hull's damping lets it)
+    b.heel = (b.heel ?? 0) * Math.exp(-dt / 3); b.heelMag = Math.abs(b.heel);
+    // her sheets let fly (the sails luffing, drawn so), and her crew where they're placed as at a dock: the forward hand at
+    // the bow on the anchor's job (physics.ts crewAtDock honors a job's station)
+    b.luff = true; crewAtDock(b, dt);
+    // her sails and her angles, as lying to a line ashore (mooringStep)
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
+    const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true;
+    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
+  }
   private belowSinceGun = new Set<number>();
   /**
    * Definitions, Racing: "from her preparatory signal until she finishes and clears the finishing line and marks or
@@ -1028,6 +1331,9 @@ export class World {
     // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
     const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
     if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
+    if (this.steps % 30 === 0 && !this.user.handled) this.crewPaddleCall(this.user); // (a jam, looked for twice a second)
+    this.paddleWork(this.user);
+    if (this.user.anchor) this.anchorWork(this.user, dt);
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
@@ -1035,6 +1341,7 @@ export class World {
       if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
+      if (b.anchor && this.onRode(b)) { this.anchorStep(b, dt); continue; } // (lying to her anchor: boat/anchor.ts)
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
@@ -1060,6 +1367,8 @@ export class World {
     this.log?.step(this, dt);
     this.trackCourses();
     this.shipEncounters();
+    // (rule 22's states for the rules: anchored, aground; the World's own grounding is a bump, not a state she stays in)
+    for (const b of this.boats) if (b.anchor || b.anchored || b.aground) { const an = lyingToAnchor(b), ag = !!b.anchor?.aground; if (b.anchored !== an) b.anchored = an; if (b.aground !== ag) b.aground = ag; } // (only a boat with her anchor out, or just weighed: the rest never get the fields, so the fleet's shape doesn't change. Declaring them on every boat made the step 1-2% slower, perf-pair)
     // (a Case's boat sails above her proper course where the Case says so, rule 17: the Case's call, not the sim's)
     if (this.caseRun) for (const b of this.boats) if (b.script && !this.caseRun.free.includes(b.script)) b.aboveProper = b.started && !!this.caseRun.pose(b.script, this.t).f.aboveProper; // (before her start she has none: Definitions, Proper Course)
     this.checkPairs();
@@ -1176,7 +1485,7 @@ export class World {
           const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
           const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = Math.hypot(dx, dy) || 1;
           b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          b.v *= m.q ? 0.9 : 0.97;
+          b.v *= m.q ? 0.9 : 0.97; b.lastHitT = this.t;
         }
       }
       // the same touch until she's got clearly away from that mark
@@ -1392,7 +1701,7 @@ export class World {
       const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && Math.hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
       if (incident.kind === 'contact') {
-        A.v *= 0.35; B.v *= 0.35;
+        A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
         const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1;
         A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
       }
@@ -1521,7 +1830,7 @@ export class World {
         if (gap < 0) {
           const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
           const cx = hv.a.x + (hv.b.x - hv.a.x) * k, cy = hv.a.y + (hv.b.y - hv.a.y) * k, l = Math.hypot(b.x - cx, b.y - cy) || 1;
-          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0;
+          b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0; b.lastHitT = this.t;
           if (b.isUser) wreck(b, `hit by the ${ty.name.toLowerCase()}`, b, this.emit); // (a ship: a wreck at any speed, WRECK-PROPOSAL section 1)
           if (b.isUser && !b.wrecked && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
         }
@@ -2062,6 +2371,7 @@ export class World {
     const u = this.user;
     u.x = p.x; u.y = p.y; u.v = 0; u.astern = 0; u.sway = 0; u.vx = 0; u.vy = 0; u.turnTarget = null;
     u.docked = undefined; u.handled = undefined; u.pushing = undefined;
+    if (u.anchor) { u.anchor = null; u.atAnchor = false; this.anchorJob(u, false); } // (a jump: the anchor comes with her, stowed)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'off'; // (stopped: a tiller pilot needs way on)
     if (this.dest && this.arrivedT != null && markDist(u, this.dest) > 40) this.arrivedT = null; // (somewhere to sail to again)
     this.emit({ type: 'toast', msg: `Moved to ${name}. The cruise and its log carry on.`, ms: 3500 });

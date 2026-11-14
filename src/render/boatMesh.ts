@@ -2,6 +2,7 @@ import './three-setup';
 import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
+import { ANCHOR } from '../boat/anchor';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
@@ -432,6 +433,8 @@ export interface BoatMesh {
   lines: Lines;
   /** Her navigation lights and the cabin's glow (navLights.ts). */
   nav: NavLights;
+  /** Her anchor rode, from the stem head into the water toward the anchor (drawn while it's out: boat/anchor.ts). */
+  rode?: THREE.Line;
   /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
   lantern: LanternSwing;
   /** The companionway's sliding hatch and washboards, moved by syncCompanionway. */
@@ -1376,12 +1379,12 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // her lights: the bicolour on the stemhead, the sternlight on the transom to port of the rudder head (clear of the
   // tiller, the backstay's bridle and the ensign staff), or the tricolour just above the masthead, under the windex
   const sternY = sheer(1) - 0.07;
-  const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z) },
+  const nav = buildNavLights(grp, { stem: V3(0, sheer(0) + 0.03, -L / 2 + 0.09), stern: V3(-0.17, sternY, aftLineZ(sternY) + 0.02), masthead: V3(0, MAST_TOP + 0.05, MAST_Z), ball: FORESTAY_DECK.clone().lerp(HOUNDS, 0.35).add(V3(0, -0.2, 0)) }, // (the ball: hung just under the forestay, about a third of the way up)
     b.paint?.navLights ?? 'deck');
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, rode: buildRode(grp), ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
   mergeStatic(grp, out);
   return out;
 }
@@ -1576,6 +1579,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   for (const r of m.ribbons) syncRibbon(r, b, t);
   // her lights: none in her slip or when switched off, the anchor light at anchor, else under way's (navLights.ts)
   syncNavLights(m.nav, b.docked || b.lightsOff ? 'off' : b.atAnchor ? 'anchor' : 'underway');
+  syncRode(m, b);
   syncRopes(m);
 }
 
@@ -1671,6 +1675,30 @@ function syncRibbon(r: Ribbon, b: Boat, t: number): void {
 
 const tmpC = new THREE.Vector3();
 /** Move the traveller car, tension the backstay, set the jib cars on their pins and run the jib sheets. */
+/** The rode: a gray line of 12 mm nylon from the stem head. */
+function buildRode(grp: THREE.Group): THREE.Line {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 3), 3));
+  const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xc9c3b4 })); line.visible = false; line.frustumCulled = false; line.name = 'rode';
+  grp.add(line); return line;
+}
+/** Out of the stem head over the bow toward the anchor, into the water, and down at the rode's angle (straight to the
+ * anchor for nylon this light: its sag is small against the pull of a boat lying to it). */
+function syncRode(m: BoatMesh, b: Boat): void {
+  const R = m.rode, a = b.anchor; if (!R) return;
+  const on = !!a?.at && (a.phase === 'paying' || a.phase === 'down' || a.phase === 'hauling' || a.phase === 'breaking');
+  R.visible = on; if (!on) return;
+  const st = { x: b.x + Math.sin(b.h * D2R) * ANCHOR.bow, y: b.y + Math.cos(b.h * D2R) * ANCHOR.bow };
+  const dx = a!.at!.x - st.x, dy = a!.at!.y - st.y, flat = Math.hypot(dx, dy), depth = (a!.depth ?? 0) + ANCHOR.bowH;
+  // in her frame (bow toward −z, starboard +x): the way to the anchor
+  const s = Math.sin(b.h * D2R), c = Math.cos(b.h * D2R), ux = flat > 0.01 ? (dx * c - dy * s) / flat : 0, uz = flat > 0.01 ? -(dx * s + dy * c) / flat : -1;
+  const head = { x: 0, y: sheer(0) + 0.02, z: -L / 2 + 0.05 }, toWater = Math.min(flat, Math.max(0.2, flat * head.y / depth));
+  const deep = Math.min(depth, 3) - head.y, along = toWater + (flat > 0.01 ? deep * flat / depth : 0);
+  const p = R.geometry.getAttribute('position') as THREE.BufferAttribute;
+  p.setXYZ(0, head.x, head.y, head.z);
+  p.setXYZ(1, head.x + ux * toWater, 0, head.z + uz * toWater);
+  p.setXYZ(2, head.x + ux * along, -deep, head.z + uz * along);
+  p.needsUpdate = true;
+}
 function syncLines(m: BoatMesh, b: Boat): void {
   const L2 = m.lines, c = b.ctl, lee = b.tack === 'S' ? -1 : 1; // the leeward side (x sign)
   // traveller car: +1 is to leeward; the mainsheet runs from the boom end down to it

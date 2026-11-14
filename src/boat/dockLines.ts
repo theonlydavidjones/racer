@@ -46,6 +46,9 @@ export interface DockLine {
   state: 'held' | 'made';
   /** the line's tension now, N (for the drawing and the tests) */
   T?: number;
+  /** what holds its far end, N, if less than the line (an anchor on the bottom: boat/anchor.ts holding): pulled harder,
+   * the far end gives (`slip`, m this step, toward her), and the pull on her is no more than this */
+  holds?: number; slip?: number;
   /** how long it'll be with her lying in her berth: the hands warp her in to that */
   goal?: number;
 }
@@ -93,7 +96,7 @@ export interface DockStepOut {
  * crew, its added masses and gyration, the keel's strips with their lift and broadside drag, the rudder (the helm still
  * steers her against a line), the motor's push, and the wind on her rig and any sail still up and let fly.
  */
-export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: number }, cur: Vec, dt: number, solid: (p: Vec) => boolean): DockStepOut {
+export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: number }, cur: Vec, dt: number, solid: (p: Vec) => boolean, sailsUp?: number): DockStepOut {
   const out: DockStepOut = {};
   const cs = b.crew, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
   const disp = (cs ? displacement(cs.spec) : HULL.displacement) + (cond?.extraKg ?? 0);
@@ -130,7 +133,7 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   const ax = Math.sin(wTo) * wv - vw.x, ay = Math.cos(wTo) * wv - vw.y, aws = Math.hypot(ax, ay);
   if (aws > 0.01) {
     const q = 0.5 * AIR * aws * aws, along = (ax * fwd.x + ay * fwd.y) / aws, across = (ax * stb.x + ay * stb.y) / aws;
-    const cloth = Math.min(1, ((b.rig?.main ?? 0) + (b.rig?.jib ?? 0)) / 2);
+    const cloth = sailsUp ?? Math.min(1, ((b.rig?.main ?? 0) + (b.rig?.jib ?? 0)) / 2);
     const wy = q * HOVE.windSide * across * Math.abs(across);
     X += q * (HANDLING.windageCdA + HANDLING.flogCdA * cloth) * along; Y += wy; M += wy * HOVE.windLever;
   }
@@ -145,6 +148,10 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
     const stretch = d - L.len, rate = -(pvx * lx.x + pvy * lx.y);
     let T = stretch > 0 ? Math.max(0, k * stretch + cDamp * rate) : 0;
     if (L.state === 'held' && T > HELD_MAX) { L.len += (T - HELD_MAX) / k; T = HELD_MAX; } // (renders out through the hand)
+    L.slip = 0;
+    // (the anchor drags: no more pull on her than it holds, and it gives by the rode's stretch past what that holds, not
+    // the damper's share, so the rode stays stretched to its holding and the anchor follows her at her own pace)
+    if (L.holds != null && T > L.holds) { L.slip = Math.max(0, stretch - L.holds / k); T = L.holds; }
     if (L.state === 'made' && T > LINE_BREAK) { out.parted = L; lines.splice(lines.indexOf(L), 1); continue; } // (it parts)
     L.T = T;
     const fx = lx.x * T, fy = lx.y * T;
