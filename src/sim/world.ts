@@ -1,3 +1,4 @@
+import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
@@ -116,6 +117,11 @@ export interface Protest {
   /** The incident: when, and the engine's call (null when the engine found no foul by the protestee). */
   t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | null;
   hailT: number; flagT: number | null;
+  /** Her penalty for it: owed (she took it on), declined, or null (no foul by her to take one for); and when her turns
+   * were done, if they were (RRS 60.5(c)(2): no further penalty). */
+  owed: boolean | null; turnsT: number | null;
+  /** The protested boat wasn't racing (the Part 2 preamble: no penalty, except rule 23.1). */
+  notRacing?: boolean;
 }
 /* Rule 43.1(a): "When as a consequence of breaking a rule a boat has compelled another boat to break a rule, the other
  * boat is exonerated for her breach." Causal: compelled when, by the time it was clear the other boat had broken a rule,
@@ -287,7 +293,7 @@ export class World {
   /** Protests made on the water (RRS 60), in order. */
   protests: Protest[] = [];
   /** The last incident the user was in: the boat, when, and the engine's call (for the Protest hail). */
-  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail' } | null = null;
+  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail'; part?: string; notRacing?: boolean } | null = null;
   finishShown = false;
   /** This outing's gone into the boats' logbooks (boat/logbook.ts). */
   logged = false;
@@ -360,6 +366,7 @@ export class World {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.motorRng = makeRng((seed ^ 0x6d6f74) >>> 0); // (her motor's pulls: its own draws, so the race's are as they were)
+    this.conductRng = makeRng((seed ^ 0x70726f74) >>> 0); // (the AI skippers' conduct under protests: its own draws too)
     // the race day and clock, and the kind of wind the day brings (from the records for the month, or as chosen)
     this.raceDate = settings.tideDate || nextSaturday();
     this.gunUtc = sfLocalToUtcMin(this.raceDate, settings.tideTime || '12:00');
@@ -938,6 +945,7 @@ export class World {
     this.trackCourses();
     this.shipEncounters();
     this.checkPairs();
+    if (this.protestsOn) this.protestsStep();
     if (!this.freeSail) this.signals(prevT);
     this.motorStep(dt);
     if (this.cruising) this.checkArrival();
@@ -1292,9 +1300,16 @@ export class World {
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         const other = A.isUser ? B : A;
-        this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind };
+        this.userIncident = { vs: other.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part, notRacing: !!incident.notRacing };
         this.emit({ type: 'incident', a: A, b: B, incident, frames: this.rec.slice(-100).concat([snapshot(this.t, this.boats)]), wind: this.wind.from });
-      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.assignPenalty(f); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
+      } else if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') this.penaltyFor(f, this.t); // (one not racing, under 23.1, takes none: rule 44.1; one already turning owes this incident's turns too, assignPenalty)
+      // Protests: an AI boat fouled hails "Protest!" at once (her reaction time), before she knows if the other will turn.
+      // (Rule 23.1 too: a boat not racing that interferes is penalized in the race nearest in time, 60.5(c); a Part 2 breach
+      // by a boat not racing otherwise isn't, the Part 2 preamble, so nothing to protest)
+      if (this.protestsOn && victim.ai && incident.exoneratedBy == null && !incident.notRacing) {
+        const after = protestAfter({ fouled: false, since: 0 });
+        if (after != null) this.pendingProtests.push({ by: victim.id, vs: f.id, at: this.t + after, inc: { vs: f.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part } });
+      }
     }
   }
 
@@ -1812,6 +1827,11 @@ export class World {
 
   /* ---------- her outboard (boat/motor.ts) ---------- */
   private motorRng: Rng;
+  private conductRng: Rng;
+  /** Protests the AI boats will hail, once their reaction time is up: by, against, when, and the incident. */
+  private pendingProtests: { by: number; vs: number; at: number; inc: NonNullable<World['userIncident']> }[] = [];
+  /** Under protests, the penalties the AI boats declined: `boat@incident time`. */
+  private declined = new Set<string>();
   /** Tilt the outboard down into the water, or up out of it (stopping it first). */
   motorTilt(): void {
     const m = this.user.motor; if (!m) return;
@@ -2114,10 +2134,14 @@ export class World {
 
   /** `by` hails "Protest!" at `vs` over the incident just now, and flies the red flag (RRS 60.2(a)(1): a Folkboat is over
    * 6 m). Recorded for the hearing. */
-  protest(by: Boat, vs: Boat): void {
-    const ui = by.isUser ? this.userIncident : null;
-    const inc = ui && ui.vs === vs.id ? ui : null;
-    this.protests.push({ by: by.id, vs: vs.id, t: inc?.t ?? this.t, rule: inc && inc.fouler === vs.id ? inc.rule : null, fouler: inc?.fouler ?? null, kind: inc?.kind ?? null, hailT: this.t, flagT: this.t });
+  protest(by: Boat, vs: Boat, given?: NonNullable<World['userIncident']>): void {
+    const ui = given ?? (by.isUser ? this.userIncident : null);
+    const inc = ui && (ui.vs === vs.id || given) ? ui : null;
+    const fouled = !!inc && inc.fouler === vs.id;
+    // (her penalty: declined if she chose not to take it, owed otherwise; done once her turns are, protestsStep. Rule 23.1
+    // has no turns to take, 44.1 being for an incident while racing: none owed)
+    const owed = !fouled ? null : inc!.part === '23.1' ? false : !this.declined.has(`${vs.id}@${inc!.t}`);
+    this.protests.push({ by: by.id, vs: vs.id, t: inc?.t ?? this.t, rule: fouled ? inc!.rule : null, fouler: inc?.fouler ?? null, kind: inc?.kind ?? null, hailT: this.t, flagT: this.t, owed, turnsT: null, notRacing: fouled && !!inc!.notRacing });
     by.protestFlag = true;
     if (by.isUser) this.emit({ type: 'toast', ms: 3500, msg: `"Protest!" Your red flag's up (Rule 60.2).` });
     else if (vs.isUser) this.emit({ type: 'toast', ms: 4500, msg: `${by.name}: "Protest!" (${by.no.replace(/^US\s+/, 'USA ')})` });
@@ -2162,6 +2186,26 @@ export class World {
     const why = this.whyNoRoomHail(u);
     if (why) { this.emit({ type: 'toast', ms: 6000, msg: why }); return; }
     this.emit({ type: 'toast', ms: 5000, msg: 'Nothing to hail. "Room to tack!" is for when you\'re close-hauled and will soon have to change course a lot to clear an obstruction (the shore, a pier, an island), with a boat to windward stopping you tacking (Rule 20). "Starboard!" is for a port-tack boat on a collision course with you.' });
+  }
+
+  /**
+   * The penalty for a foul, through her own choice under protests (RRS 44.1: she "may take" it): the AI skipper's
+   * conduct (ai/conduct.ts) decides; you take yours or not by steering them. Umpired, it's owed. `t`: the incident's time.
+   */
+  penaltyFor(b: Boat, t = this.userIncident?.t ?? this.t): void {
+    if (this.protestsOn && b.ai && !takesPenalty({ fouled: true, since: this.t - t }, this.conductRng())) { this.declined.add(`${b.id}@${t}`); return; }
+    this.assignPenalty(b);
+  }
+
+  /** Protests: the AI boats' hails as they come due, and turns done by a boat protested (RRS 60.5(c)(2)). */
+  private protestsStep(): void {
+    if (this.pendingProtests.length) {
+      const due = this.pendingProtests.filter(p => this.t >= p.at); this.pendingProtests = this.pendingProtests.filter(p => this.t < p.at);
+      for (const p of due) { const by = this.boats[p.by], vs = this.boats[p.vs]; if (by && vs && this.racing(by)) this.protest(by, vs, p.inc); }
+    }
+    // (turns done count only before she finishes: at or near the line her hull must be on the course side before she
+    // finishes, 44.2, and the sim doesn't have her finish again)
+    for (const p of this.protests) { const vs = this.boats[p.vs]; if (p.owed && p.turnsT == null && !vs.finished && vs.penalty <= 0) p.turnsT = this.t; }
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */

@@ -4,6 +4,7 @@ import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, PROTEST_HAIL, World } from '../src/sim/world';
+import { PROTEST_REACT } from '../src/ai/conduct';
 
 // Protests (RRS Part 5): the hail and the red flag (60.2(a)(1)), under "On-the-water judging: Protests"
 const SS2 = ss2 as unknown as CourseFile, TRAIN = train as unknown as CourseFile;
@@ -65,6 +66,58 @@ describe('Protests: the hail and the red flag (RRS 60.2(a)(1))', () => {
     expect(w.user.protestFlag).toBe(true);
     w.user.retired = true; w.step(DT);
     expect(w.user.protestFlag).toBe(false);
+  });
+});
+
+describe('Protests: the AI boats take their turns, or not, and protest (ai/conduct.ts fallbacks)', () => {
+  const sailed = (judging: 'protests' | 'umpired') => {
+    const w = new World(SS2, settings({ fleet: 7, judging }), 4);
+    for (let i = 0; i < 60 * 60 * 8; i++) { w.step(DT); w.drainEvents(); }
+    return w;
+  };
+  it('an AI boat fouled hails "Protest!" at once (PROTEST_REACT after the incident), with the penalty owed or declined on record', () => {
+    const w = sailed('protests');
+    expect(w.protests.length).toBeGreaterThan(0);
+    for (const p of w.protests) {
+      expect(p.hailT - p.t).toBeCloseTo(PROTEST_REACT, 1); // (within a step)
+      expect(p.fouler).toBe(p.vs); // (the fallback protests only the engine's fouler)
+      expect(typeof p.owed).toBe('boolean');
+      expect(w.boats[p.by].protestFlag || !w.racing(w.boats[p.by])).toBe(true);
+    }
+  }, 120_000);
+  it('umpired, the same race has no protests', () => {
+    expect(sailed('umpired').protests).toEqual([]);
+  }, 120_000);
+  it('under protests, an AI boat takes her penalty TAKES_PENALTY of the time (997 in 1000); umpired, always', () => {
+    const w = new World(SS2, settings({ fleet: 1, judging: 'protests' }), 3); racing(w);
+    const o = w.boats[1]; let took = 0;
+    for (let i = 0; i < 4000; i++) { o.penalty = 0; w.penaltyFor(o, w.t + i); if (o.penalty > 0) took++; }
+    expect(took).toBeGreaterThan(3970); expect(took).toBeLessThan(4000); // (about 12 declined)
+    const um = new World(SS2, settings({ fleet: 1, judging: 'umpired' }), 3); racing(um);
+    um.penaltyFor(um.boats[1], um.t); expect(um.boats[1].penalty).toBeGreaterThan(0);
+  });
+  it('rule 23.1 (a boat not racing interfering) has no turns to take: none owed, so the protest stands (60.5(c))', () => {
+    const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
+    const o = w.boats[1], u = w.user;
+    w.protest(o, u, { vs: u.id, t: w.t, rule: '23', fouler: u.id, kind: 'contact', part: '23.1' });
+    w.step(DT); w.step(DT);
+    expect(w.protests[0]).toMatchObject({ owed: false, turnsT: null });
+  });
+  it('turns done after she has finished don\'t count (44.2: before she finishes)', () => {
+    const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
+    const o = w.boats[1], u = w.user;
+    w.penaltyFor(u, w.t); w.protest(o, u, { vs: u.id, t: w.t, rule: '10', fouler: u.id, kind: 'contact' });
+    u.finished = true; u.finishT = w.t; u.penalty = 0; w.step(DT);
+    expect(w.protests[0].turnsT).toBeNull();
+  });
+  it('a protest records whether the protested boat took her turns (RRS 60.5(c)(2): then no further penalty)', () => {
+    const w = new World(SS2, settings({ judging: 'protests' }), 3); racing(w);
+    const o = w.boats[1], u = w.user;
+    const inc = { vs: u.id, t: w.t, rule: '10', fouler: u.id, kind: 'contact' as const };
+    w.penaltyFor(u, w.t); w.protest(o, u, inc);
+    expect(w.protests[0]).toMatchObject({ by: o.id, vs: u.id, rule: '10', owed: true, turnsT: null });
+    w.step(DT); expect(w.protests[0].turnsT).toBeNull(); // (her turns still to do)
+    u.penalty = 0; w.step(DT); expect(w.protests[0].turnsT).not.toBeNull();
   });
 });
 
