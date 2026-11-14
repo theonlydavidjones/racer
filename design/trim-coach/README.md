@@ -57,6 +57,20 @@ The pause-menu entry is gone. Two options follow; Option 1 is the pick.
   - the notes are away from the controls, which is the mapping the owner asked to see;
   - you can't work a line and watch its note change.
 
+## 3. The notes themselves (both options)
+
+- **Every line, in the band's own order,** port to starboard: jib car, jib sheet, main halyard, jib Cunningham, main
+  Cunningham, outhaul, vang, jib halyard, with the backstay, mainsheet and traveler where they sit. The dual-ended lines
+  appear once.
+- **Lines to fix are numbered by what they're worth** (amber). Each has three short parts:
+  - **NOW:** what it's doing to her ("Off: the top of the main twists away");
+  - **SHOULD:** the step to take, in the band's own words ("Vang on, hard");
+  - **WHY:** one reason ("With the sheet eased, only the vang holds the leech.").
+- **Lines that are right get a green ✓** and a few words ("Foot right for 8 kt").
+- **Targets:** the target (teal ◆) is on the line's own track, in the band in Option 1 and on each card's track in
+  Option 2.
+- **The header gives the situation and her speed against the polar's** (2.3 of 4.3 kt).
+
 ## The words come from the physics
 
 - **SHOULD and the target** are the coach's own (`lineLesson`, `bestFor`).
