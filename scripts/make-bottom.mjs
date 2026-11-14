@@ -4,10 +4,13 @@
  * (src/geo/data/enc-chart.json, made by fetch-charts.mjs). For running aground on depth: the water over a point is the
  * bottom's depth below MLLW plus the tide's height there (environment/tide.ts tideHeightAt), against her draft.
  *  - Each depth area (DEPARE) gives a band: its shoal edge and its deep edge (DRVAL1, DRVAL2, m below MLLW; negative, a
- *    flat drying that high). Within it, the bottom at a cell is the chart's soundings within SOUND_R m, weighted by the
- *    inverse square of the distance, held inside the band (a sounding just across the band's line belongs to the next
- *    one); with no sounding near, the band's middle (the bottom taken as spread evenly through it, as tide.ts wetBand has
- *    it). The chart doesn't sound the drying flats (none of its soundings is below the datum), so they're at their middle.
+ *    flat drying that high). The line between two bands is a depth contour, so within a band the bottom slopes from its
+ *    shoal edge's depth to its deep edge's by the distance to each (the shore counted as its shoal side): two bands meet
+ *    at their line's depth, no step there (where the chart's bands leave a gap, a flat drying to the datum beside water
+ *    from 1.8 m, a step it shows stays). On that, the chart's soundings within SOUND_R m, by the inverse square of the
+ *    distance tapered to nothing at SOUND_R (no edge where one stops counting), each held inside the band (a sounding
+ *    just across the band's line belongs to the next one). The chart doesn't sound the drying flats (none of its
+ *    soundings is below the datum), so there it's the band's slope alone.
  *  - Only where the band's shoal edge is under SHOAL m: deeper than that, no Folkboat (1.2 m) can touch at any tide (the
  *    lowest, about 0.6 m below MLLW), so it's left out, as is land (the sim's own shore decides that: geo/shore.ts).
  *
@@ -53,21 +56,49 @@ for (let k = 0; k < S.length; k += 3) {
   const lon = S[k] / 1e5, lat = S[k + 1] / 1e5, i = Math.floor((lon - B.west) * MLON / CELL), j = Math.floor((B.north - lat) * MLAT / CELL);
   const key = Math.floor(i / BIN) * 100000 + Math.floor(j / BIN); (bins.get(key) ?? bins.set(key, []).get(key)).push([(lon - B.west) * MLON, (B.north - lat) * MLAT, S[k + 2] / 10]);
 }
-const bottomAt = (i, j, lo, hi) => {
-  const x = (i + 0.5) * CELL, y = (j + 0.5) * CELL, bi = Math.floor(i / BIN), bj = Math.floor(j / BIN);
-  let w = 0, s = 0;
-  for (let a = bi - 1; a <= bi + 1; a++) for (let b = bj - 1; b <= bj + 1; b++) for (const [sx, sy, d] of bins.get(a * 100000 + b) ?? []) {
-    const r = Math.hypot(sx - x, sy - y); if (r > SOUND_R) continue;
-    const q = 1 / Math.max(25, r) ** 2; w += q; s += q * Math.min(hi, Math.max(lo, d));
+// Within a band, where it lies between its edges: the line to a shoaler band is the band's shoal-edge contour (DRVAL1),
+// the line to a deeper one its deep-edge contour (DRVAL2). So the bottom between them is taken to slope from one to the
+// other by the distance to each (a band against land or drying ground on its shoal side slopes up to that edge too),
+// and two bands meet at the depth of the line between them: no step there. (Distances by a two-pass chamfer transform
+// over the cells, for each band's shoal edge in turn.)
+const INF = 1e9, toShoal = new Float32Array(nx * ny).fill(INF), toDeep = new Float32Array(nx * ny).fill(INF);
+{
+  const levels = [...new Set(Array.from(d1).filter(v => !Number.isNaN(v)))].sort((a, b) => a - b), dist = new Float32Array(nx * ny);
+  const chamfer = () => { const D = Math.SQRT2;
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const c = j * nx + i; let v = dist[c];
+      if (i > 0) v = Math.min(v, dist[c - 1] + 1); if (j > 0) { v = Math.min(v, dist[c - nx] + 1); if (i > 0) v = Math.min(v, dist[c - nx - 1] + D); if (i < nx - 1) v = Math.min(v, dist[c - nx + 1] + D); } dist[c] = v; }
+    for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) { const c = j * nx + i; let v = dist[c];
+      if (i < nx - 1) v = Math.min(v, dist[c + 1] + 1); if (j < ny - 1) { v = Math.min(v, dist[c + nx] + 1); if (i < nx - 1) v = Math.min(v, dist[c + nx + 1] + D); if (i > 0) v = Math.min(v, dist[c + nx - 1] + D); } dist[c] = v; } };
+  for (const L of levels) {
+    if (L >= SHOAL + 5) break; // (only the shoal bands need it; the deep side of the last of them is any band below)
+    // the cells shoaler than this band's (or land: no depth area), and those deeper, as sources in turn
+    for (const shoaler of [true, false]) {
+      for (let c = 0; c < dist.length; c++) { const v = d1[c]; dist[c] = (shoaler ? (Number.isNaN(v) || v < L) : (!Number.isNaN(v) && v > L)) ? 0 : INF; }
+      chamfer();
+      for (let c = 0; c < dist.length; c++) if (d1[c] === L) (shoaler ? toShoal : toDeep)[c] = dist[c] * CELL;
+    }
   }
-  return w > 0 ? s / w : (lo + hi) / 2;
+}
+/** The sounding's weight at r m: the inverse square of the distance, tapered to nothing at SOUND_R (no edge where it stops). */
+const weight = r => r >= SOUND_R ? 0 : (1 - (r / SOUND_R) ** 2) ** 2 / Math.max(25, r) ** 2;
+const bottomAt = (i, j, lo, hi) => {
+  const x = (i + 0.5) * CELL, y = (j + 0.5) * CELL, bi = Math.floor(i / BIN), bj = Math.floor(j / BIN), c = j * nx + i;
+  // the band's own slope between its edges (its middle if it touches neither, or both equally far)
+  const a = toShoal[c], b = toDeep[c], slope = a >= INF / 2 && b >= INF / 2 ? (lo + hi) / 2 : a >= INF / 2 ? hi : b >= INF / 2 ? lo + (hi - lo) * Math.min(1, a / 400) : lo + (hi - lo) * a / (a + b);
+  // the soundings near, held inside the band, against it: the slope counted as one more sounding at SOUND_R / 2
+  let w = weight(SOUND_R / 2), s = w * slope;
+  for (let p = bi - 1; p <= bi + 1; p++) for (let q = bj - 1; q <= bj + 1; q++) for (const [sx, sy, d] of bins.get(p * 100000 + q) ?? []) {
+    const k = weight(Math.hypot(sx - x, sy - y)); if (k <= 0) continue;
+    w += k; s += k * Math.min(hi, Math.max(lo, d));
+  }
+  return s / w;
 };
 
 /** Runs packed: a 0 (known deep) or a LAND (no depth area: land, or water the chart doesn't sound) is followed by how many (1–255) there are. */
 const LAND = 255;
 const rle = g => { const out = []; for (let k = 0; k < g.length;) { const v = g[k]; if (v && v !== LAND) { out.push(g[k++]); continue; } let n = 0; while (k < g.length && g[k] === v && n < 255) { n++; k++; } out.push(v, n); } return out; };
 const tiles = [];
-let shoal = 0, sounded = 0;
+let shoal = 0;
 for (let tj = 0; tj * TILE < ny; tj++) for (let ti = 0; ti * TILE < nx; ti++) {
   const g = new Uint8Array(TILE * TILE); let any = false;
   for (let b = 0; b < TILE; b++) for (let a = 0; a < TILE; a++) {
@@ -76,11 +107,11 @@ for (let tj = 0; tj * TILE < ny; tj++) for (let ti = 0; ti * TILE < nx; ti++) {
     if (d1[c] >= SHOAL) continue; // (known deep: 0)
     const d = bottomAt(i, j, d1[c], d2[c]); if (d >= SHOAL) continue;
     g[b * TILE + a] = Math.min(LAND - 1, Math.max(1, 1 + Math.round((d - OFF) / STEP))); any = true; shoal++;
-    if (d !== (d1[c] + d2[c]) / 2) sounded++;
+
   }
   if (any) tiles.push([ti, tj, Buffer.from(rle(g)).toString('base64')]);
 }
-console.log(`${nx}×${ny} cells, ${tiles.length} tiles; ${shoal} shoal cells (${(shoal * CELL * CELL / 1e6).toFixed(0)} km²), ${sounded} with soundings near`);
+console.log(`${nx}×${ny} cells, ${tiles.length} tiles; ${shoal} shoal cells (${(shoal * CELL * CELL / 1e6).toFixed(0)} km²)`);
 await writeFile(new URL('../src/environment/data/bottom.json', import.meta.url), JSON.stringify({
   source: 'NOAA ENC (S-57) depth areas (DEPARE) and soundings (SOUNDG), src/geo/data/enc-chart.json; m below MLLW',
   made: 'scripts/make-bottom.mjs',

@@ -43,7 +43,7 @@ export const keelDepth = (b: Boat): number => GROUND.draft * Math.cos((b.heel ??
  * bottom, the mud's friction against that motion, and she's stopped short of where she'd have got to. `ms`: the time
  * (UTC, ms), for the tide.
  */
-export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: { t: number }, t: number): void {
+export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: { t: number }, t: number, h0 = b.h): void {
   const p: Vec = { x: b.x, y: b.y }, w = waterOver(p, ms);
   const into = w === null ? 0 : keelDepth(b) - w; // (how far the keel would be below the bottom, afloat)
   if (into <= 0) { b.aground = undefined; return; }
@@ -58,6 +58,16 @@ export function groundStep(b: Boat, ms: number, dt: number, emit: Emit, toast: {
   const mx = b.vx, my = b.vy; // (what travel moved her by this step)
   const was = b.aground;
   b.aground = into;
+  // (her keel in the mud holds her heading too: the turn she made this step, and her rate of turn, kept only by the
+  // share of her weight the water still carries; with all of it on the bottom she pivots no more than she slides. An
+  // estimate, as the friction is: the mud's moment on a keel of her length against the helm's and the sails')
+  const free = 1 - load / (mass * GROUND.g);
+  if (free < 1) {
+    let dh = b.h - h0; dh -= 360 * Math.round(dh / 360);
+    b.h = h0 + dh * free;
+    if (b.yawRate != null) b.yawRate *= free;
+    if (b.turnRate != null) b.turnRate *= free;
+  }
   // her motion over the ground, slowed (stopped, if the friction takes all of it), and where that leaves her this step
   const k = g > dv ? (g - dv) / g : 0, nx = vx * k, ny = vy * k;
   // (knocked against the shore this step, travel has already put her where she ends it: only her motion is the mud's)

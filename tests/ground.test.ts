@@ -18,8 +18,8 @@ const extreme = (sign: number) => { let best = -Infinity, at = 0; for (let m = 6
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const FLAT = LL(37.880, -122.505), D = 900 * Math.SQRT1_2, START = { x: FLAT.x + D, y: FLAT.y - D }, HEAD = 315;
 
-function sail(minute: number, seconds = 5 * 60) {
-  const S = { ...DEFAULT_SETTINGS, mode: 'sail', windKind: 'west', windKt: 12, windDir: 180, windTurn: 0, tideDate: '2026-11-14', tideTime: hhmm(minute), current: 'real', traffic: 0 } as Settings;
+function sail(minute: number, seconds = 5 * 60, current = 'real') {
+  const S = { ...DEFAULT_SETTINGS, mode: 'sail', windKind: 'west', windKt: 12, windDir: 180, windTurn: 0, tideDate: '2026-11-14', tideTime: hhmm(minute), current, traffic: 0 } as Settings;
   const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
   // in the deeper water south-east of the flat, sailing straight at it on a broad reach, at speed
   u.x = START.x; u.y = START.y; u.h = HEAD; u.v = 2.5; u.steer = 0; u.tiller = 0;
@@ -61,4 +61,21 @@ describe('aground on the mud', () => {
     expect(b.v).toBe(0); expect(Math.hypot(b.vx, b.vy)).toBe(0);
     expect(b.x).toBe(FLAT.x); expect(b.y).toBe(FLAT.y); // (where travel put her)
   });
+  it('stuck in the mud with the stream running past her, she can\'t pivot on her keel: hard over for half a minute, she barely turns', () => {
+    // (a big ebb, 2.5 kt everywhere: the water past her rudder gives it bite, held fast as she is)
+    const lo = extreme(-1), { w, u } = sail(lo, 5 * 60, 'bigebb');
+    expect(u.aground).toBeGreaterThan(0);
+    expect(Math.hypot(u.cur.x, u.cur.y)).toBeGreaterThan(0.5);
+    // (head into the stream: held still, the water runs past her from bow to stern, as if she were sailing, and her
+    // rudder has its full bite)
+    const into = n360(Math.atan2(-u.cur.x, -u.cur.y) * 180 / Math.PI);
+    u.h = into; u.v = 0; u.astern = 0; u.sway = 0; // (swung round by hand: her way through the water with her heading)
+    for (let k = 0; k < 5 * 60; k++) { u.steer = 0; u.tiller = 0; u.h = into; w.step(DT); }
+    expect(u.v).toBeGreaterThan(0.5);
+    const h0 = u.h;
+    for (let k = 0; k < 30 * 60; k++) { u.steer = 1; u.tiller = 1; w.step(DT); }
+    let dh = u.h - h0; dh -= 360 * Math.round(dh / 360);
+    expect(Math.abs(dh)).toBeLessThan(1.5); // (the mud holding her heading: half a degree; without it, 2.4°, the slow helm of a boat held still)
+    expect(u.aground).toBeGreaterThan(0);
+  }, 300_000);
 });
