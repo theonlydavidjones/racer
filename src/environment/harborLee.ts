@@ -62,12 +62,13 @@ export function stepDeficit(x: number, h: number): number {
 }
 
 type Kind = 'fence' | 'step' | 'shed';
-interface Body { kind: Kind; pts: Vec[]; H: number; box: { x0: number; x1: number; y0: number; y1: number }; /** the whole wall a piece belongs to */ wall?: Vec[]; /** (its width across the wind, last asked) */ wKey?: number; wVal?: number; /** (its outline in the wind's frame, for the last wind asked: along and across, and the extents) */ eFrom?: number; pa?: Float64Array; pn?: Float64Array; a0?: number; a1?: number; n0?: number; n1?: number; cross?: number }
+interface Body { kind: Kind; pts: Vec[]; H: number; box: { x0: number; x1: number; y0: number; y1: number }; /** the circle round it (its center and radius) */ cx: number; cy: number; R: number; /** the whole wall a piece belongs to */ wall?: Vec[]; /** (its width across the wind, last asked) */ wKey?: number; wVal?: number; /** (its outline in the wind's frame, for the last wind asked: along and across, and the extents) */ eFrom?: number; pa?: Float64Array; pn?: Float64Array; a0?: number; a1?: number; n0?: number; n1?: number; cross?: number }
 const reach = (k: Kind, H: number) => k === 'fence' ? 80 * H : k === 'step' ? 15 * H : 50 * H;
 const BODIES: Body[] = (() => {
   const out: Body[] = [];
   const add = (kind: Kind, pts: Vec[], H: number, wall?: Vec[]) => { const r = reach(kind, H);
-    out.push({ kind, pts, H, wall, box: { x0: Math.min(...pts.map(q => q.x)) - r, x1: Math.max(...pts.map(q => q.x)) + r, y0: Math.min(...pts.map(q => q.y)) - r, y1: Math.max(...pts.map(q => q.y)) + r } }); };
+    const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length, cy = pts.reduce((a, q) => a + q.y, 0) / pts.length, R = Math.max(...pts.map(q => Math.hypot(q.x - cx, q.y - cy))) + 1e-6;
+    out.push({ kind, pts, H, wall, cx, cy, R, box: { x0: Math.min(...pts.map(q => q.x)) - r, x1: Math.max(...pts.map(q => q.x)) + r, y0: Math.min(...pts.map(q => q.y)) - r, y1: Math.max(...pts.map(q => q.y)) + r } }); };
   // each breakwater a run of wall pieces (its line's segments; an area's outline's)
   for (const h of HARBORS) for (const b of h.breakwaters) {
     const pts = b.area ? [...b.pts, b.pts[0]] : b.pts;
@@ -87,20 +88,43 @@ const GROUPS = (() => {
   for (const B of BODIES) { const k = B.kind === 'shed' ? 'sheds' : `${Math.round(B.box.x0 / 1500)},${Math.round(B.box.y0 / 1500)}`; (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(B); }
   return [...byKey.values()].map(bs => ({ bodies: bs, box: bs.reduce((a, b) => ({ x0: Math.min(a.x0, b.box.x0), x1: Math.max(a.x1, b.box.x1), y0: Math.min(a.y0, b.box.y0), y1: Math.max(a.y1, b.box.y1) }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity }) }));
 })();
-/** The bodies whose reach overlaps each 50 m cell, filed the first time a cell is asked about (a boat's wind tests a
- * handful, not every wall piece of the harbor she's near). */
-const CELL_M = 50, CELLS = new Map<number, Body[]>(), NONE: Body[] = [];
-function cellBodies(p: Vec): Body[] {
+/**
+ * Whether body B can give any lee that counts (a thousandth: addHarborLee leaves less out) at a point q from its center,
+ * the wind blowing toward e, with q anywhere within `slack` of where it's given. By the circle round the body: p upwind
+ * of all of it is in no lee of it; far enough to the side of it, past a shed's widest wake or a wall's end fade, it's
+ * under 0.0004. (Exact, not an approximation: it only leaves out bodies whose lee there would be left out anyway.)
+ */
+function couldShelter(B: Body, qx: number, qy: number, e: Vec, slack: number): boolean {
+  const R = B.R + slack, ca = qx * e.x + qy * e.y;
+  if (ca <= -R) return false;
+  const side = Math.abs(qx * e.y - qy * e.x) - R;
+  if (side <= 0) return true;
+  const X = ca + R; // (the most p can be downwind of any part of it)
+  // (a shed's wake half-width, at most; a wall's end fade's width: beyond 4 and 2.8 of them each leaves under 0.0004)
+  return side <= (B.kind === 'shed' ? Math.max(3, 0.25 * B.H + 0.1 * X) * 4 : (0.2 * X + B.H) * 2.8);
+}
+/** The bodies that can shelter some of each 50 m cell, for each degree of wind direction, filed the first time a cell
+ * is asked about: almost always none (a boat's wind is asked for every boat, every step, and most of the walls near her
+ * are downwind of her or off to the side). */
+const CELL_M = 50, CELLS = new Map<number, Body[][]>(), NONE: Body[] = [];
+function cellBodies(p: Vec, from: number): Body[] {
   const i = Math.floor(p.x / CELL_M), j = Math.floor(p.y / CELL_M), key = i * 1_000_003 + j;
   let l = CELLS.get(key);
   if (!l) {
-    const x0 = i * CELL_M, y0 = j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M; l = [];
+    const x0 = i * CELL_M, y0 = j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M, near: Body[] = [];
     for (const G of GROUPS) { if (G.box.x1 < x0 || G.box.x0 > x1 || G.box.y1 < y0 || G.box.y0 > y1) continue;
-      for (const B of G.bodies) if (!(B.box.x1 < x0 || B.box.x0 > x1 || B.box.y1 < y0 || B.box.y0 > y1)) l.push(B); }
-    if (!l.length) l = NONE;
+      for (const B of G.bodies) if (!(B.box.x1 < x0 || B.box.x0 > x1 || B.box.y1 < y0 || B.box.y0 > y1)) near.push(B); }
+    // each degree's list, tested from the cell's middle at the degree's middle: anywhere in the cell is within half its
+    // diagonal of the middle, and anywhere in the degree turns a point |q| from the body by at most |q|·0.0088 (2 sin 0.25°)
+    const cx = x0 + CELL_M / 2, cy = y0 + CELL_M / 2, rc = CELL_M * Math.SQRT1_2;
+    l = Array.from({ length: 360 }, (_, k) => {
+      const e = V(k + 0.5 + 180), out = near.filter(B => { const qx = cx - B.cx, qy = cy - B.cy; return couldShelter(B, qx, qy, e, rc + (Math.hypot(qx, qy) + rc) * 0.0088 + 0.01); });
+      return out.length ? out : NONE;
+    });
     CELLS.set(key, l);
   }
-  return l;
+  const k = Math.floor(from) % 360;
+  return l[k < 0 ? k + 360 : k];
 }
 /** Each breakwater's width across the wind, by wind direction (a tenth of a degree): it's asked for every piece, every boat. */
 const WALL_W = new Map<Vec[], Map<number, number>>();
@@ -185,12 +209,13 @@ function shedFace(B: Body, p: Vec, e: Vec): boolean {
 let lastFrom = NaN, lastE: Vec = { x: 0, y: 0 };
 export function harborLeeDeficit(p: Vec, from: number): number {
   if (p.x < BOX.x0 || p.x > BOX.x1 || p.y < BOX.y0 || p.y > BOX.y1) return 0;
-  const list = cellBodies(p); if (!list.length) return 0;
+  const list = cellBodies(p, from); if (!list.length) return 0;
   if (from !== lastFrom) { lastFrom = from; lastE = V(from + 180); }
   const e = lastE; let best = 0;
   {
   for (const B of list) {
     if (p.x < B.box.x0 || p.x > B.box.x1 || p.y < B.box.y0 || p.y > B.box.y1) continue;
+    if (!couldShelter(B, p.x - B.cx, p.y - B.cy, e, 0)) continue; // (most of them, cheaply: no outline worked out)
     let d: number;
     frame(B, from, e);
     if (B.kind === 'shed') {
