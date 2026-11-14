@@ -1,5 +1,6 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
+import { groundStep } from '../boat/ground';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
@@ -1035,13 +1036,14 @@ export class World {
       if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
-      const x0 = b.x, y0 = b.y;
+      const x0 = b.x, y0 = b.y, h0 = b.h;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
         pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
+      groundStep(b, this.clockUtc * 60e3, dt, this.emit, this.groundToast, this.t, h0); // (her keel on the mud, where the tide leaves less water than she draws: boat/ground.ts)
       if (b.wrecked && b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); // (in a season race, RET only: the Coordinator)
       if (b.isUser) this.sailedM += Math.hypot(b.x - x0, b.y - y0);
       if (b.pushing) this.walkOut(b, Math.hypot(b.x - x0, b.y - y0), dt);
