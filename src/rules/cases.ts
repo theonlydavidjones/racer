@@ -86,6 +86,7 @@ const mark = (side: 's' | 'p', beat: boolean, p: [number, number] = [0, 0]): Rul
 // (A where the zone's edge is about 10 m behind her at 99 s: 14 m short of the mark, 3 m to its side, as the diagram had her)
 const A15 = off(off([0, 0], 45, -14, 3), 45, -2.5 * 4), hA15 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 99) * 30));
 const hL53 = (t: number) => 300 - Math.min(30, Math.max(0, (t + 31.8) * 30));
+const AS27 = off([0, 0], 45, -10), hAS27 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 50) * 20));
 const hL7 = (t: number) => 315 + Math.min(5, Math.max(0, (t - 50) * 5));
 const hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
 const hOL25 = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5));
@@ -169,13 +170,16 @@ export const CASES: RulesCase[] = [
   },
   {
     case: 27, title: 'Tacking close ahead', rules: ['13'],
+    // (sailed: both on port close-hauled at 045°, 2.5 m/s, BP 8 m astern and 5 m to windward of AS; AS tacks from 50 s at
+    // 20°/s, through head to wind at 52.25 s; BP, holding her course, runs into her while she's still turning)
     boats: [
-      { letter: 'AS', frames: [at(50, [0, 0], 45), at(51, [0.3, 0.3], 350, { tacking: true, tackT: 50.5, tack: 'S' })] },
-      { letter: 'BP', frames: [at(50, off([0, 0], 45, -12, -7.6), 45), at(51, [-2.6, -2.2], 45)] },
+      { letter: 'AS', frames: [at(45.9, AS27, 45, { look: false }), ...tacking(sail(AS27, hAS27, 2.5, 46, 58), 52.25, 54.5, 'S')] },
+      { letter: 'BP', frames: [at(45.9, off(AS27, 45, -8, -5), 45, { look: false }), ...sail(off(AS27, 45, -8, -5), () => 45, 2.5, 46, 58)] },
     ],
-    pair: ['AS', 'BP'],
-    momentT: 50, ask: 'foul', answer: { who: 'AS', rule: '13', line: 'AS tacked too close: past head to wind and not yet close-hauled, she keeps clear (13).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['AS', 'BP'], checks: [{ t: 46, keepsClear: 'BP', rule: '12' }],
+    momentT: 50, ask: 'foul', answer: { who: 'AS', rule: '13', line: 'AS tacked too close: past head to wind and not yet close-hauled, she keeps clear (13).' }, teach: true,
   },
+
   {
     case: 43, title: 'Along a bank, meeting a starboard boat', rules: ['10', '19'], bank: { d: 2, n: { x: Math.SQRT1_2, y: -Math.SQRT1_2 } },
     // (sailed: both at 2.5 m/s on their headings, meeting at the origin at 52 s; P along the bank, 2 m off her port side)
