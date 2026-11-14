@@ -579,6 +579,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // the jib trimmer: the sheet in the forward hand, led from the leeward winch
     const w = winchAt(-windward);
     const hold = p.hip.clone().add(V(0, 0.26 * k, 0)).addScaledVector(fwd(p.yaw), 0.5 * k).lerp(w, 0.15); // (at arm's length, the elbow easy)
+    // (in front of them, not reached back aft: sat at the bench's forward end turned a little aft, the sheet hand went back
+    // into the next crew's place, sat at the winch, the two arms through each other)
+    hold.z = Math.min(hold.z, p.hip.z + 0.05);
     p.hands[s > 0 ? 0 : 1] = hold;
   }
   return p;
@@ -986,7 +989,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const onBench = cr.crew.map(() => false);
   if (inMid.filter(Boolean).length > 1) {
     const mids = cr.crew.map((_, i) => i).filter(i => inMid[i]).sort((i, j) => Math.abs(ppl![i + 1].z - SOLE_Z) - Math.abs(ppl![j + 1].z - SOLE_Z));
-    for (const i of mids.slice(1)) onBench[i] = true;
+    // (at their own stations well apart fore and aft, the winch's and forward of it (crewPhys.ts Z), neither kneels: each
+    // sits on the bench's edge at their own place. One knelt on the sole's spot, its shins back toward the thwart, and the
+    // one sat at the winch had their feet in among them)
+    const zs2 = mids.map(i => ppl![i + 1].z), apart = Math.max(...zs2) - Math.min(...zs2) >= 0.4;
+    for (const i of apart ? mids : mids.slice(1)) onBench[i] = true;
   }
   const tackOn = !!c && (tacking || !!c.roll);
   const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
