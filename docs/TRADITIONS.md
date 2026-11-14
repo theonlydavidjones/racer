@@ -157,7 +157,10 @@ until the owner confirms it from the fleet.
         the sail-world and norcalsailing reports, seen through search summaries).
     - The fleet's custom (owner): a boat near the club is both the committee boat and a rounding mark, and its crew of
       women famously flash the boats as they round.
-    - In the sim: a festive committee-boat mark with a lively, cheering crew; nothing explicit on screen.
+    - In the sim (owner's decision, 13 November, replacing the earlier "nothing explicit"): as in real life, "this is a
+      true to life sim." The committee boat's crew flash the fleet as boats round: adult women, topless only, nothing
+      sexual, drawn in the crew figures' own stylized style, and shown blurred (owner: "just blur the titties"). No
+      mature-content setting. Before any public release, the host club's permission covers this as well as its name.
     - Not yet sourced: the course and marks (norcalsailing.com and sail-world.com are blocked here).
 15. **Dressing ship.** Kept as reference (item 6 has the CCA's practice); the owner hasn't seen it done in the fleet, so
     it's ranked low.

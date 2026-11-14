@@ -51,6 +51,12 @@ export interface AiState {
   commitHail?: boolean;
   /** How long she's been in another boat's dirty air on this beat, s. */
   dirtyT?: number;
+  /** How long she's been in another boat's wind shadow running, s (it eases off twice as fast once she's clear). */
+  dirtyRunT?: number;
+  /** Headed up out of a wind shadow on a run: she holds the higher course until this time. */
+  dirtyRunUntil?: number;
+  /** Getting out of an island's lee after rounding it: the side she chose (+1: to the right of the wind's direction). */
+  leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
   commitFor: number; // the desired heading that commitment was for
@@ -208,7 +214,7 @@ export interface Boat {
   twsSlow?: number;
   // whisker pole (wing-on-wing): the crew sets it on command and gybes it end-for-end
   poleWant: boolean;
-  /** Your boat: the pole is yours to call (you've worked it), not the crew's (ai.ts crewPoleCall). */
+  /** Your boat: the pole is yours to call, always (the owner); the crew only stows it when it must come in (ai.ts poleMustCome). */
   poleMine?: boolean;
   pole: PoleState;
   poleT: number; // seconds left in the current crew job
@@ -259,6 +265,8 @@ export interface Boat {
   ensign?: string; special?: string;
   /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
   ensignStruck?: boolean;
+  /** Coming in to a berth: the crew's lines going ashore (boat/dockLines.ts, sim/world.ts mooringStep). */
+  mooring?: import('./dockLines').Mooring;
   /** The ensign down for its hours: outside 0800–sunset, unless she's entering or leaving a harbour (boat/colours.ts). */
   ensignNight?: boolean;
   /** Her paint, when it isn't her fleet entry's (your own boat, as you've set her up). */

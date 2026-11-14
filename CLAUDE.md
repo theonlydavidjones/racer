@@ -62,6 +62,7 @@ node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headle
 node scripts/check/spelling.cjs              # US spelling in what the player reads (strings, index.html, README, docs); --fix changes them
 npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost races end to end (sail, save, sail it again with its ghost)
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
+npm run dev & node scripts/check/save-pattern.cjs <out-dir> # ~2 min: Save and "Save changes?" on a member, a boat's crew and the boat editor
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
                                               # discarding one function's code (docs/CAPACITY.md, "The compiler's thrown-away work")
@@ -73,7 +74,7 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
-  practice, color, favor, meters, harbor, maneuver, center, gray, -ize. New code comments use it too.
+  practice, color, favor, meters, harbor, maneuver, center, gray, jibe ("Ready to jibe" … "Jibe-ho"; the owner, 13 Nov), -ize. New code comments use it too.
 - Before opening a PR (the owner, 13 Nov 2026, for faster releases): merge origin/main into your branch and run the
   full `npm test` on it, not only test:fast; say in the PR that it passed (or which load timeouts you reran alone).
 - How the Coordinator tests a batch (the owner, 13 Nov 2026): test:fast first on the merged batch (fail fast), then the
@@ -113,3 +114,8 @@ them across agents makes conflicting edits.
 - Sail pictures (render/boatMesh.ts `sailTexture`) are in the cloth's own uv (u luff→leech, v foot→head): draw
   everything where it physically is; only the starboard set of figures runs back to front.
 - Comments explain the sailing or physics reason, in plain words.
+- The page's styles are src/styles/NN-<part>.css, joined in that order by src/styles.css: the order is the cascade, so a
+  rule goes in its part's file, and a new part's file at the end.
+- src/app.ts's parts are src/app/*.ts (setup, results and the pause screen, drills, dev handles), each a `mount…(app)`
+  function run where its code used to be. They reach app.ts's own state through its `ctx`: a getter for each binding,
+  and a setter where a part changes it. A part never keeps its own copy of `w` or `host`.

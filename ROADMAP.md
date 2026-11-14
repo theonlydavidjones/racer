@@ -143,10 +143,21 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Sculling comes
+   from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
+   (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
+   Next for the rules (owner, 13 November):
+   - **Protests and hearings (RRS Part 5): design approved** (docs/PROTESTS-PROPOSAL.md, branch rules-protests-design;
+     owner, 13 November):
+     - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
+     - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
+       option.
+   - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
+     committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
    Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
    (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
@@ -190,11 +201,100 @@ What's planned, roughly in order. Done work is described in the README.
    the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
    tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
    remember the conditions it happened in, so the check covers every pose and wind.
-8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
+8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8m. **Now — leaving the slip at Gashouse Cove: she drifts to windward under bare poles** (bug, physics; 3–5 h; owner, 13
+   November): "coming out of a slip at Gas House Cove. The wind is on the beam on the port side. I get pushed off. I
+   don't raise the sails. And the boat seems to just drift to windward, weirdly, even if I have the tiller at
+   centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
+   slip at Gas House Cove. I've tried over and over and over again. I just can't get pushed back far enough, and I
+   can't seem to get the nose around."
+   - Batch 34: at the dock and under bare poles the crew now sit centered; and Deep Physics' test of leaving under bare
+     poles on the real tide, beam wind both ways, finds she goes to leeward, so the windward drift didn't reproduce. If
+     it's still seen, the owner's exact case (time, tide, wind) is needed. The push-off and getting the nose round stay open.
+   - **Drifting to windward with no sails up is a bug.** A boat with no way on and no sail up is set to leeward by
+     the wind on her hull and rig, plus or minus the current. Nothing drives her upwind. Look at the bare-pole windage
+     force's sign or direction, the hove-to and in-irons models acting with the sails down, the shelter field inside
+     the basin, and any current in the basin.
+   - **The crew's weight doesn't move her sideways.** It changes her heel, and so a little of her drag and turning, not
+     her drift. Crew hiking or sitting to leeward at the dock is itself odd: they should be aboard and ready, not hiking.
+   - **Which way her bow goes**, to check against a source: with no sail up, a boat usually lies beam-on or falls off,
+     because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
+     the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
+     get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
+     the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
+     literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
+     crew would. It's hard but possible, as in real life.
+   - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
+     Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
+     Gashouse Cove with the wind on the beam both ways.
+8o. **Hoisting at the mast, finishing at the piano** (owner, 13 November; next; 2–3 h). First ask: "when sails are down,
+   hoisting the halyards does not hoist the sail… we can probably use the lines instead of the hoist buttons, no?" Then
+   the owner's correction: "there is some difference. the sails are hoisted from the mast. the piano controls use a
+   block and tackle to finalize the last several inches of hoisting. so having the piano halyard control fully 'on'
+   isn't the same distance as the actual hoisting distance." As on Josephine:
+   - **The hoist is done at the mast:** a crew member (or you) goes to the mast and hauls the sail up, taking the real
+     time and moving the crew's weight forward. It's started from inside an existing element (the band's crew tab,
+     or the key), not a new button. Both sails are hoisted at the mast (owner confirmed).
+   - **The piano's halyard controls finish it:** the main halyard's tackle and the jib halyard take up only the last
+     several inches, then set the luff tension. Their range is that short distance, not the whole hoist. With the sail
+     down they show as slack and idle.
+   - **The routine** (owner): "one of the first steps after raising sails and getting underway is tensioning the
+     halyards from the piano. they usually stay untouched for the rest of the sail, unless there's need to fine tune
+     (which better sailors than I may do often; I'm not sure)." So the crew tension the halyards at the piano soon
+     after getting under way, then leave them; a skilled crew may fine-tune them as the wind changes (to source).
+   - **Lowering:** let the halyard go at the mast, and the sail comes down fast.
+   - The sails, flags, telltales and physics answer the hoist as it happens: half-hoisted sails draw badly, luff and
+     flog.
+8q. **The boom on the centerline in the slip** (owner, 13 November; <1 h): "when in a slip, boom should be at
+   centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
+   with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
+   tied up.
+8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (bug; 2–3 h): owner, "at aquatic park, auto
+   nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
+   curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
+   geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
+   of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
+8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
+   intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
+   Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
+   really lies: rolled or flaked into a long, narrow sausage along the foredeck from the stemhead aft, its luff still on
+   the forestay at its forward end (so the stay meets it, not passes through), tied with a sail tie or two. Check from
+   both sides.
+8p. **Bug: with the sails down, the jib cars show as loaded** (owner, 13 November; <1 h): "with sails down, neither jib
+   car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
+8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
+   trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
+   reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
+   its "IDLE SPEED / NO WAKE" sign and light to the west, Fort Mason's pier to the east, the Bay and Angel Island
+   beyond) and reference/photos/fort-mason-pier-piles-gashouse-exit.jpg (the pier's open undercroft of massive concrete
+   piles).
+   1. Inside, sheltered: "the marina side of the exit is nicely sheltered from wind and current by the breakwater."
+   2. Outside, all at once: "the bay side of the exit smacks straight into the wind and the tidal current, and the boat
+      usually feels it immediately." The shelter has to end at the entrance in a few boat lengths, not fade over a
+      long distance, for the wind, the current and the chop alike.
+   3. The Fort Mason pier to leeward: "the eastern (usually leeward) side of the exit is the ft mason pier, which has
+      massive concrete piers supporting it. the wind (and often current) badly want to push you into those piers. that
+      means bye bye to your boat; you would just churn around under there in all the decades-old concrete and rebar and
+      barnacles." So:
+      - the pier's pile field is solid to the boat;
+      - the current runs through and under the piles, while the shed above blocks the wind;
+      - getting set under it is a real wreck, not a bounce. Until the wreck design below is agreed, contact with the piles
+        just stops her;
+      - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
+        of the pier, and pick the tide.
+   4. Eddies in the entrance (owner: "There are also frequent eddies in the entry. Have the physics session model the
+      water there carefully"): the tidal stream separating off the breakwater's end and the pier's corner sheds eddies
+      into the gap, which turn the current across the entrance and back on itself. Deep Physics models the water there
+      carefully, from the flood and ebb past the breakwater and through the pier's piles, sourced where it can be
+      (NOAA's SFBOFS currents, shallow-water eddy shedding behind a breakwater). The eddies should be visible on the
+      water as the other eddies are. Deep Physics takes it after the turning model.
+   Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
+   common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
 8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
    v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
    line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
@@ -278,14 +378,21 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~The setup builds the World only on Start~~ (done: one World per change, the scene once at Start) (owner: the configurator lags because it rebuilds the play surface
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
-   - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
+   - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **Bugs in the race setup's "When" section** (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
+     - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
+       off after the first week. It should open fully visible, flipping upward or scrolling the panel.
+     - Starting from her slip at Gashouse Cove with "Leave at 1:35 PM", equal to the 13:35 gun, the line reads "She
+       starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
+       plainly that she can't make the start from there.
+   - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
      no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
      One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
      some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
      first.
-   - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
+   - ~~Remove the line~~ (done) "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
      OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
@@ -299,12 +406,12 @@ What's planned, roughly in order. Done work is described in the README.
      4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
         signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
         saying.
-   - **A Save button on the Yacht Club's member page** (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
+   - ~~**A Save button on the Yacht Club's member page**~~ (done, batch 34: Save, and "Save changes?" on leaving, on a member's page, a boat's crew and the boat editor) (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
      save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
      commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
      stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
      editor, the Yacht Club's boats) in the audit. Owner's decision: leaving with unsaved edits asks "Save changes?" with Save and Discard.
-   - **The pause menu redesigned** (owner, 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
+   - **The pause menu redesigned** (approved by the owner, "fine for now"; 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
      too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
      Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
      Proposed: one narrow column (about a third of the screen's width), grouped by what you're doing:
@@ -356,6 +463,16 @@ as it is.
   compass item.
 - **A racing season:** a proposal for the owner (docs), built from the real 2025–26 Seaweed Soup.
 
+**Built 13 November, also** (to v178):
+- Josephine as she really is: sail number USA 122 (the 2026–27 Seaweed Soup results), and her club BVBC.
+- The 2026–27 Seaweed Soup season under way: its race 1 (7 November 2026) as a real past race, with 2025–26 a pick
+  away. Real skippers appear as anonymous ids, with no names in the shipped page.
+- The published page is down from 9.4 MB to 5.3 MB (one copy of the sim's code).
+- The Crew button back on the surface, opening on where the crew can sit (owner).
+- Your whisker pole goes out only on your call (owner).
+- The rest of the site map (UI audit): the Yacht Club as one name, Past races a screen of its own, Settings in two tabs.
+- For the owner to review: the boat editor mock-up (8i), and a design note for real docking (docs).
+
 **Owner's decisions, 12 November (morning)**, via the Coordinator:
 - Blanketing is not a foul: "stealing wind is a significant part of the strategy of tacking". Rules removes it as
   rule-23 interference (rule 23 protects a boat taking a penalty or on another leg, not one being covered on the same leg).
@@ -392,7 +509,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    c. ~~Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
       change with trim and heel) from a Folkboat lines plan, and the righting curve's shape past a few degrees (the
-      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll gybe; the help a roll
+      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll jibe; the help a roll
       tack: she now rolls through it (in light air too), the rig's sweep adds push while she rolls (quasi-steady, from the
       sail forces) and a turn costs speed by the rudder it needs net of her helm, but in a 2-tonne keelboat that adds
       up to nothing measurable; the only measured gains are a Laser's (Kogure et al. 2013, GPS: 5.3% faster through the
@@ -539,7 +656,19 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   30+ kt under full sail? The heel past a few degrees still needs the righting curve from the hull's offsets (see crew
   weight, above); if Bay racers sail on unreefed, she must be able to too, not lie at 60° at 0 kt;
   (2) the auto crew's heavy-air handling as Bay sailors do it (dump the main, sail on the jib, feather);
-  (3) water in the cockpit: water shipped, its weight, the pump;
+  (3) water in the cockpit and the bilge, and the bilge pump (owner, 13 November, "for later": "pumping the bilge is
+  important to the physics. unpumped adds substantial weight. we may need a crew animation for this, but only if
+  performance allows. also. need logic for how and when the bilge fills: rain fills it, heavy heeling can fill it,
+  heavy seas and splash can fill it"; 4–6 h):
+  - How the bilge fills, each from the physics:
+    - rain, from the observed and forecast rainfall for the day (NWS);
+    - heeling far enough to put the lee rail or cockpit coaming under;
+    - green water and spray in heavy seas;
+    - a wooden boat's planks weeping a little, as lapstrake hulls do.
+  - Its weight (1 kg a liter) is carried low and sloshes to leeward, adding to her displacement, heel and drag.
+  - Pumping: a crew member at the pump, at a sourced rate per stroke. The class rules allow pumps only while racing
+    (no self-bailers; NFIA 12.40). The smart crew pump when it pays.
+  - A pumping animation only if the frame budget allows; otherwise the crew member shows as busy at the pump.
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
   Update (12 November): owner, "nobody who races Folkboats on the bay has a reef setup. races just get canceled at 23
@@ -690,7 +819,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
    vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
    everywhere (off the Cityfront it should be about twice the slot's).
-4a. ~~**The AI's tacks aren't held**~~ (done: a tack or gybe she decides on is held until she's round; the rhumb-line test by
+4a. ~~**The AI's tacks aren't held**~~ (done: a tack or jibe she decides on is held until she's round; the rhumb-line test by
    her close-hauled course; clear of the whole committee boat) (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
    uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
    boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
@@ -698,11 +827,11 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
    38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
    only) and some never start.
-4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and gybing on the
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and jibing on the
    laylines downwind, headers from her own wind held 10 s; to do: the planner's 8 s a tack; and the AI fouls at the
    windward mark: 3–7 two-turn penalties among five boats in a 620 m race, the base code as much: mark-room and
    right-of-way handling there): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
-   she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
+   she ends up running), no run angle or jibing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 jibes on a
    620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
    and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
    US Sailing's 1–2 for keelboats).
@@ -730,7 +859,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
    ~~The AI's slow tack on a hail~~ (done, branch ai-hail-tack: a hailed boat that puts her helm down at once had been
    called in breach for not reaching head to wind in 5 s, and then fell back onto her old tack; starting to tack is now
-   her response under 20.2(c), and a slow AI boat tacks through rather than gybing round). The Delft resistance is
+   her response under 20.2(c), and a slow AI boat tacks through rather than jibing round). The Delft resistance is
    blocked by data: the Folkboat's hull form (waterline beam, canoe-body draft, Cp, Cm, LCB, LCF) isn't published in
    any source found, and the DSYHS coefficients only in a secondary source (a 2022–23 ULiège thesis reproducing
    Keuning & Sonnenberg 1999). It needs the class lines plan and offsets (NFIA Plan 1, 1961).
@@ -882,8 +1011,8 @@ placeholder names, marked as placeholders in the code (and the doc) so they're n
 After each race, the club's evening at the race's level: drinks; drinks and dinner; drinks, dinner and results; drinks,
 dinner, results and awards (owner). The Plastic Classic's committee-boat mark, when it's built (TRADITIONS item 14), as in real life (owner, 13 November:
 "this is a true to life sim"): its crew of adult women flash the fleet as boats round, topless only, nothing sexual,
-in the crew figures' stylized style. Pending the owner: whether it sits behind a mature-content setting, and the
-default. Before any public release, the host club's permission covers it.
+in the crew figures' stylized style. Shown blurred (owner: "just blur the titties"); no mature-content setting. Before any public release, the host
+club's permission covers it.
 
 Also asked for:
 
@@ -974,12 +1103,12 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colors, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colors are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
-  East Bay landmarks you navigate by (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
+  ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
   the university's and the hotel's own figures) and they belong in the landmark set used for transits, like Coit
   Tower and the Transamerica Pyramid.
-  **Sutro Tower, properly built** (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
+  ~~**Sutro Tower, properly built**~~ (done: the legs drawn in to a waist and out, to its real form) (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
   landmark already in the transit set, src/sim/transits.ts; 3–5 h). Today (render/landscape.ts) it's three banded legs
   to 298 m with crossarms at two levels and thin masts on top. Find why it reads as cut off: the masts too thin to
   see, the top lost to the far clipping plane or the fog, or the base sunk in the terrain. Build it to its real form,
@@ -1001,7 +1130,7 @@ traveling over the hull and sails to help players learn about sail shape and lam
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
   model. True to the physics, and labeled where it's illustrative.
 
-- **3. The tack and gybe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+- **3. The tack and jibe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
   the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
   "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
   also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
@@ -1018,9 +1147,13 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - **4. A learn-to-sail mode** (owner, 13 November: the on-screen tiller instructions don't need to be there, "except maybe
   in a 'learn to sail' mode, which we haven't even roadmapped yet"; not ranked; a design to the owner first). For
   someone who has never sailed: the parts of the boat, steering with the tiller, the points of sail, trimming to the
-  telltales, tacking and gybing, heaving to and docking, each as a short guided lesson on the water, with the
+  telltales, tacking and jibing, heaving to and docking, each as a short guided lesson on the water, with the
   instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
   coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
+
+- **Badges along the ASA ladder** (owner, 13 November): the learn-to-sail mode's lessons and badges follow the American
+  Sailing Association's course ladder, with ASA 101 Basic Keelboat as Learn to Sail. Each badge has a hover saying it
+  isn't the certification. ASA's permission is needed before any public release.
 
 ## Next up
 
@@ -1158,6 +1291,16 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **Wrecks: an open design** (owner, 13 November: "we need to work through the broader logic and plan for wrecks. I
+  don't know yet."; Marinas drafts a proposal): what counts as a wreck (piles, rocks, a ship, a seawall, grounding),
+  the damage and what it does to her, whether she retires or is towed, and how the logbook and the season score it.
+  For now, contact with the Fort Mason piles just stops her.
+
+- **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
+  whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's
+  scored and saved. That covers RET or DNF in the season and the results, the ghost and the logbook kept or not, and
+  practice against a season race.
 
 - **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
   getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the

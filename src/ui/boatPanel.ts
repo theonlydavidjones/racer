@@ -1,10 +1,9 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, LINE_COLORS, ROPE_COLORS, SAIL_COUNTRIES, TEAK_DECKS, ensignFor, fixSpec, lineColor, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
-import { BURGEES, CLUBS } from '../render/burgees';
-import { ENSIGNS } from '../render/flagArt';
-import { PERF_INFO, conditionItems, referencePerf } from '../boat/condition';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, LINE_COLORS, ROPE_COLORS, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, lineColor, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
+import { CLUBS } from '../render/burgees';
+import { conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
-import { TUNE_DEFAULT, TUNE_INFO, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
+import { TUNE_DEFAULT, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
 import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
 import { morph } from './morph';
 
@@ -15,7 +14,11 @@ import { morph } from './morph';
  */
 export class BoatPanel {
   private el: HTMLElement;
-  constructor(private S: Settings, private changed: () => void, private done: () => void) {
+  /**
+   * `changed(save)`: her setup changed (`save`: keep it: your boats saved; else shown in the showroom only, until you Save).
+   * `done(saved)`: back to her page (`saved`: just saved, a quick confirmation there).
+   */
+  constructor(private S: Settings, private changed: (save: boolean) => void, private done: (saved: boolean) => void) {
     this.el = document.getElementById('boatPanel')!;
     this.el.addEventListener('click', e => this.click(e));
     this.el.addEventListener('input', e => this.input(e));
@@ -24,14 +27,15 @@ export class BoatPanel {
 
   get open(): boolean { return !this.el.hidden; }
   show(id = this.S.boatId): void {
-    this.editId = id; this.confirmDiscard = false;
+    this.editId = id; this.leaving = null;
     this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); // for "Discard changes"
     this.render(); this.el.hidden = false;
   }
   /** Your boats as they were when you opened the panel. */
   private snap: { boats: BoatSpec[]; boatId: string; opponents: string[] } | null = null;
-  private confirmDiscard = false;
-  private get edited(): boolean { return !!this.snap && JSON.stringify(this.snap) !== JSON.stringify({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
+  /** Leaving with changes unsaved (the owner): where to, once you've said Save or Discard. */
+  private leaving: (() => void) | null = null;
+  get edited(): boolean { return !!this.snap && JSON.stringify(this.snap) !== JSON.stringify({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
   /** The showroom's slow turn: pause it to look at her from one side (set by main; returns whether she's turning now). */
   onSpin: (() => boolean) | null = null;
   private spinning = true;
@@ -50,14 +54,26 @@ export class BoatPanel {
     if (i >= 0) this.S.boats[i] = b; else this.S.boats.push(b);
     if (b.id === this.S.boatId) this.S.boat = b;
     this.editId = b.id;
-    this.changed(); if (rerender) this.render(); else { this.report(); if (!this.el.querySelector('[data-act="discard"]') && this.edited) this.render(); }
-    this.flashSaved();
+    this.changed(false); if (rerender) this.render(); else { this.report(); if (!this.el.querySelector('[data-act="save"]') && this.edited) this.render(); } // (shown, not yet kept: Save keeps it)
   }
-  private flashSaved(): void {
-    const el = this.el.querySelector('#bpSaved'); if (!el) return;
-    el.classList.add('on'); clearTimeout(this.savedT); this.savedT = window.setTimeout(() => el.classList.remove('on'), 1400);
+  /** Keep her changes: your boats saved, and the panel's starting point moved up to them. */
+  private keep(): void { this.changed(true); this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); }
+  /** Put her back as she was when the panel opened. */
+  private revert(): void {
+    if (!this.snap) return;
+    const s0 = structuredClone(this.snap);
+    this.S.boats = s0.boats; this.S.boatId = s0.boatId; this.S.opponents = s0.opponents;
+    this.S.boat = this.S.boats.find(x => x.id === s0.boatId) ?? this.S.boats[0];
+    if (!this.S.boats.some(x => x.id === this.editId)) this.editId = this.S.boatId;
+    this.changed(true);
   }
-  private savedT = 0;
+  /** Done (or Esc): back to her page, asking first if her changes aren't saved. */
+  requestDone(): void { this.leave(() => this.done(false)); }
+  /** Go on (Done, Esc, the start page), or with changes unsaved, ask first: Save or Discard. */
+  leave(next: () => void): void {
+    if (!this.edited) { next(); return; }
+    this.leaving = next; this.render();
+  }
   private uniqueName(base: string): string {
     const names = new Set(this.S.boats.map(b => b.name)); let n = base, k = 2;
     while (names.has(n)) n = `${base} ${k++}`;
@@ -68,19 +84,11 @@ export class BoatPanel {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act]'); if (!t) return;
     const v = t.dataset.v ?? '';
     switch (t.dataset.act) {
-      case 'done': this.done(); return;
+      case 'done': this.leave(() => this.done(false)); return;
+      case 'save': this.keep(); this.done(true); return;
+      case 'askSave': { const go = this.leaving; this.leaving = null; this.keep(); go?.(); return; }
+      case 'askDiscard': { const go = this.leaving; this.leaving = null; this.revert(); go?.(); return; }
       case 'spin': if (this.onSpin) { this.spinning = this.onSpin(); t.textContent = this.spinning ? 'Pause turning' : 'Turn her'; t.setAttribute('aria-pressed', String(!this.spinning)); } return;
-      case 'discard': this.confirmDiscard = true; this.render(); return;
-      case 'discardNo': this.confirmDiscard = false; this.render(); return;
-      case 'discardYes': {
-        if (!this.snap) return;
-        const s0 = structuredClone(this.snap);
-        this.S.boats = s0.boats; this.S.boatId = s0.boatId; this.S.opponents = s0.opponents;
-        this.S.boat = this.S.boats.find(x => x.id === s0.boatId) ?? this.S.boats[0];
-        if (!this.S.boats.some(x => x.id === this.editId)) this.editId = this.S.boatId;
-        this.confirmDiscard = false;
-        this.changed(); this.render(); return;
-      }
       case 'skipper': this.set(b => { b.skipper = v === 'you' ? 'you' : 'ai'; }); return;
       case 'material': this.set(b => { b.hull.material = v as BoatSpec['hull']['material']; if (v === 'wood' && b.deck === '#8e9f7c') b.deck = 'teak-silver'; }); return;
       case 'upper': this.set(b => { b.hull.upper = v; }); return;
@@ -162,7 +170,7 @@ export class BoatPanel {
     const paint = () => {
       el.innerHTML = `<table><tr><td><small>In ${kt} kt, against a clean, new-sailed boat</small></td><td><small>Upwind</small></td><td><small>Reach</small></td><td><small>Run</small></td></tr>`
         + rows.map((r, i) => `<tr${i === rows.length - 1 && rows.length > 1 && r.spec === b ? ' class="tot"' : ''}><td>${r.label}</td>${cells[i].map(c => `<td>${c}</td>`).join('')}</tr>`).join('')
-        + `</table><small>Speed through the water, measured by sailing her in the sim. 1% at 5 kt is about 7 seconds a mile.</small>`;
+        + `</table>`;
     };
     paint();
     const tasks: (() => void)[] = [];
@@ -187,65 +195,58 @@ export class BoatPanel {
     const deckList = [...TEAK_DECKS, ...HULL_COLORS]; // laid teak on glassfibre decks too (a common refit)
     const ages: [SailAge, string][] = [['new', 'New'], ['mid', 'Midlife'], ['old', 'End of life']];
     morph(this.el, `
-      <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button><button type="button" class="cta" data-act="done">Done</button></div>
+      <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button>${this.leaving ? '' : this.edited ? '<button type="button" class="cta" data-act="save">Save</button>' : '<button type="button" class="cta" data-act="done">Done</button>'}</div>
       <div class="garage">
-        ${this.confirmDiscard
-          ? `<div class="gconfirm">Undo every change since you started editing? <button type="button" class="ghost danger" data-act="discardYes">Discard changes</button><button type="button" class="ghost" data-act="discardNo">Keep them</button></div>`
-          : `<small>Every change is saved as you make it.<span class="gsaved" id="bpSaved">Saved ✓</span>${this.edited ? ' <button type="button" class="linkbtn" data-act="discard">Discard changes</button>' : ''}</small>`}
+        ${this.leaving ? '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-act="askSave">Save</button><button type="button" class="ghost" data-act="askDiscard">Discard</button></div>' : ''}
       </div>
       <div class="bpbody">
       <section><h3>Particulars</h3>
         <div class="field"><span>Name</span><input data-k="name" class="pick" maxlength="18" value="${esc(b.name)}"></div>
         <div class="field"><span>Sail number · home country</span><div class="row2">
           <select data-k="country" class="pick" aria-label="Home country (national letters)">${SAIL_COUNTRIES.some(c => c[0] === b.sails.country) ? '' : `<option value="${esc(b.sails.country)}" selected>${esc(b.sails.country || 'No letters')}</option>`}${SAIL_COUNTRIES.map(([c, n]) => `<option value="${c}"${c === b.sails.country ? ' selected' : ''}>${c} · ${n}</option>`).join('')}</select>
-          <input data-k="number" class="pick" inputmode="numeric" maxlength="5" value="${esc(b.sails.number)}" aria-label="Number"></div>
-          <small>Her national letters are her home country: the countries where Folkboats are sailed (the class association's national fleets).</small></div>
+          <input data-k="number" class="pick" inputmode="numeric" maxlength="5" value="${esc(b.sails.number)}" aria-label="Number"></div></div>
         <div class="field"><span>Yacht club</span><select data-k="club" class="pick"><option value="">None</option>${CLUBS.map(c => `<option value="${c.id}"${c.id === b.club ? ' selected' : ''}>${esc(c.club)}</option>`).join('')}</select></div>
-        <div class="field"><span>Skipper</span>${seg('skipper', [['you', 'You'], ['ai', 'AI skipper (generic)']], b.skipper)}
-          <small>Skippers come with the Yacht Club; for now she's yours to skipper, or a generic AI's.</small></div>
+        <div class="field"><span>Skipper</span>${seg('skipper', [['you', 'You'], ['ai', 'AI skipper (generic)']], b.skipper)}</div>
         <div class="field"><span>Home marina</span><select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div>
-        ${b.marina ? `<div class="field"><span>Her slip in ${esc(harborOf(b.marina)?.short ?? '')}</span><select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>
-          <small>She lies bow in (boats nose into a slip here, never back in): to leave, push off. The docks are mapped from OpenStreetMap. ${SLIP_NOTE[b.marina] ?? ''}</small></div>` : ''}
-        <div class="field"><span>Her flags</span><small id="bpFlagNote">${flagNote(b)}</small></div>
+        ${b.marina ? `<div class="field"><span>Her slip in ${esc(harborOf(b.marina)?.short ?? '')}</span><select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select></div>` : ''}
       </section>
       <section><h3>Hull</h3>
-        <div class="field"><span>Hull</span>${seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood']], b.hull.material)}
-          <small>The class weighs wooden and fiberglass Folkboats to the same minimum, so they race as equals.</small></div>
+        <div class="field"><span>Hull</span>${seg('material', [['fiberglass', 'Fiberglass'], ['wood', 'Wood']], b.hull.material)}</div>
         <div class="field"><span>Topsides · ${name(upperList, b.hull.upper)}</span>${sw('upper', upperList, b.hull.upper)}</div>
         <div class="field"><span>Boot stripe · ${b.hull.stripe ? name(HULL_COLORS, b.hull.stripe) : 'none'}</span>${sw('stripe', HULL_COLORS, b.hull.stripe, 'None')}</div>
         <div class="field"><span>Bottom paint · ${name(BOTTOM_COLORS, b.hull.lower)}</span>${sw('lower', BOTTOM_COLORS, b.hull.lower)}</div>
       </section>
       <section><h3>Deck</h3>
-        <div class="field"><span>${name(deckList, b.deck)}</span>${sw('deck', deckList, b.deck)}${wood ? '' : '<small>Teak laid over the glassfibre deck, as many owners have done.</small>'}</div>
+        <div class="field"><span>${name(deckList, b.deck)}</span>${sw('deck', deckList, b.deck)}</div>
         <div class="field"><span>Cabin top · ${b.cabinTop ? name(deckList, b.cabinTop) : b.deck.startsWith('teak') ? 'painted canvas' : 'like the deck'}</span>${sw('cabinTop', deckList, b.cabinTop ?? '', 'Like the deck')}</div>
-        <div class="field"><span>Name lettering</span>${seg('nameColor', [['', 'Auto'], ['#1e5236', 'Dark green'], ['#1f2c4f', 'Navy'], ['#16181b', 'Black'], ['#a8802f', 'Gold'], ['#8c1d24', 'Red']], b.nameColor ?? '')}<small>In script on the cabin sides, aft of the window.</small></div>
+        <div class="field"><span>Name lettering</span>${seg('nameColor', [['', 'Auto'], ['#1e5236', 'Dark green'], ['#1f2c4f', 'Navy'], ['#16181b', 'Black'], ['#a8802f', 'Gold'], ['#8c1d24', 'Red']], b.nameColor ?? '')}</div>
         <div class="field"><span>Forehatch</span>${seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic (smoked, aluminum frame)']], b.hatch ?? 'teak')}</div>
-        <div class="field"><span>Companionway</span>${seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')}<small>Open: the hatch slid forward and the doors stowed below. Closed: the hatch slid aft over it and the doors in.</small></div>
-        <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}<small>Flat alongside the toe rail, by the cabin.</small></div>
-        <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolour']], b.navLights ?? 'deck')}<small>Lit from sunset to sunrise. Under 20 m, a sailing boat may show the three in one masthead lantern instead (Rule 25).</small></div>
+        <div class="field"><span>Companionway</span>${seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')}</div>
+        <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}</div>
+        <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolour']], b.navLights ?? 'deck')}</div>
       </section>
       <section><h3>Sails</h3>
         <div class="field"><span>Sailcloth</span>${seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)}</div>
         <div class="field"><span>Sail numbers</span>${seg('numberColor', [['', 'Auto'], ...NUMBER_INKS], b.sails.numberColor ?? '')}</div>
-        <div class="field"><span>Class letter F</span>${seg('insigniaColor', [['', 'Like the numbers'], ...NUMBER_INKS], b.sails.insigniaColor ?? '')}<small>${SAIL_INK_NOTE}</small></div>
+        <div class="field"><span>Class letter F</span>${seg('insigniaColor', [['', 'Like the numbers'], ...NUMBER_INKS], b.sails.insigniaColor ?? '')}</div>
       </section>
       <section><h3>Lines <em>· their colors in the sail controls band</em></h3>
         ${LINE_ROWS.map(([k, n]) => `<div class="field"><span>${n} · ${name(ROPE_COLORS, lineColor(b, k)) || 'custom'}</span><div class="swatches">${ROPE_COLORS.map(([cn, c]) => `<button type="button" class="sw" style="background:${c}" data-act="lineColor" data-line="${k}" data-v="${c}" aria-pressed="${lineColor(b, k) === c}" title="${cn}" aria-label="${n}: ${cn}"></button>`).join('')}</div></div>`).join('')}
-        <div class="field"><small>As on Josephine's piano, a color for each line, so you find it by eye. ${b.lineColors ? '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual colors</button>' : 'These are the usual colors: jib lines warm, main lines cool, the backstay white.'}</small></div>
+        ${b.lineColors ? '<div class="field"><small><button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual colors</button></small></div>' : ''}
       </section>
       <section><h3>Condition <em>· changes her speed</em></h3>
         <div class="field"><span>Bottom last cleaned · <b id="bpWeeksV">${weeksLabel(b.perf.cleanedWeeks)}</b></span>
-          <input type="range" data-k="weeks" min="0" max="26" step="1" value="${b.perf.cleanedWeeks}"><small>${PERF_INFO.weeks}</small></div>
-        <div class="field"><span>Bottom paint finish</span>${seg('finish', [['antifouling', 'As rolled on'], ['race', 'Wet-sanded, burnished']], b.perf.finish)}<small>${PERF_INFO.finish}</small></div>
+          <input type="range" data-k="weeks" min="0" max="26" step="1" value="${b.perf.cleanedWeeks}"></div>
+        <div class="field"><span>Bottom paint finish</span>${seg('finish', [['antifouling', 'As rolled on'], ['race', 'Wet-sanded, burnished']], b.perf.finish)}</div>
         <div class="field"><span>Mainsail</span>${seg('mainAge', ages, b.perf.mainAge)}</div>
-        <div class="field"><span>Jib</span>${seg('jibAge', ages, b.perf.jibAge)}<small>${PERF_INFO.sails}</small></div>
+        <div class="field"><span>Jib</span>${seg('jibAge', ages, b.perf.jibAge)}</div>
         <div class="field"><span>Mast</span>${seg('mast', [['aluminium', 'Aluminum'], ['wood', 'Wood (spruce)']], b.perf.mast)}
           ${b.perf.mast === 'wood' ? seg('stiff', [['soft', 'Soft'], ['average', 'Average'], ['stiff', 'Stiff']], b.perf.mastStiffness) : ''}</div>
-        <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood (spruce)']], b.perf.boom)}<small>${PERF_INFO.spars}</small></div>
+        <div class="field"><span>Boom</span>${seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood (spruce)']], b.perf.boom)}</div>
         ${rigTuneFields(b, seg)}
         <div class="field"><span>Outboard</span>${seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed aboard'], ['bracket', 'On the bracket']], b.perf.outboard)}
-          ${b.perf.outboard !== 'none' ? seg('outboardHp', [['2.5', '2.5 hp (no reverse)'], ['3.5', '3.5 hp'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5)) : ''}<small>${PERF_INFO.outboard}</small></div>
-        <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label><small>${PERF_INFO.gear}</small></div>
+          ${b.perf.outboard !== 'none' ? seg('outboardHp', [['2.5', '2.5 hp (no reverse)'], ['3.5', '3.5 hp'], ['6', '6 hp']], String(b.perf.outboardHp ?? 3.5)) : ''}</div>
+        <div class="field"><span>Weight over the class minimum</span><label class="inline"><input data-k="gear" class="pick" inputmode="numeric" value="${Math.round(b.perf.gearKg / 0.4536)}"> lb</label></div>
         <div class="bpreport" id="bpReport"></div>
       </section>
       </div>`);
@@ -264,22 +265,8 @@ function slipOptions(b: BoatSpec, boats: BoatSpec[]): string {
   return '<option value="">No slip</option>' + docks.map(d => `<optgroup label="${(n => n[0].toUpperCase() + n.slice(1))(dockName(d))}">${slips.filter(s => s.dock === d).map(s =>
     `<option value="${s.id}"${s.id === mine ? ' selected' : ''}${taken.has(s.id) ? ' disabled' : ''}>${s.label}${taken.has(s.id) ? ` · ${esc(taken.get(s.id)!)}` : ''}</option>`).join('')}</optgroup>`).join('');
 }
-/** What's real about each marina's dock letters and slip numbers (geo/marina.ts). */
-const SLIP_NOTE: Record<string, string> = {
-  'west-harbor': 'The slip numbers are the marina\'s own, and so are Docks E, F and G (its maps); where the maps don\'t show the order along a dock, it\'s this sim\'s guess.',
-  'gashouse-cove': 'The slip numbers are the marina\'s own, each dock\'s range from its map; the order along each dock isn\'t published, so that\'s this sim\'s guess.',
-  'south-beach': 'Docks A to G and the slip numbers are the harbor\'s own (its map).',
-  corinthian: 'A dock, along the breakwater, is the club\'s own; B and C, the fingers and the slip numbers are this sim\'s.'
-};
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 export const weeksLabel = (w: number) => w === 0 ? 'just cleaned' : w === 1 ? '1 week ago' : `${w} weeks ago`;
-function flagNote(b: BoatSpec): string {
-  const club = BURGEES.find(x => x.id === b.club), ens = ENSIGNS.find(x => x.id === ensignFor(b.sails.country));
-  const notes = [`${club ? `Her club's burgee` : CLUBS.some(c => c.id === b.club) ? 'No burgee yet (this club\'s isn\'t drawn)' : 'No burgee (no club)'}, and her country's ensign${ens ? `: ${ens.name}` : ''}, on its staff at the stern. Her ensign keeps its hours: up at 0800 and down at sunset, and flown after dark only for entering or leaving harbor.`];
-  if (ens && ens.id !== 'us' && ens.id !== 'us-yacht') notes.push('As a visitor on the Bay she flies the US flag as a courtesy flag at the starboard spreader, and her burgee moves to port.');
-  notes.push('Flags fly when she\'s cruising; racing boats strike them for a race. Officers\' flags will go with skippers, in the Yacht Club.');
-  return notes.join(' ');
-}
 
 
 /* ---------- the rig tune (boat/rigTune.ts) ---------- */
@@ -306,22 +293,16 @@ function rigTuneFields(b: BoatSpec, seg: Seg): string {
     const [lo, hi] = TUNE_RANGE[key], v = (t ?? TUNE_DEFAULT)[key];
     return `<input type="range" data-k="${k}" min="${lo * scale}" max="${hi * scale}" step="${step}" value="${v * scale}"${t ? '' : ' disabled'}>`;
   };
-  const row = (k: string, key: keyof RigTune, label: string, scale: number, step: number, note: string) =>
-    `<div class="field"><span>${label} · <b id="bp_${k}">${tuneLabel(key, t ?? TUNE_DEFAULT)}</b></span>${range(k, key, scale, step)}<small>${note}</small></div>`;
-  return `<div class="field"><span>Rig tune · set at the dock</span>${seg('tune', [['auto', 'For the forecast'], ['light', 'North Sails light'], ['medium', 'North Sails medium'], ['strong', 'North Sails strong'], ['heikkila', 'Heikkilä'], ...(cur === 'custom' ? [['custom', 'Your own'] as [string, string]] : [])], cur)}<small>${TUNE_INFO.tune}</small></div>
-    ${t ? `${row('tuneMark', 'forestayMark', 'Forestay mark (rake)', 100, 0.5, TUNE_INFO.forestayMark)}
-    ${row('tuneFoot', 'footAft', 'Mast foot', 1, 1, TUNE_INFO.footAft)}
-    ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25, TUNE_INFO.shroudTurns)}
-    ${row('tuneJumper', 'jumperTurns', 'Jumpers', 1, 0.5, TUNE_INFO.jumperTurns)}
+  const row = (k: string, key: keyof RigTune, label: string, scale: number, step: number) =>
+    `<div class="field"><span>${label} · <b id="bp_${k}">${tuneLabel(key, t ?? TUNE_DEFAULT)}</b></span>${range(k, key, scale, step)}</div>`;
+  return `<div class="field"><span>Rig tune · set at the dock</span>${seg('tune', [['auto', 'For the forecast'], ['light', 'North Sails light'], ['medium', 'North Sails medium'], ['strong', 'North Sails strong'], ['heikkila', 'Heikkilä'], ...(cur === 'custom' ? [['custom', 'Your own'] as [string, string]] : [])], cur)}</div>
+    ${t ? `${row('tuneMark', 'forestayMark', 'Forestay mark (rake)', 100, 0.5)}
+    ${row('tuneFoot', 'footAft', 'Mast foot', 1, 1)}
+    ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25)}
+    ${row('tuneJumper', 'jumperTurns', 'Jumpers', 1, 0.5)}
     <div class="field"><small id="bpTuneRead">${tuneReadout(t)}</small></div>` : ''}
-    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label><small>A row in the sail controls band (under the traveler): the crew turns the jumpers' turnbuckle a half turn at a time. The class rules allow it (CR 7.40); Heikkilä Sailmaker adjusts them during a race, North Sails' Theis Palm races with them fixed.</small></div>`;
+    <div class="field"><label class="inline"><input type="checkbox" data-k="jumpersUnderWay"${b.perf.jumpersUnderWay ? ' checked' : ''}> Adjust the jumpers under way</label></div>`;
 }
 
 /** Colours for the sail numbers and the F: the usual sailmakers' vinyls. */
 const NUMBER_INKS: [string, string][] = [['#16181b', 'Black'], ['#1f2c4f', 'Navy'], ['#2456a8', 'Blue'], ['#b3202a', 'Red'], ['#1e5236', 'Green'], ['#f4f4f0', 'White']];
-/**
- * The rule, under the choices. The class rule is read from its text (NFIA 2025–2028, March 2026 update, 9.14); the racing
- * rules' Appendix G on colour (letters and numbers in one colour, contrasting with the sail) is from secondary sources:
- * its text couldn't be reached to quote. Nothing in either limits the F's colour.
- */
-const SAIL_INK_NOTE = 'Auto: black on white sails, white on black. The class places the F and the numbers as the racing rules\' Appendix G lays down (CR 9.14: at least 300 mm high, 200 wide, 40 thick, 60 apart); Appendix G asks for letters and numbers in one color that contrasts with the sail. Nothing limits the F\'s color.';

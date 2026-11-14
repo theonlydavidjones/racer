@@ -51,8 +51,10 @@ export class Chart {
     $('bChartClose').onclick = () => this.close();
     $('bChartPal').onclick = () => {
       if (!this.w) return;
-      this.setPal((this.w.settings.chartPal ?? 'day') === 'day' ? 'dusk' : 'day');
-      this.palLabel(); this.draw();
+      // (the race learns the palette by command; the chart redraws once its mirror has it, or it'd take two clicks)
+      const pal = (this.w.settings.chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
+      this.setPal(pal); $('bChartPal').textContent = pal === 'day' ? 'Dusk colors' : 'Day colors';
+      void this.race.ask({ k: 'settings', patch: {} }).then(() => { this.palLabel(); this.draw(); });
     };
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
@@ -77,7 +79,6 @@ export class Chart {
     this.scale = Math.min(innerWidth, innerHeight) / 6000; // about 3 nm across to begin with
     $('chart').hidden = false;
     $('chartTitle').textContent = w.cruising ? 'Chart · pick a destination' : 'Chart';
-    $('chartSub').textContent = w.freeSail ? 'Paused. Tap the water or a place: sail there, or move her there. Drag to move, scroll to zoom.' : w.cruising ? 'Paused. Tap the water or a place to pick where to go. Drag to move, scroll to zoom.' : 'Paused. Drag to move, scroll to zoom. (Racing: your course is set by the committee.)';
     this.info(); this.palLabel();
     this.draw();
     // the streaks move every frame while the chart's open (the sail is paused: they're the only thing that moves)
@@ -133,7 +134,7 @@ export class Chart {
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);
     const twa = Math.abs(wrap(w.wind.from - b)), beat = beatFor(u);
     const kind = twa < beat ? 'upwind of you: a beat, tacking' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'downwind: a run';
-    const cur = w.currentAt(p), ckt = Math.hypot(cur.x, cur.y) / KT;
+    const cur = w.currentDrawn(p), ckt = Math.hypot(cur.x, cur.y) / KT;
     const nm = d / 1852;
     el.innerHTML = `<p><b>${this.pick.name}</b></p><p>${nm < 0.2 ? Math.round(d) + ' m' : nm.toFixed(2) + ' nm'}, bearing ${String(Math.round(b) % 360).padStart(3, '0')}° (true), ${kind}.</p>`
       + `<p>Current there now: ${ckt < 0.1 ? 'slack' : `${ckt.toFixed(1)} kt setting ${String(Math.round(brg(cur.x, cur.y)) % 360).padStart(3, '0')}°`}.</p>`;
