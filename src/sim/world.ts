@@ -509,7 +509,7 @@ export class World {
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
       penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
-      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
+      cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
       weatherHeld: undefined, carOff: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
@@ -1701,7 +1701,11 @@ export class World {
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true; // sails up at the dock weathervane, let fly
-    b.boom += ((up ? side * 75 : 0) - b.boom) * k; // (the main down: its boom sheeted in amidships, clear of the dock and the boats either side) b.jib += (side * 35 - b.jib) * k;
+    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k;
+    // the main down, tied up: the mainsheet hauled in and made fast, the traveller car in the middle, so the boom lies on
+    // the centerline, clear of the dock and the boats either side (8q, the owner: "when in a slip, boom should be at
+    // centerline (when starting) or brought to centerline (when finishing a sail and docking)")
+    if (!up) { b.ctl.mainsheet += (0 - b.ctl.mainsheet) * k; b.ctl.traveller += (0 - b.ctl.traveller) * k; if (b.ctlTarget) { delete b.ctlTarget.mainsheet; delete b.ctlTarget.traveller; } }
     crewRig(b, dt, this.emit);
   }
 
