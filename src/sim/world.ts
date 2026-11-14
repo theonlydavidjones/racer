@@ -1556,7 +1556,9 @@ export class World {
     const hoist = plan.headToWind ? ' She\'ll be head to wind: get the main up first (U), or she\'ll soon stop.' : '';
     this.emit({ type: 'toast', ms: 7000, msg: plan.kind === 'swing'
       ? plan.hold
-        ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
+        ? Math.abs(plan.hold.off) > 90
+          ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. There\'s no room to bear away under the main here: push off again (G) and they\'ll carry the line to her stern and let the wind wind her round to point downwind, then slip it. Get the jib up (J) for way.'
+          : 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'
         ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. She's going astern: steer with the tiller (the bow goes the way you push it), then get sail on her.${hoist}`
@@ -1619,14 +1621,14 @@ export class World {
         } else if (P.hold && H.held !== false) {
           // head to wind, held on the bow line: waiting for the main to go up and the word to let go; she lies to the wind as
           // it shifts (a boat on a bow line follows it), within 20 degrees of where she came to
-          if (H.held == null) { H.held = true; this.emit({ type: 'toast', msg: 'She\'s lying head to wind, held on the bow line (stopped: no water past the rudder, so the tiller does little). Hoist the main (U), then push off (G) to let her go.', ms: 6000 }); }
+          if (H.held == null) { H.held = true; this.emit({ type: 'toast', msg: Math.abs(P.hold.off) > 90 ? 'She\'s lying head to wind, held on the bow line. Push off (G) and they\'ll wind her round on a stern line to point downwind.' : 'She\'s lying head to wind, held on the bow line (stopped: no water past the rudder, so the tiller does little). Hoist the main (U), then push off (G) to let her go.', ms: 6000 }); }
           const want = clamp(wrap(ww.from - n360(H.h0 + P.turn)), -20, 20), cur = H.follow ?? 0;
           H.follow = cur + clamp(want - cur, -CREW_TURN * dt, CREW_TURN * dt);
           const q = swingAbout(start, H.h0, 3.8, P.turn + H.follow); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h);
         } else if (P.hold && (H.releasing ?? 0) < 1) {
-          // her bow pushed off the wind, about the bow, toward the way out (or walked right round, about her middle, to point downwind)
+          // her bow pushed off the wind, about the bow, toward the way out (or wound round on a stern line, about her stern, to point downwind)
           H.releasing = Math.min(1, (H.releasing ?? 0) + dt * CREW_TURN * 2 / Math.abs(P.hold.off));
-          const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, holdPivot(P.hold.off), P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); // (walked right round: about her middle)
+          const q0 = swingAbout(start, H.h0, 3.8, P.turn + (H.follow ?? 0)), q = swingAbout(q0.c, q0.h, holdPivot(P.hold.off), P.hold.off * H.releasing); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); // (wound round: about her stern, holdPivot)
         } else this.letGo(b, P.hold ? n360(H.h0 + P.turn + (H.follow ?? 0) + P.hold.off) : P.h, SHOVE, 0);
       } else {
         // shoved off astern: enough to coast her into the fairway on the water's drag
