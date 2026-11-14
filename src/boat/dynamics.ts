@@ -66,12 +66,32 @@ const RESIDUARY: [number, number][] = [
   [0.7, 0.16], [0.8, 0.21], [1.0, 0.31]
 ];
 
+/**
+ * The curve through those points, smooth: a monotone cubic (Fritsch & Carlson 1980, "Monotone piecewise cubic
+ * interpolation", SIAM J. Numer. Anal. 17), which passes through every point, never turns back between them, and has
+ * no corners. Joined by straight lines, the resistance's slope jumped at each point (every 0.05 of Froude number: 3.7
+ * and 4.5 kt for her), and what a given drag costs her in speed goes by that slope: her speed in chop against the
+ * polar's came out in flats and ramps along the angle, her speed made good with two near-equal peaks, and the beat
+ * angle found from it jumped 5–7° on a quarter-knot puff.
+ */
+const RES_SLOPE: number[] = (() => {
+  const t = RESIDUARY, n = t.length, d: number[] = [], m: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n - 1; i++) d.push((t[i + 1][1] - t[i][1]) / (t[i + 1][0] - t[i][0]));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (d[i - 1] * d[i] <= 0) { m[i] = 0; continue; }
+    // (the harmonic mean of the two slopes, weighted by the intervals: Fritsch & Butland's form, monotone by construction)
+    const h0 = t[i][0] - t[i - 1][0], h1 = t[i + 1][0] - t[i][0], w0 = 2 * h1 + h0, w1 = h1 + 2 * h0;
+    m[i] = (w0 + w1) / (w0 / d[i - 1] + w1 / d[i]);
+  }
+  return m;
+})();
 function residuaryFraction(fn: number): number {
   const t = RESIDUARY;
   if (fn >= t[t.length - 1][0]) return t[t.length - 1][1];
   for (let i = 1; i < t.length; i++) if (fn <= t[i][0]) {
-    const [x0, y0] = t[i - 1], [x1, y1] = t[i];
-    return y0 + (y1 - y0) * (fn - x0) / (x1 - x0);
+    const [x0, y0] = t[i - 1], [x1, y1] = t[i], h = x1 - x0, u = (fn - x0) / h, u2 = u * u, u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * y0 + (u3 - 2 * u2 + u) * h * RES_SLOPE[i - 1] + (-2 * u3 + 3 * u2) * y1 + (u3 - u2) * h * RES_SLOPE[i];
   }
   return 0;
 }

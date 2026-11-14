@@ -16,7 +16,8 @@ const polarSpeed = (w: number, a: number) => polar(w, a, 'jib');
  * and above that.
  *
  * The wind at the sails' height by ORC's log profile (VPP Documentation §7.1, z0 = 0.005 m), as physics.ts sailWind; her
- * course's angle (the polar's), upright. Cached by the knot, 5° of angle and a twentieth of the speed ratio.
+ * course's angle (the polar's), upright. Tabled by the knot, 5° of angle and a twentieth of the speed ratio, and read
+ * blended between the knots and the angles either side.
  */
 const GRADIENT = Math.log(CE_ABOVE_WL / 0.005) / Math.log(10 / 0.005);
 /** The ratios, filled in as asked for (0: not yet): a flat table, as the AI's predictions ask thousands of times a step. */
@@ -31,25 +32,40 @@ function sailDrive(tws: number, twa: number, u: number): number {
   return sf.main.drive + sf.jib.drive;
 }
 
+/**
+ * The table's four corners round a wind and an angle, and how much of each: the knot below and above, the 5° below and
+ * above, blended (bilinear). The ratio used to be read at the nearest knot and the nearest 5° alone, which stepped by a
+ * couple of percent at each bin's edge: enough to give her speed made good in chop two near-equal peaks, and the beat
+ * angle found from it swung 5–7° on a quarter-knot puff, the AI's target angle and the laylines with it.
+ */
+function corners(tws: number, twa: number): { w0: number; w1: number; a0: number; a1: number; fw: number; fa: number } {
+  const w = clamp(tws, 2, 40), a = clamp(twa, 30, 180) / 5;
+  const w0 = Math.floor(w), a0 = Math.floor(a), fw = w - w0, fa = a - a0;
+  return { w0, w1: fw > 0 ? w0 + 1 : w0, a0: a0 * 5, a1: (fa > 0 ? a0 + 1 : a0) * 5, fw, fa };
+}
 /** Drive at speed v over drive at the polar's speed vt (both m/s), for tws kt at the course's angle twa. 1 at v = vt. */
 export function driveRatio(tws: number, twa: number, v: number, vt: number): number {
   if (vt <= 0.05) return 1;
-  const w = Math.round(clamp(tws, 2, 40)), a = Math.round(clamp(twa, 30, 180) / 5) * 5, x = clamp(v / vt * 20, 0, 29.999), q = Math.floor(x), f = x - q;
-  return at(w, a, q) * (1 - f) + at(w, a, q + 1) * f;
+  const { w0, w1, a0, a1, fw, fa } = corners(tws, twa), x = clamp(v / vt * 20, 0, 29.999), q = Math.floor(x), f = x - q;
+  const col = (k: number) => (at(w0, a0, k) * (1 - fa) + at(w0, a1, k) * fa) * (1 - fw) + (at(w1, a0, k) * (1 - fa) + at(w1, a1, k) * fa) * fw;
+  return col(q) * (1 - f) + col(q + 1) * f;
 }
 /**
- * driveRatio as a curve for one wind, angle and polar speed: the rounding and the row worked out once, so each look is
- * a multiply and two reads of the table (the AI's predictions step a speed along it hundreds of times).
+ * driveRatio as a curve for one wind, angle and polar speed: the corners and their weights worked out once, and the
+ * blended row filled in as it's asked for, so each look after the first at a speed is a multiply and two reads (the AI's
+ * predictions step a speed along it hundreds of times).
  */
 export function driveCurveFor(tws: number, twa: number, vt: number): (v: number) => number {
   if (vt <= 0.05) return () => 1;
-  const w = Math.round(clamp(tws, 2, 40)), a = Math.round(clamp(twa, 30, 180) / 5) * 5, row = (w * 64 + a / 5) * 32, s = 20 / vt;
+  const { w0, w1, a0, a1, fw, fa } = corners(tws, twa), s = 20 / vt;
+  const k00 = (1 - fw) * (1 - fa), k01 = (1 - fw) * fa, k10 = fw * (1 - fa), k11 = fw * fa;
+  const r00 = (w0 * 64 + a0 / 5) * 32, r01 = (w0 * 64 + a1 / 5) * 32, r10 = (w1 * 64 + a0 / 5) * 32, r11 = (w1 * 64 + a1 / 5) * 32;
+  // (a corner with no weight isn't looked up: on a whole knot and a whole 5°, the one row as before)
+  const cell = (r: number, w: number, a: number, q: number) => cache[r + q] || at(w, a, q);
+  const col = (q: number) => (k00 ? k00 * cell(r00, w0, a0, q) : 0) + (k01 ? k01 * cell(r01, w0, a1, q) : 0) + (k10 ? k10 * cell(r10, w1, a0, q) : 0) + (k11 ? k11 * cell(r11, w1, a1, q) : 0);
   return (v: number) => {
     const x = clamp(v * s, 0, 29.999), q = Math.floor(x), f = x - q;
-    let k0 = cache[row + q], k1 = cache[row + q + 1];
-    if (k0 === 0) k0 = at(w, a, q);
-    if (k1 === 0) k1 = at(w, a, q + 1);
-    return k0 * (1 - f) + k1 * f;
+    return col(q) * (1 - f) + col(q + 1) * f;
   };
 }
 function at(w: number, a: number, q: number): number {
