@@ -217,6 +217,9 @@ export interface Boat {
   /** Your boat: the pole is yours to call, always (the owner); the crew only stows it when it must come in (ai.ts poleMustCome). */
   poleMine?: boolean;
   pole: PoleState;
+  /** Your boat: when she came up to 145° true or higher with the pole wanted (the World's clock, s): it comes in after 3 s
+   * there (ai.ts poleMustCome). */
+  poleHighAt?: number;
   poleT: number; // seconds left in the current crew job
   poleTack: Tack; // tack the pole was set on (it goes on the windward side)
   // trim / visuals
@@ -255,7 +258,7 @@ export interface Boat {
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
-  scoring?: 'ZFP' | 'UFD' | 'BFD' | null;
+  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: the umpire's, for finishing with her penalty not taken)
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;
@@ -263,6 +266,9 @@ export interface Boat {
   burgee?: string;
   /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */
   ensign?: string; special?: string;
+  /** The red protest flag flying (RRS 60.2(a)(1): over 6 m, "conspicuously display a red flag" with the hail, until she
+   * is no longer racing): tied on the backstay. */
+  protestFlag?: boolean;
   /** The ensign struck: taken down off its staff and the staff unshipped, as a crew does in a blow (it flogs to rags). */
   ensignStruck?: boolean;
   /** Coming in to a berth: the crew's lines going ashore (boat/dockLines.ts, sim/world.ts mooringStep). */

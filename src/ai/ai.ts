@@ -863,13 +863,25 @@ export function crewPoleCall(w: World, b: Boat): void {
  * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts
  * jibEfficiency; between there and 154.5 it does less than the jib would to leeward, and that's your call, with the
  * coach's cue), the jib is down, penalty turns, a harbor's basin, or the dock. Null when it may stay out. (Gybing it end
- * for end with her, as she gybes, is still your pole going across.)
+ * for end with her, as she gybes, is still your pole going across.) `highS`: how long she's been at 145° or higher with it
+ * wanted: a crew doesn't strip the pole for a shift of a few seconds, only once she's stayed up there 3 s, or at once
+ * when she's higher than 135°, where it's plainly aback (estimates of practice). The World keeps that clock (b.poleHighAt).
  */
-export function poleMustCome(b: Boat): string | null {
+export function poleMustCome(b: PoleBoat, highS = 0): string | null {
+  return poleBlocked(b) ?? (b.twa < 135 || (b.twa <= 145 && highS >= 3) ? POLE_TOO_HIGH : null);
+}
+/** Why your crew won't set the pole on a new call (none at 145° true and higher, or where it must come in), or null. The
+ * band's Pole tab shows only when this is null (or the pole is out, or going out or in); a call it refuses says why. */
+export function poleRefused(b: PoleBoat): string | null {
+  return poleBlocked(b) ?? (b.twa <= 145 ? POLE_TOO_HIGH : null);
+}
+const POLE_TOO_HIGH = 'she\'s too high for it: the poled-out jib won\'t fill';
+/** What the pole's rules read (the page's mirror of your boat will do). */
+type PoleBoat = Readonly<Pick<Boat, 'docked' | 'x' | 'y' | 'penalty' | 'twa'>> & { readonly rig?: Readonly<NonNullable<Boat['rig']>> };
+function poleBlocked(b: PoleBoat): string | null {
   if (b.docked) return 'at the dock';
   if (inBasin(b)) return 'not in the harbor: no room to pole out in a marina';
   if (b.penalty > 0) return 'in for the penalty turns';
   if (!!b.rig && (b.rig.jib < 1 || !b.rig.jibUp)) return 'the jib is down';
-  if (b.twa <= 145) return 'she\'s too high for it: the poled-out jib is aback';
   return null;
 }

@@ -402,6 +402,8 @@ export interface BoatMesh {
   flags: FlyingFlag[];
   /** The ensign, its staff and truck, and how far down it is (0 flying … 1 struck and the staff unshipped). */
   ensign: { staff: THREE.Group; flag: THREE.Mesh | null; at: THREE.Vector3; axis: THREE.Vector3; slideMax: number; down: number } | null;
+  /** The red protest flag, tied on the backstay (shown while `protestFlag`: RRS 60.2(a)(1)). */
+  protest: THREE.Mesh;
   /** The crew, and whether to hide the helm (you're looking through their eyes in the cockpit view). */
   crew: Crew; hideHelm: boolean;
   mainsheet: THREE.Line;
@@ -1217,6 +1219,13 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const fh = ens ? 0.61 * ens.height / ens.width : 0, slideMax = Math.max(0, Math.min(0.62, staffH - 0.03 - fh - 0.05));
     ensign = { staff: staffG, flag, at: flag?.position.clone() ?? top, axis: top.clone().sub(base).normalize(), slideMax, down: b.ensignStruck || b.ensignNight ? 1 : 0 };
   }
+  // the protest flag (RRS 60.2(a)(1): a boat over 6 m "conspicuously display[s] a red flag"): plain red, about 30 by 20 cm,
+  // tied on the backstay a little above the crew's reach from the cockpit, where it's seen from astern and abeam; hidden
+  // until she protests (placed on the wire each frame: the bridle's apex moves with the backstay)
+  const pc = document.createElement('canvas'); pc.width = 48; pc.height = 32;
+  { const g = pc.getContext('2d')!; g.fillStyle = '#d8241f'; g.fillRect(0, 0, 48, 32); }
+  hoist(pc, new THREE.Vector3(0, 3, 3), 0.2, grp, false);
+  const protest = flags[flags.length - 1].mesh; protest.visible = false;
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
   { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });
@@ -1265,7 +1274,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  return { rigDrawn: { mast, mastBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
@@ -1520,7 +1529,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
     // (the masthead where the bent mast has it; the apex on the straight wire from there to the fixed foot: both legs meet it)
     const headAft = -mastFwd(MAST_TOP - DECK_AT_MAST, m.rigDrawn.bow, m.rigDrawn.topAft); apex.z += headAft * (1 - f);
     q.setXYZ(0, MASTHEAD.x, MASTHEAD.y, MASTHEAD.z + headAft); q.setXYZ(1, apex.x, apex.y, apex.z);
-    q.setXYZ(2, 0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, -0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.needsUpdate = true; }
+    q.setXYZ(2, 0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, -0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.needsUpdate = true;
+    // (the protest flag on the wire, 0.6 m above the bridle's apex)
+    m.protest.visible = !!b.protestFlag;
+    if (m.protest.visible) { const k = 0.6 / Math.max(0.1, MASTHEAD.y - apex.y); m.protest.position.set(0, apex.y + 0.6, apex.z + (MASTHEAD.z + headAft - apex.z) * k); } }
   // the jib sheet: one line, its middle at the clew's ring; each half runs through its car on the cabin top, off the cabin's
   // side to its fairlead on the side deck, aft along the rail to its winch, round it, and the tail into the cockpit. The
   // working half (the leeward, or the windward when she's backed) taut; the lazy one slack, lying on the boat

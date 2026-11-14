@@ -21,7 +21,7 @@ export function approxRace(i: number, o: ApproxOpts) {
   const [c, s, seed0] = APPROX_RACES[i], seed = o.seed ?? seed0;
   setShoreGrid(o.grid);
   try {
-    const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, ...s } as never, seed);
+    const w = new World(c as unknown as CourseFile, { ...DEFAULT_SETTINGS, judging: 'umpired', ...s } as never, seed); // (tests/setup/judging.ts)
     w.exactPairs = !o.skip; w.exactAI = !!o.exactAI;
     if (o.curK) { const f = w.currentAt.bind(w); w.currentAt = (p, l) => { const v = f(p, l); return { x: v.x * o.curK!, y: v.y * o.curK! }; }; }
     const sum = w.boats.map(() => 0), incidents: string[] = []; let n = 0, fouls = 0;
@@ -37,7 +37,7 @@ export function approxRace(i: number, o: ApproxOpts) {
 }
 export type ApproxResult = ReturnType<typeof approxRace>;
 
-const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', ...o });
+const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, judging: 'umpired', windKind: 'west', windKt: 12, tideDate: '2026-11-14', ...o });
 const median = (xs: number[]) => { const s = xs.slice().sort((a, b) => a - b); return s.length % 2 ? s[s.length >> 1] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
 /**
  * tests/sim-fleet.test.ts: one race of Seaweed Soup course 2 in an ebb (fleet of four) against the strategist's plan:
