@@ -32,10 +32,41 @@ export const SLOW_TACK = 1.3;
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
 
-/** Slowing while she goes astern: dv/dt = −(c0 + c1·v), m/s². */
-export const ASTERN_DRAG = { c0: 0.005, c1: 0.035 };
-/** How far she coasts astern from `v0` m/s (to a stop) with that drag, m. */
-export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c1) * Math.log(1 + ASTERN_DRAG.c1 * v0 / ASTERN_DRAG.c0)) / ASTERN_DRAG.c1;
+/**
+ * The water's drag on her going astern, over her resistance going ahead at the same speed (dynamics.ts hullResistance:
+ * the ITTC friction line and the residuary, as sailing). AN ESTIMATE: no measurement of a small keelboat's resistance
+ * stern first was found, nor a timed coast-down (researched 14 Nov 2026: ships' astern trials weren't reachable, and
+ * there's nothing for yachts). Stern first she leads with her afterbody and her rudder, which are shaped to leave the
+ * water, not to meet it: more drag than ahead, by the factor a streamlined section shows turned end for end, about two
+ * (NACA TN 3361, Critzos, Heyson & Boswinkle 1955: the NACA 0012's drag at 180° about twice its drag at 0°; a wing
+ * section in two dimensions, not a hull, so still an estimate).
+ * It replaces dv/dt = −(0.005 + 0.035·v), which had no source and was 6 to 20 times her hull's own resistance at a
+ * walk (48 N against 8 N at 0.4 m/s), with a constant part a hull's drag doesn't have. So she carries her way as a
+ * two-tonne keelboat does: shoved off at 0.5 m/s she has lost it (WAY_LOST) after 40 m and four minutes, not 8 m and
+ * half a minute. The owner is to say how far she really glides.
+ * Under a tenth of a knot hullResistance is nearly in proportion to her speed (its residuary table runs straight from
+ * nothing to its first row), so her last way dies off slowly, halving about every two minutes, over eight
+ * meters more: in still water a hull does creep on like that, and any wind or stream soon outweighs it.
+ */
+export const ASTERN = 2;
+/** How fast the water slows her sternway (m/s²) at `v` m/s astern (at her design displacement: her crew's weight isn't in it yet). */
+export const asternDrag = (v: number): number => ASTERN * hullResistance(v) / HANDLING.mass;
+/** Below this (m/s) she has lost her way, for a coast's length: the water's drag alone takes minutes more to stop her. */
+const WAY_LOST = 0.05;
+/**
+ * How far she coasts astern from `v0` m/s until she has lost her way (m), on the water's drag alone: the distance run
+ * while slowing from v0 to WAY_LOST, ∫ m·u/(ASTERN·R(u)) du (tabled once, every 5 mm/s up to 2 m/s).
+ */
+let coastTable: Float64Array | null = null;
+const COAST_STEP = 0.005, COAST_N = 401;
+export function asternCoast(v0: number): number {
+  if (!coastTable) {
+    coastTable = new Float64Array(COAST_N);
+    for (let i = 1; i < COAST_N; i++) { const u = (i - 0.5) * COAST_STEP; coastTable[i] = coastTable[i - 1] + (u > WAY_LOST ? u / asternDrag(u) * COAST_STEP : 0); }
+  }
+  const x = Math.min(COAST_N - 1, Math.max(0, v0 / COAST_STEP)), i = Math.min(COAST_N - 2, Math.floor(x));
+  return coastTable[i] + (coastTable[i + 1] - coastTable[i]) * (x - i);
+}
 
 /** Crew timings for the whisker pole, s. */
 export const POLE = { set: 8, stow: 5, gybe: 8 };
@@ -361,8 +392,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b), disp, b.luff || (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
-  // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
-  // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
+  // equation would take below zero becomes sternway, which the water's drag then slows (asternDrag, in travel). Head to
+  // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against her hull's drag stern first)
   // (with her sails up and flogging, in irons, the same: their windage on top of the rig's, so she gathers sternway
   // faster, and the rudder then works backwards; the way out is to bear away, the tiller pushed the way she's to go)
   const v1 = b.v + a * dt;
@@ -578,7 +609,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // the equations of motion: surge, sway, yaw
   const sails = { main, jib };
   // (the seaway's added resistance as when sailing; the turning drag the polar model adds is here in the strips' damping)
-  // (going astern, the water's drag on her is travel's, ASTERN_DRAG, as when she's driven astern sailing)
+  // (going astern, the water's drag on her is travel's, asternDrag, as when she's driven astern sailing)
   const X = main.drive + jib.drive + windX - hullResistance(Math.max(0, u0)) + inducedX + rudX - (u0 > 0 ? seaDrag(b.sea, b.h, u0) + (cond ? foulingDrag(cond, u0) : 0) : 0);
   const Y = main.heel + jib.heel + windY + hullY + rudY;
   const M = sailYaw(sails, b.heelMag!, b.sheets.main, smAll.ceh) - windY * HOVE.windLever + hullM + rudY * RUDDER.arm + F * clrShift(cs.trim);
@@ -900,7 +931,9 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // (the coast's law at a walk; faster, her hull's resistance going through the water, the same as ahead, which rises with
   // the square of the speed and more; the drag's constant part stops her in a finite time, and the wind's push astern
   // builds a little a step)
-  if (ast > 0) b.astern = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
+  // (her hull's resistance going through the water, and twice it stern first: ASTERN, an estimate. It falls away with
+  // her speed, so her last way dies slowly; under a tenth of a millimeter a second she's taken as stopped)
+  if (ast > 0) { const left = ast - asternDrag(ast) * dt; b.astern = left > 1e-4 ? left : 0; }
   // sideways too, while she's slipping (hove to)
   const sw = b.sway ?? 0, stb = V(b.h + 90);
   b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;

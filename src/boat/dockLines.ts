@@ -1,6 +1,6 @@
 import type { Boat } from './boat';
-import { HANDLING, HULL } from './dynamics';
-import { ASTERN_DRAG, HOVE } from './physics';
+import { HANDLING, HULL, hullResistance } from './dynamics';
+import { ASTERN, HOVE } from './physics';
 import { FULL_RUDDER, RUDDER } from './balance';
 import { displacement } from './crewPhys';
 import { condition } from './condition';
@@ -102,10 +102,10 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   let u = b.v - (b.astern ?? 0), sw = b.sway ?? 0, r = (b.turnRate ?? 0) * D2R; // (surge and sway through the water, m/s; yaw rate, rad/s, + to starboard)
   const vg = { x: fwd.x * u + stb.x * sw + cur.x, y: fwd.y * u + stb.y * sw + cur.y }; // (over the ground)
   let X = 0, Y = 0, M = 0;
-  // the water: ahead and astern at a walk, the coast's law (ASTERN_DRAG, as an acceleration); sideways and turning, the
+  // the water: ahead her hull's own resistance, astern twice it (physics.ts ASTERN, an estimate); sideways and turning, the
   // hull and keel strip by strip as hove to: the keel's lift with way on and the broadside drag (its centre HOVE.dragAft
   // abaft the keel's)
-  X -= Math.sign(u) * (ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * Math.abs(u)) * mx;
+  X -= u >= 0 ? hullResistance(u) : -ASTERN * hullResistance(-u);
   const Lw = orc.boat.imsL, N = 8, A = HOVE.latArea, aL = Math.PI * HOVE.aspect / 2, uEff = u >= 0 ? u : 0.5 * Math.abs(u);
   const x2 = (Lw * Lw / 12) * (1 - 1 / (N * N)), kD = -HOVE.dragAft / x2;
   for (let i = 0; i < N; i++) {
