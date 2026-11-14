@@ -19,14 +19,16 @@ const J = bottom as unknown as { box: { south: number; north: number; west: numb
 const B = J.box, CELL = J.cell, TILE = J.tile, MLAT = 111320, MLON = 111320 * Math.cos((B.south + B.north) / 2 * Math.PI / 180);
 /** Deeper than this (m below MLLW) the chart's water isn't kept: shoal cells next to it are read against it. */
 const DEEP = 3;
-const PACKED = new Map(J.tiles.map(([ti, tj, s]) => [ti * 4096 + tj, s]));
-const TILES = new Map<number, Float32Array | null>();
-/** A tile's cells (m below MLLW; NaN where not shoal), unpacked the first time it's asked for. */
+/** The tiles, densely by (ti, tj): each its packed cells, or none where there's no shoal water (most of the Bay). */
+const TNX = Math.ceil(J.nx / TILE), TNY = Math.ceil(J.ny / TILE), PACKED: (string | null)[] = new Array(TNX * TNY).fill(null);
+for (const [ti, tj, s] of J.tiles) PACKED[tj * TNX + ti] = s;
+const TILES: (Float32Array | null | undefined)[] = new Array(TNX * TNY).fill(undefined);
+/** A tile's cells (m below MLLW; NaN where not shoal), unpacked the first time it's asked for. (Every boat asks, every step.) */
 function tile(ti: number, tj: number): Float32Array | null {
-  const key = ti * 4096 + tj;
-  let t = TILES.get(key);
+  const key = tj * TNX + ti;
+  let t = TILES[key];
   if (t === undefined) {
-    const s = PACKED.get(key);
+    const s = PACKED[key];
     if (!s) t = null;
     else {
       const raw = atob(s), g = new Float32Array(TILE * TILE).fill(NaN);
@@ -37,14 +39,15 @@ function tile(ti: number, tj: number): Float32Array | null {
       }
       t = g;
     }
-    TILES.set(key, t);
+    TILES[key] = t;
   }
   return t;
 }
 /** One cell's bottom (m below MLLW), or NaN if it isn't shoal water. */
 function cell(i: number, j: number): number {
   if (i < 0 || j < 0 || i >= J.nx || j >= J.ny) return NaN;
-  const t = tile(Math.floor(i / TILE), Math.floor(j / TILE));
+  const ti = (i / TILE) | 0, tj = (j / TILE) | 0, s = TILES[tj * TNX + ti];
+  const t = s === undefined ? tile(ti, tj) : s;
   return t ? t[(j % TILE) * TILE + (i % TILE)] : NaN;
 }
 
@@ -53,6 +56,8 @@ export function bottomDepth(p: Vec): number | null {
   const { lat, lon } = toLL(p);
   const fx = (lon - B.west) * MLON / CELL - 0.5, fy = (B.north - lat) * MLAT / CELL - 0.5;
   const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+  // (the quick no: the four cells round p all in tiles with no shoal water, as almost everywhere a boat sails)
+  if (i >= 0 && j >= 0 && i + 1 < J.nx && j + 1 < J.ny && !PACKED[((j / TILE) | 0) * TNX + ((i / TILE) | 0)] && !PACKED[(((j + 1) / TILE) | 0) * TNX + (((i + 1) / TILE) | 0)] && !PACKED[((j / TILE) | 0) * TNX + (((i + 1) / TILE) | 0)] && !PACKED[(((j + 1) / TILE) | 0) * TNX + ((i / TILE) | 0)]) return null;
   const a = cell(i, j), b = cell(i + 1, j), c = cell(i, j + 1), d = cell(i + 1, j + 1);
   if (Number.isNaN(a) && Number.isNaN(b) && Number.isNaN(c) && Number.isNaN(d)) return null;
   // (a neighbor that isn't shoal is read as the deep water's edge: the depth runs smoothly out toward it)
