@@ -180,17 +180,17 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
-8h. **Now — the chart's Wind shadow layer shows nothing** (bug; 1–2 h): owner, "also on chart: toggling wind shadow
+8h. ~~**The chart's Wind shadow layer shows nothing**~~ (done: c1ea689, a716a18; the shadows from the physics, checked in the built page) (bug; 1–2 h): owner, "also on chart: toggling wind shadow
    doesn't do anything that I can see." Find out whether it draws nothing (a bug), draws only near other boats or only
    while racing (then say so on the chart when there's nothing to show), or draws too faintly (as with Waves). The
    shadows to show: boats' dirty air, ships, the committee boat, the lee of the land and of the bridge piers, all already
    in the physics. With 8f and 8g: the same layer row.
-8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
+8g. ~~**The chart's Waves layer is unreadable**~~ (done: c1ea689; legible at the chart's usual zoom, checked in the built page) (polish/clarity; 1–2 h): owner, "waves notation in chart view is too
    small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
    chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
    swell's direction) plainly where it matters, without cluttering the chart. Options to the owner if the look changes
    much.
-8f. **Now — the map layer buttons need two clicks** (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
+8f. ~~**The map layer buttons need two clicks**~~ (done: c1ea689; scripts/check/layer-clicks.cjs) (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
    OFF, the long visibility note above it), "these buttons are requiring two clicks for some reason". One click should
    switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
    re-render under the pointer swallows it. Check every chip row with the same pattern (the map layers, the setup's
@@ -342,14 +342,14 @@ What's planned, roughly in order. Done work is described in the README.
    - the time of day rebuilding the sky and lights from scratch.
    Profile one click of each kind, fix the slow path, and add a check that a boat-editor change takes under a frame
    budget.
-8u. **Partly fixed — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
+8u. ~~**The boat editor shows no way to set her sail number or country**~~ (done: dd7db94, 23fa772; every fleet boat and a new one, scripts/check/save-pattern.cjs, built page) (bug; 1 h): owner, "I'm in the boat
    editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
    in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
    input), so something hides them on screen. Not the Save banner (owner: there's none showing). Suspects: the turning boat's panel pushing
    Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
    published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
    ensign. Owner, 14 November: they're back for Josephine; the other boats in the fleet still to check.
-8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
+8t. ~~**The boats have vanished from the boat cards' pictures**~~ (done: 03b2c49; smoke.cjs checks each card has the boat) (regression; 1–2 h): owner, with a screenshot of the
    Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
    Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
    - the pictures are kept between visits, so empty ones may have been saved and are now reused;
@@ -367,7 +367,7 @@ What's planned, roughly in order. Done work is described in the README.
    Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
-8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
+8j. ~~**The windex lost its point of sail**~~ (done: e62a2229; tests/pointofsail.test.ts, scripts/check/point-of-sail.cjs) (regression; <1 h): owner, "I want the windex dial to show the point of
    sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
    beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
@@ -447,12 +447,8 @@ What's planned, roughly in order. Done work is described in the README.
        starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
        plainly that she can't make the start from there.
    - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
-   - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
-     between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
-     no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
-     One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
-     some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
-     first.
+   - ~~Yours or the crew's, shown coherently in the sail band~~ (owner, 14 November: declined, "The current tab copy and
+     states are fine." The Auto-trim / Hand back tab stays as it is.)
    - ~~Remove the line~~ (done) "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
    - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
