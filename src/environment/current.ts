@@ -171,6 +171,15 @@ export function warmBasins(near: readonly Vec[], r: number, ms: number): boolean
   for (;;) { const r = job.next(); if (r.done) { best.calm = r.value; best.job = undefined; return true; } if (performance.now() - t0 >= ms) return true; }
 }
 
+/**
+ * calmIn's answers by a wall, for the last few points asked, per grid: by a wall each answer traces lines of sight to
+ * as many as 36 nodes, a sample every half meter, and a boat lying against the wall (pinned by the wind, or docking) is
+ * asked about at the same point every step, by every look at her current. The same point on the same finished grid
+ * gives the same answer, so it's kept: exactly the answer worked out. (Capacity's profile, 14 Nov 2026: 1.5 ms of a
+ * 2.9 ms step, as long as she lay there.)
+ */
+const CALM_MEMO = new WeakMap<Calm, { x: Float64Array; y: Float64Array; v: Float64Array; next: number }>();
+const MEMO_N = 16;
 /** The calm one harbor's grid gives at p (1 off its grid, and in open water). */
 function calmIn(c: Calm, p: Vec): number {
   const fx = (p.x - c.x0) / CELL, fy = (p.y - c.y0) / CELL, i = Math.floor(fx), j = Math.floor(fy);
@@ -178,8 +187,17 @@ function calmIn(c: Calm, p: Vec): number {
   // (bilinear between the four nodes, over those in water: a wall's own nodes don't pull it either way)
   // (only nodes in sight of p: by a thin wall the nodes on it are solid, and the water beyond it, a node away, mustn't
   // be blended in. Checked only there, next to a solid node)
+  const nearWall = c.d[j * c.nx + i] < 0 || c.d[j * c.nx + i + 1] < 0 || c.d[(j + 1) * c.nx + i] < 0 || c.d[(j + 1) * c.nx + i + 1] < 0;
+  if (!nearWall) return calmAt(c, p, fx, fy, i, j, false);
+  let m = CALM_MEMO.get(c);
+  if (!m) { m = { x: new Float64Array(MEMO_N).fill(NaN), y: new Float64Array(MEMO_N).fill(NaN), v: new Float64Array(MEMO_N), next: 0 }; CALM_MEMO.set(c, m); }
+  for (let k = 0; k < MEMO_N; k++) if (m.x[k] === p.x && m.y[k] === p.y) return m.v[k];
+  const r = calmAt(c, p, fx, fy, i, j, true);
+  m.x[m.next] = p.x; m.y[m.next] = p.y; m.v[m.next] = r; m.next = (m.next + 1) % MEMO_N;
+  return r;
+}
+function calmAt(c: Calm, p: Vec, fx: number, fy: number, i: number, j: number, nearWall: boolean): number {
   const u = fx - i, v = fy - j; let s = 0, w = 0;
-  const nearWall = [0, 1].some(a => [0, 1].some(b => c.d[(j + b) * c.nx + i + a] < 0));
   const seen = (I: number, J: number) => { if (!nearWall) return true; const q = { x: c.x0 + I * CELL, y: c.y0 + J * CELL };
     const L = Math.hypot(q.x - p.x, q.y - p.y), n = Math.max(1, Math.ceil(L / 0.5)); // (every half meter: a thin wall a meter off is still seen)
     for (let m = 1; m < n; m++) { const r = { x: p.x + (q.x - p.x) * m / n, y: p.y + (q.y - p.y) * m / n }; if (hitsWall(r) || onLand(r)) return false; } return true; };
