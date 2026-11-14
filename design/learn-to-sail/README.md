@@ -16,6 +16,11 @@ The visual language is shared with the trim-coach revamp (UI & Experience, desig
 | fill along the card's foot | progress |
 | amber ring | the control to use |
 
+Colors are the page's tokens: `--accent` (amber), `--row` (green), `--muted`, and `--target` (#3ad1c1, teal), which is
+added to 01-layout.css by whichever of the two builds lands first. The ring, the ◆ and the ✓ are the shared classes
+`.cue-ring`, `.cue-target` and `.cue-ok`. The stuck ring is the trim coach's own ring, pulsing gently. The mock's
+stills use near values.
+
 Nothing new on screen. The marks go on what's already there:
 - the top line (#359);
 - the heading tape;
