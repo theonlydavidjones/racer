@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { dressWarm, kitFor } from '../src/render/crewBody';
+import { dress, dressWarm, kitFor } from '../src/render/crewBody';
+import { rainLevel } from '../src/environment/rain';
+import { sfLocalToUtcMin } from '../src/environment/tide';
 import { LL } from '../src/geo/geo';
 
 /**
@@ -33,5 +35,15 @@ describe("The crew dress for the day's weather (render/crewBody.ts dressWarm, ki
     for (let d = 1; d <= 30 && !found; d++) { const date = `2024-09-${String(d).padStart(2, '0')}`; if (dressWarm(date, 0, calm, alameda) && !dressWarm(date, 0, calm, gate)) found = date; }
     console.log(`a day warm off Alameda and not at the Gate: ${found || 'none in Sep 2024'}`);
     expect(found).not.toBe('');
+  });
+  it('in the rain, hoods up: everyone in heavy rain, most in light; their usual heads on a dry day', () => {
+    const heads = (wet: 0 | 1 | 2) => { dress.wet = wet; const h = Array.from({ length: 60 }, (_, i) => kitFor(1000 + i, 0x2b4f8a, false).head); dress.wet = 0; return h; };
+    expect(heads(2).every(h => h === 'hood')).toBe(true);
+    const light = heads(1).filter(h => h === 'hood').length / 60, dry = heads(0).filter(h => h === 'hood').length / 60;
+    expect(light).toBeGreaterThan(0.6); expect(dry).toBeLessThan(0.35);
+  });
+  it('the owner\'s rainy morning (13 Nov 2026, 11:00): heavy rain at the gun, so no shorts and every hood up', () => {
+    const rain = rainLevel('real', sfLocalToUtcMin('2026-11-13', '11:00'));
+    expect(rain).toBe(2); expect(dressWarm('2026-11-13', rain, calm)).toBe(false);
   });
 });

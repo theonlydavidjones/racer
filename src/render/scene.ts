@@ -10,6 +10,7 @@ import { Puffs, TerrainGrid } from '../environment/wind';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { sunPosition } from '../environment/sun';
 import { rainLevel } from '../environment/rain';
+import { dayWindOf } from '../environment/air';
 import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
@@ -443,8 +444,10 @@ export class SceneView {
     if (key !== this.terrainKey) { this.terrain = new TerrainGrid(w.C.center.x, w.C.center.y, 5000, 50, w.C.base); this.terrainKey = key; } // with the lee of the land
     const oldBoats = this.boatMeshes.map(m => m.grp);
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
+    // (what the crew wear: the rain at the gun, the record's or the one set; the day's wind, for how warm a day it is)
+    const day = { date: w.raceDate, rain: rainLevel(w.settings.rain, w.gunUtc ?? w.clockUtc), wind: dayWindOf(w.raceDate, w.weather) };
     this.boatMeshes = w.boats.map(b => {
-      const m = buildBoatMesh(b, { date: w.raceDate, rain: w.settings.rain ?? 0 }); this.scene.add(m.grp);
+      const m = buildBoatMesh(b, day); this.scene.add(m.grp);
       m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       return m;
     });

@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import type { Person } from '../boat/crewPhys';
-import { warmDay } from '../environment/air';
+import { warmDay, type DayWind } from '../environment/air';
 
 /**
  * A sailor's body: one skinned mesh on fifteen bones (hips, spine, head, shoulders, elbows, wrists, hips, knees, ankles), so a person is
@@ -728,9 +728,10 @@ const LENSES = [0x303a44, 0x2c3846, 0x3a2e26, 0x26303a];
  * colour: a cap, a beanie or the hood up over a cap; their jacket in the team colour or their own; salopettes; an
  * inflatable or a foam vest; boots, skin, hair and lenses.
  */
-/** A warm, dry day's kit or not, for the figures being built now (set by dressWarm for each boat as it's built:
- * render/boatMesh.ts; 'all', everyone in shorts, for checking the kit: the crew lab's ?summer=all). */
-export const dress: { warm: boolean | 'all' } = { warm: false };
+/** What the figures being built now are dressed for (set for each boat as it's built: render/boatMesh.ts): `warm`, a
+ * warm, dry day's kit or not (dressWarm; 'all', everyone in shorts, for checking the kit: the crew lab's ?summer=all);
+ * `wet`, the rain at the gun (environment/rain.ts: 1 light, 2 heavy; the crew lab's ?wet=1, ?wet=2). */
+export const dress: { warm: boolean | 'all'; wet: 0 | 1 | 2 } = { warm: false, wet: 0 };
 /** Whitecaps at Beaufort force 5, a fresh breeze (17 kt, 8.75 m/s at 10 m), the first force whose sea state the scale
  * gives "chance of some spray": the same whitecap formula as environment/sea.ts (Monahan & O'Muircheartaigh 1980,
  * W = 3.84e-6·U^3.41). And chop steeper than about 1 in 14 (H/L 0.07: sea.ts's `steep`), short and steep, which throws
@@ -739,13 +740,15 @@ const SPRAY_WHITE = 3.84e-6 * Math.pow(8.75, 3.41), SPRAY_STEEP = 0.07;
 /**
  * What a crew dresses for at the dock, for the day (the owner, 13 Nov 2026): shorts and sneakers for about half of
  * them on a warm day where she is (68 °F, 20 °C, or more in the racing hours: environment/air.ts warmDay, from the shore
- * stations round the Bay, blended by distance: their record, the forecast or their climate) that's dry (no rain set) and where they won't be soaked (the sea where she is: no whitecaps
- * of a fresh breeze, no steep chop). Decided once, as she's built for the race: nobody changes clothes mid-race.
+ * stations round the Bay, blended by distance: their record, the forecast or their climate, and on a climate-only day
+ * the day's wind, `wind`: air.ts dayWindOf) that's dry (no rain at the gun: environment/rain.ts, the record's or the one
+ * set) and where they won't be soaked (the sea where she is: no whitecaps of a fresh breeze, no steep chop). Decided
+ * once, as she's built for the race: nobody changes clothes mid-race.
  */
-export function dressWarm(date: string, rain: number, sea?: { white: number; steep: number }, at?: { x: number; y: number }): boolean {
+export function dressWarm(date: string, rain: number, sea?: { white: number; steep: number }, at?: { x: number; y: number }, wind?: DayWind): boolean {
   if (!date || rain > 0) return false;
   if (sea && (sea.white >= SPRAY_WHITE || sea.steep >= SPRAY_STEEP)) return false;
-  return warmDay(date, at);
+  return warmDay(date, at, wind);
 }
 /** Shorts in the colours they come in (the owner's photo: maroon), and sneakers: white, or grey and navy. */
 const SHORTS = [0x6a2a32, 0x6a2a32, 0x7a3a36, 0xb9a88a, 0xa8946e, 0x2a3346, 0x4a4f57, 0x3f5a3a]; // (maroons and khakis the commonest: they stand out from the dark jackets, as in the photo)
@@ -755,7 +758,8 @@ export function kitFor(seed: number, team: number, warm: boolean | 'all' = dress
   const jacket: Mat = { c: jc, r: 0.42 }, yoke: Mat = { c: hash(seed, 12) < 0.6 ? 0x2c3037 : darker(jc, 0.55), r: 0.5 };
   const pc = hash(seed, 13) < 0.3 ? darker(jc, 0.95) : pick(BIBS, seed, 14);
   const tone = Math.floor(hash(seed, 1) * SKINS.length);
-  const head = (['cap', 'cap', 'cap', 'beanie', 'beanie', 'hood'] as const)[Math.floor(hash(seed, 6) * 6)];
+  // (in the rain, the jacket's hood up over the cap: all of them in heavy rain, most in light)
+  const head = dress.wet === 2 || (dress.wet === 1 && hash(seed, 24) < 0.7) ? 'hood' as const : (['cap', 'cap', 'cap', 'beanie', 'beanie', 'hood'] as const)[Math.floor(hash(seed, 6) * 6)];
   const foam = hash(seed, 3) < 0.4, [boots, sole] = pick(BOOTS, seed, 9);
   return {
     name: String(seed), skin: SKINS[tone],
