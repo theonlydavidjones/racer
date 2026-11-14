@@ -108,11 +108,13 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
     sail(b, 10);
     const w = tack === 'S' ? 1 : -1; let worst = 0, lo = 9, hi = -9;
-    for (let i = 0; i < 6 * 30; i++) {
+    for (let i = 0; i < 8 * 30; i++) {
       sail(b, 1 / 30);
-      const f = b.crew.people[2]; f.pose = 'winch'; f.x = arm * w; f.z = 1.88; f.goal = { x: f.x, z: f.z }; f.lean = 0;
+      // (first sat out on the side deck, hands up on the knees, as from wherever they were: then to the winch, the hand
+      // brought in under the deck from above it, not stopped on the deck's top)
+      const f = b.crew.people[2], at = i >= 60; f.pose = at ? 'winch' : 'hike'; f.x = (at ? arm : 0.95) * w; f.z = 1.88; f.goal = { x: f.x, z: f.z }; f.lean = at ? 0 : 0.6;
       syncCrew(cr, w, b.crew, 1 / 30, false, undefined, b.heel, b.tacking);
-      if (i > 90) {
+      if (i > 150) {
         through(cr, `winch ${i}`, bad); elbows(cr, `winch ${i}`, bad);
         expect(cr.winch, 'someone at the winch').toBeTruthy();
         const fg = cr.crew[1]; fg.root.updateMatrixWorld(true); const gp = winchGrip(cr.winch!.side, cr.winch!.turn);

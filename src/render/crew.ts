@@ -563,6 +563,7 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // (the hand on the winch's side cranks, the other tails the sheet)
     // (the hand round the grip's lower half: the forearm under the deck's edge, not up against its underside)
     const g = winchGrip(ws, turn).add(V(0, -0.03, 0)), rr = right(p.yaw);
+    g.x = ws * Math.min(Math.abs(g.x), benchOut(uAtZ(g.z)) - 0.02); // (the hand round the grip, inside the lining at the stroke's outboard end)
     // (sat facing in, the after arm cranks: its shoulder about level with the handle's end, the elbow down inside the
     // coaming, the forearm out under the deck's edge. The forward one, nearer in a straight line, would reach through the
     // winch's pedestal. The other hand tails the sheet off the drum, inboard of it)
@@ -571,7 +572,8 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     p.hands = near ? [tail, g] : [g, tail]; cranked.hand = near;
     // (the cranking elbow down and a little out, below the deck's edge, the forearm level in under it to the grip: not
     // back past the handle's end)
-    { const e = V((near ? 1 : -1) * 0.3, -1, 0.2); p.elbow = near ? [undefined, e] : [e, undefined]; }
+    // (and the tailing elbow down by their side, inboard of the coaming beside them, not out over it)
+    { const e = V((near ? 1 : -1) * 0.3, -1, 0.2), t = V((near ? 1 : -1) * 0.3, -1, 0.3); p.elbow = near ? [t, e] : [e, t]; }
     p.pitch = 0.05; p.look = winchGrip(ws, 0); // (sat up, back to the coaming: leant forward, the shoulder came inboard, away from the handle)
   } else if (idx === 0 && lean <= 0.15) {
     // the jib trimmer: the sheet in the forward hand, led from the leeward winch
@@ -687,6 +689,8 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   // the owner, "these arms are backwards. poor guy")
   f.arm.forEach((a, i) => {
     const tgt = local(p.hands[i], _p).applyQuaternion(_tq).clone();
+    // (a pose that says which way an elbow goes has it go that way, not the way the last one bent it)
+    if (p.elbow?.[i]) a.root.userData.bend = undefined;
     ik(a, a.root.position, tgt, BONE.upper, BONE.fore, p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
     const par = f.root.parent; if (!par) return;
     f.root.updateMatrixWorld(true);
@@ -694,7 +698,7 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
     const bad = () => {
       f.root.updateMatrixWorld(true);
       const el = par.worldToLocal(a.mid.getWorldPosition(_h));
-      return el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z));
+      return !underDeck(el.x, el.y, el.z) && el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z)); // (in under the side deck is open: the winch)
     };
     for (let h = 0; h < hints.length && bad(); h++) { a.root.userData.bend = undefined; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, hints[h], -1); }
   });
@@ -770,7 +774,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // (only over something on its way that's higher than both ends, the coaming between the deck and the cockpit: not
       // whatever's merely near it, which held a hand up beside the coaming on its way down to a locker lid)
       let clear = 0;
-      if (far) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
+      if (far && !inTo) { let top = 0; // (not going in under the side deck: that's below the coaming, not over it) for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
       hd.y = Math.max(hd.y, Math.min(clear, hd.y + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
     const foot = c.feet[i], sw = f.swing![i];
@@ -834,6 +838,7 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
   const kw = c.kneeW ?? (c.knee ? 1 : 0), tk = want.kneeSlow ? 0.3 : !want.knee && c.feet.some(p => Math.abs(p.x) < chz(p.z) + 0.03) ? 1e-3 : want.knee && c.feet.every(p => Math.abs(p.x) > chz(p.z)) ? 0.2 : 0.1;
   c.kneeW = kw + Math.max(-dt / tk, Math.min(dt / tk, (want.knee ? 1 : 0) - kw));
   if (want.knee) c.knee = want.knee.clone(); else if (c.kneeW <= 0) c.knee = undefined;
+  c.elbow = want.elbow; // (the way an elbow's to go, as the pose has it now: not as it was when they were first drawn)
   return c;
 }
 const _s = V(0, 0, 0), _t = V(0, 0, 0), _u = V(0, 0, 0), _sh = V(0, 0, 0), _v = V(0, 0, 0), _w = V(0, 0, 0);
