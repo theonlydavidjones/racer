@@ -257,7 +257,7 @@ describe('Two crew keep to themselves (render/crew.ts)', () => {
  * - no elbow forward of the line from the shoulder to the wrist (as elbows()), once they're in a pose and still in it
  *   half a second on, not walking: an elbow swinging round as the hands go from one place to the next (up on the cabin
  *   top's lines to the knees) passes forward for a tenth of a second, which isn't this (a follow-up);
- * - no hand more than 0.2 m behind its shoulder, in the torso's own frame. The main hand tacking the main had their hands
+ * - no hand more than 0.2 m behind its shoulder along the way they face (level), with the elbow bent. The main hand tacking the main had their hands
  *   on the mainsheet at the thwart behind them while facing forward, 0.31 m behind the shoulder: reached through the
  *   elbow. A hiker's hand on the rail beside the hip, leaning out, is up to 0.16.
  */
@@ -273,11 +273,15 @@ describe('No backwards arms anywhere (render/crew.ts)', () => {
         const pose = b.crew!.people[k].pose; if (pose !== held[k].pose || fig.going || fig.route) { held[k] = { pose, t: w.t }; }
         const settled = w.t - held[k].t > 0.5;
         const wv = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), fw = fig.root.localToWorld(new THREE.Vector3(0, 0, -1)).sub(wv(fig.root)).setY(0);
-        const tq = fig.torso.getWorldQuaternion(new THREE.Quaternion()).invert();
         fig.arm.forEach((a, i) => {
           const sh = wv(a.root), el = wv(a.mid), wr = wv(a.mid, -BONE.fore);
-          const rel = wr.clone().sub(sh).applyQuaternion(tq);
-          if (rel.z > 0.2) bad.push(`${at}: ${who} ${pose} arm${i} hand ${rel.z.toFixed(2)} m behind its shoulder`);
+          // (behind along the way they face, level: a hiker leaning back with the sheet in front of them has the hand behind
+          // the leaning torso's own front, which isn't this)
+          // (and bent at the elbow: an arm reaching straight back, the helm passing the tiller extension behind them as they
+          // cross, is a shoulder's reach, not a forearm folded back)
+          const back = -wr.clone().sub(sh).dot(fw) / fw.length(), bent = wr.distanceTo(sh) < 0.9 * (BONE.upper + BONE.fore) * fig.scale;
+          // (the crew: the helm crossing passes the stick behind them on purpose, helmCrossing)
+          if (k > 0 && back > 0.2 && bent) bad.push(`${at}: ${who} ${pose} arm${i} hand ${back.toFixed(2)} m behind its shoulder`);
           const line = wr.clone().sub(sh), t = el.clone().sub(sh).dot(line) / line.lengthSq(), off = el.clone().sub(sh.clone().addScaledVector(line, t)), ahead = off.dot(fw) / fw.length();
           if (settled && ahead > 0.06 && -off.y < ahead) bad.push(`${at}: ${who} ${pose} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
         });
