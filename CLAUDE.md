@@ -66,6 +66,7 @@ npm run dev & node scripts/check/save-pattern.cjs <out-dir> # ~2 min: Save and "
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
+node scripts/check/perf-pair.mjs --ai         # ~11 min: an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), the mean
 node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
                                               # this tree and the published one back to back; fails on a clear regression
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
@@ -77,6 +78,9 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   step within v168 × 1.019 (the same 43.1 as before, now without the drift). A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
+  A PR that changes how boats sail or are judged (src/ai, src/rules) uses `--ai` instead, the mean over ten races: it
+  changes the race itself, and one race's ratio then lands anywhere in ±3% of the mean (#276 against turning: 0.986 to
+  1.067 over the ten, 1.032 the mean; docs/CAPACITY.md §8).
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
