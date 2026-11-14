@@ -243,11 +243,13 @@ function spin(i: number, g: number, f: Vec, dt: number): number {
   }
   return g;
 }
+// (the one box round every mouth's box, as plain numbers: nearly every boat is outside it nearly always, and four
+// comparisons say so)
+const ALL_X0 = Math.min(Infinity, ...MOUTHS.map(m => m.box.x0)), ALL_X1 = Math.max(-Infinity, ...MOUTHS.map(m => m.box.x1));
+const ALL_Y0 = Math.min(Infinity, ...MOUTHS.map(m => m.box.y0)), ALL_Y1 = Math.max(-Infinity, ...MOUTHS.map(m => m.box.y1));
+const inABox = (p: Vec): boolean => { for (const M of MOUTHS) { const B = M.box; if (p.x > B.x0 && p.x < B.x1 && p.y > B.y0 && p.y < B.y1) return true; } return false; };
 /** Is p where a harbor mouth's water is (a box check: asked for every boat's current, every step)? */
-export function nearMouth(p: Vec): boolean {
-  for (const M of MOUTHS) { const B = M.box; if (p.x > B.x0 && p.x < B.x1 && p.y > B.y0 && p.y < B.y1) return true; }
-  return false;
-}
+export const nearMouth = (p: Vec): boolean => p.x > ALL_X0 && p.x < ALL_X1 && p.y > ALL_Y0 && p.y < ALL_Y1 && (MOUTHS.length === 1 || inABox(p));
 /** How far back the gyre is spun up from when the water is first looked at (h), and in what steps. */
 const PAST = 13, PAST_STEP = 0.25;
 /**

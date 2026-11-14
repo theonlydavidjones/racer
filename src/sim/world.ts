@@ -458,6 +458,8 @@ export class World {
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
+    // (and the harbor mouths' gyres spun up through the tide's last 13 hours now, not in the race's first step: mouthFlows)
+    this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
     this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
