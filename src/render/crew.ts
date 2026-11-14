@@ -620,6 +620,9 @@ function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.V
   const d = chest.sub(tip), ext = tip.clone().addScaledVector(d.normalize(), Math.max(0.2, Math.min(0.95, d.length() - 0.25)));
   ext.y = Math.min(ext.y, p.hip.y + 0.2 * h.scale); // (low, at the hip, as they pass the stick behind them)
   p.hands[x >= 0 ? 0 : 1] = ext;
+  // (the knees over the cockpit, inboard and up, as they turn to face forward: turned with the body, the knee of a foot
+  // still on the seat inside the coaming swung out over it, the shin through its top)
+  if (Math.abs(p.hip.x) > 0.3) { p.knee = V(-Math.sign(p.hip.x) * 0.5, 0.7, -0.5); p.kneeW = 1; }
   return p;
 }
 
