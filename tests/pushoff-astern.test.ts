@@ -21,14 +21,14 @@ describe('pushed off astern', () => {
     expect(asternCoast(ASTERN_SHOVE)).toBeGreaterThan(ASTERN_RUN - 3); expect(asternCoast(ASTERN_SHOVE)).toBeLessThanOrEqual(ASTERN_RUN);
   });
 
-  for (const kt of [12, 4]) it(`in a ${kt} kt westerly, at every harbor, steered stern first as the plan says: well out of her slip, steerable for 10 s and more, touching nothing`, () => {
+  for (const kt of [12, 4, 0]) it(`in a ${kt} kt westerly, at every harbor, steered stern first as the plan says: well out of her slip, steerable for 10 s and more, touching nothing`, () => {
     const bad: string[] = []; let n = 0;
     for (const H of HARBORS) {
       const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
       for (let i = 0; i < 12; i++) {
         const s = all[Math.floor(i * all.length / 12)];
         const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
-        const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
+        const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: Math.max(kt, 0.01), windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
         const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user;
         w.pushOff(); const plan = u.handled?.plan;
         if (plan?.kind !== 'astern') continue; n++;
@@ -44,16 +44,17 @@ describe('pushed off astern', () => {
           if (v0 > 0.2 && v1 < 0.3 * v0 && went <= plan.coast) bump = true; // (her way gone at once: against something)
         }
         const f = { x: Math.sin(s.heading * Math.PI / 180), y: Math.cos(s.heading * Math.PI / 180) };
-        const out = -((u.x - s.p.x) * f.x + (u.y - s.p.y) * f.y) - 0.45 * s.finger; // (her middle past her finger's end)
-        // (her hull clear of the slip by half a length and more, her middle 7.6 m out: half a fairway of 1.5–1.75 boat lengths,
+        // (her middle past her finger's end, and her nearest end, bow or stern, along the slip's line)
+        const out = -((u.x - s.p.x) * f.x + (u.y - s.p.y) * f.y) - 0.45 * s.finger, end = out - 3.8 * Math.abs(Math.cos((u.h - s.heading) * Math.PI / 180));
+        // (her whole hull 2 m clear of the slip and more, her middle 7.6 m out: half a fairway of 1.5–1.75 boat lengths,
         // the marina-design range found so far, unverified, 14 Nov 2026; steerable 10 s, everywhere; and in the water the plan
         // found clear, touching nothing: past it, she's the helmsman's to steer on down the fairway)
-        if (plan.coast >= 8 && out < 7.6) bad.push(`${s.id}: only ${out.toFixed(1)} m out`);
+        if (plan.coast >= 8 && (out < 7.6 || end < 2)) bad.push(`${s.id}: only ${out.toFixed(1)} m out, her nearest end ${end.toFixed(1)} m`);
         if (steer < 10) bad.push(`${s.id}: steerable only ${steer.toFixed(1)} s`);
         if (bump) bad.push(`${s.id}: touched`);
       }
     }
-    expect(n).toBeGreaterThanOrEqual(20);
+    expect(n).toBeGreaterThanOrEqual(kt ? 20 : 5); // (in a calm the crew can swing her out from most: few are shoved off astern)
     expect(bad).toEqual([]);
   }, 600_000);
 

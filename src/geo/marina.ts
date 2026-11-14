@@ -694,8 +694,10 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
     return 0;
   };
   const opts = helms.map(helm => { const L = run(helm); return { helm, L, rest: rests(helm, L) }; });
-  // (short of that, straight back unless steering gets her clearly further: the simplest to do)
-  const go = opts.find(o => o.rest >= ASTERN_ENOUGH) ?? [...opts].sort((a, b) => (b.rest + (b.helm ? 0 : 0.5)) - (a.rest + (a.helm ? 0 : 0.5)))[0];
+  // (short of that, steered wherever there's room to steer her: her glide runs on past the water the plan clears, and
+  // steered, her stern comes round down the fairway; straight back, she'd cross it into the boats opposite: the physics review)
+  const steered = opts.filter(o => o.helm && o.rest >= 2);
+  const go = opts.find(o => o.rest >= ASTERN_ENOUGH) ?? (steered.length ? [...steered].sort((a, b) => b.rest - a.rest)[0] : [...opts].sort((a, b) => b.rest - a.rest)[0]);
   // (as far as the shove carries her, or to where there's room to turn her, if that's less: berthClear keeps its margins;
   // nowhere with room past a couple of metres, straight back as far as her slip's clear)
   const way: PushOff = go.rest < 2 ? { kind: 'astern', back: b0, coast: Math.min(ASTERN_RUN, Math.max(0, reach - b0)), helm: 0, h: s.heading } : { kind: 'astern', back: b0, coast: go.rest, helm: go.helm, h: s.heading };

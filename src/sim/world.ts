@@ -1793,7 +1793,7 @@ export class World {
         ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'
-        ? `Pushing off: there's no room to swing her, so your crew walks her back and shoves her off astern into the fairway. ${plan.helm ? `Push the tiller to ${plan.helm > 0 ? 'starboard' : 'port'}: her stern swings round toward the way out (going astern, the bow goes the way you push it).` : 'Steer her straight back (going astern, the bow goes the way you push the tiller).'} Then get sail on her.${hoist}`
+        ? `Shoved off astern: ${plan.helm ? `tiller to ${plan.helm > 0 ? 'starboard' : 'port'} to swing her stern toward the way out.` : 'steer her straight back.'}${hoist}`
         : plan.setBack
           ? plan.h !== slip.heading
             ? plan.headToWind
