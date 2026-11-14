@@ -28,7 +28,7 @@ import { Wakes } from './wake';
 import { setRestrictedVisibility } from './navLights';
 import { Moorings } from './moored';
 import { Wildlife } from './wildlife';
-import { Harbor } from './marina';
+import { Harbor, harborLights, lightOn } from './marina';
 import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
@@ -737,6 +737,9 @@ export class SceneView {
     for (const l of bridgeLights) l.visible = el < 3; // the bridge lights come on around sunset
     { const on = ((performance.now() / 1000) % 2) < 0.33; // Sutro Tower's beacons: 30 flashes a minute (landscape.ts sutroBeacons)
       if (sutroBeacons.red) sutroBeacons.red.visible = on && el < 3; if (sutroBeacons.white) sutroBeacons.white.visible = on && el >= 3; }
+    // the harbors' lights, by night, each in its charted character (render/marina.ts lightOn: Iso R 6s at the Gashouse Cove
+    // seawall's end, Q R and Fl G/R 5s at West Harbor's)
+    { const t = performance.now() / 1000; for (const l of harborLights) l.obj.visible = el < 3 && lightOn(l.lit, t); }
     if (this.land) this.land.lights.visible = el < 1;
     // the fog bank
     const fogAmt = fog === 'real' ? fogBankAmount(tMin) : 0; // set fog replaces the summer fog bank

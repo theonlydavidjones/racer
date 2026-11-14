@@ -3,6 +3,7 @@ import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage'
 import { KT, V, clamp, wrap, n360, D2R, type Vec } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
+import { shoreKind } from '../geo/shoreKind';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey, type Tack } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
@@ -819,16 +820,15 @@ function closingAt(b: Boat, p: Vec): number {
   return Math.max(0, -(vx * n.x + vy * n.y));
 }
 /** What she hit at `hit`, for the harm it does (boat/damage.ts) and for the words. (The open shore, outside the harbors'
- * walls, counts as mud and sand for now, aground with no damage: which stretches are seawall, riprap or beach isn't in the
- * sim's data yet (the NOAA chart's shoreline construction and coastline kinds would say), nor are the charted rocks;
- * ROADMAP's wreck item.) */
+ * walls: what NOAA's chart says its edge is made of, seawall, riprap, rocks or beach (geo/shoreKind.ts); mud where the
+ * chart says nothing. The bottom and its charted rocks, obstructions and wrecks are Bay East's grounding.) */
 function whatHit(hit: Vec): { kind: Struck; name: string } {
   const piles = underPier(hit); if (piles) return { kind: 'piles', name: `the piles of ${piles.name}` };
   const pier = pierNear(hit, 6); if (pier) return { kind: 'concrete', name: `the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}` };
   if (hitsWall(hit)) return { kind: 'concrete', name: 'the breakwater' };
   if (hitsHarbor(hit)) return { kind: 'dock', name: 'the dock' };
   if (hitsWharf(hit)) return { kind: 'concrete', name: 'the wharf' };
-  return { kind: 'mud', name: 'the shore' };
+  return shoreKind(hit) ?? { kind: 'mud', name: 'the shore' }; // (what the chart says the edge is made of: geo/shoreKind.ts; mud where it says nothing)
 }
 const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];
 /**
@@ -838,7 +838,7 @@ const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];
  */
 function hurt(b: Boat, what: { kind: Struck; name: string }, closing: number, hit: Vec, emit: Emit): DamageLevel {
   const m = displacement((b.crew ??= newCrew(DEFAULT_CREW, b.tack)).spec), level = damageOf(impactEnergy(closing, m), what.kind, m);
-  if (!b.isUser) return level; // (the AI boats aren't wrecked or marked: the Coordinator's call, for now)
+  if (!b.isUser) return level; // (the AI boats aren't wrecked or marked: the owner, 14 Nov 2026)
   if (RANK.indexOf(level) > RANK.indexOf(b.damage?.level ?? 'none')) b.damage = { level, what: what.name };
   if (level === 'wreck') wreck(b, `hit ${what.name} at ${(closing / KT).toFixed(1)} kn`, hit, emit);
   return level;
