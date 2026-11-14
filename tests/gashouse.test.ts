@@ -7,7 +7,7 @@ import { DT, World } from '../src/sim/world';
 
 /**
  * Leaving a slip at Gashouse Cove with the wind on the beam (ROADMAP 8m: the owner couldn't get out). Pushed off with no
- * sail up, she's walked out by her crew (round to point downwind down the fairway where there's room, else shoved off
+ * sail up, she's walked out by her crew (swung by the wind and held head to wind where there's room, else shoved off
  * astern), let go, and the jib goes up: she has to get way on to steer, clear of the docks and the boats.
  */
 const slips = slipsIn('gashouse-cove');
@@ -34,7 +34,8 @@ describe('leaving a slip at Gashouse Cove, the wind on the beam (8m)', () => {
       notes.push(`${s.label} (h ${s.heading}) ${side > 0 ? 'stbd' : 'port'}: ${r.plan}, let go h ${r.hLet}, least way ${r.way.toFixed(2)} m/s, ${r.out.toFixed(0)} m out${r.bumps.length ? `, ${r.bumps[0]}` : ''}`);
     }
     // (GOOD of the 16 today, 14 Nov 2026, with the push-off physically honest (8m, from the physics review: no turning her
-    // stern against the wind by hand, a bow line no more than 2.5 m past the finger). The rest are shoved off astern and
+    // stern against the wind by hand, a bow line no more than 2.5 m past the finger, no winding her round on a stern line until
+    // it's modeled with real lines). The rest are shoved off astern and
     // left with no way on; they wait on Deep Physics' turning at rest (left alone she lies with the wind about 86 degrees off
     // her bow, so the jib can draw) and the jib-on-a-run drive, and on the paddle (8c). Raise this as they land.)
     expect(good, notes.join('; ')).toBeGreaterThanOrEqual(GOOD);

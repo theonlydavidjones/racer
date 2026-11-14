@@ -405,7 +405,7 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   // Cove). The ways out a sailor has: a sail up for way (the jib goes up at any angle but head to wind), the main hoisted at
   // the dock held head to wind, or a paddle (Crew Controls' 8c, to add here when it lands)
   if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && Math.hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
-    return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way; next time, hoist the main while she\'s held head to wind on the bow line.', why: '', look: 'which way the wind is setting her' };
+    return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way.', why: '', look: 'which way the wind is setting her' };
   // set toward Fort Mason's piers with little way on (the Gashouse Cove entrance, 8n): the stream or the wind carries her
   // onto the piles in seconds (physics.ts piles); way on, and steer off
   { const u = V(b.h), st = V(b.h + 90), hull = [bow(b), stern(b), ...[1, -1].flatMap(sg => [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + st.x * sg * 1.1, y: b.y + u.y * a + st.y * sg * 1.1 })))];

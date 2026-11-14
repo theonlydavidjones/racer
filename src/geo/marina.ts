@@ -348,9 +348,12 @@ const HALF_L = 3.8, HALF_B = 1.1;
  * finger is wide (0.95 m along her, 0.55 m across), and the other way round too: no corner of a dock or of a moored boat
  * inside her outline.
  */
-export function berthClear(c: Vec, h: number, except: Slip): boolean {
+export function berthClear(c: Vec, h: number, except: Slip, fine = false): boolean {
   const u = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }, n = { x: u.y, y: -u.x };
-  for (let a = -3.7; a <= 3.71; a += 0.925) for (let b = -1.05; b <= 1.06; b += 0.525) {
+  // (her hull sampled about every 0.9 m along and 0.5 m across; `fine`, twice as closely, so a thin dock or finger edge
+  // can't slip between the samples as she turns: the physics review)
+  const da = fine ? 0.4625 : 0.925, db = fine ? 0.2625 : 0.525;
+  for (let a = -3.7; a <= 3.71; a += da) for (let b = -1.05; b <= 1.06; b += db) {
     const q = { x: c.x + u.x * a + n.x * b, y: c.y + u.y * a + n.y * b };
     if (!inBasin(q) || hitsHarbor(q) || !clearOfBoats(q, except)) return false;
   }
@@ -399,28 +402,36 @@ const BOW = 3.8;
  */
 export const WIND_SWINGS = 4;
 /**
- * Where she's turned as she's let go from head to wind: pushed off for the main, about her bow on the bow line; wound
- * round to point downwind, about her stern. (Winding her: the crew carries the line aft to her stern quarter and lets
- * the bow go; hanging by her stern, the wind blows her bow off and round until she lies stern to wind. The line does
- * the holding, so it needs no hand's strength, and she lies by her stern where her bow was held, as a boat on a stern
- * line lies downwind of it.)
+ * Where she's turned as she's let go from head to wind: pushed off for the main, about her bow on the bow line. (Winding
+ * her round on a stern line to point downwind was tried and taken out, from the physics review, 14 Nov 2026: on the
+ * sim's own dock-line physics she turns about her middle, her stern swinging 3–4.5 m sideways, in a time the wind sets,
+ * not a pivot about her stern. To come back through boat/dockLines.ts, with a real stern line.)
  */
-export const holdPivot = (off: number): number => Math.abs(off) > 90 ? -BOW : BOW;
+export const holdPivot = (_off: number): number => BOW;
 /** How far the World lets her follow the wind while she's held head to wind on the line (deg, either way: world.ts). */
 export const HOLD_FOLLOW = 20;
 /**
- * Her release from head to wind clear of everything: from any heading she may have followed the wind to while held
- * (HOLD_FOLLOW), turned by `off` about holdPivot, checked every 2 degrees (her bow moves 0.13 m between checks).
+ * Her hold and release from head to wind clear of everything: held, anywhere she may follow the wind to (HOLD_FOLLOW,
+ * about her bow on the line), and let go from any of those, turned by `off` about holdPivot; every 2 degrees, the hull
+ * sampled finely (berthClear's `fine`), from the pose she starts in. Choosing among the ways, a quick look (`coarse`).
  */
 function releaseClear(c0: Vec, h0: number, off: number, s: Slip, coarse = false): boolean {
-  const piv = holdPivot(off), sweep = (f: number, step: number) => {
+  const piv = holdPivot(off), sweep = (f: number, step: number, fine: boolean) => {
     const q0 = about(c0, h0, BOW, f), n = Math.ceil(Math.abs(off) / step);
-    for (let k = 1; k <= n; k++) { const q = about(q0.c, q0.h, piv, off * k / n); if (!berthClear(q.c, q.h, s)) return false; }
+    for (let k = 0; k <= n; k++) { const q = about(q0.c, q0.h, piv, off * k / n); if (!berthClear(q.c, q.h, s, fine)) return false; }
     return true;
   };
-  // (a quick look every 10 degrees from where she came to first, then every 2 from there and from either end of the follow)
-  // (choosing among the ways, the quick look only; the way taken gets the whole check: fine)
-  return coarse ? sweep(0, 10) : sweep(0, 10) && sweep(0, 2) && sweep(-HOLD_FOLLOW, 2) && sweep(HOLD_FOLLOW, 2);
+  if (coarse) return sweep(0, 10, false);
+  // (held: the arc she may follow the wind through, about her bow)
+  for (let f = -HOLD_FOLLOW; f <= HOLD_FOLLOW; f += 2) { const q = about(c0, h0, BOW, f); if (!berthClear(q.c, q.h, s, true)) return false; }
+  // (let go: from where she came to, and from either end of the follow; between them the review found nothing these miss)
+  return sweep(0, 10, false) && sweep(0, 2, true) && sweep(-HOLD_FOLLOW, 2, true) && sweep(HOLD_FOLLOW, 2, true);
+}
+/** Let go held off the wind by `off`, after following it by `f`: the room ahead to gather way (10 m), along her path as
+ * she rounds up (WANDER) and as she sags to leeward (LEE_SAG). */
+function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
+  const q0 = about(c0, h0, BOW, f), e = about(q0.c, q0.h, holdPivot(off), off);
+  return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(off) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(off) * LEE_SAG);
 }
 const plans = new Map<string, PushOff>();
 export function pushOffPlan(s: Slip, windFrom?: number, windKt = 0): PushOff {
@@ -563,7 +574,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   type Way = { back: number; turn: number; h: number; gain: number; run: number; hold?: { off: number } };
   const ways: Way[] = [];
   // (the turns searched in 12 steps; the one taken, checked in 24, and its push off the wind if she's held head to wind)
-  const fine = (w: Way) => { for (let k = 1; k <= 24; k++) { const q = about(at(w.back), s.heading, BOW, w.turn * k / 24); if (!berthClear(q.c, q.h, s)) return false; } if (w.hold) { const c0 = about(at(w.back), s.heading, BOW, w.turn); if (!releaseClear(c0.c, c0.h, w.hold.off, s)) return false; } return true; };
+  const fine = (w: Way) => { for (let k = 1; k <= 24; k++) { const q = about(at(w.back), s.heading, BOW, w.turn * k / 24); if (!berthClear(q.c, q.h, s)) return false; } if (w.hold) { const c0 = about(at(w.back), s.heading, BOW, w.turn); if (!releaseClear(c0.c, c0.h, w.hold.off, s)) return false; for (const f of [-HOLD_FOLLOW, HOLD_FOLLOW]) if (!letGoClear(c0.c, c0.h, w.hold.off, s, f)) return false; } return true; };
   const search = (swings: boolean): void => {
     for (const gap of [0.5, 1, 1.5, 2, 2.5]) { // (her bow past the finger's end on the bow line; no further: a line only pulls, and across the wind she'd lie down along the finger ends, not out in the fairway)
       const back = tip + BOW + gap; if (back > reach) break;
@@ -583,19 +594,10 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
             const c0 = about(at(back), s.heading, BOW, turn);
             // (or, with no room for that, wound round on a stern line to point downwind out of it: holdPivot)
             const ok = (o: number) => {
-              // (pushed off for the main: about her bow, held on the line; wound round: about her stern, pointed downwind with no
-              // main up to round her up, so only the clear water ahead counts). Clear from wherever she's followed the wind to.
-              const round = Math.abs(o) > 90, piv = holdPivot(o);
-              if (!releaseClear(c0.c, c0.h, o, s, true)) return false;
-              const e = about(c0.c, c0.h, piv, o);
-              // (wound round downwind she may have the main up by then, as the coach says: the clear water a run needs, 14 m
-              // ahead and her leeway either side)
-              if (round) return runAhead(e.c, e.h, s) >= 14 && pathClear(e.c, e.h, s, 0, LEE_SAG) && pathClear(e.c, e.h, s, 0, -LEE_SAG);
-              return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(o) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(o) * LEE_SAG);
+              // (pushed off for the main: about her bow, held on the line; the room ahead from where she came to: fine checks the rest)
+              return releaseClear(c0.c, c0.h, o, s, true) && letGoClear(c0.c, c0.h, o, s);
             };
-            // (pushed off for the main if there's room for it; only if there's none, wound round on a stern line)
-            let offs = [60, -60, 50, -50, 40, -40].filter(ok);
-            if (!offs.length) offs = [180, -180].filter(ok);
+            const offs = [60, -60, 50, -50, 40, -40].filter(ok);
             if (!offs.length) continue;
             const score = (o: number) => { const q = about(c0.c, c0.h, BOW, o), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
             hold = { off: offs.sort((a, b) => Math.abs(b) - Math.abs(a) || Math.round(score(b) / 3) - Math.round(score(a) / 3))[0] }; // (as far off the wind as there's room; toward the way out)
