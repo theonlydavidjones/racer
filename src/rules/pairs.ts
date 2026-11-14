@@ -292,7 +292,7 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): numbe
   for (let t = tEnd; t - W >= oldest - 1e-9; t -= RING_DT) { if (turned(t) < 1) break; t0 = t - W; }
   // where the keep-clear boat was then, and the turn she was already making
   const kOld = K.t[at(K, K.n - 1)], kw = Math.min(TURN_WINDOW, t0 - kOld), k0 = poseAt(K, t0);
-  const kc0 = { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 }; // (over a window, through the waves' yaw)
+  const kc0 = { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0, leeway: kc.leeway }; // (over a window, through the waves' yaw; her leeway as now)
   // the right-of-way boat's actual course from t0 (then on as she is)
   const v = row.v ?? Math.hypot(row.vx, row.vy), last = poseAt(R, now);
   const actual = (tau: number): Pose => {
@@ -336,7 +336,7 @@ export function couldAvoid(f: RulesBoat, victim: RulesBoat, by: RulesBoat, since
   };
   const seen = (R: PoseRing) => { const p = poseAt(R, t0), w = Math.min(TURN_WINDOW, t0 - oldestOf(R)); return straightOn(p, w > 0.2 ? wrap(p.h - poseAt(R, t0 - w).h) / w : 0); };
   const f0 = poseAt(F, t0), fw = Math.min(TURN_WINDOW, t0 - oldestOf(F));
-  const kc0 = { ...f0, turnRate: fw > 0.2 ? wrap(f0.h - poseAt(F, t0 - fw).h) / fw : 0 };
+  const kc0 = { ...f0, turnRate: fw > 0.2 ? wrap(f0.h - poseAt(F, t0 - fw).h) / fw : 0, leeway: f.leeway };
   const wind = f.ww?.from ?? ctx.windFrom, o = { delay: RESPOND_DELAY, horizon: now - t0 + 1, windKt: f.ww?.kt ?? ctx.windKt };
   // the turn a prompt helmsman would choose then: clearest of the boat she must keep clear of (the victim), making things
   // no worse with the boat that fouled her than holding on would (she has right of way over that one, owing only rule 14)
