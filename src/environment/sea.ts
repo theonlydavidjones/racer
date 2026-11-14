@@ -91,10 +91,10 @@ const fineHarbor = (p: Vec): Harbor | null => harborAt(p) ?? HARBORS.find(h => p
  * of the fine map (`out`), from where they're open water again.
  */
 function basinRay(p: Vec, from: number, H = fineHarbor(p)!): { d: number; out: Vec | null } {
-  const u = V(from), m = wallMap(H);
+  const u = V(from), m = wallMap(H), q = { x: 0, y: 0 }; // (one point walked along the ray, not one every 2 m: walled only reads it)
   for (let d = 2; d < 4000; d += 2) {
-    const q = { x: p.x + u.x * d, y: p.y + u.y * d };
-    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: q };
+    q.x = p.x + u.x * d; q.y = p.y + u.y * d;
+    if (q.x < m.x0 || q.x >= m.x1 || q.y < m.y0 || q.y >= m.y1) return { d, out: { x: q.x, y: q.y } };
     if (walled(H, q)) return { d, out: null };
   }
   return { d: 4000, out: null };
@@ -110,9 +110,10 @@ export function fetchRay(p: Vec, from: number, fine = fineFetch(p)): number {
   // (`fine` false: open water's fetch, measured coarsely as it always was, even from a point that's in a basin)
   const H = fine ? fineHarbor(p) : null; // (none: a point just past the fine map's edge, traced coarsely after all)
   if (H) { const r = basinRay(p, from, H); return r.out ? Math.min(MAX_FETCH, r.d + fetchRay(r.out, from)) : Math.max(2, r.d); }
-  const u = V(from);
+  const u = V(from), q = { x: 0, y: 0 }; // (one point walked along the ray, as basinRay: landAt only reads it)
   for (let d = 50; d < MAX_FETCH; d += 100) {
-    const l = landAt({ x: p.x + u.x * d, y: p.y + u.y * d });
+    q.x = p.x + u.x * d; q.y = p.y + u.y * d;
+    const l = landAt(q);
     if (l === null) return MAX_FETCH; // out past the map: open water
     if (l) return Math.max(50, d - 50);
   }
