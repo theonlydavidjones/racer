@@ -11,7 +11,10 @@ import { wrap } from '../core/math';
 
 const LOA = 7.64; // (the diagrams' boat: a Folkboat, src/rules/cases.ts)
 const INK: Record<string, string> = { W: '#56b4e9', L: '#e8603c', A: '#56b4e9', B: '#e8603c', S: '#56b4e9', P: '#e8603c', I: '#1fbf8f', O: '#e69f00', M: '#1fbf8f', PL: '#e8603c', PW: '#e69f00' };
-export const caseChoices = (c: RulesCase): string[] => c.ask === 'keepsClear' ? c.pair.slice() : [...c.pair, 'neither'];
+/** The choices: every boat on the water by her letter, and Neither when the question is who broke a rule (the Rules
+ * session's call, 14 Nov 2026: the pair is only the two the engine judges; a boat on screen that broke nothing is a fair
+ * wrong answer). */
+export const caseChoices = (c: RulesCase): string[] => [...c.boats.map(b => b.letter), ...(c.ask === 'keepsClear' ? [] : ['neither'])];
 const ink = (l: string, i: number) => INK[l] ?? ['#56b4e9', '#e8603c', '#1fbf8f', '#e69f00'][i % 4];
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
