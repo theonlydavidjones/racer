@@ -32,12 +32,16 @@ const { chromium } = require('playwright');
       // section would misplace)
       const R = M.RIG ?? {}, mast = { z: R.MAST_Z, ath: (R.MAST_ATH ?? 0.11) / 2, fa: (R.MAST_FA ?? 0.133) / 2, top: (R.DECK_AT_MAST ?? 0.7) + 2.5 };
       const deckAtMast = H.deckY(H.uAtZ(mast.z ?? 0), 0);
+      // (the mast is raked aft about its centre at the deck, boatMesh RIG.MAST_RAKE: a point taken into the upright mast's
+      // frame before it's tested against the mast's section)
+      const rk = R.MAST_RAKE ?? 0, cr = Math.cos(rk), sr = Math.sin(rk), pvY = R.DECK_AT_MAST ?? deckAtMast;
+      const up = q => { const y = q.y - pvY, z = q.z - (mast.z ?? 0); return { x: q.x, y: pvY + y * cr + z * sr, z: (mast.z ?? 0) - y * sr + z * cr }; };
       // how far (m) a point in her frame is inside a solid surface, or 0
-      const inMast = q => mast.z != null && q.y > deckAtMast && q.y < mast.top && (q.x / mast.ath) ** 2 + ((q.z - mast.z) / mast.fa) ** 2 < 1;
+      const inMast = q0 => { const q = up(q0); return mast.z != null && q.y > deckAtMast && q.y < mast.top && (q.x / mast.ath) ** 2 + ((q.z - mast.z) / mast.fa) ** 2 < 1; };
       const depth = (x, y, z) => {
         const u = H.uAtZ(z), ax = Math.abs(x);
         if (u < 0.002 || u > 0.998 || ax > H.halfBeam(u)) return 0;
-        if (mast.z != null && y > deckAtMast && y < mast.top && (x / mast.ath) ** 2 + ((z - mast.z) / mast.fa) ** 2 < 1) return Math.min(mast.ath - ax, mast.fa - Math.abs(z - mast.z));
+        { const m = up({ x, y, z }); if (mast.z != null && m.y > deckAtMast && m.y < mast.top && (x / mast.ath) ** 2 + ((m.z - mast.z) / mast.fa) ** 2 < 1) return Math.min(mast.ath - ax, mast.fa - Math.abs(m.z - mast.z)); }
         let top;
         if (u > H.CABIN.u0 && u < H.CABIN.u1 && ax < H.cabinHalf(u)) top = H.cabinTopAt(u, x);
         else if (u > H.COCKPIT.u0 && u < H.COCKPIT.u1 && ax < H.cockpitHalf(u)) return 0; // (the cockpit well: open)
@@ -73,7 +77,7 @@ const { chromium } = require('playwright');
         if (nearLine(p, self)) return 'line';
         for (let i = 0; i < fit.length; i += 3) if ((fit[i] - p.x) ** 2 + (fit[i + 1] - p.y) ** 2 + (fit[i + 2] - p.z) ** 2 < 0.05 * 0.05) return 'fitting';
         const u = H.uAtZ(p.z), ax = Math.abs(p.x);
-        if (mast.z != null && p.y > deckAtMast && Math.abs(p.z - mast.z) < (p.y < mast.top ? mast.fa + 0.04 : 0.3) && ax < (p.y < mast.top ? mast.ath + 0.04 : 0.15)) return 'mast';
+        { const m = up(p); if (mast.z != null && m.y > deckAtMast && Math.abs(m.z - mast.z) < (m.y < mast.top ? mast.fa + 0.04 : 0.3) && ax < (m.y < mast.top ? mast.ath + 0.04 : 0.15)) return 'mast'; }
         if (u > H.COCKPIT.u0 && u < H.COCKPIT.u1 + 0.02 && ax < H.cockpitHalf(u) + 0.03) return 'cockpit';
         if (u > 0 && u < 1 && ax < H.halfBeam(u) + 0.02) {
           const top = u > H.CABIN.u0 && u < H.CABIN.u1 && ax < H.cabinHalf(u) ? H.cabinTopAt(u, p.x) : H.deckY(u, ax);
