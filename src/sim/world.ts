@@ -35,7 +35,7 @@ import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
-import { mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
+import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, type Slip } from '../geo/marina';
 import { ensignFor, sailNo } from '../boat/spec';
@@ -689,9 +689,10 @@ export class World {
     if (!this.tide && this.mouthC !== this.cvec) { this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; this.mouthC = this.cvec; }
     const S = this.mouthS;
     if (!(this.t - S.t >= 0 && this.t - S.t < 30)) {
-      // (the first look under the real tide: the last 13 hours of it, predicted from the same constants, to spin the gyre up)
+      // (the first look under the real tide: the last 13 hours of it, predicted from the same constants, to spin the gyre up;
+      // only the stations within 4 km of a mouth are predicted: the stream there is theirs to within a percent, at an eighth of the cost)
       let past: ((p: Vec, hoursAgo: number) => Vec) | undefined;
-      if (this.tide && !(this.t - S.t >= 0)) { const now = this.clockUtc, f = new CurrentField(stationsFor(now - 13 * 60 - 5, now + 5)); past = (p, h) => { f.setTime(now - h * 60); return f.atShore(p, false); }; }
+      if (this.tide && !(this.t - S.t >= 0)) { const now = this.clockUtc, f = new CurrentField(stationsFor(now - 13 * 60 - 5, now + 5, { at: MOUTH_REFS, within: 4000 })); past = (p, h) => { f.setTime(now - h * 60); return f.atShore(p, false); }; }
       refreshMouths(S, this.t, q => this.streamAt(q, false), past);
       // (as a new object each time, like the piers' flows: the page's mirror is sent what's new, not what's changed in place)
       return this.mouthS = { t: S.t, flows: S.flows.slice(), gyre: S.gyre.slice(), phase: S.phase.slice() };
