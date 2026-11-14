@@ -61,19 +61,22 @@ const materials = () => mats ??= {
  * plate. Rings go in order along the body; their points go round the same way.
  */
 function loft(rings: THREE.Vector3[][], caps = true): THREE.BufferGeometry {
+  // (the skin's normals smoothed across its rings and round each one, as a molded or cast surface is; the end caps flat,
+  // their own vertices, so their edges stay crisp)
   const n = rings[0].length, pos: number[] = [], idx: number[] = [];
   for (const r of rings) for (const p of r) pos.push(p.x, p.y, p.z);
   for (let i = 0; i < rings.length - 1; i++) for (let j = 0; j < n; j++) {
     const a = i * n + j, b = i * n + (j + 1) % n, c = (i + 1) * n + j, d = (i + 1) * n + (j + 1) % n;
     idx.push(a, c, b, b, c, d);
   }
+  const body = new THREE.BufferGeometry(); body.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); body.setIndex(idx); body.computeVertexNormals();
+  const parts = [body.toNonIndexed()];
   if (caps) for (const [k, flip] of [[0, true], [rings.length - 1, false]] as const) {
-    const ctr = rings[k].reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(n), ci = pos.length / 3;
-    pos.push(ctr.x, ctr.y, ctr.z);
-    for (let j = 0; j < n; j++) { const a = k * n + j, b = k * n + (j + 1) % n; if (flip) idx.push(ci, b, a); else idx.push(ci, a, b); }
+    const r = rings[k], ctr = r.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(n), cp: number[] = [];
+    for (let j = 0; j < n; j++) { const a = r[j], b = r[(j + 1) % n]; cp.push(ctr.x, ctr.y, ctr.z, ...(flip ? [b.x, b.y, b.z, a.x, a.y, a.z] : [a.x, a.y, a.z, b.x, b.y, b.z])); }
+    const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(cp, 3)); cg.computeVertexNormals(); parts.push(cg);
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
-  const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng;
+  return mergeGeometries(parts)!;
 }
 /** A superellipse loop in the horizontal plane at height y: half-widths a (x) and b (z), squareness e (2 an ellipse, 4 a rounded box). */
 function ring(cx: number, y: number, cz: number, a: number, b: number, e: number, n = 28): THREE.Vector3[] {
@@ -163,7 +166,11 @@ export function buildOutboard(hp: number): OutboardMesh {
   swivel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 14).translate(0, -0.07, 0), GREY));
   // the powerhead's cowl: rounded, a little longer aft than forward of the leg, narrowing to its top
   const cz = 0.03, y0 = 0.04, rings: THREE.Vector3[][] = [];
-  for (const [f, k, e] of [[0, 0.92, 3], [0.08, 0.98, 3.2], [0.35, 1, 3.4], [0.75, 0.97, 3.2], [0.92, 0.86, 2.8], [1, 0.62, 2.4]] as const) rings.push(ring(0, y0 + f * D.cowlH, cz, D.cowlW / 2 * k, D.cowlL / 2 * k, e));
+  // (molded: full-sided to about two-thirds up, then rounding over into a low dome, its plan easing from a rounded box
+  // toward an oval as it closes; fine enough that its outline and highlights run smooth)
+  const cowlAt: [number, number, number][] = [[0, 0.92, 3], [0.04, 0.96, 3.1], [0.1, 0.985, 3.25], [0.3, 1, 3.4], [0.55, 1, 3.4]];
+  for (let k = 1; k <= 9; k++) { const t = k / 9, f = 0.55 + 0.45 * Math.sin(t * Math.PI / 2); cowlAt.push([f, Math.pow(Math.max(0, 1 - t ** 2.6), 1 / 2.6) * 0.96 + 0.04 * (1 - t), 3.4 - 1.2 * t]); }
+  for (const [f, k, e] of cowlAt) rings.push(ring(0, y0 + f * D.cowlH, cz, D.cowlW / 2 * Math.max(k, 0.06), D.cowlL / 2 * Math.max(k, 0.06), e, 44));
   swivel.add(new THREE.Mesh(loft(rings), GREY));
   swivel.add(new THREE.Mesh(loft([ring(0, y0 - 0.005, cz, D.cowlW / 2 * 0.93, D.cowlL / 2 * 0.93, 3), ring(0, y0 + 0.012, cz, D.cowlW / 2 * 0.94, D.cowlL / 2 * 0.94, 3)]), DARK)); // the seal between the cowls
   // the leg: a streamlined strut from under the cowl down to the plate, a touch fuller at the top
