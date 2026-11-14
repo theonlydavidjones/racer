@@ -36,3 +36,28 @@ describe('the navigator round Aquatic Park', () => {
     expect(closest).toBeGreaterThanOrEqual(4);
   }, 300000);
 });
+
+// Leaving the basin she hit the wall and "just kinda sat there" (the owner): the pilot let go the moment she drifted
+// astern, with the tiller hard over. Now, touching the pier or stopped head to wind, it gets her off and out.
+describe('the navigator off Municipal Pier, after touching it or stopped in irons', () => {
+  const OUT = LL(37.8110, -122.4330);
+  for (const [name, at, h, from] of [
+    ['reached onto the pier\'s inner face (wind from N)', LL(37.8092, -122.4255), 270, 0],
+    ['reached onto the pier\'s inner face (wind from SSW)', LL(37.8092, -122.4255), 270, 200],
+    ['stopped head to wind in the basin (northwesterly)', LL(37.8090, -122.4255), 300, 300]] as const) it(name, () => {
+    const w = new World(COURSES[0], S({ windDir: from }), 4, { freeSail: true }), u = w.user;
+    expect(w.moveHere(at, 'start')).toBe(true);
+    u.h = h; u.v = from === h ? 0 : 2.5;
+    let touched = false;
+    const hits = () => (w.drainEvents() as { msg?: string }[]).some(e => !!e.msg && /ollision|ump|ground/.test(e.msg));
+    if (from !== h) { for (let t = 0; t < 45; t += DT) { w.step(DT); if (hits()) touched = true; } expect(touched, 'she reached the pier').toBe(true); }
+    w.setDest(OUT, 'out'); engage(u, w.pilot, 'nav');
+    let lastHit = 0, t = 0;
+    for (; t < 15 * 60 && w.arrivedT == null; t += DT) {
+      w.step(DT); if (hits()) lastHit = t;
+      expect(w.pilot.mode, `the pilot let go at ${t.toFixed(0)} s: ${w.pilot.alarm ?? ''}`).not.toBe('off');
+    }
+    expect(w.arrivedT, 'she got out').not.toBe(null);
+    expect(lastHit, 'off the wall soon, not bumping along it').toBeLessThan(90);
+  }, 300000);
+});
