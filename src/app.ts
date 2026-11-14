@@ -279,7 +279,7 @@ let setupTimer = 0;
 /* ---------------- sim events → UI ---------------- */
 function handle(e: SimEvent): void {
   switch (e.type) {
-    case 'toast': toast(e.msg, e.ms); break;
+    case 'toast': toast(e.msg, e.ms); if (e.msg.startsWith('Pilot alarm')) pilotNote('Alarm'); break;
     case 'horn': if (e.delayMs) setTimeout(() => horn(e.dur), e.delayMs); else horn(e.dur); break;
     case 'incident': showIncident(e.a, e.b, e.incident, { frames: e.frames, focus: [e.a.id, e.b.id], wind: e.wind, kind: 'incident' }); break;
     case 'finished': break;
@@ -761,13 +761,30 @@ for (const [id, sail] of [['bJib', 'jib'], ['bMain', 'main']] as const) {
 /* The tiller pilot (boat/autopilot.ts): cruising only, since RRS 52 says a racing boat's rudder is worked by her
  * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
 function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
-  if (!w.running || w.paused) return;
-  if (!w.cruising) { toast('No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.', 5000); return; }
+  if (!w.running) return;
+  // (every refusal says why, on the button itself, where the player is looking, as well as in Messages: the owner, v188,
+  // "the button won't engage", with the reason only in the Messages card across the screen)
+  if (w.paused) { pilotRefused('Paused', 'The sail is paused: resume it, then engage the pilot.'); return; }
+  if (!w.cruising) { pilotRefused('Racing', 'No autopilot when racing: RRS 52 says a racing boat\'s rudder is worked only by her crew\'s own power. Cruising, it\'s yours.'); return; }
   const u = w.user;
-  if (u.docked || u.pushing || (u.astern ?? 0) > 0.1 || u.v < 0.5) { toast('Get her sailing first: a tiller pilot needs way on to steer.', 3500); return; }
-  unlash();
-  if (mode === 'nav' && (!w.dest || w.arrivedT != null)) { toast('Nav needs somewhere to go: tap the map and pick a destination.', 4000); return; }
-  releaseTiller(); send({ k: 'pilot', op: 'engage', mode });
+  if (u.docked || u.pushing) { pilotRefused('Alongside', 'She\'s alongside: cast off and get her sailing, then engage the pilot.'); return; }
+  if ((u.astern ?? 0) > 0.1) { pilotRefused('Going astern', 'She\'s going astern: a tiller pilot can\'t steer backwards. Get her moving ahead first.'); return; }
+  if (u.v < 0.5) { pilotRefused('Needs way on', `Get her sailing first: a tiller pilot needs way on to steer (she's making ${(u.v * 1.944).toFixed(1)} kt; it needs 1).`); return; }
+  if (mode === 'nav' && (!w.dest || w.arrivedT != null)) { pilotRefused('No destination', 'Nav needs somewhere to go: tap the map and pick a destination.'); return; }
+  unlash(); releaseTiller(); send({ k: 'pilot', op: 'engage', mode });
+}
+/** A refusal: its reason in Messages, and a short word on the pilot's button (or its panel's readout) for a few seconds. */
+let pilotNoteT = 0, pilotNoteUntil = 0;
+function pilotRefused(word: string, msg: string): void {
+  toast(msg, 4000); pilotNote(word);
+}
+function pilotNote(word: string): void {
+  pilotNoteUntil = performance.now() + 3000;
+  const chip = $('bPilot'), lab = chip.querySelector<HTMLElement>('.w')!, read = $('pilotRead');
+  // (on both: the button, if the pilot's off, and the panel's readout, if it's steering)
+  lab.textContent = word; read.textContent = word; pilotShown = word; chip.classList.add('refused'); $('pilot').classList.add('refused');
+  const my = ++pilotNoteT;
+  setTimeout(() => { if (my !== pilotNoteT) return; lab.textContent = 'Autopilot'; pilotShown = ''; chip.classList.remove('refused'); $('pilot').classList.remove('refused'); }, 3000);
 }
 function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
@@ -788,7 +805,7 @@ function pilotTick(dt: number): void {
     const d = w.dest; const nm = d ? Math.hypot(d.p.x - u.x, d.p.y - u.y) / 1852 : 0;
     txt = d ? `→ ${d.name.replace(/^Off /, '')} · ${nm < 0.1 ? Math.round(nm * 1852) + ' m' : nm.toFixed(1) + ' nm'} · ${String(Math.round(p.navH) % 360).padStart(3, '0')}°` : 'No destination';
   }
-  if (txt !== pilotShown) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
+  if (txt !== pilotShown && performance.now() > pilotNoteUntil) { $('pilotRead').textContent = txt; $('pilotRead').title = txt; pilotShown = txt; }
   for (const b of panel.querySelectorAll<HTMLButtonElement>('[data-pm]')) b.classList.toggle('on', b.dataset.pm === p.mode);
 }
 /** The ghost race's pacing: how far ahead or behind your ghost you are, in seconds (replay/ghost.ts ghostGap). */
