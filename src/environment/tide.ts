@@ -479,6 +479,10 @@ export function sfLocalToUtcMin(date: string, time: string): number {
   return (guess - off * 60e3) / 60e3;
 }
 
+/** Minutes since epoch, UTC → "2026-11-14", the date in San Francisco. */
+export function sfDate(tMin: number): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(tMin * 60e3));
+}
 /** Minutes since epoch, UTC → "14:05", San Francisco local time. */
 export function sfClock(tMin: number): string {
   return CLOCK_FMT.format(new Date(tMin * 60e3));
