@@ -645,6 +645,7 @@ $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(dt: number): void {
+  document.body.classList.toggle('inLesson', !!w.lesson && w.running); // (the lesson's line at the top: 11-lessons.css)
   if (!w.running) { $('coachTip').classList.remove('on'); return; }
   if (w.lesson) { lessonTick(); return; }
   const u = w.user;
@@ -691,16 +692,21 @@ function lessonTick(): void {
   if (L.id === 'before' && L.step === 0 && dockFor !== L) { dockFor = L; dockGear.clear(); send({ k: 'pause', on: true }); paintDock(); $('lessonCard').hidden = false; }
   $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
   $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
+  // the lesson's one line, at the top for as long as the lesson runs (in the chase view the coach's own tip is off, its
+  // words in the Coach card, where a lesson's went unseen: the owner, 14 Nov 2026), its progress filling under it
+  if (tip.textContent !== L.cue) tip.textContent = L.cue;
+  const cls = (w.paused ? '' : 'on ') + (L.passed ? 'done' : 'fix');
+  if (tip.className.replace(' flash', '') !== cls) tip.className = cls;
+  tip.style.setProperty('--p', (L.passed ? 1 : L.progress).toFixed(3));
   if (L.cue !== lessonCue) {
     lessonCue = L.cue;
-    if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
+    tip.classList.remove('flash'); void tip.offsetWidth; tip.classList.add('flash'); // (a new step: lit a moment)
     if (L.passed && L.id !== 'case' && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
     // passed: a moment to see it, then paused on the lessons, this one ticked (a Case sailed: back on it in the Rules
     // trainer, with how it came out)
     const R = w.caseRun;
     if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', `${w.user.name} (${w.user.no})`, R.fouls[0] ? foulTitle(R.fouls[0]) : '', R.free.map(l => `${l} (${w.boats.find(b => b.name === l)?.no ?? ''}) sailed free after the contact`).join(' · ')); } else setup.openLessons(); } }, 3000);
   }
-  tipFade();
 }
 function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 function stepCar(k: 'carFore' | 'carIn', d: number): void {

@@ -170,7 +170,7 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
     // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
     const pastStop = s.atMax && t.err > 4;
     const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
-      : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
+      : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: its luff telltales streaming, windward and leeward')
       : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
         : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveler on purpose to keep her on her feet; the lifting luff is the price`
         : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
