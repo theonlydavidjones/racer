@@ -51,13 +51,38 @@ export function rudderCoef(a: number): { cl: number; cd: number } {
  * against her motion (negative ahead).
  */
 export function rudderForce(u: number, d: number, r: number, delta: number): { y: number; x: number } {
+  rudderInto(u, d, r, delta);
+  return { y: RUD.y, x: RUD.x };
+}
+/** rudderForce's answer left in RUD, for every boat every step (nothing made to throw away). */
+export const RUD = { y: 0, x: 0 };
+export function rudderInto(u: number, d: number, r: number, delta: number): void {
   const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
-  const aoa = (back ? -delta : delta) - Math.atan2(vy, Math.max(0.01, uf));
-  const c = rudderCoef(clamp(aoa, -Math.PI / 2, Math.PI / 2)), q = 0.5 * RHO * v2 * RUDDER.area, k = back ? 0.7 : 1;
-  return { y: q * c.cl * k, x: -q * c.cd * (back ? -1 : 1) };
+  const a = clamp((back ? -delta : delta) - inflowAngle(vy, uf), -Math.PI / 2, Math.PI / 2), q = 0.5 * RHO * v2 * RUDDER.area;
+  let cl: number, cd: number;
+  // (below the stall: rudderCoef's own first line, written out; past it, rudderCoef)
+  if (Math.abs(a) <= RUDDER_STALL + 1e-9) { cl = RUDDER.slope * a; cd = RUDDER_CD0 + cl * cl / (Math.PI * RUDDER.aspect); } else { const c = rudderCoef(a); cl = c.cl; cd = c.cd; }
+  RUD.y = q * cl * (back ? 0.7 : 1); RUD.x = -q * cd * (back ? -1 : 1);
+}
+/** The angle the water meets the blade at from her stern's sideways motion (rad): asked twice a step for the same water
+ * (the helm for a turn, then the force it makes), so the last answer is kept. */
+let inVy = NaN, inUf = NaN, inA = 0;
+function inflowAngle(vy: number, uf: number): number {
+  if (vy !== inVy || uf !== inUf) { inVy = vy; inUf = uf; inA = Math.atan2(vy, Math.max(0.01, uf)); }
+  return inA;
 }
 
 const STRIPS = 8;
+/** The strips' places along her (m, + forward) and the sums the hull's forces need, worked out once (HOVE is read when
+ * first asked, not when this file loads: physics.ts and this file read each other). */
+let strips: { xs: Float64Array; S2: number; S4: number; k: number; aL: number; kD: number; half: number } | null = null;
+function stripsOf() {
+  if (strips) return strips;
+  const L = orc.boat.imsL, N = STRIPS, xs = new Float64Array(N); let S2 = 0, S4 = 0;
+  for (let i = 0; i < N; i++) { const x = -L / 2 + (i + 0.5) * L / N; xs[i] = x; S2 += x * x; S4 += x * x * x * x; }
+  return strips = { xs, S2, S4, k: 0.5 * RHO * HOVE.latArea / N, aL: Math.PI * HOVE.aspect / 2, kD: -HOVE.dragAft / (S2 / N), half: L / 2 };
+}
+
 /**
  * Her hull and keel against the water sideways, strip by strip along the waterline: each strip's lift (with way on,
  * either way: trailing edge first about half of it, an estimate) and its broadside drag (Hoerner's cross-flow, more of
@@ -65,12 +90,11 @@ const STRIPS = 8;
  * turning her toward the wind): what damps her turn, and what swings her as she slides.
  */
 export function hullSide(u: number, d: number, r: number): { y: number; m: number } {
-  const L = orc.boat.imsL, A = HOVE.latArea, aL = Math.PI * HOVE.aspect / 2, N = STRIPS;
-  const x2 = (L * L / 12) * (1 - 1 / (N * N)), kD = -HOVE.dragAft / x2, uEff = u >= 0 ? u : 0.5 * -u;
+  const { xs, k, aL, kD } = stripsOf(), uEff = u >= 0 ? u : 0.5 * -u, cd = HOVE.crossCd;
   let y = 0, m = 0;
-  for (let i = 0; i < N; i++) {
-    const x = -L / 2 + (i + 0.5) * L / N, vy = d - r * x; // (x + forward) the water's sideways speed past the strip
-    const f = -0.5 * RHO * (A / N) * (aL * uEff * vy + HOVE.crossCd * (1 + kD * x) * vy * Math.abs(vy));
+  for (let i = 0; i < STRIPS; i++) {
+    const x = xs[i], vy = d - r * x; // (x + forward) the water's sideways speed past the strip
+    const f = -k * (aL * uEff * vy + cd * (1 + kD * x) * vy * Math.abs(vy));
     y += f; m -= f * x; // a push to windward ahead of the centre turns her toward the wind
   }
   return { y, m };
@@ -81,20 +105,16 @@ export function hullSide(u: number, d: number, r: number): { y: number; m: numbe
  * the same way (her sway more than her ends' swing, as it is sailing; S2 and S4 the strips' Σx² and Σx⁴), strip by
  * strip otherwise. The same numbers as hullSide's.
  */
-let S2 = 0, S4 = 0;
+
 export function hullYawM(u: number, d: number, r: number): number {
   if (d === 0 && r === 0) return 0;
-  const L = orc.boat.imsL, N = STRIPS;
-  if (!S2) for (let i = 0; i < N; i++) { const x = -L / 2 + (i + 0.5) * L / N; S2 += x * x; S4 += x * x * x * x; }
-  const k = 0.5 * RHO * HOVE.latArea / N, aL = Math.PI * HOVE.aspect / 2, uEff = u >= 0 ? u : 0.5 * -u, kD = -HOVE.dragAft / (S2 / N);
-  // Σ f·x with f = −k·(aL·u·vy + Cd·(1 + kD·x)·vy·|vy|), vy = d − r·x; m = −Σ f·x
-  if (Math.abs(d) > Math.abs(r) * L / 2) return k * (aL * uEff * -r * S2 + Math.sign(d) * HOVE.crossCd * (-2 * d * r * S2 + kD * (d * d * S2 + r * r * S4)));
+  const { xs, S2, S4, k, aL, kD, half } = stripsOf(), uEff = u >= 0 ? u : 0.5 * -u, cd = HOVE.crossCd;
+  if (Math.abs(d) > Math.abs(r) * half) return k * (aL * uEff * -r * S2 + Math.sign(d) * cd * (-2 * d * r * S2 + kD * (d * d * S2 + r * r * S4)));
   let m = k * aL * uEff * -r * S2; // (the lift's part is the same sum either way; the broadside drag's strip by strip, where the water passes her ends opposite ways)
-  for (let i = 0; i < N; i++) { const x = -L / 2 + (i + 0.5) * L / N, vy = d - r * x; m += k * HOVE.crossCd * (1 + kD * x) * vy * Math.abs(vy) * x; }
+  for (let i = 0; i < STRIPS; i++) { const x = xs[i], vy = d - r * x; m += k * cd * (1 + kD * x) * vy * Math.abs(vy) * x; }
   return m;
 }
 
-/** Her moment of inertia in yaw with the water she carries round with her, kg·m² (HOVE.gyration, yawAdded: estimates). */
 let yawI = 0;
 export const yawInertia = (disp: number = HULL.displacement) => disp === HULL.displacement ? (yawI ||= disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded)) : disp * (HOVE.gyration * orc.boat.loa) ** 2 * (1 + HOVE.yawAdded);
 
@@ -113,7 +133,7 @@ export const yawInertia = (disp: number = HULL.displacement) => disp === HULL.di
 export function turnDragN(r: number, u: number, side = 0, disp: number = HULL.displacement): number {
   const m = disp * HANDLING.mass / HULL.displacement, F = m * Math.abs(u) * r, cap = Math.abs(F);
   if (cap < 1e-9) return 0;
-  const d = ((side + F) * (side + F) - side * side) / (RHO * Math.PI * orc.boat.draft ** 2 * Math.max(1e-6, u * u));
+  const d = ((side + F) * (side + F) - side * side) / (KEEL_SPAN * Math.max(1e-6, u * u));
   return clamp(d, -cap, cap);
 }
 
@@ -125,7 +145,7 @@ export function turnDragN(r: number, u: number, side = 0, disp: number = HULL.di
 export function helmForMoment(want: number, u: number, d: number, r: number): number {
   const back = u < 0, uf = Math.abs(u), vy = HOVE.rudderFlow * (d + r * RUDDER.arm), v2 = u * u + vy * vy;
   const q = 0.5 * RHO * v2 * RUDDER.area * RUDDER.slope * RUDDER.arm * (back ? 0.7 : 1);
-  const inflow = Math.atan2(vy, Math.max(0.01, uf));
+  const inflow = inflowAngle(vy, uf);
   const lim = RUDDER_STALL - 1e-6, aoa = q > 1e-6 ? clamp(want / q, -lim, lim) : Math.sign(want) * lim; // (just inside it: the angles are summed and taken apart again)
   return clamp((aoa + inflow) * (back ? -1 : 1), -FULL_RUDDER * D2R, FULL_RUDDER * D2R);
 }
@@ -135,6 +155,9 @@ export function helmForMoment(want: number, u: number, d: number, r: number): nu
  * sails: rad/s. Her turning circle, u / r, comes out near constant: about 9 m, 1.2 boat lengths (the hull's damping and
  * the rudder's moment both go with her speed). Solved once (bisection on the moments).
  */
+/** ρ·π·T²: the keel's span in its induced drag (turnDragN) */
+const KEEL_SPAN = RHO * Math.PI * orc.boat.draft ** 2;
+
 let turnK = 0;
 export function steadyTurnRate(u: number): number {
   if (!turnK) {

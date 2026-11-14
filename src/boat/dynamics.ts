@@ -181,13 +181,16 @@ const bluffCdA = (c: number, s: number, crew: number, bare: number) =>
   (WINDAGE.mastFront * (0.4 + 0.4 * bare) + WINDAGE.crewFront) * Math.abs(c) + (WINDAGE.mastSide * (0.6 + 0.2 * bare) + WINDAGE.crewSide * crew) * s + WINDAGE.wire;
 /** The hull's share of Blendermann's denominator (1 bow-on and beam-on, least at 45°). */
 const hullDen = (c: number, s: number) => 1 - 2 * WINDAGE.delta * (1 - WINDAGE.hullFront / WINDAGE.hullSide) * s * s * c * c;
+/** (the wind angle's cosine and sine, kept from the last asked: a boat's step asks the windage's four parts at one angle) */
+let trigA = NaN, trigC = 1, trigS = 0, trigDen = 1;
+const trig = (a: number) => { if (a !== trigA) { trigA = a; trigC = Math.cos(a); trigS = Math.sin(a); trigDen = hullDen(trigC, trigS); } };
 export function windFore(awa: number, crew = 3, bare = 0): number {
-  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a);
-  return (WINDAGE.hullFront / hullDen(c, s) + bluffCdA(c, s, crew, bare)) * c;
+  const a = Math.abs(awa) * D2R; trig(a); const c = trigC, s = trigS;
+  return (WINDAGE.hullFront / trigDen + bluffCdA(c, s, crew, bare)) * c;
 }
 export function windSide(awa: number, crew = 3, bare = 0): number {
-  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a);
-  return (WINDAGE.hullSide / hullDen(c, s) + bluffCdA(c, s, crew, bare)) * s;
+  const a = Math.abs(awa) * D2R; trig(a); const c = trigC, s = trigS;
+  return (WINDAGE.hullSide / trigDen + bluffCdA(c, s, crew, bare)) * s;
 }
 
 /**
@@ -206,10 +209,10 @@ export function windSide(awa: number, crew = 3, bare = 0): number {
  */
 const WIND_LEVER = { hull: 0.12, shift: 0.18 * 7.64, mast: 0.79, crew: -2.4 };
 export function windTurn(awa: number, crew = 3, bare = 0): number {
-  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a), ac = Math.abs(c);
+  const a = Math.abs(awa) * D2R; trig(a); const c = trigC, s = trigS, ac = Math.abs(c);
   const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s + WINDAGE.wire;
   const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
-  return s * (WINDAGE.hullSide / hullDen(c, s) * (WIND_LEVER.hull + WIND_LEVER.shift * (Math.PI / 2 - a)) + mast * WIND_LEVER.mast + people * WIND_LEVER.crew);
+  return s * (WINDAGE.hullSide / trigDen * (WIND_LEVER.hull + WIND_LEVER.shift * (Math.PI / 2 - a)) + mast * WIND_LEVER.mast + people * WIND_LEVER.crew);
 }
 
 /**
@@ -222,10 +225,10 @@ export function windTurn(awa: number, crew = 3, bare = 0): number {
  */
 const WIND_HEIGHT = { hull: 0.44 + 0.52, mast: 5.8 + 0.52, wire: 4.0 + 0.52, crew: 0.9 + 0.52 };
 export function windHeel(awa: number, crew = 3, bare = 0): number {
-  const a = Math.abs(awa) * D2R, c = Math.cos(a), s = Math.sin(a), ac = Math.abs(c);
+  const a = Math.abs(awa) * D2R; trig(a); const c = trigC, s = trigS, ac = Math.abs(c);
   const mast = WINDAGE.mastFront * (0.4 + 0.4 * bare) * ac + WINDAGE.mastSide * (0.6 + 0.2 * bare) * s;
   const people = WINDAGE.crewFront * ac + WINDAGE.crewSide * crew * s;
-  return s * (WINDAGE.hullSide / hullDen(c, s) * WIND_HEIGHT.hull + mast * WIND_HEIGHT.mast + WINDAGE.wire * WIND_HEIGHT.wire + people * WIND_HEIGHT.crew);
+  return s * (WINDAGE.hullSide / trigDen * WIND_HEIGHT.hull + mast * WIND_HEIGHT.mast + WINDAGE.wire * WIND_HEIGHT.wire + people * WIND_HEIGHT.crew);
 }
 
 /** How much the sails flog (0..1): none at or above the beat angle, fully by head to wind; partly when eased to luff. */

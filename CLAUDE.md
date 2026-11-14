@@ -64,13 +64,17 @@ npm run dev & node scripts/check/ghost.cjs <out-dir>       # ~10 min: ghost race
 npm run dev & node scripts/check/season.cjs <out-dir>      # ~10 min: the season end to end (the Season tab, a race sailed and saved, the standings)
 npm run dev & node scripts/check/save-pattern.cjs <out-dir> # ~2 min: Save and "Save changes?" on a member, a boat's crew and the boat editor
 npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both sides on both tacks
+node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
+node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
                                               # discarding one function's code (docs/CAPACITY.md, "The compiler's thrown-away work")
 ```
 
-- perf.test (the owner, 13 Nov 2026): the budget holds. The shared test host is noisy, so a single perf.test failure on
-  code that hasn't changed the step is rerun once; it counts as a regression only if it fails again, or if the change
-  touches the step and measures slower than main back to back.
+- The step's speed (the owner, 14 Nov 2026): measured paired, both versions sailed by turns in one process, so the
+  host's drift cancels (scripts/check/perf-pair.mjs, docs/CAPACITY.md §8). The budget holds: perf.test requires the
+  step within v168 × 1.019 (the same 43.1 as before, now without the drift). A PR that touches the step (src/boat,
+  src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
+  at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
