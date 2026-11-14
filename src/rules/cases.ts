@@ -77,8 +77,14 @@ const back = (h: number, dt: number, v = 2.5): [number, number] => off([0, 0], h
 function then(frames: CaseFrame[], hOf: (t: number) => number, v: number, t0: number, t1: number): CaseFrame[] {
   const f = frames[frames.length - 1]; return [...frames, ...sail([f.x, f.y], hOf, v, t0, t1)];
 }
+/** Her frames as she tacks: from head to wind at `htw` until she's close-hauled at `done` (rule 13), onto `tack`. */
+function tacking(frames: CaseFrame[], htw: number, done: number, tack: 'S' | 'P'): CaseFrame[] {
+  return frames.map(f => f.t >= htw && f.t < done ? { ...f, tacking: true, tackT: htw, tack } : f.t >= done && f.t - 0.05 < done ? { ...f, tacking: false } : f);
+}
 const mark = (side: 's' | 'p', beat: boolean, p: [number, number] = [0, 0]): RulesMark => ({ name: 'M', p: { x: p[0], y: p[1] }, type: 'round', side, beat });
 
+// (A where the zone's edge is about 10 m behind her at 99 s: 14 m short of the mark, 3 m to its side, as the diagram had her)
+const A15 = off(off([0, 0], 45, -14, 3), 45, -2.5 * 4), hA15 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 99) * 30));
 const hL7 = (t: number) => 315 + Math.min(5, Math.max(0, (t - 50) * 5));
 const hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
 const hOL25 = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5));
@@ -131,13 +137,16 @@ export const CASES: RulesCase[] = [
 
   {
     case: 15, title: 'Clear ahead at the zone, then tacking', rules: ['18.2(a)', '13'], marks: [mark('p', true)],
+    // (sailed: both on port close-hauled at 045°, 2.5 m/s, B 12 m astern; A, in the zone, tacks from 99 s, 30°/s on
+    // the 2.5 m/s she carries into it, through head to wind at 100.5 s; the question once she's past it)
     boats: [
-      { letter: 'A', frames: [at(100, off([0, 0], 45, -14, 3), 45), at(101, off([0, 0], 45, -14, 3), 350, { tacking: true, tackT: 100.5, tack: 'S' })] },
-      { letter: 'B', frames: [at(100, off([0, 0], 45, -26, 3), 45)] },
+      { letter: 'A', frames: [at(94.9, A15, 45, { look: false }), ...tacking(sail(A15, hA15, 2.5, 95, 101.2), 100.5, 999, 'S')] },
+      { letter: 'B', frames: [at(94.9, off(A15, 45, -12), 45, { look: false }), ...sail(off(A15, 45, -12), () => 45, 2.5, 95, 101.2)] },
     ],
-    pair: ['A', 'B'], checks: [{ t: 100, keepsClear: 'B', rule: '18.2(a)' }],
-    momentT: 100, ask: 'keepsClear', answer: { who: 'A', rule: '13', line: 'Past head to wind, A\'s mark-room is over (18.2(b)): while she tacks she keeps clear (13).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['A', 'B'], checks: [{ t: 99, keepsClear: 'B', rule: '18.2(a)' }],
+    momentT: 99, ask: 'keepsClear', answer: { who: 'A', rule: '13', line: 'Past head to wind, A\'s mark-room is over (18.2(b)): while she tacks she keeps clear (13).' }, teach: true,
   },
+
   {
     case: 23, title: 'Running between two port boats', rules: ['10', '19'], fleet: true,
     boats: [
