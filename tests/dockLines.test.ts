@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HELD_MAX, LINE_BREAK, cleatOf, dockStep, type DockLine } from '../src/boat/dockLines';
 import type { Boat } from '../src/boat/boat';
+import { HANDLING, hullResistance } from '../src/boat/dynamics';
+import { ASTERN } from '../src/boat/physics';
 
 /** Dock lines as damped springs, with the capstan equation's hold round a cleat (boat/dockLines.ts). */
 const boat = (v = 0, h = 0): Boat => ({ x: 0, y: 0, h, v, astern: 0, sway: 0, turnRate: 0, vx: 0, vy: 0 } as unknown as Boat);
@@ -62,6 +64,14 @@ describe('dock lines', () => {
   it('the same inputs, the same result, to the last bit', () => {
     const go = () => { const b = boat(0.4, 10), L: DockLine[] = [{ role: 'bow', at: 3.6, side: 1, to: { x: 2, y: 4 }, len: 1.2, state: 'held' }]; run(b, L, { from: 200, kt: 12 }, 20); return [b.x, b.y, b.h, b.v, b.sway, L[0].len, L[0].T]; };
     expect(go()).toEqual(go());
+  });
+  it('gliding free in a calm she slows by her hull\'s own resistance ahead, and by twice it stern first (physics.ts ASTERN)', () => {
+    const slowing = (v: number, astern: number) => { const b = boat(v); b.astern = astern; const u0 = b.v - b.astern!; dockStep(b, [], calm, still, 1 / 60, open); return Math.abs(u0) - Math.abs(b.v - (b.astern ?? 0)); };
+    for (const v of [0.2, 0.5, 1]) {
+      const ahead = slowing(v, 0) * 60, back = slowing(0, v) * 60, hull = hullResistance(v) / HANDLING.mass; // (m/s²)
+      expect(ahead / hull, `ahead at ${v} m/s`).toBeGreaterThan(0.98); expect(ahead / hull).toBeLessThan(1.1); // (and the air on her at her own speed, a little)
+      expect(back / hull, `astern at ${v} m/s`).toBeGreaterThan(ASTERN * 0.98); expect(back / hull).toBeLessThan(ASTERN * 1.1);
+    }
   });
   it('touching the dock: her speed into it taken out, and the bump reported', () => {
     const b = boat(0, 0); b.sway = -0.6; // (sliding to port at 0.6 m/s onto a dock along x < -1.4)

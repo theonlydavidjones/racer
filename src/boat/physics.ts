@@ -37,16 +37,21 @@ export const CREW_LAG = 0.8;
  * the ITTC friction line and the residuary, as sailing). AN ESTIMATE: no measurement of a small keelboat's resistance
  * stern first was found, nor a timed coast-down (researched 14 Nov 2026: ships' astern trials weren't reachable, and
  * there's nothing for yachts). Stern first she leads with her afterbody and her rudder, which are shaped to leave the
- * water, not to meet it: more drag than ahead, by a factor a streamlined body shows turned end for end, about two.
+ * water, not to meet it: more drag than ahead, by the factor a streamlined section shows turned end for end, about two
+ * (NACA TN 3361, Critzos, Heyson & Boswinkle 1955: the NACA 0012's drag at 180° about twice its drag at 0°; a wing
+ * section in two dimensions, not a hull, so still an estimate).
  * It replaces dv/dt = −(0.005 + 0.035·v), which had no source and was 6 to 20 times her hull's own resistance at a
- * walk (48 N against 8 N at 0.4 m/s), with a constant part and a part going as the speed that a hull's drag doesn't
- * have (it goes about as the square). So she carries her way as a two-tonne keelboat does: shoved off at 0.5 m/s she
- * has lost it after 40 m and four minutes, not 8 m and half a minute. The owner is to say how far she really glides.
+ * walk (48 N against 8 N at 0.4 m/s), with a constant part a hull's drag doesn't have. So she carries her way as a
+ * two-tonne keelboat does: shoved off at 0.5 m/s she has lost it (WAY_LOST) after 40 m and four minutes, not 8 m and
+ * half a minute. The owner is to say how far she really glides.
+ * Under a tenth of a knot hullResistance is nearly in proportion to her speed (its residuary table runs straight from
+ * nothing to its first row), so her last way dies off slowly, halving about every two minutes, over eight
+ * meters more: in still water a hull does creep on like that, and any wind or stream soon outweighs it.
  */
 export const ASTERN = 2;
-/** How fast the water slows her sternway (m/s²) at `v` m/s astern. */
+/** How fast the water slows her sternway (m/s²) at `v` m/s astern (at her design displacement: her crew's weight isn't in it yet). */
 export const asternDrag = (v: number): number => ASTERN * hullResistance(v) / HANDLING.mass;
-/** Below this (m/s) she has lost her way, for a coast's length: the water's drag alone never quite stops her. */
+/** Below this (m/s) she has lost her way, for a coast's length: the water's drag alone takes minutes more to stop her. */
 const WAY_LOST = 0.05;
 /**
  * How far she coasts astern from `v0` m/s until she has lost her way (m), on the water's drag alone: the distance run
@@ -931,8 +936,8 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // sternway (pushed off astern): she coasts back, slowing on the water's drag, which is slight at a walking pace (a
   // two-tonne boat glides a long way: from a shove of 0.5 m/s, five lengths in four minutes)
   const ast = b.astern ?? 0;
-  // (her hull's resistance going through the water, and twice it stern first: ASTERN, an estimate. It goes as the
-  // square of her speed, so she never quite stops by it alone; under a tenth of a millimeter a second she's taken as stopped)
+  // (her hull's resistance going through the water, and twice it stern first: ASTERN, an estimate. It falls away with
+  // her speed, so her last way dies slowly; under a tenth of a millimeter a second she's taken as stopped)
   if (ast > 0) { const left = ast - asternDrag(ast) * dt; b.astern = left > 1e-4 ? left : 0; }
   // sideways too, while she's slipping (hove to)
   const sw = b.sway ?? 0, stb = V(b.h + 90);
