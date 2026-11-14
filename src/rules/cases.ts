@@ -87,6 +87,7 @@ const mark = (side: 's' | 'p', beat: boolean, p: [number, number] = [0, 0]): Rul
 const A15 = off(off([0, 0], 45, -14, 3), 45, -2.5 * 4), hA15 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 99) * 30));
 const hL53 = (t: number) => 300 - Math.min(30, Math.max(0, (t + 31.8) * 30));
 const AS27 = off([0, 0], 45, -10), hAS27 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 50) * 20));
+const hL13 = (t: number) => 280 + Math.min(35, Math.max(0, (t + 35) * 5));
 const hL7 = (t: number) => 315 + Math.min(5, Math.max(0, (t - 50) * 5));
 const hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
 const hOL25 = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5));
@@ -118,13 +119,17 @@ export const CASES: RulesCase[] = [
   },
   {
     case: 13, title: 'Before the start, a luff to close-hauled', rules: ['11', '17'],
+    // (sailed, before the start: W reaching at 280°, 2 m/s; L comes up from 12 m astern, 5 m to leeward, at 3.5 m/s,
+    // overlaps her, slows to her speed and luffs to close-hauled, 5°/s from -35 s: before the start no boat has a proper
+    // course, so rule 17 doesn't limit her; W, slower to respond, is touched: W's 11. The same from 3 to 8°/s, 4 to 6 m)
     boats: [
-      { letter: 'W', started: false, frames: [at(-40, [0, 0], 280), at(-30, off([0, 0], 280, 2, -1.8), 280)] },
-      { letter: 'L', started: false, frames: [at(-40, off([0, 0], 280, -12, -1), 280), at(-39, off([0, 0], 280, -1, -5), 280), at(-30, off([0, 0], 280, 2, -4), 315, { ago: 315, aboveProper: true })] },
+      { letter: 'W', started: false, frames: [at(-44.1, [0, 0], 280, { v: 2, look: false }), ...sail([0, 0], () => 280, 2, -44, -20)] },
+      { letter: 'L', started: false, frames: [at(-44.1, off([0, 0], 280, -12, -5), 280, { look: false }), ...then(sail(off([0, 0], 280, -12, -5), () => 280, 3.5, -44, -35.1), hL13, 2, -35, -20).map(f => f.t >= -35 ? { ...f, aboveProper: true } : f)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: -40, keepsClear: 'L', rule: '12' }],
-    momentT: -39, ask: 'foul', answer: { who: 'W', rule: '11', line: 'Before the start there\'s no proper course, so no rule 17: L may luff to close-hauled. W keeps clear (11).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['W', 'L'], checks: [{ t: -44, keepsClear: 'L', rule: '12' }],
+    momentT: -35, ask: 'foul', answer: { who: 'W', rule: '11', line: 'Before the start there\'s no proper course, so no rule 17: L may luff to close-hauled. W keeps clear (11).' }, teach: true,
   },
+
   {
     case: 14, title: 'A slow luff toward the shore', rules: ['11', '16.1', '17'],
     // (sailed: W broad reaching at 200°, 2.5 m/s; L comes up from 12 m astern, 6 m to leeward, at 3.5 m/s, overlapping
