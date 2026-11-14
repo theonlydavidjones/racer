@@ -22,7 +22,8 @@ import orc from './data/nordic-folkboat-orc.json';
  *   drag coefficient about 2 broadside (Hoerner, Fluid-Dynamic Drag), drawn through the water at about 2 m/s, for about
  *   half of each stroke: ½ × 1025 × 2 × 0.03 × 2² × ½ ≈ 60 N.
  * Her own hull (physics.ts, the ITTC-1957 friction line on her 14.75 m² of wetted surface, ORC) then sets how fast she
- * goes: about a knot (ITTC alone: 5 W of thrust power holds 1 kt, 15 W 1.5 kt).
+ * goes: about a knot and a half (ITTC alone: about 5 W of thrust power holds 1 kt, 18 W 1.5 kt; the 22 W kept up here
+ * holds a little over 1.5 kt).
  * - The turn: the stroke's push is ARM off her centreline (the side deck, about 0.95 m out, and the reach), a yaw moment
  *   F × ARM against the water's resistance to her turning: her keel's and rudder's lift with way on (physics.ts
  *   yawDamping, the strips her yaw lag is worked from), and her hull and keel broadside to it, about her middle,
@@ -45,7 +46,7 @@ export const PADDLE = {
 const yawDrag = () => 0.5 * 1025 * HOVE.crossCd * HOVE.latArea * orc.boat.imsL ** 3 / 32; // (worked when used: physics.ts imports this file)
 
 /** Paddling: the side, when it began (sim time), and whether the crew called it themselves (a jam) or you did. */
-export interface PaddleState { side: 'P' | 'S'; t0: number; auto: boolean; back?: boolean }
+export interface PaddleState { side: 'P' | 'S'; t0: number; auto: boolean; back?: boolean; /** when the side was last chosen (sim time) */ aimT?: number }
 
 /** Who paddles: the forward hand (the crutch's job, as the pole's), or with no crew the helm. */
 export const paddler = (b: Boat): number => { const n = b.crew?.spec.crew.length ?? 0; return n === 0 ? 0 : ownerOf('pole', n, b.crew!.spec); };
@@ -66,6 +67,13 @@ export function paddleForce(b: Boat, t: number): number {
   const vAhead = b.v - (b.astern ?? 0), dir = p.back ? -1 : 1;
   const along = Math.max(0.05, dir * vAhead); // (her speed the way the stroke pushes)
   return dir * Math.min(PADDLE.fMax, PADDLE.bladeEff * P / along);
+}
+
+/** The paddle's turning moment about her middle (N·m, + to starboard): its push, out on the side deck (hove to, the
+ * strips there resist it: physics.ts heaveTo). */
+export function paddleMoment(b: Boat, t: number): number {
+  const p = b.paddle, F = Math.abs(paddleForce(b, t)); if (!p || F <= 0) return 0;
+  return (p.side === 'P' ? 1 : -1) * (p.back ? -1 : 1) * F * PADDLE.arm;
 }
 
 /** The turn paddling on one side gives her (deg/s, + to starboard): the stroke's moment against the water's resistance

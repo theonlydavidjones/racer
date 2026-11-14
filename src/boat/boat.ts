@@ -101,6 +101,8 @@ export interface Boat {
   motor?: import('./motor').MotorState;
   /** The crew paddling her with the boom crutch (boat/paddle.ts): the side, since when, and whether they called it. */
   paddle?: import('./paddle').PaddleState | null;
+  /** You stopped the crew's own paddling: they leave it to you until the jam has passed (world.ts crewPaddleCall). */
+  paddleOff?: boolean;
   /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
   lastHitT?: number;
   /**

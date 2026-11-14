@@ -143,4 +143,39 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     const u = w.user; u.x = w.C.marks[0].p.x - 30; u.y = w.C.marks[0].p.y; u.v = 0;
     for (let i = 0; i < 60 * 30; i++) { w.step(DT); expect(u.paddle?.auto ?? false).toBe(false); }
   });
+  it('you stopping the crew\'s paddling sticks: they don\'t pick the crutch up again while the jam lasts', () => {
+    const w = world('roundings', 1, 'flood'), u = w.user, W = w.rounding!.marks[0].p;
+    u.x = W.x - 30; u.y = W.y; u.v = 0; u.h = 0;
+    while (!u.paddle?.auto && w.t < 60) w.step(DT);
+    expect(u.paddle?.auto).toBe(true);
+    applyCommand(w, { k: 'paddle', side: null });
+    for (let i = 0; i < 60 * 20; i++) { w.step(DT); expect(u.paddle).toBeNull(); }
+  });
+  it('a back-paddling spell ends once she has sternway and is clear (her way is either way)', () => {
+    // (head to wind in a light air with the shore dead ahead: they back her off it, and stop once she's clear)
+    const w = world('sail', 1), u = w.user;
+    u.paddle = { side: 'S', t0: w.t, auto: true, back: true, aimT: w.t };
+    for (let i = 0; i < 60 * 60; i++) w.step(DT);
+    expect(u.paddle, 'they stopped well before they\'d be worn out (180 s)').toBeNull();
+  });
+  it('the paddler stays on the side they paddle when she swings through the wind', () => {
+    const w = world('sail', 1), u = w.user;
+    applyCommand(w, { k: 'paddle', side: 'S' }); w.step(DT);
+    const arm = () => u.crew!.people.find(a => a.job?.line === 'paddle')!.job!.station!.arm;
+    const t0 = u.tack, a0 = arm();
+    u.h = (2 * u.ww.from - u.h + 360) % 360; // (her heading mirrored across the wind: the other tack)
+    for (let i = 0; i < 30 && u.tack === t0; i++) w.step(DT);
+    expect(u.tack).not.toBe(t0); w.step(DT); // (the station follows on the next step)
+    expect(arm()).toBeCloseTo(-a0, 5);
+  });
+});
+
+describe('Paddled while hove to', () => {
+  it('the crutch pushes her and turns her hove to as well', () => {
+    const still = testBoat({ heading: 90, kt: 0, windKt: 0.5 }), b = testBoat({ heading: 90, kt: 0, windKt: 0.5 });
+    for (const x of [still, b]) (x as Boat & { hove?: boolean }).hove = true;
+    b.paddle = { side: 'P', t0: 0, auto: false };
+    sail(still, 30); sail(b, 30);
+    expect(b.v - (b.astern ?? 0)).toBeGreaterThan(still.v - (still.astern ?? 0) + 0.2);
+  });
 });

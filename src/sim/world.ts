@@ -817,9 +817,10 @@ export class World {
    */
   paddle(side: 'P' | 'S' | null, back: boolean, auto: boolean): void {
     const u = this.user, was = u.paddle;
-    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } return; }
+    // (you stopping the crew's own paddling sticks: they don't start again until the jam has passed. crewPaddleCall)
+    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) { u.paddleOff = was.auto; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
     if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
-    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back };
+    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t };
     this.paddleJob(u, side);
     const who = (u.crew?.spec.crew.length ?? 0) === 0 ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
     const how = `${back ? 'back-paddles' : 'paddles'} on the ${side === 'P' ? 'port' : 'starboard'} side`;
@@ -839,14 +840,17 @@ export class World {
     const c = b.crew; if (!c) return;
     const a = c.people[paddler(b)]; if (!a) return;
     if (!side) { if (a.job?.line === 'paddle') a.job = null; return; }
-    const windward = (b.tack === 'S') === (side === 'S') ? 1 : -1; // (the station's arm is out to windward when +)
-    a.job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' } };
+    // (the station's arm is out to windward when +: worked for this tack, and again if she swings through the wind while
+    // paddling, so the paddler stays on the side they're paddling: paddleWork)
+    const windward = (b.tack === 'S') === (side === 'S') ? 1 : -1;
+    a.job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' }, side: b.tack };
   }
   /** Each step: the paddling ends with the motor driving her or once she's made fast; racing, a breach of rule 42 is
    * flagged (rules: world.rule42, one penalty a spell). */
   private paddleWork(b: Boat): void {
     const p = b.paddle; if (!p) return;
     if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
+    const job = b.crew?.people[paddler(b)]?.job; if (job?.line === 'paddle' && job.side !== b.tack) this.paddleJob(b, p.side);
     if (paddlePower(b, this.t) > 0 && this.racing(b) && !this.paddleAllowed(b)) this.rule42(b, 'paddle');
   }
   /**
@@ -882,37 +886,55 @@ export class World {
   private r42count = new Map<number, number>();
   /**
    * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
-   * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons with the shore
-   * within 40 m. They paddle her away from it (back-paddling if it's ahead), on the side that turns her bow off it, and stop
-   * once she's clear with way on or wind to sail by. Racing, only where rule 42 lets them (42.3(h)). Not while you're
-   * paddling her yourself, the motor's driving, or she's alongside.
+   * the stream setting her onto the shore, a pier or a mark within the next minute; or stopped in irons in a light air
+   * with the shore within 40 m. They paddle her away from it (back-paddling if it's ahead), on the side that turns her bow off it, and stop
+   * once she's clear with way on or wind to sail by, re-aiming if they're paddling her onto something else. Racing, only
+   * where rule 42 lets them (42.3(h)). Not while you're paddling her yourself, the motor's driving, or she's alongside;
+   * and if you stop them, not again until the jam has passed.
    */
   private crewPaddleCall(b: Boat): void {
     const p = b.paddle, n = b.crew?.spec.crew.length ?? 0;
     if ((p && !p.auto) || n === 0 || b.docked || b.handled || b.pushing || (b.motor?.running && b.motor.gear !== 'N')) return;
     if (this.racing(b) && !(b.lastHitT != null && this.t - b.lastHitT <= 30)) { if (p) this.paddle(null, false, true); return; }
-    const calm = b.ww.kt < 3, slow = b.v < 0.25;
-    // what she'll hit in the next minute, drifting as she is over the ground
-    let hazard: Vec | null = null;
-    for (let k = 1; k <= 6 && !hazard; k++) {
-      const q = { x: b.x + b.vx * 10 * k, y: b.y + b.vy * 10 * k };
-      if (onLand(q)) hazard = q;
-      else for (const m of [...this.C.marks, ...(this.rounding?.marks ?? [])]) if (m.shape !== 'island' && dist(q, m.p) < 10) { hazard = m.p; break; }
+    const ahead = b.v - (b.astern ?? 0), calm = b.ww.kt < 3, slow = Math.abs(ahead) < 0.25;
+    // what the stream alone sets her onto in the next minute (her own way she can stop or turn; the stream she can't), and
+    // while paddling, what she's heading for as she goes over the ground (the way they're paddling her)
+    const set = this.driftHazard(b, b.cur), going = p ? this.driftHazard(b, { x: b.vx, y: b.vy }) : null;
+    // in irons: stopped head to wind in a light air (in a breeze she backs the jib and sails out: physics.ts) near the shore
+    const headUp = b.ww.kt < 4 && Math.abs(wrap(b.ww.from - b.h)) < 30 && shoreDist(b) < 40, irons = slow && headUp;
+    const trouble = (calm && !!set) || headUp, jam = slow && trouble;
+    if (!p) {
+      if (!trouble) b.paddleOff = false; // (the jam has passed: next time they may paddle again)
+      if (!jam || b.paddleOff) return; // (you stopped them: they leave it to you)
+      const at = set ?? nearestLand(b, 40) ?? { x: b.x + V(b.h).x, y: b.y + V(b.h).y };
+      const a = this.paddleAim(b, at); this.paddle(a.side, a.back, true); return;
     }
-    const irons = slow && Math.abs(wrap(b.ww.from - b.h)) < 30 && shoreDist(b) < 40;
-    if (!(slow && (calm && hazard || irons))) {
-      // clear: with way on or wind to sail by, and nothing ahead of her drift, they stop (after a fair spell)
-      if (p && !hazard && (b.v > 0.5 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
-      if (p && this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
+    // paddling her into something (a second hazard, or the shore she started off): re-aim off it, given a fair spell
+    // on each side; if the same stroke would be chosen again it isn't helping, so they stop
+    if (going && this.t - (p.aimT ?? p.t0) > 10) {
+      const a = this.paddleAim(b, going);
+      if (a.side !== p.side || a.back !== !!p.back) this.paddle(a.side, a.back, true); else this.paddle(null, false, true);
       return;
     }
-    if (p) return; // (already at it)
-    // away from it: back-paddle if it's ahead, else forward; the side that swings her bow off it (in irons, off the wind
-    // toward open water: the side the shore isn't)
-    const at = hazard ?? nearestLand(b, 40) ?? { x: b.x + V(b.h).x, y: b.y + V(b.h).y }, rel = wrap(brg(at.x - b.x, at.y - b.y) - b.h);
-    const back = !irons && Math.abs(rel) < 90, turn = -Math.sign(rel) || 1; // (+: bow to starboard)
-    const side: 'P' | 'S' = back ? (turn > 0 ? 'S' : 'P') : (turn > 0 ? 'P' : 'S');
-    this.paddle(side, back, true);
+    // clear: the stream no longer setting her onto anything, with way on (either way) or wind to sail by
+    if (!set && !going && !irons && (Math.abs(ahead) > 0.5 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
+    else if (this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
+  }
+  /** Where she'll be on land, or within 10 m of a mark, drifting at `vel` (m/s over the ground) in the next minute, looking
+   * every 5 s (at a 2 m/s Gate ebb, 10 m apart: a mark or a thin pier isn't stepped over). */
+  private driftHazard(b: Boat, vel: Vec): Vec | null {
+    for (let k = 1; k <= 12; k++) {
+      const q = { x: b.x + vel.x * 5 * k, y: b.y + vel.y * 5 * k };
+      if (onLand(q)) return q;
+      for (const m of [...this.C.marks, ...(this.rounding?.marks ?? [])]) if (m.shape !== 'island' && dist(q, m.p) < 10) return m.p;
+    }
+    return null;
+  }
+  /** Which side and which way to paddle to get her off `at`: back-paddling if it's ahead, else forward; on the side that
+   * swings her bow off it (forward on port swings her bow to starboard; back-paddling, the other way). */
+  private paddleAim(b: Boat, at: Vec): { side: 'P' | 'S'; back: boolean } {
+    const rel = wrap(brg(at.x - b.x, at.y - b.y) - b.h), back = Math.abs(rel) < 90, turn = -Math.sign(rel) || 1; // (+: bow to starboard)
+    return { side: back ? (turn > 0 ? 'S' : 'P') : (turn > 0 ? 'P' : 'S'), back };
   }
   private belowSinceGun = new Set<number>();
   /**
