@@ -122,8 +122,8 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     }
     expect(bad.slice(0, 8)).toEqual([]);
     expect(worst, 'the hand on the grip (its lower half), m').toBeLessThan(0.04);
-    expect(hi - lo, 'short pulls, rad').toBeGreaterThan(0.5);
-    expect(Math.max(Math.abs(lo), Math.abs(hi)), 'short pulls, not round').toBeLessThan(0.5);
+    expect(hi - lo, 'short pulls, rad').toBeGreaterThan(0.45);
+    expect(Math.max(Math.abs(lo), Math.abs(hi)), 'short pulls, not round').toBeLessThan(0.4);
   }, 180_000);
 });
 

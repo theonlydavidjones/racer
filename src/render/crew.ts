@@ -80,10 +80,11 @@ export function winchGrip(side: number, turn: number): THREE.Vector3 {
 }
 /**
  * The handle's swing for a short pull (rad either side of pointing aft): the handle under the deck's edge can't go round,
- * so the sheet's ground in with short strokes, ratcheting, back and forth about 45 degrees, about one a second
+ * so the sheet's ground in with short strokes, ratcheting, about 17 degrees either way (Boat Detail: a crank worked in a
+ * tight space, its end clear of the lining), about one a second
  * (Lewmar's ratchet handles: worked in part-turns where a full sweep is blocked). An estimate of the stroke's pace.
  */
-const SHORT_PULL = { swing: 0.38, hz: 0.9 };
+const SHORT_PULL = { swing: 0.3, hz: 0.9 };
 /** The cranker's seat on the bench: the after shoulder about level with the handle's end, the arm in under the deck ahead of the after end of the space there (COCKPIT_FIT.benchAft). */
 const BENCH_TOP_AFT = 1.68;
 /** How far round toward the winch's handle they turn from facing in (of the whole way): enough for the shoulder to reach. */
@@ -96,9 +97,7 @@ const WINCH_TURN = 0;
 export function underDeck(x: number, y: number, z: number): boolean {
   if (!(z > COCK0 + 0.06 && z < BENCH_AFT)) return false;
   const u = uAtZ(z), ax = Math.abs(x);
-  // (out to the lining, and the grip's own width past it: at the short pull's full swing outboard the handle's end comes
-  // within a couple of centimetres of it, Boat Detail asked)
-  return ax > cockpitHalf(u) - 0.01 && ax < benchOut(u) + 0.03 && y > SEAT_Y && y < deckY(u, ax) - 0.03;
+  return ax > cockpitHalf(u) - 0.01 && ax < benchOut(u) && y > SEAT_Y && y < deckY(u, ax) - 0.03;
 }
 /** What's under a hand: the ground, or in under the side deck, the locker lid. */
 const handFloor = (x: number, y: number, z: number) => (underDeck(x, y, z) ? SEAT_Y : ground(x, z));
