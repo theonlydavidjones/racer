@@ -145,12 +145,16 @@ function lapOut(pt: { x: number; y: number }, u: number, p: number, lap: number)
 }
 
 /** The section point at station u: p from 0 at the sheer to 0.8 at the keel's side (canoe body), 1 at the keel bottom. */
+/** (the station's own figures, kept for the last station asked: the searches along a section ask the same u again and
+ * again, the crew's footing every frame among them, ROADMAP 8x) */
+let secU = NaN, secB = 0, secS = 0, secKc = 0, secWk = 0, secKb = 0, secAl = 0, secBe = 0;
 function sectionPoint(u: number, p: number): { x: number; y: number } {
-  const b = halfBeam(u), s = sheer(u), kc = canoe(u), wk = keelHalf(u), kb = Math.min(keel(u), kc);
+  if (u !== secU) { secU = u; secB = halfBeam(u); secS = sheer(u); secKc = canoe(u); secWk = keelHalf(u); secKb = Math.min(keel(u), secKc); const sh = sectionShape(u); secAl = sh.al; secBe = sh.be; }
+  const b = secB, s = secS, kc = secKc, wk = secWk, kb = secKb;
   if (p <= 0.8) {
     // heights spread down the section (the strakes a little closer near the keel), the breadth from the wineglass curve
     const a = (p / 0.8) * Math.PI / 2, g = Math.pow(Math.sin(a), 1.15), ys = s - (s - kc) * g;
-    const { al, be } = sectionShape(u), w = Math.min(wk, b), F = Math.pow(1 - Math.pow(g, al), be);
+    const al = secAl, be = secBe, w = Math.min(wk, b), F = Math.pow(1 - Math.pow(g, al), be);
     return { x: w + (b - w) * F, y: ys };
   }
   const f = (p - 0.8) / 0.2;
@@ -215,7 +219,7 @@ export const PAINT_LINES = { wl: 0.045, wlRise: 0.035, stripe: 0.065, stripeRise
 export const paintLines = (z: number) => { const e = (2 * z / L) ** 2; return { wl: PAINT_LINES.wl + PAINT_LINES.wlRise * e, top: PAINT_LINES.wl + PAINT_LINES.stripe + (PAINT_LINES.wlRise + PAINT_LINES.stripeRise) * e }; };
 
 /** The shell's geometry; its vertex colours are only the light and shade of the laps (the paint is per pixel: boatMesh.ts). */
-export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry {
+function hullGeometryBuild(_paint?: HullPaint): THREE.BufferGeometry {
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
   const white = new THREE.Color(1, 1, 1), colorAt = (_y: number) => white;
   // rows: the planked canoe body in STRAKES bands (each plank's lower edge stands out by LAP), then the keel. Each entry
@@ -385,7 +389,7 @@ const CAMBER = 0.05;
 export const deckY = (u: number, x: number) => sheer(u) + CAMBER * Math.max(0, 1 - (x / Math.max(0.05, halfBeam(u))) ** 2) * halfBeam(u) / 1.1;
 
 /** The deck: cambered, following the sheer, open where the cabin and cockpit are. */
-export function deckGeometry(): THREE.BufferGeometry {
+function deckGeometryBuild(): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [];
   const us: number[] = [];
   for (let i = 0; i <= NU; i++) us.push(i / NU);
@@ -493,7 +497,7 @@ export const cabinTopAt = (u: number, x: number) => {
 };
 
 /** The cabin trunk: sides from below the deck up to an arched top, and the after end (the main bulkhead's face). */
-export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } {
+function cabinGeometryBuild(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } {
   const N = 40, topY = cabinTopY;
   const outline: { u: number; x: number }[] = [];
   // (with stations at the windows' openings' ends, so the openings' edges are grid lines)
@@ -561,7 +565,9 @@ export function quad(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: TH
  * shelf's top laid teak (`teak`), the lockers' fronts and ends varnished panels (`panel`), the hull's inside and the
  * after wall the smooth moulded lining (`lining`).
  */
-export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE.BufferGeometry[]; panel: THREE.BufferGeometry[] } {
+/** A function of a station u, worked out once per u (the cockpit's linings ask for the same station's points again and again). */
+function memoU<T>(f: (u: number) => T): (u: number) => T { const m = new Map<number, T>(); return u => { let v = m.get(u); if (v === undefined) { v = f(u); m.set(u, v); } return v; }; }
+function cockpitGeometryBuild(): { teak: THREE.BufferGeometry[]; lining: THREE.BufferGeometry[]; panel: THREE.BufferGeometry[] } {
   const { u0, u1, sole } = COCKPIT, { seat, soleHalf, benchAft, shelfFwd } = COCKPIT_FIT, V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
   const strip = (pts: [THREE.Vector3, THREE.Vector3][]) => {
     const pos: number[] = [], idx: number[] = [];
@@ -595,9 +601,9 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
     panel.push(strip(bench.map(u => [V(s * (sh(u) - 0.012), seat, zAt(u)), V(s * benchOut(u), seat, zAt(u))]))); // the lid: a solid varnished panel
     lining.push(strip(bench.map(u => [V(s * benchOut(u), seat, zAt(u)), V(s * benchOut(u), deckY(u, benchOut(u)) - 0.02, zAt(u))]))); // the back, under the side deck
     // the footwell's sides: no panel, just the hull's own inside, curving up from the sole's edge to the deck over it
-    const prof = (u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
+    const prof = memoU((u: number) => { const pts: THREE.Vector3[] = [V(s * sh(u), sole, zAt(u))], top = deckY(u, halfBeam(u)) - 0.02;
       for (let k = 0; k <= WELL_K; k++) { const y = sole + (top - sole) * k / WELL_K; pts.push(V(s * Math.max(sh(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
-      return pts; };
+      return pts; }); // (once per station: each strip of the lining takes two points of it)
     for (let k = 0; k <= WELL_K; k++) lining.push(strip(well.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; })));
     const ub = zU(benchAft); panel.push(face(benchAft, [[s * (sh(ub) - 0.012), sole], ...hullSide(ub, s, true), [s * (sh(ub) - 0.012), seat]])); // the locker's end, out to the hull
   }
@@ -606,13 +612,14 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
   // above that (the hull lifting towards the transom), running aft to HOLLOW.z1, lined; the plank slides in and out of it
   // (boatMesh)
   { const { z1 } = HOLLOW, zs = span(zA - 0.04, z1, 10); // (begun a little forward of the after end, under the well's lining, so the two meet without a seam)
-    const floorY = (u: number) => { let y = sole; while (y < sole + 0.4 && hullInnerHalf(u, y) - 0.03 < 0.1) y += 0.005; return y; };
-    const wF = (u: number) => Math.max(0.07, hullInnerHalf(u, floorY(u)) - 0.03);
+    // (the floor's height: the lowest the hull's inside is 10 cm out from the middle, found by halving, once per station)
+    const floorY = memoU((u: number) => { if (hullInnerHalf(u, sole) - 0.03 >= 0.1) return sole; let lo = sole, hi = sole + 0.4; for (let n = 0; n < 16; n++) { const m = (lo + hi) / 2; if (hullInnerHalf(u, m) - 0.03 < 0.1) lo = m; else hi = m; } return hi; });
+    const wF = memoU((u: number) => Math.max(0.07, hullInnerHalf(u, floorY(u)) - 0.03));
     lining.push(strip(zs.map(u => [V(-wF(u), floorY(u), zAt(u)), V(wF(u), floorY(u), zAt(u))]))); // its floor
     // its sides: the hull's inside, from the floor up to the deck over it
-    const profOf = (s: number) => (u: number) => { const f = floorY(u), top = deckY(u, halfBeam(u)) - 0.02, q: THREE.Vector3[] = [];
+    const profOf = (s: number) => memoU((u: number) => { const f = floorY(u), top = deckY(u, halfBeam(u)) - 0.02, q: THREE.Vector3[] = [];
         for (let k = 0; k <= 14; k++) { const y = f + (top - f) * k / 14; q.push(V(s * Math.max(wF(u), Math.min(hullInnerHalf(u, y), halfBeam(u)) - 0.03), y, zAt(u))); }
-        return q; };
+        return q; });
     // the step up from the sole into it, where the hull's bottom rises above the sole's level: the well's lining at the
     // cockpit's after end (upright at the sole's edge, then the hull's inside) below the hollow's floor
     const ua = zU(zA), fa = floorY(ua), wa = wF(ua), sa = sh(ua);
@@ -620,9 +627,10 @@ export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE
       const side: number[][] = [];
       for (let k = 1; k <= 24; k++) { const y = sole + (fa - sole) * k / 24; side.push([Math.min(wa, Math.max(sa, Math.min(hullInnerHalf(ua, y), halfBeam(ua)) - 0.03)), y]); }
       lining.push(face(zA, [[-sa, sole], [sa, sole], ...side, ...side.slice().reverse().map(([x, y]) => [-x, y])])); }
-    for (const s of [1, -1]) { const prof = profOf(s); for (let k = 0; k < 14; k++) lining.push(strip(zs.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; }))); }
+    const profS = { 1: profOf(1), [-1]: profOf(-1) } as Record<number, (u: number) => THREE.Vector3[]>;
+    for (const s of [1, -1]) { const prof = profS[s]; for (let k = 0; k < 14; k++) lining.push(strip(zs.map(u => { const q = prof(u); return [q[k], q[k + 1]] as [THREE.Vector3, THREE.Vector3]; }))); }
     // its after end, closing it off from the floor to the deck, hull side to hull side
-    const ub = zU(z1), sb = profOf(1)(ub), pt = profOf(-1)(ub), top: number[][] = [];
+    const ub = zU(z1), sb = profS[1](ub), pt = profS[-1](ub).slice(), top: number[][] = [];
     for (let i = 1; i < 8; i++) { const x = sb[14].x - (sb[14].x - pt[14].x) * i / 8; top.push([x, deckY(ub, Math.abs(x)) - 0.01]); }
     lining.push(face(z1, [...sb.map(q => [q.x, q.y]), ...top, ...pt.reverse().map(q => [q.x, q.y])])); }
   return { teak: out, lining, panel };
@@ -638,7 +646,7 @@ export function lazaretteLids(): { x0: number; x1: number; z0: number; z1: numbe
 }
 
 /** The thwart: a beam across the cockpit between the coamings, its top flat and its underside curved (boat's frame). */
-export function thwartGeometry(): THREE.BufferGeometry[] {
+function thwartGeometryBuild(): THREE.BufferGeometry[] {
   const { z, half, depth, depthEnd } = COCKPIT_FIT.thwart, top = thwartTop(), w = cockpitHalf(zU(z)) + COAMING_T, N = 16;
   const bot = (x: number) => top - (depthEnd + (depth - depthEnd) * (1 - (x / w) ** 2));
   const pos: number[] = [], P = (x: number, y: number, zz: number) => pos.push(x, y, zz);
@@ -677,7 +685,7 @@ export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number),
  * heel, z aft. Put the group at HEEL rotated by RUDDER_RAKE about x; turn it about its y axis to steer.
  */
 export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
-export function rudderGeometry(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
+function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
   // the class's rudder (CR 5.20): breadth square off the fore edge (the hinge), at distances up the fore edge from the
   // blade's lower edge, ±20 mm; 1528 mm up is at the waterline, and the head runs on, 160 mm wide, to 2700 mm
   const OFF: [number, number][] = [[0, 0.105], [0.289, 0.240], [0.640, 0.385], [0.991, 0.470], [1.220, 0.490], [1.342, 0.480], [1.528, 0.415], [1.693, 0.270], [2.006, 0.160], [2.700, 0.160]];
@@ -744,7 +752,7 @@ export function topsidesPatch(uc: number, y0: number, y1: number, width: number,
 }
 
 /** A lid over the cockpit at deck level (drawn into the depth buffer only): the sea is never drawn inside the hull. */
-export function cockpitLid(): THREE.BufferGeometry {
+function cockpitLidBuild(): THREE.BufferGeometry {
   const { u0, u1 } = COCKPIT, N = 16, pos: number[] = [], idx: number[] = [];
   for (let i = 0; i <= N; i++) { const u = u0 + (u1 - u0) * i / N, w = cockpitHalf(u) + 0.02, y = deckY(u, w) + 0.01; pos.push(-w, y, zAt(u), w, y, zAt(u)); }
   for (let i = 0; i < N; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3, a, a + 1, a + 2, a + 1, a + 3, a + 2); }
@@ -752,7 +760,7 @@ export function cockpitLid(): THREE.BufferGeometry {
 }
 
 /** Depth-only covers over the companionway's openings (as cockpitLid): the sea isn't drawn inside her through them. */
-export function companionwayLid(): THREE.BufferGeometry {
+function companionwayLidBuild(): THREE.BufferGeometry {
   const { hw, len, sill } = COMPANIONWAY, u1 = CABIN.u1, z1 = zAt(u1) + 0.003, uS = u1 - len / L, V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
   // (flat at the crown's height: over the arch's edges they stand at most a couple of cm proud, and draw nothing)
   const yc = cabinTopAt(u1, 0) + 0.005, zS = zAt(uS);
@@ -812,3 +820,25 @@ export function sidePatch(uc: number, width: number, h0: number, h1: number, nu 
   for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, b, c, b, d, c); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
+
+// ———————————————————————————— the geometry, built once ————————————————————————————
+/**
+ * These shapes don't change from boat to boat (the hull's lines, the cabin, the cockpit), and they're slow to work out
+ * (the cockpit's linings follow the hull's curves, point by point): so each is built once, and every boat, the boat
+ * editor's every rebuild included, gets its own copy (ROADMAP 8v: an editor click rebuilt them all, seconds a click).
+ */
+const GEO_CACHE: Record<string, unknown> = {};
+function cloneGeo(v: unknown): unknown {
+  if (v instanceof THREE.BufferGeometry) return v.clone();
+  if (Array.isArray(v)) return v.map(cloneGeo);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cloneGeo(x)]));
+  return v; // (numbers, and the functions that go with them, as the cabin's topY)
+}
+export function hullGeometry(_paint?: HullPaint): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.hullGeometry ??= hullGeometryBuild(_paint)) as ReturnType<typeof hullGeometryBuild>; }
+export function deckGeometry(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.deckGeometry ??= deckGeometryBuild()) as ReturnType<typeof deckGeometryBuild>; }
+export function cabinGeometry(): { sides: THREE.BufferGeometry; top: THREE.BufferGeometry; aft: THREE.BufferGeometry; topY: (u: number) => number } { return cloneGeo(GEO_CACHE.cabinGeometry ??= cabinGeometryBuild()) as ReturnType<typeof cabinGeometryBuild>; }
+export function cockpitGeometry(): { teak: THREE.BufferGeometry[]; lining: THREE.BufferGeometry[]; panel: THREE.BufferGeometry[] } { return cloneGeo(GEO_CACHE.cockpitGeometry ??= cockpitGeometryBuild()) as ReturnType<typeof cockpitGeometryBuild>; }
+export function thwartGeometry(): THREE.BufferGeometry[] { return cloneGeo(GEO_CACHE.thwartGeometry ??= thwartGeometryBuild()) as ReturnType<typeof thwartGeometryBuild>; }
+export function rudderGeometry(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } { return cloneGeo(GEO_CACHE.rudderGeometry ??= rudderGeometryBuild()) as ReturnType<typeof rudderGeometryBuild>; }
+export function cockpitLid(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.cockpitLid ??= cockpitLidBuild()) as ReturnType<typeof cockpitLidBuild>; }
+export function companionwayLid(): THREE.BufferGeometry { return cloneGeo(GEO_CACHE.companionwayLid ??= companionwayLidBuild()) as ReturnType<typeof companionwayLidBuild>; }

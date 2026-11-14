@@ -3,7 +3,7 @@ export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
   | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft' | 'paddle'
-  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView'
+  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
   | 'course' | 'log' | 'pause' | 'keys';
@@ -59,6 +59,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'log', label: 'All messages', group: 'General' },
   { id: 'pause', label: 'Pause', group: 'General' },
   { id: 'keys', label: 'Keyboard settings', group: 'General' },
+  { id: 'perfMeter', label: 'Frame-time readout: fps, the 95% frame time and long frames over the last 10 s (on / off)', group: 'General' },
 ];
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
@@ -68,7 +69,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
-  log: ['l'], pause: ['p'], keys: ['k'],
+  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'],
 };
 
 /** Keys you can't rebind (Esc cancels things; Tab moves focus). */
