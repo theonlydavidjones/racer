@@ -10,11 +10,14 @@ interface MarkTag { el: HTMLDivElement; p: Vec; z: number; idx: number[] }
 export class Labels {
   private tagEls: (HTMLDivElement | null)[] = [];
   private markTags: MarkTag[] = [];
+  /** Coming in to a berth: the one-word cue by your boat (Closer, Too fast, Step, Made fast, Bump: sim/world.ts mooringStep). */
+  private cueEl: HTMLDivElement | null = null;
   private tmp = new THREE.Vector3();
   constructor(private root: HTMLElement) {}
 
   build(w: SimView): void {
     this.root.innerHTML = ''; this.tagEls = [];
+    this.cueEl = document.createElement('div'); this.cueEl.className = 'tag cue'; this.cueEl.hidden = true; this.root.appendChild(this.cueEl);
     for (const b of w.boats) {
       if (b.isUser) { this.tagEls.push(null); continue; }
       const d = document.createElement('div'); d.className = 'tag';
@@ -57,5 +60,8 @@ export class Labels {
       el.lastChild!.textContent = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? ' · turns' : '');
     });
     for (const mt of this.markTags) { this.place(mt.el, camera, mt.p.x, mt.p.y, mt.z); mt.el.classList.toggle('next', mt.idx.includes(u.leg) && w.t > 0); }
+    // the cue while it's news (a few seconds), or for as long as it holds while the hand waits at the shrouds
+    const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
+    if (c) { if (!word) c.hidden = true; else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
   }
 }

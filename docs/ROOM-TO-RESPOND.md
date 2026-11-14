@@ -7,11 +7,11 @@ Built (13 Nov 2026): `escapes()` in src/boat/arcs.ts, and rule 16.1 in src/rules
 
 **What the rules ask.** Rule 16.1: "When a right-of-way boat changes course, she shall give the other boat room to keep clear."
 Definitions, *Room*: "The space a boat needs in the existing conditions, including space to comply with her obligations under the
-rules of Part 2 and rule 31, while manoeuvring promptly in a seamanlike way." *Keep Clear*: the right-of-way boat "can sail her
+rules of Part 2 and rule 31, while maneuvering promptly in a seamanlike way." *Keep Clear*: the right-of-way boat "can sail her
 course with no need to take avoiding action".
 
 **What WS Case 105 says** (Case Book 2025–2028, p.235). Two boats are running on opposite tacks, side by side, after a long time
-on parallel courses. S luffs, and P doesn't respond, although she could have kept clear (by gybing). P broke 10,
+on parallel courses. S luffs, and P doesn't respond, although she could have kept clear (by jibing). P broke 10,
 and S didn't break 16.1: P had room.
 
 **What the engine does today.** src/rules/pairs.ts `turnedToward` reads a turn of 12° or more toward the other boat within 3 s
@@ -25,8 +25,8 @@ redesign needs exactly that: "If I turn hard now, do I clear?"
 
 ## One primitive: `escapes()`
 
-This is a pure function. It predicts the keep-clear boat's best avoiding manoeuvres from a given moment, using the physics' own
-turning model, against the right-of-way boat's actual course. It reports whether any of those manoeuvres keeps her clear.
+This is a pure function. It predicts the keep-clear boat's best avoiding maneuvers from a given moment, using the physics' own
+turning model, against the right-of-way boat's actual course. It reports whether any of those maneuvers keeps her clear.
 
 ```ts
 // src/boat/arcs.ts: Deep Physics owns src/boat, so this is to be agreed with them. It reads only dynamics.ts and physics.ts exports.
@@ -49,15 +49,15 @@ The "hold" candidate continues whatever turn she is already making (`turnRate`: 
 doesn't misjudge a turn she has already committed to. Skipper Model's points, 13 Nov 2026. The per-step kinematics (turn
 rate, yaw lag, speed loss) are exported, so the AI and the rules use exactly the same motion.
 
-**The candidate manoeuvres.** The helm goes over after `delay`, each way, at each of several amounts (full, half, and holding
+**The candidate maneuvers.** The helm goes over after `delay`, each way, at each of several amounts (full, half, and holding
 her course). For each one she:
 
 - **turns** at physics' own rate: `maxTurnRate(v)` from src/boat/dynamics.ts (the 9 m turning radius, capped at 4–22°/s),
   reached through the first-order yaw lag `yawLag(v)` (src/boat/physics.ts), as physics.ts already steps it;
 - **loses speed** in the turn, from the rudder drag physics.ts applies (`rudderDrag`). If that is too heavy for a predictor,
   a fitted decay per degree turned will do;
-- **gybes** if the turn passes the wind astern. That is allowed, with no extra cost over the turn itself. Case 105 counts
-  gybing as a way to keep clear, and the crew's gybe timing (Crew Model, 9057d28) can limit the rate later;
+- **jibes** if the turn passes the wind astern. That is allowed, with no extra cost over the turn itself. Case 105 counts
+  jibing as a way to keep clear, and the crew's jibe timing (Crew Model, 9057d28) can limit the rate later;
 - **tacks** if the turn passes head to wind. That is allowed, at the tack's own speed loss.
 
 The function steps every candidate at 0.1 s over the horizon, and gets the gap from src/rules/geometry.ts `hullGap` on the
@@ -77,7 +77,7 @@ which is rare. The AI would call it per threatened pair, about once a second (Sk
    - If an escape exists, the right-of-way boat gave room. Contact is then the keep-clear boat's breach of the basic rule
      (10, 11, 12 or 13). That is Case 105's answer.
    - If none exists, she didn't give room. That is 16.1, or 16.2 for a starboard boat bearing away on a beat.
-4. **The parameters.** These are modelling choices, to be confirmed with the researcher (human reaction time at the helm,
+4. **The parameters.** These are modeling choices, to be confirmed with the researcher (human reaction time at the helm,
    and what "seamanlike" margin protest committees accept):
    - `delay` = 1.0 s ("promptly": a helmsman watching the other boat);
    - `horizon` = until the predicted closest point of approach has passed, at most 8 s;
@@ -102,13 +102,13 @@ proposal's rule: "rule-reading errors are applied to the `rights()` answer she a
 ## Tests
 
 - **Case 105:** turn its `it.fails` into a plain test. The luff is slow and the boats start a beam's width apart, so P can
-  gybe or luff away, and P broke 10.
+  jibe or luff away, and P broke 10.
 - **Case 92 (16.2)** and the 16.1 tests in tests/rules.test.ts must still hold. Those turns were sharp and late, and left no
   room.
 - **New unit tests for `escapes()`:**
   - straight-line encounters with known answers;
   - turn rates matching physics at 1, 2 and 3 m/s;
-  - a gybe escape on a run.
+  - a jibe escape on a run.
 - **The AI's avoidance tests** (tests/ai-avoid, sim-fleet) as Skipper Model wires it in.
 
 ## Who does what

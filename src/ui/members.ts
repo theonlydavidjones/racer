@@ -17,7 +17,7 @@ export const CREW_UI: [Attr, string, string][] = [
   ['trim', 'Trim', 'How close to the best they keep the sails and the boat: heel, weight, the lines'],
   ['react', 'Reactions', 'How quickly they start on a change: a puff, a call, a tack'],
   ['eyes', 'Eyes', 'How far off they see puffs and lulls coming, and how few they miss'],
-  ['handling', 'Boat handling', 'The pace of their work: tacks, gybes, the pole, the hatch'],
+  ['handling', 'Boat handling', 'The pace of their work: tacks, jibes, the pole, the hatch'],
   ['fitness', 'Fitness', 'How far out they hike and how long they last'],
   ['composure', 'Composure', 'How well they hold up under pressure: the start, the marks, close crosses'],
 ];
@@ -90,22 +90,26 @@ export function membersGrid(ms: Member[], boats: BoatSpec[]): string {
   return `<div class="mtools"><button type="button" class="cta" data-f="mnew">New member</button></div>
     ${group('You and your crew', yours, 'Just you so far: New member adds someone to sail with you.')}
     ${club.length ? group('The club', club, '') : ''}
-    <small class="fnote">Yours are yours to set; the club's own members are shown as the club knows them. Open anyone for all their ratings.</small>`;
+`;
 }
 
 /** A member's page: their name and build, their skill and crew ratings, a skipper too, and leaving the club. */
-export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean): string {
+export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean, save: { dirty: boolean; asking: boolean } = { dirty: false, asking: false }): string {
   const yours = m.origin === 'yours', you = m.id === YOU;
   const skillSel = `<select data-m="skill"${yours ? '' : ' disabled'}>${SKILLS.map(([v, l]) => `<option value="${v}"${Math.abs((m.skill ?? 0.6) - v) < 0.05 ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  // each rating follows their Skill until you set it (the owner: say so plainly): the number always shown, "auto" by one
+  // that's following Skill, as the band marks the crew's against your own
   const sliders = CREW_UI.map(([a, l, t]) => {
     const v = attrOf(m, a), own = m.attr?.[a] != null;
-    return `<label class="mslider" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-m="attr" data-a="${a}"${yours ? '' : ' disabled'}><output>${own ? Math.round(v * 100) : 'as skill'}</output></label>`;
+    return `<label class="mslider${own ? ' own' : ''}" title="${t}"><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${v}" data-m="attr" data-a="${a}"${yours ? '' : ' disabled'}><output>${Math.round(v * 100)}${own ? '' : '<i class="mauto">auto</i>'}</output></label>`;
   }).join('');
+  const anyOwn = CREW_UI.some(([a]) => m.attr?.[a] != null);
   const skipperToo = !you && yours ? `<label class="mcheck"><input type="checkbox" data-m="skipper"${m.roles.includes('skipper') ? ' checked' : ''}> Also sails as a skipper</label>` : '';
   const del = you || !yours ? '' : confirmDelete
     ? `<div class="gconfirm">Remove ${esc(m.name)} from the club? <button type="button" class="ghost danger" data-f="mdelYes">Remove</button><button type="button" class="ghost" data-f="mdelNo">Keep</button></div>`
     : `<button type="button" class="ghost" data-f="mdel">Remove from the club</button>`;
-  return `<div class="mhead"><button type="button" class="linkbtn" data-f="mback">‹ Members</button><h2>${esc(m.name)}</h2><span class="mwho">${whoLine(m)}</span></div>
+  return `<div class="mhead"><button type="button" class="linkbtn" data-f="mback">‹ Members</button><h2>${esc(m.name)}</h2><span class="mwho">${whoLine(m)}</span>${save.dirty && !save.asking ? '<button type="button" class="cta sm" data-f="msave">Save</button>' : ''}</div>
+    ${save.asking ? askSaveHtml : ''}
     <div class="mpage">
       <section><h3>${you ? 'You' : 'Who they are'}</h3>
         <label class="mfield"><span>Name</span><input data-m="name" value="${esc(m.name)}"${you || !yours ? ' disabled' : ''}></label>
@@ -114,13 +118,16 @@ export function memberPage(m: Member, boats: BoatSpec[], confirmDelete: boolean)
         <label class="mfield"><span>Skill</span>${skillSel}</label>
         <p class="fnote">${berth(m, boats)}</p>${skipperToo}${del}
       </section>
-      <section><h3>${you ? 'As crew, when you crew' : 'As crew'}</h3>${sliders}
-        ${yours ? '<button type="button" class="ghost" data-f="mreset">All as skill</button>' : ''}</section>
+      <section><h3>${you ? 'As crew, when you crew' : 'As crew'}</h3>
+        <p class="fnote">Each rating follows ${you ? 'your' : 'their'} Skill until you set it.</p>${sliders}
+        ${yours && anyOwn ? `<button type="button" class="ghost" data-f="mreset">Reset to ${you ? 'my' : 'their'} Skill</button>` : ''}</section>
       ${m.roles.includes('skipper') && !you ? `<section><h3>As skipper</h3>${SKIPPER_UI.section(m)}</section>` : ''}
     </div>`;
 }
 
 /** A change on a member's page (an input's data-m, and its value): applied to the member. Returns whether it changed. */
+/** Leaving with unsaved changes (the owner): Save or Discard, in place, before going. */
+export const askSaveHtml = '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-f="askSave">Save</button><button type="button" class="ghost" data-f="askDiscard">Discard</button></div>';
 export function applyMemberInput(m: Member, field: string, value: string, attr?: string, checked?: boolean): boolean {
   if (m.origin !== 'yours') return false;
   switch (field) {

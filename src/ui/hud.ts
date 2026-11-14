@@ -21,7 +21,7 @@ import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
 import { VESSEL } from '../sim/traffic';
 import { transitOffset } from '../sim/transits';
-import { targetShape, type Shape } from '../boat/controls';
+import { BOOM_STOP, targetShape, type Shape } from '../boat/controls';
 
 /** "Main: a bit full (outhaul, backstay) · draft aft (Cunningham)": what's off in each sail's shape and the line that fixes it. */
 function shapeWords(u: Boat): string {
@@ -34,8 +34,8 @@ function shapeWords(u: Boat): string {
     else if (s.depth < t.depth - 0.012) out.push(`too flat (ease ${main ? 'outhaul, backstay' : 'backstay'})`);
     if (s.draft > t.draft + 0.04) out.push(maxed(...(main ? ['cunningham', 'downhaul'] as const : ['jibCunningham', 'jibHalyard'] as const)) ? (main ? 'draft aft (the mast bend: Cunningham all on)' : 'draft aft (jib luff all on)') : `draft aft (${main ? 'Cunningham, main halyard' : 'jib Cunningham, jib halyard'} on)`);
     else if (s.draft < t.draft - 0.04) out.push(`draft forward (ease ${main ? 'Cunningham' : 'jib halyard, jib Cunningham'})`);
-    if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveller up') : 'jib car forward next tack'})`);
-    else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : u.ww.kt >= 13 ? 'ease the sheet, traveller down' : 'ease the sheet, traveller up') : 'jib car aft next tack'})`);
+    if (s.twist > t.twist + 3) out.push(`twisted open (${main ? (u.awa > 60 ? 'vang on' : 'sheet in, traveler up') : 'jib car forward next tack'})`);
+    else if (s.twist < t.twist - 3) out.push(`leech too closed (${main ? (u.awa > 60 ? 'ease the vang' : u.ww.kt >= 13 ? 'ease the sheet, traveler down' : 'ease the sheet, traveler up') : 'jib car aft next tack'})`);
     parts.push(`<b>${main ? 'Main' : 'Jib'}:</b> ${out.length ? out.join(', ') : 'shape good'}`);
   };
   if (u.luff) return '';
@@ -43,7 +43,8 @@ function shapeWords(u: Boat): string {
   return `${parts.join(' · ')} <b>· shape ${Math.round(u.shape.eff * 100)}%</b>`;
 }
 import { toast } from './feedback';
-import { drawCourse, drawLaylines, drawWindShadow, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { drawCourse, drawLaylines, fitCanvas, makeTf, type Tf, PEN } from './draw2d';
+import { ShadowLayer } from './shadowLayer';
 import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
@@ -51,9 +52,11 @@ import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import { drawFog, drawSea, nm } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
+import { rainAt, rainLevel } from '../environment/rain';
 import { driveCurveFor } from '../boat/driveCurve';
 import type { SeaHere } from '../environment/sea';
 import { laylinesFor } from '../sim/laylines';
+import { pointOfSailWord } from './pointOfSail';
 
 export function fmtClock(t: number): string {
   const a = Math.abs(t), m = Math.floor(a / 60), s = Math.floor(a % 60);
@@ -67,13 +70,8 @@ export const sideWord = (s: string) => s === 's' ? 'stbd' : 'port';
  * and sea, boat/seaway.ts), a beam reach the wind square across her (80–100°), a run within 20° of dead downwind; head
  * to wind inside 30°, where no sail draws.
  */
-export function pointOfSail(u: Boat): { short: string; long: string } {
-  const a = Math.abs(u.twa), beat = beatFor(u);
-  const [short, long] = a < 30 ? ['head to wind', 'head to wind'] : a < beat + 7 ? ['close-hauled', 'close-hauled']
-    : a < 80 ? ['close reach', 'on a close reach'] : a <= 100 ? ['beam reach', 'on a beam reach']
-    : a < 160 ? ['broad reach', 'on a broad reach'] : ['run', 'running'];
-  return { short, long };
-}
+// (her point of sail: ui/pointOfSail.ts, shown with the windex in the band and on the dial)
+export { pointOfSail } from './pointOfSail';
 
 /** Which way north points on a map turned so that `W` (deg, the wind's direction) is at the top: the angle (rad) to
  * turn an up-pointing arrow by, clockwise on the canvas (makeTf: a bearing b is drawn at b − W from up). */
@@ -106,7 +104,11 @@ export class Hud {
   private mapC = $<HTMLCanvasElement>('map');
   /** The wind or current as Windy draws it (ui/flow.ts): the colour field for each map, and its moving streaks (drawn
    * every frame on a canvas over each map: the maps themselves are drawn ten times a second, or when the chart moves). */
-  private flowField = { chart: new FlowField() }; // (the full chart's only: the inset shows no field)
+  private flowField = { chart: new FlowField() };
+  /** The wind shadows on each map (ui/shadowLayer.ts): the race's own wind, the lee of everything upwind. */
+  private shadows = { inset: new ShadowLayer(), chart: new ShadowLayer() };
+  /** Shadows switched on and none in view, on each map: the chart says so. */
+  private shadowNone: Record<'inset' | 'chart', boolean> = { inset: false, chart: false }; // (the full chart's only: the inset shows no field)
   private streaks = { chart: new Streaks(900) };
   private mapFx = $<HTMLCanvasElement>('mapFx');
   /** how each map was drawn last (its transform), for the streaks */
@@ -291,7 +293,10 @@ export class Hud {
       luffing: 'Luffing: eased too far, or she\'s pointing too high, so the front of the sail lifts. Trim in, or if it\'s already in hard, bear away until it stops.',
       stalled: 'Stalled: trimmed in too far for this wind angle (or she\'s borne away without easing), so the flow breaks off the back. Ease until the leeward and leech telltales stream.',
       backed: 'Aback: the jib is sheeted to windward and pushes her bow away (heaving to).', off: '' };
-    tm.title = why[mc] ?? ''; tj.title = why[jc] ?? '';
+    // (the boom on the shroud, stalled on a broad reach: it can't be eased any further, so not "ease")
+    const onShroud = mc === 'stalled' && u.sheets.main >= BOOM_STOP - 0.5;
+    tm.title = onShroud ? 'Stalled with the boom on the shroud: it can\'t go out any further. Ease the vang to let the top of the main twist off, or bear away (or come up) until the leech telltales stream.' : why[mc] ?? '';
+    tj.title = why[jc] ?? '';
     // the sails' shape against the best shape for the conditions, and which line fixes it
     const sw = shapeWords(u);
     $('tpShape').innerHTML = sw;
@@ -301,9 +306,9 @@ export class Hud {
       // who's trimming: the crew depowers on their own (controls.ts depowerLimits); when they've done all they can, it's the helm's job
       const crewTrims = !(['backstay', 'vang', 'outhaul', 'traveller'] as const).some(k => byHand(u, k)), dp = u.depower ?? 0;
       const overUp = crewTrims ? (dp < 0.95 ? ' · overpowered: the crew is depowering' : ' · overpowered with everything on: feather (sail a touch higher, letting the main lift) or ease the main in the puffs')
-        : ' · overpowered: backstay on, vang on, traveller down, flatten';
-      const advice = u.luff ? '' : hn > 5 ? (up ? overUp : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveller up, ease backstay, fuller sails' : heel > 24 && up ? (crewTrims && dp < 0.95 ? ' · heeling too far: the crew is depowering' : ' · heeling too far: depower') : '';
-      if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveller down (Trim coach explains).`, 6000); }
+        : ' · overpowered: backstay on, vang on, traveler down, flatten';
+      const advice = u.luff ? '' : hn > 5 ? (up ? overUp : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveler up, ease backstay, fuller sails' : heel > 24 && up ? (crewTrims && dp < 0.95 ? ' · heeling too far: the crew is depowering' : ' · heeling too far: depower') : '';
+      if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveler down (Trim coach explains).`, 6000); }
       // the Coach card's second line (the chase-view layout): the sails' state, heel and helm, where the crew are; a state
       // that isn't good in amber or red
       const st = (name: string, w: string, c: string) => `${name} <b class="tp-st ${c}">${w.toLowerCase()}</b>`;
@@ -329,7 +334,7 @@ export class Hud {
   private hinted = { deep: false, aback: false };
   /** Coach the whisker pole: suggest it on a deep run, and warn when it's left out on a reach. */
   private poleHints(w: SimView, u: Boat): void {
-    if (w.t < 0 || u.finished || u.retired || !u.poleMine) return; // (while the pole is the crew's, they call it: ai.ts crewPoleCall)
+    if (w.t < 0 || u.finished || u.retired) return; // (the pole is yours to call: a cue, never done for you)
     const deep = u.twa > 158 && u.pole === 'down' && !u.poleWant;
     this.deepT = deep ? this.deepT + 0.1 : 0;
     if (!deep && u.twa < 140) this.hinted.deep = false;
@@ -337,12 +342,14 @@ export class Hud {
       this.hinted.deep = true;
       toast('Running deep: the main is blanketing the jib. Pole it out to windward and go wing-on-wing (the band\'s Pole tab, or O).', 4500);
     }
-    const aback = u.pole === 'set' && u.twa < 140;
+    // (poled out up where it doesn't pay: from 154.5 true down to 145 the jib does less than it would to leeward; below
+    // that the crew bring it in themselves, ai.ts poleMustCome)
+    const aback = u.pole === 'set' && u.twa < 154.5;
     this.abackT = aback ? this.abackT + 0.1 : 0;
     if (!aback) this.hinted.aback = false;
     if (this.abackT > 3 && !this.hinted.aback) {
       this.hinted.aback = true;
-      toast('The poled-out jib is aback on this course. Stow the pole (the band\'s Pole tab, or O).', 4000);
+      toast('Up here the poled-out jib does less than it would to leeward. Stow the pole (the band\'s Pole tab, or O), or bear away.', 4000);
     }
   }
 
@@ -489,7 +496,7 @@ export class Hud {
       const favEnd: 0 | 1 | -1 = !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
       // (one short line on the card, the owner: no degrees; the end's name only)
       const endName = (k > 0 ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
-      const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favoured</span>`;
+      const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favored</span>`;
       const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
       if (d > 0) {
         this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
@@ -542,6 +549,10 @@ export class Hud {
     const pa = Math.atan2(by - ay, bx - ax);
     ctx.beginPath(); ctx.moveTo(bx + Math.cos(pa) * 4, by + Math.sin(pa) * 4); ctx.lineTo(bx - Math.cos(pa - 0.5) * 9, by - Math.sin(pa - 0.5) * 9); ctx.lineTo(bx - Math.cos(pa + 0.5) * 9, by - Math.sin(pa + 0.5) * 9); ctx.fill();
     ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
+    // her point of sail, as the windex shows it (the owner: the dial names it); also on the canvas for the checks
+    const pos = pointOfSailWord(u); this.dialC.dataset.pos = pos; this.dialC.setAttribute('aria-label', `Wind angle dial: ${pos}, true wind ${Math.round(u.twa)}°, apparent ${Math.round(u.awa)}°`);
+    ctx.fillStyle = '#e9f2f5'; ctx.font = '700 10px "Saira Semi Condensed", sans-serif'; ctx.fillText(pos, cx, cy - R * 0.5);
+    ctx.fillStyle = '#94abb7'; ctx.font = '600 10px "Saira Semi Condensed", sans-serif';
     ctx.fillText('TWA ' + Math.round(u.twa) + '°', cx, cy + R * 0.56);
     ctx.fillText('AWA ' + Math.round(u.awa) + '°', cx, cy + R * 0.8);
   }
@@ -595,7 +606,7 @@ export class Hud {
     if (nav) { // the navigator's view: how far she has to sail, and when she'd get there
       const y = h - 34 - (fog ? 12 : 0), turns = nav.tacks.length + nav.gybes.length;
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif';
-      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} GYBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
+      say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} JIBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
       ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say('TAP FOR THE PASSAGE PLAN', w / 2, y + 12, 'center');
     } else if (kind) {
       const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
@@ -640,6 +651,13 @@ export class Hud {
       ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
       const fw = ctx.measureText(fogLine).width; ctx.fillStyle = I.halo; ctx.fillRect(10, 8, fw + 12, 18);
       ctx.fillStyle = I.text; ctx.fillText(fogLine, 16, 21);
+    }
+    // the wind shadows switched on with none in view: say so, so the switch isn't taken for broken
+    if (this.shadowNone.chart) {
+      const t = 'Wind shadows: nothing upwind casts one here (land, boats, ships, piers)';
+      ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
+      const y = fogLine ? 30 : 8, tw = ctx.measureText(t).width; ctx.fillStyle = I.halo; ctx.fillRect(10, y, tw + 12, 18);
+      ctx.fillStyle = I.text; ctx.fillText(t, 16, y + 13);
     }
     // north, the wind, and a scale bar
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
@@ -706,8 +724,12 @@ export class Hud {
   fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(wd.settings, 'fog')) return null;
     // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
-    const set = setVisibility(wd.settings), why = set.fogSet && (wd.settings.rain ?? 0) ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
-    const here = (m: number) => short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`;
+    // (the rain falling: the panel's, or the record's, environment/rain.ts)
+    const rl = rainLevel(wd.settings.rain, wd.clockUtc), rainReal = typeof wd.settings.rain !== 'number';
+    const set = setVisibility({ fog: wd.settings.fog, rain: rl }), why = set.fogSet && rl ? 'fog and rain' : set.fogSet ? 'fog' : 'rain';
+    const here = (m: number) => rainReal && !set.fogSet
+      ? (short ? `VIS ${nm(m).toUpperCase()} HERE · RAIN` : `Visibility ${nm(m)} here, in the ${rainAt(wd.clockUtc).says}.`)
+      : (short ? `VIS ${nm(m).toUpperCase()} HERE · ${why.toUpperCase()} SET` : `Visibility ${nm(m)} here, in the ${why} you've set.`);
     if (set.fogSet) return here(set.m);
     const v = visibilityFor(wd.raceDate, wd.clockUtc);
     if (Number.isFinite(set.m)) { const real = 'none' in v || v.source === 'outlook' ? Infinity : v.source === 'observed' ? v.points[0].m : v.at(wd.user); if (!(real < set.m)) return here(set.m); }
@@ -759,16 +781,20 @@ export class Hud {
     if (flowHere && kind === 'wind') sim.push('wind'); // (the puffs and lulls are in its colours: ui/flow.ts)
     if (field === 'sea' && detail === 'chart' && !wd.sea.flat) sim.push('sea');
     if (fog && !('none' in fog)) sim.push('fog');
-    if (on('shadows') && !wd.freeSail) sim.push('shadows');
-    this.keyState[detail] = { sim, pal, scale };
+    // (the shadows, sampled below: in the key only when there's one in view)
+    const shadowsOn = on('shadows');
+    this.keyState[detail] = { sim, pal, scale }; // (the shadows add themselves when drawn, below: the key reads this list when asked)
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
     // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore),
     // every 10 s of the clock (the chart's paused); the full chart's only
     if (flowHere) this.flowField.chart.draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
-    if (wd.freeSail) drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
-    else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
+    if (wd.freeSail) {
+      drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
+      // a lesson's buoy (the tiller: steer for it), a filled yellow dot while it's the one to reach
+      if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
+    } else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
     if (on('laylines')) drawLaylines(ctx, tf, L, wd.freeSail ? 2500 : 450, 1.2, I);
     // ships and ferries: their hull to scale (at least a few pixels), a heading line, and the name when zoomed in
     if (on('ships')) for (const v of wd.vessels) {
@@ -780,7 +806,14 @@ export class Hud {
       if (v.moving) { const f = tf(v.x + u2.x * (ty.len / 2 + v.v * 60), v.y + u2.y * (ty.len / 2 + v.v * 60)); ctx.strokeStyle = I.ship; ctx.globalAlpha = PEN.ahead.alpha; ctx.lineWidth = PEN.ahead.w; ctx.setLineDash(PEN.ahead.dash); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(f[0], f[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
       if (labels) { ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = I.shipHalo; const lx = (a[0] + b2[0]) / 2 + 6, ly = (a[1] + b2[1]) / 2 - 6; ctx.strokeText(ty.name, lx, ly); ctx.fillStyle = I.shipText; ctx.fillText(ty.name, lx, ly); }
     }
-    if (on('shadows') && !wd.freeSail) for (const b of wd.boats) drawWindShadow(ctx, tf, b); // where each boat's dirty air goes
+    // the wind shadows (the owner: "toggling wind shadow doesn't do anything that I can see": it was a 60 m cone behind
+    // each boat, a few pixels on the chart, and off when cruising): the lee of land, boats, ships, the committee boat
+    // and the bridge piers, from the race's own wind, so the map and the sails agree; the inset's every 2 s of race time
+    if (shadowsOn) {
+      const L = this.shadows[detail]; L.draw(ctx, tf, w, h, wd, detail === 'chart' ? 8 : 6, detail === 'chart' ? 0.5 : 2);
+      if (L.maxDeficit >= 0.05) sim.push('shadows');
+      this.shadowNone[detail] = L.maxDeficit < 0.05;
+    } else this.shadowNone[detail] = false;
     // the boats: each in her colour with a halo and a dark edge, so she reads on any part of the chart; you bigger, in cyan
     // (bigger on the full chart, and bigger still zoomed out, where everything else shrinks round her)
     const big = detail === 'chart' ? (scale < 0.1 ? 1.6 : 1.25) : 1;

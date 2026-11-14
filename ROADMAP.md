@@ -8,7 +8,7 @@ variability and staggering beauty, in a Folkboat, the purest sailing boat a norm
 Bay, you can sail anywhere; if you can sail a Folkboat, you can sail anything." Every item below is weighed against it.
 
 **The vision roadmap** (adopted by the owner, 13 November): docs/VISION-ROADMAP.md, near, middle and long term. Its
-seven "dialled in" criteria are the bar for physics and racing. On its questions: the owner will try to get protest
+seven "dialed in" criteria are the bar for physics and racing. On its questions: the owner will try to get protest
 records (Skipper Model researches meanwhile); crew timings come from published sources until next season.
 
 **Standing rule for the screen** (owner, 13 November): "We should be extremely conservative about allowing new buttons
@@ -16,7 +16,7 @@ and distractions on the game surface." New controls go inside existing elements 
 menus, the Keys), not as new buttons on the screen. Every item below that adds a control is held to this.
 
 **The order of work** (owner, 13 November, also in CLAUDE.md): physics and racing first. "If it's not real and accurate,
-then it's not a simulator." Later, once the physics and racing are dialled in (the owner loves both):
+then it's not a simulator." Later, once the physics and racing are dialed in (the owner loves both):
 - **The Bay's beauty:** light, fog pouring through the Gate, sunsets, the skyline, the bridges.
   Scenery for it (owner, 13 November; later, with the Bay's beauty):
   - **Oracle Park** (6–10 h): the ballpark on the shore by McCovey Cove, with its pennants waving during games, the
@@ -28,16 +28,16 @@ then it's not a simulator." Later, once the physics and racing are dialled in (t
 - **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighbouring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
-  neighbouring bins, as driveCalibration already does across the wind.
-- **AI boats into the harbour after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
+  neighboring bins, as driveCalibration already does across the wind.
+- **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
-  after N or AP over A the AI boats now sail home and stand off the nearest racing harbour, each at her own spot with
+  after N or AP over A the AI boats now sail home and stand off the nearest racing harbor, each at her own spot with
   open water to leeward, lying to (ai.ts homeCourse). Real boats would go in: sail or motor through the entrance and
   berth in the basin, out of the breeze (lying to for an hour in 23+ kt is hard on the sails). That needs the AI boats
   given slips and the marina's way in (geo/marina.ts), as the user's boat has.
@@ -53,10 +53,10 @@ then it's not a simulator." Later, once the physics and racing are dialled in (t
   Cove's seawall reflects nearly all, so the real basin holds more than the bare diffraction gives, and long swell can
   set up a harbor's seiche); piers between an entrance and a slip (20 of Gashouse Cove's slips have none in sight); the
   tide's depth over the entrance (MLLW's); a curved breakwater taken straight at its head (West Harbor, facing east,
-  away from the swell, gets well under a millimetre in a 2 m swell outside, where the old unsourced ×0.15 gave 3 cm)) (from review
+  away from the swell, gets well under a millimeter in a 2 m swell outside, where the old unsourced ×0.15 gave 3 cm)) (from review
   of the Gashouse Cove seawall; minor): (1) the swell gets in on a single ray
-  through the entrance, so a strip a few metres wide just inside Gashouse Cove's entrance gets the full swell while its
-  neighbours get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
+  through the entrance, so a strip a few meters wide just inside Gashouse Cove's entrance gets the full swell while its
+  neighbors get a seventh of it; a 12 s swell (~225 m long) should diffract weakly and evenly through a 20–40 m gap, by
   sourced coefficients (Wiegel's diffraction diagrams, Shore Protection Manual) in place of the unsourced ×0.15;
   (2) the 15 fetch rays alias on the 10 m grid near an entrance (chop 0.17 → 0.04 → 0.13 m over 12 m at 315°): spread
   or smooth them; (3) at South Beach and the Corinthian, just inside the entrance has a little more chop than just outside
@@ -67,7 +67,7 @@ What's planned, roughly in order. Done work is described in the README.
 ## Priorities (owner's ranking, November 2026)
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
-1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner moulding with brown cushions,
+1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
    shelves and fiddles, floorboards, knees, a hanging locker, the forepeak opening to the rule, the keel-stepped mast).
    Next in P0: true-to-life rigging (the owner's top boat item, Rigging, begun with the mainsheet's blocks) and the
    boat review's bugs, winching and polish (P0 items 6–7).
@@ -91,7 +91,7 @@ What's planned, roughly in order. Done work is described in the README.
    after shelf, so he never passes forward along the deck (a change to the tack role's station: physics and a pose).
 3. ~~Crystal clarity on the crew and trim controls~~ (done, live in v134: the band with the main halyard renamed, the jib
    halyard, the Auto-trim and Pole tabs, the windex and the Hail tab, v120–v129; the chase-view layout, v129; every RRS
-   2025–2028 race signal in the flag index and one-line messages with the log, v132; line colours in the boat editor and
+   2025–2028 race signal in the flag index and one-line messages with the log, v132; line colors in the boat editor and
    the committee's call-off shown clearly, v134). Owner's answers (12 November): the crew leans across from windward, as the sim has it; no tiller strip. The
    questions were: (1) on Josephine, does the crew reach
    the far side of the piano from windward (the sim leans them in, 0.2 m to windward)? (2) bring back a tiller strip
@@ -103,20 +103,20 @@ What's planned, roughly in order. Done work is described in the README.
      clam cleat (main Cunningham) · jib Cunningham, with the main halyard's tackle). Mock-up in progress with the UI & Experience session:
      https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB: trim / ease buttons on each.
    - **The jib**: a sheet on each side, trim / ease.
-   - **The main**: the mainsheet, the backstay, and "the traveller specifically I would want to move left and right
+   - **The main**: the mainsheet, the backstay, and "the traveler specifically I would want to move left and right
      like a real traveler" (a car you drag along a track).
    Laid out as you face forward from the helm (port on the left), each control with its auto pill, its setting, and its
    ends named. Later: the jib cars and the rig ("we can figure that out later"). A clickable mock-up goes to the owner
    before the build. 6–10 h; replaces the trim-panel review.
    **Design agreed with the owner, 12 November; handed to the Coordinator to build.** Mock-up:
    https://claude.ai/artifact/TiHGqpmpSFh5bw7AJ6RctB (source design/sail-controls-band.html on branch
-   ui/sail-controls-band-mockup). A compact console at the bottom centre:
+   ui/sail-controls-band-mockup). A compact console at the bottom center:
    - the piano lines and jib sheets vertical (▼ pulls on);
    - the jib cars as an H: the crossbar slides fore and aft on two tracks, the car slides across it (controls.ts's 7×5
      pins). The cars are now in scope, no longer later;
    - the backstay's ends pulled outboard;
-   - the mainsheet shown as the boom's position, stacked above the traveller car;
-   - one click is one step; rope colours by sail (jib warm, main cool);
+   - the mainsheet shown as the boom's position, stacked above the traveler car;
+   - one click is one step; rope colors by sail (jib warm, main cool);
    - Crew or You shown by an amber name, tap it to hand the line back, "All ↺" for every line.
    Build needs: "downhaul" renamed "Main halyard" everywhere the player sees it, and a new jib halyard control
    (starboard, jib luff tension), with a physics review.
@@ -135,7 +135,7 @@ What's planned, roughly in order. Done work is described in the README.
    Also queued (owner, 12 November: "yes"): the rest of the RRS race signals in the flag index (AP, N, first
    substitute, S… from the RRS 2025–2028 "Race Signals" page, checked by the researcher; 1–2 h); and one-line
    on-screen messages with the full text in the log (1–2 h). Not queued: renaming the "Crew · Auto" button.
-   After the band (owner, 12 November; not urgent; 1–2 h): line colours chosen in the boat editor, one per line (jib
+   After the band (owner, 12 November; not urgent; 1–2 h): line colors chosen in the boat editor, one per line (jib
    sheets, jib Cunningham, jib halyard, mainsheet, outhaul, vang, main Cunningham, main halyard, backstay), used in the
    band and on the 3D lines once P0 phase 4 draws them; the band's defaults (jib warm, main cool, backstay white) as
    the starting set; saved with the boat.
@@ -143,16 +143,27 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder. Sculling comes
+   from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
+   (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
    Includes, from a physics review (done, #125, v134: checked, no change needed, a test added): the drifter heel. In about 3 kt the crew's placement prefers near upright over the
    leeward heel light-air technique calls for (heeled to leeward to hold the sails' shape and cut wetted area); check
    crewBestHeel and the light-air "want" in crewPhys.ts against sources, then a test.
 6. ~~The racing rules still to finish~~ (done, live v125, follow-ups through v137): 20.3, 20.2(e)'s end, a boat as the
+   Next for the rules (owner, 13 November):
+   - **Protests and hearings (RRS Part 5): design approved** (docs/PROTESTS-PROPOSAL.md, branch rules-protests-design;
+     owner, 13 November):
+     - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
+     - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
+       option.
+   - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
+     committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
    Racing, the Part 2 preamble. Blanketing was built as rule 23 interference and then taken out on the owner's decision
    (12 November): "Stealing wind is a significant part of the strategy of tacking. It's not a foul." Wind shadow stays a
    tactical fact in the debrief ("in X's dirty air"); rule 23 is called for getting in a boat's way only.
 7. ~~The debrief shown on the replay~~ (done, v127, PR #93: "Watch your race" on the results and "Watch your race so
-   far" on pause; the race overhead, wind up, every boat's track; each finding coloured and numbered on your track and
+   far" on pause; the race overhead, wind up, every boat's track; each finding colored and numbered on your track and
    a bar on the timeline; jump to a moment, rule incidents in close-up, 10/30/60× or follow your boat).
 8. ~~Cruise and race: places on the map, conditions and the start changed mid-sail, "Send her home"~~ (done: the start
    and destination picked on the chart; Change the conditions mid-sail, physics-reviewed; "Move her here" without
@@ -169,11 +180,222 @@ What's planned, roughly in order. Done work is described in the README.
    11), holding close-hauled while it's answered, only with 9–12 s to the meeting and no other boat close by.
    (23.2 for bearing away onto another boat's wind was built too, then taken out with blanketing on 12 November.)
    ~~properTwa ignores the current~~ (done, branch proper-current: it allows for the crab that makes good the line).
-8d. **Now — auto keeps her hove to** (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
+8h. **Now — the chart's Wind shadow layer shows nothing** (bug; 1–2 h): owner, "also on chart: toggling wind shadow
+   doesn't do anything that I can see." Find out whether it draws nothing (a bug), draws only near other boats or only
+   while racing (then say so on the chart when there's nothing to show), or draws too faintly (as with Waves). The
+   shadows to show: boats' dirty air, ships, the committee boat, the lee of the land and of the bridge piers, all already
+   in the physics. With 8f and 8g: the same layer row.
+8g. **The chart's Waves layer is unreadable** (polish/clarity; next; 1–2 h): owner, "waves notation in chart view is too
+   small and low-contrast to be useful." Bigger, higher-contrast wave marks on the chart and inset: legible at the
+   chart's usual zoom, on halos like the other overlays, in colors the NOAA chart doesn't use. Show the height (and the
+   swell's direction) plainly where it matters, without cluttering the chart. Options to the owner if the look changes
+   much.
+8f. **Now — the map layer buttons need two clicks** (bug; 1 h): owner, with a screenshot of the layer row (… WAVES · FOG ·
+   OFF, the long visibility note above it), "these buttons are requiring two clicks for some reason". One click should
+   switch the layer. Suspects: the first click only dismisses the note or the tooltip over the row, or moves focus, or a
+   re-render under the pointer swallows it. Check every chip row with the same pattern (the map layers, the setup's
+   choices). A test that one click switches.
+8e. **Now — a crew member's arms are on backwards** (bug; Crew Figures; 1–2 h): owner, from a close cockpit view, "these
+   arms are backwards. poor guy." The crew member in the orange jacket at the piano has both forearms pointing back
+   past his body, hands facing the wrong way, as if the shoulders or elbows were mirrored. Likely the arm IK choosing
+   the wrong elbow side, or a left/right swap for that pose or tack. Check every crew pose (piano, winch, hiking,
+   tacking) from both sides on both tacks, and add a test that the elbows bend forward and down. The owner doesn't
+   remember the conditions it happened in, so the check covers every pose and wind.
+8d. ~~**Now — auto keeps her hove to**~~ (done: the crew hold her hove to under Auto, and through the wind the sheets change roles as they really do; 4e3a340) (bug; 1–2 h): owner, "when I heave the boat to, resetting it to auto crew and auto
    tune should keep her hove to." Handing the lines back to the crew (Auto-trim, the crew's Auto) while she's hove to
    should leave her hove to: the jib still backed to windward, the main eased, the tiller still lashed to leeward. That's
    what a real crew told "we're hove to" does. Auto-trim sails her on only when the helm sails her off (the lash
    released, or a new course). A test: heave to, press Auto-trim and the crew's Auto, and she stays hove to.
+8m. **Now — leaving the slip at Gashouse Cove: she drifts to windward under bare poles** (bug, physics; 3–5 h; owner, 13
+   November): "coming out of a slip at Gas House Cove. The wind is on the beam on the port side. I get pushed off. I
+   don't raise the sails. And the boat seems to just drift to windward, weirdly, even if I have the tiller at
+   centerline… what surprises me is that the boat does not turn nose to wind… I'm completely unable to get out of the
+   slip at Gas House Cove. I've tried over and over and over again. I just can't get pushed back far enough, and I
+   can't seem to get the nose around."
+   - Batch 34: at the dock and under bare poles the crew now sit centered; and Deep Physics' test of leaving under bare
+     poles on the real tide, beam wind both ways, finds she goes to leeward, so the windward drift didn't reproduce. If
+     it's still seen, the owner's exact case (time, tide, wind) is needed. The push-off and getting the nose round stay open.
+   - **Drifting to windward with no sails up is a bug.** A boat with no way on and no sail up is set to leeward by
+     the wind on her hull and rig, plus or minus the current. Nothing drives her upwind. Look at the bare-pole windage
+     force's sign or direction, the hove-to and in-irons models acting with the sails down, the shelter field inside
+     the basin, and any current in the basin.
+   - **The crew's weight doesn't move her sideways.** It changes her heel, and so a little of her drag and turning, not
+     her drift. Crew hiking or sitting to leeward at the dock is itself odd: they should be aboard and ready, not hiking.
+   - **Which way her bow goes**, to check against a source: with no sail up, a boat usually lies beam-on or falls off,
+     because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
+     the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
+     get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
+     the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
+     literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
+     crew would. It's hard but possible, as in real life.
+   - **Push-off at Gashouse Cove** (built by v96, test over every slip): she can't be pushed back far enough there.
+     Recheck that harbor's slips against the fairway's width and the wind on the beam, with a test that sails out of
+     Gashouse Cove with the wind on the beam both ways.
+8o. **Hoisting at the mast, finishing at the piano** (owner, 13 November; next; 2–3 h). First ask: "when sails are down,
+   hoisting the halyards does not hoist the sail… we can probably use the lines instead of the hoist buttons, no?" Then
+   the owner's correction: "there is some difference. the sails are hoisted from the mast. the piano controls use a
+   block and tackle to finalize the last several inches of hoisting. so having the piano halyard control fully 'on'
+   isn't the same distance as the actual hoisting distance." As on Josephine:
+   - **The hoist is done at the mast:** a crew member (or you) goes to the mast and hauls the sail up, taking the real
+     time and moving the crew's weight forward. It's started from inside an existing element (the band's crew tab,
+     or the key), not a new button. Both sails are hoisted at the mast (owner confirmed).
+   - **The piano's halyard controls finish it:** the main halyard's tackle and the jib halyard take up only the last
+     several inches, then set the luff tension. Their range is that short distance, not the whole hoist. With the sail
+     down they show as slack and idle.
+   - **The routine** (owner): "one of the first steps after raising sails and getting underway is tensioning the
+     halyards from the piano. they usually stay untouched for the rest of the sail, unless there's need to fine tune
+     (which better sailors than I may do often; I'm not sure)." So the crew tension the halyards at the piano soon
+     after getting under way, then leave them; a skilled crew may fine-tune them as the wind changes (to source).
+   - **Lowering:** let the halyard go at the mast, and the sail comes down fast.
+   - The sails, flags, telltales and physics answer the hoist as it happens: half-hoisted sails draw badly, luff and
+     flog.
+8q. **The boom on the centerline in the slip** (owner, 13 November; <1 h): "when in a slip, boom should be at
+   centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
+   with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
+   tied up.
+8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (bug; 2–3 h): owner, "at aquatic park, auto
+   nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
+   curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
+   geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
+   of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
+8r. **The stowed jib on the foredeck** (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
+   intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
+   Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
+   really lies: rolled or flaked into a long, narrow sausage along the foredeck from the stemhead aft, its luff still on
+   the forestay at its forward end (so the stay meets it, not passes through), tied with a sail tie or two. Check from
+   both sides.
+8p. **Bug: with the sails down, the jib cars show as loaded** (owner, 13 November; <1 h): "with sails down, neither jib
+   car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
+8n. **The Gashouse Cove exit, true to life** (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
+   trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
+   reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
+   its "IDLE SPEED / NO WAKE" sign and light to the west, Fort Mason's pier to the east, the Bay and Angel Island
+   beyond) and reference/photos/fort-mason-pier-piles-gashouse-exit.jpg (the pier's open undercroft of massive concrete
+   piles).
+   1. Inside, sheltered: "the marina side of the exit is nicely sheltered from wind and current by the breakwater."
+   2. Outside, all at once: "the bay side of the exit smacks straight into the wind and the tidal current, and the boat
+      usually feels it immediately." The shelter has to end at the entrance in a few boat lengths, not fade over a
+      long distance, for the wind, the current and the chop alike.
+   3. The Fort Mason pier to leeward: "the eastern (usually leeward) side of the exit is the ft mason pier, which has
+      massive concrete piers supporting it. the wind (and often current) badly want to push you into those piers. that
+      means bye bye to your boat; you would just churn around under there in all the decades-old concrete and rebar and
+      barnacles." So:
+      - the pier's pile field is solid to the boat;
+      - the current runs through and under the piles, while the shed above blocks the wind;
+      - getting set under it is a real wreck, not a bounce. Until the wreck design below is agreed, contact with the piles
+        just stops her;
+      - the coach and the smart crew know the danger and the way out: build speed before the gap, hold up to windward
+        of the pier, and pick the tide.
+   4. Eddies in the entrance (owner: "There are also frequent eddies in the entry. Have the physics session model the
+      water there carefully"): the tidal stream separating off the breakwater's end and the pier's corner sheds eddies
+      into the gap, which turn the current across the entrance and back on itself. Deep Physics models the water there
+      carefully, from the flood and ebb past the breakwater and through the pier's piles, sourced where it can be
+      (NOAA's SFBOFS currents, shallow-water eddy shedding behind a breakwater). The eddies should be visible on the
+      water as the other eddies are. Deep Physics takes it after the turning model.
+   Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
+   common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+8w. **The crew's places on the rail, and moving through the cockpit** (owner, 14 November; accuracy; next; 3–5 h; Crew
+   Figures, with a physics review since the stations feed the trim):
+   - Moving fore and aft: "they tend to squat-crawl along the side of the hull, between the coaming and the toe rail, to
+     move fore and aft. that's just not true to life. any human crew would step into the cockpit to get around." So
+     the route is down into the footwell, along it, and back up, not along the side deck outside the coaming.
+   - Their places, sitting on the rail: "front crew would be between the aft cabin wall and the winch, middle crew
+     between the winch and the thwart, and the skipper behind the thwart. the area behind the thwart is pretty
+     exclusively reserved for the skipper." Today the middle crew sits aft of the thwart. Change the stations from the
+     option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
+     thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
+     and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
+8x. **URGENT — the whole new release stutters** (regression, performance; owner, 14 November): "the whole new release is
+   moving very, very slow. whitecaps on the water are stuttering. everything is stuttering." The boat editor's slowness
+   (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare
+   frame time and the worker's step against v178 (perf-pair.mjs, and the frame-time readout), and look first at what
+   the latest batches added to every frame or step (the protests batch, the basin grids warmed between frames, the app
+   split, new per-frame water or crew work). Add a frame-time check to the release smoke test so a stuttering build
+   can't ship.
+8v. **Now — the boat editor is very slow** (regression, performance; 2–3 h): owner, on the new release, "moving very,
+   very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
+   several full seconds." Every change should land within a frame or two, as before. Suspects:
+   - each change rebuilding the whole boat model or the showroom scene;
+   - the boat cards' golden-hour pictures re-rendered on each change;
+   - the Save pattern's "changed?" check copying or comparing the whole save each time;
+   - the time of day rebuilding the sky and lights from scratch.
+   Profile one click of each kind, fix the slow path, and add a check that a boat-editor change takes under a frame
+   budget.
+8u. **Partly fixed — the boat editor shows no way to set her sail number or country** (bug; 1 h): owner, "I'm in the boat
+   editor now and there's no way to change her country or sail number. same with creating a new boat." The fields are
+   in the code (src/ui/boatPanel.ts, "Particulars": "Sail number · home country", a country select and a number
+   input), so something hides them on screen. Not the Save banner (owner: there's none showing). Suspects: the turning boat's panel pushing
+   Particulars out of view with no scroll, a CSS rule from the styles split, or the copy-noise cut. Check in the
+   published page, for an existing boat and a new one. Her ensign follows her country, so this also blocks changing the
+   ensign. Owner, 14 November: they're back for Josephine; the other boats in the fleet still to check.
+8t. **Now — the boats have vanished from the boat cards' pictures** (regression; 1–2 h): owner, with a screenshot of the
+   Yacht Club's Boats tab, "my boats have disappeared." All four cards (No Inheritance GBR 1655, Josephine USA 122,
+   Caviaro RSA 100, Sailor Twift USA 225) show the golden-hour sea and sky but no boat. Suspects:
+   - the pictures are kept between visits, so empty ones may have been saved and are now reused;
+   - the boat model not built yet when the picture is taken (the setup now builds lazily, and the page is split);
+   - the camera framing.
+   Fix the cause, throw away any saved empty pictures, and add a check that each card's picture has the boat in it.
+8l. **Now — rushing water is back** (regression, third time; 2–3 h): owner, "getting rushing water again" (13 November,
+   v176). Fixed before for the waves turning about the sim's origin (1bda738, v146) and for the ripples starting out of
+   line (aced96b). Find the layer that still moves faster than real water: the ripples, the foam and wake, the
+   current's flow-mapped texture, a jump in the focus (camera switch, the chart opened and closed, "Move her here"), or
+   float precision far from the origin. Owner's report: cruising, off South Beach (about 6 km southeast of the
+   Cityfront, far from the sim's origin), when it started unknown. A second report with a chart screenshot: the boat just inside a breakwater's corner, by a
+   channel marked by green lights "9" and "11" (Fl G 2.5s 15ft 4M) and an "Iso G 6s 34ft" light, in 3–5 ft charted
+   water, heading northeast along the shore. Owner's answer: it was the chart's moving streaks, not the 3D water (Charts and
+   Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
+   than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
+   back.
+8j. **Now — the windex lost its point of sail** (regression; <1 h): owner, "I want the windex dial to show the point of
+   sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
+   it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
+   beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
+   dial under the inset map, 8b), and a test that it's on screen.
+8i. **The boat editor reorganized, with a real color picker** (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+   the owner first):
+   - "all sail stuff together, all hull stuff together, etc." Proposed groups:
+     - **Her:** name, sail number and country, club.
+     - **Hull:** material, topsides, boot stripe, bottom paint and its finish, bottom last cleaned, name lettering, weight
+       over the class minimum.
+     - **Deck and cabin:** deck, cabin top, forehatch, companionway, whisker pole stowage, navigation lights, outboard.
+     - **Rig:** mast, boom, rig tune.
+     - **Sails:** sailcloth, mainsail, jib, sail number color, class letter F color.
+     - **Lines:** each line's color.
+   - The skipper, and the home marina and slip: "not sure skipper assignment belongs here. also not sure about marina and
+     slip assignment. help me decide." **Owner's decision (13 November): as recommended.** The skipper moves to the Yacht Club, which is
+     already where crew are assigned to boats; the boat page shows the skipper read-only, with a link there. The home
+     marina and slip stay with the boat, as her "Home berth" at the end, since a berth is where the boat lives, not a
+     person's attribute.
+   - Color: "I don't like the little color chips, or the fact that some elements use a kind of toggle array for color.
+     I'd like a color picker for everything ideally, with ability to add hex codes, and some smarts to save a few custom
+     color chips (like in Google Docs) so I don't have to re-enter them for each different thing." One color picker for
+     every color on the boat (hull, boot stripe, bottom, deck, cabin top, lettering, sail numbers, the F, each line): a
+     full picker, a hex field, the class's usual colors as presets, and a row of your own saved custom colors shared by
+     every picker and kept with your account. Where a choice is a material rather than a color (teak or fiberglass,
+     sailcloth), it stays a choice.
+   - Lines are the exception (owner, 13 November): "color selection for lines should probably give options for real rope
+     patterns. there's not a ton of options IRL, so an infinite color picker seems to be the wrong choice." Lines get a
+     palette of real rope colorways, not the free picker. Sourced so far, from New England Ropes only (Sta-Set, Endura
+     Braid, VPC; neropes.com, fetched 13 November):
+     - solids: white, red, blue, black, green;
+     - flecks: red, blue and green fleck (on white, inferred from the naming).
+     Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
+     fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
+     Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
+8k. **Drop and raise the anchor** (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
+   later cruising mode's anchoring challenge):
+   - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
+     anchor: haul in the rode, break it out, stow it. Each takes the time it takes, by crew and skill.
+   - The physics, sourced: the holding force against the wind and current on her hull and rig; the scope (rode out
+     against depth, from the NOAA chart, with the tide's height); she swings to whichever wins, wind or current, as the
+     moored boats already do; and she drags if the scope is short, the bottom poor (the chart's bottom types) or the
+     load too high.
+   - Racing: on the Bay, kedging is a real tactic. In no wind against a foul tide, anchoring keeps the ground a drifting
+     boat would lose. The racing rules allow anchoring, but she must recover the anchor before she continues (check
+     the 2025–2028 text, rule 45). The strategist and the smart crew should know when to call it.
+   - At anchor: the anchor light at night (built, Rule 30) and the anchor ball by day (Rule 30(a)).
+   - On the screen rule: the call goes inside an existing element (the sail band's crew tab, a key), not a new button.
 8c. **"Oh fuck time to paddle"** (the owner's name for it, 13 November; feature, seamanship; next; 3–5 h): "sometimes when
    you're in a jam you need to grab the boom crutch from the cabin and start paddling. there's just one crutch, so just
    one crew will paddle. need to be able to tell them starboard or port. smart crew will do it on their own."
@@ -188,7 +410,7 @@ What's planned, roughly in order. Done work is described in the README.
      racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
      The on-screen label is the owner's choice.
-8b. **A UI audit with real rigour** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
+8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
    navigation in place of "< Start page"; and the Yacht Club's Everyone / Skippers / Crew / Yours toggle, which confuses
@@ -197,15 +419,63 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~The setup builds the World only on Start~~ (done: one World per change, the scene once at Start) (owner: the configurator lags because it rebuilds the play surface
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
-   - The wind angle dial, when shown, on the left under the inset map (owner, 13 November; polish; <1 h).
+   - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **Bugs in the race setup's "When" section** (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
+     - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
+       off after the first week. It should open fully visible, flipping upward or scrolling the panel.
+     - Starting from her slip at Gashouse Cove with "Leave at 1:35 PM", equal to the 13:35 gun, the line reads "She
+       starts in her slip… -3 minutes before the start": a negative lead time. Clamp it to a real lead time, or say
+       plainly that she can't make the start from there.
+   - The sail band's decorative cleats removed, with no dimming in their place (owner, 13 November).
    - **Yours or the crew's, shown coherently in the sail band** (owner, 13 November; clarity; 2–3 h): "there's confusion
      between active and auto state on sail controls. if i'm manually controlling a line, it turns yellow. but there's
      no state change for the auto trim tab. let's get that cleaned up and coherent. not sure the exact solution."
      One visual language for "yours" against "the crew's", on each line and on the Auto-trim tab: the tab shows when
      some or all lines are yours, how many, and what pressing it will do. Options from UI & Experience to the owner
      first.
-   - Remove the line "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
+   - ~~Remove the line~~ (done) "Real boats have neither: they have the windex and the telltales." from Settings (owner, 13 November;
      index.html line 369; minutes).
+   - **Boat editor copy out** (owner, 13 November; minutes): the slip note ("She lies bow in … The docks are mapped from
+     OpenStreetMap.") and the whole "Her flags" field, which is only a note (src/ui/boatPanel.ts lines 208–209, flagNote).
+   - **The season's flow** (owner, 13 November; clarity; next; 3–5 h; a mock-up to the owner first): "I'm confused about the
+     UX for seasons. I go to the yacht club to pick a season (counterintuitive, since I would think to go to Race), then
+     when I select a season, BAM, I'm in my slip. no clue what's going on." Proposed:
+     1. **Enter from Race:** Race → Season (the Yacht Club's Season tab shows the standings and history too).
+     2. **Choosing a season opens its overview first,** not the water: the calendar (the real regattas, which are done),
+        the next race (date, club, course, the day's real conditions), the standings, and her crew.
+     3. **"Sail the next race"** opens that race's setup, filled in, and the brief.
+     4. **Then the water,** with one line saying where she is and what's next ("In your slip at South Beach. The warning
+        signal is at 11:55 off StFYC: sail out to the start."). Starting in the slip is true to life; it just needs
+        saying.
+   - ~~**A Save button on the Yacht Club's member page**~~ (done, batch 34: Save, and "Save changes?" on leaving, on a member's page, a boat's crew and the boat editor) (owner, 13 November, with a screenshot of "Crew 2"; 1 h): "I'd like a
+     save button here. clicking it should give a quick visual confirmation and send me back to previous page." Save
+     commits the member's edits, shows a quick confirmation (a check and "Saved"), and goes back one step on the back
+     stack (to Members). Today edits apply as they're made (81ed7c5). The same pattern for the other edit pages (the boat
+     editor, the Yacht Club's boats) in the audit. Owner's decision: leaving with unsaved edits asks "Save changes?" with Save and Discard.
+   - **The pause menu redesigned** (approved by the owner, "fine for now"; 13 November, with a screenshot; 1–2 h): "these buttons are a beast to read.
+     too wide, incoherent stacking. just bad design." Today it's full-width buttons in rows of 1, 1, 3 and 2: Resume,
+     Change the conditions…, Restart this cruise · Back to setup · Settings, Sound: On · Exit to the start page.
+     Proposed: one narrow column (about a third of the screen's width), grouped by what you're doing:
+     1. Resume.
+     2. On the water: Change the conditions.
+     3. Start again: Restart this cruise, Back to setup.
+     4. The game: Settings, Sound.
+     5. Exit to the start page, set apart.
+     The same pattern for every menu in the game. A mock-up to the owner first.
+   - **The inset map's flag and layer icons off the game surface** (owner, 13 November; 1–2 h): "the little flag icon and
+     layer icon on the inset map doesn't belong on the game surface. those should be toggles in the full map view, with
+     the inset remembering my choices." The layer choices (and the flag index) move into the full chart. The inset shows
+     whatever was last chosen there, saved with the player's settings. The standing screen rule applies.
+   - **The on-screen tiller instructions out** (owner, 13 November; minutes): the keys line across the screen (#keysHint,
+     "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
+     The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
+   - **An audit for that kind of noise everywhere** (owner: "let's do an audit for this kind of noise throughout"; part
+     of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
+     the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
+     the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
+     these.
+   - Remove the body line under "Chart · Pick a destination" ("Paused. Tap the water or a place: sail there, or move her
+     there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. Clean up the wind controls in "Change the conditions" (owner; Crew Controls proposes options to the owner before
    building; 1–2 h): the "Wind from" slider sits beside the Kind of wind choice (real day / westerly / northerly /
    southerly / light), which is confusing, and the owner sailed in a 355° northerly after picking Westerly. One clear
@@ -216,7 +486,7 @@ What's planned, roughly in order. Done work is described in the README.
    original motion back; the boats' flags keep the measured physics; the strike animates).
 10. ~~P0 phase 4: deck hardware and lines, with the rigging detail~~ (done, v128–v134).
 Then: the skipper and crew model; cheating, protests and hearings; validation against real fleets; real past races;
-rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Building, aluminium spars, the boat cards, the
+rig tuning; seasons and awards; fog's effect on sailing; looks (the Ferry Building, aluminum spars, the boat cards, the
 showroom's time and conditions, the swinging lantern); Sam's; accounts for other players; real slip numbers and nicer
 moored boats; the sea inside the marinas; the desktop release; the phone layout (on hold). The Bay East work carries on
 as it is.
@@ -233,6 +503,16 @@ as it is.
 - **The cabin instrument:** the Tacktick-style unit at the hatch garage's forward end, key 6. This begins the tactical
   compass item.
 - **A racing season:** a proposal for the owner (docs), built from the real 2025–26 Seaweed Soup.
+
+**Built 13 November, also** (to v178):
+- Josephine as she really is: sail number USA 122 (the 2026–27 Seaweed Soup results), and her club BVBC.
+- The 2026–27 Seaweed Soup season under way: its race 1 (7 November 2026) as a real past race, with 2025–26 a pick
+  away. Real skippers appear as anonymous ids, with no names in the shipped page.
+- The published page is down from 9.4 MB to 5.3 MB (one copy of the sim's code).
+- The Crew button back on the surface, opening on where the crew can sit (owner).
+- Your whisker pole goes out only on your call (owner).
+- The rest of the site map (UI audit): the Yacht Club as one name, Past races a screen of its own, Settings in two tabs.
+- For the owner to review: the boat editor mock-up (8i), and a design note for real docking (docs).
 
 **Owner's decisions, 12 November (morning)**, via the Coordinator:
 - Blanketing is not a foul: "stealing wind is a significant part of the strategy of tacking". Rules removes it as
@@ -258,19 +538,19 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
    a. ~~Easier sail controls: adjusting one line takes only that line off auto; one tap puts it back; bigger targets~~ (done).
    b. ~~Heaving to: each jib sheet on its own, the tiller lashed at an angle, hove-to physics checked against real boats~~
       (done; the real-boat figures are anecdotal, so a GPS track of a Folkboat hove to would tighten the test bands).
-      Later, from review: the hull's lift and broadside drag both act at one centre of lateral resistance (no Munk
+      Later, from review: the hull's lift and broadside drag both act at one center of lateral resistance (no Munk
       moment), and the hove-to model's lateral area, added masses and side windage are estimates (physics.ts HOVE).
-      The broadside drag's centre hove to is tuned (HOVE.dragAft 0.3 m aft of the CLR, against the drawn profile's
+      The broadside drag's center hove to is tuned (HOVE.dragAft 0.3 m aft of the CLR, against the drawn profile's
       0.81 m, which makes her wander 30° in 8 kt), and HOVE.latArea (3.39 m²) disagrees with the drawn profile (5.36 m²):
       a towing-tank or GPS record of a long-keeler drifting, or the class lines (Plan 1), would settle both.
       The force model's drive calibration (physics.ts driveCalibration) comes from full, unreefed sails at their best
       shape, so in a gale (k ≈ 0.2 at 35 kt) it stands in for the reefing and depowering it leaves out; from rest a
-      backed-jib boat there gathers way quickly (5 kt in about 10 s). Holding the traveller down doesn't depower her: the
-      crew sheets in to keep the boom angle it wants, so with the traveller yours the mainsheet should follow your intent.
+      backed-jib boat there gathers way quickly (5 kt in about 10 s). Holding the traveler down doesn't depower her: the
+      crew sheets in to keep the boom angle it wants, so with the traveler yours the mainsheet should follow your intent.
    c. ~~Crew weight in the physics: the low side in light air, hiking, body-tacking, forward downwind; the AI crew by
       skill; an option to place the crew yourself~~ (done). Later: the hull's hydrostatics (MCT, the wetted surface's
       change with trim and heel) from a Folkboat lines plan, and the righting curve's shape past a few degrees (the
-      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll gybe; the help a roll
+      moment at 1° is now from three ORC certificates; the curve needs the hull's offsets); a roll jibe; the help a roll
       tack: she now rolls through it (in light air too), the rig's sweep adds push while she rolls (quasi-steady, from the
       sail forces) and a turn costs speed by the rudder it needs net of her helm, but in a 2-tonne keelboat that adds
       up to nothing measurable; the only measured gains are a Laser's (Kogure et al. 2013, GPS: 5.3% faster through the
@@ -283,7 +563,7 @@ Estimates are focused build hours including tests, review and publishing, ±50%.
 3. ~~Race strategist in the course view, and a navigator for cruising~~ (done; published with the combined build of
    the parallel branches). Later: a gridded wind analysis so the sides of a beat differ by more than the shore and the
    slot; the strategist's plan B checked again on the water at the warning signal; the navigator's hazards from NOAA's
-   chart data; the crew-trim model's traveller (boat/controls.ts puts it to leeward in medium air: found in review).
+   chart data; the crew-trim model's traveler (boat/controls.ts puts it to leeward in medium air: found in review).
    Also from review: ~~check the brief's leg times against the sim's own fleet sailing the same legs~~ (done, PR #111:
    with four AI boats on Seaweed Soup course 2 and the training course, the 38 vs 47–71 gap is gone since the AI's held
    tacks; runs and reaches match the plan or the fleet is a little faster; beats take 5–20% longer, the plan being a
@@ -312,7 +592,7 @@ is now "much better" (owner).
    hull's heel, pitch and roll, its light moving with it (1–2 h).
 6. ~~**True-to-life rigging, the owner's most important boat item**~~ (done: rigging-gear #159 and rigging-deck; the piano in the band's order, the halyard tackles, the jib sheet as Josephine has it) (12 November, from the owner's boat review; Rigging,
    after its current PRs; a big job, about 8–14 h): the blocks for the jib and main at the mast and the boom's junction,
-   the Cunninghams, and the lines visible along the traveller, each led as on Josephine (the Full sail controls
+   the Cunninghams, and the lines visible along the traveler, each led as on Josephine (the Full sail controls
    tables, reference/photos).
 7. From the same review (12 November):
    - Bugs (Boat Detail; about 1–2 h): a stray second toerail on the starboard side; a half-circle see-through patch at
@@ -361,19 +641,19 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   hull. That shouldn't be there." Seen side-on in the showroom: thin gaps let the background through along the join, from
   the forefoot aft along the garboard. On a real Folkboat the keel is faired into the hull with no gap (the planks land on
   the keel's rabbet). Check from both sides.
-- ~~**Next — the thwart, the cockpit's proportions and where the skipper sits**~~ (done with P0 phase 3: the cockpit to the construction plan, the thwart a deep varnished beam with the traveller and cam cleats, the helm on the after deck; accuracy; 4–6 h; owner: "when time is
+- ~~**Next — the thwart, the cockpit's proportions and where the skipper sits**~~ (done with P0 phase 3: the cockpit to the construction plan, the thwart a deep varnished beam with the traveler and cam cleats, the helm on the after deck; accuracy; 4–6 h; owner: "when time is
   right"): the thwart is drawn as "a horizontal plank", and "the skipper is crammed behind the thwart with the thwart in
   their lap. That's not true to life. While underway, skippers often (but not always) sit on the stern… or along the rear
   rail." From the owner's three photos (Josephine at the dock, Josephine under way looking aft, CircleSea side-on; the
   photos are in reference/photos: josephine-cockpit-at-dock.jpg, josephine-helm-on-aft-deck-underway.jpg,
   circlesea-helm-on-aft-rail-side.jpg):
   (1) the thwart is a deep wooden beam spanning the cockpit at about coaming height, with a vertical face, not a flat
-  plank; the black traveller track and car with the mainsheet blocks run along its top, and the green cam cleats for the
-  traveller (and the backstay ends) sit at each end where it meets the coamings;
+  plank; the black traveler track and car with the mainsheet blocks run along its top, and the green cam cleats for the
+  traveler (and the backstay ends) sit at each end where it meets the coamings;
   (2) aft of it there's real room: the helm sits on the aft deck (green non-skid, the ensign staff at the stern) with legs
   in the cockpit, or on the aft coaming, steering with the tiller extension; under way side-on, crew forward by the
   shrouds and the helm well aft on the rail;
-  (3) the first photo shows how the mainsheet and traveller attach to the boom (mainsheet blocks from the car up to the
+  (3) the first photo shows how the mainsheet and traveler attach to the boom (mainsheet blocks from the car up to the
   boom).
   Use these and class sources (Nordic Folkboat construction plan, class rules) for the cockpit length, the thwart's
   position and height; the helm's places (aft deck, aft coaming) go to the crew-placement model too. Check from both
@@ -393,7 +673,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   roll on (CurrentField.cover; tests/seaDial.test.ts at the owner's spot). The swell: the dial and the water come from
   the same sea state, and 9 ft is what the model gives there on a big day with an ebb against it (0.77 of the bar
   buoy's height, steepened by the ebb). A long-period swell (14–18 s, 300–500 m long) is a slope of about 1°: the boat
-  heaves about a metre and the cockpit view rises and falls with her, but the chase camera holds its height, so the
+  heaves about a meter and the cockpit view rises and falls with her, but the chase camera holds its height, so the
   horizon stays put. Open: (a) should the chase camera ride the swell? (owner's call); (b) the swell's reach into the
   Gate (0.77 there, 0.55 at the bridge) is an estimate: no measured ratio found (Hanes & Erikson 2013, ECSS 133, is
   paywalled; the ESA/BCDC Crissy Field comparison is on a blocked host); (c) Deep Physics: the bar buoy's total height
@@ -413,11 +693,23 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   reefed, the AVS. So "they don't need to reef" is the owner's report of Bay practice, not yet sourced either way; to
   try next: sfbayfolkboats.org and the YRA sailing instructions, the Year Books, North Sails' Folkboat guide.
   To build:
-  (1) first, the physics: with the main eased or luffing, traveller down and backstay on, what does she really do in
+  (1) first, the physics: with the main eased or luffing, traveler down and backstay on, what does she really do in
   30+ kt under full sail? The heel past a few degrees still needs the righting curve from the hull's offsets (see crew
   weight, above); if Bay racers sail on unreefed, she must be able to too, not lie at 60° at 0 kt;
   (2) the auto crew's heavy-air handling as Bay sailors do it (dump the main, sail on the jib, feather);
-  (3) water in the cockpit: water shipped, its weight, the pump;
+  (3) water in the cockpit and the bilge, and the bilge pump (owner, 13 November, "for later": "pumping the bilge is
+  important to the physics. unpumped adds substantial weight. we may need a crew animation for this, but only if
+  performance allows. also. need logic for how and when the bilge fills: rain fills it, heavy heeling can fill it,
+  heavy seas and splash can fill it"; 4–6 h):
+  - How the bilge fills, each from the physics:
+    - rain, from the observed and forecast rainfall for the day (NWS);
+    - heeling far enough to put the lee rail or cockpit coaming under;
+    - green water and spray in heavy seas;
+    - a wooden boat's planks weeping a little, as lapstrake hulls do.
+  - Its weight (1 kg a liter) is carried low and sloshes to leeward, adding to her displacement, heel and drag.
+  - Pumping: a crew member at the pump, at a sourced rate per stroke. The class rules allow pumps only while racing
+    (no self-bailers; NFIA 12.40). The smart crew pump when it pays.
+  - A pumping animation only if the frame budget allows; otherwise the crew member shows as busy at the pump.
   (4) reefing only in cruising, hidden in racing, and only once it's sourced how a Folkboat reefs (slab or roller, how
   many reefs, at what wind).
   Update (12 November): owner, "nobody who races Folkboats on the bay has a reef setup. races just get canceled at 23
@@ -426,7 +718,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   "OA will cancel racing for the day when wind is above 25 knots"; before dockout, if the forecast is above 25 kt, the
   Race Chair with the OA decides, and tells the fleet by text. It's marked proposed; the bylaws say nothing on wind. So
   in racing: no reefing; the committee cancels in a blow, by the fleet's practice (the owner's 23 kt vote; the written
-  proposal's 25 kt), signalled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
+  proposal's 25 kt), signaled as the sim's committee boat does (AP or N with A), and the strategist warns ahead from
   the forecast. Racing above that isn't part of the Bay fleet's sailing. **Owner's decision: the sim cancels at 23 kt** (built: the committee calls racing off over 23 kt, AP or N over A, the
   strategist warns ahead, CXL in the logbook) (the fleet's
   practice), and **reefing is held until there's a Folkboat-specific source** (a cruiser's account or a sailmaker). For cruising: the owner expects blue-water
@@ -450,7 +742,7 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   time of day and conditions in showroom mode. no rush on this request." Time of day (so the sun, dusk and the night
   lights can be seen on the boat) and the wind, sea and sky.
 - **Later — found along the way (12 November)** (polish/accuracy; from the building sessions):
-  - From Marinas, the motor: the outboard's thrust is off her centreline (about 0.45 m out on the bracket, some 180 N·m at full
+  - From Marinas, the motor: the outboard's thrust is off her centerline (about 0.45 m out on the bracket, some 180 N·m at full
     throttle: she swings away from the motor's side until she has steerage), and prop walk in reverse; both left out for now,
     both real lessons at the dock. And sourced figures for the figure of merit (0.55), reverse (0.5) and the leg's drag.
   - From Charts, after Lime Point (#64): ~~blocky 50 m terrain cliffs along the Marin shore~~ (done: the shore fit and
@@ -463,18 +755,18 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
     shifts the trim calibration, so it needs its own reviewed PR.
   - From Bay East: Richmond YC and Encinal slips, BYC and Encinal racing marks, and the current in embayments without
     NOAA stations all need sources it can't reach yet (the club sites aren't allowed hosts).
-- ~~**Later — aluminium spars look like white plastic**~~ (done by v147: clear-anodised extrusion, a satin mid-grey with soft
+- ~~**Later — aluminum spars look like white plastic**~~ (done by v147: clear-anodised extrusion, a satin mid-gray with soft
   broad highlights, checked against CircleSea's boom in strong sun; polish; 1–2 h): owner, "the aluminum on the masts and booms
-  looks like white plastic, not aluminum." Anodised aluminium is a satin silver metal (physically based: fully metallic,
+  looks like white plastic, not aluminum." Anodised aluminum is a satin silver metal (physically based: fully metallic,
   fairly smooth, a faint brushed streak along the spar) that reflects the sky and the water, darkens at dusk and shows
-  a long highlight down the mast. For every aluminium rig (the wooden spars stay wood). Check in daylight and at night.
+  a long highlight down the mast. For every aluminum rig (the wooden spars stay wood). Check in daylight and at night.
 - ~~**Later — the boat cards' pictures**~~ (done, v144, PR #141: the owner chose the Bay at golden hour, a physical sky
   with a low sun and rippled water reflecting it, her whole rig in frame, the pictures kept between visits; polish; 2–3 h): owner, "make the background of these models more true to life
   and less ugly af, or just show the model suspended in empty space and slowly rotating? find something beautiful to do
   here." Today (render/thumbs.ts) each boat card (name, flag, sail number) shows her on a flat blue sky over a flat blue
   sea. Options to show the owner as pictures before building: her on the real Bay water and sky at golden hour; or alone
   in soft studio light on a dark gradient, turning slowly (live on hover, still otherwise); either with her heel and sails
-  set as she'd sail, and her own colours. A design change, so the owner picks.
+  set as she'd sail, and her own colors. A design change, so the owner picks.
 - **Next — chase view: see the sails clear of the dials** (polish; 1–2 h): owner, "right now in chase view the hull
   appears to be centered in frame, but I need to be able to see the sails easily. currently too much stuff (dials,
   notifs) sit on top of the sail." Frame her so the whole sail plan sits in the open middle of the screen, clear of
@@ -521,11 +813,11 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   (to leeward heels her in light air; hiking is always to windward, to hold her flat), which way is which on the
   current tack, and what auto is doing now. Every line's setting, too: owner, "can't tell which way is 'on' for the
   backstay. is 0% on? or 100%?" (100% is on: controls.ts, 0 off … 1 bar tight). Label each end in sailors' words
-  (eased … on, or for the traveller windward … leeward) and what that end does to the sail. Layout to the owner first.
+  (eased … on, or for the traveler windward … leeward) and what that end does to the sail. Layout to the owner first.
 - **Next — a broader review of the trim controls** (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
-- ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-coloured water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
+- ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-colored water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.
 - ~~**Next — instruments**~~ (done, v83: wind speed the big number on the wind dial, the tide (Flood/Ebb/Slack) on the sea dial, the point of sail under the windex): the TWD dial's big number should be **wind speed** ("I already have the windex
@@ -548,7 +840,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
 2. ~~**No tactical wind shifts on most days.**~~ (done: environment/shifts.ts, fitted to FTPC1's record by kind of day and
    strength, counted from when the course is laid, carried down the course; later: the lateral coherence (the sides of
    the course) from two stations' records rather than assumed; the HUD's lift/header readout and the rules' wind (Overlap,
-   Rule 18's beat) still use the course-centre wind, not the boat's; shifts quicker than ~12 min aren't resolved by
+   Rule 18's beat) still use the course-center wind, not the boat's; shifts quicker than ~12 min aren't resolved by
    6-minute samples) Off observed days the only shifts are two fixed sine waves (120 s ±6°,
    41 s ±2.5°, unsourced) and a 63 s ±8% pulse: about 1° rms change over 30–60 min, against Fort Point's 13–14° on
    10–15 kt westerlies (6-minute record, 492 days, racing hours) and 26–29° on 6–10 kt days. Beats are drag races; a
@@ -568,7 +860,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    factor 1.10, so heel and helm feel steady in a breeze. Light-air gusts are sized as a share of the mean, so they
    vanish as it dies (the record: +1.5–4 kt at 2–6 kt); puffs die before they cross the course (60–210 s); one gustiness
    everywhere (off the Cityfront it should be about twice the slot's).
-4a. ~~**The AI's tacks aren't held**~~ (done: a tack or gybe she decides on is held until she's round; the rhumb-line test by
+4a. ~~**The AI's tacks aren't held**~~ (done: a tack or jibe she decides on is held until she's round; the rhumb-line test by
    her close-hauled course; clear of the whole committee boat) (AI 1; src/ai): the tack decision is made afresh every step (the rhumb-line test
    uses her heading, which crosses the course axis mid-tack; the header tack is a fresh random draw each step), so
    boats sit head to wind or wheel round and run off for a minute: beats 448–909 s against 337 s at polar VMG, and the
@@ -576,11 +868,11 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    decision (as autopilot.ts does) gives beats of 349–428 s and a 12% spread. Probably the strategist's "planned at
    38 min, the AI took 47–71". And (AI 2) AI boats hit the committee boat (avoidMarks steers clear of its windward end
    only) and some never start.
-4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and gybing on the
+4b. **The AI sails at the mark** (AI 3, 4, 8, 9; done: the crab for the current reaching, the run angle and jibing on the
    laylines downwind, headers from her own wind held 10 s; to do: the planner's 8 s a tack; and the AI fouls at the
    windward mark: 3–7 two-turn penalties among five boats in a 620 m race, the base code as much: mark-room and
    right-of-way handling there): no allowance for a cross-current reaching (1.5 kt costs 5%, 2 kt 15%:
-   she ends up running), no run angle or gybing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 gybes on a
+   she ends up running), no run angle or jibing on the laylines downwind (2–6% VMG in 6–12 kt, and 3–14 jibes on a
    620 m run as the wind swings through dead downwind), headers judged from the course-wide wind rather than her own,
    and the planner charges 8 s a tack where the physics' own tack costs 3.4–5 s (0.8–1.2 boat lengths, the low end of
    US Sailing's 1–2 for keelboats).
@@ -608,7 +900,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    32 s, the force model 45 s. And the upright hull's resistance at 3–5 kt is 24–37% above the Delft series (hull 4).
    ~~The AI's slow tack on a hail~~ (done, branch ai-hail-tack: a hailed boat that puts her helm down at once had been
    called in breach for not reaching head to wind in 5 s, and then fell back onto her old tack; starting to tack is now
-   her response under 20.2(c), and a slow AI boat tacks through rather than gybing round). The Delft resistance is
+   her response under 20.2(c), and a slow AI boat tacks through rather than jibing round). The Delft resistance is
    blocked by data: the Folkboat's hull form (waterline beam, canoe-body draft, Cp, Cm, LCB, LCF) isn't published in
    any source found, and the DSYHS coefficients only in a secondary source (a 2022–23 ULiège thesis reproducing
    Keuning & Sonnenberg 1999). It needs the class lines plan and offsets (NFIA Plan 1, 1961).
@@ -630,7 +922,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    2.8 s at 1 kt). Open, unsourced either way: sternway in a breeze (2.2 m/s in 22 kt, 2.7 in 28, on the ahead
    resistance curve going astern: a transom-first hull may drag more); held amidships head to wind she never sheers
    off; in 6 kt held head to wind she makes a little headway as she rolls from side to side (the roll's sweep).
-11. **The chop** (waves 3–6): ~~it follows the wind at the boat, so a puff or a neighbour's lee changes her sea~~ (done:
+11. **The chop** (waves 3–6): ~~it follows the wind at the boat, so a puff or a neighbor's lee changes her sea~~ (done:
    the wind over the water); ~~it's fully grown at once~~ (done) (CEM: 3.4 h to fetch-limited on the Berkeley Circle
    in 18 kt, so 2.5× too big an hour into the breeze); ORC's polar already has a seaway drag in it (eq. 3.2, D_raw), so
    the chop is partly counted twice and "flat water" isn't flat (est. 1–3% upwind); and its added drag falls off too
@@ -653,7 +945,7 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    the certificates' declared 240–308, mean 276; the light-air heel target steps at 7 kt; legs over the side on a reach,
    which CR 13.20 allows); the sails' weight aloft (negligible, −1.8% GM); crewSolve's start dependence; the twist
    function against VPP 2022 eq. 5.49; the chop's peak period (SPM against CEM, 25% apart); added masses.
-15. ~~The keel's induced drag fell with heel~~ (done): ORC's FH is the force normal to the centre plane (VPP 2022 §3),
+15. ~~The keel's induced drag fell with heel~~ (done): ORC's FH is the force normal to the center plane (VPP 2022 §3),
    not its part across the water, so heel was nearly free to the speed search (about 2° less heel at 18–20 kt now).
    ~~The ×0.6 on heel past 120° TWA~~ (done: no source; the heel follows the balance of moments everywhere).
 Checked and sound: the hiking geometry against CR 13.20 (only mid-thigh to feet must stay inboard), the roll period
@@ -663,7 +955,7 @@ physics, whitecaps, Kelvin wakes, fatigue, the tiller pilot, the condition model
 **Depowering: the physics against the sailmaker** (owner, November 2026: "crew follows the guide for now, but let's keep
 this on the roadmap as something to investigate"; 4–8 h). With ORC's sail and keel physics, a speed search like ORC's
 VPP (physics.ts powerFactor) has a Folkboat carry full power to about 17–18 kt; North Sails' Nordic Folkboat guide has
-the outhaul on its band above 12 kt, the Cunningham hard above 15 and the traveller eased down above 14. Fitting the
+the outhaul on its band above 12 kt, the Cunningham hard above 15 and the traveler eased down above 14. Fitting the
 heeled hull's drag to close the gap needs an impossible value (19% of her speed at 16° of heel), so the crew follows
 the guide's line settings and the search decides only the depowering past them. Candidates: ORC's own flat and twist
 optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
@@ -710,7 +1002,7 @@ a real GPU gets, frame JS here is about 3× a laptop's; the sim in Node), before
   counts stay level race after race. Ships hidden when traffic is off (the last race's had stayed where they were).
 - Draw calls (full fleet, before → after): at the start in the chase view 1,780 → 1,740, overhead zoomed out
   2,020 → 1,160, night at the East Span 2,300 → 1,640, night from the start line 1,990 → 1,120. Each boat is about 180
-  draw calls; her fittings smaller than half a metre are left out while they'd cover less than a pixel (render/fittings.ts),
+  draw calls; her fittings smaller than half a meter are left out while they'd cover less than a pixel (render/fittings.ts),
   which changes nothing you can see. Triangles 1.0–1.3 million everywhere.
 - Frame JS (here, chase view at the start): about 31 → 21 ms (≈ 7 ms on a laptop): the wind map on the water no longer
   works out the shore distance it threw away (25,600 points every 0.15 s), the wave height's directions' sin and cos
@@ -743,7 +1035,7 @@ Checked: RRS 52 and the ERS rudder definition (primary sources), and the ST2000+
 unconfirmed: the ST2000+'s hard-over time (now 4.5 s, from secondary sources), its AutoTack default (100°) and AutoTrim;
 the handbook (Raymarine document 81130) wasn't reachable.
 
-## The owner's list (November 2026, to prioritise)
+## The owner's list (November 2026, to prioritize)
 
 ~~The full-screen chart and a tiller pilot~~ (done; the ST2000+'s AutoTack and AutoTrim still unconfirmed).
 Then the skipper/crew model (calibration data first; Yacht Club sliders; crew skill driving trim, pole and puff calls; AI
@@ -754,12 +1046,20 @@ Club is the place where crew members are created, configured and assigned to boa
 creates the other skippers and their details. The race setup shows the boat's assigned crew, swappable there, but isn't
 where crew are configured. It's the home of the skipper and crew model's sliders above, and later of Seasons' rankings
 and awards (below), which become attributes of the winning boat and skipper.
+Trophies (owner, 13 November): use the fleet's real perpetuals where they're found (docs/TRADITIONS.md: the Contender's
+Cup, the San Francisco International Cup, and, unconfirmed, the Rick Wolf trophy for the Wednesday series). Elsewhere use
+placeholder names, marked as placeholders in the code (and the doc) so they're never shown as a real trophy's history.
+After each race, the club's evening at the race's level: drinks; drinks and dinner; drinks, dinner and results; drinks,
+dinner, results and awards (owner). The Plastic Classic's committee-boat mark, when it's built (TRADITIONS item 14), as in real life (owner, 13 November:
+"this is a true to life sim"): its crew of adult women flash the fleet as boats round, topless only, nothing sexual,
+in the crew figures' stylized style. Shown blurred (owner: "just blur the titties"); no mature-content setting. Before any public release, the host
+club's permission covers it.
 
 Also asked for:
 
 - **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
-  conditions and how they'll change, the favoured side and course options (one plan, or several when it's uncertain), the
+  conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
   competition, and trim and tuning by phase ("it starts light, so…; it'll build late, so watch…"), with specifics.
 - **A navigator** in cruising, doing the same for the route: timeliness and safety (current gates, the slot, shipping lanes).
 - **Easier sail controls:** bigger targets; adjusting one line takes only that line off auto, and it's easy to put it
@@ -795,14 +1095,14 @@ Also asked for:
 - ~~**More marinas:** Gashouse Cove, South Beach, Corinthian (Tiburon) to start.~~ (done)
 - **Sam's, Sausalito:** dock at Sam's (and have a beer).
 - **Save or discard** after each race or cruise: asked when it ends, before it goes in the logbook.
-- **Heaving to, and the other seamanship manoeuvres** (a real-world stress test the sim fails today): each jib sheet on
+- **Heaving to, and the other seamanship maneuvers** (a real-world stress test the sim fails today): each jib sheet on
   its own, so the jib can be backed to windward; the tiller lashed at a set angle; the physics of a hove-to boat (backed
   jib against a feathered main and the rudder, fore-reaching slowly and drifting to leeward) checked against real boats.
 - **Real nautical charts on the map:** NOAA's official charts (the US nautical charts are NOAA's; USGS makes land maps):
-  chart 18649 (Entrance to San Francisco Bay) and its neighbours, as raster tiles or drawn from the ENC vector data
+  chart 18649 (Entrance to San Francisco Bay) and its neighbors, as raster tiles or drawn from the ENC vector data
   (depths, channels, buoys, lights, restricted areas), on the inset map and the full-screen chart.
 - **Map layers and contrast** (requested): ~~layers on the inset map and the chart (wind, current, sea state, fog from
-  real visibility only, ships, laylines, wind shadows), saved per player; the sim's overlays in colours the chart
+  real visibility only, ships, laylines, wind shadows), saved per player; the sim's overlays in colors the chart
   doesn't use, on halos~~ (done). Next: **fog in the 3D scene and on the water** from the same real visibility (today
   the 3D fog bank is an estimate by month and hour), and **its effect on sailing**: you can't see marks, boats or ships
   beyond the visibility, so no transits, laylines by eye or sighting the next mark; ships sound their fog signals (and
@@ -828,7 +1128,7 @@ Also asked for:
   sim, peak about 0.4–0.8 kt against Raccoon Strait's 2–3 kt); ~~San Rafael Bay's current~~ (done: a dead end, so by continuity: Point
   San Quentin's tide, NOAA 9414873 from San Francisco's constants by NOAA's offsets, fills and empties the water beyond
   each line across the bay, NOAA chart depths; peak about 0.1–0.3 kt over the open bay against 1.7 kt at the mouth,
-  handed over across the first kilometre, but up to about 1.5 kt in the creek channel off San Rafael around spring low
+  handed over across the first kilometer, but up to about 1.5 kt in the creek channel off San Rafael around spring low
   water, when the flats beyond it (their drying heights from the chart) drain through it; USGS's San Pablo Bay speed-against-depth relation was tried first and rejected in review,
   as San Pablo Bay's shoals sit beside a channel carrying the whole North Bay's tide while San Rafael Bay has nothing
   behind it); ~~San
@@ -841,14 +1141,20 @@ Also asked for:
   canal's jet into the bay, handed over to the bay's own stream within 500 m of the canal's mouth; over the flats the
   stream is held to a long wave's speed in its depth, √(gD), where continuity through a nearly dry line would drive a
   bore); BYC's and Encinal YC's own racing marks aren't published where we could
-  reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colours, counts per terminal and
-  sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colours are unconfirmed
+  reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colors, counts per terminal and
+  sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colors are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
-  East Bay landmarks you navigate by (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
+  ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
   the university's and the hotel's own figures) and they belong in the landmark set used for transits, like Coit
   Tower and the Transamerica Pyramid.
+  ~~**Sutro Tower, properly built**~~ (done: the legs drawn in to a waist and out, to its real form) (owner, 13 November: "it's sort of decapitated at the moment"; accuracy; a navigation
+  landmark already in the transit set, src/sim/transits.ts; 3–5 h). Today (render/landscape.ts) it's three banded legs
+  to 298 m with crossarms at two levels and thin masts on top. Find why it reads as cut off: the masts too thin to
+  see, the top lost to the far clipping plane or the fog, or the base sunk in the terrain. Build it to its real form,
+  sourced: the three-legged frame with its two levels of crossarms, the antenna masts on top, its red and white bands,
+  and its aircraft warning lights at night.
 - **Accounts and logins:** other people play in their own instance, their boats, saves and histories kept from session to
   session. First: make your own saves durable (today a republish can lose race history and boat changes).
 
@@ -861,9 +1167,34 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - ~~**1. A midair wind indicator**~~ (done: true and apparent wind in the air beside her at three heights, key `, physics-reviewed) (2–4 h): arrows or streamers in the air around the boat showing the true and the apparent
   wind, direction and strength, switchable. At several heights, so the wind gradient and the apparent wind's twist up
   the rig (already in the physics) can be seen.
-- ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modelled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
+- ~~**2. A flow view**~~ (done: key \, two physics reviews; the labels say which is the sim's, and that the slot isn't modeled) (8–14 h): streamlines over the sails and hull showing attached and stalled flow, the slot between the
   jib and the main, and the telltales' story, driven by the sim's own apparent wind, angle of attack and sail-shape
-  model. True to the physics, and labelled where it's illustrative.
+  model. True to the physics, and labeled where it's illustrative.
+
+- **3. The tack and jibe drill, made a real drill** (owner, 13 November; next; 4–6 h; UI & Experience to mock it up for
+  the owner first). Built: every maneuver scored against a good crew's, with what to change (#218). The owner's feedback:
+  "the coach info is too far away from the boat for me to see it and keep an eye on the boat at the same time. it's
+  also too much copy to read in the moment. I need contextual cues to help me know when to tack, when to wait, etc.
+  maybe even some on-water tracks or something. this doesn't feel different from regular cruise mode."
+  - **Cues where you're looking, in a word or two:** beside or above the boat, not in the Coach card: "Build speed",
+    "Tack now", "Hold", "Ease", "Trim". The full advice moves to after each rep.
+  - **On-water guides:** a lane or track drawn on the water showing the line to sail, where to start the turn, and the
+    new course after it; a target heading mark; and her wake shown against the ideal turn afterwards. All drawn from
+    the sim's own polar and turn model.
+  - **A drill's own shape,** so it doesn't feel like cruising: a set course in open water, numbered reps, a short
+    score after each (speed lost, distance lost, the turn's rate and the tiller's), and a best-of summary.
+  - On the screen rule: the cues live on the water and on the boat, not as new buttons.
+
+- **4. A learn-to-sail mode** (owner, 13 November: the on-screen tiller instructions don't need to be there, "except maybe
+  in a 'learn to sail' mode, which we haven't even roadmapped yet"; not ranked; a design to the owner first). For
+  someone who has never sailed: the parts of the boat, steering with the tiller, the points of sail, trimming to the
+  telltales, tacking and jibing, heaving to and docking, each as a short guided lesson on the water, with the
+  instructions on screen there and nowhere else. It builds on the drills, the wind indicator, the flow view and the
+  coach. The lessons' content should be checked against a recognized syllabus (US Sailing's Basic Keelboat, for one).
+
+- **Badges along the ASA ladder** (owner, 13 November): the learn-to-sail mode's lessons and badges follow the American
+  Sailing Association's course ladder, with ASA 101 Basic Keelboat as Learn to Sail. Each badge has a hover saying it
+  isn't the certification. ASA's permission is needed before any public release.
 
 ## Next up
 
@@ -877,11 +1208,11 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
   Owner's requests, 12 November (unranked; the owner will rank them):
-  1. Significantly more hull paint colours (Boat Detail).
-  2. Colour options for the sail numbers and the F class letter (Boat Detail).
+  1. Significantly more hull paint colors (Boat Detail).
+  2. Color options for the sail numbers and the F class letter (Boat Detail).
   3. The interior and cockpit material, teak or fibreglass (Boat Detail).
-  4. The drawn rigging lines in the colours chosen for the control panel (the Boat page's line colours), so each line
-     wears its control's colour (Rigging, with the rigging rendering).
+  4. The drawn rigging lines in the colors chosen for the control panel (the Boat page's line colors), so each line
+     wears its control's color (Rigging, with the rigging rendering).
   5. A tactical compass on the cabin top, as Josephine's Tacktick-style unit at the mast foot
      (reference/photos/josephine-cabin-top-forward-port.png): usable in the game, readable from the cockpit camera,
      showing heading, and used tack to tack to read lifts and headers like the real one (Boat Detail for the unit,
@@ -904,7 +1235,7 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
 ### What the water looks like (the cues sailors actually use)
 
 - **Puffs and lulls:** darker, rougher patches where the wind is stronger, moving downwind across the water toward you; lighter, smoother patches in the lulls; cat's paws in light air. Whitecaps starting around 12 kt, foam streaks lined up with the wind in a strong breeze. Their shape and speed come from the wind field, so you can see a puff coming and judge when it will reach you.
-- ~~**Tidelines and current lines:**~~ (done, from the current field's convergence; colour change not yet) where currents of different speed or direction meet (along the edge of the Cityfront relief, off points like Fort Point and Blackaller), a line of foam, kelp and debris collects, the water texture changes across it, and sometimes the colour (brown, silty Bay water against clearer ocean water). Drawn where the current field converges, so the line is where the current actually changes.
+- ~~**Tidelines and current lines:**~~ (done, from the current field's convergence; color change not yet) where currents of different speed or direction meet (along the edge of the Cityfront relief, off points like Fort Point and Blackaller), a line of foam, kelp and debris collects, the water texture changes across it, and sometimes the color (brown, silty Bay water against clearer ocean water). Drawn where the current field converges, so the line is where the current actually changes.
 - ~~**Wind against tide on the surface:**~~ (done) visibly steeper, shorter, whiter chop where an ebb meets the westerly.
 - **Eddies and boils** behind points and shoals: swirling, glassy patches.
 - **Marks and moored boats:** ~~buoys lean and trail a wake downstream in the current~~ (done); ~~anchored and moored boats swing to point into the current (or the wind, when it wins)~~ (done, in the anchorages).
@@ -917,14 +1248,14 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
 
 ### The boats
 1. ~~**A real Folkboat hull**~~ (done, from class figures and estimated lines; refine against the official lines plan if we get it): the deep, narrow hull with its sweeping sheer, the long keel with the rudder hung on the transom, the doghouse-style cabin trunk with portlights, the cockpit well and coamings, the tiller. Wooden boats lapstrake (clinker), with the plank lands visible; yours smooth glassfibre with a boot stripe and antifouling that shows when she heels.
-2. ~~**Materials and light:**~~ (done, but sail translucency) physically based materials (gloss gelcoat, varnished wood, anodised aluminium, Dacron sails with seams and a little translucency), shadows (sails shading the deck, boats shading the water), and reflections of the sky.
+2. ~~**Materials and light:**~~ (done, but sail translucency) physically based materials (gloss gelcoat, varnished wood, anodised aluminum, Dacron sails with seams and a little translucency), shadows (sails shading the deck, boats shading the water), and reflections of the sky.
 3. ~~**Crew:**~~ (done) helm and crew figures that hike out, move across on a tack, and sit where you'd sit.
 4. ~~**Bow wave, wake and spray,**~~ (done) sized by boat speed; boats pitch and roll in the waves once sea state is in.
 5. **Rigging detail:** (sail numbers and the class letter done) blocks, sheets and control lines (comes with the full sail controls), sail numbers and the class insignia.
 
 ### The bay
-1. ~~**Sky and sun for the race day and time**~~ (done, with the Golden Gate Bridge modelled): the sun where it really is (we already know the date and time), glare and glitter on the water, and the summer fog bank pouring in through the Gate in the afternoon.
-2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, coloured from land cover, instead of the hand-traced outline.
+1. ~~**Sky and sun for the race day and time**~~ (done, with the Golden Gate Bridge modeled): the sun where it really is (we already know the date and time), glare and glitter on the water, and the summer fog bank pouring in through the Gate in the afternoon.
+2. ~~**Real terrain:**~~ (done) elevation data for the Presidio, Marin Headlands, Angel Island, Alcatraz and the city hills, colored from land cover, instead of the hand-traced outline.
 3. ~~**Landmarks you steer and sight by:**~~ (done, with transits for the start line and laylines) the Golden Gate Bridge, Alcatraz and its lighthouse, the Palace of Fine Arts, Fort Mason's piers, the yacht clubs, Coit Tower, the Transamerica Pyramid. They're also transits for the start line and laylines, as racers use them.
 4. ~~**Marks and the committee boat:**~~ (done; no general recall yet) real buoy shapes swinging to the current, a committee boat flying the actual signals (class flag, P, I, Z, U, black flag, individual recall X) in sequence: teaches the flags.
 4a. ~~**The Ferry Building, drawn properly**~~ (done by v147: from OpenStreetMap, the tower's stages to 75 m, the arcade on
@@ -934,13 +1265,13 @@ Same principle as the water: realistic means *recognisably the real thing*, and 
    True to life (Wikipedia, Ferry Building (San Francisco)): A. Page Brown, Beaux-Arts, opened 1898; the clock tower is
    245 ft (75 m), so ours is 15 m short; the building is about 660 ft (200 m) long with an arched arcade along the
    whole base; four 22 ft (6.7 m) dials, the inner dial lit at night; ferry slips B–G behind it on the Bay side (B to
-   the north, C–D the Golden Gate Ferry terminal at the centre, E–G south); the plaza in front. The **PORT OF SAN
+   the north, C–D the Golden Gate Ferry terminal at the center, E–G south); the plaza in front. The **PORT OF SAN
    FRANCISCO** sign has been on the Bay side since 1951, replacing "Welcome to San Francisco" (OpenSFHistory photo
-   wnp25.2344). Still to find: its letter style and colour, exact position, and whether it's lit at night (the Port's
+   wnp25.2344). Still to find: its letter style and color, exact position, and whether it's lit at night (the Port's
    sign guidelines, sfport.com, have a Ferry Building section: that host needs allowing), the building's width and
    roof height, and its OSM footprint.
 5. **The water itself:** see Sea state above (waves, sky reflection, foam, tidelines).
-6. ~~**Moored boats**~~ (done: the anchorages; marinas need the real shoreline) **and marina life** in the harbour behind the line; traffic (see below).
+6. ~~**Moored boats**~~ (done: the anchorages; marinas need the real shoreline) **and marina life** in the harbor behind the line; traffic (see below).
 
 ## Ship traffic and wakes — done (see README, Ship traffic)
 
@@ -969,8 +1300,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 | Main Cunningham | Main | Port piano only, fixed clam cleat | Its own line through a ring in the luff above the boom. Fine luff tension under way |
 | Main halyard (tackle) | Main | Port side: the halyard's tail on a block and tackle, with its own cleat at the base of the block | Pulled tight at the start of the sail (the last inches of hoist, and luff tension under load); rarely touched after. Coarse luff tension. In the sim it's the control named `downhaul` (controls.ts), which already sails this way: rename it in the UI (owner, 12 November) |
 | Jib halyard | Jib | Starboard piano, outboard of the jib Cunningham, uncleated | Used under way: coarse jib luff tension, beside the jib Cunningham. The owner's crew uses it and the jib Cunningham rarely; top sailors who borrowed Josephine for the Internationals used the jib Cunningham. The sim needs a jib halyard control (owner, 12 November) |
-| Mainsheet | Main | Boom end to the traveller car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
-| Traveller | Main | Wooden thwart across the cockpit | Dual-ended |
+| Mainsheet | Main | Boom end to the traveler car on a wooden thwart across the cockpit, in front of the helmsman | Purchase unknown: model 4:1 (typical for a keelboat this size) until counted |
+| Traveler | Main | Wooden thwart across the cockpit | Dual-ended |
 | Backstay | Rig | Each end of the cockpit thwart, where it meets the hull | Dual-ended; the bridle is on the transom |
 | Jib sheets | Jib | Along the side decks to the winches | The only lines on the winches. Winches are **not** self-tailing: one hand cranks, the other tails, so trimming in a breeze is slow and takes crew |
 | Jib cars | Jib | H-shaped track on each side of the cabin top | Moved by hand with pin stops, both fore–aft (twist) and athwartships (sheeting angle: inboard to point, outboard to foot). Set before a leg, not adjusted while loaded. Best guess until counted: 7 fore–aft positions and 5 athwartships, 25 mm apart (the usual hole spacing) |
@@ -981,7 +1312,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - **Vang:** holds the boom down and controls main leech twist. It matters most off the wind, when the mainsheet no longer pulls the boom down.
 - **Outhaul:** depth in the lower main. Ease for power, tighten to flatten.
 - **Cunningham and halyards:** luff tension, which moves the draft forward and opens the leech. The fix when the draft blows aft as the breeze builds.
-- **Traveller:** sets the boom's angle to the centreline without changing twist, which sheet tension controls.
+- **Traveler:** sets the boom's angle to the centerline without changing twist, which sheet tension controls.
 - **Mainsheet:** angle and twist together. Trimming hard closes the leech.
 - **Jib sheet and cars:** sheet tension sets the angle. Car fore–aft sets twist: forward makes a deeper jib with a tighter leech, aft a flatter jib with an open top. Car in–out sets the sheeting angle: inboard points higher in flat water, outboard gives more power and speed in chop or when reaching.
 - **Halyard tackle vs. Cunningham:** both tension the main's luff. The main halyard's tackle does the heavy lifting; the Cunningham fine-tunes it. On the jib, the halyard and the jib Cunningham share the job the same way.
@@ -1001,6 +1332,17 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **Wrecks** (designed: docs/WRECK-PROPOSAL.md, the owner's answers 14 November; Marinas; after #292; not urgent; 6–10 h):
+  the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
+  short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
+  lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,
+  contact with the Fort Mason piles just stops her.
+
+- **Leaving a race, and whether it's recorded** (owner, 13 November: "eventually we need logic for leaving a race and
+  whether it gets recorded"; Debrief, or Marinas for the season, when it comes up): leaving mid-race and how it's
+  scored and saved. That covers RET or DNF in the season and the results, the ghost and the logbook kept or not, and
+  practice against a season race.
 
 - **Desktop release** (owner, November 2026: "put a desktop release on the roadmap. it's not urgent, but if we're
   getting to a place where it no longer makes sense to keep building in-browser, say so."; later; 3–6 days for the

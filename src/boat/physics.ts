@@ -1,6 +1,7 @@
 import { hitsHarbor } from '../geo/marina';
 import { KT, V, clamp, wrap, n360, D2R } from '../core/math';
 import { onLand, pierNear } from '../geo/shore';
+import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
@@ -52,6 +53,20 @@ export function sailPlan(b: Boat): SailPlan {
  * spreaders and shrouds and the slides bind, so it goes up far more slowly.
  */
 export const HOIST = { main: 30, jib: 15, strikeMain: 15, strikeJib: 10 };
+/**
+ * At the dock (and walked or pushed off it): the crew sit centred on the benches, not hiked or to leeward for a heel she
+ * isn't sailing at (the owner); their weight still moves only her heel, never her across the water. (placeCrew, placed
+ * in the middle for the moment, as you'd place them yourself: your own placing comes back with her under way.)
+ */
+export function crewAtDock(b: Boat, dt: number): void {
+  const cs = b.crew; if (!cs) return;
+  const yours = cs.place;
+  // (placed by you, they're where you put them, at the dock as under way; and fore and aft in the cockpit unless you've
+  // put them elsewhere: no bow hand off to the mast for the trim of a boat that isn't sailing)
+  cs.place = { across: yours?.across ?? 'mid', fore: yours?.fore ?? 'mid' };
+  placeCrew(cs, { need: 0, twa: b.twa, tws: b.ww.kt, v: 0, pole: false, tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(b.ww.kt), extraMoment: 0, sea: 0, heel: b.heelMag ?? 0, tackComing: false, rmPerDeg: 250 }, dt);
+  cs.place = yours;
+}
 export function crewRig(b: Boat, dt: number, emit: Emit): void {
   const r = b.rig; if (!r) return;
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg, ms: 3500 }); };
@@ -83,7 +98,7 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
   else if (!b.poleWant && (b.pole === 'set' || b.pole === 'setting')) { b.pole = 'stowing'; b.poleT = POLE.stow / hands; }
   else if (b.pole === 'set' && b.tack !== b.poleTack) {
     b.pole = 'setting'; b.poleT = POLE.gybe / hands; b.poleTack = b.tack;
-    say('Gybing the pole end-for-end. The jib is down for a few seconds.');
+    say('Jibing the pole end-for-end. The jib is down for a few seconds.');
   }
   if (b.pole === 'setting' || b.pole === 'stowing') {
     if (b.pole === 'setting' && b.poleTack !== b.tack) b.poleTack = b.tack; // gybed while setting: set it on the new windward side
@@ -224,7 +239,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // as a crew flattens her, gives them more wind; heeling to leeward takes some away, which damps the roll)
   // the wind the sails see: at their height, in the plane of the heeled mast (sailWind), as the crew trims to it
   // (going astern head to wind she moves downwind, so she sees less of it; slipping to leeward, the wind comes a little more abeam: leeway)
-  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, b.v - (b.astern ?? 0) + rigSurge(b), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
   // (the sails, their trim and their forces, in the wind across her course through the water (sailFrame): the frame the
   // sail model was calibrated in before she had leeway, when heading and course were one. A calibration choice, not
   // something ORC's documentation is shown to say: the wind's angle to the hull itself is her leeway less (ap, for the
@@ -232,7 +247,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // frame is on the ROADMAP)
   stepFrame(b, dt);
   const fr = sailFrame(b), slip = fr.rot;
-  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0) : ap;
+  const apF = slip ? sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0) + rigSurge(b), fr.across + rigSway(b), b.heel ?? 0) : ap;
   trimSails(b, apF.awa, plan, dt);
   // heel and helm balance from the forces on the sails (balance.ts)
   const jibOn = plan === 'jib' && b.trim.jib && b.shape.jib ? { trim: b.trim.jib, shape: b.shape.jib } : null;
@@ -256,7 +271,14 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const rmExtra = (h: number) => cond ? cond.rightingDelta(h) : 0; // weight aloft (a wooden rig) or high aft (the outboard on its bracket)
   // (off the wind the heel is the same balance of moments as upwind: the eased sails' smaller side force is what heels her
   // less, so a broad reach in a puff still heels her, and rounds her up, as it does a real boat)
-  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt);
+  // (under bare poles, the sails struck, there's no heel worth sailing at: the crew sit her upright, in the middle, not out
+  // to windward for a breeze she isn't sailing in nor to leeward for a light-air heel she can't have; as at the dock,
+  // crewAtDock. Placed by you, they stay where you put them)
+  // (struck, not half-hoisted: a sail half up still heels her, sf.main.heel by the hoist, and they sit up for it)
+  const bare = !!b.rig && b.rig.main <= 0.05 && b.rig.jib <= 0.05, yours = cs.place;
+  if (bare && !yours?.across) cs.place = { across: 'mid', fore: yours?.fore ?? 'mid' };
+  const heelT = crewAndHeel(b, cs, F, sf.ceh, disp, rmExtra, Math.min(180, twa + (b.leeway ?? 0)), ww.kt, rel, cond?.extraMoment ?? 0, dt, bare ? 0 : undefined);
+  cs.place = yours;
   rollTo(b, heelT, rel, disp, dt);
   b.helmNeed = helmNeeded(sf, b.heelMag!, b.sheets.main, b.v, sf.ceh, clrShift(cs.trim));
   b.forces = { heel: sf.main.heel + sf.jib.heel, drive: sf.main.drive + sf.jib.drive };
@@ -305,10 +327,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // measured on dinghies (Schutt & Williamson, Cornell) only adds to it), scaled to the hull as the force model scales
   // the sails' push (driveCalibration). Kogure et al. (Japan J. Coaching Studies 27(1), 2013) measured a Laser
   // Radial's roll tacks 5.3% faster than flat ones through the tack in 2–4 m/s, 2.8% in 4–6 m/s.
+  // (and as she pitches: the rig swinging fore and aft through the air, seaway.ts waveMotion, rigSurge)
   let sweep = 0;
-  const sway = rigSway(b);
-  if (Math.abs(sway) > 0.02 && !b.luff) {
-    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along, fr.across, b.heel ?? 0); // (as sf's, without the roll)
+  const sway = rigSway(b), surge = rigSurge(b);
+  if ((Math.abs(sway) > 0.02 || Math.abs(surge) > 0.02) && !b.luff) {
+    const ap0 = sailWind(ww.from, ww.kt, b.h + slip, fr.along - (b.astern ?? 0), fr.across, b.heel ?? 0); // (as sf's, without the roll and the pitch: her sternway in both)
     const sf0 = sailForces(ap0.aws, ap0.awa, { trim: b.trim.main, shape: b.shape.main, out: b.sheets.main }, jibOn, b.luff);
     // (each sail as much as is hoisted, as sf is; both already carry the worn cloth through the shape, so no wornDrive here)
     sweep = (sf.main.drive + sf.jib.drive - hm * sf0.main.drive - hj * sf0.jib.drive) * driveCalibration(ww.kt, twa);
@@ -490,7 +513,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
   // (her surge signed: + ahead, − astern. In irons, backing the jib is the way out: she's often going astern as she does)
   const u0 = b.v - (b.astern ?? 0), uf = Math.abs(u0), d0 = -toWind * (b.sway ?? 0), r0 = toWind * (b.yawRate ?? 0) * D;
-  const ap = sailWind(ww.from, ww.kt, b.h, u0, (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
+  const ap = sailWind(ww.from, ww.kt, b.h, u0 + rigSurge(b), (b.sway ?? 0) + rigSway(b), b.heel ?? 0);
   trimSails(b, ap.awa, 'jib', dt);
   const q = 0.5 * RHO_A * ap.aws * ap.aws, awaR = ap.awa * D;
   const hm = b.rig?.main ?? 1, hj = b.rig?.jib ?? 1;
@@ -562,6 +585,9 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
 /** The rig's sideways speed through the air at the sails' centre of effort (m/s, + to starboard) from her rolling: the
  * roll rate times the centre of effort's height above the roll axis, taken at the waterline (balance.ts CE_ABOVE_WL). */
 const rigSway = (b: Boat) => -(b.heelRate ?? 0) * D2R * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
+/** ... and its speed forward through the air from her pitching (m/s, + forward): bow up, the rig swings aft, the pitch rate
+ * times the same height (pitching about her centre of flotation, at the waterline: seaway.ts waveMotion). */
+const rigSurge = (b: Boat) => -(b.pitchRate ?? 0) * CE_ABOVE_WL * Math.cos((b.heel ?? 0) * D2R);
 /** The waves' added resistance at speed v as a share of the calm-water resistance (for the trim: hullTrim.ts). */
 const seaShare = (b: Boat, v: number) => { const r = hullResistance(Math.max(0.5, v)); return r > 0 ? seaDrag(b.sea, b.h, Math.max(0.5, v)) / r : 0; };
 /** (Worked out twice a second, as the sea is refreshed.) */
@@ -757,6 +783,23 @@ function rollTo(b: Boat, heelLee: number, rel: number, disp: number, dt: number)
   b.heel = r.heel; b.heelRate = r.rate; b.heelMag = b.heel * side;
 }
 
+/** Fort Mason's piers stand on close-set concrete piles under a deck lower than her masthead: set onto them by the
+ * stream or the wind with no way on to steer off, or set sideways onto them, she's caught against them, and in real
+ * life that's very likely the end of the boat (the owner, 13 Nov 2026). What a wreck means in the sim is still to be
+ * worked out (docs/WRECK-PROPOSAL.md); for now she's stopped against them (end on: dead; sideways: her way into them,
+ * keeping her way along them), and told so once each time she comes onto them, by how hard. */
+const pileTouch = new WeakMap<Boat, number>();
+function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, emit: Emit, t: number): void {
+  if (endOn) { b.v = 0; b.astern = 0; }
+  b.sway = 0;
+  const last = pileTouch.get(b) ?? -99; pileTouch.set(b, t);
+  if (b.isUser && t - last > 3) emit({ type: 'toast', ms: 6000, msg: closing < 0.15 ? `Against the piles of ${pier}: fend off, and get way on to get clear.` : `Set onto the piles of ${pier}: in real life, likely the end of your boat.` });
+}
+/** Below this speed through the water (m/s), about a knot, her rudder barely bites and she goes where the stream and wind
+ * set her (ESTIMATE: no source found for a Folkboat; a long keel's rudder needs some way to answer) */
+const STEERAGE = 0.5;
+/** Her outboard driving her: running, down and in gear (idling in neutral it gives no steerage). */
+const motorDrives = (b: Boat) => !!b.motor?.running && b.motor.down && b.motor.gear !== 'N';
 /** Move her over the ground (through the water plus the current), and stop her on a dock or the shore. */
 function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   const u = V(b.h), ww = b.ww;
@@ -772,34 +815,48 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { b.lastHitT = t; if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } }; // (lastHitT: rule 42.3(h), getting clear after it)
+  const x0 = b.x - b.vx * dt, y0 = b.y - b.vy * dt; // (where she was: pushed back off something, she never ends a step on land)
+  const offLand = () => { if (onLand(bow(b)) || onLand(b)) { b.x = x0; b.y = y0; } };
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
   else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
-    const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit); // (where her bow struck, before she's pushed back off it)
-    b.x -= u.x * 0.6; b.y -= u.y * 0.6; b.v = 0; b.sway = 0;
-    bump(pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
-  } else if (ast > 0 && onLand(stern(b))) {
-    const hit = stern(b), pier = pierNear(hit, 6);
-    b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
-    bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.');
+    const hit = bow(b), pier = pierNear(hit, 6), dock = hitsHarbor(hit), piles = underPier(hit); // (where her bow struck, before she's pushed back off it)
+    const closing = Math.max(0, b.vx * u.x + b.vy * u.y);
+    b.x -= u.x * 0.6; b.y -= u.y * 0.6;
+    if (piles && b.v < STEERAGE && !motorDrives(b)) onPiles(b, piles.name, closing, true, emit, t);
+    else {
+      b.v = 0; b.sway = 0;
+      bump(piles ? `Collision: you hit the piles of ${piles.name}. Bear away and give it room.` : pier ? `Collision: you hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}. Bear away and give it room.` : dock ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : 'Aground! Steer back out to open water.');
+    }
+    offLand();
+  } else if (onLand(stern(b)) && (ast > 0 || b.vx * u.x + b.vy * u.y < -0.02)) { // (going astern, or carried stern first by the stream)
+    const hit = stern(b), pier = pierNear(hit, 6), piles = underPier(hit), closing = Math.max(0, -(b.vx * u.x + b.vy * u.y));
+    b.x += u.x * 0.4; b.y += u.y * 0.4;
+    if (piles) onPiles(b, piles.name, closing, true, emit, t); // (going astern she has no steerage: on the piles)
+    else { b.astern = 0; bump(pier ? `Collision: your stern hit the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')} going astern.` : hitsHarbor(hit) ? 'Bump: your stern hit the dock going astern.' : 'Your stern touched bottom going astern.'); }
+    offLand();
   }
-  // set sideways onto something (the wind on her bare rig across her, at a dock, or her leeway): her side at the beam, amidships
-  // and at the quarters, half her beam (1.1 m) out on the side she's going; she stops against it, as against a fender
-  // (only while she's going more sideways than ahead: under way, what she meets she meets bow first, above)
+  // set sideways onto something (the wind on her bare rig across her, at a dock, her leeway, or the stream): her side at
+  // the beam, amidships and at the quarters, half her beam (1.1 m) out on the side she's going; she stops going into it,
+  // as against a fender, and keeps her way along it
   // (her sideways motion over the ground: her slip through the water and the current's set across her)
-  const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y;
-  if (!b.pushing && Math.abs(side) > 0.005 && Math.abs(side) > 0.5 * Math.abs(ahead)) {
-    const sgn = Math.sign(side), hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
+  // (her side checked in full while she's going more sideways than ahead; going ahead, only once her side amidships is
+  // on something, sliding along a face, so the check costs one look a step: the perf budget)
+  const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y, sgn = Math.sign(side);
+  if (!b.pushing && Math.abs(side) > 0.005 && (Math.abs(side) > 0.5 * Math.abs(ahead) || onLand({ x: b.x + stb.x * sgn * 1.1, y: b.y + stb.y * sgn * 1.1 }))) {
+    const hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
     if (hit) {
-      const pier = pierNear(hit, 6);
+      const pier = pierNear(hit, 6), piles = underPier(hit);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
-      bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
+      if (piles) onPiles(b, piles.name, Math.abs(side), false, emit, t);
+      else bump(pier ? `Collision: she's been set sideways onto the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}.` : hitsHarbor(hit) ? 'Bump: she\'s been set sideways onto the dock.' : 'She\'s been set sideways onto the shore.');
+      offLand();
     }
   }
   // trim to the apparent wind: wind over the water minus the boat's own motion through it (and the rig's as she rolls,
   // so the flags, the windex and the crew see what the sails see)
   // (in the frame the sails are trimmed in, the wind across her course through the water: step(), apF)
   const fr = sailFrame(b);
-  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0), fr.across + rigSway(b), b.heel ?? 0);
+  const aw = apparent(ww.from, ww.kt, b.h + fr.rot, fr.along - (b.astern ?? 0) + rigSurge(b), fr.across + rigSway(b), b.heel ?? 0);
   b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
 }
 
@@ -835,6 +892,12 @@ export function byHand(b: Boat, k: LineKey): boolean {
   if (k === 'jibsheetW') return false; // the lazy sheet is the crew's until you haul on it
   return k === 'mainsheet' || k === 'jibsheet' ? b.manualTrim : b.trimAll;
 }
+/**
+ * Hove to with the tiller lashed: a crew told "we're hove to" keep her so, the jib's windward sheet made fast with the jib
+ * backed and the main left eased where it is, whoever had the lines before (the owner: Auto, crew or trim, while she's
+ * hove to should keep her hove to). Only the helm sails her off, by letting the lashing go.
+ */
+export const keepsHove = (b: Boat) => b.isUser && !!b.hove && b.lashed != null;
 /** The lines you have. */
 export const linesByHand = (b: Boat): LineKey[] => LINES.filter(k => byHand(b, k));
 /** Take a line (you're working it), or give it back to the crew (`mine` false): they carry on from where it is. */
@@ -843,7 +906,7 @@ export function takeLine(b: Boat, k: LineKey, mine = true): void {
   if (!mine && k !== 'car') { delete b.ctlCmd[k]; if (b.ctlTarget) delete b.ctlTarget[k]; }
 }
 /** Every line back to the crew. */
-export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.hand = {}; b.ctlCmd = {}; b.ctlTarget = {}; b.poleMine = false; }
+export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.hand = {}; b.ctlCmd = {}; b.ctlTarget = {}; } // (the pole stays yours: your call only, the owner)
 
 /**
  * At a tack (or gybe) the jib sheets stay on their own sides. The crew lets the old sheet fly and tails the new one, so
@@ -852,6 +915,10 @@ export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.h
  * (the classic way to heave to: tack and leave the jib sheet made fast).
  */
 function jibSheetsAtTack(b: Boat, emit: Emit): void {
+  // (the crew holding her hove to, and she's gone through the wind all the same, a shift or the lashed tiller moved: the
+  // sheet made fast is the leeward one now, so the jib fills on it and the old leeward sheet, let fly, is the lazy one;
+  // the lines stay the crew's, who trim her once she's sailing)
+  if (!byHand(b, 'jibsheetW') && keepsHove(b)) { const c = b.ctl; [c.jibsheet, c.jibsheetW] = [c.jibsheetW, c.jibsheet]; return; }
   if (!byHand(b, 'jibsheetW')) return;
   const c = b.ctl, h = b.hand ??= {}, leeMine = byHand(b, 'jibsheet');
   [c.jibsheet, c.jibsheetW] = [c.jibsheetW, c.jibsheet];
@@ -876,6 +943,10 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const c = b.ctl, tws = b.ww.kt;
   // working a line takes that line, and only that line, off the crew
   if (b.isUser) for (const k of [...Object.keys(b.ctlCmd), ...Object.keys(b.ctlTarget ?? {})] as Ctl[]) if (b.ctlCmd[k] || b.ctlTarget?.[k] != null) takeLine(b, k);
+  // hove to, the tiller lashed, the crew keep her so (keepsHove); the lashing let go, they let the windward sheet fly and
+  // trim for sailing. (Lines you take yourself are yours as ever.)
+  const keepHove = keepsHove(b);
+  const held = (k: 'jibsheetW' | 'mainsheet') => byHand(b, k) || keepHove;
   // the crew work the lines they have one job at a time, each person at their own pace (crewWork.ts): `on` is filled in
   // below, once the crew's targets are known
   let on: Partial<Record<Ctl, { pace: number; to: number }>> = {};
@@ -925,7 +996,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
       for (const k of FIXABLE_LINES) if (byHand(b, k)) fixed[k] = c[k];
       if (byHand(b, 'car')) { const lazy = c.car[b.tack]; fixed.carFore = lazy.fore; fixed.carIn = lazy.ins; }
     }
-    if (b.isUser && byHand(b, 'mainsheet')) fixed.mainsheet = c.mainsheet;
+    if (b.isUser && held('mainsheet')) fixed.mainsheet = c.mainsheet;
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
@@ -940,13 +1011,13 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   b.crewPlanT = (b.crewPlanT ?? 0) - dt;
   const t = b.crewPlan;
   // what the crew would do with each line they have; then who gets to it, and when (crewWork.ts)
-  const backing0 = byHand(b, 'jibsheetW') && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
+  const backing0 = held('jibsheetW') && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
   const want: Partial<Record<Ctl, number>> = {};
   // (a line is moved only if it's worth the trip: a skilled crew sees smaller gains, ~0.1% of drive; a novice ~0.4%)
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
   for (const k of CREW_LINES_T) if (!byHand(b, k)) want[k] = (b.crewWorth?.[k] ?? 1) >= minGain || !b.crewReady ? t[k] : c[k];
-  if (!byHand(b, 'mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
-  if (!byHand(b, 'jibsheetW')) want.jibsheetW = 1;
+  if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
+  if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
   // the lazy (windward) jib car: the crew's plan for it (they move it only when it's worth it), or yours
   if (byHand(b, 'car')) b.carPlan = null; else if (!b.carPlan || b.carPlan.fore !== t.carFore || b.carPlan.ins !== t.carIn) b.carPlan = { fore: t.carFore, ins: t.carIn };
@@ -965,7 +1036,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   { const dir = byHand(b, 'traveller') ? (b.ctlCmd.traveller ?? (b.ctlTarget?.traveller != null ? b.ctlTarget.traveller - c.traveller : 0)) : (on.traveller ? on.traveller.to : want.traveller!) - c.traveller;
     const rate = travellerRate(dir > 0, tws);
     if (byHand(b, 'traveller')) hand('traveller', rate); else move('traveller', want.traveller!, rate); }
-  if (byHand(b, 'mainsheet')) hand('mainsheet'); else move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
+  if (held('mainsheet')) hand('mainsheet'); else move('mainsheet', mainsheetFor(wantMain, c.traveller), CONTROL_RATE.mainsheet * 1.5);
   // the jib sheets, one on each winch: hauling in on a winch is slow in a breeze, easing is quick
   const going = (k: 'jibsheet' | 'jibsheetW') => b.ctlCmd[k] ?? (b.ctlTarget?.[k] != null ? b.ctlTarget[k]! - c[k] : 0);
   // a windward sheet you've hauled and then eased right off again is the crew's lazy sheet once more
@@ -973,7 +1044,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (c.jibsheetW < 0.9) b.wHauled = true;
     else if (b.wHauled && c.jibsheetW > 0.95 && !b.ctlCmd.jibsheetW && b.ctlTarget?.jibsheetW == null) { b.hand.jibsheetW = false; b.wHauled = false; }
   } else b.wHauled = false;
-  const wMine = byHand(b, 'jibsheetW');
+  const wMine = held('jibsheetW');
   // (until it comes tight a lazy sheet is just slack, taken in hand over hand in a second or two; only the last of it
   // needs the winch)
   const wSlack = jibClew({ ...c, jibsheet: 1 }, b.tack) > jibAngle(c, b.tack) + 3;
@@ -1050,7 +1121,7 @@ function windAtZ(from: number, windKt: number, h: number, v: number, g: number, 
  * `from`: the bearing each comes from (deg).
  */
 export function windAtHeight(b: Boat, z: number): { tw: { kt: number; from: number }; air: { kt: number; from: number }; aw: { kt: number; awa: number } } {
-  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0), across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
+  const ww = b.ww, g = gradientAt(z), fr = sailFrame(b), h = b.h + fr.rot, along = fr.along - (b.astern ?? 0) + rigSurge(b) * z / CE_ABOVE_WL, across = fr.across + rigSway(b) * z / CE_ABOVE_WL;
   const level = windAtZ(ww.from, ww.kt, h, along, g, across, 0), plane = windAtZ(ww.from, ww.kt, h, along, g, across, b.heel ?? 0);
   return { tw: { kt: ww.kt * g, from: ww.from }, air: { kt: level.aws / KT, from: n360(h + level.arel) }, aw: { kt: plane.aws / KT, awa: plane.awa } };
 }

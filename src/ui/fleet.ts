@@ -6,7 +6,7 @@ import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
 import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
-import { applyMemberInput, memberPage, membersGrid } from './members';
+import { applyMemberInput, askSaveHtml, memberPage, membersGrid } from './members';
 import { morph } from './morph';
 
 /**
@@ -32,6 +32,9 @@ export interface FleetHooks {
   /** The Yacht Club's members (club/members.ts), and that they changed (saved by the caller). */
   members(): Member[];
   membersChanged(): void;
+  /** The Season tab's contents (ui/season.ts), and sailing one of its races. */
+  seasonHtml(id: string | null): string;
+  sailSeason(seasonId: string, raceNo: number): void;
 }
 
 const VIEW_KEY = 'fbsim-fleet-view';
@@ -43,30 +46,67 @@ export class Fleet {
   private boatId = '';
   private confirmDelete = false;
   /** The Yacht Club's tab (docs/YACHT-CLUB.md): your boats, or the members; the member open, and the roster's filter. */
-  private tab: 'boats' | 'members' = 'boats';
+  private tab: 'boats' | 'members' | 'season' = 'boats';
+  /** The season shown (null: the one under way). */
+  private seasonId: string | null = null;
   private memberId: string | null = null;
   private confirmMemberDel = false;
+  /**
+   * Saving (the owner): a member's page and a boat's crew seats change a draft; Save keeps it (a quick "Saved", and back);
+   * leaving with changes unsaved asks first, Save or Discard.
+   */
+  private draft: Member | null = null;
+  private seatDraft: string[] | null = null;
+  private leaving: (() => void) | null = null;
+  private flash = '';
+  private flashT = 0;
+  private get memberDirty(): boolean { const m = this.stored(); return !!this.draft && !!m && JSON.stringify(this.draft) !== JSON.stringify(m); }
+  private get seatsDirty(): boolean { return !!this.seatDraft && !!this.cur && JSON.stringify(this.seatDraft) !== JSON.stringify(this.cur.crewIds ?? []); }
+  /** Go on, or, with changes unsaved, ask first (the answer goes on). */
+  private guard(next: () => void): void {
+    if (this.memberDirty || this.seatsDirty) { this.leaving = next; if (this.list.hidden) this.drawBoat(); else this.drawList(); return; }
+    this.leaving = null; this.draft = null; this.seatDraft = null; next();
+  }
+  /** A quick "Saved" on her page (the boat editor's Save). */
+  flashSaved(): void { this.saved('boat'); if (this.boatOpen) this.drawBoat(); }
+  private saved(where: 'list' | 'boat'): void {
+    this.flash = 'Saved ✓'; clearTimeout(this.flashT);
+    this.flashT = window.setTimeout(() => { this.flash = ''; if (where === 'list' && !this.list.hidden) this.drawList(); else if (where === 'boat' && this.boatOpen) this.drawBoat(); }, 1500);
+  }
+  private saveMember(): void {
+    const ms = this.hooks.members(), i = ms.findIndex(x => x.id === this.draft?.id);
+    if (i >= 0 && this.draft) { ms[i] = structuredClone(this.draft); this.hooks.membersChanged(); }
+    this.draft = null;
+  }
+  private saveSeats(): void {
+    const b = this.cur; if (b && this.seatDraft) { b.crewIds = [...this.seatDraft]; this.hooks.changed(); this.hooks.membersChanged(); }
+    this.seatDraft = null;
+  }
   constructor(private S: Settings, private hooks: FleetHooks) {
     try { if (localStorage.getItem(VIEW_KEY) === 'list') this.view = 'list'; } catch { /* storage unavailable */ }
     for (const el of [this.list, this.page]) el.addEventListener('click', e => this.click(e));
     // (her crew's seats, on her page: picked from the members; none leaves the seat empty, the forward hand moving up)
     this.page.addEventListener('change', e => {
       const t = e.target as HTMLSelectElement, b = this.cur; if (!b || t.dataset.f !== 'seat') return;
-      const ids = [...(b.crewIds ?? [])], i = Number(t.dataset.v);
+      const ids = [...(this.seatDraft ?? b.crewIds ?? [])], i = Number(t.dataset.v);
       if (t.value) ids[i] = t.value; else ids.splice(i, 1);
-      b.crewIds = ids.filter(Boolean).slice(0, 2); this.hooks.changed(); this.hooks.membersChanged(); this.drawBoat();
+      this.seatDraft = ids.filter(Boolean).slice(0, 2); this.drawBoat(); // (kept when you Save)
     });
     // (a member's page: their name, build, skill and ratings)
     this.list.addEventListener('change', e => {
-      const t = e.target as HTMLInputElement, m = this.member(); if (!m || !t.dataset.m) return;
-      if (applyMemberInput(m, t.dataset.m, t.value, t.dataset.a, t.checked)) { this.hooks.membersChanged(); this.drawList(); }
+      const t = e.target as HTMLInputElement;
+      if (t.dataset.f === 'sseason') { this.seasonId = t.value; this.drawList(); return; } // (the Season tab's season)
+      const m = this.member(); if (!m || !t.dataset.m) return;
+      if (applyMemberInput(m, t.dataset.m, t.value, t.dataset.a, t.checked)) this.drawList(); // (the draft: kept when you Save)
     });
     this.list.addEventListener('input', e => {
       const t = e.target as HTMLInputElement; if (t.dataset.m !== 'attr') return;
       const out = t.nextElementSibling as HTMLOutputElement | null; if (out) out.value = String(Math.round(Number(t.value) * 100));
     });
   }
-  private member(): Member | null { return this.hooks.members().find(m => m.id === this.memberId) ?? null; }
+  private stored(): Member | null { return this.hooks.members().find(m => m.id === this.memberId) ?? null; }
+  /** The member open: a draft of them, while their page is open. */
+  private member(): Member | null { const m = this.stored(); if (!m) return null; if (this.draft?.id !== m.id) this.draft = structuredClone(m); return this.draft; }
 
   /** Her page is open (she's in the showroom). */
   get boatOpen(): boolean { return !this.page.hidden; }
@@ -80,14 +120,14 @@ export class Fleet {
   }
   openBoat(id: string): void {
     const b = this.S.boats.find(x => x.id === id); if (!b) { this.openList(); return; }
-    this.boatId = id; this.confirmDelete = false;
+    this.boatId = id; this.confirmDelete = false; this.seatDraft = null; this.leaving = null;
     this.list.hidden = true;
     this.drawBoat(); this.page.hidden = false; this.hooks.showroom(b);
   }
   /** Esc on the Yacht Club: a member's page back to the members (true), else nothing here (false: the back stack's). */
   escape(): boolean {
     if (this.list.hidden || !this.memberId) return false;
-    this.memberId = null; this.confirmMemberDel = false; this.drawList(); return true;
+    this.guard(() => { this.memberId = null; this.confirmMemberDel = false; this.drawList(); }); return true;
   }
   /** Straight to the members (from the race setup's crew line). */
   openMembers(): void { this.tab = 'members'; this.memberId = null; this.openList(); }
@@ -97,16 +137,20 @@ export class Fleet {
     const t = (e.target as HTMLElement).closest<HTMLElement>('[data-f]'); if (!t) return;
     const v = t.dataset.v ?? '';
     switch (t.dataset.f) {
-      case 'back': this.close(); this.hooks.back(); return;
+      case 'back': this.guard(() => { this.close(); this.hooks.back(); }); return;
+      case 'askSave': { const go = this.leaving; this.leaving = null; if (this.draft) this.saveMember(); if (this.seatDraft) this.saveSeats(); this.saved(this.list.hidden ? 'boat' : 'list'); go?.(); return; }
+      case 'askDiscard': { const go = this.leaving; this.leaving = null; this.draft = null; this.seatDraft = null; go?.(); return; }
+      case 'msave': this.saveMember(); this.memberId = null; this.saved('list'); this.drawList(); return;
+      case 'bsave': this.saveSeats(); this.saved('boat'); this.drawBoat(); return;
       case 'view': this.view = v === 'list' ? 'list' : 'grid'; try { localStorage.setItem(VIEW_KEY, this.view); } catch { /* ignore */ } this.drawList(); return;
       case 'boat': this.hooks.toBoat(v); return;
-      case 'toList': this.hooks.back(); return;
+      case 'toList': this.guard(() => this.hooks.back()); return;
       case 'new': {
         const names = new Set(this.S.boats.map(b => b.name)); let n = 'NEW BOAT', k = 2; while (names.has(n)) n = `NEW BOAT ${k++}`;
         const nb = newBoat(n); nb.sails.number = freeNumber(this.S.boats, 100); delete nb.slip; delete nb.marina;
         this.S.boats.push(nb); this.hooks.changed(); this.close(); this.hooks.edit(nb.id); return;
       }
-      case 'edit': this.close(); this.hooks.edit(this.boatId); return;
+      case 'edit': this.guard(() => { this.close(); this.hooks.edit(this.boatId); }); return;
       case 'del': this.confirmDelete = true; this.drawBoat(); return;
       case 'delNo': this.confirmDelete = false; this.drawBoat(); return;
       case 'delYes': {
@@ -117,11 +161,12 @@ export class Fleet {
         if (this.S.boatId === gone) { this.S.boat = this.S.boats[0]; this.S.boatId = this.S.boat.id; }
         this.hooks.changed(); this.hooks.back(); return;
       }
-      case 'tab': this.tab = v === 'members' ? 'members' : 'boats'; this.memberId = null; this.drawList(); return;
+      case 'tab': this.guard(() => { this.tab = v === 'members' ? 'members' : v === 'season' ? 'season' : 'boats'; this.memberId = null; this.drawList(); }); return;
+      case 'season': { const [id, no] = v.split('|'); this.close(); this.hooks.sailSeason(id, Number(no)); return; }
       case 'member': this.memberId = v; this.confirmMemberDel = false; this.drawList(); return;
-      case 'mback': this.memberId = null; this.drawList(); return;
+      case 'mback': this.guard(() => { this.memberId = null; this.drawList(); }); return;
       case 'mnew': { const m = newMember(this.hooks.members(), { h: 1.75, w: 75 }, 'New member'); this.hooks.membersChanged(); this.memberId = m.id; this.drawList(); return; }
-      case 'mreset': { const m = this.member(); if (m && m.origin === 'yours') { delete m.attr; this.hooks.membersChanged(); this.drawList(); } return; }
+      case 'mreset': { const m = this.member(); if (m && m.origin === 'yours') { delete m.attr; this.drawList(); } return; } // (the draft)
       case 'mdel': this.confirmMemberDel = true; this.drawList(); return;
       case 'mdelNo': this.confirmMemberDel = false; this.drawList(); return;
       case 'mdelYes': {
@@ -132,7 +177,7 @@ export class Fleet {
       }
       case 'go': { // straight to the setup with her chosen; from her slip if she has one (the setup can change it)
         const slip = !!slipById(this.cur?.slip);
-        this.close(); this.hooks.sail(this.boatId, v === 'cruise' ? 'cruise' : 'race', slip); return;
+        this.guard(() => { this.close(); this.hooks.sail(this.boatId, v === 'cruise' ? 'cruise' : 'race', slip); }); return;
       }
     }
   }
@@ -144,14 +189,21 @@ export class Fleet {
       ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}"><img class="fthumb" data-thumb="${b.id}" alt=""><b>${esc(b.name || 'Unnamed')}</b><span>${ensignImg(b)}${esc(sailNo(b))}</span></button>`).join('')}</div>`
       : `<div class="ftable"><table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Club</th><th>Marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
           `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${slipById(b.slip)?.label ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
-    // the Yacht Club's tabs (docs/YACHT-CLUB.md): your boats, the members; the club's sliders and seasons to come
-    const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button></div>`;
+    // the Yacht Club's tabs (docs/YACHT-CLUB.md): your boats, the members, the season (ui/season.ts); the club's sliders to come
+    const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button><button type="button" data-f="tab" data-v="season" aria-pressed="${this.tab === 'season'}">Season</button>${this.flash ? `<span class="gsaved on">${this.flash}</span>` : ''}</div>`;
+    if (this.tab === 'season') {
+      morph(this.list, `<div class="panel wide fleetpanel">
+        <button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>
+        <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
+        ${this.hooks.seasonHtml(this.seasonId)}</div>`);
+      return;
+    }
     if (this.tab === 'members') {
       const ms = this.hooks.members(), m = this.member();
       morph(this.list, `<div class="panel wide fleetpanel">
         ${m ? '' : `<button type="button" class="linkbtn back" data-f="back">${esc(this.hooks.backLabel())}</button>`}
         <div class="fhead"><div><div class="eyebrow">San Francisco · Folkboat fleet</div><h1>The Yacht Club</h1></div></div>${tabs}
-        ${m ? memberPage(m, boats, this.confirmMemberDel) : membersGrid(ms, boats)}</div>`);
+        ${m ? memberPage(m, boats, this.confirmMemberDel, { dirty: this.memberDirty, asking: !!this.leaving }) : membersGrid(ms, boats)}</div>`);
       return;
     }
     morph(this.list, `<div class="panel wide fleetpanel">
@@ -160,7 +212,7 @@ export class Fleet {
         <div class="seg"><button type="button" data-f="view" data-v="grid" aria-pressed="${this.view === 'grid'}">Grid</button><button type="button" data-f="view" data-v="list" aria-pressed="${this.view === 'list'}">List</button></div>
         <button type="button" class="cta" data-f="new">New boat</button></div>${tabs}
       ${body}
-      <small class="fnote">${boats.length} boat${boats.length === 1 ? '' : 's'}. Open one to see her record, edit her, or race or cruise her.</small></div>`);
+      </div>`);
     // her pictures: drawn one at a time once the list is up (each is a 3D render of her as she's set up)
     const imgs = [...this.list.querySelectorAll<HTMLImageElement>('img[data-thumb]')], job = ++this.thumbJob;
     const next = () => {
@@ -180,7 +232,7 @@ export class Fleet {
    * practice option, and it sails that way in a race too). A boat always has her skipper.
    */
   private crewRows(b: BoatSpec): string {
-    const ms = this.hooks.members().filter(m => m.id !== YOU && m.roles.includes('crew')), ids = b.crewIds ?? [];
+    const ms = this.hooks.members().filter(m => m.id !== YOU && m.roles.includes('crew')), ids = this.seatDraft ?? b.crewIds ?? [];
     const pick = (i: number) => `<select data-f="seat" data-v="${i}"><option value="">None</option>${ms.map(m => `<option value="${esc(m.id)}"${ids[i] === m.id ? ' selected' : ''}${ids.includes(m.id) && ids[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
     return `<tr><td>Middle crew</td><td>${pick(0)}</td></tr><tr><td>Forward hand</td><td>${pick(1)}</td></tr>`;
   }
@@ -195,8 +247,8 @@ export class Fleet {
     morph(this.page, `
       <div class="bphead"><button type="button" class="linkbtn" data-f="toList">${esc(this.hooks.backLabel())}</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
       <div class="garage">
-        <div class="gbtns"><button type="button" class="cta" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
-        ${this.confirmDelete ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')} and her record? <button type="button" class="ghost danger" data-f="delYes">Delete</button><button type="button" class="ghost" data-f="delNo">Keep her</button></div>` : ''}
+        <div class="gbtns">${this.seatsDirty ? '<button type="button" class="cta" data-f="bsave">Save</button>' : ''}${this.flash ? `<span class="gsaved on">${this.flash}</span>` : ''}<button type="button" class="${this.seatsDirty ? 'ghost' : 'cta'}" data-f="go" data-v="race">Race her</button><button type="button" class="ghost" data-f="go" data-v="cruise">Cruise her</button><button type="button" class="ghost" data-f="edit">Edit</button>${this.S.boats.length > 1 ? '<button type="button" class="ghost" data-f="del">Delete</button>' : ''}</div>
+        ${this.leaving ? askSaveHtml : ''}${this.confirmDelete ? `<div class="gconfirm">Delete ${esc(b.name || 'this boat')} and her record? <button type="button" class="ghost danger" data-f="delYes">Delete</button><button type="button" class="ghost" data-f="delNo">Keep her</button></div>` : ''}
       </div>
       <div class="bpbody">
       <section><h3>Particulars</h3><table class="ftab">
@@ -213,10 +265,10 @@ export class Fleet {
         ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
         ${row('Bottom', `${colour(BOTTOM_COLORS, b.hull.lower)}, ${p.cleanedWeeks ? `cleaned ${p.cleanedWeeks} wk ago` : 'just cleaned'}`)}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
-        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminium frame' : 'Teak')}
+        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
         ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}
         ${row('Sails', `${b.sails.color === 'black' ? 'Black' : 'White'}; main ${ages[p.mainAge]}, jib ${ages[p.jibAge]}`)}
-        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminium mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminium'} boom`)}
+        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminum mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminum'} boom`)}
       </table></section>
       <section><h3>Race record</h3>
         ${rec.races ? `<p class="frec"><b>${rec.races}</b> race${rec.races === 1 ? '' : 's'} · <b>${rec.wins}</b> win${rec.wins === 1 ? '' : 's'} · <b>${rec.podiums}</b> in the top three${rec.avg != null ? ` · average place <b>${rec.avg.toFixed(1)}</b>` : ''}</p>
@@ -224,8 +276,7 @@ export class Fleet {
           : '<small>No races yet. Sail her in a race, or race against her, and her results go here.</small>'}</section>
       <section><h3>Crew history</h3>
         ${log.length ? `<table class="flog"><thead><tr><th>Day</th><th>Sailed</th><th>Skipper</th><th>Crew</th></tr></thead><tbody>${log.map(crewRow).join('')}</tbody></table>`
-          : '<small>Nobody has sailed her yet.</small>'}
-        <small>When you don't sail her, a generic AI skipper does.</small></section>
+          : '<small>Nobody has sailed her yet.</small>'}</section>
       </div>`);
   }
 

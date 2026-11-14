@@ -187,12 +187,20 @@ export class Puffs {
       c.x += c.dx! * v * dt; c.y += c.dy! * v * dt; c.age += dt;
       if (c.age > c.life || Math.abs(c.x - this.center.x) > this.half + 300 || Math.abs(c.y - this.center.y) > this.half + 300) { this.spawn(c); c.dx = c.dy = c.v = undefined; }
     }
+    this.steps++; bucketPuffs(this);
   }
+  /** Steps taken (the buckets below are for this many: a copy of the puffs that hasn't stepped, the page's mirror, has none). */
+  steps = 0;
 
   /** Strength of one puff at a point, 0..1: a smooth streak along the wind where it is (or `dir`), fading in and out over its life. */
   static weight(c: Puff, x: number, y: number, mean: Vec): number {
     const ux = c.dx ?? mean.x, uy = c.dy ?? mean.y; // (no object per call: this runs for every puff, for every boat, every step)
-    const dx = x - c.x, dy = y - c.y, a = (dx * ux + dy * uy) / (c.r * PUFF_LONG), b = (dx * uy - dy * ux) / (c.r * PUFF_WIDE);
+    // (a point outside the square about the streak's long radius is outside the streak: its distance is at least that
+    // radius, and the streak's ellipse lies inside it, its direction a unit vector. With a margin of 1 in 10 000 the
+    // answer is the 0 the full sum gives, whatever the rounding: most puffs are far from most boats)
+    const R = c.r * PUFF_LONG * 1.0001, dx = x - c.x, dy = y - c.y;
+    if (dx > R || dx < -R || dy > R || dy < -R) return 0;
+    const a = (dx * ux + dy * uy) / (c.r * PUFF_LONG), b = (dx * uy - dy * ux) / (c.r * PUFF_WIDE);
     const d2 = a * a + b * b;
     if (d2 >= 1) return 0;
     return (1 - d2) ** 2 * Math.sin(Math.PI * c.age / c.life);
@@ -201,14 +209,49 @@ export class Puffs {
   /** Speed factor (1 = mean) and direction change (deg, + veered) at a point. */
   at(p: Vec): { k: number; veer: number } {
     let k = 1, veer = 0;
-    for (const c of this.cells) {
+    const add = (c: Puff) => {
       const w = Puffs.weight(c, p.x, p.y, this.dir);
-      if (!w) continue;
+      if (!w) return;
       const a = c.amp * this.gustiness * w;
       k += a; veer += a > 0 ? a * 30 : a * 12; // a full puff (+0.3) veers ~9°, a deep lull backs ~3°
-    }
+    };
+    const g = BUCKETS.get(this);
+    if (g && g.steps === this.steps) { for (const i of g.near(p.x, p.y)) add(this.cells[i]); } // (only the puffs that can reach her, in their order)
+    else for (const c of this.cells) add(c);
     return { k: clamp(k, 0.45, 1.7), veer: clamp(veer, -6, 12) };
   }
+}
+
+/**
+ * The puffs by where they are, in squares as wide as the longest streak's radius (with weight's margin), so a puff that
+ * reaches a point is in its square or one beside it: a boat's wind sums only those, in the puffs' own order, and the
+ * rest give the 0 weight() would. The same sums, from a few puffs where it was all 170, for each boat every step.
+ * Kept beside the puffs, not on them, so the page's mirror isn't sent them; made again each step (puffs.steps).
+ */
+interface PuffBuckets { steps: number; near(x: number, y: number): number[] }
+interface Grid extends PuffBuckets { size: number; x0: number; y0: number; nx: number; ny: number; head: Int32Array; next: Int32Array; out: number[] }
+const BUCKETS = new WeakMap<Puffs, Grid>();
+function bucketPuffs(f: Puffs): void {
+  let size = 1, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const c of f.cells) { size = Math.max(size, c.r * PUFF_LONG * 1.0001); x0 = Math.min(x0, c.x); y0 = Math.min(y0, c.y); x1 = Math.max(x1, c.x); y1 = Math.max(y1, c.y); }
+  const nx = Math.max(1, Math.floor((x1 - x0) / size) + 1), ny = Math.max(1, Math.floor((y1 - y0) / size) + 1);
+  let g = BUCKETS.get(f);
+  if (!g) {
+    g = { steps: 0, size, x0, y0, nx, ny, head: new Int32Array(0), next: new Int32Array(0), out: [], near(x, y) {
+      const G = this as Grid, out = G.out; out.length = 0;
+      const bx = Math.floor((x - G.x0) / G.size), by = Math.floor((y - G.y0) / G.size);
+      for (let j = Math.max(0, by - 1); j <= Math.min(G.ny - 1, by + 1); j++)
+        for (let i = Math.max(0, bx - 1); i <= Math.min(G.nx - 1, bx + 1); i++) for (let k = G.head[j * G.nx + i]; k >= 0; k = G.next[k]) out.push(k);
+      return out.sort((a, b) => a - b); // (the puffs' own order: the sums add up as they did)
+    } };
+    BUCKETS.set(f, g);
+  }
+  // (each square's puffs a chain through next[], the arrays kept from step to step: nothing new a step)
+  if (g.head.length < nx * ny) g.head = new Int32Array(nx * ny * 2);
+  if (g.next.length < f.cells.length) g.next = new Int32Array(f.cells.length);
+  g.head.fill(-1, 0, nx * ny);
+  Object.assign(g, { steps: f.steps, size, x0, y0, nx, ny });
+  f.cells.forEach((c, i) => { const b = Math.floor((c.y - y0) / size) * nx + Math.floor((c.x - x0) / size); g!.next[i] = g!.head[b]; g!.head[b] = i; });
 }
 
 /** windTerrain on a precomputed 50 m grid (for drawing the wind on the water, where it's needed at thousands of points). */

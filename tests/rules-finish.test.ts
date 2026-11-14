@@ -276,11 +276,15 @@ describe('hull contact geometry', () => {
 });
 
 describe('Rule 44.1: one penalty per incident', () => {
-  it('you foul a boat and touch her again while still tangled: the same incident. Once you have begun your turns, or been clear of her, a new contact is a new foul (21.2, 44.2)', async () => {
-    const cases: [string, { turned: number; clear: boolean }, number][] = [
+  it('you foul a boat and touch her again while still tangled: the same incident (Appeal 65). Once you have begun your turns (44.2: well clear first; 21.2: keep clear while turning), or been clear of her, a new contact is a new foul', async () => {
+    const cases: [string, { turned: number; clear: boolean; firstBy?: 'A'; jam?: boolean }, number][] = [
       ['still tangled, turns not begun', { turned: 0, clear: false }, 0],
-      ['already turning next to her', { turned: 90, clear: false }, 1],
-      ['had been clear of her since', { turned: 0, clear: true }, 1]
+      ['already turning next to her, still tangled: a new 21.2 breach', { turned: 90, clear: false }, 1],
+      ['had been clear of her since', { turned: 0, clear: true }, 1],
+      // (the tangle opened by A's foul on her: her own breach 7 s later, both under way, is hers, a new incident)
+      ['the other boat had fouled first, 7 s ago, both under way', { turned: 0, clear: false, firstBy: 'A' }, 1],
+      // (but jammed, both barely moving, it's the same tangle whoever touches whom)
+      ['the other boat had fouled first, both jammed', { turned: 0, clear: false, firstBy: 'A', jam: true }, 0]
     ];
     for (const [name, c, want] of cases) {
       const w = race(), [u, A] = w.boats;
@@ -292,6 +296,8 @@ describe('Rule 44.1: one penalty per incident', () => {
       u.penalty = u.penaltyTotal = 720; u.penaltyTurned = c.turned; u.penaltyDir = c.turned ? 1 : 0; // her turns from the first foul, against A
       const hh = (w as unknown as { hHist: number[][] }).hHist; hh[0] = [u.h]; hh[1] = [A.h]; // (nobody turned onto the other)
       (w as unknown as { lastFoulVs: Map<number, { vs: number; t: number; clear: boolean }> }).lastFoulVs.set(u.id, { vs: A.id, t: w.t - 7, clear: c.clear });
+      (w as unknown as { tangles: Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }> }).tangles.set(u.id < A.id ? u.id + '-' + A.id : A.id + '-' + u.id, { t0: w.t - 7, t: w.t - 7, clear: c.clear, fouler: c.firstBy ? A.id : u.id, parted: true, g0: 2 }); // (they'd come apart since)
+      if (c.jam) { u.v = 0.2; A.v = 0.2; } // (drifting together at a few tenths of a knot, barely closing) else if (c.firstBy || c.turned) { u.v = 2.5; A.v = 2.5; } // (under way)
       u.x = OPEN.x; u.y = OPEN.y; A.x = OPEN.x + 0.2; A.y = OPEN.y; // in contact again
       const fouls = w.fouls;
       w.step(DT);

@@ -9,6 +9,8 @@
 export type Place =
   | { k: 'home' }
   | { k: 'race' }
+  | { k: 'past' }
+  | { k: 'drill' }
   | { k: 'setup' }
   | { k: 'club'; tab?: 'boats' | 'members' }
   | { k: 'boat'; id: string };

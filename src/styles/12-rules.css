@@ -1,0 +1,17 @@
+/* The Rules trainer (src/ui/rulesTrainer.ts) */
+#rulesTrainer .panel{max-width:1100px}
+.rtBody{display:grid;grid-template-columns:640px 1fr;gap:20px;align-items:start}
+.rtStage{position:relative}.rtStage canvas{display:block;width:640px;height:480px;border-radius:10px}
+.rtTiles{position:absolute;right:10px;top:10px}
+.rtPanel h2{margin:4px 0 6px}
+.rtSetup{color:var(--muted);margin:0 0 12px}
+.rtChoices{display:flex;gap:8px;margin-bottom:12px}
+.rtChoice{flex:1;padding:10px 0;border-radius:8px;border:1px solid var(--rule);background:var(--pod);color:var(--text);font:700 15px/1 var(--f-inst);cursor:pointer}
+.rtChoice:disabled{cursor:default}.rtChoice:disabled:not(.right):not(.wrong){opacity:.55}
+.rtChoice.right{border-color:#1fbf8f;background:rgba(31,191,143,.16);color:#7df0c8}
+.rtChoice.wrong{border-color:#e8603c;background:rgba(232,96,60,.14)}
+.rtAnswer{border-left:3px solid #1fbf8f;padding:4px 0 4px 12px;margin-bottom:12px}
+.rtAnswer.no{border-left-color:#e8603c}
+.rtRules{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.rtRule{font:600 12px/1 var(--f-inst);border-radius:12px;padding:5px 9px;background:#16364a;color:#cfe3ec}
+.rtRule.key{background:var(--accent);color:#06101a}

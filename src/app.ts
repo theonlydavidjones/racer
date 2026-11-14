@@ -1,74 +1,150 @@
 import { CoachMemory } from './boat/coach';
-import { PREP_MEANING } from './sim/signals';
-import { describeSea } from './environment/sea';
 import './styles.css';
-import { CURRENTS } from './environment/current';
-import { COURSES, courseFile } from './courses/registry';
+import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
-import { place } from './sim/places';
 import { OUTBOARDS } from './boat/motor';
-import { ghostGap, ghostsFor, keepGhost, loadGhost, setupKey, trackOf, type Ghost } from './replay/ghost';
+import { ghostGap, ghostsFor, loadGhost, setupKey, type Ghost } from './replay/ghost';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
-import { addLog, loadLog, type LogEntry, type RaceSetup } from './boat/logbook';
-import { harborOf, inBasin, slipById, slipPlace } from './geo/marina';
-import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
+import { loadLog, type LogEntry } from './boat/logbook';
+import { harborAt, inBasin } from './geo/marina';
+import { HULL_COLORS, BRIGHT_FINISH, sailNo } from './boat/spec';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
-import { tactics, type Tactics } from './replay/tactics';
-import { tacticsHtml, tacticsTop, type TacShown } from './ui/tacticsView';
-import { planLegs } from './sim/strategist';
-import { outlookFor } from './sim/outlook';
-import { beatAngle } from './boat/polar';
-import { bigMoments, gapWords, legWords, rivalWho, versus, type VsInput } from './replay/versus';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
 import { HELD, KeyMap, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
-import { D2R, V, brg, dist, wrap } from './core/math';
-import { EXONERATION, RULES, explain, ptsText, raceScores, scoreOrder, type Incident, type ScoreOut } from './rules';
-import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, loadSettings, saveSettings, type Settings } from './settings';
+import { D2R, V } from './core/math';
+import { EXONERATION, RULES, explain, scoreOrder, type Incident } from './rules';
+import { MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './settings';
 import { FLEET } from './boat/boat';
+import { currentSeason, seasonById, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
+import { seasonHtml } from './ui/season';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
 import { placeAmong, realFleetIds, realRace, realRaces, sailKey } from './sim/realRaces';
 import type { Boat, LineKey } from './boat/boat';
-import { randomSeed } from './core/rng';
-import { CONDITION_KEYS, World, describeTide } from './sim/world';
-import { LocalHost, WorkerHost, type SimHost, type SimView, type WorldArgs } from './sim/host';
-import { spawnSimWorker } from './sim/spawn';
+import { CONDITION_KEYS } from './sim/world';
+import { WorkerHost, type SimHost, type SimView } from './sim/host';
 import type { Command, CtlKey } from './sim/commands';
-import { POLE, byHand, linesByHand } from './boat/physics';
+import { byHand, linesByHand } from './boat/physics';
 import type { PlaceAcross, PlaceFore } from './boat/crewPhys';
-import { YOU, ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
+import { ensureMembers, loadMembers, pullCrew, saveMembers, type Member } from './club/members';
 import { installSkipperUI } from './ui/skipperUI';
 installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said of her, her record)
 import { SailBand } from './ui/sailBand';
 import { WindLadder } from './render/windLadder';
-import { windBand, type ManoeuvreScore } from './sim/drill';
-import { roundingKey, type RoundingScore } from './sim/roundings';
 import { LINE_NAME } from './ui/lines';
-import { autoAcross, showCrewRow, toggleCrewOpen } from './ui/crewWords';
-import { CurrentField, nextSaturday, sfClock } from './environment/tide';
+import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
-import { compassPoint, degAndPoint, turnWords } from './core/compass';
-import { WIND_KINDS, WIND_KIND_LABEL, windKindFreq, windTerrain, type WindKind } from './environment/wind';
-import { compass, sunPosition, sunTimes } from './environment/sun';
-import { startDebrief, type StartStats } from './sim/startDebrief';
+import { degAndPoint, turnWords } from './core/compass';
+import { WIND_KIND_LABEL, type WindKind } from './environment/wind';
+import { sunPosition } from './environment/sun';
+import { type StartStats } from './sim/startDebrief';
 import type { SimEvent } from './sim/events';
 import { $ } from './ui/dom';
 import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } from './ui/feedback';
-import { Hud, fmtClock, sideWord } from './ui/hud';
+import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
-import { onSaveTrouble } from './store/cloud';
-import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView } from './ui/layers';
+import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView, type MenuChoice } from './ui/layers';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
 import { PlanChart } from './ui/planChart';
-import { passageNow, whyNot } from './sim/navigator';
 import { FlowPanel } from './ui/flowPanel';
 import type { PilotMode } from './boat/autopilot';
 import { Nav, type Place } from './ui/nav';
+import { morph } from './ui/morph';
+import { emptyTile, splitNo, tile } from './ui/tiles';
+import { installDevHandles } from './app/devHandles';
+import { mountDrills } from './app/drills';
+import { mountResults } from './app/results';
+import { mountSetup } from './app/setup';
+import { dockCardHtml } from './ui/lessons';
+import { RulesTrainer } from './ui/rulesTrainer';
+
+/**
+ * What the app's parts (src/app/*.ts) reach of its own state: each a getter, so a part sees it as it is now, and a
+ * setter where a part changes it. (Read when a part's code runs, after app.ts has set them up.)
+ */
+const ctx = {
+  get activeGhost() { return activeGhost; }, set activeGhost(v) { activeGhost = v; },
+  get host() { return host; }, set host(v) { host = v; },
+  get hud() { return hud; },
+  get look() { return look; },
+  get nav() { return nav; },
+  get over() { return over; },
+  get planChart() { return planChart; },
+  get setLook() { return setLook; },
+  get showroomTwa() { return showroomTwa; }, set showroomTwa(v) { showroomTwa = v; },
+  get view() { return view; },
+  get w() { return w; }, set w(v) { w = v; },
+  get DRILL_FROM() { return DRILL_FROM; },
+  get S() { return S; },
+  get beginRace() { return setup.beginRace; },
+  get rulesTrainer() { return rulesTrainer; },
+  get beginLesson() { return setup.beginLesson; },
+  get openLessons() { return setup.openLessons; },
+  get drillRuns() { return drillRuns; },
+  get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
+  get drillView() { return drillView; },
+  get esc() { return esc; },
+  get openSetup() { return setup.openSetup; },
+  get toSetup() { return setup.toSetup; },
+  get showPlace() { return showPlace; },
+  get fleetChosen() { return fleetChosen; },
+  get send() { return send; },
+  get setControlsIdle() { return setControlsIdle; },
+  get drills() { return drills; },
+  get incidentClips() { return incidentClips; }, set incidentClips(v) { incidentClips = v; },
+  get mmss() { return mmss; },
+  get pendingGhost() { return pendingGhost; }, set pendingGhost(v) { pendingGhost = v; },
+  get pendingSeason() { return pendingSeason; }, set pendingSeason(v) { pendingSeason = v; },
+  get raceReplay() { return raceReplay; },
+  get realResults() { return realResults; },
+  get replayPin() { return replayPin; }, set replayPin(v) { replayPin = v; },
+  get resultsShown() { return resultsShown; }, set resultsShown(v) { resultsShown = v; },
+  get seasonLine() { return seasonLine; },
+  get seasonRaceOf() { return seasonRaceOf; },
+  get seasonResult() { return seasonResult; },
+  get titleCase() { return titleCase; },
+  get KIND_NOTE() { return KIND_NOTE; },
+  get MEMBERS() { return MEMBERS; },
+  get SIM_GUARD() { return SIM_GUARD; },
+  get SIM_INPROC() { return SIM_INPROC; },
+  get adjustUi() { return adjustUi; },
+  get boatPanel() { return boatPanel; },
+  get committee() { return committee; },
+  get condLive() { return condLive; }, set condLive(v) { condLive = v; },
+  get courseView() { return courseView; },
+  get fleet() { return fleet; },
+  get ghostNext() { return ghostNext; },
+  get hhmm() { return hhmm; },
+  get insetViews() { return insetViews; },
+  get keymap() { return keymap; },
+  get keysHint() { return keysHint; },
+  get labels() { return labels; },
+  get navView() { return navView; },
+  get pendingPenalty() { return pendingPenalty; }, set pendingPenalty(v) { pendingPenalty = v; },
+  get prepared() { return prepared; }, set prepared(v) { prepared = v; },
+  get realRaceHolds() { return realRaceHolds; },
+  get results() { return results; },
+  get setupChart() { return setupChart; },
+  get setupTimer() { return setupTimer; }, set setupTimer(v) { setupTimer = v; },
+  get showBar() { return showBar; },
+  get showCond() { return showCond; }, set showCond(v) { showCond = v; },
+  get showCrewPlace() { return showCrewPlace; },
+  get showLash() { return showLash; },
+  get showMin() { return showMin; },
+  get showSaved() { return showSaved; }, set showSaved(v) { showSaved = v; },
+  get showTrimOwner() { return showTrimOwner; },
+  get shownDest() { return shownDest; }, set shownDest(v) { shownDest = v; },
+  get speedSet() { return speedSet; }, set speedSet(v) { speedSet = v; },
+  get still() { return still; }, set still(v) { still = v; },
+  get unshown() { return unshown; }, set unshown(v) { unshown = v; },
+  get word() { return word; },
+};
+export type AppCtx = typeof ctx;
 
 const S: Settings = loadSettings();
 // the Yacht Club's members (club/members.ts): you and your crew, assigned to your boat's seats; the race's crew comes from them
@@ -186,12 +262,7 @@ let condLive = false;
 /** Ghost races (replay/ghost.ts): the ghost chosen in Run a past race, the one being raced now (while the race is the
  * ghost's very race), and your run of the race just logged (kept as a ghost if you save it). */
 let ghostNext: Ghost | null = null, activeGhost: Ghost | null = null, pendingGhost: Ghost | null = null;
-function newGame(seed = randomSeed()): void {
-  if (condLive && w?.running) { saveSettings(S); void host.ask({ k: 'conditions', settings: S }).then(() => view.conditionsChanged(w)); return; } // (redrawn once the race has them: the committee boat to the new wind) // (the owner: at once, without a restart)
-  // (a setup change still waiting on its debounce is overtaken: this race is built from the settings as they are now)
-  clearTimeout(setupTimer); const fs = [...setupAfter]; setupAfter.clear();
-  prepare(seed); show(); fs.forEach(f => f());
-}
+const setup = mountSetup(ctx); // (src/app/setup.ts)
 /*
  * The setup's changes build the race but not the scene (the owner, 13 Nov 2026: "let me finish configuring the race
  * before loading up the game"). prepare() builds the one World the setup's cards and charts read (its course, weather,
@@ -203,66 +274,7 @@ function newGame(seed = randomSeed()): void {
 let still = false, unshown = false;
 /** How many Worlds the page has built (for the checks: a setup change builds one, after the debounce). */
 let prepared = 0;
-function prepare(seed = randomSeed()): void {
-  incidentClips = []; // (a new race: its own rule incidents)
-  pendingPenalty = null; // (an incident's penalty is for the race it happened in)
-  // in the showroom (editing one of your boats, or her page in the Fleet): she's the boat shown, her flags flying
-  const shown: BoatSpec | null = boatPanel?.open ? boatPanel.editing : fleet?.showing ?? null, showFlags = !!shown;
-  const WS0 = shown && shown.id !== S.boatId ? (() => { const o = S.opponents.filter(x => x !== shown.id); return { ...S, boat: shown, opponents: o, fleet: o.length }; })() : S;
-  // (an older race sailed again keeps the direction it was pinned to, for this race only: replayPin)
-  const WS1 = replayPin != null ? { ...WS0, windDir: replayPin } : WS0;
-  // (on show: the showroom's own time of day and conditions, if you've set them; your races' and cruises' are untouched)
-  const WS = shown ? { ...WS1, ...(showCond ?? {}), ...(showMin != null ? { tideTime: hhmm(showMin + WS1.seq) } : {}) } : WS1;
-  const rc = S.course === RC_COURSE ? committee(WS) : null;
-  const courseSignal = rc ? { no: rc.est.no, why: rc.why } : undefined;
-  // (the practice drills, alone, in the setup's day and conditions: the tack and gybe drill off the Cityfront; the
-  // mark-rounding drill round the practice course's marks, so its file is forced to the practice course)
-  const soloDrill = (S.mode === 'manoeuvres' || S.mode === 'roundings') && !shown;
-  const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: 'cityfront', sailTo: '' } : WS;
-  const drillFile = S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
-  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(S.course === RC_COURSE ? COURSES[0].id : S.course)), settings: WSd, seed,
-    opts: S.mode === 'drill' ? { startAt: S.drillFrom ?? DRILL_FROM, solo: S.drillSolo ?? true, showFlags, courseSignal } : (S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: S.seq * 60 } : {}) } };
-  // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
-  const facts = new World(args.file, args.settings, args.seed, args.opts);
-  if (host) host.rebuild(args, facts);
-  else {
-    // the race in a worker of its own (sim/host.ts WorkerHost), the page drawing its mirror; in the page's own thread where
-    // a worker can't start, or with ?inproc (the dev handles and the check scripts that change the World directly)
-    const wk = SIM_INPROC ? null : spawnSimWorker();
-    host = wk ? new WorkerHost(wk, args, SIM_GUARD, why => { document.documentElement.dataset.sim = 'local'; toast(`The race moved to the page's own thread (${why.split('\n')[0]}).`, 4000); }, facts)
-      : new LocalHost(facts, SIM_GUARD);
-  }
-  w = host.view; shownDest = w.dest; speedSet = w.speed; drillShown = false; resultsShown = false;
-  document.documentElement.dataset.sim = host.mode; // (where the race sails, for the checks: 'worker' or 'local')
-  unshown = true; document.documentElement.dataset.prepared = String(++prepared);
-}
-/** The scene for the race prepare() built: the boats, marks and labels drawn, and the view live again. */
-function show(): void {
-  unshown = false; setStill(false);
-  showTrimOwner(); showLash(); showCrewPlace();
-  word('bCourse', w.freeSail ? 'Navigator' : 'Course'); keysHint(); insetViews();
-  view.setWorld(w);
-  // a ghost race: the run chosen in Run a past race, shown only while the race is that very race (its setup's key: the same
-  // course, seed, start time and conditions); any other race has none
-  activeGhost = ghostNext && S.mode === 'race' && setupKey(raceSetup()) === ghostNext.key ? ghostNext : null; view.setGhost(w, activeGhost?.pts ?? null);
-  labels.build(w);
-}
-function setStill(on: boolean): void { still = on; document.body.classList.toggle('still', on); }
-/** Leaving the setup without sailing (the start page): its race drawn, and live again. */
-function wake(): void { if (unshown) show(); else setStill(false); }
 let setupTimer = 0;
-const setupAfter = new Set<() => void>();
-/**
- * A choice in the setup: its race built once the clicks stop (120 ms), then `after` (the cards that read it). Outside
- * the setup (the showroom, the pause menu's conditions) the change is drawn at once, as before.
- */
-function setupChanged(after?: () => void, wait = 120): void {
-  if (!still || condLive) { newGame(); after?.(); return; }
-  if (after) setupAfter.add(after);
-  clearTimeout(setupTimer);
-  const go = () => { if (!still) return; prepare(); const fs = [...setupAfter]; setupAfter.clear(); fs.forEach(f => f()); };
-  if (wait <= 0) go(); else setupTimer = window.setTimeout(go, wait);
-}
 
 /* ---------------- sim events → UI ---------------- */
 function handle(e: SimEvent): void {
@@ -276,7 +288,7 @@ function handle(e: SimEvent): void {
 
 let lastClip: ReplayClip | null = null;
 /** This race's rule incidents, for the race replay (by Moment.ref). */
-let incidentClips: { clip: ReplayClip; title: string; what: string }[] = [];
+let incidentClips: { clip: ReplayClip; title: string; what: string; t?: number }[] = [];
 function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): void {
   setControlsIdle();
   const user = A.isUser ? A : B, other = A.isUser ? B : A, youFault = inc.fouler.isUser;
@@ -301,15 +313,15 @@ function showIncident(A: Boat, B: Boat, inc: Incident<Boat>, clip: ReplayClip): 
   // boat breaking a rule of Part 2 isn't penalized for it, except rule 14 with injury or serious damage, and rule 23.1)
   const preamble = !!inc.notRacing;
   $('rPen').textContent = preamble ? `No penalty: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing${w.cancelled ? ' (racing was called off)' : ''}. The right-of-way rules still apply between boats out here, but a boat not racing isn't penalized for breaking them (Part 2 preamble).` : notRacing ? `No turns: ${youFault ? 'you weren\'t' : `${inc.fouler.name} wasn't`} racing, and a turns penalty is only for an incident while racing (Rule 44.1). ${youFault ? `${other.name} may protest you` : `You may protest ${inc.fouler.name}`} instead.` : exonerated ? `No penalty: ${youFault ? 'you were' : `${inc.fouler.name} was`} compelled by ${w.boats[inc.exoneratedBy!].name}'s foul (Rule 43.1(a)).` : youFault
-    ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a gybe (Rule 44.2).`
-    : `${other.name} takes a ${turns} penalty.`;
+    ? `Penalty: ${turns} (${w.penaltyDeg}°). Get clear of other boats, then turn ${w.penaltyDeg === 720 ? 'two full circles' : 'one full circle'} in the same direction: each one includes a tack and a jibe (Rule 44.2).${w.protestsOn ? ` Skip them and ${other.name} may protest.` : ''}`
+    : w.protestsOn ? `${other.name}'s ${turns} penalty is theirs to take (Rule 44.1). To protest, hail "Protest!" now (${keymap.label('hail')}).` : `${other.name} takes a ${turns} penalty.`;
   logMessage(`${youFault ? 'Foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}. ${ex.what}`);
   pendingPenalty = exonerated || notRacing || preamble ? null : inc.fouler;
   lastClip = clip;
   if (w.log) {
     const title = `${youFault ? 'Your foul' : `${other.name} fouled you`}: ${RULES[inc.rule][0]}`;
     send({ k: 'logNote', note: { key: 'rule', t0: w.t - 10, t1: w.t, x: user.x, y: user.y, lost: 0, text: title, ref: incidentClips.length } });
-    incidentClips.push({ clip, title, what: ex.what });
+    incidentClips.push({ clip, title, what: ex.what, t: w.t });
   }
   $('replay').hidden = false;
   replayView.play(w, clip);
@@ -368,7 +380,7 @@ function showTiller(): void {
   if (tillerHeld) $('tgCur').style.left = `${50 + t * TILLER_SPAN * 100}%`;
   $('tiller').setAttribute('aria-valuenow', String(Math.round(t * 100)));
   $('tillerLab').textContent = w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
-    : Math.abs(t) < 0.04 ? 'Tiller · centred' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
+    : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`;
 }
 // Tiller bar: drag the handle left/right. Let go and it springs back to centre.
 let barDrag = false;
@@ -398,7 +410,7 @@ function takeTiller(x?: number): void {
   pilotOff('Pilot on standby: you have the tiller.'); unlash();
   tillerHeld = true; document.body.classList.add('tiller-held'); $('tiller').classList.add('held');
   if (x != null) tillerFromCursor(x);
-  if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's centre line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
+  if (!toldTiller) { toldTiller = true; toast(`You have the tiller. Slide left or right: the screen's center line is straight ahead, right of it turns you to port, left of it to starboard. ${keymap.label('takeTiller')}, Esc or a click lets go.`, 5000); }
 }
 function releaseTiller(): void {
   if (!tillerHeld) return;
@@ -429,7 +441,7 @@ type CtlItem = { key: CtlKey | 'carFore' | 'carIn'; label: string; group: string
 /** The lines, grouped as they are on Josephine. */
 const CTL_UI: CtlItem[] = [
   { group: 'Cockpit thwart', key: 'mainsheet', label: 'Mainsheet' },
-  { group: 'Cockpit thwart', key: 'traveller', label: 'Traveller' },
+  { group: 'Cockpit thwart', key: 'traveller', label: 'Traveler' },
   { group: 'Cockpit thwart', key: 'backstay', label: 'Backstay' },
   { group: 'Piano', key: 'vang', label: 'Vang' },
   { group: 'Piano', key: 'outhaul', label: 'Outhaul' },
@@ -470,13 +482,19 @@ document.addEventListener('click', e => {
   if (you) { send({ k: 'line', key: k, mine: true }); showTrimOwner(); toast(`The ${LINE_NAME[k]} is yours: it stays where it is until you work it, or tap Crew.`, 3000); }
   else { giveBack(k); toast(`The ${LINE_NAME[k]} is the crew's again.`, 2000); }
 });
-// the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout)
-function crewPopOpen(open = !!$('crewPop').hidden): void {
+// the crew's weight lives in a pop-up on the Crew button, bottom right (the chase-view layout), or opened from the
+// Coach card's crew line. The owner (13 Nov 2026): the button back on the surface, so you can find where the crew sit
+// when you need them (in irons, their weight to leeward helps her bear away)
+function crewPopOpen(open = !!$('crewPop').hidden, from: 'button' | 'coach' = 'coach'): void {
   $('crewPop').hidden = !open; $('bCrew').setAttribute('aria-expanded', String(open)); $('bCrew').classList.toggle('on', open);
-  // (opened from the Coach card's crew line: it sits just above that card, on the left, clear of the band)
-  if (open) { const r = $('trimPanel').getBoundingClientRect(), pop = $('crewPop').style; pop.bottom = `${Math.round(innerHeight - r.top + 8)}px`; pop.left = `${Math.round(r.left)}px`; pop.right = 'auto'; }
+  if (!open) return;
+  const pop = $('crewPop').style;
+  // (from the button: just above it, bottom right, as before, with the places to sit open; from the Coach card's crew
+  // line: just above that card, on the left, clear of the band)
+  if (from === 'button') { pop.bottom = pop.left = pop.right = ''; openCrewChoices(); showCrewPlace(); }
+  else { const r = $('trimPanel').getBoundingClientRect(); pop.bottom = `${Math.round(innerHeight - r.top + 8)}px`; pop.left = `${Math.round(r.left)}px`; pop.right = 'auto'; }
 }
-$('bCrew').onclick = () => crewPopOpen();
+$('bCrew').onclick = () => crewPopOpen(undefined, 'button');
 // the crew line in the Coach card is redrawn every frame: catch its clicks on the card
 $('trimPanel').addEventListener('click', e => { if ((e.target as HTMLElement).closest('.tp-crew')) crewPopOpen(); });
 $('tpCrewLine').onclick = () => { if (!w.user.crew?.place) { toggleCrewOpen(); showCrewPlace(); } };
@@ -487,7 +505,7 @@ const band = new SailBand({
   hold: (k, d) => { if (d == null) delete btnCmd[k]; else btnCmd[k] = d; applyHeld(); },
   changed: () => showTrimOwner(),
   toast: (m, ms) => toast(m, ms),
-  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Auto-trim: every line, both jib cars and the pole back to the crew.', 2500); },
+  allBack: () => { send({ k: 'allToCrew' }); S.manualTrim = 0; saveSettings(S); showTrimOwner(); toast('Hand Back: every line and both jib cars back to the crew. The pole stays yours.', 2500); },
   pole: () => togglePole(),
   paddle: (side: 'P' | 'S') => paddleSide(side),
   hailWords: () => w.hailOption()?.words ?? null,
@@ -551,79 +569,12 @@ function windShow(on: boolean): void {
   refreshMenus();
 }
 windShow(!!S.windLadder);
-/* The tack and gybe drill (sim/drill.ts): each manoeuvre scored in the race, shown here in the Coach card as it's
- * scored, the whole list (and your bests, kept by manoeuvre and wind band) on the Pause screen. */
-let drillSeen = 0;
-const drillName = (k: 'tack' | 'gybe') => (k === 'tack' ? 'Tack' : 'Gybe');
-const drillKey = (s: ManoeuvreScore) => `${s.kind}-${windBand(s.tws)}`;
-function drillTick(): void {
-  const el = $('tpDrill'), list = w.drill?.list;
-  if (!list) { if (w.rounding) return; if (!el.hidden) { el.hidden = true; drillSeen = 0; } return; } // (the rounding drill shares the card)
-  if (list.length < drillSeen) drillSeen = 0; // (a restart: a new, empty list)
-  if (list.length === drillSeen) { if (!list.length) el.hidden = true; return; }
-  for (let i = drillSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by manoeuvre and wind band)
-    const s = list[i], k = drillKey(s), b = S.practiceBest?.[k];
-    if (!s.scored || s.lostM < 0) continue; // (a turn noted, not scored, is no best; nor a reading below nothing, the measure's own wander)
-    if (!b || Math.max(0, s.lostM) < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(S); }
-  }
-  drillSeen = list.length;
-  const s = list[list.length - 1], best = S.practiceBest?.[drillKey(s)];
-  el.hidden = false;
-  if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
-  el.innerHTML = `<b>${drillName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b> (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
-  el.querySelector('.tp-dcoach')!.textContent = s.coach;
-}
-/* ---- the mark-rounding drill (sim/roundings.ts): the same Coach card and Pause slot, one drill at a time ---- */
-const roundName = (k: 'windward' | 'leeward') => (k === 'windward' ? 'Windward mark' : 'Leeward mark');
-let roundSeen = 0;
-function roundTick(): void {
-  const el = $('tpDrill'), list = w.rounding?.list;
-  if (!list) { if (w.drill) return; if (!el.hidden) { el.hidden = true; roundSeen = 0; } return; }
-  if (list.length < roundSeen) roundSeen = 0; // (a restart: a new, empty list)
-  if (list.length === roundSeen) { if (!list.length) el.hidden = true; return; }
-  for (let i = roundSeen; i < list.length; i++) { // (your bests: the fewest metres lost, by mark and wind band)
-    const s = list[i], k = roundingKey(s), b = S.practiceBest?.[k];
-    if (!s.scored || s.lostM < 0 || s.provisional) continue; // (a provisional score is no best)
-    if (!b || Math.max(0, s.lostM) < b.lostM) { S.practiceBest = { ...(S.practiceBest ?? {}), [k]: { lostM: Math.max(0, s.lostM), goodM: s.goodM } }; saveSettings(S); }
-  }
-  roundSeen = list.length;
-  const s = list[list.length - 1], best = S.practiceBest?.[roundingKey(s)];
-  el.hidden = false;
-  if (!s.scored) { el.innerHTML = '<span class="tp-dcoach"></span>'; el.querySelector('.tp-dcoach')!.textContent = s.coach; return; }
-  el.innerHTML = `<b>${roundName(s.kind)} ${list.filter(x => x.kind === s.kind && x.scored).length}</b> · lost <b>${Math.max(0, Math.round(s.lostM))} m</b>${s.provisional ? ' (provisional: first lap)' : ''} (a good crew ${Math.round(s.goodM)} m)${best ? ` · best ${Math.max(0, Math.round(best.lostM))} m` : ''}<br><span class="tp-dcoach"></span>`;
-  el.querySelector('.tp-dcoach')!.textContent = s.coach;
-}
-/** The Pause screen's list for the rounding drill: every rounding, its numbers, and your bests. */
-function roundHtml(): string {
-  const list = w.rounding?.list ?? [], f = (v: number | null, d = 0) => (v == null ? '—' : v.toFixed(d));
-  const bestOf = (k: 'windward' | 'leeward') => list.reduce((bi, x, i) => (x.kind === k && x.scored && !x.provisional && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
-  const lit = new Set([bestOf('windward'), bestOf('leeward')]);
-  const row = (s: RoundingScore, i: number) => {
-    const head = `<td>${i + 1}. ${roundName(s.kind)}</td><td>${Math.round(s.tws)} kt</td>`;
-    if (!s.scored) return `<tr class="noscore">${head}<td colspan="5">not scored</td></tr><tr class="dcoach"><td colspan="7">${s.coach.replace(/</g, '&lt;')}</td></tr>`;
-    // approach: the tacks inside the zone (windward) or the pole down before the mark (leeward); exit: how close onto the new course
-    const approach = s.kind === 'windward' ? `${s.tacks} tack${s.tacks === 1 ? '' : 's'}${s.pinchS > 2 ? `, pinched ${f(s.pinchS)} s` : s.freeS > 2 ? `, free ${f(s.freeS)} s` : ''}` : `in ${Math.round(s.entryD)} m`;
-    const pole = s.kind === 'windward' ? (s.poleS == null ? 'no pole' : `+${f(s.poleS)} s`) : (s.dropS == null ? '—' : `−${f(Math.max(0, s.dropS))} s`);
-    return `<tr${lit.has(i) ? ' class="best"' : ''}>${head}<td><b>${Math.max(0, Math.round(s.lostM))} m</b>${s.provisional ? '*' : ''} / ${Math.round(s.goodM)} m</td><td>${approach}</td><td>${pole}</td><td>${Math.round(s.exitD)} m</td></tr><tr class="dcoach"><td colspan="7">${s.coach.replace(/</g, '&lt;')}</td></tr>`;
-  };
-  const rows = list.map(row).join('');
-  const bests = Object.entries(S.practiceBest ?? {}).filter(([k]) => /^(wmark|lmark)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'wmark' ? 'Windward' : 'Leeward'} mark, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
-  return `<h3>Mark roundings</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Approach</th><th>Pole</th><th>Exit off mark</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No roundings yet: beat up to the windward mark, round it to port and set the pole for the run down to the pin; round the pin to port and beat up again.</p>'}`
-    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on from 100 m off the mark until you were 100 m past it, measured through the water: a stream doesn't score a clean rounding, though a mistake costs a little more in a strong one, as it does on the water. A rounding is provisional (marked *) when your pace on the new leg's point of sail isn't measured yet: usually your first windward mark, before you've run. The twin sails each leg at your own pace on that point of sail, from your last steady leg of it. Good crew: the sim's own crew, measured the same way in this wind, in flat water. Approach: tacks inside 100 m of the windward mark, and whether you reached in (free) or pinched in the last 60 m; for the leeward mark, how far off it you began the turn. Pole: for the windward mark, seconds from rounding to the pole set; for the leeward mark, seconds the pole was down before the mark. Exit off mark: at the leeward mark, how far the mark was to windward of your new close-hauled track as you came onto the wind (wide in, close out), against the good crew's. Only the windward mark and the pin (the leeward mark), each left to port, are scored.</p>`
-    + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
-}
-/** The Pause screen's list: every manoeuvre so far, with its numbers, and your bests. */
-function drillHtml(): string {
-  const list = w.drill?.list ?? [], f = (v: number | null, d = 0) => (v == null ? '—' : v.toFixed(d));
-  // (the best of each kind this run, the fewest metres lost: lit, as the start-line drill lights its best)
-  const bestOf = (k: 'tack' | 'gybe') => list.reduce((bi, x, i) => (x.kind === k && x.scored && x.lostM >= 0 && (bi < 0 || x.lostM < list[bi].lostM) ? i : bi), -1);
-  const lit = new Set([bestOf('tack'), bestOf('gybe')]);
-  const rows = list.map((s, i) => !s.scored ? `<tr class="noscore"><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td colspan="6">not scored</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>` : `<tr${lit.has(i) ? ' class="best"' : ''}><td>${i + 1}. ${drillName(s.kind)}</td><td>${Math.round(s.tws)} kt</td><td><b>${Math.max(0, Math.round(s.lostM))} m</b> / ${Math.round(s.goodM)} m</td><td>${f(s.rate)}°/s</td><td>${s.kind === 'tack' ? f(s.deadS, 1) + ' s' : '—'}</td><td>${f(s.overshoot)}°</td><td>${s.acrossS == null ? '—' : (s.acrossS >= 0 ? '+' : '') + s.acrossS.toFixed(1) + ' s'}</td><td>${f(s.backS)} s</td></tr><tr class="dcoach"><td colspan="8">${s.coach.replace(/</g, '&lt;')}</td></tr>`).join('');
-  const bests = Object.entries(S.practiceBest ?? {}).filter(([k]) => /^(tack|gybe)-/.test(k)).map(([k, b]) => { const [kind, band] = k.split('-'); return `${kind === 'tack' ? 'Tack' : 'Gybe'}, ${band} wind: ${Math.max(0, Math.round(b.lostM))} m (a good crew ${Math.round(b.goodM)} m)`; }).join(' · ');
-  return `<h3>Tacks and gybes</h3>${list.length ? `<table class="attempts"><thead><tr><th></th><th>Wind</th><th>Lost / good crew</th><th>Turn</th><th>Head to wind</th><th>Past course</th><th>Across</th><th>Back to speed</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No tacks or gybes yet: tack when you\'re ready, or bear away to a run, settle, and gybe.</p>'}`
-    + `<p class="drillnote">Lost: progress along the wind you gave away against a twin sailing on, until she was back to 90% speed (98% after a gybe), not the whole loss to full speed. Good crew: the sim's own crew, measured the same way in this wind, in flat water (in a chop she'll lose a little more). A shift or a puff reaches the twin too. Only a tack from close-hauled and a gybe from a run, each from a steady course, are scored. Turn: its mean rate. Past course: how far past the new close-hauled course (or up from the run). Across: when the jib (or the boom) came across, in seconds after head to wind (dead downwind).</p>`
-    + (bests ? `<p><b>Your bests</b>: ${bests}</p>` : '');
-}
+const drills = mountDrills(ctx); // (src/app/drills.ts)
+/** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
+ * the ones answered right first time kept with your settings. Its entry is a Drill card (the Drill section). */
+const rulesTrainer = new RulesTrainer($('rulesTrainer'), () => S.rulesRight ?? [], n => { S.rulesRight = [...(S.rulesRight ?? []), n]; saveSettings(S); });
+$('rulesTrainer').addEventListener('click', e => rulesTrainer.click(e));
+$('bRules').onclick = () => rulesTrainer.open();
 /** Each frame: the ladder by her while she's sailing (not in the slip's menus or the showroom). */
 function windTick(): void {
   const on = !!S.windLadder && w.running && !w.user.docked;
@@ -657,6 +608,7 @@ $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLEleme
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(dt: number): void {
   if (!w.running) { $('coachTip').classList.remove('on'); return; }
+  if (w.lesson) { lessonTick(); return; }
   const u = w.user;
   if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
   coachT += dt; if (coachT < 0.5 && coachShown) { tipFade(); return; }
@@ -675,6 +627,40 @@ function coachTick(dt: number): void {
   if (open) coachTipUntil = 0;
   tipFade();
   if (!$('coachPanel').hidden) renderCoach();
+}
+/** A lesson (sim/lessons.ts): its one cue in the coach's own places (the trim panel's headline, and on the water for a few
+ * seconds when it's new), with how far through the check you are; passed, it's kept with your settings. */
+let lessonCue = '', lessonOf: unknown = null;
+/** Before you go's dock card (ui/lessons.ts dockCardHtml): the gear tapped, then Cast off sends the lesson on. */
+let dockFor: unknown = null;
+const dockGear = new Set<string>();
+const paintDock = () => { $('dockCard').innerHTML = dockCardHtml(dockGear, 1 + (S.crew?.people?.length ?? 0), (S.boat?.perf?.outboard ?? 'none') !== 'none'); };
+$('bDockX').onclick = () => { $('lessonCard').hidden = true; setup.openLessons(); }; // (back to the lessons: this one left)
+$('dockCard').addEventListener('click', e => {
+  const el = e.target as HTMLElement, g = el.closest<HTMLElement>('[data-gear]')?.dataset.gear;
+  if (g) { if (dockGear.has(g)) dockGear.delete(g); else dockGear.add(g); paintDock(); return; }
+  if (el.closest('[data-dock="go"]')) {
+    // the float plan, left with the club (your settings): where, back by when, who's aboard
+    const v = (k: string) => (document.querySelector<HTMLInputElement>(`#dockCard [data-fp="${k}"]`)?.value ?? '').trim();
+    S.floatPlan = { where: v('where'), back: v('back'), aboard: +v('aboard') || 1 }; saveSettings(S);
+    $('lessonCard').hidden = true; send({ k: 'lessonReady' }); send({ k: 'pause', on: false });
+  }
+});
+function lessonTick(): void {
+  const L = w.lesson!, tip = $('coachTip');
+  if (L !== lessonOf) { lessonOf = L; lessonCue = ''; } // (a new lesson, or the same one again: its first cue shows)
+  // Before you go: at the dock, its card first (the gear, the float plan), the lesson paused behind it
+  if (L.id === 'before' && L.step === 0 && dockFor !== L) { dockFor = L; dockGear.clear(); send({ k: 'pause', on: true }); paintDock(); $('lessonCard').hidden = false; }
+  $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
+  $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
+  if (L.cue !== lessonCue) {
+    lessonCue = L.cue;
+    if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
+    if (L.passed && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
+    // passed: a moment to see it, then paused on the lessons, this one ticked
+    if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); setup.openLessons(); } }, 3000);
+  }
+  tipFade();
 }
 function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 function stepCar(k: 'carFore' | 'carIn', d: number): void {
@@ -728,8 +714,9 @@ function cyclePaddle(): void {
 }
 function togglePole(): void {
   if (!w.running || w.paused) return;
-  const want = !w.user.poleWant; send({ k: 'pole', want }); // (yours now, until Auto-trim)
-  toast(want ? `Crew: setting the whisker pole (about ${POLE.set} s). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback.` : `Crew: stowing the pole (about ${POLE.stow} s).`, 3000);
+  // (the pole is always yours: your call only. The race answers, setting it or saying why not: sim/commands.ts, so the
+  // message is what the crew actually do, never the page's guess from its mirror)
+  send({ k: 'pole', want: !w.user.poleWant });
 }
 // act on the press itself, and don't take keyboard focus (a later key press must not toggle it again)
 // the Flags tile opens the flag index; × or Esc closes it
@@ -755,6 +742,25 @@ $('bFlagIndexX').addEventListener('click', () => hud.flagIndex(w, false));
 function doHail(): void { if (w.running && !w.paused) send({ k: 'hail' }); }
 /* Push off from her slip: the crew walks her out and swings her round (sim/world.ts). */
 function pushOff(): void { if (w.running && !w.paused) send({ k: 'pushOff' }); }
+/**
+ * G, by the dock: push off when she's made fast (or being walked out); coming in, lines ready (again: stand down); lying to
+ * her lines along a dock, let go (sim/world.ts linesReady, letGoLines).
+ */
+function berthKey(): void {
+  const u = w.user; if (!w.running || w.paused) return;
+  if (u.docked || u.handled) pushOff(); else if (u.mooring?.lines.length) send({ k: 'letGo' }); else send({ k: 'lines' });
+}
+/** The Crew panel's dock row: shown in a harbor while cruising, its words by where she is in coming in. */
+function linesUi(): void {
+  const u = w.user, m = u.mooring, show = w.running && w.cruising && !u.docked && !u.handled && !!harborAt(u);
+  const row = $('tpDockRow'); if (row.hidden !== !show) row.hidden = !show;
+  if (!show) return;
+  const word = !m ? 'Lines ready' : m.phase === 'ready' ? 'Stand down' : m.lines.length ? 'Let go' : 'Lines ready';
+  const sub = !m ? (u.crew?.spec.crew.length ? 'G · crew steps off at the shrouds' : 'G · you step off with the midships line') : m.phase === 'ready' ? `G · ${m.cue ?? 'coming in'}` : 'G · cast off her lines';
+  if ($('bLinesW').textContent !== word) $('bLinesW').textContent = word;
+  if ($('bLinesS').textContent !== sub) $('bLinesS').textContent = sub;
+}
+$('bLines').onclick = berthKey;
 $('bPushOff').onclick = pushOff;
 /* Hoist or strike a sail (the crew does it at their pace: boat/physics.ts crewRig). */
 function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) return; const r = w.user.rig; send({ k: 'sail', sail, up: !(r ? (sail === 'main' ? r.mainUp : r.jibUp) : true) }); }
@@ -840,7 +846,7 @@ $('bMotorNo').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', 
 /* ---------------- Home: send her back to her home slip (racing, it retires her first) ---------------- */
 function goHome(): void {
   if (!w.running) return;
-  if (!w.homeSlip) { toast('She has no home slip: give her one in the Fleet.', 3500); return; }
+  if (!w.homeSlip) { toast('She has no home slip: give her one in the Yacht Club.', 3500); return; }
   if (!w.freeSail && !w.user.finished && !w.user.retired) { send({ k: 'pause', on: true }); $('homeAsk').hidden = false; ($('bHomeNo') as HTMLButtonElement).focus(); return; }
   homeNow();
 }
@@ -859,7 +865,7 @@ function homeButton(): void {
   if (el.hidden !== hide) el.hidden = hide;
   if (!$('bHome').hidden) $('bHome').hidden = true;
   el.classList.toggle('dim', !w.homeSlip);
-  const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Fleet first)';
+  const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Yacht Club first)';
   if (el.title !== t) el.title = t;
 }
 $('bPilot').onclick = () => { if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); };
@@ -911,121 +917,16 @@ let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
 let resultsShown = false;
 $('bFast').onclick = () => { speedSet = speedSet === 1 ? 2 : speedSet === 2 ? 4 : 1; send({ k: 'speed', v: speedSet }); word('bFast', 'Speed ' + speedSet + '×'); };
-$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); $('bSound2').textContent = `Sound: ${sound.on ? 'on' : 'off'}`; };
-// Sound and Exit live in the pause menu (the surface audit, owner 13 Nov: Pause and Speed stay on the surface)
-$('bSound2').onclick = () => $('bSound').click();
-$('bPause').onclick = () => {
-  if (!w.running) return; send({ k: 'pause', on: true }); setControlsIdle(); $('pause').hidden = false;
-  $('bRestart').textContent = w.drill || w.rounding ? 'Restart the drill' : w.freeSail ? 'Restart this cruise' : 'Restart this race';
-  const d = $('pauseDebrief'), html = w.drill ? drillHtml() : w.rounding ? roundHtml() : w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
-  mountDebriefTactics(d);
-  $('pauseWatch').hidden = !html || w.track.length < 2;
-};
-/** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
-function vsInput(log: NonNullable<typeof w.log>): VsInput {
-  const C = w.C, wind = w.committeeFrom, last = C.marks[C.marks.length - 1]?.p ?? C.center;
-  // the finish leg's point of sail, as the course sets the others' (courses/course.ts: within 55° of the committee's wind a beat, past 125° a run)
-  const off = Math.abs(wrap(brg(C.center.x - last.x, C.center.y - last.y) - wind)), fin = off < 55 ? 'beat' : off > 125 ? 'run' : 'reach';
-  return {
-    frames: w.track, you: w.user.id, startTimes: w.startTimes, marks: log.boatMarks, from: C.center, finishLine: [C.pin, C.committee],
-    boats: (sc => w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, finishT: b.finished ? b.finishT : null, dsq: b.scoring === 'UFD' || b.scoring === 'BFD' || b.scoring === 'DSQ', points: sc.get(b.id)!.points })))(scores()),
-    legs: [...C.marks.map(m => ({ name: m.name, to: m.p, kind: m.leg })), { name: 'the finish', to: C.center, kind: fin as 'beat' | 'reach' | 'run' }]
-  };
-}
-/* ---------------- the tactical debrief (replay/tactics.ts, ui/tacticsView.ts) ---------------- */
-/** The planner's ideal for this race (strategist.planLegs: costly, so once a race), and what's shown on the chart. */
-let tacPlan: { w: unknown; legs: ReturnType<typeof planLegs> } | null = null;
-const tacShown: TacShown = { best: true, ideal: true, boats: new Set() };
-let tacShownFor: unknown = null;
-/** The plan, once a race (outlookFor reads the gun's day, not the clock: the same plan the briefing showed). */
-function tacPlanNow(): ReturnType<typeof planLegs> {
-  if (tacPlan?.w !== w) { try { tacPlan = { w, legs: planLegs(w, outlookFor(w)) }; } catch (e) { console.warn('the tactical debrief: no ideal', e); tacPlan = { w, legs: [] }; } }
-  return tacPlan.legs;
-}
-/** A planned leg's time, s: its sailing time and the rounding at its end (an island's, or 10 s at a mark: strategist.legEnds). */
-const idealS = (P: ReturnType<typeof planLegs>, k: number) => !P[k] ? null : ((P[k + 1] ? P[k + 1].t0 - P[k].t0 : P[k].minutes) * 60);
-function tacticsNow(): Tactics | null {
-  const log = w.log; if (!log || w.track.length < 2 || w.drill) return null;
-  tacPlanNow();
-  const C = w.C, u = w.user.id, V0 = vsInput(log);
-  const legs = V0.legs.map((L, k) => ({ name: L.name, from: k === 0 ? C.center : V0.legs[k - 1].to, to: L.to, kind: L.kind, ideal: idealS(tacPlan!.legs, k) }));
-  // what the race log measured for you, by leg: past the layline, and each tack or gybe's cost. A moment goes to the leg
-  // it happened in: a tack at its turn (the moment opens 3 s before it), a spell at its middle; the first leg from the gun
-  const ends = [0, ...C.marks.map((_, k) => log.boatMarks[u]?.[k] ?? null), w.user.finished ? w.user.finishT : null];
-  const at = (m: { key: string; t0: number; t1: number }) => m.key === 'tacks' ? m.t0 + 3 : (m.t0 + m.t1) / 2;
-  const ms = log.moments(w), logged = legs.map((_, k) => {
-    const a = ends[k], b = ends[k + 1] ?? Infinity, inLeg = (m: { key: string; t0: number; t1: number }) => a != null && at(m) >= a && at(m) < b;
-    return { laylines: ms.filter(m => m.key === 'laylines' && inLeg(m)).reduce((x, m) => x + m.lost, 0), tacks: ms.filter(m => m.key === 'tacks' && inLeg(m)).map(m => m.lost) };
-  });
-  return tactics({ frames: w.track, you: u, beat: beatAngle(w.wind.kt), tws: w.wind.kt, hs: w.user.sea?.hsW ?? 0, legs, logged,
-    boats: w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : b.name, color: b.color, start: w.startTimes[b.id] ?? null, marks: log.boatMarks[b.id] ?? [], finishT: b.finished ? b.finishT : null })) });
-}
-/** Draw the tactical debrief into `host` (the results' or the pause screen's debrief, or the replay's list), and answer its chips. */
-function mountTactics(host: HTMLElement, compact: boolean, onLeg: (i: number) => void): void {
-  const T = tacticsNow(); if (!T || T.rows.length < 2) { host.innerHTML = ''; return; }
-  if (tacShownFor !== w) {
-    // a new race: the winner shown beside you (or the boat second, if you won)
-    tacShownFor = w; tacShown.boats.clear();
-    const V = versus(vsInput(w.log!)); if (V) tacShown.boats.add(V.rival);
-  }
-  // (a fleet goes by sail numbers, the owner, 13 Nov 2026: the chips say "USA 110 Varnish", the chart's tight spots "USA 110")
-  const boats = w.boats.map(b => ({ id: b.id, name: b.isUser ? 'You' : `${b.no} ${b.name}`.trim(), short: b.isUser ? 'You' : b.no || b.name, color: b.color }));
-  const paint = () => {
-    const sc = scores(), me = sc.get(w.user.id), place = me?.rank != null ? `${ordinal(me.rank)} of ${w.boats.length}` : 'Racing';
-    host.innerHTML = (compact ? '' : tacticsTop(T, place, w.user.finishT != null ? mmss(w.user.finishT) : `${mmss(w.t)} so far`)) + tacticsHtml(T, boats, w.user.id, tacShown, { compact });
-  };
-  paint();
-  host.onclick = e => {
-    const el = e.target as HTMLElement, chip = el.closest<HTMLElement>('[data-tchip]')?.dataset.tchip;
-    if (chip) {
-      if (chip === 'best') tacShown.best = !tacShown.best; else if (chip === 'ideal') tacShown.ideal = !tacShown.ideal;
-      else if (chip !== 'you') { const id = +chip; if (tacShown.boats.has(id)) tacShown.boats.delete(id); else tacShown.boats.add(id); }
-      paint(); return;
-    }
-    const leg = el.closest<HTMLElement>('[data-tleg]')?.dataset.tleg; if (leg != null) onLeg(+leg);
-  };
-}
-/** The planner's ideal track on each leg, for the replay (dashed beside yours). */
-const idealPaths = () => tacPlanNow().map(L => L.plans[L.best].path.map(q => q.p));
-
-/** The race replay: your race from just before the gun, with the debrief on its track and timeline. */
-function watchRace(): void {
-  const log = w.log; if (!log || w.track.length < 2) return;
-  raceReplay.open(w, {
-    frames: w.track, moments: log.moments(w), findings: log.findings(w), wind: w.gun?.windFrom ?? w.wind.from,
-    marks: log.places().filter(p => p.t != null).map(p => ({ name: p.name, t: p.t! })), clips: incidentClips,
-    vs: versus(vsInput(log)), real: realLine(),
-    tactics: (host, onLeg) => mountTactics(host, true, onLeg), idealPaths: idealPaths(), chosen: () => [...tacShown.boats]
-  });
-}
-/**
- * A real past race (Charts' sim/realRaces.ts): in a line, where your time would have placed among the real fleet on the
- * day, the gap to its winner and that per mile, with the doubt about the course's length beside the per-mile figure
- * when the published distance and the course sheet disagree. (The results page has the full table: realResults.)
- */
-function realLine(): string | undefined {
-  const r = S.realRace ? realRace(S.realRace) : undefined; if (!r || w.userFinishT == null) return undefined;
-  const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!); if (!fin.length) return undefined;
-  const you = w.userFinishT, { place, of } = placeAmong(r, you), gap = you - fin[0].elapsedS!, per = gap / Math.max(0.1, r.distanceNm);
-  const day = new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  // Charts' "Course uncertain: …" sentence, where the sim's own perfect boat can't match the real times (the course or
-  // the recorded wind in doubt); ahead of the doubt about the distance. (Read loosely: the field lands on its own.)
-  const uncertain = (r as { uncertain?: string | null }).uncertain ?? null;
-  return `On ${day} (${r.event}, race ${r.raceNo}) you'd have placed ${ordinal(place)} of ${of}: ${gap <= 0 ? `${mmss(-gap)} ahead of ${titleCase(fin[0].boat)}, who won` : `${mmss(gap)} behind ${titleCase(fin[0].boat)}, who won, ${Math.round(per)} s a mile over its ${r.distanceNm} nm`}.${uncertain ? ` ${uncertain}` : ''}${r.doubt && gap > 0 ? ` ${r.doubt}` : ''}`;
-}
-$('bWatch').onclick = $('bWatch2').onclick = watchRace;
-$('bResume').onclick = () => { $('pause').hidden = true; send({ k: 'pause', on: false }); };
-$('bRestart').onclick = () => { $('pause').hidden = true; beginRace(); };
-$('bSettings').onclick = () => { $('pause').hidden = true; openSetup(); };
-$('bAgain').onclick = () => { $('results').hidden = true; beginRace(); };
-$('bSet2').onclick = () => { $('results').hidden = true; openSetup(); };
+$('bSound').onclick = () => { sound.on = !sound.on; word('bSound', sound.on ? 'Sound' : 'Muted'); $('bSound').classList.toggle('muted', !sound.on); };
+// Sound and Exit sit with Pause and Speed, top right, Exit outermost (the owner, 13 Nov 2026)
+const results = mountResults(ctx); // (src/app/results.ts)
 // Tap the inset map: the chart, full screen, with the sail paused (pick a destination there when cruising)
 let chartDest: unknown = null;
 /** Cruise setup: the start and the destination, picked on the chart (ui/setupChart.ts); each pick rebuilds the world. */
 const cruisePicks: SetupPicks = {
   world: () => w,
   get: which => (which === 'from' ? S.sailFrom ?? 'cityfront' : S.sailTo ?? ''),
-  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); setupChanged(tideBox, 0); } // (the tide graph's Arrive moves with them; at once, for the chart that redraws from it)
+  set: (which, id) => { if (which === 'from') S.sailFrom = id; else S.sailTo = id; saveSettings(S); setup.setupChanged(setup.tideBox, 0); } // (the tide graph's Arrive moves with them; at once, for the chart that redraws from it)
 };
 setupChart = new SetupChart(hud, cruisePicks);
 /** The cruise planner: both pins on one big chart (ui/planChart.ts), opened from the setup's Where. */
@@ -1037,39 +938,47 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
-  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); };
+  // (the map's layers are the page's own settings, S: the race in its worker learns them by command, and its mirror,
+  // what the maps draw from, a frame or two later. So the chips and menus read S, and the maps redraw once the race
+  // has the change; drawn at once, from the mirror, a click showed nothing, and it took a second click: the owner's
+  // "these buttons are requiring two clicks")
+  const sendLayers = () => { send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); void host.ask({ k: 'settings', patch: {} }).then(() => { redraw(); menus.forEach(m => m()); }); };
+  const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); sendLayers(); };
   const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
   const fieldBtns = [...document.querySelectorAll<HTMLButtonElement>('#chartField button, #planField button')];
-  const syncField = () => { const f = fieldLayer(w?.settings ?? S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
+  const syncField = () => { const f = fieldLayer(S) ?? 'off'; for (const b of fieldBtns) b.setAttribute('aria-checked', String(b.dataset.field === f)); };
   for (const b of fieldBtns) b.addEventListener('click', () => {
     const f = b.dataset.field!;
-    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); }
+    if (f === 'off') { S.mapLayers = { ...S.mapLayers }; for (const k of FIELD_LAYERS) S.mapLayers[k] = false; sendLayers(); }
     else setLayer(f as LayerKey, true);
-    redraw(); setTimeout(() => menus.forEach(m => m()), 30); // (after the chart's redrawn, so the key lists what's on it now)
   });
   syncField(); openChartHook = syncField; refreshMenus = () => menus.forEach(m => m());
   // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
   const views: MenuView[] = [
-    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' centre and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
+    { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
     { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
-  const menus = [layerMenu($('bMapLayers'), $('mapLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'inset', f), views),
-    layerMenu($('bChartLayers'), $('chartLayersPop'), () => w?.settings ?? S, setLayer, redraw, (el, f) => hud.keyInto(el, 'chart', f))];
+  // (the inset map has no buttons of its own: the owner, "those should be toggles in the full map view, with the inset
+  // remembering my choices". Its layers, what it shows cruising, and the training views are all in the chart's menu)
+  const insetChoice: MenuChoice = {
+    heading: 'The inset map shows', shown: () => !!w?.cruising,
+    options: [{ v: 'map', name: 'The water round her', what: 'The chart round her, turned north up' }, { v: 'nav', name: 'The passage', what: 'The navigator\'s course to the destination, whole; tap the inset for the passage plan' }],
+    get: () => S.insetView ?? 'map', set: v => { S.insetView = v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews(); }
+  };
+  const menus = [layerMenu($('bChartLayers'), $('chartLayersPop'), () => S, setLayer, () => {}, (el, f) => hud.keyInto(el, 'chart', f), views, [insetChoice])];
 }
 $('map').addEventListener('click', () => {
   if (!w.running || chart.isOpen) return;
   if (w.cruising && hud.insetView === 'nav') { navView.toggle(w); return; } // (the navigator's view: its passage plan)
   releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook();
 });
-/** Cruising, the navigator is one of the inset map's views, toggled by a quiet button on its rim (the owner: "It should
- * just be a view in the inset map", and no new buttons outside it); racing, the Course button stays with the helm's. */
+/** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
+ * chosen in the full chart's Layers menu and remembered with your settings (no buttons on the inset: the owner). */
 function insetViews(): void {
-  const cruising = !!w?.cruising, b = $('bMapNav');
-  b.hidden = !cruising; $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
-  if (!cruising) hud.insetView = 'map';
-  b.setAttribute('aria-pressed', String(hud.insetView === 'nav'));
+  const cruising = !!w?.cruising;
+  $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
+  hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in the full chart's Layers menu, and remembered)
 }
-$('bMapNav').addEventListener('click', e => { e.stopPropagation(); hud.insetView = hud.insetView === 'nav' ? 'map' : 'nav'; insetViews(); });
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
 /* ---------------- message log ---------------- */
@@ -1104,14 +1013,15 @@ const keysView = new KeysView(keymap, () => keysHint());
 const held = new Set<Action>();
 function keysHint(): void {
   const k = (a: Action) => keymap.label(a);
-  $('keysHint').textContent = `${k('takeTiller')}/click: take or let go of tiller · right-click, double-click or ${k('lashTiller')}: lash it · ${k('steerPort')}/${k('steerStbd')} steer · ${k('luff')} luff · ${k('viewCockpit')}/${k('viewChase')}/${k('viewOverhead')} views · arrows look · ${k('keys')} all keys`;
+  // (the keys aren't spelled out on the sailing screen, the owner, 13 Nov 2026: they're in the Keys panel; a learn-to-sail
+  // mode will teach them)
   // each cluster button's name and key, on hover (the word under it is short)
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
     ['bJib', 'Hoist or strike the jib', 'jibHalyard'], ['bMain', 'Hoist or strike the main', 'mainHalyard'], ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
-  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off';
+  $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
 keysHint();
 hud.hailKey = () => keymap.label('hail');
@@ -1135,7 +1045,7 @@ function setView(i: number): void {
   word('bView', VIEWS[viewMode]); $('bView').title = `View: ${VIEWS[viewMode]}. Click for the next one (${keymap.label('cycleView')})`;
   $('bOrient').hidden = viewMode !== 2;
 }
-const anyOverlay = () => !$('motorAsk').hidden || !$('homeAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('club').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
+const anyOverlay = () => !$('lessonCard').hidden || !$('motorAsk').hidden || !$('homeAsk').hidden || !$('leaveAsk').hidden || !$('raceChoose').hidden || !$('condDlg').hidden || !$('keepAsk').hidden || chart.isOpen || !$('home').hidden || !$('pastView').hidden || !$('drillView').hidden || fleet.open || boatPanel.open || !$('setup').hidden || !$('replay').hidden || !$('results').hidden || !$('drill').hidden || !$('pause').hidden || raceReplay.isOpen;
 addEventListener('keydown', e => {
   if (keysView.isOpen) return; // the settings screen handles keys while it's open
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
@@ -1145,6 +1055,7 @@ addEventListener('keydown', e => {
   if (!$('keepAsk').hidden) return; // save or discard first
   if (!$('motorAsk').hidden) { if (e.key === 'Escape') $('bMotorNo').click(); return; }
   if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
+  if (!$('leaveAsk').hidden) { if (e.key === 'Escape') $('bLeaveNo').click(); return; } // leave or keep racing first
   const a = keymap.actionFor(e.key);
   if (e.key === '`' && !a) { perf.toggle(); return; } // the frame-time readout (ui/perfMeter.ts), unless you've bound ` to something
   if (e.key === 'Escape') {
@@ -1157,10 +1068,9 @@ addEventListener('keydown', e => {
     // the screens around the sailing (docs/UI-AUDIT.md §3 rule 5): Esc is back. A layer over one closes first, then a
     // sub-page (a member's page), then back to where you came from; on the start page, nothing
     if (!$('condDlg').hidden && !condLive) { $('bCondClose').click(); return; }
-    if (boatPanel.open) { $('boatPanel').querySelector<HTMLElement>('[data-act="done"]')?.click(); return; }
+    if (boatPanel.open) { boatPanel.requestDone(); return; }
     if (fleet.escape()) return;
-    if (!$('raceChoose').hidden || !$('setup').hidden || fleet.open) { nav.back(); return; }
-    if (!$('club').hidden) { openHome(); return; }
+    if (!$('raceChoose').hidden || !$('pastView').hidden || !$('setup').hidden || !$('drillView').hidden || fleet.open) { nav.back(); return; }
     if (tillerHeld) { releaseTiller(); return; } // Esc lets go of the tiller, and nothing else
     if (condLive && !$('condDlg').hidden) { $('bCondClose').click(); return; } // (back to the pause menu)
     if (!$('pause').hidden) { $('bResume').click(); return; }
@@ -1194,7 +1104,7 @@ addEventListener('keydown', e => {
     case 'crewFwd': stepCrew('fore', 1); break;
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
-    case 'pushOff': pushOff(); break;
+    case 'pushOff': berthKey(); break;
     case 'navLights': { const off = !w.user.lightsOff; send({ k: 'lights', off }); toast(off ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break; }
     case 'jibHalyard': halyard('jib'); break;
     case 'mainHalyard': halyard('main'); break;
@@ -1299,336 +1209,6 @@ function lookLabel(): void {
 addEventListener('pointerup', () => { drag = null; });
 addEventListener('pointercancel', () => { drag = null; });
 
-/* ---------------- setup + flow ---------------- */
-function buildSetupChoices(): void {
-  // the course picker, grouped (Seaweed Soup starting west / east, practice), each with its marks and length
-  const groups = new Map<string, typeof COURSES>();
-  for (const c of COURSES) { const g = c.group ?? 'Practice'; if (!groups.has(g)) groups.set(g, []); groups.get(g)!.push(c); }
-  const shortMark = (k: string) => k === 'X' ? '' : k;
-  const label = (c: typeof COURSES[number]) => {
-    if (!c.group) return c.title;
-    const route = c.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
-    return `${c.title.replace('Seaweed Soup · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
-  };
-  const sel = $('courseSel') as HTMLSelectElement;
-  groups.delete('Practice');
-  sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
-  sel.value = S.course;
-  sel.onchange = () => { S.course = lastPick = sel.value; saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); };
-  $('condDlg').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
-}
-function courseCard(): void {
-  const C = w.C;
-  const chips = ['<span class="m">Start</span>']
-    .concat(C.marks.map(m => `<span class="m ${m.type === 'pass' ? 'x' : m.side}">${m.name.split(' ')[0]}${m.type === 'pass' ? '' : ' ' + sideWord(m.side)}</span>`))
-    .concat(['<span class="m">Finish</span>']);
-  const sig = w.courseSignal;
-  $('courseCard').innerHTML = (sig ? `<div class="rcpick"><b>The committee will fly course ${sig.no}</b><small>${sig.why}</small></div>` : '')
-    + `<div class="legs">${chips.join('<span class="arr">→</span>')}</div>`;
-  { // the host club: its courses and its sailing instructions
-    const host = hostOf(S.course), rc = S.course === RC_COURSE;
-    document.querySelectorAll<HTMLButtonElement>('#hostSeg [data-host]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.host === host)));
-    document.querySelectorAll<HTMLButtonElement>('#courseMode [data-cm]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.cm === 'rc') === rc)));
-    $('courseMode').hidden = host === 'practice';
-    $('courseSel').hidden = host === 'practice' || rc;
-    if (!rc && host !== 'practice') ($('courseSel') as HTMLSelectElement).value = S.course;
-    const flag = S.prepFlag === 'black' ? 'black flag' : `${S.prepFlag ?? 'P'} flag`;
-    const line = C.biasAdjustable ? ` · line ${S.bias ? (S.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(S.bias) + '°' : 'square'}` : '';
-    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${S.seq}-min sequence · ${flag} · ${S.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${line}`;
-  }
-  $('lengthField').hidden = S.mode === 'sail' || S.course !== RC_COURSE;
-  $('biasField').hidden = !C.biasAdjustable;
-  $('prepNote').textContent = PREP_MEANING[S.prepFlag ?? 'P'];
-  $('fleetField').hidden = S.mode === 'sail';
-  { // racing from her slip: sail out to the line from her marina
-    const sl = slipById(S.boat.slip), btn = $<HTMLButtonElement>('raceFromSlip');
-    $('raceFromField').hidden = S.mode === 'sail';
-    btn.disabled = !sl; btn.textContent = sl ? `From her slip (${slipPlace(sl)})` : 'From her slip (she has none)';
-    if (!sl && S.raceFrom === 'slip') S.raceFrom = 'water';
-    S.raceFrom ??= 'water';
-    $('raceFromNote').textContent = S.raceFrom === 'slip' && w.fromSlip
-      ? `She starts in her slip in ${harborOf(sl!.marina)?.short ?? 'her marina'}, ${Math.round((w.startAt - S.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
-      : '';
-  }
-  { // her slip, if she has one (Marina)
-    const slip = slipById(S.boat.slip);
-    if (!slip && (S.sailFrom === 'slip' || S.sailTo === 'slip')) { if (S.sailFrom === 'slip') S.sailFrom = 'cityfront'; if (S.sailTo === 'slip') S.sailTo = ''; }
-  }
-  // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
-  // clarification, March 2006, under class rule 1.11); the bracket can stay
-  if (S.mode !== 'sail' && S.boat.perf.outboard === 'bracket') {
-    S.boat.perf.outboard = 'stowed'; saveSettings(S); if (still) prepare(); else newGame();
-    toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
-  }
-  const cruise = S.mode === 'sail';
-  for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
-  $('whereField').hidden = !cruise;
-  if (cruise) setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
-  $('bDrill').hidden = cruise;
-  $('bGo').textContent = cruise ? 'Cast off' : 'Start the sequence';
-  $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
-  $('setupTitle').textContent = cruise ? 'Cruise' : 'Create a race';
-  $('setupBack').textContent = nav.backLabel() || (cruise ? '‹ Start page' : '‹ Race');
-  $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
-  { const c = S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
-    $('crewSum').textContent = `${c.n ? `You + ${c.n}` : 'Single-handed'}, ${Math.round(kg / 0.4536)} lb aboard`; }
-  adjustUi();
-}
-/* Real tide: race day, start time, and a graph of the current at the start line through the day. */
-function tideBox(): void {
-  $('currentNote').hidden = S.current === 'real';
-  $('windDaySeg').hidden = !w.seaBreeze || w.realWind;
-  { // where the day's weather comes from, what the records say for the month, and what today is
-    const mo = Number(w.raceDate.slice(5, 7)) - 1, f = windKindFreq(mo), month = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { month: 'long' });
-    const odds = WIND_KINDS.filter(k => f[k] >= 0.01).map(k => `${WIND_KIND_LABEL[k].toLowerCase()} ${Math.round(f[k] * 100)}%`).join(', ');
-    const wx = w.weather, day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    const span = (() => { const ks: number[] = [], ds: number[] = []; for (let m = 0; m <= 240; m += 30) { const b = wx.at(w.gunUtc - 60 + m); ks.push(b.kt); ds.push(b.from); } return `${Math.round(Math.min(...ks))}–${Math.round(Math.max(...ks))} kt`; })();
-    const src = wx.source === 'observed' ? `What happened on ${day}: ${WIND_KIND_LABEL[wx.kind].toLowerCase()}, ${span} around the race (the wind observed every 6 minutes at Fort Point, its real shifts and gusts)${wx.realSwell ? ', and the swell observed at the Bar buoy' : ''}.`
-      : wx.source === 'forecast' ? `The National Weather Service forecast for ${day} (issued ${new Date(wx.issued!).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', minute: '2-digit' })}): ${WIND_KIND_LABEL[wx.kind].toLowerCase()}, ${span} around the race${wx.realSwell ? ', and its swell forecast outside the Gate' : ''}. Hour by hour; the shifts and puffs within the hour are the sim's.`
-      : wx.source === 'records' ? `No observations or forecast for ${day} yet: a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day, drawn from the ${month} records.`
-      : `You chose a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day${f[w.windKind] < 0.02 ? ` (it almost never blows in ${month}; you get the westerly)` : ''}, from the ${month} records.`;
-    $('windKindNote').textContent = `${src} Across the course: ${wx.fieldSource}${S.aids ? ' (shaded on the map)' : ''}. ${month} race days at Fort Point, 2021–25: ${odds}. ${KIND_NOTE[w.windKind]}`.replace(/around the race/g, S.mode === 'sail' ? 'through the afternoon' : 'around the race');
-    const issued = wx.issued ? new Date(wx.issued).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
-    condSource = !w.seaBreeze ? 'Wind: as you set it' : wx.source === 'observed' ? 'Wind: observed at Fort Point' : wx.source === 'forecast' ? `Wind: NWS forecast, issued ${issued}`
-      : wx.source === 'records' ? `Wind: no forecast yet; a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day from the ${month} records` : `Wind: a ${WIND_KIND_LABEL[wx.kind].toLowerCase()} day you chose, from the ${month} records`;
-  }
-
-  $('swellDaySeg').hidden = w.sea.flat || w.weather.realSwell;
-  const d = $<HTMLInputElement>('tideDate'), tm = $<HTMLInputElement>('tideTime');
-  d.value = w.raceDate; tm.value = S.tideTime || '12:00';
-  drawTideGraph();
-}
-/** Where the day's wind comes from, in one line for the conditions card (tideBox). */
-let condSource = '';
-/** Current (filled: flood up, ebb down) and the westerly (line, right scale) at the start line through the day; the conditions card's rows. */
-function drawTideGraph(): void {
-  const cv = $<HTMLCanvasElement>('tideGraph'), dpr = devicePixelRatio || 1, W = cv.clientWidth || 360, H = cv.clientHeight || 120;
-  cv.width = W * dpr; cv.height = H * dpr;
-  const ctx = cv.getContext('2d')!; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-  const p = w.C.center, from = w.gunUtc - 3 * 60, to = w.gunUtc + 4 * 60, n = 84;
-  const top = 16, bot = H - 18, mid = (top + bot) / 2, x = (i: number) => 8 + (W - 16) * i / n;
-  const tx = (m: number) => 8 + (W - 16) * (m - from) / (to - from);
-  const cruise = S.mode === 'sail';
-  // race window: the gun to about 75 minutes later
-  if (!cruise) { ctx.fillStyle = 'rgba(255,182,39,.10)'; ctx.fillRect(tx(w.gunUtc), top - 6, tx(w.gunUtc + 75) - tx(w.gunUtc), bot - top + 12); }
-  const rows: [string, string][] = [];
-  if (w.tide) {
-    // signed current at the line: + flood (east, into the Bay), − ebb
-    const f = new CurrentField(w.tide.stations), fl = V(f.stations.find(s => s.id === 'SFB1204')?.flood ?? 88);
-    const pts: number[] = [];
-    for (let i = 0; i <= n; i++) { f.setTime(from + (to - from) * i / n); const c = f.atShore(p); pts.push((c.x * fl.x + c.y * fl.y) / 0.5144); }
-    const max = Math.max(1, ...pts.map(Math.abs)), y = (v: number) => mid - v / max * (bot - top) / 2;
-    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, mid); ctx.lineTo(W - 8, mid); ctx.stroke();
-    for (const [sign, col] of [[1, 'rgba(111,168,255,.40)'], [-1, 'rgba(255,140,90,.40)']] as const) {
-      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x(0), mid);
-      pts.forEach((v, i) => ctx.lineTo(x(i), sign * v > 0 ? y(v) : mid)); ctx.lineTo(x(n), mid); ctx.fill();
-    }
-    ctx.font = '600 10px system-ui, sans-serif'; ctx.textAlign = 'left';
-    ctx.fillStyle = '#9cc3ff'; ctx.fillText('FLOOD ↑', 10, top + 2);
-    ctx.fillStyle = '#ffb08a'; ctx.fillText('EBB ↓', 10, bot);
-    f.setTime(w.gunUtc);
-    rows.push(['Current', `${describeTide(f, p, w.gunUtc).label}${cruise ? '' : ' at the line'}`]);
-  }
-  if (w.seaBreeze) {
-    // the westerly in the open water near the line, kt, on its own scale (right)
-    const kts: number[] = [];
-    for (let i = 0; i <= n; i++) { const b = w.weather.at(from + (to - from) * i / n); kts.push(b.kt * windTerrain(p, b.from)); }
-    const kmax = Math.max(10, Math.ceil(Math.max(...kts) / 5) * 5), yk = (v: number) => bot - v / kmax * (bot - top);
-    ctx.strokeStyle = '#7fe0a8'; ctx.lineWidth = 2; ctx.beginPath(); kts.forEach((v, i) => (i ? ctx.lineTo(x(i), yk(v)) : ctx.moveTo(x(i), yk(v)))); ctx.stroke();
-    ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = '#7fe0a8'; ctx.textAlign = 'right';
-    ctx.fillText(`WIND · top ${kmax} kt`, W - 10, top + 2); ctx.fillText('0', W - 10, bot);
-    const b = w.weather.at(w.gunUtc), b2 = w.weather.at(w.gunUtc + 90), k = windTerrain(p, b.from);
-    const trend = b2.kt > b.kt + 0.6 ? `building to ${Math.round(b2.kt * k)} kt` : b2.kt < b.kt - 0.6 ? `easing to ${Math.round(b2.kt * k)} kt` : 'steady';
-    rows.unshift(['Wind', `${WIND_KIND_LABEL[w.windKind]} ${Math.round(b.kt * k)} kt from ${S.windDir != null ? `${degAndPoint(S.windDir)} (an older setting)` : w.windKind === 'light' ? 'all over' : degAndPoint(b.from) + (S.windTurn ? ` (${turnWords(S.windTurn)} from the usual ${compassPoint(b.from - S.windTurn)})` : '')}, ${trend} over 90 min${w.windKind === 'west' ? ' (more in the slot)' : ''}`]);
-  } else rows.unshift(['Wind', `${Math.round(w.wind.kt)} kt from ${degAndPoint(w.wind.from)}, as you set it`]);
-  if (!w.tide) rows.push(['Current', CURRENTS[S.current]?.label ?? S.current]);
-  rows.push(['Sea', w.sea.flat ? 'Flat' : `${w.sea.swell ? `${Math.round(w.sea.swell.hs / 0.3048)} ft, ${Math.round(w.sea.swell.tp)} s swell outside the Gate${w.sea.swell.total ? ` (the buoy reads ${Math.round(w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(S.chop ?? 1) !== 1 ? `, chop × ${(S.chop ?? 1).toFixed(1)}` : ''}${S.rain ? `, ${S.rain === 2 ? 'heavy' : 'light'} rain` : ''}${S.fog && S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][S.fog]} fog` : ''}`]);
-  { // the sun: when it's up, and where it is at the gun
-    const st = sunTimes(w.gunUtc * 60000), sp = sunPosition(w.gunUtc * 60000);
-    ctx.fillStyle = 'rgba(8,14,30,.35)';
-    if (Number.isFinite(st.set)) { const xs = tx(st.set / 60000); if (xs < W - 8) ctx.fillRect(Math.max(8, xs), top - 6, W - 8 - Math.max(8, xs), bot - top + 12); }
-    if (Number.isFinite(st.rise)) { const xr = tx(st.rise / 60000); if (xr > 8) ctx.fillRect(8, top - 6, Math.min(W - 16, xr - 8), bot - top + 12); }
-    rows.push(['Sun', sp.el > 0 ? `${Math.round(sp.el)}° up in the ${compass(sp.az)}, sets ${sfClock(st.set / 60000)}` : `After sunset (${sfClock(st.set / 60000)}): sailing in the dusk`]);
-  }
-  ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(w.gunUtc), top - 6); ctx.lineTo(tx(w.gunUtc), bot + 6); ctx.stroke();
-  ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
-  for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  const pn = cruise && w.dest ? passageNow(w) : null, near = pn?.eta != null && tx(pn.eta) - tx(w.gunUtc) < 44;
-  ctx.fillStyle = '#ffb627'; if (near) ctx.textAlign = 'right'; ctx.fillText(cruise ? 'leave' : 'gun', tx(w.gunUtc) - (near ? 4 : 0), 10); ctx.textAlign = 'center';
-  // cruising somewhere: when she'd get there leaving then (sim/navigator.ts passageNow: the course she'd sail, tacks and
-  // all, in the forecast wind and NOAA's current), as a second bar; past the graph's end, an arrow at its edge
-  if (pn?.eta != null) {
-    const xa = tx(pn.eta), inside = xa <= W - 8, xd = Math.min(xa, W - 10);
-    ctx.strokeStyle = '#3fd197'; ctx.lineWidth = 2; ctx.setLineDash(inside ? [] : [3, 3]); ctx.beginPath(); ctx.moveTo(xd, top - 6); ctx.lineTo(xd, bot + 6); ctx.stroke(); ctx.setLineDash([]);
-    // (close to the leave bar, the label goes to the right of its bar, clear of 'leave')
-    const close = inside && near;
-    ctx.fillStyle = '#3fd197'; ctx.textAlign = !inside ? 'right' : close ? 'left' : 'center';
-    ctx.fillText(inside ? 'arrive' : `arrive ${sfClock(pn.eta)} →`, !inside ? W - 12 : close ? xd + 4 : xd, 10);
-  }
-  const day = new Date(w.raceDate + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  if (pn) rows.unshift(['Arrive', pn.eta != null ? `about ${sfClock(pn.eta)}: ${(pn.sailedM / 1852).toFixed(1)} nm over the ground in ${Math.floor(pn.minutes / 60) ? `${Math.floor(pn.minutes / 60)} h ` : ''}${Math.round(pn.minutes % 60)} min${pn.tacks.length ? `, ${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : ''}${pn.gybes.length ? `, ${pn.gybes.length} gybe${pn.gybes.length > 1 ? 's' : ''}` : ''}` : `leaving then she can't get there: ${whyNot(pn.why)}`]);
-  $('condSum').innerHTML = `<dt>When</dt><dd>${day}, ${cruise ? 'leaving' : 'gun'} at ${sfClock(w.gunUtc)}</dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
-  $('tideNote').textContent = `${condSource}${w.tide ? ' · current: NOAA predictions' : ''}. Graph: flood up, ebb down, the wind as a line${cruise ? '' : ', about a race shaded'}, dark after sunset.`;
-}
-$<HTMLInputElement>('tideDate').addEventListener('change', e => { S.tideDate = (e.target as HTMLInputElement).value || nextSaturday(); saveSettings(S); setupChanged(tideBox); });
-$<HTMLInputElement>('tideTime').addEventListener('change', e => { S.tideTime = (e.target as HTMLInputElement).value || '12:00'; saveSettings(S); setupChanged(tideBox); });
-
-function paintSeg(): void {
-  document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => {
-    const k = seg.dataset.k as keyof Settings;
-    const cur = String(S[k]);
-    seg.querySelectorAll<HTMLButtonElement>('button').forEach(b => b.setAttribute('aria-pressed', String(cur === b.dataset.v)));
-  });  document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => { c.checked = (S[c.dataset.t as 'aids' | 'windDial' | 'camRide'] ?? 0) === 1; });
-}
-// the on-screen training aids: a switch each (on = shown)
-document.querySelectorAll<HTMLInputElement>('input[data-t]').forEach(c => c.addEventListener('change', () => {
-  const k = c.dataset.t as 'aids' | 'windDial' | 'camRide'; S[k] = c.checked ? 1 : 0; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg();
-}));
-document.querySelectorAll<HTMLElement>('.seg[data-k]').forEach(seg => seg.addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest('button'); if (!b) return;
-  const k = seg.dataset.k as keyof Settings, v = b.dataset.v!;
-  if (k === 'aids' || k === 'windDial') { S[k] = Number(v) as 0 | 1; (w.settings as Settings)[k] = S[k]; saveSettings(S); paintSeg(); return; }
-  if (k === 'windKind') { chooseWindKind(S, v as WindKind); paintSeg(); setupChanged(() => { courseCard(); tideBox(); }); return; }
-  (S as unknown as Record<string, string | number>)[k] = (k === 'current' || k === 'course' || k === 'mode' || k === 'sea' || k === 'prepFlag' || k === 'raceLength' || k === 'raceFrom' || (k === 'fog' && v === 'real')) ? v : Number(v);
-  paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
-}));
-/**
- * Your crew in the race setup (the Yacht Club, phase 3; the owner: the race setup "isn't where crew are configured",
- * but you may swap people in and out there): you at the helm, then a pick for each seat from the club's members (the
- * middle crew: the main; the forward hand: the jib, the cabin top, the pole), the seats swapped, and the members
- * themselves set up in the Yacht Club. There's no crew count (the owner): both seats left at None is single-handed, for
- * practice or a race, and a seat left empty moves the forward hand up to the middle (one crew does both jobs).
- */
-function crewRows(): void {
-  const rows = $('crewRows'), boat = S.boats.find(b => b.id === S.boatId) ?? S.boat, seats = boat.crewIds ?? [];
-  const esc = (t: string) => t.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
-  // (anyone who crews, and isn't on another seat of hers; someone on another of your boats can still be brought aboard)
-  const crewers = MEMBERS.filter(m => m.id !== YOU && m.roles.includes('crew'));
-  const seatName = (i: number) => (i === 0 ? 'Middle: main' : 'Forward: jib, pole');
-  const pick = (i: number) => `<label>${seatName(i)} <select data-seat="${i}"><option value="">None</option>${crewers.map(m => `<option value="${esc(m.id)}"${seats[i] === m.id ? ' selected' : ''}${seats.includes(m.id) && seats[i] !== m.id ? ' disabled' : ''}>${esc(m.name)}</option>`).join('')}</select></label>`;
-  const you = MEMBERS.find(m => m.id === YOU);
-  rows.innerHTML = `<div class="crewline"><span class="crewyou">${esc(you?.name ?? 'You')} · helm</span>${pick(0)}${pick(1)}`
-    + (seats.length === 2 ? `<button type="button" class="ghost" data-crew="swap" title="Swap the middle crew and the forward hand">Seats ⇅</button>` : '')
-    + `<button type="button" class="linkbtn" data-crew="club">Edit in the Yacht Club</button></div>`;
-  const changed = () => { pullCrew(S, MEMBERS); saveMembers(MEMBERS); saveSettings(S); crewRows(); setupChanged(courseCard); };
-  rows.querySelectorAll<HTMLSelectElement>('select[data-seat]').forEach(sel => sel.onchange = () => {
-    const ids = [...(boat.crewIds ?? [])], i = Number(sel.dataset.seat);
-    if (sel.value) ids[i] = sel.value; else ids.splice(i, 1);
-    boat.crewIds = ids.filter(Boolean).slice(0, 2); changed();
-  });
-  rows.querySelector<HTMLButtonElement>('[data-crew="swap"]')?.addEventListener('click', () => { const ids = boat.crewIds ?? []; if (ids.length === 2) boat.crewIds = [ids[1], ids[0]]; changed(); });
-  rows.querySelector<HTMLButtonElement>('[data-crew="club"]')?.addEventListener('click', () => nav.go({ k: 'club', tab: 'members' }));
-}
-function openSetup(): void { settleLog(openSetupNow); }
-function openSetupNow(): void {
-  replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
-  if (S.mode === 'drill' || S.mode === 'manoeuvres' || S.mode === 'roundings') { S.mode = 'race'; prepare(); }
-  // (behind the setup the view is still: the last frame stays and nothing sails; a race just prepared isn't running,
-  // and is sent nothing until it starts)
-  setStill(true);
-  courseView.close(); navView.close(); if (w.running) send({ k: 'running', on: false }); ($('courseSel') as HTMLSelectElement).value = S.course; paintSeg(); crewRows(); courseCard(); $('setup').hidden = false; if (S.mode === 'sail') setupChart?.sync(true); tideBox(); }
-function beginRace(seed?: number): void { settleLog(() => beginRaceNow(seed)); }
-function beginRaceNow(seed?: number): void {
-  nav.reset({ k: 'setup' }); // (the pause menu's and the results' Back to setup: the setup you sailed from)
-  realRaceHolds();
-  saveSettings(S);
-  newGame(seed);
-  if (S.mode === 'manoeuvres') { logMessage('— Tacks and gybes'); send({ k: 'running', on: true }); send({ k: 'pause', on: false }); word('bFast', 'Speed 1×');
-    toast(`Tacks and gybes: ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. She's close-hauled: tack when you're ready, or bear away to a run, settle there, and gybe. Each one is scored against a good crew's, in the Coach card.`, 6000); return; }
-  if (S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); send({ k: 'running', on: true }); send({ k: 'pause', on: false }); word('bFast', 'Speed 1×');
-    const W = w.rounding!.marks[0];
-    toast(`Mark roundings: ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
-  logMessage(`— ${S.mode === 'sail' ? `Cruise · ${place(S.sailFrom)?.name ?? ''}${w.dest ? ' to ' + w.dest.name : ''}` : S.mode === 'drill' ? 'Start practice' : 'Race'} · ${S.mode === 'sail' ? '' : w.C.title}`);
-  send({ k: 'running', on: true }); send({ k: 'pause', on: false });
-  word('bFast', 'Speed 1×');
-  horn(1.0);
-  const m0 = w.C.marks[0];
-  if (w.fromSlip) {
-    const m = Math.round((w.startAt - S.seq * 60) / 60);
-    toast(`In her ${w.homeSlip!.kind === 'alongside' ? 'berth' : 'slip'} in ${harborOf(w.homeSlip!.marina)?.short ?? 'her marina'}, ${w.homeSlip!.label}, ${w.homeSlip!.kind === 'alongside' ? 'alongside the end of the dock, bow out,' : 'bow in'} and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to have the crew walk her out by hand into the fairway, then sail her out through the entrance${S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
-    return;
-  }
-  toast(S.mode === 'sail'
-    ? `Cruising${w.dest ? ` to ${w.dest.name}` : ''}: no race. ${Math.round(w.wind.kt)} kt from ${Math.round(w.wind.from)}°, ${w.cur.label.toLowerCase()}. Sea: ${describeSea(w.seaHere(w.user))}.${w.dest ? ' The navigator (M) has a passage plan.' : ' Try the tiller, the trim and the pole.'}`
-    : S.mode === 'drill'
-    ? `Start practice${w.boats.length === 1 ? ', alone' : ''}: ${w.startAt / 60 === 1 ? 'one minute' : `${w.startAt / 60} minutes`} to the gun. Check the line head to wind, time your run in, and be on the line at full speed when it goes. Current: ${w.cur.label}.`
-    : `${S.seq}-minute sequence.${w.courseSignal ? ` The committee is flying course ${w.courseSignal.no}.` : ''} The strategist's briefing is in the course view (M). Current: ${w.cur.label}. Sea: ${describeSea(w.seaHere(w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
-  if (w.courseSignal && S.mode !== 'sail') logMessage(`Course ${w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signalled by the warning signal). ${w.courseSignal.why}`);
-}
-
-/* ---------------- start practice debrief ---------------- */
-let drillClip: ReplayClip | null = null;
-function showDrill(): void {
-  drillShown = true; send({ k: 'pause', on: true }); setControlsIdle();
-  const d = startDebrief(w);
-  if (d.stats) drillRuns.push({ ...d.stats, n: drillRuns.length + 1, from: w.startAt, solo: w.boats.length === 1 });
-  drillOptions(); drillTable();
-  $('dTitle').textContent = d.title;
-  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  $('dFacts').innerHTML = d.facts.map(f => `<li>${esc(f)}</li>`).join('');
-  $('dTips').innerHTML = d.tips.map(f => `<li>${esc(f)}</li>`).join('');
-  $('dVerdict').className = 'verdict' + (d.grade === 'great' || d.grade === 'good' ? ' ok' : '');
-  $('drill').hidden = false;
-  drillClip = { frames: w.rec.slice(), focus: [w.user.id], wind: w.gun?.windFrom ?? w.wind.from, kind: 'start' };
-  drillView.play(w, drillClip);
-}
-const closeDrill = () => { $('drill').hidden = true; drillView.stop(); };
-/** The drill's two choices (inside its panel): how long before the gun each attempt starts, and alone or with the fleet. */
-function drillOptions(): void {
-  const from = S.drillFrom ?? DRILL_FROM, solo = S.drillSolo ?? true;
-  $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
-    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet</button></div>`;
-}
-$('dOpts').addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-v]'), g = b?.closest<HTMLElement>('[data-dopt]')?.dataset.dopt; if (!b || !g) return;
-  if (g === 'from') S.drillFrom = +b.dataset.v!; else S.drillSolo = b.dataset.v === '1';
-  saveSettings(S); drillOptions();
-});
-/** The run of attempts this session: each start's numbers, the best marked, to see the trend. */
-function drillTable(): void {
-  if (drillRuns.length < 2) { $('dRuns').innerHTML = ''; return; }
-  // (a start is as good as it is on time and at speed: each 10% of speed short counts as about 5 s late, the time it
-  // takes a Folkboat to build that speed back)
-  const score = (r: typeof drillRuns[number]) => r.grade === 'ocs' ? Infinity : Math.abs(r.lateS) + (100 - r.pct) / 2;
-  const best = drillRuns.reduce((a, r) => score(r) < score(a) ? r : a);
-  const endW = (e: string) => e === 'pin' ? w.C.pinLabel : e === 'committee' ? w.C.committeeLabel : 'middle';
-  const rows = drillRuns.slice(-10).map(r => `<tr${r === best ? ' class="best"' : ''}><td>${r.n}</td><td>${r.grade === 'ocs' ? `over, ${Math.round(-r.behindM)} m` : r.behindM < 0 ? `past, ${Math.round(-r.behindM)} m` : `${Math.round(r.behindM)} m · ${Math.round(r.lateS)} s`}</td><td>${r.pct}%</td><td>${esc(endW(r.end))}${r.fav ? (r.onFav ? ' ✓' : '') : ''}</td><td>${r.grade}</td></tr>`).join('');
-  const last = drillRuns.slice(-3), avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const clean = last.filter(r => r.grade !== 'ocs'), trend = drillRuns.length >= 4 && clean.length ? ` Your last three averaged ${Math.round(avg(clean.map(r => r.lateS)))} s late at ${Math.round(avg(last.map(r => r.pct)))}% speed${clean.length < last.length ? ` (${last.length - clean.length} over early)` : ''}.` : '';
-  $('dRuns').innerHTML = `<p class="lede">Your starts this session (the best highlighted; ✓ started at the favoured end).${trend}</p><table class="res attempts"><thead><tr><th>#</th><th>At the gun</th><th>Speed</th><th>End</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-$('bDReplay').onclick = () => { if (drillClip) drillView.play(w, drillClip); };
-$('bDAgain').onclick = () => { closeDrill(); beginRace(w.seed); };
-$('bDNew').onclick = () => { closeDrill(); beginRace(); };
-$('bDKeep').onclick = () => { closeDrill(); send({ k: 'pause', on: false }); };
-$('bDSetup').onclick = () => { closeDrill(); openSetup(); };
-$('bGo').onclick = () => { if (S.mode === 'drill') S.mode = 'race'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-$('bDrill').onclick = () => { S.mode = 'drill'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-$('bManoeuvres').onclick = () => { S.mode = 'manoeuvres'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-$('bRoundings').onclick = () => { S.mode = 'roundings'; courseView.close(); navView.close(); $('setup').hidden = true; beginRace(); };
-/* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
-const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
-let lastPick = hostOf(S.course) === 'ggyc' && S.course !== RC_COURSE ? S.course : COURSES.find(c => c.group)!.id;
-function setCourse(id: string): void { S.course = id; saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); }
-$('hostSeg').addEventListener('click', e => {
-  const h = (e.target as HTMLElement).closest<HTMLElement>('[data-host]')?.dataset.host; if (!h || h === hostOf(S.course)) return;
-  setCourse(h === 'practice' ? COURSES.find(c => !c.group)!.id : RC_COURSE);
-});
-$('courseMode').addEventListener('click', e => {
-  const m = (e.target as HTMLElement).closest<HTMLElement>('[data-cm]')?.dataset.cm; if (!m) return;
-  setCourse(m === 'rc' ? RC_COURSE : lastPick);
-});
-/* Change the conditions: one dialog over the setup. */
-$('bCond').onclick = () => { $('condDlg').hidden = false; };
-$('bCondClose').onclick = () => {
-  $('condDlg').hidden = true;
-  if (condLive) { condLive = false; $('pause').hidden = false; }
-  if (showSaved) { // (from the showroom: what was set becomes the showroom's, and your own conditions go back as they were)
-    const cond: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
-    for (const k of CONDITION_KEYS) (cond as Record<string, unknown>)[k] = rec[k];
-    showCond = cond; Object.assign(S, showSaved); showSaved = null; saveSettings(S); paintSeg(); newGame(); showBar();
-  }
-};
 /* ---------------- the showroom's own time of day and conditions ---------------- */
 /** The bar under her on show: the time (and whether it's day, dusk or night there), and the conditions. */
 function showBar(): void {
@@ -1639,169 +1219,21 @@ function showBar(): void {
   $('bShowReal').hidden = showMin == null && showCond == null;
 }
 $('showTime').addEventListener('input', () => { const m = Number(($('showTime') as HTMLInputElement).value); $('showTimeV').textContent = hhmm(m); });
-$('showTime').addEventListener('change', () => { showMin = Number(($('showTime') as HTMLInputElement).value); newGame(); showBar(); });
+$('showTime').addEventListener('change', () => { showMin = Number(($('showTime') as HTMLInputElement).value); setup.newGame(); showBar(); });
 $('bShowCond').onclick = () => {
   // the same panel; while it's open your conditions take the showroom's, and they're put back when it closes
   const saved: Partial<Settings> = {}, rec = S as unknown as Record<string, unknown>;
   for (const k of CONDITION_KEYS) (saved as Record<string, unknown>)[k] = rec[k];
   showSaved = saved; Object.assign(S, showCond ?? {}); showCond = null;
-  paintSeg(); tideBox(); $('condDlg').hidden = false;
+  setup.paintSeg(); setup.tideBox(); $('condDlg').hidden = false;
 };
-$('bShowReal').onclick = () => { showMin = null; showCond = null; newGame(); showBar(); };
+$('bShowReal').onclick = () => { showMin = null; showCond = null; setup.newGame(); showBar(); };
 // mid-sail (from the pause menu): the same panel, its changes taken at once by the sail that's running (newGame below)
-$('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; tideBox(); $('condDlg').hidden = false; };
+$('bPauseCond').onclick = () => { if (!w.running) return; condLive = true; $('pause').hidden = true; setup.tideBox(); $('condDlg').hidden = false; };
 $('bCondReal').onclick = () => {
-  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 0, fog: 'real' });
-  saveSettings(S); paintSeg(); setupChanged(() => { courseCard(); tideBox(); });
+  Object.assign(S, { windKind: 'auto', windKt: 0, windDir: null, windTurn: 0, chop: 1, swellHs: null, current: 'real', rain: 'real', fog: 'real' });
+  saveSettings(S); setup.paintSeg(); setup.setupChanged(() => { setup.courseCard(); setup.tideBox(); });
 };
-
-/** The tactics debrief: what cost you time, most first, and your place at each mark. */
-/** The tactical chart at the top of a debrief: clicking a leg opens "Watch your race" on it. */
-function mountDebriefTactics(box: HTMLElement): void {
-  const host = box.querySelector<HTMLElement>('.tacHost[data-tac]'); if (!host) return;
-  mountTactics(host, false, i => { watchRace(); raceReplay.pickLegNo(i); });
-}
-function debriefHtml(title: string): string {
-  const log = w.log;
-  if (!log || w.t <= 0) return '';
-  const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
-  const fs = log.findings(w), pl = log.places().filter(p => p.place != null);
-  const items = fs.map(f => `<li><div class="dbHead"><b>${esc(f.title)}</b><span class="dbLost">${f.key === 'start' && f.lost < 2 ? 'on time' : `−${f.lost} s`}</span></div><p>${esc(f.detail)}</p><p class="dbTip">${esc(f.tip)}</p></li>`).join('');
-  const marks = pl.length > 1 ? `<p class="lede">Your place at each mark: ${pl.map(p => `${esc(p.name)} ${nth(p.place!)}`).join(' → ')}.</p>` : '';
-  const total = fs.reduce((a, f) => a + f.lost, 0);
-  return `<div class="eyebrow">${title}</div><div class="tacHost" data-tac></div>${items ? `<p class="lede">What cost you time, most first: about ${total} s in all. The seconds are estimates from the boat's physics.</p><ol>${items}</ol>` : '<p class="lede">Nothing cost you more than a couple of seconds.</p>'}${marks}${vsDebriefHtml(log)}`;
-}
-/**
- * Against the winner (or the boat second, if you won), in the debrief: the gap, a line for each leg, and the moments
- * that cost or gained most (her tacks and gybes against yours, on the shifts), from the race's own recorded tracks.
- * The replay ("Watch your race") has every moment, to jump to.
- */
-function vsDebriefHtml(log: NonNullable<typeof w.log>): string {
-  const V = w.track.length > 1 ? versus(vsInput(log)) : null;
-  if (!V || V.legs.length < 2) return '';
-  const sgn = (x: number) => Math.abs(x) < 0.5 ? '±0 s' : `${x > 0 ? '−' : '+'}${Math.round(Math.abs(x))} s`;
-  const kindW: Record<string, string> = { beat: 'a beat', reach: 'a reach', run: 'a run' };
-  const legs = V.legs.map(L => {
-    const mark = L.moments.find(m => m.kind === 'mark');
-    return `<li><div class="dbHead"><b>${L.i ? `Leg ${L.i}, to ${esc(L.name)} (${kindW[L.kind]})` : 'The start'}</b><span class="dbLost">${sgn(L.lost)}</span></div><p>${esc(legWords(L, V.rivalName))}${mark ? ` ${esc(mark.text)}` : ''}</p></li>`;
-  }).join('');
-  const big = bigMoments(V);
-  const moments = big.length ? `<p class="lede">The moments that counted most:</p><ol>${big.map(m => `<li><div class="dbHead"><span><b>Leg ${m.leg}:</b> ${esc(m.text)}</span><span class="dbLost">${m.lostM > 0 ? '−' : '+'}${Math.round(Math.abs(m.lostM))} m</span></div></li>`).join('')}</ol>` : '';
-  return `<div class="eyebrow">Against ${esc(V.rivalName)}, ${rivalWho(V, w.boats[V.rival].finished)}</div><p class="lede">${esc(gapWords(V))} Leg by leg, from both your tracks. Metres are ground made good up or down the course (across the mean wind; along the leg on a reach), in the same minutes of wind, less your plain speed difference: so they're the tacks and the shifts. Downwind, a lift is the wind going aft: gybe on the lifts.</p><ol>${legs}</ol>${moments}`;
-}
-
-/* ---------------- the boats' logbooks ---------------- */
-function outing(b: BoatSpec, isUser: boolean): Omit<LogEntry, 'kind' | 'title'> {
-  const c = S.crew, n = c?.n ?? 2;
-  return {
-    boatId: b.id, at: new Date().toISOString(), day: w.raceDate, time: S.tideTime || '12:00',
-    skipper: isUser ? 'you' : 'ai', crew: isUser ? (n ? `You at the helm, ${n} crew` : 'You, single-handed') : 'Generic AI skipper and crew',
-    wind: `${compass(w.windModel.base)} ${Math.round(w.wind.kt)} kt`
-  };
-}
-/** The settings a race was sailed in, kept with your entry so you can sail it again (Run a past race). */
-const REPLAY_KEYS = ['tideTime', 'opponents', 'realRace', 'raceLength', 'windKind', 'windKt', 'windDir', 'windTurn', 'chop', 'swellHs', 'current', 'rain', 'fog', 'windDay', 'swellDay', 'traffic', 'seq', 'prepFlag', 'penaltyTurns', 'bias', 'raceFrom', 'crew', 'sea'] as const;
-function raceSetup(): RaceSetup {
-  const s: Record<string, unknown> = { tideDate: w.raceDate };
-  for (const k of REPLAY_KEYS) if (S[k] !== undefined) s[k] = structuredClone(S[k]);
-  if (replayPin != null) s.windDir = replayPin; // (sailed again, then saved: it keeps its pinned direction)
-  return { seed: w.seed, course: w.C.id, s };
-}
-/** The race, into the logbook of every boat of yours in it: her place (or why she has none) and her time. */
-function logRace(rows: Boat[], sc: Map<number, ScoreOut>): void {
-  if (w.logged || S.mode === 'drill') return; send({ k: 'shown', logged: true });
-  const title = `${w.C.title}${w.courseSignal ? ` (course ${w.courseSignal.no})` : ''}`, out: LogEntry[] = [];
-  rows.forEach(b => {
-    const spec = b.isUser ? S.boat : b.spec && S.boats.some(x => x.id === b.spec!.id) ? b.spec : null; if (!spec) return;
-    const dsq = b.scoring === 'UFD' || b.scoring === 'BFD' || b.scoring === 'DSQ';
-    const entry: LogEntry = { ...outing(spec, b.isUser), kind: 'race', title, of: rows.length, ...(b.isUser ? { setup: raceSetup() } : {}),
-      ...(dsq ? { code: 'DSQ' } : b.finished ? { place: sc.get(b.id)!.rank ?? rows.indexOf(b) + 1, ...([...sc.values()].filter(x => x.points != null && x.points === sc.get(b.id)!.points).length > 1 ? { tied: true } : {}), elapsed: b.finishT!, ...(b.scoring === 'ZFP' ? { code: 'ZFP' } : {}) } : { code: 'unfinished' }) };
-    out.push(entry);
-    // your run, kept as a ghost for this race if you save it (her own track from the race's, once a second)
-    if (b.isUser && entry.setup) pendingGhost = { at: entry.at, key: setupKey(entry.setup), elapsed: entry.elapsed, place: entry.place, of: entry.of, code: entry.code, pts: trackOf(w.track, b.id) };
-  });
-  stage(out);
-}
-/** Leaving an outing (back to the start page, to setup, or starting another): log it if there's anything to log. */
-function logOuting(): void {
-  if (!w || w.logged || S.mode === 'drill') return;
-  if (S.mode === 'sail' && w.freeSail && w.t >= 60) {
-    send({ k: 'shown', logged: true });
-    const from = S.sailFrom === 'slip' ? `her slip (${(s => s ? slipPlace(s) : '')(slipById(S.boat.slip))})` : place(S.sailFrom)?.name ?? 'the Bay';
-    stage([{ ...outing(S.boat, true), kind: 'cruise', title: `From ${from}${w.dest ? ` to ${w.dest.name}` : ''}`, elapsed: Math.round(w.t), nm: w.sailedM / 1852, arrived: w.arrivedT != null }]);
-  } else if (S.mode === 'race' && !w.freeSail && w.cancelled) {
-    // racing called off for the wind: no result, but the outing goes in her logbook
-    send({ k: 'shown', logged: true });
-    stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'CXL', of: w.boats.length, setup: raceSetup() }]);
-  } else if (S.mode === 'race' && !w.freeSail && w.t > 0 && w.userFinishT == null) {
-    // you left the race before finishing: retired
-    send({ k: 'shown', logged: true });
-    stage([{ ...outing(S.boat, true), kind: 'race', title: w.C.title, code: 'RET', of: w.boats.length, setup: raceSetup() }]);
-  }
-}
-/** The sail just ended, waiting for you to say whether it goes in the logbook. */
-let pending: LogEntry[] | null = null;
-const ordinal = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
-function stage(entries: LogEntry[]): void { if (entries.length) pending = entries; }
-/**
- * Leaving a race or a cruise: ask whether to keep it in her logbook (with her race record and crew history) or
- * discard it, then carry on.
- */
-function settleLog(next: () => void): void {
-  logOuting();
-  if (!pending) { next(); return; }
-  const p = pending, e = p.find(x => x.boatId === S.boat.id) ?? p[0];
-  const mins = (s?: number) => s == null ? '' : `${Math.floor(s / 60)} min`;
-  $('keepTitle').textContent = e.kind === 'race' ? 'Keep this race?' : 'Keep this cruise?';
-  $('keepWhat').textContent = e.kind === 'race'
-    ? `${e.title}: ${e.code === 'RET' ? 'retired' : e.code === 'CXL' ? 'racing cancelled for the wind' : e.code === 'unfinished' ? 'not finished' : e.code === 'DSQ' ? 'disqualified' : `${ordinal(e.place!)} of ${e.of}`}${e.elapsed ? `, ${mins(e.elapsed)}` : ''}. Saved, it goes in her race record and logbook.`
-    : `${e.title}: ${(e.nm ?? 0).toFixed(1)} nm in ${mins(e.elapsed)}${e.arrived ? ', arrived' : ''}. Saved, it goes in her logbook.`;
-  $('keepAsk').hidden = false;
-  const done = (keep: boolean) => {
-    $('keepAsk').hidden = true; pending = null;
-    if (keep) addLog(p);
-    if (keep && pendingGhost) keepGhost(pendingGhost); pendingGhost = null;
-    toast(keep ? 'Saved to her logbook.' : 'Discarded.', 2200);
-    next();
-  };
-  $('bKeep').onclick = () => done(true); $('bDiscard').onclick = () => done(false);
-}
-onSaveTrouble(msg => toast(msg, 6000));
-
-/** The race's scores (Low Point, with the Z flag's 20% added in points: rules/scoring.ts), by boat id. */
-function scores(): Map<number, ScoreOut> {
-  // the boats still racing, in the order they're in now (most marks rounded, then nearest the next), to project them
-  const C = w.C, toGo = (b: Boat) => { const m = w.nextMark(b); return dist(b, m ? m.p : C.center); };
-  const out = w.boats.filter(b => !b.finished && !b.retired).sort((a, b) => b.leg - a.leg || toGo(a) - toGo(b));
-  return new Map(raceScores(w.boats.map(b => ({ id: b.id, finishT: b.finished ? b.finishT : null, code: b.retired ? 'RET' : b.scoring ?? null, ahead: out.indexOf(b) }))).map(s => [s.id, s]));
-}
-
-function showResults(): void {
-  send({ k: 'shown', finishShown: true }); resultsShown = true;
-  // in order of points (RRS A4, 44.3(c)), then of time across the line for the boats still racing
-  const sc = scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
-  logRace(rows, sc);
-  const mine = sc.get(w.user.id)!, place = mine.rank ?? rows.indexOf(w.user) + 1, tied = rows.filter(b => sc.get(b.id)!.rank === place && sc.get(b.id)!.points === mine.points).length > 1;
-  const nth = (n: number) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th');
-  // a Z-flag place waits on the boats still racing: any of them finishing on fewer points beats her (44.3(c))
-  $('resTitle').textContent = mine.code === 'UFD' || mine.code === 'BFD' || mine.code === 'DSQ' ? 'You were disqualified'
-    : !mine.final ? `On points, you're likely ${nth(place)}: boats still racing can finish ahead of your ${ptsText(mine.points!)}`
-    : place === 1 ? (tied ? 'You tied for first' : 'You won the race') : `You finished ${tied ? 'equal ' : ''}${nth(place)}`;
-  const sr = w.startReport;
-  $('resStart').textContent = sr ? `Your start: crossed ${sr.delay.toFixed(1)} s after the gun at ${sr.kt.toFixed(1)} kt, ${Math.round(sr.frac * 100)}% of the way from ${w.C.pinLabel} to ${w.C.committeeLabel}.` : 'No clean start recorded.';
-  const code = (b: Boat) => { const s = sc.get(b.id)!; return b.scoring === 'ZFP' ? ` · ZFP: ${Number.isInteger(s.across!) ? nth(s.across!) : `tied ${nth(Math.floor(s.across!))}`} across the line, +${ptsText(s.penalty)} points (Rule 30.2, 44.3(c))${s.final ? '' : '; her place waits on the boats still racing'}` : b.scoring ? ` · ${b.scoring}: disqualified (Rule ${b.scoring === 'UFD' ? '30.3' : b.scoring === 'DSQ' ? '42' : '30.4'})` : ''; };
-  const rankOf = (b: Boat) => { const s = sc.get(b.id)!; return s.code === 'UFD' || s.code === 'BFD' || s.code === 'DSQ' ? 'DSQ' : s.rank == null ? '–' : `${s.final ? '' : '~'}${rows.filter(x => sc.get(x.id)!.rank === s.rank && sc.get(x.id)!.points === s.points).length > 1 ? '=' : ''}${s.rank}`; };
-  $('resBody').innerHTML = rows.map(b => `<tr><td>${rankOf(b)}</td><td><span class="dot" style="background:${b.color}"></span>${b.isUser ? 'You' : b.name} <span style="color:var(--muted)">${b.no}</span></td><td>${b.finished ? fmtClock(b.finishT!).replace('+', '') : 'Still racing'}${code(b)}</td><td>${sc.get(b.id)!.points != null ? ptsText(sc.get(b.id)!.points!) : ''}</td></tr>`).join('');
-  $('resFouls').textContent = `Fouls you committed: ${w.fouls}. Fouls against you: ${w.fouledBy}.`;
-  { const rr = realResults(); $('resReal').innerHTML = rr; $('resReal').hidden = !rr; }
-  const db = debriefHtml('Your race, debriefed');
-  $('resDebrief').innerHTML = db; $('resDebrief').hidden = !db; $('resStart').hidden = !!db; // the debrief has the start in full
-  mountDebriefTactics($('resDebrief'));
-  $('bWatch').hidden = !w.log || w.track.length < 2;
-  $('results').hidden = false;
-  send({ k: 'pause', on: true });
-}
-
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
 function resize(): void { view.resize(innerWidth, innerHeight); }
 addEventListener('resize', resize); resize();
@@ -1823,15 +1255,15 @@ function frame(now: number): void {
   const showing = boatPanel.open || fleet.boatOpen;
   const simMs = host.advance(dt, showing ? showroomTwa : undefined);
   if (w.running && !w.paused) {
-    if (w.userFinishT != null && !w.finishShown && !resultsShown && w.t - w.userFinishT > 3) showResults();
-    if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) showDrill();
+    if (w.userFinishT != null && !w.finishShown && !resultsShown && w.t - w.userFinishT > 3) results.showResults();
+    if (S.mode === 'drill' && !drillShown && w.t >= DRILL_DEBRIEF_AT) drills.showDrill();
   }
   for (const e of host.drainEvents()) handle(e);
   if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
-  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drillTick(); roundTick();
+  $('bPushOff').hidden = !(w.running && (!!w.user.docked || !!w.user.handled?.held)); sailButtons(); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
@@ -1850,7 +1282,13 @@ function boatSummary(): void {
   pick.innerHTML = S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${(x.name || 'Unnamed').replace(/</g, '&lt;')} · ${sailNo(x)}</option>`).join('');
   const cond = [p.cleanedWeeks ? `bottom ${p.cleanedWeeks} wk` : 'clean bottom', p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : 'used sails', p.mast === 'wood' ? 'wooden mast' : ''].filter(Boolean).join(', ');
   $('boatSum').textContent = `${colour} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull; ${cond}.`;
+  morph($('boatTiles'), S.boats.map(x => { const [ctry, n] = splitNo(sailNo(x)); return tile(n, x.name || 'Unnamed', x.hull.upper, { country: ctry, on: x.id === b.id, data: { boat: x.id }, title: `${sailNo(x)} ${x.name || 'Unnamed'}${x.id === b.id ? `: ${$('boatSum').textContent}` : ''}` }); }).join(''));
+  setup.setupHeads();
 }
+$('boatTiles').addEventListener('click', e => {
+  const t = (e.target as HTMLElement).closest<HTMLElement>('[data-boat]'), pick = $('boatPick') as HTMLSelectElement; if (!t || t.dataset.boat === pick.value) return;
+  pick.value = t.dataset.boat!; pick.dispatchEvent(new Event('change'));
+});
 ($('boatPick') as HTMLSelectElement).onchange = e => {
   const b = S.boats.find(x => x.id === (e.target as HTMLSelectElement).value); if (!b) return;
   S.boat = b; S.boatId = b.id; crewFromClub(); fleetChanged(); boatSummary();
@@ -1860,31 +1298,29 @@ function boatSummary(): void {
 function fleetChanged(): void {
   const ids = new Set(S.boats.map(b => b.id));
   S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId));
-  S.fleet = S.opponents.length; saveSettings(S); oppRows(); setupChanged();
+  S.fleet = S.opponents.length; saveSettings(S); oppRows(); setup.setupChanged();
 }
+/** The fleet chosen, for the setup's fleet row: each boat's number, name and colors. */
+let fleetChosen: { no: string; name: string; hull: string; tag: string }[] = [];
 function oppRows(): void {
+  const chosen: typeof fleetChosen = [];
   const chip = (id: string, name: string, no: string, colour: string, hull: string) => {
-    const on = S.opponents.includes(id), full = !on && S.opponents.length >= MAX_OPPONENTS;
-    return `<button type="button" class="opp" data-opp="${id}" aria-pressed="${on}"${full ? ' disabled' : ''}><i style="background:${hull};box-shadow:0 0 0 2px ${colour}"></i><span>${name}</span><small>${no}</small></button>`;
+    const on = S.opponents.includes(id), full = !on && S.opponents.length >= MAX_OPPONENTS, [ctry, n] = splitNo(no);
+    if (on) chosen.push({ no, name, hull, tag: colour });
+    return tile(n, name, hull, { country: ctry, ring: colour, on, dim: !on, data: { opp: id }, disabled: full, title: `${no} ${name}${on ? ': racing (tap to leave her out)' : full ? ': the fleet is full' : ': tap to race her'}` });
   };
   const mine = S.boats.filter(b => b.id !== S.boatId);
-  const html = `<div class="opp-h">Club boats</div>` + FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')
+  const title = (t: string) => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+  const html = `<div class="t-pickrow"><span class="t-lab">Club boats</span><span class="t-group">${FLEET.slice(1).map((f, i) => chip(`stock:${i + 1}`, f.name, f.no.replace(/^US\s+/, 'USA '), f.tag, f.hull)).join('')}</span></div>`
     // generic club Folkboats (boat/generic.ts), to fill out the fleet: tap one to drop her, + to add another
-    + `<div class="opp-h">More club Folkboats</div>` + S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), sailNo(g), genericTag(id), g.hull.upper); }).join('')
-    + (S.opponents.length < MAX_OPPONENTS ? `<button type="button" class="opp" data-fill="1"><span>+ Add one</span></button>` : '')
-    + `<div class="opp-h">Your boats</div>` + (mine.length ? mine.map(b => chip(b.id, (b.name || 'Unnamed').replace(/</g, '&lt;'), sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more boats under Your boats…</small>');
-  // The same chips as shown: change only who's picked, in place, so the chip under the pointer keeps its hover and
-  // eases into its new look like every other choice; rebuild only when boats come or go.
-  const list = $('oppList'), next = document.createElement('div'); next.innerHTML = html;
-  const keys = (el: Element) => [...el.querySelectorAll<HTMLElement>('.opp')].map(b => b.dataset.opp ?? 'fill').join(',');
-  if (keys(list) === keys(next) && list.childElementCount === next.childElementCount) {
-    const now = list.querySelectorAll<HTMLButtonElement>('.opp');
-    next.querySelectorAll<HTMLButtonElement>('.opp').forEach((b, i) => {
-      const pr = b.getAttribute('aria-pressed'); if (pr !== null) now[i].setAttribute('aria-pressed', pr);
-      now[i].disabled = b.disabled;
-    });
-  } else list.innerHTML = html;
+    + `<div class="t-pickrow"><span class="t-lab">More boats</span><span class="t-group">${S.opponents.filter(isGeneric).map(id => { const g = genericSpec(id, S.boats.map(b => b.sails.number))!; return chip(id, title(g.name), sailNo(g), genericTag(id), g.hull.upper); }).join('')}`
+    + (S.opponents.length < MAX_OPPONENTS ? emptyTile('Add one', true, { data: { fill: '1' }, title: 'Another club Folkboat' }) : '') + `</span></div>`
+    + `<div class="t-pickrow"><span class="t-lab">Your boats</span><span class="t-group">${mine.length ? mine.map(b => chip(b.id, b.name || 'Unnamed', sailNo(b), '#c08cff', b.hull.upper)).join('') : '<small class="opp-none">None yet: save more in the Yacht Club</small>'}</span></div>`;
+  // (changed in place: the tile under the pointer keeps its hover and eases into its new look)
+  morph($('oppList'), html);
+  fleetChosen = chosen;
   $('oppCount').textContent = S.opponents.length ? `· ${S.opponents.length} boat${S.opponents.length > 1 ? 's' : ''}` : '· nobody (a solo race)';
+  setup.setupHeads();
 }
 $('oppList').addEventListener('click', e => {
   if ((e.target as HTMLElement).closest('[data-fill]')) { S.opponents = fillFleet(S.opponents, S.opponents.length + 1, MAX_OPPONENTS); fleetChanged(); return; }
@@ -1893,8 +1329,9 @@ $('oppList').addEventListener('click', e => {
   S.opponents = S.opponents.includes(id) ? S.opponents.filter(x => x !== id) : [...S.opponents, id].slice(0, MAX_OPPONENTS);
   fleetChanged();
 });
-boatPanel = new BoatPanel(S, () => { S.fleet = S.opponents.length; saveSettings(S); newGame(); boatSummary(); oppRows(); }, () => {
+boatPanel = new BoatPanel(S, save => { S.fleet = S.opponents.length; if (save) saveSettings(S); setup.newGame(); boatSummary(); oppRows(); }, saved => {
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
+  if (saved) fleet.flashSaved();
 });
 boatPanel.onSpin = () => (look.spin = !look.spin);
 $('bBoat').onclick = () => nav.go({ k: 'club' });
@@ -1912,8 +1349,8 @@ const fleet: Fleet = new Fleet(S, {
   members: () => MEMBERS,
   // (a member changed: saved, and your boat's race crew drawn again from her seats)
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
-  showroom: b => { showroom(!!b || boatPanel.open); newGame(); },
-  edit: id => { showroom(true); boatPanel.show(id); newGame(); },
+  showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
+  edit: id => { showroom(true); boatPanel.show(id); setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
@@ -1921,6 +1358,8 @@ const fleet: Fleet = new Fleet(S, {
     else { if (S.mode === 'sail') S.mode = 'race'; S.raceFrom = fromSlip && b.slip ? 'slip' : 'water'; }
     saveSettings(S); boatSummary(); oppRows(); nav.go({ k: 'setup' });
   },
+  seasonHtml: id => { const s = (id ? seasonById(id) : undefined) ?? currentSeason(); return s ? seasonHtml(s, seasonResults(s.id), seasons(), liveBoat) : ''; },
+  sailSeason: (id, no) => sailSeason(id, no),
   back: () => nav.back(),
   toBoat: id => nav.go({ k: 'boat', id }),
   backLabel: () => nav.backLabel()
@@ -1929,23 +1368,26 @@ const fleet: Fleet = new Fleet(S, {
  * The back stack (ui/nav.ts; docs/UI-AUDIT.md §3): the screens around the sailing, each shown here, and named for the
  * back link of the screen above it.
  */
-const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'club' ? 'Yacht Club'
+const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'past' ? 'Past races' : p.k === 'drill' ? 'Drill' : p.k === 'club' ? 'Yacht Club'
   : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
 function showPlace(p: Place): void {
   if (p.k === 'home') { openHome(); return; }
-  for (const id of ['home', 'raceChoose', 'setup', 'condDlg', 'club']) $(id).hidden = true;
+  for (const id of ['home', 'raceChoose', 'pastView', 'setup', 'drillView', 'condDlg']) $(id).hidden = true;
   if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
-  if (p.k === 'race') { $('pastNote').hidden = true; $('bPast').setAttribute('aria-expanded', 'false'); $('raceBack').textContent = nav.backLabel(); $('raceChoose').hidden = false; }
-  else if (p.k === 'setup') { prepare(); openSetup(); }
+  if (p.k === 'race') { $('raceBack').textContent = nav.backLabel(); $('raceChoose').hidden = false; }
+  else if (p.k === 'past') { $('pastBack').textContent = nav.backLabel(); pastRaces(); $('pastView').hidden = false; }
+  else if (p.k === 'setup') { setup.prepare(); setup.openSetup(); }
+  else if (p.k === 'drill') { if (S.mode === 'sail') S.mode = 'race'; setup.prepare(); setup.openSetup('drill'); }
   else if (p.k === 'club') { if (p.tab === 'members') fleet.openMembers(); else fleet.openList(); }
   else fleet.openBoat(p.id);
 }
-function openHome(): void { settleLog(openHomeNow); }
+function openHome(): void { results.settleLog(openHomeNow); }
 function openHomeNow(): void {
+  if (boatPanel.open && boatPanel.edited) { boatPanel.leave(openHomeNow); if (boatPanel.edited) return; } // (her changes unsaved: Save or Discard first)
   nav.reset(); // (the start page: the bottom of the back stack)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
-  wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
-  for (const id of ['motorAsk', 'homeAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'club', 'coachPanel']) $(id).hidden = true;
+  setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
+  for (const id of ['motorAsk', 'homeAsk', 'leaveAsk', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'coachPanel', 'lessonCard', 'lessons']) $(id).hidden = true;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);
@@ -1960,12 +1402,20 @@ document.addEventListener('click', e => {
   else if (where === 'create') { if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'cruise') { S.mode = 'sail'; saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'fleet') nav.go({ k: 'club' });
-  else if (where === 'club') { $('home').hidden = true; $('club').hidden = false; }
+  else if (where === 'past') nav.go({ k: 'past' });
+  else if (where === 'drill') nav.go({ k: 'drill' });
 });
-$('bExit').onclick = () => openHome();
-$('bExit2').onclick = () => openHome();
+/** Mid-race (or a drill), the corner's Exit asks first: a misclick shouldn't throw the race away. The sail waits meanwhile. */
+const leaving = () => w.running && $('results').hidden && (w.drill || w.rounding || (!w.freeSail && w.userFinishT == null));
+$('bExit').onclick = () => {
+  if (!leaving() || !$('pause').hidden) { openHome(); return; }
+  $('leaveTitle').textContent = w.drill || w.rounding ? 'Leave drill?' : 'Leave race?';
+  send({ k: 'pause', on: true }); $('leaveAsk').hidden = false; $('bLeaveNo').focus();
+};
+$('bLeaveNo').onclick = () => { $('leaveAsk').hidden = true; if ($('pause').hidden) send({ k: 'pause', on: false }); };
+$('bLeaveYes').onclick = () => { $('leaveAsk').hidden = true; openHome(); };
+$('bExit2').onclick = $('bExit3').onclick = () => openHome();
 $('bKeys0').onclick = () => keysView.open();
-$('bPast').onclick = () => { const n = $('pastNote'); n.hidden = !n.hidden; $('bPast').setAttribute('aria-expanded', String(!n.hidden)); if (!n.hidden) pastRaces(); };
 /* Real past races (sim/realRaces.ts; docs/VISION-ROADMAP.md near term 7): a day the San Francisco Folkboat fleet raced,
    sailed in that day's observed wind and NOAA's tide, on the course they sailed, against the real boats (by name and sail
    number), and at the finish your time among theirs. Listed in the past-race panel, no new buttons (the owner's rule). */
@@ -1979,7 +1429,7 @@ function realRaceRows(): void {
     const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!);
     const won = fin[0];
     return `<div class="pastrow"><div><b>${esc(r.event.replace(/^GGYC Manuel Fagundes /, ''))} · race ${r.raceNo} · course ${r.courseNo} (${r.distanceNm} nm)</b>`
-      + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} won in ${mmss(won.elapsedS!)}${r.uncertain ? ` · <span class="warn" title="${esc(r.uncertain)}">course uncertain</span>` : ''}${r.doubt ? ` · <span class="warn" title="${esc(r.doubt)}">the published distance disagrees with the course sheet</span>` : ''}</small></div>`
+      + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} ${esc(won.key)} won in ${mmss(won.elapsedS!)}${r.courseFrom ? ` · <span title="${esc('The course from ' + r.courseFrom)}">course from a sailor in the race (a last-minute change)</span>` : ''}${r.uncertain ? ` · <span class="warn" title="${esc(r.uncertain)}">course uncertain</span>` : ''}${r.doubt ? ` · <span class="warn" title="${esc(r.doubt)}">the published distance disagrees with the course sheet</span>` : ''}</small></div>`
       + `<button type="button" class="ghost sm" data-real="${esc(r.id)}">Sail it</button></div>`;
   }).join('') : '';
 }
@@ -1988,14 +1438,14 @@ $('realRows').addEventListener('click', e => {
   const r = realRace(b.dataset.real!); if (!r) return;
   // the day as it was: its observed wind and NOAA's tide, the sea it made, the fleet's own start; the real boats that started
   Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
-    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 0, fog: 'real', realRace: r.id });
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.id });
   replayPin = null;
   S.opponents = realFleetIds(r, S.boat.sails.number, MAX_OPPONENTS);
   S.fleet = S.opponents.length;
   if (!S.boat.slip) S.raceFrom = 'water';
-  saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
+  saveSettings(S); boatSummary(); oppRows(); setup.crewRows(); setup.paintSeg();
   $('raceChoose').hidden = true;
-  beginRace();
+  setup.beginRace();
 });
 /**
  * A real race is only that race on its day: the course, the day and the gun it was sailed on, in the wind as it was. Once
@@ -2011,18 +1461,19 @@ function realRaceHolds(): void {
 function realResults(): string {
   const r = S.realRace ? realRace(S.realRace) : undefined; if (!r || w.userFinishT == null) return '';
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-  const you = w.userFinishT, { place, of } = placeAmong(r, you), nth = ordinal(place);
+  const you = w.userFinishT, { place, of } = placeAmong(r, you), nth = results.ordinal(place);
   const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!), win = fin[0].elapsedS!;
   const simT = (key: string) => w.boats.find(b => !b.isUser && b.spec?.id === `real:${r.id}:${key}`);
   // (a real boat with your sail number stays ashore: you sailed in her place)
   const mine = sailKey(S.boat.sails.number);
   const rows = [...fin.map(b => ({ name: titleCase(b.boat), no: b.key, t: b.elapsedS!, sim: simT(b.key), you: false, yours: !!mine && b.key === mine })), { name: 'You', no: '', t: you, sim: undefined, you: true, yours: false }].sort((a, b) => a.t - b.t);
   const gap = you - win, perMile = gap / Math.max(0.1, r.distanceNm);
+  const simCol = rows.some(x => x.sim || x.yours); // (a season race sails the club's fleet: no real boat in the sim)
   return `<div class="eyebrow">Against the real fleet · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>`
-    + `<p class="lede">On the day you'd have been <b>${nth} of ${of}</b>: ${gap <= 0 ? `${mmss(-gap)} ahead of the winner` : `${mmss(gap)} behind the winner, ${Math.round(perMile)} s a mile`}. Their times are the published ones (${esc(r.event)}, race ${r.raceNo}: all on the same rating, so elapsed time decides); the sim's column is the AI sailing each boat today, a check on the sim against the real fleet.</p>`
+    + `<p class="lede">On the day you'd have been <b>${nth} of ${of}</b>: ${gap <= 0 ? `${mmss(-gap)} ahead of the winner` : `${mmss(gap)} behind the winner, ${Math.round(perMile)} s a mile`}. Their times are the published ones (${esc(r.event)}, race ${r.raceNo}: all on the same rating, so elapsed time decides)${simCol ? '; the sim\'s column is the AI sailing each boat today, a check on the sim against the real fleet' : ''}.</p>`
     + (r.uncertain ? `<p class="lede">${esc(r.uncertain)}</p>` : '')
     + (r.doubt ? `<p class="lede">${esc(r.doubt)}</p>` : '')
-    + `<table class="res"><thead><tr><th></th><th>Boat</th><th>Real</th><th>In the sim</th></tr></thead><tbody>${rows.map((x, i) => `<tr${x.you ? ' class="you"' : ''}><td>${i + 1}</td><td>${esc(x.name)} <span style="color:var(--muted)">${esc(x.no)}</span></td><td>${mmss(x.t)}</td><td>${x.you ? '' : x.yours ? 'your number: you sailed for her' : x.sim?.finished ? mmss(x.sim.finishT!) : x.sim ? '–' : ''}</td></tr>`).join('')}</tbody></table>`
+    + `<table class="res"><thead><tr><th></th><th>Boat</th><th>Real</th>${simCol ? '<th>In the sim</th>' : ''}</tr></thead><tbody>${rows.map((x, i) => `<tr${x.you ? ' class="you"' : ''}><td>${i + 1}</td><td>${esc(x.name)} <span style="color:var(--muted)">${esc(x.no)}</span></td><td>${mmss(x.t)}</td>${simCol ? `<td>${x.you ? '' : x.yours ? 'your number: you sailed for her' : x.sim?.finished ? mmss(x.sim.finishT!) : x.sim ? '–' : ''}</td>` : ''}</tr>`).join('')}</tbody></table>`
     + `<p class="lede"><a href="${esc(r.url)}" target="_blank" rel="noopener">The published results</a></p>`;
 }
 
@@ -2032,6 +1483,60 @@ function realResults(): string {
 let pastList: LogEntry[] = [];
 const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id === e.setup!.course) ? e.setup.course
   : COURSES.slice().sort((a, b) => b.title.length - a.title.length).find(c => e.title.startsWith(c.title))?.id ?? null;
+/* ---------------- the season (club/season.ts): a real club series, race by race, against the club's fleet ---------------- */
+let pendingSeason: { series: Series; no: number; at: string } | null = null;
+/** A boat as she is now, by sail number: your boats and the club's other Folkboats, from their specs (club/season.ts LiveBoat). */
+const liveBoat = (sail: string) => {
+  const mine = S.boats.find(b => sailNo(b).replace(/^US\s+/, 'USA ') === sail);
+  if (mine) return { name: mine.name || undefined, hull: mine.hull.upper, club: mine.club };
+  for (const id of seasons()[0]?.fleet ?? []) if (isGeneric(id)) { const g = genericSpec(id, S.boats.map(x => x.sails.number)); if (g && sailNo(g) === sail) return { name: g.name.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()), hull: g.hull.upper, club: g.club }; }
+  return undefined;
+};
+/** Sail race `no` of the season: its real day and start, the day's observed wind and tide, its course (or the committee's), the club's fleet. */
+function sailSeason(id: string, no: number): void {
+  const series = seasonById(id), r = series?.races.find(x => x.no === no); if (!series || !r || r.abandoned) return;
+  Object.assign(S, { mode: 'race', course: r.courseId, tideDate: r.date, tideTime: r.start, windKind: 'auto', windKt: 0, windDir: null, windTurn: 0,
+    chop: 1, swellHs: null, current: 'real', sea: 'real', rain: 'real', fog: 'real', realRace: r.realId ?? undefined });
+  replayPin = null; ghostNext = null;
+  S.opponents = [...series.fleet]; S.fleet = S.opponents.length;
+  if (!S.boat.slip) S.raceFrom = 'water';
+  saveSettings(S); boatSummary(); oppRows(); setup.crewRows(); setup.paintSeg();
+  setup.beginRace();
+}
+/** The season race this race is, if it's one: that race's course, day and start, in the day's real conditions, against the series' fleet. */
+function seasonRaceOf(): { series: Series; no: number } | null {
+  if (S.mode !== 'race' || !w || w.freeSail) return null;
+  for (const series of seasons()) for (const r of series.races) {
+    if (r.abandoned || S.course !== r.courseId || S.tideDate !== r.date || S.tideTime !== r.start) continue;
+    if (S.windKind !== 'auto' || S.windKt || S.windTurn || S.windDir != null || replayPin != null || S.current !== 'real') continue;
+    if (S.opponents.length !== series.fleet.length || !series.fleet.every(o => S.opponents.includes(o))) continue;
+    return { series, no: r.no };
+  }
+  return null;
+}
+/** Her hull's colour, for a boat in the race: yours, a club boat, or one of the club's other Folkboats. */
+function hullOf(b: Boat): string {
+  if (b.isUser) return S.boat.hull.upper;
+  const id = S.opponents[b.id - 1] ?? '';
+  if (id.startsWith('stock:')) return FLEET[+id.slice(6)]?.hull ?? '#ccc';
+  return (isGeneric(id) ? genericSpec(id, S.boats.map(x => x.sails.number))?.hull.upper : b.spec?.hull.upper) ?? '#ccc';
+}
+/** This race's scores, as the season keeps them: each boat by country and sail number; the boats still racing in the order they're in now. */
+function seasonResult(at: string): SeasonResult | null {
+  if (!w) return null;
+  const sc = results.scores(), rows = scoreOrder([...sc.values()], id => w.boats[id].finished ? w.boats[id].finishT : null).map(s => w.boats[s.id]);
+  return { at, scores: rows.map((b, i) => { const s = sc.get(b.id)!; return { sail: b.no.replace(/^US\s+/, 'USA '), name: b.isUser ? (S.boat.name || 'You') : b.name, hull: hullOf(b), you: b.isUser, club: b.isUser ? S.boat.club : b.spec?.club, points: s.points ?? (b.isUser ? w.boats.length + 1 : i + 1), code: s.points == null && b.isUser ? 'RET' : s.code === 'UFD' || s.code === 'BFD' ? 'DSQ' : s.code }; }) };
+}
+/** At the finish of a season race: where this race puts you in the series (counted once you save it). */
+function seasonLine(): string {
+  const sr = seasonRaceOf(); if (!sr) return '';
+  const now = seasonResult('now'); if (!now) return '';
+  const res = { ...seasonResults(sr.series.id), [sr.no]: now }, { rows } = standings(sr.series, res);
+  const you = rows.find(r => r.you), lead = rows[0]; if (!you) return '';
+  const done = sr.series.races.length >= sr.series.scheduled && sr.series.races.filter(r => !r.abandoned).every(r => res[r.no]); // (every scheduled race on the calendar, and sailed)
+  const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  return `<b>${esc(sr.series.title.replace(/ \d{4}.*/, ''))}: ${results.ordinal(you.rank)} · ${you.nett} nett</b> <span>· ${lead === you ? (done ? 'you win the series' : 'you lead') : `${esc(lead.sail)} ${esc(lead.name)} ${done ? 'wins' : 'leads'} on ${lead.nett}`} · counts when you save it</span>`;
+}
 /**
  * A ghost to race against, when there's a run of this very race kept (replay/ghost.ts): your best (the fastest finish), this
  * run if it's another, or none. Sailing it again, the ghost sails its run beside you.
@@ -2039,7 +1544,7 @@ const courseOfEntry = (e: LogEntry) => e.setup?.course && COURSES.some(c => c.id
 function ghostPick(e: LogEntry, i: number): string {
   const gs = ghostsFor(setupKey(e.setup)); if (!gs.length) return '';
   const mm = (s?: number) => s == null ? '' : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-  const what = (g: typeof gs[0]) => g.code ? 'not finished' : `${g.place != null ? ordinal(g.place) + ', ' : ''}${mm(g.elapsed)}`;
+  const what = (g: typeof gs[0]) => g.code ? 'not finished' : `${g.place != null ? results.ordinal(g.place) + ', ' : ''}${mm(g.elapsed)}`;
   const best = gs[0], mine = gs.find(g => g.at === e.at);
   const opts = [`<option value="${best.at}">Ghost: your best (${what(best)})</option>`]
     .concat(mine && mine !== best ? [`<option value="${mine.at}">Ghost: this run (${what(mine)})</option>`] : [])
@@ -2050,7 +1555,7 @@ function pastRaces(): void {
   realRaceRows();
   pastList = loadLog().filter(e => e.kind === 'race' && e.skipper === 'you').sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'CXL' ? 'Cancelled (wind)' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${ordinal(e.place)} of ${e.of}` : '';
+  const result = (e: LogEntry) => e.code === 'RET' ? 'Retired' : e.code === 'CXL' ? 'Canceled (wind)' : e.code === 'unfinished' ? 'Not finished' : e.code === 'DSQ' ? 'Disqualified' : e.place != null ? `${results.ordinal(e.place)} of ${e.of}` : '';
   $('pastRows').innerHTML = pastList.length ? pastList.map((e, i) => {
     const boat = S.boats.find(b => b.id === e.boatId), ok = !!courseOfEntry(e);
     const day = new Date(e.day + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -2067,15 +1572,16 @@ $('pastRows').addEventListener('click', e => {
   ghostNext = g && en.setup && g.key === setupKey(en.setup) ? g : null;
   // (a race saved before Turn the wind has no windTurn: it sails unturned, whatever the slider says now; one saved with
   // a pinned 'Wind from' keeps it for this race only, outside your settings, so it can't stick to the next)
-  if (en.setup) Object.assign(S, { windTurn: 0 }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
+  // (a race saved before On-the-water judging was umpired)
+  if (en.setup) Object.assign(S, { windTurn: 0, judging: 'umpired' }, structuredClone(en.setup.s)); else { S.tideDate = en.day; S.tideTime = en.time; }
   replayPin = S.windDir ?? null; S.windDir = null;
   S.course = course; S.mode = 'race';
   const boat = S.boats.find(x => x.id === en.boatId); if (boat) { S.boat = boat; S.boatId = boat.id; crewFromClub(); }
   if (!S.boat.slip) S.raceFrom = 'water';
   { const ids = new Set(S.boats.map(x => x.id)); S.opponents = S.opponents.filter(o => o.startsWith('stock:') || isGeneric(o) || (!!S.realRace && isReal(o)) || (ids.has(o) && o !== S.boatId)); S.fleet = S.opponents.length; }
-  saveSettings(S); boatSummary(); oppRows(); crewRows(); paintSeg();
+  saveSettings(S); boatSummary(); oppRows(); setup.crewRows(); setup.paintSeg();
   $('raceChoose').hidden = true;
-  beginRace(en.setup?.seed);
+  setup.beginRace(en.setup?.seed);
 });
 
 /* The conditions adjuster: each control is 'real' until moved; Real puts it back. */
@@ -2094,7 +1600,7 @@ function adjustUi(): void {
     if (cur == null) { inp.value = String(a.def()); $(a.el + 'V').textContent = k === 'windTurn' ? 'as usual' : 'real'; } else { inp.value = String(cur); $(a.el + 'V').textContent = a.show(cur); real.push(k); }
   }
   if (S.current !== 'real') real.push('current');
-  if (S.rain) real.push('rain');
+  if (typeof S.rain === 'number' && S.rain) real.push('rain');
   if ((S.fog ?? 'real') !== 'real') real.push('fog');
   const names: Record<string, string> = { windKt: 'wind speed', windTurn: 'wind turned', chop: 'chop', swellHs: 'swell', current: 'current', rain: 'rain', fog: 'fog' };
   if (S.windKind !== 'auto') real.unshift('windKind');
@@ -2109,14 +1615,12 @@ function adjustUi(): void {
 for (const [k, a] of Object.entries(ADJ)) {
   const inp = $<HTMLInputElement>(a.el);
   inp.addEventListener('input', () => { $(a.el + 'V').textContent = a.show(Number(inp.value)); });
-  inp.addEventListener('change', () => { (a.set as (v: number | null) => void)(Number(inp.value)); saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); });
-  document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!.onclick = () => { (a.set as (v: number | null) => void)(null); saveSettings(S); setupChanged(() => { courseCard(); tideBox(); }); };
+  inp.addEventListener('change', () => { (a.set as (v: number | null) => void)(Number(inp.value)); saveSettings(S); setup.setupChanged(() => { setup.courseCard(); setup.tideBox(); }); });
+  document.querySelector<HTMLButtonElement>(`[data-real="${k}"]`)!.onclick = () => { (a.set as (v: number | null) => void)(null); saveSettings(S); setup.setupChanged(() => { setup.courseCard(); setup.tideBox(); }); };
 }
 
-buildSetupChoices();
-newGame(); paintSeg(); crewRows(); courseCard(); tideBox(); boatSummary(); oppRows();
+setup.buildSetupChoices();
+setup.newGame(); setup.paintSeg(); setup.crewRows(); setup.courseCard(); setup.tideBox(); boatSummary(); oppRows();
 requestAnimationFrame(frame);
 
-// Dev-only handle for debugging and browser tests: window.sim() returns the current World.
-if (import.meta.env.DEV) Object.assign(window, { __ghost: (pts: Ghost['pts'] | null) => { activeGhost = pts ? { at: 'dev', key: 'dev', pts } : null; view.setGhost(w, pts); } }); // (a ghost on any race, for checking how it's drawn)
-if (import.meta.env.DEV) Object.assign(window, { sim: () => host.world, __w: () => w, __host: () => host, __hud: hud, __plan: planChart, __look: (yaw: number, pitch: number, chase?: number) => { setLook(yaw, pitch); if (chase) look.chase = chase; }, __over: over, __view: view, __twa: (a: number) => { showroomTwa = a; }, __nav: () => nav.trail });
+installDevHandles(ctx); // (src/app/devHandles.ts)

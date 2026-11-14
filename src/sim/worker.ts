@@ -6,6 +6,7 @@
  * that, and draws and asks its questions of the mirror.
  */
 import { applyCommand, type Command, type CommandResult } from './commands';
+import { warmBasins } from '../environment/current';
 import { CHECK_EVERY, SyncSource, checkOf, type Packet } from './sync';
 import { DT, World, type WorldOptions } from './world';
 import type { CourseFile } from '../courses/course';
@@ -61,6 +62,9 @@ export class RaceWorker {
       this.acc += m.dt; while (this.acc >= DT) { world.idle(DT, m.twa); this.acc -= DT; }
     }
     const ms = performance.now() - t0;
+    // (in the frame's spare time, the harbors' still-water grids a boat is sailing toward: environment/current.ts. Not in
+    // the step: the race comes out the same whenever they're built, a query building one at once that isn't)
+    warmBasins(world.boats, 3000, Math.max(0, 8 - ms));
     const packet = this.src!.capture(world.drainEvents());
     return { k: 'state', gen: this.gen, packet, results, ms, steps: world.steps - steps0, ...(resync != null ? { resync } : {}), ...(++this.frames % CHECK_EVERY === 0 ? { check: checkOf(world) } : {}) };
   }

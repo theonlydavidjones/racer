@@ -99,8 +99,8 @@ export function startDebrief(w: SimView): StartDebrief {
   const offSq = Math.abs(wrap(gw - brg(w.N.x, w.N.y))), kind: 'up' | 'down' | 'reach' = offSq < 45 ? 'up' : offSq > 135 ? 'down' : 'reach';
   const kk = dot(sub(w.pin, w.committee), V(gw)) / w.lineLen, k = kind === 'down' ? -kk : kk, bias = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
   const favEnd = k > 0 ? C.pinLabel : C.committeeLabel, gain = w.lineLen * Math.abs(k);
-  if (kind === 'reach') facts.push(`In this wind the line is ${Math.round(offSq)}° off square: the first leg is a reach, so neither end is favoured as on a beat. Start where you can sail fast for the first mark in clear air. (A line fixed ashore, like the club's, is only as square as the day's wind makes it; to practise judging the favoured end, choose the practice area's course, whose line is laid to the wind.)`);
-  else if (bias >= 2) facts.push(`The ${favEnd} end was favoured by ${bias.toFixed(0)}°${kind === 'down' ? ' (a downwind start: the end further downwind)' : ''}: starting there is worth about ${Math.round(gain)} m ${kind === 'down' ? 'downwind' : 'upwind'} over the other end.`);
+  if (kind === 'reach') facts.push(`In this wind the line is ${Math.round(offSq)}° off square: the first leg is a reach, so neither end is favored as on a beat. Start where you can sail fast for the first mark in clear air. (A line fixed ashore, like the club's, is only as square as the day's wind makes it; to practice judging the favored end, choose the practice area's course, whose line is laid to the wind.)`);
+  else if (bias >= 2) facts.push(`The ${favEnd} end was favored by ${bias.toFixed(0)}°${kind === 'down' ? ' (a downwind start: the end further downwind)' : ''}: starting there is worth about ${Math.round(gain)} m ${kind === 'down' ? 'downwind' : 'upwind'} over the other end.`);
   else facts.push('The line was nearly square to the wind: neither end gained much.');
 
   // grade and tips
@@ -150,7 +150,7 @@ export function startDebrief(w: SimView): StartDebrief {
       const old = tips.findIndex(t => t.startsWith('At full speed you were about')); if (old >= 0) tips.splice(old, 1);
     }
     if (ap.meanV < 0.8 * vFull && grade !== 'ocs') tips.push(`Your run averaged ${Math.round(100 * ap.meanV / vFull)}% of full speed for that angle. Build speed before you turn in (bear off a little and sheet in), so the run is at full speed and the time on distance holds.`);
-  } else if (!ap && grade !== 'ocs') tips.push('Practise a timed run: from a spot below the line, note the time, sail at it at full speed, and see how long it takes. That run, started that many seconds before the gun, is your start.');
+  } else if (!ap && grade !== 'ocs') tips.push('Practice a timed run: from a spot below the line, note the time, sail at it at full speed, and see how long it takes. That run, started that many seconds before the gun, is your start.');
 
   // the favoured end, as you'd check it on the water: head to wind near the line (on an upwind start)
   const favKey: 'pin' | 'committee' | null = kind !== 'reach' && bias >= 2 ? (k > 0 ? 'pin' : 'committee') : null;
@@ -161,9 +161,9 @@ export function startDebrief(w: SimView): StartDebrief {
       // signed, + toward the pin: the read against the bias at the gun, within 3° (about the wind's own wobble) agreeing
       const readS = chk.toward === 'pin' ? chk.offDeg : chk.toward === 'committee' ? -chk.offDeg : 0, gunS = k > 0 ? bias : -bias;
       const right = Math.abs(readS - gunS) <= 3;
-      const gunWords = favKey ? `the ${endName(favKey)} end was favoured by ${bias.toFixed(0)}°` : 'the line was about square';
+      const gunWords = favKey ? `the ${endName(favKey)} end was favored by ${bias.toFixed(0)}°` : 'the line was about square';
       facts.push(`At ${clockOf(chk.t)} you went head to wind ${Math.round(chk.atM)} m below the line: the wind came from ${chk.toward ? `${Math.round(chk.offDeg)}° toward the ${endName(chk.toward)} end` : 'square to the line'}${Math.abs(chk.bowOff) > 4 ? ` (your bow was ${Math.round(Math.abs(chk.bowOff))}° off it: sit closer to head to wind for a true read)` : ''}${right ? `, and at the gun ${gunWords}: the right read.` : `. At the gun ${gunWords}: the wind where you were then differed from the wind at the line at the gun (a shift, or a puff's own direction), so check again nearer the gun.`}`);
-    } else tips.push(`Check the line before the start: go head to wind near it for a few seconds and look where your bow points. Square to the line (90° to it), neither end is favoured; pointing toward an end, that end is upwind, and starting there gains about ${Math.round(w.lineLen / 57)} m for each degree.`);
+    } else tips.push(`Check the line before the start: go head to wind near it for a few seconds and look where your bow points. Square to the line (90° to it), neither end is favored; pointing toward an end, that end is upwind, and starting there gains about ${Math.round(w.lineLen / 57)} m for each degree.`);
   }
 
   const stats: StartStats = { behindM: me.ocs ? -me.d : behind, lateS: me.ocs ? -(me.d / Math.max(0.5, me.target)) : Math.max(0, lateS), pct,
