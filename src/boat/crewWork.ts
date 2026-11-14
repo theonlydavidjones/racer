@@ -246,6 +246,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // (and over a whole gust-lull cycle, LINE_GAP: what counts as a change that has come to stay, urgent, a new point of
   // sail; not a long puff, which the 20 s wish follows most of the way)
   const ls = c.lineSlow ??= {};
+  // (and her angle over the same 20 s: whether she has turned since the lasting wish began to lag)
+  if (look) c.twa20 = c.twa20 == null ? b.twa ?? 0 : c.twa20 + ((b.twa ?? 0) - c.twa20) * Math.min(1, c.lineT / LINE_TAU);
   if (look) { for (const k of PIANO) { if (!(k in want)) { delete lw[k]; delete ls[k]; continue; } const w = want[k as Ctl]!; lw[k] = lw[k] == null ? w : lw[k] + (w - lw[k]) * Math.min(1, c.lineT / LINE_TAU); ls[k] = ls[k] == null ? w : ls[k] + (w - ls[k]) * Math.min(1, c.lineT / LINE_GAP); } c.lineT = 0; }
   // (a new point of sail since the line was set; or their wish for it over the cycle well away from where they set
   // it: a real change. Against where it was set, not the wish then: a line set right through for a puff, the wish went
@@ -291,6 +293,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       const real = realChange(k, skill);
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
+      // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
+      // Set right through to a puff's wish, they were back seven seconds later as it passed, the vang 0.17, 0.89, 0.58)
+      if (walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
       urgentTo = urgent && walk;
       if (!walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
     }
@@ -320,11 +325,14 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const reach = sheet && !a.job && (st == null || a.pose === st.pose) ? 0 : reachTime(a, st, windward, ppl[who]);
     // (a cabin-top line is set to where they've wanted it lately, the wind there is, not this puff's: it's a threshold
     // off the line, so the trip is never for nothing; a big change that has come to stay, they set right through)
+    // (just turned, the lasting wish still the old course's (her angle 20° off her angle over its 20 s, c.twa20): set to
+    // the new course's wish, as a placed crew's outhaul was left at the beat's after a bear-away)
+    const turned = PIANO.has(k) && Math.abs((b.twa ?? 0) - (c.twa20 ?? b.twa ?? 0)) > 20;
     const thr = startThreshold(k, skill, want[k]), far = PIANO.has(k) && Math.abs(lw[k] - b.ctl[k]) > 2 * thr && Math.abs(want[k]! - b.ctl[k]) > 2 * thr;
     // (an urgent one is set right through to where they want it now: set to the lagging wish it was still well off after,
     // and they were back for it seconds later. A trip to the foredeck (big: the line's PLACED_TRIP off) sets the line where
     // it's wanted, not partway along the lagging wish: one trip, not two)
-    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo && !big ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}), ...(PIANO.has(k) ? { refTwa: b.twa ?? 0 } : {}) };
+    a.job = { line: k, reach, work: 0, station: st, to: PIANO.has(k) && !far && !urgentTo && !big && !turned ? lw[k] : want[k], ...(big ? { big } : {}), ...(urgentTo ? { urgent: true } : {}), ...(PIANO.has(k) ? { refTwa: b.twa ?? 0 } : {}) };
     if (PIANO.has(k) && placed) (c.lineSet ??= {})[k] = c.clock ?? 0; // (placed by you: as before, from setting off)
   }
   // work: whoever's at their line works it

@@ -27,7 +27,7 @@ import { n360 } from '../src/core/math';
  * - the most they turn round in 4 s;
  * - time two of them spend within a body's width of each other both moving at once (the "dancing around each other").
  */
-type Watch = { seat?: number; inJob?: boolean; jobEnd?: number; fam?: string; famNew?: string; famT?: number; secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
+type Watch = { seat?: number; inJob?: boolean; jobEnd?: number; fam?: string; famNew?: string; famT?: number; secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; mastCross?: number; excusedAt?: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
 
 function cruise(twa: number, kt: number, mins: number) {
   const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
@@ -37,11 +37,18 @@ function cruise(twa: number, kt: number, mins: number) {
   const cr = buildCrew(u.crew!.spec.helm, u.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), figs = [cr.helm, ...cr.crew];
   const ws: Watch[] = figs.map(() => ({ secs: 0, trips: 0, poses: 0, knee: 0, lean: 0, crawl: 0, cross: 0, spin: 0, turned: 0, hist: [], dance: 0 }));
   let lastTurn = 0, side = Math.sign(u.rel), tack = u.tack;
+  // (a crewmate going up to the mast or back from it: the moment the others share changes, and one of them may cross to
+  // keep her heel where it's wanted. One such crossing each, within MAST_CROSS s of it, toward where the physics has them)
+  let layout = u.crew!.layout ?? 'cockpit', mastAt = -1e9, mastEvents = 0;
+  const MAST_CROSS = 6;
   while (w.t < mins * 60) {
     w.step(DT);
     syncCrew(cr, u.rel >= 0 ? 1 : -1, u.crew, DT, false, undefined, u.heel, u.tacking);
     // (a gybe on the tiller pilot, a shift taking her by the lee on a run, is her tack changing: the boom across)
     if (Math.sign(u.rel) !== side || u.tack !== tack || u.tacking || u.crew!.roll) { lastTurn = w.t; side = Math.sign(u.rel); tack = u.tack; }
+    const lay = u.crew!.layout ?? 'cockpit';
+    if (lay !== layout && (lay === 'mast' || layout === 'mast')) { mastAt = w.t; if (w.t > 30) mastEvents++; }
+    layout = lay;
     const steady = w.t > 30 && w.t - lastTurn > 10;
     const job = (q: string) => ['piano', 'winch', 'car', 'mast', 'fore', 'bow'].includes(q);
     // (at work on a line, whatever the pose: trimming the jib from the leeward winch on a reach is sat to leeward, the job's
@@ -67,7 +74,16 @@ function cruise(twa: number, kt: number, mins: number) {
         // (and only in the cockpit: forward of it, at the mast or on the foredeck, they're not on a side, and back from there
         // to a seat on the other side is a trip, counted as one, not a crossing)
         if (inJob || back) { /* (at a job, or on the way back from it: the trip's) */ } else if (a.z < Z.cockpitFwd) s.seat = undefined;
-        else if (Math.abs(now.x) > 0.15 && !atJob(a)) { const sd = Math.sign(now.x); if (s.seat && sd !== s.seat) s.cross++; s.seat = sd; }
+        else if (Math.abs(now.x) > 0.15 && !atJob(a)) {
+          const sd = Math.sign(now.x);
+          if (s.seat && sd !== s.seat) {
+            // (excused only right after a crewmate went up to the mast or came back, once each for that event, and toward
+            // the side their physics goal is on: the shared moment called for it)
+            const forMast = w.t - mastAt < MAST_CROSS && s.excusedAt !== mastAt && Math.sign(a.goal?.x ?? a.x) === sd;
+            if (forMast) { s.mastCross = (s.mastCross ?? 0) + 1; s.excusedAt = mastAt; } else s.cross++;
+          }
+          s.seat = sd;
+        }
         // (the knees while they're not on their way anywhere: walking is legs moving, as it should be, and the trips and
         // the travel along the deck are counted on their own; the "knee kicking" was legs moving while sat still)
         if (!f.going && !f.route) s.knee += Math.abs(now.knee[0] - q.knee[0]) + Math.abs(now.knee[1] - q.knee[1]);
@@ -87,7 +103,7 @@ function cruise(twa: number, kt: number, mins: number) {
       s.inJob = atJob(a); s.prev = now;
     });
   }
-  return ws.map((s, i) => { const m = s.secs / 60; return { who: i ? `crew ${i}` : 'helm', mins: m, trips: s.trips / m, poses: s.poses / m, cross: s.cross / m, crawl: s.crawl / m, lean: s.lean / m, knee: s.knee / m, spin: s.spin * 180 / Math.PI, dance: s.dance }; });
+  return ws.map((s, i) => { const m = s.secs / 60; return { who: i ? `crew ${i}` : 'helm', mins: m, trips: s.trips / m, poses: s.poses / m, cross: s.cross / m, mastCross: s.mastCross ?? 0, mastEvents, crawl: s.crawl / m, lean: s.lean / m, knee: s.knee / m, spin: s.spin * 180 / Math.PI, dance: s.dance }; });
 }
 
 describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/crewWork.ts)', () => {
@@ -108,6 +124,8 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         // (off the wind, across the cockpit only when she gybes; close-hauled or reaching in light air, to leeward for a
         // lull that lasts, heeling her, or to trim the jib from there, and back up as the breeze fills: a move each way in
         // a few minutes, not each puff (crewPhys.ts hold, under 8 kt and up to 120° true))
+        // (beyond one each for a crewmate going up to the mast or back, at most, and only then: MAST_CROSS)
+        expect(o.mastCross, `${t}: crossings for a crewmate at the mast, against ${o.mastEvents} trips there`).toBeLessThanOrEqual(o.mastEvents);
         if (twa > 120 || (twa > 75 && kt >= 8)) expect(o.cross, `${t}: crossings a minute`).toBe(0);
         else expect(o.cross, `${t}: crossings a minute`).toBeLessThan(0.5);
         // (sliding along the deck, sat or kneeling, not on the way anywhere: settling into a place, no more)
