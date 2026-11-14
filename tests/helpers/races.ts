@@ -57,3 +57,16 @@ export function fleetLegs(seed: number) {
   });
   return { perLeg, total: sailed / plan };
 }
+
+/**
+ * tests/fouls-start.test.ts: one start and the five minutes after it (Seaweed Soup course 10, a fleet of eight, the
+ * real tide of 14 Nov 2026, a westerly of `kt`): how many penalties the AI boats are given, and how long they spend on
+ * them (boat-seconds with a penalty to do).
+ */
+export function startFouls(kt: number, seed: number) {
+  const w = new World(ss10 as unknown as CourseFile, { ...DEFAULT_SETTINGS, judging: 'umpired', tideDate: '2026-11-14', windKind: 'west', windKt: kt, current: 'real', opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], fleet: 7 } as never, seed);
+  let fouls = 0, steps = 0;
+  const ap = w.assignPenalty.bind(w); w.assignPenalty = b => { if (!b.isUser) fouls++; ap(b); };
+  while (w.t < 5 * 60) { w.step(DT); for (const b of w.boats) if (!b.isUser && b.penalty > 0) steps++; }
+  return { fouls, onPenalty: steps * DT };
+}

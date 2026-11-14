@@ -10,7 +10,7 @@
 // the polar changes this with them. Left out: trim, crew and sea.
 
 import { V, wrap } from '../core/math';
-import { hullGap } from '../rules/geometry';
+import { hullEndsInto, hullGapEnds2 } from '../rules/geometry';
 import { flowTurnRate } from './turning';
 import { turnSpeed, yawLag } from './physics';
 
@@ -19,7 +19,7 @@ export interface Pose { x: number; y: number; h: number; v: number }
 
 /** The boat that is to keep clear, now: her pose, the turn she is already making (deg/s, + to starboard: mid-tack, or
  * answering the helm), and her weather helm (deg; physics' helmNeed, 0 if not known). */
-export interface Escaper extends Pose { turnRate?: number; helmNeed?: number; /** her leeway, deg (turnSpeed's course angle; default 4) */ leeway?: number }
+export interface Escaper extends Pose { turnRate?: number; helmNeed?: number; /** her leeway, deg (turnSpeed's course angle; default 4) */ leeway?: number; /** she lets her sheets fly as she turns (b.luff) */ luff?: boolean }
 
 export interface EscapeOpts {
   /** Reaction time before the helm goes over, s: she carries on as she is until then. */
@@ -32,6 +32,9 @@ export interface EscapeOpts {
   turns?: number[];
   /** The true wind's speed, kt: the polar's speed on each heading she passes through, and her beat angle. Default 12 kt. */
   windKt?: number;
+  /** Step holding on too (default true): false where only the turns are wanted (ai.ts's rule 13 tack gate), the hold-on
+   * path's 40 sub-steps not worked out to be thrown away. */
+  hold?: boolean;
 }
 
 /** One avoiding manoeuvre: the heading change asked for, the heading she reaches (the AI's `desired`), and her least
@@ -45,13 +48,15 @@ const TURNS = [-90, -60, -30, 30, 60, 90];
  * seconds from now). The rules ask whether the best `minGap` reaches their clearance; the AI picks the candidate that
  * keeps every gap above hers, nearest her course.
  */
-export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFrom: number, o: EscapeOpts): Candidate[] {
-  const dt = o.dt ?? 0.1, n = Math.max(1, Math.round(o.horizon / dt)), wKt = o.windKt ?? 12;
-  const out: Candidate[] = [];
-  const me = { x: 0, y: 0, h: 0 }; // (reused: hullGap memoises a hull's ends by its numbers)
-  for (const turn of [0, ...(o.turns ?? TURNS)]) {
-    const gaps = tracks.map(() => Infinity);
-    let x = kc.x, y = kc.y, h = kc.h, v = kc.v, r = kc.turnRate ?? 0, minGap = Infinity;
+/** Her own path for each candidate turn, stepped forward (escapes' first half): it doesn't depend on the other boats, so
+ * one set of paths serves every set of tracks judged against it (ai.ts keepClear: the threats, then the boats beside them). */
+export interface EscapePaths { turns: number[]; n: number; dt: number; /** her hull's bow and stern at each step (rules/geometry.ts hullEndsInto), 4 numbers a step */ ends: Float64Array[]; heading: number[]; v: number[] }
+export function escapePaths(kc: Escaper, windFrom: number, o: EscapeOpts): EscapePaths {
+  const dt = o.dt ?? 0.1, n = Math.max(1, Math.round(o.horizon / dt)), wKt = o.windKt ?? 12, turns = o.hold === false ? [...(o.turns ?? TURNS)] : [0, ...(o.turns ?? TURNS)];
+  const P: EscapePaths = { turns, n, dt, ends: [], heading: [], v: [] };
+  for (const turn of turns) {
+    const E = new Float64Array(4 * (n + 1));
+    let x = kc.x, y = kc.y, h = kc.h, v = kc.v, r = kc.turnRate ?? 0;
     const target = h + turn;
     for (let i = 1; i <= n; i++) {
       const t = i * dt;
@@ -67,13 +72,28 @@ export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFro
       h += r * dt;
       // (Deep Physics checked the prediction against the AI's real steered turn: the heading within 3-6°, the position
       // 1.3-5 m out at 8 s, nearly all of it the speed; turnSpeed is their answer, Skipper Model's request)
-      v = turnSpeed(v, r, h, windFrom, wKt, dt, kc.helmNeed ?? 0, kc.leeway ?? 4);
+      v = turnSpeed(v, r, h, windFrom, wKt, dt, kc.helmNeed ?? 0, kc.leeway ?? 4, turn !== 0 && t > o.delay && !!kc.luff);
       const u = V(h); x += u.x * v * dt; y += u.y * v * dt;
-      me.x = x; me.y = y; me.h = h;
-      for (let k = 0; k < tracks.length; k++) { const g = hullGap(me, tracks[k](t)); if (g < gaps[k]) gaps[k] = g; if (g < minGap) minGap = g; }
+      hullEndsInto(x, y, h, E, 4 * i);
     }
-    out.push({ turn, heading: ((h % 360) + 360) % 360, minGap, gaps, v });
+    P.ends.push(E); P.heading.push(((h % 360) + 360) % 360); P.v.push(v);
   }
+  return P;
+}
+
+export function escapes(kc: Escaper, tracks: Array<(t: number) => Pose>, windFrom: number, o: EscapeOpts, paths = escapePaths(kc, windFrom, o)): Candidate[] {
+  const { n, dt } = paths, out: Candidate[] = [];
+  // (each track's hull ends, once, as numbers: the same for every turn, as her own are: geometry.ts hullEndsInto; no pose
+  // objects kept or memoised)
+  const at = tracks.map(tr => { const F = new Float64Array(4 * (n + 1)); for (let i = 1; i <= n; i++) { const p = tr(i * dt); hullEndsInto(p.x, p.y, p.h, F, 4 * i); } return F; });
+  paths.turns.forEach((turn, j) => {
+    const gaps = tracks.map(() => Infinity), E = paths.ends[j];
+    let minGap = Infinity;
+    for (let i = 1; i <= n; i++) {
+      for (let k = 0; k < at.length; k++) { const g = hullGapEnds2(E, 4 * i, at[k], 4 * i); if (g < gaps[k]) gaps[k] = g; if (g < minGap) minGap = g; }
+    }
+    out.push({ turn, heading: paths.heading[j], minGap, gaps, v: paths.v[j] });
+  });
   return out;
 }
 
