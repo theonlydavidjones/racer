@@ -11,6 +11,7 @@ export type Place =
   | { k: 'race' }
   | { k: 'past' }
   | { k: 'drill' }
+  | { k: 'season'; id: string; no?: number }
   | { k: 'setup' }
   | { k: 'club'; tab?: 'boats' | 'members' }
   | { k: 'boat'; id: string };

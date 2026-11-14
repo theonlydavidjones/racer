@@ -91,6 +91,10 @@ export interface Boat {
   x: number; y: number; h: number; // position (m) and heading (deg)
   /** In her slip, made fast, bow in (sim/world.ts pushOff casts her off). */
   docked?: { slip: string };
+  /** Wrecked (docs/WRECK-PROPOSAL.md; your boat only): how, and where ("at West Harbor…", "on the Bay"); `carryOn` once you've chosen to carry on, marked wrecked. */
+  wrecked?: { how: string; where: string; carryOn?: boolean };
+  /** The worst damage she's taken this outing (boat/damage.ts), what did it and where. */
+  damage?: { level: import('./damage').DamageLevel; what: string };
   /** At anchor or on a mooring (she shows the all-round anchor light after dark; render/navLights.ts). */
   atAnchor?: boolean;
   /** Her navigation lights switched off by her skipper (the owner's switch: the lights key). */
@@ -112,7 +116,7 @@ export interface Boat {
    */
   handled?: { plan: import('../geo/marina').PushOff; from: { x: number; y: number }; h0: number; s: number; a: number; /** held head to wind on the bow line (true), or told to let go (false) */ held?: boolean; releasing?: number; /** deg she's followed the wind round while held */ follow?: number; /** deg the tiller's yawed her, walked out */ yaw?: number; /** her berth's id */ slip?: string };
   /** Her sails: how far each is hoisted (0 down … 1 up) and whether the crew is hoisting (true) or striking (false) it. Absent: both up. */
-  rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean };
+  rig?: { main: number; jib: number; mainUp: boolean; jibUp: boolean; /** the last inches taken up at the piano (0..1; absent: done) */ mainTaut?: number; jibTaut?: number };
   v: number; // speed through the water, m/s
   vx: number; vy: number; // velocity over the ground, m/s
   tack: Tack;
@@ -236,7 +240,7 @@ export interface Boat {
   /** The crew has set her up (the first time they trim, their lines start where they want them). */
   crewReady?: boolean;
   /** The lazy jib car you've asked the crew to move to (pins), until it's done (crewWork.ts). */
-  carCmd?: { fore: number; ins: number } | null;
+  carCmd?: { fore: number; ins: number; side?: Tack } | null;
   /** The lazy jib car the crew's own plan wants, and how long (s) the car has been off it. */
   carPlan?: { fore: number; ins: number } | null; carOff?: number;
   /** Heel rate (deg/s, + rolling to port) and the boat's roll: heel follows its equilibrium as a damped oscillator (balance.ts rollStep). */
@@ -264,6 +268,8 @@ export interface Boat {
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;
+  /** A Case's boat (Sail it yourself, sim/caseRun.ts): her letter; she sails the Case's track, not the AI's. */
+  script?: string;
   /** The club burgee she flies (an id from render/burgees.ts), if any. */
   burgee?: string;
   /** Her ensign and a special flag (officer, owner absent...), if flown (render/flagArt.ts ids). */

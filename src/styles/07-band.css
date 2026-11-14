@@ -8,7 +8,9 @@
 .sailband.shut{background:none;border-color:transparent;pointer-events:none}
 .sailband.shut .sb-top > :not(.sb-wx),.sailband.shut .sb-tabs,.sailband.shut .sb-pen{visibility:hidden}
 .sailband.shut .sb-bot{visibility:hidden} /* (kept in the layout: the windex stays where it was, not jumping down) */
-.sailband.shut .sb-hail{pointer-events:auto}
+.sailband.shut .sb-hail,.sailband.shut .sb-hoist{pointer-events:auto}
+.sb-hoist{color:var(--text)!important}
+.sb-hoist.dim{opacity:.55}
 .sailband.off{opacity:.55}
 .sailband button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 .sailband button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
