@@ -326,6 +326,20 @@ function route(f: Figure, want: PoseT, dt: number, k: number): PoseT | null {
   return w;
 }
 /** On the cockpit seat, back to the coaming, feet on the sole. */
+/**
+ * Forward of the cockpit, beside the cabin's after end (crewPhys.ts Z.cabinSide, two crew with the weight wanted forward:
+ * the owner's 8w): sat on the cabin top near its edge, which stands about a seat's height over the side deck, facing
+ * outboard, the feet on the side deck. Out to its very edge to hike, the body leaning out over the deck.
+ */
+function onCabinSide(s: number, z: number, lean: number, k: number): PoseT {
+  const u = uAtZ(z), ch = cabinHalf(u), e = halfBeam(u), hx = ch - 0.17 + 0.1 * Math.min(1, lean);
+  const hip = V(s * hx, cabinTopAt(u, hx) + 0.09 * k, z), yaw = -s * Math.PI / 2, r = right(yaw), f = fwd(yaw);
+  const fx = Math.min(e - 0.08, ch + 0.16);
+  const foot = (j: number) => { const q = V(s * fx, 0, z).addScaledVector(r, (j ? 1 : -1) * 0.11 * k); return q.setY(deckY(uAtZ(q.z), Math.abs(q.x)) + 0.06); };
+  const kneeAt = hip.clone().addScaledVector(f, 0.38 * k).add(V(0, 0.08, 0));
+  const hands: [THREE.Vector3, THREE.Vector3] = [kneeAt.clone().addScaledVector(r, -0.1), kneeAt.clone().addScaledVector(r, 0.1)];
+  return { hip, yaw, pitch: -0.1 - 0.5 * Math.min(1, lean), roll: 0, feet: [foot(0), foot(1)], hands, look: JIB_LUFF.clone() };
+}
 function onSeat(s: number, x: number, z: number, k: number): PoseT {
   const c = chz(z), hx = Math.min(c - 0.1, Math.max(benchEdge(z) + 0.12, Math.abs(x) + 0.08));
   // (facing inboard and a little forward; at the bench's forward end, inboard and a little aft, the knees clear of the
@@ -447,6 +461,8 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   // (and crawling on until they're there, not sat down while still on the way)
   else if ((job === 'fore' || job === 'bow') && fig.cur && Math.abs(fig.cur.hip.z - z) > 0.15) { isMoving = true; dest = z; }
   if (z < COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) isMoving = true;
+  // (at the station beside the cabin's after end, sat there: on the cabin top's edge, the side the weight's on)
+  else if (!isMoving && z < COCK0 && (job === 'sit' || job === 'lee' || job === 'hike')) return onCabinSide(Math.abs(x) > 0.05 ? Math.sign(x) : windward, z, lean, k);
   // (seated along the cockpit, they're on its benches or the side deck beside them: the weight's place from the physics,
   // drawn within the benches' length)
   else if (z < COCK1 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) {
