@@ -30,7 +30,7 @@ describe('hull shell', () => {
     const n = new THREE.Vector3(0, -(TRANSOM_TOP.z - HEEL.z), TRANSOM_TOP.y - HEEL.y).normalize(), o = new THREE.Vector3(0, HEEL.y, HEEL.z);
     const on = (p: THREE.Vector3) => Math.abs(p.clone().sub(o).dot(n)) < 1e-3;
     const cracks = open.filter(([a, b]) => on(a) && on(b) && a.distanceTo(b) > 1e-5 && Math.min(a.y, b.y) < TRANSOM_TOP.y - 0.05);
-    expect(cracks.length).toBeLessThanOrEqual(16); // 8 lands a side
+    expect(cracks.length).toBeLessThanOrEqual(30); // 15 lands a side at most (16 planks, CR 2.207.5; fewer where the lower ones have run out on the keel)
     for (const [a, b] of cracks) expect(a.distanceTo(b)).toBeLessThan(0.06);
   });
   it('keeps the cockpit inside her: no locker or shelf panel pokes out through the hull', () => {
