@@ -120,7 +120,7 @@ export class DrillTracker {
         // noted only if it was a real attempt: a real turn (or time head to wind) for a tack, the boom across for a gybe
         // (a wave's yaw on a dead run flips her side with no gybe at all)
         const real = c.kind === 'tack' ? Math.abs(c.turned) >= 20 || c.deadS >= 2 : c.across != null;
-        if (real) this.note(c.kind, b.ww.kt, hs, `${c.kind === 'tack' ? 'Tack' : 'Gybe'} not completed: she went back onto her old ${c.kind === 'tack' ? 'tack' : 'gybe'}. Commit to the turn once you start it.`);
+        if (real) this.note(c.kind, b.ww.kt, hs, `${c.kind === 'tack' ? 'Tack' : 'Jibe'} not completed: she went back onto her old ${c.kind === 'tack' ? 'tack' : 'jibe'}. Commit to the turn once you start it.`);
         return;
       }
       this.finish(s); // (a new turn before the last is scored: the last is scored where it stands)
@@ -152,9 +152,9 @@ export class DrillTracker {
     }
     if (ok && v0 < MIN_V) return; // (drifting: not a manoeuvre, and not worth a word)
     // a turn that didn't start right is followed all the same, and noted only if it proves a real manoeuvre (finish)
-    const why = !ok ? `${kind === 'tack' ? 'Tack' : 'Gybe'} not scored: hold a steady course for a few seconds first, so there's a speed to measure it against.`
+    const why = !ok ? `${kind === 'tack' ? 'Tack' : 'Jibe'} not scored: hold a steady course for a few seconds first, so there's a speed to measure it against.`
       : kind === 'tack' && twa0 > 70 ? 'Tack not scored: start it from close-hauled (it began from a reach). Come up to close-hauled, settle, then tack.'
-      : kind === 'gybe' && twa0 < 120 ? 'Gybe not scored: bear away to a run first and settle there (it began from a reach or the wind), then gybe.' : '';
+      : kind === 'gybe' && twa0 < 120 ? 'Jibe not scored: bear away to a run first and settle there (it began from a reach or the wind), then jibe.' : '';
     // her share of the polar's best VMG before the turn: the twin sails on at it, in whatever wind comes
     const eta = ok ? mean(q => along(kind, q)) / Math.max(0.05, bestVmg(kind, tws0)) : 0;
     // the new course to measure past: the crew's own close-hauled heading after a tack (physics.ts tackTarget: the
@@ -264,12 +264,12 @@ export function coachLine(s: ManoeuvreScore, jibMine = false): string {
     if (jibMine && s.acrossS != null && s.acrossS > 2.5) return 'You held the old jib sheet too long: it backed against the rig like a brake. Release it as it backs halfway across.';
     if (s.backS != null && s.backS > 1.5 * g.back) return `Slow back to speed (${Math.round(s.backS)} s, a good crew ${Math.round(g.back)} s): foot off a little with the jib eased, then point once she's going.`;
   } else {
-    if (s.overshoot > 20) return `You came ${Math.round(s.overshoot)}° up past the run after the gybe: meet her with the helm as the boom crosses.`;
-    if (s.rate > 1.8 * g.rate) return `A fast gybe (${Math.round(s.rate)}°/s, a good crew ${Math.round(g.rate)}°/s): turn slower, and bring the main in before the boom comes across.`;
+    if (s.overshoot > 20) return `You came ${Math.round(s.overshoot)}° up past the run after the jibe: meet her with the helm as the boom crosses.`;
+    if (s.rate > 1.8 * g.rate) return `A fast jibe (${Math.round(s.rate)}°/s, a good crew ${Math.round(g.rate)}°/s): turn slower, and bring the main in before the boom comes across.`;
   }
   // (good: within what the measure itself wanders, ±2–3 m in the Bay's shifts and puffs with no turn at all: the physics review)
-  if (lost <= Math.max(2.5, 0.15 * s.goodM)) return `A good ${s.kind}: you lost ${Math.max(0, Math.round(s.lostM))} m, a good crew ${Math.round(s.goodM)} m.`;
-  return `${s.kind === 'tack' ? 'Tack' : 'Gybe'}: ${Math.round(lost)} m more than a good crew. Keep it smooth: a steady turn and the sheets across on time.`;
+  if (lost <= Math.max(2.5, 0.15 * s.goodM)) return `A good ${s.kind === 'gybe' ? 'jibe' : 'tack'}: you lost ${Math.max(0, Math.round(s.lostM))} m, a good crew ${Math.round(s.goodM)} m.`;
+  return `${s.kind === 'tack' ? 'Tack' : 'Jibe'}: ${Math.round(lost)} m more than a good crew. Keep it smooth: a steady turn and the sheets across on time.`;
 }
 
 /** A score's wind band, for the running bests: light (under 8 kt), medium (8–14), fresh (over 14). */
