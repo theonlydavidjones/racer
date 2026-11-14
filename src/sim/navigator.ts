@@ -96,9 +96,12 @@ export function passageNow(w: SimView): PassageNow | null {
   const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
   const key = `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`;
   // (and the conditions it was worked in: changed from the pause menu, World.applyConditions, they're new objects)
-  const refs = [w.weather, w.tide, w.windModel, w.sea];
+  // (with the tiller pilot steering on Nav, its own route round the land, so the course drawn is the way it's going; it's
+  // kept, and re-planned, by the pilot: boat/autopilot.ts followRoute)
+  const pp = w.pilot, piloted = pp?.mode === 'nav' && w.arrivedT == null && pp.route ? pp.route : null;
+  const refs = [w.weather, w.tide, w.windModel, w.sea, piloted];
   const m = nowMemo.get(w); if (m && m.key === key && m.refs.every((r, i) => r === refs[i])) return m.v;
-  const o = outlookFor(w), route = routeAround(from, dest.p), r = passage(o, route, t0);
+  const o = outlookFor(w), route = piloted ? [from, ...piloted.slice(pp.ri)] : routeAround(from, dest.p), r = passage(o, route, t0);
   const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
   const turns = r.legs.flatMap(l => l.turns), last = r.legs[r.legs.length - 1];
   const lk: 'beat' | 'run' | null = !last ? null : last.turns.length ? (last.turns[last.turns.length - 1].kind === 'gybe' ? 'run' : 'beat') : last.kind === 'reach' ? null : last.kind;

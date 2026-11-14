@@ -577,7 +577,10 @@ export class Hud {
       const back = { x: Math.sin(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy), y: Math.cos(Math.atan2(mcx, mcy) + W * D2R) * Math.hypot(mcx, mcy) };
       tf = makeTf(back.x, back.y, W, scale, w, h); ctr = back;
     }
-    this.insetPlan = nav; // (chartBody draws her course with it: drawSailing)
+    // (her course with it, drawSailing; and on the map view too while the pilot steers on Nav: the course it will sail, its
+    // tacks, jibes and the current's set, not just the line to the destination (the owner, v188: "course is just showing
+    // a straight line; no accounting for obstacles or jibing or current"))
+    this.insetPlan = nav ?? (wd.cruising && wd.pilot.mode === 'nav' && wd.arrivedT == null ? this.navPassage(wd) : null);
     this.chartBody(ctx, w, h, wd, u, tf, scale, ctr, W, this.mapZoom, 'inset');
     this.insetPlan = null;
     const day = (wd.settings.chartPal ?? 'day') === 'day', I = INK[day ? 'day' : 'dusk'];
