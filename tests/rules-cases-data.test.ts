@@ -34,7 +34,7 @@ export function sailCase(c: RulesCase) {
     seen[t] = { keepsClear: r.keepsClear, rule: r.rule }; last = r;
     if (r.foul && !foul) { foul = { t, by: r.foul.by, rule: r.foul.part ?? r.foul.rule }; break; }
   }
-  return { seen, foul, last };
+  return { seen, foul, last, rec: p.rec, boats: bs };
 }
 
 describe('the World Sailing Cases as data (src/rules/cases.ts): the engine answers each as the Case does', () => {
@@ -66,6 +66,10 @@ describe('the World Sailing Cases as data (src/rules/cases.ts): the engine answe
       expect(r.seen[c.momentT]).toBeDefined();
       expect(Math.max(...Object.keys(r.seen).map(Number))).toBeGreaterThan(c.momentT);
     }
+  });
+  it('Case 14: L overlapped from clear astern within two lengths, so rule 17 binds her (and she still broke neither)', () => {
+    const r = sailCase(CASES.find(c => c.case === 14)!);
+    expect(r.rec.r17).toBe(r.boats.get('L')!.id);
   });
   it('every Case\'s frames are in time order and its letters match its pair', () => {
     for (const c of CASES) {
