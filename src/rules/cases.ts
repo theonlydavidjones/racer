@@ -73,22 +73,31 @@ function sail(from: [number, number], hOf: (t: number) => number, v: number, t0:
 }
 /** Where a boat on heading h at 2.5 m/s was `dt` seconds before she reaches the origin. */
 const back = (h: number, dt: number, v = 2.5): [number, number] => off([0, 0], h, -v * dt);
+/** Sailed on from where the frames before left her. */
+function then(frames: CaseFrame[], hOf: (t: number) => number, v: number, t0: number, t1: number): CaseFrame[] {
+  const f = frames[frames.length - 1]; return [...frames, ...sail([f.x, f.y], hOf, v, t0, t1)];
+}
 const mark = (side: 's' | 'p', beat: boolean, p: [number, number] = [0, 0]): RulesMark => ({ name: 'M', p: { x: p[0], y: p[1] }, type: 'round', side, beat });
 
-const W14 = off([0, 0], 200, -1, -6), hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
+const hL7 = (t: number) => 315 + Math.min(5, Math.max(0, (t - 50) * 5));
+const hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
 const hOL25 = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5));
 const hS105 = (t: number) => 181 + Math.min(30, Math.max(0, (t - 50) * 6));
 
 export const CASES: RulesCase[] = [
   {
     case: 7, title: 'Overlapped to leeward from clear astern', rules: ['11', '17'],
+    // (sailed: W close-hauled at 315°, 2.5 m/s, holding her course; L comes up from 12 m astern, 6 m to leeward, at 3.5 m/s,
+    // overlapping her within two lengths, slows to her speed and luffs slightly, 5° over 1 s at 50 s (no course change
+    // for 16.1, and no higher than her proper course for 17), closing on W until W's boom touches her)
     boats: [
-      { letter: 'W', frames: [at(50, [0, 0], 315), at(60, off([0, 0], 315, 4, -3.5), 315)] },
-      { letter: 'L', frames: [at(50, off([0, 0], 315, -12, -1), 315), at(51, off([0, 0], 315, -1, -6), 315), at(60, off([0, 0], 315, 4, -5.6), 315)] },
+      { letter: 'W', frames: [at(39.9, [0, 0], 315, { look: false }), ...sail([0, 0], () => 315, 2.5, 40, 70)] },
+      { letter: 'L', frames: [at(39.9, off([0, 0], 315, -12, -6), 315, { look: false }), ...then(sail(off([0, 0], 315, -12, -6), () => 315, 3.5, 40, 47.9), hL7, 2.5, 48, 70)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: 50, keepsClear: 'L', rule: '12' }, { t: 51, keepsClear: 'W', rule: '11' }],
-    momentT: 51, ask: 'foul', answer: { who: 'W', rule: '11', line: 'W, to windward, keeps clear (rule 11). L came from astern, but sailed no higher than her proper course (17).' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['W', 'L'], checks: [{ t: 40, keepsClear: 'L', rule: '12' }, { t: 48, keepsClear: 'W', rule: '11' }],
+    momentT: 50, ask: 'foul', answer: { who: 'W', rule: '11', line: 'W, to windward, keeps clear (rule 11). L came from astern, but sailed no higher than her proper course (17).' }, teach: true,
   },
+
   {
     case: 11, title: 'Two port boats meet a starboard boat', rules: ['19', '10'], fleet: true,
     boats: [
@@ -110,13 +119,16 @@ export const CASES: RulesCase[] = [
   },
   {
     case: 14, title: 'A slow luff toward the shore', rules: ['11', '16.1', '17'],
+    // (sailed: W broad reaching at 200°, 2.5 m/s; L comes up from 12 m astern, 6 m to leeward, at 3.5 m/s, overlapping
+    // her from clear astern within two lengths (so rule 17 binds her), slows to W's speed, then luffs 4°/s from 50 s)
     boats: [
-      { letter: 'W', frames: [at(40, [0, 0], 200), ...sail([0, 0], () => 200, 2.5, 45, 80)] },
-      { letter: 'L', frames: [at(40, off([0, 0], 200, -12, -6), 200), at(41, W14, 200), ...sail(W14, hL14, 2.5, 45, 80)] },
+      { letter: 'W', frames: [at(35.9, [0, 0], 200, { look: false }), ...sail([0, 0], () => 200, 2.5, 36, 80)] },
+      { letter: 'L', frames: [at(35.9, off([0, 0], 200, -12, -6), 200, { look: false }), ...then(sail(off([0, 0], 200, -12, -6), () => 200, 3.5, 36, 44.9), hL14, 2.5, 45, 80)] },
     ],
-    pair: ['W', 'L'], checks: [{ t: 40, keepsClear: 'L', rule: '12' }, { t: 41, keepsClear: 'W', rule: '11' }],
-    momentT: 50, ask: 'foul', answer: { who: 'W', rule: '11', line: 'L luffs slowly, to her proper course: W had room to keep clear and didn\'t (11). L broke neither 16.1 nor 17.' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['W', 'L'], checks: [{ t: 36, keepsClear: 'L', rule: '12' }, { t: 45, keepsClear: 'W', rule: '11' }],
+    momentT: 50, ask: 'foul', answer: { who: 'W', rule: '11', line: 'L luffs slowly, to her proper course: W had room to keep clear and didn\'t (11). L broke neither 16.1 nor 17.' }, teach: true,
   },
+
   {
     case: 15, title: 'Clear ahead at the zone, then tacking', rules: ['18.2(a)', '13'], marks: [mark('p', true)],
     boats: [
