@@ -85,6 +85,7 @@ const mark = (side: 's' | 'p', beat: boolean, p: [number, number] = [0, 0]): Rul
 
 // (A where the zone's edge is about 10 m behind her at 99 s: 14 m short of the mark, 3 m to its side, as the diagram had her)
 const A15 = off(off([0, 0], 45, -14, 3), 45, -2.5 * 4), hA15 = (t: number) => 45 - Math.min(90, Math.max(0, (t - 99) * 30));
+const hL53 = (t: number) => 300 - Math.min(30, Math.max(0, (t + 31.8) * 30));
 const hL7 = (t: number) => 315 + Math.min(5, Math.max(0, (t - 50) * 5));
 const hL14 = (t: number) => 200 + Math.min(40, Math.max(0, (t - 50) * 4));
 const hOL25 = (t: number) => 60 - Math.min(30, Math.max(0, (t - 50) * 5));
@@ -188,13 +189,16 @@ export const CASES: RulesCase[] = [
 
   {
     case: 53, title: 'Overlapped from astern, a boat nearly stopped', rules: ['15', '11'],
+    // (sailed, before the start: W nearly stopped at 300°, 0.2 m/s; L comes up from 12 m astern, 4 m to leeward, at 2.5 m/s,
+    // overlaps her, and at once bears away 30° (30°/s) to give her time to respond: a swerve, but hers to make)
     boats: [
-      { letter: 'W', started: false, frames: [at(-30, [0, 0], 300, { v: 0.2 })] },
-      { letter: 'L', started: false, frames: [at(-30, off([0, 0], 300, -12, -1), 300), at(-29, off([0, 0], 300, -2, -4), 300), at(-28.5, off([0, 0], 300, -1, -5.5), 270)] },
+      { letter: 'W', started: false, frames: [at(-34.1, [0, 0], 300, { v: 0.2, look: false }), ...sail([0, 0], () => 300, 0.2, -34, -26)] },
+      { letter: 'L', started: false, frames: [at(-34.1, off([0, 0], 300, -12, -4), 300, { look: false }), ...sail(off([0, 0], 300, -12, -4), hL53, 2.5, -34, -26)] },
     ],
-    pair: ['W', 'L'], swerveAt: [-28.5],
-    momentT: -29, ask: 'foul', answer: { who: 'neither', rule: null, line: 'L got right of way by overlapping from astern, so she gives W time to respond (15). Bearing away to do so breaks no rule.' }, teach: false, why: 'keyframes are the test\'s snapshots, not a sailed track: to be re-authored with sail()',
+    pair: ['W', 'L'], swerveAt: [-31], checks: [{ t: -34, keepsClear: 'L', rule: '12' }, { t: -31.9, keepsClear: 'W', rule: '11' }],
+    momentT: -32, ask: 'foul', answer: { who: 'neither', rule: null, line: 'L got right of way by overlapping from astern, so she gives W time to respond (15). Bearing away to do so breaks no rule.' }, teach: true,
   },
+
   {
     case: 92, title: 'Starboard bears away onto a ducking port boat', rules: ['16.2', '10'],
     boats: [
