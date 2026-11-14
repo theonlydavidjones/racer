@@ -1384,6 +1384,17 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
+- **The luff set for the breeze, not each gust** (Crew Controls, 14 November; shelved, the Coordinator agreeing): the crew
+  already tune the luff (both halyards, both Cunninghams) by the wind as North Sails' Nordic Folkboat guide does (none
+  in light air, the wrinkles just out in medium, hard on above 15 kt), a skilled crew more finely. But they re-plan every
+  line each second for the wind of the moment, so they retune the luff in every gust, where the sources answer a gust
+  with the quick lines (sheets, traveller, vang, backstay) and retune the luff for a lasting change. Tried: the luff set
+  for the wind steadied over about a minute (an estimate), looked at every 10 s, the quick lines worked around it. It
+  isn't small: the crew move a line only when it's worth the trip (minGain), so with the luff no longer jumping with the
+  gusts its gains get small and its lines stay where earlier winds left them. The same conditions ended with the
+  Cunningham at 0 or 0.62, and three tests failed (crew.test's placed/auto outhaul, halyard.test's take-up after a
+  re-hoist, a crew figure through the boat in a light-air tack). Doing it right means reworking how the crew settle
+  their trim. The attempt is stashed on branch `luff-steady`.
 - **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
   short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
