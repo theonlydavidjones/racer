@@ -100,6 +100,16 @@ describe('Learn to sail, lesson 9: rules of the road', () => {
     expect(gap).toBeGreaterThan(LESSON_MARKS.clearLoa * LOA);
   }, 60_000);
 
+  it('standing on, you bearing away to a run after she\'s set: the encounter still ends, it isn\'t left open astern of you', () => {
+    const w = world(), L = w.lesson!, from = w.windModel.base;
+    L.step = 4; setOn(w, from - 90);
+    w.lesson = null; sail(w, 40); w.lesson = L; // (settled on her reach first)
+    sail(w, 60, () => !!L.approach); expect(L.approach).not.toBeNull();
+    steer(w, from - 160);
+    sail(w, 400, () => L.step !== 4 && L.step !== 5);
+    expect([4, 6]).toContain(L.step); expect(L.enc).toBeNull();
+  }, 60_000);
+
   it('she\'s set only once your heading and speed have settled, and never coming up from astern (Rule 13)', () => {
     const w = world(), L = w.lesson!, from = w.windModel.base;
     setOn(w, from + 100); steer(w, from + 40); // (still turning)
