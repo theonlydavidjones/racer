@@ -312,7 +312,7 @@ export class SceneView {
     scene.add(this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
     const sun = this.sun = new THREE.DirectionalLight(0xfff3dd, 0.75 * Math.PI); sun.position.set(-300, 500, 200); scene.add(sun); scene.add(sun.target);
     // shadows from the sun: a small, sharp shadow map that follows your boat (sails on the deck and the water)
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; // (three.js r186 dropped PCFSoft: asked for, it warned and switched to PCF on the first shadow drawn, and every material compiled before then compiled again: about fifty programs never drawn)
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 10, far: 1200 });
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
@@ -430,6 +430,7 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
+  private sunLit = true;
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
@@ -458,16 +459,15 @@ export class SceneView {
    * Have the GPU compile the shaders of everything that's hidden now (the city's and the bridge's lights after dark,
    * the boats' navigation lights, rain, the fog bank) in the background, so the frame they first appear in doesn't
    * stall while it compiles fifty-odd of them (half a second or more when night fell with the city in view). Each is
-   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. Both with
-   * the sun's shadows and without (it stops casting them once it's down, which changes every lit surface's shader).
-   * Programs already compiled are reused, so after the first race this costs only the walk through the scene.
+   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. (The sun casts
+   * its shadows day and night, faded out once it's down, so one pass covers both.) Programs already compiled are reused,
+   * so after the first race this costs only the walk through the scene.
    */
   private warmShaders(): void {
-    const hidden: THREE.Object3D[] = [], shadow = this.sun.castShadow;
+    const hidden: THREE.Object3D[] = [];
     this.scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-    try {
-      for (const cast of [shadow, !shadow]) { this.sun.castShadow = cast; void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
-    } finally { this.sun.castShadow = shadow; for (const o of hidden) o.visible = false; }
+    try { void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
+    finally { for (const o of hidden) o.visible = false; }
   }
 
   /** A buoy on the water, leaning and trailing a wake in the current (see update). */
@@ -707,7 +707,9 @@ export class SceneView {
     this.sun.intensity = 0.75 * Math.PI * up;
     const f = focus;
     this.sun.target.position.set(f.x, 0, -f.y); this.sun.position.copy(this.sun.target.position).addScaledVector(dir.y > 0.05 ? dir : new THREE.Vector3(0, 1, 0), 500);
-    this.sun.castShadow = up > 0.05;
+    // (the sun casts its shadows always, so no lit surface's shader changes as it sets; below the horizon its shadows are
+    // faded out and the shadow map no longer drawn: one set of programs, not one for day and one for night)
+    { const lit = up > 0.05; this.sun.shadow.intensity = lit ? 1 : 0; this.renderer.shadowMap.autoUpdate = lit; if (lit && !this.sunLit) this.renderer.shadowMap.needsUpdate = true; this.sunLit = lit; }
     // twilight sky colours: civil twilight (sun 0–6° down) still glows; darker through nautical twilight
     const tw = 1 - ss(-12, -1, el), glow = ss(-10, -2, el);
     sm.uniforms.uTwi.value = 1 - ss(-1, 4, el);
