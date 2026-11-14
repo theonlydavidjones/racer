@@ -185,8 +185,7 @@ export const SHOVE_N = 27 * 9.80665;
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /**
  * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more (the helm hard over turns her
- * about 1.7 deg/s at it: physics.ts). Her glide from it (about 30 m on physics.ts's drag) runs on past the clear water the
- * planner found at most berths: the rest is the helmsman's, steering her on down the fairway, or a bump at a crawl.
+ * about 1.7 deg/s at it: physics.ts). Her glide from it is about 6 m (physics.ts asternCoast).
  */
 export const ASTERN_STEERAGE = 0.38;
 /**
