@@ -1164,6 +1164,12 @@ Also asked for:
   reach (yra.org, berkeleyyc.org and encinal.org are blocked here); the Port's crane colors, counts per terminal and
   sizes, the Richmond–San Rafael Bridge's paint and deck profile, and East Brother's house colors are unconfirmed
   (portofoakland.com, dot.ca.gov and eastbrother.org need allowing).
+  **Grounding on depth** (Coordinator, 14 November; Bay East, after bay-east-17; physics review; with Skipper Model for
+  the AI's routing): today a boat runs aground only on the coastline, so at low water she sails over drying flats and
+  shoals with her 1.20 m draft (Folkboat, class rules). San Rafael's and San Leandro's flats, Richardson Bay and the
+  Berkeley flats are where Folkboats really go aground. The chart's depth plus the tide's height there (tide.ts
+  tideHeightAt) against her draft: soft mud, so she's aground, not wrecked, and stuck until the tide lifts her or she
+  kedges off (the anchor); the AI's routes keep to water deep enough.
   ~~East Bay landmarks you navigate by~~ (done: the Campanile and the Claremont, landmarks for bearings) (owner, 13 November; with Bay East; 2–4 h): the **Berkeley Campanile** (Sather
   Tower, on the UC Berkeley campus) and the **Claremont Hotel** (the large white hotel in the Berkeley Hills). Both are
   sighted from across the Bay for bearings and transits, so their positions, heights and outlines need sourcing (OSM,
@@ -1353,7 +1359,7 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
-- **Wrecks** (designed: docs/WRECK-PROPOSAL.md, the owner's answers 14 November; Marinas; after #292; not urgent; 6–10 h):
+- **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
   short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs
   lay her up for a few real days, with no money. In a season race it's RET. Only your boat is wrecked. Until it's built,
