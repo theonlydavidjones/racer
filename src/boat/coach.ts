@@ -239,6 +239,12 @@ const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] }
  */
 export function withCrew(b: Boat, k: LineKey, v: number): Controls {
   const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
+  // (and the crew's lines where they're already taking them: a cabin-top line they mean to set, worth the trip to them
+  // (physics.ts trimSails' pick, b.crewWorth), is judged at their setting, not where it is now on the way. Settling in,
+  // a vang eased over the next minute; promised against the line half-way, the fix was worth what the crew were about
+  // to give her anyway, and the boat left alone caught up: the promise didn't come true)
+  const plan0 = b.crewPlan, worth0 = b.crewWorth;
+  if (plan0 && worth0) { const min = 0.001 + 0.003 * (1 - crewSkill(b.crew)); for (const x of FIXABLE) if (x !== k && !byHand(b, x) && (worth0[x] ?? 0) >= min) c[x] = plan0[x]; }
   if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
   // (a shape line moved under a main the crew trim: they set the car and the sheet around it as they do every second,
   // the lines you hold fixed where you have them (physics.ts trimSails, crewSolve): the vang off upwind, they sheet
