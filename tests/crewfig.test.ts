@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { testBoat, sail, startTack, courseHeading } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew, slotOf, type CrewPlace } from '../src/boat/crewPhys';
-import { buildCrew, ground, syncCrew, underDeck, winchGrip, type Crew, type Figure } from '../src/render/crew';
+import { buildCrew, ground, syncCrew, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
+import { PADDLE, paddler } from '../src/boat/paddle';
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
 import { COURSES } from '../src/courses/registry';
@@ -65,17 +66,23 @@ function elbows(cr: Crew, label: string, bad: string[]): void {
   }
 }
 
-function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean; sea?: number }, label: string): string[] {
+function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean; sea?: number; paddle?: 'P' | 'S' }, label: string): string[] {
   const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
   const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) };
   b.crew = newCrew(spec, 'S'); if (o.place) b.crew.place = o.place;
   const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
   let hold = true, tt = 0;
   sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
-  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); tt += 1 / 30; syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking, o.sea ? o.sea * Math.sin(2 * Math.PI * tt / 2.6) : undefined); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
+  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); tt += 1 / 30; syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking, o.sea ? o.sea * Math.sin(2 * Math.PI * tt / 2.6) : undefined, pd); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
+  // (paddling: as world.ts paddle() and paddleJob set it, the paddler's job the side deck on the side called)
+  let pd: PaddleDraw | null = null;
+  if (o.paddle) { const who = paddler(b), windward = (b.tack === 'S') === (o.paddle === 'S') ? 1 : -1; b.paddle = { side: o.paddle, t0: 0, auto: false };
+    b.crew.people[who].job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' }, side: b.tack };
+    pd = { side: o.paddle, back: false, fetch: PADDLE.fetchS, who, key: 0 }; }
   frames(3);
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
   else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
+  else if (o.paddle) frames(o.secs ?? 20);
   return bad;
 }
 
@@ -93,6 +100,9 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     // (on until one of them's sat on the bow, the legs hanging down over it either side of the stem: the owner's "hang his
     // legs over the front")
     ['pole out, on to the bow and sat there', { kt: 7, twa: 172, pole: true, secs: 62 }],
+    // (paddling with the boom crutch, on each side: fetched up from the companionway, carried out to the side deck, and
+    // stroked over the side, ROADMAP 8c)
+    ['paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22 }], ['paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
   for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000);
