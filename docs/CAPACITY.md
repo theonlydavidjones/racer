@@ -616,3 +616,27 @@ and threw each one away ("Maps became deprecated during optimization"), 14 s of 
 - In the browser the compiler's threads are off the worker's, so this costs a player background CPU in the first race
   rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
   nothing.
+
+## A behaviour's cost: the puff response (15 Nov 2026)
+
+The auto crew's heavy-air puff response (physics.ts puffEase, on branch claude/puff-response) failed perf-pair --ai at
+1.041 against main. Split into what its code costs and what the different race costs (Crew Model with Capacity, each pair
+run alone, perf race and --ai):
+
+- **Code, about 3.7%.** H2: all of puffEase's code run every step, its result thrown away, so the race is the no-puff race
+  to the last digit (fingerprint bd02309f): 1.037 against the no-puff tree. The first probe of this, H (puffEase returning
+  at its first line), read 0.995 and was wrong: V8 drops the body after an early `return`, so the caller stays small and
+  keeps its inlining. **To measure a function's code cost, run all of it and drop the effect, not an early return.**
+- **Cuts, about 2.8% back, the race bit-identical (7905d3b8):** the seven fields declared in makeBoat (each boat
+  otherwise gained them at its first puff, mid-race: 0.7%), and the call gated to steps with a puff on, one being seen, or
+  something still eased (nearly every step has none).
+- **Behaviour, about 2%:** the boats sail a different race with the main eased in the gusts. Profiled with
+  `--max-inlined-bytecode-size=0` (puff on against H2, so the code is alike and only the race differs), the extra time is
+  spread: moveBoat, step and trimSails a few per cent each, aiThink +14%, the crew's hold +25%, clearAstern +14%. No
+  function is new work. A first profile pinned it on heaveTo's strip model; counted, no boat was ever hove to or had her
+  jib aback in either race (heaveTo needs b.isUser). The line was the leeway-as-motion block, the same HOVE formula,
+  which runs every step in both.
+- **Where it stands:** the gated version reads 1.019 on perf-pair --ai (12 kt about 1.005, 22 kt about 1.035), against
+  the 1.5% gate. Ruled (the Coordinator): the gate holds. The crew chain (#347, #348, crewJobs step 2, the seat swap: 0.9905)
+  lands without it, and the puff response follows once crewPhys placeCrew's step 3 (its 8.1 KB a step of allocations)
+  has paid for it.

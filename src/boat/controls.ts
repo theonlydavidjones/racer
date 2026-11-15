@@ -462,11 +462,23 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
 }
 
 /**
+ * The cabin-top lines worth a trip together, though none is alone (planWorth's `minGain`): the most worth first, until
+ * what's picked is worth a trip, its gain judged with them all moved at once (lines on the same shape, the Cunningham
+ * and the downhaul both moving the draft, each claim the same error alone: the singles' sum ran 12 to 46% over the
+ * whole, the physics review); none if even all of them aren't. The owner's crew getting up for one line sort the rest
+ * while they're up; judged one by one, a placed crew's six lines each worth 0.02 to 0.2% were left in a lull. The
+ * traveller and the backstay need no trip, so they're not in it. Worked out with the plan, kept with its result.
+ */
+const TOGETHER = new WeakMap<object, ReadonlySet<string>>();
+const NONE: ReadonlySet<string> = new Set();
+export const worthTogether = (W: object): ReadonlySet<string> => TOGETHER.get(W) ?? NONE;
+const TOP_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'] as const;
+/**
  * What moving each line from where it is to the crew's plan is worth: the drive it gains (a share: 0.002 = 0.2%), or 1
  * when the depowering steps call for it (she's overpowered: it's for her heel and helm, not the sail's shape). A crew
  * gets up to move a line only when it's worth it (crewWork.ts).
  */
-export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number): Partial<Record<keyof CrewSettings, number>> {
+export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number, minGain?: number): Partial<Record<keyof CrewSettings, number>> {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
   const loaded = loadedCar(c, tack);
   const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, jibHalyard: c.jibHalyard ?? 0.3, carFore: loaded.fore, carIn: loaded.ins };
@@ -478,6 +490,20 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
     // attack, worth more than any shape
     if (k === 'traveller' && mainsheet != null) { out[k] = Math.abs(plan.traveller - now.traveller) > 0.02 ? 1 : 0; continue; }
     out[k] = settingsDrive({ ...now, [k]: plan[k] }, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet) - base;
+  }
+  // (and the cabin-top lines worth a trip together: worthTogether)
+  if (minGain != null) {
+    const small: [typeof TOP_LINES[number], number][] = [];
+    for (const k of TOP_LINES) { const w = out[k]; if (w != null && w > 0 && w < minGain) small.push([k, w]); }
+    if (small.length > 1) {
+      small.sort((x, y) => y[1] - x[1]);
+      const moved: CrewSettings = { ...now }, set = new Set<string>();
+      let sum = 0;
+      for (const [k, w] of small) {
+        set.add(k); moved[k] = plan[k]; sum += w;
+        if (sum >= minGain && settingsDrive(moved, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet) - base >= minGain) { TOGETHER.set(out, set); break; }
+      }
+    }
   }
   return out;
 }

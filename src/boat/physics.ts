@@ -19,7 +19,7 @@ import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -709,7 +709,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -1342,7 +1342,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet);
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)));
+    b.crewTogether = worthTogether(b.crewWorth); // (worked out with the worth, once a second: not looked up each step)
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
       const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
@@ -1358,15 +1359,17 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
   // (the crew's lines and the traveller, in that order (CREW_LINES, then 'traveller'), written out by name: the same values put in the same order, but each line's
   // reads its own, where a loop over the names made every read look up a different one: about 1% of the step)
-  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, pick = (w: number | undefined) => (w ?? 1) >= minGain || !ready;
-    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang) ? t.vang : c.vang;
-    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul) ? t.outhaul : c.outhaul;
-    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham) ? t.cunningham : c.cunningham;
-    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul) ? t.downhaul : c.downhaul;
-    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) ? t.backstay : c.backstay;
-    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham) ? t.jibCunningham : c.jibCunningham;
-    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard) ? t.jibHalyard : c.jibHalyard;
-    if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller) ? t.traveller : c.traveller; }
+  // (and the small ones together when they add up to a trip's worth: controls.ts worthTogether)
+  { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, also = ready ? b.crewTogether : undefined;
+    const pick = (w: number | undefined, k: string) => (w ?? 1) >= minGain || !ready || (also !== undefined && also.has(k));
+    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang, 'vang') ? t.vang : c.vang;
+    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
+    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham, 'cunningham') ? t.cunningham : c.cunningham;
+    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul, 'downhaul') ? t.downhaul : c.downhaul;
+    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay, 'backstay') ? t.backstay : c.backstay;
+    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
+    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
+    if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller, 'traveller') ? t.traveller : c.traveller; }
   if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!held('jibsheetW')) want.jibsheetW = 1;
   if (!byHand(b, 'jibsheet')) want.jibsheet = backing0 ? 1 : jibsheetFor(wantJib, c, b.tack);
