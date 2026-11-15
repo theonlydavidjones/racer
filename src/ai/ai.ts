@@ -423,6 +423,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   let desired = b.h, luff = false, beating = false;
   let aim: Vec | null = null; // (the point she's steering for, racing)
   ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
+  ai.featherOK = false; // (set below: clear water round her)
   if (b.penalty > 0) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
@@ -732,12 +733,18 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // looks at each heading's room to other boats: out on the course the simple moves below are enough, and cheaper)
   const startArea = w.t < 60;
   const near: { o: Boat; dx: number; dy: number; r: ReturnType<World['rights']>; cp: { t: number; d: number } }[] = [];
+  let clear = true;
   for (const o of w.boats) {
     if (o === b) continue;
     const dx = o.x - b.x, dy = o.y - b.y;
     if (dx * dx + dy * dy > 3600) continue;
+    if (dx * dx + dy * dy < 900) clear = false;
     near.push({ o, dx, dy, r: w.rights(b, o), cp: cpa(b, o) });
   }
+  // (feathering in a puff, physics.ts featherFor, only with no boat within four lengths: a luff of a few degrees is a
+  // change of course, and close to another boat that's rule 16.1's room, or, keeping clear, a turn toward the boat
+  // she's keeping clear of. With a boat that close her trimmer answers the puff alone)
+  ai.featherOK = clear;
   // First, her right of way. Rule 16.1: a right-of-way boat changing course must give the other boat room to keep
   // clear, so if the turn she wants would close on a boat close by she turns only as far as still leaves it that room.
   // (Room: 8 m between centres, a little more than a Folkboat's length (7.6 m); with less than that already, she

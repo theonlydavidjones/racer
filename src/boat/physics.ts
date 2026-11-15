@@ -225,6 +225,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       const long = err + ai.turnCommit * 360;
       if (Math.abs(long) > 330) ai.turnCommit = 0; else err = long; // target moved: drop the commitment
     }
+    // feathering in a puff: the helm has her a little above her course while it's on her (featherFor); not mid-turn
+    if (ai && !midTack && ai.turnCommit === 0 && !ai.urgent) err = wrap(err + toWind * featherFor(b, dt));
+    else if (ai) ai.feather = 0;
     // (where her heading's going with the helm amidships; checking a swing is the rudder's work, not sculling's: rule
     // 42.3(d) allows sculling only to turn toward close-hauled)
     const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? rateFor(Math.sign(lead)) : flow;
@@ -987,6 +990,41 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
  * (crewWork.ts workPace). The margins and times are estimates: no source gives them in degrees or seconds.
  */
 export const PUFF_HEEL = 15, PUFF_HELM = 5, PUFF_BACK = 3, PUFF_BOOM = 15, PUFF_CLEAR = 2, PUFF_SEE = 2, PUFF_RIDE = 2, PUFF_SPAN = 10, PUFF_DUMP = 1.5, PUFF_RUN = 0.1, PUFF_LET = 4;
+/**
+ * Feathering, upwind in a puff: the helm luffs her a little toward the wind as it hits, to spill power and keep her on
+ * her feet, and bears back off as it passes (North Sails, "Steering upwind": "feather up (head up slightly)" in puffs,
+ * "foot off a few degrees" in lulls; "In moderate to heavy winds, you can use the angle of heel as your primary guide").
+ * Trim comes first and feathering second ("Puff response upwind in heavy air": "The proper initial response is a change
+ * in trim ... In heavy air we then feather up to point a little higher"): so she feathers on the same cue as her
+ * trimmer eases (puffEase: the tiller pulling past PUFF_HELM, or heel past her crew's best by PUFF_HEEL, 2.5° of heel
+ * counting as a degree of helm, PUFF_CLEAR), and the two share the load: each answers what's left of it, and as the
+ * main goes out and the tiller lightens she bears back off. No source gives the angle in degrees, so none is set here:
+ * she luffs while the load's there, as far as it takes to bring it down, and the boat's own forces say how far that
+ * is. She goes no higher than the jib's luff just lifting (the inside telltales, FEATHER_LIFT of trim.ts's luffing:
+ * "If you head up too far, the inside telltales lift"), and bears away if she's losing her feet, slower than
+ * FEATHER_FEET of the speed she had as the puff hit ("Chop can stop you dead in your tracks if you feather up in fresh
+ * breeze": in a seaway that comes sooner, and she feathers less). The helm feels the load in their own reaction time
+ * (crewPhys.ts reactTime: an expert's half a second, a novice's a second and a half) and answers it as fast: a novice
+ * late, then over, an expert close. FEATHER_LIFT, FEATHER_FEET and FEATHER_MAX (a stop, not a target) are judgements.
+ * Returns how far above her course she's held, deg.
+ */
+export const FEATHER_LIFT = 0.1, FEATHER_FEET = 0.9, FEATHER_MAX = 10;
+export function featherFor(b: Boat, dt: number): number {
+  const ai = b.ai!, was = ai.feather ?? 0;
+  const relD = wrap(b.ww.from - b.desired), beat = beatAngle(b.ww.kt);
+  // (close-hauled on the course she wants, on the tack she's on, with way on, and clear water round her: ai.ts)
+  const beating = !!ai.featherOK && !b.tacking && b.v > 1 && Math.abs(relD) <= beat + 3 && (relD >= 0) === ((b.rel ?? relD) >= 0);
+  if (!beating) { ai.featherSeen = 0; return (ai.feather = 0); }
+  const c = b.crew, helmP = c ? allAboard(c.spec)[0] : null, react = helmP ? reactTime(helmP) : 1;
+  const heelOver = (b.heelMag ?? 0) - crewBestHeel(b.twa, b.ww.kt, crewSkill(c));
+  const load = Math.max((b.helmNeed ?? 0) - PUFF_HELM, (heelOver - PUFF_HEEL) / 2.5);
+  const seen = (ai.featherSeen = (ai.featherSeen ?? 0) + (load - (ai.featherSeen ?? 0)) * Math.min(1, dt / react));
+  if (was === 0) ai.featherV0 = b.v;
+  const lift = b.trim.jib?.flow === 'luffing' ? b.trim.jib.amount : 0, feet = b.v >= FEATHER_FEET * (ai.featherV0 ?? b.v);
+  // (up while she's pressed and has room to go up; back down as the load comes off, or at once at the telltales or slowing)
+  const rate = seen > 0 && (lift > FEATHER_LIFT || !feet) ? -Math.max(1, was) / react : seen / react;
+  return (ai.feather = clamp(was + rate * dt, 0, FEATHER_MAX));
+}
 function puffEase(b: Boat, up: boolean, tws: number, dt: number): number {
   const was = b.gust ?? 0;
   if (!up) return (b.gust = 0);
