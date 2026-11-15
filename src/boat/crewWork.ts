@@ -322,7 +322,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (each against its own threshold: the fine one for a line wanted right to its stop is for setting it there, not for
       // a trip to move it 2% because this moment's wish is at the stop and the lasting one isn't)
       const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
-      if (Math.abs(dl) < startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
+      // (a line they're setting early for the next leg, before a rounding, sim/world.ts roundingPrep: gone to on what they
+      // want now, not on their wish smoothed over LINE_TAU, which a few lengths out hasn't caught up with the rounding yet)
+      const prep = !!b.crewPrep?.lines.includes(k as never);
+      if (prep ? Math.abs(dn) < th : (Math.abs(dl) < startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0)) continue;
       // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
       const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
       // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
@@ -347,8 +350,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a walk for a real change: a new point of sail, their wish over the cycle well away from the setting (LINE_MOVED), or a line
       // they've not set yet. Urgent too: the wish over the cycle well off counts only once it has moved since the set)
       const real = realChangeOf(c, twa, ls, k, skill);
-      // (and a line they're setting early for the next leg, before a rounding: sim/world.ts roundingPrep)
-      const prep = !!b.crewPrep?.lines.includes(k as never);
+      // (and a line they're setting early for the next leg, `prep` above, urgent too. Placed by you (walk false), they keep
+      // PLACED_TRIP's big-change rule for a trip: you've put them where they are)
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || prep || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.

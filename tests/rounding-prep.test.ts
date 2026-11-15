@@ -71,3 +71,21 @@ describe('Ready before the leeward mark', () => {
     }
   });
 });
+
+import { testBoat, sail } from './helpers/testBoat';
+import { startThreshold } from '../src/boat/crewWork';
+import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
+import { beatAngle } from '../src/boat/polar';
+describe('A small change for the next leg still goes before the mark (crewJobs: on what they want now)', () => {
+  it('the outhaul a little harder for the beat, 1.5 times the least change they bother with: set within a few seconds', () => {
+    const b = testBoat({ heading: 360 - 160, kt: 4, windKt: 12 }); b.crew ??= newCrew(DEFAULT_CREW, 'S');
+    sail(b, 60); // (settled on the run)
+    const skill = crewSkill(b.crew!), o0 = b.ctl.outhaul, step = 1.5 * startThreshold('outhaul', skill, o0 + 0.1);
+    const plan = { ...b.crewPlan!, outhaul: Math.min(1, o0 + step) };
+    b.crewPrep = { lines: ['outhaul'], awa: 40, up: true, plan };
+    let moved = -1; sail(b, 8, t => { if (moved < 0 && b.ctl.outhaul > o0 + 0.005) moved = t; });
+    expect(moved, 'the outhaul on its way within 8 s').toBeGreaterThanOrEqual(0);
+    expect(b.ctl.outhaul).toBeGreaterThan(o0);
+    void beatAngle;
+  });
+});
