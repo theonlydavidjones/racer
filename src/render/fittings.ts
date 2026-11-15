@@ -56,7 +56,8 @@ const CAST_MIN = 0.25;
  * A boat's shadows from the parts that show in them (the hull, keel, rudder, mast, boom, sails, crew: the shadows a
  * sailor sees on deck and on the water), not from her small fittings: a cleat's or a block's shadow is under a pixel of
  * the sun's shadow map (2048 texels over its patch of sea), but each was a draw call in the shadow pass, about 235 of a
- * start's 1,150 a frame. Every part still receives shadows.
+ * start's 1,150 a frame. Nor from her ropes, whose shadows broke up into crawling dashes on the sails. Every part still
+ * receives shadows.
  */
 export function boatShadows(g: THREE.Object3D): void {
   g.updateMatrixWorld(true);
@@ -65,6 +66,10 @@ export function boatShadows(g: THREE.Object3D): void {
     const m = o as THREE.Mesh; if (!m.isMesh) return;
     m.receiveShadow = true;
     if (m.userData.cullR !== undefined) { m.castShadow = false; return; } // (a merged set of small parts: FittingCull's)
+    // (her ropes: one instanced mesh of short segments a few millimetres thick; their shadows are far under a texel of the
+    // shadow map, and broke up into dashes that crawled over the sails as the lines and the cloth moved, the owner's
+    // "gray confetti flying up the sail")
+    if ((m as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = false; return; }
     if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
     m.castShadow = m.geometry.boundingSphere!.radius * m.matrixWorld.getMaxScaleOnAxis() / gs >= CAST_MIN;
   });
