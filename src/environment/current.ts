@@ -64,7 +64,14 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
  * and the stream is whole within that distance of it, so it runs on along a breakwater's outside and in through a mouth. Past that it fades over
  * BASIN_MOUTH meters to BASIN_EDDY of itself in a harbor with breakwaters, or BASIN_OPEN among docks that lie open to
  * an estuary with no breakwater (more of the stream gets in among their piles and hulls). All four are estimates: no
- * measured figure was found for these harbors, or in general.
+ * measured figure was found for these harbors (NOAA has no current station inside the Marina, Gashouse Cove, Fort Mason or
+ * Aquatic Park: the nearest are SFB1204, Alcatraz Island SW, and SFB1205, North Point Pier 35, CO-OPS station list, Nov
+ * 2026). From general, not San Francisco, work they sit in a plausible range: a mixing layer along a harbor's mouth spreads
+ * at about 0.03–0.1 of the distance the stream has run in shallow water (bed friction slows it from the free 0.1–0.2:
+ * Chu & Babarutsi 1988; Uijttewaal & Jirka 2003), so over the few hundred meters it runs past a breakwater, 10–60 m wide,
+ * where BASIN_MOUTH's 30 m is; and the gyre inside a narrow-mouthed basin runs at roughly 0.05–0.2 of the stream outside
+ * (marinas exchanging through such a layer: e.g. "Shear-driven flushing of micro-tidal marinas", ICCE 2012), where
+ * BASIN_EDDY's 0.1 is. (Both as summarized: the papers themselves weren't reachable from here.)
  * Known limits of the 4 m grid it's worked out on: land thinner than about 2 m on a slant can be slipped through (one
  * strip by Fortmann Marina); water is open or not by a sharp 30 m cutoff, so a dead-end slip just over 60 m wide (Fort
  * Mason's) would carry the stream at 1 m resolution and doesn't here; slots under ~10 m between solid piers read closed.
