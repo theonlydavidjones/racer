@@ -196,7 +196,10 @@ export class DrillCoach {
     const k = Math.max(0, Math.min(1, ((pos.x - L.pin.x) * lx + (pos.y - L.pin.y) * ly) / (ll * ll))), Q = { x: L.pin.x + lx * k, y: L.pin.y + ly * k };
     const up = dir(u.ww.from), side = (pos.x - Q.x) * up.x + (pos.y - Q.y) * up.y; // (+: to windward of the line)
     const d = dist(pos, Q), toQ = n360(Math.atan2(Q.x - pos.x, Q.y - pos.y) / D2R);
-    const spec: GuideSpec = { lane: [{ pts: [pos, Q], half: 6 }], gate: { p: Q, h: toQ, half: 9 } };
+    // the approach: the lane from her to the spot on the line to cross at the gun, arrowheads in it pointing at the line,
+    // and the gate lying along the line itself at that spot (the owner, 15 Nov 2026, didn't read the lane as the way in)
+    const lineH = n360(Math.atan2(lx, ly) / D2R), ahead = Math.min(d - 4, 26), arrowsAt = add(Q, dir(toQ), -ahead);
+    const spec: GuideSpec = { lane: [{ pts: [pos, Q], half: 6 }], gate: { p: Q, h: lineH - 90, half: 12 }, ...(ahead > 6 ? { arrows: { p: arrowsAt, h: toQ, n: 3 } } : {}) };
     const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}`; // (the lane redrawn as she moves: about once a second)
     const left = -w.t;
     if (side > 1 && left > 0) return { spec, key, wake: null, cue: { word: 'Dip back', sub: `over the line · ${Math.round(left)} s` } };

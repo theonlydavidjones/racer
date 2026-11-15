@@ -21,6 +21,8 @@ export interface GuideSpec {
   gate?: { p: Pt; h: number; half: number };
   /** A good crew's turn (white). */
   ideal?: Pt[];
+  /** Gold arrowheads along the lane toward its end (the start: the approach, pointing at the line). */
+  arrows?: { p: Pt; h: number; n: number };
   /** The course to steer after the turn: chevrons on the water along it. */
   target?: { p: Pt; h: number };
   /** Rounding: the mark's zone, drawn bright; the exit course (dashed, with chevrons). */
@@ -90,6 +92,7 @@ export class DrillGuides {
     }
     if (g.gate) { const r = dir(g.gate.h + 90), p = g.gate.p; add(ribbon([{ x: p.x - r.x * g.gate.half, y: p.y - r.y * g.gate.half }, { x: p.x + r.x * g.gate.half, y: p.y + r.y * g.gate.half }], 1.4, GOLD, 0.95)); }
     if (g.ideal && g.ideal.length > 1) add(ribbon(g.ideal, 0.8, WHITE, 0.85));
+    if (g.arrows) chevrons(g.arrows.p, g.arrows.h, g.arrows.n, GOLD).forEach(add);
     if (g.target) chevrons(g.target.p, g.target.h, 3, CYAN).forEach(add);
     if (g.zone) { const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.35, ZONE + 0.35, 96), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(g.zone.x, g.zone.y, 0.35)); add(ring); }
     if (g.exit) { const d = dir(g.exit.h), p = g.exit.p; add(ribbon([p, { x: p.x + d.x * g.exit.len, y: p.y + d.y * g.exit.len }], 0.6, CYAN, 0.8, 4)); chevrons({ x: p.x + d.x * (g.exit.len - 14), y: p.y + d.y * (g.exit.len - 14) }, g.exit.h, 2, CYAN).forEach(add); }

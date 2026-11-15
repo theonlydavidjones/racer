@@ -15,7 +15,7 @@ import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
 import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
-import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
+import { DEFAULT_SETTINGS, chooseWindKind, drillFleet, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
 import { CONDITION_KEYS, World, describeTide } from '../sim/world';
 import { LocalHost, WorkerHost, type WorldArgs } from '../sim/host';
@@ -64,8 +64,9 @@ function prepare(seed = randomSeed()): void {
   // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
   // checkArrival, intoSlip)
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
+  const WSf = app.S.mode === 'drill' ? drillFleet(WSd, app.S.drillSolo ?? true) : WSd;
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
-  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSd, seed,
+  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
   // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
   courseFileNow = args.file;

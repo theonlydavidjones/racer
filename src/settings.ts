@@ -82,6 +82,11 @@ export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt:
 const KEY = 'fbsim-settings-v2';
 /** The most boats you can race against. */
 export const MAX_OPPONENTS = 7;
+/** The start practice's fleet: "With the fleet" always brings boats. With nobody chosen to race (the setup's "Nobody: a
+ *  solo race"), the club's three stock boats come out for it, so switching to the fleet between attempts brings a fleet
+ *  (the owner, 15 Nov 2026: "I toggled on 'with the fleet,' but no fleet appeared"). Alone: as set. */
+export const drillFleet = <T extends Pick<Settings, 'opponents' | 'fleet'>>(s: T, solo: boolean): T =>
+  solo || s.fleet > 0 ? s : { ...s, opponents: DEFAULT_SETTINGS.opponents.slice(), fleet: DEFAULT_SETTINGS.opponents.length };
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };

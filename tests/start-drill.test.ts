@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
-import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { DEFAULT_SETTINGS, drillFleet, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { brg, V } from '../src/core/math';
 import type { Frame } from '../src/replay/recorder';
@@ -24,6 +24,15 @@ describe('the start-line drill', () => {
     while (race.t < -20) race.step(DT);
     expect(race.track[0].t).toBeGreaterThanOrEqual(-30);
   }, 180_000);
+
+  it('"With the fleet" brings a fleet even with nobody chosen to race (the club\'s stock boats); alone stays alone', () => {
+    const none = settings({ opponents: [], fleet: 0 });
+    expect(new World(TRAIN, drillFleet(none, false), 4, { startAt: 60, solo: false }).boats.length).toBe(4);
+    expect(new World(TRAIN, drillFleet(none, true), 4, { startAt: 60, solo: true }).boats.length).toBe(1);
+    const two = settings({ opponents: ['stock:2', 'stock:4'], fleet: 2 }); // (a chosen fleet is kept as chosen)
+    expect(drillFleet(two, false)).toBe(two);
+    expect(new World(TRAIN, drillFleet(two, false), 4, { startAt: 60 }).boats.length).toBe(3);
+  }, 60_000);
 
   /** A world with your track replaced: from (d m below the line, along a), heading h, at v m/s, from t0 to the gun. */
   const withTrack = (pts: (t: number) => { d: number; a: number; h: number; wind: number }) => {

@@ -129,3 +129,19 @@ body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .
 
 /* (the briefing: a point's rest on hover) */
 .bf-items li[title]{cursor:help}.bf-more{color:var(--muted)}
+/* the start practice's results: takeaways (a bar for the seconds each cost), the attempts with the latest and the best
+   marked, where on the line as an icon (drills.ts takeaways, drillTable) */
+#dTips .dtk{list-style:none;margin-left:-18px;display:flex;align-items:center;gap:10px;font-size:15px;line-height:1.35}
+#dTips .dtk b{color:var(--accent)}
+#dTips .dtk-bar{flex:0 0 40px;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent) calc(var(--s) * 100%),rgba(255,255,255,.12) 0)}
+#dTips .dtk-i{cursor:help;color:var(--muted);font-size:14px;margin-left:6px}
+.dstarts tr.latest td{background:rgba(255,255,255,.06)}
+.dstarts td.ocs{color:#ff6b6b}
+.dend line{stroke:var(--muted);stroke-width:1.2}
+.dend .pin{fill:none;stroke:var(--muted);stroke-width:1.2}
+.dend .rc{fill:var(--muted)}
+.dend .me{fill:#fff}
+.dend .me.fav{fill:var(--row)}
+.dlegend{display:flex;gap:16px;margin:6px 0 2px;font:600 11px/1 var(--f-inst);color:var(--muted);align-items:center}
+.dlegend .b{color:var(--accent)}
+.dlegend svg{vertical-align:-2px}
