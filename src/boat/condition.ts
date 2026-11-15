@@ -123,6 +123,17 @@ export function mainRig(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: Bo
   const base = b.cond?.main ?? STD_RIG;
   return b.rigMain ??= { ...base, tune: tuneEffect(b.tune, base.bend) };
 }
+/**
+ * The same rig as mainRig, without keeping anything on the boat: for readers that don't own her (the coach, run on the
+ * page's copy of the race, which the page may only change by commands: sim/commands.ts). Her kept rig if she has one.
+ */
+export function rigOf(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: BoatSpec }): SailRig | undefined {
+  const cond = b.cond ?? (b.spec ? condition(b.spec) : undefined);
+  if (!b.tune) return cond?.main;
+  if (b.rigMain) return b.rigMain;
+  const base = cond?.main ?? STD_RIG;
+  return { ...base, tune: tuneEffect(b.tune, base.bend) };
+}
 
 /** Added skin friction (N) at speed v (m/s) from roughness over the smooth-hull friction line, with the form factor. */
 export const foulingDrag = (c: Condition, v: number) => v <= 0 ? 0 : 0.5 * 1025 * HULL.wettedSurface * c.dCf(v) * v * v * 1.15;
