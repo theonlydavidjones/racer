@@ -1006,8 +1006,18 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 $('map').addEventListener('click', () => {
   if (!w.running || chart.isOpen) return;
   if (w.cruising && hud.insetView === 'nav') { navView.toggle(w); return; } // (the navigator's view: its passage plan)
-  releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook();
+  releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); chartNavLabel();
 });
+/** The navigator (cruising) or the course and strategist (racing) from the full chart: its button in the chart's own
+ * row, and its key, both close the chart and open it (the owner: "when in a cruise, if I expand the inset map I can no
+ * longer find navigator mode"). */
+function chartNavLabel(): void {
+  const b = $('bChartNav'), k = keymap.label('course');
+  b.textContent = w.cruising ? 'Navigator' : 'Strategist';
+  b.title = `${w.cruising ? 'The navigator: the passage plan' : 'The course and the strategist'}${k ? ` (${k})` : ''}`;
+}
+function chartToNav(): void { chart.close(); if (w.cruising) navView.open(w); else courseView.open(w); }
+$('bChartNav').onclick = chartToNav;
 /** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
  * chosen in the full chart's Layers menu and remembered with your settings (no buttons on the inset: the owner). */
 function insetViews(): void {
@@ -1087,7 +1097,7 @@ addEventListener('keydown', e => {
   // typing in a field (a time, a name, a number): the keys are the field's, not the boat's
   const tgt = e.target as HTMLElement | null;
   if (tgt && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) && e.key !== 'Escape') return;
-  if (chart.isOpen && e.key !== 'Escape') return; // the chart is paused: only Esc, to close it
+  if (chart.isOpen && e.key !== 'Escape') { if (keymap.actionFor(e.key) === 'course') chartToNav(); return; } // the chart is paused: only Esc, to close it, and the navigator's key
   if (!$('keepAsk').hidden) return; // save or discard first
   if (!$('motorAsk').hidden) { if (e.key === 'Escape') $('bMotorNo').click(); return; }
   if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
