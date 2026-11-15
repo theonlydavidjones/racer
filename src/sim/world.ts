@@ -337,7 +337,7 @@ export class World {
    * touch). Not for the user once her turns have begun: locked against the boat she fouled, she isn't "well clear"
    * (44.2), and her turns there don't excuse the touches; the AI gets clear before it turns. */
   private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number }>();
-  private lastTouch = new Map<number, { t: number; near: number[]; loaded: boolean }>(); // (the boats within ENGAGED of her as she touched; whether her turn for it was loaded, or she declined it)
+  private lastTouch = new Map<number, { t: number; near: number[]; loaded?: boolean }>(); // (the boats within ENGAGED of her as she touched; whether her turn for it was loaded, or she declined it)
   /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
    * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
    * after the first sign of it; at most TANGLE_MAX after `t`). */
@@ -2405,11 +2405,11 @@ export class World {
     const lt = this.lastTouch.get(b.id), vs = this.lastFoulVs.get(b.id)?.vs;
     const same = !!lt && this.t - lt.t < TANGLE_MAX && !b.penaltyDir && vs != null && lt.near.includes(vs);
     // (same incident: the foul's turns replace only the touch's one turn, if it was loaded, keeping any others she still owes)
-    const touched = same && lt!.loaded && b.penalty > 0;
+    const touched = same && lt!.loaded !== false && b.penalty > 0;
     if (b.penalty <= 0) startPenalty(b, this.penaltyDeg); else addPenalty(b, touched ? this.penaltyDeg - ONE_TURN : this.penaltyDeg);
     // (a touch she'd declined, then this foul in the same incident: she "need not take the penalty" for it, 44.1(a), so a
     // protest of the touch reads as owed, and taken with these turns)
-    if (same && !lt!.loaded) {
+    if (same && lt!.loaded === false) {
       this.declined.delete(`${b.id}@${lt!.t}:31`); this.lastTouch.delete(b.id);
       for (const p of this.protests) if (p.vs === b.id && p.t === lt!.t && p.kind === 'mark') p.owed = true;
     }
