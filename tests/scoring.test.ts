@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { ptsText, raceScores, scoreOrder, tenth } from '../src/rules/scoring';
 import { rivalOf } from '../src/replay/versus';
 
-const fleet = (n: number, o: Record<number, 'ZFP' | 'UFD' | 'BFD'> = {}) =>
+const fleet = (n: number, o: Record<number, 'ZFP' | 'UFD' | 'BFD' | 'DSQ'> = {}) =>
   Array.from({ length: n }, (_, i) => ({ id: i, finishT: 600 + i * 10, code: o[i] ?? null }));
 const by = (s: ReturnType<typeof raceScores>) => new Map(s.map(x => [x.id, x]));
 
 describe('scoring (RRS 2025–2028 Appendix A, 30.2 and 44.3(c))', () => {
+  it('a boat disqualified for rule 42 who sails on and finishes first: DNF points, and each boat behind her moves up a place (A6.1)', () => {
+    const s = by(raceScores(fleet(5, { 0: 'DSQ' })));
+    expect(s.get(0)!.points).toBe(6);
+    expect(s.get(1)!.points).toBe(1); // (second across the line, first on points)
+    expect(s.get(4)!.points).toBe(4);
+  });
   it('Low Point (A4): 1 for first, 2 for second…', () => {
     const s = by(raceScores(fleet(5)));
     expect([0, 1, 2, 3, 4].map(i => s.get(i)!.points)).toEqual([1, 2, 3, 4, 5]);
