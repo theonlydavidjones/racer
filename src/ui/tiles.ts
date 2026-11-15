@@ -53,3 +53,10 @@ export function emptyTile(label: string, add: boolean, o: { round?: boolean; on?
   const attrs = Object.entries(o.data).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="button" class="${cls}"${attrs}${o.on != null ? ` aria-pressed="${!!o.on}"` : ''}${o.title ? ` title="${esc(o.title)}"` : ''}>${face}</button>`;
 }
+
+/** The start practice's alone-or-with-the-fleet choice, readable at a glance (the owner misread it, 15 Nov 2026): a
+ *  sail for each boat on the line, yours amber, the fleet's white; the words after. */
+export function fleetChoiceHtml(fleet: boolean, n: number): string {
+  const sail = (you: boolean) => `<svg class="fsail${you ? ' you' : ''}" viewBox="0 0 8 12" width="8" height="12" aria-hidden="true"><path d="M1 11h6L4 1z"/></svg>`;
+  return `<span class="fsails">${sail(true)}${fleet ? Array.from({ length: n }, () => sail(false)).join('') : ''}</span>${fleet ? `With the fleet · ${n}` : 'Alone'}`;
+}

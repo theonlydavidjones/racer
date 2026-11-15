@@ -3,7 +3,7 @@ export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
   | 'mainIn' | 'mainOut' | 'travUp' | 'travDown' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft' | 'paddle'
-  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView' | 'perfMeter'
+  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'restartStart' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
   | 'course' | 'log' | 'pause' | 'keys' | 'trimNotes';
@@ -49,6 +49,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'viewOverhead', label: 'Overhead view', group: 'Views' },
   { id: 'cycleView', label: 'Next view', group: 'Views' },
   { id: 'lookInstrument', label: 'Look at the cabin-top instrument from the helm (press again to look back)', group: 'Views' },
+  { id: 'restartStart', label: 'Start practice: a new countdown from the same start, now (your starts so far kept)', group: 'Racing' },
   { id: 'windLadder', label: 'Wind indicator: the true and apparent wind in the air beside her, at three heights (on / off)', group: 'Views' },
   { id: 'flowView', label: 'Flow view: the air over the sails, at three heights (show / put away)', group: 'Views' },
   { id: 'lookLeft', label: 'Look left', group: 'Views' },
@@ -70,7 +71,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
   luff: ['s'], mainIn: ['z'], mainOut: ['x'], travUp: ['Shift+Z'], travDown: ['Shift+X'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], paddle: ['/'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
-  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
+  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], restartStart: ['Shift+R'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
   log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['Shift+F'], trimNotes: ['Shift+T'],
