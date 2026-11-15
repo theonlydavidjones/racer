@@ -744,7 +744,15 @@ What's planned, roughly in order. Done work is described in the README.
      way to make the windex smaller and get the heel indicator into the main part of the panel, just above the windex?
      or even as an outside ring on the top part of the windex, like from 10:00 to 2:00?" Two more are shown in place:
      (R) a ring around the windex's top from 10:00 to 2:00, its mark at her heel angle one to one; and (S) the windex
-     about 20% smaller with the slim bar just above it. The owner's pick goes here.
+     about 20% smaller with the slim bar just above it. The owner picked R, then refined it in place (15 November):
+     - **Ring:** a thin ring hugging the windex's top from 10:00 to 2:00, one to one with her heel, all inside the
+       panel. The windex is a little smaller (about 87%) and set a hair lower, clear of the mainsheet row.
+     - **Mark:** a small circle on the ring, white, then amber past 20° and red past 25°, with the ring's amber and red
+       zones behind it.
+     - **Best heel:** a teal ◆ tucked tight outside the ring at her best heel; the circle may overlap it, so long as
+       the ◆'s top half shows.
+     - **Degrees:** just outside the ring at 1:30 or 10:30, on the side she's heeled to.
+     Drawings: the Roadmap session's scratchpad (heel/). It reads b.heelMag and crewBestHeel. No new button.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
