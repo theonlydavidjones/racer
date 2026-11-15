@@ -176,6 +176,13 @@ function cityfrontDepth(p: Vec): number {
 }
 /** Across this much of the Cityfront box's edge (m), the land's lee fades out, rather than stopping at a straight line. */
 const CF_FADE = 250;
+/**
+ * Fill the ground's lattice (groundHeightSmooth) within `half` m of each point now, at the race's set-up: a tile filled
+ * the first time a boat's rays reach it costs about a millisecond, which would otherwise land inside a step.
+ */
+export function prepareLee(pts: Vec[], half: number): void {
+  for (const c of pts) for (let y = c.y - half; y <= c.y + half; y += GL * GT) for (let x = c.x - half; x <= c.x + half; x += GL * GT) groundHeightSmooth({ x, y });
+}
 /** A dip between two stretches of land narrower than this (m) doesn't part them for the lee (terrainLeeRaw). */
 const DIP_GAP = 200;
 /** The mask's share of land (0..1, read bilinearly) from which the ground counts: its cells' own edge. */
@@ -263,36 +270,47 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
   let worst = 0;
   for (const off of [-8, 0, 8]) {
     const u = V(from + off), side = off === 0 ? 1 : 0.85;
-    // the stretch being crossed: where the ray met it; and the chain of stretches before it, parted only by narrow dips
-    // (a creek, a low neck): its first shore, and how much the dips between have parted it (chainW: 1 one hill … 0 apart)
-    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, chain = -1, chainW = 0, exitChain = -1, dip = 8;
+    // the stretch being crossed: where the ray met it, its highest point so far; and the chain of stretches before it,
+    // parted only by dips: the chain's first shore, and how much the dips between have parted it (chainW: 1 one hill …
+    // 0 apart). A stretch ends where the ground falls below half its height so far (8 m at least): low flats between a
+    // spit and the ridge behind it (the marsh behind Strawberry Point) part them as water would, eased by how deep and
+    // wide the dip is
+    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, chain = -1, chainW = 0, exitChain = -1, dip = 0, exitLevel = 8;
     const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), cav = 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1); return (x < xr ? cav : cav * (xr / x) ** pe) * Math.min(1, (H - 8) / 8); };
-    const close = () => { const v = side * Math.max(lee(enter, top), chain >= 0 ? chainW * lee(chain, top) : 0); worst = Math.max(worst, v); };
+    const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), chain >= 0 ? chainW * lee(chain, top) : 0)); };
+    const at = (L: number, d: number, h: number) => prevH === h ? prevD : prevD + (d - prevD) * (L - prevH) / (h - prevH); // (where the height passes L, between the samples)
     let step = 50;
     for (let d = 50; d <= 6000; d += step) {
       step = d < 1000 ? 50 : 100;
       // the ground the air comes over, averaged across the wind over a width that grows with the distance run (a lee's
       // edge spreads as it goes: wakes mix at roughly 1 in 5 to 1 in 10 of the distance; the spread here, d/8 either
-      // side weighted ¼ ½ ¼, is an estimate, no figure measured for these shores). Close in it's under the 50 m mask's
-      // own scale and changes nothing; far off a narrow gap opens gradually, averaged with the land beside it
+      // side weighted ¼ ½ ¼, is an estimate, no figure measured for these shores). Close in it's under the coast's own
+      // 50 m cells and changes nothing; far off a narrow gap opens gradually, averaged with the land beside it
       const q = { x: p.x + u.x * d, y: p.y + u.y * d }, a = d / 8, nx = u.y * a, ny = -u.x * a;
-      const h = skipGate && q.x < GATE_X ? 0 : 0.5 * groundHeightSmooth(q) + 0.25 * (groundHeightSmooth({ x: q.x + nx, y: q.y + ny }) + groundHeightSmooth({ x: q.x - nx, y: q.y - ny }));
-      const cross = prevH === h ? prevD : prevD + (d - prevD) * (8 - prevH) / (h - prevH); // (where the height passes 8 m, between the samples)
-      if (h > 8) {
-        if (enter < 0) {
-          enter = prevH >= 8 ? prevD : cross; top = 0;
-          // a dip under DIP_GAP wide doesn't part the land: the hill beyond still shelters from the first shore, less so the
-          // wider the dip and the deeper it goes under 8 m (one only just under it hardly parts them: Deep Physics)
-          if (exit >= 0) { const w = Math.max(0, 1 - Math.min(1, (enter - exit) / DIP_GAP) * (1 - Math.max(0, dip) / 8)); if (chain < 0 || chainW === 0) { chain = exitChain; } chainW = w * (chainW > 0 ? chainW : 1); if (chainW === 0) chain = -1; }
+      const g = (r: Vec) => skipGate && r.x < GATE_X ? 0 : groundHeightSmooth(r);
+      const h = 0.5 * g(q) + 0.25 * (g({ x: q.x + nx, y: q.y + ny }) + g({ x: q.x - nx, y: q.y - ny }));
+      if (enter >= 0) {
+        const L = Math.max(8, 0.5 * top);
+        if (h >= L) { top = Math.max(top, h); close(); } // (scored as the stretch rises, not only at its top: low ground
+        // at the shore joined to high ground behind still makes a low hill's near-calm close in; a high hill's is gustier)
+        else { close(); exit = at(L, d, h); exitLevel = L; exitChain = chain >= 0 && chainW > 0 ? chain : enter; enter = -1; dip = h; }
+      } else {
+        if (exit >= 0) dip = Math.min(dip, h);
+        // the level that starts the next stretch: the last one's own, eased down to 8 m as the dip goes down to the water
+        const L = exit >= 0 ? 8 + (exitLevel - 8) * clamp(dip / 8, 0, 1) : 8;
+        if (h > L) {
+          enter = prevH >= L ? prevD : at(L, d, h); top = h;
+          if (exit >= 0) {
+            // a dip parts the land by its width (DIP_GAP) and its depth under the level it fell from: a creek or a low neck
+            // hardly does, a wide deep one entirely (squared: Deep Physics); the hill beyond still shelters from the first
+            // shore by what's left
+            const part = Math.min(1, (enter - exit) / DIP_GAP) * clamp(1 - dip / exitLevel, 0, 1), w = (1 - part) ** 2;
+            if (chain < 0 || chainW === 0) chain = exitChain;
+            chainW = w * (chainW > 0 ? chainW : 1); if (chainW < 1e-3) { chain = -1; chainW = 0; }
+          }
+          close();
         }
-        top = Math.max(top, h);
-        // (scored as the stretch rises, not only at its top: low ground at the shore, joined to high ground behind, still
-        // makes a low hill's near-calm close in, as it did when the blocks parted them; a high hill's lee is the gustier)
-        close();
-      } else if (enter >= 0) {
-        close(); exit = cross; exitChain = chain >= 0 && chainW > 0 ? chain : enter; enter = -1; dip = h;
       }
-      if (enter < 0) dip = Math.min(dip, h);
       prevD = d; prevH = h;
     }
     if (enter >= 0) close();
