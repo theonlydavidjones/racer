@@ -282,6 +282,37 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
+8m2. **Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid** (owner, 15 November; bug;
+   now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
+   main issue is that her bow starts turning west, since the wind is pushing her hard. ... she doesn't seem to get
+   underway until the pushoff animation stops ... so i keep getting pushed into other boats long before i have a chance
+   to get out." In real life the owner walks her out by hand to the fairway first. The owner's day: a real day, 15 kt
+   from the SW, a 1.1 kt flood, 13:35.
+   Isolated (a scratch replay of that day, nothing committed; the logs are in the Roadmap session's scratchpad):
+   - **Baseline.** The plan is a swing. She walks 10 m in 22 s, then swings −90° in 24 s, and is handled for 46 s with
+     her sails let fly. She's let go at 0.5 m/s, heading 261, bow west into the dead end, on the line of the moored
+     boats' sterns. Her hull is inside the next boat 2 s later. The fairway is about 12 m between the sterns and the
+     way out is east.
+   - **The lee at the slip** is 0.17 (12.4 kt against 15.1 open).
+   - **Moored boats aren't obstacles** to a boat sailing free. Physics stops her only on docks and land
+     (src/boat/physics.ts:1017); `hitsMooredBoat` runs only in `mooringStep` (src/sim/world.ts:1920). So she sails
+     through them with no bump.
+   - **One lever at a time:**
+     - A longer walk alone (14 m) clears the let-go, but she's still bow west and must turn about 140° at 0.2–0.7 m/s
+       in 12 m: she touches the far side.
+     - The crew-only swing rate, the sails live during the handling, a 1.0 m/s shove, and 0.3–0.5 of shelter each
+       change only timing or speed.
+     - **A walk to the fairway (14 m) with the swing turned toward the exit** (heading 081, the bow east): no overlap
+       and no bump through the turn-out.
+   The fix, as the owner does it in real life:
+   - (1) walk her out to the fairway and point her bow at the way out (src/geo/marina.ts:619-628; the walk at
+     world.ts:2096-2106);
+   - (2) make the moored boats solid to a boat sailing free;
+   - (3) then tests/gashouse.test.ts slip 572 goes from `it.fails` to passing.
+   Symptom (b), sails dead while she's handled, is the scripted push-off by design (world.ts:1283). Once the walk
+   leaves her pointing out, a short hand-over is enough; giving her sails during the walk drove her back into the
+   slips in the replay.
+
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
@@ -426,6 +457,12 @@ What's planned, roughly in order. Done work is described in the README.
    Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
+   **Back again** (owner, 15 November; regression, fourth time; now; 2–4 h): "rushing water is back. I'm way out at the
+   map edge outside the Golden Gate." The owner confirms it's the 3D sea around the boat, not the chart's streaks.
+   Far out beyond the Gate is the farthest the sim goes from its origin, so float precision (positions or wave phase
+   in 32-bit in the shaders) is the first suspect, then the map edge itself (a sea layer clamped, wrapped or tiled
+   differently at the edge, or the swell from the open ocean). The every-layer test (31ce983) evidently doesn't reach
+   this far: extend it to the map's edge, west of the Gate, at the corners, so it can't come back a fifth time.
 8j. ~~**The windex lost its point of sail**~~ (done: e62a2229; tests/pointofsail.test.ts, scripts/check/point-of-sail.cjs) (regression; <1 h): owner, "I want the windex dial to show the point of
    sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
@@ -570,6 +607,28 @@ What's planned, roughly in order. Done work is described in the README.
      posts). Nothing from St. Francis YC, GGYC or US Sailing yet, and no sourced committee-habit claim, so the strategist
      says none of it as fact until better sources (the clubs' race and sailing-instruction pages; latitude38.com is
      blocked here) are read.
+   - **Jibe-ho: a confirmation, a reachable key, and how to use it** (owner, 15 November; polish; now; 1–2 h): "I need to
+     see some kind of confirmation when I call jibe ho during a jibe. and the shift-j command is too hard. those keys are
+     too far away from each other. need a better option, clearer instructions on how to use it." Today turnHo is
+     Shift+J (src/ui/keys.ts:73; app.ts:1223 sends {k:'turn'}), J is also the jib halyard, and nothing shows the call
+     was made. Wanted:
+     - The confirmation: the call itself, seen and heard where she's looking: the crew's "Ready to jibe" … "Jibe-ho"
+       (or "Ready about" … "Helm's a-lee") as a brief call by the helm, and the crew visibly moving to it.
+     - The key: Space (the owner chose it, 15 November), replacing Shift+J; keep it
+       rebindable in Keys.
+     - The how-to: no copy block; at most one short chip at the moment it's useful (bearing away toward a run, or
+       close-hauled before a tack), e.g. "Space · jibe-ho", fading once she's used it a few times.
+   - **Tiller and mainsheet keys that follow the tack** (owner, 15 November; feature; next; 2–4 h): "tiller and mainsheet
+     key commands should switch based on starboard or port tack to reflect real life movement." The owner chose:
+     - An option in Keys, with today's fixed port/starboard (A/D) staying the default. The option makes the tiller keys
+       push and pull from the helm's windward seat, so they swap sides with each tack.
+     - The mainsheet follows the hand holding it on each tack: pull in and ease, toward and away from the helm.
+     The swap happens when she's through the tack or jibe, not mid-turn, so a held key doesn't reverse under the
+     player's finger. The keys' labels show which way each key works now. No new screen controls.
+   - **The trim coach's ◆ unexplained** (owner, 15 November, from a screenshot of the mainsheet in the sail band;
+     polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
+     wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
+     to here", and nothing on the screen.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
