@@ -459,6 +459,11 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **The cruise planner's layers: slow to switch, streaks redrawn oddly** (owner, 15 November; not urgent; 1–2 h):
+     "toggling between current and waves in cruise planner takes forever, and the moving lines redraw themselves in
+     weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
+     recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
+     jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
      'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
      icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
