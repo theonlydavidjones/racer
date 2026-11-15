@@ -110,12 +110,34 @@ export class DrillGuides {
     const w = document.createElement('div'); w.className = 'w'; w.textContent = c.word; this.tag.appendChild(w);
     if (c.sub) { const s = document.createElement('div'); s.className = 's'; s.textContent = c.sub; this.tag.appendChild(s); }
   }
-  /** Each frame: the cue rides above her masthead (11.5 m up), beside where you're already looking. */
+  /** Each frame: the cue rides above her masthead (11.5 m up), beside where you're already looking, but always whole on
+   *  the screen: below the dials' row, above the sail band, clear of the sides (the owner, 15 Nov 2026: it "keeps floating
+   *  out of view" in the start practice, up under the top bar), and eased toward where it's going so the boat's pitch and
+   *  the camera's sway don't shake it. */
   place(at: Pt | null): void {
     if (this.tag.hidden || !at) return;
     const v = P3(at.x, at.y, 11.5).project(this.camera);
-    if (v.z > 1) { this.tag.style.visibility = 'hidden'; return; } // (behind the camera)
-    this.tag.style.visibility = ''; this.tag.style.left = `${(v.x + 1) / 2 * innerWidth}px`; this.tag.style.top = `${(1 - v.y) / 2 * innerHeight}px`;
+    if (v.z > 1) { this.tag.style.visibility = 'hidden'; this.held = null; return; } // (behind the camera)
+    const W = innerWidth, H = innerHeight, cw = this.tag.offsetWidth, ch = this.tag.offsetHeight, now = performance.now();
+    if (now - this.edgeT > 1000) { // (the dials' row and the band, measured again each second: they come and go with views)
+      this.edgeT = now;
+      const box = (q: string) => { const r = document.querySelector(q)?.getBoundingClientRect(); return r && r.height > 0 ? r : null; }; // (fixed: no offsetParent)
+      this.edgeTop = Math.max(box('#hud')?.bottom ?? 0, box('#hudRight')?.bottom ?? 0) + 10;
+      this.edgeBot = Math.min(box('.sailband')?.top ?? H, H) - 10;
+      this.sides = ['#leftCol', '#map', '#trimPanel', '#msgLog'].map(box).filter((r): r is DOMRect => !!r);
+    }
+    // (the tag hangs from its point: translate(-50%, -100%), so x is its middle and y its foot)
+    let x = Math.min(Math.max((v.x + 1) / 2 * W, cw / 2 + 16), W - cw / 2 - 16);
+    const y = Math.min(Math.max((1 - v.y) / 2 * H, this.edgeTop + ch), Math.max(this.edgeTop + ch, this.edgeBot));
+    // (and off the panels down the sides, the start line's card, the flags, the inset map: slid toward the middle past them)
+    for (const r of this.sides) if (y > r.top && y - ch < r.bottom && x + cw / 2 > r.left && x - cw / 2 < r.right)
+      x = r.left + r.width / 2 < W / 2 ? r.right + cw / 2 + 10 : r.left - cw / 2 - 10;
+    const k = this.held ? 1 - Math.exp(-(now - this.held.t) / 120) : 1; // (eased over ~0.1 s)
+    const p = this.held ? { x: this.held.x + (x - this.held.x) * k, y: this.held.y + (y - this.held.y) * k } : { x, y };
+    this.held = { ...p, t: now };
+    this.tag.style.visibility = ''; this.tag.style.left = `${Math.round(p.x)}px`; this.tag.style.top = `${Math.round(p.y)}px`;
   }
+  private held: { x: number; y: number; t: number } | null = null;
+  private edgeT = -1e9; private edgeTop = 0; private edgeBot = 0; private sides: DOMRect[] = [];
   clear(): void { this.set(null, ''); this.wake(null); this.cue(null); }
 }
