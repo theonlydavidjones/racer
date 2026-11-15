@@ -18,7 +18,7 @@ const W = 400, H = 300;
 /** The camera looks this way: from off her starboard bow, a little above her deck. */
 const VIEW = new THREE.Vector3(-17, -0.6, 16).normalize();
 /** Bump when the picture's drawing changes, so pictures kept from before are drawn again. */
-const LOOK_VERSION = 2; // (2: pictures saved before 8t's fix framed an empty sea; the new key drops them)
+const LOOK_VERSION = 3; // (2: pictures saved before 8t's fix framed an empty sea; 3: the showroom's settled trim, World.idle)
 const STORE = 'folkboat.thumbs', KEEP = 24;
 interface GL { renderer: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.PerspectiveCamera; sea: THREE.Mesh; fog: THREE.Fog }
 let gl: GL | null = null;
@@ -114,9 +114,10 @@ export function boatThumb(spec: BoatSpec, S: Settings): string {
   // her, as the sim builds her: a quiet world with just her in it, sailing a gentle reach with her flags flying
   const w = new World(COURSES[0], { ...S, boat: spec, boatId: spec.id, boats: [spec], opponents: [], fleet: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', windKind: 'west', windKt: 10, traffic: 0 }, 1, { freeSail: true, showFlags: true });
   const b = w.user;
-  // she sails: twenty seconds on a close reach, port tack, in the real physics (the crew trimming), so her sails, heel and
-  // flags all answer the same apparent wind; then the picture, from off her starboard bow (her leeward side)
-  for (let i = 0; i < 60 * 20; i++) w.idle(DT, -55);
+  // she sails on a close reach, port tack, in the real physics: the first step settles the crew's trim and her speed and
+  // heel (World.idle, as the showroom does), the next three seconds put her on the waves, so her sails, heel and flags all
+  // answer the same apparent wind; then the picture, from off her starboard bow (her leeward side)
+  for (let i = 0; i < 60 * 3; i++) w.idle(DT, -55);
   const m = buildBoatMesh(b);
   for (let i = 0; i < 90; i++) syncBoatMesh(m, b, i / 30); // (the windex and flags swing round to the wind as they would)
   m.crew.group.visible = false; // just the boat

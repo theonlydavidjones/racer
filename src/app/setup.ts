@@ -7,7 +7,7 @@ import { rainLevel } from '../environment/rain';
 import { PREP_MEANING } from '../sim/signals';
 import { LESSONS, type LessonId } from '../sim/lessons';
 import { lessonGridHtml } from '../ui/lessons';
-import { describeSea } from '../environment/sea';
+import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
@@ -281,8 +281,12 @@ function drawTideGraph(): void {
   } else { strip.windKt = Math.round(app.w.wind.kt); strip.windFrom = app.w.wind.from; rows.unshift(['Wind', `${Math.round(app.w.wind.kt)} kt from ${degAndPoint(app.w.wind.from)}, as you set it`]); }
   if (!app.w.tide) rows.push(['Current', CURRENTS[app.S.current]?.label ?? app.S.current]);
   const rainNow = rainLevel(app.S.rain, app.w.clockUtc); // (set, or the record's then)
-  if (app.w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (app.w.sea.swell) { strip.sea = `${Math.round(app.w.sea.swell.hs / 0.3048)} ft`; strip.seaSub = `${Math.round(app.w.sea.swell.tp)} s swell`; }
-  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${app.w.sea.swell ? `${Math.round(app.w.sea.swell.hs / 0.3048)} ft, ${Math.round(app.w.sea.swell.tp)} s swell outside the Gate${app.w.sea.swell.total ? ` (the buoy reads ${Math.round(app.w.sea.swell.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
+  // (the swell where she starts, not the buoy's offshore: inside the Gate it's turned and spread, and dies away behind the
+  // headlands and the city front (sea.ts swellReach). The offshore figure on the tile read as if it were the course's:
+  // 14 ft at the Cityfront, where the race said glassy)
+  const sw = app.w.sea.swell, at = cruise ? { x: app.w.user.x, y: app.w.user.y } : p, here = sw ? sw.hs * swellReach(at, true, sw.from).k : 0, ft = (m: number) => Math.round(m / 0.3048);
+  if (app.w.sea.flat) { strip.sea = 'Flat'; strip.seaSub = 'sea'; } else if (sw) { strip.sea = `${ft(here)} ft`; strip.seaSub = `${Math.round(sw.tp)} s swell`; }
+  rows.push(['Sea', app.w.sea.flat ? 'Flat' : `${sw ? `${ft(here)} ft of swell here, ${ft(sw.hs)} ft, ${Math.round(sw.tp)} s outside the Gate${sw.total ? ` (the buoy reads ${Math.round(sw.total / 0.3048)} ft with the ocean's own wind waves, which the sea here makes for itself)` : ''}` : 'No swell'}${(app.S.chop ?? 1) !== 1 ? `, chop × ${(app.S.chop ?? 1).toFixed(1)}` : ''}${rainNow ? `, ${rainNow === 2 ? 'heavy' : 'light'} rain` : ''}${app.S.fog && app.S.fog !== 'real' ? `, ${['no', 'patchy', 'thick'][app.S.fog]} fog` : ''}`]);
   { // the sun: when it's up, and where it is at the gun
     const st = sunTimes(app.w.gunUtc * 60000), sp = sunPosition(app.w.gunUtc * 60000);
     ctx.fillStyle = 'rgba(8,14,30,.35)';

@@ -3,7 +3,7 @@ import { bow, stern, type Boat, type LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
 import { CAR_FORE_PINS, boomAngle, crewSolve, depowerLimits, planWorth, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls, type CrewSettings, type Shape } from './controls';
 import { crewBestHeel, crewMass, crewMoment, crewSkill, displacement, specAttr } from './crewPhys';
-import { condition, mainRig } from './condition';
+import { condition, rigOf } from './condition';
 import { airDrag, driveSpeedRatio, hullResistance } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
@@ -152,12 +152,12 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, d
   // the boat trims them in, across her course through the water, her leeway in it (physics.ts sailFrame). Without the
   // leeway the coach judged her trim some 5° off the boat's and promised what the boat never paid: Bay East, 14 Nov)
   const fr = sailFrame(b), sw = sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, heelIn);
-  const tws = b.ww.kt, awa = sw.awa, aws = sw.aws / KT, plan = sailPlan(b), cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  const tws = b.ww.kt, awa = sw.awa, aws = sw.aws / KT, plan = sailPlan(b), cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
   const main = clamp(boomAngle(c) + dm, SAILS.main.min, SAILS.main.max), clew = jibClew(c, b.tack);
   if (clew < 0) return { s: 0, heel: b.heelMag ?? 0, helm: 0 }; // backed: not sailing
   const jib = clamp(clew + dj, SAILS.jib.min, SAILS.jib.max);
   const tm = sailTrim('main', awa, main), tj = plan === 'jib' ? sailTrim('jib', awa, jib) : null;
-  const ms = mainShape(c, tws, mainRig(b), aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws, mainRig(b)?.tune) : null;
+  const ms = mainShape(c, tws, rigOf(b), aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws, rigOf(b)?.tune) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, dep)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, dep)) : 1;
   const eff = js ? SAILS.main.share * em + SAILS.jib.share * ej : em;
   // (the main's sheet against the crew's intended boom, eased down the traveller on purpose on the last depowering steps,
@@ -247,12 +247,12 @@ export function withCrew(b: Boat, k: LineKey, v: number): Controls {
   else if (k !== 'mainsheet' && k !== 'traveller' && k !== 'jibsheet' && k !== 'car' && k !== 'jibsheetW' && !byHand(b, 'mainsheet') && !byHand(b, 'traveller')) {
     const fixed: Partial<CrewSettings> = {};
     for (const x of FIXABLE) if (x === k || byHand(b, x)) fixed[x] = c[x];
-    const tws = b.ww.kt, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
-    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed);
+    const tws = b.ww.kt, cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
+    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed);
     // (and only if it's worth the trip to them, as they judge it: physics.ts trimSails, controls.ts planWorth; a skilled
     // crew moves the car for ~0.1% of drive, a novice for ~0.4%)
     // (every line of theirs, as trimSails applies the plan: the outhaul off, they may take the backstay up as well)
-    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), mainRig(b), cond?.jib, b.aws / KT, b.depower), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
+    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
     for (const x of ['traveller', ...FIXABLE] as const) if (fixed[x as keyof CrewSettings] == null && (worth[x] ?? 1) >= minGain) c[x] = plan[x];
     c.mainsheet = mainsheetFor(want, c.traveller);
   }
@@ -631,11 +631,11 @@ export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: 
 export function tuneLoss(b: Boat): number {
   if (!b.tune) return 0;
   // each rig with the crew's best settings for it (crewSolve), at her sheets as they are: a soft rig wants more backstay
-  const guide: Boat = { ...b, tune: undefined, rigMain: undefined }, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  const guide: Boat = { ...b, tune: undefined, rigMain: undefined }, cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
   const tws = b.ww.kt, main = boomAngle(b.ctl), jib = jibClew(b.ctl, b.tack);
   if (jib < 0) return 0;
   const best = (x: Boat): Controls => {
-    const v = crewSolve(tws, b.awaSlow, b.tack, main, jib, undefined, mainRig(x), cond?.jib, b.aws / KT, b.depower);
+    const v = crewSolve(tws, b.awaSlow, b.tack, main, jib, undefined, rigOf(x), cond?.jib, b.aws / KT, b.depower);
     return { ...b.ctl, traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul, backstay: v.backstay, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard,
       mainsheet: mainsheetFor(main, v.traveller) };
   };
