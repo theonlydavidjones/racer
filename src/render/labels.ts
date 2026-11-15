@@ -92,10 +92,13 @@ export class Labels {
       // (the warning held while the crew get ready, as the sim holds the turn: world.ts callTurn, boat/calls.ts; a crewmate
       // busy at a job answers "Not ready!")
       // (then the order, for a moment only: once called, it's called. The owner, 15 Nov 2026)
-      const waiting = !!u.callWait;
-      if (!waiting && k.doneT == null) k.doneT = w.t;
-      if (k.doneT != null && w.t - k.doneT > ORDER_S) this.call = null;
-      else say = waiting ? (u.callWait!.notReady ? 'Not ready!' : k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
+      // (the race's copy here hears of the call a moment after you make it: a third of a second's grace before reading it)
+      const waiting = !!u.callWait, heard = w.t - k.t0 > 0.3;
+      // (a call dropped, not put over, she not turning: no order said)
+      const dropped = heard && !waiting && k.doneT == null && u.turnTarget == null && !u.tacking && u.gybeTo == null;
+      if (heard && !waiting && k.doneT == null) k.doneT = w.t;
+      if (dropped || (k.doneT != null && w.t - k.doneT > ORDER_S)) this.call = null;
+      else say = waiting && u.callWait!.notReady ? 'Not ready!' : waiting || !heard ? (k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
     }
     if (ce) { if (!say || word) { if (!ce.hidden) ce.hidden = true; } else { this.place(ce, camera, u.x, u.y, 3.2); if (ce.textContent !== say) ce.textContent = say; } }
     // the hint: on a run (from 150° off the wind) or close-hauled (to 50°), held two seconds there, she not turning

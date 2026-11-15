@@ -16,7 +16,7 @@ import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
-import { BOOM_SEEN, CALL_KEEP, boomStrike } from './calls';
+import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
@@ -710,10 +710,13 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  // (and a jibe coming: off the wind, the helm taking her on round through dead downwind; how long either has shown, for
-  // the crew reading it without a call, fading as long again once it's past so the turn itself still finds it: boat/calls.ts)
-  const jibeComing = aim != null && twa > 120 && Math.abs(dAim) > 15 && Math.sign(wrap(b.ww.from - aim)) !== Math.sign(wrap(b.ww.from - b.h));
-  b.comingFor = tackComing || jibeComing ? (b.comingFor ?? 0) + dt : Math.max(0, (b.comingFor ?? 0) - dt);
+  // (and how long a turn has visibly been coming, for the crew getting ready without a call (boat/calls.ts): what she's
+  // doing, not where she's aimed: close-hauled and turning up into the wind, or deep and turning her stern through it,
+  // faster than TURN_SEEN; yours by hand or the AI's alike. Fading as long again once it's past, so the turn itself still
+  // finds it; no more than CUE_MAX, so a long luff doesn't count for a turn much later)
+  const rate = b.turnRate ?? 0, toWind = Math.sign(wrap(b.ww.from - b.h)), swinging = Math.abs(rate) > TURN_SEEN;
+  const shows = swinging && ((twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind));
+  b.comingFor = shows ? Math.min(CUE_MAX, (b.comingFor ?? 0) + dt) : Math.max(0, (b.comingFor ?? 0) - dt);
   placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
@@ -1093,17 +1096,21 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
     // gybe it if she's being turned through a gybe; otherwise it lies where it is until the wind gets behind it
     const across = tk === 'S' ? -1 : 1; // (the boom's side on the new tack: to port on starboard)
     if (Math.sign(b.boom) !== across && Math.abs(b.boom) >= 1) {
+      if (b.byLeeSince == null) { b.byLeeSince = t; b.byLeeCue = b.comingFor ?? 0; } // (when, and how much of the turn they'd seen: gybeMeant)
       if (b.boomFree == null && gybeMeant(b, tk, t)) b.gybeTo = tk;
       b.byLee = true; return;
     }
   }
+  b.byLeeSince = undefined;
   if (tk === b.tack) { if (b.boomFree == null) b.gybeTo = undefined; b.byLee = false; return; } // (the wind back on her main's side before the crew had gybed it)
   // head to wind: a tack. Not if the wind came round her stern and her tack is only now catching up (her boom still
   // uncrossed as she reaches up on the new side, hove to or spun round in light air): that's a gybe, however late
   const tacked = twa < 90 && !b.byLee;
   if (tacked) { b.tacking = true; b.headToWindT = t; }
   b.byLee = false; b.tack = tk; b.gybeTo = undefined; b.lastTackT = t; if (sheets) jibSheetsAtTack(b, emit);
-  if (tacked) jibLetGo(b, emit);
+  // (back through the wind while the old sheet is still made fast: it's her leeward sheet again, and the jib fills on it)
+  if ((b.jibHold ?? 0) > 0) { b.jibHold = 0; b.ctl.jibsheetW = 1; }
+  else if (tacked) jibLetGo(b, emit);
   penaltyManeuver(b, tacked ? twa : 180, emit); // (a tack or a jibe of her penalty turns, rule 44.2)
 }
 
@@ -1117,9 +1124,10 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
  */
 const KEY_HELD = 0.6;
 function gybeMeant(b: Boat, to: 'S' | 'P', t: number): boolean {
-  // (an AI boat: her crew bring the main across if her skipper called the jibe, or the one on the mainsheet saw it
-  // coming; else the wind takes it, a crash jibe: boat/calls.ts, boomStep)
-  if (!b.isUser) return !!b.callOn || mainHandReady(b);
+  // (an AI boat: her crew bring the main across at once if her skipper called the jibe; caught unready, once the one on
+  // the mainsheet has got ready, she sailing by the lee meanwhile, and if she's swung on round far enough first, the
+  // wind takes it before they do: a crash jibe, boomStep. boat/calls.ts)
+  if (!b.isUser) return !!b.callOn || mainHandReady(b, t);
   if (b.turnCalledT != null && t - b.turnCalledT < 3) return true; // (tackStep keeps the time)
   // (onto starboard she's turning to starboard: her stern through the wind, which comes round onto her starboard quarter)
   return b.steer === (to === 'S' ? 1 : -1) && b.steerSince != null && t - b.steerSince >= KEY_HELD;
@@ -1257,7 +1265,7 @@ export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.h
 /**
  * Through the wind, the old leeward jib sheet is the windward one: still made fast, it holds the jib aback until the
  * crew let it fly. Ready (called, or got ready as she turned), they let it go as the jib comes across; caught unready,
- * once they are, the jib backed meanwhile, which slows her turn and costs her way (boat/calls.ts). Yours if you hold it.
+ * once they are, the jib backed meanwhile, which costs her way (boat/calls.ts). Yours if you hold it.
  */
 function jibLetGo(b: Boat, emit: Emit): void {
   if (byHand(b, 'jibsheetW') || keepsHove(b) || !b.crew || sailPlan(b) !== 'jib' || b.v < TURN_V) return; // (a tack under way: not a drift through the wind in irons, where the jib's own model holds)
@@ -1269,11 +1277,12 @@ function jibLetGo(b: Boat, emit: Emit): void {
   b.jibHold = PREPARED + left;
   if (b.isUser && b.jibHold > 1) emit({ type: 'toast', ms: 4500, msg: 'Tacked without a call: the crew weren\'t ready and the jib backed. Call it (Ready about) and they will be.' });
 }
-/** The one on the mainsheet got ready for the jibe as she turned (prepLeft, without a call). */
-function mainHandReady(b: Boat): boolean {
+/** The one on the mainsheet is ready to bring it across, unwarned: by the lee long enough to finish getting ready, from
+ * what of the turn they'd seen (prepLeft, PREPARED). */
+function mainHandReady(b: Boat, t: number): boolean {
   const c = b.crew; if (!c) return true;
   const n = c.spec.crew.length, who = mainHand(n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), p = who === 0 ? c.spec.helm : c.spec.crew[who - 1];
-  return !!p && prepLeft(p, false, b.comingFor ?? 0) === 0;
+  return !p || (b.byLeeSince != null && t - b.byLeeSince >= PREPARED + prepLeft(p, false, b.byLeeCue ?? 0));
 }
 function jibSheetsAtTack(b: Boat, emit: Emit): void {
   // (the crew holding her hove to, and she's gone through the wind all the same, a shift or the lashed tiller moved: the

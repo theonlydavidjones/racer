@@ -198,13 +198,19 @@ export interface Boat {
   /** When the helm last called a turn ("Ready about", "Ready to jibe"), s: her crew warned of it get ready, and work it
    * at once on the order (crewPhys.ts PREPARED). Uncalled, they react as they see it (boat/calls.ts). */
   callT?: number;
-  /** Your call, held until the crew answer ready (world.ts callTurn): when it was made, and whether one has said "Not
-   * ready" (busy at a job). The turn starts once they're ready, or at once if you call it again. */
-  callWait?: { t0: number; notReady: boolean } | null;
+  /** Your call, held until the crew answer ready (world.ts callTurn): when it was made, whether one has said "Not
+   * ready" (busy at a job), and her tack then. The turn starts once they're ready, or at once if you call it again; you
+   * steering her yourself meanwhile, or CALL_WAIT_MAX s gone, and it's dropped (still a call: the crew were warned). */
+  callWait?: { t0: number; notReady: boolean; tack: 'S' | 'P' } | null;
   /** Her crew warned of the turn coming (a call within CALL_KEEP s: tackStep), and how long it has visibly been coming
    * (s: the helm turning her up to tack, or down through a run to jibe), which the experienced read without a call. */
   callOn?: boolean;
   comingFor?: number;
+  /** When she went by the lee with a jibe wanted, and how much of the turn her crew had seen then (physics.ts gybeMeant). */
+  byLeeSince?: number;
+  byLeeCue?: number;
+  /** When her skipper last decided a turn, called or not (boat/calls.ts decideTurn: once a turn). */
+  decidedT?: number;
   /** Turns her skipper has decided (the AI's call or not is worked from this: boat/calls.ts). */
   turnsDecided?: number;
   /** The windward jib sheet, made fast through the tack, held so many more seconds before the crew let it fly (s): an

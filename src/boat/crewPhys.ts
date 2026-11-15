@@ -451,7 +451,8 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const s = c.spec, ppl = c.ppl ??= allAboard(s), W = c.W ??= ppl.map(p => p.w), total = c.total ??= W.reduce((a, b) => a + b, 0), n = s.crew.length;
   // who's ready for a turn coming (the call, or got ready as she turns: prepLeft), for the figures; only while one is, or was
   const coming = k.coming ?? 0;
-  if (k.called || coming > 0 || c.people.some(a => a.ready)) for (let i = 1; i <= n; i++) { const a = c.people[i]; if (a) a.ready = (k.called || coming > 0) && prepLeft(ppl[i]!, !!k.called, coming) === 0; }
+  let was = false; for (let i = 1; i <= n; i++) if (c.people[i]?.ready) { was = true; break; }
+  if (k.called || coming > 0 || was) for (let i = 1; i <= n; i++) { const a = c.people[i]; if (a) a.ready = (k.called || coming > 0) && prepLeft(ppl[i]!, !!k.called, coming) === 0; }
   const w = k.windward;
   // the crew's judgement of where to be (trim) and their boat handling: the average of the crew (alone: the helm's)
   const skill = specAttr(s, 'trim'), handling = specAttr(s, 'handling');

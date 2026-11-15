@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../src/boat/crewPhys';
-import { CALL_AT, boomStrike, callsTurn } from '../src/boat/calls';
+import { CALL_AT, boomStrike, callsTurn, decideTurn } from '../src/boat/calls';
 import { beatAngle } from '../src/boat/polar';
 import { World, DT } from '../src/sim/world';
 import { courseFile } from '../src/courses/registry';
@@ -61,16 +61,44 @@ describe('A tack, called or not (physics.ts jibLetGo, crewPhys.ts readyFor)', ()
 });
 
 describe('A jibe on an AI boat, called or not (physics.ts gybeMeant, boomStep)', () => {
-  // (turned on round through dead downwind, nobody aiming her there first: no turn to read coming)
-  const jibe = (called: boolean, skill: number) => {
+  // (turned on round through dead downwind at `rate` deg/s to 60° past it, her heading set by hand: no turn the crew see)
+  const jibe = (called: boolean, skill: number, rate: number) => {
     const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false; b.crew = newCrew(crew(skill), 'S');
     sail(b, 30, () => held(b, 170));
-    sail(b, 30, t => { if (called) b.callT = t; held(b, 170 + Math.min(50, 2 * t)); }); // (on round, 40° by the lee: past where her main holds, BOOM physics.ts boomStep)
-    return b;
+    let byLee = NaN, across = NaN;
+    sail(b, 30, t => { if (called) b.callT = t; held(b, 170 + Math.min(60, rate * t));
+      if (b.byLee && Number.isNaN(byLee)) byLee = t; if (b.tack === 'S' && Number.isNaN(across)) across = t; });
+    return { crashed: b.crashT != null, tack: b.tack, late: across - byLee };
   };
-  it('called, the crew bring the main across; sprung on them unseen, the wind takes it: a crash jibe', () => {
-    expect(jibe(true, 0.2).crashT).toBeUndefined();
-    expect(jibe(false, 0.2).crashT).toBeDefined();
+  it('called, the crew bring the main across as her stern passes the wind', () => {
+    const c = jibe(true, 0.2, 2); expect(c.crashed).toBe(false); expect(c.tack).toBe('S'); expect(c.late).toBeLessThan(0.5);
+  }, 60_000);
+  it('uncalled, a novice crew finish getting ready by the lee, then bring it across: late, but jibed', () => {
+    const u = jibe(false, 0.2, 2);
+    expect(u.crashed).toBe(false); expect(u.tack, 'jibed').toBe('S');
+    expect(u.late, 'some seconds by the lee first').toBeGreaterThan(3); expect(u.late).toBeLessThan(7);
+  }, 60_000);
+  it('uncalled and swung hard through it, the wind takes the boom before a novice crew can: a crash jibe', () => {
+    expect(jibe(false, 0.2, 14).crashed).toBe(true);
+    expect(jibe(true, 0.2, 14).crashed).toBe(false);
+  }, 60_000);
+});
+
+describe('The turn seen coming, without a call (physics.ts crewAndHeel comingFor)', () => {
+  // (a tack by hand: her helm put over and held, the tiller, as the keys do, nobody calling it)
+  const handTack = (skill: number) => {
+    const twa = beatAngle(12), b = testBoat({ heading: 360 - twa, kt: 5, windKt: 12 }); b.crew = newCrew(crew(skill), 'S');
+    sail(b, 60, () => { b.h = 360 - twa; });
+    let held = 0, cueMax = 0; (b as Boat & { handsOff?: boolean }).handsOff = true; b.tiller = -0.8;
+    sail(b, 12, () => { if ((b.jibHold ?? 0) > 0) held += 1 / 60; cueMax = Math.max(cueMax, b.comingFor ?? 0); if (b.tack === 'P' && Math.abs(b.twa - beatAngle(12)) < 8) b.tiller = 0; });
+    return { held, cueMax, tack: b.tack };
+  };
+  it('an expert crew see a tack by hand coming and are ready; a novice is caught', () => {
+    const e = handTack(0.95), n = handTack(0.2);
+    expect(e.tack).toBe('P'); expect(n.tack).toBe('P');
+    expect(e.held, 'expert: the jib let fly at once').toBe(0);
+    expect(n.held, 'novice: held aback a while').toBeGreaterThan(0.5);
+    expect(e.cueMax, 'never more than CUE_MAX').toBeLessThanOrEqual(6);
   }, 60_000);
 });
 
@@ -110,7 +138,7 @@ describe('A crash jibe and the crew in its way (calls.ts boomStrike)', () => {
     // (at the cabin top's lines on a job, standing at its after end; or on the bench, as the crew sit)
     const a = b.crew!.people[2]!, put = () => { if (pose === 'piano') a.job = { line: 'cunningham', reach: 0, work: 5, station: { arm: 0.3, z: 0.85, pose: 'piano' } }; };
     let struck = false, outFor = 0;
-    sail(b, 30, t => { if (called) b.callT = t; if (!struck) put(); held(b, 170 + Math.min(50, 2 * t)); if (!struck && a.outUntil > 0) { struck = true; outFor = a.outUntil - (b.crew!.clock ?? 0); } });
+    sail(b, 30, t => { if (called) b.callT = t; if (!struck) put(); held(b, 170 + Math.min(60, 14 * t)); if (!struck && a.outUntil > 0) { struck = true; outFor = a.outUntil - (b.crew!.clock ?? 0); } });
     return { struck, outFor, crashed: b.crashT != null };
   };
   it('standing at the cabin top\'s lines, unwarned: struck, and out of action for a while; ducked in time, or ready, not', () => {
@@ -131,4 +159,34 @@ describe('A crash jibe and the crew in its way (calls.ts boomStrike)', () => {
     const s = strike('sit', false); expect(s.crashed).toBe(true); expect(s.struck).toBe(false);
     const c = strike('sit', true); expect(c.crashed).toBe(false); expect(c.struck).toBe(false);
   }, 60_000);
+});
+
+describe('Called, then put about by hand; a tack back in the hold; a turn decided once (review round 1)', () => {
+  it('you call, then tack her yourself before they\'re ready: the call is dropped, not a second tack back', () => {
+    const S = { ...DEFAULT_SETTINGS, mode: 'sail' as const, windKt: 12, windKind: 'west' as const, current: 'slack', sea: 'flat' as const, traffic: 0 as const, fleet: 0, opponents: [], crew: { n: 2, helm: { ...DEFAULT_CREW.helm, skill: 0.1 }, people: DEFAULT_CREW.crew.map(p => ({ ...p, skill: 0.1 })) } };
+    const w = new World(courseFile('train'), S as never, 4242, { freeSail: true }); w.running = true;
+    for (let i = 0; i < 60 * 30; i++) w.step(DT);
+    const u = w.user, t0 = u.tack;
+    applyCommand(w, { k: 'turn' }); expect(u.callWait).toBeTruthy();
+    u.steer = u.tack === 'S' ? 1 : -1; // (a steering key held: up into the wind and through)
+    for (let i = 0; i < 60 * 8 && u.tack === t0; i++) w.step(DT);
+    u.steer = 0;
+    expect(u.tack).not.toBe(t0); expect(u.callWait ?? null).toBeNull();
+    for (let i = 0; i < 60 * 10; i++) w.step(DT);
+    expect(u.tack, 'not tacked back').not.toBe(t0); expect(u.turnTarget ?? null).toBeNull();
+  }, 120_000);
+  it('back through the wind while the old sheet is still fast: the jib fills on it again, not held aback on the new tack', () => {
+    const twa = beatAngle(12), b = testBoat({ heading: 360 - twa, kt: 5, windKt: 12 }); b.crew = newCrew(crew(0.1), 'S');
+    sail(b, 60, () => { b.h = 360 - twa; });
+    startTack(b); let backT = NaN;
+    sail(b, 20, t => { if (b.tack === 'P' && Number.isNaN(backT) && (b.jibHold ?? 0) > 0) { backT = t; startTack(b); } });
+    expect(Number.isNaN(backT), 'held aback on the first tack').toBe(false);
+    expect(b.tack).toBe('S'); expect(b.jibHold ?? 0).toBeLessThanOrEqual(0); expect(b.ctl.jibsheetW).toBeGreaterThan(0.9);
+  }, 60_000);
+  it('a turn decided is decided once, called or not: no second draw on the next think', () => {
+    const b = testBoat({ heading: 0, kt: 5, windKt: 10 }); b.crew = newCrew(crew(0.3), 'S');
+    for (let k = 0; k < 50; k++) decideTurn(b, k * 0.05);
+    expect(b.turnsDecided).toBe(1);
+    decideTurn(b, 20); expect(b.turnsDecided).toBe(2);
+  });
 });

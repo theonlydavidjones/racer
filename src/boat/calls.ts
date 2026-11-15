@@ -28,6 +28,11 @@ import { prepTime, reactTime, skillOf, type Pose } from './crewPhys';
  */
 export { PREPARED, prepLeft, prepTime } from './crewPhys';
 export const CALL_KEEP = 12;
+/** A turn seen coming: she's swinging faster than this (deg/s) up into the wind close-hauled, or her stern through it
+ * deep; and the most that counts (s), past the longest getting ready (estimates). */
+export const TURN_SEEN = 3, CUE_MAX = 6;
+/** Your call waiting on a busy crew is dropped after this long (s): an estimate, the job most likely done or the moment gone. */
+export const CALL_WAIT_MAX = 15;
 /** The share of decided turns an AI skipper calls at skill 0, and at 1 (estimates). */
 export const CALL_AT = { novice: 0.35, expert: 0.98 };
 /** The jobs a crew member can't leave mid-way to answer a call: they say "Not ready" (crewWork.ts's committed jobs). */
@@ -46,7 +51,9 @@ export function callsTurn(b: Boat, n: number): boolean {
 /** An AI skipper has decided a turn at `t`: called or not (`always`: a tack to answer a hail, which a skipper always
  * calls). Once a turn: a decision held a while isn't a new one. */
 export function decideTurn(b: Boat, t: number, always = false): void {
-  if (b.callT != null && t - b.callT < CALL_KEEP) return;
+  if (always) { b.decidedT = b.callT = t; return; }
+  if (b.decidedT != null && t - b.decidedT < CALL_KEEP) return;
+  b.decidedT = t;
   const n = b.turnsDecided = (b.turnsDecided ?? 0) + 1;
   if (always || callsTurn(b, n)) b.callT = t;
 }
@@ -67,11 +74,12 @@ export function crewAnswer(b: Boat, t: number): 'ready' | 'busy' | 'getting' {
 
 /**
  * A crash jibe: the boom (and its sheet) swept across, and anyone in its way who hadn't got their head down struck
- * (boomStep, at the crossing). The Folkboat's boom is high, its underside 1.6 m over the cockpit sole, a metre over the
+ * (boomStep, at the crossing). The Folkboat's boom is high, its underside 1.68 m over the cockpit sole, a metre over the
  * deck at the mast (class rules 6.1.11, 9.25: the boom's top no lower than the mast's band 1000 ± 10 mm over the deck,
  * folkboats.com; ORC's BAS 1.0; the model's deck, render/hull.ts deckY and COCKPIT_FIT: the benches 0.22, the side deck
- * about 0.6, the sole −0.08), so sitting on the benches heads clear it: it's whoever is up, standing at the cabin top's
- * lines, crouched high crossing, or sitting tall on the side deck, between the mast and the boom's end. The heights by
+ * about 0.6, the sole −0.08; heights here over the model's datum, the underside at 1.6), so sitting on the benches, or
+ * crouched crossing, heads clear it: it's whoever is standing, at the cabin top's lines, between the mast and the boom's
+ * end, or a tall one (over about 1.9 m) sitting up on the side deck. The mainsheet's own sweep isn't modeled yet. The heights by
  * pose are of the stature, an estimate: sitting height about 0.52 of it (ANSUR II's means, not checked here), standing
  * all of it, crouched across 0.6, hiking (leaning out) 0.35, kneeling at a car 0.4. Ducked: down to a crouch on the seat or the
  * deck, 0.3 of it, once they've seen it coming (ready for the jibe, or their reaction and DUCK_S since the boom was

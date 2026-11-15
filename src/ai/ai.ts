@@ -457,6 +457,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (!near) ai.reclear = false;
     ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
+    if (!ai.clearing) decideTurn(b, w.t, true); // (spinning her turns: a skipper always calls those, boat/calls.ts)
     b.luff = false; return;
   }
   ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
@@ -875,10 +876,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
   if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
-  // an avoidance that takes her through the wind (a duck that becomes a tack, ducking astern on a run that becomes a
-  // gybe): a turn she's decided on, called by skill like any other (the owner, 15 Nov 2026: boat/calls.ts). Not a
+  // any course that takes her through the wind (a tack or jibe she's decided on: an avoidance, a duck that becomes a tack,
+  // a rounding, the pre-start), called by skill (the owner, 15 Nov 2026: boat/calls.ts; once a turn, decideTurn). Not a
   // bear-away duck or a luff, which keep her on her side of the wind; and not dead downwind, where a degree flips it
-  if (avoiding && !ai.goTack && !ai.hailTack && Math.abs(wrap(ww.from - desired)) < 175 && (wrap(ww.from - desired) >= 0) !== ((b.rel ?? 0) >= 0)) decideTurn(b, w.t);
+  if (Math.abs(wrap(ww.from - desired)) < 175 && (wrap(ww.from - desired) >= 0) !== ((b.rel ?? 0) >= 0)) decideTurn(b, w.t);
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
 }

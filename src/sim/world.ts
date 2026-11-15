@@ -1,6 +1,6 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
-import { crewAnswer } from '../boat/calls';
+import { CALL_WAIT_MAX, crewAnswer } from '../boat/calls';
 import { paddlePower, paddler, paddleStart, paddleStep } from '../boat/paddle';
 import { RoundingTracker } from './roundings';
 import { addHarborLee } from '../environment/harborLee';
@@ -662,7 +662,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crewTogether: undefined, gybeTo: undefined, turnCalledT: undefined, callT: undefined, callWait: null, callOn: false, comingFor: 0, turnsDecided: 0, jibHold: 0, byLee: false, boomFree: undefined, boomFrom: undefined, crashT: undefined, boomFreeT: undefined, boomSeenT: undefined, steerSince: undefined, steerWas: 0, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crewTogether: undefined, gybeTo: undefined, turnCalledT: undefined, callT: undefined, callWait: null, callOn: false, comingFor: 0, byLeeSince: undefined, byLeeCue: undefined, decidedT: undefined, turnsDecided: 0, jibHold: 0, byLee: false, boomFree: undefined, boomFrom: undefined, crashT: undefined, boomFreeT: undefined, boomSeenT: undefined, steerSince: undefined, steerWas: 0, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -2040,7 +2040,7 @@ export class World {
     const alone = (u.crew?.spec.crew.length ?? 0) === 0;
     u.callT = this.t;
     if (u.callWait || alone || u.turnTarget != null) { u.callWait = null; this.putOver(u); }
-    else u.callWait = { t0: this.t, notReady: false };
+    else u.callWait = { t0: this.t, notReady: false, tack: u.tack };
     return true;
   }
   /** "Tacking!" / "Jibe-ho!": the helm puts her over (physics.ts tackTarget, gybeMeant). */
@@ -2053,6 +2053,9 @@ export class World {
   private callWork(u: Boat): void {
     const w = u.callWait; if (!w) return;
     if (u.docked || u.handled || u.hove || u.lashed != null || u.atAnchor || u.mooring) { u.callWait = null; return; }
+    // (you've put her about yourself meanwhile, or are steering her, or it's waited long enough: the call stands, warned,
+    // but the helm doesn't then put her over again)
+    if (u.tack !== w.tack || u.steer !== 0 || this.t - w.t0 > CALL_WAIT_MAX) { u.callWait = null; return; }
     const a = crewAnswer(u, this.t);
     if (a === 'ready') { u.callWait = null; u.callT = this.t; this.putOver(u); return; }
     if (a === 'busy' && !w.notReady && this.t - w.t0 > 0.6) { w.notReady = true; this.emit({ type: 'toast', ms: 4000, msg: '"Not ready!" Your crew are busy at a job: the helm waits (call again to go anyway).' }); }
