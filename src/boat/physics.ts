@@ -221,7 +221,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       const sternFirst = astern > b.v, dirFlow = Math.sign(helm) * (sternFirst ? -1 : 1), d = Math.sign(helm);
       // (a tiller held over with sternway turns her by the flow, the bow toward the tiller: sculling is pumping it, and with
       // steerage way astern, STEERS_ASTERN, a held helm is steering, not sculling, whatever her heading to the wind)
-      const sculls = !(sternFirst && astern > STEERS_ASTERN);
+      // (that's the tiller in your hand, which is where you put it. A steering key asks for the turn: her helmsman
+      // works the helm for it, sculling her round where the rule allows, as before, sternway or none)
+      const sculls = b.steer !== 0 || !(sternFirst && astern > STEERS_ASTERN);
       const byFlow = dirFlow * Math.abs(helm) * flow, sculled = sculls && d && scullOK(d) ? d * Math.abs(helm) * HANDLING.minTurnRate : 0;
       rate = Math.abs(sculled) > Math.abs(byFlow) ? sculled : byFlow;
       if (sternFirst && rate === byFlow) bladeFlip = true;

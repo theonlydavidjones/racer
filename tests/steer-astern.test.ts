@@ -69,6 +69,15 @@ describe('steering astern, shoved off under bare poles', () => {
     expect(asternGlide(0.5, 0, 0, 20, 60).steerable).toBeGreaterThan(59); // (from a walk, she never loses it)
     const calm = asternGlide(0.55, 0, 90, 0, 60).steerable; expect(calm).toBeGreaterThan(12); expect(calm).toBeLessThan(14);
   });
+  it('in irons with sternway, a steering key held still sculls her round (rule 42.3(d)): the tiller in your hand is literal, a key asks for the turn', () => {
+    // (the batch's rule 21.2 test, 15 Nov 2026: helmed back and forth across the wind by the keys she no longer got across)
+    const turn = (helm: (b: Helm) => void) => {
+      const b = testBoat({ heading: 5, kt: 0, windKt: 10, windFrom: 0 }) as Helm; b.isUser = true; b.v = 0; b.astern = 0.3;
+      sail(b, 8, () => helm(b)); return wrap(b.h - 5);
+    };
+    expect(turn(b => { b.steer = 1; })).toBeGreaterThan(10); // (sculled to starboard, toward 4 deg/s as her turn gathers: the way the key asks)
+    expect(Math.abs(turn(b => { b.tiller = -1; b.steer = 0; b.handsOff = true; }))).toBeLessThan(6); // (the held tiller: by the flow past her rudder, little at 0.3 m/s)
+  });
   it('a wind on her stern shortens the glide, a wind on her bow carries her on', () => {
     const calm = asternGlide(0.64, 0, 90, 0), stern = asternGlide(0.64, 0, 180, 20), bow = asternGlide(0.64, 0, 0, 20);
     expect(stern.dist).toBeLessThan(0.7 * calm.dist); expect(stern.going).toBe(false);
