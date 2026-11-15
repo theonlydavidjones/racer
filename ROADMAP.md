@@ -692,6 +692,11 @@ What's planned, roughly in order. Done work is described in the README.
      (aa6471f7). Measure the inset's draw time per frame against the published version before these (perf-ab's views,
      with the inset open and a layer on). Likely more fields or streaks redrawn every frame than before. Add the
      inset's cost to the frame gate so it can't creep back.
+   - **On-water current view, in Tools** (owner, 15 November; feature; next; 3–5 h): "on-water current view, toggle-able
+     from Tools". Like wind in the air and the flow view: the current drawn on the water around her (its set and drift,
+     from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
+     move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
+     it and it can't bring back the rushing water.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
