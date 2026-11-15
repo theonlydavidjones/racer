@@ -59,7 +59,8 @@ function rulesPassage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?:
 function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
   const a = route[0], b = route[route.length - 1];
   // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
-  // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried)
+  // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried.
+  // An estimate: docs/CONSTANTS.md)
   const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain);
   // (and the old rules' plans over the way round the land, which take a moment: the passage is the quicker. The router's
   // 5° headings and 1-minute fronts can be a few minutes out on a reach the rules sail dead straight)
@@ -166,8 +167,8 @@ export function passageNow(w: SimView): PassageNow | null {
  * draws only on demand: the setup's tide graph).
  */
 const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<void, PassageNow | null, void>; ready?: () => void }>();
-/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (a quarter of a 60 fps frame). */
-const SLICE_MS = 4, TICK_MS = 16;
+/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (an eighth of a 60 fps frame: a design choice inside Capacity's frame budget). */
+const SLICE_MS = 2, TICK_MS = 16;
 export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
   const k = nowKey(w, LIVE_M, LIVE_MIN); if (!k) return null;
   const m = nowMemo.get(w); if (fresh(m, k)) return m!.v;

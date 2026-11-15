@@ -3,6 +3,8 @@ import { beatAngle, runAngle } from '../boat/polar';
 import { speedInChop } from '../boat/seaway';
 import { landDist, manoeuvreS, sailLeg, type SailResult, type LegKind } from './routing';
 import type { Outlook } from './outlook';
+import { anyShoreDistNear, landAlongNear, landDist as terrainLandDist, limePointBox } from '../geo/shore';
+import { LL } from '../geo/geo';
 
 /**
  * The isochrone router (the owner, 15 November 2026): the fastest way from a to b through the day's wind, the land's lee
@@ -17,13 +19,20 @@ import type { Outlook } from './outlook';
  * The method is the one sailing routers use (isochrones: R. W. James, "Application of wave forecasts to marine
  * navigation", US Navy Hydrographic Office, 1957; Hagiwara 1989). Its steps here are estimates chosen for the Bay's
  * scales: STEP_MIN 1 min (100–200 m at her speeds, finer than the lee's and the tide's changes), HEADING_STEP 5°,
- * SECTOR 2° (how finely the front is kept), SHORE 20 m (how close to the land she may sail).
+ * SECTOR 1° (how finely the front is kept), SHORE 50 m (how close to the land she may sail), STALL 10 min.
  */
-const SHORE = 20;
+/** How close to the shore a plan takes her (m), an estimate of seamanship, not a measured number: about seven boat
+ * lengths. Racers do rock-hop a steep-to shore to cheat a foul tide, but the sim has no depths along it, and a learner
+ * follows the plan (Deep Physics' review, S2). The owner's Horseshoe Bay case keeps its gain at 50 m: 65.4 min against
+ * 65.2 at 20 m. Nearer than this only while she isn't closing the shore (leaving a berth or a shore she started by), and
+ * by the mark as near as the mark is. */
+const SHORE = 50;
 /** How finely the router works (estimates for the Bay's scales): a front every `step` minutes, headings `heading`° apart,
- * the front kept in `sector`° sectors round the start. COARSE is for quick looks; its minutes can be out by half. */
+ * the front kept in `sector`° sectors round the start. FINE's sector is 1°: at 2°, 190 m wide 5 km out, light-air cases
+ * lost the way round a point (Crissy Field to Belvedere in 6 kt: 332 min where 1° finds 66, the finest grain 66.5:
+ * Deep Physics' convergence check, V2). COARSE is for quick looks; its minutes can be out by half. */
 export interface Grain { step: number; heading: number; sector: number }
-export const FINE: Grain = { step: 1, heading: 5, sector: 2 }, COARSE: Grain = { step: 2, heading: 10, sector: 4 };
+export const FINE: Grain = { step: 1, heading: 5, sector: 1 }, COARSE: Grain = { step: 2, heading: 10, sector: 4 };
 
 interface Node { p: Vec; t: number; side: number; parent: number; turn: '' | 'tack' | 'gybe'; kt: number; cur: number }
 
@@ -51,18 +60,39 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
 /** landDist (routing.ts, to 600 m) remembered here on its own 25 m cells by a number, not a string: the router asks
  * hundreds of thousands of times a plan. */
 const near = new Map<number, number>();
+const CFB = { x0: LL(0, -122.4800).x - 150, x1: LL(0, -122.4000).x + 150, y0: LL(37.780, 0).y - 150, y1: LL(37.8150, 0).y + 150 };
 function landNear(p: Vec): number {
+  // (away from the hand-drawn shores, the Cityfront's and Lime Point's, the terrain's own distance map, one lookup)
+  if (!handShore(p)) return Math.max(0, terrainLandDist(p) - 15);
+  return nearCell(p);
+}
+/** Inside the hand-drawn shores' boxes, the exact distance off the 10 m lattice; elsewhere the terrain's (to ~15 m). */
+function shoreNear(p: Vec): number { return handShore(p) ? anyShoreDistNear(p) : terrainLandDist(p); }
+function handShore(p: Vec): boolean {
+  const lp = limePointBox();
+  return (p.x > CFB.x0 && p.x < CFB.x1 && p.y > CFB.y0 && p.y < CFB.y1) || (p.x > lp.x0 - 150 && p.x < lp.x1 + 150 && p.y > lp.y0 - 150 && p.y < lp.y1 + 150);
+}
+function nearCell(p: Vec): number {
   const i = Math.round(p.x / 25), j = Math.round(p.y / 25), k = (i + 1e5) * 2e5 + (j + 1e5);
   let v = near.get(k); if (v === undefined) { v = landDist({ x: i * 25, y: j * 25 }); if (near.size > 400000) near.clear(); near.set(k, v); }
   return v;
 }
 /** Clear water along a segment, at least SHORE m from the land: if the land is farther from its middle than half its
  * length and SHORE (and a cell's error), no point of it is nearer; otherwise looked at every 25 m. */
-function clear(p: Vec, q: Vec): boolean {
+function clear(p: Vec, q: Vec, mark: Vec, arrive: number): boolean {
   const L = dist(p, q), m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
-  if (landNear(m) > L / 2 + SHORE + 18) return true;
-  const n = Math.max(1, Math.ceil(L / 25));
-  for (let k = 1; k <= n; k++) { const f = k / n; if (landNear({ x: p.x + (q.x - p.x) * f, y: p.y + (q.y - p.y) * f }) <= SHORE) return false; }
+  if (landNear(m) > L / 2 + SHORE + 100) return true; // (no land within reach of any point of it, by the coarse reading)
+  if (landAlongNear(p, q) !== Infinity) return false; // (exact: nothing, however narrow, slips through: a breakwater, a pier)
+  const n = Math.max(1, Math.ceil(L / 10));
+  let d0 = NaN;
+  for (let k = 1; k <= n; k++) {
+    const x = { x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n };
+    if (landNear(x) >= SHORE + 50 || dist(x, mark) < SHORE + arrive) continue; // (by the mark she goes as near as it is)
+    const d = shoreNear(x);
+    if (d >= SHORE) continue;
+    if (d0 !== d0) d0 = shoreNear(p);
+    if (d < d0 - 2) return false; // (nearer than SHORE and closing it: only leaving a berth or a shore she started by)
+  }
   return true;
 }
 
@@ -75,7 +105,7 @@ export function routeLeg(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, ma
   while (!r.done) r = g.next();
   return r.value;
 }
-/** routeLeg one isochrone at a time: it yields after each minute's front, so a plan can be worked out a slice a frame
+/** routeLeg a little at a time: it yields every 16 points of a front and after each front, so a plan can be worked out a slice a frame
  * (sim/navigator.ts passageLive) instead of holding a frame up for a second or two. */
 export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE): Generator<void, SailResult, void> {
   const STEP_MIN = grain.step, HEADING_STEP = grain.heading, SECTOR = grain.sector;
@@ -89,58 +119,80 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   // from the start alone, the front lost the boats working round a point of land toward the mark behind it (Raccoon
   // Strait from the Cityfront: never got there); nearest the mark alone, it kept boats that had come no way and turned
   // twice as often. On the Yellow Bluff, Horseshoe Bay and Raccoon cases this one was quickest, with the fewest turns)
+  // A known weakness (Deep Physics' review, S1): a sector is a bearing from the start, so two points on one bearing on
+  // either side of a peninsula share it, and the one nearer the mark as the crow flies is kept, which may be in a dead-end
+  // bay. The stall rescue and the rules' plan (navigator.ts, the quicker is taken) cover it; if a case shows it, the cure
+  // is to keep the front by place (cells ~100 m, by tack, a cell reached on an earlier front never taken again).
   const score = (q: Vec) => dist(q, a) - dist(q, b);
-  // (a front that stops gaining on the mark, its nearest point no nearer for STALL minutes: the router's grain can't
-  // thread the last of the way in, or she's stuck. From that point she sails the rest by the rules, routing.ts sailLeg)
-  const STALL = 10; let nearD = dist(a, b), nearStep = 0;
-  for (let step = 0; step * STEP_MIN < maxMin && best < 0; step++) {
-    const sectors = new Map<number, number>(); // sector → node index, the farthest from the start
+  // (a front that stops gaining on the mark, its nearest point no nearer for STALL minutes: the router's grain may not
+  // thread the last of the way in, or she's stuck. From that point she could sail the rest by the rules (routing.ts
+  // sailLeg): that arrival is kept as the time to beat, and the front searches on until it beats it or passes it. Taken
+  // as the end at once, a light-air case (Horseshoe Bay to Yellow Bluff, 25 Nov 15:30, 6 kt) took the rules' 221 min
+  // where the front, searching on, got there in 131. STALL is an estimate: docs/CONSTANTS.md)
+  const STALL = 10; let nearD = dist(a, b), nearStep = 0, bound: { k: number; r: SailResult; t: number } | null = null;
+  for (let step = 0; step * STEP_MIN < maxMin && best < 0 && !(bound && t0 + step * STEP_MIN >= bound.t); step++) {
+    const sectors = new Map<number, Node>(); // sector → the point kept there (only those are stored: the rest are many)
+    let worked = 0;
     for (const i of front) {
+      if (++worked % 16 === 0) yield; // (a front can take tens of ms cold: the page's slices stop between its points)
       const n = nodes[i], w = windOn(o, n.p, n.t), c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
-      if (w.kt < 0.5) continue; // (becalmed here: she waits for the tide to carry her, which the next minute's front shows)
-      const beat = beatAngle(w.kt);
-      // (her beat angle, every HEADING_STEP from there, and her run angle exactly: the angles a navigator sails)
-      const run = runAngle(w.kt), cand: [number, number][] = [];
-      for (let x = beat; x <= 180; x += HEADING_STEP) for (const sd of [1, -1]) if (!(x === 180 && sd < 0)) cand.push([x, sd]);
-      if (!cand.some(([x]) => Math.abs(x - run) < 0.5)) { cand.push([run, 1]); cand.push([run, -1]); }
-      // (and the heading that crabs straight for the mark across the current, if she can sail it: on a reach the best way
-      // is a straight line over the ground, and the fan's 5° steps miss it, the stream setting her off and back again)
-      { const toB = unit(sub(b, n.p)), r = wrap(w.from - brg(toB.x, toB.y));
-        let v0 = chopSpeed(w.kt, Math.abs(r), ch.hs, ch.tp);
-        for (let k = 0; k < 2; k++) { const hm = crabTo(toB, c, v0), tw = Math.abs(wrap(w.from - hm)); if (tw >= beat) { v0 = chopSpeed(w.kt, tw, ch.hs, ch.tp); if (k === 1) cand.push([tw, wrap(w.from - hm) >= 0 ? 1 : -1]); } else break; }
+      // (becalmed here, under 0.5 kt on the water: she can't sail, but the tide still carries her. The front keeps her,
+      // drifting the minute on the same board with no turn, so a hole in the breeze doesn't delete the routes through it:
+      // Deep Physics' review, M1)
+      const calm = w.kt < 0.5, beat = calm ? 0 : beatAngle(w.kt);
+      const cand: [number, number][] = calm ? [[NaN, n.side]] : [];
+      if (!calm) {
+        // (her beat angle, every HEADING_STEP from there, and her run angle exactly: the angles a navigator sails)
+        const run = runAngle(w.kt);
+        for (let x = beat; x <= 180; x += HEADING_STEP) for (const sd of [1, -1]) if (!(x === 180 && sd < 0)) cand.push([x, sd]);
+        if (!cand.some(([x]) => Math.abs(x - run) < 0.5)) { cand.push([run, 1]); cand.push([run, -1]); }
+        // (and the heading that crabs straight for the mark across the current, if she can sail it: on a reach the best way
+        // is a straight line over the ground, and the fan's 5° steps miss it, the stream setting her off and back again)
+        { const toB = unit(sub(b, n.p)), r = wrap(w.from - brg(toB.x, toB.y));
+          let v0 = chopSpeed(w.kt, Math.abs(r), ch.hs, ch.tp);
+          for (let k = 0; k < 2; k++) { const hm = crabTo(toB, c, v0), tw = Math.abs(wrap(w.from - hm)); if (tw >= beat) { v0 = chopSpeed(w.kt, tw, ch.hs, ch.tp); if (k === 1) cand.push([tw, wrap(w.from - hm) >= 0 ? 1 : -1]); } else break; }
+        }
       }
       for (const [twa, sd] of cand) {
-        const h = w.from - sd * twa, v = chopSpeed(w.kt, twa, ch.hs, ch.tp); // (sd +1: wind from starboard, starboard tack/jibe)
+        const h = w.from - sd * twa, v = twa === twa ? chopSpeed(w.kt, twa, ch.hs, ch.tp) : 0; // (sd +1: wind from starboard, starboard tack/jibe)
         // a tack or jibe costs its time, drifting with the current: the minute's sailing is that much shorter
-        const turn: Node['turn'] = n.side && sd !== n.side ? (twa < 90 ? 'tack' : 'gybe') : '', lost = turn ? manoeuvreS(turn, w.kt, ch.hs) : 0;
-        const secs = STEP_MIN * 60, sail = Math.max(0, secs - lost), d = V(h);
+        const turn: Node['turn'] = v && n.side && sd !== n.side ? (twa < 90 ? 'tack' : 'gybe') : '', lost = turn ? manoeuvreS(turn, w.kt, ch.hs) : 0;
+        const secs = STEP_MIN * 60, sail = Math.max(0, secs - lost), d = v ? V(h) : { x: 0, y: 0 };
         const q = { x: n.p.x + d.x * v * sail + c.x * secs, y: n.p.y + d.y * v * sail + c.y * secs };
-        if (!clear(n.p, q)) continue;
-        const idx = nodes.length; nodes.push({ p: q, t: n.t + STEP_MIN, side: sd, parent: i, turn, kt: w.kt, cur: dot(c, legU) / KT });
-        // there: this minute's segment passes within `arrive` of the mark
-        const s = sub(q, n.p), L2 = s.x * s.x + s.y * s.y, f = L2 > 0 ? Math.max(0, Math.min(1, dot(sub(b, n.p), s) / L2)) : 0;
-        if (dist({ x: n.p.x + s.x * f, y: n.p.y + s.y * f }, b) <= arrive) {
-          nodes[idx].p = { x: n.p.x + s.x * f, y: n.p.y + s.y * f }; nodes[idx].t = n.t + STEP_MIN * f;
+        // there: this minute's segment comes within `arrive` of the mark, timed where it first does (Deep Physics' S4),
+        // and only that much of it need be clear (S3: a mark by the shore is reached, not refused as land)
+        const s = sub(q, n.p), L2 = s.x * s.x + s.y * s.y, e = sub(n.p, b), bq = dot(e, s), cq = dot(e, e) - arrive * arrive;
+        const disc = bq * bq - L2 * cq;
+        let f = -1;
+        if (cq <= 0) f = 0; else if (L2 > 0 && disc >= 0) { const f1 = (-bq - Math.sqrt(disc)) / L2; if (f1 >= 0 && f1 <= 1) f = f1; }
+        if (f >= 0) {
+          const at = { x: n.p.x + s.x * f, y: n.p.y + s.y * f };
+          if (f > 0 && !clear(n.p, at, b, arrive)) continue;
+          const idx = nodes.length; nodes.push({ p: at, t: n.t + STEP_MIN * f, side: sd, parent: i, turn, kt: w.kt, cur: dot(c, legU) / KT });
           if (best < 0 || nodes[idx].t < nodes[best].t) best = idx;
           continue;
         }
         const r = sub(q, a), key = Math.round(brg(r.x, r.y) / SECTOR), cur = sectors.get(key);
-        if (cur == null || score(q) > score(nodes[cur].p)) sectors.set(key, idx);
+        if (cur && score(q) <= score(cur.p)) continue;
+        if (!clear(n.p, q, b, arrive)) continue;
+        sectors.set(key, { p: q, t: n.t + STEP_MIN, side: sd, parent: i, turn, kt: w.kt, cur: dot(c, legU) / KT });
       }
     }
     if (best >= 0) break;
-    front = [...sectors.values()];
-    if (!front.length) return finish(0, false, 'land');
+    front = []; for (const nd of sectors.values()) { front.push(nodes.length); nodes.push(nd); }
+    if (!front.length) return bound ? finish(bound.k, true, undefined, bound.r) : finish(0, false, 'land');
     let k = front[0]; for (const i of front) if (dist(nodes[i].p, b) < dist(nodes[k].p, b)) k = i;
     const dk = dist(nodes[k].p, b);
     if (dk < nearD - 10) { nearD = dk; nearStep = step; }
     else if ((step - nearStep) * STEP_MIN >= STALL) {
       const n = nodes[k], r = sailLeg(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
-      if (r.ok) return finish(k, true, undefined, r);
-      nearStep = step; // (the rules can't from there either: the front searches on, and tries again after another stall)
+      if (r.ok && (!bound || n.t + r.minutes < bound.t)) bound = { k, r, t: n.t + r.minutes };
+      nearStep = step; // (and tries again after another stall, from wherever the front has got to)
     }
     yield;
   }
+  if (best >= 0 && (!bound || nodes[best].t <= bound.t)) return finish(best, true);
+  if (bound) return finish(bound.k, true, undefined, bound.r);
   if (best < 0) { // (out of time: the front's point nearest the mark)
     let k = front[0]; for (const i of front) if (dist(nodes[i].p, b) < dist(nodes[k].p, b)) k = i;
     return finish(k, false, 'time');
@@ -153,7 +205,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     // makes): the router's headings are 5° apart, and the board she lays the mark on is the one the chart's laylines draw
     let tail: SailResult | null = rescue ?? null, tailKind: 'tack' | 'gybe' | null = null;
     // (from the earliest of her last three turns whose laid board (one tack or jibe onto the layline at most) gets there within 2 minutes or 3% of the router's
-    // time, what the 5° steps and the minute's grain can be out by: so a jink in the last minute onto the mark goes, and
+    // time, what the 5° steps and the minute's grain can be out by (an estimate: docs/CONSTANTS.md): so a jink in the last minute onto the mark goes, and
     // the board she lays it on is her last)
     const endT = chain[chain.length - 1].t, slack = Math.max(2, 0.03 * (endT - t0));
     const turnsAt = chain.map((n, k) => n.turn ? k : -1).filter(k => k > 0).slice(-3);
