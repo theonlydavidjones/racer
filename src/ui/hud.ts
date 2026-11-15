@@ -646,7 +646,7 @@ export class Hud {
    * The full-screen chart (ui/chart.ts): north up, centred on (cx, cy) at `scale` px/m, with the places' names, and the
    * spot you've picked. Same picture as the inset map: land, wind, puffs, current, the course or your destination, boats, ships.
    */
-  drawChart(c: HTMLCanvasElement, wd: SimView, cx: number, cy: number, scale: number, pick: Vec | null): void {
+  drawChart(c: HTMLCanvasElement, wd: SimView, cx: number, cy: number, scale: number, pick: Vec | null, opts: { cornerFree?: boolean } = {}): void {
     const pal = this.shown(wd).chartPal ?? 'day', [ctx, w, h] = fitCanvas(c), u = wd.user, tf = makeTf(cx, cy, 0, scale, w, h), I = INK[pal];
     // the places' names go over the chart: its own print keeps clear of them
     ctx.font = '600 11px "Saira Semi Condensed", sans-serif';
@@ -688,8 +688,10 @@ export class Hud {
     }
     // north, the wind, and a scale bar
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('N', w - 28, 22); ctx.beginPath(); ctx.moveTo(w - 28, 28); ctx.lineTo(w - 23, 42); ctx.lineTo(w - 33, 42); ctx.closePath(); ctx.fill();
-    const wf = wd.wind.from * D2R, ox = w - 28, oy = 80;
+    // (`cornerFree`: the top-right corner left for the setup chart's expand icon, north and the wind just left of it)
+    const nx = opts.cornerFree ? w - 72 : w - 28;
+    ctx.fillText('N', nx, 22); ctx.beginPath(); ctx.moveTo(nx, 28); ctx.lineTo(nx + 5, 42); ctx.lineTo(nx - 5, 42); ctx.closePath(); ctx.fill();
+    const wf = wd.wind.from * D2R, ox = nx, oy = 80;
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(ox + Math.sin(wf) * 18, oy - Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 12, oy + Math.cos(wf) * 12); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
