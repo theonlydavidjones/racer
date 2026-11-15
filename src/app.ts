@@ -1455,14 +1455,20 @@ document.addEventListener('click', e => {
   else if (where === 'past') { seasonPick = null; nav.go({ k: 'past' }); }
   else if (where === 'drill') { seasonPick = null; nav.go({ k: 'drill' }); }
 });
-/** Mid-race (or a drill), the corner's Exit asks first: a misclick shouldn't throw the race away. The sail waits meanwhile. */
-const leaving = () => w.running && $('results').hidden && (w.drill || w.rounding || (!w.freeSail && w.userFinishT == null));
+/** Whenever she's sailing, the corner's Exit asks first (the owner: "need a way to x out of the Exit menu if I accidentally
+ * press it"): a misclick shouldn't throw away a race, a drill, a lesson or a sail. The sail waits meanwhile; ✕, Esc, a
+ * click outside or Keep sailing all carry on. */
+const leaving = () => w.running && $('results').hidden;
 $('bExit').onclick = () => {
-  if (!leaving() || !$('pause').hidden) { openHome(); return; }
-  $('leaveTitle').textContent = w.drill || w.rounding ? 'Leave drill?' : 'Leave race?';
+  if (!leaving()) { openHome(); return; }
+  const race = !w.freeSail && !w.drill && !w.rounding && !w.lesson;
+  $('leaveTitle').textContent = w.lesson ? 'Leave lesson?' : w.drill || w.rounding ? 'Leave drill?' : w.freeSail ? 'Stop sailing?' : 'Leave race?';
+  $('bLeaveNo').textContent = race ? 'Keep Racing' : 'Keep Sailing'; // (the owner's "Keep Racing", for a race)
   send({ k: 'pause', on: true }); $('leaveAsk').hidden = false; $('bLeaveNo').focus();
 };
 $('bLeaveNo').onclick = () => { $('leaveAsk').hidden = true; if ($('pause').hidden) send({ k: 'pause', on: false }); };
+$('bLeaveX').onclick = () => $('bLeaveNo').click();
+$('leaveAsk').addEventListener('click', e => { if (e.target === $('leaveAsk')) $('bLeaveNo').click(); }); // (a click outside the panel)
 $('bLeaveYes').onclick = () => { $('leaveAsk').hidden = true; openHome(); };
 $('bExit2').onclick = $('bExit3').onclick = () => openHome();
 $('bKeys0').onclick = () => keysView.open();
