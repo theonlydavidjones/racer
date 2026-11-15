@@ -1,5 +1,5 @@
 import { clamp } from '../core/math';
-import { polar } from './polar';
+import { beatAngle, polar } from './polar';
 import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
@@ -63,6 +63,10 @@ export const LINE_URGENT = 0.25;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+/** Her speed to be back up to after a tack (m/s): the polar's along her course through the water, her leeway and all,
+ * and no closer to the wind than its beat angle (as physics.ts reads it): at her heading's angle, 4° above her course,
+ * it read low, and the trips went at 91% of her speed. */
+const settleSpeed = (b: Boat): number => polar(b.ww.kt, Math.max(beatAngle(b.ww.kt), Math.min(180, Math.abs(b.twa ?? 0) + (b.leeway ?? 0))));
 /** How long after a tack (s) the cabin-top lines wait for her to be back up to speed, at most. An estimate, unsourced. */
 export const TACK_SETTLE = 60;
 export function waitingLines(c: CrewState): readonly string[] {
@@ -238,7 +242,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
     // back up to speed first: after a tack the helm and the sheets build her speed again, and nobody goes to the cabin top
     // until she's going (to 95% of the polar's speed, a minute at most). A line knocked well off still goes at once
-    if (PIANO.has(k) && !urgentTo && c.tackedAt != null && (c.clock ?? 0) - c.tackedAt < TACK_SETTLE && b.v < 0.95 * polar(b.ww.kt, Math.min(180, Math.abs(b.twa ?? 0)))) continue;
+    if (PIANO.has(k) && !urgentTo && c.tackedAt != null && (c.clock ?? 0) - c.tackedAt < TACK_SETTLE && b.v < 0.95 * settleSpeed(b)) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
     // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
     // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them
