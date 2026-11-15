@@ -278,8 +278,11 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
     // (the stretches before this one it still joins: the one just left (a) and the best of those before it (b), each
     // with its first shore and how much the dips between have parted them; and, at an exit, the same carried over)
     let ca = -1, wa = 0, cb = -1, wb = 0, xEnter = -1, xa = -1, xwa = 0, xb = -1, xwb = 0;
-    const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), cav = 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1); return (x < xr ? cav : cav * (xr / x) ** pe) * Math.min(1, (H - 8) / 8); };
-    const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), ca >= 0 ? wa * lee(ca, top) : 0, cb >= 0 ? wb * lee(cb, top) : 0)); };
+    const cavOf = (H: number) => 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1);
+    const shape = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5); return (x < xr ? 1 : (xr / x) ** pe) * Math.min(1, (H - 8) / 8); };
+    const lee = (x: number, H: number) => cavOf(H) * shape(x, H);
+    let rise = 0; // (the stretch's ground as it rises, scored from where it stands: the most of shape(d, height so far))
+    const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), cavOf(top) * rise, ca >= 0 ? wa * lee(ca, top) : 0, cb >= 0 ? wb * lee(cb, top) : 0)); };
     const at = (L: number, d: number, h: number) => prevH === h ? prevD : prevD + (d - prevD) * (L - prevH) / (h - prevH); // (where the height passes L, between the samples)
     let step = 50;
     for (let d = 50; d <= 6000; d += step) {
@@ -293,8 +296,11 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
       const h = 0.5 * g(q) + 0.25 * (g({ x: q.x + nx, y: q.y + ny }) + g({ x: q.x - nx, y: q.y - ny }));
       if (enter >= 0) {
         const L = Math.max(8, 0.5 * top);
-        if (h >= L) { top = Math.max(top, h); close(); } // (scored as the stretch rises, not only at its top: low ground
-        // at the shore joined to high ground behind still makes a low hill's near-calm close in; a high hill's is gustier)
+        // the ground as it rises, its reach scored from where it stands by the height reached so far (Deep Physics): 20 m
+        // reached 100 m up a hillside reaches only 80 m from there. How calm it is goes by the hill it's part of, its whole
+        // top (close): a hillside rising to a ridge is the ridge's gusty lee, not a low hill's near-calm. Low ground parted
+        // from the ridge behind by a dip is its own stretch, and keeps its own
+        if (h >= L) { top = Math.max(top, h); rise = Math.max(rise, shape(d, top)); }
         else { close(); exit = at(L, d, h); exitLevel = L; xEnter = enter; xa = ca; xwa = wa; xb = cb; xwb = wb; enter = -1; dip = h; }
       } else {
         if (exit >= 0) dip = Math.min(dip, h);
@@ -311,7 +317,7 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
             ca = xEnter; wa = w; cb = older[0]; wb = older[1] * w;
             if (wa < 1e-3) { ca = -1; wa = 0; } if (wb < 1e-3) { cb = -1; wb = 0; }
           }
-          close();
+          rise = shape(d, top);
         }
       }
       prevD = d; prevH = h;
