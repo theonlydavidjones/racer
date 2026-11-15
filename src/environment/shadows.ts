@@ -178,6 +178,8 @@ function cityfrontDepth(p: Vec): number {
 const CF_FADE = 250;
 /** A dip between two stretches of land narrower than this (m) doesn't part them for the lee (terrainLeeRaw). */
 const DIP_GAP = 200;
+/** The mask's share of land (0..1, read bilinearly) from which the ground counts: about its cells' own edge. */
+const LAND_FROM = 0.3;
 
 /**
  * The lee of the land at p, wind from `from` (deg): looking upwind along three rays (straight up, and the wake's
@@ -198,7 +200,7 @@ export function terrainLee(p: Vec, from: number, skipGate = false): number {
  * and the ray took them as one hill, from the nearer shore: the review, bay-east-16. The land's share keeps the water
  * between them at nothing.)
  */
-function groundHeightSmooth(p: Vec): number {
+function groundHeightAt(p: Vec): number {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
   const inCf = Math.min((lat - CITYFRONT.south) * MLAT, (CITYFRONT.north - lat) * MLAT, (lon - CITYFRONT.west) * MLON, (CITYFRONT.east - lon) * MLON);
   const cf = inCf <= 0 ? 1 : Math.max(0, 1 - inCf / 100); if (cf === 0) return 0;
@@ -206,7 +208,31 @@ function groundHeightSmooth(p: Vec): number {
   const i = Math.floor(ci), j = Math.floor(cj), u = ci - i, v = cj - j;
   const at = (a: number, b: number) => a < 0 || b < 0 || a >= HM.nx || b >= HM.ny ? 0 : HGRID[b * HM.nx + a] * HM.step;
   const h = (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
-  return h > 0 ? h * landShareAt(p) * cf : 0;
+  if (!(h > 0)) return 0;
+  // (the land counted from where the mask's share passes LAND_FROM, so the land starts about at the mask's own edge,
+  // not 20–30 m out where its bilinear share first rises off nothing)
+  return h * Math.min(1, Math.max(0, (landShareAt(p) - LAND_FROM) / (1 - LAND_FROM))) * cf;
+}
+/**
+ * groundHeightAt off a 50 m lattice, read bilinearly (continuous like it, and one read where it is eight): every boat's
+ * lee looks at some 600 points twice a second, and the planner's grids at thousands. Filled in tiles of 64 × 64 points
+ * (3.2 km) as the rays first reach them, each a few milliseconds.
+ */
+const GL = 50, GT = 64, glTiles = new Map<number, Float32Array>();
+let glKey = NaN, glTile: Float32Array | null = null; // (the last tile read: a ray's points mostly fall in the one before)
+function groundHeightSmooth(p: Vec): number {
+  const fx = p.x / GL, fy = p.y / GL;
+  if (!Number.isFinite(fx) || !Number.isFinite(fy)) return 0;
+  const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, ti = Math.floor(i / GT), tj = Math.floor(j / GT), key = (ti + 4096) * 8192 + (tj + 4096);
+  let t = key === glKey ? glTile : glTiles.get(key);
+  if (!t) {
+    t = new Float32Array((GT + 1) * (GT + 1));
+    for (let b = 0; b <= GT; b++) for (let a = 0; a <= GT; a++) t[b * (GT + 1) + a] = groundHeightAt({ x: (ti * GT + a) * GL, y: (tj * GT + b) * GL });
+    glTiles.set(key, t);
+  }
+  glKey = key; glTile = t;
+  const a = i - ti * GT, b = j - tj * GT, k = b * (GT + 1) + a, n = GT + 1;
+  return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
 }
 /**
  * Along each ray, every stretch of land shelters by its highest point, from where the ray meets it. Its inputs are
@@ -227,7 +253,12 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
     let step = 50;
     for (let d = 50; d <= 6000; d += step) {
       step = d < 1000 ? 50 : 100;
-      const q = { x: p.x + u.x * d, y: p.y + u.y * d }, h = skipGate && q.x < GATE_X ? 0 : groundHeightSmooth(q);
+      // the ground the air comes over, averaged across the wind over a width that grows with the distance run (a lee's
+      // edge spreads as it goes: wakes mix at roughly 1 in 5 to 1 in 10 of the distance; the spread here, d/8 either
+      // side weighted ¼ ½ ¼, is an estimate, no figure measured for these shores). Close in it's under the 50 m mask's
+      // own scale and changes nothing; far off a narrow gap opens gradually, averaged with the land beside it
+      const q = { x: p.x + u.x * d, y: p.y + u.y * d }, a = d / 8, nx = u.y * a, ny = -u.x * a;
+      const h = skipGate && q.x < GATE_X ? 0 : 0.5 * groundHeightSmooth(q) + 0.25 * (groundHeightSmooth({ x: q.x + nx, y: q.y + ny }) + groundHeightSmooth({ x: q.x - nx, y: q.y - ny }));
       const cross = prevH === h ? prevD : prevD + (d - prevD) * (8 - prevH) / (h - prevH); // (where the height passes 8 m, between the samples)
       if (h > 8) {
         if (enter < 0) {
