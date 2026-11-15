@@ -1218,7 +1218,13 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   // Jib: to leeward normally (to windward when backed); poled out square to windward when wing-on-wing; hanging
   // centred while the crew works the pole.
   const jibT = plan === 'wing' ? -jibSide * 82 : plan === 'main' ? jibSide * 10 : jibSide * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
-  if (b.boomFree == null) b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4); // (free, the wind has it: boomStep)
+  if (b.boomFree == null) {
+    let to = b.boom + (side * boomT - b.boom) * Math.min(1, dt * 4); // (free, the wind has it: boomStep)
+    // (handed across in a jibe it can pass her centerline in one step, some 9°: held a moment at it, so her tack changes
+    // with it (tackStep, the next step) and never lags the boom by a step, Definitions)
+    if (b.gybeTo && Math.sign(to) === side && Math.sign(b.boom) !== side && Math.abs(to) > 0.9) to = side * 0.9;
+    b.boom = to;
+  }
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 
