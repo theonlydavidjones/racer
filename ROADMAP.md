@@ -485,11 +485,19 @@ What's planned, roughly in order. Done work is described in the README.
      the line?" The gold lane is the approach to the line (render/drillGuides.ts). It needs to show at a glance what it
      is, without copy: for example, ending on the line at the spot to cross at the gun. It folds into the favored-end
      work below, where the lane should lead to the favored end.
-   - **The start drill's results: "End" unclear** (owner, 15 November, from a screenshot; polish; <1 h): "don't know what
+   - **The start drill's results: "End" unclear; the table unreadable; the copy block** (owner, 15 November, from screenshots; now; 3–4 h): "don't know what
      'end: middle' means (the column) in start practice." It's where along the line she crossed: the pin end, the
      middle or the committee boat end (src/app/drills.ts endW). Make it plain without copy: a tiny line icon with her
      crossing marked, the favored end lit once the favored-end work lands, so the column also says whether she started
      at the right end.
+     Then (15 November, from a screenshot of the results; now; 2–3 h): "I can't read this table. I don't know which
+     session is my most recent; apparently the yellow is my best? and some of the times are preposterous. I didn't take
+     17m 8s to cross the line." And: "that copy block is insane. nobody will every read that. short, sharp takeaways."
+     The "At the gun" column reads "17 m · 8 s" (meters behind, seconds late) as a time; the latest start isn't marked;
+     gold for the best isn't explained; one row says "X" (the line's end mark) where the others say "middle". The "What
+     happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
+     takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
+     the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
