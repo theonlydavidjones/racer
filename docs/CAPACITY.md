@@ -496,7 +496,8 @@ arithmetic in the cache.
 
 **The method** (scripts/check/perf-pair.mjs): load two versions of the sim in one Node process (vite's runnerImport, two
 module graphs), sail them by turns in 10-second pieces, A, B, B, A, and time each piece on this thread's CPU clock.
-The host's drift lands on both alike. The second version loaded runs about 0.4% slower, so it runs twice, each version
+The host's drift lands on both alike. The second version loaded runs slower, by 0.4% on a quiet host and up to 3% on a busy one (14 Nov: main against v168,
+0.987–1.015 with main first, 1.022–1.047 with v168 first), so it runs twice, each version
 loaded first once, three races each, and the result is the geometric mean of the six ratios (about ±0.65%). The other version's `src/`
 comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from origin first if the clone hasn't got it.
 
@@ -510,8 +511,38 @@ comes from git (`git archive`) into `.cache/perf-pair/<commit>/`, fetched from o
 
 **Two uses:**
 - **The PR gate:** `node scripts/check/perf-pair.mjs`, against origin/main. A PR that touches the step may be at most 1.5% slower.
+- **AI and rules PRs:** `--ai`, ten races (seeds 1–5 at 12 and 22 kt), each once, alternating the load order, the
+  geometric mean. A change to how boats sail changes the race: on the perf race's seed alone #276 read 1.023 against
+  turning, but over the ten its ratios ran 0.986–1.067 and their mean was 1.032; equal fouling in both versions still
+  cost 2–7%, so it was the code, not a more crowded race (14 Nov 2026).
 - **The owner's budget:** perf.test, and `--budget`, against v168 (425a5eb, the commit 43.1 was set on). v168 measured
   42.31 in the old units, so 43.1 is v168 × 43.1 / 42.31 = **v168 × 1.019**: the same budget, measured without the drift.
+
+### 8a. Two lessons from batch 41 (14 Nov 2026)
+
+**One run of six ratios isn't enough to decide on.** Batch 41d against v168, both runs quiet and balanced: perf.test's
+six read 1.0209, `--budget`'s twelve read 1.0006, each with a standard error of about 0.6%. They differ by 2.0%, about
+2.4 errors: on this host, one run can land 1–1.5% from the next, more than each run's own spread says, and the
+load-order effect even changed sign between them (0.985 and 1.02 with v168 loaded first). Pooled, the eighteen read
+1.0073 ± 0.5%. So perf.test now sails six races with each tree loaded first, twelve ratios (the owner, 14 Nov 2026).
+
+**A call added in World.step costs every step, even one that returns at once.** The paddle (#326) added two lines to
+World.step: the crew's look for a jam (every 30 steps) and the paddling's own work (returns at once with no paddle). The
+race was bit-identical with and without paddle, and still the step was 1.3% slower (12 ratios). Against the paddle
+merge, 8 ratios each:
+
+| variant | ratio |
+|---|---|
+| moveBoat's two paddle calls behind `if (b.paddle)` | 1.0017 |
+| without the two new fields on the Boat | 1.0101 (worse: the fields belong there) |
+| the physics.ts ↔ paddle.ts import cycle broken | 1.0049 |
+| the two lines in World.step removed | **0.9896** |
+| the two calls in a method of their own, entered only `if (user.paddle \|\| steps % 30 === 0)` | **0.9962** |
+
+World.step is very large: what's added to it changes how the engine compiles all of it, whatever the new code does at
+run time. So **new per-step work goes behind one cheap test, in a method of its own**, not inline in World.step; and a
+PR that adds lines to World.step runs perf-pair even when the lines look free. (A profile of a bundled build didn't
+show this cost; one of the trees loaded as perf-pair loads them, by vite's runnerImport, did.)
 
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
