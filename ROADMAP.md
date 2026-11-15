@@ -630,8 +630,19 @@ What's planned, roughly in order. Done work is described in the README.
      **The isochrone router** (the owner's decision, asked 15 November): the rule-based planner can't get out of a dead end
      on a run, light air in a lee with the tide setting her on (the owner's own route off Yellow Bluff, 25 Nov 15:00,
      with the land's lee without seams: tests/passage-hairpin's it.fails). A router spreading out every minute on every
-     heading, with the real wind, lee and current, keeps the fastest way to each place; 6–10 h, a plan in 1–3 s, nothing
-     per step. (Built: sim/router.ts, the passage planner's; the owner said yes, 15 November.)
+     heading, with the real wind, lee and current, keeps the fastest way to each place; a plan in 3–7 s cold, worked out
+     between frames, nothing per step. (Built: sim/router.ts, the passage planner's; the owner said yes, 15 November;
+     physics review two rounds, Deep Physics.)
+     **The router's pruning by place, not by bearing** (Deep Physics, review round 2): the front keeps one point per 1°
+     sector of bearing from the start, so two points on one bearing either side of a point of land share a sector, and
+     the one kept can be in a dead-end bay. Alcatraz to Clipper in 6 kt shows it: finer grains plan 14% slower than FINE,
+     whose route sails true. Tried and failed (15 November): pure 100 m cells by tack (the front floods the Bay, out of
+     memory); cells added to the sectors, a cell never taken twice (a light-air boat can't leave its cell in a minute,
+     worse everywhere); the same with 3 minutes' grace (still worse). Next to try: a dominance test on time-of-arrival
+     per cell, keeping the sectors as the bound.
+     **The router off the page's thread** (Capacity's suggestion, 15 November; the Coordinator to decide): 3–7 s of CPU,
+     sliced 2 ms a frame, puts the first plan up in about 50 s. In its own worker, or as a job in the sim's worker
+     between steps, it would show in about 6 s with nothing on the frame.
      **Next: the race brief and the AI's leg planning onto the router** (the Coordinator, 15 November): strategist.ts
      comparePlans and the AI still sail the old rules (routing.ts sailLeg). Moved later, with the race's own timing in mind.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the

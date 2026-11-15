@@ -1,9 +1,9 @@
 import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { speedInChop } from '../boat/seaway';
-import { landDist, manoeuvreS, sailLeg, type SailResult, type LegKind } from './routing';
+import { landDist, manoeuvreS, sailLegSteps, type SailResult, type LegKind } from './routing';
 import type { Outlook } from './outlook';
-import { anyShoreDistNear, landAlongNear, landDist as terrainLandDist, limePointBox } from '../geo/shore';
+import { anyShoreDist, landAlong, landDist as terrainLandDist, limePointBox } from '../geo/shore';
 import { LL } from '../geo/geo';
 
 /**
@@ -72,7 +72,15 @@ function landNear(p: Vec): number {
   return nearCell(p);
 }
 /** Inside the hand-drawn shores' boxes, the exact distance off the 10 m lattice; elsewhere the terrain's (to ~15 m). */
-function shoreNear(p: Vec): number { return handShore(p) ? anyShoreDistNear(p) : terrainLandDist(p); }
+function shoreNear(p: Vec): number { return handShore(p) ? exactNear(p) : terrainLandDist(p); }
+/** The exact distance to any shore at the nearest 10 m point, remembered point by point: the 10 m lattice
+ * (anyShoreDistNear) fills a 320 m tile at its first look, ~30 ms at once, which would hold a frame up. */
+const exact10 = new Map<number, number>();
+function exactNear(p: Vec): number {
+  const i = Math.round(p.x / 10), j = Math.round(p.y / 10), k = (i + 1e6) * 2e6 + (j + 1e6);
+  let v = exact10.get(k); if (v === undefined) { v = anyShoreDist({ x: i * 10, y: j * 10 }); if (exact10.size > 400000) exact10.clear(); exact10.set(k, v); }
+  return v - 7.1; // (the point is up to 7 m off: never read her farther off than she is)
+}
 function handShore(p: Vec): boolean {
   const lp = limePointBox();
   return (p.x > CFB.x0 && p.x < CFB.x1 && p.y > CFB.y0 && p.y < CFB.y1) || (p.x > lp.x0 - 150 && p.x < lp.x1 + 150 && p.y > lp.y0 - 150 && p.y < lp.y1 + 150);
@@ -87,7 +95,7 @@ function nearCell(p: Vec): number {
 function clear(p: Vec, q: Vec, mark: Vec, arrive: number): boolean {
   const L = dist(p, q), m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
   if (landNear(m) > L / 2 + SHORE + 100) return true; // (no land within reach of any point of it, by the coarse reading)
-  if (landAlongNear(p, q) !== Infinity) return false; // (exact: nothing, however narrow, slips through: a breakwater, a pier)
+  if (landAlong(p, q) !== Infinity) return false; // (exact: nothing, however narrow, slips through: a breakwater, a pier)
   const n = Math.max(1, Math.ceil(L / 10));
   let d0 = NaN;
   for (let k = 1; k <= n; k++) {
@@ -110,7 +118,7 @@ export function routeLeg(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, ma
   while (!r.done) r = g.next();
   return r.value;
 }
-/** routeLeg a little at a time: it yields every 16 points of a front and after each front, so a plan can be worked out a slice a frame
+/** routeLeg a little at a time: it yields every 4 points of a front and after each front, so a plan can be worked out a slice a frame
  * (sim/navigator.ts passageLive) instead of holding a frame up for a second or two. */
 /** `limit`: an arrival (minute since epoch UTC) another plan already makes. A point that couldn't get there sooner even
  * at OPTIMISTIC over the ground is dropped, and the search ends there: it can't lose a quicker route. */
@@ -121,7 +129,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   const legU = unit(sub(b, a)), w0 = windOn(o, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, t0);
   const off0 = Math.abs(wrap(brg(legU.x, legU.y) - w0.from));
   const kind: LegKind = off0 < beatAngle(w0.kt) + 3 ? 'beat' : off0 > 150 ? 'run' : 'reach';
-  if (dist(a, b) <= arrive) return finish(0, true);
+  if (dist(a, b) <= arrive) return yield* finish(0, true);
   // (which point of each sector of the front is kept: the one farthest out from the start and nearest the mark. Farthest
   // from the start alone, the front lost the boats working round a point of land toward the mark behind it (Raccoon
   // Strait from the Cityfront: never got there); nearest the mark alone, it kept boats that had come no way and turned
@@ -142,7 +150,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     const sectors = new Map<number, Node>(); // sector → the point kept there (only those are stored: the rest are many)
     let worked = 0;
     for (const i of front) {
-      if (++worked % 16 === 0) yield; // (a front can take tens of ms cold: the page's slices stop between its points)
+      if (++worked % 4 === 0) yield; // (a front can take tens of ms cold: the page's slices stop between its points)
       const n = nodes[i], w = windOn(o, n.p, n.t), c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
       // (becalmed here, under 0.5 kt on the water: she can't sail, but the tide still carries her. The front keeps her,
       // drifting the minute on the same board with no turn, so a hole in the breeze doesn't delete the routes through it:
@@ -189,26 +197,26 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     }
     if (best >= 0) break;
     front = []; for (const nd of sectors.values()) { front.push(nodes.length); nodes.push(nd); }
-    if (!front.length) return bound ? finish(bound.k, true, undefined, bound.r) : finish(0, false, 'land');
+    if (!front.length) return yield* (bound ? finish(bound.k, true, undefined, bound.r) : finish(0, false, 'land'));
     let k = front[0]; for (const i of front) if (dist(nodes[i].p, b) < dist(nodes[k].p, b)) k = i;
     const dk = dist(nodes[k].p, b);
     if (dk < nearD - 10) { nearD = dk; nearStep = step; }
     else if ((step - nearStep) * STEP_MIN >= STALL) {
-      const n = nodes[k], r = sailLeg(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
+      const n = nodes[k], r = yield* sailLegSteps(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
       if (r.ok && (!bound || n.t + r.minutes < bound.t)) bound = { k, r, t: n.t + r.minutes };
       nearStep = step; // (and tries again after another stall, from wherever the front has got to)
     }
     yield;
   }
-  if (best >= 0 && (!bound || nodes[best].t <= bound.t)) return finish(best, true);
-  if (bound) return finish(bound.k, true, undefined, bound.r);
+  if (best >= 0 && (!bound || nodes[best].t <= bound.t)) return yield* finish(best, true);
+  if (bound) return yield* finish(bound.k, true, undefined, bound.r);
   if (best < 0) { // (out of time: the front's point nearest the mark)
     let k = front[0]; for (const i of front) if (dist(nodes[i].p, b) < dist(nodes[k].p, b)) k = i;
-    return finish(k, false, 'time');
+    return yield* finish(k, false, 'time');
   }
-  return finish(best, true);
+  return yield* finish(best, true);
 
-  function finish(end: number, ok: boolean, why?: 'land' | 'time', rescue?: SailResult): SailResult {
+  function* finish(end: number, ok: boolean, why?: 'land' | 'time', rescue?: SailResult): Generator<void, SailResult, void> {
     let chain: Node[] = []; for (let i = end; i >= 0; i = nodes[i].parent) chain.unshift(nodes[i]);
     // the last board into the mark sailed exactly (routing.ts sailLeg: her beat or run angle on the layline the current
     // makes): the router's headings are 5° apart, and the board she lays the mark on is the one the chart's laylines draw
@@ -220,7 +228,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     const turnsAt = chain.map((n, k) => n.turn ? k : -1).filter(k => k > 0).slice(-3);
     if (ok && !rescue) find: for (const li of turnsAt) for (const plan of ['middle', 'left', 'right'] as const) {
       // (left starts on starboard, right on port, looking up the wind: whichever lays it on one board)
-      const from = chain[li - 1], r = sailLeg(o, from.p, b, from.t, plan, undefined, arrive, 90);
+      const from = chain[li - 1], r = yield* sailLegSteps(o, from.p, b, from.t, plan, undefined, arrive, 90);
       if (r.ok && r.turns.length <= 1 && from.t + r.minutes <= endT + slack) { tail = r; tailKind = chain[li].turn as 'tack' | 'gybe'; chain = chain.slice(0, li); break find; }
     }
     // (a point every half step: the drawn track's points are no farther apart than a boat sails in 30 s)
