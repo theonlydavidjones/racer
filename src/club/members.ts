@@ -60,10 +60,12 @@ export function ensureMembers(s: Settings, ms: Member[]): boolean {
   if (!ms.some(m => m.id === YOU)) { ms.unshift({ id: YOU, name: 'You', roles: ['skipper', 'crew'], origin: 'yours', seed: seedOf(YOU), ...personOf(s.crew.helm) }); changed = true; }
   const boat = s.boats.find(b => b.id === s.boatId) ?? s.boat;
   if (boat && !boat.crewIds) {
-    // (your crew as members: the ones you have already, or, the first time, from the old settings; your crew beyond the
-    // count you'd chosen are still members, free for another day)
+    // (your crew as members: the ones seated on another of your boats, the crew you sail with; else the ones you have
+    // already, or, the first time, from the old settings; your crew beyond the count you'd chosen are still members, free
+    // for another day)
     const have = ms.filter(m => m.origin === 'yours' && m.id !== YOU).map(m => m.id);
-    const ids = have.length ? have.slice(0, 2) : s.crew.people.slice(0, 2).map(p => newMember(ms, p).id);
+    const sailed = s.boats.find(b => b !== boat && b.crewIds?.some(id => have.includes(id)))?.crewIds?.filter(id => have.includes(id));
+    const ids = sailed?.length ? sailed.slice(0, 2) : have.length ? have.slice(0, 2) : s.crew.people.slice(0, 2).map(p => newMember(ms, p).id);
     boat.crewIds = ids.slice(0, s.crew.n); changed = true;
   }
   return changed;
