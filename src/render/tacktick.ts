@@ -18,9 +18,9 @@ export const UNIT = { w: 0.164, h: 0.122, d: 0.058, tilt: 20 * Math.PI / 180, lc
  * a few times a second reads better in the sim. */
 const EVERY = 0.25;
 /** How far the unit stands above the cabin top (m): the owner (15 Nov 2026) couldn't read it over the hatch boards from
- * the helm, so its bracket sits on a teak riser block 6.5 cm (about 2.5 in) tall (boatMesh.ts builds the block, in the
- * boat's own teak; the owner wanted it wooden and sturdy, not a post). */
-export const RISE = 0.065;
+ * the helm, so its bracket sits on a teak riser block 5 cm (about 2 in) tall, no bigger round than its foot (boatMesh.ts builds the block, in the
+ * boat's own teak; the owner wanted it wooden, not a post, and then lower and slimmer). */
+export const RISE = 0.05;
 
 export interface Instrument { grp: THREE.Group; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; next: number; shown: string }
 
