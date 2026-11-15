@@ -1,4 +1,4 @@
-import { KT, V, brg, clamp, dot, type Vec } from '../core/math';
+import { KT, V, brg, clamp, dot, type Vec, hypot } from '../core/math';
 import { CURRENTS, currentAt, currentVector, windOnWater } from '../environment/current';
 import type { SeaHere } from '../environment/sea';
 import { CurrentField, events, sfClock, type TideStation } from '../environment/tide';
@@ -108,7 +108,7 @@ export function tideWord(kt: number): string { return Math.abs(kt) < 0.15 ? 'sla
 
 /** The nearest NOAA current station to a point. */
 export function nearestStation(st: TideStation[], p: Vec): TideStation {
-  return st.reduce((a, s) => (Math.hypot(s.p.x - p.x, s.p.y - p.y) < Math.hypot(a.p.x - p.x, a.p.y - p.y) ? s : a));
+  return st.reduce((a, s) => (hypot(s.p.x - p.x, s.p.y - p.y) < hypot(a.p.x - p.x, a.p.y - p.y) ? s : a));
 }
 
 export interface TideEvent { t: number; kind: 'max flood' | 'slack before ebb' | 'max ebb' | 'slack before flood'; kt: number }
@@ -125,7 +125,7 @@ export function stationEvents(s: TideStation, from: number, to: number): TideEve
 
 /** The current at p as words: "ebb 1.4 kt setting 275°", relative to the flood/ebb of the nearest station. */
 export function currentWords(c: Vec, floodDir: number | null): string {
-  const kt = Math.hypot(c.x, c.y) / KT;
+  const kt = hypot(c.x, c.y) / KT;
   if (kt < 0.15) return 'slack';
   const set = Math.round(brg(c.x, c.y));
   const kind = floodDir == null ? '' : dot(c, V(floodDir)) >= 0 ? 'flood ' : 'ebb ';

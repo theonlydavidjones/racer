@@ -1,6 +1,6 @@
 import { harborNear, hitsHarbor, hitsWall } from '../geo/marina';
 import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage';
-import { KT, V, clamp, wrap, n360, D2R, type Vec } from '../core/math';
+import { KT, V, clamp, wrap, n360, D2R, type Vec, hypot } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
@@ -888,7 +888,7 @@ export function outward(p: Vec): Vec {
   for (const r of [1, 2, 4]) { // (further out if she's deeper in than a metre)
     let x = 0, y = 0;
     for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, q = { x: p.x + r * Math.sin(a), y: p.y + r * Math.cos(a) }; if (!onLand(q)) { x += Math.sin(a); y += Math.cos(a); } }
-    const l = Math.hypot(x, y); if (l > 1e-6) return { x: x / l, y: y / l };
+    const l = hypot(x, y); if (l > 1e-6) return { x: x / l, y: y / l };
   }
   return { x: 0, y: 0 };
 }
@@ -973,7 +973,7 @@ function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, hit: Ve
   // SAME_SPELL s. Fended a hand's breadth off with next to no wind she takes longer than PINNED_GAP to drift back, and
   // it's the same spell. And told again at once if it has got worse: touching gently, then set on them, then damage)
   const told = pileTold.get(b) ?? -99, at = pileAt.get(b), kind = level === 'damage' ? 2 : closing >= PIN_V ? 1 : 0, worse = !!at && kind > at.kind && t - told < SAME_SPELL;
-  const still = !!at && t - told < SAME_SPELL && Math.hypot(b.x - at.x, b.y - at.y) < 2 && !worse;
+  const still = !!at && t - told < SAME_SPELL && hypot(b.x - at.x, b.y - at.y) < 2 && !worse;
   const tell = b.isUser && (t - told > PINNED_GAP || worse);
   // (sliding along them untold, the worst she's been told of this spell is kept: not told again every couple of meters)
   pileTold.set(b, t); if (!still) pileAt.set(b, { x: b.x, y: b.y, kind: tell || !at || t - told >= SAME_SPELL ? kind : Math.max(kind, at.kind) });
@@ -1438,7 +1438,7 @@ export function apparent(from: number, windKt: number, h: number, v: number, swa
   const vt = windKt * KT, rel = wrap(from - h) * D2R;
   const along = vt * Math.cos(rel) + v, across = vt * Math.sin(rel) * Math.cos(heelDeg * D2R) + sway;
   const arel = Math.atan2(across, along) / D2R;
-  return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
+  return { aws: hypot(along, across), arel, awa: Math.abs(arel) };
 }
 
 /**
@@ -1458,7 +1458,7 @@ function windAtZ(from: number, windKt: number, h: number, v: number, g: number, 
   const vt = windKt * KT * g, rel = wrap(from - h) * D2R, c = Math.cos(heelDeg * D2R);
   const along = vt * Math.cos(rel) + v, across = vt * Math.sin(rel) * c + sway; // (+: air coming from ahead / from starboard)
   const arel = Math.atan2(across, along) / D2R;
-  return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
+  return { aws: hypot(along, across), arel, awa: Math.abs(arel) };
 }
 /**
  * The wind she feels at `z` m above the water (the midair wind indicator, render/windLadder.ts):

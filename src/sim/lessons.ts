@@ -1,5 +1,5 @@
 import type { Boat } from '../boat/boat';
-import { KT, V, wrap, type Vec } from '../core/math';
+import { KT, V, wrap, type Vec, hypot } from '../core/math';
 import { beatFor } from '../boat/seaway';
 import { DrillTracker } from './drill';
 import { byHand } from '../boat/physics';
@@ -203,7 +203,7 @@ export class LessonTracker {
 
   private tiller(b: Boat, dt: number): void {
     if (this.step === 0) {
-      const d = this.buoy ? Math.hypot(b.x - this.buoy.x, b.y - this.buoy.y) : 0;
+      const d = this.buoy ? hypot(b.x - this.buoy.x, b.y - this.buoy.y) : 0;
       this.progress = 0;
       if (d <= LESSON_MARKS.buoyM) {
         // at the buoy: the course to hold is the one she's on, to the nearest 5° (a compass course a helm can read)
@@ -244,7 +244,7 @@ export class LessonTracker {
     // (her speed through the water either way: going astern counts as moving, not stopped)
     const M = LESSON_MARKS, kt = Math.abs(b.v - (b.astern ?? 0)) / KT, twa = b.twa;
     if (this.step === 0) {
-      const d = this.buoy ? Math.hypot(b.x - this.buoy.x, b.y - this.buoy.y) : 0;
+      const d = this.buoy ? hypot(b.x - this.buoy.x, b.y - this.buoy.y) : 0;
       if (this.hold(d <= M.stopM && kt < M.stopKt, dt, M.stopS)) { this.step = 1; this.cue = 'Get going again: trim in'; }
     } else if (this.step === 1) {
       if (this.hold(kt > M.goKt, dt, M.stopS)) { this.step = 2; this.cue = 'Turn head to wind and stop: you\'re in irons'; }
@@ -331,7 +331,7 @@ export class LessonTracker {
     if (this.step === 1) { if (!b.lightsOff) { this.step = 2; this.cue = 'Hoist both sails and push off'; } return; }
     if (this.step !== 2) return;
     const up = !b.rig || (b.rig.mainUp && b.rig.jibUp && b.rig.main > 0.95 && b.rig.jib > 0.95);
-    if (up && !b.docked && this.slip && Math.hypot(b.x - this.slip.x, b.y - this.slip.y) > 30) this.passed = true;
+    if (up && !b.docked && this.slip && hypot(b.x - this.slip.x, b.y - this.slip.y) > 30) this.passed = true;
   }
 
   /** Home to the slip: from her slip out of the harbor, and back in, made fast (world.ts intoSlip: stopped, bow in). */

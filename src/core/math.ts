@@ -20,24 +20,45 @@ export const brg = (dx: number, dy: number): number => n360(Math.atan2(dx, dy) /
 export const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 export const dot = (a: Vec, b: Vec): number => a.x * b.x + a.y * b.y;
 export const cross = (a: Vec, b: Vec): number => a.x * b.y - a.y * b.x;
-export const unit = (v: Vec): Vec => { const l = Math.hypot(v.x, v.y) || 1; return { x: v.x / l, y: v.y / l }; };
+/**
+ * Math.hypot for two numbers, as V8 works it out (its MathHypot builtin: NaN and Infinity first, then the squares of
+ * each over the larger magnitude summed with Kahan's compensation, the root times it back), in the same operations in
+ * the same order, so the same result to the last bit (checked against Math.hypot on 2·10⁷ random pairs and the edge
+ * cases: ±0, subnormals, the largest doubles, ±Infinity, NaN). The builtin allocates a scratch array and a boxed result
+ * every call, a couple of thousand times a step; this allocates nothing, and inlines (docs/CAPACITY.md §8a).
+ */
+export function hypot(x: number, y: number): number {
+  const ax = Math.abs(x), ay = Math.abs(y);
+  if (x !== x || y !== y) return ax === Infinity || ay === Infinity ? Infinity : NaN;
+  const max = ax > ay ? ax : ay;
+  if (max === Infinity) return Infinity;
+  if (max === 0) return 0;
+  let sum = 0, comp = 0;
+  let n = ax / max, summand = n * n - comp, pre = sum + summand; comp = (pre - sum) - summand; sum = pre;
+  n = ay / max; summand = n * n - comp; pre = sum + summand; sum = pre;
+  return Math.sqrt(sum) * max;
+}
+export const unit = (v: Vec): Vec => { const l = hypot(v.x, v.y) || 1; return { x: v.x / l, y: v.y / l }; };
 export const sub = (a: Vec, b: Vec): Vec => ({ x: a.x - b.x, y: a.y - b.y });
-export const dist = (a: Vec, b: Vec): number => Math.hypot(a.x - b.x, a.y - b.y);
+export const dist = (a: Vec, b: Vec): number => hypot(a.x - b.x, a.y - b.y);
 
 export function inPoly(p: Vec, poly: Vec[]): boolean {
+  // (p's coordinates read once: p comes as many kinds of object (a boat, her bow, a plain point), and V8 hands each such
+  // read of a fractional number back boxed, an allocation, so a read per vertex was one too. The same comparisons)
+  const px = p.x, py = p.y;
   let c = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const a = poly[i], b = poly[j];
-    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c;
+    if ((a.y > py) !== (b.y > py) && px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x) c = !c;
   }
   return c;
 }
 
 /** Distance from point p to segment ab. */
 export function segPt(p: Vec, a: Vec, b: Vec): number {
-  const abx = b.x - a.x, aby = b.y - a.y;
-  const t = clamp(((p.x - a.x) * abx + (p.y - a.y) * aby) / (abx * abx + aby * aby || 1), 0, 1);
-  return Math.hypot(p.x - a.x - abx * t, p.y - a.y - aby * t);
+  const px = p.x, py = p.y, ax = a.x, ay = a.y, abx = b.x - ax, aby = b.y - ay; // (each read once: inPoly)
+  const t = clamp(((px - ax) * abx + (py - ay) * aby) / (abx * abx + aby * aby || 1), 0, 1);
+  return hypot(px - ax - abx * t, py - ay - aby * t);
 }
 
 /** True if segments p1p2 and q1q2 properly intersect. */
@@ -55,4 +76,4 @@ export function markReach(mk: { p: Vec; reach?: number[] }, q: Vec): number {
   const b = (Math.atan2(q.x - mk.p.x, q.y - mk.p.y) * 180 / Math.PI + 360) % 360, i = Math.floor(b / 10) % 36, f = b / 10 - Math.floor(b / 10);
   return mk.reach[i] * (1 - f) + mk.reach[(i + 1) % 36] * f;
 }
-export const markDist = (q: Vec, mk: { p: Vec; reach?: number[] }): number => Math.max(0, Math.hypot(q.x - mk.p.x, q.y - mk.p.y) - markReach(mk, q));
+export const markDist = (q: Vec, mk: { p: Vec; reach?: number[] }): number => Math.max(0, hypot(q.x - mk.p.x, q.y - mk.p.y) - markReach(mk, q));

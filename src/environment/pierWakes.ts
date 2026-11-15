@@ -1,4 +1,4 @@
-import { V, clamp, type Vec } from '../core/math';
+import { V, clamp, type Vec, hypot } from '../core/math';
 import { PIERS, type Pier } from '../geo/shore';
 import { WindSum, bluffDeficit } from './shadows';
 
@@ -117,7 +117,7 @@ function wakesFor(flows: Vec[]): typeof wakeList {
   if (flows === wakeFlows) return wakeList;
   wakeFlows = flows; wakeList = [];
   for (let i = 0; i < WAKE_PIERS.length; i++) {
-    const { P, c } = WAKE_PIERS[i], f = flows[i], U = Math.hypot(f.x, f.y);
+    const { P, c } = WAKE_PIERS[i], f = flows[i], U = hypot(f.x, f.y);
     if (U < 0.02) continue;
     const e = { x: f.x / U, y: f.y / U }, { W, back } = extent(P, c, e);
     wakeList.push({ P, c, U, e, W, back });
