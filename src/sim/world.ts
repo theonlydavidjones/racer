@@ -43,7 +43,7 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
-import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, harborRoute, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
@@ -1301,7 +1301,7 @@ export class World {
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
-        pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
+        pilotStep(b, this.pilot, this.arrivedT == null ? (this.pilot.mode === 'nav' ? this.navTarget(b) : this.dest?.p ?? null) : null, this.t, dt); // (the way in worked out only on Nav: its harbor's flood is a third of a second, once)
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
@@ -2460,6 +2460,7 @@ export class World {
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
     this.retire();
     this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
+    this.homeTurn = -1; // (the way in from the harbor's mouth, from its start)
     this.arrivedT = null;
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
     this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
@@ -2536,6 +2537,26 @@ export class World {
     this.emit({ type: 'toast', msg: `Conditions changed: ${Math.round(this.wind.kt)} kt from ${String(Math.round(this.wind.from) % 360).padStart(3, '0')}°, ${this.cur.label.toLowerCase()}, ${sea}.${laid}`, ms: laid ? 7000 : 4500 });
   }
 
+  /** Where on the navigator's way home she's on: the next turn of geo/marina.ts harborRoute's path (-1: not in yet). */
+  private homeTurn = -1;
+  /**
+   * What the pilot steers for, on Nav: the destination; or, bound for her slip, the harbor's mouth (geo/marina.ts
+   * harborRoute's entry: the Bay's router, sim/routing.ts, takes her there), then each turn of the way in along the
+   * fairways, clear of the docks and the moored boats, to the fairway off her slip, where the pilot goes to standby and
+   * she's yours to bring in (as a real tiller pilot can't).
+   */
+  private navTarget(b: Boat): Vec | null {
+    const d = this.dest; if (!d) return null;
+    const slip = d.key === 'slip' ? this.homeSlip : null, r = slip ? harborRoute(slip) : null;
+    if (!slip || !r) return d.p;
+    if (this.homeTurn < 0) { if (dist(b, r.entry) < 15) this.homeTurn = 1; else return r.entry; }
+    while (this.homeTurn < r.path.length && dist(b, r.path[this.homeTurn]) < 6) this.homeTurn++;
+    if (this.homeTurn >= r.path.length) {
+      if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `Off her slip: the pilot's on standby. Bring her in by hand.`, ms: 5000 }); }
+      return r.approach;
+    }
+    return r.path[this.homeTurn];
+  }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
     const d = this.dest, u = this.user;
