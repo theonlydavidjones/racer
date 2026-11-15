@@ -1228,6 +1228,12 @@ function puffEase(b: Boat, up: boolean, tws: number, dt: number, yours: boolean,
   const was = b.gustDeg ?? 0;
   if (!up || yours) { b.gustSeen = 0; b.gust = 0; return (b.gustDeg = 0); }
   const c = b.crew;
+  // (the breeze she's set up for: her 20 s wind, but through a long puff no faster than the depowering takes it up,
+  // about a minute, PUFF_HAND: they hand the puff over to it, not drop it before it's there)
+  const slow = b.twsSlow ?? tws, ref = b.gustRef = b.gustSeen ? Math.min(slow, (b.gustRef ?? slow) + (tws - (b.gustRef ?? slow)) * Math.min(1, dt / PUFF_HAND)) : slow;
+  const size = clamp((tws - ref - PUFF_RIDE) / PUFF_SPAN, 0, 1);
+  // (no puff and nothing let go, nearly every moment: nothing to do, the rest the same as working it through)
+  if (size === 0 && was === 0) { b.gustSeen = 0; b.gustPeak = 0; b.gust = 0; return (b.gustDeg = 0); }
   // (the trimmer's reaction time: whoever has the main in the crew's layout now, worked out once for it)
   let react = 1;
   if (c) {
@@ -1235,10 +1241,6 @@ function puffEase(b: Boat, up: boolean, tws: number, dt: number, yours: boolean,
     if (r && r.fwd === fwd) react = r.t;
     else { const p = allAboard(c.spec)[mainHand(c.spec.crew.length, c.spec, fwd)]; react = p ? reactTime(p) : 1; REACT.set(c, { fwd, t: react }); }
   }
-  // (the breeze she's set up for: her 20 s wind, but through a long puff no faster than the depowering takes it up,
-  // about a minute, PUFF_HAND: they hand the puff over to it, not drop it before it's there)
-  const slow = b.twsSlow ?? tws, ref = b.gustRef = b.gustSeen ? Math.min(slow, (b.gustRef ?? slow) + (tws - (b.gustRef ?? slow)) * Math.min(1, dt / PUFF_HAND)) : slow;
-  const size = clamp((tws - ref - PUFF_RIDE) / PUFF_SPAN, 0, 1);
   // (her helm before it, what she carries in this breeze: they ease to keep her near that, not some fixed figure, and
   // not less than PUFF_HELM_MIN: a light-air puff's couple of degrees is power, not a problem)
   if (size > 0 && !b.gustSeen) b.gustHelm = b.helmNeed ?? 0;
