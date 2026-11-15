@@ -143,6 +143,32 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   **Now, first in the pass: the helm's travel and response** (owner, 15 November; accuracy; now; 3–5 h): "the turning
+   radius is too slow and not wide enough when I'm tacking ... short tacks in the marina. I need to be able to push the
+   tiller about 50% wider, and I would expect the tiller to be much more reactive ... There should be no delay in the
+   turn of the boat and the push of the tiller ... exactly in line." The owner's answers:
+   - It's the mouse on the tiller, and the keys too.
+   - The tiller doesn't go far enough: "the tiller handle should be pushable to where it's almost flush to the transom;
+     the entire radius of the tiller handle is maybe 150º or so."
+   - The delay is from tiller to boat.
+   - Responsiveness shouldn't depend on her speed, as long as she's moving.
+
+   Today:
+   - The rudder stops at ±30° (FULL_RUDDER, src/boat/balance.ts:99), a 60° arc against the owner's ~150°.
+   - The mouse span is TILLER_SPAN 0.35 of the window (app.ts:450).
+   - The turn radius at full helm is 9 m, an estimate (dynamics.ts:46), capped at 22°/s.
+   - The turn reaches the helm's rate through yawLag (physics.ts:544), the delay the owner feels.
+
+   The fix:
+   - The tiller swings about ±75°. Past about 35–45° the rudder stalls and brakes more than it turns, as a real one does,
+     so the extra travel is for short-tacking, sculling and braking, not a free tighter circle.
+   - The yaw response is tightened until the turn visibly starts with the tiller. Test it on the water at slow speeds
+     in a fairway.
+
+   The researcher (15 November) found no source for the rudder's stop, the tiller's swing, a Folkboat turning circle or
+   a measured yaw time constant. The class rules fix the rudder's outline (about 490 mm wide, NFIA 2025–2028 §5) but not
+   its angle. So the owner's own boat is the reference: their ~150° tiller arc and how she answers. Physics-reviewer and
+   perf-pair as usual.
    Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder (in PR #289; sternway in PR #317). Sculling comes
    from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
