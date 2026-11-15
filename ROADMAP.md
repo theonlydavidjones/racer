@@ -233,7 +233,7 @@ What's planned, roughly in order. Done work is described in the README.
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
      from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. Then the planner allows for the
-     lee's edge, the wind to leeward of her line (Horseshoe Bay A27 in a 20 kt easterly: tests/pushoff-astern's it.fails).
+     lee's edge, the wind to leeward of her line (Horseshoe Bay A27 in a 20 kt easterly: tests/pushoff-astern's it.fails; and Corinthian B16 in a 20 kt northerly, in the land's lee under Tiburon's ridge, held apart the same way with the lee's seams fixed).
    - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
      the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
      literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled

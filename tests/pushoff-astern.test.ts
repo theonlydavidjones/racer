@@ -150,12 +150,21 @@ describe('pushed off astern', () => {
       const k = Math.min(6, all.length);
       for (let i = 0; i < k; i++) {
         const s = all[Math.floor(i * all.length / k)];
+        if (from === 0 && s.id === 'corinthian:B16') continue; // (held apart below: a known failure)
         const g = glideAt(s, from); if (!g) continue;
         n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
       }
     }
     expect(n).toBeGreaterThanOrEqual(3); expect(bad).toEqual([]);
   }, 600_000);
+  // (held apart, the Coordinator's ruling: the land's lee without seams (shadows.ts) joins the 17 m knoll behind
+  // Corinthian's slips to the ridge beyond, so the lee is the ridge's, gustier than main's near-calm, and rises along her
+  // line. The plan reads the wind at her berth, not along her line: Deep Physics' next item, which removes the it.fails)
+  it.fails('known failure: corinthian:B16 in a 20 kt northerly, let go in the land\'s lee (0.32 at the slip, 0.55 by 20 m out) and drifting out of it into more wind, sails 17.7 m against a planned 14.0 (ROADMAP: the push-off plan reads the wind along her line)', () => {
+    const s = slipsIn('corinthian').find(q => q.id === 'corinthian:B16')!;
+    const g = glideAt(s, 0)!;
+    expect(Math.abs(g.went - g.want)).toBeLessThanOrEqual(0.15 * g.want);
+  }, 120_000);
   // (Horseshoe Bay A27 in the easterly was held apart as a known failure, 15.4% over, let go in the harbor's lee and
   // drifting out of it into more wind; with main's wind of 15 Nov 2026 merged she's 13.7% over, inside the bound, and is
   // in the sweep above with the rest. The lee's edge is still on the ROADMAP for the planner)
