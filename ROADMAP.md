@@ -1391,6 +1391,8 @@ club's permission covers it.
 
 Also asked for:
 
+- **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
+- **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
 - **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
   - **The boom's place on a beat** (Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's

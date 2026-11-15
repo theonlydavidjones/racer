@@ -12,12 +12,26 @@ export class Labels {
   private markTags: MarkTag[] = [];
   /** Coming in to a berth: the one-word cue by your boat (Closer, Too fast, Step, Made fast, Bump: sim/world.ts mooringStep). */
   private cueEl: HTMLDivElement | null = null;
+  /** The helm's call by her (the owner, 15 Nov 2026: "some kind of confirmation when I call jibe ho"): "Ready to jibe" …
+   *  "Jibe-ho!" (or "Ready about" … "Tacking!") for as long as the crew turn her, and a moment after. */
+  private callEl: HTMLDivElement | null = null;
+  private call: { kind: 'jibe' | 'tack'; t0: number; doneT: number | null } | null = null;
+  /** The one-line hint, at the moment the call is useful (a run: jibe-ho; close-hauled: tack), until it's been used a few
+   *  times: `hint` gives the key's name, and null once learned. */
+  private hintEl: HTMLDivElement | null = null;
+  private hintSince = 0; private hintKind: 'jibe' | 'tack' | null = null;
+  hint: (() => string | null) | null = null;
   private tmp = new THREE.Vector3();
   constructor(private root: HTMLElement) {}
+  /** The helm's called the turn (app.ts, its key): the call shows by her. */
+  called(kind: 'jibe' | 'tack', t: number): void { this.call = { kind, t0: t, doneT: null }; }
 
   build(w: SimView): void {
     this.root.innerHTML = ''; this.tagEls = [];
     this.cueEl = document.createElement('div'); this.cueEl.className = 'tag cue'; this.cueEl.hidden = true; this.root.appendChild(this.cueEl);
+    this.callEl = document.createElement('div'); this.callEl.className = 'tag cue call'; this.callEl.hidden = true; this.root.appendChild(this.callEl);
+    this.hintEl = document.createElement('div'); this.hintEl.className = 'tag cue khint'; this.hintEl.hidden = true; this.root.appendChild(this.hintEl);
+    this.call = null;
     for (const b of w.boats) {
       if (b.isUser) { this.tagEls.push(null); continue; }
       const d = document.createElement('div'); d.className = 'tag';
@@ -67,6 +81,23 @@ export class Labels {
     // the cue while it's news (a few seconds), or for as long as it holds while the hand waits at the shrouds
     const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
     if (c) { if (!word) { if (!c.hidden) c.hidden = true; } else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
+    // the helm's call: the warning first (a second and a half: the crew to their places), then the order, held while she
+    // turns (her turn target set: sim/world.ts callTurn, boat/physics.ts) and a second and a half after
+    const k = this.call, ce = this.callEl;
+    if (k && w.t < k.t0 - 1) this.call = null; // (a new race: the clock went back)
+    let say = '';
+    if (k && this.call) {
+      const turning = u.turnTarget != null; if (!turning && k.doneT == null && w.t - k.t0 > 1.5) k.doneT = w.t;
+      if (k.doneT != null && w.t - k.doneT > 1.5) this.call = null;
+      else say = w.t - k.t0 < 1.5 ? (k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
+    }
+    if (ce) { if (!say || word) { if (!ce.hidden) ce.hidden = true; } else { this.place(ce, camera, u.x, u.y, 3.2); if (ce.textContent !== say) ce.textContent = say; } }
+    // the hint: on a run (from 150° off the wind) or close-hauled (to 50°), held two seconds there, she not turning
+    const he = this.hintEl, key = this.hint?.() ?? null, twa = Math.abs(u.twa ?? 90);
+    const kind: 'jibe' | 'tack' | null = !key || say || word || u.turnTarget != null || !w.running || (u.v ?? 0) < 0.8 ? null : twa >= 150 ? 'jibe' : twa <= 50 ? 'tack' : null;
+    if (kind !== this.hintKind) { this.hintKind = kind; this.hintSince = w.t; }
+    const show = kind && w.t - this.hintSince > 2 ? `${key} · ${kind === 'jibe' ? 'jibe-ho' : 'tack'}` : '';
+    if (he) { if (!show) { if (!he.hidden) he.hidden = true; } else { this.place(he, camera, u.x, u.y, 1.2); if (he.textContent !== show) he.textContent = show; } }
   }
 }
 

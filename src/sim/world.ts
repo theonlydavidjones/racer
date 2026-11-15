@@ -2014,7 +2014,7 @@ export class World {
    * water's drag) and answers the tiller.
    */
   /**
-   * "Ready about… hard alee" or "Ready to jibe… jibe-ho": the helm calls the turn and her crew work it. Close-hauled or
+   * "Ready about… tacking" or "Ready to jibe… jibe-ho": the helm calls the turn and her crew work it. Close-hauled or
    * reaching she's taken through the wind onto the other tack; off the wind, round her stern onto the other jibe, her
    * crew handing the main across (physics.ts tackTarget, gybeMeant). By the lee already, the main comes across and her
    * heading's held. Not at the dock, hove to, or with the tiller lashed.
