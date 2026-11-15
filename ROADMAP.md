@@ -484,6 +484,10 @@ What's planned, roughly in order. Done work is described in the README.
      gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
      like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
      shadows, or a shadow-map artifact. Find what casts them and stop it; check both sides on both tacks.
+   - **The flow view keeps the boat in the middle of the screen** (owner, 15 November; not urgent; polish; <1 h): "when
+     I engage wind-over-sails, don't bump the boat to the left. keep her center screen." Opening the flow view shouldn't
+     move the camera or shift the boat aside to make room. The flow panel sits over the scene, and the boat stays where
+     she was.
    - **The flow view with one sail down** (owner, 15 November; not urgent; accuracy; 1–2 h): "check that the wind over
      sails map is accounting for when I'm sailing on just jib or just main." A first look found nothing in
      ui/sailFlow.ts or ui/flowPanel.ts that checks whether each sail is hoisted. With one sail down, the view should
