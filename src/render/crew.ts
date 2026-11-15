@@ -603,7 +603,9 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // the cabin-top lines at its after end: kneeling on the sole at the forward end of the cockpit,
     // facing forward, hands on the lines at their jammers on the cabin top's after edge, either side of the hatch (Boat Detail: |x| 0.37–0.50)
     const zk = COCK0 + 0.55, px = s * Math.min(ax, benchEdge(zk) - 0.14);
-    { const p = kneel(px, zk, 0, [V(-0.43, cabinTopAt(uAtZ(COCK0 - 0.08), 0.43) + 0.05, COCK0 - 0.08), V(0.43, cabinTopAt(uAtZ(COCK0 - 0.08), 0.43) + 0.05, COCK0 - 0.08)], k); p.pitch = -0.25; return p; }
+    // (the hands on the lines just in from the top's after edge and a little above it: kneeling on the sole, the shoulders
+    // are below the cabin top, and 8 cm in, a forearm still coming up from the turn after a tack crossed its edge, 21 kt)
+    { const zj = COCK0 - 0.03; const p = kneel(px, zk, 0, [V(-0.43, cabinTopAt(uAtZ(zj), 0.43) + 0.08, zj), V(0.43, cabinTopAt(uAtZ(zj), 0.43) + 0.08, zj)], k); p.pitch = -0.25; return p; }
   }
   let p: PoseT;
   if (onDeckHere) p = onDeck(s, zc, lean, k);
