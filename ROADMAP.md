@@ -927,7 +927,7 @@ as it is.
 - The rules trainer: "Sail it yourself". A World Sailing Case laid out on the water, you helm the boat it's about; 23
   Cases sailed and taught.
 - Wrecks, built from Marinas' design: every contact graded (boat/damage.ts); a hard blow, a ship, or being pinned in
-  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, and she's laid up for repairs.
+  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, laying up for repairs is off for now (the owner, 15 Nov 2026: "silly and punitive in its current state"; to come back to later; boat/spec.ts LAY_UP).
 - The season's flow as approved: Race → Season → the overview → Sail race N → its setup; the announced 2026–27 race days.
 - The drills' cues by the boat and guides on the water (8b and Training tools 3, as approved).
 - No on-screen tiller instructions outside the Learn to sail lessons.

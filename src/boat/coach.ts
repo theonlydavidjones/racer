@@ -389,7 +389,7 @@ function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boole
       return { text: s.awa > 110 ? 'Off the wind, the main goes out by the shroud.' : 'A main is trimmed right when its leech telltales stream aft.', tick: true };
     case 'jibsheet':
       if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'A jib is trimmed right when its windward luff telltales just lift.', tick: true };
-      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'On a broad reach, the jib goes out to its stop.', tick: true };
+      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'On a broad reach, the jib can\'t ease past the shrouds: it\'s as far out as it goes.', tick: true };
       return { text: s.awa > 115 ? 'Off the wind, the jib goes right out.' : 'A jib is trimmed right when all its luff telltales stream together, both sides.', tick: true };
     case 'traveller': {
       // (sailing practice: upwind in light air the car goes up to windward, the boom to the centerline on an eased sheet;
