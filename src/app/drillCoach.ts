@@ -30,7 +30,7 @@ export interface CoachView {
   drill?: { list: { scored: boolean; lostM: number; goodM: number; kind: 'tack' | 'gybe' }[] } | null;
   rounding?: { marks: { p: Pt }[]; leg?: number; list: { scored: boolean; lostM: number; goodM: number; kind: 'windward' | 'leeward'; provisional?: boolean }[] } | null;
   /** The start: its line, and the other boats (to find the clear stretch). */
-  start?: { pin: Pt; committee: Pt; others?: Pt[]; call?: 'pin' | 'committee' | null; read?: boolean } | null;
+  start?: { pin: Pt; committee: Pt; others?: Pt[]; call?: 'pin' | 'committee' | null; read?: boolean; names?: [string, string] } | null;
 }
 export interface CoachOut { spec: GuideSpec | null; key: string; wake: Pt[] | null; cue: Cue | null }
 
@@ -224,7 +224,7 @@ export class DrillCoach {
     // below it, for the player's first calls (L.read)
     const sq90 = n360(lineH + 90), sqUp = Math.cos((sq90 - u.ww.from) * D2R) >= 0 ? sq90 : n360(sq90 + 180); // (square to the line, toward the wind)
     const htw = Math.abs(wrap(u.h - u.ww.from)) < 10 && side < 0 && -side < 150 && w.t < 0;
-    if (L.read && htw) spec.read = { o: pos, bow: u.h, sq: sqUp };
+    if (L.read && htw) spec.read = { o: pos, bow: u.h, sq: sqUp, ends: [{ p: L.pin, name: L.names?.[0] ?? 'Pin', ring: true }, { p: L.committee, name: L.names?.[1] ?? 'Committee', ring: false }] };
     const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}${spec.read ? `:r${Math.round(u.h)}` : ''}`; // (the lane redrawn as she moves: about once a second)
     const left = -w.t;
     if (side > 1 && left > 0) return { spec, key, wake: null, cue: { word: 'Dip back', sub: `over the line · ${Math.round(left)} s` } };
