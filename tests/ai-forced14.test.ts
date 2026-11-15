@@ -13,8 +13,8 @@ import { cpa, hullGap } from '../src/rules';
 // Rule 14 between two AI boats: a port-tacker that makes a starboard boat swerve to avoid her hasn't kept clear (the
 // definition of Keep Clear, (a): the right-of-way boat "can sail her course with no need to take avoiding action"), so
 // the swerve is an incident as it is when your boat forces one (ai.ts, world.ts forced14). Only the swerve proper:
-// about to touch, close; not the starboard boat's wide early avoidance, a boat-length or two out, which the AI
-// port-tacker, already turning away, might yet have made unneeded.
+// within 10 m, the hulls (not their middles) about to touch had she held her course; not her early avoidance further
+// off, nor a close pass end on or side by side with water between the hulls.
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, current: 'slack', tideDate: '2026-11-14', traffic: 0, ...o });
 function put(w: World, b: Boat, at: { x: number; y: number }, x: number, y: number, h: number, v: number): void {
   const u = V(h), from = w.wind.from, rel = wrap(from - h);
@@ -35,6 +35,19 @@ function crossing(t: number, v = 3, userY = false) {
   if (userY) Y.isUser = true;
   return { w, B, Y };
 }
+/** B on starboard on a beam reach and Y on the reciprocal course (port), both at v, passing `off` m apart, centre to
+ * centre, in t seconds. */
+function passing(off: number, t = 1.0, v = 3) {
+  const w = new World(ss2 as unknown as CourseFile, settings({ fleet: 3 }), 1);
+  w.t = 300;
+  const [, B, Y] = w.boats, F = w.wind.from;
+  const at = { x: w.center.x - w.N.x * 300, y: w.center.y - w.N.y * 300 };
+  for (const b of w.boats) put(w, b, at, 5000, 5000, 0, 2);
+  const hS = n360(F - 100), u = V(hS), side = V(hS + 90);
+  put(w, B, at, 0, 0, hS, v);
+  put(w, Y, at, u.x * 2 * v * t + side.x * off, u.y * 2 * v * t + side.y * off, n360(hS + 180), v);
+  return { w, B, Y };
+}
 describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a foul (ai.ts forced14)', () => {
   it('about to touch, within 10 m: the starboard boat\'s swerve is put down to the port-tacker', () => {
     const { w, B, Y } = crossing(1.2, 4);
@@ -48,11 +61,12 @@ describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a 
     expect(Math.abs(wrap(B.desired - B.h)), 'she swerves').toBeGreaterThan(5);
     expect(B.forced14).toBe(Y.id);
   });
-  it('her wider, earlier avoidance, a couple of lengths out: she still keeps out of it, but no foul is called', () => {
-    const { w, B, Y } = crossing(2.4);
-    const cp = cpa(B, Y);
-    expect(cp.t).toBeGreaterThan(Math.min(1.5, yawLag(B.v)) + 1);
-    expect(cp.t).toBeLessThan(2.4 + Math.min(1.5, yawLag(B.v))); // (inside the rule 14 branch: she does avoid)
+  it('her earlier avoidance, more than 10 m off: she keeps out of it, but no foul is called', () => {
+    // (crossing close-hauled, any time this branch fires the hulls on their courses would meet: a Folkboat's bow is
+    // nearly 4 m ahead of her middle, so the bows are close long before the middles' tracks cross. What leaves out her
+    // early move is the distance: a length and a half off she's avoiding in good time, not forced to)
+    const { w, B, Y } = crossing(3.0, 3); const uP = V(Y.h); Y.x += uP.x * 1.5; Y.y += uP.y * 1.5;
+    expect(dist(B, Y)).toBeGreaterThan(10);
     aiThink(w, B, DT);
     expect(Math.abs(wrap(B.desired - B.h)), 'she avoids').toBeGreaterThan(5);
     expect(B.forced14).toBeNull();
@@ -60,8 +74,23 @@ describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a 
   it('your boat in the same place: the swerve she forces is still a foul, as before', () => {
     const { w, B, Y } = crossing(2.5, 3, true);
     expect(dist(B, Y)).toBeLessThan(10);
-    expect(cpa(B, Y).t).toBeGreaterThan(Math.min(1.5, yawLag(B.v)) + 1);
     aiThink(w, B, DT);
+    expect(B.forced14).toBe(Y.id);
+  });
+  it('passing end on, a couple of metres of water between the hulls: she may still take avoiding action, but no foul', () => {
+    // (4.2 m centre to centre is 2 m between the hulls, a Folkboat's beam 2.2 m: the port boat is keeping clear, Keep
+    // Clear (b), the starboard boat "can also change course in both directions without immediately making contact")
+    const { w, B, Y } = passing(4.2);
+    expect(w.rights(B, Y).kc).toBe(Y);
+    expect(cpa(B, Y).d).toBeLessThan(4.5);
+    aiThink(w, B, DT);
+    expect(B.forced14).toBeNull();
+  });
+  it('end on and the hulls would meet: the swerve is the port boat\'s foul', () => {
+    const { w, B, Y } = passing(1.0);
+    expect(w.rights(B, Y).kc).toBe(Y);
+    aiThink(w, B, DT);
+    expect(Math.abs(wrap(B.desired - B.h)), 'she swerves').toBeGreaterThan(5);
     expect(B.forced14).toBe(Y.id);
   });
 });
