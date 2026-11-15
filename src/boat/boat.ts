@@ -244,6 +244,8 @@ export interface Boat {
   gustSeen?: number;
   /** The breeze she's set up for, through a puff (kt): her 20 s wind, taken up no faster than the depowering does. */
   gustRef?: number;
+  /** The most she's been over-pressed in this puff (degrees of heel, a degree of helm as two): puffEase sizes its answer by it. */
+  gustPeak?: number;
   /** Her helm when the puff came (degrees): they ease to keep her near it. */
   gustHelm?: number;
   /** The boom angle they ease from: where it was when the puff hit. */
