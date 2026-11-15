@@ -395,7 +395,12 @@ What's planned, roughly in order. Done work is described in the README.
    then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
    favored end), sighting the line square to the wind, and the line's compass bearing against the wind's. The drill hides
    "favored" until the player commits to an end; the debrief scores the call; later attempts fade the help. A mock to
-   the owner before building.
+   the owner before building. (Built: the head-to-wind read on the water, the call in the start line's card, the call
+   scored first in the debrief, the read drawn for the first three calls; design/favored-end on design/learn-to-sail.)
+   Later (owner OK'd, not built):
+   - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
+     gap between them is the bias;
+   - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
 8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.

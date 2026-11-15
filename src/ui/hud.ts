@@ -82,6 +82,11 @@ export const northOnMap = (W: number) => -W * Math.PI / 180;
 export const insetRotation = (wd: { freeSail: boolean; C: { base: number } }) => wd.freeSail ? 0 : wd.C.base;
 
 export class Hud {
+  /** The start practice's favored-end call (8za; app.ts): 'ask' before the gun, where the card hides which end is
+   *  favored and asks which you think; `favCall` the end you've called, if any. */
+  favAsk: 'off' | 'ask' = 'off';
+  favCall: 'pin' | 'committee' | null = null;
+  private askKey = '';
   private acc = 0;
   mapZoom = false;
   /** What the inset shows, cruising: the water round her (the map), or the navigator's passage (her course to the
@@ -481,6 +486,21 @@ export class Hud {
       + `<circle cx="${X}" cy="${Y}" r="4" fill="${col}"/><path d="M${X} ${Y + 3 * dir} v${7 * dir}" stroke="${col}" stroke-width="2"/>`
       + `<path d="M${X - 3.5} ${Y + 7 * dir} l3.5 ${4 * dir} l3.5 ${-4 * dir}" fill="none" stroke="${col}" stroke-width="2"/>`;
   }
+  /** The card's "Which end?" row: the two ends in the sketch's own order (left first, looking up the course), the one
+   *  called lit. Written only when it changes, so a click lands. */
+  private askRow(w: SimView, on: boolean): void {
+    const row = $('ncAsk');
+    const pinLeft = on && dot(sub(w.pin, w.center), { x: -w.N.y, y: w.N.x }) > 0;
+    const key = on ? `${pinLeft}|${this.favCall}` : '';
+    if (key === this.askKey) return; this.askKey = key;
+    row.hidden = !on; if (!on) return;
+    const C = w.C, short = (s: string) => s.replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
+    const ends: ['pin' | 'committee', string][] = [['pin', short(C.pinLabel)], ['committee', short(C.committeeLabel)]];
+    if (!pinLeft) ends.reverse();
+    const [l, r] = row.querySelectorAll<HTMLButtonElement>('button');
+    l.dataset.end = ends[0][0]; l.textContent = `◀ ${ends[0][1]}`; l.setAttribute('aria-pressed', String(this.favCall === ends[0][0]));
+    r.dataset.end = ends[1][0]; r.textContent = `${ends[1][1]} ▶`; r.setAttribute('aria-pressed', String(this.favCall === ends[1][0]));
+  }
   /** Distance in the card's units: metres close in, nautical miles further off. */
   private range(m: number): [string, string] { return m < 0.2 * 1852 ? [m.toFixed(0), 'm'] : [(m / 1852).toFixed(m < 1852 * 10 ? 1 : 0), 'nm']; }
 
@@ -492,6 +512,7 @@ export class Hud {
    */
   private lineBox(w: SimView, u: Boat): void {
     const el = $('linebox'), C = w.C;
+    if (w.t >= 0 || u.finished) this.askRow(w, false);
     if (u.finished) { $('nextCard').hidden = true; return; }
     const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     if (w.cruising) { // (cruising, or retired from the race and heading home)
@@ -528,11 +549,13 @@ export class Hud {
       const d = w.lineD(bow(u)), uN = Math.sin(u.h * D2R) * w.N.x + Math.cos(u.h * D2R) * w.N.y;
       // the end closer to the wind on the water is favored
       const k = dot(sub(w.pin, w.committee), V(u.ww.from)) / w.lineLen, deg = Math.asin(clamp(Math.abs(k), 0, 1)) / D2R;
-      const favEnd: 0 | 1 | -1 = !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
+      const asking = this.favAsk === 'ask' && w.t < 0; // (start practice: the favored end yours to find, shown at the gun)
+      const favEnd: 0 | 1 | -1 = asking || !w.settings.aids || deg < 2 ? -1 : k > 0 ? 0 : 1;
       // (one short line on the card, the owner: no degrees; the end's name only)
       const endName = (k > 0 ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, '').split(' ').slice(0, 2).join(' ');
-      const fav = !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favored</span>`;
+      const fav = asking || !w.settings.aids ? '' : deg < 2 ? ' · <span class="fav">square line</span>' : ` · <span class="fav">${endName} end favored</span>`;
       const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
+      this.askRow(w, asking && d <= 0);
       if (d > 0) {
         this.card('ocs', 'Over early', d.toFixed(0), 'm', this.lineSketch(w, u, ends, favEnd, true, uN < 0));
         el.innerHTML = w.t < 0 ? `Over by ${d.toFixed(0)} m · get back below the line` : u.roundEnd ? 'I flag: back round an end of the line' : 'OCS · dip back below the line and start';
