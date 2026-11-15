@@ -11,8 +11,7 @@
  *   outboard motor at an angle of 180°" and shift to Forward.
  * - The 6 (tohatsu.com/marine/int/outboards/mfs6c_1.html; MFS4C/5C/6C owner's manual): "Gear Shift Forward - Neutral -
  *   Reverse", gear ratio 2.15 (28:13), 5,000–6,000 rpm, 25.6–27.1 kg by shaft and tank (26 here). Its
- *   standard propeller is 7.8 in across; the pitch here (7.0 in) is the manual's lower-pitch option, the plain motor's
- *   standard reading as 8.0 in in a table that didn't copy cleanly: to check.
+ *   standard propeller is 7.8 × 8 in (YACHT's test, below).
  * (Before: the 2.5 was down as 13 kg, the 6's gear ratio as 2.08, which is the two-cylinder 6's, and the 3.5 as having a
  * reverse gear.)
  *
@@ -23,10 +22,17 @@
  * (approximated as a straight line: an estimate of the shape, the usual first approximation) to nothing at the prop's pitch speed (where each turn advances the boat one pitch: no slip,
  * no thrust), pitch × prop rpm. Reverse is weaker than ahead (the blades work backwards: REVERSE, an estimate). The rated
  * power is the crank's; the gearbox takes perhaps 5–10% of it, inside the figure of merit's uncertainty.
- * For the 3.5 that's about 400 N at rest (90 lbf), falling to nothing at about 7.6 m/s (15 kt).
- * A check, second hand: Yacht magazine's bollard-pull tests of 5 hp four-strokes are reported at 0.55–0.61 kN (the
- * Tohatsu MFS5 0.61; seen in search results only, the article wasn't reachable); this working gives about 0.52 kN for 5 hp on the 6's prop,
- * so the figure of merit may be a little low. Not changed on a figure we couldn't read.
+ * For the 3.5 that's about 410 N at rest (92 lbf), falling to nothing at about 7.6 m/s (15 kt); for the 6, 0.61 kN.
+ * Calibrated on a measurement (read 15 Nov 2026): YACHT's bollard-pull tests, the motors at full throttle on an electronic
+ * scale. The Tohatsu MFS5 pulled 0.61 kN on its stock 7.8 × 8 in prop, the strongest of four 5 hp motors (0.55–0.61 kN;
+ * yacht.de/ausruestung/motoren/motoren-test-5-ps-aussenborder-immer-genug-schub-fuer-alle-bedingungen, J. Erdmann, 19 Aug
+ * 2025); the MFS6, the same 123 cc engine on the same prop, is printed as "61 Kilonewton" in the 6 hp test (yacht.de/
+ * ausruestung/motoren/test-fuenf-leistungsstarke-6-ps-aussenborder-im-vergleich, J.-O. Puls, 21 Sep 2023: read as 0.61 kN,
+ * the others 0.59–0.62). So the 6's figure of merit is 0.61 kN over its ideal disc's 1.08 kN: 0.56. (The same engine
+ * rated 5 hp pulls the same, which would be 0.64 at that rating: at rest it's the prop and the engine's torque that
+ * limit the pull, not the rating.) The 2.5 and the 3.5, another engine (86 cc) on a smaller prop, weren't in either
+ * test: theirs is this figure of merit carried over, an ESTIMATE; by the same reasoning they likely pull much the same
+ * as each other. The 6's stock prop in that test is 7.8 × 8 in, and it turned 5,140 rpm at full throttle on a light boat.
  */
 import type { Boat } from './boat';
 import { OUTBOARD_PROP } from './outboardMount';
@@ -40,10 +46,10 @@ export interface Outboard { hp: OutboardHp; kg: number; reverse: boolean; propD:
 export const OUTBOARDS: Record<OutboardHp, Outboard> = {
   2.5: { hp: 2.5, kg: 18.5, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5000, gear: 2.15 },
   3.5: { hp: 3.5, kg: 18.5, reverse: false, propD: 7.4 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 },
-  6: { hp: 6, kg: 26, reverse: true, propD: 7.8 * 0.0254, pitch: 7.0 * 0.0254, rpm: 5500, gear: 2.15 }
+  6: { hp: 6, kg: 26, reverse: true, propD: 7.8 * 0.0254, pitch: 8.0 * 0.0254, rpm: 5500, gear: 2.15 }
 };
 /** A small outboard's prop: how much of the ideal disc's thrust it gets at rest (an estimate: small props do 0.5–0.7). */
-export const FIGURE_OF_MERIT = 0.55;
+export const FIGURE_OF_MERIT = 0.56;
 /** Astern, the share of the thrust ahead (an estimate: the blades' sections work backwards, and the exhaust's in the way). */
 export const REVERSE = 0.5;
 /** The leg and the stopped prop down in the water, not driving: drag area (Cd·A, m²). An estimate: a streamlined strut about

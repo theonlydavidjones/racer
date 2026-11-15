@@ -26,6 +26,9 @@ describe('the outboard', () => {
     expect(thrust({ ...m, gear: 'R' }, 0)).toBeLessThan(0); expect(-thrust({ ...m, gear: 'R' }, 0)).toBeLessThan(T0 * 0.6); // (astern, weaker)
     expect(thrust({ ...m, gear: 'N' }, 0)).toBe(0); expect(thrust({ ...m, down: false }, 0)).toBe(0); expect(thrust({ ...m, running: false }, 0)).toBe(0);
     expect(staticThrust(OUTBOARDS[6])).toBeGreaterThan(T0); expect(staticThrust(OUTBOARDS[2.5])).toBeLessThan(T0);
+    // (the 6's is the measured one: YACHT's bollard pull for the Tohatsu MFS5/MFS6 on the 7.8 × 8 in prop, 0.61 kN)
+    expect(staticThrust(OUTBOARDS[6])).toBeGreaterThan(610 * 0.97); expect(staticThrust(OUTBOARDS[6])).toBeLessThan(610 * 1.03);
+    expect(OUTBOARDS[6].pitch / 0.0254).toBeCloseTo(8, 6);
   });
   // (the motor's on her port quarter, 0.42 m off her centerline: boat/outboardMount.ts)
   it('off her centerline: at rest the 3.5 at full throttle turns her bow to starboard with about 130 N·m, its thrust times its offset less the prop\'s walk; astern, to port', () => {

@@ -316,10 +316,10 @@ physics, ranked like the ten above:
 | HP | 745.7 | 22 | standard |  |
 | OUTBOARDS (2.5) | 18.5 kg, no reverse, 5000 rpm, gear 2.15, prop 7.4 × 7.0 in | 41 | sourced | Tohatsu MFS2.5C/3.5C owner's manual and product page, read 14 Nov 2026 |
 | OUTBOARDS (3.5) | 18.5 kg, no reverse, 5500 rpm, gear 2.15, prop 7.4 × 7.0 in | 42 | sourced | the same |
-| OUTBOARDS (6) | 26 kg, reverse, 5500 rpm, gear 2.15, prop 7.8 × 7.0 in | 43 | sourced, pitch to check | Tohatsu MFS4C/5C/6C manual and product page; the standard prop's pitch may be 8.0 in (pitch speed 8.7 m/s, not 7.6) |
+| OUTBOARDS (6) | 26 kg, reverse, 5500 rpm, gear 2.15, prop 7.8 × 8 in | 43 | sourced | Tohatsu MFS4C/5C/6C manual and product page; the prop from YACHT's 6 hp test (21 Sep 2023) |
 | PROP_WALK | 0.02 ahead, 0.04 in reverse gear | | estimate | no figure for an outboard was found |
 | MOUNT_X, OUTBOARD_PROP (outboardMount.ts) | 0.42 m to port; prop 0.17–0.22 m under, 4.15–4.18 m aft of her middle | | estimate | no Folkboat bracket's dimensions were found |
-| FIGURE_OF_MERIT | 0.55 | 33 | estimate |  |
+| FIGURE_OF_MERIT | 0.56 | 46 | sourced for the 6, estimate for the 2.5 and 3.5 | YACHT's bollard pulls: Tohatsu MFS5/MFS6 0.61 kN on a 7.8 × 8 in prop |
 | REVERSE | 0.5 | 35 | estimate |  |
 | LEG_CDA | 0.010 | 39 | estimate |  |
 
