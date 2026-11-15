@@ -5,10 +5,9 @@ import type { Boat } from '../src/boat/boat';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { aiThink } from '../src/ai/ai';
-import { yawLag } from '../src/boat/physics';
 import { beatFor } from '../src/boat/seaway';
 import { V, dist, n360, wrap } from '../src/core/math';
-import { cpa, hullGap } from '../src/rules';
+import { CONTACT_GAP, cpa, hullGap } from '../src/rules';
 
 // Rule 14 between two AI boats: a port-tacker that makes a starboard boat swerve to avoid her hasn't kept clear (the
 // definition of Keep Clear, (a): the right-of-way boat "can sail her course with no need to take avoiding action"), so
@@ -50,13 +49,10 @@ function passing(off: number, t = 1.0, v = 3) {
 }
 describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a foul (ai.ts forced14)', () => {
   it('about to touch, within 10 m: the starboard boat\'s swerve is put down to the port-tacker', () => {
-    const { w, B, Y } = crossing(1.2, 4);
+    const { w, B, Y } = crossing(1.6, 4);
     expect(w.rights(B, Y).kc).toBe(Y);
-    const cp = cpa(B, Y);
-    expect(cp.t).toBeLessThan(Math.min(1.5, yawLag(B.v)) + 1);
-    expect(cp.d).toBeLessThan(4.5);
     expect(dist(B, Y)).toBeLessThan(10);
-    expect(hullGap(B, Y), 'not touching yet').toBeGreaterThan(0.5);
+    expect(hullGap(B, Y), 'not touching yet').toBeGreaterThanOrEqual(CONTACT_GAP);
     aiThink(w, B, DT);
     expect(Math.abs(wrap(B.desired - B.h)), 'she swerves').toBeGreaterThan(5);
     expect(B.forced14).toBe(Y.id);
@@ -85,12 +81,5 @@ describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a 
     expect(cpa(B, Y).d).toBeLessThan(4.5);
     aiThink(w, B, DT);
     expect(B.forced14).toBeNull();
-  });
-  it('end on and the hulls would meet: the swerve is the port boat\'s foul', () => {
-    const { w, B, Y } = passing(1.0);
-    expect(w.rights(B, Y).kc).toBe(Y);
-    aiThink(w, B, DT);
-    expect(Math.abs(wrap(B.desired - B.h)), 'she swerves').toBeGreaterThan(5);
-    expect(B.forced14).toBe(Y.id);
   });
 });

@@ -417,12 +417,17 @@ export function bestApproach(w: World, b: Boat): { h: number; along: number } {
 }
 
 /** Would b's hull and o's touch (CONTACT_GAP, hull to hull) within T seconds, b sailing heading h at her speed and o
- * holding her course and speed? Each hull on a straight track, a quarter-second apart: what a boat could see coming. */
+ * going on as she is, turning as she's turning (her turn rate, the helm's, not the sea's knocks: a boat already bearing away to duck astern of her isn't
+ * on the straight line her velocity points along)? A quarter-second apart: what a boat could see coming. */
 function wouldTouch(b: Boat, o: Boat, h: number, T: number): boolean {
-  const u = V(h), v = Math.max(0, b.v), B = { x: b.x, y: b.y, h }, O = { x: o.x, y: o.y, h: o.h };
+  const u = V(h), v = Math.max(0, b.v), B = { x: b.x, y: b.y, h }, O = { x: o.x, y: o.y, h: o.h }, r = (o.turnRate ?? 0) * Math.PI / 180;
+  let vx = o.vx, vy = o.vy;
   for (let t = 0; t <= T + 1e-9; t += 0.25) {
-    B.x = b.x + u.x * v * t; B.y = b.y + u.y * v * t; O.x = o.x + o.vx * t; O.y = o.y + o.vy * t;
+    B.x = b.x + u.x * v * t; B.y = b.y + u.y * v * t;
     if (hullGap(B, O) < CONTACT_GAP) return true;
+    // (her velocity turns with her heading: + yaw is to starboard, clockwise from above, as headings run)
+    const c = Math.cos(r * 0.25), s = Math.sin(r * 0.25), nx = vx * c + vy * s, ny = -vx * s + vy * c;
+    O.x += (vx + nx) / 2 * 0.25; O.y += (vy + ny) / 2 * 0.25; vx = nx; vy = ny; O.h += (o.turnRate ?? 0) * 0.25;
   }
   return false;
 }
@@ -828,11 +833,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // the other boat made her swerve: that's a foul (a keep-clear boat that makes the right-of-way boat change course to
       // avoid her hasn't kept clear: the definition of Keep Clear, (a), "the right-of-way boat can sail her course with no
       // need to take avoiding action"). Your boat, whenever this swerve's within 10 m. Another AI boat only for the swerve
-      // proper: within 10 m, and the two hulls would have touched within her turn's lag and a second (as ai.urgent) had
-      // she held her course, the one she'd steer with no boat to keep clear of (wouldTouch). Not the wide early avoidance
-      // this branch also takes, which an AI keep-clear boat already turning away may yet make unneeded; and hull to hull,
-      // not centre to centre, which side by side or passing end on leaves a couple of metres of water, keeping clear
-      if (Math.hypot(dx, dy) < 10 && (o.isUser || wouldTouch(b, o, course, lagT + 1))) b.forced14 = o.id;
+      // proper: within 10 m, and the two hulls would touch within her turn's lag and a second (as ai.urgent) on the heading
+      // she's sailing (wouldTouch). Not the wide early avoidance this branch also takes, which an AI keep-clear boat
+      // already turning away may yet make unneeded; and hull to hull, not centre to centre, which side by side or passing
+      // end on leaves a couple of metres of water, keeping clear. (Her heading, not the course she'd steer with no boat
+      // about: that could be anywhere, a tack away, and called swerves she never made. Already avoiding, a foul may go
+      // uncalled; that's the safe way to be wrong)
+      // (and not once they're touching: that's a contact, its own incident, not a swerve to avoid one; held against her,
+      // a swerve every step would keep the pair's tangle going (world.ts) and swallow a later breach of the other's)
+      if (Math.hypot(dx, dy) < 10 && (o.isUser || (hullGap(b, o) >= CONTACT_GAP && wouldTouch(b, o, b.h, lagT + 1)))) b.forced14 = o.id;
     }
   }
   for (const o of w.boats) {
