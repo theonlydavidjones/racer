@@ -377,6 +377,9 @@ What's planned, roughly in order. Done work is described in the README.
    straight rake from a cut-away forefoot to the stemhead, the forward sections fine and V'd. A lines job in render/hull.ts
    (the stations, the stem's profile, the forefoot), with a physics review after: the bow's shape feeds the hull's
    resistance and wetted area, and boat/hullPlan.ts's deck outline (the rules' touching shape) if the deck line moves.
+   Tried 15 Nov: a draft (straighter stem, cut-away forefoot, finer forward sections) is on branch claude/bow-rework, with
+   before/after stills in shots/bow-rework/. The owner preferred main's bow, so nothing merged. The class bow figures aren't
+   published as numbers; revisit when the owner's class plan, lines drawing and trailer photo are in reference/.
 8z. ~~**Now — the cruise setup's map is blank**~~ (done: redrawn whenever its size changes, 0e622c58) (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
    no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
    (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
