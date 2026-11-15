@@ -377,6 +377,9 @@ What's planned, roughly in order. Done work is described in the README.
    straight rake from a cut-away forefoot to the stemhead, the forward sections fine and V'd. A lines job in render/hull.ts
    (the stations, the stem's profile, the forefoot), with a physics review after: the bow's shape feeds the hull's
    resistance and wetted area, and boat/hullPlan.ts's deck outline (the rules' touching shape) if the deck line moves.
+   Tried 15 Nov: a draft (straighter stem, cut-away forefoot, finer forward sections) is on branch claude/bow-rework, with
+   before/after stills in shots/bow-rework/. The owner preferred main's bow, so nothing merged. The class bow figures aren't
+   published as numbers; revisit when the owner's class plan, lines drawing and trailer photo are in reference/.
 9b. **The crew's walk forward and back, and sitting on the bow** (in PR, claude/crew-bow-walk) (owner, 14 November; animation;
    Crew Figures): owner, "look at this dork. have him hang his legs over the front please. also the way the head forward
    looks like they're dragging their legs like paralyzed people. let's do better on these animations." Sat on the bow
@@ -653,6 +656,29 @@ What's planned, roughly in order. Done work is described in the README.
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
      to here", and nothing on the screen.
+   - **The navigator doesn't see piers, and can't bring her home** (owner, 15 November; bug; now; 6–10 h):
+     "navigator not detecting this pier. I ran right into it." The planned track runs straight along a long NE–SW pier
+     to its tip, in the Precautionary Area (20–39 ft charted). Suspects: the planner's land test (src/sim/routing.ts
+     landDist, :47-66) uses the terrain's land mask and the Cityfront's hand-drawn shore, not the wharf layer
+     (geo/shore.ts wharfNearest, imported but apparently unused there); and its grid cache and ring search can miss a
+     pier about 30 m wide. The fix: every pier and wharf counts as land for routing, kept clear by at least half a
+     boat length plus a margin, with a test that a plan past each Embarcadero pier keeps clear. Then (15 November): "it looks
+     like navigator is missing most of the piers actually. we're tacking toward one right now. not urgent but let's get
+     the coastlines updated." So it's all the piers, not one: bring every pier, wharf and breakwater the chart draws
+     into the planner's land, from the same source as the chart (NOAA ENC/OSM), and test along the whole Cityfront and
+     Embarcadero. 2–4 h. Then (15 November; now; 6–10 h in all): "navigator just cannot take her home to her slip. it
+     doesn't understand how to move around piers, obstacles, even other docks in the same marina." So the navigator
+     needs a real route, not only land avoidance:
+     - (1) every pier, wharf, breakwater and dock as an obstacle with clearance;
+     - (2) inside a marina, a path along the fairways to her own slip (the marinas' dock and fairway data in
+       src/geo/marina.ts), finishing with the docking hand-over;
+     - (3) moored boats solid, the same fix as slip 572 (8m2);
+     - (4) a test that the navigator brings her home from the Bay to slip 572 with no contact.
+   - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
+     polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
+     destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
+     "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
+     its name. Coordinates at most behind a hover on the chart.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
