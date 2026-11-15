@@ -3,7 +3,8 @@ import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
 import type { CourseFile } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
-import type { Vessel } from '../src/sim/traffic';
+import { ROUTES, Traffic, entersWay, type Vessel } from '../src/sim/traffic';
+import { brg } from '../src/core/math';
 import { COMMITTEE, decide, hearings, raceScores, type ProtestRec } from '../src/rules';
 import { standings, type SeasonResult, type Series } from '../src/club/season';
 
@@ -46,27 +47,27 @@ describe('A ship\'s danger signal and the race committee\'s protest', () => {
     run(w, 400, x, y + 0.01, 0, done(w)); // (a hair off the centerline: run down, pushed off)
     expect(w.protests.length).toBe(1); expect(w.protests[0].committee!.entered).toBe(true);
     expect(heardOut(w)).toBe('DNE');
-  });
+  }, 60000);
 
   it('she gets out of the way at the signal: never in it, the presumption rebutted, dismissed', () => {
     const { w, u } = withShip(950); const x = u.x, y = u.y;
     run(w, 1, x, y); expect(w.protests.length).toBe(1);
     run(w, 400, x, y + 200, 0, done(w)); // (out to the north, clear of her way, while she passes)
     expect(w.protests[0].committee).toMatchObject({ entered: false, done: true }); expect(heardOut(w)).toBe('dismissed');
-  });
+  }, 60000);
 
   it('retiring doesn\'t end the record: she retires in the ship\'s way and stays there: DNE', () => {
     const { w, u } = withShip(950); const x = u.x, y = u.y;
     run(w, 1, x, y); u.retired = true;
     run(w, 400, x, y + 0.01, 0, done(w));
     expect(heardOut(w)).toBe('DNE');
-  });
+  }, 60000);
 
   it('a boat astern of her, or alongside well off her side going her way: no signal', () => {
     const a = withShip(-300); expect(run(a.w, 60, a.u.x, a.u.y)).toBe(0); // (the ship 300 m east of her, going away)
     const b = withShip(300, 150); expect(run(b.w, 120, b.u.x, b.u.y, 5 * 0.5144)).toBe(0); // (129 m off her side, being overtaken)
     expect(a.w.protests.concat(b.w.protests)).toEqual([]);
-  });
+  }, 60000);
 
   it('two boats in her way: one signal, a protest of each', () => {
     const { w, u } = withShip(950); const o = w.boats[1], x = u.x, y = u.y; let horns = 0;
@@ -86,17 +87,17 @@ describe('A ship\'s danger signal and the race committee\'s protest', () => {
   });
 });
 
-describe('The AI fleet and a ship', () => {
-  it('a container ship steaming through the fleet on the beat: the AI boats keep out of her way, and none is protested into a DNE', () => {
-    const w = new World(SS2, settings({ fleet: 7 }), 5);
-    while (w.t < 90) w.step(DT); // (started and up the beat)
-    const cx = w.boats.reduce((a, b) => a + b.x, 0) / w.boats.length, cy = w.boats.reduce((a, b) => a + b.y, 0) / w.boats.length;
-    const ship: Vessel = { id: 0, kind: 'container', x: cx - 2200, y: cy, h: 90, v: 12 * 0.5144, moving: true }, t0 = w.t;
-    w.traffic.vessels = () => [{ ...ship, x: ship.x + (w.t - t0) * ship.v }];
-    while (w.t < t0 + 600) { w.step(DT); w.drainEvents(); }
-    const ai = w.protests.filter(p => p.committee && !w.boats[p.vs].isUser);
-    expect(ai.filter(p => p.committee!.entered)).toEqual([]);
-  }, 120000);
+describe('The ship\'s way follows her route', () => {
+  it('at a bend in the channel the way turns with her: water on her next leg ahead is in it, the straight run on past the bend isn\'t', () => {
+    const tr = new Traffic(true, 3), r = ROUTES.channel;
+    let v: Vessel | undefined;
+    for (let t = 0; t < 86400 && !v; t += 5) { const c = tr.vessels(t)[0]; if (c.moving && Math.hypot(c.x - r[3].x, c.y - r[3].y) < 250 && brg(r[3].x - c.x, r[3].y - c.y) - c.h < 1 && brg(r[3].x - r[2].x, r[3].y - r[2].y) === c.h) v = c; }
+    expect(v).toBeTruthy();
+    const nx = r[4].x - r[3].x, ny = r[4].y - r[3].y, nl = Math.hypot(nx, ny), ux = Math.sin(v!.h * Math.PI / 180), uy = Math.cos(v!.h * Math.PI / 180);
+    const onNext = { x: r[3].x + nx / nl * 300, y: r[3].y + ny / nl * 300 }, straightOn = { x: r[3].x + ux * 300, y: r[3].y + uy * 300 };
+    expect(entersWay(v!, onNext.x, onNext.y, 0, 0, 0)).toBe(0);
+    expect(entersWay(v!, straightOn.x, straightOn.y, 0, 0, 0)).toBeNull();
+  });
 });
 
 describe('The hearing of a committee ship protest', () => {

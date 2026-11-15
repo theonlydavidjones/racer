@@ -32,7 +32,7 @@ import type { Settings } from '../settings';
 import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
-import { Traffic, VESSEL, channelBound, entersWay, hullDist, shipFrame, vesselHull, whistleRange, type Vessel } from './traffic';
+import { Traffic, VESSEL, WAY_ABEAM, channelBound, entersWay, hullDist, onTrack, shipFrame, vesselHull, whistleRange, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
@@ -119,9 +119,12 @@ export const PROTEST_HAIL = 10;
  * action to allow sufficient sea room", with no number). */
 export const SHIP_LOOK = 40;
 /** How far ahead an AI skipper watches a ship's way, s: she acts on what she can see coming, well before the ship would
- * doubt her (a modeling choice). Once she's keeping clear, she holds it until her track clears the way by AI_SHIP_EXTRA m
- * with half as long again to look (so she doesn't flick back and forth on the edge). */
+ * doubt her (a modeling choice). AI_SHIP_EXTRA: the margin, m, she keeps beyond the way before she lets go
+ * (keepClearOfShips). */
 export const AI_SHIP_LOOK = 120, AI_SHIP_EXTRA = 30;
+/** A Folkboat's best speed through the water, m/s (about 6 kt: her hull speed, 1.34·√(LWL in ft) with LWL 6.0 m), for
+ * how soon she could sail back into a ship's way. */
+const AI_SHIP_SPEED = 3.1;
 /** The ship sounds again for another boat no sooner than this, s (a ship would sound again for a second boat). */
 const RESOUND = 10;
 
@@ -1513,21 +1516,28 @@ export class World {
 
   /**
    * AI boats keep out of every vessel's way (traffic.ts entersWay): seen coming into it within AI_SHIP_LOOK, she steers
-   * square off the ship's track to the side she's on (to the side she's heading for if she's on it), and holds that
-   * until her track is clear of the way with room to spare. Off the track is the quick way out: a Folkboat can't outrun
-   * a ship along it, and aiming at her stern from ahead of her leads down her side.
+   * square off the ship's track to the side she's on (to the side she's heading for if she's on it). Off the track is
+   * the quick way out: a Folkboat can't outrun a ship along it, and aiming at her stern from ahead of her leads down her
+   * side. She holds that until the ship's stern has passed her, or she's far enough off that even sailing straight back
+   * at her best speed she couldn't be in the way before the stern goes by (latched on where she is, not on her heading,
+   * which is the thing that changes when she turns).
    */
   private keepClearOfShips(b: Boat): void {
     const ai = b.ai!;
     for (const v of this.vessels) {
       if (!v.moving || Math.abs(b.x - v.x) > 2500 || Math.abs(b.y - v.y) > 2500) { if (ai.shipClear === v.id) ai.shipClear = null; continue; }
-      const keeping = ai.shipClear === v.id;
-      const t = entersWay(v, b.x, b.y, b.vx, b.vy, keeping ? AI_SHIP_LOOK * 1.5 : AI_SHIP_LOOK, keeping ? AI_SHIP_EXTRA : 10);
-      if (t == null) { if (keeping) ai.shipClear = null; continue; }
+      const ty = VESSEL[v.kind], o = onTrack(v, b.x, b.y);
+      if (ai.shipClear === v.id) {
+        const pass = (o.a + ty.len / 2) / Math.max(0.5, v.v), off = o.d - (ty.beam / 2 + WAY_ABEAM + AI_SHIP_EXTRA);
+        if (o.a < -ty.len / 2 || off > AI_SHIP_SPEED * pass) { ai.shipClear = null; continue; }
+      } else if (entersWay(v, b.x, b.y, b.vx, b.vy, AI_SHIP_LOOK, 10) == null) continue;
       ai.shipClear = v.id;
-      const f = shipFrame(v, b.x, b.y), ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R), lv = b.vx * uy - b.vy * ux; // (her own motion to the ship's starboard)
-      const side = Math.abs(f.lat) > VESSEL[v.kind].beam / 2 ? Math.sign(f.lat) : Math.sign(lv) || 1;
-      b.desired = sailable(b, n360(v.h + 90 * side)); b.luff = false;
+      const ux = Math.sin(o.h * D2R), uy = Math.cos(o.h * D2R), lv = b.vx * uy - b.vy * ux; // (her own motion to the track's starboard)
+      const side = o.d > ty.beam / 2 ? o.side : Math.sign(lv) || 1;
+      b.desired = sailable(b, n360(o.h + 90 * side)); b.luff = false;
+      // (her penalty turns wait: she takes them "after getting well clear", 44.2, and a ship's way isn't clear water;
+      // spinning there she'd sit in it. Clearing, she sails, and the turns aren't counted till she begins again)
+      if (b.penalty > 0) ai.clearing = true;
       return;
     }
   }
@@ -1560,7 +1570,7 @@ export class World {
         this.warned.set(v.id, this.t);
         this.emit({ type: 'toast', ms: 7000, msg: channelBound(v)
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
-          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
+          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Watch her, and expect a wake.` });
       }
     }
     if (this.protestsOn) this.committeeWatch();
@@ -1588,7 +1598,11 @@ export class World {
     this.warned.set(-1 - v.id, this.t);
     const u = this.user, heard = named.includes(u) || dist(u, v) < whistleRange(v);
     if (heard) for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
-    if (named.includes(u)) this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+    // (only a ship confined to the channel is one you must keep out of the way of, Rule 9(b): a ferry or a tour boat
+    // under way is a power-driven vessel that keeps out of a sailing vessel's way, Rule 18(a); her signal says only she doubts you)
+    if (named.includes(u)) this.emit({ type: 'toast', ms: 6000, msg: channelBound(v)
+      ? `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.`
+      : `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts what you're doing. Make your course plain to her.` });
     else if (heard) this.emit({ type: 'toast', ms: 4000, msg: `Five short blasts from the ${ty.name.toLowerCase()} at ${named.map(b => `${b.name} (${b.no.replace(/^US\s+/, 'USA ')})`).join(', ')}.` });
     // the race committee's protest: a ship in the channel only (Rule 9(b)), one for each boat an encounter, while she's racing
     if (!this.protestsOn || !channelBound(v)) return;

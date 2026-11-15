@@ -6,6 +6,8 @@ import { beatAngle, runAngle } from '../src/boat/polar';
 import { crabFor } from '../src/ai/ai';
 import { V, n360, wrap } from '../src/core/math';
 import type { CourseFile } from '../src/courses/course';
+import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
+import type { Vessel } from '../src/sim/traffic';
 
 /** The AI fleet sailing the training course (windward–return, 620 m legs), the user's boat left at the line. */
 function race(kt: number, current = 'slack', seed = 77) {
@@ -97,4 +99,22 @@ describe('the AI sails the boat as a sailor does', () => {
       expect(over.x * V(brg).x + over.y * V(brg).y).toBeGreaterThan(0);
     }
   });
+});
+
+// (from ship-protest.test.ts: a whole fleet sailing for ten minutes, too long for test:fast)
+describe('The AI fleet and a ship (Inland Rule 9; docs/SHIP-PROTESTS.md)', () => {
+  it.each([90, 270, 0, 180])('a container ship steaming through the fleet on the beat, heading %i°: the AI boats keep out of her way (none is protested into a DNE), each deciding once to keep clear and holding it', h => {
+    const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', current: 'slack', judging: 'protests', fleet: 7 }, 5);
+    while (w.t < 90) w.step(DT); // (started and up the beat)
+    const cx = w.boats.reduce((a, b) => a + b.x, 0) / w.boats.length, cy = w.boats.reduce((a, b) => a + b.y, 0) / w.boats.length, u = V(h);
+    const ship: Vessel = { id: 0, kind: 'container', x: cx - u.x * 2200, y: cy - u.y * 2200, h, v: 12 * 0.5144, moving: true }, t0 = w.t;
+    w.traffic.vessels = () => [{ ...ship, x: ship.x + u.x * (w.t - t0) * ship.v, y: ship.y + u.y * (w.t - t0) * ship.v }];
+    const flips = new Map<number, number>(), was = new Map<number, unknown>();
+    while (w.t < t0 + 600) {
+      w.step(DT); w.drainEvents();
+      for (const b of w.boats) if (b.ai) { const now = b.ai.shipClear ?? null; if (now !== (was.get(b.id) ?? null)) flips.set(b.id, (flips.get(b.id) ?? 0) + 1); was.set(b.id, now); }
+    }
+    expect(w.protests.filter(p => p.committee && !w.boats[p.vs].isUser && p.committee.entered)).toEqual([]);
+    expect(Math.max(0, ...flips.values())).toBeLessThanOrEqual(4); // (on and off, perhaps twice: not a flicker)
+  }, 300000);
 });

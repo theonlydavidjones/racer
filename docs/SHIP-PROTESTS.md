@@ -39,6 +39,8 @@ DSQ. Built on the hearing."
 - **The ship's way** (sim/traffic.ts `entersWay`):
   - The water a ship needs clear, measured from her hull: from her stern to two of her lengths ahead of her bow
     (`WAY_AHEAD`), and her half-beam plus 50 m to either side (`WAY_ABEAM`).
+  - It's laid along her route as she'll sail it (`onTrack`), so it bends with her at a waypoint.
+  - It slides along the route with her: a boat's predicted track is sampled against it every 2 s (4 s beyond a minute).
   - Nothing abaft the stern: a boat astern of her is no hindrance.
 - **The signal** (sim/world.ts `dangerSignals`):
   - A moving vessel sounds five blasts for any boat that would come into her way within `SHIP_LOOK` (40 s), as both
@@ -65,9 +67,13 @@ DSQ. Built on the hearing."
 - **Under umpiring** (practice, the drills): the signal and its warning only, with no protest.
 - **The AI boats** (`keepClearOfShips`):
   - Each watches every vessel's way 120 s ahead.
-  - Coming into it, she steers square off the ship's track to the side she's on, and holds that until her track is
-    clear of the way by 30 m, looking half as long again.
-  - In the test, a container ship steams through a seven-boat fleet on the beat and no AI boat is in her way.
+  - Coming into it, she steers square off the ship's track (at that point of the route) to the side she's on.
+  - She holds that until the ship's stern has passed her, or she's far enough off that, sailing straight back at a
+    Folkboat's hull speed, she couldn't be in the way before the stern goes by. The latch is on where she is, not on
+    her heading, so it doesn't flicker.
+  - Penalty turns wait while she's keeping clear (44.2: "after getting well clear"; a ship's way isn't clear water).
+  - In the test (tests/sim-ai.test.ts), a container ship steams through a seven-boat fleet on the beat from each of
+    four directions. No AI boat is in her way, and none decides to keep clear more than twice.
 
 ## Modeling choices (no number in the sources)
 

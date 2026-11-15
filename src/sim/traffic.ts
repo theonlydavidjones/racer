@@ -1,4 +1,4 @@
-import { D2R, brg, type Vec } from '../core/math';
+import { D2R, brg, clamp, segPt, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
 
 /**
@@ -127,23 +127,65 @@ export function shipFrame(v: Vessel, x: number, y: number): { along: number; lat
   return { along: rx * ux + ry * uy, lat: rx * uy - ry * ux };
 }
 
+/** The track a vessel will follow: from her stern (half her length back along her heading) through her middle and on
+ * along her route as she'll sail it, out to `reach` m ahead of her middle (less where her route ends and she stops).
+ * `s` is each point's distance along it from her middle (the stern's −len/2). */
+interface Track { x: number[]; y: number[]; s: number[] }
+const tracks = new WeakMap<Vessel, Track>();
+function trackOf(v: Vessel): Track {
+  const hit = tracks.get(v); if (hit) return hit;
+  const ty = VESSEL[v.kind], sv = SERVICES[v.id], r = ROUTES[sv.route], ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R);
+  const reach = ty.len / 2 + WAY_AHEAD * ty.len + v.v * WAY_LOOK_MAX;
+  const T: Track = { x: [v.x - ux * ty.len / 2, v.x], y: [v.y - uy * ty.len / 2, v.y], s: [-ty.len / 2, 0] };
+  // the leg she's on (she's on it exactly), and which way along it she's going (by her heading)
+  let k = 1, dir = 1, best = Infinity;
+  for (let i = 1; i < r.length; i++) {
+    const d = segPt(v, r[i - 1], r[i]); if (d > best + 1e-6 || d > 1) continue;
+    const fw = Math.abs(((brg(r[i].x - r[i - 1].x, r[i].y - r[i - 1].y) - v.h) % 360 + 540) % 360 - 180) < 90;
+    best = d; k = i; dir = fw ? 1 : -1;
+  }
+  // (off every route, as a vessel placed by hand is: straight on along her heading)
+  if (best === Infinity) { T.x.push(v.x + ux * reach); T.y.push(v.y + uy * reach); T.s.push(reach); tracks.set(v, T); return T; }
+  let j = dir > 0 ? k : k - 1, sum = 0, px = v.x, py = v.y;
+  for (let n = 0; n < r.length + 1 && sum < reach; n++) {
+    if (j < 0 || j >= r.length) { if (!sv.loop) break; j = dir > 0 ? 1 : r.length - 2; } // (a loop runs on round; a route's end stops her)
+    const q = r[j], l = Math.hypot(q.x - px, q.y - py);
+    if (sum + l >= reach) { const f = (reach - sum) / l; T.x.push(px + (q.x - px) * f); T.y.push(py + (q.y - py) * f); T.s.push(reach); sum = reach; break; }
+    if (l > 1e-6) { sum += l; T.x.push(q.x); T.y.push(q.y); T.s.push(sum); px = q.x; py = q.y; }
+    j += dir;
+  }
+  tracks.set(v, T); return T;
+}
+/** The longest look ahead asked of entersWay, s (the AI's, held: world.ts AI_SHIP_LOOK × 1.5). */
+const WAY_LOOK_MAX = 180;
+
+/** The nearest point of a vessel's track to (x, y): how far off it (d, m; `side` +1 to her starboard), how far along it
+ * from her middle (a, m: behind her stern the first leg runs on, so a point abaft her reads less than −len/2), and the
+ * track's heading there. */
+export function onTrack(v: Vessel, x: number, y: number): { d: number; a: number; side: number; h: number } {
+  const T = trackOf(v); let d = Infinity, a = 0, side = 1, h = v.h;
+  for (let i = 1; i < T.x.length; i++) {
+    const ax = T.x[i - 1], ay = T.y[i - 1], dx = T.x[i] - ax, dy = T.y[i] - ay, L2 = dx * dx + dy * dy; if (L2 < 1e-9) continue;
+    let t = ((x - ax) * dx + (y - ay) * dy) / L2; t = i === 1 ? Math.min(1, t) : clamp(t, 0, 1);
+    const fx = ax + dx * t, fy = ay + dy * t, dd = Math.hypot(x - fx, y - fy);
+    if (dd < d) { d = dd; a = T.s[i - 1] + (T.s[i] - T.s[i - 1]) * t; side = (x - fx) * dy - (y - fy) * dx >= 0 ? 1 : -1; h = brg(dx, dy); }
+  }
+  return { d, a, side, h };
+}
+
 /**
- * When a boat at (x, y) moving at (vx, vy) over the ground first comes into the ship's way in the next `T` s, as both
- * hold their course and speed (0 if she's in it now), or null if she doesn't. `extra` widens the way all round, m.
+ * When a boat at (x, y) moving at (vx, vy) over the ground first comes into the ship's way in the next `T` s, she holding
+ * her course and speed and the ship following her route (0 if she's in it now), or null if she doesn't. The way slides
+ * along the track with the ship: at time τ it runs from her stern to WAY_AHEAD lengths ahead of her bow, along the
+ * route, so it bends where she will. Sampled every 2 s (4 s beyond a minute). `extra` widens it all round, m.
  */
 export function entersWay(v: Vessel, x: number, y: number, vx: number, vy: number, T: number, extra = 0): number | null {
-  const ty = VESSEL[v.kind], ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R), p = shipFrame(v, x, y);
-  // her motion relative to the ship's, in the ship's frame
-  const wx = vx - ux * v.v, wy = vy - uy * v.v, da = wx * ux + wy * uy, dl = wx * uy - wy * ux;
-  const a0 = -ty.len / 2 - extra, a1 = ty.len / 2 + WAY_AHEAD * ty.len + extra, l = ty.beam / 2 + WAY_ABEAM + extra;
-  // (the slabs' overlap in time: Liang–Barsky clipping of her track against the box)
-  let t0 = 0, t1 = T;
-  const slab = (p0: number, d: number, lo: number, hi: number): boolean => {
-    if (Math.abs(d) < 1e-9) return p0 >= lo && p0 <= hi;
-    let ta = (lo - p0) / d, tb = (hi - p0) / d; if (ta > tb) { const s = ta; ta = tb; tb = s; }
-    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); return t0 <= t1;
-  };
-  return slab(p.along, da, a0, a1) && slab(p.lat, dl, -l, l) ? t0 : null;
+  const ty = VESSEL[v.kind], w = ty.beam / 2 + WAY_ABEAM + extra, step = T > 60 ? 4 : 2;
+  for (let tau = 0; tau <= T + 1e-9; tau += step) {
+    const o = onTrack(v, x + vx * tau, y + vy * tau), m = v.v * tau;
+    if (o.d <= w && o.a >= m - ty.len / 2 - extra && o.a <= m + ty.len / 2 + WAY_AHEAD * ty.len + extra) return tau;
+  }
+  return null;
 }
 
 /** The distance from a point to the ship's hull, m (0 or less: touching). */
