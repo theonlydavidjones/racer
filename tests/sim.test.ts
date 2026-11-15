@@ -5,7 +5,7 @@ import type { CourseFile } from '../src/courses/course';
 import { buildCourse } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World, startPenalty } from '../src/sim/world';
-import { V, brg, wrap } from '../src/core/math';
+import { V, brg, n360, wrap } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
 import { inBasin } from '../src/geo/marina';
 
@@ -517,5 +517,30 @@ describe('Rule 21.2 starts when her turns begin (Perry: "clearly beginning to ma
     expect(u.penaltyDir).toBe(0); expect(u.penalty).toBe(360);
     helm(1, d => d > 90); // (now the turn, carried on)
     expect(u.penaltyDir).not.toBe(0);
+  });
+
+  it('her turns are done with the last tack or jibe they need (44.2), not 720° round: from a reach, two turns end short of two full circles', () => {
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
+    w.t = 30; const u = w.user; u.started = true; u.ocs = false;
+    u.h = n360(w.wind.from + 100); u.desired = u.h; for (let i = 0; i < 60 * 15; i++) { u.steer = 0; w.step(DT); } // (settled on a reach)
+    startPenalty(u, 720); let turned = 0, last = u.h;
+    for (let i = 0; i < 60 * 240 && u.penalty > 0; i++) { u.steer = -1; w.step(DT); turned += wrap(u.h - last); last = u.h; }
+    u.steer = 0;
+    expect(u.penalty).toBe(0);
+    expect(u.penaltyMoves).toBe(4); expect(u.tacking).toBe(false); // (two tacks and two jibes; a final tack complete, close-hauled)
+    expect(Math.abs(turned)).toBeLessThan(700); // (the last jibe, not all the way back round to her reach)
+  });
+
+  it('falling back across the wind, or waggling across it, isn\'t a tack of her turns: only new ground in her direction counts', () => {
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
+    w.t = 30; const u = w.user; u.started = true; u.ocs = false;
+    u.h = n360(w.wind.from + 45); u.desired = u.h; for (let i = 0; i < 60 * 15; i++) { u.steer = 0; w.step(DT); } // (close-hauled)
+    startPenalty(u, 720); const from = w.wind.from;
+    const off = () => wrap(u.h - from); // (her heading off the wind: + to starboard of it)
+    let flips = 0, was = u.tack;
+    const helm = (dir: 1 | -1, until: () => boolean) => { for (let i = 0; i < 60 * 30 && !until(); i++) { u.steer = dir; w.step(DT); if (u.tack !== was) { flips++; was = u.tack; } } u.steer = 0; };
+    for (let k = 0; k < 4; k++) { helm(-1, () => off() < -8); helm(1, () => off() > 8); } // (through head to wind and back, four times)
+    expect(flips).toBeGreaterThanOrEqual(6); // (she did cross it, each way)
+    expect(u.penaltyMoves).toBeLessThanOrEqual(1); expect(u.penalty).toBeGreaterThan(0);
   });
 });
