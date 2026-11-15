@@ -106,6 +106,9 @@ export interface Aboard {
   /** Paddling (paddle.ts): the share of their W′ left (1 fresh), the share of their endurance used (0 fresh), and when
    * those were worked out (sim time). */
   wBal: number; wUsed: number; wT: number;
+  /** Ready for a turn coming: warned by the call, or got ready as she turns (prepLeft; for the figures, a look up and a
+   * hand to the sheet: render/crew.ts). */
+  ready: boolean;
 }
 /** A job: a line to work, the jib car to move, the pole; `reach` s still to get there; `work` s of work left (car, pole). */
 export interface Job {
@@ -301,6 +304,15 @@ export const helmArms = (p: Person, fatigue = 0) => {
 const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * attrOf(p, 'fitness')) * (1 - 0.6 * fatigue);
 /** Reaction time (s) to a new call: an expert ~0.4 s, a novice ~1.6 s (simple visual reaction is 0.2–0.3 s; choosing what to do takes longer). Estimates. */
 export const reactTime = (p: Person) => 1.6 - 1.2 * attrOf(p, 'react');
+/** Ready for a turn, a person moves on the order after a prepared reaction (s). Getting ready takes them prepTime: seeing
+ * it's coming (their reaction), then the work, the working sheet freed ready to run and the lazy one loaded, and to
+ * their place (by their handling: about a second in all for an expert, nearly five for a novice). Warned by the call they
+ * do it before the helm puts her over; unwarned they start as they see her turning, and what's left of it comes after.
+ * Estimates (boat/calls.ts). */
+export const PREPARED = 0.25, PREP_WORK = { novice: 4, expert: 0.5 };
+export const prepTime = (p: Person) => reactTime(p) + PREP_WORK.novice - (PREP_WORK.novice - PREP_WORK.expert) * attrOf(p, 'handling');
+/** What's left of getting ready (s): none if called; else their prepTime less the `coming` s they've seen her turning. */
+export const prepLeft = (p: Person, called: boolean, coming: number): number => called ? 0 : Math.max(0, prepTime(p) - coming);
 /** Pace of a person's work and movement against a club crew (1 at handling 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
 export const pace = (p: Person) => 0.55 + 0.75 * attrOf(p, 'handling');
 /** Hiking endurance (s at a full hike, by fitness) and recovery time constant (s): Vogiatzis 1995 (above). */
@@ -310,7 +322,7 @@ export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   attrCache.delete(spec);
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
-    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0
+    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0, ready: false
   }));
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
   // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)
@@ -352,6 +364,10 @@ export interface CrewCall {
   bestHeel?: number;
   /** A tack is coming: she's turning up toward the wind to tack (a roll tack starts here). */
   tackComing?: boolean;
+  /** The helm has called the turn (physics.ts tackStep, boat/calls.ts), and how long a turn has visibly been coming (s,
+   * fading as long again once it's past): who's ready for it moves at once (prepLeft, PREPARED). */
+  called?: boolean;
+  coming?: number;
   /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
   rmPerDeg?: number;
 }
@@ -428,6 +444,9 @@ interface Held { arm: number; z: number; since: number; off: number; cross?: num
  */
 export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const s = c.spec, ppl = c.ppl ??= allAboard(s), W = c.W ??= ppl.map(p => p.w), total = c.total ??= W.reduce((a, b) => a + b, 0), n = s.crew.length;
+  // who's ready for a turn coming (the call, or got ready as she turns: prepLeft), for the figures; only while one is, or was
+  const coming = k.coming ?? 0;
+  if (k.called || coming > 0 || c.people.some(a => a.ready)) for (let i = 1; i <= n; i++) { const a = c.people[i]; if (a) a.ready = (k.called || coming > 0) && prepLeft(ppl[i]!, !!k.called, coming) === 0; }
   const w = k.windward;
   // the crew's judgement of where to be (trim) and their boat handling: the average of the crew (alone: the helm's)
   const skill = specAttr(s, 'trim'), handling = specAttr(s, 'handling');
@@ -574,7 +593,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const big = Math.abs(tx - gx) > 0.25 || Math.abs(tz - gz) > 0.4;
     const rolling = c.roll?.phase === 'flatten' || (a.job && a.job.reach > 0);
     if (big && !rolling) {
-      if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = reactTime(p);
+      if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = tacked ? PREPARED + prepLeft(p, !!k.called, k.coming ?? 0) : reactTime(p); // (at a turn: on the order once ready for it)
       a.react -= dt;
       if (a.react <= 0) { setGoal(a, tx, tz); a.react = 0; }
       else if (!a.goal) a.goal = { x: a.x, z: a.z };

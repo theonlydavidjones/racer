@@ -81,15 +81,18 @@ export class Labels {
     // the cue while it's news (a few seconds), or for as long as it holds while the hand waits at the shrouds
     const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
     if (c) { if (!word) { if (!c.hidden) c.hidden = true; } else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
-    // the helm's call: the warning first (a second and a half: the crew to their places), then the order, held while she
-    // turns (her turn target set: sim/world.ts callTurn, boat/physics.ts) and a second and a half after
+    // the helm's call: the warning first, while the crew get to their places, then the order, held while she turns (her
+    // turn target set: sim/world.ts callTurn, boat/physics.ts) and a second and a half after
     const k = this.call, ce = this.callEl;
     if (k && w.t < k.t0 - 1) this.call = null; // (a new race: the clock went back)
     let say = '';
     if (k && this.call) {
-      const turning = u.turnTarget != null; if (!turning && k.doneT == null && w.t - k.t0 > 1.5) k.doneT = w.t;
+      // (the warning held while the crew get ready, as the sim holds the turn: world.ts callTurn, boat/calls.ts; a crewmate
+      // busy at a job answers "Not ready!")
+      const turning = u.turnTarget != null, waiting = !!u.callWait;
+      if (!turning && !waiting && k.doneT == null && w.t - k.t0 > 0.3) k.doneT = w.t;
       if (k.doneT != null && w.t - k.doneT > 1.5) this.call = null;
-      else say = w.t - k.t0 < 1.5 ? (k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
+      else say = waiting ? (u.callWait!.notReady ? 'Not ready!' : k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
     }
     if (ce) { if (!say || word) { if (!ce.hidden) ce.hidden = true; } else { this.place(ce, camera, u.x, u.y, 3.2); if (ce.textContent !== say) ce.textContent = say; } }
     // the hint: on a run (from 150° off the wind) or close-hauled (to 50°), held two seconds there, she not turning
