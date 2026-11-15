@@ -177,3 +177,78 @@ describe('the outboard, as it\'s used', () => {
     expect(second).toBeGreaterThan(3); expect(second).toBeLessThan(20);
   });
 });
+
+import { MOTOR_SHIP_S, MOTOR_STOW_S } from '../src/boat/motor';
+import { applyCommand } from '../src/sim/commands';
+describe('Stowing it below and shipping it again (the owner: off the sliding bracket into the lazarette)', () => {
+  const stowedSpec = (mode: 'sail' | 'race') => {
+    const boat = { ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, outboard: 'stowed' as const, outboardHp: 3.5 as const } };
+    const s = { ...S, mode, boats: [boat], boat, boatId: boat.id, fleet: mode === 'race' ? 1 : 0, opponents: mode === 'race' ? DEFAULT_SETTINGS.opponents.slice(0, 1) : [] } as Settings;
+    return mode === 'race' ? new World(COURSES[0], s, 1) : new World(COURSES[0], s, 1, { freeSail: true });
+  };
+  it('only stopped and tilted up: running or down, it stays on the bracket, and the crew say why', () => {
+    const w = withMotor('sail'), m = w.user.motor!;
+    w.motorTilt(); applyCommand(w, { k: 'motor', op: 'stow' });
+    expect(m.shifting ?? null).toBeNull(); expect(m.stowed ?? false).toBe(false);
+    w.motorStart(); for (let i = 0; i < 60 * 5; i++) w.step(DT); expect(m.running).toBe(true);
+    applyCommand(w, { k: 'motor', op: 'stow' }); expect(m.shifting ?? null).toBeNull();
+    const msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
+    expect(msgs.some(t => /Tilt it up first/.test(t))).toBe(true); expect(msgs.some(t => /Stop it first/.test(t))).toBe(true);
+  });
+  it('stowed: the crew take it off in about 20 s (an estimate); stowed, it can\'t be tilted, started or put in gear; shipped again in about 25 s, tilted up', () => {
+    const w = withMotor('sail'), m = w.user.motor!;
+    applyCommand(w, { k: 'motor', op: 'stow' });
+    expect(m.shifting?.to).toBe('stowed'); expect(m.down).toBe(false); expect(m.running).toBe(false);
+    const of = m.shifting!.of; expect(of).toBeGreaterThanOrEqual(MOTOR_STOW_S); expect(of).toBeLessThan(MOTOR_STOW_S / 0.3 + 1);
+    for (let i = 0; i < 60 * (of - 1); i++) w.step(DT); expect(m.stowed ?? false).toBe(false);
+    for (let i = 0; i < 60 * 2; i++) w.step(DT);
+    expect(m.stowed).toBe(true); expect(m.shifting ?? null).toBeNull();
+    w.motorTilt(); expect(m.down).toBe(false);
+    expect(w.motorStart()).toBe('tilt'); expect(m.pulling ?? null).toBeNull();
+    w.motorGear('F'); w.motorThrottle(1); expect(m.gear).toBe('N'); expect(m.throttle).toBe(0);
+    applyCommand(w, { k: 'motor', op: 'stow' }); expect(m.shifting?.to).toBe('bracket');
+    const of2 = m.shifting!.of; expect(of2).toBeGreaterThanOrEqual(MOTOR_SHIP_S);
+    for (let i = 0; i < 60 * (of2 + 1); i++) w.step(DT);
+    expect(m.stowed).toBe(false); expect(m.down).toBe(false);
+    w.motorTilt(); expect(m.down).toBe(true);
+  }, 60_000);
+  it('its weight goes with it: stowed, the same weight aboard but further forward and off the height of the bracket; shipped again, as before', () => {
+    const w = withMotor('sail'), u = w.user, m = u.motor!, c = u.cond!;
+    // (her condition is written as it stands, the same object: its numbers taken at each stage)
+    const now = () => ({ kg: c.extraKg, moment: c.extraMoment, rd: c.rightingDelta(20) });
+    const shift = () => { applyCommand(w, { k: 'motor', op: 'stow' }); const of = m.shifting!.of; for (let i = 0; i < 60 * (of + 1); i++) w.step(DT); };
+    const on = now(); expect(on.rd).toBeLessThan(0); // (on the bracket it's weight up at deck level)
+    shift(); expect(m.stowed).toBe(true); expect(u.cond).toBe(c); const below = now();
+    expect(below.kg).toBe(on.kg);
+    expect(Math.abs(below.moment)).toBeLessThan(Math.abs(on.moment)); expect(below.moment).toBeLessThan(0); // (still aft of her middle, less far)
+    expect(below.rd).toBeGreaterThan(on.rd); // (and no longer up on the bracket)
+    shift(); expect(m.stowed).toBe(false);
+    const back = now(); expect(back.moment).toBeCloseTo(on.moment, 9); expect(back.rd).toBeCloseTo(on.rd, 9);
+  }, 60_000);
+
+  it('someone goes aft to the bracket to do it, their weight with them, and back again when it\'s done', { timeout: 60_000 }, () => {
+    const w = withMotor('sail'), u = w.user;
+    for (let i = 0; i < 60 * 5; i++) w.step(DT);
+    applyCommand(w, { k: 'motor', op: 'stow' });
+    for (let i = 0; i < 60 * 15; i++) w.step(DT);
+    const aft = u.crew!.people.find(p => p.job?.line === 'outboard');
+    expect(aft, 'a crewmate on the outboard').toBeTruthy(); expect(aft!.z).toBeGreaterThan(3);
+    for (let i = 0; i < 60 * 200 && u.motor!.shifting; i++) w.step(DT);
+    expect(u.motor!.stowed).toBe(true); expect(u.crew!.people.some(p => p.job?.line === 'outboard')).toBe(false);
+  });
+  it('stowed below in her setup: cruising, it\'s aboard to ship; racing, it stays below with no motor to work', () => {
+    const c = stowedSpec('sail'); expect(c.user.motor).toMatchObject({ stowed: true, down: false, running: false });
+    expect(stowedSpec('race').user.motor ?? null).toBeNull();
+  });
+});
+
+describe('Racing, no outboard aboard (class rule 1.11; NFIA, 2006; racers leave it ashore)', () => {
+  it('a race carries none of its weight, a cruise carries it stowed', () => {
+    const boat = { ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, outboard: 'stowed' as const, outboardHp: 3.5 as const, gearKg: 0 } };
+    const mk = (mode: 'sail' | 'race') => { const s = { ...S, mode, boats: [boat], boat, boatId: boat.id, fleet: mode === 'race' ? 1 : 0, opponents: mode === 'race' ? DEFAULT_SETTINGS.opponents.slice(0, 1) : [] } as Settings; return mode === 'race' ? new World(COURSES[0], s, 1) : new World(COURSES[0], s, 1, { freeSail: true }); };
+    const race = mk('race'), cruise = mk('sail');
+    expect(race.user.cond!.extraKg).toBe(0); expect(race.user.cond!.extraMoment).toBe(0); expect(race.user.motor ?? null).toBeNull();
+    for (const b of race.boats) expect(b.cond?.extraKg ?? 0, `${b.name}: no outboard racing`).toBe(b.spec?.perf.gearKg ?? 0);
+    expect(cruise.user.cond!.extraKg).toBeCloseTo(OUTBOARDS[3.5].kg, 6); expect(cruise.user.motor?.stowed).toBe(true);
+  });
+});

@@ -12,7 +12,8 @@ import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
-import { OUTBOARDS } from '../boat/motor';
+import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
+import { bodyJob } from '../boat/crewWork';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
@@ -610,7 +611,11 @@ export class World {
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? boatLook(spec).sailColor : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: boatLook(spec).paint } : { paint: F.paint }),
+      // (racing, no outboard aboard at all, hers or a rival's: the class rules never mention one, rule 1.11 has anything not
+      // clearly covered taken as illegal, and the class's Technical Committee ruled in March 2006 against racing with one
+      // mounted aft (NFIA clarifications); that racers leave it ashore rather than stowed below is our inference from those,
+      // not a rule's words. Its weight goes with it: none aboard, none aft. Cruising, it's aboard as her setup has it)
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9, this.freeSail ? undefined : 'none'), paint: boatLook(spec).paint } : { paint: F.paint }),
       ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : v0 ?? (isUser && this.startAt < 120 ? 2 : 1.5), vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
@@ -624,7 +629,9 @@ export class World {
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
       // her outboard, if it's on its transom bracket: tilted up, stopped (boat/motor.ts)
-      ...(isUser && spec?.perf.outboard === 'bracket' ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0 } } : {}),
+      // (stowed below in the lazarette, cruising: aboard, to ship on the bracket when you want it. Racing, a stowed motor
+      // stays below: the class rules don't allow racing with it mounted aft, app/setup.ts)
+      ...(isUser && (spec?.perf.outboard === 'bracket' || (spec?.perf.outboard === 'stowed' && this.freeSail)) ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0, stowed: spec.perf.outboard === 'stowed', shifting: undefined } } : {}),
       ai: isUser ? null : (() => {
         // (her dice, drawn in this order: the same races come out of the same seeds)
         const wp = r() < 0.5 ? 0 : 1, f = 0.12 + 0.76 * r(), depth = 55 + r() * 45, aggr = r() * 6, width = 110 + r() * 130, aware = r() < 0.7;
@@ -2196,6 +2203,7 @@ export class World {
   /** Tilt the outboard down into the water, or up out of it (stopping it first). */
   motorTilt(): void {
     const m = this.user.motor; if (!m) return;
+    if (m.stowed || m.shifting) { this.emit({ type: 'toast', msg: 'It\'s stowed below: ship it on the bracket first.', ms: 2500 }); return; }
     if (m.down && (m.running || m.pulling)) { m.running = false; m.pulling = undefined; }
     m.down = !m.down; if (!m.down) { m.gear = 'N'; m.throttle = 0; m.swivel = false; }
     this.emit({ type: 'toast', msg: m.down ? 'Outboard down: its leg in the water.' : 'Outboard tilted up, clear of the water.', ms: 2000 });
@@ -2208,6 +2216,7 @@ export class World {
   motorStart(retireFirst = false): 'ok' | 'racing' | 'tilt' | 'gear' {
     const m = this.user.motor; if (!m) return 'ok';
     if (m.running || m.pulling) return 'ok';
+    if (m.stowed || m.shifting) { this.emit({ type: 'toast', msg: 'It\'s stowed below: ship it on the bracket first.', ms: 2500 }); return 'tilt'; }
     if (this.racingNow) { if (!retireFirst) return 'racing'; this.retire(', to use her motor (RRS 42.1)'); }
     if (!m.down) { this.emit({ type: 'toast', msg: 'Tilt the outboard down first: the prop needs to be in the water.', ms: 2500 }); return 'tilt'; }
     if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Put it in neutral to start it: it won\'t start in gear.', ms: 2500 }); return 'gear'; }
@@ -2218,15 +2227,33 @@ export class World {
   motorStop(): void { const m = this.user.motor; if (!m) return; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; }
   /** Into gear: F, N or R (the 2.5 and the 3.5 have no reverse: swivel it round instead). Shifting is done at tick-over. */
   motorGear(g: 'F' | 'N' | 'R'): void {
-    const m = this.user.motor; if (!m) return;
+    const m = this.user.motor; if (!m || m.stowed || m.shifting) return;
     if (g === 'R' && !OUTBOARDS[m.hp].reverse) { this.emit({ type: 'toast', msg: `The ${m.hp} has no reverse gear: swivel it round on its bracket to push astern.`, ms: 3500 }); return; }
     if (g !== m.gear) m.throttle = Math.min(m.throttle, 0.15);
     m.gear = g;
   }
-  motorThrottle(t: number): void { const m = this.user.motor; if (m) m.throttle = clamp(t, 0, 1); }
+  motorThrottle(t: number): void { const m = this.user.motor; if (m && !m.stowed && !m.shifting) m.throttle = clamp(t, 0, 1); }
+  /**
+   * Stow it, or ship it again (the owner: Folkboat outboards sit on a sliding bracket on the after deck, slid up and away,
+   * and off it to stow): the crew slide it off the bracket into the lazarette, or back on, taking MOTOR_STOW_S or
+   * MOTOR_SHIP_S (estimates) at their pace. Only stopped and tilted up; racing, it stays below (the class rules don't allow
+   * racing with it mounted aft). The weight moves with it, and stowed there's no leg in the water (condition.ts, motor.ts).
+   */
+  motorStow(): void {
+    const u = this.user, m = u.motor; if (!m || m.shifting) return;
+    const say = (msg: string) => this.emit({ type: 'toast', msg, ms: 3000 });
+    if (!m.stowed) {
+      if (m.running || m.pulling) { say('Stop it first, then it can come off the bracket.'); return; }
+      if (m.down) { say('Tilt it up first, then it can come off the bracket.'); return; }
+    } else if (this.racingNow) { say('Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
+    // (whoever goes aft to the bracket: the forward hand, or sailing alone, you; their weight goes aft with them)
+    const to = m.stowed ? 'bracket' : 'stowed', pace = Math.max(0.3, bodyJob(u, 'outboard', true)), of = (to === 'stowed' ? MOTOR_STOW_S : MOTOR_SHIP_S) / pace;
+    m.shifting = { to, left: of, of }; m.down = false; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; m.swivel = false;
+    say(to === 'stowed' ? 'Unclamping the outboard to stow it below.' : 'Getting the outboard out of the lazarette to ship it.');
+  }
   /** The 2.5 and the 3.5: turned round on the bracket, its push goes astern (in neutral). */
   motorSwivel(): void {
-    const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse) return;
+    const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse || m.stowed || m.shifting) return;
     if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Into neutral first, then swivel it round.', ms: 2500 }); return; }
     m.swivel = !m.swivel;
     this.emit({ type: 'toast', msg: m.swivel ? 'Swiveled round: in gear it pushes her astern.' : 'Swiveled back: in gear it pushes her ahead.', ms: 2500 });
@@ -2240,7 +2267,19 @@ export class World {
     return true;
   }
   private motorStep(dt: number): void {
-    const m = this.user.motor; if (!m?.pulling) return;
+    const m = this.user.motor; if (!m) return;
+    if (m.shifting) {
+      m.shifting.left -= dt;
+      if (m.shifting.left <= 0) {
+        m.stowed = m.shifting.to === 'stowed'; m.shifting = undefined; bodyJob(this.user, 'outboard', false); // (back from the bracket)
+        // (its weight goes where it now is: off her stern and low, or back out on the bracket; boat/condition.ts)
+        // (its weight's new place, written into her condition as it stands: a new object would reach the page's mirror without
+        // its functions, sim/sync.ts)
+        { const u = this.user; if (u.spec) { const n = condition(u.spec, +this.raceDate.slice(5, 7) || 9, m.stowed ? 'stowed' : 'bracket'), c = u.cond ??= n; c.extraKg = n.extraKg; c.extraMoment = n.extraMoment; c.aloft = n.aloft; } }
+        this.emit({ type: 'toast', msg: m.stowed ? 'Outboard stowed in the lazarette.' : 'Outboard on its bracket, tilted up.', ms: 2500 }); }
+      return;
+    }
+    if (!m.pulling) return;
     m.pulling.left -= dt;
     if (m.pulling.left > 0) return;
     if (m.pulling.catches) { m.pulling = undefined; m.running = true; m.warm = true; this.emit({ type: 'toast', msg: `The ${m.hp} hp's running.`, ms: 2000 }); }
