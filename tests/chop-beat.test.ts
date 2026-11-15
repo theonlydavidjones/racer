@@ -57,6 +57,17 @@ describe('the beat angle in chop', () => {
       expect(vmg(beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeGreaterThan(0.997 * top);
     }
   });
+  it('in any chop the wind can make (up to half again a fully grown sea, for a current steepening it), a degree a quarter knot at most, 6.5 to 26 kt', () => {
+    // (the review's scan: with the polar's top a corner at its beat angle, 0.5–0.7 m in 8 kt stepped 1.16° at some periods;
+    // the polar's smooth top takes it under 0.65°. Fully grown: Hs = 0.243·U²/g, U the wind in m/s)
+    let worst = 0;
+    for (let hs = 0.1; hs <= 1.2; hs += 0.1) for (let tp = 1.5; tp <= 4.5; tp += 0.5) {
+      if (hs > 0.1 * 9.81 * tp * tp / (2 * Math.PI)) continue; // (steeper than breaking: sea.ts caps it)
+      let prev = beatInChop(6.5, hs, tp);
+      for (let kt = 6.75; kt <= 26; kt += 0.25) { const b = beatInChop(kt, hs, tp), U = kt * KT; if (hs <= 1.5 * 0.243 * U * U / 9.81) worst = Math.max(worst, Math.abs(b - prev)); prev = b; }
+    }
+    expect(worst).toBeLessThan(1);
+  }, 120_000);
   it('her speed in chop against the polar\'s changes smoothly with the angle: a third of a percent at most across half a degree (it stepped 1.2%)', () => {
     let worst = 0;
     for (let kt = 8; kt <= 24; kt += 0.25) for (let t = 36; t <= 60; t += 0.5) worst = Math.max(worst, Math.abs(speedInChop(kt, t, 0.6, 3.2) / polar(kt, t) - speedInChop(kt, t + 0.5, 0.6, 3.2) / polar(kt, t + 0.5)));
