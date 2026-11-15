@@ -90,10 +90,12 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * and back re-trimmed her, which is gone (the physics review). And 4.0 since the crew cross as soon as the new side
  * fills (crewPhys.ts ROLL_HEEL), rather than sitting on the low side while she heels 20° and more: 3.98 measured (4.29
  * with it off); in 20 kt 2.82 (3.11), within the table's 2.9; light air unchanged.
+ * Measured again, every wind, 15 Nov 2026, with her turn answering the helm sooner (physics.ts HOVE.gyration 0.19): light-air
+ * tacks a second or two cheaper, the 25 kt tack 4.8 s.
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 23.1], [4, 14.6], [6, 8.2], [8, 5.1], [12, 3.3], [16, 3.2], [20, 2.9], [25, 4.0]],
-  gybe: [[3, 4.2], [4, 3.6], [6, 2.4], [8, 2.0], [12, 1.1], [16, 0.6], [20, 0.5], [25, 0.5]]
+  tack: [[3, 21.3], [4, 13.7], [6, 8.1], [8, 5.2], [12, 3.1], [16, 3.0], [20, 3.0], [25, 4.8]],
+  gybe: [[3, 4.1], [4, 3.6], [6, 2.4], [8, 1.7], [12, 1.1], [16, 0.7], [20, 0.6], [25, 0.5]]
 };
 /**
  * The cost (s) of a tack or a gybe in `tws` kt, and `hs` m of chop: in a wind sea a tack costs about 40% more a metre of

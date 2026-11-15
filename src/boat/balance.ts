@@ -95,8 +95,50 @@ const CHORD = { main: 2.4, jib: 2.0 };
  * third of the geometric one. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
  */
 export const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
-/** Full helm (deg of rudder) for the sim's fastest turn. */
+/** Full helm (deg of rudder): the unit the helm is counted in (b.tiller, b.steer, b.helm: 1 is this much), and the most
+ * her AI helmsman and the tiller pilot use. */
 export const FULL_RUDDER = 30;
+/**
+ * The tiller's swing, deg each side: pushed until it's almost flush with the transom (the owner, of his own boat, 15 Nov
+ * 2026: "the entire radius ... maybe 150 degrees"). The tiller is fast to the rudder's head, so this is the blade's
+ * angle too. And the angle the blade stalls at: up to it the turn grows with the angle; past it the water breaks away
+ * from the blade's back, its side force falls off and it mostly brakes. 40 degrees is an ESTIMATE: a free-standing blade
+ * of this shape stalls at 20 to 25 (Molland & Turnock, Marine Rudders and Control Surfaces), but hers is hung on the
+ * keel's after edge and works as its flap, which holds on to about twice that; no measurement for a Folkboat was found
+ * (the researcher, 15 Nov 2026), so the owner's boat is the reference: he wants about half as much tiller again as 30.
+ * A practitioner's account, the best evidence short of a logged sea trial (a seasoned skipper who tried the sim, relayed
+ * by the owner, 15 Nov 2026): "it was immediately apparent that the tiller was wrong. sixty degrees turning radius is
+ * 'crazy'" (the tiller's whole swing was 60 degrees, 30 each side).
+ */
+export const HARD_OVER = 75, RUDDER_STALL = 40;
+/** Hard over, and the stall, in the helm's units (FULL_RUDDER each). */
+export const HELM_MAX = HARD_OVER / FULL_RUDDER, HELM_STALL = RUDDER_STALL / FULL_RUDDER;
+/** A stalled flat plate's normal force coefficient at `a` rad to the flow (Kirchhoff's free-streamline result, as in
+ * Hoerner, Fluid-Dynamic Drag, ch. 3: 2π·sin a / (4 + π·sin a); 0.88 square on). */
+const plateCn = (a: number) => 2 * Math.PI * Math.sin(a) / (4 + Math.PI * Math.sin(a));
+const STALL_SIDE = plateCn(RUDDER_STALL * D2R) * Math.cos(RUDDER_STALL * D2R), STALL_DRAG = plateCn(RUDDER_STALL * D2R) * Math.sin(RUDDER_STALL * D2R);
+/**
+ * The turn the rudder gives at `helm` (its units, 0 and up), as a multiple of full helm's (FULL_RUDDER's): in step with the
+ * angle up to the stall (a third more turn at 40 degrees than at 30: a 6.8 m radius for 9), then falling as a stalled
+ * plate's side force does, its normal force's part across the flow (0.94 of the most at 50 degrees, 0.79 at 60, 0.43 at
+ * 75: hard over she turns less than half as fast as at the stall, and stops).
+ */
+export function rudderTurn(helm: number): number {
+  if (helm <= HELM_STALL) return helm;
+  const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
+  return HELM_STALL * plateCn(a) * Math.cos(a) / STALL_SIDE;
+}
+/**
+ * The stalled rudder's braking, N, at `helm` (its units) and v m/s: a flat plate's drag at that angle, ½ρv²·A·Cn·sin a,
+ * less the part the turn's own bleed of speed already has (physics.ts turnBleed, which goes by how fast she's turning:
+ * the drag at the stall, in the measure of the turn she still gets). Hard over at 4.7 kt, about 800 N: with nothing
+ * else, a knot off her in under 2 s.
+ */
+export function rudderBrake(helm: number, v: number): number {
+  if (helm <= HELM_STALL) return 0;
+  const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
+  return 0.5 * RHO_W * v * v * RUDDER.area * (plateCn(a) * Math.sin(a) - STALL_DRAG * rudderTurn(helm) / HELM_STALL);
+}
 /**
  * Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. Sailing texts put it at about 3–5°
  * (Dellenbaugh, Steering; Sailing World), and Keuning's downwash measurements give the least drag at about 3° (as

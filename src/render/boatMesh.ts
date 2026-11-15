@@ -4,6 +4,7 @@ import { workPace } from '../boat/crewWork';
 import { ensignStep, flagDrawn, flagExtension, flagHang, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
+import { FULL_RUDDER, HARD_OVER } from '../boat/balance';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
@@ -1503,8 +1504,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
     u.uLampUp.value.set(0, 1, 0).applyQuaternion(m.lantern.arm.quaternion); }
-  const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
-  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);
+  const want = Math.max(-HARD_OVER, Math.min(HARD_OVER, (b.helm ?? 0) * FULL_RUDDER)) * D2R; // (the blade and the tiller where they are: to hard over, almost flush with the transom)
+  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 20); // (with your hand: no slower than a tiller swings)
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
