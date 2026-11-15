@@ -735,12 +735,18 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // cabin-top lines from that side deck, whose place is fixed by the job)
   const seated = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
   const onDeckI = (i: number) => i > 0 && !!tgt[i] && Math.abs(tgt[i].arm) > DECK_ARM;
-  const out = tgt.map((t, i) => onDeckI(i) && seated(t) ? i : -1).filter(i => i > 0);
+  // (someone still on their way to their place, back from a job or coming along the footwell, ducks past whoever's
+  // sitting: they don't move a seated crewmate along for a place they're not at yet)
+  const there = (i: number) => Math.abs(c.people[i].z - tgt[i].z) < Z.gap;
+  const out = tgt.map((t, i) => onDeckI(i) && seated(t) && there(i) ? i : -1).filter(i => i > 0);
   const atJob = tgt.map((t, i) => onDeckI(i) && !seated(t) && t.z > Z.cockpitFwd - 0.5 ? i : -1).filter(i => i > 0);
   const put = (i: number, z: number) => { tgt[i].z = z; const hi = held[i]; if (hi) hi.z = z; };
   // (out on deck, nobody forward of the seat beside the cabin's after end, but the front hand forward of the winch, on the
   // cabin top's edge at Z.cabinSide)
-  for (const i of out) if (tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) put(i, Z.deckFwd);
+  // (the front hand's own seat there, when both are forward of the winch: back from the cabin top or a car with their
+  // place still where the job was, it's that seat they go to, not the deck forward of the winch and then on to it)
+  const fwdBoth = c.spec.crew.length === 2 && (c.place?.fore ? (c.place.fore === 'fwd' || c.place.fore === 'deck' ? 1 : c.place.fore === 'mid' ? 0.5 : 0) : c.fore01 ?? 0.5) >= TWO_FWD;
+  for (let i = 1; i < tgt.length; i++) if (onDeckI(i) && seated(tgt[i]) && tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) put(i, fwdBoth && slotOf(i - 1, 2) === 0 ? Z.cabinSide : Z.deckFwd);
   for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
   // (in their order along the cockpit, front to back: the one whose place is forward keeps it. By their places, not
   // their numbers: with two crew the jib hand, people[2], is the forward one, slotOf)

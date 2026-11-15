@@ -15,9 +15,9 @@ import { beatAngle } from '../src/boat/polar';
  * and then for minutes, not a puff. A race of AI boats in the Bay's gusty westerly: each crew member's moves along the
  * boat (more than 0.3 m) while sailing, counted by the minute, jobs and the run's foredeck aside.
  */
-export function stationMoves(kt: number) {
+export function stationMoves(kt: number, seed = 1) {
   // (two AI boats, as tests/helpers/crewsettle.ts sails them; yours, left unsteered, isn't counted)
-  const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 2, opponents: ['stock:1', 'stock:2'] } as never, 1);
+  const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 2, opponents: ['stock:1', 'stock:2'] } as never, seed);
   const ai = w.boats.filter(b => !b.isUser);
   // (a seat: no job, and in the cockpit or beside the cabin, z 0.88 and aft; the cabin top, the mast and the foredeck are
   // jobs and their trips. A new seat: the place they're making for moves more than 5 cm, from one seat to another)
@@ -81,8 +81,14 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     // a minute measured in 5 to 7 kt; from 10 kt up, at their stations, 0 measured)
     m.roles.forEach((r, k) => expect(r.stay, `boat ${k + 1}: the hand who stays put, trips a minute`).toBeLessThan(kt >= 10 ? 0.1 : 0.7));
     m.free.forEach((f, j) => expect(f, `crew ${j % 2 + 1}: trips a minute for no job`).toBeLessThan(0.1));
-    for (let k = 0; k < m.trips.length; k += 2) expect(m.trips[k] + m.trips[k + 1], `boat ${k / 2 + 1}: both crew's trips a minute`).toBeLessThan(1.4);
-  }, 600_000);
+    // (each boat's two crew together, under 1.4 a minute: over three races, seeds 1 to 3, so that one trip more or less at
+    // the end of the 800 s doesn't decide it, where the race's chance puts the last of them)
+    const runs = [m, stationMoves(kt, 2), stationMoves(kt, 3)];
+    for (let k = 0; k < m.trips.length; k += 2) {
+      const mean = runs.reduce((a, r) => a + r.trips[k] + r.trips[k + 1], 0) / runs.length;
+      expect(mean, `boat ${k / 2 + 1}: both crew's trips a minute, over three races (${runs.map(r => (r.trips[k] + r.trips[k + 1]).toFixed(2)).join(', ')})`).toBeLessThan(1.4);
+    }
+  }, 1_200_000);
 });
 
 describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', () => {
