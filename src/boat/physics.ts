@@ -1140,7 +1140,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul) ? t.outhaul : c.outhaul;
     if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham) ? t.cunningham : c.cunningham;
     if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul) ? t.downhaul : c.downhaul;
-    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) ? t.backstay : c.backstay;
+    // (the backstay they've taken up for the helm is worth the trip whatever it does for the drive: it's for the rudder)
+    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) || (b.helmBackstay ?? 0) > c.backstay + 0.05 ? t.backstay : c.backstay;
     if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham) ? t.jibCunningham : c.jibCunningham;
     if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard) ? t.jibHalyard : c.jibHalyard;
     if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller) ? t.traveller : c.traveller; }

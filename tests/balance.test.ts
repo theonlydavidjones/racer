@@ -1,3 +1,4 @@
+import { boomAngle, mainsheetFor } from '../src/boat/controls';
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
@@ -16,11 +17,12 @@ import { crewWords } from '../src/ui/crewWords';
 const steer = (b: Boat, twa: number) => { b.h = 360 - (twa - (b.leeway ?? 0)); };
 function beat(windKt: number, change?: (c: Controls) => void, full = !!change, secs = 20): Boat {
   const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4.5, windKt });
-  sail(b, secs, () => { steer(b, twa); if (full) b.depower = 0; });
+  // (full power: no depowering of either kind, the speed search's steps or the backstay the crew take up for the helm)
+  sail(b, secs, () => { steer(b, twa); if (full) { b.depower = 0; b.helmBackstay = 0; } });
   if (change) {
     const base = JSON.parse(JSON.stringify(b.ctl));
     b.manualTrim = true; b.trimAll = true; b.ctl = base; change(b.ctl);
-    sail(b, 12, () => { steer(b, twa); if (full) b.depower = 0; });
+    sail(b, 12, () => { steer(b, twa); if (full) { b.depower = 0; b.helmBackstay = 0; } });
   }
   return b;
 }
@@ -48,7 +50,9 @@ describe('Heel from the forces on the sails', () => {
     expect(beat(22, c => { c.backstay = 1; }).heelMag!).toBeLessThan(base);
     // (the outhaul's on its band already in 22 kt, North Sails: easing it heels her more)
     expect(beat(22, c => { c.outhaul = 0; }).heelMag!).toBeGreaterThan(base);
-    expect(beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); }).heelMag!).toBeLessThan(base - 4);
+    // (the crew already have the car down in 22 kt, North's guide: so the traveller's effect is from the middle to down)
+    // (at the same part-eased sheet, as the crew had it before they kept the sheet tight: the car alone swings the boom 9.5°)
+    expect(beat(22, c => { c.traveller = 1; c.mainsheet = 0.27; }).heelMag!).toBeLessThan(beat(22, c => { c.traveller = 0; c.mainsheet = 0.27; }).heelMag! - 4);
     expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 1); // fuller: more power, more heel
   });
   it('in a moderate breeze the crew hike to hold her; depowering lets them hike less', () => {
@@ -99,7 +103,9 @@ describe('Helm balance (weather helm)', () => {
     const base = beat(16, undefined, true).helmNeed!;
     // (the traveller down and the sheet eased, as the name says: dropped on its own, the crew sheets in to keep the boom
     // where they want it, so it doesn't ease the boom)
-    expect(beat(16, c => { c.traveller = 1; c.mainsheet = Math.min(1, c.mainsheet + 0.12); }).helmNeed!).toBeLessThan(base - 2);
+    // (from the car in the middle, sheeted to the crew's boom: the crew have it most of the way down in 16 kt already)
+    const centred = beat(16, c => { c.mainsheet = mainsheetFor(boomAngle(c), 0); c.traveller = 0; }).helmNeed!;
+    expect(beat(16, c => { const at = boomAngle(c) + 8; c.traveller = 1; c.mainsheet = mainsheetFor(at, 1); }).helmNeed!).toBeLessThan(centred - 2); // (the boom 8° past the crew's)
     expect(beat(16, c => { c.backstay = 1; }).helmNeed!).toBeLessThan(base);
     // (eased until it's luffing hard: the main's flogging slows her too, physics.ts sailFlog)
     expect(beat(16, c => { c.mainsheet += 0.25; }).helmNeed!).toBeLessThan(0);
