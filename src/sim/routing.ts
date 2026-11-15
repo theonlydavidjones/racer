@@ -236,7 +236,9 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       // the land close ahead on this board and no better on the other (a corner, a narrowing channel): she tacks (or
       // gybes) off it all the same, as a skipper does before the shallows, rather than sail on into it
       else if (!near && room(tack) < 30 && room(other) >= room(tack) && t - lastTurnT > 0.75) flip = true; // (45 s on a board at least: not a burst of tacks in a dead end)
-      else if (plan === 'middle') {
+      // (the lane is for open water: within 400 m of the shore the shore's rules decide, or the lane's turn sent her back
+      // toward the land the closing-the-shore turn had just taken her off, a tack a minute in light air)
+      else if (plan === 'middle' && sd >= 400) {
         // the lane either side of the course: she turns back when she's beyond it on the side this board is taking her
         // (her track over the ground: on a run the gybes go to the opposite sides from a beat's tacks)
         const xt = cross(legU, sub(p, a)), go = cross(legU, gnd(tack)); // (+ left of the straight course, looking from start to mark)

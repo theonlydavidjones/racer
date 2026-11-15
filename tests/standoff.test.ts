@@ -25,4 +25,11 @@ describe("the planner in a dead end: both boards blocked close ahead (Angel Isla
       expect(r.ok).toBe(true);
       expect(r.path.some(q => onLand(q.p))).toBe(false);
     });
+  // (the review's light-air case: the lane's turn and the closing-the-shore turn sent her to and fro, 85 tacks in two hours,
+  // 20 of them under 15 m apart)
+  for (const [kt, from] of [[2.5, 300], [3, 300]] as [number, number][]) it(`in ${kt} kt from ${from}°, tacking up the island's shore without dithering (a dozen tacks, not 70–90)`, () => {
+    const w = () => ({ kt, from }), o = { ...lee(kt, { x: 0.15, y: 0 }), wind: () => ({ ...w(), gust: 1.3 }), breeze: () => ({ ...w(), gust: 1.3 }), windOnWater: () => w() } as Outlook;
+    const r = sailLeg(o, { x: 2145, y: 6012 }, { x: 703, y: 7126 }, 0, 'middle');
+    expect(r.ok).toBe(true); expect(r.tacks).toBeLessThan(15);
+  });
 });
