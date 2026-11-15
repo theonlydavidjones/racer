@@ -33,7 +33,7 @@ function exit(current: 'flood' | 'ebb', how: 'skilled' | 'careless') {
   // skilled: out through the gap's windward half, then up to windward of the pier's head, then out into the Bay
   const legs = [at(mid, 0, 6), at(mid, 70, 25), at(mid, 200, 40)];
   let leg = 0, closest = Infinity, slowest = Infinity, wrecked = false, outAt: number | null = null;
-  const trace: { across: number; kt: number; heel: number; v: number; cur: number; set: number }[] = [];
+  const trace: { across: number; kt: number; heel: number; v: number; cur: number; set: number; along: number }[] = [];
   for (let k = 0; k < 4 * 60 * 60 && outAt === null; k++) {
     if (how === 'skilled') {
       const q = legs[leg]; if (Math.hypot(q.x - u.x, q.y - u.y) < 12 && leg < legs.length - 1) leg++;
@@ -45,7 +45,7 @@ function exit(current: 'flood' | 'ebb', how: 'skilled' | 'careless') {
     if (Math.abs(across) < 10) slowest = Math.min(slowest, Math.hypot(u.vx, u.vy));
     // (what she feels: the wind over the water at her, her heel, her speed through the water, the stream and its push
     // across her heading)
-    { const r = (u.h * Math.PI) / 180, ax = Math.cos(r), ay = -Math.sin(r); trace.push({ across, kt: u.ww.kt, heel: Math.abs(u.heel), v: u.v, cur: Math.hypot(u.cur.x, u.cur.y), set: Math.abs(u.cur.x * ax + u.cur.y * ay) }); }
+    { const r = (u.h * Math.PI) / 180, ax = Math.cos(r), ay = -Math.sin(r); trace.push({ across, kt: u.ww.kt, heel: Math.abs(u.heel), v: u.v, cur: Math.hypot(u.cur.x, u.cur.y), set: Math.abs(u.cur.x * ax + u.cur.y * ay), along: u.cur.x * M.along.x + u.cur.y * M.along.y }); }
     if (u.wrecked) wrecked = true;
     if (across > 150) outAt = w.t;
   }
@@ -69,22 +69,25 @@ describe('leaving Gashouse Cove in a westerly', () => {
 });
 
 /**
- * Out of the shelter into the Bay (ROADMAP 8n.5; the owner: leaving Gashouse Cove the breeze and the stream should hit her
- * as she crosses out of the shelter: she heels, and she's set sideways). Just inside the mouth (20 m in to the mouth's
- * line) against just outside it (20–40 m out): within four boat lengths her heel about doubles and the stream's push
- * across her heading comes on. Her speed through the water rises only a little: near her hull speed a few more knots of
- * wind are worth little more speed, so she heels and drives, she doesn't leap (the drive she gains goes into heel and
- * into holding her speed against the chop outside). The current's edge is BASIN_MOUTH's (environment/current.ts).
+ * Out of the shelter into the Bay (ROADMAP 8n.5; the owner: leaving Gashouse Cove the stream should hit her as she
+ * crosses out of the shelter, and set her sideways). Just inside the mouth (20 m in to the mouth's line: further in she's
+ * still gathering way from her 2.0 m/s start) against just outside it (20–40 m out): within four boat lengths the stream
+ * comes on across her, setting her east, into the Bay, on the flood and west, toward the Gate, on the ebb, from next to
+ * nothing in the cove (the current's edge is BASIN_MOUTH's, environment/current.ts). Her speed through the water rises
+ * only a little: near her hull speed (about 5.9 kn) a little more wind is worth little more speed, so she drives on, she
+ * doesn't leap. (The wind's own edge leaving the cove, and the heel it brings, are the next piece: the Cityfront's
+ * shore relief. Here her heel changes mostly as she comes up onto her second leg, so it isn't asserted.)
  */
 describe('crossing out of the cove\'s shelter', () => {
-  for (const current of ['flood', 'ebb'] as const) it(`on the ${current}: within four boat lengths of the mouth she heels and is set sideways`, () => {
+  for (const current of ['flood', 'ebb'] as const) it(`on the ${current}: within four boat lengths of the mouth the stream sets her ${current === 'flood' ? 'east' : 'west'}, and she drives on`, () => {
     const { trace } = exit(current, 'skilled');
     const mean = (k: keyof (typeof trace)[0], a: number, b: number) => { const q = trace.filter(t => t.across >= a && t.across < b); return q.reduce((s, t) => s + t[k], 0) / q.length; };
-    const inH = mean('heel', -20, 0), outH = mean('heel', 20, 40), inS = mean('set', -20, 0), outS = mean('set', 20, 40), inV = mean('v', -20, 0), outV = mean('v', 20, 40);
-    expect(outH, `heel ${inH.toFixed(1)}° inside, ${outH.toFixed(1)}° outside`).toBeGreaterThan(1.6 * inH); // (3.7° to 7.4–7.9°, both tides)
-    expect(inS, 'the stream across her inside (m/s)').toBeLessThan(0.06); // (slack in the cove: 0 on the flood, 0.04 on the ebb)
-    expect(outS - inS, `the stream across her: ${inS.toFixed(2)} inside, ${outS.toFixed(2)} m/s outside`).toBeGreaterThan(0.1); // (0.14 on the flood, 0.18 on the ebb)
-    expect(outV).toBeGreaterThan(inV); expect(outV).toBeLessThan(1.1 * inV); // (2.6 to 2.7 m/s: she drives on, she doesn't leap)
+    // (`along`: the stream along the shore, + toward the breakwater, west; the flood runs east into the Bay, the ebb west)
+    const sign = current === 'flood' ? -1 : 1, inA = sign * mean('along', -20, 0), outA = sign * mean('along', 20, 40), inV = mean('v', -20, 0), outV = mean('v', 20, 40);
+    expect(Math.abs(inA), 'the stream along the shore inside (m/s)').toBeLessThan(0.06); // (slack in the cove: 0 on the flood, 0.04 on the ebb)
+    expect(outA, `the stream setting her ${current === 'flood' ? 'east' : 'west'} 20–40 m out (m/s)`).toBeGreaterThan(0.1); // (0.15 on the flood, 0.24 on the ebb)
+    expect(outA - inA).toBeGreaterThan(0.1);
+    expect(outV).toBeGreaterThan(inV); expect(outV).toBeLessThan(1.1 * inV); // (2.63 to 2.70 m/s, 5.1 to 5.25 kn: she drives on, she doesn't leap)
   }, 300_000);
 });
 

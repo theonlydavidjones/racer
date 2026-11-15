@@ -68,7 +68,7 @@ export const shoreRelief = (p: Vec, lattice = false): number => {
  * Aquatic Park: the nearest are SFB1204, Alcatraz Island SW, and SFB1205, North Point Pier 35, CO-OPS station list, Nov
  * 2026). From general, not San Francisco, work they sit in a plausible range: a mixing layer along a harbor's mouth spreads
  * at about 0.03–0.1 of the distance the stream has run in shallow water (bed friction slows it from the free 0.1–0.2:
- * Chu & Babarutsi 1988; Uijttewaal & Jirka 2003), so over the few hundred meters it runs past a breakwater, 10–60 m wide,
+ * Chu & Babarutsi 1988; Uijttewaal and co-workers), so over the few hundred meters it runs past a breakwater, 10–60 m wide,
  * where BASIN_MOUTH's 30 m is; and the gyre inside a narrow-mouthed basin runs at roughly 0.05–0.2 of the stream outside
  * (marinas exchanging through such a layer: e.g. "Shear-driven flushing of micro-tidal marinas", ICCE 2012), where
  * BASIN_EDDY's 0.1 is. (Both as summarized: the papers themselves weren't reachable from here.)
