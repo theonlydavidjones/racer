@@ -1,9 +1,10 @@
 import './three-setup';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -28,7 +29,7 @@ export interface Figure extends Body {
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
-export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
+export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
    * +x), for boatMesh.ts to draw the handle where the hand has it */ winch?: { side: 1 | -1; turn: number } }
 type Limb = Body['arm'][number];
@@ -43,8 +44,28 @@ export function buildCrew(helm: Person, people: Person[], jackets: number[], see
   // the tiller extension (a black glassfibre stick on a universal joint at the tiller's end), in the helm's hand
   const extension = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 1, 6), new THREE.MeshLambertMaterial({ color: 0x1b1d20 }));
   extension.castShadow = true; group.add(extension);
-  return { group, helm: h, crew, helmSide: 1, side: 1, extension };
+  const crutch = new THREE.Mesh(crutchGeometry(), new THREE.MeshLambertMaterial({ color: 0x9a6a3c })); crutch.visible = false; crutch.castShadow = true; group.add(crutch);
+  return { group, helm: h, crew, helmSide: 1, side: 1, extension, crutch };
 }
+
+/**
+ * The boom crutch (boat/paddle.ts): a varnished wooden post that holds the boom up when she's moored, its foot a flat
+ * end about 0.15 × 0.20 m (paddle.ts F_MAX's blade), its head a crotch for the boom. One mesh, along +y from the foot
+ * (y 0) to the crotch (1.35 m), the foot's flat faces toward ±z.
+ */
+function crutchGeometry(): THREE.BufferGeometry {
+  const shaft = new THREE.CylinderGeometry(0.017, 0.019, 1.2, 7).translate(0, 0.75, 0);
+  const foot = new THREE.BoxGeometry(0.15, 0.2, 0.022).translate(0, 0.1, 0);
+  const prong = (s: number) => new THREE.BoxGeometry(0.03, 0.16, 0.03).translate(0, 0.08, 0).rotateZ(s * 0.45).translate(0, 1.33, 0);
+  const g = mergeGeometries([shaft, foot, prong(1), prong(-1)].map(q => q.index ? q.toNonIndexed() : q));
+  return g;
+}
+/** The paddling as the page sees it (boatMesh.ts, from boat/paddle.ts): the side, back-paddling, the time the crutch
+ * takes to fetch (s), who paddles (CrewState.people's index: 0 the helm), and its start as a key. */
+export interface PaddleDraw { side: 'P' | 'S'; back: boolean; fetch: number; who: number; key: number }
+/** This frame's paddler (syncCrew): their figure, how long since the paddling began (s, the race's clock), the fetch
+ * time, the side (+1 starboard), back-paddling, and since when it stopped. */
+let pdl: { f: Figure; e: number; fetch: number; sd: number; back: boolean; stop?: number } | undefined;
 
 // ———————————————————————————— the boat's surfaces, where people sit and step ————————————————————————————
 
@@ -139,6 +160,9 @@ const inCockpit = (ax: number, z: number) => z > COCK0 && z < COCK1 && ax < chz(
 /** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, footrest, thwart, coaming, deck, cabin top. */
 export function ground(x: number, z: number): number {
   const ax = Math.abs(x), u = uAtZ(z);
+  // (the companionway, open in the cabin's after end down to its sill: hull.ts COMPANIONWAY; a hand reaches down into it
+  // for the boom crutch below)
+  if (ax < COMPANIONWAY.hw - 0.02 && z < COCK0 + 0.03 && z > COCK0 - COMPANIONWAY.len + 0.02) return COMPANIONWAY.sill; // (through the after bulkhead too: the opening's cut down to the sill)
   if (inCockpit(ax, z)) {
     if (Math.abs(z - THWART.z) < THWART.half) return THWART.top;
     if (onFootrest(ax, z)) return SEAT_Y; // (the footrest, across)
@@ -406,6 +430,63 @@ function kneel(x: number, z: number, yaw: number, reach: [THREE.Vector3, THREE.V
   const foot = (j: number) => { const q = hip.clone().addScaledVector(f, -0.11 * k).addScaledVector(r, (j ? 1 : -1) * 0.1 * k); return q.setY(Math.max(g, ground(q.x, q.z)) + 0.07); };
   return { hip, yaw, pitch: -0.45, roll: 0, feet: [foot(0), foot(1)], hands: reach, look: lookAt.clone() };
 }
+/** The crutch carried upright in front of them, both hands on it (to the side deck, and back below). */
+function carry(p: PoseT, k: number): PoseT {
+  const f = fwd(p.yaw), r = right(p.yaw), h = p.hip;
+  // (at arm's length ahead and the elbows down and out: held close in, the upper hand by the shoulder folded the arm with
+  // its elbow forward, kneeling with it on the side deck)
+  p.hands = [h.clone().addScaledVector(f, 0.42 * k).addScaledVector(r, -0.08 * k).setY(h.y + 0.4 * k), h.clone().addScaledVector(f, 0.46 * k).addScaledVector(r, 0.08 * k).setY(h.y + 0.66 * k)];
+  p.elbow = [V(0.3, -1, 0.3), V(-0.3, -1, 0.3)]; return p;
+}
+/**
+ * Paddling (boat/paddle.ts): the paddler goes to the companionway, reaches down for the crutch below and comes up with
+ * it, in the time the physics gives them (PADDLE.fetchS at their pace); carries it out to the side deck the physics
+ * sends them to (world.ts paddleJob: the side deck by the cockpit's forward end, z 1.35); then kneels there facing
+ * forward and a little out and paddles over the side: the crutch's foot dips in ahead, is drawn aft through the water,
+ * lifted out and swung forward again, a stroke about every 2 s (1.7 in the first push, PADDLE.burstS); back-paddling, the
+ * other way. The push itself is the physics' (paddleForce), steady: the strokes only draw it.
+ */
+function paddleWant(f: Figure, want: PoseT, q: NonNullable<typeof pdl>, px: number, z: number, going: boolean, windward: number, idx: number): PoseT {
+  const k = f.scale, e = q.e, F = q.fetch, cu = f.cur?.hip;
+  if (q.stop != null) return carry(want, k); // (stopped: carried back, and below)
+  if (e < 0.62 * F) {
+    // to the companionway, kneeling at its foot facing forward, reaching down into it; the crutch comes up from 0.42
+    const cz = COCK0 + 0.5;
+    // (on the way there, as any trip in the cockpit is posed: crewPose, which steps down off the side deck and over the coaming)
+    if (cu && Math.hypot(cu.x, cu.z - cz) > 0.3) return crewPose(f, 0.05 * Math.sign(cu.x || 1), cz, 0, 'sit', windward, true, Math.atan2(cu.x, cu.z - cz), idx);
+    const up = Math.max(0, Math.min(1, (e - 0.42 * F) / (0.2 * F))), zh = COCK0 - 0.12 + 0.3 * up;
+    const hy = (j: number) => COMPANIONWAY.sill + 0.3 + up * (0.62 + j * 0.25);
+    // (the hands close together and the elbows down and in, inside the opening's 0.55 m: splayed, the forearms crossed its jambs)
+    const p = kneel(0, cz, 0, [V(-0.06, hy(0), zh), V(0.06, hy(1), zh)], k, V(0, COMPANIONWAY.sill, COCK0 - 0.4));
+    p.pitch = -0.95 + 0.6 * up; p.elbow = [V(0.3, -1, 0.4), V(-0.3, -1, 0.4)]; return p;
+  }
+  // (out to the side deck with it; and paddling once they're there)
+  const u = uAtZ(z), hb = halfBeam(u);
+  // (still on the way out to it: walked there, stepping up out of the cockpit and over the coaming, not glided in to the
+  // place where the physics, there already, has them kneeling; crewPose posed it sat on the deck, the feet sliding up)
+  const far = !cu || Math.hypot(Math.abs(cu.x) - (hb - 0.2), cu.z - z) > 0.3;
+  if (far && !going) return carry(moving(f, px, z, Math.atan2(-(px - cu!.x), -(z - cu!.z)), k), k); // (moving's way up out of the cockpit onto the side deck: the pole trip's, crewfig)
+  if (going || far) return carry(want, k);
+  // (kneeling on the side deck, outboard of the cabin's side or the coaming's, whichever is there, the inboard knee and foot
+  // clear of it: beside the cockpit the deck's only 0.3 m wide; there with the crutch before the first stroke, too: the
+  // physics' own kneel there, the jib car's, put the inboard foot on the coaming)
+  const sd = q.sd, dk = deckY(u, hb), wall = Math.max(z < COCK0 ? cabinHalf(u) : 0, z > COCK0 - 0.05 ? chz(z) + COAMING_T : 0), x = sd * Math.max(wall + 0.12, hb - 0.24);
+  const knelt = (hands: [THREE.Vector3, THREE.Vector3], look: THREE.Vector3) => {
+    const p = kneel(x, z, -sd * 0.45, hands, k, look);
+    for (const ft of p.feet) if (Math.abs(ft.x) < wall + 0.06) ft.setX(sd * (wall + 0.06)).setY(ground(ft.x, ft.z) + 0.07);
+    p.pitch = -0.5; return p;
+  };
+  if (e < F) return carry(knelt([V(0, 0, 0), V(0, 0, 0)], V(sd * 3, 0, z - 2)), k);
+  const ep = e - F, per = q.back ? 2.2 : ep < 20 ? 1.7 : 2.1, ph = (ep / per) % 1, pull = ph < 0.6;
+  const w = pull ? ph / 0.6 : (ph - 0.6) / 0.4;
+  let sw = pull ? -Math.cos(Math.PI * w) : Math.cos(Math.PI * w); // (−1 at the catch, ahead; +1 drawn aft)
+  if (q.back) sw = -sw;
+  const z0 = z - 0.15;
+  const P = V(sd * (hb + 0.03), dk + 0.16, z0 + 0.22 * sw); // (the lower hand, at the rail)
+  const B = V(sd * (hb + 0.38), pull ? -0.1 : 0.08 + 0.14 * Math.sin(Math.PI * w), z0 + 0.7 * sw); // (the foot: in the water pulling, lifted to swing forward)
+  const d = P.clone().sub(B).normalize(), T = P.clone().addScaledVector(d, 0.66); // (the upper hand, up the shaft)
+  return knelt(sd > 0 ? [T, P] : [P, T], B);
+}
 /** Moving about the boat: crouched under the boom, stepping over what's beneath, facing the way they're going. */
 function moving(fig: Figure, x: number, z: number, yaw: number, k: number): PoseT {
   // (from where the figure is, a stride on toward where the physics has them: they walk at their feet's pace, behind it
@@ -465,6 +546,9 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     // (by the cabin's after end, stepping up out of the cockpit beside it: the knees forward and a little out, clear of its
     // corner. Not along the rest of it: further out, the knees went over the side, past the hull)
     if (outside && ch(z) > 0.05 && z > COCK0 - 0.5) { p.knee = f.clone().add(V(s * 0.35, 0.5, 0)); p.kneeW = 1; }
+    // (and beside the cockpit, the hips near the coaming's line on the way up out of it onto the side deck: the knees
+    // forward and out over the deck too, not folded onto the coaming's top under hips still rising; going out to paddle)
+    else if (z > COCK0 - 0.05 && z < COCK1 && Math.abs(hip.x) > chz(z) - 0.1) { p.knee = f.clone().add(V(s * 0.35, 0.5, 0)); p.kneeW = 1; }
     // (and the hips stay inside the coaming's line until no foot is left down in the cockpit: out over it with a foot
     // still on the bench, that knee went with them and the shin crossed the coaming's inner face, climbing out from the
     // cockpit's after stations (crew-seat-swap's) at z 1.6)
@@ -1081,7 +1165,7 @@ function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: nu
  * the mast). `windward` +1 when the wind is over the starboard side; `c` the crew state (null: a default);
  * `hideHelm` when you're looking through the helm's eyes; `dt` for easing; `tip` the tiller's end (tillerTip).
  */
-export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0, tacking = false, pitch?: number): void {
+export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0, tacking = false, pitch?: number, paddle?: PaddleDraw | null): void {
   // (how she's moving in the sea, from her pitch as drawn, rad: its rate's mean square over about four seconds)
   if (pitch != null && dt > 0 && dt < 0.5) { if (cr.seaP != null) { const r = (pitch - cr.seaP) / dt; cr.seaMs = (cr.seaMs ?? 0) + (r * r - (cr.seaMs ?? 0)) * (1 - Math.exp(-dt / 4)); } cr.seaP = pitch; }
   rough = Math.max(0, Math.min(1, (Math.sqrt(cr.seaMs ?? 0) - 0.012) / 0.04));
@@ -1091,6 +1175,14 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   // (the time the race moved since the last frame, for their walking: track)
   const clk = c?.clock, sdt = clk == null || cr.clock == null || clk < cr.clock ? dt : clk - cr.clock; cr.clock = clk;
   poseClock = clk ?? poseClock + dt; cranked = undefined;
+  // (paddling: since when, by the race's clock as the drawing first sees it; and once stopped, the crutch carried back
+  // below for 2.5 s)
+  if (paddle && (!cr.pd || cr.pd.key !== paddle.key || cr.pd.end != null)) cr.pd = { key: paddle.key, t0: poseClock };
+  else if (!paddle && cr.pd && cr.pd.end == null) cr.pd.end = poseClock;
+  if (cr.pd?.end != null && poseClock - cr.pd.end > 2.5) cr.pd = undefined;
+  if (cr.pd && paddle) cr.pdWho = paddle.who;
+  const pf = cr.pd ? (cr.pdWho ? cr.crew[cr.pdWho - 1] : undefined) : undefined;
+  pdl = cr.pd && pf ? { f: pf, e: poseClock - cr.pd.t0, fetch: paddle?.fetch ?? 0, sd: paddle?.side === 'S' ? 1 : paddle?.side === 'P' ? -1 : 0, back: !!paddle?.back, stop: cr.pd.end } : undefined;
   // (two of them on the same side don't sit in each other's laps: at least a shoulder's width apart fore and aft)
   // (out on a side deck, not forward of the winch there; in the middle, on the benches, on forward)
   const ZMAX = DECK_AFT, inC = (z: number) => z > COCK0 - 0.1 && z < COCK1;
@@ -1172,7 +1264,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (the side they're going to, the physics' own: at the role's end they can be just across the middle from it)
     if (wasTack && !f.tack && f.cur && Math.cos(f.cur.yaw) < -0.3) f.turnDir = -Math.sign(x) || -Math.sign(f.cur.hip.x) || 1;
     const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
-    const want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z, cr.crew.length < 2 || i === fore);
+    let want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z, cr.crew.length < 2 || i === fore);
+    if (pdl?.f === f) want = paddleWant(f, want, pdl, x, a?.z ?? z, go, windward, i);
     // (on the way along the side deck, and settling into the new place after it)
     const routed = route(f, want, dt, f.scale);
     if (routed) f.walked = true; else if (f.walked && f.cur && f.cur.hip.distanceTo(want.hip) < 0.03) f.walked = false;
@@ -1203,7 +1296,22 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     ex.position.copy(t).addScaledVector(d.normalize(), len / 2); ex.scale.set(1, len, 1);
     ex.quaternion.setFromUnitVectors(V(0, 1, 0), d);
   }
+  // the crutch, in the paddler's hands from when it comes up out of the companionway: along the line from the lower hand
+  // to the upper, its foot below the lower (over the side and in the water, paddling)
+  const cf = pdl?.f, cu = cr.crutch;
+  cu.visible = !!cf && (pdl!.stop != null || pdl!.e > 0.47 * pdl!.fetch);
+  if (cu.visible && cf?.cur) {
+    const [h0, h1] = cf.cur.hands, lo = h0.y < h1.y ? h0 : h1, hi = lo === h0 ? h1 : h0;
+    const d = _t.copy(hi).sub(lo); if (d.lengthSq() < 1e-6) d.set(0, 1, 0); d.normalize();
+    const paddling = pdl!.stop == null && pdl!.e >= pdl!.fetch && Math.abs(lo.x) > 0.9;
+    cu.position.copy(lo).addScaledVector(d, paddling ? -0.85 : -0.45);
+    // (the foot's flat faces fore and aft, square to the stroke)
+    const zAx = _s.set(0, 0, 1).addScaledVector(d, -d.z); if (zAx.lengthSq() < 1e-6) zAx.set(1, 0, 0); zAx.normalize();
+    const xAx = _u.copy(d).cross(zAx);
+    cu.quaternion.setFromRotationMatrix(_m4.makeBasis(xAx, d, zAx));
+  }
 }
+const _m4 = new THREE.Matrix4();
 
 /**
  * Pushing off: the bow crew member standing on the finger beside her (the shrouds), leaning in with both hands on her
