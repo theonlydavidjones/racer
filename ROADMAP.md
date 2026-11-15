@@ -469,6 +469,16 @@ What's planned, roughly in order. Done work is described in the README.
      by 3 s") drifts up until the top bar cuts it off. It should stay fully on screen and steady: kept below the top bar
      and clamped inside the view wherever the boat it's pinned to goes. Its faint second line also needs to be readable
      against a pale sky.
+   - **The start-line drill teaches the favored end and why** (owner, 15 November; feature; 3–5 h): "start line
+     training also needs to help me learn which side is favored and why." Each run shows which end of the line is
+     favored and the reasons, in pictures rather than copy:
+     - the line's bias to the wind: the square line drawn against the real one, with the favored end lit;
+     - the current at the line: which end it carries you to, and how it sets the boats at the gun;
+     - the first beat: which side of the course pays (the strategist's left/right, from the wind and tide);
+     - the crowd: where the fleet bunches.
+     At the end of each run, a one-line verdict ("pin favored by about 2 boat lengths") and how your end compared.
+     Better still, the player calls it first ("which end?") before the reveal, so it's practice at judging and not
+     just reading. The wind's shifts in the drill come from the real data, as everywhere.
    - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
      cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
      chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
