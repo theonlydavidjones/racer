@@ -25,7 +25,9 @@ export class PerfMeter {
    * The browser's own work after our JS each frame: a message posted as the frame's callback ends runs as the next task,
    * after the event loop's rendering step (style, layout, paint of the page's own labels and HUD, and handing the frame
    * to the compositor), so the gap is that work, which the JS figures don't see. What's left of the frame is the wait:
-   * for the display's next refresh, or the GPU. Which one sets the pace is then on the readout itself.
+   * for the display's next refresh, or the GPU. Which one sets the pace is then on the readout itself. (The HTML event
+   * loop's order, and Chrome's; WebKit's isn't documented: if Safari ran the message before its rendering, the browser
+   * figure would read near 0 and its work would show in the wait.)
    */
   private ch: MessageChannel | null = null; private sent = 0; private after = { ms: 0, n: 0 };
   get on(): boolean { return !!this.el; }
@@ -60,9 +62,14 @@ export class PerfMeter {
     const k = this.n, fr = this.sum.frame / (k - 1), i = r.info, mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     // the stutter over the last 10 s: the 95th-percentile frame, and how many frames ran long
     const fs = this.span.map(x => x.f).sort((a, b) => a - b), p95 = fs.length ? fs[Math.min(fs.length - 1, Math.floor(fs.length * 0.95))] : 0, long = fs.filter(f => f > LONG).length;
+    // the frames' rhythm: at a 60 Hz pace a frame that misses its refresh lands at 25 ms on a 120 Hz screen (33 at 60 Hz),
+    // so the shares near 16.7 and near 25 show a pacing step where the average only shows 21 ms (Safari paces pages at
+    // about 60 fps even at 120 Hz: its "Prefer Page Rendering Updates near 60fps" feature flag)
+    const near = (lo: number, hi: number) => fs.length ? Math.round(100 * fs.filter(f => f >= lo && f < hi).length / fs.length) : 0;
     const secs = this.span.length ? Math.min(WINDOW, now - this.span[0].t + this.span[0].f) / 1000 : 0;
     this.txt.textContent = `${(1000 / fr).toFixed(0)} fps  ${fr.toFixed(1)} ms/frame  worst ${this.worst.toFixed(0)} ms\n`
       + `last ${secs.toFixed(0)} s: 95% of frames under ${p95.toFixed(1)} ms  ${long} long (> ${LONG} ms) of ${fs.length}\n`
+      + `frames ≤ 12 ms ${near(0, 12)}%, 12–20 ms ${near(12, 20)}%, 20–30 ms ${near(20, 30)}%, over 30 ms ${near(30, Infinity)}%\n`
       + `JS ${(this.sum.js / k).toFixed(1)} ms: sim ${(this.sum.sim / k).toFixed(1)}, scene ${(this.sum.scene / k).toFixed(1)}, rest ${((this.sum.js - this.sum.sim - this.sum.scene) / k).toFixed(1)}\n`
       + (this.after.n ? `then the browser ${(this.after.ms / this.after.n).toFixed(1)} ms (style, layout, paint), waiting ${Math.max(0, fr - this.sum.js / k - this.after.ms / this.after.n).toFixed(1)} ms\n` : '')
       + `${i.render.calls} draw calls  ${(i.render.triangles / 1e6).toFixed(2)} M triangles  ${i.programs?.length ?? 0} programs\n`
