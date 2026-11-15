@@ -16,7 +16,7 @@ export type MooredKind = 'sail' | 'power';
 /** The widest a boat in one of the sim's slips is drawn, m: the slips are worked out a Folkboat's beam and fenders wide (3.0 m), so a big boat's beam is drawn to fit hers. */
 export const MAX_BEAM = 3.0;
 /** One part of a moored boat: its geometry (for a 1 m boat), and its colour, fixed or each boat's own. */
-export interface MooredPart { geo: THREE.BufferGeometry; colour: number; own?: 'hull' | 'cover' }
+export interface MooredPart { geo: THREE.BufferGeometry; colour: number; own?: 'hull' | 'cover'; /** its geometry carries colors of its own (the hull's boot stripe and bottom paint) */ vc?: boolean }
 
 /** The hull's lines, as fractions of the length overall. */
 interface Lines { beam: number; fbBow: number; fbStern: number; transom: number; draft: number; rake: number }
@@ -51,6 +51,10 @@ function hull(L: Lines, N = 24): { side: THREE.BufferGeometry; deck: THREE.Buffe
   // the transom: closing the last section
   const t0 = N * ring; for (let j = 1; j < ring - 1; j++) idx.push(t0, t0 + j + 1, t0 + j);
   const side = new THREE.BufferGeometry(); side.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); side.setIndex(idx); side.computeVertexNormals();
+  // her bottom paint below the waterline (a near-black blue antifouling: multiplied by her own color, as mooredNear.ts's)
+  const bottom = new THREE.Color(0x1b2230), col: number[] = [];
+  for (let k = 1; k < pos.length; k += 3) col.push(...(pos[k] < -1e-6 ? [bottom.r, bottom.g, bottom.b] : [1, 1, 1]));
+  side.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   const di: number[] = []; for (let i = 1; i <= N; i++) { const a = (i - 1) * 2, c = i * 2; di.push(a, a + 1, c, a + 1, c + 1, c); }
   const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(deck, 3)); dg.setIndex(di); dg.computeVertexNormals();
   return { side, deck: dg, sheer, half };
@@ -124,16 +128,20 @@ export function sailParts(far = false): MooredPart[] {
     rod(mastFoot, head, 0.008, 6),
     rod(new THREE.Vector3(0, boomY, mastZ), boomEnd, 0.005),
     rod(head, new THREE.Vector3(0, M.fbBow, -0.495), 0.0012, 3), // the forestay, to the stemhead
-    rod(head, new THREE.Vector3(0, M.fbStern + 0.01, 0.49), 0.0012, 3) // the backstay, to the transom
+    rod(head, new THREE.Vector3(0, M.fbStern + 0.01, 0.49), 0.0012, 3), // the backstay, to the transom
+    ...[1, -1].map(sd => rod(new THREE.Vector3(0, M.mastAbove * 0.96, mastZ), new THREE.Vector3(sd * h.half(M.mastAt) * 0.94, h.sheer(M.mastAt), mastZ + 0.01), 0.0012, 3)) // the shrouds, to the rail
   ].map(g => g.toNonIndexed()));
+  // the cockpit's sole, aft of the cabin (a quad just above the deck: from a distance, the well's darker floor)
+  const sole = new THREE.BufferGeometry(), cw = h.half(0.8) * 0.5, sy = (u: number) => h.sheer(u) + 0.0015;
+  sole.setAttribute('position', new THREE.Float32BufferAttribute([cw, sy(0.7), 0.2, -cw, sy(0.7), 0.2, -cw, sy(0.93), 0.43, cw, sy(0.7), 0.2, -cw, sy(0.93), 0.43, cw, sy(0.93), 0.43], 3)); sole.computeVertexNormals();
   const cover = rod(new THREE.Vector3(0, boomY + 0.016, mastZ + 0.01), new THREE.Vector3(0, boomY + 0.01, boomEnd.z - 0.03), 0.017, far ? 4 : 7);
   if (far) return [
     { geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: h.deck, colour: 0xe9e5da }, { geo: cabin, colour: 0xf2efe7 },
     { geo: rod(mastFoot, head, 0.008, 3), colour: 0xc4c9ce }, { geo: cover, colour: 0xffffff, own: 'cover' }
   ];
   return [
-    { geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: rubrail(h.sheer, h.half), colour: 0x2a2d30 }, { geo: h.deck, colour: 0xe9e5da }, { geo: cabin, colour: 0xf2efe7 },
-    { geo: ports, colour: 0x1d2328 }, { geo: rig, colour: 0xc4c9ce }, { geo: cover, colour: 0xffffff, own: 'cover' }
+    { geo: h.side, colour: 0xffffff, own: 'hull', vc: true }, { geo: rubrail(h.sheer, h.half), colour: 0x2a2d30 }, { geo: h.deck, colour: 0xe9e5da }, { geo: cabin, colour: 0xf2efe7 },
+    { geo: ports, colour: 0x1d2328 }, { geo: rig, colour: 0xc4c9ce }, { geo: cover, colour: 0xffffff, own: 'cover' }, { geo: sole, colour: 0xb9ad94 }
   ];
 }
 
@@ -151,7 +159,7 @@ export function powerParts(far = false): MooredPart[] {
   ].map(g => g.toNonIndexed()));
   if (far) return [{ geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: h.deck, colour: 0xe9e5da }, { geo: house, colour: 0xf4f2ec }, { geo: windows, colour: 0x1a2026 }];
   return [
-    { geo: h.side, colour: 0xffffff, own: 'hull' }, { geo: rubrail(h.sheer, h.half), colour: 0x2a2d30 }, { geo: h.deck, colour: 0xe9e5da }, { geo: house, colour: 0xf4f2ec },
+    { geo: h.side, colour: 0xffffff, own: 'hull', vc: true }, { geo: rubrail(h.sheer, h.half), colour: 0x2a2d30 }, { geo: h.deck, colour: 0xe9e5da }, { geo: house, colour: 0xf4f2ec },
     { geo: windows, colour: 0x1a2026 }, { geo: bridge, colour: 0xd8dadc }
   ];
 }
