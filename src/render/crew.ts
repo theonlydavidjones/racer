@@ -449,7 +449,7 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
       if (outside) { const e = ch(ft.z) + 0.16; if (e > 0.16 && Math.abs(ft.x) < e) ft.x = s * e; }
       // (and never down in the cockpit beside the cabin's after end: out on the side deck, past the coaming. A foot put in
       // from the hips there stepped back down onto the bench, the shin through the cabin's corner)
-      if (ft.z > COCK0 - 0.05 && ft.z < COCK1 && Math.abs(ft.x) < chz(ft.z) + COAMING_T + 0.08) ft.x = s * (chz(ft.z) + COAMING_T + 0.1); // (clear of the coaming's top too: a foot on it goes inside it, onGround)
+      if (ft.z > COCK0 - 0.05 && ft.z < COCK1 && Math.abs(ft.x) < chz(ft.z) + 0.13) ft.x = s * (chz(ft.z) + 0.13); // (clear of the coaming's top too: within 12 cm of its inner face, onGround puts a foot inside it)
       const e2 = halfBeam(uAtZ(ft.z)) - 0.05; if (Math.abs(ft.x) > e2) ft.x = Math.sign(ft.x) * e2;
       return ft.setY(ground(ft.x, ft.z) + 0.07); }) as [THREE.Vector3, THREE.Vector3];
     const zh = z + f.z * 0.2 * k; // (a little ahead, the way they're going)
@@ -465,6 +465,10 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     // (by the cabin's after end, stepping up out of the cockpit beside it: the knees forward and a little out, clear of its
     // corner. Not along the rest of it: further out, the knees went over the side, past the hull)
     if (outside && ch(z) > 0.05 && z > COCK0 - 0.5) { p.knee = f.clone().add(V(s * 0.35, 0.5, 0)); p.kneeW = 1; }
+    // (and the hips stay inside the coaming's line until no foot is left down in the cockpit: out over it with a foot
+    // still on the bench, that knee went with them and the shin crossed the coaming's inner face, climbing out from the
+    // cockpit's after stations (crew-seat-swap's) at z 1.6)
+    if (fig.cur?.feet.some(ft => inCockpit(Math.abs(ft.x), ft.z) && ft.y < SEAT_Y + 0.2)) { const lim = chz(hip.z) - 0.02; if (lim > 0.2 && Math.abs(hip.x) > lim) hip.x = Math.sign(hip.x) * lim; }
     return p;
   }
   // in the cockpit (or across the after deck): crouched under the boom, stepping over the seats and the thwart (with
@@ -923,6 +927,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         // (and never past the deck's edge: carried on the way it was going, out across the side deck, a foot was put down
         // 2 cm outboard of it, hung over the topsides)
         { const e = halfBeam(uAtZ(ahead.z)) - 0.06; if (Math.abs(ahead.x) > e) ahead.x = Math.sign(ahead.x) * e; }
+        // (and where it's meant to go is out on the side deck beside the cockpit, it stays out there: carried 8 cm on
+        // the way it was going, partly inboard, onto the coaming's line, onGround put it back down on the bench)
+        { const wf = want.feet[i], wo = chz(wf.z) + COAMING_T; if (wf.z > COCK0 - 0.05 && wf.z < COCK1 && Math.abs(wf.x) >= wo && ahead.z > COCK0 - 0.05 && ahead.z < COCK1) { const ao = chz(ahead.z) + 0.13; if (Math.abs(ahead.x) < ao) ahead.x = Math.sign(wf.x) * ao; } } // (onGround's margin: 12 cm from its inner face)
         const to = want.deck ? ahead.setX(want.feet[i].x).setY(ground(want.feet[i].x, ahead.z) + 0.06) : onGround(ahead); let top = Math.max(foot.y, to.y); // (on the side deck, as far out as it's meant to be)
         // (every 1.2 cm, finer than the coaming's 2.5 cm width: at twelve looks a long step out of the cockpit passed between
         // two of them and the shin went through its top; and what's within the first third of the way)
