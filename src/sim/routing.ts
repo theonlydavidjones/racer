@@ -131,7 +131,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   let turnedNow = false, lastTurnT = -Infinity, forced: LegKind | null = null;
   /** A tack or a gybe here: where, on the drawn track, and the time it costs (manoeuvreS, in the wind here). */
   const turn = (kind: 'tack' | 'gybe', c: Vec, tws: number, hs = 0) => {
-    tacks++; turns.push({ p: { ...p }, kind }); turnedNow = true; lastTurnT = t;
+    tacks++; turns.push({ p: { ...p }, kind }); turnedNow = true; lastTurnT = t; turnTs.push(t);
     const lp = path[path.length - 1]; if (lp.p.x !== p.x || lp.p.y !== p.y) path.push({ p: { ...p }, t });
     // (what it costs, as time with no way on, drifting with the current: the distance made good it loses, over her VMG)
     const ms = manoeuvreS(kind, tws, hs);
@@ -149,7 +149,8 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   }
   let mode: LegKind | null = null, side = 0; // (side: which side of the wind her heading is on, + starboard)
   /** Standing off the land, borne away: both boards were blocked close ahead (below) */
-  let standOff = false, standT = 0, standTwa = 0;
+  let standOff = false, standT = 0, standTwa = 0, standEnd = -Infinity;
+  const turnTs: number[] = []; // (when she turned: a dead end shows as turns crowding together)
   const maxSteps = maxMin * 60 / DT;
   while (dist(p, b) > arrive && steps < maxSteps) {
     steps++;
@@ -178,22 +179,6 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     if (mode === 'reach') {
       v = sp(off); h = crabTo(u, c, v);
       const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, Math.min(run, twa)));
-      // the land ahead on the straight line (a point, an island's corner, a current setting her onto the shore): she
-      // steers round it, as on any board, on the clear heading that makes most toward the mark: her track over the next
-      // minute and a half clear water all the way and ending with room, no closer to the wind than close-hauled. Held
-      // to the line, she sailed straight onto it
-      { const g0 = V(h), e0 = { x: p.x + (g0.x * v + c.x) * 90, y: p.y + (g0.y * v + c.y) * 90 };
-        if (sd < 400 && (landAlong(p, e0) !== Infinity || landDist(e0) < 30)) {
-          let best = -Infinity, bh = h, bv = v;
-          for (let dh = -90; dh <= 90; dh += 10) {
-            const hh = h + dh, ta = Math.abs(wrap(hh - w.from)); if (ta < beat) continue;
-            const vv = sp(Math.min(run, ta)), d = V(hh), gx = d.x * vv + c.x, gy = d.y * vv + c.y, e = { x: p.x + gx * 90, y: p.y + gy * 90 };
-            if (landAlong(p, e) !== Infinity) continue;
-            const r = landDist(e), score = (r >= 30 ? 1e4 : r) + (gx * u.x + gy * u.y) * 90;
-            if (score > best) { best = score; bh = hh; bv = vv; }
-          }
-          h = bh; v = bv;
-        } }
     } else {
       const sgn = mode === 'beat' ? -1 : 1;
       // her angle to the wind on each board: close-hauled to windward; downwind, the pair of angles, one on each gybe from
@@ -230,7 +215,10 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       const made = (T: 'S' | 'P') => { const g = gnd(T); return g.x * u.x + g.y * u.y; };
       // can she lay the mark on this tack (her track over the ground, current and all, reaches it)?
       /** how far the mark is inside tack T's track over the ground, seen from q (deg: 0 on the layline, + she lays it) */
-      const inside = (T: 'S' | 'P', q: Vec) => { const g = gnd(T), d = sub(b, q); return wrap(brg(d.x, d.y) - brg(g.x, g.y)) * (T === 'S' ? sgn : -sgn); };
+      // (downwind she lays it once it's inside her deepest angle's track: anywhere from there to the hotter angle's she can
+      // steer straight for it; judged on the hotter angle alone, she sailed on past it and overstood)
+      const layG = (T: 'S' | 'P') => { if (mode !== 'run') return gnd(T); const d = V(w.from + (T === 'S' ? -run : run)), vr = sp(run); return { x: d.x * vr + c.x, y: d.y * vr + c.y }; };
+      const inside = (T: 'S' | 'P', q: Vec) => { const g = layG(T), d = sub(b, q); return wrap(brg(d.x, d.y) - brg(g.x, g.y)) * (T === 'S' ? sgn : -sgn); };
       const lays = (T: 'S' | 'P') => { const r = inside(T, p); return r >= 0 && r < 90; };
       /** if she'll cross the other tack's layline within this step, sail on just to it (so she tacks on it, not up to a
        * step past it and overstanding the mark) and say so */
@@ -258,7 +246,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         // the lane either side of the course: she turns back when she's beyond it on the side this board is taking her
         // (her track over the ground: on a run the gybes go to the opposite sides from a beat's tacks)
         const xt = cross(legU, sub(p, a)), go = cross(legU, gnd(tack)); // (+ left of the straight course, looking from start to mark)
-        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5 && made(other) > 0.25 * Math.max(0, made(tack)) && room(other) >= 80) flip = true; // (half a minute on a board at least; never back onto a board that loses ground or barely makes it, a track doubling back; and not onto a board with no water ahead, back across the lane into the shore, where the room rules sent her back again, a tack every step)
+        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5 && made(other) > Math.max(0.1, 0.5 * made(tack)) && room(other) >= 80) flip = true; // (half a minute on a board at least; never back onto a board that makes less than half what this one does, or under 0.1 m/s, a track doubling back; and not onto a board with no water ahead, back across the lane into the shore, where the room rules sent her back again, a tack every step)
       }
       // both boards blocked close ahead on a beat (a corner of the shore, an island's lee with the tide setting her on):
       // tacking from one to the other every half-minute only drifts her onto it. A skipper bears away and stands off,
@@ -267,8 +255,14 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       const close = mode === 'beat' && !near && (sd < 400 || standOff), rS = close ? room('S') : 600, rP = close ? room('P') : 600;
       // (out to where a board has room to make some ground, a minute at least: let go at the first 80 m, she sailed
       // straight back into the same pocket)
-      if (close && rS < 30 && rP < 30) { if (!standOff) standT = t; standOff = true; }
-      else if (standOff && (!close || (Math.max(rS, rP) >= 150 && t - standT >= 1))) standOff = false;
+      // (and let go once a board has room to make some ground, after a minute at least; or after five, whatever: hovering
+      // where both boards showed 50-100 m she stood off till the time ran out, a board change every half-minute. Then
+      // not again for two minutes)
+      // (a last resort, once the dead end shows in her turns, three in three minutes: the usual rules see her through most
+      // shores, and standing off where they would have she wandered off and back for hours)
+      const crowded = turnTs.length >= 3 && t - turnTs[turnTs.length - 3] < 3;
+      if (close && sd < 60 && rS < 30 && rP < 30 && crowded && !standOff && t - standEnd > 2) { standT = t; standOff = true; }
+      else if (standOff && (!close || (Math.max(rS, rP) >= 150 && t - standT >= 1) || t - standT >= 5)) { standOff = false; standEnd = t; }
       let off: { h: number; v: number; T: 'S' | 'P'; twa: number } | null = null;
       if (standOff) {
         const off0 = t - standT > 1e-9; // (standing off since an earlier step: she's on standTwa, not close-hauled)
@@ -283,7 +277,9 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
           // (m: the time the turn costs, at her speed; through the wind or round downwind, whichever's the shorter turn from
           // the angle she's on now)
           const now = off0 ? standTwa : beat, cost = T === tack ? 0 : manoeuvreS(now + twa < 180 ? 'tack' : 'gybe', w.kt, ch.hs) * vv;
-          const score = clear && r >= 80 ? 1e4 + dot(g, u) * 90 - cost : clear ? r : r - 1e3;
+          // (the other board for more than the turn costs and 25 m besides: in light air the turn's cost is a few meters,
+          // and she swapped boards every half-minute where the two were near-equal)
+          const score = clear && r >= 80 ? 1e4 + dot(g, u) * 90 - cost - (T === tack ? 0 : 25) : clear ? r : r - 1e3;
           if (score > best) { best = score; off = { h: hh, v: vv, T, twa }; }
         }
         flip = false;

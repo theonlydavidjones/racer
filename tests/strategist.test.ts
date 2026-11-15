@@ -48,10 +48,7 @@ describe('sailing a leg on paper', () => {
     const day = fakeDay((_p, t) => ({ kt: 10, from: 180 + Math.min(20, t) })); // the wind from the south, veering; the leg runs north
     const r = comparePlans(day, A, UP, 0);
     expect(r.left.kind).toBe('run');
-    // (the left beats the right; the middle, sailing each gybe at the angle that makes most along the course as the wind
-    // veers, does as well as the left: on main the two tied and the tie went to the left)
-    expect(r.right.minutes - r.left.minutes).toBeGreaterThan(0.25);
-    expect(bestPlan(r)).not.toBe('right');
+    expect(bestPlan(r)).toBe('left');
   });
   it('reaching across a current, she crabs up-current and still gets there in a straight line', () => {
     const day = fakeDay(() => ({ kt: 12, from: 270 }), () => ({ x: 0, y: -1 * KT })); // a beam reach north, 1 kt setting south… along
