@@ -197,6 +197,13 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** The perf meter's test switches (ui/perfMeter.ts): the sun's shadows, and the boats' sails, each on unless switched off for a reading. */
+  readonly test = { shadows: true, sails: true };
+  /** Shadows on or off for a reading: off, no shadow pass and no shadow sampling (every material recompiles once). */
+  setTestShadows(on: boolean): void {
+    this.test.shadows = on; this.renderer.shadowMap.enabled = on;
+    this.scene.traverse(o => { const m = (o as THREE.Mesh).material; if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true; });
+  }
   /** Crew overboard: the person in the water (made when first needed). */
   private mobMesh: THREE.Group | null = null;
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
@@ -992,7 +999,10 @@ export class SceneView {
     { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
       if (g) { const c = g.worldToLocal(this.hullCam.copy(camera.position)), uu = (c.z + L / 2) / L;
         if (uu > 0 && uu < 1 && Math.abs(c.x) < halfBeam(uu) && c.y < deckY(uu, c.x)) { h.uHullOn.value = 1; h.uHullInv.value.copy(g.matrixWorld).invert(); } } }
+    // (the perf meter's sails switch: every boat's main and jib hidden for this draw only, then as they were)
+    const hid = this.test.sails ? null : this.boatMeshes.map(m => { const v = [m.main.mesh.visible, m.jib.mesh.visible]; m.main.mesh.visible = m.jib.mesh.visible = false; return v; });
     this.renderer.render(this.scene, camera);
+    if (hid) this.boatMeshes.forEach((m, i) => { m.main.mesh.visible = hid[i][0]; m.jib.mesh.visible = hid[i][1]; }); // (each as it was: a lowered sail stays down)
   }
 }
 
