@@ -194,7 +194,7 @@ describe('The crew', () => {
     // (and it "shifts with the skipper's experience": an expert skipper with a novice crew make a club boat's call)
     const mixed = { helm: { ...DEFAULT_CREW.helm, skill: 0.9 }, crew: [{ h: 1.75, w: 78, skill: 0.25 }, { h: 1.72, w: 72, skill: 0.25 }] };
     expect(run(mixed).layout).toBe('foredeck');
-  });
+  }, 30_000); // (about 3 s alone; it ran past the 5 s default under the suite's load)
   it('go up on the foredeck when you send them there, and say so', () => {
     const b = testBoat({ heading: 195, kt: 4, windKt: 16 }); b.crew = newCrew(crewOf(0.6), 'S'); b.crew.place = { across: null, fore: 'deck' };
     sail(b, 20, () => { b.h = 195; });

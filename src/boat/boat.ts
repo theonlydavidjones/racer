@@ -78,6 +78,9 @@ export interface AiState {
   headedT?: number;
 }
 
+/** The lines a crew set early for the next leg before a rounding (sim/world.ts roundingPrep). */
+export type CtlPrep = 'vang' | 'cunningham' | 'backstay' | 'outhaul';
+
 export interface Boat {
   id: number;
   isUser: boolean;
@@ -202,6 +205,11 @@ export interface Boat {
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
   crewPlan?: CrewSettings | null; crewPlanT?: number;
+  /** Getting ready for the next leg before a rounding (sim/world.ts roundingPrep): which lines the crew have switched to
+   * the next leg's settings, that leg's apparent wind angle, and their plan for it (physics.ts). Null otherwise. */
+  crewPrep?: { key: string; t0: number; tws?: number; lines: CtlPrep[]; up: boolean; awa: number; aws: number; depower: number; plan?: CrewSettings | null } | null;
+  /** The rounding (sim/world.ts roundingPrep's key) your crew last said "pole down?" for: once a rounding. */
+  poleCalled?: string;
   /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
@@ -213,6 +221,20 @@ export interface Boat {
   crewIdeal?: CrewSettings & { mainsheet: number; jibsheet: number } | null;
   /** How far the crew has depowered her (0 full power … 1 everything on): they add more while she's heeling too far or carrying heavy weather helm upwind, and ease off as she comes back. */
   depower?: number;
+  /** The crew's answer to a puff she can't carry, 0..1 of PUFF_MAX (physics.ts puffEase): the car down, then the main eased. */
+  gust?: number;
+  /** The same, in degrees of boom past where the crew had it. */
+  gustDeg?: number;
+  /** How long the puff has been on her (s): the trimmer answers once they've seen it. */
+  gustSeen?: number;
+  /** The breeze she's set up for, through a puff (kt): her 20 s wind, taken up no faster than the depowering does. */
+  gustRef?: number;
+  /** The most she's been over-pressed in this puff (degrees of heel, a degree of helm as two): puffEase sizes its answer by it. */
+  gustPeak?: number;
+  /** Her helm when the puff came (degrees): they ease to keep her near it. */
+  gustHelm?: number;
+  /** The boom angle they ease from: where it was when the puff hit. */
+  gustBase?: number;
   sheetCmd: { main: number; jib: number }; // while you hold a trim button: −1 trim in, +1 ease
   trim: { main: SailTrim; jib: SailTrim | null };
   awaSlow: number; // apparent wind angle as the crew perceives it (they react with a short lag)

@@ -4,18 +4,19 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 
 /** Sail her close-hauled (the crew trimming) for a while; returns her lines, heel, helm and speed (m/s) at the end. */
-function beat(kt: number, holdFullPower = false) {
+function beat(kt: number, holdFullPower = false, noPuff = holdFullPower) {
   const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', tideDate: '2026-07-11', current: 'slack', sea: 'flat' };
   const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user;
   // (the wind gusts: her heel is taken as its mean over the last minute)
-  let vmg = 0, n = 0, heel = 0;
+  let vmg = 0, n = 0, heel = 0, hard = 0, lee = 0;
   for (let i = 0; i < 60 * 150; i++) {
     u.h = (w.wind.from + 42 + 360) % 360; u.turnTarget = null; u.steer = 0; u.tiller = 0;
     if (holdFullPower) u.depower = 0;
+    if (noPuff) u.gustSeen = 0; // (and the gusts not answered: the trimmer never sees them, physics.ts puffEase)
     w.step(DT);
-    if (i > 60 * 90) { vmg += u.v * Math.cos(42 * Math.PI / 180); heel += u.heelMag ?? 0; n++; }
+    if (i > 60 * 90) { vmg += u.v * Math.cos(42 * Math.PI / 180); heel += u.heelMag ?? 0; n++; if ((u.helmNeed ?? 0) > 6) hard++; if ((u.helmNeed ?? 0) < -1) lee++; }
   }
-  return { ctl: { ...u.ctl }, depower: u.depower ?? 0, heel: heel / n, helm: u.helmNeed ?? 0, vmg: vmg / n };
+  return { ctl: { ...u.ctl }, depower: u.depower ?? 0, heel: heel / n, helm: u.helmNeed ?? 0, vmg: vmg / n, hard: hard / n, lee: lee / n };
 }
 
 describe('the crew depowers when she is overpowered upwind', () => {
@@ -27,6 +28,12 @@ describe('the crew depowers when she is overpowered upwind', () => {
     expect(d.ctl.traveller).toBeGreaterThan(0.3); // down, to leeward (−1 windward … +1 leeward)
     expect(d.heel).toBeLessThan(full.heel);
     expect(d.vmg).toBeGreaterThanOrEqual(full.vmg * 0.99);
+  });
+  for (const kt of [20, 28]) it(`answering the gusts on top of the depowering, in ${kt} kt: she's steerable more of the time, no lee helm, as fast (physics.ts puffEase)`, () => {
+    const d = beat(kt), none = beat(kt, false, true);
+    expect(d.hard, 'share of the time past 6° of helm').toBeLessThanOrEqual(none.hard);
+    expect(d.lee, 'share of the time in lee helm').toBeLessThanOrEqual(none.lee + 0.01);
+    expect(d.vmg).toBeGreaterThanOrEqual(none.vmg * 0.99);
   });
   it('in a moderate breeze she keeps her power', () => {
     const d = beat(8);
