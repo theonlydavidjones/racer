@@ -686,6 +686,12 @@ What's planned, roughly in order. Done work is described in the README.
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
+   - **The inset map is lagging again** (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
+     again." Recent changes to the chart: dbb27a7e (the layers switch at once: each field kept, each kind's streaks its
+     own), caae0506 (chart-skip-3d, batch 42b), the harbor lee's cells (3c80d150) and the wind shadows' skip
+     (aa6471f7). Measure the inset's draw time per frame against the published version before these (perf-ab's views,
+     with the inset open and a layer on). Likely more fields or streaks redrawn every frame than before. Add the
+     inset's cost to the frame gate so it can't creep back.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
