@@ -138,8 +138,10 @@ describe('pushed off astern', () => {
     for (let j = 0; j < 60 * 60 && u.handled; j++) w.step(DT);
     const v0 = u.astern ?? 0, h = u.h, ww = (w as unknown as { windHere: (a: unknown, b: unknown, c: boolean) => { from: number; kt: number } }).windHere(u, u, false);
     // (gauged to stop COAST_SHORT short of the plan's clear water, unless the steerage floor is more: then that floor's glide)
-    const gauged = Math.max(plan.coast - COAST_SHORT, 0), floored = asternGlide(v0, h, ww.from, ww.kt, ASTERN_GLIDE_S).dist > gauged + 0.5;
-    const want = floored ? asternGlide(v0, h, ww.from, ww.kt, ASTERN_GLIDE_S).dist : gauged; let went = 0;
+    // (the glide in the wind along her line out, as the shove was gauged: World.windAstern)
+    const meant = asternGlide(v0, h, ww.from, ww.kt, ASTERN_GLIDE_S, undefined, w.windAstern(u, h)).dist;
+    const gauged = Math.max(plan.coast - COAST_SHORT, 0), floored = meant > gauged + 0.5;
+    const want = floored ? meant : gauged; let went = 0;
     for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); if (!berthClear(u, u.h, s)) return null; }
     return { went, want };
   };
