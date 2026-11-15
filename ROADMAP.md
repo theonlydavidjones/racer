@@ -377,6 +377,10 @@ What's planned, roughly in order. Done work is described in the README.
    straight rake from a cut-away forefoot to the stemhead, the forward sections fine and V'd. A lines job in render/hull.ts
    (the stations, the stem's profile, the forefoot), with a physics review after: the bow's shape feeds the hull's
    resistance and wetted area, and boat/hullPlan.ts's deck outline (the rules' touching shape) if the deck line moves.
+   Kept (owner, 15 November): "hang onto the new boat drawing work. I want to come back to it." The draft is kept on
+   branch `claude/bow-rework` (1a4711ca…bf79aeff: straighter stem, cut-away forefoot, finer forward sections, the
+   forefoot faired into the keel, the bow lab and before/after stills). Don't delete the branch; it's the starting
+   point when 9a is picked up.
    Tried 15 Nov: a draft (straighter stem, cut-away forefoot, finer forward sections) is on branch claude/bow-rework, with
    before/after stills in shots/bow-rework/. The owner preferred main's bow, so nothing merged. The class bow figures aren't
    published as numbers; revisit when the owner's class plan, lines drawing and trailer photo are in reference/.
