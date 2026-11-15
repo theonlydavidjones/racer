@@ -272,7 +272,7 @@ export function boatLook(spec: BoatSpec) {
  * how close she must be passing the mark (m, past its own reach) for a rounding; where your crew call the pole (m: where
  * the AI boats' crews take theirs in, ai.ts crewPoleCall); the least skill
  * (crewPhys.ts crewSkill) that gets ready at all. */
-const PREP_VANG_S = 4, PREP_TURN_S = 1.5, PREP_POLE_S = 7, PREP_LINE_S = 4, PREP_MARGIN_S = 3, PREP_HOLD_S = 60, PREP_PASS_M = 25, POLE_CALL_M = 45, PREP_SKILL = 0.25;
+const PREP_VANG_S = 4, PREP_TURN_S = 1.5, PREP_POLE_S = 7, PREP_LINE_S = 4, PREP_MARGIN_S = 3, PREP_HOLD_S = 90, PREP_PASS_M = 25, POLE_CALL_M = 45, PREP_SKILL = 0.25;
 
 export class World {
   readonly C: Course;
@@ -1510,7 +1510,10 @@ export class World {
    * leads and so on for the next leg"; North Sails' Nordic Folkboat guide: "always remember to ease the kickingstrap for
    * downwind sailing when bearing off, otherwise the boom might break").
    * - Bearing away (any bear-away of more than 30°: onto a reach too): the vang eased just before the turn (PREP_VANG_S
-   *   before the mark, fetching it), then, as she bears away, the backstay and Cunningham, for a run. Held so until she's
+   *   before she passes closest to the mark), then the backstay and Cunningham, on the tack she rounds on (PREP_TURN_S
+   *   out) or as she bears away. A boat that tacks and bears away in one movement at the mark has no time on the rounding
+   *   tack, and in a hard turn the crew start no line: hers come off as she settles on the run. Easing them before her
+   *   last tack instead cost the AI boats 1-1.5 s a rounding at 20 kt (physics review, 15 Nov 2026). Held so until she's
    *   settled on her new course (her apparent wind past 100°): the crew's own plan lags the turn and would haul them on
    *   again for the beat she's left.
    * - Rounding up for a beat: the pole in first (ai.ts crewPoleCall at 45 m; yours, the crew say so there), then the
