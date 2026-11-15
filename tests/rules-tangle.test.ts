@@ -40,6 +40,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   };
   // (a touch with the hulls overlapping, then held off `apart` m for 4.5 s (past COMPELLED_WINDOW), then together again
   // as the pair's incident cooldown runs out, so that's what's judged: three touches in 13 s, inside TANGLE_MAX)
+  // (first on their headings a length apart for 3 s: set down on a new heading, a boat's main takes a moment to come
+  // across, and by the rules' definitions she's on her old tack until it has (physics.ts tackStep); the touches are to be
+  // judged with both on the tack they're sailing)
+  off = FAR; run(3); got.length = 0; byB.length = 0;
   off = together ? 2 : 0; run(0.5);
   // (pressed: held touching, side by side 2 m apart between the centerlines, all along)
   if (o.pressed) { off = 2; run(o.pressed); return got.length; }
