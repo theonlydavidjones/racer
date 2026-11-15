@@ -1309,6 +1309,10 @@ function frame(now: number): void {
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   boatLesson.tick();
+  // (the full chart covers the whole screen, opaque: the 3D scene behind it isn't drawn, nor its labels. The race sails
+  // on in its worker, paused by the chart; on its close the scene's drawn again from the race as it is. The ruling,
+  // 15 Nov 2026: the chart was drawing a whole 3D frame under itself every frame)
+  if (chart.isOpen) { const t2 = performance.now(); hud.update(w, dt); if (perf.on) perf.frame(now, performance.now() - t0, simMs, t2 - t1, view.renderer); return; }
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else if (boatLesson.on) { look.shift = 0; view.render(w, dt, now, 3, look, over); } // (lesson 1: her on show, the whole view hers)
   else view.render(w, dt, now, viewMode, look, over);
