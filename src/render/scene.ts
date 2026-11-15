@@ -35,6 +35,7 @@ import { addWharf } from './wharf';
 import { VesselView } from './vessels';
 import { foamDrift, landAt } from '../environment/sea';
 import { N_WAVES, WAVE_GLSL, boatOnWaves, packWaves, waterGrid } from './waves';
+import { EnvelopeFrame, FOAM_ACROSS, FOAM_ALONG, FoamFrame, turnTexture } from './waterFrame';
 import { waveTime } from '../environment/waveField';
 import type { SeaHere } from '../environment/sea';
 
@@ -184,13 +185,14 @@ const WATER_FRAGMENT = `
   // the waves or the puffs. The threshold is the noise field's own quantile for that fraction (fitted from its
   // distribution: T = 0.5665 − 0.1835·x − 0.0227·x², x = log10 W), so the area that shows white is the area the law says
   float Wc = clamp(vWhite, 0.0, 0.2), lx = log(max(Wc, 1e-4)) / log(10.0), thr = 0.5665 - 0.1835 * lx - 0.0227 * lx * lx;
-  vec2 fadv0 = vWaveP - uFoamOff, wdc = normalize(uPuffV + vec2(1e-5, 0.0));
+  // (its streaks lie down the wind here, uFoamDir, and turn with it where they lie by you: uFoamQ, waterFrame.ts FoamFrame)
+  vec2 fadv0 = vWaveP - uFoamOff, wdc = uFoamDir;
   float caps = 0.0;
   if (Wc > 1e-4) for (int k = 0; k < 2; k++) {
     float a = uTime / 8.0 + 0.5 * float(k), ph = fract(a), seed = floor(a) + 3.7 * float(k);
     // (uFoamOff carries it on the course's stream; over its life each patch also moves with the water here's difference
     // from that, dflow / 6 (m/s): in a harbor's still basin, or off South Beach with the Cityfront's ebb, it lies still)
-    vec2 fadv = fadv0 - dflow / 6.0 * (ph * 8.0), fq = vec2(dot(fadv, wdc) / 3.0, dot(fadv, vec2(-wdc.y, wdc.x)) / 1.6);
+    vec2 fadv = fadv0 - dflow / 6.0 * (ph * 8.0), frel = vWaveP - uWaveO - dflow / 6.0 * (ph * 8.0), fq = vec2(dot(frel, wdc) / ${FOAM_ALONG.toFixed(1)}, dot(frel, vec2(-wdc.y, wdc.x)) / ${FOAM_ACROSS.toFixed(1)}) + uFoamQ;
     float life = ph < 0.1 ? ph / 0.1 : 1.0 - (ph - 0.1) / 0.9; // (white at once as it breaks, then fading)
     vec2 q = fq + seed * vec2(37.1, 17.3);
     float cf = 0.65 * vnoise(q) + 0.35 * vnoise(q * 2.3 + vec2(7.1, 3.3)) + 0.06 * (vnoise(q * 7.0 + 2.0) - 0.5);
@@ -332,7 +334,10 @@ export class SceneView {
   private puffData = new Uint8Array(PUFF_N * PUFF_N * 4);
   private puffSum = new Float32Array(PUFF_N * PUFF_N);
   private puffTex = new THREE.DataTexture(this.puffData, PUFF_N, PUFF_N, THREE.RGBAFormat);
-  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() }, uFoamOff: { value: new THREE.Vector2() } };
+  private puffUni = { uPuff: { value: this.puffTex as THREE.Texture }, uPuffO: { value: new THREE.Vector2() }, uPuffS: { value: PUFF_SPAN }, uMeanKt: { value: 12 }, uPuffV: { value: new THREE.Vector2() }, uPuffOff: { value: new THREE.Vector2() }, uFoamOff: { value: new THREE.Vector2() }, uFoamDir: { value: new THREE.Vector2(0, 1) }, uFoamQ: { value: new THREE.Vector2() } };
+  private foamFrame = new FoamFrame();
+  private envFrame = new EnvelopeFrame();
+  private waveE = new Float32Array(N_WAVES * 2);
   private puffT: number | null = null;
   private puffAcc = 1;
   private terrain: TerrainGrid | null = null;
@@ -375,7 +380,7 @@ export class SceneView {
     const u = this.roseUni; u.uRoseOn.value = r ? 1 : 0; if (!r) return;
     u.uRoseC.value.set(r.x, r.y); u.uRoseFrom.value = r.from; u.uRoseE.value = r.edges; u.uRoseR.value.set(r.r0, r.r1, r.rm); u.uRoseLit.value.set(r.lit, r.side); u.uRoseTgt.value = r.target;
   }
-  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
+  private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uWaveE: { value: this.waveE }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
   private wakes!: Wakes;
@@ -459,7 +464,7 @@ export class SceneView {
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni, this.roseUni);
-      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
+      const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uFoamDir; uniform vec2 uFoamQ; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -897,7 +902,11 @@ export class SceneView {
     const t = now / 1000, k = (w.running && !w.paused ? w.speed : 0) * dt / this.tile;
     // ripples lie across the wind (the course's mean direction, so they don't swing with every shift)
     { const d = Math.atan2(Math.sin(-w.windModel.base * D2R - this.ripAngle), Math.cos(-w.windModel.base * D2R - this.ripAngle)); // the short way round
-      this.ripAngle += d * Math.min(1, dt * 0.2); }
+      // (turned where they lie by you, not about the Bay's origin, the texture's center: 14 km out, a degree of turn
+      // swept them 250 m past her, the owner's "rushing water" at the map's edge. waterFrame.ts)
+      const rot = this.ripAngle + d * Math.min(1, dt * 0.2), fo = viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user;
+      const off = turnTexture(this.wtex.offset, this.wtex.repeat, this.wtex.center, this.ripAngle, rot, { x: (fo.x + 60000) / 120000, y: (fo.y + 60000) / 120000 });
+      this.wtex.offset.set(off.x, off.y); this.ripAngle = rot; }
     const c = Math.cos(this.ripAngle), s = Math.sin(this.ripAngle);
     this.wtex.rotation = this.ripAngle;
     // the texture drifts with the current: offset in texture space is the rotated displacement
@@ -923,7 +932,8 @@ export class SceneView {
     // the puffs' texture carried down the wind on the sim's clock (paused, sped up and replayed with it; a jump starts afresh)
     const pdt = this.puffT == null ? 0 : w.t - this.puffT; this.puffT = w.t;
     if (pdt > 0 && pdt < 5) this.puffUni.uPuffOff.value.addScaledVector(this.puffUni.uPuffV.value, pdt);
-    if (pdt > 0 && pdt < 5) { const fd = foamDrift(w.wind.from, w.wind.kt, w.cvec); this.puffUni.uFoamOff.value.x += fd.x * pdt; this.puffUni.uFoamOff.value.y += fd.y * pdt; } // (the foam with the surface water)
+    const foamD = foamDrift(w.wind.from, w.wind.kt, w.cvec), foamDt = pdt > 0 && pdt < 5 ? pdt : 0;
+    this.puffUni.uFoamOff.value.x += foamD.x * foamDt; this.puffUni.uFoamOff.value.y += foamD.y * foamDt; // (the foam with the surface water)
     this.puffAcc += dt;
     if (this.puffAcc > 0.15) { this.puffAcc = 0; this.drawWindOnWater(w, viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
     // the waves: heights for the sea where you are, then the sea map around you (every 2 s)
@@ -938,6 +948,10 @@ export class SceneView {
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
     const wo = { x: Math.round(focus.x / 500) * 500, y: Math.round(focus.y / 500) * 500 };
     packWaves(waves, this.waveA, this.waveB, tw, wo); this.waveUni.uWaveO.value.set(wo.x, wo.y);
+    // (the wave groups' light and the foam's streaks, each turned where it lies at the focus: waterFrame.ts)
+    this.envFrame.pack(waves, this.waveE, tw, wo, focus);
+    this.foamFrame.step(this.puffUni.uPuffV.value, foamD, foamDt, wo, focus);
+    this.puffUni.uFoamDir.value.set(this.foamFrame.dx, this.foamFrame.dy); this.puffUni.uFoamQ.value.set(this.foamFrame.qx, this.foamFrame.qy);
     this.waveUni.uTime.value = tw; this.waveUni.uHs.value.set(waves.refW, waves.refS); this.waveUni.uWhiteRef.value = this.seaRef.white;
     // the signal flags, and marks leaning and trailing a wake in the current
     this.signal?.mast.sync(w.flags, w.wind.from, this.signal.heading, t, dt);

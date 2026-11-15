@@ -46,6 +46,7 @@ uniform vec4 uWaveA[${N_WAVES}];
 uniform vec4 uWaveB[${N_WAVES}];
 uniform float uTime;
 uniform vec2 uWaveO; // the local origin the phases in uWaveB are for (packWaves)
+uniform vec2 uWaveE[${N_WAVES}]; // each component's group envelope at that origin: along and across its travel (waterFrame.ts EnvelopeFrame)
 // p: sim coords (x east, y north); kW, kS: local scale; dist: from the camera (m)
 // A wave moves the mesh only where the mesh is fine enough to draw it (the grid spacing at that distance is under a
 // third of its wavelength): finer waves are left to the shading, or they alias into rings round the camera.
@@ -76,8 +77,9 @@ vec3 waveSlope(vec2 p, float kW, float kS, float foot) {
     vec4 A = uWaveA[i], B = uWaveB[i];
     float L = 6.2832 / A.z, fade = 1.0 - smoothstep(L * 0.25, L * 0.7, foot);
     // the group envelope: elongated across the wave's travel, moving at the group speed (half the phase speed)
+    // (its coordinates from the local origin, uWaveE: turned with the wave about where you are, not the Bay's origin)
     vec2 along = A.xy, across = vec2(-A.y, A.x);
-    float env = B.w > 0.5 ? 1.0 : 0.25 + 1.5 * wgNoise(vec2(dot(p, along) - 0.5 * B.x / A.z * uTime, dot(p, across) * 0.4) / (L * 4.0) + float(i) * 7.31);
+    float env = B.w > 0.5 ? 1.0 : 0.25 + 1.5 * wgNoise((vec2(dot(p - uWaveO, along), dot(p - uWaveO, across) * 0.4) + uWaveE[i]) / (L * 4.0) + float(i) * 7.31);
     float a = A.w * mix(kW, kS, B.w) * fade * env;
     float th = A.z * dot(A.xy, p - uWaveO) + B.y;
     s.xy += a * A.z * A.xy * cos(th);

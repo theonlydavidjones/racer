@@ -426,12 +426,19 @@ What's planned, roughly in order. Done work is described in the README.
    Bay East have it). Shallow-water waves by the breakwater: yes, with Bay East, after the rushing fixes. Then add one test over every water layer: none moves past a still boat faster
    than its own waves, or the current, at any distance and after any of those events. That test is what stops it coming
    back.
-   **Back again** (owner, 15 November; regression, fourth time; now; 2–4 h): "rushing water is back. I'm way out at the
+   ~~**Back again**~~ (done) (owner, 15 November; regression, fourth time): "rushing water is back. I'm way out at the
    map edge outside the Golden Gate." The owner confirms it's the 3D sea around the boat, not the chart's streaks.
    Far out beyond the Gate is the farthest the sim goes from its origin, so float precision (positions or wave phase
    in 32-bit in the shaders) is the first suspect, then the map edge itself (a sea layer clamped, wrapped or tiled
    differently at the edge, or the swell from the open ocean). The every-layer test (31ce983) evidently doesn't reach
    this far: extend it to the map's edge, west of the Gate, at the corners, so it can't come back a fifth time.
+   **Fixed** (Deep Physics): not float precision, and not the edge itself. Three drawn layers lie along the wind or
+   the waves (the ripples, the foam's streaks, the wave groups' light) and each was turned by turning its coordinates,
+   about the Bay's origin by the GGYC line. 14 km from it, a degree of turn swept the pattern 250 m: measured in the
+   page at the west edge, the mean wind turned 3 degrees, the ripples went 209 m past a still boat in a second. Each
+   now turns where it lies by the boat (render/waterFrame.ts): 0.04 m. tests/rushing-drawn.test.ts holds the three at
+   the west edge, past it, the four corners and off the bar; scripts/check/rushing-edge.cjs checks the page itself;
+   stills in shots/rushing-water/.
 8j. ~~**The windex lost its point of sail**~~ (done: e62a2229; tests/pointofsail.test.ts, scripts/check/point-of-sail.cjs) (regression; <1 h): owner, "I want the windex dial to show the point of
    sail (broad reach, close haul, etc)". It did as of v83; the chase-view layout's round windex in the sail band dropped
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
