@@ -131,7 +131,7 @@ const JIB_DEF: SailDef = (() => {
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
 export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
-const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }); // (one pass, not two: three draws a transparent DoubleSide material twice, back faces then front, re-deriving its program each time; a thin window faces the eye one way, so one pass draws the same pixels: Capacity, 15 Nov 2026)
 
 /** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
 export const REFLECTIVE: { mat: THREE.MeshPhongMaterial; amount: number }[] = [];
@@ -217,7 +217,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // syncNavLights sets how bright, on the boat-lights clock)
   // (clear glass in an aluminium frame, cut through the cabin side: the cabin's inside, lit by its lantern after dark,
   // is what shows through it)
-  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, forceSinglePass: true }); // (one pass: see WINDOW_MAT)
   for (const s of [1, -1]) {
     // (a patch over the light and its frame; the picture draws the tapered glass and the frame on it, the same shape both
     // sides: mirrored to port without turning the picture round)
@@ -1336,6 +1336,10 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   { const g = pc.getContext('2d')!; g.fillStyle = '#d8241f'; g.fillRect(0, 0, 48, 32); }
   hoist(pc, new THREE.Vector3(0, 3, 3), 0.2, grp, false);
   const protest = flags[flags.length - 1].mesh; protest.visible = false;
+  // (it reads red whichever side the light's on, as a flag in daylight does: lit through as well as on, from its own red;
+  // and never left out as a small part (FittingCull): scene.ts keeps it big enough to see at a distance, PROTEST_MIN_PX)
+  { const pm = protest.material as THREE.MeshLambertMaterial; pm.emissive.set(0xffffff); pm.emissiveMap = pm.map; pm.emissiveIntensity = 0.45; }
+  protest.frustumCulled = false;
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
   { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });
@@ -1428,26 +1432,46 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
     if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || keep.has(m) || m.name || m.children.length || !m.visible || m.renderOrder !== 0 || Array.isArray(m.material)) continue;
     const mat = m.material as THREE.Material;
     if (mat.transparent || m.morphTargetInfluences || Object.keys(m.userData).length) continue;
-    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',') + '|' + (m.frustumCulled ? tierOf(radius(m)) : -1) + '|' + +m.castShadow + +m.receiveShadow; // (its shadows as they were: a merged mesh that took them up where its parts hadn't would want shader programs of its own)
+    // (a plain painted part, its colour its only difference from the others of its kind, goes in with them: its colour
+    // carried by its vertices. Anything else merges only with its own material.)
+    const plain = plainKey(mat), g = m.geometry;
+    const key = (plain ?? mat.uuid) + '|' + (plain ? 'position,normal,color' : ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',')) + '|' + (m.frustumCulled ? tierOf(radius(m)) : -1) + '|' + +m.castShadow + +m.receiveShadow; // (its shadows as they were: a merged mesh that took them up where its parts hadn't would want shader programs of its own)
     if (!g.getAttribute('position') || !g.getAttribute('normal')) continue;
     (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(m);
   }
   for (const [key, ms] of buckets) {
     if (ms.length < 2) continue;
     const names = key.split('|')[1].split(',');
+    const tint = names.includes('color');
     const geos = ms.map(m => {
       m.updateMatrix();
       const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
+      if (tint) { const c = (m.material as THREE.MeshLambertMaterial).color, n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
       for (const a of Object.keys(g.attributes)) if (!names.includes(a)) g.deleteAttribute(a);
       g.morphAttributes = {}; g.clearGroups(); return g;
     });
     const merged = mergeGeometries(geos, false); if (!merged) continue;
-    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms[0].castShadow; one.receiveShadow = ms[0].receiveShadow;
+    let mat = ms[0].material as THREE.Material;
+    if (tint) { const t = mat.clone() as THREE.MeshLambertMaterial; t.vertexColors = true; t.color.set(0xffffff); mat = t; } // (white: the vertices carry each part's colour)
+    const one = new THREE.Mesh(merged, mat); one.castShadow = ms[0].castShadow; one.receiveShadow = ms[0].receiveShadow;
     if (+key.split('|')[2] >= 0) one.userData.cullR = Math.max(...ms.map(radius)); // (FittingCull: left out as its largest part would be)
     for (const m of ms) { grp.remove(m); m.geometry.dispose(); }
     for (const g of geos) g.dispose();
     grp.add(one);
   }
+}
+
+/**
+ * A plain painted material's kind: everything about it but its colour (Lambert or Phong, no texture, opaque, no shader
+ * changes of its own), so parts that differ only in colour can share one draw; null if it isn't one.
+ */
+function plainKey(mat: THREE.Material): string | null {
+  const m = mat as THREE.MeshPhongMaterial;
+  if (!(m.type === 'MeshLambertMaterial' || m.type === 'MeshPhongMaterial') || m.transparent || m.vertexColors || m.opacity !== 1) return null;
+  if (Object.prototype.hasOwnProperty.call(m, 'onBeforeCompile') || m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey) return null;
+  for (const k of ['map', 'emissiveMap', 'normalMap', 'bumpMap', 'alphaMap', 'aoMap', 'lightMap', 'specularMap', 'envMap', 'displacementMap'] as const) if ((m as unknown as Record<string, unknown>)[k]) return null;
+  const j = m.toJSON() as unknown as Record<string, unknown>; delete j.uuid; delete j.name; delete j.color; delete j.metadata; delete j.userData;
+  return 'plain:' + JSON.stringify(j);
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */

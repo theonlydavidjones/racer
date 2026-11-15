@@ -37,7 +37,7 @@ import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
-import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
+import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
@@ -64,6 +64,9 @@ import { RaceLog } from './debrief';
 
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
+/** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
+ * start, eased sheets, they take about 10 s; her speed, a heavy boat's in light air, about 50 (World.idle). */
+const SHOWROOM_SETTLE_S = 50;
 /** How near (m) the basins' current is worked out before the start (farther ones in the worker's or the page's spare time: sim/worker.ts, app.ts). */
 const BASINS_NEAR = 4000;
 /** Two-turns penalty, in degrees of turning. */
@@ -204,6 +207,12 @@ export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.m
  * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.555 m/s; a breeze on her
  * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
+/** How far along her line astern the crew read the breeze before the shove, how far to leeward of it, and how often, m
+ * (windAstern): past her longest glide in a breeze (ASTERN_LOOK_MAX, 24 m, and what a bow wind adds) and the furthest
+ * the wind sets her across it meanwhile, at the scale a harbor's lee changes over (Corinthian's: 0.32 to 0.55 of the open
+ * wind in 20 m). And her set to leeward, m/s per knot of the breeze on her beam, lying stern first with no sail up: the
+ * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. */
+const ASTERN_WIND_FAR = 40, ASTERN_SET_FAR = 16, ASTERN_WIND_STEP = 4, SET_PER_KT = 0.019;
 useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE); // (the planner's look along her glide)
 /**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
@@ -524,6 +533,8 @@ export class World {
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
+    // (and the ground the land's lee reads, within its rays' 6 km of the course and her start: shadows.ts prepareLee)
+    prepareLee([this.C.center, this.user], 7000);
     // (and the harbor mouths' gyres spun up through the tide's last 13 hours now, not in the race's first step: mouthFlows)
     this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
@@ -2130,7 +2141,8 @@ export class World {
         // shoved off astern into the fairway, as hard as the crew shoves, or less if the room she has ahead of her stern is short
         // (her glide in the wind there is, heading held: physics.ts asternGlide; and never so gently she can't steer for
         // STEER_FOR s, in that wind: the breeze on her stern shortens it, on her bow lengthens it)
-        const ww = this.windHere(b, b, false), g = (v: number) => asternGlide(v, P.h, ww.from, ww.kt, ASTERN_GLIDE_S); // (her whole glide, to where she's lost her way)
+        // (in the wind along her line out, not only at the slip: let go in a lee, she glides out of it into more)
+        const ww = this.windHere(b, b, false), along = this.windAstern(b, P.h), g = (v: number) => asternGlide(v, P.h, ww.from, ww.kt, ASTERN_GLIDE_S, undefined, along); // (her whole glide, to where she's lost her way)
         let lo = 0, hi = ASTERN_SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (g(m).dist < P.coast - COAST_SHORT) lo = m; else hi = m; }
         let flo = 0, fhi = ASTERN_SHOVE; for (let k = 0; k < 20; k++) { const m = (flo + fhi) / 2; if (g(m).steerable < STEER_FOR) flo = m; else fhi = m; }
         // (and never less than the way she has already, walked back at WALK: her crew can leave the last push out, but
@@ -2143,6 +2155,31 @@ export class World {
     }
     if (b.pushing && b.pushing.jump > 0) { b.pushing.jump += dt / 0.7; if (b.pushing.jump >= 1) b.pushing = undefined; }
     if (b.handled) { b.vx = (b.x - x0) / dt; b.vy = (b.y - y0) / dt; }
+  }
+  /**
+   * The breeze she'll meet going out astern from where she lies, as her crew read it down the fairway before they shove
+   * (the ripples off the dock's end): the wind every ASTERN_WIND_STEP m along her line out to ASTERN_WIND_FAR, and as far
+   * again to leeward of it as the wind can set her meanwhile (ASTERN_SET_FAR), read between; beyond, the last. Given her
+   * distance along the line and the time since she was let go: she is set across her line, to leeward, at SET_PER_KT of
+   * the breeze's part on her beam (Horseshoe Bay A27 in a 20 kt easterly: 0.15 m/s, 13 m in a minute and a half, into a
+   * different lee from her line's). Worked out once, as she's let go (some fifty looks at the wind), not in the step.
+   */
+  windAstern(b: Boat, h: number): (dist: number, t: number) => Wind {
+    const u = V(h), here = this.windHere(b, b, false), rel = wrap(here.from - h), lee = V(h + (rel > 0 ? -90 : 90));
+    const set = SET_PER_KT * here.kt * Math.abs(Math.sin(rel * D2R)), nd = Math.round(ASTERN_WIND_FAR / ASTERN_WIND_STEP) + 1, ns = Math.round(ASTERN_SET_FAR / ASTERN_WIND_STEP) + 1, ws: Wind[] = [];
+    // (as her own wind is worked out, her wake left out, but with the land's lee at each point, not the one she carries
+    // from where she lies: that lee is the very thing that changes along her way)
+    const leeK = b.leeK, shadowK = b.shadowK;
+    for (let j = 0; j < ns; j++) for (let i = 0; i < nd; i++) {
+      const d = i * ASTERN_WIND_STEP, a = j * ASTERN_WIND_STEP, q = { x: b.x - u.x * d + lee.x * a, y: b.y - u.y * d + lee.y * a };
+      b.leeK = landLee(q, this.wind.from); ws.push(this.windHere(q, b, false));
+    }
+    b.leeK = leeK; b.shadowK = shadowK;
+    const mix = (a: Wind, c: Wind, k: number): Wind => ({ from: n360(a.from + wrap(c.from - a.from) * k), kt: a.kt + (c.kt - a.kt) * k });
+    return (dist, t) => {
+      const fd = clamp(dist / ASTERN_WIND_STEP, 0, nd - 1), i = Math.min(nd - 2, Math.floor(fd)), fs = clamp(set * t / ASTERN_WIND_STEP, 0, ns - 1), j = Math.min(ns - 2, Math.floor(fs));
+      return mix(mix(ws[j * nd + i], ws[j * nd + i + 1], fd - i), mix(ws[(j + 1) * nd + i], ws[(j + 1) * nd + i + 1], fd - i), fs - j);
+    };
   }
   /** The crew lets her go with a shove as they step aboard (ahead, or astern): from here she's under her own way. */
   private letGo(b: Boat, h: number, ahead: number, astern: number): void {
@@ -2167,6 +2204,21 @@ export class World {
   idle(dt: number, twa?: number): void {
     const u = this.user;
     if (u.docked) { this.dockStep(u, dt); return; }
+    // The showroom (a held true wind angle: app.ts passes one only there; sailing never does, so it's unchanged): the
+    // first time she's shown, her crew's trim is settled at once. She's built with her sheets eased, and from that cold
+    // start the crew haul them in at their real rate, which took about 10 s in the showroom with her boom near square
+    // (Rigging's visual check, 14 November); so that time, and her speed and heel coming up with it, are sailed through
+    // here before she's seen, without the waves. (Also the boat cards' pictures, render/thumbs.ts.)
+    if (twa != null && this.showroomSettled !== u) {
+      this.showroomSettled = u;
+      for (let i = 0; i < SHOWROOM_SETTLE_S / dt; i++) this.idleStep(u, dt, twa, false);
+    }
+    this.idleStep(u, dt, twa, true);
+  }
+  /** The boat the showroom has settled her trim for (idle). */
+  private showroomSettled: Boat | null = null;
+  /** One idle step for `u` (idle); `waves`: the wave field runs on and she rides it. */
+  private idleStep(u: Boat, dt: number, twa: number | undefined, waves: boolean): void {
     const h = twa != null ? n360(this.wind.from + twa) : u.h;
     u.h = h; u.turnTarget = null; u.steer = 0; u.tiller = 0; u.luff = false;
     u.cur = this.currentAt(u); u.ww = windOnWater(this.windHere(u, u), u.cur);
@@ -2174,6 +2226,7 @@ export class World {
     this.steps++;
     moveBoat(u, dt, this.t, () => { /* quietly */ }, { t: Infinity });
     u.h = h; // held there
+    if (!waves) return;
     // (the waves run on, and she rides them, as on the water: the setup's and the showroom's sea isn't glassy)
     if (this.steps % 30 === 1) this.waveRefSea = null;
     this.waves.update(this.waveRef(), this.windModel.base, dt, u); waveMotion(u, this.waves, waveTime(this.t), dt);

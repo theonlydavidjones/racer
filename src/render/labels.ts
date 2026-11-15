@@ -59,7 +59,7 @@ export class Labels {
       this.place(el, camera, b.x, b.y, viewMode === 2 ? 2 : 10.2);
       if (el.hidden) return;
       const r = w.rights(u, b), kc = r.kc === u, near = dist(u, b) < 70;
-      const cls = 'tag' + (near ? (kc ? ' kc' : ' row') : ''), txt = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? (b.penaltyDir ? ' · turns' : ' · owes turns') : '');
+      const cls = 'tag' + (near ? (kc ? ' kc' : ' row') : ''), txt = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? (b.penaltyDir ? turnsTag(b) : ' · owes turns') : '') + (b.protestFlag ? ' · protest' : '');
       if (el.className !== cls) el.className = cls;
       if (el.lastChild!.textContent !== txt) el.lastChild!.textContent = txt;
     });
@@ -68,4 +68,10 @@ export class Labels {
     const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
     if (c) { if (!word) { if (!c.hidden) c.hidden = true; } else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
   }
+}
+
+/** A boat taking her penalty: which turn she's on, of how many (a turn is 360°: RRS 44.2, a two-turns penalty 720°). */
+export function turnsTag(b: { penaltyTotal: number; penaltyTurned: number }): string {
+  const n = Math.max(1, Math.round(b.penaltyTotal / 360)), k = Math.min(n, Math.floor(Math.abs(b.penaltyTurned) / 360) + 1);
+  return ` · turn ${k} of ${n}`;
 }

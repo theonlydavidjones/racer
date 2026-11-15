@@ -46,11 +46,16 @@ export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c
  * she goes astern in `secs` (m), how long from the start she keeps `steerage` m/s of sternway (s: until it first falls
  * under it; way the wind gives her back later doesn't count, she has lain there unsteerable meanwhile), and whether
  * she's still going astern at the end. Her set to leeward across the wind isn't in it.
+ * `windAt`, where given, is the wind she meets `dist` m along her line astern `t` s after she's let go (the caller's to
+ * say where the wind has set her across it by then), in place of the one wind: let go in the
+ * lee of a shore or a harbor wall she glides out of it into more (Corinthian's B16 in a northerly: 0.32 of the open wind
+ * at the slip, 0.55 by 20 m out), and a shove gauged to the slip's wind alone carried her a quarter too far.
  */
-export function asternGlide(v0: number, heading: number, windFrom: number, windKt: number, secs = 60, steerage = 0.3): { dist: number; steerable: number; going: boolean } {
-  const twa = Math.abs(wrap(windFrom - heading)), drift = 0.1 * windKt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)), dt = 1 / 60;
-  let ast = v0, dist = 0, steerable = 0, steers = v0 > steerage;
+export function asternGlide(v0: number, heading: number, windFrom: number, windKt: number, secs = 60, steerage = 0.3, windAt?: (dist: number, t: number) => { from: number; kt: number }): { dist: number; steerable: number; going: boolean } {
+  const driftIn = (from: number, kt: number) => 0.1 * kt * KT * Math.max(0, Math.min(1, (Math.abs(wrap(from - heading)) - 90) / 60)), dt = 1 / 60;
+  let ast = v0, dist = 0, steerable = 0, steers = v0 > steerage, drift = driftIn(windFrom, windKt);
   for (let t = 0; t < secs && ast > 0; t += dt) {
+    if (windAt) { const w = windAt(dist, t); windFrom = w.from; windKt = w.kt; drift = driftIn(windFrom, windKt); }
     const ap = sailWind(windFrom, windKt, heading, -ast);
     ast -= surgeAccel(0, drift, airDrag(ap.aws, ap.awa, 1, 0)) * dt; // (what would be headway comes off her sternway: one motion)
     if (ast > 0) ast = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);

@@ -232,8 +232,10 @@ What's planned, roughly in order. Done work is described in the README.
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
-     from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. Then the planner allows for the
-     lee's edge, the wind to leeward of her line (Horseshoe Bay A27 in a 20 kt easterly: tests/pushoff-astern's it.fails).
+     from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. The lee's edge is allowed for in the shove (done,
+     Deep Physics: gauged to the wind along her line out and to leeward of it, World.windAstern; Corinthian B16 in a 20 kt
+     northerly and Horseshoe Bay A27 in a 20 kt easterly stop where it meant). Left: the planner's own look (marina.ts) is
+     still in the slip's wind, and a steered plan's arc leaves the line the wind is read along.
    - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
      the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
      literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
@@ -629,6 +631,11 @@ What's planned, roughly in order. Done work is described in the README.
      current, and never draw a track going backward. Fix: choose the angle and the jibes by speed made good over the
      ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
      changing the design). The AI's own leg planning shares sailLeg: check it too.
+     **The isochrone router** (the owner's decision, asked 15 November): the rule-based planner can't get out of a dead end
+     on a run, light air in a lee with the tide setting her on (the owner's own route off Yellow Bluff, 25 Nov 15:00,
+     with the land's lee without seams: tests/passage-hairpin's it.fails). A router spreading out every minute on every
+     heading, with the real wind, lee and current, keeps the fastest way to each place; 6–10 h, a plan in 1–3 s, nothing
+     per step.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
      'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
      icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
@@ -1087,6 +1094,11 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done. And
    the crew's deliberate ease of the main on the last depowering steps (up to 7°, half luffing) flogs at no cost, in the
    speed search and on the water alike: price it in the search, then judge the main where it is.
+   **The flogging main's drag: no measurement; revisit if a source or an on-the-water observation turns up** (the
+   owner, 15 Nov 2026: paused). As it is (dynamics.ts flogCdA, 0.12 on the cloth): close-hauled with the jib drawing and
+   the main let right off, she slows from 5.4 kn to 1.8 kn in 30 s in 18 kt and stops inside two minutes; in 10 kt she is
+   down to 0.9 kn. At 0.05 she would keep 1.0 kn and 1.4 kn. Flags give 0.05 before they flutter and 0.15 to 0.35
+   fluttering; ORC's zero-lift main is 0.03 to 0.04. Until then the crew's ease in a puff must not go past the luff.
 2. ~~**No tactical wind shifts on most days.**~~ (done: environment/shifts.ts, fitted to FTPC1's record by kind of day and
    strength, counted from when the course is laid, carried down the course; later: the lateral coherence (the sides of
    the course) from two stations' records rather than assumed; the HUD's lift/header readout and the rules' wind (Overlap,
