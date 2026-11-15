@@ -35,6 +35,9 @@ import { installSkipperUI } from './ui/skipperUI';
 installSkipperUI(); // (the Members tab's skipper half: her ratings, what's said of her, her record)
 import { SailBand } from './ui/sailBand';
 import { WindLadder } from './render/windLadder';
+import { WindRose } from './render/windRose';
+import { beatFor } from './boat/seaway';
+import { pointTarget } from './sim/lessons';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
@@ -600,6 +603,13 @@ function windShow(on: boolean): void {
   refreshMenus();
 }
 windShow(!!S.windLadder);
+/* The points of sail on the water round her (render/windRose.ts; the owner, 15 Nov 2026: "give them all the points of
+ * sail to start"): every point named, laid out from the true wind and turning with it; her own point lit, lesson 4's
+ * target teal. On in the lessons unless you've switched it off; elsewhere off unless you switch it on (the Layers
+ * menu's Training views, or its key), and remembered. */
+const rose = new WindRose(view.scene, view, { r0: 9, r1: 26, rm: 19, labels: 'all' });
+const roseOn = (): boolean => S.pointsRose ?? !!w.lesson;
+function roseShow(on: boolean): void { S.pointsRose = on; saveSettings(S); refreshMenus(); }
 const drills = mountDrills(ctx); // (src/app/drills.ts)
 const boatLesson = mountBoatLesson(ctx); // (src/app/boatLesson.ts)
 /* The drills' coach by the boat (app/drillCoach.ts, render/drillGuides.ts): the guides on the water and the word or two
@@ -623,6 +633,8 @@ $('bRules').onclick = () => rulesTrainer.open();
 function windTick(): void {
   const on = !!S.windLadder && w.running && !w.user.docked;
   ladder.grp.visible = on; if (on) ladder.update(w.user);
+  const u = w.user, ro = roseOn() && w.running && !u.docked && !!u.ww;
+  rose.update(u.x, u.y, u.ww?.from ?? 0, u.h, ro ? beatFor(u) : 0, pointTarget(w.lesson), ro);
 }
 openLines((S.band ?? 1) === 1);
 /* The trim coach, as a teacher (boat/coach.ts): the one thing that matters now, why, and what to look at on the boat;
@@ -993,6 +1005,7 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
   // (the training views, switched from the inset map's menu too: no buttons of their own on the game surface)
   const views: MenuView[] = [
     { name: 'Wind in the air', what: 'The true wind (white) and the apparent wind (amber) in the air beside her, at the deck, the sails\' center and the masthead', keyLabel: () => keymap.label('windLadder'), on: () => !!S.windLadder, set: on => windShow(on) },
+    { name: 'Points of sail', what: 'The points of sail and the wind on the water round her, turning with every shift (on in the lessons)', keyLabel: () => keymap.label('pointsRose'), on: () => roseOn(), set: on => roseShow(on) },
     { name: 'Flow over the sails', what: 'The flow view: the air over the sails at three heights, and what the telltales are saying', keyLabel: () => keymap.label('flowView'), on: () => flowPanel.open, set: on => openFlow(on) }];
   // (the inset map has no buttons of its own: the owner, "those should be toggles in the full map view, with the inset
   // remembering my choices". Its layers, what it shows cruising, and the training views are all in the chart's menu)
@@ -1149,6 +1162,7 @@ addEventListener('keydown', e => {
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
     case 'windLadder': windShow(!S.windLadder); break;
+    case 'pointsRose': roseShow(!roseOn()); break;
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: F9 unless rebound; ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;

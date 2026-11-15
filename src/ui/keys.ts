@@ -3,7 +3,7 @@ export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
   | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft' | 'paddle'
-  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView' | 'perfMeter'
+  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'pointsRose' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
   | 'course' | 'log' | 'pause' | 'keys';
@@ -46,6 +46,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'cycleView', label: 'Next view', group: 'Views' },
   { id: 'lookInstrument', label: 'Look at the cabin-top instrument from the helm (press again to look back)', group: 'Views' },
   { id: 'windLadder', label: 'Wind indicator: the true and apparent wind in the air beside her, at three heights (on / off)', group: 'Views' },
+  { id: 'pointsRose', label: 'Points of sail on the water round her, and the wind (on / off)', group: 'Views' },
   { id: 'flowView', label: 'Flow view: the air over the sails, at three heights (show / put away)', group: 'Views' },
   { id: 'lookLeft', label: 'Look left', group: 'Views' },
   { id: 'lookRight', label: 'Look right', group: 'Views' },
@@ -66,7 +67,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
   luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], paddle: ['/'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
-  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
+  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], pointsRose: ['F8'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
   log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'],
