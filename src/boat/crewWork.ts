@@ -1,4 +1,5 @@
 import { clamp } from '../core/math';
+import { polar } from './polar';
 import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
@@ -62,6 +63,8 @@ export const LINE_URGENT = 0.25;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+/** How long after a tack (s) the cabin-top lines wait for her to be back up to speed, at most. An estimate, unsourced. */
+export const TACK_SETTLE = 60;
 export function waitingLines(c: CrewState): readonly string[] {
   if (c.place?.across == null) return [];
   return c.spec.crew.length ? ['cunningham', 'downhaul', 'jibHalyard'] : [...PIANO];
@@ -163,6 +166,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const err = (k: Ctl) => Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
   const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
+  if (b.tacking) c.tackedAt = c.clock ?? 0; // (the crew's own clock: TACK_SETTLE, below)
   // finish or drop jobs on lines that are done, or that you've taken. A control line is set to where the crew wanted it
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
   c.people.forEach(a => {
@@ -232,6 +236,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const sheet = sheetOf(k);
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
+    // back up to speed first: after a tack the helm and the sheets build her speed again, and nobody goes to the cabin top
+    // until she's going (to 95% of the polar's speed, a minute at most). A line knocked well off still goes at once
+    if (PIANO.has(k) && !urgentTo && c.tackedAt != null && (c.clock ?? 0) - c.tackedAt < TACK_SETTLE && b.v < 0.95 * polar(b.ww.kt, Math.min(180, Math.abs(b.twa ?? 0)))) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
     // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
     // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them
