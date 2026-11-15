@@ -151,7 +151,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     const rel = (from: number, h: number) => ((from - h + 540) % 360) - 180;
     let n = 0, held = 0;
     for (const s of SLIPS.filter((_, i) => i % 3 === 0)) for (const from of [270, 225, 0]) {
-      const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing') continue;
+      const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing' || p.pivot === 0) continue; // (walked out to the fairway and turned there by hand toward the way out, 8m2: not the wind's swing)
       if (15 * Math.abs(Math.sin(rel(from, s.heading) * Math.PI / 180)) < WIND_SWINGS) continue;
       n++;
       expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading))); // (the bow comes round toward the wind: the stern goes downwind)

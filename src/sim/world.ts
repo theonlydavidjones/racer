@@ -6,7 +6,7 @@ import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, POLE, apparent, asternGlide, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
+import { HOVE, POLE, apparent, asternGlide, mooredBoats, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
@@ -466,6 +466,7 @@ export class World {
     this.rounding = settings.mode === 'roundings' ? new RoundingTracker(this.C) : null;
     this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
     this.homeSlip = slipById(settings.boat?.slip);
+    mooredBoats.home = this.homeSlip; // (the boats in the other slips solid to her: physics.ts; her own, empty while she's out, not)
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
@@ -2113,7 +2114,7 @@ export class World {
           const rate = Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
           // (the tiller can't hurry or slow it: the water crosses the rudder broadside)
           H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + rate * dt);
-          const q = swingAbout(start, H.h0, 3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); b.astern = 0;
+          const q = swingAbout(start, H.h0, P.pivot ?? 3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); b.astern = 0; // (about her bow on the bow line, or her middle, walked out into the fairway)
         } else if (P.hold && H.held !== false) {
           // head to wind, held on the bow line: waiting for the main to go up and the word to let go; she lies to the wind as
           // it shifts (a boat on a bow line follows it), within 20 degrees of where she came to

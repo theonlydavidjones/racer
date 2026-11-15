@@ -95,8 +95,8 @@ describe('pushed off astern', () => {
     };
     for (const id of [...NO_ASTERN, ...NO_ASTERN_WEST]) {
       expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
-      const r = tryIt(id, 270, 12); // (every one of them planned astern there: the sweep)
-      expect(r.astern, `${id}: astern in a 12 kt westerly`).toBe(true); expect(r.went, id).toBe(false); expect(r.docked, id).toBe(true); expect(r.told, id).toBe(true);
+      const r = tryIt(id, 270, 12); // (planned astern there, kept fast and told; or walked out to the fairway instead, 8m2, and got out)
+      if (r.astern) { expect(r.went, id).toBe(false); expect(r.docked, id).toBe(true); expect(r.told, id).toBe(true); } else expect(r.went, id).toBe(true);
     }
     // (the edges of the westerly's band, and the six in a northerly: kept fast where the plan's astern, got out where it isn't)
     for (const [ids, from, kt] of [[NO_ASTERN_WEST, 225, 12], [NO_ASTERN_WEST, 315, 12], [NO_ASTERN, 0, 12]] as const) for (const id of ids) {
@@ -142,7 +142,7 @@ describe('pushed off astern', () => {
     const meant = asternGlide(v0, h, ww.from, ww.kt, ASTERN_GLIDE_S, undefined, w.windAstern(u, h)).dist;
     const gauged = Math.max(plan.coast - COAST_SHORT, 0), floored = meant > gauged + 0.5;
     const want = floored ? meant : gauged; let went = 0;
-    for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); if (!berthClear(u, u.h, s)) return null; }
+    for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); if (!berthClear(u, u.h, s) || w.drainEvents().some(e => e.type === 'toast' && /Bump|Collision|hit /.test(e.msg))) return null; } // (stopped by a dock or a moored boat: no glide to compare)
     return { went, want };
   };
   for (const [from, name] of [[0, 'northerly'], [90, 'easterly']] as const) it(`in a 20 kt ${name}, she stops where the plan meant her to (a meter short of its clear water, or her steerage floor's glide): within 15%, stern first, the helm amidships`, () => {

@@ -1,4 +1,4 @@
-import { harborNear, hitsHarbor, hitsWall } from '../geo/marina';
+import { harborNear, hitsHarbor, hitsMooredBoat, hitsWall, type Slip } from '../geo/marina';
 import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage';
 import { KT, V, clamp, wrap, n360, D2R, type Vec } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
@@ -911,7 +911,16 @@ function closingAt(b: Boat, p: Vec): number {
  * walls, counts as mud and sand for now, aground with no damage: which stretches are seawall, riprap or beach isn't in the
  * sim's data yet (the NOAA chart's shoreline construction and coastline kinds would say), nor are the charted rocks;
  * ROADMAP's wreck item.) */
+/**
+ * The boats lying in the other slips are solid to a boat sailing free (8m2, the owner: "i keep getting pushed into other
+ * boats"): her own slip, the one she left, aside (the World sets it: mooredBoats.home). The same boats, as drawn
+ * (geo/marina.ts hitsMooredBoat), that her lines and fenders keep her off at the dock.
+ */
+export const mooredBoats: { home: Slip | null } = { home: null };
+/** Land, a dock, or (near a harbor: `nearHarbor`, looked up once a step) a boat lying in a slip: what stops her. */
+const solidAt = (p: Vec, nearHarbor: boolean): boolean => onLand(p) || (nearHarbor && hitsMooredBoat(p, mooredBoats.home ?? undefined));
 function whatHit(hit: Vec): { kind: Struck; name: string } {
+  if (!onLand(hit) && hitsMooredBoat(hit, mooredBoats.home ?? undefined)) return { kind: 'boat', name: 'the boat in the next slip' };
   const piles = underPier(hit); if (piles) return { kind: 'piles', name: `the piles of ${piles.name}` };
   const pier = pierNear(hit, 6); if (pier) return { kind: 'concrete', name: `the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}` };
   if (hitsWall(hit)) return { kind: 'concrete', name: 'the breakwater' };
@@ -1005,7 +1014,8 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   b.x += b.vx * dt; b.y += b.vy * dt;
   const bump = (msg: string) => { b.lastHitT = t; if (b.isUser && t - groundToast.t > 4) { groundToast.t = t; emit({ type: 'toast', msg }); } }; // (lastHitT: rule 42.3(h), getting clear after it)
   const x0 = b.x - b.vx * dt, y0 = b.y - b.vy * dt; // (where she was: pushed back off something, she never ends a step on land)
-  const offLand = () => { if (onLand(bow(b)) || onLand(b)) { b.x = x0; b.y = y0; } };
+  const nearHarbor = harborNear(b) != null, solid = (p: Vec) => solidAt(p, nearHarbor); // (the moored boats only where there are any: the step's cost)
+  const offLand = () => { if (solid(bow(b)) || solid(b)) { b.x = x0; b.y = y0; } };
   // what a blow did, in words: the harm (boat/damage.ts) first, else what she touched
   const say = (level: DamageLevel, what: { kind: Struck; name: string }, closing: number, plain: string) => {
     const kn = (closing / KT).toFixed(1);
@@ -1015,7 +1025,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   };
   let touched = false;
   if (b.pushing) { /* being walked out of her own slip by hand: nothing to hit */ }
-  else if (onLand(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
+  else if (solid(bow(b))) { // (the message by what she hit, a dock, a bridge's pier or the shore, not by where she is)
     const hit = bow(b), what = whatHit(hit), closing = closingAt(b, hit), piles = underPier(hit); // (where her bow struck, before she's pushed back off it)
     touched = true; b.x -= u.x * 0.6; b.y -= u.y * 0.6;
     if (piles && b.v < STEERAGE && !motorDrives(b)) onPiles(b, piles.name, closing, true, hit, emit, t);
@@ -1024,7 +1034,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
       say(hurt(b, what, closing, hit, emit), what, closing, what.kind === 'dock' ? 'Bump: your bow hit the dock. Steer off and back into the fairway.' : what.kind === 'mud' ? 'Aground! Steer back out to open water.' : `Collision: you hit ${what.name}. Bear away and give it room.`);
     }
     offLand();
-  } else if (onLand(stern(b)) && (ast > 0 || b.vx * u.x + b.vy * u.y < -0.02)) { // (going astern, or carried stern first by the stream)
+  } else if (solid(stern(b)) && (ast > 0 || b.vx * u.x + b.vy * u.y < -0.02)) { // (going astern, or carried stern first by the stream)
     const hit = stern(b), what = whatHit(hit), closing = closingAt(b, hit), piles = underPier(hit);
     touched = true; b.x += u.x * 0.4; b.y += u.y * 0.4; b.astern = 0;
     if (piles) onPiles(b, piles.name, closing, true, hit, emit, t); // (going astern she has no steerage: on the piles)
@@ -1039,8 +1049,8 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // on something, sliding along a face, so the check costs one look a step: the perf budget; one contact a step: an end
   // that's touched is the blow)
   const side = b.vx * stb.x + b.vy * stb.y, ahead = b.vx * u.x + b.vy * u.y, sgn = Math.sign(side);
-  if (!touched && !b.pushing && Math.abs(side) > 0.005 && (Math.abs(side) > 0.5 * Math.abs(ahead) || onLand({ x: b.x + stb.x * sgn * 1.1, y: b.y + stb.y * sgn * 1.1 }))) {
-    const hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => onLand(q));
+  if (!touched && !b.pushing && Math.abs(side) > 0.005 && (Math.abs(side) > 0.5 * Math.abs(ahead) || solid({ x: b.x + stb.x * sgn * 1.1, y: b.y + stb.y * sgn * 1.1 }))) {
+    const hit = [0, 2.4, -2.4].map(a => ({ x: b.x + u.x * a + stb.x * sgn * 1.1, y: b.y + u.y * a + stb.y * sgn * 1.1 })).find(q => solid(q));
     if (hit) {
       const what = whatHit(hit), closing = closingAt(b, hit), piles = underPier(hit);
       b.x -= stb.x * sgn * 0.15; b.y -= stb.y * sgn * 0.15; if (Math.sign(b.sway ?? 0) === sgn) b.sway = 0;
