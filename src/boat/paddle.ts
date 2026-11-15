@@ -36,7 +36,7 @@ import orc from './data/nordic-folkboat-orc.json';
  *   ½ × 1025 × 1.18 × 0.03 × 2² × ½ ≈ 36 N.
  * Her own hull (physics.ts, the ITTC-1957 friction line on her 14.75 m² of wetted surface, ORC) then sets how fast she
  * goes: about a knot and a half (ITTC alone: about 5 W of thrust power holds 1 kt, 18 W 1.5 kt; a club crewmate's
- * stroke, 150 W easing to 100 W, gives 30–45 W of thrust: 1.5–2 kt).
+ * stroke, 150 W easing to their CP of 75 W, gives 45 W of thrust easing to about 22 W: she settles at a little over 1.5 kt).
  * - The turn: the stroke's push is ARM off her centreline (the side deck, about 0.95 m out, and the reach), a yaw moment
  *   F × ARM against the water's resistance to her turning: her keel's and rudder's lift with way on (physics.ts
  *   yawDamping, the strips her yaw lag is worked from), and her hull and keel broadside to it, about her middle,
@@ -106,12 +106,13 @@ const tauOf = (dcp: number) => 546 * Math.exp(-0.01 * dcp / PADDLE.side) + 316;
 /** How long (s) a person keeps going at their CP before they must rest, by fitness: an estimate, its top at Poole 2016's
  * 24 min held at CP, less for the less fit, and less for work on the knees reaching down to the water. */
 const endureOf = (p: Person) => PADDLE.endure0 + PADDLE.endure1 * attrOf(p, 'fitness');
-/** A person's stores at `t` (W′'s share left, and how much of their endurance is used), recovered since they were last
- * stamped while not paddling (resting, or at other work, which a crutch's muscles don't do: as at rest). */
+/** The share of W′ a person has at `t`, recovered since they were last stamped while not paddling (resting, or at other
+ * work, which a crutch's muscles don't do: as at rest). */
 export function wLeft(a: Aboard, p: Person, t: number): number {
   const w = a.wBal; if (w >= 1) return 1;
   return 1 - (1 - w) * Math.exp(-Math.max(0, t - a.wT) / tauOf(cpOf(p).cp));
 }
+/** The share of their endurance used at `t`, recovered (RECOVER) since they were last stamped while not paddling. */
 export function usedNow(a: Aboard, t: number): number {
   const u = a.wUsed; if (u <= 0) return 0;
   return u * Math.exp(-Math.max(0, t - a.wT) / PADDLE.recover);
@@ -186,7 +187,8 @@ export function paddleStep(b: Boat, t: number, dt: number): 'rest' | 'swap' | 'r
   const { cp, wp } = cpOf(person);
   const P = paddlePower(b, t), pace = Math.min(1, workPace(b, who)), Pin = pace > 0 ? P / pace : 0;
   if (Pin <= 0) { stamp(a, person, t); p.rate = 0; return null; } // (fetching it, or the handover: resting)
-  // (over CP W′ is spent at the excess; under it, it comes back as resting does, by Skiba's τ for that gap)
+  // (over CP W′ is spent at the excess; under it, it comes back as resting does, by Skiba's τ for that gap: not reached
+  // while the job's stroke is over everyone's CP, effort, but kept so a gentler stroke stays right)
   a.wBal = Pin >= cp ? Math.max(0, a.wBal - (Pin - cp) * dt / wp) : 1 - (1 - a.wBal) * Math.exp(-dt / tauOf(cp - Pin));
   a.wUsed += dt * (Pin / cp) / endureOf(person); // (their endurance, at the pace of their CP: faster over it)
   a.wT = t;
