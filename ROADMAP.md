@@ -522,6 +522,19 @@ What's planned, roughly in order. Done work is described in the README.
      before each puff, mark its dark patch upwind (a ring or arrow on the water) with a short countdown cue ("Puff · 8 s"),
      then "Ease" as it lands; fade the marker over the lesson so she ends up spotting the patches herself. Visual, no
      copy; the puff's timing from the sim's own Puffs (environment/wind.ts), never invented.
+   - **The race strategist, redone as an expert at your side** (owner, 15 November, from a screenshot of the Strategist
+     tab; polish/feature; next; 6–10 h; mock-up to the owner first): "the race strategist tab ... is a mess. way too much
+     copy, way too much self-referential stuff ("sim physics"), etc. This page should feel like an expert racer is at
+     dockside or in your boat before a race, assessing the course and competition and conditions, and giving you easy to
+     understand advice about how to win. definitely should touch on how to find the favored start side, and any clues
+     about which side that might be, assuming those clues are discernible from pre-race context (i.e. we haven't had a
+     chance to get to the line and measure; make this real world). stacking all the legs into one advice column is too
+     much. one bit at a time." So: the voice of a racer, not of the sim (no "sim physics", no methods); short, sharp
+     calls; the course, the fleet (by sail number) and the conditions; one bit at a time (one leg, one point, stepped),
+     not all eight legs stacked. The start: how to find the favored end once she's at the line (the methods of the
+     favored-end drill below) and the pre-race clues a real racer would have: the forecast wind's direction against the
+     course's axis, a known shift (the sea breeze veering through the afternoon), the tide's set across the line, the
+     committee's habit; the researcher to source these for the Bay. Never the measured answer before she's measured it.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
