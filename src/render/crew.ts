@@ -806,6 +806,11 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       if (rising) { aim.x = c.hip.x + (want.hip.x - c.hip.x) * 0.3; aim.z = c.hip.z + (want.hip.z - c.hip.z) * 0.3; }
     }
   }
+  // (shuffling along a side deck sat on it, the legs in over the coaming: the seat lifted a little on the way, as anyone's
+  // is, not slid along at the same height into the coaming's top where it rises forward; after a tack in 18 kt, to the
+  // cabin-top lines from the deck aft, the thigh went 5 cm into it)
+  if (!rising && Math.abs(want.hip.z - c.hip.z) > 0.05 && Math.sign(c.hip.x) === Math.sign(want.hip.x) && Math.abs(c.hip.x) > chz(c.hip.z) + COAMING_T && Math.abs(want.hip.x) > chz(want.hip.z) + COAMING_T)
+    aim.y = Math.max(aim.y, want.hip.y + 0.14 * f.scale * Math.min(1, Math.abs(want.hip.z - c.hip.z) / 0.15));
   // (walking: at the feet's pace. While one foot swings, the hips go no further than a stride from the one planted, as
   // anyone's do; free to run on, they went 1.3 m past it, the next step 1.6 m long, the leg stretched back through the
   // cabin's side)
