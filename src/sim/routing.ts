@@ -185,7 +185,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       // her deepest VMG angle up to 30° hotter, whose tracks over the ground, current and all, sailed one then the other,
       // make most along the straight line to the mark (the two tracks' meeting with that line: the polar's double tangent,
       // with the current in it). In still water it is her deepest VMG angle on both; in a current across her course the
-      // gybe into it sails hotter, so it still makes ground, and the other deeper. Sailed at the deepest angle on both,
+      // gybe into it sails hotter, so it still makes ground. Sailed at the deepest angle on both,
       // the gybe into a cross-current made next to none, and the plan doubled back (the owner's Horseshoe Bay plan, 15 Nov
       // 2026: it gybed off Yellow Bluff and ran back toward the start)
       let angS = beat, angP = beat;
@@ -206,6 +206,14 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
           let bv = -Infinity, ba = run; as.forEach((a, i) => { const q = T === 'S' ? GS[i] : GP[i], m = q.x * u.x + q.y * u.y; if (m > bv + 1e-9) { bv = m; ba = a; } });
           if (T === 'S') angS = ba; else angP = ba;
         }
+      }
+      // (a gybe that lays the mark already on her deepest angle's track sails that angle: the hotter one is for the board
+      // before the layline. Every rule after reads her track by this angle: the room ahead, what she makes, the layline;
+      // with the hotter angle in some and the deepest in others she sailed on past the mark and ashore)
+      if (mode === 'run') for (const T of ['S', 'P'] as const) {
+        const d = V(w.from + (T === 'S' ? -run : run)), vr = sp(run), g = { x: d.x * vr + c.x, y: d.y * vr + c.y }, m = sub(b, p);
+        const r = wrap(brg(m.x, m.y) - brg(g.x, g.y)) * (T === 'S' ? 1 : -1);
+        if (r >= 0 && r < 90) { if (T === 'S') angS = run; else angP = run; }
       }
       const angT = (T: 'S' | 'P') => T === 'S' ? angS : angP;
       const vbS = sp(angS), vbP = angP === angS ? vbS : sp(angP), vbT = (T: 'S' | 'P') => T === 'S' ? vbS : vbP;
@@ -290,6 +298,9 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       else if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
         const hm = crabTo(u, c, vbT(tack)), twa = Math.abs(wrap(hm - w.from));
         if (mode === 'beat' ? twa >= beat : twa <= run) { h = hm; v = sp(twa); }
+        // (downwind, the mark deeper than she'll sail: she holds her deepest angle, the layline she lays it on and the chart
+        // draws, not the hotter angle she sails before she lays it, which carried her on away from the mark and ashore)
+        else if (mode === 'run') { h = w.from + (tack === 'S' ? -run : run); v = sp(run); }
       }
     }
     // her heading across the wind from the last step's however she came to it (a reach turned beat, a beat's last board
