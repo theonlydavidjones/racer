@@ -28,7 +28,7 @@ export function sail(b: Boat, seconds: number, each?: (t: number) => boolean | v
     if (each && each(t) === true) return t;
     // a helmsman holding her straight: the tiller to windward just enough to cancel the weather helm
     if (b.turnTarget == null && b.steer === 0 && !(b as Boat & { handsOff?: boolean }).handsOff) {
-      const toWind = wrap(b.ww.from - b.h) >= 0 ? 1 : -1;
+      const rel = wrap(b.ww.from - b.h), toWind = Math.abs(rel) >= 90 ? (b.tack === 'S' ? 1 : -1) : rel >= 0 ? 1 : -1; // (her helm's side: physics.ts helmSide)
       b.tiller = Math.max(-0.4, Math.min(0.4, (b.helmNeed ?? 0) / FULL_RUDDER)) * toWind; // (as much as the boat's own turning, physics.ts balRate)
     }
     moveBoat(b, DT, t, noop, g);

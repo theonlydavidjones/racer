@@ -175,7 +175,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const rateFor = (dir: number) => dir && scullOK(dir) ? Math.max(flow, HANDLING.minTurnRate) : flow;
   const maxRate = Math.max(1e-3, flow);
   // helm balance: with weather helm she turns toward the wind unless the rudder holds her (balance.ts)
-  const balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * toWind;
+  // (her helm's own side: toward the wind. Off the wind that's by her tack, her boom's side, not by which quarter the wind
+  // is on: by the lee the drive out on her boom still turns her bow away from the boom, back toward a run)
+  const helmSide = Math.abs(wrap(ww.from - b.h)) >= 90 ? (b.tack === 'S' ? 1 : -1) : toWind;
+  const balRate = clamp((b.helmNeed ?? 0) / FULL_RUDDER, -0.4, 0.4) * maxRate * helmSide;
   let rate: number, rudder: number; // rudder: fraction of full, in the turn-rate sense (+ turns to starboard)
   // she answers the helm over a moment, not at once: her yaw inertia against the water's damping (yawLag); a helmsman
   // (and the AI) eases the helm before the heading he wants, by what she'll still turn once it's amidships
@@ -236,7 +239,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate : 0)) > flow + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
   if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
   b.helm = clamp(bladeFlip ? -rudder : rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
-  b.weatherHeld = -toWind * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
+  b.weatherHeld = -helmSide * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
   // (paddling on one side swings her too, against the same inertia and the water's resistance to her turning: paddle.ts)
   rate += paddleYawRate(b, t);
   // (penalty spins too: the crew's backed sails turn her against the same inertia and damping as the rudder does)
@@ -986,19 +989,24 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
   if (b.steer === 0) b.steerSince = undefined; else if (b.steerSince == null || b.steer !== b.steerWas) b.steerSince = t; // (how long a steering key has been held)
   b.steerWas = b.steer;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
-  if (twa > 176 && mainUp) tk = b.tack; // dead downwind: the tack she had, her main where it lies
+  // dead downwind: the tack she had, her main where it lies; unless the player has called the jibe, which her crew
+  // make as soon as the wind's over the main's own side, however little
+  const called = b.isUser && b.turnCalledT != null && t - b.turnCalledT < 3;
+  if (twa > 176 && mainUp && !called) tk = b.tack;
   if (twa >= 90 && mainUp && tk !== b.tack) {
     // by the lee: her main's side is her leeward side, so she's on her old tack until the boom has crossed. Her crew
     // gybe it if she's being turned through a gybe; otherwise it lies where it is until the wind gets behind it
     const across = tk === 'S' ? -1 : 1; // (the boom's side on the new tack: to port on starboard)
     if (Math.sign(b.boom) !== across && Math.abs(b.boom) >= 1) {
       if (b.boomFree == null && gybeMeant(b, tk, t)) b.gybeTo = tk;
-      return;
+      b.byLee = true; return;
     }
   }
-  if (tk === b.tack) { if (b.boomFree == null) b.gybeTo = undefined; return; } // (the wind back on her main's side before the crew had gybed it)
-  if (twa < 90) { b.tacking = true; b.headToWindT = t; } // head to wind: a tack (a gybe passes the wind astern)
-  b.tack = tk; b.gybeTo = undefined; b.lastTackT = t; if (sheets) jibSheetsAtTack(b, emit);
+  if (tk === b.tack) { if (b.boomFree == null) b.gybeTo = undefined; b.byLee = false; return; } // (the wind back on her main's side before the crew had gybed it)
+  // head to wind: a tack. Not if the wind came round her stern and her tack is only now catching up (her boom still
+  // uncrossed as she reaches up on the new side, hove to or spun round in light air): that's a gybe, however late
+  if (twa < 90 && !b.byLee) { b.tacking = true; b.headToWindT = t; }
+  b.byLee = false; b.tack = tk; b.gybeTo = undefined; b.lastTackT = t; if (sheets) jibSheetsAtTack(b, emit);
 }
 
 /**
@@ -1417,7 +1425,9 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
   // for. Her heading's held and her crew hand it across; turning to the "mirror" would take her back onto the tack
   // she's on and then jibe her twice)
   if ((b.rig?.mainUp ?? true) && (rel >= 0 ? 'S' : 'P') !== b.tack) return { dir: rel >= 0 ? 1 : -1, target: b.h };
-  return { dir: rel >= 0 ? -1 : 1, target: n360(from + rel) };
+  // (and far enough past dead astern for the wind to be over her main's own side when she gets there: from a dead run
+  // the mirror is where she already is)
+  return { dir: rel >= 0 ? -1 : 1, target: n360(from + (rel >= 0 ? 1 : -1) * Math.min(twa, 172)) };
 }
 
 /**

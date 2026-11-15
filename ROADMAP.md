@@ -270,6 +270,10 @@ What's planned, roughly in order. Done work is described in the README.
    both sides.
 8p. ~~**Bug: with the sails down, the jib cars show as loaded**~~ (done: bf2a855, ecc0d4c) (owner, 13 November; <1 h): "with sails down, neither jib
    car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
+   - **The push-off's known limits** (physics review of #384, not blocking): kept-fast for the six westerly berths is
+     asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
+     that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
+     under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with

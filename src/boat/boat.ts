@@ -192,6 +192,8 @@ export interface Boat {
   gybeTo?: 'S' | 'P';
   /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
   turnCalledT?: number;
+  /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
+  byLee?: boolean;
   /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
    * wind means the jibe; a tap doesn't (physics.ts gybeMeant). */
   steerSince?: number;

@@ -88,6 +88,28 @@ describe('a gybe that\'s meant', () => {
     sail(b, 15);
     expect(b.tack).toBe('S'); expect(b.boom).toBeLessThan(-40); expect(b.crashT).toBeUndefined();
   });
+  // (the physics review, 15 Nov 2026: from a dead run the mirror heading is where she already is, and the call did nothing)
+  for (const h0 of [174, 178, 182]) it(`the jibe key from ${h0 < 180 ? `${180 - h0}° short of dead downwind` : `${h0 - 180}° by the lee`}: the main is handed across all the same, no crash`, () => {
+    const b = running(12); for (let h = 171; h <= h0; h++) sail(b, 2, () => held(b, h)); // (brought round slowly from 170, on port)
+    expect(b.tack).toBe('P'); expect(b.boom).toBeGreaterThan(40); // (on port, her boom to starboard, whichever quarter the wind's on)
+    const t0 = tackTarget(b); b.turnDir = t0.dir; b.turnTarget = t0.target;
+    sail(b, 15);
+    expect(b.tack).toBe('S'); expect(b.boom).toBeLessThan(-40); expect(b.crashT).toBeUndefined();
+    expect(Math.abs(((b.h - 180 + 540) % 360) - 180)).toBeLessThan(15); // (still on a run, a few degrees the other side at most)
+  });
+  it('by the lee her helm\'s balance still goes by her boom: let go, her bow falls back toward a run, not deeper by the lee', () => {
+    const b = running(12); sail(b, 20, () => held(b, 192)); // (12° by the lee on port, her boom to starboard)
+    expect(b.tack).toBe('P'); expect(b.helmNeed!).toBeGreaterThan(0);
+    const h0 = b.h; (b as Boat & { handsOff?: boolean }).handsOff = true; b.turnTarget = null;
+    sail(b, 6, () => { b.steer = 0; b.tiller = 0; });
+    expect(b.crashT).toBeUndefined(); expect(((b.h - h0 + 540) % 360) - 180).toBeLessThan(0); // (to port: back toward 180)
+  });
+  it('spun round her stern in light air faster than her boom swings: her tack catching up on the new reach is a gybe, not a tack', () => {
+    const b = testBoat({ heading: 170, kt: 3, windKt: 5 }); b.isUser = true; sail(b, 30, () => held(b, 170));
+    const htw = b.headToWindT, was = b.tack; free(b);
+    sail(b, 40, () => { b.steer = 0; b.tiller = b.tack === was && Math.abs(((b.h - 270 + 540) % 360) - 180) > 5 ? -1 : 0; });
+    expect(b.tack).not.toBe(was); expect(b.headToWindT).toBe(htw); expect(b.tacking).toBeFalsy();
+  });
   it('a steering key held down as her stern passes the wind: meant, handed across within a few degrees, no crash', () => {
     const b = running(12); let across = NaN;
     sail(b, 12, t => { b.steer = t < 8 ? 1 : 0; if (isNaN(across) && b.boom < 0) across = b.h - 180; });
