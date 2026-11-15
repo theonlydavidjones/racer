@@ -313,6 +313,16 @@ What's planned, roughly in order. Done work is described in the README.
    leaves her pointing out, a short hand-over is enough; giving her sails during the walk drove her back into the
    slips in the replay.
 
+8m3. **Let go from the bow-line swing with room to leeward** (Marinas, 15 November; found once the moored boats were solid,
+   8m2; tests/mooredSolid.test.ts names West Harbor 507). A sweep (every berth whose plan is the swing on her bow line, in
+   12 and 15 kt from 270, 225 and 000: 1,604 cases at 753 berths) found the crew's swing itself touches no moored boat
+   anywhere. But once she's let go at the finger's end, the jib up, she hits the boat to leeward within about 12 s in 1,167
+   cases (613 berths) with the tiller left alone, and 1,124 (593) with her heading held on the pilot. The cause is where
+   she's let go: with under 1 m between her side and a moored boat downwind, 871 of 1,084 hit; with 2–8 m, 14 of 90. Mostly
+   in a northerly (933 of 1,250). The fix: the plan lets her go only with 2–3 m to leeward, like the walk-out's clear run
+   ahead (the crew hold her off on the line, or walk her further out first), and is let go 60 degrees and more off the
+   wind, as the walk-outs are. 507 in a 12 kt northwesterly is let go only 53 degrees off.
+
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with

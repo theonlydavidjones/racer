@@ -40,3 +40,29 @@ describe('the walk-out to the fairway', () => {
     expect(n).toBeGreaterThan(20); expect(bad).toEqual([]);
   }, 600_000);
 });
+
+// (a known failure, found once the moored boats were solid, 15 Nov 2026: at West Harbor 507, in a 12 kt northwesterly,
+// the crew's swing on her bow line is clean, but they let her go heading 262, only 53 degrees off the wind, at 0.5 m/s.
+// The jib up and the tiller left alone, she can't get way on that close to the wind and is set sideways onto the boats
+// to leeward inside 15 s. The walk-outs are let go 60 degrees and more off the wind; the bow-line swing isn't held to
+// it. ROADMAP 8m3.)
+function swingOut(id: string, from: number, kt: number) {
+  const s = SLIPS.find(q => q.id === id)!, boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
+  const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, windDir: from, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings, 1, { freeSail: true }), u = w.user;
+  for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
+  const went = w.pushOff(), P = (u.handled as { plan?: { kind: string; pivot?: number } } | undefined)?.plan, hits: string[] = [];
+  const seen = () => { for (const e of w.drainEvents()) if (e.type === 'toast' && /next slip/.test((e as { msg: string }).msg)) hits.push((e as { msg: string }).msg); };
+  for (let k = 0; k < 60 * 150 && (u.handled || u.pushing); k++) { w.step(DT); if (u.handled?.held) w.pushOff(); seen(); }
+  const swung = hits.length, hLet = u.h;
+  w.setSail('jib', true); const x0 = u.x, y0 = u.y;
+  for (let k = 0; k < 60 * 60 && Math.hypot(u.x - x0, u.y - y0) < 15; k++) { w.step(DT); seen(); }
+  return { went, bowLine: P?.kind === 'swing' && P.pivot !== 0, hits, swung, off: Math.abs(((from - hLet + 540) % 360) - 180) };
+}
+describe('West Harbor 507, swung on her bow line in a 12 kt northwesterly', () => {
+  it('the plan there is the swing on her bow line, and the crew swing her touching no boat', () => {
+    const r = swingOut('west-harbor:507', 315, 12); expect(r.went).toBe(true); expect(r.bowLine).toBe(true); expect(r.swung).toBe(0);
+  }, 120_000);
+  it.fails('let go 60 degrees and more off the wind, and hands off with the jib up, 15 m without touching a boat (8m3: set onto one today)', () => {
+    const r = swingOut('west-harbor:507', 315, 12); expect(r.off).toBeGreaterThanOrEqual(60); expect(r.hits).toEqual([]);
+  }, 120_000);
+});
