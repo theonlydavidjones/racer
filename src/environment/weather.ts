@@ -1,9 +1,9 @@
 import { clamp, n360, wrap, type Vec } from '../core/math';
 import { LL } from '../geo/geo';
-import { anyShoreDist, onGround } from '../geo/shore';
+import { onGround } from '../geo/shore';
 import real from './data/sf-real-days.json';
 import { swellFor, swellShare, type Swell, type SwellDay } from './sea';
-import { OPEN_WATER, breezeAt, windKindFor, windTerrain, type Breeze, type WindDay, type WindKind } from './wind';
+import { OPEN_WATER, breezeAt, shoreSlow, windKindFor, windTerrain, type Breeze, type WindDay, type WindKind } from './wind';
 
 /**
  * The weather on a race day, the way it really was or will be:
@@ -121,7 +121,7 @@ function interp(samples: Sample[], min: number): { kt: number; from: number; gus
 /* ---------- the wind across the course ---------- */
 
 /** The shore's own slowdown (wind.ts), without the slot: for the forecast grid, which has the Gate's channelling in it. */
-const shoreFactor = (p: Vec) => 0.8 + 0.2 * clamp(anyShoreDist(p) / 400, 0, 1);
+const shoreFactor = (p: Vec, from: number) => shoreSlow(p, from);
 const FORT_POINT = LL(37.8063, -122.4659);
 /** The forecast's reference cell (MTR 84,107), whose hourly wind is the course-wide wind on a forecast day. */
 const REF = LL(37.8118, -122.4488);
@@ -225,7 +225,7 @@ function forecastField(date: string) {
     for (const c of live) { const wt = c.s / ((q.x - c.x) ** 2 + (q.y - c.y) ** 2 + 1200 * 1200) ** 1.5; u += c.e * wt; v += c.n * wt; w += wt; }
     return w > 0 ? { kt: Math.hypot(u, v) / w, from: (Math.atan2(u, v) * 180 / Math.PI + 360) % 360 } : null;
   }
-  return (p: Vec, tMin: number) => {
+  return (p: Vec, tMin: number, from: number) => {
     if (tMin !== at) {
       const hf = clamp(localMin(tMin) / 60 - R.grid.hours[0], 0, R.grid.hours.length - 1), h0 = Math.floor(hf), h1 = Math.min(R.grid.hours.length - 1, h0 + 1), f = hf - h0;
       live = [];
@@ -239,10 +239,10 @@ function forecastField(date: string) {
       at = tMin; ref = uvOf(REF);
     }
     const a = uvOf(p), r = ref;
-    if (!a || !r || r.kt < 0.5) return { k: shoreFactor(p), turn: 0 };
+    if (!a || !r || r.kt < 0.5) return { k: shoreFactor(p, from), turn: 0 };
     // (the limits only guard against a broken forecast: across the whole world the water's cells turn up to about 75°
     // from the reference cell's wind along the Berkeley flats, and blow from a fifth to twice as hard)
-    return { k: shoreFactor(p) * clamp(a.kt / r.kt, 0.15, 3), turn: clamp(wrap(a.from - r.from), -100, 100) };
+    return { k: shoreFactor(p, from) * clamp(a.kt / r.kt, 0.15, 3), turn: clamp(wrap(a.from - r.from), -100, 100) };
   };
 }
 

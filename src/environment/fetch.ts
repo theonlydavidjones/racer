@@ -1,5 +1,12 @@
 /**
- * The shore's slowdown of the wind, by how far the air has blown over open water (its fetch).
+ * The shore's slowdown of the wind, by how far the air has blown over open water (its fetch). Used only in and around
+ * the San Francisco Marina's harbors (West Harbor and Gashouse Cove: shoreSlowLocal), where it makes the edge a boat
+ * feels leaving the cove. Everywhere else the shore's slowdown is still wind.ts's by the distance to the nearest shore.
+ * Why local: the wind's calibration (wind.ts OPEN_WATER) pairs with that shore slowdown at the NOAA station, and
+ * taking fetch everywhere would re-derive it by direction (+5…+12% on most courses in a westerly, about −15% in a
+ * northerly). No open-water wind record inside the Bay could be found to check that against (Alcatraz and Point Blunt
+ * aren't in NDBC's inventory; the shore and pier stations are ruled by their own shelter): docs/wind-fetch-check.md.
+ * So here the fetch only shapes the slowdown between the same two ends, 0.8 by the land and 1.0 in open water.
  *
  * Wind off the land carries the land's slower, rougher surface layer out over the water with it. Over the smooth water a
  * new layer grows up from the surface (the internal boundary layer), and within it the wind speeds up toward what open
@@ -23,6 +30,7 @@
  */
 import { V, type Vec } from '../core/math';
 import { onGround, PILE_PIERS, anyShoreDistNear } from '../geo/shore';
+import { HARBORS } from '../geo/marina';
 import { inPoly } from '../core/math';
 
 const Z0_LAND = 0.3, Z0_WATER = 0.0002, BLEND_H = 60, THIN = 40;
@@ -89,4 +97,50 @@ const FAN = [-5, 0, 5];
 export function shoreFetchFactor(p: Vec, from: number): number {
   if (anyShoreDistNear(p) > FETCH_FULL) return 1;
   let s = 0; for (const a of FAN) s += fetchRatio(fetchAlong(p, from + a)); return s / FAN.length;
+}
+
+/* ---------- in and around the Marina's harbors ---------- */
+/** The SF Marina's harbors (West Harbor, Gashouse Cove), their basins, breakwaters and docks, and NEAR m round them. */
+const NEAR = 150, BLEND = 150;
+const MARINA = (() => {
+  const hs = HARBORS.filter(h => h.id === 'west-harbor' || h.id === 'gashouse-cove');
+  return { x0: Math.min(...hs.map(h => h.reach.x0)) - NEAR, x1: Math.max(...hs.map(h => h.reach.x1)) + NEAR, y0: Math.min(...hs.map(h => h.reach.y0)) - NEAR, y1: Math.max(...hs.map(h => h.reach.y1)) + NEAR };
+})();
+/** How much the fetch shapes the slowdown at p: 1 within NEAR m of the harbors, easing (smoothstep) to 0 over BLEND m beyond. */
+export function marinaWeight(p: Vec): number {
+  const dx = Math.max(MARINA.x0 - p.x, 0, p.x - MARINA.x1), dy = Math.max(MARINA.y0 - p.y, 0, p.y - MARINA.y1);
+  if (dx === 0 && dy === 0) return 1;
+  const d = Math.hypot(dx, dy); if (d >= BLEND) return 0;
+  const t = 1 - d / BLEND; return t * t * (3 - 2 * t);
+}
+/** The fetch's share of the way from the land's air to open water's here (0..1): shoreFetchFactor between its two ends. */
+const R0 = fetchRatio(0);
+const shape = (p: Vec, from: number) => (shoreFetchFactor(p, from) - R0) / (1 - R0);
+/**
+ * shape off a 10 m lattice and whole degrees of the wind, kept as worked out (every boat in the harbor asks every step;
+ * a look is three rays of up to 400 cells): bilinear between the lattice's points, straight-line between degrees. The
+ * slowdown changes by under 2% over 10 m except right at a breakwater's end, where the fan of rays spreads it.
+ */
+const LAT = 10, cache = new Map<number, number>();
+function node(i: number, j: number, d: number): number {
+  const dd = ((d % 360) + 360) % 360, key = ((i + 40000) * 80000 + (j + 40000)) * 360 + dd;
+  let v = cache.get(key);
+  if (v === undefined) { if (cache.size > 200000) cache.clear(); v = shape({ x: i * LAT, y: j * LAT }, dd); cache.set(key, v); }
+  return v;
+}
+function shapeNear(p: Vec, from: number): number {
+  const fx = p.x / LAT, fy = p.y / LAT, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+  const d0 = Math.floor(from), g = from - d0;
+  const at = (d: number) => (node(i, j, d) * (1 - u) + node(i + 1, j, d) * u) * (1 - v) + (node(i, j + 1, d) * (1 - u) + node(i + 1, j + 1, d) * u) * v;
+  return g === 0 ? at(d0) : at(d0) * (1 - g) + at(d0 + 1) * g;
+}
+/**
+ * The shore's slowdown at p, given `byDist`, wind.ts's by the distance to the nearest shore: in and around the Marina's
+ * harbors, by the fetch instead (between the same ends, 0.8 and 1); blended into byDist over BLEND m beyond them.
+ */
+export function shoreSlowLocal(p: Vec, from: number, byDist: number): number {
+  if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(from)) return byDist;
+  const w = marinaWeight(p); if (w === 0) return byDist;
+  const f = 0.8 + 0.2 * shapeNear(p, from);
+  return byDist + (f - byDist) * w;
 }

@@ -3,6 +3,7 @@ import type { Rng } from '../core/rng';
 import { LL } from '../geo/geo';
 import { anyShoreDist, anyShoreDistNear } from '../geo/shore';
 import { terrainLee } from './shadows';
+import { shoreSlowLocal } from './fetch';
 import clim from './data/sf-wind-climate.json';
 
 /** True wind over the ground. `from` is a compass direction, `kt` is speed in knots. */
@@ -148,8 +149,16 @@ export function windTerrain(p: Vec, from = 255, lattice = false): number {
   const slot = slotWeight(p) * slotFlow(from);
   // (`lattice`: the shore's distance off its 10 m lattice, geo/shore.ts anyShoreDistNear, a few metres out at most, so
   // under 0.3% of the wind here, typically 0.005% (the review's measure over the water within 420 m of a shore): for a boat's own wind every step, as for her current; the map keeps the exact one)
-  const shore = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : shoreDistAt(p)) / 400, 0, 1); // (every shore: the Cityfront's, the islands', Marin's and the East Bay's)
-  return (1 + SLOT_BOOST * slot) * shore;
+  return (1 + SLOT_BOOST * slot) * shoreSlow(p, from, lattice);
+}
+/**
+ * The shore's slowdown alone (no slot): 0.8 at every shore (the Cityfront's, the islands', Marin's and the East Bay's),
+ * full strength ~400 m off; in and around the SF Marina's harbors, by how far the air has come over the water instead
+ * (environment/fetch.ts: local, so the calibration against the station holds). weather.ts's forecast field uses it too.
+ */
+export function shoreSlow(p: Vec, from: number, lattice = false): number {
+  const byDist = 0.8 + 0.2 * clamp((lattice ? anyShoreDistNear(p) : shoreDistAt(p)) / 400, 0, 1);
+  return shoreSlowLocal(p, from, byDist);
 }
 
 /* ---------- puffs and lulls ---------- */
