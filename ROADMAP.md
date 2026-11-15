@@ -34,6 +34,9 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **The drive calibration snaps to 5°** (from the polar's smooth-top review): physics.ts calAt reads the sails' drive
+  calibration at the nearest 5° of angle, so the physics boat's own VMG curve has small steps (8 kt: 2.951 at 45°, 2.921
+  at 46°). Blend it across angles as driveCurve now is.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
