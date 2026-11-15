@@ -89,3 +89,26 @@ slip past its end. By this physics the cove isn't in the land's slower air. Its 
 the gap, nothing 60 m out). If the edge the owner feels is sharper, it more likely comes from what the model lacks:
 the yacht clubs' buildings on the moles, Marina Green's trees, and the seawall with the land behind it, whose lee is cut
 at 15 heights. Those need heights from a source (ROADMAP 8n).
+
+## The harbor's structures: what could be sourced (for ROADMAP 8n.7)
+
+From OpenStreetMap (api.openstreetmap.org, 15 November 2026) and NOAA's datums for 9414290 (api.tidesandcurrents.noaa.gov
+mdapi, epoch 1983–2001). Planning and engineering documents (BCDC, SF Planning's 2007 Marina EIR 2007.0903E, the Corps)
+were unreachable from the sessions' hosts.
+
+| Structure | Where | Height | Source |
+|---|---|---|---|
+| Golden Gate YC | 37.8077 N, 122.4426 W; ~24 × 26 m | 8 m | OSM way 239024736 (tag, no source given) |
+| St. Francis YC | 37.8072 N, 122.4467 W; ~49 × 96 m box | none found (2 stories: Wikipedia) | OSM relation 3826284 |
+| Harbor master's office | 37.8066 N, 122.4427 W; ~9 × 27 m | none found | OSM way 852170598 |
+| 1 Marina Green Dr | 37.8073 N, 122.4379 W; ~9 × 12 m | 4 m | OSM way 117021463 (survey) |
+| Fort Mason Pier 1 shed | 37.8079 N, 122.4324 W | 17 m | OSM way 288387751 (in pile-piers.json already) |
+| Marina Green trees, east end | 9 trees, 37.8066–37.8069 N, 122.4343–122.4357 W | none found | OSM natural=tree nodes |
+| Gashouse Cove seawall top | | none found; 1.8 m over the water is the owner's photos (gashouse-cove.json) | |
+
+- The yacht clubs are 600 m (Golden Gate YC) and over 1 km (St. Francis YC) west of the cove: 75 heights or more. Their
+  lee can't make the edge at the cove's mouth.
+- The nearest candidates are the tree row at the Green's east end, beside the cove (no species or heights found), and
+  the seawall with the land behind it (no surveyed crest).
+- Datums at 9414290 (ft, station datum): MLLW 5.98, MSL 9.10, MHHW 11.82, NAVD88 5.92. MSL is 0.95 m above MLLW; MHHW
+  is 0.83 m above MSL. A wall top 1.8 m over the water is a height at one tide, not a crest elevation.
