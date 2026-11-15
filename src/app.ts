@@ -373,24 +373,37 @@ function word(id: string, t: string): void { const e = $(id).querySelector('.w')
 
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
-function setTiller(v: number): void { send({ k: 'tiller', v }); }
+/** The tiller angle the page last sent: what it meant the tiller to be (its own copy of the race is a frame or two behind). */
+let tillerSent = 0, tillerSentAt = -1e9;
+function setTiller(v: number): void { tillerSent = Math.max(-1, Math.min(1, v)); tillerSentAt = performance.now(); send({ k: 'tiller', v }); }
+/** Where the tiller is meant to be: where the page last put it, if it has in the last half second (your hand, the spring);
+ * otherwise where the race has it (the pilot's ram, a reset). */
+const tillerMeant = () => performance.now() - tillerSentAt < 500 ? tillerSent : w.user.tiller;
+/** A lash sent and not yet seen in the page's copy of the race: until it is, the tiller's spring stays off it (each step of
+ * the spring is a tiller command, and a tiller command moves a lashing: a small angle was eased to amidships, the owner).
+ * For 30 of the page's frames at most (half a second; counted in frames, so a slow machine waits as many as a fast one):
+ * the race can drop a lash before the page sees it (pushing off, ashore). */
+let lashPendingFrames = 0;
+const lashPending = () => lashPendingFrames > 0;
 /* Lashing the tiller: a line from the tiller to a cleat holds it where you leave it, hands off (heaving to). It's done on
  * the tiller itself: right-click (or double-click, or the key) to lash it where it is. The lashing shows on the tiller guide; a click
  * or A/D takes the tiller and the lashing comes off; double-click again to lash it somewhere else. */
 const lashWhere = (t: number) => Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'}`;
-function lash(): void {
+function lash(at = tillerMeant()): void {
   if (!w.running || w.paused) return;
   const u = w.user;
-  if (u.lashed != null) { unlash(); return; }
+  if (u.lashed != null || lashPending()) { unlash(); return; }
+  if (u.pushing) return; // (being pushed off: her crew are fending, and the race takes the lashing straight off)
   pilotOff('Pilot on standby.'); releaseTiller();
-  send({ k: 'lash', on: true }); showLash();
-  const t = u.tiller, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
+  // (lashed at the angle meant, sent with the command: not at whatever the tiller is when the command lands)
+  tillerSent = at; lashPendingFrames = 30; send({ k: 'lash', on: true, at }); showLash();
+  const t = at, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
   const fast = u.v > 2 / 1.944 && lee && Math.abs(t) > 0.15 && !((u.jibBacked ?? 0) > 0.5);
   toast(fast ? `Tiller lashed to leeward with way on (${(u.v * 1.944).toFixed(1)} kt): she'll round up and tack. To heave to, back the jib first and let her slow to a knot or two, then lash.`
     : Math.abs(t) < 0.04 ? 'Tiller lashed amidships. To lash it elsewhere, take the tiller, move it, and right-click (or double-click).'
     : `Tiller lashed ${lashWhere(t)} (${lee ? 'to leeward: she turns toward the wind' : 'to windward: she bears away'}). Click or ${keymap.label('steerPort')}/${keymap.label('steerStbd')} takes the tiller; right-click or double-click lashes it again.`, fast ? 6000 : 4500);
 }
-function unlash(): void { const u = w.user; if (u.lashed == null) return; send({ k: 'lash', on: false }); showLash(); toast('Lashing off: you have the tiller.', 2000); }
+function unlash(): void { const u = w.user; if (u.lashed == null && !lashPending()) return; lashPendingFrames = 0; send({ k: 'lash', on: false }); showLash(); toast('Lashing off: you have the tiller.', 2000); }
 function showLash(): void {
   const l = w.user.lashed, on = l != null;
   document.body.classList.toggle('lashed', on); $('tiller').classList.toggle('lashed', on);
@@ -451,7 +464,8 @@ addEventListener('blur', releaseTiller);
 /** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
 function tillerSpring(dt: number): void {
   if (tillerHeld && (!w.running || w.paused)) releaseTiller(); // paused or stopped: hands off
-  if (w.pilot.mode !== 'off' || w.user.lashed != null) return; // the pilot's ram has it, or it's lashed
+  if (w.user.lashed != null) lashPendingFrames = 0; else if (lashPendingFrames > 0) lashPendingFrames--; // (the lash has reached the page's copy; or not yet)
+  if (w.pilot.mode !== 'off' || w.user.lashed != null || lashPending()) return; // the pilot's ram has it, or it's lashed
   if (tillerHeld || barDrag || !w.running || w.paused) return;
   const t = w.user.tiller; if (t !== 0) setTiller(t - Math.sign(t) * Math.min(Math.abs(t), 2.5 * dt));
 }
@@ -846,6 +860,7 @@ function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) retur
 /* The tiller pilot (boat/autopilot.ts): cruising only, since RRS 52 says a racing boat's rudder is worked by her
  * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
 function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
+  tillerSentAt = -1e9; // (the ram has the tiller now: a lash takes its angle, not your hand's last)
   if (!w.running) return;
   // (every refusal says why, on the button itself, where the player is looking, as well as in Messages: the owner, v188,
   // "the button won't engage", with the reason only in the Messages card across the screen)
@@ -1101,7 +1116,6 @@ hud.hailKey = () => keymap.label('hail');
 $('bKeys2').onclick = () => keysView.open();
 /** Helm and sheets follow whatever is held. */
 function applyHeld(): void {
-  const u = w.user;
   const steer = w.pilot.mode !== 'off' ? 0 : (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); // (on the pilot, the steering keys turn its course: pilotTick)
   // the lines you're working: sheet keys, the selected line's keys, and the panel's buttons
   const cmd: Partial<Record<CtlKey, number>> = { ...btnCmd };
@@ -1111,7 +1125,7 @@ function applyHeld(): void {
   add('traveller', (held.has('travDown') ? 1 : 0) - (held.has('travUp') ? 1 : 0)); // (−1 windward … +1 leeward, at the car's own rate)
   const sel = CTL_UI[ctlSel];
   if (sel.key !== 'carFore' && sel.key !== 'carIn') add(sel.key, (held.has('ctlUp') ? 1 : 0) - (held.has('ctlDown') ? 1 : 0));
-  if (steer && u.lashed != null) unlash(); // a hand on the tiller: the lashing comes off
+  if (steer) unlash(); // a hand on the tiller: the lashing comes off (one still on its way too: unlash knows)
   send({ k: 'helm', steer, luff: held.has('luff'), ctl: cmd });
 }
 function setView(i: number): void {
@@ -1245,12 +1259,12 @@ gl.addEventListener('pointerdown', e => {
   const now = performance.now(), dbl = now - lastTap < 300; lastTap = now;
   // a double-click with the mouse lashes the tiller at the angle of the first press; on a touch screen a double tap looks ahead
   if (dbl && e.pointerType === 'mouse' && viewMode !== 2 && w.running && !w.paused) {
-    lastTap = 0; if (firstPress != null) setTiller(firstPress); firstPress = null;
-    if (w.user.lashed == null) lash(); return;
+    lastTap = 0; const at = firstPress ?? tillerMeant(); firstPress = null;
+    if (w.user.lashed == null && !lashPending()) lash(at); return;
   }
   if (dbl) { if (viewMode === 2) recentre(); else lookAhead(); }
   if (viewMode === 2) { gl.setPointerCapture?.(e.pointerId); touches.set(e.pointerId, [e.clientX, e.clientY]); pinch = null; panning = true; return; }
-  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); firstPress = w.user.tiller; return; }
+  if (e.pointerType === 'mouse' && w.running && !w.paused) { if (tillerHeld) releaseTiller(); else takeTiller(e.clientX); firstPress = tillerMeant(); return; }
   drag = { x: e.clientX, y: e.clientY, yaw0: look.yaw, pitch0: look.pitch };
 });
 gl.addEventListener('pointermove', e => {
