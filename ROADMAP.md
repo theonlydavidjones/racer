@@ -535,6 +535,13 @@ What's planned, roughly in order. Done work is described in the README.
      favored-end drill below) and the pre-race clues a real racer would have: the forecast wind's direction against the
      course's axis, a known shift (the sea breeze veering through the afternoon), the tide's set across the line, the
      committee's habit; the researcher to source these for the Bay. Never the measured answer before she's measured it.
+     The researcher's first pass (15 November, search summaries only): the general clues are sourced (line bearing
+     against the wind, about 1/8 of the line per 5° of bias, sailmagazine.com/cruising/choose-wisely; oscillating vs
+     persistent, windcheckmagazine.com; a back before the start: start right and tack toward the veer, sailingworld.com).
+     The Bay's lore is not: the sea breeze veering as it fills (one unread blog), the ebb in the deep water (forum
+     posts). Nothing from St. Francis YC, GGYC or US Sailing yet, and no sourced committee-habit claim, so the strategist
+     says none of it as fact until better sources (the clubs' race and sailing-instruction pages; latitude38.com is
+     blocked here) are read.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
