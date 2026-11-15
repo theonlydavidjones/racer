@@ -498,6 +498,11 @@ What's planned, roughly in order. Done work is described in the README.
      happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
      takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
      the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
+   - **Start practice: restart without finishing** (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
+     like to be able to restart without having to finish the whole drill." The pause menu has a Restart (labeled
+     "Restart Race" here, since only drill and rounding say "Drill"), which the owner didn't find or which starts over
+     from scratch. Give a new countdown from the same setup at any time, keeping the session's starts table: a key
+     (listed in Keys) and the pause menu's Restart labeled for the drill. No new on-screen button.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
