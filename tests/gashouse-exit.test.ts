@@ -14,9 +14,9 @@ import { brg, wrap } from '../src/core/math';
  * Driven through the helm (the player's steering input, held on a heading), judged by outcomes: how near the piles she
  * comes, whether she has way on through the gap, whether she gets out (Deep Physics: these hold under any turning model).
  * She starts under way inside the cove, not from her slip (the push-off is changing).
- * In a westerly Pier 1 is to leeward on both tides, so the wind sets a careless boat down onto it either way. On the ebb
- * the stream does too, running across the gap (about 0.45 kt there in the piles' lee, 0.85 kt past the pier's head); on
- * the flood the gap is slack (the stream leaves the breakwater's knuckle: environment/harborMouth.ts) and it's the wind alone.
+ * In a westerly Pier 1 is to leeward on both tides, so the wind sets a careless boat down onto it. The stream doesn't help
+ * her there: the gap is slack on the flood (the stream leaves the breakwater's knuckle: environment/harborMouth.ts), and on
+ * the ebb it runs west across the gap (about 0.1 kt in the gap, 0.3–0.9 kt outside), away from the pier.
  */
 const M = MOUTHS[0] as unknown as { a: { x: number; y: number }; b: { x: number; y: number }; into: { x: number; y: number }; along: { x: number; y: number } };
 // a: Pier 1's corner (east, to leeward in a westerly); b: the breakwater's tip (west); `into`: into the cove (south)
