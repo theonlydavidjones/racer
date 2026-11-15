@@ -330,27 +330,24 @@ export class Hud {
     $('tpShape').innerHTML = sw;
     // heel and helm balance: what the boat feels like on the tiller
     { const heel = Math.round(u.heelMag ?? 0), hn = u.helmNeed ?? 0, up = u.twa < 70;
-      const helm = Math.abs(hn) < 0.8 ? 'neutral' : hn > 0 ? `${hn.toFixed(0)}° weather` : `${(-hn).toFixed(0)}° lee`;
       // who's trimming: the crew depowers on their own (controls.ts depowerLimits); when they've done all they can, it's the helm's job
       const crewTrims = !(['backstay', 'vang', 'outhaul', 'traveller'] as const).some(k => byHand(u, k)), dp = u.depower ?? 0;
       const overUp = crewTrims ? (dp < 0.95 ? ' · overpowered: the crew is depowering' : ' · overpowered with everything on: feather (sail a touch higher, letting the main lift) or ease the main in the puffs')
         : ' · overpowered: backstay on, vang on, traveler down, flatten';
       const advice = u.luff ? '' : hn > 5 ? (up ? overUp : ' · ease the main or vang') : hn < -1.5 ? ' · lee helm: traveler up, ease backstay, fuller sails' : heel > 24 && up ? (crewTrims && dp < 0.95 ? ' · heeling too far: the crew is depowering' : ' · heeling too far: depower') : '';
       if (!this.toldHelm && hn > 3.5 && up && !u.luff) { this.toldHelm = true; toast(`Weather helm: she wants to round up into the wind. Let go of the tiller and she will. Hold the tiller a little to windward to sail straight, or take the helm off her: backstay on, traveler down (Trim coach explains).`, 6000); }
-      // the Coach card's second line (the chase-view layout): the sails' state, heel and helm, where the crew are; a state
-      // that isn't good in amber or red
-      const st = (name: string, w: string, c: string) => `${name} <b class="tp-st ${c}">${w.toLowerCase()}</b>`;
+      // the Coach card's second line (the chase-view layout): where the crew are, and what to do when she's overpowered
       // where the crew are, the line's last word: a button that opens their places, in place of a Crew button (the
       // surface audit, owner 13 Nov), amber once you've placed them as a line is in the band. It's built once and only its
       // words change, so a click never straddles a rewrite of the line.
       const c = u.crew, crewWhere = !c ? '' : `crew ${c.mode === 'hike' ? 'hiking' : c.mode === 'leeward' ? 'to leeward' : c.mode === 'foredeck' ? 'on the foredeck' : c.fore > 0.55 ? 'forward' : c.fore < 0.25 ? 'aft' : 'amidships'}`;
       const box = $('tpBalance');
-      if (!box.querySelector('.tp-crew')) box.innerHTML = '<span class="tp-bal"></span><span class="tp-sep"> · </span><button type="button" class="tp-crew"></button><span class="tp-adv warn"></span>';
-      const bal = `${st('Main', mw, mc)} · ${st('Jib', jw, jc)} · Heel <b>${heel}°</b> · helm <b class="${hn > 5 || hn < -1.5 ? 'warn' : ''}">${helm}</b>`;
-      if (bal !== this.balShown) { box.querySelector('.tp-bal')!.innerHTML = bal; this.balShown = bal; }
+      // (the sails' states, heel and helm left the line (the owner, 15 Nov 2026: the band shows them); where the crew are
+      // and what to do when she's overpowered stay)
+      if (!box.querySelector('.tp-crew')) box.innerHTML = '<button type="button" class="tp-crew"></button><span class="tp-adv warn"></span>';
       const cb = box.querySelector<HTMLButtonElement>('.tp-crew')!, placed = !!c?.place;
       if (cb.textContent !== crewWhere) cb.textContent = crewWhere;
-      cb.hidden = !c; (box.querySelector('.tp-sep') as HTMLElement).hidden = !c;
+      cb.hidden = !c;
       cb.classList.toggle('mine', placed);
       const tt = `Where the crew sit: click to place them (keys 7–0). ${placed ? 'Placed by you' : 'On auto'}`; if (cb.title !== tt) cb.title = tt;
       const adv = box.querySelector('.tp-adv')!; if (adv.textContent !== advice) adv.textContent = advice; }
@@ -447,7 +444,6 @@ export class Hud {
 
   private cardKey = '';
   /** The Coach card's second line as last drawn. */
-  private balShown = '';
   /** The signal flags drawn into the card's sketch (as data URLs, made once). */
   private flagUrl: Partial<Record<'N' | 'AP' | 'A', string>> = {};
   /** The "where next" card's header, number and sketch (only rewritten when they change). */

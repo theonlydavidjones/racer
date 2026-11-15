@@ -1,5 +1,5 @@
 import { $ } from './dom';
-import { ACTIONS, keyLabel, type Action, type KeyMap } from './keys';
+import { ACTIONS, keyLabel, keyOf, type Action, type KeyMap } from './keys';
 
 /** Keyboard settings: see every binding; click a key to change it (then press the new key); reset to defaults. */
 export class KeysView {
@@ -28,8 +28,8 @@ export class KeysView {
       e.preventDefault(); e.stopImmediatePropagation();
       if (['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) return;
       const a = this.listening; this.listening = null;
-      const stolen = this.map.bind(a, e.key);
-      this.note(stolen ? `${keyLabel(e.key)} now does "${ACTIONS.find(x => x.id === a)!.label}". It no longer does "${ACTIONS.find(x => x.id === stolen)!.label}".` : `${keyLabel(e.key)} now does "${ACTIONS.find(x => x.id === a)!.label}".`);
+      const stolen = this.map.bind(a, keyOf(e));
+      this.note(stolen ? `${keyLabel(keyOf(e))} now does "${ACTIONS.find(x => x.id === a)!.label}". It no longer does "${ACTIONS.find(x => x.id === stolen)!.label}".` : `${keyLabel(keyOf(e))} now does "${ACTIONS.find(x => x.id === a)!.label}".`);
       this.render(); this.onChange();
     }, true);
   }
