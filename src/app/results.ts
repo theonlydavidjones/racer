@@ -31,7 +31,7 @@ import type { AppCtx } from '../app';
 export function mountResults(app: AppCtx) {
 $('bPause').onclick = () => {
   if (!app.w.running) return; app.send({ k: 'pause', on: true }); app.setControlsIdle(); $('pause').hidden = false;
-  $('bRestart').textContent = app.w.drill || app.w.rounding ? 'Restart Drill' : app.w.freeSail ? 'Restart Cruise' : 'Restart Race';
+  $('bRestart').textContent = app.S.mode === 'drill' || app.w.drill || app.w.rounding ? 'Restart Drill' : app.w.freeSail ? 'Restart Cruise' : 'Restart Race';
   const d = $('pauseDebrief'), html = app.w.drill ? app.drills.drillHtml() : app.w.rounding ? app.drills.roundHtml() : app.w.userFinishT == null ? debriefHtml('Your race so far') : ''; d.innerHTML = html; d.hidden = !html;
   mountDebriefTactics(d);
   $('bWatch2').hidden = !html || app.w.track.length < 2;
@@ -131,7 +131,10 @@ function realLine(): string | undefined {
 }
 $('bWatch').onclick = $('bWatch2').onclick = watchRace;
 $('bResume').onclick = () => { $('pause').hidden = true; app.send({ k: 'pause', on: false }); };
-$('bRestart').onclick = () => { $('pause').hidden = true; app.beginRace(); };
+/** The start practice, restarted at any moment: a new countdown from the same start (its seed), the session's starts
+ *  table kept (the owner, 15 Nov 2026: "restart without having to finish the whole drill"). */
+function restartDrill(): void { $('pause').hidden = true; $('drill').hidden = true; app.drillView.stop(); app.beginRace(app.w.seed); }
+$('bRestart').onclick = () => { if (app.S.mode === 'drill') { restartDrill(); return; } $('pause').hidden = true; app.beginRace(); };
 $('bSettings').onclick = () => { $('pause').hidden = true; app.toSetup(); };
 $('bAgain').onclick = () => { $('results').hidden = true; app.beginRace(); };
 $('bSet2').onclick = () => { $('results').hidden = true; app.toSetup(); };
@@ -378,5 +381,5 @@ function showResults(): void {
 }
 
 
-return { ordinal, raceSetup, scores, settleLog, showResults, towed };
+return { ordinal, raceSetup, restartDrill, scores, settleLog, showResults, towed };
 }
