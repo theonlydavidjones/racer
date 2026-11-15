@@ -464,6 +464,13 @@ What's planned, roughly in order. Done work is described in the README.
    - **Now — the paddling drawn** (owner, 15 November: "there's no animation associated with paddling?"; Crew Figures):
      the physics shipped in v196 but nothing is drawn. The crew member goes below for the boom crutch, comes up with it,
      kneels at the rail on the called side and strokes, the blade dipping in time with the push; then stows it.
+   - **Paddling tires the paddler** (owner, 15 November: "paddling is exhausting… strength of paddling and duration
+     without rest should be tied to crew fitness"; Crew Model, Deep Physics reviewing): the stroke's power and how long
+     it lasts before a rest come from the paddler's fitness and the same fatigue model as hiking (crewPhys.ts), with a
+     sourced sustainable-power curve for one person paddling; a tired paddler slows, rests and can be swapped.
+   - **The paddle tab as arrows** (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
+     clickable arrows like < PADDLE >"; Crew Controls): ‹ paddles on port, › on starboard (the side the crew kneels on,
+     as you face forward); tap the lit one again to stop.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
