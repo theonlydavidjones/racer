@@ -17,7 +17,7 @@ on-the-water practical (the skill items 21–40).
 | 6 Tacking | S33 tack; K5 the commands ("Ready about" … "Hard alee") | built; the cue now gives the commands |
 | 7 Jibing | S34 gybe; K5 the commands | built; ASA writes "jibe" (see below) |
 | 8 Heave to | — (not in ASA 101) | kept from US Sailing BK, as an extra |
-| 9 Rules of the road | K6–13 the Navigation Rules; K14–15 aids to navigation | |
+| 9 Rules of the road | K6–13 the Navigation Rules; K14–15 aids to navigation | built: K7 port/starboard (you give way), K8 windward/leeward, standing on (Rule 17), K14 the lateral buoys (red right returning). Still to add: K9 overtaking, K10–12 power-driven vessels, K13 commercial traffic, K15 the other marks |
 | 10 Crew overboard | S36 | |
 | 11 A breeze | — (ASA 101 is "up to 15 knots"; reefing is a term only, K3) | kept as an extra: depowering in a puff |
 | 12 Home to the slip | S23 depart the dock; S37–39 stow, return, secure (lines, fenders) | |

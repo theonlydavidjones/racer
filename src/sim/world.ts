@@ -1,7 +1,7 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
 import { RoundingTracker } from './roundings';
-import { LESSON_WIND, LessonTracker } from './lessons';
+import { LESSON_WIND, LessonTracker, type MobEnv, type RoadEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
@@ -16,7 +16,7 @@ import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, curren
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
-import { waveMotion } from '../boat/seaway';
+import { speedInChop, waveMotion } from '../boat/seaway';
 import { dayWeather, turnWeather, type DayWeather } from '../environment/weather';
 import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, type WindDay, type WindKind, type WindModel } from '../environment/wind';
 import { ShiftField, shiftStats } from '../environment/shifts';
@@ -29,7 +29,7 @@ import type { RuleId } from '../rules/types';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { aimPoint, crabFor, sailable } from '../ai/ai';
 import type { Settings } from '../settings';
-import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
+import { OPEN_GAP, aiThink, keepClearMove, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
@@ -454,7 +454,9 @@ export class World {
       const o = getPlace(settings.sailFrom)?.p ?? this.C.center;
       this.caseRun = new CaseRun(rc, windOnWater(this.windHere(o, undefined, false), this.currentAt(o, true)).from, o); // (the wind on the water, the current's in it: what she sails by)
     }
-    for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
+    // (the rules of the road lesson: one other boat, a club Folkboat, the lesson sails her)
+    const road = this.freeSail && settings.mode === 'lesson' && settings.lesson === 'road';
+    for (let i = 0; i <= (this.caseRun ? this.caseRun.c.boats.length - 1 : road ? 1 : this.freeSail || opts.solo ? 0 : settings.fleet); i++) this.boats.push(this.makeBoat(i)); // (Setup keeps fleet = opponents.length)
     if (this.caseRun) this.placeCase();
     this.startTimes = this.boats.map(() => null);
     // (a sheltered start, a slip, doesn't raise the mean: out on the Bay she'd have it all)
@@ -469,6 +471,13 @@ export class World {
       return { x: u.x, y: u.y }; // (nowhere open: at her own spot, reached at once)
     })()) : null;
     if (this.lesson && this.homeSlip) this.lesson.slip = { ...this.homeSlip.p };
+    if (this.lesson?.id === 'road' && road) {
+      this.roadEnv = this.makeRoadEnv(this.boats[1]);
+      // (the North Channel's entrance pair, east of Alcatraz, sim/places.ts marks 7 and 21: NOAA ENC US5CA13M has them as
+      // pillar buoys, 1 green Fl G 6s at 37.83201 N 122.40863 W, 2 red Fl R 6s at 37.83331 N 122.39642 W, read 14 Nov 2026;
+      // the numbers rise northward, so coming in is northbound, red 2 to starboard)
+      const red = getPlace('m-7')?.p, green = getPlace('m-21')?.p; if (red && green) this.lesson.channel = { red, green };
+    }
     if (this.lesson && this.caseRun) this.lesson.cue = `You're ${this.caseRun.helm}: sail it without breaking a rule`;
     if (this.lesson?.id === 'before') this.boats[0].lightsOff = true; // (Before you go: switching them on is a step)
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
@@ -909,6 +918,31 @@ export class World {
     return this.settings.mode === 'lesson' ? clamp(kt, lo / f, hi / f) : kt;
   } // (a breeze: the top of the range; a Case: a breeze she sails at the Cases' own speed in)
   private lessonField: number | null = null;
+  /** Rules of the road (sim/lessons.ts): the other boat, and what the lesson asks of the World for her. */
+  private roadEnv: RoadEnv | null = null;
+  private makeRoadEnv(o: Boat): RoadEnv {
+    // (she starts well off to windward, out of the way, till the first encounter sets her)
+    const u = this.boats[0], up = V(this.windModel.base);
+    o.x = u.x + up.x * 600; o.y = u.y + up.y * 600; o.h = o.desired = n360(this.windModel.base + 90); o.v = 0;
+    return {
+      other: o,
+      place: (p, h, v, meet) => {
+        if ([p, meet, { x: (p.x + u.x) / 2, y: (p.y + u.y) / 2 }, { x: (p.x + meet.x) / 2, y: (p.y + meet.y) / 2 }].some(q => onLand(q) || inBasin(q))) return false;
+        if (landAlong(p, { x: p.x + V(h).x * 300, y: p.y + V(h).y * 300 }) < Infinity) return false; // (and none ahead of her as she starts in: the lesson lets her go for that)
+        o.x = p.x; o.y = p.y; o.h = o.desired = n360(h); o.v = v; o.turnRate = 0; o.tacking = false; o.turnTarget = null;
+        const g = V(o.h); o.vx = g.x * v + o.cur.x; o.vy = g.y * v + o.cur.y;
+        o.ww = windOnWater(this.windHere(o, o), o.cur); settleTrim(o, o.ww.from, o.ww.kt);
+        return true;
+      },
+      speed: h => speedInChop(o.ww.kt, Math.abs(wrap(o.ww.from - h)), o.sea.hsW, o.sea.tpW),
+      helm: give => keepClearMove(this, o, this.user, !give),
+      sailable: h => sailable(o, h),
+      landAhead: h => landAlong(o, { x: o.x + V(h).x * 300, y: o.y + V(h).y * 300 }) < Infinity,
+      gap: () => hullGap(this.user, o)
+    };
+  }
+  /** Crew overboard (sim/lessons.ts): the current and the wind where the person in the water is. */
+  private readonly mobEnv: MobEnv = { current: p => this.currentAt(p), wind: p => this.windHere(p, undefined, false) };
 
   /** Sail it yourself: each boat set at her pose in the Case at its start, the others to sail its track (their letters
    * for names: the Case's own, as the incident card and the labels then read). */
@@ -952,7 +986,7 @@ export class World {
       // (the Coordinator, 14 Nov 2026: no pinned wall)
       const o = this.boats.find(b => b.id === ui.vs);
       if (ui.kind === 'contact' && o?.script && !R.free.includes(o.script)) {
-        R.free.push(o.script); o.aboveProper = false; o.desired = o.h;
+        R.free.push(o.script); o.aboveProper = false; o.desired = o.h; this.freeCourse.set(o.id, o.h);
         this.emit({ type: 'toast', ms: 3500, msg: `${o.name} (${o.no}) sails on free after the contact.` });
       }
     }
@@ -962,6 +996,90 @@ export class World {
     L.cue = R.result === 'clear' ? 'Sailed it clear ✓' : `Foul: ${foulTitle(R.fouls[0])}`;
   }
   private caseSeen: World['userIncident'] = null;
+  /** A Case's boats sailing free: the course each was on when she was freed, and her helm's last call (held a moment). */
+  private freeCourse = new Map<number, number>();
+  private freeCall = new Map<number, { h: number; luff: boolean; until: number }>();
+  /**
+   * A Case's boat sailing free is a boat, helmed: her course (as she can sail it in the wind now, and off any shore
+   * ahead), and the racing rules as the race AI keeps them (ai.ts keepClearMove), each other boat taken nearest first.
+   * Required to keep clear (Rules 10–13): already drawing away she sails on; else the race AI's keep-clear. With right of
+   * way: Rule 14 has her avoid contact once it's clear the other isn't keeping clear, so with the hulls closing within
+   * OPEN_GAP she bears off from her (the race AI's own swerve waits on the closest approach of the centres, seconds off,
+   * and two boats converging side by side never get there before they touch); and Rule 16.1: while a boat that must keep
+   * clear of her is within two lengths she doesn't turn back toward her to her course, holding her heading, which gives
+   * the room. No
+   * easing to luff below steerage way (she'd stop and couldn't turn), and a call held a second, as a helmsman's is,
+   * unless the hulls are about to touch.
+   */
+  private freeHelm(): void {
+    const R = this.caseRun!;
+    for (const b of this.boats) if (b.script && R.free.includes(b.script)) {
+      const v = b.v + (b.astern ?? 0);
+      // (no shore within 150 m ahead, across a swath 15° either side: straight ahead alone, a shore she closes at a fine
+      // angle is seen only once she's on it)
+      const clear = (h: number) => [0, 15, -15].every(k => landAlong(b, { x: b.x + V(h + k).x * 150, y: b.y + V(h + k).y * 150 }) === Infinity);
+      // (she tacks for none of these moves, Rule 13 making a tacking boat keep clear of all of them, and jibes for none
+      // with a boat within two lengths: on port, onto starboard she'd take the right of way at close quarters (Rule 15);
+      // on starboard she'd give it up, becoming the boat that must keep clear, so only when the hulls are about to touch
+      // and it's the way clear (Rule 14: a starboard boat on a run with a port boat closing on her windward quarter has no
+      // other): judged on the turn
+      // she'd make, the short way round from her heading as her helm takes her (physics.ts), not on where it ends. Through
+      // the wind: close-hauled on her own tack; with a boat that near, short of dead downwind on her own tack by more than
+      // the wind's swing second to second, 3–5°, so a degree's veer doesn't carry her across)
+      const from = b.ww.from, own = b.tack === 'S' ? -1 : 1;
+      const crowded = this.boats.some(o => o !== b && Math.hypot(o.x - b.x, o.y - b.y) < 2 * LOA);
+      const through = (t: number, x: number) => { const d = wrap(t - b.h), f = wrap(x - b.h); return Math.sign(f) === Math.sign(d) && Math.abs(f) < Math.abs(d); };
+      // (and a move away from a boat no more than BEAR_CAP off her course, so it doesn't run on round, through a jibe,
+      // while the gap's still closing: past that, or through the wind, she turns whichever way on her own tack opens the
+      // gap more, judged on the closest approach over the next 15 s at her speed: bearing away BEAR_CAP below her course,
+      // or heading up as far as BEAR_CAP above it (close-hauled at most) and easing to slow. A boat keeping clear of one
+      // ahead goes round her without tacking, and never turns down onto a boat to leeward of her, Rule 11)
+      const BEAR_CAP = 40, RUN_OFF = 5, base = this.freeCourse.get(b.id) ?? b.h, hauled = n360(from + own * (beatAngle(b.ww.kt) + 1));
+      let ease = false, urgent = false; // (urgent: the hulls about to touch, set below for each boat in turn)
+      const mine = (h: number, away: { x: number; y: number; vx: number; vy: number } | null = null) => {
+        let t = sailable(b, h);
+        if (away && (through(t, from) || Math.abs(wrap(t - base)) > BEAR_CAP)) {
+          const down = sailable(b, base + own * BEAR_CAP), upH = base - own * BEAR_CAP, up = through(upH, from) || Math.abs(wrap(from - upH)) < beatAngle(b.ww.kt) + 1 ? hauled : sailable(b, upH);
+          const miss = (h: number) => { // (the closest approach over 15 s, she on h at her speed, the other as she's going)
+            const wx = away.vx - V(h).x * Math.max(1, v), wy = away.vy - V(h).y * Math.max(1, v), ww = wx * wx + wy * wy;
+            const tt = ww < 1e-6 ? 0 : clamp(-(away.x * wx + away.y * wy) / ww, 0, 15);
+            return Math.hypot(away.x + wx * tt, away.y + wy * tt);
+          };
+          if (miss(up) > miss(down)) { t = up; ease = true; } else t = down;
+        }
+        if (through(t, from)) return hauled;
+        const relOwn = -own * wrap(from - t);
+        if (crowded && (b.tack === 'P' || !urgent) && (relOwn > 180 - RUN_OFF || (relOwn < 0 && Math.abs(relOwn) > 90))) return n360(from + own * (180 - RUN_OFF));
+        return t;
+      };
+      const c0 = mine(base);
+      const course = clear(c0) ? c0 : [30, -30, 60, -60, 90, -90, 135, -135].map(k => mine(c0 + k)).find(clear) ?? c0;
+      if (course !== c0) this.freeCourse.set(b.id, course); // (a shore ahead: her course from now on, not back to it after)
+      let call: { h: number; luff: boolean } | null = null, room = false;
+      const others = this.boats.filter(o => o !== b).sort((p, q) => hullGap(b, p) - hullGap(b, q));
+      for (const o of others) {
+        const dx = o.x - b.x, dy = o.y - b.y, g = hullGap(b, o);
+        if (dx * dx + dy * dy > 60 * 60) break; // (the rest further: none near enough to sail by, the race AI's own reach)
+        const r = this.rights(b, o);
+        const side = Math.sign(dot(V(b.h + 90), { x: dx, y: dy })) || 1; // (+1: the other boat's to starboard of her)
+        const rate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
+        if (rate < -0.05 && g < CONTACT_GAP + 1) urgent = true; // (closing faster than 5 cm/s: pressed together, the rate's sign flickers)
+        if (r.kc === b && rate > 0.05) { call = { h: mine(b.h), luff: false }; break; } // (drawing away: she is keeping clear)
+        ease = false; call = keepClearMove(this, b, o); if (call) call = { h: mine(call.h, { x: dx, y: dy, vx: o.vx, vy: o.vy }), luff: call.luff || ease };
+        if (!call && r.kc === o && rate < -0.05 && g < OPEN_GAP) { // (bearing off 30° from her side)
+          ease = false; call = { h: mine(b.h - side * 30, { x: dx, y: dy, vx: o.vx, vy: o.vy }), luff: ease };
+        }
+        if (call) break;
+        if (r.kc === o && Math.hypot(dx, dy) < 2 * LOA && Math.sign(wrap(course - b.h)) === side) room = true;
+      }
+      const want = call ? { h: call.h, luff: call.luff && v > 1 && !urgent } : { h: room ? mine(b.h) : course, luff: false };
+      const held = this.freeCall.get(b.id);
+      const same = held && Math.abs(wrap(want.h - held.h)) < 5 && want.luff === held.luff;
+      const now = held && !same && this.t < held.until && !urgent ? held : same ? { ...want, until: held!.until } : { ...want, until: this.t + 1 };
+      this.freeCall.set(b.id, now);
+      b.desired = now.h; b.luff = now.luff;
+    }
+  }
 
   /** The sea breeze for the time of day: sets the course-wide mean direction and strength, and the gustiness. */
   private updateBreeze(): void {
@@ -1019,7 +1137,8 @@ export class World {
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
     // boat answers her helm every step); in close quarters (World.closeQuarters: a boat or a mark within four lengths, about to
     // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
-    for (const b of this.boats) if (!b.isUser && !b.script) {
+    if (this.caseRun) this.freeHelm();
+    for (const b of this.boats) if (!b.isUser && !b.script && b !== this.roadEnv?.other) { // (a Case's boats sail its track; the lesson's boat, the lesson sails her)
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
       if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
@@ -1054,7 +1173,7 @@ export class World {
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
-    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (a lesson: its check, on the boat as she sails)
+    this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0, this.mobEnv, this.roadEnv ?? undefined); // (a lesson: its check, on the boat as she sails)
     if (!this.freeSail) { this.checkLines(prevT); this.checkMarkTouches(); }
     else if (this.rounding) { this.checkMarkTouches(); this.rounding.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); } // (the rounding drill: no start or finish line, only its two marks)
     this.log?.step(this, dt);
@@ -1417,7 +1536,7 @@ export class World {
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       this.onIncident?.(A, B, incident);
-      if (A.isUser || B.isUser) {
+      if ((A.isUser || B.isUser) && !this.roadEnv) { // (the rules of the road lesson: the Navigation Rules, and the lesson says what happened)
         this.paused = true;
         if (incident.exoneratedBy == null && !incident.notRacing) { if (f.isUser) this.fouls++; else this.fouledBy++; }
         const other = A.isUser ? B : A;
