@@ -30,9 +30,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   const hB = together ? h : (h + 180) % 360, vB = together ? o.vA : 0.3;
   const run = (s: number) => {
     for (let i = 0; i < Math.round(s / DT); i++) {
-      Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB });
+      // (held: her heading and her turn both, or what she'd turn by is still there for the other boat to see coming)
+      Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB, turnRate: 0, yawRate: 0 });
       if (bTurning) { B.penaltyDir = 1; B.penaltyTurned = 90; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
-      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1, penaltyTurned: 90 }); // (her turns begun: 90° into them, physics.ts countPenalty)
+      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1, penaltyTurned: 90, turnRate: 0, yawRate: 0 }); // (her turns begun: 90° into them, physics.ts countPenalty)
       if (o.retired) { A.retired = true; A.penalty = A.penaltyTotal = 0; A.penaltyDir = 0; } // (not racing: her contacts carry no penalty)
       else { A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty); }
       w.step(DT); w.paused = false;

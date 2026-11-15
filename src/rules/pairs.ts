@@ -321,6 +321,9 @@ function boreAwayOnBeat(b: RulesBoat, ctx: RulesContext): boolean {
 export interface PairObservation {
   /** A right-of-way boat had to change course to avoid the other boat (Rule 14 / "forced to swerve"). */
   swerve: boolean;
+  /** The boat that made her swerve, where it's known (world.ts forced14): the swerve is hers only if she's the boat that
+   * had to keep clear as the pair stands now, not the swerving boat after right of way has changed between them. */
+  swerveBy?: number;
 }
 
 /** Not racing (Definitions, Racing: a boat races "until she finishes and clears the finishing line and marks or retires"). */
@@ -460,6 +463,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   // Rule 15: a boat that has just got right of way and changes course to give the other boat room to keep clear is
   // complying with it, not being forced to swerve (WS Case 53)
   if (kind === 'swerve' && rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id) return { verdict: r, incident: null };
+  if (kind === 'swerve' && obs.swerveBy != null && obs.swerveBy !== r.kc.id) return { verdict: r, incident: null };
   // Rule 20.2(c): nor is the boat that replied "You tack", changing course to give the hailing boat the room she owes her
   const yt = rec.hail?.kind === 'room' && rec.hail.replyAt != null ? rec.hail : null;
   if (kind === 'swerve' && yt && yt.by === r.kc.id) return { verdict: r, incident: null };
