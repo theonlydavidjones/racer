@@ -17,7 +17,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'steerStbd', label: 'Turn to starboard (push the tiller to port)', group: 'Helm' },
   { id: 'centreTiller', label: 'Center the tiller', group: 'Helm' },
   { id: 'lashTiller', label: 'Lash the tiller where it is (heaving to) / unlash', group: 'Helm' },
-  { id: 'turnHo', label: 'Jibe-ho: the crew jibe her (or tack-ho through the wind)', group: 'Helm' },
+  { id: 'turnHo', label: 'Call the turn: "Ready to jibe" … "Jibe-ho!" on a run, or "Ready about" … "Hard alee!" upwind; the crew turn her', group: 'Helm' },
   { id: 'luff', label: 'Luff (ease both sails, hold)', group: 'Sails' },
   { id: 'mainIn', label: 'Trim the main in', group: 'Sails' },
   { id: 'mainOut', label: 'Ease the main', group: 'Sails' },
@@ -70,7 +70,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 ];
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
-  takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'], turnHo: ['Shift+J'],
+  takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'], turnHo: ['Space'],
   luff: ['s'], mainIn: ['z'], mainOut: ['x'], travUp: ['Shift+Z'], travDown: ['Shift+X'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], paddle: ['/'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], restartStart: ['Shift+R'], pointsRose: ['Shift+P'], flowView: ['\\'],

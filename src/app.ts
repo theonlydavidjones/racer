@@ -175,6 +175,8 @@ S.windKind ??= 'auto';
 
 const view = new SceneView($<HTMLCanvasElement>('gl'));
 const labels = new Labels($('labels'));
+// the hint by her for the turn's key, until the helm's called a few turns (render/labels.ts)
+labels.hint = () => { const k = keymap.label('turnHo'); return (S.turnHoUses ?? 0) >= 3 || k === 'none' ? null : k; };
 const hud = new Hud();
 const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));
 const courseView = new CourseView();
@@ -1196,6 +1198,7 @@ addEventListener('keydown', e => {
   if (a === 'trimNotes') { if ($('trimNotes').hidden) { if (!anyOverlay()) openTrimNotes(); } else closeTrimNotes(); return; }
   if (anyOverlay() || !a) return;
   if (a.startsWith('look') || a === 'zoomIn' || a === 'zoomOut') e.preventDefault(); // don't scroll the page
+  if (a === 'turnHo') e.preventDefault(); // (Space: not a click on whatever button has the focus, nor a scroll)
   if ((a === 'ctlUp' || a === 'ctlDown') && !e.repeat) { const k = CTL_UI[ctlSel].key; if (k === 'carFore' || k === 'carIn') { stepCar(k, a === 'ctlUp' ? 1 : -1); return; } }
   if (HELD.has(a)) { if (!e.repeat) { held.add(a); applyHeld(); } return; }
   if (e.repeat) return;
@@ -1220,7 +1223,10 @@ function runAction(a: Action): void {
     case 'crewFwd': stepCrew('fore', 1); break;
     case 'crewAft': stepCrew('fore', -1); break;
     case 'hail': doHail(); break;
-    case 'turnHo': if (w.running && !w.paused) send({ k: 'turn' }); break;
+    case 'turnHo': if (w.running && !w.paused) {
+      send({ k: 'turn' }); labels.called(Math.abs(w.user.twa) > 90 ? 'jibe' : 'tack', w.t);
+      S.turnHoUses = (S.turnHoUses ?? 0) + 1; saveSettings(S);
+    } break;
     case 'pushOff': berthKey(); break;
     case 'navLights': { const off = !w.user.lightsOff; send({ k: 'lights', off }); toast(off ? 'Navigation lights off.' : 'Navigation lights on: lit from sunset to sunrise (under way; none in the slip).'); break; }
     case 'jibHalyard': halyard('jib'); break;
