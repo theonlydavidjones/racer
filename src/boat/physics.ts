@@ -1286,7 +1286,7 @@ function jibLetGo(b: Boat, emit: Emit): void {
   const left = prepLeft(p, !!b.callOn, b.comingFor ?? 0); if (left <= 0) return;
   b.ctl.jibsheetW = Math.min(b.ctl.jibsheetW, b.ctl.jibsheet); // (the old leeward sheet as it was trimmed, now to windward)
   b.jibHold = PREPARED + left;
-  if (b.isUser && b.jibHold > 1) emit({ type: 'toast', ms: 4500, msg: 'Tacked without a call: the crew weren\'t ready and the jib backed. Call it (Ready about) and they will be.' });
+  if (b.isUser && b.jibHold > 1) emit({ type: 'toast', ms: 4500, msg: 'Uncalled tack: the jib backed.' });
 }
 /** The one on the mainsheet is ready to bring it across, unwarned: by the lee long enough to finish getting ready, from
  * what of the turn they'd seen (prepLeft, PREPARED). */

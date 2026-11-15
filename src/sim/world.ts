@@ -2059,7 +2059,7 @@ export class World {
     if (u.tack !== w.tack || steering || this.t - w.t0 > CALL_WAIT_MAX) { u.callWait = null; return; }
     const a = crewAnswer(u, this.t);
     if (a === 'ready') { u.callWait = null; u.callT = this.t; this.putOver(u); return; }
-    if (a === 'busy' && !w.notReady && this.t - w.t0 > 0.6) { w.notReady = true; this.emit({ type: 'toast', ms: 4000, msg: '"Not ready!" Your crew are busy at a job: the helm waits (call again to go anyway).' }); }
+    if (a === 'busy' && !w.notReady && this.t - w.t0 > 0.6) { w.notReady = true; this.emit({ type: 'toast', ms: 4000, msg: '"Not ready!" Call again to go.' }); }
   }
   pushOff(): boolean {
     const u = this.user, H = u.handled;

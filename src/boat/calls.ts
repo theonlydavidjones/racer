@@ -122,6 +122,6 @@ export function boomStrike(b: Boat, t: number, w: number, emit?: (e: { type: 'to
     if (headY(a.pose, a.x, p.h, ducked) < BOOM.low) continue;
     a.outUntil = (c.clock ?? 0) + out; a.job = null; hit++;
   }
-  if (hit && emit) emit({ type: 'toast', ms: 6000, msg: hit > 1 ? 'Crash jibe: the boom caught your crew. Call the jibe ("Ready to jibe") so they get their heads down.' : 'Crash jibe: the boom caught one of your crew. Call the jibe ("Ready to jibe") so they get their heads down.' });
+  if (hit && emit) emit({ type: 'toast', ms: 6000, msg: 'Crash jibe: crew hit. Call jibes.' });
   return hit;
 }
