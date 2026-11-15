@@ -636,6 +636,11 @@ What's planned, roughly in order. Done work is described in the README.
      (geo/shore.ts wharfNearest, imported but apparently unused there); and its grid cache and ring search can miss a
      pier about 30 m wide. The fix: every pier and wharf counts as land for routing, kept clear by at least half a
      boat length plus a margin, with a test that a plan past each Embarcadero pier keeps clear.
+   - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
+     polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
+     destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
+     "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
+     its name. Coordinates at most behind a hover on the chart.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
