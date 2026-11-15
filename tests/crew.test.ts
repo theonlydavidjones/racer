@@ -281,11 +281,12 @@ describe('How often the crew move (crewPhys.ts HOLD)', () => {
     const twa = beatAngle(windKt), b = testBoat({ heading: 360 - twa, kt: 4, windKt }); b.crew = newCrew(crewOf(0.6), 'S');
     sail(b, 30, () => { b.h = courseHeading(b, 360 - twa); });
     const h = b.h, last = b.crew.people.map(p => ({ ...p.goal! })), n = last.map(() => 0), trips = last.map(() => 0); // (then held: her leeway at the mean wind)
+    const at = last.map(() => -9); // (a seat chosen in steps a few tenths apart is one move: she slides along to it; the flicker is 4.3 s)
     sail(b, 600, t => {
       b.h = h; b.ww = { ...b.ww, kt: windKt + 2 * Math.sin(t * 2 * Math.PI / 30) + 0.7 * Math.sin(t * 2 * Math.PI / 4.3) };
       // (setting off for a seat, or back to one from a job; a trip out to a line at the cabin top is the puff being
       // trimmed for, not the flicker, and is counted on its own)
-      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (p.job?.station) trips[i]++; else n[i]++; last[i] = { ...p.goal }; } });
+      b.crew!.people.forEach((p, i) => { if (p.goal && Math.hypot(p.goal.x - last[i].x, p.goal.z - last[i].z) > 0.1) { if (p.job?.station) trips[i]++; else if (t - at[i] > 1) n[i]++; if (!p.job?.station) at[i] = t; last[i] = { ...p.goal }; } });
     });
     lastTrips = trips.slice(1);
     return n.slice(1);
