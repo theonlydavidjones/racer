@@ -103,8 +103,9 @@ export interface Aboard {
   react: number; goal: { x: number; z: number } | null;
   /** 0 fresh … 1 spent (hiking). */
   fatigue: number;
-  /** The share of their W′ left for paddling (paddle.ts: 1 fresh), and when that was worked out (sim time). */
-  wBal: number; wT: number;
+  /** Paddling (paddle.ts): the share of their W′ left (1 fresh), the share of their endurance used (0 fresh), and when
+   * those were worked out (sim time). */
+  wBal: number; wUsed: number; wT: number;
 }
 /** A job: a line to work, the jib car to move, the pole; `reach` s still to get there; `work` s of work left (car, pole). */
 export interface Job {
@@ -309,7 +310,7 @@ export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   attrCache.delete(spec);
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
-    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wT: 0
+    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0
   }));
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
   // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)

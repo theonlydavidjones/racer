@@ -1,6 +1,6 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
-import { paddlePower, paddler, paddleStep } from '../boat/paddle';
+import { paddlePower, paddler, paddleStart, paddleStep } from '../boat/paddle';
 import { RoundingTracker } from './roundings';
 import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
@@ -910,7 +910,10 @@ export class World {
     // (you stopping the crew's own paddling sticks: they don't start again until the jam has passed. crewPaddleCall)
     if (!side) { if (was) { this.paddleJob(u, null); u.paddle = null; if (!auto) { u.paddleOff = true; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
     if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
-    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t, who: was?.who, rest: was?.rest ?? false, handT: was?.handT, rate: was?.rate ?? 0 }; // (the same spell: whoever has the crutch keeps it, resting or not)
+    // (the same spell: whoever has the crutch keeps it, resting or not; a new one, the forward hand, or if they're still
+    // tired someone ready, or a rest first: paddleStart)
+    const st = was ? null : paddleStart(u, this.t);
+    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t, who: was ? was.who : st!.who, rest: was ? was.rest : st!.rest, handT: was?.handT, rate: was?.rate ?? 0 };
     this.paddleJob(u, side);
     const solo = (u.crew?.spec.crew.length ?? 0) === 0, who = solo ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
     const verb = solo || auto ? (back ? 'back-paddle' : 'paddle') : (back ? 'back-paddles' : 'paddles'); // (agreeing with who)
@@ -1041,7 +1044,9 @@ export class World {
     // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
     // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
     if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
-    // (tired, they rest and paddle on, or swap: paddle.ts paddleStep; as long as the jam lasts)
+    // (tired, they rest and paddle on, or swap, as long as the jam lasts: paddle.ts paddleStep. Resting once she's clear of
+    // it, they put the crutch away rather than paddle again to make way)
+    else if (p.rest && !set && !going && !irons) this.paddle(null, false, true);
   }
   /** Where she'll be on land, or within 10 m of a mark, drifting at `vel` (m/s over the ground) in the next minute, looking
    * every 5 s (at a 2 m/s Gate ebb, 10 m apart: a mark or a thin pier isn't stepped over). */
