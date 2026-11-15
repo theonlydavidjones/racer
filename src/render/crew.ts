@@ -807,10 +807,14 @@ function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.V
 
 /** Where a figure's shoulders are about, in a pose (the chest's middle, between them). */
 const chest = (p: PoseT, k: number) => p.hip.clone().addScaledVector(fwd(p.yaw), -Math.sin(p.pitch) * BONE.shoulderY * k).add(V(0, Math.cos(p.pitch) * BONE.shoulderY * k, 0));
-/** The hand of a pose nearer `to`, moved there, or as far toward it as an arm reaches from the chest. */
+/** The hand of a pose nearer `to`, moved there, or as far toward it as an arm reaches from the chest; none if it's behind them. */
 function reachTo(p: PoseT, to: THREE.Vector3, k: number): void {
   const i = p.hands[0].distanceToSquared(to) <= p.hands[1].distanceToSquared(to) ? 0 : 1, c = chest(p, k), max = 0.55 * k;
-  const d = to.clone().sub(c); if (d.length() > max) d.setLength(max);
+  const d = to.clone().sub(c);
+  // (only to something in front of them: the mainsheet behind someone sat facing forward, aft of the thwart, had the hand
+  // go back past the shoulder, the arm bent backwards. They leave it, and only look up)
+  if (d.dot(fwd(p.yaw)) < 0.15 * k) return;
+  if (d.length() > max) d.setLength(max);
   p.hands[i] = c.add(d);
   if (p.elbow) p.elbow[i] = undefined;
 }
