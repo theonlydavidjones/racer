@@ -503,6 +503,12 @@ What's planned, roughly in order. Done work is described in the README.
      "Restart Race" here, since only drill and rounding say "Drill"), which the owner didn't find or which starts over
      from scratch. Give a new countdown from the same setup at any time, keeping the session's starts table: a key
      (listed in Keys) and the pause menu's Restart labeled for the drill. No new on-screen button.
+   - **A breeze (lesson 11): see the puffs coming** (owner, 15 November; feature; next; 2–3 h): "on the breeze drill, I
+     need more in-game guidance about when the puffs are coming." The water already darkens under a puff (render/scene.ts,
+     a 15% puff plainly darker), but nothing teaches her to look for it. Teach reading the water, as a real sailor does:
+     before each puff, mark its dark patch upwind (a ring or arrow on the water) with a short countdown cue ("Puff · 8 s"),
+     then "Ease" as it lands; fade the marker over the lesson so she ends up spotting the patches herself. Visual, no
+     copy; the puff's timing from the sim's own Puffs (environment/wind.ts), never invented.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
