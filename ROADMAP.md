@@ -476,6 +476,11 @@ What's planned, roughly in order. Done work is described in the README.
      the line?" The gold lane is the approach to the line (render/drillGuides.ts). It needs to show at a glance what it
      is, without copy: for example, ending on the line at the spot to cross at the gun. It folds into the favored-end
      work below, where the lane should lead to the favored end.
+   - **The start drill's results: "End" unclear** (owner, 15 November, from a screenshot; polish; <1 h): "don't know what
+     'end: middle' means (the column) in start practice." It's where along the line she crossed: the pin end, the
+     middle or the committee boat end (src/app/drills.ts endW). Make it plain without copy: a tiny line icon with her
+     crossing marked, the favored end lit once the favored-end work lands, so the column also says whether she started
+     at the right end.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
