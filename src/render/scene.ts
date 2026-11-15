@@ -58,6 +58,9 @@ export function fogBankAmount(tMin: number): number {
 
 /** Wind map on the water: PUFF_N × PUFF_N texels over PUFF_SPAN metres around the camera. */
 const PUFF_N = 160, PUFF_SPAN = 3200;
+/** Beyond this (m) from the camera, a boat's crew and sail cloth are posed every third frame (syncBoatMesh hold): the
+ * owner's Mac spent about 1.8 ms a frame posing them on every boat (Capacity's profile, 15 Nov 2026). */
+const FAR_SYNC = 150;
 /** Sea map resolution (samples per side). */
 const SEA_N = 24;
 /** Current map resolution (samples per side), for the flowing texture and tidelines. */
@@ -258,6 +261,8 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** Frames drawn, for staggering the far boats' crew and cloth (FAR_SYNC). */
+  private syncN = 0;
   /** The perf meter's test switches (ui/perfMeter.ts): the sun's shadows, and the boats' sails, each on unless switched off for a reading. */
   readonly test = { shadows: true, sails: true };
   /** Shadows on or off for a reading: off, no shadow pass and no shadow sampling (every material recompiles once). */
@@ -1016,6 +1021,7 @@ export class SceneView {
       mo.wake.position.set(mo.p.x + Math.sin(set) * 5 * len, 0.12, -(mo.p.y + Math.cos(set) * 5 * len));
       (mo.wake.material as THREE.MeshBasicMaterial).opacity = Math.min(0.9, kt / 1.2);
     }
+    this.syncN++;
     w.boats.forEach((b, i) => {
       // riding her own heave and pitch (boat/seaway.ts waveMotion: the physics', so the sails, flags and heel answer the
       // same motion; roll is her heel's)
@@ -1023,8 +1029,11 @@ export class SceneView {
       // her heave, smoothed twice over (about 0.8 s each) for the chase camera to ride: it glides on a swell (90% of a 14 s
       // one) but hardly stirs on the chop (15% of a 2 s one)
       if (b.isUser) { const k = Math.min(1, dt / 0.8); this.heave1 += (mo.heave - this.heave1) * k; this.heaveS += (this.heave1 - this.heaveS) * k; }
-      this.boatMeshes[i].hideHelm = b.isUser && viewMode === 0;
-      syncBoatMesh(this.boatMeshes[i], b, t, mo);
+      const bm = this.boatMeshes[i]; bm.hideHelm = b.isUser && viewMode === 0;
+      // (a boat beyond FAR_SYNC of the camera, where it was last frame: her crew and sail cloth posed every third frame,
+      // the boats' turns staggered; at that range a figure is a few pixels tall. Yours, every frame)
+      const hold = !b.isUser && (this.syncN + i) % 3 !== 0 && bm.grp.position.distanceToSquared(this.camera.position) > FAR_SYNC * FAR_SYNC;
+      syncBoatMesh(bm, b, t, mo, hold);
     });
     // the ghost: where its run was at this moment of the race, on the same waves (no heel: its track doesn't have it)
     // her dock lines, from her cleats (at her rail, deck height) to the dock's (on the dock's top): boat/dockLines.ts

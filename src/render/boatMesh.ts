@@ -415,6 +415,8 @@ export interface BoatMesh {
   jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
   pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
+  /** When her crew and sail cloth were last posed (a far boat's are every third frame: syncBoatMesh `far`). */
+  liveT?: number;
   /** The mast (bent by syncRig: its unbent vertices kept) and the forestay (sagging), with the bend last drawn. */
   rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; bands: THREE.Mesh; bandsBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
@@ -1477,7 +1479,12 @@ function plainKey(mat: THREE.Material): string | null {
 }
 
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
-export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: number; pitch: number; roll: number }): void {
+/**
+ * Her mesh as the boat is now. `hold`: leave her crew and sail cloth as they were last frame (a boat far off, beyond
+ * about 150 m, has them posed every third frame: scene.ts; the hull, spars, lines and flags still every frame, and the
+ * crew and cloth then ease over the time since they last were).
+ */
+export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: number; pitch: number; roll: number }, hold = false): void {
   // riding the waves: heave, pitch and roll from the sea surface under her (or a gentle bob in flat water)
   const heave = wave ? wave.heave : Math.sin(t * 1.3 + b.id) * 0.03, pitch = wave ? wave.pitch : Math.sin(t * 0.9 + b.id) * 0.006;
   m.grp.position.copy(P3(b.x, b.y, heave));
@@ -1538,9 +1545,11 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   if (m.instrument) syncInstrument(m.instrument, t, b.h, b.v / KT);
   // the crew on the windward side, hiking as hard as she needs
   // (paddling with the boom crutch: who, which side, and how long the crutch takes to fetch, boat/paddle.ts)
+  const live = !hold || m.liveT == null, ldt = m.liveT == null || m.liveT < 0 ? dt : Math.min(0.15, Math.max(0, t - m.liveT));
+  if (live) m.liveT = t;
   const pd = b.paddle, who = pd ? paddler(b) : 0;
-  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
-  if (b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
+  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
+  if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);
@@ -1573,7 +1582,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     const jt0 = JIB_DEF.tack.length();
     jibShape.luff = { x: v.x * jibSgnNow, z: v.z, f: tt => { const u = (jt0 + tt * JIB_LUFF) / STAY_LEN; return 4 * u * (1 - u); } };
   }
-  m.main.update(mainShape);
+  if (live) m.main.update(mainShape);
   m.main.mesh.scale.x = Math.sign(b.boom || 1);
   // a backed jib lies to windward, but the wind still presses its belly to leeward, toward the mast
   const jibSgn = (b.jibBacked ?? 0) > 0 ? Math.sign(b.boom || 1) : Math.sign(b.jib || 1);
@@ -1591,8 +1600,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     jm.matrixWorldNeedsUpdate = true;
   }
   // (now its frame is known: the cloth against the mast and shrouds where the wind presses it onto them)
-  jibShape.obstacles = jibObstacles(m.jibPivot.quaternion, m.jib.mesh.matrix, rd.bow, rd.topAft);
-  m.jib.update(jibShape);
+  if (live) { jibShape.obstacles = jibObstacles(m.jibPivot.quaternion, m.jib.mesh.matrix, rd.bow, rd.topAft); m.jib.update(jibShape); }
   // the cloth's front face looks along the mesh's +x, which the mirroring turns to starboard (+1) or port (−1)
   for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, jibSgn]] as const) {
     const mats = sail.mesh.material as THREE.MeshLambertMaterial[], pr = sailPics.get(mats[0]);
