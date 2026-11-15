@@ -126,8 +126,31 @@ function takeaways(d: ReturnType<typeof startDebrief>): void {
   const more = [...d.facts, ...d.tips].join('\n\n');
   const info = more ? ` <span class="dtk-i" tabindex="0" title="${esc(more).replace(/"/g, '&quot;')}">ⓘ</span>` : '';
   const top = rows.slice(0, 3);
-  $('dTips').innerHTML = top.map((r, i) => `<li class="dtk"><i class="dtk-bar" style="--s:${Math.min(1, r.s / 30).toFixed(2)}"></i><span>${r.html}${i === top.length - 1 ? info : ''}</span></li>`).join('');
+  $('dTips').innerHTML = callLine(st) + top.map((r, i) => `<li class="dtk"><i class="dtk-bar" style="--s:${Math.min(1, r.s / 30).toFixed(2)}"></i><span>${r.html}${i === top.length - 1 ? info : ''}</span></li>`).join('');
   $('dFacts').innerHTML = '';
+}
+/** The favored-end call (8za), first in the debrief: yours against the line at the gun (the debrief's own read:
+ *  startDebrief's stats.fav, the end nearer the wind at the gun, from 2° of bias), with a small picture of why (the
+ *  line, its square dashed, the wind leaning toward the favored end), and how many more starts the read's drawn on the
+ *  water for. The call's counted here, once a start. */
+function callLine(st: ReturnType<typeof startDebrief>['stats']): string {
+  if (!st) return '';
+  const w = app.w, call = app.favCall, C = w.C, name = (e: 'pin' | 'committee') => app.esc((e === 'pin' ? C.pinLabel : C.committeeLabel).replace(/^(the )?/i, ''));
+  if (call) { app.S.favCalls = (app.S.favCalls ?? 0) + 1; saveSettings(app.S); }
+  const left = Math.max(0, 3 - (app.S.favCalls ?? 0));
+  // the bias at the gun, as the debrief reads it (sim/startDebrief.ts)
+  const gw = (w.gun?.windFrom ?? w.wind.from) * Math.PI / 180, k = ((w.pin.x - w.committee.x) * Math.sin(gw) + (w.pin.y - w.committee.y) * Math.cos(gw)) / w.lineLen;
+  const bias = Math.round(Math.asin(Math.min(1, Math.abs(k))) * 180 / Math.PI);
+  const fav = st.fav, ok = call && fav ? call === fav : null;
+  // the picture, seen from below the line as the card's sketch is: the end on the left first
+  const pinLeft = ((w.pin.x - w.center.x) * -w.N.y + (w.pin.y - w.center.y) * w.N.x) > 0, favLeft = fav ? (fav === 'pin') === pinLeft : null;
+  const lean = (favLeft == null ? 0 : favLeft ? -1 : 1) * Math.max(4, Math.min(30, bias)) * Math.PI / 180, wx = 22 + Math.sin(lean) * 16, wy = 22 - Math.cos(lean) * 16;
+  const pic = `<svg class="dcall-pic" viewBox="0 0 44 26" width="66" height="39" aria-hidden="true"><line x1="5" y1="22" x2="39" y2="22"/><circle cx="5" cy="22" r="2.4"/><rect x="36.5" y="19.5" width="5" height="5"/>`
+    + `<line class="sq" x1="22" y1="22" x2="22" y2="4"/><line class="wd" x1="22" y1="22" x2="${wx.toFixed(1)}" y2="${wy.toFixed(1)}"/></svg>`;
+  const what = fav ? `${name(fav)} favored ${bias}°` : 'a square line: neither end';
+  const head = call ? `Your call: <b class="${ok === false ? 'bad' : 'ok'}">${name(call)} ${ok === false ? '✗' : '✓'}</b> · ${what}` : `No call · ${what}`;
+  const dots = call || left < 3 ? `<span class="dcall-dots" title="The read's drawn on the water for ${left} more start${left === 1 ? '' : 's'}">${'●'.repeat(left)}${'○'.repeat(3 - left)}</span>` : '';
+  return `<li class="dcall">${pic}<span>${head}</span>${dots}</li>`;
 }
 /** The attempts this session, with units in the headings, the latest and the best marked, where on the line as an icon. */
 function drillTable(): void {

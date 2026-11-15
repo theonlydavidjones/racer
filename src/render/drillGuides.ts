@@ -21,6 +21,9 @@ export interface GuideSpec {
   gate?: { p: Pt; h: number; half: number; hint?: string };
   /** A good crew's turn (white). */
   ideal?: Pt[];
+  /** The favored-end read (8za): from her, her bow's line (amber) and the line's square (white, dashed), the arc between
+   *  them and its degrees; the bow leans toward the favored end. */
+  read?: { o: Pt; bow: number; sq: number };
   /** Gold arrowheads along the lane toward its end (the start: the approach, pointing at the line). */
   arrows?: { p: Pt; h: number; n: number };
   /** The course to steer after the turn: chevrons on the water along it. */
@@ -75,17 +78,20 @@ export class DrillGuides {
   private readonly tag: HTMLDivElement;
   private readonly hit: HTMLDivElement;
   private gateAt: Pt | null = null;
+  private readAt: { p: Pt; txt: string } | null = null;
+  private readonly readTag: HTMLDivElement;
   constructor(private scene: THREE.Scene, private camera: THREE.Camera) {
     this.tag = document.createElement('div'); this.tag.className = 'dg-cue'; this.tag.hidden = true; this.tag.setAttribute('aria-live', 'polite');
     document.body.appendChild(this.tag);
     // (the gate's hover: a small invisible patch over it on the screen, its line the gate's hint)
     this.hit = document.createElement('div'); this.hit.className = 'dg-hit'; this.hit.hidden = true; document.body.appendChild(this.hit);
+    this.readTag = document.createElement('div'); this.readTag.className = 'dg-read'; this.readTag.hidden = true; document.body.appendChild(this.readTag);
   }
   /** The guides on the water: rebuilt only when `key` changes (they're fixed for a rep). */
   set(g: GuideSpec | null, key: string): void {
     if (key === this.key) return; this.key = key;
     this.objs.forEach(o => { this.scene.remove(o); free(o); }); this.objs = [];
-    if (!g) { this.gateAt = null; this.hit.hidden = true; return; }
+    if (!g) { this.gateAt = null; this.hit.hidden = true; this.readAt = null; this.readTag.hidden = true; return; }
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.objs.push(o); };
     for (const L of g.lane ?? []) {
       add(ribbon(L.pts, L.half * 2, GOLD, 0.10)); // (the lane itself, faint)
@@ -98,6 +104,14 @@ export class DrillGuides {
     if (g.gate) { const r = dir(g.gate.h + 90), p = g.gate.p; add(ribbon([{ x: p.x - r.x * g.gate.half, y: p.y - r.y * g.gate.half }, { x: p.x + r.x * g.gate.half, y: p.y + r.y * g.gate.half }], 1.4, GOLD, 0.95)); }
     if (g.ideal && g.ideal.length > 1) add(ribbon(g.ideal, 0.8, WHITE, 0.85));
     if (g.arrows) chevrons(g.arrows.p, g.arrows.h, g.arrows.n, GOLD).forEach(add);
+    this.readAt = null;
+    if (g.read) {
+      const { o, bow, sq } = g.read, R = 90, off = ((bow - sq + 540) % 360) - 180, at = (h: number, r: number) => { const q = dir(h); return { x: o.x + q.x * r, y: o.y + q.y * r }; };
+      add(ribbon([o, at(sq, R)], 0.9, WHITE, 0.85, 4));
+      add(ribbon([o, at(bow, R)], 1.1, AMBER, 0.95));
+      if (Math.abs(off) >= 1) add(ribbon(Array.from({ length: 13 }, (_, i) => at(sq + off * i / 12, R * 0.65)), 0.7, AMBER, 0.9));
+      this.readAt = { p: at(sq + off / 2, R * 0.8), txt: `${Math.round(Math.abs(off))}°` };
+    }
     if (g.target) chevrons(g.target.p, g.target.h, 3, CYAN).forEach(add);
     if (g.zone) { const ring = new THREE.Mesh(new THREE.RingGeometry(ZONE - 0.35, ZONE + 0.35, 96), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(g.zone.x, g.zone.y, 0.35)); add(ring); }
     if (g.exit) { const d = dir(g.exit.h), p = g.exit.p; add(ribbon([p, { x: p.x + d.x * g.exit.len, y: p.y + d.y * g.exit.len }], 0.6, CYAN, 0.8, 4)); chevrons({ x: p.x + d.x * (g.exit.len - 14), y: p.y + d.y * (g.exit.len - 14) }, g.exit.h, 2, CYAN).forEach(add); }
@@ -123,6 +137,9 @@ export class DrillGuides {
    *  out of view" in the start practice, up under the top bar), and eased toward where it's going so the boat's pitch and
    *  the camera's sway don't shake it. */
   place(at: Pt | null): void {
+    if (this.readAt) { const g = P3(this.readAt.p.x, this.readAt.p.y, 0.4).project(this.camera), on = g.z <= 1 && Math.abs(g.x) < 1 && Math.abs(g.y) < 1;
+      this.readTag.hidden = !on; if (on) { this.readTag.style.left = `${Math.round((g.x + 1) / 2 * innerWidth)}px`; this.readTag.style.top = `${Math.round((1 - g.y) / 2 * innerHeight)}px`; if (this.readTag.textContent !== this.readAt.txt) this.readTag.textContent = this.readAt.txt; } }
+    else if (!this.readTag.hidden) this.readTag.hidden = true;
     if (this.gateAt) { const g = P3(this.gateAt.x, this.gateAt.y, 0.4).project(this.camera), on = g.z <= 1 && Math.abs(g.x) < 1 && Math.abs(g.y) < 1;
       this.hit.hidden = !on; if (on) { this.hit.style.left = `${Math.round((g.x + 1) / 2 * innerWidth)}px`; this.hit.style.top = `${Math.round((1 - g.y) / 2 * innerHeight)}px`; } }
     if (this.tag.hidden || !at) return;

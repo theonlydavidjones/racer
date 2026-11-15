@@ -30,7 +30,7 @@ export interface CoachView {
   drill?: { list: { scored: boolean; lostM: number; goodM: number; kind: 'tack' | 'gybe' }[] } | null;
   rounding?: { marks: { p: Pt }[]; leg?: number; list: { scored: boolean; lostM: number; goodM: number; kind: 'windward' | 'leeward'; provisional?: boolean }[] } | null;
   /** The start: its line, and the other boats (to find the clear stretch). */
-  start?: { pin: Pt; committee: Pt; others?: Pt[] } | null;
+  start?: { pin: Pt; committee: Pt; others?: Pt[]; call?: 'pin' | 'committee' | null; read?: boolean } | null;
 }
 export interface CoachOut { spec: GuideSpec | null; key: string; wake: Pt[] | null; cue: Cue | null }
 
@@ -202,7 +202,10 @@ export class DrillCoach {
     // from 2° of bias), or the middle with neither end favored; along it the spot with the most room from the other boats,
     // kept unless another has a good deal more (so it doesn't hop about as they move)
     const sk = ((L.pin.x - L.committee.x) * up.x + (L.pin.y - L.committee.y) * up.y) / ll, bias = Math.asin(Math.min(1, Math.abs(sk))) / D2R;
-    const fav = bias >= 2 && bias < 30 ? (sk > 0 ? 'pin' : 'committee') : null; // (past 30° the line's a reach: no end to favor; judgment)
+    const truth = bias >= 2 && bias < 30 ? (sk > 0 ? 'pin' : 'committee') : null; // (past 30° the line's a reach: no end to favor; judgment)
+    // (the favored end is the player's to find (8za, the owner): the lane goes to the line's middle till they call an end,
+    // then to the end they called, right or wrong; the gun tells them)
+    const fav = 'call' in L ? L.call ?? null : truth; void truth;
     const [f0, f1] = fav === 'pin' ? [0.06, 1 / 3] : fav === 'committee' ? [2 / 3, 0.94] : [0.2, 0.8], fPref = fav === 'pin' ? 1 / 6 : fav === 'committee' ? 5 / 6 : 0.5;
     const near = (L.others ?? []).filter(o => Math.abs((o.x - L.pin.x) * ly - (o.y - L.pin.y) * lx) / ll < 200) // (boats within 200 m of the line)
       .map(o => ((o.x - L.pin.x) * lx + (o.y - L.pin.y) * ly) / (ll * ll));
@@ -216,7 +219,13 @@ export class DrillCoach {
     // line at the spot ("Cross here at the gun" on a hover)
     const lineH = n360(Math.atan2(lx, ly) / D2R), ahead = Math.min(d - 4, 26), arrowsAt = add(Q, dir(toQ), -ahead);
     const spec: GuideSpec = { lane: [{ pts: [pos, Q], half: 6 }], gate: { p: Q, h: lineH - 90, half: 12, hint: 'Cross here at the gun' }, ...(ahead > 6 ? { arrows: { p: arrowsAt, h: toQ, n: 3 } } : {}) };
-    const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}`; // (the lane redrawn as she moves: about once a second)
+    // the read, as sailors make it (8za): head to wind near the line, her bow (the wind's direction) against the line's
+    // square; the bow leans toward the favored end by the bias. Drawn on the water while she's head to wind within 150 m
+    // below it, for the player's first calls (L.read)
+    const sq90 = n360(lineH + 90), sqUp = Math.cos((sq90 - u.ww.from) * D2R) >= 0 ? sq90 : n360(sq90 + 180); // (square to the line, toward the wind)
+    const htw = Math.abs(wrap(u.h - u.ww.from)) < 10 && side < 0 && -side < 150 && w.t < 0;
+    if (L.read && htw) spec.read = { o: pos, bow: u.h, sq: sqUp };
+    const key = `s${Math.round(Q.x / 10)},${Math.round(Q.y / 10)}:${Math.round(pos.x / 6)},${Math.round(pos.y / 6)}${spec.read ? `:r${Math.round(u.h)}` : ''}`; // (the lane redrawn as she moves: about once a second)
     const left = -w.t;
     if (side > 1 && left > 0) return { spec, key, wake: null, cue: { word: 'Dip back', sub: `over the line · ${Math.round(left)} s` } };
     // her time to the line: at her speed for that course, the stream along it, and the time to get up to speed (a

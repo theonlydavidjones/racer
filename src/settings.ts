@@ -32,6 +32,8 @@ export interface Settings {
   opponents: string[];
   seq: number; // start sequence, minutes
   /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
+  /** Starts in which you've called the favored end: the read's drawn on the water for the first three (app/drills.ts). */
+  favCalls?: number;
   drillFrom?: number; drillSolo?: boolean; /** The start practice's fleet size (1 to MAX_OPPONENTS). */ drillFleetN?: number;
   /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
   rulesRight?: number[];
