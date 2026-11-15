@@ -697,6 +697,16 @@ What's planned, roughly in order. Done work is described in the README.
      from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
      move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
      it and it can't bring back the rushing water.
+   - **A heel indicator at the top-center of the sail controls** (owner, 15 November; feature; next; 2–3 h; drawings first):
+     "at top-center of the sail controls, I want a heel indicator. show me drawings before building anything." Then:
+     "need to see it in situ with the sail panel." Three options shown in place on the real band:
+     - (A) an arc with a mast that tilts;
+     - (B) a tiny hull and mast from astern;
+     - (C) a flat bubble bar like the band's tracks.
+
+     Each has the teal ◆ at her best heel (boat/crewPhys.ts crewBestHeel), amber past 20° (the coach's
+     "overpowered", coach.ts:98) and red past 25° (laid over), with only the degree number as text. It follows the side
+     she's heeled to (b.heelMag), sits inside the band, and adds no new button. The owner's pick goes here.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
