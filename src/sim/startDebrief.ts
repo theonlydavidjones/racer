@@ -128,7 +128,7 @@ export function startDebrief(w: SimView): StartDebrief {
   }
   const favoredThird = k > 0 ? me.frac < 1 / 3 : me.frac > 2 / 3;
   if (kind !== 'reach' && bias >= 5 && !favoredThird && grade !== 'ocs') tips.push(`Starting nearer the ${favEnd} end would have put you about ${Math.round(gain * (k > 0 ? me.frac : 1 - me.frac))} m farther up the course.`);
-  if (me.penalty) tips.push('You were doing penalty turns at the gun. Keep clear before the start too: the rules apply from the preparatory signal.');
+  if (me.penalty) tips.push('You owed penalty turns at the gun. Keep clear before the start too: the rules apply from the preparatory signal.');
 
   // time on distance: your run in, against what full speed on the same line would have taken. Full speed for the
   // angle you came in at (the polar at your mean wind angle on the run: on a close reach that's faster than

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ZONE } from '../src/core/math';
-import type { RulesMark } from '../src/rules';
+import { CONTACT_GAP, hullGap, type RulesMark } from '../src/rules';
 import { boat, moveTo, pair, verdict } from './diagram';
 
 /* Every diagram: wind from the top of the page (north). x = metres east, y = metres north. */
@@ -437,6 +437,25 @@ describe('Rule 21.2 · taking a penalty', () => {
     const red = boat('Red', { at: [0, 0], heading: 315, penalty: 400 });
     const blue = boat('Blue', { at: [10, 0], heading: 45 });
     expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '21.2' });
+  });
+  it('owing turns but still getting clear first (44.2), she isn\'t yet "taking a penalty": Section A as usual, here her starboard right of way', () => {
+    const red = boat('Red', { at: [0, 0], heading: 315, penalty: 360 }); // starboard, owing a turn
+    const blue = boat('Blue', { at: [10, 0], heading: 45 }); // port
+    red.penaltyDir = 0; // (her turns not begun: boat/physics.ts sets the direction once she has turned 30° one way)
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Blue', rule: '10' });
+    red.penaltyDir = 1; // (and once she's turning, 21.2)
+    expect(verdict(red, blue)).toEqual({ keepsClear: 'Red', rule: '21.2' });
+  });
+  it('a port boat that luffed to keep clear of her, holding that course as she begins her turns beside her, didn\'t interfere (23.2): contact is the turning boat\'s (21.2)', () => {
+    const red = boat('Red', { at: [6, -4], heading: 315, penalty: 360 }); // starboard, owing a turn, not begun
+    const blue = boat('Blue', { at: [-3.2, -1.2], heading: 20, aboveProper: true }); // port, luffed up to let her cross
+    red.penaltyDir = 0;
+    const p = pair(red, blue);
+    expect(hullGap(red, blue)).toBeGreaterThan(CONTACT_GAP + 1);
+    expect(p.at(50)).toMatchObject({ keepsClear: 'Blue', rule: '10', foul: null });
+    red.penaltyDir = 1; moveTo(red, [-0.6, -0.4], 290, 315); // her turns begun, bearing away into Blue, who holds her course
+    expect(hullGap(red, blue)).toBeLessThan(CONTACT_GAP);
+    expect(p.at(51).foul).toMatchObject({ by: 'Red', rule: '21.2' });
   });
 });
 
