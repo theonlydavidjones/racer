@@ -1383,7 +1383,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // back): nearly every step there's none, and the rest of the step is spared its code)
   const gust = b.gustDeg || b.gustSeen || (up && tws - (b.twsSlow ?? tws) > PUFF_RIDE) ? puffEase(b, up, tws, dt, held('mainsheet'), easeBoom) : 0;
   let mainTo = optimalSheet('main', b.awaSlow) + easeBoom;
-  if (gust > 0 || b.gustSeen) mainTo = Math.max(mainTo, b.gustBase ??= mainTo); else b.gustBase = undefined;
+  if (gust > 0 || b.gustSeen) mainTo = Math.max(mainTo, b.gustBase ??= mainTo); else if (b.gustBase !== undefined) b.gustBase = undefined;
   const wantMain = mainTo + gust, wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
