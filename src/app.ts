@@ -1,4 +1,5 @@
-import { CoachMemory, lineNotes } from './boat/coach';
+import { lineNotes } from './boat/coach';
+import type { CoachStep } from './sim/coachRun';
 import { trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
 import { COURSES } from './courses/registry';
@@ -623,8 +624,7 @@ openLines((S.band ?? 1) === 1);
 /* The trim coach, as a teacher (boat/coach.ts): the one thing that matters now, why, and what to look at on the boat;
  * when you fix it, it says so. Its headline sits in the trim panel and, when there's something new to say, shows on
  * the water for a few seconds; the panel beside the trim panel has the why and the tell, and the smaller things. */
-const coachMem = new CoachMemory();
-let coachT = 0, coachMore = false, coachTipUntil = 0, lastLeg = -1, legT = -1e9, coachShown: ReturnType<CoachMemory['step']> | null = null;
+let coachMore = false, coachTipUntil = 0, lastLeg = -1, legT = -1e9, coachShown: CoachStep | null = null;
 const ce = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 function renderCoach(): void {
   const r = coachShown; if (!r) return;
@@ -663,15 +663,16 @@ $('bCoach').onclick = () => openTrimNotes();
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
-function coachTick(dt: number): void {
+function coachTick(): void {
   document.body.classList.toggle('inLesson', !!w.lesson && w.running); // (the lesson's line at the top: 11-lessons.css)
-  if (!w.running) { $('coachTip').classList.remove('on'); return; }
-  if (w.lesson) { lessonTick(); return; }
+  if (!w.running) { $('coachTip').classList.remove('on'); host.coach(null); return; }
+  if (w.lesson) { host.coach(null); lessonTick(); return; }
   const u = w.user;
   if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
-  coachT += dt; if (coachT < 0.5 && coachShown) { tipFade(); return; }
-  coachT = 0;
-  coachShown = coachMem.step(u, w.t, { preStart: !w.freeSail && w.t < 0, justRounded: w.t - legT < 12 });
+  // (the coach weighs her lines beside the race, in the worker, twice a second: its newest word, when one's come)
+  const got = host.coach({ preStart: !w.freeSail && w.t < 0, justRounded: w.t - legT < 12 });
+  if (!got) { tipFade(); return; }
+  coachShown = got;
   const r = coachShown, top = r.view.top, fix = !r.done && top.kind === 'fix';
   // the live note: one at a time, numbered, held (the bar runs out over its hold); what the line's doing and why under
   // it, with All notes; the line ringed in the band, its target on its track
@@ -1315,7 +1316,7 @@ function frame(now: number): void {
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);

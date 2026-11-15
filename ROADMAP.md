@@ -870,6 +870,13 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - **Next — a broader review of the trim controls** (the band done with item 3; the trim coach on branches ui/trim-coach, design/trim-coach, ui/telltale-words, no PR yet) (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
+- **Next — the trim coach's promise in light air** (the next coach item after the trim coach's PR; accuracy; 3–5 h;
+  the Coordinator, 15 Nov 2026: lessons are in light air, so it matters for learners). Since the trim coach's promise
+  fix, its top fix pays at least ¾ of what it says across 10–20 kt (tests/coach-promise.test.ts). Under 10 kt it still
+  over-promises: in 7 kt, outhaul eased, it promised 1.47% and the boat paid 1.02%. In the first ~20 s of a lull the
+  crew are still coming in off the rail, while the coach has them where they are, and it promises about twice what she
+  gets. Find the terms the coach's speedFactor still lacks there (the crew's light-air placing, crewAndHeel below their
+  best heel; clothFill), and extend the test down to 5 kt and into the lull.
 - ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-colored water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.

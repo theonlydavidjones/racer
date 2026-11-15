@@ -167,6 +167,10 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number): 
     const twaC = Math.min(180, b.twa + (b.leeway ?? 0));
     const pushNow = sailPush(tws, twaC, plan, b.shape.main, plan === 'jib' ? b.shape.jib : null, b.heelMag ?? 0, b.depower ?? 0);
     if (pushNow > 1) K *= Math.max(0, sailPush(tws, twaC, plan, ms, js, heel, b.depower ?? 0)) / pushNow;
+    // (against the polar crew's push as the boat holds it (physics.ts powerFactor's b.powerK, and the polar crew's heel,
+    // b.powerRefHeel): a ratio alone cancels in a gain, but not against a force (the flogging's windage, the helm's
+    // drag) nor against her speed: without it a main half luffing had her a sixth slower than she sails)
+    K *= b.powerK ?? 1; f /= b.powerRefHeel ?? 1;
     helm = clamp(hn, -12, 12);
   }
   // her leeway with these sails, as the boat makes it (physics.ts step: the side force against the keel's lift at the
@@ -185,7 +189,10 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number): 
   const luffAmt = (t: { flow: string; amount: number } | null) => t && t.flow === 'luffing' ? t.amount : 0;
   const flog = Math.max(Math.min(1, SAILS.main.share * luffAmt(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max))) + (tj ? SAILS.jib.share * luffAmt(tj) : 0)), pinchFlog(crs, beatAngle(tws)));
   // (and the helm the sails demand, its drag a force on her the same way: physics.ts helmDrag, at the speed she settles at)
-  const D = flog > 0 ? airDrag(b.aws, b.awa, flog) : 0;
+  // (the step's own wind for it: at the sails' height, at her heading, physics.ts step `ap`; b.aws is the sail frame's
+  // wind at 10 m, some 12% stronger in its pressure: the second physics review, 15 Nov)
+  const apH = flog > 0 ? sailWind(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0), b.sway ?? 0, b.heel ?? 0) : null;
+  const D = apH ? airDrag(apH.aws, apH.awa, flog) : 0;
   if (vT <= 0.05 || (D <= 0 && helm === 0)) return { s: vT / vt0, heel: heelC };
   const rT = hullResistance(vT), k = driveCurveFor(tws, crs, vT), g = (v: number) => rT * k(v) - hullResistance(v) - D - rudderDrag(helm, v);
   let lo = 0, hi = vT;
@@ -214,8 +221,9 @@ export function withCrew(b: Boat, k: LineKey, v: number): Controls {
     const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed);
     // (and only if it's worth the trip to them, as they judge it: physics.ts trimSails, controls.ts planWorth; a skilled
     // crew moves the car for ~0.1% of drive, a novice for ~0.4%)
-    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), mainRig(b), cond?.jib, b.aws / KT, b.depower).traveller ?? 1;
-    if (worth >= 0.001 + 0.003 * (1 - crewSkill(b.crew))) c.traveller = plan.traveller;
+    // (every line of theirs, as trimSails applies the plan: the outhaul off, they may take the backstay up as well)
+    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), mainRig(b), cond?.jib, b.aws / KT, b.depower), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
+    for (const x of ['traveller', ...FIXABLE] as const) if (fixed[x as keyof CrewSettings] == null && (worth[x] ?? 1) >= minGain) c[x] = plan[x];
     c.mainsheet = mainsheetFor(want, c.traveller);
   }
   return c;
@@ -251,8 +259,12 @@ function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: numbe
   // a gain over its near-nothing is one the boat never pays, so it's counted from where she is. Only then: a promise is
   // two settled states against each other, and the way she carries over them in a lull, after heading up or surfing
   // decays alike whichever way the line's set; the physics review, 15 Nov)
+  // (fully below a fifth of her polar speed, where a flogging sail's windage outweighs the little drive the model leaves
+  // her; not at all from two fifths, where the model's base is her settled speed as it is for any fix; in between,
+  // blended, so the promise never jumps as she slows: the second physics review, 15 Nov)
   const real = Math.min(1, b.v / Math.max(0.5, polar(b.ww.kt, Math.min(180, b.twa + (b.leeway ?? 0)), sailPlan(b))));
-  return { to, gain: Math.min(3, best / Math.max(base, real > 1.25 * base ? real : 0, 0.1) - 1) };
+  const w = clamp((0.4 - base) / 0.2, 0, 1);
+  return { to, gain: Math.min(3, best / Math.max(base, w * real + (1 - w) * base, 0.1) - 1) };
 }
 
 /* ---------- the lessons for a line you hold ---------- */
