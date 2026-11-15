@@ -286,6 +286,9 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
           if (exit >= 0) { const w = Math.max(0, 1 - Math.min(1, (enter - exit) / DIP_GAP) * (1 - Math.max(0, dip) / 8)); if (chain < 0 || chainW === 0) { chain = exitChain; } chainW = w * (chainW > 0 ? chainW : 1); if (chainW === 0) chain = -1; }
         }
         top = Math.max(top, h);
+        // (scored as the stretch rises, not only at its top: low ground at the shore, joined to high ground behind, still
+        // makes a low hill's near-calm close in, as it did when the blocks parted them; a high hill's lee is the gustier)
+        close();
       } else if (enter >= 0) {
         close(); exit = cross; exitChain = chain >= 0 && chainW > 0 ? chain : enter; enter = -1; dip = h;
       }
