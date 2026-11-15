@@ -476,16 +476,24 @@ What's planned, roughly in order. Done work is described in the README.
      the line?" The gold lane is the approach to the line (render/drillGuides.ts). It needs to show at a glance what it
      is, without copy: for example, ending on the line at the spot to cross at the gun. It folds into the favored-end
      work below, where the lane should lead to the favored end.
-   - **The start-line drill teaches the favored end and why** (owner, 15 November; feature; 3–5 h): "start line
-     training also needs to help me learn which side is favored and why." Each run shows which end of the line is
-     favored and the reasons, in pictures rather than copy:
-     - the line's bias to the wind: the square line drawn against the real one, with the favored end lit;
-     - the current at the line: which end it carries you to, and how it sets the boats at the gun;
-     - the first beat: which side of the course pays (the strategist's left/right, from the wind and tide);
-     - the crowd: where the fleet bunches.
-     At the end of each run, a one-line verdict ("pin favored by about 2 boat lengths") and how your end compared.
-     Better still, the player calls it first ("which end?") before the reveal, so it's practice at judging and not
-     just reading. The wind's shifts in the drill come from the real data, as everywhere.
+   - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
+     line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
+     favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
+     water before the gun, with the answer only after you've judged:
+     - **Head to wind on the line:** luff head to wind at mid-line. The end the bow points nearer to is the favored end.
+     - **The compass:** sight down the line from one end for its bearing, then go head to wind for the wind's. If the
+       wind is more than 90° from the line toward one end, that end's favored. The tactical compass on the cabin top
+       (in progress) is the tool.
+     - **Sailing the line:** reach down the line, sails trimmed, and see which way the sails need easing or trimming.
+     - **The current:** watch the committee boat's anchor line, the pin's wake or a crab pot, to see where the stream
+       carries you at the gun.
+     - **The first beat:** which side pays, from the wind and tide (the strategist).
+     - **The crowd:** where the fleet bunches.
+     Each run asks you to call it ("which end?") before the reveal. Then it shows how you could have told: the square
+     line against the real one, and the bias in boat lengths. It also shows how your call and your start compared. The
+     wind's shifts stay real, so the favored end can change while you check it, as on the day. Pictures and actions,
+     not copy. Methods to be checked by the researcher against published racing guides (US Sailing, North U).
+
    - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
      cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
      chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
