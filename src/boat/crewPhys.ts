@@ -586,11 +586,13 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const vx = (crossing ? 1.0 : 0.7) * pace(p) * (c.roll?.phase === 'flatten' ? 1.3 : 1);
     const x0 = a.x, z0 = a.z;
     const dz = clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
-    let toX = goal.x, hold = false;
+    let toX = goal.x, wait = false;
     // (two on the move along the deck, within a body's width of each other, CREW_PASS: nobody closes to within a stride,
-    // CREW_SEP, of a crewmate on the move, going their way or coming the other, but waits; one who has to get past a
-    // crewmate who's stopped, or coming the other way, steps aside first, to the side they're on of them, then goes by,
-    // and stays out until they're a stride past, not cutting back in across their toes)
+    // CREW_SEP, of a crewmate on the move going their way, but waits; one who has to get past a crewmate who's stopped,
+    // or coming the other way, steps aside first, then goes by, and stays out until they're a stride past, not cutting
+    // back in across their toes. Two meeting head on, neither going past the other's place: the first of them steps
+    // aside and goes, the other waits)
+    let slow = 1;
     if (i > 0) {
       let by = a.passing != null ? c.people[a.passing] : undefined;
       if (by && (Math.abs(by.z - a.z) >= CREW_SEP || Math.abs(goal.z - a.z) < 0.02)) { a.passing = undefined; by = undefined; }
@@ -600,18 +602,26 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
         const o = c.people[j], dxo = Math.abs(o.x - a.x), d0 = Math.abs(o.z - a.z), d1 = Math.abs(o.z - a.z - dz);
         if (dxo >= CREW_PASS || d1 >= CREW_SEP || d1 >= d0) continue;
         const og = o.goal ?? o, oDir = Math.sign(og.z - o.z) * (Math.abs(og.z - o.z) > 0.05 ? 1 : 0);
-        const past = (goal.z - o.z) * dir > 0.05;
-        if (past && oDir !== dir) { a.passing = j; by = o; hold = dxo < CREW_PASS - 0.05; }
-        else if (oDir !== 0) hold = true;
+        const past = (goal.z - o.z) * dir > 0.1, headOn = oDir === -dir;
+        if ((past && oDir !== dir) || (headOn && i < j)) { a.passing = j; by = o; }
+        else if (oDir !== 0) wait = true;
       }
       if (by) {
-        const away = a.x !== by.x ? Math.sign(a.x - by.x) : by.x >= 0 ? -1 : 1, room = Math.max(0.05, deckHalf(a.z) - 0.25);
-        toX = clamp(by.x + away * CREW_PASS, -room, room);
-        if (Math.abs(by.z - a.z) > 0.05 && (by.z - a.z) * dir < 0) hold = false; // (by them now: on, out to the side)
+        // (inboard of them by default, behind the back of someone sitting out, over the cabin top past the narrow side
+        // deck; outboard only where there's more room that way. No closer to the edge than half a shoulder's width.
+        // Where neither side has a body's width, they squeeze by, slowly, rather than stand there)
+        const room = Math.max(0.05, deckHalf(a.z) - Z.gap / 2), inb = by.x >= 0 ? -1 : 1;
+        const inX = clamp(by.x + inb * CREW_PASS, -room, room), outX = clamp(by.x - inb * CREW_PASS, -room, room);
+        toX = Math.abs(outX - by.x) > Math.abs(inX - by.x) + 0.05 ? outX : inX;
+        const aside = Math.abs(toX - by.x);
+        if (aside < CREW_PASS - 0.05) slow = 0.5;
+        // (stepping aside, as far as the deck lets them, before going by; by them now, on, out to the side)
+        const ahead = (by.z - a.z) * dir;
+        wait = ahead > 0.05 && ahead < CREW_SEP - 0.1 && Math.abs(a.x - toX) > 0.03 && Math.abs(a.x - by.x) < aside - 0.03;
       }
     }
     a.x += clamp(toX - a.x, -vx * dt, vx * dt);
-    if (!hold) a.z += dz;
+    if (!wait) a.z += dz * slow;
     // (in the cockpit, round the jib winch on the side deck, not through it: from one side of it to the other they step in
     // off the deck first, past it on the bench, and out again beyond it; nor out on the deck beside it. Going on forward
     // of the cockpit, to the mast, they climb past it)

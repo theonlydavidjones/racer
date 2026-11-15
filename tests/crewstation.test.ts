@@ -87,6 +87,8 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     for (let k = 0; k < m.trips.length; k += 2) {
       const mean = runs.reduce((a, r) => a + r.trips[k] + r.trips[k + 1], 0) / runs.length;
       expect(mean, `boat ${k / 2 + 1}: both crew's trips a minute, over three races (${runs.map(r => (r.trips[k] + r.trips[k + 1]).toFixed(2)).join(', ')})`).toBeLessThan(1.4);
+      // (and no one race far over it: a per-race cap a little above, so the mean doesn't hide a race gone wrong)
+      runs.forEach((r, q) => expect(r.trips[k] + r.trips[k + 1], `boat ${k / 2 + 1}: both crew's trips a minute, seed ${q + 1}`).toBeLessThan(1.5));
     }
   }, 1_200_000);
 });
