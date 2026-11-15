@@ -100,10 +100,11 @@ describe('a gybe that\'s meant', () => {
     expect(b.h - 180).toBeGreaterThan(12); expect(b.tack).toBe('P'); expect(b.boom).toBeGreaterThan(60); expect(b.crashT).toBeUndefined();
   });
   it('steered slowly through by the tiller in your hand: literal, nobody jibes the main, and the wind takes it', () => {
-    const b = running(12); free(b); let rate = 0, n = 0;
-    sail(b, 150, () => { if (b.crashT != null) return; b.steer = 0; b.tiller = -0.04; rate += b.turnRate ?? 0; n++; });
+    // (a little tiller to port, more than her helm's own balance takes up: about a degree a second to starboard)
+    const b = running(12); free(b); let rate = 0, n = 0, after = '';
+    sail(b, 150, () => { if (b.crashT != null) { after ||= b.tack; b.tiller = 0; return; } b.steer = 0; b.tiller = -0.08; rate += b.turnRate ?? 0; n++; });
     expect(rate / n).toBeGreaterThan(0.2); expect(rate / n).toBeLessThan(2); // (a slow, steady turn to starboard)
-    expect(b.crashT).toBeDefined(); expect(b.tack).toBe('S');
+    expect(b.crashT).toBeDefined(); expect(after).toBe('S'); // (her boom across: on starboard tack as it lands)
   });
   it('the tiller pilot turned 30° across her stern: its turn is a called one, her crew jibe the main, no crash', () => {
     const b = running(12) as Boat & { handsOff?: boolean }, p = newPilot(); let across = 0, side = Math.sign(b.boom);
