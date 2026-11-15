@@ -1,8 +1,8 @@
 import { setOntoPier } from '../geo/fortMason';
 import { bow, stern, type Boat, type LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
-import { boomAngle, crewSolve, depowerLimits, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls, type CrewSettings } from './controls';
-import { crewBestHeel, crewMass, crewMoment, displacement, specAttr } from './crewPhys';
+import { boomAngle, crewSolve, depowerLimits, planWorth, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls, type CrewSettings } from './controls';
+import { crewBestHeel, crewMass, crewMoment, crewSkill, displacement, specAttr } from './crewPhys';
 import { condition, mainRig } from './condition';
 import { airDrag, driveSpeedRatio, hullResistance } from './dynamics';
 import { driveCurveFor } from './driveCurve';
@@ -114,14 +114,27 @@ export function driveSpeed(b: Boat, K: number): number {
  * angle of attack and shape as drive, heel past her best, and the drag of the helm the sails demand).
  */
 export function speedFactor(b: Boat, c: Controls): number {
+  // (twice: her heel with these sails changes the wind the sails see (heeled, the apparent wind across them is the
+  // narrower), and the crew sheet to that wind as she comes up or goes down (physics.ts crewMainAngle, on awaSlow), so a
+  // flatter sail that lets her stand up has them ease a touch and keep some of the power: weighed at the heel the first
+  // look finds, with the sheets the crew hold where they'd put them there. Without it the coach promised a breeze's
+  // small fixes twice what they paid: the physics review, 15 Nov)
+  const first = speedAt(b, c, b.heel ?? 0, 0, 0);
+  if (!b.crew || Math.abs(first.heel - (b.heelMag ?? 0)) < 0.2) return first.s;
+  const fr = sailFrame(b), sideOf = Math.sign(b.heel || 1), at = (h: number) => sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, sideOf * h).awa;
+  const a0 = at(b.heelMag ?? 0), a1 = at(first.heel);
+  const dm = byHand(b, 'mainsheet') ? 0 : optimalSheet('main', a1) - optimalSheet('main', a0), dj = byHand(b, 'jibsheet') ? 0 : optimalSheet('jib', a1) - optimalSheet('jib', a0);
+  return speedAt(b, c, sideOf * first.heel, dm, dj).s;
+}
+function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number): { s: number; heel: number } {
   // (in the wind the sails see as she heels, as the boat does: physics.ts sailWind, ORC eqs. 7.2–7.3; and in the frame
   // the boat trims them in, across her course through the water, her leeway in it (physics.ts sailFrame). Without the
   // leeway the coach judged her trim some 5° off the boat's and promised what the boat never paid: Bay East, 14 Nov)
-  const fr = sailFrame(b), sw = sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, b.heel ?? 0);
+  const fr = sailFrame(b), sw = sailWind(b.ww.from, b.ww.kt, b.h + fr.rot, fr.along, fr.across, heelIn);
   const tws = b.ww.kt, awa = sw.awa, aws = sw.aws / KT, plan = sailPlan(b), cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
-  const main = clamp(boomAngle(c), SAILS.main.min, SAILS.main.max), clew = jibClew(c, b.tack);
-  if (clew < 0) return 0; // backed: not sailing
-  const jib = clamp(clew, SAILS.jib.min, SAILS.jib.max);
+  const main = clamp(boomAngle(c) + dm, SAILS.main.min, SAILS.main.max), clew = jibClew(c, b.tack);
+  if (clew < 0) return { s: 0, heel: b.heelMag ?? 0 }; // backed: not sailing
+  const jib = clamp(clew + dj, SAILS.jib.min, SAILS.jib.max);
   const tm = sailTrim('main', awa, main), tj = plan === 'jib' ? sailTrim('jib', awa, jib) : null;
   const ms = mainShape(c, tws, mainRig(b), aws), js = plan === 'jib' ? jibShape(c, tws, b.tack, cond?.jib, aws, mainRig(b)?.tune) : null;
   const em = shapeEfficiency(ms, targetShape('main', tws, awa, b.depower)), ej = js ? shapeEfficiency(js, targetShape('jib', tws, awa, b.depower)) : 1;
@@ -135,7 +148,7 @@ export function speedFactor(b: Boat, c: Controls): number {
   // heel and helm, with the crew where they are now
   const sf = sailForces(sw.aws, sw.awa, { trim: tm, shape: ms, out: main }, tj && js ? { trim: tj, shape: js } : null, false);
   const cs = b.crew;
-  let heelC = b.heelMag ?? 0;
+  let heelC = b.heelMag ?? 0, helm = 0;
   if (cs) {
     const disp = displacement(cs.spec) + (cond?.extraKg ?? 0), F = sf.main.heel + sf.jib.heel;
     let heel = heelWithCrew(F, sf.ceh, disp, h => crewMoment(cs, h) + (cond ? cond.rightingDelta(h) : 0), crewMass(cs.spec));
@@ -154,7 +167,7 @@ export function speedFactor(b: Boat, c: Controls): number {
     const twaC = Math.min(180, b.twa + (b.leeway ?? 0));
     const pushNow = sailPush(tws, twaC, plan, b.shape.main, plan === 'jib' ? b.shape.jib : null, b.heelMag ?? 0, b.depower ?? 0);
     if (pushNow > 1) K *= Math.max(0, sailPush(tws, twaC, plan, ms, js, heel, b.depower ?? 0)) / pushNow;
-    K *= Math.max(0, 1 - rudderDrag(clamp(hn, -12, 12), v) / Math.max(1, hullResistance(v)));
+    helm = clamp(hn, -12, 12);
   }
   // her leeway with these sails, as the boat makes it (physics.ts step: the side force against the keel's lift at the
   // polar's speed, slender-wing lift, Newman §5.12), against hers now: at the heading she holds, sails that heel her less
@@ -167,16 +180,18 @@ export function speedFactor(b: Boat, c: Controls): number {
   // the sails flogging, as the boat counts it (physics.ts sailFlog, pinchFlog; dynamics.ts airDrag): a main eased till it
   // luffs, or a course pinched below the beat, costs her windage the drive no longer pays for. A force, so where it
   // leaves her is where the drive at her speed meets the hull's resistance and it, as the surge settles (dynamics.ts
-  // surgeAccel); a main eased down the traveler looked free to the coach without it (Bay East, 15 Nov)
+  // surgeAccel), in the wind across her hull, as the step takes it; a main eased down the traveler looked free to the
+  // coach without it (Bay East, 15 Nov)
   const luffAmt = (t: { flow: string; amount: number } | null) => t && t.flow === 'luffing' ? t.amount : 0;
   const flog = Math.max(Math.min(1, SAILS.main.share * luffAmt(sailTrim('main', awa, clamp(main - ease, SAILS.main.min, SAILS.main.max))) + (tj ? SAILS.jib.share * luffAmt(tj) : 0)), pinchFlog(crs, beatAngle(tws)));
-  const D = flog > 0 && vT > 0.05 ? airDrag(sw.aws, awa, flog) : 0;
-  if (D <= 0) return vT / vt0;
-  const rT = hullResistance(vT), k = driveCurveFor(tws, crs, vT), g = (v: number) => rT * k(v) - hullResistance(v) - D;
+  // (and the helm the sails demand, its drag a force on her the same way: physics.ts helmDrag, at the speed she settles at)
+  const D = flog > 0 ? airDrag(b.aws, b.awa, flog) : 0;
+  if (vT <= 0.05 || (D <= 0 && helm === 0)) return { s: vT / vt0, heel: heelC };
+  const rT = hullResistance(vT), k = driveCurveFor(tws, crs, vT), g = (v: number) => rT * k(v) - hullResistance(v) - D - rudderDrag(helm, v);
   let lo = 0, hi = vT;
-  if (g(lo) <= 0) return 0;
+  if (g(lo) <= 0) return { s: 0, heel: heelC };
   for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (g(m) > 0) lo = m; else hi = m; }
-  return (lo + hi) / 2 / vt0;
+  return { s: (lo + hi) / 2 / vt0, heel: heelC };
 }
 
 const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] };
@@ -188,8 +203,24 @@ const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] }
 export function withCrew(b: Boat, k: LineKey, v: number): Controls {
   const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
   if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
+  // (a shape line moved under a main the crew trim: they set the car and the sheet around it as they do every second,
+  // the lines you hold fixed where you have them (physics.ts trimSails, crewSolve): the vang off upwind, they sheet
+  // harder and drop the car to hold the leech. Without it the coach saw the leech twist away that the crew never let go,
+  // and missed what the vang hard on was costing: the physics review, 15 Nov)
+  else if (k !== 'mainsheet' && k !== 'traveller' && k !== 'jibsheet' && k !== 'car' && k !== 'jibsheetW' && !byHand(b, 'mainsheet') && !byHand(b, 'traveller')) {
+    const fixed: Partial<CrewSettings> = {};
+    for (const x of FIXABLE) if (x === k || byHand(b, x)) fixed[x] = c[x];
+    const tws = b.ww.kt, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed);
+    // (and only if it's worth the trip to them, as they judge it: physics.ts trimSails, controls.ts planWorth; a skilled
+    // crew moves the car for ~0.1% of drive, a novice for ~0.4%)
+    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), mainRig(b), cond?.jib, b.aws / KT, b.depower).traveller ?? 1;
+    if (worth >= 0.001 + 0.003 * (1 - crewSkill(b.crew))) c.traveller = plan.traveller;
+    c.mainsheet = mainsheetFor(want, c.traveller);
+  }
   return c;
 }
+const FIXABLE = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
 /** The best setting for one line with the crew answering it, and the speed it's worth. */
 function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: number; gain: number } {
   // (never past the most the crew themselves would set it: the North Sails guide's caps, controls.ts depowerLimits.
@@ -200,14 +231,28 @@ function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: numbe
   const hi = Math.max(lo, Math.min(hi0, lim.max[k as keyof CrewSettings] ?? hi0)), base = speedFactor(b, withCrew(b, k, b.ctl[k]));
   // (with both sails flogging the drive is nil: a floor, so the line that brings one back still counts)
   let to = b.ctl[k], best = Math.max(base, 0);
-  for (let i = 0; i <= 40; i++) {
-    const v = lo + (hi - lo) * i / 40, f = speedFactor(b, withCrew(b, k, v));
-    if (f > best * 1.0005) { best = f; to = v; }
-  }
-  // (against her speed now where the model has her slower than she is: with a sail flogging the coach's own estimate of
-  // her now runs low, and a gain over it is one the boat never pays; her speed is the one she'll be gaining on)
-  const real = b.v / Math.max(0.5, polar(b.ww.kt, Math.min(180, b.twa + (b.leeway ?? 0)), sailPlan(b)));
-  return { to, gain: Math.min(3, best / Math.max(base, Math.min(1, real), 0.1) - 1) };
+  // (coarse, then fine about the best: a tenth of the range, then a fortieth either side of it, at half the looks of a
+  // fortieth all through, each with the crew's own solve: controls.ts crewSolve. Of the settings within 0.05% of the
+  // best, the one nearest where the line is (a shape line's: a sheet takes its best): the least you need do for it, and on a broad top the model's far end is
+  // where it's least sure; climbing from one end it took the far end, which the boat didn't pay: the physics review)
+  const seen: [number, number][] = [];
+  const look = (v: number) => { const f = speedFactor(b, withCrew(b, k, v)); seen.push([v, f]); if (f > best) best = f; };
+  for (let i = 0; i <= 10; i++) look(lo + (hi - lo) * i / 10);
+  const mid = seen.reduce((a, x) => x[1] > a[1] ? x : a)[0], d = (hi - lo) / 40;
+  for (const j of [-3, -2, -1, 1, 2, 3]) { const v = mid + j * d; if (v >= lo && v <= hi) look(v); }
+  const sheet = k === 'mainsheet' || k === 'jibsheet' || k === 'traveller';
+  if (best > Math.max(base, 0) * 1.0005) {
+    // (a sheet's or the car's best is at the edge of a luff: the nearest that's nearly as good is on the edge itself)
+    let near = Infinity, pick = best;
+    for (const [v, f] of seen) if ((sheet ? f >= best : f * 1.0005 >= best) && Math.abs(v - b.ctl[k]) < near) { near = Math.abs(v - b.ctl[k]); to = v; pick = f; }
+    best = pick;
+  } else best = Math.max(base, 0);
+  // (a sail flogging hard: the model has her all but stopped while she still sails on at a third of her speed or more, and
+  // a gain over its near-nothing is one the boat never pays, so it's counted from where she is. Only then: a promise is
+  // two settled states against each other, and the way she carries over them in a lull, after heading up or surfing
+  // decays alike whichever way the line's set; the physics review, 15 Nov)
+  const real = Math.min(1, b.v / Math.max(0.5, polar(b.ww.kt, Math.min(180, b.twa + (b.leeway ?? 0)), sailPlan(b))));
+  return { to, gain: Math.min(3, best / Math.max(base, real > 1.25 * base ? real : 0, 0.1) - 1) };
 }
 
 /* ---------- the lessons for a line you hold ---------- */
