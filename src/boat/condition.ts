@@ -128,7 +128,7 @@ export function mainRig(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: Bo
  * page's copy of the race, which the page may only change by commands: sim/commands.ts). Her kept rig if she has one.
  */
 export function rigOf(b: Pick<Boat, 'tune' | 'rigMain' | 'cond'> & { spec?: BoatSpec }): SailRig | undefined {
-  const cond = b.cond ?? (b.spec ? condition(b.spec) : undefined);
+  const cond = b.spec && !b.cond ? condition(b.spec) : b.cond; // (as mainRig: her condition before her rig)
   if (!b.tune) return cond?.main;
   if (b.rigMain) return b.rigMain;
   const base = cond?.main ?? STD_RIG;

@@ -3,6 +3,9 @@ import { TUNE_PRESETS } from '../src/boat/rigTune';
 import { lessons, tuneLoss } from '../src/boat/coach';
 import { guarded } from '../src/sim/host';
 import { testBoat, sail } from './helpers/testBoat';
+import { COURSES } from '../src/courses/registry';
+import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
+import { World, DT } from '../src/sim/world';
 
 /* The coach runs on the page, over its copy of the race; with ?simguard that copy refuses writes (sim/host.ts). The rig
  * lesson worked out her tuned rig through mainRig, which keeps it on the boat (b.rigMain): a write to the page's copy
@@ -19,5 +22,16 @@ describe('the coach reads the boat, never writes her', () => {
     const got = lessons(g).list.find(x => x.id === 'rig:soft');
     expect(got?.head).toBe(want!.head);
     expect(b.rigMain).toBeUndefined();
+  });
+  it('a raced boat (her own spec) with neither her condition nor her rig kept: the coach works both out and keeps neither', () => {
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKt: 18, fleet: 0 } as Settings, 3), u = w.user;
+    while (w.t < 30) w.step(DT);
+    expect(u.spec && u.tune).toBeTruthy();
+    const want = JSON.stringify(lessons(u).list.map(l => [l.id, l.head])), loss = tuneLoss(u);
+    u.cond = undefined; u.rigMain = undefined; // (as the page's copy can have them)
+    const g = guarded(u, 'w.user');
+    expect(tuneLoss(g)).toBeCloseTo(loss, 12);
+    expect(JSON.stringify(lessons(g).list.map(l => [l.id, l.head]))).toBe(want);
+    expect(u.cond).toBeUndefined(); expect(u.rigMain).toBeUndefined();
   });
 });
