@@ -15,6 +15,7 @@ import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
 import { pointOfSailWord } from './pointOfSail';
 import { OUTBOARDS } from '../boat/motor';
+import { crewBestHeel, crewSkill } from '../boat/crewPhys';
 
 /**
  * The sail controls band (the owner's design, 12 Nov 2026; the UI session's mock-up, design/sail-controls-band.html):
@@ -138,6 +139,25 @@ const windexSvg = () => {
   <text class="sb-pos" x="70" y="119" text-anchor="middle"></text><text class="sb-awa" x="70" y="131" text-anchor="middle">0°</text></svg>`;
 };
 
+/**
+ * Her heel, on a thin ring hugging the top of the windex from 10 to 2 o'clock, one to one: a degree of heel is a degree
+ * round the ring, upright at the top, the mark toward the side she's heeled to (the owner, 15 Nov 2026, after four
+ * rounds of stills: "lets go back to the last iteration of the curved dial. build that"). Amber from 20° to 25°, where
+ * the coach calls her overpowered (boat/coach.ts), red past 25°; a teal ◆ just outside it at the heel her crew sail her
+ * best at (boat/crewPhys.ts crewBestHeel), on her leeward side; her heel in degrees beside it at 1:30 or 10:30. Drawn in
+ * the windex's own coordinates (its centre at 70, 70; its face 69 across), on a layer a little larger than it.
+ */
+const HEEL_R = 78, HEEL_MAX = 60, HEEL_AMBER = 20, HEEL_RED = 25;
+const heelSvg = () => {
+  const P = (deg: number, r: number) => [70 + Math.sin(deg * D2R) * r, 70 - Math.cos(deg * D2R) * r].map(n => n.toFixed(1));
+  const arc = (a0: number, a1: number, cls: string) => { const [x0, y0] = P(a0, HEEL_R), [x1, y1] = P(a1, HEEL_R); return `<path class="${cls}" d="M${x0} ${y0} A${HEEL_R} ${HEEL_R} 0 0 1 ${x1} ${y1}"/>`; };
+  return `<svg class="sb-heel" viewBox="-21 -21 182 182" aria-hidden="true">
+  ${arc(-HEEL_MAX, HEEL_MAX, 'hr-base')}${arc(-HEEL_RED, -HEEL_AMBER, 'hr-amber')}${arc(HEEL_AMBER, HEEL_RED, 'hr-amber')}${arc(-HEEL_MAX, -HEEL_RED, 'hr-red')}${arc(HEEL_RED, HEEL_MAX, 'hr-red')}
+  <path class="hr-best" d="M70 ${70 - HEEL_R - 13} l5 5 l-5 5 l-5 -5 Z"/>
+  <circle class="hr-dot" cx="70" cy="${70 - HEEL_R}" r="7"/>
+  <text class="hr-deg" x="70" y="70"></text></svg>`;
+};
+
 /** A jib car on its H-shaped track: two fore-and-aft legs, a crossbar between them (7 rows), the car on it (5 pins). */
 const jcar = (side: Side) => {
   let holes = '';
@@ -209,7 +229,7 @@ export class SailBand {
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
-  <span class="sb-wx" role="img">${windexSvg()}<span class="sb-wx-hint">▴ Sail controls</span></span>
+  <span class="sb-wx" role="img">${windexSvg()}${heelSvg()}<span class="sb-wx-hint">▴ Sail controls</span></span>
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
@@ -490,6 +510,26 @@ export class SailBand {
     tab.classList.toggle('on', !!m.running);
   }
 
+  /** Her heel on the ring over the windex (heelSvg): the mark, her crew's best heel, and the degrees. */
+  private heelRing(wx: HTMLElement, u: Boat, attr: (el: Element, k: string, v: string) => void, put: (el: Element, t: string) => void): void {
+    // (b.heel is + to port; on the windex, looking down, bow up, port is to the left: the ring's angle is − the heel)
+    const heel = u.heel ?? 0, mag = Math.abs(heel), a = Math.max(-HEEL_MAX, Math.min(HEEL_MAX, -heel));
+    // her leeward side: the side she's heeled to, or upright, the side her boom's on (heel + to port with the wind over the
+    // starboard side, by her tack)
+    const lee = mag > 0.5 ? Math.sign(heel) : u.tack === 'S' ? 1 : -1;
+    const zone = mag > HEEL_RED ? 'red' : mag >= HEEL_AMBER ? 'amber' : '';
+    const dot = wx.querySelector('.hr-dot')!, best = wx.querySelector('.hr-best')!, deg = wx.querySelector('.hr-deg')!;
+    attr(dot, 'transform', `rotate(${(Math.round(a * 2) / 2).toFixed(1)} 70 70)`);
+    attr(dot, 'class', `hr-dot ${zone}`);
+    const bh = crewBestHeel(u.twa, u.ww.kt, crewSkill(u.crew));
+    attr(best, 'transform', `rotate(${(-lee * Math.min(HEEL_MAX, bh)).toFixed(1)} 70 70)`);
+    // the degrees just outside the ring at 10:30 or 1:30, on her leeward side
+    const r = HEEL_R + 13, x = 70 - lee * Math.sin(45 * D2R) * r, y = 70 - Math.cos(45 * D2R) * r;
+    attr(deg, 'x', x.toFixed(1)); attr(deg, 'y', y.toFixed(1)); attr(deg, 'text-anchor', lee > 0 ? 'end' : 'start');
+    attr(deg, 'class', `hr-deg ${zone}`);
+    put(deg, `${Math.round(mag)}°`);
+  }
+
   /** The windex and the tabs on the band's top edge: Hail (when a hail applies), a penalty's turns, the pole, Auto-Trim / Hand Back. */
   private tabs(w: ReturnType<BandHost['world']>, u: Boat): void {
     // the windex: the vane into the apparent wind (arel, + from starboard: clockwise looking down)
@@ -500,6 +540,7 @@ export class SailBand {
     const put = (el: Element, t: string) => { if (el.textContent !== t) el.textContent = t; };
     const attr = (el: Element, k: string, v: string) => { if (el.getAttribute(k) !== v) el.setAttribute(k, v); };
     put(wx.querySelector('.sb-awa')!, `${awa}°`);
+    this.heelRing(wx, u, attr, put);
     // her point of sail under the vane (the owner: the windex names it: Close-hauled, Beam reach, Broad reach, Run)
     const pos = pointOfSailWord(u); put(wx.querySelector('.sb-pos')!, pos);
     attr(wx, 'aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
