@@ -1302,7 +1302,7 @@ const TOOLS: Tool[] = [
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
   { id: 'course', label: 'Course chart', icon: 'chart', key: () => toolKey('course'), on: () => courseView.isOpen || navView.isOpen, act: toggleCourse },
-  { id: 'lookInstrument', label: 'Cabin-top instrument', icon: 'inst', key: () => toolKey('lookInstrument'), on: () => !!instLook, act: () => runAction('lookInstrument') },
+  { id: 'lookInstrument', label: 'Cabin-top instrument', icon: 'inst', key: () => toolKey('lookInstrument'), on: () => !!instLook, act: () => runAction('lookInstrument'), hidden: () => !view.userMesh?.instrument }, // (her boat may have none: BoatSpec.instrument)
   { id: 'navLights', label: 'Nav lights', icon: 'lights', key: () => toolKey('navLights'), on: () => !w.user.lightsOff, act: () => runAction('navLights') },
   { id: 'paddle', label: 'Paddle', icon: 'paddle', key: () => toolKey('paddle'), act: () => runAction('paddle') },
   { id: 'log', label: 'Log', icon: 'log', key: () => toolKey('log'), on: () => !$('logView').hidden, act: () => { if ($('logView').hidden) openLog(); else $('logView').hidden = true; } },

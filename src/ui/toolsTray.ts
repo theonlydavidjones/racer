@@ -12,6 +12,8 @@ export interface Tool {
   /** Whether it's on (a switch); none for an action. */
   on?: () => boolean;
   act: () => void;
+  /** Left out when there's nothing to show (a boat with no cabin-top instrument). */
+  hidden?: () => boolean;
 }
 const svg = (d: string) => `<svg viewBox="0 0 20 20" aria-hidden="true">${d}</svg>`;
 /** 20×20 line icons, as the top bar's. */
@@ -45,7 +47,7 @@ export class ToolsTray {
   toggle(): void { if (this.open) this.close(); else { this.render(); this.el.hidden = false; this.btn.classList.add('on'); } }
   close(): void { this.el.hidden = true; this.btn.classList.remove('on'); }
   private render(): void {
-    this.el.innerHTML = this.tools.map(t => `<button type="button" class="tt${t.on ? '' : ' act'}" data-tool="${t.id}" title="${t.label} (${t.key()})"><kbd>${t.key()}</kbd>${svg(TOOL_ICONS[t.icon as keyof typeof TOOL_ICONS] ?? '')}<span>${t.label}</span></button>`).join('')
+    this.el.innerHTML = this.tools.filter(t => !t.hidden?.()).map(t => `<button type="button" class="tt${t.on ? '' : ' act'}" data-tool="${t.id}" title="${t.label} (${t.key()})"><kbd>${t.key()}</kbd>${svg(TOOL_ICONS[t.icon as keyof typeof TOOL_ICONS] ?? '')}<span>${t.label}</span></button>`).join('')
       + `<div class="tt-speed">${svg(TOOL_ICONS.speed)}<span>Speed</span><span class="seg">${[1, 2, 4].map(v => `<button type="button" data-speed="${v}">${v}×</button>`).join('')}</span></div>`;
     this.refresh();
   }
