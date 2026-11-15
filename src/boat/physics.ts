@@ -1087,7 +1087,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
   // the backstay for the helm (North Sails' Folkboat guide: "In heavy winds, sheet tight and pull the backstay until the
   // rudder feels light again (but without losing pointing)"): upwind in the guide's higher wind (from 14 kt, over a
-  // couple of knots, and gone by 60° apparent, as the guide's other settings), while the helm she needs is past the top
+  // couple of knots; the guide's rule is for beating: full to 45° apparent, gone by 50°), while the helm she needs is past the top
   // of the light band (IDEAL_HELM + 2°, the published 3–5°'s top: Deep Physics' reading, an estimate) the crew take up
   // backstay, about all of it in 20 s; once it's half a degree back inside the band they ease it off as slowly, back to
   // what the speed search would have (which already weighs the rudder's drag and the pointing, and settles at 2.7–3.7°
@@ -1095,7 +1095,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // is light). A floor on their plan, and the gate closing takes it off at the same rate, not at once. Not out of a tack
   // or while she's slow (under 90% of the polar's speed): the helm she needs then is for the speed she hasn't got (the
   // rudder's lift goes as the speed squared), not for too much power, and a crew powers up out of a tack, not down.
-  { const gate = up && !b.hove ? smooth((tws - 14) / 2) * smooth((60 - Math.abs(b.awaSlow)) / 20) : 0, hn = b.helmNeed ?? 0;
+  { const gate = up && !b.hove ? smooth((tws - 14) / 2) * smooth((50 - Math.abs(b.awaSlow)) / 5) : 0, hn = b.helmNeed ?? 0;
     const heavy = gate > 0 && hn > IDEAL_HELM + 2 && !b.tacking && b.v >= 0.9 * polar(tws, Math.max(Math.abs(b.twa), beatAngle(tws)), plan);
     const dir = heavy ? 1 : gate <= 0 || hn < IDEAL_HELM + 1.5 ? -1 : 0;
     const hbs = clamp((b.helmBackstay ?? 0) + dir * dt / 20, 0, 1);

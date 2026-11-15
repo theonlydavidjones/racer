@@ -90,7 +90,7 @@ describe('the backstay for the helm ("pull the backstay until the rudder feels l
     const at = (bs: number) => { const b = testBoat({ heading: 318, kt: 5, windKt: 18 }); takeLine(b, 'backstay'); (b.ctlTarget ??= {}).backstay = bs; sail(b, 60, () => { b.h = courseHeading(b, 318); }); return b.helmNeed ?? 0; };
     expect(at(1)).toBeLessThan(at(0) - 0.5);
   });
-  it('light air, a close reach (past 60° apparent) or off the wind: no backstay for the helm', () => {
-    for (const [h, kt] of [[318, 10], [280, 20], [250, 20]] as const) { const b = testBoat({ heading: h, kt: 5, windKt: kt }); sail(b, 60, () => { b.h = courseHeading(b, h); }); expect(b.helmBackstay ?? 0).toBe(0); }
+  it('light air, a close reach (past 50° apparent: the guide\'s rule is for beating) or off the wind: no backstay for the helm', () => {
+    for (const [h, kt] of [[318, 10], [290, 20], [280, 20], [250, 20]] as const) { const b = testBoat({ heading: h, kt: 5, windKt: kt }); sail(b, 60, () => { b.h = courseHeading(b, h); }); expect(b.helmBackstay ?? 0).toBe(0); }
   });
 });

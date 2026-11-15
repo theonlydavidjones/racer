@@ -1014,6 +1014,10 @@ the guide's line settings and the search decides only the depowering past them. 
 optimum for a low-stability boat (does ORC's VPP itself flatten a Folkboat at 14 kt?); pointing, which the guide's
 settings may serve and the sim's fixed polar beat angle can't reward (a flatter sail points higher: VMG, not speed); the
 heeled hull's drag from a real lines plan; the shape model's depth and twist ranges against measured sail shapes.
+Done (depower-guide, November 2026): in heavy air the boom goes down on the traveler with the sheet tight ("sheet tight",
+"cars eased to leeward"), the vang off close-hauled under 18 kt ("never ... in less than 18 knots"). Still to do: crews
+ease the backstay when a breeze drops (from 22 kt to 15 the backstay stays at 0.28, not worth the trip by the line's
+drive alone, and she's 0.03 kt slow: a crew easing it as the wind goes, not only for shape).
 Open, the rig's height datum (November 2026, the Coordinator: keep the physics on the ORC certificates; settle if the
 IMS rule text becomes reachable): the drawing measures the rig from the deck at the mast, as CR 6.1.11 does (the Lower
 Mast Point 1000 mm above the deck, along the mast's after side); the physics (balance.ts RIG) uses ORC's BAS 1.00 and
