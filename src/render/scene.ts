@@ -66,7 +66,7 @@ const CUR_N = 56;
  * mouth is 37 m wide, its eddies a couple of dozen meters across (environment/harborMouth.ts), so they'd fall between
  * them. Within FINE_FAR m of a mouth, the water there reads a patch FINE_N × FINE_N of FINE_CELL m round it.
  */
-const FINE_N = 64, FINE_CELL = 4, FINE_FAR = 1500;
+const FINE_N = 64, FINE_CELL = 4, FINE_FAR = 1500, FINE_EVERY = 4, FINE_NEAR = 300;
 
 /**
  * Water colour from the wind on it. Stronger wind roughens the surface: denser, higher-contrast ripples and a
@@ -736,12 +736,18 @@ export class SceneView {
     const fx0 = Math.round(m.x / FINE_CELL) * FINE_CELL - (FINE_N / 2) * FINE_CELL, fy0 = Math.round(m.y / FINE_CELL) * FINE_CELL - (FINE_N / 2) * FINE_CELL;
     if (!this.fine || this.fine.x0 !== fx0 || this.fine.y0 !== fy0) this.fine = { x0: fx0, y0: fy0, row: 0, F: new Float32Array(FINE_N * FINE_N * 2), shown: false };
   }
-  /** The finer patch round a harbor's mouth (updateSeaMap): read a row a frame, as reading the current there all at once
-   * would hold a frame up (some 60 ms); when the last row is in, its current and convergence go to the texture and the
-   * next pass starts. Its water changes over minutes (the eddies pass every few), so a pass a second or two is plenty. */
+  /** The finer patch round a harbor's mouth (updateSeaMap): read a row every FINE_EVERY frames, as reading the current
+   * there all at once would hold a frame up (some 60 ms, a row about 1 ms); when the last row is in, its current and
+   * convergence go to the texture and the next pass starts. Its water changes over minutes (the eddies pass every few),
+   * so a pass every 4 s is plenty. Farther than FINE_NEAR m from the patch its 4 m detail can't be seen, and what was
+   * read last stays shown, so nothing is read (Capacity). */
   private fine: { x0: number; y0: number; row: number; F: Float32Array; shown: boolean } | null = null;
-  private fineStep(w: SimView): void {
+  private fineFrame = 0;
+  private fineStep(w: SimView, at: Vec): void {
     const f = this.fine; if (!f) return;
+    if ((++this.fineFrame) % FINE_EVERY !== 0) return;
+    const half = (FINE_N / 2) * FINE_CELL, cx = f.x0 + half, cy = f.y0 + half;
+    if (f.shown && Math.hypot(at.x - cx, at.y - cy) > half + FINE_NEAR) return;
     const j = f.row;
     for (let i = 0; i < FINE_N; i++) { const c = w.currentDrawn({ x: f.x0 + i * FINE_CELL, y: f.y0 + j * FINE_CELL }); f.F[(j * FINE_N + i) * 2] = c.x; f.F[(j * FINE_N + i) * 2 + 1] = c.y; }
     if (++f.row < FINE_N) return;
@@ -970,7 +976,7 @@ export class SceneView {
       this.seaAcc = 0; this.seaRef = w.seaHere(focus);
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
     }
-    this.fineStep(w); // (a row of the harbor mouth's finer current a frame)
+    this.fineStep(w, focus); // (a row of the harbor mouth's finer current every few frames)
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
