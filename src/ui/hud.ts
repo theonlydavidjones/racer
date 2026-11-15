@@ -753,7 +753,7 @@ export class Hud {
 
   /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
   fogNote(wd: SimView, short: boolean): string | null {
-    if (!layerOn(this.shown(wd), 'fog')) return null;
+    if (!layerOn(this.display ? this.shown(wd) : wd.settings as Settings, 'fog')) return null; // (the page's own layers when set; the race's otherwise)
     // the visibility where she is: the fog and rain you've set, when they close it in (owner: her own, not Pier 17's)
     // (the rain falling: the panel's, or the record's, environment/rain.ts)
     const rl = rainLevel(wd.settings.rain, wd.clockUtc), rainReal = typeof wd.settings.rain !== 'number';
