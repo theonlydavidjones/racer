@@ -1379,7 +1379,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // and a puff she can't carry: the boom eased past it (puffEase), the car first, then the sheet; the boom they ease
   // from is where it was when the puff hit (heeled hard, her apparent wind reads narrower: not trimmed in for that, nor
   // while they're still seeing it)
-  const gust = puffEase(b, up, tws, dt, held('mainsheet'), easeBoom);
+  // (entered only with a puff on her, one being seen, or the main still let go for one (and so, off the wind, to put it
+  // back): nearly every step there's none, and the rest of the step is spared its code)
+  const gust = b.gustDeg || b.gustSeen || (up && tws - (b.twsSlow ?? tws) > PUFF_RIDE) ? puffEase(b, up, tws, dt, held('mainsheet'), easeBoom) : 0;
   let mainTo = optimalSheet('main', b.awaSlow) + easeBoom;
   if (gust > 0 || b.gustSeen) mainTo = Math.max(mainTo, b.gustBase ??= mainTo); else b.gustBase = undefined;
   const wantMain = mainTo + gust, wantJib = optimalSheet('jib', b.awaSlow);
