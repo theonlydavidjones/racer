@@ -28,7 +28,7 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 - **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
-- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; chunky generic moored boats in the marinas (with "nicer moored boats"). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
+- ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; ~~chunky generic moored boats in the marinas~~ (done: the slips within 120 m of the camera drawn in detail, boot stripe and bottom paint, cockpit well, raked cabin with its windows, shrouds and spreaders, pulpits and lifelines; the rest with bottom paint, shrouds and a cockpit sole; render/mooredNear.ts). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
@@ -459,6 +459,28 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **The cruise planner's layers: slow to switch, streaks redrawn oddly** (owner, 15 November; not urgent; 1–2 h):
+     "toggling between current and waves in cruise planner takes forever, and the moving lines redraw themselves in
+     weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
+     recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
+     jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
+     <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
+     gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
+     like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
+     shadows, or a shadow-map artifact. Find what casts them and stop it; check both sides on both tacks.
+   - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
+     the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
+     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
+     more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
+     gybe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
+     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored gybe and use the
+     current, and never draw a track going backward. Fix: choose the angle and the gybes by speed made good over the
+     ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
+     changing the design). The AI's own leg planning shares sailLeg: check it too.
+   - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
+     'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
+     icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
    - ~~**Bugs in the race setup's "When" section**~~ (done: 196e7db) (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
      - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
        off after the first week. It should open fully visible, flipping upward or scrolling the panel.
