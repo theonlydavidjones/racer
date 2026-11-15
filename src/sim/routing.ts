@@ -178,6 +178,22 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
     if (mode === 'reach') {
       v = sp(off); h = crabTo(u, c, v);
       const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, Math.min(run, twa)));
+      // the land ahead on the straight line (a point, an island's corner, a current setting her onto the shore): she
+      // steers round it, as on any board, on the clear heading that makes most toward the mark: her track over the next
+      // minute and a half clear water all the way and ending with room, no closer to the wind than close-hauled. Held
+      // to the line, she sailed straight onto it
+      { const g0 = V(h), e0 = { x: p.x + (g0.x * v + c.x) * 90, y: p.y + (g0.y * v + c.y) * 90 };
+        if (sd < 400 && (landAlong(p, e0) !== Infinity || landDist(e0) < 30)) {
+          let best = -Infinity, bh = h, bv = v;
+          for (let dh = -90; dh <= 90; dh += 10) {
+            const hh = h + dh, ta = Math.abs(wrap(hh - w.from)); if (ta < beat) continue;
+            const vv = sp(Math.min(run, ta)), d = V(hh), gx = d.x * vv + c.x, gy = d.y * vv + c.y, e = { x: p.x + gx * 90, y: p.y + gy * 90 };
+            if (landAlong(p, e) !== Infinity) continue;
+            const r = landDist(e), score = (r >= 30 ? 1e4 : r) + (gx * u.x + gy * u.y) * 90;
+            if (score > best) { best = score; bh = hh; bv = vv; }
+          }
+          h = bh; v = bv;
+        } }
     } else {
       const sgn = mode === 'beat' ? -1 : 1;
       // her angle to the wind on each board: close-hauled to windward; downwind, the pair of angles, one on each gybe from

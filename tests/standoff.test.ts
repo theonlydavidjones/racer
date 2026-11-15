@@ -32,4 +32,11 @@ describe("the planner in a dead end: both boards blocked close ahead (Angel Isla
     const r = sailLeg(o, { x: 2145, y: 6012 }, { x: 703, y: 7126 }, 0, 'middle');
     expect(r.ok).toBe(true); expect(r.tacks).toBeLessThan(15);
   });
+  // (a reach whose straight line meets the island's corner: held to the line, she sailed onto it at every wind; the
+  // physics review's case)
+  for (const [kt, from] of [[2.5, 250], [5, 230], [10, 210]] as [number, number][]) it(`on a reach in ${kt} kt from ${from}°, round the corner, not onto it`, () => {
+    const w = () => ({ kt, from }), o = { ...lee(kt, { x: 0.15, y: 0 }), wind: () => ({ ...w(), gust: 1.3 }), breeze: () => ({ ...w(), gust: 1.3 }), windOnWater: () => w() } as Outlook;
+    const r = sailLeg(o, { x: 2145, y: 6012 }, { x: 703, y: 7126 }, 0, 'middle');
+    expect(r.why).not.toBe('land'); expect(r.ok).toBe(true); expect(r.path.some(q => onLand(q.p))).toBe(false);
+  });
 });
