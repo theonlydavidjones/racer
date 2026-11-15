@@ -85,7 +85,9 @@ describe('her outboard, aboard', () => {
     expect(u.docked).toBeTruthy(); expect(w.castOff()).toBe(false); // (not running yet)
     w.motorTilt(); w.motorStart(); for (let i = 0; i < 60 * 5; i++) w.step(DT);
     expect(w.castOff()).toBe(true); expect(u.docked).toBeUndefined();
-    w.motorGear('R'); w.motorThrottle(0.6);
+    // (the 3.5 has no reverse gear either: asked for R she stays in neutral; swiveled round, ahead pushes her astern)
+    w.motorGear('R'); expect(u.motor!.gear).toBe('N');
+    w.motorSwivel(); w.motorGear('F'); w.motorThrottle(0.6);
     const p0 = { x: u.x, y: u.y };
     for (let i = 0; i < 60 * 20; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT); expect(hitsHarbor(u)).toBe(false); }
     expect(Math.hypot(u.x - p0.x, u.y - p0.y)).toBeGreaterThan(5); // (backed out of the slip)
