@@ -65,14 +65,14 @@ function elbows(cr: Crew, label: string, bad: string[]): void {
   }
 }
 
-function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean }, label: string): string[] {
+function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean; sea?: number }, label: string): string[] {
   const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
   const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) };
   b.crew = newCrew(spec, 'S'); if (o.place) b.crew.place = o.place;
   const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
-  let hold = true;
+  let hold = true, tt = 0;
   sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
-  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
+  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); tt += 1 / 30; syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking, o.sea ? o.sea * Math.sin(2 * Math.PI * tt / 2.6) : undefined); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
   frames(3);
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
   else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
@@ -84,12 +84,22 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     ['light air, to leeward', { kt: 4 }], ['Mid: on the cockpit sole', { kt: 8, place: { across: 'mid', fore: null } }],
     ['Lee, placed', { kt: 8, place: { across: 'lee', fore: null } }], ['Up, a breeze', { kt: 12 }], ['hiking', { kt: 20 }],
     ['forward, light air', { kt: 6, place: { across: null, fore: 'fwd' } }], ['aft', { kt: 12, place: { across: null, fore: 'aft' } }],
-    ['a tack in light air', { kt: 5, tack: true }], ['a tack in a breeze', { kt: 14, tack: true }], ['a tack hiking', { kt: 20, tack: true }],
+    ['a tack in light air', { kt: 5, tack: true }], ['a tack in a breeze', { kt: 14, tack: true }], 
     ['downwind, light', { kt: 6, twa: 160 }], ['downwind, breeze', { kt: 16, twa: 165 }], ['a gybe', { kt: 12, twa: 160, tack: true }],
     ['pole out on a light-air run: up on the foredeck, and the trip there', { kt: 7, twa: 172, pole: true, secs: 40 }],
+    // (and in a seaway, lower and on all fours: her pitching 0.03 rad either way every 2.6 s, its rate's root mean square
+    // 0.05 rad/s, as in the Bay's westerly at about 20 kt (crew.ts rough). The wind's the light air's, for the pole)
+    ['pole out in a seaway: forward low, both hands down', { kt: 7, twa: 172, pole: true, secs: 45, sea: 0.03 }],
+    // (on until one of them's sat on the bow, the legs hanging down over it either side of the stem: the owner's "hang his
+    // legs over the front")
+    ['pole out, on to the bow and sat there', { kt: 7, twa: 172, pole: true, secs: 62 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
-  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
+  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000);
+  // (a tack hiking, through the Bay's breeze: its timing shifts with the wind, and where a figure is at each moment with
+  // it. The shin into the boat at 21 kt on main, at 20 on a branch whose tack ran a little differently; at 18.25 kt the
+  // thigh into the coaming's top, shuffling along the new side deck sat on it after the tack)
+  for (const kt of [16, 17, 18, 18.25, 19, 20, 21, 22, 23, 24]) it(`a tack hiking, ${kt} kt`, () => { const bad = run({ kt, tack: true }, `a tack hiking ${kt}`); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
   // (the forward hand at the cabin top's lines, held there, on both tacks: kneeling at the cockpit's forward end, and from
   // the side deck for the lines worked from either side; where the owner saw the arms bent backwards)
   for (const tack of ['S', 'P'] as const) for (const arm of [0.3, 0.65]) it(`at the cabin top's lines, ${tack === 'S' ? 'starboard' : 'port'} tack, ${arm > 0.55 ? 'from the side deck' : 'kneeling'}`, () => {

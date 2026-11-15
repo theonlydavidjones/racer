@@ -61,8 +61,9 @@ describe('The crew move about the boat smoothly (render/crew.ts)', () => {
       // 8 m/s² at most, measured along the deck. Both above a person's own pace for now: HIP's comment)
       expect(o.maxHip, `${t}: the hips' fastest, m/s`).toBeLessThan(2.7);
       expect(o.maxAcc, `${t}: the hips' sharpest start or stop, m/s²`).toBeLessThan(8.5);
-      // (a step's swing at its quickest, a hand to its place at LIMB_SPEED with the hips moving too: measured up to 6.5)
-      expect(o.maxLimb, `${t}: the fastest hand or foot, m/s`).toBeLessThan(7);
+      // (a step's swing at its quickest, a hand to its place at LIMB_SPEED with the hips moving too: measured up to 4.4
+      // since a step's lift is held to twice LIMB_SPEED; its steep start threw a foot up at 7 m/s in a frame before)
+      expect(o.maxLimb, `${t}: the fastest hand or foot, m/s`).toBeLessThan(5);
       // (feet put down where a pose has them glide there, the last of it: measured up to 1.5 m a minute, 5.5 s of it faster
       // than 0.3 m/s in six minutes. To be brought down: they should step, not glide)
       expect(o.slide, `${t}: planted feet sliding, m a minute`).toBeLessThan(2);

@@ -2,7 +2,7 @@
  * Crew lab (dev only: npm run dev, then http://localhost:5173/scripts/check/crewlab/): one boat sailing with the real
  * physics in steady wind on flat water, and a camera you put anywhere around her crew. For checking the crew's seats,
  * paths and poses from both sides on both tacks (scripts/check/crew.cjs drives it).
- *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n? })  then lab.sail(seconds)
+ *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n?, pole?, sea? (pitch amplitude, rad) })  then lab.sail(seconds)
  *   lab.tack()  (starts a tack; then lab.sail(s) in small steps to see the crossing)
  *   lab.cam(yawDeg, pitchDeg, dist, [x, y, z] boat-frame target)  (yaw 0: from dead astern; 90: from starboard)
  *   lab.mesh()  (the boat's mesh, its crew figures in .crew: for finding which part of whom is where)
@@ -47,7 +47,8 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number }) {
+    (lab as any).seaA = o.sea ?? 0; // (pitching in a seaway: that many radians either way every 2.6 s, crew.ts rough)
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
     b.crew = newCrew({ helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) }, tack);
@@ -68,7 +69,7 @@ const lab = {
     render();
   },
   /** Sail `s` seconds drawing every frame, calling `shot(i)` every `every` frames (for sequences through a tack). */
-  frames(s: number) { const hold = (lab as any).hold; for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { if (hold != null && b.turnTarget == null && !b.tacking) b.h = hold; t += 1 / 60; }); syncBoatMesh(m!, b, t); } render(); },
+  frames(s: number) { const hold = (lab as any).hold; for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { if (hold != null && b.turnTarget == null && !b.tacking) b.h = hold; t += 1 / 60; }); const A = (lab as any).seaA; syncBoatMesh(m!, b, t, A ? { heave: 0, pitch: A * Math.sin(2 * Math.PI * t / 2.6), roll: 0 } : undefined); } render(); },
   tack() { (lab as any).hold = null; startTack(b); },
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */
