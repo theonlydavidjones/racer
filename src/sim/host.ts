@@ -138,6 +138,7 @@ export class LocalHost implements SimHost {
   rebuild(args: WorldArgs, mirror?: World): void {
     this.world = mirror && mirror.steps === 0 && !mirror.running ? mirror : new World(args.file, args.settings, args.seed, args.opts);
     this.view = this.guard ? guarded(this.world) : this.world; this.acc = 0;
+    this.coachRun = new CoachRun(); this.coachDt = 0; // (a new race, a fresh coach: its memory is of the old race's clock)
   }
   advance(dt: number, twa?: number): number {
     const w = this.world, t0 = performance.now(); this.coachDt += dt;

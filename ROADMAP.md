@@ -876,7 +876,10 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
   over-promises: in 7 kt, outhaul eased, it promised 1.47% and the boat paid 1.02%. In the first ~20 s of a lull the
   crew are still coming in off the rail, while the coach has them where they are, and it promises about twice what she
   gets. Find the terms the coach's speedFactor still lacks there (the crew's light-air placing, crewAndHeel below their
-  best heel; clothFill), and extend the test down to 5 kt and into the lull.
+  best heel; clothFill), and extend the test down to 5 kt and into the lull. Also: with old sails in 20 kt and the main
+  bar-tight, its fix (ease the main) pays only 62–72% of the promise; the crew's way back off their depowering steps is
+  only roughly foreseen (coach.ts speedFactor). And the coach's settle lacks the sea's drag, fouling and the weight
+  aboard, so in chop or on an old, heavy boat it under-promises by 1.3–2×.
 - ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-colored water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.

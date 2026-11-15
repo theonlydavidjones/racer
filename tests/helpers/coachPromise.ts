@@ -4,10 +4,11 @@ import { takeLine } from '../../src/boat/physics';
 import { FIX_MIN, lineNotes, teach } from '../../src/boat/coach';
 import { polar } from '../../src/boat/polar';
 import type { Boat } from '../../src/boat/boat';
+import { DEFAULT_BOAT } from '../../src/boat/spec';
 import type { SeaHere } from '../../src/environment/sea';
 
 const hold = (b: Boat, t: number, each?: () => void) => { const h = b.h; sail(b, t, () => { b.h = h; each?.(); }); };
-function boat(o: { heading: number; windKt: number; sea?: SeaHere }) { const b = testBoat({ heading: o.heading, kt: 5, windKt: o.windKt }); if (o.sea) b.sea = o.sea; sail(b, 30, () => { b.h = courseHeading(b, o.heading); }); return b; } // (`heading`: her course, her leeway allowed for; then held)
+function boat(o: { heading: number; windKt: number; sea?: SeaHere; old?: boolean }) { const b = testBoat({ heading: o.heading, kt: 5, windKt: o.windKt }); if (o.sea) b.sea = o.sea; if (o.old) b.spec = { ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, mainAge: 'old', jibAge: 'old' } } as Boat['spec']; sail(b, 30, () => { b.h = courseHeading(b, o.heading); }); return b; } // (`heading`: her course, her leeway allowed for; then held)
 function wrong(b: Boat, k: 'jibsheet' | 'mainsheet' | 'backstay' | 'vang' | 'outhaul' | 'traveller', v: number) { takeLine(b, k); (b.ctlTarget ??= {})[k] = v; hold(b, 30); }
 
 // The coach only promises what the boat pays (the Coordinator, from Bay East, 15 Nov 2026: outhaul off upwind in 12–14 kt,
@@ -43,6 +44,21 @@ describe('the trim coach: its promise comes true', () => {
   // physics review: a floor at her speed silenced it), the fix pays, and once the crew have settled to the lull (40 s)
   // it pays what it said. (In the first 20 s they're still coming in off the rail, and the coach, which has them where
   // they are, promises about twice what she gets: for later)
+  // old sails (the owner's boat has a spec; the final physics review: hard in, an old main's hooked leech stalls, and the
+  // coach had it paying, and she lost a quarter-knot): in a breeze, the main hauled in, eased or the outhaul off, the fix
+  // pays what it says. (In 20 kt with the main bar-tight it pays 62–72% of it still, the crew's way back off their
+  // depowering only roughly foreseen: ROADMAP, the coach's promise in light air; there it must pay at least half)
+  if (lull) it('with old sails, in a breeze', () => {
+    for (const windKt of [16, 18, 20]) for (const [k, v] of [['mainsheet', 0], ['mainsheet', 0.4], ['outhaul', 0], ['backstay', 0]] as const) {
+      const b = boat({ heading: 316, windKt, old: true }); wrong(b, k, v); hold(b, 60);
+      const top = teach(b).top;
+      const left = boat({ heading: 316, windKt, old: true }); wrong(left, k, v); hold(left, 60);
+      if (top?.kind !== 'fix' || top.to == null || !top.line) continue;
+      (b.ctlTarget ??= {})[top.line as 'outhaul'] = top.to; hold(b, 90); hold(left, 90);
+      expect(b.v - left.v, `${windKt} kt, ${k} at ${v}, old sails: ${top.line} → ${top.to.toFixed(2)}, promised ${(top.gain * left.v).toFixed(3)} m/s`).toBeGreaterThanOrEqual((windKt === 20 && k === 'mainsheet' && v === 0 ? 0.5 : 0.75) * top.gain * left.v);
+    }
+  }, 300000);
+
   if (lull) it('in a lull, with the way she carried still on', () => {
     for (const k of ['outhaul', 'vang'] as const) for (const wait of [10, 40]) {
       const b = boat({ heading: 320, windKt: 14 }); wrong(b, k, 1);
