@@ -92,7 +92,9 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   A session's full `npm test` may run as two halves: correctness, `npx vitest run --exclude tests/perf.test.ts`, which
   may run beside another session's (at most two at once); and the timing, `npx vitest run tests/perf.test.ts` (and any
   perf-pair, perf-ab or deopt), only in a quiet slot from Capacity, one at a time. A correctness failure under load is
-  rerun alone before it's called a load timeout. The PR says both halves passed: "full npm test: correctness (under
+  rerun alone before it's called a load timeout. Each session is its own VM of 4 vCPUs (`uptime`'s load is that
+  VM's own; other sessions reach it only as CPU steal): run one vitest process at a time in it, never two suites side by
+  side (Deep Physics, 15 Nov: two at once took 85 minutes and timed out 24 tests). The PR says both halves passed: "full npm test: correctness (under
   load) + perf.test (quiet slot)". The Coordinator's batch runs stay whole, on a quiet host.
 - How the Coordinator tests a batch (the owner, 13 Nov 2026): test:fast first on the merged batch (fail fast), then the
   tier the batch needs. A batch touching src/boat, src/environment, src/sim, src/ai, src/rules, src/core, tests or the
