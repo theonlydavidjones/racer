@@ -58,3 +58,9 @@ NOW items, who has them:
 - Paddle: fatigue by fitness (Crew Model, after the crew chain); ‹ PADDLE › arrows (Crew Controls).
 - Fort Mason Center lettering (8n.6): waits on the owner's photo or the photo sites.
 Morning for the owner: v197 live, stills for the Tools tray, the start-drill screen, the chart expand.
+
+## Lighter models (owner, 15 Nov 2026: "switch to lighter models for sessions that can still be effective with them")
+When one of these finishes its current item, archive it and start its successor on claude-sonnet-5-5 with a handoff
+prompt (its branch, its queue, the rules): Crew Art, Boat Detail, Crew Controls, Marinas, Debrief, Charts, Rigging,
+UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, Rules, Skipper Model, Crew Model,
+Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
