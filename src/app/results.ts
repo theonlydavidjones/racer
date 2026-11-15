@@ -6,7 +6,7 @@ import { place } from '../sim/places';
 import { keepGhost, setupKey, trackOf } from '../replay/ghost';
 import { addLog, type LogEntry, type RaceSetup } from '../boat/logbook';
 import { saveSettings } from '../settings';
-import { localDay } from '../boat/spec';
+import { LAY_UP, localDay } from '../boat/spec';
 import { slipById, slipPlace } from '../geo/marina';
 import { type BoatSpec } from '../boat/spec';
 import { tactics, type Tactics } from '../replay/tactics';
@@ -222,7 +222,7 @@ function hurtOf(): Partial<LogEntry> {
  * (ESTIMATES: WRECK_DAYS, DAMAGE_DAYS). No money. Once per outing, whether or not it's kept in her logbook. */
 const WRECK_DAYS = 3, DAMAGE_DAYS = 1, laidUp = new WeakSet<object>();
 function layUp(): void {
-  const w = app.w; if (!w || laidUp.has(w)) return;
+  const w = app.w; if (!LAY_UP || !w || laidUp.has(w)) return; // (off for now: boat/spec.ts LAY_UP)
   const h = hurtOf(), days = h.wreck ? WRECK_DAYS : h.damage ? DAMAGE_DAYS : 0; if (!days) return;
   laidUp.add(w);
   const until = localDay(days - 1); // (laid up today and the days after it: 3 days is today and the next two)
