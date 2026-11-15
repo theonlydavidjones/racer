@@ -570,6 +570,17 @@ What's planned, roughly in order. Done work is described in the README.
      posts). Nothing from St. Francis YC, GGYC or US Sailing yet, and no sourced committee-habit claim, so the strategist
      says none of it as fact until better sources (the clubs' race and sailing-instruction pages; latitude38.com is
      blocked here) are read.
+   - **Jibe-ho: a confirmation, a reachable key, and how to use it** (owner, 15 November; polish; now; 1–2 h): "I need to
+     see some kind of confirmation when I call jibe ho during a jibe. and the shift-j command is too hard. those keys are
+     too far away from each other. need a better option, clearer instructions on how to use it." Today turnHo is
+     Shift+J (src/ui/keys.ts:73; app.ts:1223 sends {k:'turn'}), J is also the jib halyard, and nothing shows the call
+     was made. Wanted:
+     - The confirmation: the call itself, seen and heard where she's looking: the crew's "Ready to jibe" … "Jibe-ho"
+       (or "Ready about" … "Helm's a-lee") as a brief call by the helm, and the crew visibly moving to it.
+     - The key: one key near the steering hand (A/D). Space is free; ask the owner before choosing, and keep it
+       rebindable in Keys.
+     - The how-to: no copy block; at most one short chip at the moment it's useful (bearing away toward a run, or
+       close-hauled before a tack), e.g. "Space · jibe-ho", fading once she's used it a few times.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
