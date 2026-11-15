@@ -70,7 +70,7 @@ export type Command =
   | { k: 'pilot'; op: 'tack' }
   | { k: 'pilot'; op: 'adjust'; d: number }
   /** The outboard. */
-  | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' }
+  | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' | 'stow' }
   | { k: 'motor'; op: 'start'; retireFirst: boolean }
   | { k: 'motor'; op: 'gear'; gear: 'F' | 'N' | 'R' }
   | { k: 'motor'; op: 'throttle'; v: number }
@@ -148,6 +148,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       if (c.op === 'tilt') w.motorTilt();
       else if (c.op === 'stop') w.motorStop();
       else if (c.op === 'swivel') w.motorSwivel();
+      else if (c.op === 'stow') w.motorStow();
       else if (c.op === 'start') return w.motorStart(c.retireFirst);
       else if (c.op === 'gear') w.motorGear(c.gear);
       else if (c.op === 'throttle') w.motorThrottle(c.v);

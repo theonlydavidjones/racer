@@ -65,7 +65,20 @@ export interface MotorState {
   pulling?: { left: number; catches: boolean };
   /** it's run already this sail: a warm motor starts more readily */
   warm?: boolean;
+  /** off its bracket, in the lazarette (the owner: Folkboat outboards sit on a sliding bracket on the after deck, slid off
+   * it to stow below). Stowed or on its way, it's tilted up, stopped, in neutral: no leg in the water, no thrust */
+  stowed?: boolean;
+  /** the crew sliding it off the bracket and below (to 'stowed'), or up and back on (to 'bracket'): seconds left, of how long */
+  shifting?: { to: 'stowed' | 'bracket'; left: number; of: number };
 }
+/**
+ * The crew's time to stow it and to ship it again: ESTIMATES, nothing published. Stowing is the fuel cock shut and the
+ * tank vent closed, the safety lanyard and the two clamp screws off, an 18 kg motor (the 3.5, OUTBOARDS) lifted off the
+ * bracket and over the after deck, laid in the lazarette on its proper side (a four-stroke laid down must lie as its
+ * maker says), the hatch shut: about 45 s for a crew who've done it before. Shipping is the reverse, lining the clamps up
+ * on the bracket's board and screwing them down, about a minute. A slower crewmate takes longer (workPace).
+ */
+export const MOTOR_STOW_S = 45, MOTOR_SHIP_S = 60;
 
 /** The prop's static thrust at full power (N), from momentum theory and the figure of merit. */
 export function staticThrust(o: Outboard): number {
