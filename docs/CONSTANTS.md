@@ -619,22 +619,23 @@ physics, ranked like the ten above:
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| FINE.step | 1 min | 40 | estimate | a front each minute (100–200 m at her speeds). Settled by convergence (Deep Physics, V2): ten passages against {30 s, 2.5°, 0.5°}, nine within 1.6%, all ten on the same side |
-| FINE.heading | 5° | 40 | estimate | the heading fan's spacing, plus her exact beat and run angles and the crab to the mark; same check |
-| FINE.sector | 1° | 40 | estimate | how finely the front is kept round the start; at 2° light-air cases lost the way round a point (Crissy Field to Belvedere, 6 kt: 332 min against 66); same check |
-| COARSE | 2 min, 10°, 4° | 40 | numerical | quick looks only; its minutes can be out by half |
-| SHORE | 50 m | 29 | estimate | how close a plan takes her to the shore: seamanship for a learner with no depths in the model (Deep Physics, S2). The owner's case: 65.4 min at 50 m, 65.2 at 20 m. Settled by charted depths along the shore |
-| STALL | 10 min | 147 | estimate | a front no nearer the mark for this long asks the rules (sailLeg) for a time to beat, and searches on |
-| OPTIMISTIC | 15 kt | 34 | estimate | an upper bound on her speed over the ground (8 kt boat, 7 kt tide, above SFB1201's 6.7 kt constituent sum): the time-to-beat pruning never drops a winner |
-| tail slack | max(2 min, 3%) | 227 | estimate | the laid last board replaces the router's when within this: what the 5° fan and the minute can be out by |
+| FINE.step | 1 min | 45 | estimate | a front each minute (100–200 m at her speeds). Settled by convergence (Deep Physics, V2): ten passages against {30 s, 2.5°, 0.5°}, nine within 1.6%, all ten on the same side |
+| FINE.heading | 5° | 45 | estimate | the heading fan's spacing, plus her exact beat and run angles and the crab to the mark; same check |
+| FINE.sector | 1° | 45 | estimate | how finely the front is kept round the start; at 2° light-air cases lost the way round a point (Crissy Field to Belvedere, 6 kt: 332 min against 66); same check |
+| COARSE | 2 min, 10°, 4° | 45 | numerical | quick looks only; its minutes can be out by half |
+| SHORE | 50 m | 30 | estimate | how close a plan takes her to the shore: seamanship for a learner with no depths in the model (Deep Physics, S2). The owner's case: 65.4 min at 50 m, 65.2 at 20 m. Settled by charted depths along the shore |
+| STALL | 10 min | 191 | estimate | a front no nearer the mark for this long asks the rules (sailLeg) for a time to beat, and searches on |
+| WHARF_CLEAR | 20 m | 34 | estimate | how close a plan takes her to a pier, wharf, breakwater or dock: a man-made face with known depth, closer than a natural shore (the owner ran into an Embarcadero pier; the Coordinator, 15 Nov 2026) |
+| OPTIMISTIC | 15 kt | 39 | estimate | an upper bound on her speed over the ground (8 kt boat, 7 kt tide, above SFB1201's 6.7 kt constituent sum): the time-to-beat pruning never drops a winner |
+| tail slack | max(2 min, 3%) | 271 | estimate | the laid last board replaces the router's when within this: what the 5° fan and the minute can be out by |
 
 ### src/sim/navigator.ts (router, 15 Nov 2026)
 
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
-| direct cap | 4 × straight line at 2 kn, 20–360 min | 68 | estimate | when the direct router gives up before trying stretch by stretch round the land |
-| LIVE_M, LIVE_MIN | 150 m, 2 min | 139 | numerical | how often the page's live plan is worked out again |
-| SLICE_MS, TICK_MS | 2 ms per 16 ms | 175 | design | the background plan's share of the page's thread (an eighth of a 60 fps frame; Capacity's budget) |
+| direct cap | 4 × straight line at 2 kn, 20–360 min | 72 | estimate | when the direct router gives up before trying stretch by stretch round the land |
+| LIVE_M, LIVE_MIN | 150 m, 2 min | 143 | numerical | how often the page's live plan is worked out again |
+| SLICE_MS, TICK_MS | 2 ms per 16 ms | 187 | design | the background plan's share of the page's thread (an eighth of a 60 fps frame; Capacity's budget) |
 
 ### src/sim/outlook.ts (router, 15 Nov 2026)
 

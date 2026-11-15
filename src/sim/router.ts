@@ -3,7 +3,8 @@ import { beatAngle, runAngle } from '../boat/polar';
 import { speedInChop } from '../boat/seaway';
 import { landDist, manoeuvreS, sailLegSteps, type SailResult, type LegKind } from './routing';
 import type { Outlook } from './outlook';
-import { anyShoreDist, landAlong, landDist as terrainLandDist, limePointBox } from '../geo/shore';
+import { anyShoreDist, landAlong, landDist as terrainLandDist, limePointBox, wharfNearest } from '../geo/shore';
+import { HARBORS, harborNear, hitsHarbor, inBasin } from '../geo/marina';
 import { LL } from '../geo/geo';
 
 /**
@@ -27,6 +28,10 @@ import { LL } from '../geo/geo';
  * 65.2 at 20 m. Nearer than this only while she isn't closing the shore (leaving a berth or a shore she started by), and
  * by the mark as near as the mark is. */
 const SHORE = 50;
+/** How close to a pier, a wharf, a breakwater or a dock a plan takes her (m), an estimate: a man-made face with known
+ * depth alongside, closer than a natural shore, and still four lengths off its end (the owner ran into an Embarcadero
+ * pier the navigator hadn't seen: the Coordinator, 15 Nov 2026). Nearer only leaving one she started by, and by the mark. */
+const WHARF_CLEAR = 20;
 /** The fastest she could possibly go over the ground (m/s): 8 kt through the water, above a Folkboat's best off the wind
  * (hull speed about 6 kt on her 6 m waterline), and 7 kt of tide, above the strongest the sim's currents can run (NOAA's
  * constituents at SFB1201, the Bay's entrance, add up to 6.7 kt: environment/data/sf-currents.json). An upper bound on
@@ -94,19 +99,58 @@ function nearCell(p: Vec): number {
  * length and SHORE (and a cell's error), no point of it is nearer; otherwise looked at every 25 m. */
 function clear(p: Vec, q: Vec, mark: Vec, arrive: number): boolean {
   const L = dist(p, q), m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
-  if (landNear(m) > L / 2 + SHORE + 100) return true; // (no land within reach of any point of it, by the coarse reading)
+  // (the terrain has no piers in it: an Embarcadero pier reaches 250 m out from a shore the terrain puts far off, so the
+  // structures are looked for as well before a segment is passed as clear without the exact test)
+  const built = structuresNear(m, L / 2 + WHARF_CLEAR + 10);
+  if (!built && landNear(m) > L / 2 + SHORE + 100) return true; // (no land within reach of any point of it, by the coarse reading)
   if (landAlong(p, q) !== Infinity) return false; // (exact: nothing, however narrow, slips through: a breakwater, a pier)
   const n = Math.max(1, Math.ceil(L / 10));
-  let d0 = NaN;
+  let d0 = NaN, w0 = NaN;
   for (let k = 1; k <= n; k++) {
     const x = { x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n };
-    if (landNear(x) >= SHORE + 50 || dist(x, mark) < SHORE + arrive) continue; // (by the mark she goes as near as it is)
-    const d = shoreNear(x);
-    if (d >= SHORE) continue;
-    if (d0 !== d0) d0 = shoreNear(p);
-    if (d < d0 - 2) return false; // (nearer than SHORE and closing it: only leaving a berth or a shore she started by)
+    if (dist(x, mark) < SHORE + arrive) continue; // (by the mark she goes as near as it is)
+    if (landNear(x) < SHORE + 50) {
+      const d = shoreNear(x);
+      if (d < SHORE) {
+        if (d0 !== d0) d0 = shoreNear(p);
+        if (d < d0 - 2) return false; // (nearer than SHORE and closing it: only leaving a berth or a shore she started by)
+      }
+    }
+    if (built) {
+      const dw = structureDist(x);
+      if (dw < WHARF_CLEAR) {
+        if (w0 !== w0) w0 = structureDist(p);
+        if (dw < w0 - 2) return false; // (the same for a pier, a wharf, a breakwater or a dock: WHARF_CLEAR)
+      }
+    }
   }
   return true;
+}
+/** Any pier, wharf, breakwater or dock within r of p (the chart's own: geo/shore.ts's wharves and piers, the marinas'). */
+function structuresNear(p: Vec, r: number): boolean {
+  if (wharfNearest(p, r) !== null) return true;
+  for (const H of HARBORS) if (p.x > H.reach.x0 - r && p.x < H.reach.x1 + r && p.y > H.reach.y0 - r && p.y < H.reach.y1 + r) return true;
+  return false;
+}
+/** How far p is from the nearest structure, up to WHARF_CLEAR (Infinity beyond): a wharf or pier exactly; a marina's
+ * breakwaters and docks by looking round p at 5 m steps out to WHARF_CLEAR (her basin itself counts as 0: the way in
+ * and out of a marina is the marina's own, not the passage's). */
+function structureDist(p: Vec): number {
+  let d = wharfNearest(p, WHARF_CLEAR)?.d ?? Infinity;
+  const H = harborNear(p) ?? HARBORS.find(h => p.x > h.reach.x0 - WHARF_CLEAR && p.x < h.reach.x1 + WHARF_CLEAR && p.y > h.reach.y0 - WHARF_CLEAR && p.y < h.reach.y1 + WHARF_CLEAR);
+  if (H) {
+    if (inBasin(p)) return 0;
+    for (let r = 5; r <= WHARF_CLEAR && r < d; r += 5) for (let k = 0; k < 12; k++) {
+      const t = k * Math.PI / 6;
+      if (hitsHarbor({ x: p.x + Math.sin(t) * r, y: p.y + Math.cos(t) * r })) { d = Math.min(d, r); break; }
+    }
+  }
+  return d;
+}
+/** Does a track cross anything a boat runs aground on, segment by segment (exactly: geo/shore.ts landAlong)? */
+export function trackCrosses(track: { p: Vec }[]): boolean {
+  for (let k = 1; k < track.length; k++) if (landAlong(track[k - 1].p, track[k].p) !== Infinity) return true;
+  return false;
 }
 
 /**
@@ -203,7 +247,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     if (dk < nearD - 10) { nearD = dk; nearStep = step; }
     else if ((step - nearStep) * STEP_MIN >= STALL) {
       const n = nodes[k], r = yield* sailLegSteps(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
-      if (r.ok && (!bound || n.t + r.minutes < bound.t)) bound = { k, r, t: n.t + r.minutes };
+      if (r.ok && (!bound || n.t + r.minutes < bound.t) && !trackCrosses(r.path)) bound = { k, r, t: n.t + r.minutes }; // (the rules sample every 10 s: a pier can slip between)
       nearStep = step; // (and tries again after another stall, from wherever the front has got to)
     }
     yield;
@@ -229,7 +273,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     if (ok && !rescue) find: for (const li of turnsAt) for (const plan of ['middle', 'left', 'right'] as const) {
       // (left starts on starboard, right on port, looking up the wind: whichever lays it on one board)
       const from = chain[li - 1], r = yield* sailLegSteps(o, from.p, b, from.t, plan, undefined, arrive, 90);
-      if (r.ok && r.turns.length <= 1 && from.t + r.minutes <= endT + slack) { tail = r; tailKind = chain[li].turn as 'tack' | 'gybe'; chain = chain.slice(0, li); break find; }
+      if (r.ok && r.turns.length <= 1 && from.t + r.minutes <= endT + slack && !trackCrosses(r.path)) { tail = r; tailKind = chain[li].turn as 'tack' | 'gybe'; chain = chain.slice(0, li); break find; }
     }
     // (a point every half step: the drawn track's points are no farther apart than a boat sails in 30 s)
     const path: { p: Vec; t: number }[] = [];

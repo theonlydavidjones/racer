@@ -6,9 +6,10 @@ import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
 import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
-import { FINE, routeLegSteps, type Grain } from './router';
+import { FINE, routeLegSteps, trackCrosses, type Grain } from './router';
 import { groundLaylines, landDist, routeAroundSteps, sailLegSteps, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
+import { harborAt } from '../geo/marina';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
 /**
@@ -38,8 +39,11 @@ function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { o
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
   for (let i = 1; i < route.length; i++) {
     const arrive = i === route.length - 1 ? 30 : 120;
-    let r = yield* sailLegSteps(o, at, route[i], tt, 'middle', undefined, arrive, 360);
-    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) { const q = yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360); if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q; }
+    // (each plan's track checked segment by segment against everything she'd run aground on: the rules sail in 10 s
+    // steps, ~30 m, and a pier can lie between two of them)
+    const sound = (q: SailResult): SailResult => q.ok && trackCrosses(q.path) ? { ...q, ok: false, why: 'land' } : q;
+    let r = sound(yield* sailLegSteps(o, at, route[i], tt, 'middle', undefined, arrive, 360));
+    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) { const q = sound(yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360)); if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q; }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; }
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
@@ -80,7 +84,7 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
     // (the router couldn't: the old rules, up the middle, then the long board first to one side or the other)
     if (!r.ok) for (const pl of ['middle', 'left', 'right'] as const) {
       const q = yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360);
-      if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q;
+      if (q.ok && !trackCrosses(q.path) && (!r.ok || q.minutes < r.minutes)) r = q;
     }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
@@ -138,12 +142,20 @@ function nowKey(w: SimView, cell = 25, every = 1): { key: string; refs: unknown[
  * seconds of the page's spare time, and the passage doesn't change in less). */
 const LIVE_M = 150, LIVE_MIN = 2;
 const fresh = (m: { key: string; refs: unknown[] } | undefined, k: { key: string; refs: unknown[] }) => !!m && m.key === k.key && m.refs.every((r, i) => r === k.refs[i]);
+/** A place inside a marina's basin, for the passage: the marina's entrance nearest it (the middle of the way in). The
+ * way between the entrance and her slip, round the docks and along the fairways, is the marina's own (ROADMAP 8m2,
+ * Marinas), not the passage's. */
+function outOfBasin(p: Vec): Vec {
+  const H = harborAt(p); if (!H || !H.exits.length) return p;
+  let e = H.exits[0]; for (const x of H.exits) if (dist(x, p) < dist(e, p)) e = x;
+  return { ...e };
+}
 function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> {
   const dest = w.dest; if (!dest) return null;
-  const u = w.user, t0 = w.clockUtc, from = { x: u.x, y: u.y };
+  const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
   const o = outlookFor(w);
   yield;
-  const route = yield* routeAroundSteps(from, dest.p);
+  const route = yield* routeAroundSteps(from, to);
   const r = yield* passageSteps(o, route, t0);
   const sailedM = r.track.slice(1).reduce((a, q, i) => a + dist(r.track[i].p, q.p), 0);
   const turns = r.legs.flatMap(l => l.turns), last = r.legs[r.legs.length - 1];
@@ -151,7 +163,7 @@ function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> 
   // (the laylines she tacked or gybed onto: the wind and the current where and when she made her last turn, which is
   // where she saw she'd lay the mark; with no turn on the last stretch, those at the mark when she gets there)
   const lt = last?.turns[last.turns.length - 1], ltT = lt ? r.track.find(q => dist(q.p, lt.p) < 1)?.t : undefined;
-  const laylines = lk && r.ok ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : dest.p, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
+  const laylines = lk && r.ok ? { kind: lk, tracks: groundLaylines(o, lt && ltT != null ? lt.p : to, lt && ltT != null ? ltT : t0 + r.minutes, lk) } : null;
   return { route, track: r.track, ok: r.ok, why: r.why, minutes: r.minutes, legs: r.legs, sailedM,
     tacks: turns.filter(q => q.kind === 'tack').map(q => q.p), gybes: turns.filter(q => q.kind === 'gybe').map(q => q.p),
     laylines, leave: t0, eta: r.ok ? t0 + r.minutes : null };
@@ -219,7 +231,7 @@ export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => vo
 function* passagePlanSteps(w: SimView): Generator<void, PassagePlan | null, void> {
   const dest = w.dest; if (!dest) return null;
   const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
-  const from = { x: u.x, y: u.y }, to = dest.p;
+  const from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
   // (the same passage the chart and the setup show: passageNow)
   const k = nowKey(w)!, m = nowMemo.get(w), pn = fresh(m, k) ? m!.v : (yield* passageNowSteps(w))!, route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
