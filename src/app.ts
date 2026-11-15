@@ -1309,6 +1309,10 @@ function frame(now: number): void {
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   boatLesson.tick();
+  // (in the showroom she's shown once the race has stepped: until the worker's first answer the page's copy of the race is
+  // the cold one, her sheets still eased, and she'd flash so before the settled trim arrives: sim/world.ts idle)
+  const um = view.userMesh;
+  if (um) um.grp.visible = !showing || w.steps > 0;
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else if (boatLesson.on) { look.shift = 0; view.render(w, dt, now, 3, look, over); } // (lesson 1: her on show, the whole view hers)
   else view.render(w, dt, now, viewMode, look, over);
