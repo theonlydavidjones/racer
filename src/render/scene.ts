@@ -396,6 +396,8 @@ export class SceneView {
   private markObjs: { p: { x: number; y: number }; float: THREE.Object3D; wake: THREE.Mesh; fixed?: boolean }[] = [];
   private wakeTex: THREE.CanvasTexture | null = null;
   private seaAcc = 0;
+  /** The sea map being worked out, a row a step (seaMapSteps), while the last one is still drawn. */
+  private seaJob: Generator<void, void> | null = null;
   /** Sea map: wind-sea and swell scale and whitecaps on a coarse grid (refreshed every 2 s), sampled into the wind map. */
   private seaGrid: { x0: number; y0: number; cell: number; v: Float32Array } | null = null;
   /** The land (real terrain), once it has loaded, and the month to colour it for. */
@@ -541,7 +543,7 @@ export class SceneView {
   private readonly farCam = new THREE.Vector3();
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
-    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
     // the ripples start lying across this race's wind (turning the drifted texture into place would sweep it past at speed)
     this.ripAngle = -w.windModel.base * D2R; this.wtex.offset.set(0, 0);
 
@@ -616,7 +618,7 @@ export class SceneView {
   refreshCourse(w: SimView): void { this.buildCourse(w); }
   /** New conditions mid-sail (SimView.applyConditions): the swell's period, and the wind's drawings (puffs, ripples, laylines, sea) worked out afresh. */
   conditionsChanged(w: SimView): void {
-    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
+    this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99; this.seaJob = null;
     this.ripAngle = -w.windModel.base * D2R; // (the ripples lie across the new wind at once, not swept round to it)
 
     // the lee of the land in the puffs' shading, for the new wind's direction
@@ -698,17 +700,27 @@ export class SceneView {
   }
 
   /** The sea map: how big the chop and swell are around `at`, against the wave field's reference sea (as each boat's are), and the whitecaps. */
-  private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void {
+  private updateSeaMap(w: SimView, at: { x: number; y: number }, span: number): void { const g = this.seaMapSteps(w, at, span); while (!g.next().done); }
+  /**
+   * The sea map's work, a row at a time (yielding after each): the whole map was some 3,700 sea and current lookups at
+   * once every 2 s, a long frame each time (about 25–30 ms on the owner's Mac). Worked out over the frames that follow
+   * instead (frame(): about 1.5 ms of it a frame), into its own arrays, and the map and the current's texture both
+   * changed only once it's all done, so what's drawn is never half old and half new.
+   */
+  private *seaMapSteps(w: SimView, at: { x: number; y: number }, span: number): Generator<void, void> {
     const cell = span / (SEA_N - 1), x0 = at.x - span / 2, y0 = at.y - span / 2, v = new Float32Array(SEA_N * SEA_N * 3);
-    for (let j = 0; j < SEA_N; j++) for (let i = 0; i < SEA_N; i++) {
-      const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
-      const k = w.waves.scaleFor(s); v[o] = k.kW; v[o + 1] = k.kS; v[o + 2] = s.white;
+    for (let j = 0; j < SEA_N; j++) {
+      for (let i = 0; i < SEA_N; i++) {
+        const s = w.seaHere({ x: x0 + i * cell, y: y0 + j * cell }), o = (j * SEA_N + i) * 3;
+        const k = w.waves.scaleFor(s); v[o] = k.kW; v[o + 1] = k.kS; v[o + 2] = s.white;
+      }
+      yield;
     }
-    this.seaGrid = { x0, y0, cell, v };
     // the current, and where it converges (tidelines): convergence = −div(current), shown above ~3e-4 /s
     const cc = span / (CUR_N - 1), cx0 = Math.round((at.x - span / 2) / cc) * cc, cy0 = Math.round((at.y - span / 2) / cc) * cc, // (on its own grid, so a sharp edge in the current doesn't slide between updates)
       U = new Float32Array(CUR_N * CUR_N * 2);
-    for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) { const c = w.currentDrawn({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; }
+    for (let j = 0; j < CUR_N; j++) { for (let i = 0; i < CUR_N; i++) { const c = w.currentDrawn({ x: cx0 + i * cc, y: cy0 + j * cc }); U[(j * CUR_N + i) * 2] = c.x; U[(j * CUR_N + i) * 2 + 1] = c.y; } yield; }
+    this.seaGrid = { x0, y0, cell, v };
     const d = this.curData, at2 = (i: number, j: number, k: number) => U[(Math.min(CUR_N - 1, Math.max(0, j)) * CUR_N + Math.min(CUR_N - 1, Math.max(0, i))) * 2 + k];
     for (let j = 0; j < CUR_N; j++) for (let i = 0; i < CUR_N; i++) {
       const o = (j * CUR_N + i) * 4, conv = -((at2(i + 1, j, 0) - at2(i - 1, j, 0)) + (at2(i, j + 1, 1) - at2(i, j - 1, 1))) / (2 * cc);
@@ -929,10 +941,11 @@ export class SceneView {
     // the waves: heights for the sea where you are, then the sea map around you (every 2 s)
     const focus = viewMode === 2 ? { x: w.user.x + over.off.x, y: w.user.y + over.off.y } : w.user;
     this.seaAcc += dt;
-    if (!this.seaRef || this.seaAcc > 2) {
-      this.seaAcc = 0; this.seaRef = w.seaHere(focus);
+    if (!this.seaRef) { // (the first: all at once, so the first frame's sea is right)
+      this.seaAcc = 0; this.seaRef = w.seaHere(focus); this.seaJob = null;
       this.updateSeaMap(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN);
-    }
+    } else if (this.seaAcc > 2) { this.seaAcc = 0; this.seaRef = w.seaHere(focus); this.seaJob = this.seaMapSteps(w, focus, viewMode === 2 ? Math.max(PUFF_SPAN, over.height * 2.6) : PUFF_SPAN); }
+    if (this.seaJob) { const t0 = performance.now(); do { if (this.seaJob.next().done) { this.seaJob = null; break; } } while (performance.now() - t0 < 1.5); }
     const tw = waveTime(w.t); // wave time: the sim's clock, so the waves pause, speed up and replay with it
     const waves = w.waves; // (the World's own field, the one the boats heave and pitch on: environment/waveField.ts)
     // (the phases at a local origin by the camera, on a 500 m grid so it moves seldom: render/waves.ts packWaves)
