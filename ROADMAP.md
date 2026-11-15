@@ -384,6 +384,10 @@ What's planned, roughly in order. Done work is described in the README.
      up the crew won't leave the rail to set the lazy jib car (crewWork.ts carJob: not while she needs their weight), so
      after a change of breeze she sails the next tack on the old car. Arguably right: a good crew stays hiked and sets
      the car later, in a lull or before the tack. Left as it is until a source or the owner says otherwise.
+   - To look at (Crew Model, 15 November; from the crew chain against batch 43's land lee): an AI crew kept the pole up
+     until 108° true as she hardened up from a run to a reach, so the forward hand dropped it, walked aft and trimmed
+     the jib in one move. A crew would drop the pole earlier as she comes up, about where it stops helping the jib
+     (ai.ts poleRefused sets it at 145°). Check where it comes down.
 8x. ~~**URGENT — the whole new release stutters**~~ (fixed on main: each boat's fixed parts merged into one mesh per material, the hull in three levels of detail, small parts culled, fewer shader programs, page writes only on change, triangles back to v186's; a frame-time release gate, perf-ab.cjs, and the F9 frame-time readout) (regression, performance; owner, 14 November): "the whole new release is
    moving very, very slow. whitecaps on the water are stuttering. everything is stuttering." The boat editor's slowness
    (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare

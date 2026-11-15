@@ -544,6 +544,13 @@ run time. So **new per-step work goes behind one cheap test, in a method of its 
 PR that adds lines to World.step runs perf-pair even when the lines look free. (A profile of a bundled build didn't
 show this cost; one of the trees loaded as perf-pair loads them, by vite's runnerImport, did.)
 
+**The crew's state is built whole, as the Boat is** (the crew chain, 15 Nov 2026). CrewState's optional fields given
+mid-race, in a different order on each boat, made every read of them polymorphic: crewPhys.ts newCrew now declares all
+of them, undefined until given, as makeBoat does the Boat's. With that, and the together-set worked once with the worth
+(physics.ts `crewTogether`) rather than in each pick, the chain (3056411f, against main 5969fedd, Capacity's VM) went
+from 1.0148 to **1.0053** on the default race (12 ratios) and from 1.0193 to **1.0042** on `--ai` (ten races), the race
+bit-identical. A new field on CrewState (or on Aboard, a person aboard) goes in newCrew's literal.
+
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
 v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):
