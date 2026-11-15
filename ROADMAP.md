@@ -307,6 +307,12 @@ What's planned, roughly in order. Done work is described in the README.
    6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
+8za. **Start practice teaches picking the favored end** (owner, 15 November: "start practice also needs to help me learn how
+   to pick the favored side. don't just tell me."; Debrief; design first): the player works it out the way sailors do,
+   then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
+   favored end), sighting the line square to the wind, and the line's compass bearing against the wind's. The drill hides
+   "favored" until the player commits to an end; the debrief scores the call; later attempts fade the help. A mock to
+   the owner before building.
 8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
@@ -592,11 +598,11 @@ What's planned, roughly in order. Done work is described in the README.
      same way.
    - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
-     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
+     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and jibes whenever she's
      more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
-     gybe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
-     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored gybe and use the
-     current, and never draw a track going backward. Fix: choose the angle and the gybes by speed made good over the
+     jibe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
+     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored jibe and use the
+     current, and never draw a track going backward. Fix: choose the angle and the jibes by speed made good over the
      ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
      changing the design). The AI's own leg planning shares sailLeg: check it too.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
