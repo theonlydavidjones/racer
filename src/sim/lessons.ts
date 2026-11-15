@@ -94,7 +94,7 @@ export const LESSON_MARKS = {
 /** Each lesson's first cue. */
 const FIRST: Record<LessonId, string> = {
   boat: '', tiller: 'Steer for the buoy', points: '', irons: 'Come up to a close reach by the buoy, and ease both sheets to stop',
-  tacking: '"Ready about" … "Hard alee": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
+  tacking: '"Ready about" … "Tacking!": tack (0 of 3)', jibing: 'Bear away to a run. "Ready to jibe" … "Jibe-ho" (0 of 3)', heaveto: 'Heave to: haul the jib to windward, tiller to leeward',
   mob: 'Sail a beam reach', breeze: 'Take the mainsheet: it\'s blowing 15', case: 'Sail it without breaking a rule', home: 'Push off and sail out of the harbor', before: 'Check her over and leave a float plan'
 };
 
@@ -270,7 +270,7 @@ export class LessonTracker {
     this.progress = this.good / LESSON_MARKS.turns;
     if (this.good >= LESSON_MARKS.turns) { this.passed = true; return; }
     // (the helm's commands, as ASA 101 teaches them, its knowledge 5)
-    this.cue = kind === 'tack' ? `"Ready about" … "Hard alee": tack (${this.good} of ${LESSON_MARKS.turns})` : `Bear away to a run. "Ready to jibe" … "Jibe-ho" (${this.good} of ${LESSON_MARKS.turns})`;
+    this.cue = kind === 'tack' ? `"Ready about" … "Tacking!": tack (${this.good} of ${LESSON_MARKS.turns})` : `Bear away to a run. "Ready to jibe" … "Jibe-ho" (${this.good} of ${LESSON_MARKS.turns})`;
   }
 
   private heaveTo(b: Boat, dt: number): void {
