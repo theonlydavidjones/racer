@@ -127,11 +127,14 @@ export interface PassageNow {
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
 /** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause
  * menu, World.applyConditions, they're new objects). */
-function nowKey(w: SimView): { key: string; refs: unknown[] } | null {
+function nowKey(w: SimView, cell = 25, every = 1): { key: string; refs: unknown[] } | null {
   const dest = w.dest; if (!dest) return null;
   const u = w.user, t0 = w.clockUtc;
-  return { key: `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / 25)},${Math.round(u.y / 25)}|${Math.floor(t0)}`, refs: [w.weather, w.tide, w.windModel, w.sea] };
+  return { key: `${Math.round(dest.p.x)},${Math.round(dest.p.y)}|${Math.round(u.x / cell)},${Math.round(u.y / cell)}|${Math.floor(t0 / every)}|${cell}`, refs: [w.weather, w.tide, w.windModel, w.sea] };
 }
+/** The page's live plan is worked out again each LIVE_M m she sails or LIVE_MIN minutes of the clock (a plan takes a few
+ * seconds of the page's spare time, and the passage doesn't change in less). */
+const LIVE_M = 150, LIVE_MIN = 2;
 const fresh = (m: { key: string; refs: unknown[] } | undefined, k: { key: string; refs: unknown[] }) => !!m && m.key === k.key && m.refs.every((r, i) => r === k.refs[i]);
 function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> {
   const dest = w.dest; if (!dest) return null;
@@ -163,9 +166,10 @@ export function passageNow(w: SimView): PassageNow | null {
  * draws only on demand: the setup's tide graph).
  */
 const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<void, PassageNow | null, void>; ready?: () => void }>();
-const SLICE_MS = 6;
+/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (a quarter of a 60 fps frame). */
+const SLICE_MS = 4, TICK_MS = 16;
 export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
-  const k = nowKey(w); if (!k) return null;
+  const k = nowKey(w, LIVE_M, LIVE_MIN); if (!k) return null;
   const m = nowMemo.get(w); if (fresh(m, k)) return m!.v;
   const j = jobs.get(w);
   if (!j || !fresh(j, k)) {
@@ -178,7 +182,7 @@ export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
         if (r.done) { if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
         if (performance.now() - t > SLICE_MS) break;
       }
-      setTimeout(pump, 0);
+      setTimeout(pump, TICK_MS);
     };
     setTimeout(pump, 0);
   }
@@ -202,7 +206,7 @@ export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => vo
     if (stopped) return;
     const t = performance.now();
     for (;;) { const r = g.next(); if (r.done) { done(r.value); return; } if (performance.now() - t > SLICE_MS) break; }
-    setTimeout(pump, 0);
+    setTimeout(pump, TICK_MS);
   };
   setTimeout(pump, 0);
   return () => { stopped = true; };
