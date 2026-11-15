@@ -66,6 +66,12 @@ UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, R
 Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
 
 ### Handoffs (retired sessions)
+- **UI & Experience** (retired 15 Nov 10:15): #393 trim coach + keys, #400 map expand, #405 Tools tray, all in batch 42.
+  Branches ui/trim-coach, ui/map-expand, ui/tools-tray, design/features-tray (mock). Keys: no F-keys (tests/keys.test.ts);
+  Shift T Trim Notes, F frame readout, Z/X traveler, P points of sail, R drill restart, J jibe-ho; keydown via keyOf(e).
+  Follow-ups: a Points of sail tile in the Tools tray; Capacity's perf-readout words in it; ROADMAP "the trim coach's
+  promise in light air". Coach simguard write (coach.ts `{ ...b, tune: undefined, rigMain: undefined }`): since #393 the
+  coach runs in the worker; if it fires, look at the guarded proxy's spread and rigTune.ts/condition.ts writes.
 - **Crew Controls** (retired 15 Nov 09:20): #401 rounding prep is a draft on rounding-prep bde1024f, held on the crew
   chain's +6.7% (prep alone 0.9904 vs 6009bb9c); once the chain lands, merge main, run npm test + perf-pair --ai.
   #389, #376, #390 in batch 42 (stills on claude/setup-seats-shots). Not started: TACK_SETTLE exemption for the prep
