@@ -64,3 +64,9 @@ When one of these finishes its current item, archive it and start its successor 
 prompt (its branch, its queue, the rules): Crew Art, Boat Detail, Crew Controls, Marinas, Debrief, Charts, Rigging,
 UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, Rules, Skipper Model, Crew Model,
 Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
+
+### Handoffs (retired sessions)
+- **Crew Controls** (retired 15 Nov 09:20): #401 rounding prep is a draft on rounding-prep bde1024f, held on the crew
+  chain's +6.7% (prep alone 0.9904 vs 6009bb9c); once the chain lands, merge main, run npm test + perf-pair --ai.
+  #389, #376, #390 in batch 42 (stills on claude/setup-seats-shots). Not started: TACK_SETTLE exemption for the prep
+  when drive-blend lands (`&& !prep`); letting a held backed jib sheet fly (Deep Physics' made-fast sheet, branch turning).
