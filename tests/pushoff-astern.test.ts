@@ -143,34 +143,22 @@ describe('pushed off astern', () => {
     for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); if (!berthClear(u, u.h, s)) return null; }
     return { went, want };
   };
-  /** The one run known to be off (the Coordinator, 15 Nov 2026): held as a failing case of its own, below, not let through. */
-  const LEE_EDGE = { id: 'horseshoe-bay:A27', from: 90 };
   for (const [from, name] of [[0, 'northerly'], [90, 'easterly']] as const) it(`in a 20 kt ${name}, she stops where the plan meant her to (a meter short of its clear water, or her steerage floor's glide): within 15%, stern first, the helm amidships`, () => {
     const bad: string[] = []; let n = 0;
     for (const H of HARBORS) {
       const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
       const k = Math.min(6, all.length);
       for (let i = 0; i < k; i++) {
-        const s = all[Math.floor(i * all.length / k)]; if (s.id === LEE_EDGE.id && from === LEE_EDGE.from) continue;
+        const s = all[Math.floor(i * all.length / k)];
         const g = glideAt(s, from); if (!g) continue;
         n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
       }
     }
     expect(n).toBeGreaterThanOrEqual(3); expect(bad).toEqual([]);
   }, 600_000);
-  // (a known failure, to come right when the planner allows for the lee's edge, ROADMAP: she's let go in 5 kt in the
-  // harbor's lee and drifts out of it into 9 kt within 20 s; the end of her planned line is still in the lee. 15.0 m
-  // sailed against 13.0. it.fails: it errors the day it passes, and then joins the sweep above)
-  it('Horseshoe Bay A27 in a 20 kt easterly: the known case is still the case (shoved astern, gliding free, 15–25% further than planned)', () => {
-    // (so the it.fails below can't go green for another reason: no astern plan, a touch, the berth gone)
-    const g = glideAt(slipById(LEE_EDGE.id)!, LEE_EDGE.from); expect(g, 'she is shoved astern and glides free').toBeTruthy();
-    const over = (g!.went - g!.want) / g!.want; expect(over).toBeGreaterThan(0.15); expect(over).toBeLessThan(0.25);
-  }, 120_000);
-  it.fails('Horseshoe Bay A27 in a 20 kt easterly stops where the plan meant her to, within 15%: the wind she drifts into off the harbor\'s lee isn\'t the wind she was let go in', () => {
-    const s = slipById(LEE_EDGE.id)!; expect(s.id).toBe(LEE_EDGE.id);
-    const g = glideAt(s, LEE_EDGE.from); expect(g, 'she is shoved astern and glides free').toBeTruthy();
-    expect(Math.abs(g!.went - g!.want)).toBeLessThanOrEqual(0.15 * g!.want);
-  }, 120_000);
+  // (Horseshoe Bay A27 in the easterly was held apart as a known failure, 15.4% over, let go in the harbor's lee and
+  // drifting out of it into more wind; with main's wind of 15 Nov 2026 merged she's 13.7% over, inside the bound, and is
+  // in the sweep above with the rest. The lee's edge is still on the ROADMAP for the planner)
   // (headings in a westerly: the wind abeam, and her bow within a beat of it, where a held tiller once counted as sculling: the physics review)
   for (const h0 of [0, 270, 300, 230]) for (const til of [1, -1]) it(`the tiller going astern at 0.5 m/s with no sail up, heading ${h0} in a westerly, pushed to ${til > 0 ? 'starboard' : 'port'}: her bow goes that way (the rudder works backwards), by 10 deg and more in 10 s`, () => {
     const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 8, windDir: 270, mode: 'sail', tideDate: '2026-11-14', current: 'slack' } as Settings;
