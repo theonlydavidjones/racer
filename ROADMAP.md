@@ -629,7 +629,7 @@ What's planned, roughly in order. Done work is described in the README.
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
      to here", and nothing on the screen.
-   - **The navigator doesn't see piers** (owner, 15 November, from a chart screenshot; bug; next, "not urgent"; 2–4 h):
+   - **The navigator doesn't see piers, and can't bring her home** (owner, 15 November; bug; now; 6–10 h):
      "navigator not detecting this pier. I ran right into it." The planned track runs straight along a long NE–SW pier
      to its tip, in the Precautionary Area (20–39 ft charted). Suspects: the planner's land test (src/sim/routing.ts
      landDist, :47-66) uses the terrain's land mask and the Cityfront's hand-drawn shore, not the wharf layer
@@ -639,7 +639,14 @@ What's planned, roughly in order. Done work is described in the README.
      like navigator is missing most of the piers actually. we're tacking toward one right now. not urgent but let's get
      the coastlines updated." So it's all the piers, not one: bring every pier, wharf and breakwater the chart draws
      into the planner's land, from the same source as the chart (NOAA ENC/OSM), and test along the whole Cityfront and
-     Embarcadero. 2–4 h.
+     Embarcadero. 2–4 h. Then (15 November; now; 6–10 h in all): "navigator just cannot take her home to her slip. it
+     doesn't understand how to move around piers, obstacles, even other docks in the same marina." So the navigator
+     needs a real route, not only land avoidance:
+     - (1) every pier, wharf, breakwater and dock as an obstacle with clearance;
+     - (2) inside a marina, a path along the fairways to her own slip (the marinas' dock and fairway data in
+       src/geo/marina.ts), finishing with the docking hand-over;
+     - (3) moored boats solid, the same fix as slip 572 (8m2);
+     - (4) a test that the navigator brings her home from the Bay to slip 572 with no contact.
    - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
      polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
