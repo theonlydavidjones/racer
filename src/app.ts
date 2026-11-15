@@ -549,7 +549,8 @@ const band = new SailBand({
     if (i > 0 && i < 40) { b.textContent = t.slice(0, i); e.replaceChildren(b, ' ' + t.slice(i + 2)); } else e.replaceChildren(t);
   },
   motorOn: () => !!w.user.motor && w.running && S.mode !== 'drill',
-  motorStart: () => motorStartUi()
+  motorStart: () => motorStartUi(),
+  racing: () => w.racingNow
 }, document.body);
 // the tiller strip on the band's top edge (her outboard's controls are the band's Motor tab: ui/sailBand.ts). The tiller
 // pilot goes bottom left with the Navigator, its panel opening along the bottom edge in place of its button, never up over

@@ -36,7 +36,7 @@ export type RO<T> = T extends (...a: never[]) => unknown ? T
 
 /** The World's members that change the race: the page reaches them only through SimHost (commands and steps). */
 type Changes = 'step' | 'idle' | 'drainEvents' | 'pushOff' | 'setSail' | 'setDest' | 'retire' | 'motorTilt' | 'motorStart'
-  | 'motorStop' | 'motorGear' | 'motorThrottle' | 'motorSwivel' | 'castOff' | 'sendHome' | 'moveHere' | 'applyConditions'
+  | 'motorStop' | 'motorGear' | 'motorThrottle' | 'motorSwivel' | 'motorStow' | 'castOff' | 'sendHome' | 'moveHere' | 'applyConditions'
   | 'userHail' | 'assignPenalty' | 'hail' | 'replyYouTack' | 'passOnHail' | 'paddle' | 'rule42';
 
 /*

@@ -36,7 +36,12 @@ export interface Condition {
   main: SailRig; jib: SailWear;
   /** Mass added to the boat (kg) and its fore–aft moment (kg·m, + forward of the centre of flotation: hullTrim.ts trims her by it). */
   extraKg: number; extraMoment: number;
-  /** Change in righting moment (N·m) at heel h (deg): weight aloft (a wooden rig) reduces it. */
+  /** An outboard up on its bracket, near deck level (kg; 0 stowed below or ashore). */
+  aloft: number;
+  /** Change in righting moment (N·m) at heel h (deg): weight aloft (a wooden rig, an outboard on its bracket) reduces it.
+   * It reads `aloft` off this same object, so a change of place (the motor stowed or shipped, sim/world.ts) is a change of
+   * data: the page's mirror of the race gets the numbers, and keeps its own copy of this function (sim/sync.ts sends no
+   * functions). */
   rightingDelta: (heelDeg: number) => number;
 }
 
@@ -55,22 +60,29 @@ const MAST_BEND = { soft: 145 / 125, average: 1, stiff: 105 / 125 };
  * estimate): the outboard on its transom bracket, and stowed in a cockpit locker. */
 const STATION = { transom: 3.45, locker: 2.3 };
 
-/** Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water). */
-export function condition(s: BoatSpec, month = 9): Condition {
+/**
+ * Her condition from how you've set her up, in the month (1–12) she's sailing (fouling grows faster in warm water).
+ * `outboardAt`: where her motor is right now, if that's not where her setup has it (shipped on the bracket or stowed
+ * below mid-sail, sim/world.ts motorStow): its weight moves with it, aft and up on the bracket, lower and further
+ * forward below.
+ */
+export function condition(s: BoatSpec, month = 9, outboardAt: BoatSpec['perf']['outboard'] = s.perf.outboard): Condition {
   const f = fouling(s.perf.cleanedWeeks, month), finish = s.perf.finish;
-  const ob = s.perf.outboard;
+  const ob = outboardAt;
   const extraKg = s.perf.gearKg + (ob === 'none' ? 0 : outboardKg(s));
   // gear sits about amidships (no moment); the outboard aft
   const extraMoment = ob === 'bracket' ? -outboardKg(s) * STATION.transom : ob === 'stowed' ? -outboardKg(s) * STATION.locker : 0;
   const wood = s.perf.mast === 'wood';
-  return {
+  const o: Condition = {
     fouling: f, dCf: v => dCfAt(f, finish, v),
     main: { wear: SAIL_WEAR[s.perf.mainAge], bend: wood ? MAST_BEND[s.perf.mastStiffness] ?? 1 : 1 },
     jib: SAIL_WEAR[s.perf.jibAge],
     extraKg, extraMoment,
+    aloft: ob === 'bracket' ? outboardKg(s) : 0,
     rightingDelta: h => (wood ? -WOOD_RIG.kg * G * WOOD_RIG.dz * Math.sin(h * Math.PI / 180) : 0)
-      + (ob === 'bracket' ? -outboardKg(s) * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
+      + (o.aloft ? -o.aloft * G * 0.9 * Math.sin(h * Math.PI / 180) : 0) // on the bracket it's up near deck level
   };
+  return o;
 }
 
 /** Set the jumpers (turns, under way: CR 7.40 lets them be adjusted above deck while racing): the rig is worked out again. */
