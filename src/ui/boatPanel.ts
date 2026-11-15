@@ -227,7 +227,7 @@ export class BoatPanel {
         <div class="field"><span>Companionway</span>${seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')}</div>
         <div class="field"><span>Cabin-top instrument</span>${seg('instrument', [['fitted', 'Fitted'], ['none', 'None']], b.instrument ?? 'fitted')}</div>
         <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}</div>
-        <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolour']], b.navLights ?? 'deck')}</div>
+        <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolor']], b.navLights ?? 'deck')}</div>
       </section>
       <section><h3>Sails</h3>
         <div class="field"><span>Sailcloth</span>${seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)}</div>
