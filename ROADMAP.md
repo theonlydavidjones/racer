@@ -346,6 +346,15 @@ What's planned, roughly in order. Done work is described in the README.
    straight rake from a cut-away forefoot to the stemhead, the forward sections fine and V'd. A lines job in render/hull.ts
    (the stations, the stem's profile, the forefoot), with a physics review after: the bow's shape feeds the hull's
    resistance and wetted area, and boat/hullPlan.ts's deck outline (the rules' touching shape) if the deck line moves.
+9b. **The crew's walk forward and back, and sitting on the bow** (in PR, claude/crew-bow-walk) (owner, 14 November; animation;
+   Crew Figures): owner, "look at this dork. have him hang his legs over the front please. also the way the head forward
+   looks like they're dragging their legs like paralyzed people. let's do better on these animations." Sat on the bow
+   facing forward, the legs hanging down over it either side of the stem; going forward and back a crouch, short steps
+   each foot lifted clear, along the side deck beside the cabin with a hand on its edge or the shroud; in a seaway
+   (the boat's pitching) lower, both hands down, slower. Pictures: docs/crew-bow-walk/.
+9c. **Ducking under the spinnaker pole** (Coordinator, 15 November; animation; with the pole work; Crew Figures): going
+   forward past the mast with the pole out, the walker's head and shoulder pass through the pole. A crew member ducks
+   under it or goes round it: the walk's height and route by the mast should answer the pole's place, both tacks.
 8z. ~~**Now — the cruise setup's map is blank**~~ (done: redrawn whenever its size changes, 0e622c58) (regression; 1–2 h): owner, with a screenshot of Cruise → Where, "map is
    no longer showing in cruise config." Under Start / Destination the chart area is an empty dark box. Start
    (37°48.68′N 122°26.69′W) and To (37°48.79′N 122°26.72′W) are set only about 200 m apart, which may be a side effect of
