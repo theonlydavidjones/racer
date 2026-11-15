@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The release gate for the frame's cost (ROADMAP 8x; docs/CAPACITY.md §8): this tree's page against another version's,
- * measured back to back by perf.cjs (its seven views: the renderer's counts and the JS a frame), alternating which goes
+ * measured back to back by perf.cjs (its eight views: the renderer's counts and the JS a frame), alternating which goes
  * first, so a stuttering build can't ship unnoticed. Each version is served by its own dev server; the other version's
  * app is taken from git into .cache/perf-ab/<commit>/ (as perf-pair.mjs does the sim's), fetched first if need be.
  *
@@ -18,7 +18,9 @@
  *     contention only ever adds time: one run's outlier, 70 ms where the view takes 36, mustn't fail a clean build;
  *     and one view alone can wobble +20% under load). Run it on a quiet host: a full test suite beside it slows one
  *     side's runs more than the other's,
- *   - the heap after a few races up more than 15 MB.
+ *   - the heap after a few races up more than 15 MB,
+ *   - the inset map's own JS a frame (its drawing and its overlay) up more than 30% and 0.5 ms, in any view (ROADMAP 8b:
+ *     perf.cjs's inset_layers view has the wind field and the wind shadows on).
  * (LIM, below: v186 → v188 fails on its triangles, programs, heap and JS.) The page is drawn at half size, the same shape
  * (PERF_SCALE, 0.5): the software GL's frames come about twice as fast. Its counts are a little under perf.cjs's
  * full-size page's (a few things are drawn by their size on screen), but both versions are drawn the same.
@@ -78,7 +80,7 @@ function perfRun(port, tag) {
  * to run (a few draw calls apart where the race has moved on), so their limits sit well inside that; the JS's noise
  * (±5 ms headless) needs both its median's share and its size.
  */
-const LIM = { counts: 1.05, programs: 5, js: 1.15, jsMs: 3, jsViews: 2, heapMB: 15 };
+const LIM = { counts: 1.05, programs: 5, js: 1.15, jsMs: 3, jsViews: 2, heapMB: 15, inset: 1.3, insetMs: 0.5 };
 const median = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[n >> 1] : (s[n / 2 - 1] + s[n / 2]) / 2; };
 
 (async () => {
@@ -118,9 +120,13 @@ function verdict(runs, t0) {
     if (t1 > t0_ * LIM.counts && t1 - t0_ > 20000) bad.push(`triangles ${t0_} → ${t1}`);
     if (p1 - p0 > LIM.programs) { bad.push(`programs ${p0} → ${p1}`); if (!fails.some(f => f.startsWith('shader programs'))) fails.push(`shader programs ${p0} → ${p1}`); } // (the page's, not the view's: said once)
     if (j1 > j0 * LIM.js && j1 - j0 > LIM.jsMs) { bad.push(`JS a frame ${j0.toFixed(1)} → ${j1.toFixed(1)} ms`); jsOver.push(`${v} ${j0.toFixed(1)} → ${j1.toFixed(1)} ms`); }
+    // the inset map's own JS a frame (perf.cjs's inset column), the least over the rounds: gated in every view, as it's
+    // small and steady (the owner's "inset map is really lagging again", 15 Nov 2026)
+    const i0 = Math.min(...F.map(x => x.inset ?? NaN)), i1 = Math.min(...T.map(x => x.inset ?? NaN));
+    if (Number.isFinite(i0) && Number.isFinite(i1) && i1 > i0 * LIM.inset && i1 - i0 > LIM.insetMs) bad.push(`the inset map's JS ${i0.toFixed(2)} → ${i1.toFixed(2)} ms a frame`);
     for (const b of bad) if (!b.startsWith('programs') && !b.startsWith('JS')) fails.push(`${v}: ${b}`);
     const pct = (a, b) => `${b >= a ? '+' : ''}${((b / a - 1) * 100).toFixed(0)}%`;
-    console.log(`${v.padEnd(19)} ${String(c0).padStart(6)} → ${String(c1).padEnd(6)} ${pct(c0, c1).padStart(5)}   ${String(t0_).padStart(8)} → ${String(t1).padEnd(8)} ${pct(t0_, t1).padStart(5)}   ${String(p0).padStart(3)} → ${String(p1).padEnd(3)}   ${j0.toFixed(1).padStart(5)} → ${j1.toFixed(1).padEnd(5)} ${pct(j0, j1).padStart(5)}${bad.length ? '  REGRESSION' : ''}`);
+    console.log(`${v.padEnd(19)} ${String(c0).padStart(6)} → ${String(c1).padEnd(6)} ${pct(c0, c1).padStart(5)}   ${String(t0_).padStart(8)} → ${String(t1).padEnd(8)} ${pct(t0_, t1).padStart(5)}   ${String(p0).padStart(3)} → ${String(p1).padEnd(3)}   ${j0.toFixed(1).padStart(5)} → ${j1.toFixed(1).padEnd(5)} ${pct(j0, j1).padStart(5)}   inset ${Number.isFinite(i0) ? i0.toFixed(2) : '-'} → ${Number.isFinite(i1) ? i1.toFixed(2) : '-'}${bad.length ? '  REGRESSION' : ''}`);
   }
   // (the JS, only where it's over in two views or more: a real regression moves several (v188's, five or six), and one
   // view's run-to-run wobble under load can reach +20% on its own)

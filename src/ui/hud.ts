@@ -716,22 +716,17 @@ export class Hud {
     const kind = this.drawn.chart?.kind; if (kind && h >= 420 && w >= 600) drawLegend(ctx, kind, w / 2, h - 40); // (the colours' scale, in kt: not on the setup's small chart, where it would cover it)
   }
 
-  /** The inset's streaks, every frame, on its overlay (the map under it is drawn ten times a second). */
-  private fxT = 0;
+  /** The inset's overlay (the streaks were drawn on it; they're the full chart's only now). */
   /** what the streaks cost (ms of JS a frame, smoothed), the inset's and the chart's: for the frame-cost check */
   fxMs = { inset: 0, chart: 0 };
   private insetStreaks(dt: number): void {
     const t0 = performance.now(); this.insetStreaks0(dt); this.fxMs.inset += (performance.now() - t0 - this.fxMs.inset) * 0.05;
   }
-  private insetStreaks0(dt: number): void {
-    const fx = this.mapFx;
-    this.fxT -= dt;
-    if (this.fxT <= 0) { // (the overlay kept over the map: it moves with the layout, not every frame)
-      this.fxT = 0.5; const r = this.mapC.getBoundingClientRect();
-      Object.assign(fx.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', display: r.width ? '' : 'none' });
-    }
-    // (cleared, and left clear: the streaks are the full chart's only, the owner, 13 Nov 2026)
-    const [ctx, w, h] = fitCanvas(fx); ctx.clearRect(0, 0, w, h);
+  private insetStreaks0(_dt: number): void {
+    // (the streaks are the full chart's only, the owner, 13 Nov 2026: the inset's overlay is put away, once. It was
+    // placed over the map every half second, then sized (a read of its layout, forced just after that write) and cleared
+    // every frame, empty: work for nothing on every frame, under the inset that the owner saw lagging, 15 Nov 2026)
+    if (!this.mapFx.hidden) { this.mapFx.hidden = true; this.mapFx.style.display = 'none'; }
   }
 
   /** The chart's streaks and the readout under the cursor, every frame while it's open, on its overlay. */
