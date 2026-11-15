@@ -4,8 +4,8 @@ import train from '../src/courses/data/training-windward-return.json';
 import type { CourseFile } from '../src/courses/course';
 import { buildCourse } from '../src/courses/course';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { DT, World } from '../src/sim/world';
-import { V, brg } from '../src/core/math';
+import { DT, World, startPenalty } from '../src/sim/world';
+import { V, brg, wrap } from '../src/core/math';
 import { onLand, shoreDist } from '../src/geo/shore';
 import { inBasin } from '../src/geo/marina';
 
@@ -499,5 +499,23 @@ describe('Exoneration (Rule 43.1(a))', () => {
     (w as unknown as { checkPairs(): void }).checkPairs();
     for (const e of w.drainEvents()) if (e.type === 'incident') incidents.push({ fouler: e.incident.fouler.id, rule: e.incident.rule, ex: e.incident.exoneratedBy });
     expect(incidents.find(i => i.fouler === fox.id)).toMatchObject({ rule: '11', ex: undefined });
+  });
+});
+
+describe('Rule 21.2 starts when her turns begin (Perry: "clearly beginning to make a penalty turn")', () => {
+  it('owing a turn, a 35° duck while getting clear that she comes back from isn\'t her turns: she keeps her Section A rights; a turn she carries on is', () => {
+    const w = new World(SS2, settings({ fleet: 0, current: 'slack' }), 7);
+    w.t = 30; const u = w.user; u.started = true; u.ocs = false;
+    const h0 = u.h; startPenalty(u, 360);
+    const off = () => wrap(u.h - h0);
+    // (the helm over, as you steer: until she's turned `to` degrees off where she began, or back)
+    const helm = (dir: 1 | -1, until: (d: number) => boolean) => { for (let i = 0; i < 60 * 20 && !until(off()); i++) { u.steer = dir; w.step(DT); } u.steer = 0; };
+    helm(1, d => d > 35); // (the duck)
+    expect(u.penaltyDir).not.toBe(0);
+    helm(-1, d => d < 3); // (back on her course)
+    for (let i = 0; i < 60; i++) w.step(DT);
+    expect(u.penaltyDir).toBe(0); expect(u.penalty).toBe(360);
+    helm(1, d => d > 90); // (now the turn, carried on)
+    expect(u.penaltyDir).not.toBe(0);
   });
 });
