@@ -77,4 +77,11 @@ describe('the land\'s lee without seams', () => {
       expect(Math.abs(a - b), `${lon} from ${from}`).toBeLessThan(0.02);
     }
   });
+  it('a point that is not a number (a chart not yet laid out) has no lee, and no error', () => {
+    expect(harborLeeDeficit({ x: NaN, y: 0 }, 200)).toBe(0);
+    expect(harborLeeDeficit({ x: 0, y: NaN }, 200)).toBe(0);
+    // (nor a wind from nowhere, in the lee of Fort Mason's Pier 1 shed, where a westerly takes half the wind away)
+    const P1 = PILE_PIERS.find(p => p.name === 'Pier 1')!, xe = Math.max(...P1.pts.map(q => q.x)), ym = P1.pts.reduce((a, q) => a + q.y, 0) / P1.pts.length;
+    expect(harborLeeDeficit({ x: xe + 15, y: ym }, 270)).toBeGreaterThan(0.5); expect(harborLeeDeficit({ x: xe + 15, y: ym }, NaN)).toBe(0);
+  });
 });

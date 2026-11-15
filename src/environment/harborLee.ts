@@ -131,7 +131,7 @@ let LAST_C = -1, LAST_S = 0; // (the cell last asked about and its slot: a boat'
 function cellBodies(p: Vec, from: number): Body[] {
   if (!IDX) { NX = Math.ceil((BOX.x1 - BOX.x0) / CELL_M) + 1; NY = Math.ceil((BOX.y1 - BOX.y0) / CELL_M) + 1; IDX = new Int32Array(NX * NY); }
   const i = Math.floor((p.x - BOX.x0) / CELL_M), j = Math.floor((p.y - BOX.y0) / CELL_M);
-  if (i < 0 || j < 0 || i >= NX || j >= NY) return NONE;
+  if (!(i >= 0 && j >= 0 && i < NX && j < NY)) return NONE; // (written so a NaN, a point not yet worked out, is outside too)
   const c = j * NX + i;
   let s = c === LAST_C ? LAST_S : IDX[c];
   if (s === 0) {
@@ -234,7 +234,8 @@ function shedFace(B: Body, p: Vec, e: Vec): boolean {
 /** The deficit at p (a fraction of the wind, over the rig) behind the walls and sheds, the wind from `from`: the strongest one's. */
 let lastFrom = NaN, lastE: Vec = { x: 0, y: 0 };
 export function harborLeeDeficit(p: Vec, from: number): number {
-  if (p.x < BOX.x0 || p.x > BOX.x1 || p.y < BOX.y0 || p.y > BOX.y1) return 0;
+  if (!(p.x >= BOX.x0 && p.x <= BOX.x1 && p.y >= BOX.y0 && p.y <= BOX.y1)) return 0; // (a NaN is outside)
+  if (!Number.isFinite(from)) return 0; // (no wind direction yet: no lee, rather than a lookup at NaN)
   const list = cellBodies(p, from); if (!list.length) return 0;
   if (from !== lastFrom) { lastFrom = from; lastE = V(from + 180); }
   const e = lastE; let best = 0;
