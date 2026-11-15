@@ -16,7 +16,8 @@ import { disposeUnused } from './dispose';
 import { FittingCull } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
-import type { Boat } from '../boat/boat';
+import type { Boat, Tack } from '../boat/boat';
+import { partShape, underwaterGhost, type PartId, type ScreenPart } from './boatParts';
 import { cleatOf } from '../boat/dockLines';
 import { P3 } from './coords';
 import { addLandscape, bridgeLights, sutroBeacons } from './landscape';
@@ -234,8 +235,30 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** Crew overboard: the person in the water (made when first needed). */
+  private mobMesh: THREE.Group | null = null;
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
   get userMesh(): BoatMesh | undefined { return this.boatMeshes[0]; }
+  /**
+   * Lesson 1 (The boat; render/boatParts.ts): one of your boat's named parts where it's drawn on the screen this frame, in
+   * the page's px (as a click's clientX and clientY), or null where she has none or it's out of sight. Read only.
+   */
+  /** Lesson 1: her shape under the water shown faintly through the sea (render/boatParts.ts underwaterGhost), or hidden. */
+  showUnderwater(on: boolean): void {
+    const m = this.boatMeshes[0]; if (!m) return;
+    let g = m.grp.getObjectByName('underwaterGhost');
+    if (!g) { if (!on) return; g = underwaterGhost(m); }
+    g.visible = on; if (g.userData.blade) (g.userData.blade as THREE.Object3D).visible = on;
+  }
+  projectPart(key: PartId, tack: Tack): ScreenPart | null {
+    const m = this.boatMeshes[0]; if (!m) return null;
+    const cam = this.camera; cam.updateMatrixWorld(); m.grp.updateWorldMatrix(true, false);
+    const near = m.grp.worldToLocal(cam.position.clone()).x; // (the side of her the camera's on: + starboard)
+    const shape = partShape(m, key, tack, near); if (!shape) return null;
+    const r = this.renderer.domElement.getBoundingClientRect(), q = new THREE.Vector3();
+    const pts = shape.pts.map(poly => poly.flatMap(p => { q.copy(p).project(cam); return q.z > 1 || q.z < -1 ? [] : [[r.left + (q.x + 1) / 2 * r.width, r.top + (1 - q.y) / 2 * r.height] as [number, number]]; })).filter(p => p.length);
+    return pts.length ? { kind: shape.kind, pts } : null;
+  }
   /** A ghost race's ghost: your earlier run of this race, drawn translucent on its track (replay/ghost.ts). Not in the race. */
   private ghost: { mesh: BoatMesh; pts: GhostPoint[] } | null = null;
   /** Her dock lines ashore (up to six), drawn as rope: off-white, as a dock line usually is. */
@@ -374,7 +397,7 @@ export class SceneView {
     scene.add(this.hemi = new THREE.HemisphereLight(0xe8f2ff, 0x29485a, 0.85 * Math.PI));
     const sun = this.sun = new THREE.DirectionalLight(0xfff3dd, 0.75 * Math.PI); sun.position.set(-300, 500, 200); scene.add(sun); scene.add(sun.target);
     // shadows from the sun: a small, sharp shadow map that follows your boat (sails on the deck and the water)
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; // (three.js r186 dropped PCFSoft: asked for, it warned and switched to PCF on the first shadow drawn, and every material compiled before then compiled again: about fifty programs never drawn)
     sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 10, far: 1200 });
     sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
@@ -492,7 +515,9 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
+  private harborCam = new THREE.Vector3();
   private hullCam = new THREE.Vector3();
+  private sunLit = true;
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
@@ -521,16 +546,15 @@ export class SceneView {
    * Have the GPU compile the shaders of everything that's hidden now (the city's and the bridge's lights after dark,
    * the boats' navigation lights, rain, the fog bank) in the background, so the frame they first appear in doesn't
    * stall while it compiles fifty-odd of them (half a second or more when night fell with the city in view). Each is
-   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. Both with
-   * the sun's shadows and without (it stops casting them once it's down, which changes every lit surface's shader).
-   * Programs already compiled are reused, so after the first race this costs only the walk through the scene.
+   * shown only for the moment it takes to queue the work (no frame is drawn meanwhile), then hidden again. (The sun casts
+   * its shadows day and night, faded out once it's down, so one pass covers both.) Programs already compiled are reused,
+   * so after the first race this costs only the walk through the scene.
    */
   private warmShaders(): void {
-    const hidden: THREE.Object3D[] = [], shadow = this.sun.castShadow;
+    const hidden: THREE.Object3D[] = [];
     this.scene.traverse(o => { if (!o.visible) { hidden.push(o); o.visible = true; } });
-    try {
-      for (const cast of [shadow, !shadow]) { this.sun.castShadow = cast; void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
-    } finally { this.sun.castShadow = shadow; for (const o of hidden) o.visible = false; }
+    try { void this.renderer.compileAsync(this.scene, this.camera).catch(() => { /* (a lost context: nothing to warm) */ }); }
+    finally { for (const o of hidden) o.visible = false; }
   }
 
   /** A buoy on the water, leaning and trailing a wake in the current (see update). */
@@ -770,7 +794,9 @@ export class SceneView {
     this.sun.intensity = 0.75 * Math.PI * up;
     const f = focus;
     this.sun.target.position.set(f.x, 0, -f.y); this.sun.position.copy(this.sun.target.position).addScaledVector(dir.y > 0.05 ? dir : new THREE.Vector3(0, 1, 0), 500);
-    this.sun.castShadow = up > 0.05;
+    // (the sun casts its shadows always, so no lit surface's shader changes as it sets; below the horizon its shadows are
+    // faded out and the shadow map no longer drawn: one set of programs, not one for day and one for night)
+    { const lit = up > 0.05; this.sun.shadow.intensity = lit ? 1 : 0; this.renderer.shadowMap.autoUpdate = lit; if (lit && !this.sunLit) this.renderer.shadowMap.needsUpdate = true; this.sunLit = lit; }
     // twilight sky colours: civil twilight (sun 0–6° down) still glows; darker through nautical twilight
     const tw = 1 - ss(-12, -1, el), glow = ss(-10, -2, el);
     sm.uniforms.uTwi.value = 1 - ss(-1, 4, el);
@@ -927,6 +953,10 @@ export class SceneView {
         pos.needsUpdate = true; g.geometry.setDrawRange(0, n); g.visible = n > 0;
       }
     }
+    // crew overboard (sim/lessons.ts): the person in the water, their head and life jacket riding the waves
+    { const m = w.lesson?.mob ?? null;
+      if (m && !this.mobMesh) { this.mobMesh = personInWater(); this.scene.add(this.mobMesh); }
+      if (this.mobMesh) { this.mobMesh.visible = !!m; if (m) { this.mobMesh.position.copy(P3(m.x, m.y, waves.height(m, tw, 1, 1))); this.mobMesh.rotation.y = -(w.wind.from + 180) * D2R; } } } // (the sea's height right where they are; facing downwind, their back to the wind and sea, as a person floats: McCurdy, USYRU 1986)
     if (this.ghost) {
       const g = ghostAt(this.ghost.pts, w.t), gm = this.ghost.mesh; gm.grp.visible = !!g;
       if (g) {
@@ -1004,6 +1034,7 @@ export class SceneView {
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
+    this.harbor.update(camera.getWorldPosition(this.harborCam)); // (the moored boats nearest the camera in detail)
     // the camera down inside her hull (below her deck, within its outline): the sea kept out of her (hullUni, above)
     { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
       if (g) { const c = g.worldToLocal(this.hullCam.copy(camera.position)), uu = (c.z + L / 2) / L;
@@ -1073,4 +1104,19 @@ export function fitChase(fovDeg: number, bandTop: number, rel: number, ratio: nu
     if (aM - aT > span) lo = d; else hi = d;
   }
   return { dist: (lo + hi) / 2, near: along, tBot };
+}
+
+/**
+ * A person in the water in a life jacket: the head and the jacket's orange collar and shoulders above the surface, the
+ * rest below it (as they float, upright, head back: the leeway table's "vertical" person). Sizes of an adult: head about
+ * 0.2 m across, shoulders 0.45 m.
+ */
+function personInWater(): THREE.Group {
+  const g = new THREE.Group(); g.name = 'personInWater';
+  const skin = new THREE.MeshLambertMaterial({ color: 0xc89a78 }), vest = new THREE.MeshLambertMaterial({ color: 0xff5a1f }), hair = new THREE.MeshLambertMaterial({ color: 0x3a2a1e });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), skin); head.position.y = 0.2; g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.103, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), hair); cap.position.y = 0.21; cap.rotation.x = 0.35; g.add(cap); // (tipped toward +z: the back of the head, to windward once turned)
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.065, 8, 18), vest); collar.rotation.x = Math.PI / 2; collar.position.y = 0.08; g.add(collar);
+  const shoulders = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.23, 0.18, 14), vest); shoulders.scale.z = 0.6; shoulders.position.y = -0.04; g.add(shoulders);
+  return g;
 }
