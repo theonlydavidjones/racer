@@ -543,6 +543,15 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
+   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Experience to design,
+     to the owner before building): "there's a lot of really cool shit we've built, like wind-in-air and wind-over-sails,
+     but it's hard to find these things. I think we need a 'more' (not that copy though) button on the game surface for
+     all features that show up on the game surface itself." One button, an icon rather than the word "More", that opens a
+     tray of icon tiles, each turning one on-surface feature on or off and showing its key. The candidates, from the
+     Keys list: the wind indicator (wind in the air), the flow view (wind over the sails), the sail controls band, the
+     course and strategist or navigator, the cabin-top instrument, the paddle, the navigation lights, the hail, the
+     views, all messages and the frame-time readout. The owner asked for this button; it should also absorb scattered
+     on-screen toggles, so the surface ends up with fewer controls, not more. Ties in with the UI audit (#236).
    - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
      on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
      small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
