@@ -374,11 +374,12 @@ function word(id: string, t: string): void { const e = $(id).querySelector('.w')
 /* The tiller. Its handle goes from −1 (pushed to port) to +1 (pushed to starboard); pushing it to
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
 /** The tiller angle the page last sent: what it meant the tiller to be (its own copy of the race is a frame or two behind). */
-let tillerSent = 0, tillerSentAt = -1e9;
-function setTiller(v: number): void { tillerSent = Math.max(-1, Math.min(1, v)); tillerSentAt = performance.now(); send({ k: 'tiller', v }); }
-/** Where the tiller is meant to be: where the page last put it, if it has in the last half second (your hand, the spring);
+let tillerSent = 0, tillerSentFrames = 0;
+function setTiller(v: number): void { tillerSent = Math.max(-1, Math.min(1, v)); tillerSentFrames = 30; send({ k: 'tiller', v }); }
+/** Where the tiller is meant to be: where the page last put it, if it has in its last 30 frames (your hand, the spring;
+ * counted in frames, as the race's copy lags by frames: a slow machine's second can be a frame or two);
  * otherwise where the race has it (the pilot's ram, a reset). */
-const tillerMeant = () => performance.now() - tillerSentAt < 500 ? tillerSent : w.user.tiller;
+const tillerMeant = () => tillerSentFrames > 0 ? tillerSent : w.user.tiller;
 /** A lash sent and not yet seen in the page's copy of the race: until it is, the tiller's spring stays off it (each step of
  * the spring is a tiller command, and a tiller command moves a lashing: a small angle was eased to amidships, the owner).
  * For 30 of the page's frames at most (half a second; counted in frames, so a slow machine waits as many as a fast one):
@@ -464,6 +465,7 @@ addEventListener('blur', releaseTiller);
 /** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
 function tillerSpring(dt: number): void {
   if (tillerHeld && (!w.running || w.paused)) releaseTiller(); // paused or stopped: hands off
+  if (tillerSentFrames > 0) tillerSentFrames--;
   if (w.user.lashed != null) lashPendingFrames = 0; else if (lashPendingFrames > 0) lashPendingFrames--; // (the lash has reached the page's copy; or not yet)
   if (w.pilot.mode !== 'off' || w.user.lashed != null || lashPending()) return; // the pilot's ram has it, or it's lashed
   if (tillerHeld || barDrag || !w.running || w.paused) return;
@@ -861,7 +863,7 @@ function halyard(sail: 'main' | 'jib'): void { if (!w.running || w.paused) retur
 /* The tiller pilot (boat/autopilot.ts): cruising only, since RRS 52 says a racing boat's rudder is worked by her
  * crew's own power. Taking the tiller (T, a click, the tiller bar) puts it on standby, as unhooking the ram does. */
 function pilotOn(mode: Exclude<PilotMode, 'off'>): void {
-  tillerSentAt = -1e9; // (the ram has the tiller now: a lash takes its angle, not your hand's last)
+  tillerSentFrames = 0; // (the ram has the tiller now: a lash takes its angle, not your hand's last)
   if (!w.running) return;
   // (every refusal says why, on the button itself, where the player is looking, as well as in Messages: the owner, v188,
   // "the button won't engage", with the reason only in the Messages card across the screen)
