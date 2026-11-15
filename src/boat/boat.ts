@@ -227,6 +227,8 @@ export interface Boat {
   crewPlan?: CrewSettings | null; crewPlanT?: number;
   /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
+  /** The cabin-top lines worth a trip together though each is under it alone (controls.ts worthTogether), with crewWorth. */
+  crewTogether?: ReadonlySet<string>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
   /**

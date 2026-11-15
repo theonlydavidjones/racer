@@ -309,7 +309,10 @@ export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
     x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
   }));
-  const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0 };
+  // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
+  // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)
+  const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0,
+    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined };
   summarise(c, w);
   return c;
 }
