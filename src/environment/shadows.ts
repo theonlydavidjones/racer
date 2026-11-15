@@ -122,9 +122,13 @@ export function addBoatWake(sum: WindSum, c: Caster, p: Vec, trueKt: number): vo
  */
 export function bluffDeficit(x: number, y: number, H: number, W: number, L: number, pExp = 1.5): number {
   if (x <= -L / 2) return 0;
-  const lh = Math.max(0.3, L / H) ** (-1 / 3), A = -2 + 3.7 * lh, B = -0.15 + 0.305 * lh, wh = W / H;
+  // (Hosker's fit, as Hanna, Briggs & Hosker 1982 quote it, eqs. 3.5–3.6: one form for a body short along the wind,
+  // L/H < 1; for L/H ≥ 1, A = 1.75 and B = 0.25. The short form taken past L/H = 1 turns negative and runs away)
+  const lH = Math.max(0.3, L / H), lh = Math.min(1, lH) ** (-1 / 3), A = lH >= 1 ? 1.75 : -2 + 3.7 * lh, B = lH >= 1 ? 0.25 : -0.15 + 0.305 * lh, wh = W / H;
   const xr = Math.max(1.5 * H, H * A * wh / (1 + B * wh)); // the recirculating cavity (Hosker 1984)
-  const xx = Math.max(0, x), d = xx < xr ? 0.7 : 0.65 * (xr / xx) ** (xx < W ? 1 : pExp);
+  // (in the cavity 0.65, as just past it; past x = W the decay steepens from 1/x, a 2-D wake's, to pExp, a 3-D one's,
+  // carried on from its value at W, so neither change is a step)
+  const xx = Math.max(0, x), d = xx < xr ? 0.65 : xx < W || W <= xr ? 0.65 * (xr / xx) ** (xx < W ? 1 : pExp) : 0.65 * (xr / W) * (W / xx) ** pExp;
   const s = 0.25 * H + 0.1 * xx, out = Math.max(0, Math.abs(y) - W / 2);
   return d * Math.exp(-(out * out) / (2 * s * s));
 }
@@ -169,18 +173,34 @@ const GATE_X = (-122.474 - LON0) * MLON;
 export function groundHeight(p: Vec): number {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
   if (lat > CITYFRONT.south && lat < CITYFRONT.north && lon > CITYFRONT.west && lon < CITYFRONT.east) return 0;
-  // (each cell is 4 × 4 of the terrain's samples, which sit at grid nodes)
+  // (each cell is 4 × 4 of the terrain's samples, which sit at grid nodes. Read cell by cell: read bilinearly, a valley
+  // between two crests filled in and the lee ray took the two as one hill, from the nearer shore (the review, bay-east-16).
+  // The 200 m steps in the lee this leaves want the rays to part islands at their crests, not smoother heights)
   const i = Math.floor(((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block), j = Math.floor(((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block);
   if (i < 0 || j < 0 || i >= HM.nx || j >= HM.ny) return 0;
   return HGRID[j * HM.nx + i] * HM.step;
 }
+/** How far inside the Cityfront box p is (m, 0 or less outside it). */
+function cityfrontDepth(p: Vec): number {
+  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
+  return Math.min((lat - CITYFRONT.south) * MLAT, (CITYFRONT.north + 0.0025 - lat) * MLAT, (lon - CITYFRONT.west) * MLON, (CITYFRONT.east - lon) * MLON);
+}
+/** Across this much of the Cityfront box's edge (m), the land's lee fades out, rather than stopping at a straight line. */
+const CF_FADE = 250;
 
 /**
  * The lee of the land at p, wind from `from` (deg): looking upwind along three rays (straight up, and the wake's
  * spread either side), the strongest shelter from high ground within reach. Speed factor.
  */
 export function terrainLee(p: Vec, from: number, skipGate = false): number {
-  if (inCityfront(p)) return 1; // the wind records are from here: the shore's shelter is already in them
+  // the wind records are from the Cityfront: the shore's shelter there is already in them, so inside the box the land's lee
+  // isn't added again; across its edge it fades in over CF_FADE, so the field has no straight seam (Charts' layer, #261)
+  const inside = inCityfront(p) ? cityfrontDepth(p) : 0;
+  if (inside >= CF_FADE) return 1;
+  const raw = terrainLeeRaw(p, from, skipGate);
+  return inside > 0 ? 1 - (1 - raw) * (1 - inside / CF_FADE) : raw;
+}
+function terrainLeeRaw(p: Vec, from: number, skipGate: boolean): number {
   let worst = 0;
   for (const off of [-8, 0, 8]) {
     const u = V(from + off);
