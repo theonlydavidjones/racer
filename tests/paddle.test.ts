@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { KT, dist } from '../src/core/math';
 import { takeLine } from '../src/boat/physics';
-import { PADDLE, paddleForce, paddleYawRate } from '../src/boat/paddle';
+import { PADDLE, paddleForce, paddleYawRate, paddleStep } from '../src/boat/paddle';
 import { World, DT } from '../src/sim/world';
 import { courseFile } from '../src/courses/registry';
 import { DEFAULT_SETTINGS } from '../src/settings';
@@ -13,7 +13,7 @@ import type { Boat } from '../src/boat/boat';
 function paddled(side: 'P' | 'S', secs: number, back = false): Boat {
   const b = testBoat({ heading: 90, kt: 0, windKt: 0.5 });
   b.paddle = { side, t0: 0, auto: false, back };
-  sail(b, secs);
+  sail(b, secs, t => { paddleStep(b, t, DT); }); // (the paddler tiring as World.step has them)
   return b;
 }
 
@@ -184,7 +184,7 @@ describe('Paddling in the World: your call, the crew\'s call in a jam, and rule 
     let astern = 0;
     for (let i = 0; i < 60 * 60 && u.paddle; i++) { w.step(DT); astern = Math.max(astern, u.astern ?? 0); }
     expect(astern, 'she made sternway').toBeGreaterThan(0.1);
-    expect(u.paddle, 'they stopped well before they\'d be worn out (180 s)').toBeNull();
+    expect(u.paddle, 'they stopped once clear').toBeNull();
   });
   it('the paddler stays on the side they paddle when she swings through the wind', () => {
     const w = world('sail', 1), u = w.user;
@@ -209,7 +209,7 @@ describe('Paddled while hove to', () => {
     expect(b.hove, 'she lies hove to').toBe(true);
     if (side) b.paddle = { side, t0: 0, auto: false }; // (the helper's clock starts again at 0 each call)
     // (her yaw while the crutch is out, the first 12 s of it: hove to she swings about, so over longer it washes out)
-    let v = 0, n = 0, r = 0, m = 0; sail(b, 30, t => { v += b.v - (b.astern ?? 0); n++; if (t > PADDLE.fetchS && t < PADDLE.fetchS + 12) { r += b.yawRate ?? 0; m++; } });
+    let v = 0, n = 0, r = 0, m = 0; sail(b, 30, t => { paddleStep(b, t, DT); v += b.v - (b.astern ?? 0); n++; if (t > PADDLE.fetchS && t < PADDLE.fetchS + 12) { r += b.yawRate ?? 0; m++; } });
     return { v: v / n, turned: r / m };
   };
   it('the crutch pushes her along hove to, and paddling on port swings her to starboard of where she lay, on starboard to port', () => {
