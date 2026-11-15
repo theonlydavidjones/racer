@@ -33,7 +33,9 @@ export type Command =
   /** The tiller's handle, −1 (pushed to port) … +1 (to starboard); a lashed tiller is lashed where it's put. */
   | { k: 'tiller'; v: number }
   /** Lash the tiller where it is, or take the lashing off. */
-  | { k: 'lash'; on: boolean }
+  /** `at`: the tiller angle to lash it at (the page's intended angle: its own copy of the race can be a frame or two
+   * behind, app.ts lash); without it, where the tiller is. */
+  | { k: 'lash'; on: boolean; at?: number }
   /** Take a line yourself (it stays where it is until you work it), or give it back to the crew. */
   | { k: 'line'; key: LineKey; mine: boolean }
   /** Hand Back (the band's tab): every line and both jib cars back to the crew (the pole stays yours). */
@@ -70,12 +72,13 @@ export type Command =
   | { k: 'pilot'; op: 'tack' }
   | { k: 'pilot'; op: 'adjust'; d: number }
   /** The outboard. */
-  | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' }
+  | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' | 'stow' }
   | { k: 'motor'; op: 'start'; retireFirst: boolean }
   | { k: 'motor'; op: 'gear'; gear: 'F' | 'N' | 'R' }
   | { k: 'motor'; op: 'throttle'; v: number }
   | { k: 'castOff' }
   | { k: 'pushOff' }
+  | { k: 'turn' }
   /** Coming in to a berth: lines ready (again: stand down), or let go her lines lying along a dock (sim/world.ts). */
   | { k: 'lines' } | { k: 'letGo' }
   | { k: 'hail' }
@@ -117,7 +120,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
     case 'tiller': u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
-    case 'lash': u.lashed = c.on ? u.tiller : null; return;
+    case 'lash': if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-1, Math.min(1, c.at)); u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
     case 'lazyCar': takeLine(u, 'car'); moveLazyCar(u, c.fore, c.ins); return;
@@ -148,12 +151,14 @@ export function applyCommand(w: World, c: Command): CommandResult {
       if (c.op === 'tilt') w.motorTilt();
       else if (c.op === 'stop') w.motorStop();
       else if (c.op === 'swivel') w.motorSwivel();
+      else if (c.op === 'stow') w.motorStow();
       else if (c.op === 'start') return w.motorStart(c.retireFirst);
       else if (c.op === 'gear') w.motorGear(c.gear);
       else if (c.op === 'throttle') w.motorThrottle(c.v);
       return;
     case 'castOff': return w.castOff();
     case 'pushOff': return w.pushOff();
+    case 'turn': return w.callTurn();
     case 'lines': return w.linesReady();
     case 'letGo': return w.letGoLines();
     case 'hail': w.userHail(); return;

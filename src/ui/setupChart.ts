@@ -65,7 +65,7 @@ export class SetupChart {
     s.disabled = !slip; s.title = slip ? `Her slip, ${slipPlace(slip)}` : 'Give her a slip in the Yacht Club first';
     s.textContent = this.which === 'from' ? 'Start from her slip' : 'Back to her slip';
     $('bPinNone').hidden = this.which !== 'to';
-    $('setupChartHint').textContent = this.which === 'from' ? 'Tap the water, a place or her slip to start there.' : 'Tap the water, a place or her slip to sail there.';
+    $('setupChartHint').textContent = this.which === 'from' ? 'Click the water, a place or her slip to start there.' : 'Click the water, a place or her slip to sail there.';
     if (refit || !this.fitted) this.fit();
     this.draw();
   }
@@ -89,7 +89,7 @@ export class SetupChart {
     for (const pl of PLACES) { const [x, y] = px(pl.p), d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; best = pl.id; } }
     if (best) { this.put(best); return; }
     if (onLand(q)) { this.note('That\'s land. Pick a spot on the water.'); return; }
-    if (inBasin(q)) { this.note(slip ? 'Inside a harbor: tap her slip, or pick open water outside.' : 'Inside a harbor: pick open water outside (or give her a slip in the Fleet).'); return; }
+    if (inBasin(q)) { this.note(slip ? 'Inside a harbor: click her slip, or pick open water outside.' : 'Inside a harbor: pick open water outside (or give her a slip in the Fleet).'); return; }
     this.put(spotId(q));
   }
 
@@ -107,6 +107,6 @@ export class SetupChart {
     if ($('setup').hidden || $('whereField').hidden) return;
     const w = this.picks.world();
     if (!this.fitted) this.fit();
-    this.hud.drawChart(this.c, w, this.cx, this.cy, this.scale, w.dest?.p ?? null);
+    this.hud.drawChart(this.c, w, this.cx, this.cy, this.scale, w.dest?.p ?? null, { cornerFree: true }); // (the expand icon's corner)
   }
 }

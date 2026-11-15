@@ -30,9 +30,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   const hB = together ? h : (h + 180) % 360, vB = together ? o.vA : 0.3;
   const run = (s: number) => {
     for (let i = 0; i < Math.round(s / DT); i++) {
-      Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB });
-      if (bTurning) { B.penaltyDir = 1; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
-      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1 });
+      // (held: her heading and her turn both, or what she'd turn by is still there for the other boat to see coming)
+      Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB, turnRate: 0, yawRate: 0 });
+      if (bTurning) { B.penaltyDir = 1; B.penaltyTurned = 90; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
+      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1, penaltyTurned: 90, turnRate: 0, yawRate: 0 }); // (her turns begun: 90° into them, physics.ts countPenalty)
       if (o.retired) { A.retired = true; A.penalty = A.penaltyTotal = 0; A.penaltyDir = 0; } // (not racing: her contacts carry no penalty)
       else { A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty); }
       w.step(DT); w.paused = false;
@@ -40,6 +41,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   };
   // (a touch with the hulls overlapping, then held off `apart` m for 4.5 s (past COMPELLED_WINDOW), then together again
   // as the pair's incident cooldown runs out, so that's what's judged: three touches in 13 s, inside TANGLE_MAX)
+  // (first on their headings a length apart for 3 s: set down on a new heading, a boat's main takes a moment to come
+  // across, and by the rules' definitions she's on her old tack until it has (physics.ts tackStep); the touches are to be
+  // judged with both on the tack they're sailing)
+  off = FAR; run(3); got.length = 0; byB.length = 0;
   off = together ? 2 : 0; run(0.5);
   // (pressed: held touching, side by side 2 m apart between the centerlines, all along)
   if (o.pressed) { off = 2; run(o.pressed); return got.length; }

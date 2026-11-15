@@ -51,10 +51,9 @@ export class Chart {
     $('bChartClose').onclick = () => this.close();
     $('bChartPal').onclick = () => {
       if (!this.w) return;
-      // (the race learns the palette by command; the chart redraws once its mirror has it, or it'd take two clicks)
-      const pal = (this.w.settings.chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
-      this.setPal(pal); $('bChartPal').textContent = pal === 'day' ? 'Dusk colors' : 'Day colors';
-      void this.race.ask({ k: 'settings', patch: {} }).then(() => { this.palLabel(); this.draw(); });
+      // (the palette is the page's own (Hud.shown): the chart redraws with it at once; the race learns it by command)
+      const pal = (this.hud.shown(this.w).chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
+      this.setPal(pal); this.palLabel(); this.draw();
     };
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
@@ -93,7 +92,7 @@ export class Chart {
     if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
-  private palLabel(): void { $('bChartPal').textContent = (this.w?.settings.chartPal ?? 'day') === 'day' ? 'Dusk colors' : 'Day colors'; }
+  private palLabel(): void { $('bChartPal').textContent = ((this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day') === 'day' ? 'Dusk colors' : 'Day colors'; }
 
   close(): void {
     if (!this.isOpen) return;
@@ -128,7 +127,7 @@ export class Chart {
     go.hidden = !(w?.cruising && this.pick);
     $('bChartMove').hidden = !(w?.freeSail && this.pick); // (not in a race, even retired: that would be a restart)
     if (!w || !this.pick) {
-      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Tap the water or a place to choose one.</p>` : '';
+      el.innerHTML = note ? `<p>${note}</p>` : w?.cruising ? `<p>${w.dest && w.arrivedT == null ? `Heading for <b>${w.dest.name}</b>.` : 'No destination set.'} Click the water or a place to choose one.</p>` : '';
       return;
     }
     const u = w.user, p = this.pick.p, d = Math.hypot(p.x - u.x, p.y - u.y), b = brg(p.x - u.x, p.y - u.y);

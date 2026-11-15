@@ -156,6 +156,9 @@ What's planned, roughly in order. Done work is described in the README.
      - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
      - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
        option.
+     - Rule 31 under protests (branch rules-31): a mark touch is any boat's to protest that saw it (60.1,
+       60.4(a)(2)). The boats within four lengths saw it: you may hail, and the nearest AI boat hails at once. The toucher's turn is her own choice, as for a foul.
+       The hearing decides it as a foul.
    - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
      committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and
@@ -228,6 +231,9 @@ What's planned, roughly in order. Done work is described in the README.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
+     from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. Then the planner allows for the
+     lee's edge, the wind to leeward of her line (Horseshoe Bay A27 in a 20 kt easterly: tests/pushoff-astern's it.fails).
    - **The place** (owner's chart screenshot): Josephine's real slip, number 572, at the west end of a Gashouse Cove fairway close to
      the basin's west seawall. "it's one of the narrowest fairways in the Bay. very hard to get in and out of anyway. but
      literally impossible in current sim." The test is getting her out of this slip, in the day's wind, as a skilled
@@ -270,6 +276,10 @@ What's planned, roughly in order. Done work is described in the README.
    both sides.
 8p. ~~**Bug: with the sails down, the jib cars show as loaded**~~ (done: bf2a855, ecc0d4c) (owner, 13 November; <1 h): "with sails down, neither jib
    car should show as loaded." With no sail up there's no sheet load, so both cars are free to move and shown that way.
+   - **The push-off's known limits** (physics review of #384, not blocking): kept-fast for the six westerly berths is
+     asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
+     that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
+     under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
@@ -307,6 +317,16 @@ What's planned, roughly in order. Done work is described in the README.
    6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
+   7. **The cove's edge: the harbor's buildings and trees** (Bay East, 15 November; physics; after the wind-shadow seams;
+      needs heights): by the shore's own physics the cove isn't in slower air than its mouth (docs/WIND-FETCH-CHECK.md),
+      so a sharper edge would come from the Golden Gate YC and St. Francis YC buildings on the moles, Marina Green's
+      trees and the cove's seawall with the land behind it. Built as harborLee obstacles if their heights can be sourced;
+      otherwise it waits.
+   8. **The shore's slowdown by fetch, everywhere** (Bay East, 15 November; physics; needs an open-water Bay wind
+      record): the slowdown by how far the air has come over the water, not the distance to the nearest shore, with
+      OPEN_WATER re-derived by direction at Fort Point. It moves the courses' wind by −15% to +12% by direction, so it
+      needs a record to check against (the pier stations are ruled by their own shelter) and then the owner's OK. The
+      check so far, and the code on branch bay-east-26: docs/WIND-FETCH-CHECK.md.
 8za. **Start practice teaches picking the favored end** (owner, 15 November: "start practice also needs to help me learn how
    to pick the favored side. don't just tell me."; Debrief; design first): the player works it out the way sailors do,
    then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
@@ -1033,6 +1053,16 @@ companionway redo) and Crew Figures; next as each finishes, Crew Controls and Ma
 - **Next — a broader review of the trim controls** (the band done with item 3; the trim coach on branches ui/trim-coach, design/trim-coach, ui/telltale-words, no PR yet) (polish/clarity; 4–6 h; done together with the crew controls above): owner, "we need a broader review of trim
   controls, which are still confusing." A full review of the trim panel's clarity: the labels, who's in charge of each
   line, auto against yours, and the coach. The plan goes to the owner as a layout before anything is built.
+- **Next — the trim coach's promise in light air** (the next coach item after the trim coach's PR; accuracy; 3–5 h;
+  the Coordinator, 15 Nov 2026: lessons are in light air, so it matters for learners). Since the trim coach's promise
+  fix, its top fix pays at least ¾ of what it says across 10–20 kt (tests/coach-promise.test.ts). Under 10 kt it still
+  over-promises: in 7 kt, outhaul eased, it promised 1.47% and the boat paid 1.02%. In the first ~20 s of a lull the
+  crew are still coming in off the rail, while the coach has them where they are, and it promises about twice what she
+  gets. Find the terms the coach's speedFactor still lacks there (the crew's light-air placing, crewAndHeel below their
+  best heel; clothFill), and extend the test down to 5 kt and into the lull. Also: with old sails in 20 kt and the main
+  bar-tight, its fix (ease the main) pays only 62–72% of the promise; the crew's way back off their depowering steps is
+  only roughly foreseen (coach.ts speedFactor). And the coach's settle lacks the sea's drag, fouling and the weight
+  aboard, so in chop or on an old, heavy boat it under-promises by 1.3–2×.
 - ~~**Next — the bow wave**~~ (done, #39: a ridge of sea-colored water, foam only at its crest, sized by the stem rise and Froude number; polish/accuracy; 2–3 h): looks "like a big white V rather than water", worse at night. A bow
   wave is a raised, curling ridge of water with broken foam only at its crest, lit like the rest of the sea; the Kelvin
   angle (19.5°) already used for ship wakes. Do with the spray.

@@ -85,6 +85,24 @@ describe('the race in its worker sails as in the page', () => {
     expect(r.real.t).toBeGreaterThan(-170); // (it sailed)
   }, 300_000);
 
+  // the trim coach beside the race (sim/coachRun.ts): in the worker, off the page's frame; it says what it says in the
+  // page, and weighing her lines changes nothing in the race
+  it('the trim coach in the worker: its word comes back, the same as in the page, and the race is untouched', () => {
+    const L = new LocalHost(new World(race().file, race().settings, race().seed, race().opts));
+    const fake = new FakeWorker(false), W = new WorkerHost(fake as unknown as Worker, race());
+    const quiet = new FakeWorker(false), Q = new WorkerHost(quiet as unknown as Worker, race());
+    const said: [string[], string[]] = [[], []], ctx = { preStart: false, justRounded: false };
+    for (let i = 0; i < 900; i++) {
+      for (const c of SCRIPT.get(i) ?? []) { L.send(c); W.send(c); Q.send(c); }
+      L.advance(frameDt(i)); W.advance(frameDt(i)); Q.advance(frameDt(i));
+      const a = L.coach(ctx), b = W.coach(ctx); Q.coach(null);
+      if (a) said[0].push(a.view.top.id); if (b) said[1].push(b.view.top.id);
+    }
+    expect(said[1].length).toBeGreaterThan(10);
+    expect(said[1].slice(0, 10)).toEqual(said[0].slice(0, 10)); // (the worker's a frame behind: its first words the page's)
+    expect(state(fake.race.world!), 'the coach changed the race').toBe(state(quiet.race.world!));
+  }, 300_000);
+
   it('answers come back (the motor, the chart\'s move), and a worker that fails leaves the race sailing in the page', async () => {
     const args: WorldArgs = { file: COURSES[0], settings: S({ mode: 'sail', sailFrom: 'cityfront', sailTo: '', current: 'slack' }), seed: 4, opts: { freeSail: true } };
     const fake = new FakeWorker(false); let failed = '';
