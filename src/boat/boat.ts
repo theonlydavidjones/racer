@@ -78,6 +78,9 @@ export interface AiState {
   headedT?: number;
 }
 
+/** The lines a crew set early for the next leg before a rounding (sim/world.ts roundingPrep). */
+export type CtlPrep = 'vang' | 'cunningham' | 'backstay' | 'outhaul';
+
 export interface Boat {
   id: number;
   isUser: boolean;
@@ -202,6 +205,9 @@ export interface Boat {
   shape: { main: Shape; jib: Shape | null; eff: number };
   /** The crew's current plan for the controls, and seconds until they reconsider it. */
   crewPlan?: CrewSettings | null; crewPlanT?: number;
+  /** Getting ready for the next leg before a rounding (sim/world.ts roundingPrep): which lines the crew have switched to
+   * the next leg's settings, that leg's apparent wind angle, and their plan for it (physics.ts). Null otherwise. */
+  crewPrep?: { lines: CtlPrep[]; awa: number; up: boolean; plan?: CrewSettings | null } | null;
   /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */

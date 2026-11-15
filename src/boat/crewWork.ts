@@ -347,11 +347,13 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a walk for a real change: a new point of sail, their wish over the cycle well away from the setting (LINE_MOVED), or a line
       // they've not set yet. Urgent too: the wish over the cycle well off counts only once it has moved since the set)
       const real = realChangeOf(c, twa, ls, k, skill);
-      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
+      // (and a line they're setting early for the next leg, before a rounding: sim/world.ts roundingPrep)
+      const prep = !!b.crewPrep?.lines.includes(k as never);
+      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || prep || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
       // Set right through to a puff's wish, they were back seven seconds later as it passed, the vang 0.17, 0.89, 0.58)
-      if (walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
+      if (walk && since < LINE_TAU && Math.abs(dl) < 0.5 && !prep) continue;
       urgentTo = urgent && walk;
       if (!walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
     }

@@ -1215,6 +1215,14 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
     if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
     if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller, 'traveller') ? t.traveller : c.traveller; }
+  // a rounding coming: the lines the crew set early for the next leg (sim/world.ts roundingPrep), to their plan for it
+  const prep = b.crewPrep;
+  if (prep) {
+    prep.plan ??= crewSolve(tws, prep.awa, b.tack, optimalSheet('main', prep.awa), optimalSheet('jib', prep.awa), b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, 0);
+    // (only the way the next leg takes them: eased bearing away, the vang first so the boom isn't broken; on, rounding up.
+    // A line the run wants harder, the vang in a moderate breeze, they set once she's off; the beat's eased ones, once on it)
+    for (const k of prep.lines) if (!b.isUser || !byHand(b, k)) want[k] = prep.up ? Math.max(c[k], prep.plan[k]) : Math.min(c[k], prep.plan[k]);
+  }
   // (the puff's ease, the car's share first: down the track as far as it goes, the sheet the rest, puffEase)
   const puffCar = gust > 0 && want.traveller != null && !byHand(b, 'traveller');
   if (puffCar) want.traveller = Math.min(1, want.traveller! + gust / TRAVELLER_SWING);
