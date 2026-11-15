@@ -805,10 +805,53 @@ function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.V
   return p;
 }
 
+/** Where a figure's shoulders are about, in a pose (the chest's middle, between them). */
+const chest = (p: PoseT, k: number) => p.hip.clone().addScaledVector(fwd(p.yaw), -Math.sin(p.pitch) * BONE.shoulderY * k).add(V(0, Math.cos(p.pitch) * BONE.shoulderY * k, 0));
+/** The hand of a pose nearer `to`, moved there, or as far toward it as an arm reaches from the chest. */
+function reachTo(p: PoseT, to: THREE.Vector3, k: number): void {
+  const i = p.hands[0].distanceToSquared(to) <= p.hands[1].distanceToSquared(to) ? 0 : 1, c = chest(p, k), max = 0.55 * k;
+  const d = to.clone().sub(c); if (d.length() > max) d.setLength(max);
+  p.hands[i] = c.add(d);
+  if (p.elbow) p.elbow[i] = undefined;
+}
+/**
+ * Ready for the turn coming (crewPhys.ts `ready`: the call heard, or seen coming): for a tack, a look up at the sails and
+ * a hand to their sheet, the lazy jib sheet loaded on the windward winch (it's the working one once she's through) for
+ * the jib hand, the mainsheet for the others; for a jibe, heads down for the boom coming over (the US Naval Academy's
+ * Navy 44 tacking and gybing guides: boat/calls.ts).
+ */
+function ready(p: PoseT, k: number, windward: number, jibe: boolean, jibHand: boolean): void {
+  if (jibe) {
+    p.pitch -= 0.3; p.look = p.hip.clone().addScaledVector(fwd(p.yaw), 0.8).setY(p.hip.y - 0.4);
+    return;
+  }
+  p.look = V(-windward * 0.3, 4.5, -1.2); // (the jib's luff and the main above, from wherever they sit)
+  reachTo(p, jibHand ? winchAt(windward) : V(0, 0.95, THWART.z - 0.25), k); // (the mainsheet's tail in front of the thwart, as tacking it: tackRole 'main')
+}
+/**
+ * Struck by the boom in a crash jibe (crewPhys.ts `outUntil`): slumped forward where they sit, the head in a hand,
+ * looking down.
+ */
+function struck(p: PoseT, k: number, head: THREE.Vector3 | null): void {
+  const hiking = p.pitch > 0.4; // (leant right back out over the rail: the torso's down is forward)
+  p.pitch -= 0.45;
+  // (the hand to the brow where the head's drawn, just ahead of it: from the pose's own lean, a hiker's hand went up over
+  // their head, the drawn torso less leant back than the pose's pitch)
+  const brow = (head ?? chest(p, k).add(V(0, 0.2 * k, 0))).clone().addScaledVector(fwd(p.yaw), 0.12 * k).add(V(0, -0.02 * k, 0));
+  const i = 1; // (the right hand)
+  p.hands[i] = brow.addScaledVector(right(p.yaw), 0.02 * k);
+  // (the forehead in the hand, the elbow down toward the knee: not out to the side, the hand coming up across the chest.
+  // Hiking, leant back over the rail, the elbow out to the side instead: "down" in their leant-back frame was forward)
+  p.elbow = [p.elbow?.[0], hiking ? V(1, 0.3, 0.8) : V(0.25, -1, -0.15)];
+  p.look = p.hip.clone().addScaledVector(fwd(p.yaw), 0.5).setY(p.hip.y - 0.5);
+}
+
 // ———————————————————————————— inverse kinematics ————————————————————————————
 
 /** How fast a knee or an elbow swings round to point a new way (rad/s), and this frame's time step. */
-const BEND_RATE = 8; let ikDt = 1 / 30;
+const BEND_RATE = 8; let ikDt = 1 / 30, ikFrame = 0;
+/** How fast an elbow goes round the shoulder at most (m/s): a quick reach, not a flick. */
+const ELBOW_SPEED = 3;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _a = V(0, 0, 0), _b = V(0, 0, 0), _c = V(0, 0, 0), _d = V(0, 0, 0), _x = V(0, 0, 0), _y = V(0, 0, 0), _z = V(0, 0, 0);
 /**
  * Two bones from `base` (the joint's position in the parent's frame) to `target` (in the same frame), lengths l1 and l2,
@@ -838,6 +881,18 @@ function ik(limb: Limb, base: THREE.Vector3, target: THREE.Vector3, l1: number, 
   }
   (limb.root.userData.bend ??= new THREE.Vector3()).copy(bend);
   const u1 = _c.copy(d).multiplyScalar(a).addScaledVector(bend, h).normalize(); // base → the middle joint
+  // (an elbow goes at most ELBOW_SPEED about the shoulder: with the hand in close by it, folded on the mainsheet, a few
+  // centimeters of the hand and the shoulder rising as they come up off the rail turned the arm's plane half a radian a
+  // frame, the elbow whipping round at 6 m/s as a tack ended. Held, the forearm points at the hand from where the elbow
+  // has got to, and catches up in a frame or two)
+  if (back < 0) {
+    const ud = limb.root.userData;
+    if (ud.uf !== ikFrame) { ud.uf = ikFrame; ud.u0 = ud.u1 ? (ud.u0 ?? new THREE.Vector3()).copy(ud.u1) : undefined; }
+    const u0 = ud.u0 as THREE.Vector3 | undefined, max = ELBOW_SPEED * ikDt / l1;
+    if (u0) { const ang = Math.acos(Math.max(-1, Math.min(1, u0.dot(u1))));
+      if (ang > max) { const ax = _y.crossVectors(u0, u1); if (ax.lengthSq() > 1e-10) { ax.normalize(); u1.copy(u0).applyAxisAngle(ax, max); } } }
+    (ud.u1 ??= new THREE.Vector3()).copy(u1);
+  }
   // the bone's frame: −y along it, +z the way the lower bone swings away (back for the shin, forward for the forearm)
   _y.copy(u1).negate();
   _z.copy(bend).multiplyScalar(-back).addScaledVector(u1, (bend.dot(u1)) * back).normalize();
@@ -855,7 +910,7 @@ const _ax = V(0, 0, 0), _qc = new THREE.Quaternion();
 /** Put a figure in a pose (`upright` rad: how far the torso leans against the boat's heel, to stay over the hips as she
  * heels: a sitter keeps their body nearly upright, a hiker braced on the rail less so). */
 function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
-  ikDt = dt > 0 && dt < 0.5 ? dt : 10; // (no swing to ease on a first frame)
+  ikDt = dt > 0 && dt < 0.5 ? dt : 10; ikFrame++; // (no swing to ease on a first frame)
   const k = f.scale;
   f.root.position.copy(p.hip); f.root.rotation.set(0, p.yaw, 0);
   // (the heel's axis, the boat's fore-and-aft line, in the figure's own turned frame)
@@ -875,7 +930,7 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   f.arm.forEach((a, i) => {
     const tgt = local(p.hands[i], _p).applyQuaternion(_tq).clone();
     // (a pose that says which way an elbow goes has it go that way, not the way the last one bent it)
-    if (p.elbow?.[i]) a.root.userData.bend = undefined;
+    if (p.elbow?.[i]) a.root.userData.bend = a.root.userData.u1 = undefined; // (nor held to ELBOW_SPEED from it)
     ik(a, a.root.position, tgt, BONE.upper, BONE.fore, p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
     const par = f.root.parent; if (!par) return;
     f.root.updateMatrixWorld(true);
@@ -1187,7 +1242,7 @@ function travelling(f: Figure, a: CrewState['people'][number] | undefined, x: nu
  * the mast). `windward` +1 when the wind is over the starboard side; `c` the crew state (null: a default);
  * `hideHelm` when you're looking through the helm's eyes; `dt` for easing; `tip` the tiller's end (tillerTip).
  */
-export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0, tacking = false, pitch?: number, paddle?: PaddleDraw | null): void {
+export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, dt: number, hideHelm: boolean, tip?: THREE.Vector3, heelDeg = 0, tacking = false, pitch?: number, paddle?: PaddleDraw | null, jibe = false): void {
   // (how she's moving in the sea, from her pitch as drawn, rad: its rate's mean square over about four seconds)
   if (pitch != null && dt > 0 && dt < 0.5) { if (cr.seaP != null) { const r = (pitch - cr.seaP) / dt; cr.seaMs = (cr.seaMs ?? 0) + (r * r - (cr.seaMs ?? 0)) * (1 - Math.exp(-dt / 4)); } cr.seaP = pitch; }
   rough = Math.max(0, Math.min(1, (Math.sqrt(cr.seaMs ?? 0) - 0.012) / 0.04));
@@ -1287,6 +1342,13 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     if (wasTack && !f.tack && f.cur && Math.cos(f.cur.yaw) < -0.3) f.turnDir = -Math.sign(x) || -Math.sign(f.cur.hip.x) || 1;
     const role = f.tack ? (i === fore ? 'jib' : 'main') : null;
     let want = crewPose(f, x, z, lean, pose, windward, go && !role, f.speed > 0.05 ? dir : (pose === 'cross' ? -Math.sign(x) * Math.PI / 2 : 0), i, role, a?.goal?.z ?? z, cr.crew.length < 2 || i === fore);
+    // (struck by the boom, out of it a while; or ready for the turn coming: sat or hiking where they are, not on the way
+    // anywhere, and not at a job)
+    if (a && !role && !busy && !go && pdl?.f !== f) {
+      if (((a as { outUntil?: number }).outUntil ?? 0) > (c?.clock ?? 0))
+        struck(want, f.scale, f.root.parent && f.cur ? f.root.parent.worldToLocal(f.head.localToWorld(_hd.set(0, 0.1, 0))) : null); // (the head's middle, above its pivot at the neck)
+      else if (a.ready) ready(want, f.scale, windward, jibe, cr.crew.length < 2 || i === fore);
+    }
     if (pdl?.f === f) want = paddleWant(f, want, pdl, x, a?.z ?? z, go, windward, i);
     // (on the way along the side deck, and settling into the new place after it)
     const routed = route(f, want, dt, f.scale);
@@ -1337,7 +1399,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     cu.quaternion.setFromRotationMatrix(_m4.makeBasis(xAx, d, zAx));
   }
 }
-const _m4 = new THREE.Matrix4();
+const _m4 = new THREE.Matrix4(), _hd = V(0, 0, 0);
 
 /**
  * Pushing off: the bow crew member standing on the finger beside her (the shrouds), leaning in with both hands on her

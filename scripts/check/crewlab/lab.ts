@@ -71,6 +71,11 @@ const lab = {
   /** Sail `s` seconds drawing every frame, calling `shot(i)` every `every` frames (for sequences through a tack). */
   frames(s: number) { const hold = (lab as any).hold; for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { if (hold != null && b.turnTarget == null && !b.tacking) b.h = hold; t += 1 / 60; }); const A = (lab as any).seaA; syncBoatMesh(m!, b, t, A ? { heave: 0, pitch: A * Math.sin(2 * Math.PI * t / 2.6), roll: 0 } : undefined); } render(); },
   tack() { (lab as any).hold = null; startTack(b); },
+  /** The helm calls the turn ("Ready about", "Ready to jibe"): the crew get ready for it (the helper's clock starts again
+   * each step, so a call at 0 is always just made). */
+  call() { b.callT = 0; },
+  /** The crew struck by the boom, out of it for good (crewPhys.ts outUntil). */
+  strike() { for (const a of b.crew!.people.slice(1)) (a as { outUntil?: number }).outUntil = Infinity; },
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */
   wind(kt: number) { b.ww = { ...b.ww, kt }; },

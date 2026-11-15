@@ -1539,7 +1539,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   // the crew on the windward side, hiking as hard as she needs
   // (paddling with the boom crutch: who, which side, and how long the crutch takes to fetch, boat/paddle.ts)
   const pd = b.paddle, who = pd ? paddler(b) : 0;
-  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
+  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
   if (b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
