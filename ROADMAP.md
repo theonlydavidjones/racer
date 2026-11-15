@@ -629,6 +629,13 @@ What's planned, roughly in order. Done work is described in the README.
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
      to here", and nothing on the screen.
+   - **The navigator doesn't see piers** (owner, 15 November, from a chart screenshot; bug; next, "not urgent"; 1–3 h):
+     "navigator not detecting this pier. I ran right into it." The planned track runs straight along a long NE–SW pier
+     to its tip, in the Precautionary Area (20–39 ft charted). Suspects: the planner's land test (src/sim/routing.ts
+     landDist, :47-66) uses the terrain's land mask and the Cityfront's hand-drawn shore, not the wharf layer
+     (geo/shore.ts wharfNearest, imported but apparently unused there); and its grid cache and ring search can miss a
+     pier about 30 m wide. The fix: every pier and wharf counts as land for routing, kept clear by at least half a
+     boat length plus a margin, with a test that a plan past each Embarcadero pier keeps clear.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
