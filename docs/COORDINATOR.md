@@ -66,6 +66,11 @@ UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, R
 Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
 
 ### Handoffs (retired sessions)
+- **Crew Art** (retired 15 Nov 14:25): #418 coach no-write fix (pure `rigOf()` for the coach; physics keeps `mainRig()`;
+  fingerprints identical, perf-pair 0.9914) for v198, with #409, #410, #412. Unstarted, no PR: branch crew-summer
+  (cf066789), the crew dressed for rain and season, after the crew-figure order lands. Stills branch stills/flags-tile
+  can be deleted. Tips: headless Chromium runs 1–2 frames/s, so wait on state, not time; perf.test needs --silent=false
+  to print its ratio. Bay East wants to hear first if rain ever damps the sea or the wind.
 - **UI & Experience** (retired 15 Nov 10:15): #393 trim coach + keys, #400 map expand, #405 Tools tray, all in batch 42.
   Branches ui/trim-coach, ui/map-expand, ui/tools-tray, design/features-tray (mock). Keys: no F-keys (tests/keys.test.ts);
   Shift T Trim Notes, F frame readout, Z/X traveler, P points of sail, R drill restart, J jibe-ho; keydown via keyOf(e).
