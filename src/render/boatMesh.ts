@@ -1336,6 +1336,10 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   { const g = pc.getContext('2d')!; g.fillStyle = '#d8241f'; g.fillRect(0, 0, 48, 32); }
   hoist(pc, new THREE.Vector3(0, 3, 3), 0.2, grp, false);
   const protest = flags[flags.length - 1].mesh; protest.visible = false;
+  // (it reads red whichever side the light's on, as a flag in daylight does: lit through as well as on, from its own red;
+  // and never left out as a small part (FittingCull): scene.ts keeps it big enough to see at a distance, PROTEST_MIN_PX)
+  { const pm = protest.material as THREE.MeshLambertMaterial; pm.emissive.set(0xffffff); pm.emissiveMap = pm.map; pm.emissiveIntensity = 0.45; }
+  protest.frustumCulled = false;
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
   { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });

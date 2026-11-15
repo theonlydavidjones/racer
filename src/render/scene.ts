@@ -73,6 +73,8 @@ float vnoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 *
   return mix(mix(vhash(i), vhash(i + vec2(1.0, 0.0)), f.x), mix(vhash(i + vec2(0.0, 1.0)), vhash(i + vec2(1.0, 1.0)), f.x), f.y); }
 `;
 /** Her deck's half-breadth at HULL_N + 1 stations, stem to transom (hullUni): the outline the sea's kept out of. */
+/** The protest flag's hoist (m: boatMesh), and the least it's drawn on the screen (px). */
+const PROTEST_H = 0.2, PROTEST_MIN_PX = 12;
 const HULL_N = 24;
 const HULL_DECL = `uniform float uHullOn; uniform mat4 uHullInv; uniform float uHullHalf[${HULL_N + 1}];\n`;
 /** (the sea's world place, in her frame: inside her outline, with the camera down in her, it isn't drawn) */
@@ -532,6 +534,7 @@ export class SceneView {
 
   /** Rebuild boats and course objects for a new race. */
   private harbor!: Harbor;
+  private protestAt = new THREE.Vector3();
   private harborCam = new THREE.Vector3();
   private hullCam = new THREE.Vector3();
   private sunLit = true;
@@ -1053,6 +1056,13 @@ export class SceneView {
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
     { const cp = camera.getWorldPosition(this.farCam); for (const m of this.boatMeshes) farShadows(m.grp, m.grp.position.distanceTo(cp)); } // (far boats cast none)
+    // the protest flag "conspicuously display[ed]" (RRS 60.2(a)(1)): true size close by, but never less than PROTEST_MIN_PX
+    // tall on the screen, so it reads to a hundred metres and more as a sailor sees one at that range (a legibility floor,
+    // as the boats' tags have; at most ten times its size)
+    { const k = size.y * this.renderer.getPixelRatio() / (2 * Math.tan(camera.fov * Math.PI / 360));
+      for (const m of this.boatMeshes) { const f = m.protest; if (!f.visible) continue;
+        const d = Math.max(1, f.getWorldPosition(this.protestAt).distanceTo(camera.position)), px = PROTEST_H * k / d;
+        f.scale.setScalar(Math.min(10, Math.max(1, PROTEST_MIN_PX / px))); } }
     this.harbor.update(camera.getWorldPosition(this.harborCam)); // (the moored boats nearest the camera in detail)
     // the camera down inside her hull (below her deck, within its outline): the sea kept out of her (hullUni, above)
     { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
