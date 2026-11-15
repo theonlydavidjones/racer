@@ -66,7 +66,10 @@ DSQ. Built on the hearing."
   it (90.3(b)).
 - **Under umpiring** (practice, the drills): the signal and its warning only, with no protest.
 - **The AI boats** (`keepClearOfShips`):
-  - Each looks for a vessel's way 120 s ahead, four times a second. The ship looks twice a second.
+  - Each looks for a ship's way 120 s ahead, four times a second. For a vessel free to maneuver (a ferry, a tour boat,
+    the Coast Guard boat) she looks only 30 s ahead: that vessel is the one to keep clear (Rule 18(a)), so the sailing boat
+    stands on (Rule 17) and acts late, as she may once it's plain the other isn't acting. The ship looks twice a second,
+    and so does your boat's warning.
   - Coming into it, she keeps clear until the ship's stern has passed her, or she's far enough off that, sailing
     straight back at a Folkboat's hull speed, she couldn't be in the way before the stern goes by. The latch is on where
     she is, not on her heading, so it doesn't flicker.

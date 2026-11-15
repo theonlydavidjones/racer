@@ -122,6 +122,11 @@ export const SHIP_LOOK = 40;
  * doubt her (a modeling choice). AI_SHIP_EXTRA: the margin, m, she keeps beyond the way before she lets go
  * (keepClearOfShips). */
 export const AI_SHIP_LOOK = 120, AI_SHIP_EXTRA = 30;
+/** The same for a vessel free to maneuver (a ferry, a tour boat, the Coast Guard boat), s: she's the one to keep out of
+ * a sailing vessel's way (Rule 18(a)), and the sailing boat holds her course and speed (Rule 17(a)(i)) until it's plain
+ * the other isn't acting, then acts herself (17(a)(ii), (b)). The sim's ferries don't alter course, so it's left to her,
+ * late: half a minute out (a modeling choice). */
+export const AI_CRAFT_LOOK = 30;
 /** A Folkboat's best speed through the water, m/s (about 6 kt: her hull speed, 1.34·√(LWL in ft) with LWL 6.0 m), for
  * how soon she could sail back into a ship's way. */
 const AI_SHIP_SPEED = 3.1;
@@ -1528,7 +1533,7 @@ export class World {
     for (const v of this.vessels) {
       if (!v.moving || Math.abs(b.x - v.x) > 2500 || Math.abs(b.y - v.y) > 2500) { if (ai.shipClear === v.id) ai.shipClear = null; continue; }
       const ty = VESSEL[v.kind];
-      if (ai.shipClear !== v.id && (!look || entersWay(v, b.x, b.y, b.vx, b.vy, AI_SHIP_LOOK, 10) == null)) continue;
+      if (ai.shipClear !== v.id && (!look || entersWay(v, b.x, b.y, b.vx, b.vy, channelBound(v) ? AI_SHIP_LOOK : AI_CRAFT_LOOK, 10) == null)) continue;
       const o = onTrack(v, b.x, b.y), way = ty.beam / 2 + WAY_ABEAM;
       if (ai.shipClear === v.id) {
         const pass = (o.a + ty.len / 2) / Math.max(0.5, v.v);
@@ -1575,9 +1580,10 @@ export class World {
         }
       }
       if (!v.moving) continue;
-      if ((this.steps + v.id) % 30 === 0) this.dangerSignals(v); // (twice a second: a ship's watch, not every step)
+      if ((this.steps + v.id) % 30 !== 0) continue; // (twice a second: a ship's watch, and yours, not every step)
+      this.dangerSignals(v);
       const last = this.warned.get(v.id) ?? -Infinity;
-      if (dist(u, v) > 1500 || entersWay(v, u.x, u.y, u.vx, u.vy, AI_SHIP_LOOK, 40) == null) continue;
+      if (this.t - last <= 90 || dist(u, v) > 1500 || entersWay(v, u.x, u.y, u.vx, u.vy, channelBound(v) ? AI_SHIP_LOOK : AI_CRAFT_LOOK, 40) == null) continue;
       if (this.t - last > 90) {
         this.warned.set(v.id, this.t);
         this.emit({ type: 'toast', ms: 7000, msg: channelBound(v)
