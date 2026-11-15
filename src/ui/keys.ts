@@ -69,7 +69,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
-  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'], trimNotes: ['/'],
+  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'], trimNotes: ['F2'],
 };
 
 /** Keys you can't rebind (Esc cancels things; Tab moves focus). */
