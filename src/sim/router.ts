@@ -1,4 +1,4 @@
-import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
+import { KT, V, brg, cross, dist, dot, hypot, sub, unit, wrap, type Vec } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { speedInChop } from '../boat/seaway';
 import { landDist, manoeuvreS, sailLegSteps, type SailResult, type LegKind } from './routing';
@@ -50,7 +50,7 @@ interface Node { p: Vec; t: number; side: number; parent: number; turn: '' | 'ta
 function windOn(o: Outlook, p: Vec, t: number): { kt: number; from: number } {
   const w = o.wind(p, t), c = o.current(p, t), a = V(w.from);
   const wx = -a.x * w.kt - c.x / KT, wy = -a.y * w.kt - c.y / KT;
-  return { kt: Math.hypot(wx, wy), from: brg(-wx, -wy) };
+  return { kt: hypot(wx, wy), from: brg(-wx, -wy) };
 }
 
 /** Heading that makes good a straight line toward `u` across the current c, at speed v (m/s): as routing.ts crabTo. */

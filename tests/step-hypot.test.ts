@@ -2,16 +2,15 @@
 // every call, and the step called it about 2,200 times a step (docs/CAPACITY.md §8b). hypot gives the same result to the
 // last bit; this checks that too, on random pairs and the edge cases.
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { hypot } from '../src/core/math';
 
-const STEP_DIRS = ['src/boat', 'src/environment', 'src/sim', 'src/ai', 'src/rules', 'src/geo', 'src/core', 'src/courses'];
-const files = (d: string): string[] => readdirSync(d).flatMap(f => { const p = join(d, f); return statSync(p).isDirectory() ? files(p) : p.endsWith('.ts') ? [p] : []; });
+// (the step's directories, read through vite: the project's types have no node, tsconfig)
+const STEP_SRC = import.meta.glob('../src/{boat,environment,sim,ai,rules,geo,core,courses}/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 describe('the step\'s hypot', () => {
   it('no Math.hypot in the step\'s code', () => {
-    const found = STEP_DIRS.flatMap(files).filter(f => /Math\.hypot\(/.test(readFileSync(f, 'utf8')));
+    const found = Object.entries(STEP_SRC).filter(([, src]) => /Math\.hypot\(/.test(src)).map(([f]) => f);
+    expect(Object.keys(STEP_SRC).length).toBeGreaterThan(50); // (the glob found the step's code)
     expect(found).toEqual([]);
   });
   it('the same as Math.hypot, to the last bit', () => {
