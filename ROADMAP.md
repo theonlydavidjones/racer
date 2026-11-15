@@ -649,6 +649,9 @@ What's planned, roughly in order. Done work is described in the README.
        rebindable in Keys.
      - The how-to: no copy block; at most one short chip at the moment it's useful (bearing away toward a run, or
        close-hauled before a tack), e.g. "Space · jibe-ho", fading once she's used it a few times.
+     - The call leaves sooner (owner, 15 November; polish; <0.5 h): "the "tacking!" and "jibe ho!" commands can leave the
+       screen sooner. once called, they're called." The order is held for the whole turn plus 1.5 s today
+       (src/render/labels.ts:90-92). Show it about 1–1.5 s after the warning, then let it go.
    - **Tiller and mainsheet keys that follow the tack** (owner, 15 November; feature; next; 2–4 h): "tiller and mainsheet
      key commands should switch based on starboard or port tack to reflect real life movement." The owner chose:
      - An option in Keys, with today's fixed port/starboard (A/D) staying the default. The option makes the tiller keys
