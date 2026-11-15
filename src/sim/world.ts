@@ -204,10 +204,12 @@ export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.m
  * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.555 m/s; a breeze on her
  * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
-/** How far along her line astern the crew read the breeze before the shove, and how often, m (windAstern): past her
- * longest glide in a breeze (ASTERN_LOOK_MAX, 24 m, and what a bow wind adds), at the scale a harbor's lee changes over
- * (Corinthian's: 0.32 to 0.55 of the open wind in 20 m). Estimates. */
-const ASTERN_WIND_FAR = 40, ASTERN_WIND_STEP = 4;
+/** How far along her line astern the crew read the breeze before the shove, how far to leeward of it, and how often, m
+ * (windAstern): past her longest glide in a breeze (ASTERN_LOOK_MAX, 24 m, and what a bow wind adds) and the furthest
+ * the wind sets her across it meanwhile, at the scale a harbor's lee changes over (Corinthian's: 0.32 to 0.55 of the open
+ * wind in 20 m). And her set to leeward, m/s per knot of the breeze on her beam, lying stern first with no sail up: the
+ * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. */
+const ASTERN_WIND_FAR = 40, ASTERN_SET_FAR = 16, ASTERN_WIND_STEP = 4, SET_PER_KT = 0.019;
 useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE); // (the planner's look along her glide)
 /**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
@@ -2139,16 +2141,28 @@ export class World {
     if (b.handled) { b.vx = (b.x - x0) / dt; b.vy = (b.y - y0) / dt; }
   }
   /**
-   * The breeze along her line astern from where she lies, as her crew read it down the fairway before they shove (the
-   * ripples off the dock's end): the wind every ASTERN_WIND_STEP m out to ASTERN_WIND_FAR, read between; beyond, the last.
-   * Worked out once, as she's let go (some ten looks at the wind), not in the step.
+   * The breeze she'll meet going out astern from where she lies, as her crew read it down the fairway before they shove
+   * (the ripples off the dock's end): the wind every ASTERN_WIND_STEP m along her line out to ASTERN_WIND_FAR, and as far
+   * again to leeward of it as the wind can set her meanwhile (ASTERN_SET_FAR), read between; beyond, the last. Given her
+   * distance along the line and the time since she was let go: she is set across her line, to leeward, at SET_PER_KT of
+   * the breeze's part on her beam (Horseshoe Bay A27 in a 20 kt easterly: 0.15 m/s, 13 m in a minute and a half, into a
+   * different lee from her line's). Worked out once, as she's let go (some fifty looks at the wind), not in the step.
    */
-  windAstern(b: Boat, h: number): (dist: number) => Wind {
-    const u = V(h), ws: Wind[] = [];
-    for (let d = 0; d <= ASTERN_WIND_FAR; d += ASTERN_WIND_STEP) ws.push(this.windHere({ x: b.x - u.x * d, y: b.y - u.y * d }, b, false));
-    return dist => {
-      const f = Math.max(0, Math.min(ws.length - 1, dist / ASTERN_WIND_STEP)), i = Math.min(ws.length - 2, Math.floor(f)), k = f - i, a = ws[i], c = ws[i + 1];
-      return { from: n360(a.from + wrap(c.from - a.from) * k), kt: a.kt + (c.kt - a.kt) * k };
+  windAstern(b: Boat, h: number): (dist: number, t: number) => Wind {
+    const u = V(h), here = this.windHere(b, b, false), rel = wrap(here.from - h), lee = V(h + (rel > 0 ? -90 : 90));
+    const set = SET_PER_KT * here.kt * Math.abs(Math.sin(rel * D2R)), nd = Math.round(ASTERN_WIND_FAR / ASTERN_WIND_STEP) + 1, ns = Math.round(ASTERN_SET_FAR / ASTERN_WIND_STEP) + 1, ws: Wind[] = [];
+    // (as her own wind is worked out, her wake left out, but with the land's lee at each point, not the one she carries
+    // from where she lies: that lee is the very thing that changes along her way)
+    const leeK = b.leeK, shadowK = b.shadowK;
+    for (let j = 0; j < ns; j++) for (let i = 0; i < nd; i++) {
+      const d = i * ASTERN_WIND_STEP, a = j * ASTERN_WIND_STEP, q = { x: b.x - u.x * d + lee.x * a, y: b.y - u.y * d + lee.y * a };
+      b.leeK = landLee(q, this.wind.from); ws.push(this.windHere(q, b, false));
+    }
+    b.leeK = leeK; b.shadowK = shadowK;
+    const mix = (a: Wind, c: Wind, k: number): Wind => ({ from: n360(a.from + wrap(c.from - a.from) * k), kt: a.kt + (c.kt - a.kt) * k });
+    return (dist, t) => {
+      const fd = clamp(dist / ASTERN_WIND_STEP, 0, nd - 1), i = Math.min(nd - 2, Math.floor(fd)), fs = clamp(set * t / ASTERN_WIND_STEP, 0, ns - 1), j = Math.min(ns - 2, Math.floor(fs));
+      return mix(mix(ws[j * nd + i], ws[j * nd + i + 1], fd - i), mix(ws[(j + 1) * nd + i], ws[(j + 1) * nd + i + 1], fd - i), fs - j);
     };
   }
   /** The crew lets her go with a shove as they step aboard (ahead, or astern): from here she's under her own way. */
