@@ -625,6 +625,11 @@ What's planned, roughly in order. Done work is described in the README.
      current, and never draw a track going backward. Fix: choose the angle and the jibes by speed made good over the
      ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
      changing the design). The AI's own leg planning shares sailLeg: check it too.
+     **The isochrone router** (the owner's decision, asked 15 November): the rule-based planner can't get out of a dead end
+     on a run, light air in a lee with the tide setting her on (the owner's own route off Yellow Bluff, 25 Nov 15:00,
+     with the land's lee without seams: tests/passage-hairpin's it.fails). A router spreading out every minute on every
+     heading, with the real wind, lee and current, keeps the fastest way to each place; 6–10 h, a plan in 1–3 s, nothing
+     per step.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
      'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
      icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
