@@ -34,6 +34,11 @@ function windOn(o: Outlook, p: Vec, t: number): { kt: number; from: number } {
   return { kt: Math.hypot(wx, wy), from: brg(-wx, -wy) };
 }
 
+/** Heading that makes good a straight line toward `u` across the current c, at speed v (m/s): as routing.ts crabTo. */
+function crabTo(u: Vec, c: Vec, v: number): number {
+  const s = Math.max(-0.95, Math.min(0.95, cross(u, c) / Math.max(0.2, v)));
+  return brg(u.x, u.y) + Math.asin(s) * 180 / Math.PI;
+}
 /** Polar speed in chop, remembered (it's solved by iteration): as routing.ts chopSpeed. */
 const speeds = new Map<string, number>();
 function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
@@ -95,9 +100,16 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
       if (w.kt < 0.5) continue; // (becalmed here: she waits for the tide to carry her, which the next minute's front shows)
       const beat = beatAngle(w.kt);
       // (her beat angle, every HEADING_STEP from there, and her run angle exactly: the angles a navigator sails)
-      const run = runAngle(w.kt), twas: number[] = []; for (let x = beat; x <= 180; x += HEADING_STEP) twas.push(x); if (!twas.some(x => Math.abs(x - run) < 0.5)) twas.push(run);
-      for (const twa of twas) for (const sd of [1, -1]) {
-        if (twa === 180 && sd < 0) continue;
+      const run = runAngle(w.kt), cand: [number, number][] = [];
+      for (let x = beat; x <= 180; x += HEADING_STEP) for (const sd of [1, -1]) if (!(x === 180 && sd < 0)) cand.push([x, sd]);
+      if (!cand.some(([x]) => Math.abs(x - run) < 0.5)) { cand.push([run, 1]); cand.push([run, -1]); }
+      // (and the heading that crabs straight for the mark across the current, if she can sail it: on a reach the best way
+      // is a straight line over the ground, and the fan's 5° steps miss it, the stream setting her off and back again)
+      { const toB = unit(sub(b, n.p)), r = wrap(w.from - brg(toB.x, toB.y));
+        let v0 = chopSpeed(w.kt, Math.abs(r), ch.hs, ch.tp);
+        for (let k = 0; k < 2; k++) { const hm = crabTo(toB, c, v0), tw = Math.abs(wrap(w.from - hm)); if (tw >= beat) { v0 = chopSpeed(w.kt, tw, ch.hs, ch.tp); if (k === 1) cand.push([tw, wrap(w.from - hm) >= 0 ? 1 : -1]); } else break; }
+      }
+      for (const [twa, sd] of cand) {
         const h = w.from - sd * twa, v = chopSpeed(w.kt, twa, ch.hs, ch.tp); // (sd +1: wind from starboard, starboard tack/jibe)
         // a tack or jibe costs its time, drifting with the current: the minute's sailing is that much shorter
         const turn: Node['turn'] = n.side && sd !== n.side ? (twa < 90 ? 'tack' : 'gybe') : '', lost = turn ? manoeuvreS(turn, w.kt, ch.hs) : 0;
@@ -124,7 +136,8 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     if (dk < nearD - 10) { nearD = dk; nearStep = step; }
     else if ((step - nearStep) * STEP_MIN >= STALL) {
       const n = nodes[k], r = sailLeg(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
-      return r.ok ? finish(k, true, undefined, r) : finish(k, false, 'time');
+      if (r.ok) return finish(k, true, undefined, r);
+      nearStep = step; // (the rules can't from there either: the front searches on, and tries again after another stall)
     }
     yield;
   }

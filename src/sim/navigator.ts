@@ -31,6 +31,24 @@ const ROUTE_NAME: Record<string, string> = {
   channel: 'the deep-water ship route', sausalito: 'the Sausalito ferry route', alcatraz: 'the Alcatraz ferry route', tour: 'the bay-cruise boats\' loop'
 };
 
+/** The passage by the old rules (routing.ts sailLeg, stretch by stretch along the way round the land, up the middle or
+ * the long board first to either side): #406's planner, kept as a floor under the router. */
+function rulesPassage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] } {
+  let tt = t, ok = true, why: 'land' | 'time' | undefined, at = route[0];
+  const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
+  for (let i = 1; i < route.length; i++) {
+    const arrive = i === route.length - 1 ? 30 : 120;
+    let r = sailLeg(o, at, route[i], tt, 'middle', undefined, arrive, 360);
+    if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) { const q = sailLeg(o, at, route[i], tt, pl, undefined, arrive, 360); if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q; }
+    legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
+    if (!r.ok) { ok = false; why = r.why; break; }
+    const end = r.path[r.path.length - 1].p, next = route[i + 1];
+    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
+    if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
+  }
+  return { ok, why, minutes: tt - t, track, legs };
+}
+
 /**
  * A passage from a to b leaving at t, by the isochrone router (sim/router.ts): straight from a to b first, the router
  * finding its own way round the land, the lee and the tide; if it can't (the land between hides the way from its
@@ -43,7 +61,12 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
   // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
   // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried)
   const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain);
-  if (direct.ok || route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };
+  // (and the old rules' plans over the way round the land, which take a moment: the passage is the quicker. The router's
+  // 5° headings and 1-minute fronts can be a few minutes out on a reach the rules sail dead straight)
+  const rules = rulesPassage(o, route, t);
+  if (direct.ok && (!rules.ok || direct.minutes <= rules.minutes)) return { ok: true, minutes: direct.minutes, track: direct.path, legs: [direct] };
+  if (rules.ok && (!direct.ok || rules.minutes < direct.minutes)) return rules;
+  if (route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };
   let tt = t, ok = true, why: 'land' | 'time' | undefined;
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
   // each stretch from where the last one really ended (she counts as round a turn within 120 m of it, and cuts the
