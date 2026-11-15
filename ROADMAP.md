@@ -461,6 +461,9 @@ What's planned, roughly in order. Done work is described in the README.
      racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
      The on-screen label is the owner's choice.
+   - **Now — the paddling drawn** (owner, 15 November: "there's no animation associated with paddling?"; Crew Figures):
+     the physics shipped in v196 but nothing is drawn. The crew member goes below for the boom crutch, comes up with it,
+     kneels at the rail on the called side and strokes, the blade dipping in time with the push; then stows it.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
