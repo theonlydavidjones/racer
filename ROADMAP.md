@@ -464,6 +464,10 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
+     cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
+     chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
+     toggles moved (8b), and its key working with the chart open. Check the strategist in a race the same way.
    - **Bug: lashing the tiller less than about 13° off the centerline lashes it amidships** (owner, 15 November; bug;
      <1–2 h): "tiller lashing is glitching when I try to lash it less than 13ish degrees off centerline. it just lashes
      it amidships." Leads in src/app.ts:
