@@ -15,7 +15,7 @@ import { youTackPays } from '../sim/world';
 import type { SimView } from '../sim/host';
 import { $, setHidden, setHtml, setText, setTitle } from './dom';
 import { routeAround } from '../sim/routing';
-import { passageNow, type PassageNow } from '../sim/navigator';
+import { passageLive, type PassageNow } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
@@ -99,7 +99,7 @@ export class Hud {
     if (!wd.dest) return null;
     const u = wd.user, m = this.navMemo;
     if (!m || m.dest !== wd.dest || wd.clockUtc - m.t >= 1 || Math.hypot(u.x - m.x, u.y - m.y) > 300) {
-      const pn = passageNow(wd); if (!pn) return null;
+      const pn = passageLive(wd); if (!pn) return null;
       this.navMemo = { pn, t: wd.clockUtc, x: u.x, y: u.y, dest: wd.dest };
     }
     return this.navMemo!.pn;
@@ -826,7 +826,7 @@ export class Hud {
     this.drawn[detail] = { tf, w, h, scale, kind };
     // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
     // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
-    const plan = detail === 'inset' && this.insetPlan ? this.insetPlan : wd.freeSail && !wd.running && wd.dest ? passageNow(wd) : null;
+    const plan = detail === 'inset' && this.insetPlan ? this.insetPlan : wd.freeSail && !wd.running && wd.dest ? passageLive(wd) : null;
     const fog = field === 'fog' && detail === 'chart' ? visibilityFor(wd.raceDate, wd.clockUtc) : null; // (the inset gives fog in words only)
     const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key

@@ -130,6 +130,13 @@ function crabTo(u: Vec, c: Vec, v: number): number {
  * rounding distance). Gives up after `maxMin` minutes (a leg she can't sail: becalmed against the tide).
  */
 export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): SailResult {
+  const g = sailLegSteps(o, a, b, t0, plan, sc, arrive, maxMin); let r = g.next();
+  while (!r.done) r = g.next();
+  return r.value;
+}
+/** sailLeg a little at a time: it yields every 8 of its 10 s steps, so the page can work a plan out between frames
+ * (sim/navigator.ts passageLive) without a step of it holding a frame up. */
+export function* sailLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: Scenario = AS_FORECAST, arrive = 30, maxMin = 240): Generator<void, SailResult, void> {
   const legU = unit(sub(b, a)), legLen = dist(a, b), lim = Math.max(120, 0.12 * legLen);
   let p = { ...a }, t = t0, tacks = 0, steps = 0;
   const turns: SailResult['turns'] = [];
@@ -158,6 +165,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   const turnTs: number[] = []; // (when she turned: a dead end shows as turns crowding together)
   const maxSteps = maxMin * 60 / DT;
   while (dist(p, b) > arrive && steps < maxSteps) {
+    if (steps % 8 === 7) yield;
     steps++;
     const sd = landDist(p);
     const w = windFor(o, p, t, sc), c = o.current(p, t), toB = sub(b, p), u = unit(toB), bb = brg(u.x, u.y);
@@ -363,7 +371,9 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
  * metres off the land, or else the shortest way through the water on a 50 m grid (10 m by the Wharf; A*), pulled straight between the
  * turns. Near either end (a slip, a cove) it may come closer, as it has to.
  */
-export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
+export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] { return drive(routeAroundSteps(a, b, clear)); }
+/** routeAround a little at a time (on a long leg its look along the line alone is ~100 ms): for the page's plans. */
+export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, Vec[], void> {
   const nearEnd = (q: Vec) => dist(q, a) < 400 || dist(q, b) < 400;
   const blocked = (q: Vec) => {
     if (onLand(q)) return true;
@@ -373,12 +383,12 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   };
   // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
   // the line itself is tested exactly)
-  const visible = (p: Vec, q: Vec) => { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; return true; };
-  if (visible(a, b)) return [a, b];
+  const visible = function* (p: Vec, q: Vec): Generator<void, boolean, void> { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) { if (k % 8 === 0) yield; if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; } return true; };
+  if (yield* visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.
-  const ea = wharfNearest(a, 150) ? escapeWharf(a) : [a];
-  const eb = wharfNearest(b, 150) ? escapeWharf(b).reverse() : [b];
+  const ea = wharfNearest(a, 150) ? yield* escapeWharf(a) : [a];
+  const eb = wharfNearest(b, 150) ? (yield* escapeWharf(b)).reverse() : [b];
   const A = ea[ea.length - 1], B = eb[0];
   const near2 = (q: Vec) => dist(q, A) < 400 || dist(q, B) < 400 || nearEnd(q);
   const blocked2 = (q: Vec) => {
@@ -388,7 +398,7 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
     return false;
   };
   // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier)
-  const mid = gridPath(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
+  const mid = yield* gridPathSteps(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
@@ -396,7 +406,7 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
   let i = 0;
   while (i < pts.length - 1) {
     let j = pts.length - 1;
-    while (j > i + 1 && !visible(pts[i], pts[j])) j--;
+    while (j > i + 1 && !(yield* visible(pts[i], pts[j]))) j--;
     out.push(pts[j]); i = j;
   }
   return out;
@@ -407,8 +417,10 @@ export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] {
  * eight neighbours, no cutting a corner of the land), with a and b themselves as its ends; null if there's none.
  * With `isGoal`, it stops at the first cell that passes (b then only steers the search).
  */
-function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
-  isGoal?: (q: Vec) => boolean, lean = 1): Vec[] | null {
+/** Run a generator to its end at once: the synchronous form of the functions below that the page works out between frames. */
+function drive<T>(g: Generator<void, T, void>): T { let r = g.next(); while (!r.done) r = g.next(); return r.value; }
+function* gridPathSteps(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) => boolean, edgeOk: (p: Vec, q: Vec) => boolean,
+  isGoal?: (q: Vec) => boolean, lean = 1): Generator<void, Vec[] | null, void> {
   const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad;
   const nx = Math.ceil((Math.abs(a.x - b.x) + 2 * pad) / cell) + 1, ny = Math.ceil((Math.abs(a.y - b.y) + 2 * pad) / cell) + 1;
   const at = (i: number, j: number): Vec => ({ x: x0 + i * cell, y: y0 + j * cell });
@@ -422,8 +434,9 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
   const push = (e: [number, number]) => { heap.push(e); let c = heap.length - 1; while (c > 0) { const pa = (c - 1) >> 1; if (heap[pa][0] <= heap[c][0]) break; [heap[pa], heap[c]] = [heap[c], heap[pa]]; c = pa; } };
   const pop = () => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
   gs[start] = 0; push([h(start), start]);
-  let end = -1;
+  let end = -1, popped = 0;
   while (heap.length) {
+    if (++popped % 16 === 0) yield;
     const [f, k] = pop();
     if (f > gs[k] + h(k) + 1e-6) continue; // (a stale entry)
     const i = k % nx, j = Math.floor(k / nx);
@@ -448,6 +461,6 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
 }
 
 /** From among the Wharf's piers and docks out to the nearest water clear of them (150 m), on a 10 m grid. */
-function escapeWharf(p: Vec): Vec[] {
-  return gridPath(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0) ?? [p];
+function* escapeWharf(p: Vec): Generator<void, Vec[], void> {
+  return (yield* gridPathSteps(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => wharfNearest(q, 150) === null, 0)) ?? [p];
 }

@@ -1,6 +1,6 @@
 import type { Vec } from '../core/math';
 import { onLand } from '../geo/shore';
-import { passagePlan, type PassagePlan } from '../sim/navigator';
+import { passagePlanLater, type PassagePlan } from '../sim/navigator';
 import { ROUTES } from '../sim/traffic';
 import type { SimView } from '../sim/host';
 import { briefHtml } from './briefView';
@@ -33,17 +33,20 @@ export class NavView {
     }
     $('navTitle').textContent = 'Working out the passage…';
     $('navBrief').innerHTML = '';
-    setTimeout(() => { // let the panel paint first: the plan takes a moment
+    this.stopPlan?.();
+    this.stopPlan = passagePlanLater(w, plan => { // (worked out between frames: the plan takes a few seconds)
+      this.stopPlan = null;
       if (this.world !== w || !this.isOpen) return;
-      this.plan = passagePlan(w);
+      this.plan = plan;
       if (!this.plan) return;
       $('navTitle').textContent = this.plan.title;
       $('navSub').textContent = this.plan.sub;
       $('navBrief').innerHTML = briefHtml(this.plan);
       this.draw();
-    }, 30);
+    });
   }
-  close(): void { $('navView').hidden = true; this.world = null; }
+  private stopPlan: (() => void) | null = null;
+  close(): void { this.stopPlan?.(); this.stopPlan = null; $('navView').hidden = true; this.world = null; }
   toggle(w: SimView): void { if (this.isOpen) this.close(); else this.open(w); }
 
   private draw(): void {

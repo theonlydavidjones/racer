@@ -29,7 +29,7 @@ import { compass, sunPosition, sunTimes } from '../environment/sun';
 import { $ } from '../ui/dom';
 import { horn, logMessage, toast } from '../ui/feedback';
 import { sideWord } from '../ui/hud';
-import { passageNow, whyNot } from '../sim/navigator';
+import { passageLive, whyNot } from '../sim/navigator';
 import type { AppCtx } from '../app';
 import { burgeeCanvas } from '../render/burgees';
 import { morph } from '../ui/morph';
@@ -298,7 +298,7 @@ function drawTideGraph(): void {
   ctx.strokeStyle = '#ffb627'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx(app.w.gunUtc), top - 6); ctx.lineTo(tx(app.w.gunUtc), bot + 6); ctx.stroke();
   ctx.font = '600 10px system-ui, sans-serif'; ctx.fillStyle = 'rgba(232,238,246,.8)'; ctx.textAlign = 'center';
   for (let m = Math.ceil(from / 60) * 60; m <= to; m += 60) if (tx(m) > 20 && tx(m) < W - 20) ctx.fillText(sfClock(m).slice(0, 2) + ':00', tx(m), H - 4);
-  const pn = cruise && app.w.dest ? passageNow(app.w) : null, near = pn?.eta != null && tx(pn.eta) - tx(app.w.gunUtc) < 44;
+  const pn = cruise && app.w.dest ? passageLive(app.w, drawTideGraph) : null, near = pn?.eta != null && tx(pn.eta) - tx(app.w.gunUtc) < 44;
   ctx.fillStyle = '#ffb627'; if (near) ctx.textAlign = 'right'; ctx.fillText(cruise ? 'leave' : 'gun', tx(app.w.gunUtc) - (near ? 4 : 0), 10); ctx.textAlign = 'center';
   // cruising somewhere: when she'd get there leaving then (sim/navigator.ts passageNow: the course she'd sail, tacks and
   // all, in the forecast wind and NOAA's current), as a second bar; past the graph's end, an arrow at its edge
