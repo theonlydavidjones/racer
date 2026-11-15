@@ -123,3 +123,16 @@ the lit and target sectors lie on the water.
 
 The five lesson stills above (1–5) carry the rose too, with the lesson's target teal. After the pass (5), the next
 point, close reach, turns teal.
+
+## Drawn in the water (`decal-*.jpg`, branch rose-decal)
+
+The rose is now drawn in the water's own shader (scene.ts ROSE_FRAGMENT), so the waves carry it right up to her hull;
+the names stand just above it (render/windRose.ts). In the chase view the near part shows, which the sheet above the
+water couldn't:
+- `decal-d1-chase-before`, `decal-d4-chase-after`: the 15° shift, chase view;
+- `decal-d3-above-before`, `decal-d5-above-after`: the same, from overhead;
+- `decal-d6-chase-key-small`: the owner's other choices, a smaller rose (7–20 m) and only her point and the target
+  named.
+
+Radius and names are options (`RoseOpts`). In the app it's off; a dev handle (`__rose`) shows it until the owner says
+yes.
