@@ -107,6 +107,6 @@ export class SetupChart {
     if ($('setup').hidden || $('whereField').hidden) return;
     const w = this.picks.world();
     if (!this.fitted) this.fit();
-    this.hud.drawChart(this.c, w, this.cx, this.cy, this.scale, w.dest?.p ?? null);
+    this.hud.drawChart(this.c, w, this.cx, this.cy, this.scale, w.dest?.p ?? null, { cornerFree: true }); // (the expand icon's corner)
   }
 }

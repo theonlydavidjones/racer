@@ -217,7 +217,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 /* the way onto the big chart: an expand icon in the small chart's corner (the owner, 15 Nov 2026: "kill the 'plan on the
    big chart' button and just have an expand icon on the map itself") */
 .setchart-wrap{position:relative}
-.chart-expand{position:absolute;top:16px;left:8px;width:30px;height:30px;padding:0;border-radius:6px;border:1px solid var(--rule);
+.chart-expand{position:absolute;top:16px;right:8px;width:30px;height:30px;padding:0;border-radius:6px;border:1px solid var(--rule);
   background:rgba(10,20,32,.78);color:var(--text);font:600 17px/1 var(--f-body);cursor:pointer;display:grid;place-items:center}
 .chart-expand:hover,.chart-expand:focus-visible{border-color:var(--accent);color:var(--accent)}
 #mapFx{border-radius:50%}
