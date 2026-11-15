@@ -96,11 +96,16 @@ const ROSE_FRAGMENT = `
       vec4 rc = vec4(0.0);
       if (rr < uRoseR.y) {
         float idx = twa < uRoseE[0] ? 0.0 : twa < uRoseE[1] ? 1.0 : twa < uRoseE[2] ? 2.0 : twa < uRoseE[3] ? 3.0 : twa < uRoseE[4] ? 4.0 : 5.0;
+        float de = 180.0; for (int i = 0; i < 5; i++) de = min(de, abs(twa - uRoseE[i])); // (to the nearest edge between points, °)
+        bool tgt = abs(idx - uRoseTgt) < 0.5, mine = abs(idx - uRoseLit.x) < 0.5 && side == uRoseLit.y;
+        // (on the target, her own sector stays amber with the teal as a ring round it, 0.8 m wide: a hit, not her marker
+        // gone; the Coordinator for the owner, 15 Nov 2026)
+        float edge = min(min(rr - uRoseR.x, uRoseR.y - rr), radians(de) * rr);
         if (idx < 0.5) rc = vec4(0.78, 0.27, 0.23, 0.3); // (the no-go)
-        else if (abs(idx - uRoseTgt) < 0.5) rc = vec4(0.23, 0.82, 0.76, 0.42); // (the lesson's target: --target)
-        else if (abs(idx - uRoseLit.x) < 0.5 && side == uRoseLit.y) rc = vec4(1.0, 0.71, 0.15, 0.36); // (her point, on her side: --accent)
+        else if (tgt && mine) rc = edge < 0.8 ? vec4(0.23, 0.82, 0.76, 0.8) : vec4(1.0, 0.71, 0.15, 0.42);
+        else if (tgt) rc = vec4(0.23, 0.82, 0.76, 0.42); // (the lesson's target: --target)
+        else if (mine) rc = vec4(1.0, 0.71, 0.15, 0.36); // (her point, on her side: --accent)
         // the dashed white rays between the points (a quarter of a meter wide, dashes 1.8 m in 3)
-        float de = 180.0; for (int i = 0; i < 5; i++) de = min(de, abs(twa - uRoseE[i]));
         float ray = (1.0 - smoothstep(0.16, 0.3, radians(de) * rr)) * step(fract((rr - uRoseR.x) / 3.0), 0.6);
         // a chevron on each point, both sides, pointing the way she'd sail on it
         float ch = 0.0;
