@@ -66,6 +66,13 @@ UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, R
 Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
 
 ### Handoffs (retired sessions)
+- **Boat Detail** (retired 15 Nov 18:35): #423 Fort Mason for v199. Unopened: claude/outboard-detail (10f8b9a4, the
+  cowl and kill cord polish), which needs main merged, the checks and perf-ab. landscape.ts estimates are labeled
+  (SHED_H 15.5 m, roof, monitors, arches); the shed widths come from NHL 85002433 via search snippets, to verify when
+  npgallery, loc.gov or overpass are reachable. Pier numbering: the NHL numbers Piers 1–3 west to east, opposite to OSM's
+  names in geo/fortMason.ts; a researcher should settle which is official before anything is renamed. Watch #416
+  (single-pass sail windows) for sort artifacts at grazing angles. Waiting on the owner: the jib car tape measurements;
+  ROADMAP 9a (the bow profile, "too full and round") when they say. The coach simguard write is fixed by #418.
 - **Crew Art** (retired 15 Nov 14:25): #418 coach no-write fix (pure `rigOf()` for the coach; physics keeps `mainRig()`;
   fingerprints identical, perf-pair 0.9914) for v198, with #409, #410, #412. Unstarted, no PR: branch crew-summer
   (cf066789), the crew dressed for rain and season, after the crew-figure order lands. Stills branch stills/flags-tile
