@@ -152,29 +152,29 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
   if (st.hove) { p('fp-sail', `<b>Hove to</b>: the jib backed on purpose, both sails meant to be stalled or luffing. With the main eased and the helm down she lies quiet, forereaching slowly.`); keel(); return out; }
   if (!st.sails.length) { p('fp-sail', 'No sails drawing.'); return out; }
   // (luffing on purpose, both sheets let go: the sim takes their drive away, and the telltales show it)
-  if (b.luff) { p('fp-sail', `<b>Luffing</b>: both sails let go, flogging, with no drive; the jib's windward telltales lifting. Let go of the luff to sail again.`); keel(); return out; }
+  if (b.luff) { p('fp-sail', `<b>Luffing</b>: both sails let go, flogging, with no drive; the jib's windward luff telltales lifting. Let go of the luff to sail again.`); keel(); return out; }
   for (const s of st.sails) {
     const t = s.trim, by = Math.abs(t.err), main = s.sail === 'main';
     if (st.running) {
       // (the pole for the jib when she's nearly dead downwind; on a broad reach it stays to leeward)
       const how = main ? "Ease it till it's nearly square across the wind (the boom at the shrouds)" : st.awa > 155 ? 'Pole it out to windward (wing on wing)' : 'Keep it eased to leeward, just short of collapsing';
-      p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, the telltales hanging. ${how}.`); continue;
+      p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, its telltales hanging. ${how}.`); continue;
     }
     // (luffing because the crew's eased the boom down the traveller to depower, as far as that and no further, with
     // nobody else holding the sheet or the traveller: the price of keeping her on her feet, not a mistake)
     const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
     const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
-    const stallTell = main ? (t.amount > 0.12 ? 'the leech telltale hiding' : 'the flow breaking away before the leech') : 'leeward telltales drooping';
+    const stallTell = main ? (t.amount > 0.12 ? 'its leech telltales curling behind the leech' : 'the flow breaking away before the leech') : 'its leeward luff telltales drooping';
     // (at its sheet's stop and well past its best angle: the sim's trim blends to downwind from 105° apparent and counts
     // it as drawing, but the sail's too far in for the wind; the words say so whatever the flow reads)
     const pastStop = s.atMax && t.err > 4;
     const what = pastStop ? `the sheet all the way out and the wind ${deg(t.err)} past its best: the wind's too far aft for it. Head up${main ? '' : ', or pole it out'}`
-      : t.flow === 'good' ? (main ? 'attached: the leech telltale streaming' : 'attached: both telltales streaming')
+      : t.flow === 'good' ? (main ? 'attached: its leech telltales streaming' : 'attached: its luff telltales streaming, windward and leeward')
       : t.flow === 'luffing' ? (ctx.preStart ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased to hold her back before the start. Trim in about ${deg(by)} to go`
         : eased ? `<em class="luff">luffing</em> ${pct(t.amount)}: eased down the traveler on purpose to keep her on her feet; the lifting luff is the price`
         : s.atMin ? `<em class="luff">luffing</em> ${pct(t.amount)} with the sheet in as far as it goes: she's pinching. Bear away about ${deg(turnFor(b, Math.min(by, 10)))}`
-        : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': windward telltales lifting'}. Trim in about ${deg(by)}${turn}`)
+        : `<em class="luff">luffing</em> ${pct(t.amount)}${main ? ': its luff lifting' : ': its windward luff telltales lifting'}. Trim in about ${deg(by)}${turn}`)
       : s.atMax ? `<em class="stall">stalled</em> ${pct(t.amount)}, ${stallTell}, with the sheet all the way out: the wind's too far aft for it. Head up`
       : `<em class="stall">stalled</em> ${pct(t.amount)}: ${stallTell}. Ease about ${deg(by)}, or head up`;
     // (a sail with the wind outside its foot is just flogging: said once, with what to do)

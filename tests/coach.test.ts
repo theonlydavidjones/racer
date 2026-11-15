@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt, courseHeading } from './helpers/testBoat';
 import { takeLine } from '../src/boat/physics';
-import { CoachMemory, FIX_MIN, addLessonSource, teach } from '../src/boat/coach';
+import { CoachMemory, FIX_MIN, addLessonSource, lessons, teach } from '../src/boat/coach';
 import type { Boat } from '../src/boat/boat';
 import type { SeaHere } from '../src/environment/sea';
 
@@ -35,6 +35,14 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
   // the depowering question (ROADMAP): North Sails has the outhaul to its mark above 12 kt, but in 18–20 kt the speed
   // search finds it worth next to nothing against the crew's other depowering
   it.todo('18–20 kt upwind, outhaul off: says to fix it, as North Sails does (the depowering question)');
+  // (the guide: "Never use the kickingstrap upwind in less than 18 knots"; the crew's own solver keeps to it, and so does
+  // the coach: with the main eased in light air, the cure is the sheet, not vang on hard)
+  it('7 kt upwind, main eased and vang off: never "vang on" (North Sails: no vang upwind under 18 kt)', () => {
+    const b = boat({ heading: 318, windKt: 7 }); takeLine(b, 'vang'); wrong(b, 'mainsheet', 0.45); (b.ctlTarget ??= {}).vang = 0; hold(b, 30);
+    const { list } = lessons(b), vang = list.find(l => l.line === 'vang');
+    expect(vang === undefined || (vang.to ?? 0) <= 0.1 + 1e-9).toBe(true);
+    expect(list[0]?.line).toBe('mainsheet');
+  });
   it('with two things wrong, the bigger loss comes first', () => {
     const b = boat({ heading: 318, windKt: 10 });
     takeLine(b, 'jibsheet'); takeLine(b, 'vang'); b.ctlTarget = { jibsheet: 0.3, vang: 0.4 }; hold(b, 30);
@@ -99,7 +107,7 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     b.ctlTarget = { jibsheet: first.view.top.to! };
     let done: string | null = null;
     hold(b, 20, () => { t += 1 / 60; if (Math.round(t * 60) % 30 === 0) { const r = m.step(b, t); done ??= r.done; } });
-    expect(done).toMatch(/^That's it: jib telltales streaming both sides, 3\.\d → [34]\.\d kt\./);
+    expect(done).toMatch(/^That's it: the jib's luff telltales streaming, windward and leeward, 3\.\d → [34]\.\d kt\./);
     expect(m.step(b, t).view.top.kind).toBe('ok');
   });
   it('more teachers can join (crew weight, say): ranked with the rest', () => {
