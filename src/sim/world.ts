@@ -1040,7 +1040,7 @@ export class World {
     // touch, or taking a penalty) every step, as a helmsman there watches continuously. Their clocks run on the time since she last thought
     for (const b of this.boats) if (!b.isUser && !b.script) {
       const ai = b.ai!, since = ai.thought == null ? 1 : this.steps - ai.thought;
-      if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
+      if (this.exactAI || since >= AI_EVERY || (this.steps + b.id) % AI_EVERY === 0 || this.closeQuarters(b)) { aiThink(this, b, dt * Math.min(AI_EVERY, Math.max(1, since))); ai.thought = this.steps; ai.wantH = b.desired; } // (no more than her usual interval: an idled world's steps aren't hers to reckon)
       this.keepClearOfShips(b);
     }
     // your pole: out only on your call; your crew brings it in only when it must come in, and says why (ai.ts poleMustCome)
@@ -1515,29 +1515,41 @@ export class World {
   get trafficT(): number { return (this.clockUtc * 60) % 86400; }
 
   /**
-   * AI boats keep out of every vessel's way (traffic.ts entersWay): seen coming into it within AI_SHIP_LOOK, she steers
-   * square off the ship's track to the side she's on (to the side she's heading for if she's on it). Off the track is
-   * the quick way out: a Folkboat can't outrun a ship along it, and aiming at her stern from ahead of her leads down her
-   * side. She holds that until the ship's stern has passed her, or she's far enough off that even sailing straight back
-   * at her best speed she couldn't be in the way before the stern goes by (latched on where she is, not on her heading,
-   * which is the thing that changes when she turns).
+   * AI boats keep out of every vessel's way (traffic.ts entersWay). Seen coming into it within AI_SHIP_LOOK (looked for
+   * four times a second), she keeps clear until the ship's stern has passed her, or she's far enough off that, sailing
+   * straight back at a Folkboat's hull speed, she couldn't be in the way before the stern goes by. That's latched on
+   * where she is, not on her heading (the thing that changes when she turns), so it doesn't flicker. Keeping clear:
+   * within AI_SHIP_EXTRA of the way she steers square off the ship's track to the side she's on (the quick way out: a
+   * Folkboat can't outrun a ship along it, and aiming at her stern from ahead of her leads down her side), out to twice
+   * that; beyond it she sails her own course, so long as it doesn't close the track (else along it, the nearer way).
    */
   private keepClearOfShips(b: Boat): void {
-    const ai = b.ai!;
+    const ai = b.ai!, look = (this.steps + b.id) % 15 === 0;
     for (const v of this.vessels) {
       if (!v.moving || Math.abs(b.x - v.x) > 2500 || Math.abs(b.y - v.y) > 2500) { if (ai.shipClear === v.id) ai.shipClear = null; continue; }
-      const ty = VESSEL[v.kind], o = onTrack(v, b.x, b.y);
+      const ty = VESSEL[v.kind];
+      if (ai.shipClear !== v.id && (!look || entersWay(v, b.x, b.y, b.vx, b.vy, AI_SHIP_LOOK, 10) == null)) continue;
+      const o = onTrack(v, b.x, b.y), way = ty.beam / 2 + WAY_ABEAM;
       if (ai.shipClear === v.id) {
-        const pass = (o.a + ty.len / 2) / Math.max(0.5, v.v), off = o.d - (ty.beam / 2 + WAY_ABEAM + AI_SHIP_EXTRA);
-        if (o.a < -ty.len / 2 || off > AI_SHIP_SPEED * pass) { ai.shipClear = null; continue; }
-      } else if (entersWay(v, b.x, b.y, b.vx, b.vy, AI_SHIP_LOOK, 10) == null) continue;
-      ai.shipClear = v.id;
+        const pass = (o.a + ty.len / 2) / Math.max(0.5, v.v);
+        if (o.a < -ty.len / 2 || o.d - way - AI_SHIP_EXTRA > AI_SHIP_SPEED * pass) { ai.shipClear = null; ai.shipSquare = false; continue; }
+      } else { ai.shipClear = v.id; ai.shipSquare = false; }
+      // (out from the way: square off within the margin, and on out to twice it once she's begun, so she doesn't tack on the edge)
+      ai.shipSquare = o.d < way + AI_SHIP_EXTRA || (!!ai.shipSquare && o.d < way + 2 * AI_SHIP_EXTRA);
       const ux = Math.sin(o.h * D2R), uy = Math.cos(o.h * D2R), lv = b.vx * uy - b.vy * ux; // (her own motion to the track's starboard)
-      const side = o.d > ty.beam / 2 ? o.side : Math.sign(lv) || 1;
-      b.desired = sailable(b, n360(o.h + 90 * side)); b.luff = false;
-      // (her penalty turns wait: she takes them "after getting well clear", 44.2, and a ship's way isn't clear water;
-      // spinning there she'd sit in it. Clearing, she sails, and the turns aren't counted till she begins again)
-      if (b.penalty > 0) ai.clearing = true;
+      const side = o.d > ty.beam / 2 ? o.side : Math.sign(lv) || 1, away = n360(o.h + 90 * side);
+      if (ai.shipSquare) {
+        b.desired = sailable(b, away); b.luff = false;
+        // (her penalty turns wait while she's in or by the way: she takes them "after getting well clear", 44.2, and a
+        // ship's way isn't clear water. Clearing, she sails, and the turns aren't counted till she begins again)
+        if (b.penalty > 0) ai.clearing = true;
+      } else {
+        const want = ai.wantH ?? b.desired;
+        if (Math.cos((want - away) * D2R) < 0) { // (her course closes the track: along it instead, the nearer way)
+          const along = Math.cos((want - o.h) * D2R) >= 0 ? o.h : n360(o.h + 180);
+          b.desired = sailable(b, along); b.luff = false;
+        }
+      }
       return;
     }
   }
@@ -1563,7 +1575,7 @@ export class World {
         }
       }
       if (!v.moving) continue;
-      this.dangerSignals(v);
+      if ((this.steps + v.id) % 30 === 0) this.dangerSignals(v); // (twice a second: a ship's watch, not every step)
       const last = this.warned.get(v.id) ?? -Infinity;
       if (dist(u, v) > 1500 || entersWay(v, u.x, u.y, u.vx, u.vy, AI_SHIP_LOOK, 40) == null) continue;
       if (this.t - last > 90) {
@@ -1580,7 +1592,7 @@ export class World {
    * The danger signal (IRPCAS / Inland Rule 34(d)): "at least five short and rapid blasts" from a vessel "in doubt whether
    * sufficient action is being taken by the other to avoid collision"; Rule 9(d): a vessel that can navigate only in the
    * channel "must use the signal prescribed in Rule 34(d) if in doubt as to the intention of the crossing vessel". She
-   * sounds it for any boat standing into her way (traffic.ts entersWay: in it within SHIP_LOOK s, as both hold on; a
+   * sounds it for any boat standing into her way (looked for twice a second; traffic.ts entersWay: in it within SHIP_LOOK s; a
    * boat she's passed is abaft it), once for all the boats it's for, and for another boat no sooner than RESOUND s on.
    * A ship in the channel names the boats it was for, and in a club race that's a protest by the race committee, which
    * the Bay's sailing instructions make automatic (Richmond YC 2025 SIs, clause 16; docs/SHIP-PROTESTS.md).

@@ -134,7 +134,7 @@ interface Track { x: number[]; y: number[]; s: number[] }
 const tracks = new WeakMap<Vessel, Track>();
 function trackOf(v: Vessel): Track {
   const hit = tracks.get(v); if (hit) return hit;
-  const ty = VESSEL[v.kind], sv = SERVICES[v.id], r = ROUTES[sv.route], ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R);
+  const ty = VESSEL[v.kind], sv = SERVICES[v.id] as Service | undefined, r = sv ? ROUTES[sv.route] : [], ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R);
   const reach = ty.len / 2 + WAY_AHEAD * ty.len + v.v * WAY_LOOK_MAX;
   const T: Track = { x: [v.x - ux * ty.len / 2, v.x], y: [v.y - uy * ty.len / 2, v.y], s: [-ty.len / 2, 0] };
   // the leg she's on (she's on it exactly), and which way along it she's going (by her heading)
@@ -148,7 +148,7 @@ function trackOf(v: Vessel): Track {
   if (best === Infinity) { T.x.push(v.x + ux * reach); T.y.push(v.y + uy * reach); T.s.push(reach); tracks.set(v, T); return T; }
   let j = dir > 0 ? k : k - 1, sum = 0, px = v.x, py = v.y;
   for (let n = 0; n < r.length + 1 && sum < reach; n++) {
-    if (j < 0 || j >= r.length) { if (!sv.loop) break; j = dir > 0 ? 1 : r.length - 2; } // (a loop runs on round; a route's end stops her)
+    if (j < 0 || j >= r.length) break; // (at her route's end she stops: a loop's end too, where she waits at her berth)
     const q = r[j], l = Math.hypot(q.x - px, q.y - py);
     if (sum + l >= reach) { const f = (reach - sum) / l; T.x.push(px + (q.x - px) * f); T.y.push(py + (q.y - py) * f); T.s.push(reach); sum = reach; break; }
     if (l > 1e-6) { sum += l; T.x.push(q.x); T.y.push(q.y); T.s.push(sum); px = q.x; py = q.y; }
@@ -156,21 +156,27 @@ function trackOf(v: Vessel): Track {
   }
   tracks.set(v, T); return T;
 }
-/** The longest look ahead asked of entersWay, s (the AI's, held: world.ts AI_SHIP_LOOK × 1.5). */
-const WAY_LOOK_MAX = 180;
+/** The longest look ahead asked of entersWay, s (world.ts AI_SHIP_LOOK, 120, with room to spare): it sizes the track's reach. */
+const WAY_LOOK_MAX = 150;
 
 /** The nearest point of a vessel's track to (x, y): how far off it (d, m; `side` +1 to her starboard), how far along it
  * from her middle (a, m: behind her stern the first leg runs on, so a point abaft her reads less than −len/2), and the
  * track's heading there. */
 export function onTrack(v: Vessel, x: number, y: number): { d: number; a: number; side: number; h: number } {
-  const T = trackOf(v); let d = Infinity, a = 0, side = 1, h = v.h;
+  nearest(v, x, y); return { d: NR.d, a: NR.a, side: NR.side, h: NR.h };
+}
+/** (onTrack's answer, written in place: entersWay samples it many times a step) */
+const NR = { d: 0, a: 0, side: 1, h: 0 };
+function nearest(v: Vessel, x: number, y: number): void {
+  const T = trackOf(v); let d = Infinity, a = 0, side = 1, seg = 0;
   for (let i = 1; i < T.x.length; i++) {
     const ax = T.x[i - 1], ay = T.y[i - 1], dx = T.x[i] - ax, dy = T.y[i] - ay, L2 = dx * dx + dy * dy; if (L2 < 1e-9) continue;
     let t = ((x - ax) * dx + (y - ay) * dy) / L2; t = i === 1 ? Math.min(1, t) : clamp(t, 0, 1);
     const fx = ax + dx * t, fy = ay + dy * t, dd = Math.hypot(x - fx, y - fy);
-    if (dd < d) { d = dd; a = T.s[i - 1] + (T.s[i] - T.s[i - 1]) * t; side = (x - fx) * dy - (y - fy) * dx >= 0 ? 1 : -1; h = brg(dx, dy); }
+    if (dd < d) { d = dd; a = T.s[i - 1] + (T.s[i] - T.s[i - 1]) * t; side = (x - fx) * dy - (y - fy) * dx >= 0 ? 1 : -1; seg = i; }
   }
-  return { d, a, side, h };
+  NR.d = d; NR.a = a; NR.side = side;
+  NR.h = seg ? brg(T.x[seg] - T.x[seg - 1], T.y[seg] - T.y[seg - 1]) : v.h;
 }
 
 /**
@@ -180,10 +186,12 @@ export function onTrack(v: Vessel, x: number, y: number): { d: number; a: number
  * route, so it bends where she will. Sampled every 2 s (4 s beyond a minute). `extra` widens it all round, m.
  */
 export function entersWay(v: Vessel, x: number, y: number, vx: number, vy: number, T: number, extra = 0): number | null {
-  const ty = VESSEL[v.kind], w = ty.beam / 2 + WAY_ABEAM + extra, step = T > 60 ? 4 : 2;
+  const ty = VESSEL[v.kind], w = ty.beam / 2 + WAY_ABEAM + extra, step = T > 60 ? 4 : 2, ahead = ty.len / 2 + WAY_AHEAD * ty.len + extra;
+  // (too far off to reach her way in the time, at the two speeds together: no need to look)
+  if (Math.hypot(x - v.x, y - v.y) > ahead + w + (v.v + Math.hypot(vx, vy)) * T) return null;
   for (let tau = 0; tau <= T + 1e-9; tau += step) {
-    const o = onTrack(v, x + vx * tau, y + vy * tau), m = v.v * tau;
-    if (o.d <= w && o.a >= m - ty.len / 2 - extra && o.a <= m + ty.len / 2 + WAY_AHEAD * ty.len + extra) return tau;
+    nearest(v, x + vx * tau, y + vy * tau); const m = v.v * tau;
+    if (NR.d <= w && NR.a >= m - ty.len / 2 - extra && NR.a <= m + ahead) return tau;
   }
   return null;
 }

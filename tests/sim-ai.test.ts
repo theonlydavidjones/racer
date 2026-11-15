@@ -7,7 +7,7 @@ import { crabFor } from '../src/ai/ai';
 import { V, n360, wrap } from '../src/core/math';
 import type { CourseFile } from '../src/courses/course';
 import ss2 from '../src/courses/data/seaweed-soup-2026-course2.json';
-import type { Vessel } from '../src/sim/traffic';
+import { onTrack, type Vessel } from '../src/sim/traffic';
 
 /** The AI fleet sailing the training course (windward–return, 620 m legs), the user's boat left at the line. */
 function race(kt: number, current = 'slack', seed = 77) {
@@ -109,12 +109,19 @@ describe('The AI fleet and a ship (Inland Rule 9; docs/SHIP-PROTESTS.md)', () =>
     const cx = w.boats.reduce((a, b) => a + b.x, 0) / w.boats.length, cy = w.boats.reduce((a, b) => a + b.y, 0) / w.boats.length, u = V(h);
     const ship: Vessel = { id: 0, kind: 'container', x: cx - u.x * 2200, y: cy - u.y * 2200, h, v: 12 * 0.5144, moving: true }, t0 = w.t;
     w.traffic.vessels = () => [{ ...ship, x: ship.x + u.x * (w.t - t0) * ship.v, y: ship.y + u.y * (w.t - t0) * ship.v }];
-    const flips = new Map<number, number>(), was = new Map<number, unknown>();
+    const flips = new Map<number, number>(), was = new Map<number, unknown>(), squared = new Map<number, number>(); let far = 0;
     while (w.t < t0 + 600) {
       w.step(DT); w.drainEvents();
-      for (const b of w.boats) if (b.ai) { const now = b.ai.shipClear ?? null; if (now !== (was.get(b.id) ?? null)) flips.set(b.id, (flips.get(b.id) ?? 0) + 1); was.set(b.id, now); }
+      for (const b of w.boats) if (b.ai) {
+        const now = b.ai.shipClear ?? null; if (now !== (was.get(b.id) ?? null)) flips.set(b.id, (flips.get(b.id) ?? 0) + 1); was.set(b.id, now);
+        // (steering square off the track: how long, and out to where)
+        if (now != null && b.ai.shipSquare && w.vessels[0]) { squared.set(b.id, (squared.get(b.id) ?? 0) + DT); far = Math.max(far, onTrack(w.vessels[0], b.x, b.y).d); }
+      }
     }
     expect(w.protests.filter(p => p.committee && !w.boats[p.vs].isUser && p.committee.entered)).toEqual([]);
     expect(Math.max(0, ...flips.values())).toBeLessThanOrEqual(4); // (on and off, perhaps twice: not a flicker)
+    // (out of her way and no further: the way is 71 m either side, the margin band 60 m beyond it. From on her track to
+    // the band's edge is 131 m: close-hauled, about 1.4 m/s across it, so about 95 s at the most)
+    expect(far).toBeLessThan(21 + 50 + 60 + 20); expect(Math.max(0, ...squared.values())).toBeLessThan(100);
   }, 300000);
 });

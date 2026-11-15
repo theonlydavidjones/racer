@@ -66,14 +66,19 @@ DSQ. Built on the hearing."
   it (90.3(b)).
 - **Under umpiring** (practice, the drills): the signal and its warning only, with no protest.
 - **The AI boats** (`keepClearOfShips`):
-  - Each watches every vessel's way 120 s ahead.
-  - Coming into it, she steers square off the ship's track (at that point of the route) to the side she's on.
-  - She holds that until the ship's stern has passed her, or she's far enough off that, sailing straight back at a
-    Folkboat's hull speed, she couldn't be in the way before the stern goes by. The latch is on where she is, not on
-    her heading, so it doesn't flicker.
-  - Penalty turns wait while she's keeping clear (44.2: "after getting well clear"; a ship's way isn't clear water).
+  - Each looks for a vessel's way 120 s ahead, four times a second. The ship looks twice a second.
+  - Coming into it, she keeps clear until the ship's stern has passed her, or she's far enough off that, sailing
+    straight back at a Folkboat's hull speed, she couldn't be in the way before the stern goes by. The latch is on where
+    she is, not on her heading, so it doesn't flicker.
+  - Within 30 m of the way she steers square off the ship's track (at that point of the route) to the side she's on,
+    and once begun she carries on out to 60 m. Beyond that she sails her own course, so long as it doesn't close the
+    track; otherwise she sails along it, the nearer way.
+  - Penalty turns wait only while she's in that band (44.2: "after getting well clear"; a ship's way isn't clear water).
   - In the test (tests/sim-ai.test.ts), a container ship steams through a seven-boat fleet on the beat from each of
-    four directions. No AI boat is in her way, and none decides to keep clear more than twice.
+    four directions:
+    - No AI boat is in her way.
+    - None decides to keep clear more than twice.
+    - None steers square off past the band or for longer than 100 s.
 
 ## Modeling choices (no number in the sources)
 

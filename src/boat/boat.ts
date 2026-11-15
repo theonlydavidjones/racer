@@ -34,6 +34,10 @@ export interface AiState {
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** The vessel she's keeping out of the way of, by id (sim/world.ts keepClearOfShips), or null. */
   shipClear?: number | null;
+  /** Keeping clear, and within the margin of the ship's way: steering square off her track (world.ts keepClearOfShips). */
+  shipSquare?: boolean;
+  /** The course her last decision wanted, before keeping clear of a ship changed it. */
+  wantH?: number;
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
