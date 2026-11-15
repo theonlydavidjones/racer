@@ -207,7 +207,9 @@ export interface Boat {
   crewPlan?: CrewSettings | null; crewPlanT?: number;
   /** Getting ready for the next leg before a rounding (sim/world.ts roundingPrep): which lines the crew have switched to
    * the next leg's settings, that leg's apparent wind angle, and their plan for it (physics.ts). Null otherwise. */
-  crewPrep?: { lines: CtlPrep[]; awa: number; up: boolean; plan?: CrewSettings | null } | null;
+  crewPrep?: { key: string; t0: number; lines: CtlPrep[]; up: boolean; awa: number; aws: number; depower: number; plan?: CrewSettings | null } | null;
+  /** The rounding (sim/world.ts roundingPrep's key) your crew last said "pole down?" for: once a rounding. */
+  poleCalled?: string;
   /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */

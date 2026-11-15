@@ -5,7 +5,7 @@ import { RoundingTracker } from './roundings';
 import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
-import { FLEET, bow, stern, type Boat, type CtlPrep } from '../boat/boat';
+import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, POLE, apparent, asternCoast, crewAtDock, crewRig, moveBoat, settleTrim, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
@@ -46,6 +46,7 @@ import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
 import { crewSkill, skillOf } from '../boat/crewPhys';
+import { ownerOf, workPace } from '../boat/crewWork';
 import { condition, stepJumpers } from '../boat/condition';
 import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../boat/rigTune';
 import { outlookFor } from './outlook';
@@ -266,10 +267,12 @@ export function boatLook(spec: BoatSpec) {
     paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
   };
 }
-/** How far before a rounding a skilled crew starts on the next leg's settings (boat lengths; less with less skill), and the
- * least skill (crewPhys.ts crewSkill) that does: ESTIMATES (the sources say "before the rounding", "several lengths" for
- * the pole, no number). */
-const PREP_LENGTHS = 4, PREP_SKILL = 0.25;
+/** Rounding prep (World.roundingPrep), ESTIMATES (the sources say "before the rounding", "several lengths" for the pole, no
+ * number): the vang eased this long before the windward mark (s); a line's work at the leeward mark (s) and time to spare;
+ * how close she must be passing the mark (m, past its own reach) for a rounding; where your crew call the pole (m: where
+ * the AI boats' crews take theirs in, ai.ts crewPoleCall); the least skill
+ * (crewPhys.ts crewSkill) that gets ready at all. */
+const PREP_VANG_S = 4, PREP_LINE_S = 4, PREP_MARGIN_S = 3, PREP_HOLD_S = 60, PREP_PASS_M = 25, POLE_CALL_M = 45, PREP_SKILL = 0.25;
 
 export class World {
   readonly C: Course;
@@ -624,7 +627,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, crewPrep: undefined, lastHitT: undefined, paddle: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, crewPrep: undefined, poleCalled: undefined, lastHitT: undefined, paddle: undefined, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -1504,33 +1507,58 @@ export class World {
   /**
    * The crew get ready for the next leg before a rounding, as a good crew does (David Dellenbaugh, "Rounding the leeward
    * mark", Windcheck: "Before you begin the hectic mark rounding, adjust your vang, cunningham, outhaul, backstay, jib
-   * leads and so on for the next leg"; North Sails' Nordic Folkboat guide: "always ... ease the kickingstrap for downwind
-   * sailing when bearing off, otherwise the boom might break"). Bearing away at the windward mark: the vang first, then
-   * the backstay and Cunningham off; the outhaul and the jib car once she's off (a trim for the run they see to as she
-   * settles, crewJobs' new point of sail). Rounding up at the leeward mark: the pole in first (ai.ts crewPoleCall; yours,
-   * the crew say so), then the outhaul, backstay and Cunningham on for the beat; the vang once she's on the wind.
-   * How far out: PREP_LENGTHS (ESTIMATES: no source gives lengths), sooner for a skilled crew, later for a novice, and
-   * not at all for a raw beginner (they see to it once she's round).
+   * leads and so on for the next leg"; North Sails' Nordic Folkboat guide: "always remember to ease the kickingstrap for
+   * downwind sailing when bearing off, otherwise the boom might break").
+   * - Bearing away (any bear-away of more than 30°: onto a reach too): the vang eased just before the turn (PREP_VANG_S
+   *   before the mark, fetching it), then, as she bears away, the backstay and Cunningham, for a run. Held so until she's
+   *   settled on her new course (her apparent wind past 100°): the crew's own plan lags the turn and would haul them on
+   *   again for the beat she's left.
+   * - Rounding up for a beat: the pole in first (ai.ts crewPoleCall at 45 m; yours, the crew say so there), then the
+   *   backstay, outhaul and Cunningham on, in that order (crewJobs' PRIORITY), early enough for the hands aboard to do it
+   *   (prepLead), and held until she's on the wind (apparent under 60°). Her beat's settings are worked out once for the
+   *   rounding: close-hauled (her beat angle, at her polar speed) and depowered as a beat in this wind wants.
+   * Each line only the way the next leg takes it (eased bearing away, on rounding up). A crew under PREP_SKILL leaves it
+   * till she's round. The times are ESTIMATES: no source gives lengths or seconds.
    */
   private roundingPrep(b: Boat): void {
     const m = this.nextMark(b), was = b.crewPrep;
-    const off = () => { if (was) b.crewPrep = null; };
-    if (!m || m.type !== 'round' || this.freeSail || this.t < 0 || !b.started || b.finished || b.retired || b.penalty > 0 || !b.crew) return off();
-    const skill = crewSkill(b.crew); if (skill < PREP_SKILL) return off();
-    const d = markDist(b, m), L = LOA, reach = PREP_LENGTHS * (0.4 + 0.6 * skill) * L; // (a skilled crew 4 lengths out, a novice nearer 2)
-    if (d > reach) return off();
-    // the next leg: from this mark to the one after it (or the finish line's middle)
-    const after = this.C.marks[b.leg + 1]?.p ?? { x: (this.C.committee.x + this.C.pin.x) / 2, y: (this.C.committee.y + this.C.pin.y) / 2 }; // (the last mark: the finish line's middle)
-    const hNext = brg(after.x - m.p.x, after.y - m.p.y), twaNext = Math.abs(wrap(b.ww.from - hNext)), twaNow = Math.abs(b.twa);
-    const bear = twaNow < 70 && twaNext >= 110, up = twaNow >= 110 && twaNext < 70;
-    if (!bear && !up) return off();
-    // (in one trip, in this order: crewJobs takes the lines as they come)
-    const lines: CtlPrep[] = bear ? ['vang', 'backstay', 'cunningham'] : ['outhaul', 'backstay', 'cunningham'];
-    // (the next leg's apparent wind at about her speed now: the crew's plan for it is physics.ts's, made once per leg)
-    const awa = apparent(b.ww.from, b.ww.kt, hNext, b.v).awa;
-    if (!was || was.up !== up || Math.abs(was.awa - awa) > 5) b.crewPrep = { lines, awa, up, plan: was && was.up === up && Math.abs(was.awa - awa) <= 5 ? was.plan : null };
-    // yours: the pole's your call, so at the leeward mark the crew say it's time (once a rounding)
-    if (up && b.isUser && b.poleWant && !was) this.emit({ type: 'toast', msg: 'Crew: pole down? The leeward mark\'s coming up.', ms: 3500 });
+    const drill = !!this.rounding && b === this.user;
+    const ok = !!m && m.type === 'round' && !(this.freeSail && !drill) && this.t >= 0 && (b.started || drill) && !b.finished && !b.retired && b.penalty <= 0 && !!b.crew;
+    const key = ok ? `${m!.name}:${b.leg}:${this.rounding?.rounded ?? 0}` : '';
+    // (once begun, held for the rounding: until she's settled on the new point of sail, whatever the distance says; or
+    // dropped if the rounding doesn't come, PREP_HOLD_S: she overstood, or tacked away)
+    if (was) {
+      const awa = Math.abs(b.awaSlow), first = !was.up && was.lines.length === 1;
+      const settled = was.up ? awa < 60 : !first && awa > 100;
+      if (!settled && this.t - was.t0 < PREP_HOLD_S && !b.finished && !b.retired) { this.prepStage(b, was); return; }
+      b.crewPrep = null; return;
+    }
+    if (!ok) return;
+    const next = m!.next, hNext = brg(next.x - m!.p.x, next.y - m!.p.y), twaNext = Math.abs(wrap(b.ww.from - hNext)), twaNow = Math.abs(b.twa);
+    const bear = twaNow < 110 && twaNext - twaNow > 30, up = twaNow >= 110 && twaNext < 70; // (bearing away: before or as she starts to turn)
+    // the time till she's closest to the mark, going as she is (a rounding passes it a little off: her nearest point, not
+    // the mark itself), and how near that is; on the wrong tack, not closing on it, not yet
+    const d = markDist(b, m!), to = { x: m!.p.x - b.x, y: m!.p.y - b.y }, dl = Math.hypot(to.x, to.y) || 1, v2 = b.vx * b.vx + b.vy * b.vy;
+    const closing = (b.vx * to.x + b.vy * to.y) / dl, tCpa = closing > 0.3 && v2 > 0.01 ? closing * dl / v2 : Infinity;
+    const passes = Math.sqrt(Math.max(0, dl * dl - (closing * dl) ** 2 / Math.max(v2, 0.01))) - (dl - d) < PREP_PASS_M, t2m = passes ? tCpa : Infinity;
+    // yours: the pole's your call, so at the leeward mark the crew say it's time, where they'd take theirs in (45 m)
+    if (up && b.isUser && b.poleWant && d < POLE_CALL_M && b.poleCalled !== key) { b.poleCalled = key; this.emit({ type: 'toast', msg: 'Crew: pole down? The leeward mark\'s coming up.', ms: 3500 }); }
+    if ((!bear && !up) || crewSkill(b.crew!) < PREP_SKILL) return;
+    if (bear ? t2m > PREP_VANG_S : t2m > this.prepLead(b)) return;
+    // the next leg as she'll sail it: close-hauled for a beat, the course to the next mark otherwise; at her polar speed
+    const tws = b.ww.kt, twaSail = up ? beatAngle(tws) : Math.min(twaNext, 180), v = polar(tws, twaSail);
+    const ap = apparent(0, tws, twaSail, v);
+    b.crewPrep = { key, t0: this.t, lines: bear ? ['vang'] : ['backstay', 'outhaul', 'cunningham'], up, awa: ap.awa, aws: ap.aws / KT, depower: up ? clamp((tws - 14) / 10, 0, 1) : 0, plan: null };
+  }
+  /** Bearing away: once she's turning (past 75° true), the backstay and Cunningham join the vang. */
+  private prepStage(b: Boat, p: NonNullable<Boat['crewPrep']>): void {
+    if (!p.up && p.lines.length === 1 && Math.abs(b.twa) > 75 && p.plan) p.lines = ['vang', 'backstay', 'cunningham'];
+  }
+  /** How long before the leeward mark the crew start on the beat's settings (s): about PREP_LINE_S a line for the hands
+   * there are to do the three, at their pace (one alone, at the helm's 0.6), and PREP_MARGIN_S to spare. ESTIMATES. */
+  private prepLead(b: Boat): number {
+    const n = b.crew?.spec.crew.length ?? 0, hands = Math.max(1, Math.min(2, n)), pace = Math.max(0.3, workPace(b, ownerOf('outhaul', n, b.crew?.spec)));
+    return 3 * PREP_LINE_S / hands / pace + PREP_MARGIN_S;
   }
 
   /** The AI boats think every step (for the tests): otherwise every AI_EVERY steps, staggered, and every step in close quarters. */
