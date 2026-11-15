@@ -337,7 +337,7 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
   return {
     min: { outhaul: lo(Math.max(0, outhaul - 0.05 * (1 - over(12)))), // (above 12 kt "all the way to the mark")
       cunningham: lo(0.9 * over(15)), traveller: lo(-0.4 + 0.35 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
-    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(over(19)) } // (the vang "never" upwind in less than 18 kt: off to 18, then on over a couple of knots)
+    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: 1 + (over(19) - 1) * u * smooth((45 - Math.abs(awa)) / 10) } // (the vang "never" upwind in less than 18 kt: off to 18, then on over a couple of knots; close-hauled only, the sheet in: on a close reach the sheet's eased and the vang is what holds the leech, so it's gone by 45° apparent)
   };
 }
 
@@ -503,6 +503,9 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
     // (below a floor the plan holds, and the plan's up there: the same, for heel and helm)
     const fl = k === 'traveller' ? tightTrav : floors?.[k];
     if (fl != null && now[k] < fl - 0.02 && plan[k] > now[k] + 0.02) { out[k] = 1; continue; }
+    // (and the car the other way: down so far the boom's outside the angle they want with the sheet two-blocked, it can't
+    // come in on the sheet, only on the car: the angle of attack, worth more than any shape, as with your sheet held)
+    if (k === 'traveller' && mainsheet == null && mainAngle < TRAVELLER_SWING * now.traveller - 0.3 && plan.traveller < now.traveller - 0.02) { out[k] = 1; continue; }
     // with your mainsheet held, the traveller is how they put the boom where it should be: that's the sheet's angle of
     // attack, worth more than any shape
     if (k === 'traveller' && mainsheet != null) { out[k] = Math.abs(plan.traveller - now.traveller) > 0.02 ? 1 : 0; continue; }

@@ -1092,9 +1092,12 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // backstay, about all of it in 20 s; once it's half a degree back inside the band they ease it off as slowly, back to
   // what the speed search would have (which already weighs the rudder's drag and the pointing, and settles at 2.7–3.7°
   // in 16–25 kt: under the half degree, so the floor carries her through a heavy helm and never stays on once the helm
-  // is light). A floor on their plan, and the gate closing takes it off at the same rate, not at once.
+  // is light). A floor on their plan, and the gate closing takes it off at the same rate, not at once. Not out of a tack
+  // or while she's slow (under 90% of the polar's speed): the helm she needs then is for the speed she hasn't got (the
+  // rudder's lift goes as the speed squared), not for too much power, and a crew powers up out of a tack, not down.
   { const gate = up && !b.hove ? smooth((tws - 14) / 2) * smooth((60 - Math.abs(b.awaSlow)) / 20) : 0, hn = b.helmNeed ?? 0;
-    const dir = gate > 0 && hn > IDEAL_HELM + 2 ? 1 : gate <= 0 || hn < IDEAL_HELM + 1.5 ? -1 : 0;
+    const heavy = gate > 0 && hn > IDEAL_HELM + 2 && !b.tacking && b.v >= 0.9 * polar(tws, Math.max(Math.abs(b.twa), beatAngle(tws)), plan);
+    const dir = heavy ? 1 : gate <= 0 || hn < IDEAL_HELM + 1.5 ? -1 : 0;
     const hbs = clamp((b.helmBackstay ?? 0) + dir * dt / 20, 0, 1);
     b.helmBackstay = hbs > gate ? Math.max(gate, (b.helmBackstay ?? 0) - dt / 20) : hbs; }
   // the crew works out its settings about once a second, for the conditions as they see them
