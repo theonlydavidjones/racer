@@ -271,7 +271,9 @@ export function boatLook(spec: BoatSpec) {
  * number): the vang eased this long before the windward mark (s); a line's work at the leeward mark (s) and time to spare;
  * how close she must be passing the mark (m, past its own reach) for a rounding; where your crew call the pole (m: where
  * the AI boats' crews take theirs in, ai.ts crewPoleCall); the least skill
- * (crewPhys.ts crewSkill) that gets ready at all. */
+ * (crewPhys.ts crewSkill) that gets ready at all; how long a prep is held for a rounding that doesn't come (s: past the
+ * longest lead, prepLead at the slowest pace, about 66 s, with time to round; a boat that gybes away or takes a penalty
+ * keeps the beat's lines on until then). */
 const PREP_VANG_S = 4, PREP_TURN_S = 1.5, PREP_POLE_S = 7, PREP_LINE_S = 4, PREP_MARGIN_S = 3, PREP_HOLD_S = 90, PREP_PASS_M = 25, POLE_CALL_M = 45, PREP_SKILL = 0.25;
 
 export class World {
@@ -1557,8 +1559,9 @@ export class World {
         return;
       }
       // (on the wind after rounding up: the crew's own depowering starts where they've set her, not from none, else they'd
-      // ease the backstay straight off again as their plan caught up)
-      if (was.up && settled) b.depower = Math.max(b.depower ?? 0, was.depower, beatDepower(b)); // (for the wind she has now: it may have filled since they planned)
+      // ease the backstay straight off again as their plan caught up). Their own plan and goal worked out afresh now, for the
+      // beat: else for a second they're the run's, and a job started on them eases the backstay just set
+      if (was.up && settled) { b.depower = Math.max(b.depower ?? 0, was.depower, beatDepower(b)); b.crewPlanT = 0; b.powerT = 0; } // (for the wind she has now: it may have filled since they planned)
       b.crewPrep = null; return;
     }
     if ((!bear && !up) || crewSkill(b.crew!) < PREP_SKILL) return;

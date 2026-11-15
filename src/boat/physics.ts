@@ -680,12 +680,13 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
 }
 /** How far the wind may move (kt) before the crew rethink the beat's settings they're setting up for at a leeward mark
  * (sim/world.ts roundingPrep): an ESTIMATE. */
-const PREP_RESOLVE_KT = 2, PREP_TAU = 10;
-/** The depowering her crew would sail a beat with now (her fastest step close-hauled in the wind she has): handed to the
+const PREP_RESOLVE_KT = 2;
+/** The depowering her crew would sail a beat with now (her fastest step close-hauled in the wind there's been, as
+ * the crew's own goal judges it: b.twsSlow): handed to the
  * crew's own as she comes onto the wind after a leeward rounding (sim/world.ts roundingPrep). Under main and jib, as she'll
  * sail it, whatever she's carrying as she comes round. */
 export function beatDepower(b: Boat): number {
-  const tws = b.ww.kt, spec = b.crew?.spec ?? DEFAULT_CREW, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  const tws = b.twsSlow ?? b.ww.kt, spec = b.crew?.spec ?? DEFAULT_CREW, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
   return herFastestStep(b, beatAngle(tws), tws, 'jib', displacement(spec) + (cond?.extraKg ?? 0)).d;
 }
 /** The fastest depowering step for her own crew as they are (how many, how heavy, how tired), in this wind. */
@@ -1228,13 +1229,15 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // a rounding coming: the lines the crew set early for the next leg (sim/world.ts roundingPrep), to their plan for it
   const prep = b.crewPrep;
   if (prep) {
-    // (the wind they plan the beat for, steadied over PREP_TAU: a lull or a puff at the moment isn't the beat they'll sail;
-    // worked out again if that moves by more than PREP_RESOLVE_KT. Planned on each puff, the on-only rule would ratchet the
-    // lines up to the strongest gust's settings)
-    prep.twsAvg = prep.twsAvg == null ? tws : prep.twsAvg + (tws - prep.twsAvg) * Math.min(1, dt / PREP_TAU);
-    if (prep.up && prep.plan && Math.abs(prep.twsAvg - (prep.tws ?? prep.twsAvg)) > PREP_RESOLVE_KT) prep.plan = null;
+    // (the wind they plan the beat for: the wind there's been, as the crew judge their own depowering by (b.twsSlow, over
+    // 20 s): a lull or a puff at the moment isn't the beat they'll sail. Worked out again if that moves by more than
+    // PREP_RESOLVE_KT, the apparent wind with it. Planned on each puff, the on-only rule would ratchet the lines up to the
+    // strongest gust's settings)
+    const twsP = b.twsSlow ?? tws;
+    if (prep.up && prep.plan && Math.abs(twsP - (prep.tws ?? twsP)) > PREP_RESOLVE_KT) prep.plan = null;
     if (!prep.plan) {
-      const tws = prep.twsAvg; prep.tws = tws;
+      const tws = twsP; prep.tws = tws;
+      if (prep.up) { const a = beatAngle(tws), ap = apparent(0, tws, a, polar(tws, a)); prep.awa = ap.awa; prep.aws = ap.aws / KT; }
       // (once a rounding, from the same start: the next leg as she'll sail it. A beat depowered as her fastest step for it
       // is, as she'd set up for it from the start, below; a run with the backstay and Cunningham off, as crews ease them
       // after the bear-away (Sail1Design, "rounding windward offset marks"; International Folkboat guide, North Sails: a
