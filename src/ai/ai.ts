@@ -814,7 +814,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
       if (cp.t < lagT + 1) ai.urgent = true; // (about to touch: before even finishing a tack, physics.ts midTack)
-      if (o.isUser && Math.hypot(dx, dy) < 10) b.forced14 = o.id; // the user made her swerve: that's a foul
+      // the other boat made her swerve: that's a foul (a keep-clear boat that makes the right-of-way boat change course to
+      // avoid her hasn't kept clear: the definition of Keep Clear, (a), "the right-of-way boat can sail her course with no
+      // need to take avoiding action"). Your boat, whenever this swerve's within 10 m. Another AI boat only for the swerve
+      // proper: about to touch (cp.t inside her turn's lag, as ai.urgent), on courses that would have met (cp.d under
+      // the 4.5 m this check starts from, without its allowance for her own lag), within 10 m. Not the wide early
+      // avoidance this branch also takes, which an AI keep-clear boat already turning away may yet make unneeded
+      const close = Math.hypot(dx, dy) < 10;
+      if (close && (o.isUser || (cp.t < lagT + 1 && cp.d < 4.5))) b.forced14 = o.id;
     }
   }
   for (const o of w.boats) {
