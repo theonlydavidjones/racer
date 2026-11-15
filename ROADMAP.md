@@ -649,6 +649,9 @@ What's planned, roughly in order. Done work is described in the README.
        rebindable in Keys.
      - The how-to: no copy block; at most one short chip at the moment it's useful (bearing away toward a run, or
        close-hauled before a tack), e.g. "Space · jibe-ho", fading once she's used it a few times.
+     - The call leaves sooner (owner, 15 November; polish; <0.5 h): "the "tacking!" and "jibe ho!" commands can leave the
+       screen sooner. once called, they're called." The order is held for the whole turn plus 1.5 s today
+       (src/render/labels.ts:90-92). Show it about 1–1.5 s after the warning, then let it go.
    - **Tiller and mainsheet keys that follow the tack** (owner, 15 November; feature; next; 2–4 h): "tiller and mainsheet
      key commands should switch based on starboard or port tack to reflect real life movement." The owner chose:
      - An option in Keys, with today's fixed port/starboard (A/D) staying the default. The option makes the tiller keys
@@ -683,6 +686,27 @@ What's planned, roughly in order. Done work is described in the README.
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
+   - **The inset map is lagging again** (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
+     again." Recent changes to the chart: dbb27a7e (the layers switch at once: each field kept, each kind's streaks its
+     own), caae0506 (chart-skip-3d, batch 42b), the harbor lee's cells (3c80d150) and the wind shadows' skip
+     (aa6471f7). Measure the inset's draw time per frame against the published version before these (perf-ab's views,
+     with the inset open and a layer on). Likely more fields or streaks redrawn every frame than before. Add the
+     inset's cost to the frame gate so it can't creep back.
+   - **On-water current view, in Tools** (owner, 15 November; feature; next; 3–5 h): "on-water current view, toggle-able
+     from Tools". Like wind in the air and the flow view: the current drawn on the water around her (its set and drift,
+     from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
+     move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
+     it and it can't bring back the rushing water.
+   - **A heel indicator at the top-center of the sail controls** (owner, 15 November; feature; next; 2–3 h; drawings first):
+     "at top-center of the sail controls, I want a heel indicator. show me drawings before building anything." Then:
+     "need to see it in situ with the sail panel." Three options shown in place on the real band:
+     - (A) an arc with a mast that tilts;
+     - (B) a tiny hull and mast from astern;
+     - (C) a flat bubble bar like the band's tracks.
+
+     Each has the teal ◆ at her best heel (boat/crewPhys.ts crewBestHeel), amber past 20° (the coach's
+     "overpowered", coach.ts:98) and red past 25° (laid over), with only the degree number as text. It follows the side
+     she's heeled to (b.heelMag), sits inside the band, and adds no new button. The owner's pick goes here.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
