@@ -237,7 +237,7 @@ function realChangeOf(c: CrewState, twa: number, ls: Record<string, number>, k: 
  * Where the crew are taking line `k`, by crewJobs' own decisions (the trim coach judges a fix against it, coach.ts
  * withCrew): a job under way on it, the setting they're making; a cabin-top line they'll set once their waits let them
  * (their 20 s wish off it by their start threshold, and a real change since they set it, not a line a placed crew
- * leaves for a big change), that wish, which is what they set a cabin-top line to; otherwise undefined: it stays where it
+ * leaves for a big change), and this moment's wish the same way, that wish (this moment's, for a big change), which is what they set a cabin-top line to; otherwise undefined: it stays where it
  * is. (Their thresholds at the crew's skill, where crewJobs takes the hand's own trim: near enough for the coach.) Not this moment's plan: that swings with each puff, which the crew don't chase.
  */
 export function crewHeading(b: Boat, k: Ctl): number | undefined {
@@ -245,9 +245,14 @@ export function crewHeading(b: Boat, k: Ctl): number | undefined {
   for (const a of c.people) if (a.job?.line === k && a.job.to != null) return a.job.to;
   if (!PIANO.has(k) || waitingLines(c).includes(k)) return undefined;
   const lw = c.lineWant?.[k]; if (lw == null) return undefined;
-  const skill = crewSkill(c), now = b.ctl[k];
-  if (Math.abs(lw - now) < startThreshold(k, skill, lw) || !realChangeOf(c, b.twa ?? 0, c.lineSlow ?? {}, k, skill)) return undefined;
-  return lw;
+  // (this moment's wish too, as crewJobs takes it: the plan's setting where the crew would pick it (physics.ts trimSails,
+  // b.crewWorth over their trip threshold), else where it is; off by its threshold, and the same way as the 20 s wish)
+  const skill = crewSkill(c), now = b.ctl[k], plan = b.crewPlan as Record<string, number> | null | undefined, worth = b.crewWorth as Record<string, number> | null | undefined;
+  const want = plan && worth && (worth[k] ?? 0) >= 0.001 + 0.003 * (1 - skill) ? plan[k] : now;
+  const dl = lw - now, dn = want - now, th = startThreshold(k, skill, lw);
+  if (Math.abs(dl) < th || Math.abs(dn) < startThreshold(k, skill, want) || dl * dn <= 0 || !realChangeOf(c, b.twa ?? 0, c.lineSlow ?? {}, k, skill)) return undefined;
+  // (a big change, both wishes well off, they set right through to this moment's wish, as crewJobs' `far` does)
+  return Math.abs(dl) > 2 * th && Math.abs(dn) > 2 * th ? want : lw;
 }
 /** The per-line results crewJobs hands back, kept per boat and filled in afresh each step (read within the step only:
  * physics.ts trimSails), so a step makes none: a line absent from `want` is undefined, as it was missing before. */
