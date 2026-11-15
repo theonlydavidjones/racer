@@ -33,7 +33,9 @@ export type Command =
   /** The tiller's handle, −1 (pushed to port) … +1 (to starboard); a lashed tiller is lashed where it's put. */
   | { k: 'tiller'; v: number }
   /** Lash the tiller where it is, or take the lashing off. */
-  | { k: 'lash'; on: boolean }
+  /** `at`: the tiller angle to lash it at (the page's intended angle: its own copy of the race can be a frame or two
+   * behind, app.ts lash); without it, where the tiller is. */
+  | { k: 'lash'; on: boolean; at?: number }
   /** Take a line yourself (it stays where it is until you work it), or give it back to the crew. */
   | { k: 'line'; key: LineKey; mine: boolean }
   /** Hand Back (the band's tab): every line and both jib cars back to the crew (the pole stays yours). */
@@ -117,7 +119,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
     case 'tiller': u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
-    case 'lash': u.lashed = c.on ? u.tiller : null; return;
+    case 'lash': if (c.on && c.at != null) u.tiller = Math.max(-1, Math.min(1, c.at)); u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
     case 'lazyCar': takeLine(u, 'car'); moveLazyCar(u, c.fore, c.ins); return;
