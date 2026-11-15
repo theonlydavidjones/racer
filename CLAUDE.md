@@ -93,6 +93,12 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
   practice, color, favor, meters, harbor, maneuver, center, gray, jibe ("Ready to jibe" … "Jibe-ho"; the owner, 13 Nov), -ize. New code comments use it too.
 - Before opening a PR (the owner, 13 Nov 2026, for faster releases): merge origin/main into your branch and run the
   full `npm test` on it, not only test:fast; say in the PR that it passed (or which load timeouts you reran alone).
+- The full suite on a shared host (the Coordinator, 15 Nov 2026): only the timing checks need the host to themselves.
+  A session's full `npm test` may run as two halves: correctness, `npx vitest run --exclude tests/perf.test.ts`, which
+  may run beside another session's (at most two at once); and the timing, `npx vitest run tests/perf.test.ts` (and any
+  perf-pair, perf-ab or deopt), only in a quiet slot from Capacity, one at a time. A correctness failure under load is
+  rerun alone before it's called a load timeout. The PR says both halves passed: "full npm test: correctness (under
+  load) + perf.test (quiet slot)". The Coordinator's batch runs stay whole, on a quiet host.
 - How the Coordinator tests a batch (the owner, 13 Nov 2026): test:fast first on the merged batch (fail fast), then the
   tier the batch needs. A batch touching src/boat, src/environment, src/sim, src/ai, src/rules, src/core, tests or the
   data under src/ gets the full `npm test`. A batch touching only src/ui, src/render, styles, index.html, scripts or docs
