@@ -1090,6 +1090,11 @@ data, ranked by how much it changes what a sailor feels or a race result. Each f
    no-go zone). The polar's pinch curve itself is unmeasured: it should come from the sails' forces once 9 is done. And
    the crew's deliberate ease of the main on the last depowering steps (up to 7°, half luffing) flogs at no cost, in the
    speed search and on the water alike: price it in the search, then judge the main where it is.
+   **The flogging main's drag: no measurement; revisit if a source or an on-the-water observation turns up** (the
+   owner, 15 Nov 2026: paused). As it is (dynamics.ts flogCdA, 0.12 on the cloth): close-hauled with the jib drawing and
+   the main let right off, she slows from 5.4 kn to 1.8 kn in 30 s in 18 kt and stops inside two minutes; in 10 kt she is
+   down to 0.9 kn. At 0.05 she would keep 1.0 kn and 1.4 kn. Flags give 0.05 before they flutter and 0.15 to 0.35
+   fluttering; ORC's zero-lift main is 0.03 to 0.04. Until then the crew's ease in a puff must not go past the luff.
 2. ~~**No tactical wind shifts on most days.**~~ (done: environment/shifts.ts, fitted to FTPC1's record by kind of day and
    strength, counted from when the course is laid, carried down the course; later: the lateral coherence (the sides of
    the course) from two stations' records rather than assumed; the HUD's lift/header readout and the rules' wind (Overlap,
