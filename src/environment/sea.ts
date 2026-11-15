@@ -49,15 +49,6 @@ export function landAt(p: Vec): boolean | null {
   if (i < 0 || j < 0 || i >= M.nx || j >= M.ny) return null;
   return LAND[j * M.nx + i] === 1 || onLandNear(p);
 }
-/** The 50 m land mask read bilinearly between its cells' centers (0 water … 1 land): a continuous share of land, for what
- * must not step where a cell's edge is crossed (shadows.ts terrainLee). */
-export function landShareAt(p: Vec): number {
-  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
-  const ci = ((lon - M.west) / (M.east - M.west) * (M.samples[0] - 1) + 0.5) / M.block - 0.5, cj = ((M.north - lat) / (M.north - M.south) * (M.samples[1] - 1) + 0.5) / M.block - 0.5;
-  const i = Math.floor(ci), j = Math.floor(cj), u = ci - i, v = cj - j;
-  const at = (a: number, b: number) => a < 0 || b < 0 || a >= M.nx || b >= M.ny ? 0 : LAND[b * M.nx + a];
-  return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
-}
 // the sim's own Cityfront coastline (what boats run aground on), checked only near it
 const CF = { x0: LL(0, -122.48).x, x1: LL(0, -122.40).x, y0: LL(37.79, 0).y, y1: LL(37.815, 0).y };
 const onLandNear = (p: Vec) => p.x > CF.x0 && p.x < CF.x1 && p.y > CF.y0 && p.y < CF.y1 && onLand(p);

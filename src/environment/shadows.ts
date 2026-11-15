@@ -1,7 +1,7 @@
 import { D2R, V, clamp, type Vec } from '../core/math';
 import { LAT0, LON0 } from '../geo/geo';
 import heights from './data/heights.json';
-import { landShareAt } from './sea';
+import { landGrid } from '../geo/shore';
 
 /**
  * Wind shadows: what the wind field from the NOAA records doesn't know about. Anything standing in the wind leaves a
@@ -178,8 +178,8 @@ function cityfrontDepth(p: Vec): number {
 const CF_FADE = 250;
 /** A dip between two stretches of land narrower than this (m) doesn't part them for the lee (terrainLeeRaw). */
 const DIP_GAP = 200;
-/** The mask's share of land (0..1, read bilinearly) from which the ground counts: about its cells' own edge. */
-const LAND_FROM = 0.3;
+/** The mask's share of land (0..1, read bilinearly) from which the ground counts: its cells' own edge. */
+const LAND_FROM = 0.5;
 
 /**
  * The lee of the land at p, wind from `from` (deg): looking upwind along three rays (straight up, and the wake's
@@ -200,6 +200,18 @@ export function terrainLee(p: Vec, from: number, skipGate = false): number {
  * and the ray took them as one hill, from the nearer shore: the review, bay-east-16. The land's share keeps the water
  * between them at nothing.)
  */
+/**
+ * The share of land at p (0 water … 1 land), from the coastline's 50 m terrain cells (geo/shore.ts, what a boat runs
+ * aground on) read bilinearly between the cells' nodes: continuous, and the coast where it is a half. (The sea's land
+ * mask is 100 m cells: on Alcatraz, 180 m wide, it put the shore 150 m out.)
+ */
+const LG = landGrid(), LG_CW = (LG.east - LG.west) / (LG.nx - 1), LG_CH = (LG.north - LG.south) / (LG.ny - 1);
+function landShareAt(p: Vec): number {
+  const ci = (LON0 + p.x / MLON - LG.west) / LG_CW, cj = (LG.north - (LAT0 + p.y / MLAT)) / LG_CH;
+  const i = Math.floor(ci), j = Math.floor(cj), u = ci - i, v = cj - j;
+  const at = (a: number, b: number) => a < 0 || b < 0 || a >= LG.nx || b >= LG.ny ? 0 : LG.grid[b * LG.nx + a];
+  return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+}
 function groundHeightAt(p: Vec): number {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
   const inCf = Math.min((lat - CITYFRONT.south) * MLAT, (CITYFRONT.north - lat) * MLAT, (lon - CITYFRONT.west) * MLON, (CITYFRONT.east - lon) * MLON);
@@ -207,10 +219,16 @@ function groundHeightAt(p: Vec): number {
   const ci = ((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block - 0.5, cj = ((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block - 0.5;
   const i = Math.floor(ci), j = Math.floor(cj), u = ci - i, v = cj - j;
   const at = (a: number, b: number) => a < 0 || b < 0 || a >= HM.nx || b >= HM.ny ? 0 : HGRID[b * HM.nx + a] * HM.step;
-  const h = (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
-  if (!(h > 0)) return 0;
-  // (the land counted from where the mask's share passes LAND_FROM, so the land starts about at the mask's own edge,
-  // not 20–30 m out where its bilinear share first rises off nothing)
+  // the height among the land blocks only (Deep Physics): the water blocks round an island don't pull it down, so a
+  // one-block, flat-topped island (Alcatraz: cliffs, about 41 m) reads its height wherever it's land, as the block has it,
+  // not a tent full height at one point; inland it's plain bilinear. The land's share alone makes the edge
+  const h00 = at(i, j), h10 = at(i + 1, j), h01 = at(i, j + 1), h11 = at(i + 1, j + 1);
+  const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
+  const wl = (h00 > 0 ? w00 : 0) + (h10 > 0 ? w10 : 0) + (h01 > 0 ? w01 : 0) + (h11 > 0 ? w11 : 0);
+  if (wl < 0.02) return 0; // (all but out of the land blocks: the share is next to nothing there too)
+  const h = (h00 * w00 + h10 * w10 + h01 * w01 + h11 * w11) / wl;
+  // (the land counted from where the mask's share passes a half: a cell half land is the best estimate of where the coast
+  // is. From nothing, the ground began 20–30 m out from the mask's edge under high ground, 80 m before the coast on Angel)
   return h * Math.min(1, Math.max(0, (landShareAt(p) - LAND_FROM) / (1 - LAND_FROM))) * cf;
 }
 /**
@@ -247,7 +265,7 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
     const u = V(from + off), side = off === 0 ? 1 : 0.85;
     // the stretch being crossed: where the ray met it; and the chain of stretches before it, parted only by narrow dips
     // (a creek, a low neck): its first shore, and how much the dips between have parted it (chainW: 1 one hill … 0 apart)
-    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, chain = -1, chainW = 0, exitChain = -1;
+    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, chain = -1, chainW = 0, exitChain = -1, dip = 8;
     const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), cav = 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1); return (x < xr ? cav : cav * (xr / x) ** pe) * Math.min(1, (H - 8) / 8); };
     const close = () => { const v = side * Math.max(lee(enter, top), chain >= 0 ? chainW * lee(chain, top) : 0); worst = Math.max(worst, v); };
     let step = 50;
@@ -263,13 +281,15 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
       if (h > 8) {
         if (enter < 0) {
           enter = prevH >= 8 ? prevD : cross; top = 0;
-          // a dip under DIP_GAP wide doesn't part the land: the hill beyond still shelters from the first shore, less so the wider the dip
-          if (exit >= 0) { const w = Math.max(0, 1 - (enter - exit) / DIP_GAP); if (chain < 0 || chainW === 0) { chain = exitChain; } chainW = w * (chainW > 0 ? chainW : 1); if (chainW === 0) chain = -1; }
+          // a dip under DIP_GAP wide doesn't part the land: the hill beyond still shelters from the first shore, less so the
+          // wider the dip and the deeper it goes under 8 m (one only just under it hardly parts them: Deep Physics)
+          if (exit >= 0) { const w = Math.max(0, 1 - Math.min(1, (enter - exit) / DIP_GAP) * (1 - Math.max(0, dip) / 8)); if (chain < 0 || chainW === 0) { chain = exitChain; } chainW = w * (chainW > 0 ? chainW : 1); if (chainW === 0) chain = -1; }
         }
         top = Math.max(top, h);
       } else if (enter >= 0) {
-        close(); exit = cross; exitChain = chain >= 0 && chainW > 0 ? chain : enter; enter = -1;
+        close(); exit = cross; exitChain = chain >= 0 && chainW > 0 ? chain : enter; enter = -1; dip = h;
       }
+      if (enter < 0) dip = Math.min(dip, h);
       prevD = d; prevH = h;
     }
     if (enter >= 0) close();
