@@ -618,6 +618,13 @@ What's planned, roughly in order. Done work is described in the README.
        rebindable in Keys.
      - The how-to: no copy block; at most one short chip at the moment it's useful (bearing away toward a run, or
        close-hauled before a tack), e.g. "Space · jibe-ho", fading once she's used it a few times.
+   - **Tiller and mainsheet keys that follow the tack** (owner, 15 November; feature; next; 2–4 h): "tiller and mainsheet
+     key commands should switch based on starboard or port tack to reflect real life movement." The owner chose:
+     - An option in Keys, with today's fixed port/starboard (A/D) staying the default. The option makes the tiller keys
+       push and pull from the helm's windward seat, so they swap sides with each tack.
+     - The mainsheet follows the hand holding it on each tack: pull in and ease, toward and away from the helm.
+     The swap happens when she's through the tack or jibe, not mid-turn, so a held key doesn't reverse under the
+     player's finger. The keys' labels show which way each key works now. No new screen controls.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
