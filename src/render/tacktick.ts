@@ -17,21 +17,27 @@ export const UNIT = { w: 0.164, h: 0.122, d: 0.058, tilt: 20 * Math.PI / 180, lc
 /** How often the readout changes (s): a small instrument's LCD updates about once a second for heading damping, but
  * a few times a second reads better in the sim. */
 const EVERY = 0.25;
+/** How far the unit stands above its foot (m): the owner (15 Nov 2026) couldn't read it over the hatch boards from the
+ * helm, so it sits on a riser post 6.5 cm (about 2.5 in) tall, as a deck pedestal raises an instrument clear of a dodger
+ * or hatch: a base plate on the roof, a short tube, and a cradle plate the unit bolts to. */
+export const RISE = 0.065;
 
 export interface Instrument { grp: THREE.Group; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; next: number; shown: string }
 
 export function buildInstrument(): Instrument {
   const grp = new THREE.Group(); grp.name = 'instrument';
   const body = new THREE.MeshLambertMaterial({ color: 0x15171a });
-  // the face, tilted up toward the cockpit, on a short black bracket
-  const head = new THREE.Group(); head.rotation.x = -UNIT.tilt; head.position.y = UNIT.h * 0.5 * Math.cos(UNIT.tilt) + 0.012; grp.add(head);
+  // the face, tilted up toward the cockpit, on a black riser (RISE): foot plate, tube, cradle
+  const head = new THREE.Group(); head.rotation.x = -UNIT.tilt; head.position.y = UNIT.h * 0.5 * Math.cos(UNIT.tilt) + 0.012 + RISE; grp.add(head);
   head.add(new THREE.Mesh(new THREE.BoxGeometry(UNIT.w, UNIT.h, UNIT.d), body));
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 190; // (the face's own shape)
   const ctx = cv.getContext('2d')!;
   const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4; tex.colorSpace = THREE.SRGBColorSpace;
   const face = new THREE.Mesh(new THREE.PlaneGeometry(UNIT.w * UNIT.lcd, UNIT.h * UNIT.lcd), new THREE.MeshBasicMaterial({ map: tex }));
   face.position.z = UNIT.d / 2 + 0.0005; head.add(face);
-  const foot = new THREE.Mesh(new THREE.BoxGeometry(UNIT.w * 0.5, 0.024, 0.06), body); foot.position.y = 0.012; grp.add(foot);
+  const foot = new THREE.Mesh(new THREE.BoxGeometry(UNIT.w * 0.5, 0.012, 0.07), body); foot.position.y = 0.006; grp.add(foot);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, RISE, 12), body); tube.position.y = 0.012 + RISE / 2; grp.add(tube);
+  const cradle = new THREE.Mesh(new THREE.BoxGeometry(UNIT.w * 0.5, 0.012, 0.06), body); cradle.position.y = 0.006 + RISE + 0.006; grp.add(cradle);
   const inst = { grp, ctx, tex, next: 0, shown: '' };
   draw(inst, 0, 0);
   return inst;
