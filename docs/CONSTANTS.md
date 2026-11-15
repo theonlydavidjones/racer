@@ -321,7 +321,7 @@ physics, ranked like the ten above:
 | OUTBOARDS.rpm | 5500 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
 | OUTBOARDS.gear | 2.15 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
 | OUTBOARDS.hp | 3.5 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.kg | 18.4 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
+| OUTBOARDS.kg | 18.5 | 29 | sourced | Tohatsu's owner's manuals and product pages, read 14 Nov 2026 (2.5 and 3.5: 18.5 kg short shaft; 6: 25–27 kg) |
 | OUTBOARDS.propD | 7… | 29 | estimate | 3.5's prop assumed for all |
 | OUTBOARDS.pitch | 7… | 29 | estimate | 3.5's prop assumed for all |
 | OUTBOARDS.rpm | 5500 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
@@ -473,6 +473,25 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | P1 | 283.2 | 50 | sourced |  |
+
+### src/environment/harborMouth.ts
+
+| Constant | Value | Line | Class | Note |
+|---|---:|---:|---|---|
+| MOUTH.gyre | 0.25 | 81 | sourced | "a first guess": Bijvelds 1997 §3, after Booij 1986 (nearer 0.1 in the case he checks) |
+| MOUTH.peak, rim | 0.75, 1.25 | 83 | estimate | the gyre's shape: assumed |
+| MOUTH.beta | 0.59 | 85 | estimate | Langendoen's value for a square harbor open across its width; 0.4–1 with the shape |
+| MOUTH.spread | 0.23 | 88 | sourced | Booij's measurement in a harbor's mouth as B = ΔU/(dU/dy)max (Bijvelds 1997 §4) |
+| MOUTH.B0 | 1 | 88 | estimate | the layer's width at the corner |
+| MOUTH.spacing | 3 | 91 | estimate | the largest eddies' size (Tukker 1997, in Bijvelds), taken as their spacing |
+| MOUTH.carry | 0.5 | 91 | sourced | Bijvelds 1997 |
+| MOUTH.v | 0.1 | 91 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one row of eddies (upper bound) |
+| MOUTH.cf, depth | 0.0025, 3 | 94 | sourced | the usual tidal-model drag (not measured here); Coast Pilot 7's 8–12 ft |
+| MOUTH.free | 0.18 | 96 | sourced | Brown & Roshko 1974, Bijvelds eq. 3.6 |
+| MOUTH.reattach | 4 | | estimate | steps to come back to the wall after a knuckle: 6–7 behind a square step (Kim, Kline & Johnston 1980), less behind a 27° slope |
+| (the pile lee's reach) | 1–2 pier-heads | | estimate | not derived: see the module's comment |
+| (the layer's head start through the piles) | the pier's width | | estimate | nothing found on shear layers through pile fields |
+| (the still pool's reach) | 2 gyre radii | | estimate | |
 
 ### src/environment/pierWakes.ts
 

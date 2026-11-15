@@ -1,5 +1,5 @@
 import './three-setup';
-import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
+import { ensignStep, flagDrawn, flagExtension, flagHang, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
@@ -20,6 +20,8 @@ import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLant
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 import { PART_SMALL } from './fittings';
+import { buildOutboard, syncOutboard, type OutboardMesh } from './outboard';
+import { bracketFitted } from '../boat/outboardMount';
 const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
 const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
@@ -368,14 +370,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
   grp.add(rud);
-  // an outboard on its transom bracket, tilted up (port quarter, clear of the rudder, the tiller and the ensign staff)
-  if (b.spec?.perf.outboard === 'bracket') {
-    const ob = new THREE.Group(), grey = new THREE.MeshPhongMaterial({ color: 0x9aa0a6, specular: 0x666666, shininess: 50 }), blk = MAT.dark;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.34), blk); head.position.set(0, 0.13, 0.12); ob.add(head);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.62), grey); leg.position.set(0, 0.0, -0.2); ob.add(leg); // tilted up: the leg lies forward along the bracket
-    const brk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.04), grey); brk.position.set(0, -0.05, -0.12); ob.add(brk);
-    ob.position.set(-0.42, sheer(1) - 0.12, L / 2 + 0.12); ob.rotation.x = 0.35; grp.add(ob);
-  }
+  // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
+  // prop turning, from the motor's state (syncBoatMesh)
+  // (and its bracket alone, empty and raised, while it's stowed below from it: Crew Controls' Stow / Ship)
+  // (no bracket at all with no motor aboard: boat/outboardMount.ts bracketFitted; built later if one's shipped mid-sail)
+  if (bracketFitted(b)) { const ob = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
   // her name on both sides, where the boats carry it: on the cabin side and the coaming, aft of the window and
   // forward of the winch (there's no room for it on the topsides under the low sheer); hand-lettered script
   if (paint.boatName) {
@@ -434,6 +433,8 @@ export interface BoatMesh {
   nav: NavLights;
   /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
   lantern: LanternSwing;
+  /** Her outboard and its bracket (outboard.ts), when she carries it on the bracket. */
+  outboard?: OutboardMesh;
   /** The companionway's sliding hatch and washboards, moved by syncCompanionway. */
   companionway: Companionway;
 }
@@ -1064,6 +1065,8 @@ const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = shee
 const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
 /** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
 const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
+/** A shroud's ends (starboard's; port's mirrored), in the boat group's frame: its chainplate on deck, and where it meets the mast. */
+export const SHROUD = { foot: new THREE.Vector3(CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip: new THREE.Vector3(MAST_ATH / 2, SHROUD_Y, MAST_Z) };
 const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
 /** The mast's height segments (for its bend) and the forestay's points (for its sag). */
 const MAST_SEGS = 24, STAY_PTS = 13, STAY_LEN = HOUNDS.distanceTo(FORESTAY_DECK);
@@ -1381,7 +1384,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern, outboard: grp.userData.outboard };
   mergeStatic(grp, out);
   return out;
 }
@@ -1459,6 +1462,10 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
   syncCompanionway(m.companionway, b);
+  // her outboard: let down or tilted up, the prop turning (the motor's state: boat/motor.ts, b.motor)
+  { const fit = bracketFitted(b);
+    if (fit && !m.outboard) { m.outboard = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); m.grp.add(m.outboard.group); } // (a motor shipped from below mid-sail: its bracket fitted)
+    if (m.outboard) { m.outboard.group.visible = fit; if (fit) syncOutboard(m.outboard, b.motor, Math.max(0, dt)); } }
   // the footrest: slid out while the helm sits on the after deck (their feet on it), slid back under the deck when they
   // stand to steer (the owner). b.footrest (0 out … 1 back) is set by whoever poses the helm (crew.ts): out by default,
   // as the helm sits. It slides there by hand, about half a metre a second, not in a jump.
@@ -1489,7 +1496,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
         const k = (i / 3) % (FLAG_SEGS + 1), x = ROW_X[k], y = f.base[i + 1];
         // streaming, it lies out along the wind; hanging, the fly falls away below the hoist, which stays on its staff or
         // halyard (the foot folds in under it rather than hanging the whole flag's length lower)
-        a[i] = x * cs; a[i + 1] = y - x * sn * (1 + y / f.h); a[i + 2] = ROW_Z[k];
+        const [hx, hy] = flagHang(x, y, f.h, f.fly, cs, sn); a[i] = hx; a[i + 1] = hy; a[i + 2] = ROW_Z[k];
       }
       p.needsUpdate = true;
     }
@@ -1907,24 +1914,27 @@ const teakCache = new Map<string, THREE.CanvasTexture>();
 /** Laid teak: planks with black caulked seams and grain; weathered silver-grey, or oiled and polished. */
 /**
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
- * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
+ * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks, sixteen to the texture's tile (teakTexture).
  */
 function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   if (!g.attributes.normal) g.computeVertexNormals();
   const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];
   for (let i = 0; i < p.count; i++) {
     const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
-    if (ny > 0.7) uv.push(p.getX(i) / 0.28, p.getZ(i) / 2.4);
-    else if (nx >= nz) uv.push(p.getY(i) / 0.28, p.getZ(i) / 2.4);
-    else uv.push(p.getY(i) / 0.28, p.getX(i) / 2.4);
+    if (ny > 0.7) uv.push(p.getX(i) / 1.12, p.getZ(i) / 2.4);
+    else if (nx >= nz) uv.push(p.getY(i) / 1.12, p.getZ(i) / 2.4);
+    else uv.push(p.getY(i) / 1.12, p.getX(i) / 2.4);
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
 function teakTexture(silver: boolean, seams = true): THREE.CanvasTexture {
   const key = `${silver}${seams}`, hit = teakCache.get(key); if (hit) return hit;
-  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d')!, planks = 4, pw = W / planks;
+  // (a laid deck: sixteen planks across a tile, each with its butt joint at its own place, so the joints scatter as a real
+  // deck's do; a tile of four repeated every 0.28 m across her, and the same plank's joint on every fourth plank lined up
+  // across the deck into dark bands, the owner's "odd black seams". The trim's pieces, without joints, need only four.)
+  const W = seams ? 1024 : 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!, planks = W / 64, pw = W / planks;
   let seed = silver ? 7 : 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < planks; i++) {
     const base = silver ? [168, 163, 152] : [176, 116, 62], k = 0.9 + rnd() * 0.18;
