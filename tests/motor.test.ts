@@ -3,7 +3,9 @@ import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { KT } from '../src/core/math';
-import { OUTBOARDS, pitchSpeed, staticThrust, thrust, type MotorState } from '../src/boat/motor';
+import { OUTBOARDS, PROP_WALK, motorYaw, pitchSpeed, staticThrust, thrust, type MotorState } from '../src/boat/motor';
+import { OUTBOARD_PROP } from '../src/boat/outboardMount';
+import { wrap } from '../src/core/math';
 
 /** The outboard (boat/motor.ts): its thrust from momentum theory, and her under power with her sails down. */
 const S: Settings = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 4, windTurn: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-11-14', current: 'slack', sea: 'flat' } as Settings;
@@ -24,6 +26,55 @@ describe('the outboard', () => {
     expect(thrust({ ...m, gear: 'R' }, 0)).toBeLessThan(0); expect(-thrust({ ...m, gear: 'R' }, 0)).toBeLessThan(T0 * 0.6); // (astern, weaker)
     expect(thrust({ ...m, gear: 'N' }, 0)).toBe(0); expect(thrust({ ...m, down: false }, 0)).toBe(0); expect(thrust({ ...m, running: false }, 0)).toBe(0);
     expect(staticThrust(OUTBOARDS[6])).toBeGreaterThan(T0); expect(staticThrust(OUTBOARDS[2.5])).toBeLessThan(T0);
+    // (the 6's is the measured one: YACHT's bollard pull for the Tohatsu MFS5/MFS6 on the 7.8 × 8 in prop, 0.61 kN)
+    expect(staticThrust(OUTBOARDS[6])).toBeGreaterThan(610 * 0.97); expect(staticThrust(OUTBOARDS[6])).toBeLessThan(610 * 1.03);
+    expect(OUTBOARDS[6].pitch / 0.0254).toBeCloseTo(8, 6);
+  });
+  // (the motor's on her port quarter, 0.42 m off her centerline: boat/outboardMount.ts)
+  it('off her centerline: at rest the 3.5 at full throttle turns her bow to starboard with about 130 N·m, its thrust times its offset less the prop\'s walk; astern, to port', () => {
+    const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user; u.v = 0; u.astern = 0;
+    u.motor = { hp: 3.5, down: true, running: true, gear: 'F', throttle: 1 };
+    const T0 = staticThrust(OUTBOARDS[3.5]), at = OUTBOARD_PROP[3.5];
+    expect(at.x).toBeLessThan(0); // (to port)
+    expect(motorYaw(u)).toBeCloseTo(-at.x * T0 - PROP_WALK.ahead * T0 * at.z, 6);
+    expect(motorYaw(u)).toBeGreaterThan(100); expect(motorYaw(u)).toBeLessThan(180);
+    // (turned round to push astern: her bow to port, the same size the other way)
+    u.motor.swivel = true; expect(motorYaw(u)).toBeCloseTo(at.x * T0 + PROP_WALK.ahead * T0 * at.z, 6); expect(motorYaw(u)).toBeLessThan(-100); expect(motorYaw(u)).toBeGreaterThan(-180);
+    // (the 6 in reverse gear: half its thrust, and the walk's astern share against it)
+    u.motor = { hp: 6, down: true, running: true, gear: 'R', throttle: 1 };
+    const Tr = -thrust(u.motor, 0), at6 = OUTBOARD_PROP[6];
+    expect(motorYaw(u)).toBeCloseTo(at6.x * Tr + PROP_WALK.astern * Tr * at6.z, 6); expect(motorYaw(u)).toBeLessThan(-50); expect(motorYaw(u)).toBeGreaterThan(-110);
+    u.motor.gear = 'N'; expect(motorYaw(u)).toBe(0); // (out of gear and stopped in the water: nothing)
+    u.motor = { hp: 3.5, down: false, running: false, gear: 'N', throttle: 0 }; u.v = 2; expect(motorYaw(u)).toBe(0); // (tilted up)
+    // (down and not driving, sailing at 2 m/s: the leg's drag pulls her port quarter back, a little: her bow to port)
+    u.motor.down = true; expect(motorYaw(u)).toBeLessThan(0); expect(motorYaw(u)).toBeGreaterThan(-15);
+  });
+  it('the tiller let go, she swings to starboard as she gathers way (about 10° in the first 10 s), then turns slowly: under half a degree a second at her motoring speed', () => {
+    const w = new World(COURSES[0], { ...S, windKt: 0.5 }, 1, { freeSail: true }), u = w.user;
+    u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.v = 0; u.astern = 0;
+    u.motor = { hp: 3.5, down: true, running: true, gear: 'F', throttle: 1 };
+    let turned = 0, h = u.h; const go = (secs: number) => { for (let i = 0; i < 60 * secs; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT); turned += wrap(u.h - h); h = u.h; } };
+    go(10); expect(turned).toBeGreaterThan(5); expect(turned).toBeLessThan(16);
+    go(50); expect(u.turnRate!).toBeGreaterThan(0.1); expect(u.turnRate!).toBeLessThan(0.5);
+  });
+  it('a touch of helm holds her straight at speed: under 2° of rudder', () => {
+    const w = new World(COURSES[0], { ...S, windKt: 0.5 }, 1, { freeSail: true }), u = w.user;
+    u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.v = 0; u.astern = 0;
+    u.motor = { hp: 3.5, down: true, running: true, gear: 'F', throttle: 1 };
+    for (let i = 0; i < 60 * 40; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT); }
+    // (tiller to starboard turns her bow to port, against the motor: 2° of 30 is 0.067 of full helm)
+    let turned = 0, h = u.h; for (let i = 0; i < 60 * 20; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 2 / 30; w.step(DT); turned += wrap(u.h - h); h = u.h; }
+    expect(turned).toBeLessThan(0); // (2° is more than it takes: she comes off to port)
+    // (and a quarter of a degree isn't enough: she still goes off to starboard)
+    turned = 0; for (let i = 0; i < 60 * 20; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0.25 / 30; w.step(DT); turned += wrap(u.h - h); h = u.h; }
+    expect(turned).toBeGreaterThan(0);
+  });
+  it('without a motor, or with it out of gear and tilted up, nothing turns her', () => {
+    const w = new World(COURSES[0], { ...S, windKt: 0.5 }, 1, { freeSail: true }), u = w.user;
+    u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.v = 1.5; u.astern = 0; u.motor = { hp: 3.5, down: false, running: false, gear: 'N', throttle: 0 };
+    let turned = 0, h = u.h; for (let i = 0; i < 60 * 10; i++) { u.turnTarget = null; u.steer = 0; u.tiller = 0; w.step(DT); turned += wrap(u.h - h); h = u.h; }
+    expect(Math.abs(turned)).toBeLessThan(0.5);
+    u.motor = undefined; expect(motorYaw(u)).toBe(0); // (no motor aboard)
   });
   it('sails down, the 3.5 at full throttle motors her at about 4–5 kt; the 2.5 a little less, the 6 a little more', () => {
     const v = (hp: 2.5 | 3.5 | 6) => run({ hp }, 90).v / KT;
