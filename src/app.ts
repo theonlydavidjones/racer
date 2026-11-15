@@ -607,6 +607,7 @@ const boatLesson = mountBoatLesson(ctx); // (src/app/boatLesson.ts)
 const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera);
 let coachW: unknown = null;
 function drillCues(): void {
+  const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
   if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); } // (a new race: nothing carried over)
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
@@ -943,6 +944,10 @@ $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
 // Cruising, the same button (and key) opens the navigator's passage plan instead.
 $('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle(w));
+// the start practice's restart, in the start line's card (the owner, 15 Nov 2026: "I need an actual restart button"):
+// the same as Shift+R, until the results open
+$('ncRestart').addEventListener('click', e => { e.stopPropagation(); if (S.mode === 'drill') results.restartDrill(); });
+$('ncRestart').addEventListener('keydown', e => e.stopPropagation());
 $('nextCard').addEventListener('click', () => (w.cruising ? navView.toggle(w) : courseView.toggle(w)));
 $('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navView.toggle(w) : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
