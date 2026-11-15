@@ -84,7 +84,8 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
  * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
  * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
- * (manoeuvreS's `hs`).
+ * (manoeuvreS's `hs`). Measured again with the hull's residuary resistance a smooth curve (dynamics.ts, 15 Nov 2026):
+ * in a breeze her tacks cost more (3.5 s in 20 kt, was 2.9; 5.2 in 25, was 4.3).
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
   tack: [[3, 22.1], [4, 15.0], [6, 8.4], [8, 5.5], [12, 3.2], [16, 3.2], [20, 3.5], [25, 5.2]],
@@ -225,12 +226,16 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       else if (standOff && (!close || (Math.max(rS, rP) >= 150 && t - standT >= 1))) standOff = false;
       let off: { h: number; v: number; T: 'S' | 'P' } | null = null;
       if (standOff) {
-        // (of the headings borne away that leave room, the one that makes most toward the mark: reaching along the shore
-        // and round; if none leaves room, the one with most)
+        // (of the headings borne away whose track is clear water all the way (a point or a pier between her and open water
+        // at the end is as bad as land at the end) and ends with room, the one that makes most toward the mark; the other
+        // board only for more than the tack or gybe to it costs, or she'd swap boards every step on a corner where the two
+        // are near-equal. If none leaves room, the one with most)
         let best = -Infinity;
-        for (const T of [tack, other] as const) for (let extra = 20; extra <= 100; extra += 20) { // (her own board first: the other only for better, not a swap every step)
+        for (const T of [tack, other] as const) for (let extra = 20; extra <= 100; extra += 20) {
           const twa = ang + extra, hh = w.from + (T === 'S' ? -twa : twa), vv = sp(twa), d = V(hh), g = { x: d.x * vv + c.x, y: d.y * vv + c.y };
-          const r = landDist({ x: p.x + g.x * 90, y: p.y + g.y * 90 }), score = r >= 80 ? 1e3 + dot(g, u) : r;
+          const end = { x: p.x + g.x * 90, y: p.y + g.y * 90 }, r = landDist(end), clear = landAlong(p, end) === Infinity;
+          const cost = T === tack ? 0 : manoeuvreS(twa < 90 ? 'tack' : 'gybe', w.kt, ch.hs) * vv; // (m: the time the turn costs, at her speed)
+          const score = clear && r >= 80 ? 1e4 + dot(g, u) * 90 - cost : clear ? r : r - 1e3;
           if (score > best) { best = score; off = { h: hh, v: vv, T }; }
         }
         flip = false;
