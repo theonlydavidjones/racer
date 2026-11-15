@@ -177,9 +177,39 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       v = sp(off); h = crabTo(u, c, v);
       const twa = Math.abs(wrap(h - w.from)); v = sp(Math.max(beat, Math.min(run, twa)));
     } else {
-      const ang = mode === 'beat' ? beat : run, vb = sp(ang), sgn = mode === 'beat' ? -1 : 1;
-      const hd = (T: 'S' | 'P') => w.from + (T === 'S' ? -ang : ang);
-      const gnd = (T: 'S' | 'P') => { const d = V(hd(T)); return { x: d.x * vb + c.x, y: d.y * vb + c.y }; };
+      const sgn = mode === 'beat' ? -1 : 1;
+      // her angle to the wind on each board: close-hauled to windward; downwind, the pair of angles, one on each gybe from
+      // her deepest VMG angle up to 30° hotter, whose tracks over the ground, current and all, sailed one then the other,
+      // make most along the straight line to the mark (the two tracks' meeting with that line: the polar's double tangent,
+      // with the current in it). In still water it is her deepest VMG angle on both; in a current across her course the
+      // gybe into it sails hotter, so it still makes ground, and the other deeper. Sailed at the deepest angle on both,
+      // the gybe into a cross-current made next to none, and the plan doubled back (the owner's Horseshoe Bay plan, 15 Nov
+      // 2026: it gybed off Yellow Bluff and ran back toward the start)
+      let angS = beat, angP = beat;
+      if (mode === 'run') {
+        const as: number[] = []; for (let a = run; a >= Math.max(run - 30, 90) - 1e-9; a -= 5) as.push(a);
+        const g = (T: 'S' | 'P', a: number) => { const d = V(w.from + (T === 'S' ? -a : a)), vv = sp(a); return { x: d.x * vv + c.x, y: d.y * vv + c.y }; };
+        const GS = as.map(a => g('S', a)), GP = as.map(a => g('P', a));
+        let best = -Infinity; angS = angP = run;
+        for (let i = 0; i < as.length; i++) for (let j = 0; j < as.length; j++) {
+          const s1 = cross(u, GS[i]), s2 = cross(u, GP[j]);
+          // (the two tracks either side of the line, or one on it: some share of each makes it good)
+          if (s1 * s2 > 0) continue;
+          const l = s1 === s2 ? 1 : s2 / (s2 - s1), k = l * (GS[i].x * u.x + GS[i].y * u.y) + (1 - l) * (GP[j].x * u.x + GP[j].y * u.y);
+          if (k > best + 1e-9) { best = k; angS = as[i]; angP = as[j]; }
+        }
+        // (no pair either side of the line, a current setting her off it whatever she does: each gybe its own best along it)
+        if (best === -Infinity) for (const T of ['S', 'P'] as const) {
+          let bv = -Infinity, ba = run; as.forEach((a, i) => { const q = T === 'S' ? GS[i] : GP[i], m = q.x * u.x + q.y * u.y; if (m > bv + 1e-9) { bv = m; ba = a; } });
+          if (T === 'S') angS = ba; else angP = ba;
+        }
+      }
+      const angT = (T: 'S' | 'P') => T === 'S' ? angS : angP;
+      const vbS = sp(angS), vbP = angP === angS ? vbS : sp(angP), vbT = (T: 'S' | 'P') => T === 'S' ? vbS : vbP;
+      const hd = (T: 'S' | 'P') => w.from + (T === 'S' ? -angT(T) : angT(T));
+      const gnd = (T: 'S' | 'P') => { const d = V(hd(T)), vb = vbT(T); return { x: d.x * vb + c.x, y: d.y * vb + c.y }; };
+      /** what board T makes toward the mark over the ground (m/s) */
+      const made = (T: 'S' | 'P') => { const g = gnd(T); return g.x * u.x + g.y * u.y; };
       // can she lay the mark on this tack (her track over the ground, current and all, reaches it)?
       /** how far the mark is inside tack T's track over the ground, seen from q (deg: 0 on the layline, + she lays it) */
       const inside = (T: 'S' | 'P', q: Vec) => { const g = gnd(T), d = sub(b, q); return wrap(brg(d.x, d.y) - brg(g.x, g.y)) * (T === 'S' ? sgn : -sgn); };
@@ -208,12 +238,12 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         // the lane either side of the course: she turns back when she's beyond it on the side this board is taking her
         // (her track over the ground: on a run the gybes go to the opposite sides from a beat's tacks)
         const xt = cross(legU, sub(p, a)), go = cross(legU, gnd(tack)); // (+ left of the straight course, looking from start to mark)
-        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5) flip = true; // (half a minute on a board at least)
+        if (((go > 0 && xt > lim) || (go < 0 && xt < -lim)) && t - lastTurnT > 0.5 && made(other) > 0.25 * Math.max(0, made(tack))) flip = true; // (half a minute on a board at least; and never back onto a board that loses ground or barely makes it: a track doubling back)
       }
       if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt, ch.hs); }
-      h = hd(tack); v = vb;
+      h = hd(tack); v = vbT(tack);
       if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
-        const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
+        const hm = crabTo(u, c, vbT(tack)), twa = Math.abs(wrap(hm - w.from));
         if (mode === 'beat' ? twa >= beat : twa <= run) { h = hm; v = sp(twa); }
       }
     }
