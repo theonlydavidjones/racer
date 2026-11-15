@@ -282,6 +282,37 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
+8m2. **Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid** (owner, 15 November; bug;
+   now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
+   main issue is that her bow starts turning west, since the wind is pushing her hard. ... she doesn't seem to get
+   underway until the pushoff animation stops ... so i keep getting pushed into other boats long before i have a chance
+   to get out." In real life the owner walks her out by hand to the fairway first. The owner's day: a real day, 15 kt
+   from the SW, a 1.1 kt flood, 13:35.
+   Isolated (a scratch replay of that day, nothing committed; the logs are in the Roadmap session's scratchpad):
+   - **Baseline.** The plan is a swing. She walks 10 m in 22 s, then swings −90° in 24 s, and is handled for 46 s with
+     her sails let fly. She's let go at 0.5 m/s, heading 261, bow west into the dead end, on the line of the moored
+     boats' sterns. Her hull is inside the next boat 2 s later. The fairway is about 12 m between the sterns and the
+     way out is east.
+   - **The lee at the slip** is 0.17 (12.4 kt against 15.1 open).
+   - **Moored boats aren't obstacles** to a boat sailing free. Physics stops her only on docks and land
+     (src/boat/physics.ts:1017); `hitsMooredBoat` runs only in `mooringStep` (src/sim/world.ts:1920). So she sails
+     through them with no bump.
+   - **One lever at a time:**
+     - A longer walk alone (14 m) clears the let-go, but she's still bow west and must turn about 140° at 0.2–0.7 m/s
+       in 12 m: she touches the far side.
+     - The crew-only swing rate, the sails live during the handling, a 1.0 m/s shove, and 0.3–0.5 of shelter each
+       change only timing or speed.
+     - **A walk to the fairway (14 m) with the swing turned toward the exit** (heading 081, the bow east): no overlap
+       and no bump through the turn-out.
+   The fix, as the owner does it in real life:
+   - (1) walk her out to the fairway and point her bow at the way out (src/geo/marina.ts:619-628; the walk at
+     world.ts:2096-2106);
+   - (2) make the moored boats solid to a boat sailing free;
+   - (3) then tests/gashouse.test.ts slip 572 goes from `it.fails` to passing.
+   Symptom (b), sails dead while she's handled, is the scripted push-off by design (world.ts:1283). Once the walk
+   leaves her pointing out, a short hand-over is enough; giving her sails during the walk drove her back into the
+   slips in the replay.
+
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
