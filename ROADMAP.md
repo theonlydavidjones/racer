@@ -169,6 +169,10 @@ What's planned, roughly in order. Done work is described in the README.
    a measured yaw time constant. The class rules fix the rudder's outline (about 490 mm wide, NFIA 2025–2028 §5) but not
    its angle. So the owner's own boat is the reference: their ~150° tiller arc and how she answers. Physics-reviewer and
    perf-pair as usual.
+   Confirmed by a seasoned skipper (the owner, 15 November): the feedback came from a seasoned skipper, for whom "it
+   was immediately apparent that the tiller was wrong. sixty degrees turning radius is 'crazy'", and "the boat is
+   promptly responsive to tiller turning IRL (unless she has no momentum obviously)." That's a practitioner's account,
+   the best evidence there is short of a logged sea trial, and it's to be cited as such in the code's comments.
    Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder (in PR #289; sternway in PR #317). Sculling comes
    from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
