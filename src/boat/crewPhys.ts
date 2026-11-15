@@ -617,7 +617,8 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
         if (aside < CREW_PASS - 0.05) slow = 0.5;
         // (stepping aside, as far as the deck lets them, before going by; by them now, on, out to the side)
         const ahead = (by.z - a.z) * dir;
-        wait = ahead > 0.05 && ahead < CREW_SEP - 0.1 && Math.abs(a.x - toX) > 0.03 && Math.abs(a.x - by.x) < aside - 0.03;
+        // (and a crewmate they'd started round who has since set off their way: they drop back behind them, as above)
+        wait ||= ahead > 0.05 && ahead < CREW_SEP - 0.1 && Math.abs(a.x - toX) > 0.03 && Math.abs(a.x - by.x) < aside - 0.03;
       }
     }
     a.x += clamp(toX - a.x, -vx * dt, vx * dt);

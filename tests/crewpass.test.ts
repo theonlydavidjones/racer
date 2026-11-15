@@ -68,7 +68,8 @@ describe('two crew on the move keep clear of each other (crewPhys.ts CREW_SEP, C
         }
         b.crew!.people.forEach((a, i) => {
           if (i === 0) return;
-          const off = a.goal != null && Math.abs(a.goal.z - a.z) > 0.05, same = Math.abs(a.z - was[i].z) < 1e-9 && Math.abs(a.x - was[i].x) < 1e-9;
+          // (along the boat not getting on, whatever they do across: a sideways dither at each other is standing there too)
+          const off = a.goal != null && Math.abs(a.goal.z - a.z) > 0.05, same = Math.abs(a.z - was[i].z) < 1e-9;
           still[i] = off && same && t > 1 ? still[i] + 1 / 60 : 0;
           if (still[i] > worst) { worst = still[i]; where = `run ${run}, ${t.toFixed(1)} s, crew ${i}`; }
           was[i].x = a.x; was[i].z = a.z;
