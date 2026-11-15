@@ -18,8 +18,8 @@ export const UNIT = { w: 0.164, h: 0.122, d: 0.058, tilt: 20 * Math.PI / 180, lc
  * a few times a second reads better in the sim. */
 const EVERY = 0.25;
 /** How far the unit stands above the cabin top (m): the owner (15 Nov 2026) couldn't read it over the hatch boards from
- * the helm, so its bracket sits on a teak riser block 5 cm (about 2 in) tall, no bigger round than its foot (boatMesh.ts builds the block, in the
- * boat's own teak; the owner wanted it wooden, not a post, and then lower and slimmer). */
+ * the helm, so its own black stand is a taller, sturdier one, about 5 cm (2 in) more, enough for the face to clear the
+ * hatch garage from the helm on either tack. */
 export const RISE = 0.05;
 
 export interface Instrument { grp: THREE.Group; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; next: number; shown: string }
@@ -27,7 +27,8 @@ export interface Instrument { grp: THREE.Group; ctx: CanvasRenderingContext2D; t
 export function buildInstrument(): Instrument {
   const grp = new THREE.Group(); grp.name = 'instrument';
   const body = new THREE.MeshLambertMaterial({ color: 0x15171a });
-  // the face, tilted up toward the cockpit, on its black bracket foot, on top of the riser block (RISE)
+  // the face, tilted up toward the cockpit, on its black stand (RISE tall): a solid block, a little broader at its foot,
+  // sunk 1 cm so it sits on the cambered roof all round
   const head = new THREE.Group(); head.rotation.x = -UNIT.tilt; head.position.y = UNIT.h * 0.5 * Math.cos(UNIT.tilt) + 0.012 + RISE; grp.add(head);
   head.add(new THREE.Mesh(new THREE.BoxGeometry(UNIT.w, UNIT.h, UNIT.d), body));
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 190; // (the face's own shape)
@@ -35,7 +36,9 @@ export function buildInstrument(): Instrument {
   const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4; tex.colorSpace = THREE.SRGBColorSpace;
   const face = new THREE.Mesh(new THREE.PlaneGeometry(UNIT.w * UNIT.lcd, UNIT.h * UNIT.lcd), new THREE.MeshBasicMaterial({ map: tex }));
   face.position.z = UNIT.d / 2 + 0.0005; head.add(face);
-  const foot = new THREE.Mesh(new THREE.BoxGeometry(UNIT.w * 0.5, 0.012, 0.06), body); foot.position.y = RISE + 0.006; grp.add(foot);
+  const stand = new THREE.CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2 * 1.2, 1, 4, 1).rotateY(Math.PI / 4).toNonIndexed();
+  stand.scale(UNIT.w * 0.55, RISE + 0.022, 0.06).translate(0, (RISE + 0.012 - 0.01) / 2, 0); stand.computeVertexNormals();
+  grp.add(new THREE.Mesh(stand, body));
   const inst = { grp, ctx, tex, next: 0, shown: '' };
   draw(inst, 0, 0);
   return inst;
