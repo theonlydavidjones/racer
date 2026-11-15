@@ -1,0 +1,24 @@
+planner → current: the click's work 1 ms, shown in never ms, longest frame 51 ms
+planner → sea: the click's work 0 ms, shown in never ms, longest frame 48 ms
+planner → current: the click's work 0 ms, shown in never ms, longest frame 47 ms
+planner → sea: the click's work 0 ms, shown in never ms, longest frame 121 ms
+planner → wind: the click's work 0 ms, shown in never ms, longest frame 47 ms
+planner → current: the click's work 0 ms, shown in never ms, longest frame 52 ms
+planner → wind: the click's work 0 ms, shown in never ms, longest frame 61 ms
+planner → sea: the click's work 0 ms, shown in never ms, longest frame 82 ms
+planner → off: the click's work 0 ms, shown in never ms, longest frame 47 ms
+planner → current: the click's work 0 ms, shown in never ms, longest frame 46 ms
+chart → current: the click's work 1 ms, shown in 3701 ms, longest frame 3718 ms
+chart → sea: the click's work 0 ms, shown in 3908 ms, longest frame 3877 ms
+chart → current: the click's work 0 ms, shown in 3356 ms, longest frame 3334 ms
+chart → sea: the click's work 1 ms, shown in 4015 ms, longest frame 3993 ms
+chart → wind: the click's work 0 ms, shown in 4191 ms, longest frame 4172 ms
+chart → current: the click's work 0 ms, shown in 2720 ms, longest frame 3142 ms
+chart → wind: the click's work 1 ms, shown in 3505 ms, longest frame 3545 ms
+chart → sea: the click's work 1 ms, shown in 3949 ms, longest frame 3923 ms
+chart → off: the click's work 1 ms, shown in 4171 ms, longest frame 4152 ms
+chart → current: the click's work 0 ms, shown in 4148 ms, longest frame 4133 ms
+planner: the click's work median 0 ms, worst 1 ms; shown median never ms, worst never ms
+chart: the click's work median 1 ms, worst 1 ms; shown median 3949 ms, worst 4191 ms
+ERRORS: none
+OVER Infinity ms: planner → current, planner → sea, planner → current, planner → sea, planner → wind, planner → current, planner → wind, planner → sea, planner → off, planner → current
