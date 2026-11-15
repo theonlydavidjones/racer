@@ -469,6 +469,13 @@ What's planned, roughly in order. Done work is described in the README.
      by 3 s") drifts up until the top bar cuts it off. It should stay fully on screen and steady: kept below the top bar
      and clamped inside the view wherever the boat it's pinned to goes. Its faint second line also needs to be readable
      against a pale sky.
+   - **Bug: the start-line drill's "With the fleet" brings no fleet** (owner, 15 November; bug; <1–2 h): "in start line
+     trainer, I started alone, then after a couple tries I toggled on 'with the fleet.' but no fleet appeared." Switching
+     mid-drill must bring the fleet in at the next attempt, at the latest (src/app/drills.ts, the drill's choices).
+     The owner also asked "I also don't understand what the yellow pathing is referring to. is it just pointing me to
+     the line?" The gold lane is the approach to the line (render/drillGuides.ts). It needs to show at a glance what it
+     is, without copy: for example, ending on the line at the spot to cross at the gun. It folds into the favored-end
+     work below, where the lane should lead to the favored end.
    - **The start-line drill teaches the favored end and why** (owner, 15 November; feature; 3–5 h): "start line
      training also needs to help me learn which side is favored and why." Each run shows which end of the line is
      favored and the reasons, in pictures rather than copy:
