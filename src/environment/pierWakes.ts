@@ -82,11 +82,13 @@ export function addPierWakes(sum: WindSum, from: number, p: Vec): void {
   const e = V(from + 180);
   let fender = 0, tower = 0;
   for (const P of PIERS) {
-    const b = P.box, r = 30 * P.top + 100; // (by then under 2%)
+    const b = P.box, r = 30 * P.top + 100;
     if (p.x < b.x0 - r || p.x > b.x1 + r || p.y < b.y0 - r || p.y > b.y1 + r) continue;
     const c = centreOf(P), dx = p.x - c.x, dy = p.y - c.y, x = dx * e.x + dy * e.y, y = dx * e.y - dy * e.x;
     const { W, L } = extent(P, c, e);
-    const d = bluffDeficit(x, y, P.top, W, L);
+    // (faded out over the last 30% of the box searched: a wide, low pier's far wake is still a few percent at its edge)
+    const out = Math.max(0, b.x0 - p.x, p.x - b.x1, b.y0 - p.y, p.y - b.y1);
+    const d = bluffDeficit(x, y, P.top, W, L) * Math.min(1, (r - out) / (0.3 * r));
     if (d <= 0.001) continue;
     if (/^Golden Gate Bridge, south tower/.test(P.name)) { if (/fender/.test(P.name)) fender = d; else tower = d; continue; }
     sum.addDeficit(e.x, e.y, d);
