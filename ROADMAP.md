@@ -307,6 +307,12 @@ What's planned, roughly in order. Done work is described in the README.
    6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
+8za. **Start practice teaches picking the favored end** (owner, 15 November: "start practice also needs to help me learn how
+   to pick the favored side. don't just tell me."; Debrief; design first): the player works it out the way sailors do,
+   then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
+   favored end), sighting the line square to the wind, and the line's compass bearing against the wind's. The drill hides
+   "favored" until the player commits to an end; the debrief scores the call; later attempts fade the help. A mock to
+   the owner before building.
 8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
