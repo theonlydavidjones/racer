@@ -59,7 +59,7 @@ export class Labels {
       this.place(el, camera, b.x, b.y, viewMode === 2 ? 2 : 10.2);
       if (el.hidden) return;
       const r = w.rights(u, b), kc = r.kc === u, near = dist(u, b) < 70;
-      const cls = 'tag' + (near ? (kc ? ' kc' : ' row') : ''), txt = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? ' · turns' : '');
+      const cls = 'tag' + (near ? (kc ? ' kc' : ' row') : ''), txt = b.tack + (b.ocs && w.t > 0 ? ' · OCS' : '') + (b.penalty > 0 ? (b.penaltyDir ? ' · turns' : ' · owes turns') : '');
       if (el.className !== cls) el.className = cls;
       if (el.lastChild!.textContent !== txt) el.lastChild!.textContent = txt;
     });

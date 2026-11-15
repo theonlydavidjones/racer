@@ -12,7 +12,8 @@ import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
-import { OUTBOARDS } from '../boat/motor';
+import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
+import { bodyJob } from '../boat/crewWork';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
@@ -69,7 +70,7 @@ const BASINS_NEAR = 4000;
 export const TWO_TURNS = 720;
 
 /** Start a penalty of `deg` degrees (360 = one turn, 720 = two). */
-export function startPenalty(b: Boat, deg: number): void { b.penalty = b.penaltyTotal = deg; b.penaltyTurned = 0; b.penaltyDir = 0; }
+export function startPenalty(b: Boat, deg: number): void { b.penalty = b.penaltyTotal = deg; b.penaltyTurned = 0; b.penaltyDir = 0; b.penaltyMoves = 0; b.penaltyLastMove = 0; b.penaltyAt = 0; b.penaltyEndOnTack = false; }
 /** Add `deg` degrees to a penalty she's already doing, or start one. */
 export function addPenalty(b: Boat, deg: number): void { if (b.penalty > 0) { b.penalty += deg; b.penaltyTotal += deg; } else startPenalty(b, deg); }
 
@@ -112,6 +113,9 @@ const JAM_MAX = 2 * TANGLE_MAX;
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
 const COMPELLED_WINDOW = 3;
+/** Who saw a boat touch a mark, m: the boats within four lengths of her, hull to hull. A boat not involved may protest
+ * rule 31 only if she saw the incident (60.1 with 60.4(a)(2)); this is the sim's stand-in for "saw" (a modeling choice). */
+const TOUCH_SEEN = 4 * LOA;
 /**
  * RRS 60.2(a)(1): a boat protesting an incident she saw "shall hail 'Protest' and ... conspicuously display a red flag, at
  * the first reasonable opportunity for each". The time after an incident she was in that the sim offers the hail, s
@@ -125,7 +129,7 @@ export const PROTEST_HAIL = 10;
 export interface Protest {
   by: number; vs: number;
   /** The incident: when, and the engine's call (null when the engine found no foul by the protestee). */
-  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | null;
+  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | 'mark' | null;
   hailT: number; flagT: number | null;
   /** Her penalty for it: owed (she took it on), declined, or null (no foul by her to take one for); and when her turns
    * were done, if they were (RRS 60.5(c)(2): no further penalty). */
@@ -329,7 +333,7 @@ export class World {
   /** Protests made on the water (RRS 60), in order. */
   protests: Protest[] = [];
   /** The last incident the user was in: the boat, when, and the engine's call (for the Protest hail). */
-  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail'; part?: string; notRacing?: boolean; exonerated?: boolean } | null = null;
+  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail' | 'mark'; part?: string; notRacing?: boolean; exonerated?: boolean } | null = null;
   finishShown = false;
   /** This outing's gone into the boats' logbooks (boat/logbook.ts). */
   logged = false;
@@ -357,7 +361,7 @@ export class World {
    * while they stay pressed together: a compelled boat isn't charged for being held against the other, but a touch she
    * chooses later, or the other boat's own breach, is judged afresh. */
   private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean }>();
-  private lastTouch = new Map<number, { t: number; near: number[] }>(); // (the boats within ENGAGED of her as she touched)
+  private lastTouch = new Map<number, { t: number; near: number[]; loaded?: boolean }>(); // (the boats within ENGAGED of her as she touched; whether her turn for it was loaded, or she declined it)
   /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
    * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
    * after the first sign of it; at most TANGLE_MAX after `t`). */
@@ -610,11 +614,15 @@ export class World {
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? boatLook(spec).sailColor : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: boatLook(spec).paint } : { paint: F.paint }),
+      // (racing, no outboard aboard at all, hers or a rival's: the class rules never mention one, rule 1.11 has anything not
+      // clearly covered taken as illegal, and the class's Technical Committee ruled in March 2006 against racing with one
+      // mounted aft (NFIA clarifications); that racers leave it ashore rather than stowed below is our inference from those,
+      // not a rule's words. Its weight goes with it: none aboard, none aft. Cruising, it's aboard as her setup has it)
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9, this.freeSail ? undefined : 'none'), paint: boatLook(spec).paint } : { paint: F.paint }),
       ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : v0 ?? (isUser && this.startAt < 120 ? 2 : 1.5), vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,
-      penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: false, ocs: false, leg: 0, finished: false, finishT: null,
+      penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, penaltyMoves: 0, penaltyLastMove: 0, penaltyAt: 0, penaltyEndOnTack: false, started: false, ocs: false, leg: 0, finished: false, finishT: null,
       prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
@@ -624,7 +632,9 @@ export class World {
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
       // her outboard, if it's on its transom bracket: tilted up, stopped (boat/motor.ts)
-      ...(isUser && spec?.perf.outboard === 'bracket' ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0 } } : {}),
+      // (stowed below in the lazarette, cruising: aboard, to ship on the bracket when you want it. Racing, a stowed motor
+      // stays below: the class rules don't allow racing with it mounted aft, app/setup.ts)
+      ...(isUser && (spec?.perf.outboard === 'bracket' || (spec?.perf.outboard === 'stowed' && this.freeSail)) ? { motor: { hp: spec.perf.outboardHp ?? 3.5, down: false, running: false, gear: 'N' as const, throttle: 0, stowed: spec.perf.outboard === 'stowed', shifting: undefined } } : {}),
       ai: isUser ? null : (() => {
         // (her dice, drawn in this order: the same races come out of the same seeds)
         const wp = r() < 0.5 ? 0 : 1, f = 0.12 + 0.76 * r(), depth = 55 + r() * 45, aggr = r() * 6, width = 110 + r() * 130, aware = r() < 0.7;
@@ -1416,17 +1426,22 @@ export class World {
         const pushed = !!byBoat && (byBoat.x - b.x) * (mp.x - b.x) + (byBoat.y - b.y) * (mp.y - b.y) < 0;
         const exonerated = !sameIncident && !!by && !!byBoat && this.t - by.on < COMPELLED_WINDOW && hullGap(b, byBoat) < ENGAGED
           && pushed && solidGap(by, by, touching) - touching.r < ENGAGED;
+        let declined = false;
         if (!sameIncident && !exonerated) {
-          addPenalty(b, ONE_TURN);
-          this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id) });
-        }
+          // (under protests her turn is her own choice, 44.1, as for a foul: the AI skipper's conduct decides)
+          declined = this.protestsOn && !!b.ai && !b.script && !takesPenalty({ fouled: true, since: 0 }, this.conductRng());
+          if (declined) this.declined.add(`${b.id}@${this.t}:31`);
+          else addPenalty(b, ONE_TURN);
+          this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id), loaded: !declined });
+          if (this.protestsOn) this.touchSeen(b);
+        } else if (exonerated && this.protestsOn) this.touchSeen(b, true); // (yours to protest still, if you saw it: the hearing finds the exoneration, 43.1)
         if (b.isUser) {
           if (!sameIncident && !exonerated) this.fouls++;
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
             ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
             : exonerated ? `You touched ${touching.name}, forced onto it by ${byBoat!.name}'s foul: no penalty (Rule 43.1).`
-            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a jibe.` });
-        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a jibe.${this.protestsOn ? ' Skip it and you may be protested.' : ''}` });
+        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: this.protestsOn ? `${b.name} touched ${touching.name}.` : `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
       }
       b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }
@@ -1554,7 +1569,7 @@ export class World {
       }
       // (a forced swerve counts unless both boats are all but stopped: two near-stationary boats close together, in a jam
       // at a mark in the ebb, isn't one boat forcing the other off her course; contact still counts)
-      const { incident } = assessPair(rec, A, B, ctx, { swerve: (A.forced14 === B.id || B.forced14 === A.id) && Math.max(A.v, B.v) >= STEERAGE });
+      const { incident } = assessPair(rec, A, B, ctx, { swerve: (A.forced14 === B.id || B.forced14 === A.id) && Math.max(A.v, B.v) >= STEERAGE, swerveBy: A.forced14 === B.id ? B.id : B.forced14 === A.id ? A.id : undefined });
       const h = rec.hail;
       if (h && h.kind === 'room' && !answered && h.clearAt != null && h.replyAt == null) {
         // the hailed boat is through the wind: now the hailing boat must tack too (Rule 20.2(d))
@@ -2209,6 +2224,7 @@ export class World {
   /** Tilt the outboard down into the water, or up out of it (stopping it first). */
   motorTilt(): void {
     const m = this.user.motor; if (!m) return;
+    if (m.stowed || m.shifting) { this.emit({ type: 'toast', msg: 'It\'s stowed below: ship it on the bracket first.', ms: 2500 }); return; }
     if (m.down && (m.running || m.pulling)) { m.running = false; m.pulling = undefined; }
     m.down = !m.down; if (!m.down) { m.gear = 'N'; m.throttle = 0; m.swivel = false; }
     this.emit({ type: 'toast', msg: m.down ? 'Outboard down: its leg in the water.' : 'Outboard tilted up, clear of the water.', ms: 2000 });
@@ -2221,6 +2237,7 @@ export class World {
   motorStart(retireFirst = false): 'ok' | 'racing' | 'tilt' | 'gear' {
     const m = this.user.motor; if (!m) return 'ok';
     if (m.running || m.pulling) return 'ok';
+    if (m.stowed || m.shifting) { this.emit({ type: 'toast', msg: 'It\'s stowed below: ship it on the bracket first.', ms: 2500 }); return 'tilt'; }
     if (this.racingNow) { if (!retireFirst) return 'racing'; this.retire(', to use her motor (RRS 42.1)'); }
     if (!m.down) { this.emit({ type: 'toast', msg: 'Tilt the outboard down first: the prop needs to be in the water.', ms: 2500 }); return 'tilt'; }
     if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Put it in neutral to start it: it won\'t start in gear.', ms: 2500 }); return 'gear'; }
@@ -2231,18 +2248,36 @@ export class World {
   motorStop(): void { const m = this.user.motor; if (!m) return; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; }
   /** Into gear: F, N or R (the 2.5 and the 3.5 have no reverse: swivel it round instead). Shifting is done at tick-over. */
   motorGear(g: 'F' | 'N' | 'R'): void {
-    const m = this.user.motor; if (!m) return;
+    const m = this.user.motor; if (!m || m.stowed || m.shifting) return;
     if (g === 'R' && !OUTBOARDS[m.hp].reverse) { this.emit({ type: 'toast', msg: `The ${m.hp} has no reverse gear: swivel it round on its bracket to push astern.`, ms: 3500 }); return; }
     if (g !== m.gear) m.throttle = Math.min(m.throttle, 0.15);
     m.gear = g;
   }
-  motorThrottle(t: number): void { const m = this.user.motor; if (m) m.throttle = clamp(t, 0, 1); }
-  /** The 2.5: turned round on its bracket, its push goes astern (in neutral). */
+  motorThrottle(t: number): void { const m = this.user.motor; if (m && !m.stowed && !m.shifting) m.throttle = clamp(t, 0, 1); }
+  /**
+   * Stow it, or ship it again (the owner: Folkboat outboards sit on a sliding bracket on the after deck, slid up and away,
+   * and off it to stow): the crew slide it off the bracket into the lazarette, or back on, taking MOTOR_STOW_S or
+   * MOTOR_SHIP_S (estimates) at their pace. Only stopped and tilted up; racing, it stays below (the class rules don't allow
+   * racing with it mounted aft). The weight moves with it, and stowed there's no leg in the water (condition.ts, motor.ts).
+   */
+  motorStow(): void {
+    const u = this.user, m = u.motor; if (!m || m.shifting) return;
+    const say = (msg: string) => this.emit({ type: 'toast', msg, ms: 3000 });
+    if (!m.stowed) {
+      if (m.running || m.pulling) { say('Stop it first, then it can come off the bracket.'); return; }
+      if (m.down) { say('Tilt it up first, then it can come off the bracket.'); return; }
+    } else if (this.racingNow) { say('Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
+    // (whoever goes aft to the bracket: the forward hand, or sailing alone, you; their weight goes aft with them)
+    const to = m.stowed ? 'bracket' : 'stowed', pace = Math.max(0.3, bodyJob(u, 'outboard', true)), of = (to === 'stowed' ? MOTOR_STOW_S : MOTOR_SHIP_S) / pace;
+    m.shifting = { to, left: of, of }; m.down = false; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; m.swivel = false;
+    say(to === 'stowed' ? 'Unclamping the outboard to stow it below.' : 'Getting the outboard out of the lazarette to ship it.');
+  }
+  /** The 2.5 and the 3.5: turned round on the bracket, its push goes astern (in neutral). */
   motorSwivel(): void {
-    const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse) return;
+    const m = this.user.motor; if (!m || OUTBOARDS[m.hp].reverse || m.stowed || m.shifting) return;
     if (m.gear !== 'N') { this.emit({ type: 'toast', msg: 'Into neutral first, then swivel it round.', ms: 2500 }); return; }
     m.swivel = !m.swivel;
-    this.emit({ type: 'toast', msg: m.swivel ? 'Swivelled round: in gear it pushes her astern.' : 'Swivelled back: in gear it pushes her ahead.', ms: 2500 });
+    this.emit({ type: 'toast', msg: m.swivel ? 'Swiveled round: in gear it pushes her astern.' : 'Swiveled back: in gear it pushes her ahead.', ms: 2500 });
   }
   /** Made fast in her slip, the motor running: the crew casts off the lines and she's yours to motor out. */
   castOff(): boolean {
@@ -2253,7 +2288,19 @@ export class World {
     return true;
   }
   private motorStep(dt: number): void {
-    const m = this.user.motor; if (!m?.pulling) return;
+    const m = this.user.motor; if (!m) return;
+    if (m.shifting) {
+      m.shifting.left -= dt;
+      if (m.shifting.left <= 0) {
+        m.stowed = m.shifting.to === 'stowed'; m.shifting = undefined; bodyJob(this.user, 'outboard', false); // (back from the bracket)
+        // (its weight goes where it now is: off her stern and low, or back out on the bracket; boat/condition.ts)
+        // (its weight's new place, written into her condition as it stands: a new object would reach the page's mirror without
+        // its functions, sim/sync.ts)
+        { const u = this.user; if (u.spec) { const n = condition(u.spec, +this.raceDate.slice(5, 7) || 9, m.stowed ? 'stowed' : 'bracket'), c = u.cond ??= n; c.extraKg = n.extraKg; c.extraMoment = n.extraMoment; c.aloft = n.aloft; } }
+        this.emit({ type: 'toast', msg: m.stowed ? 'Outboard stowed in the lazarette.' : 'Outboard on its bracket, tilted up.', ms: 2500 }); }
+      return;
+    }
+    if (!m.pulling) return;
     m.pulling.left -= dt;
     if (m.pulling.left > 0) return;
     if (m.pulling.catches) { m.pulling = undefined; m.running = true; m.warm = true; this.emit({ type: 'toast', msg: `The ${m.hp} hp's running.`, ms: 2000 }); }
@@ -2522,6 +2569,24 @@ export class World {
   get protestsOn(): boolean { // (a club's race: the practice area, a course with no club, is umpired, like the drills)
     return this.settings.mode === 'race' && this.settings.judging === 'protests' && !!this.file.group; }
 
+  /**
+   * Under protests, a mark touch (rule 31) is any boat's to protest that saw it (60.1; a protest of rule 31 by a boat not
+   * involved is valid only if she saw the incident, 60.4(a)(2)): the boats within TOUCH_SEEN. You may hail "Protest!" for
+   * PROTEST_HAIL s, as for a foul you were in (unless a foul you were in is still yours to protest: that one stays on the
+   * Hail); the nearest AI boat that saw it hails at once (her reaction time: ai/conduct.ts protestAfter), before she
+   * knows if the other will turn. The hearing decides it as a foul: her turn taken, no further penalty; not,
+   * disqualified. `exonerated` (43.1): yours to protest, the hearing finding it; the AI, believing the engine, doesn't.
+   */
+  private touchSeen(b: Boat, exonerated = false): void {
+    const inc: NonNullable<World['userIncident']> = { vs: b.id, t: this.t, rule: '31', fouler: b.id, kind: 'mark', ...(exonerated ? { exonerated } : {}) };
+    const seen = this.boats.filter(o => o !== b && !o.retired && !o.finished && this.racing(o) && hullGap(o, b) < TOUCH_SEEN).sort((x, y) => hullGap(x, b) - hullGap(y, b));
+    const ui = this.userIncident, open = !!ui && ui.kind !== 'mark' && this.t - ui.t <= PROTEST_HAIL && !this.protests.some(p => p.by === this.user.id && p.vs === ui.vs && p.t === ui.t);
+    if (seen.includes(this.user) && !open) this.userIncident = inc;
+    if (exonerated) return;
+    const ai = seen.find(o => o.ai && !o.script), after = ai ? protestAfter({ fouled: false, since: 0 }) : null;
+    if (ai && after != null) this.pendingProtests.push({ by: ai.id, vs: b.id, at: this.t + after, inc });
+  }
+
   /** `by` hails "Protest!" at `vs` over the incident just now, and flies the red flag (RRS 60.2(a)(1): a Folkboat is over
    * 6 m). Recorded for the hearing. */
   protest(by: Boat, vs: Boat, given?: NonNullable<World['userIncident']>): void {
@@ -2530,7 +2595,7 @@ export class World {
     const fouled = !!inc && inc.fouler === vs.id;
     // (her penalty: declined if she chose not to take it, owed otherwise; done once her turns are, protestsStep. Rule 23.1
     // has no turns to take, 44.1 being for an incident while racing: none owed)
-    const owed = !fouled ? null : inc!.part === '23.1' ? false : !this.declined.has(`${vs.id}@${inc!.t}`);
+    const owed = !fouled ? null : inc!.part === '23.1' ? false : !this.declined.has(`${vs.id}@${inc!.t}${inc!.kind === 'mark' ? ':31' : ''}`); // (a touch's apart from a foul's in the same step)
     this.protests.push({ by: by.id, vs: vs.id, t: inc?.t ?? this.t, rule: fouled ? inc!.rule : null, fouler: inc?.fouler ?? null, kind: inc?.kind ?? null, hailT: this.t, flagT: this.t, owed, turnsT: null, notRacing: fouled && !!inc!.notRacing, exonerated: fouled && !!inc!.exonerated });
     by.protestFlag = true;
     if (by.isUser) this.emit({ type: 'toast', ms: 3500, msg: `"Protest!" Your red flag's up (Rule 60.2).` });
@@ -2605,9 +2670,16 @@ export class World {
     // (the touch she's still to turn for came in this same incident: the boat she's now fouled was by her then, and her
     // turns hadn't begun: rule 44.1(a), Appeal 65. Then the foul's penalty replaces the touch's; otherwise it's owed on top)
     const lt = this.lastTouch.get(b.id), vs = this.lastFoulVs.get(b.id)?.vs;
-    const touched = !!lt && this.t - lt.t < TANGLE_MAX && !b.penaltyDir && vs != null && lt.near.includes(vs) && b.penalty > 0;
-    // (same incident: the foul's turns replace only the touch's one turn, keeping any others she still owes)
+    const same = !!lt && this.t - lt.t < TANGLE_MAX && !b.penaltyDir && vs != null && lt.near.includes(vs);
+    // (same incident: the foul's turns replace only the touch's one turn, if it was loaded, keeping any others she still owes)
+    const touched = same && lt!.loaded !== false && b.penalty > 0;
     if (b.penalty <= 0) startPenalty(b, this.penaltyDeg); else addPenalty(b, touched ? this.penaltyDeg - ONE_TURN : this.penaltyDeg);
+    // (a touch she'd declined, then this foul in the same incident: she "need not take the penalty" for it, 44.1(a), so a
+    // protest of the touch reads as owed, and taken with these turns)
+    if (same && lt!.loaded === false) {
+      this.declined.delete(`${b.id}@${lt!.t}:31`); this.lastTouch.delete(b.id);
+      for (const p of this.protests) if (p.vs === b.id && p.t === lt!.t && p.kind === 'mark') p.owed = true;
+    }
     if (touched) { this.lastTouch.delete(b.id); if (b.isUser) this.emit({ type: 'toast', ms: 5000, msg: 'Your mark touch was part of the same incident, so the foul\'s penalty covers it (Rule 44.1(a)).' }); }
   }
   /** Penalty for a foul under Part 2: Two-Turns by default (Rule 44.1), One-Turn if the sailing instructions say so. */

@@ -95,7 +95,7 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     const b = testBoat({ heading: 42, kt: 5, windKt: 18 }); b.tune = { ...TUNE_PRESETS.light };
     sail(b, 30);
     const l = lessons(b).list.find(x => x.id === 'rig:soft');
-    expect(l).toBeTruthy(); expect(l!.head).toMatch(/soft for 18 kt/);
+    expect(l).toBeTruthy(); expect(l!.head).toMatch(/soft for heavy air/);
     const ok = testBoat({ heading: 42, kt: 5, windKt: 18 }); ok.tune = { ...TUNE_PRESETS.strong }; sail(ok, 30);
     expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
   });

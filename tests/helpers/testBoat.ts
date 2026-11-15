@@ -12,7 +12,7 @@ export function testBoat(o: { heading: number; kt: number; windFrom?: number; wi
     id: 0, isUser: true, name: 'Test', no: '', color: '#fff', hullColor: '#fff', sailColor: '#fff', build: { hull: 'fiberglass', spars: 'aluminium' },
     sea: FLAT_SEA, x: 0, y: 3000, h: o.heading, v: o.kt * KT, vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
     steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: o.heading,
-    penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, started: true, ocs: false, leg: 0, finished: false, finishT: null,
+    penalty: 0, penaltyTotal: 0, penaltyTurned: 0, penaltyDir: 0, penaltyMoves: 0, penaltyLastMove: 0, penaltyAt: 0, penaltyEndOnTack: false, started: true, ocs: false, leg: 0, finished: false, finishT: null,
     prevD: null, prevAng: null, prevPass: null, nearMin: 1e9, forced14: null, markTouch: null,
     cur: { x: 0, y: 0 }, ww: { from: windFrom, kt: windKt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: false, sheetCmd: { main: 0, jib: 0 }, trimAll: false, ctl: defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, pole: 'down', poleT: 0, poleTack: 'S', heel: 0, boom: 0, jib: 0, ai: null
   };

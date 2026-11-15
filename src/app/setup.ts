@@ -2,6 +2,7 @@
  * The setup and the start of a sail: a new World for the setup's choices (prepare, newGame, setupChanged), the setup screen (the course picker and its card, the tide, the crew, the choices), the conditions dialog, and beginning a race or a cruise.
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
+import { fleetChoiceHtml } from '../ui/tiles';
 import { rainLevel } from '../environment/rain';
 import { PREP_MEANING } from '../sim/signals';
 import { LESSONS, type LessonId } from '../sim/lessons';
@@ -15,7 +16,7 @@ import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
 import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
-import { DEFAULT_SETTINGS, chooseWindKind, saveSettings, type Settings } from '../settings';
+import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, drillFleet, drillFleetSize, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
 import { CONDITION_KEYS, World, describeTide } from '../sim/world';
 import { LocalHost, WorkerHost, type WorldArgs } from '../sim/host';
@@ -64,8 +65,9 @@ function prepare(seed = randomSeed()): void {
   // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
   // checkArrival, intoSlip)
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
+  const WSf = app.S.mode === 'drill' ? drillFleet(WSd, app.S.drillSolo ?? true) : WSd;
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
-  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSd, seed,
+  const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
   // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
   courseFileNow = args.file;
@@ -168,11 +170,12 @@ function courseCard(): void {
     const slip = slipById(app.S.boat.slip);
     if (!slip && (app.S.sailFrom === 'slip' || app.S.sailTo === 'slip')) { if (app.S.sailFrom === 'slip') app.S.sailFrom = 'cityfront'; if (app.S.sailTo === 'slip') app.S.sailTo = ''; }
   }
-  // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
-  // clarification, March 2006, under class rule 1.11); the bracket can stay
+  // racing: no outboard aboard (the class rules don't allow racing with it mounted aft: NFIA clarification, March 2006,
+  // under class rule 1.11; and racers leave it ashore, sim/world.ts makeBoat, no weight for it). Off the bracket, so she's
+  // drawn with a clean transom; aboard again for a cruise
   if (app.S.mode !== 'sail' && app.S.boat.perf.outboard === 'bracket') {
     app.S.boat.perf.outboard = 'stowed'; saveSettings(app.S); if (app.still) prepare(); else newGame();
-    toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
+    toast('Her outboard stays ashore for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). It\'s aboard, stowed, for a cruise; ship it from the Motor tab.', 7000);
   }
   const cruise = app.S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
@@ -479,10 +482,18 @@ function dockSetup(view: 'setup' | 'drill' | 'season'): void {
 // the start drill's minutes to the gun, and alone or with the fleet (the debrief's own choices set these too)
 function paintDrillPage(): void {
   for (const b of $('drillFromSeg').querySelectorAll<HTMLElement>('[data-df]')) b.setAttribute('aria-pressed', String(+b.dataset.df! === (app.S.drillFrom ?? app.DRILL_FROM)));
-  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === (app.S.drillSolo ?? true)));
+  const solo = app.S.drillSolo ?? true;
+  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === solo));
+  $('drillSoloSeg').querySelector('[data-ds="1"]')!.innerHTML = fleetChoiceHtml(false, 0);
+  $('drillSoloSeg').querySelector('[data-ds="0"]')!.innerHTML = fleetChoiceHtml(true, drillFleetSize(app.S));
+  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-fn]')) b.hidden = solo;
 }
 $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; app.S.drillFrom = +b.dataset.df!; saveSettings(app.S); paintDrillPage(); });
-$('drillSoloSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds]'); if (!b) return; app.S.drillSolo = b.dataset.ds === '1'; saveSettings(app.S); paintDrillPage(); });
+$('drillSoloSeg').addEventListener('click', e => {
+  const t = e.target as HTMLElement, n = t.closest<HTMLElement>('[data-fn]'), b = t.closest<HTMLElement>('[data-ds]');
+  if (n) app.S.drillFleetN = Math.max(1, Math.min(MAX_OPPONENTS, drillFleetSize(app.S) + +n.dataset.fn!)); else if (b) app.S.drillSolo = b.dataset.ds === '1'; else return;
+  saveSettings(app.S); paintDrillPage();
+});
 function openSetupNow(view: 'setup' | 'drill' | 'season' = 'setup'): void {
   app.replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') { app.S.mode = 'race'; prepare(); }
