@@ -298,6 +298,15 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+   5. **Now — the hit at the edge** (owner, 15 November; physics; Bay East, Deep Physics reviewing; for v198): crossing
+      out of the cove's shelter, the full breeze and the ebb or flood hit her suddenly: she heels, jumps in speed, and is
+      set sideways. On main the wind's lee (harborLee.ts) and the current's basin calm (current.ts, BASIN_MOUTH 30 m) both
+      exist, but the current's edge widths are estimates with no measured source. Size how sharp the edge is from real
+      data (NOAA currents, observations at the Marina and Fort Mason), not invented numbers, and test that the heel, speed
+      and set all change within a few boat lengths of the entrance, on a flood and on an ebb.
+   6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
+      lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
+      and after pictures go to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
    Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
@@ -464,6 +473,49 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: the start-line drill's cue card floats out of view** (owner, 15 November, from a screenshot; bug; <1 h): "this
+     floating guidance card in start-line trainer mode keeps floating out of view." The cue ("BUILD SPEED", "8 s · late
+     by 3 s") drifts up until the top bar cuts it off. It should stay fully on screen and steady: kept below the top bar
+     and clamped inside the view wherever the boat it's pinned to goes. Its faint second line also needs to be readable
+     against a pale sky.
+   - **Bug: the start-line drill's "With the fleet" brings no fleet** (owner, 15 November; bug; <1–2 h): "in start line
+     trainer, I started alone, then after a couple tries I toggled on 'with the fleet.' but no fleet appeared." Switching
+     mid-drill must bring the fleet in at the next attempt, at the latest (src/app/drills.ts, the drill's choices).
+     The owner also asked "I also don't understand what the yellow pathing is referring to. is it just pointing me to
+     the line?" The gold lane is the approach to the line (render/drillGuides.ts). It needs to show at a glance what it
+     is, without copy: for example, ending on the line at the spot to cross at the gun. It folds into the favored-end
+     work below, where the lane should lead to the favored end.
+   - **The start drill's results: "End" unclear; the table unreadable; the copy block** (owner, 15 November, from screenshots; now; 3–4 h): "don't know what
+     'end: middle' means (the column) in start practice." It's where along the line she crossed: the pin end, the
+     middle or the committee boat end (src/app/drills.ts endW). Make it plain without copy: a tiny line icon with her
+     crossing marked, the favored end lit once the favored-end work lands, so the column also says whether she started
+     at the right end.
+     Then (15 November, from a screenshot of the results; now; 2–3 h): "I can't read this table. I don't know which
+     session is my most recent; apparently the yellow is my best? and some of the times are preposterous. I didn't take
+     17m 8s to cross the line." And: "that copy block is insane. nobody will every read that. short, sharp takeaways."
+     The "At the gun" column reads "17 m · 8 s" (meters behind, seconds late) as a time; the latest start isn't marked;
+     gold for the best isn't explained; one row says "X" (the line's end mark) where the others say "middle". The "What
+     happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
+     takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
+     the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
+   - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
+     line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
+     favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
+     water before the gun, with the answer only after you've judged:
+     - **Head to wind on the line:** luff head to wind at mid-line. The end the bow points nearer to is the favored end.
+     - **The compass:** sight down the line from one end for its bearing, then go head to wind for the wind's. If the
+       wind is more than 90° from the line toward one end, that end's favored. The tactical compass on the cabin top
+       (in progress) is the tool.
+     - **Sailing the line:** reach down the line, sails trimmed, and see which way the sails need easing or trimming.
+     - **The current:** watch the committee boat's anchor line, the pin's wake or a crab pot, to see where the stream
+       carries you at the gun.
+     - **The first beat:** which side pays, from the wind and tide (the strategist).
+     - **The crowd:** where the fleet bunches.
+     Each run asks you to call it ("which end?") before the reveal. Then it shows how you could have told: the square
+     line against the real one, and the bias in boat lengths. It also shows how your call and your start compared. The
+     wind's shifts stay real, so the favored end can change while you check it, as on the day. Pictures and actions,
+     not copy. Methods to be checked by the researcher against published racing guides (US Sailing, North U).
+
    - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
      cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
      chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
