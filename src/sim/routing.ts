@@ -150,7 +150,7 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
   }
   let mode: LegKind | null = null, side = 0; // (side: which side of the wind her heading is on, + starboard)
   /** Standing off the land, borne away: both boards were blocked close ahead (below) */
-  let standOff = false, standT = 0;
+  let standOff = false, standT = 0, standTwa = 0;
   const maxSteps = maxMin * 60 / DT;
   while (dist(p, b) > arrive && steps < maxSteps) {
     steps++;
@@ -224,8 +224,9 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
       // straight back into the same pocket)
       if (close && rS < 30 && rP < 30) { if (!standOff) standT = t; standOff = true; }
       else if (standOff && (!close || (Math.max(rS, rP) >= 150 && t - standT >= 1))) standOff = false;
-      let off: { h: number; v: number; T: 'S' | 'P' } | null = null;
+      let off: { h: number; v: number; T: 'S' | 'P'; twa: number } | null = null;
       if (standOff) {
+        const off0 = t - standT > 1e-9; // (standing off since an earlier step: she's on standTwa, not close-hauled)
         // (of the headings borne away whose track is clear water all the way (a point or a pier between her and open water
         // at the end is as bad as land at the end) and ends with room, the one that makes most toward the mark; the other
         // board only for more than the tack or gybe to it costs, or she'd swap boards every step on a corner where the two
@@ -234,15 +235,17 @@ export function sailLeg(o: Outlook, a: Vec, b: Vec, t0: number, plan: Plan, sc: 
         for (const T of [tack, other] as const) for (let extra = 20; extra <= 100; extra += 20) {
           const twa = ang + extra, hh = w.from + (T === 'S' ? -twa : twa), vv = sp(twa), d = V(hh), g = { x: d.x * vv + c.x, y: d.y * vv + c.y };
           const end = { x: p.x + g.x * 90, y: p.y + g.y * 90 }, r = landDist(end), clear = landAlong(p, end) === Infinity;
-          const cost = T === tack ? 0 : manoeuvreS(twa < 90 ? 'tack' : 'gybe', w.kt, ch.hs) * vv; // (m: the time the turn costs, at her speed)
+          // (m: the time the turn costs, at her speed; through the wind or round downwind, whichever's the shorter turn from
+          // the angle she's on now)
+          const now = off0 ? standTwa : ang, cost = T === tack ? 0 : manoeuvreS(now + twa < 180 ? 'tack' : 'gybe', w.kt, ch.hs) * vv;
           const score = clear && r >= 80 ? 1e4 + dot(g, u) * 90 - cost : clear ? r : r - 1e3;
-          if (score > best) { best = score; off = { h: hh, v: vv, T }; }
+          if (score > best) { best = score; off = { h: hh, v: vv, T, twa }; }
         }
         flip = false;
       }
       if (flip) { tack = tack === 'S' ? 'P' : 'S'; turn(mode === 'run' ? 'gybe' : 'tack', c, w.kt, ch.hs); }
       h = hd(tack); v = vb;
-      if (off) { tack = off.T; h = off.h; v = off.v; } // (a change of board standing off is counted below, as her heading crosses the wind)
+      if (off) { tack = off.T; h = off.h; v = off.v; standTwa = off.twa; } // (a change of board standing off is counted below, as her heading crosses the wind)
       else if (lays(tack)) { // steering for the mark: no closer to the wind than the beat angle, no deeper than the run angle
         const hm = crabTo(u, c, vb), twa = Math.abs(wrap(hm - w.from));
         if (mode === 'beat' ? twa >= beat : twa <= run) { h = hm; v = sp(twa); }
