@@ -419,6 +419,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   // north seawall, facing the Bay (the start line's inner end: see the Seaweed Soup course files)
   place(block(22, 25, 8, lam(0xf4f1ea)), 37.80773, -122.44259, 79, 2.3);
   place(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 14, 6), WHITE).translateY(7), 37.80799, -122.44260, 0, 2.3);
+  const shedWalls: ShedWall[] = [];
   // Fort Mason's piers, with the long pier sheds: each on its own pier's centerline (geo/fortMason.ts), its north end a
   // few meters short of the pier's
   for (const f of FORT_MASON_PILES) {
@@ -430,7 +431,10 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     const sl = Math.hypot(side[1].x - side[0].x, side[1].y - side[0].y), sg = Math.sign((side[1].x - side[0].x) * (end.x - base.x) + (side[1].y - side[0].y) * (end.y - base.y)) || 1;
     const u = { x: sg * (side[1].x - side[0].x) / sl, y: sg * (side[1].y - side[0].y) / sl }, c = { x: end.x - u.x * 80, y: end.y - u.y * 80 }; // (its middle 80 m back from the end)
     const shed = group(block(18, 140, 13, lam(0xd9cfb8), PIER_DECK)); shed.position.copy(P3(c.x, c.y, 0)); shed.rotation.y = -Math.atan2(u.x, u.y); grp.add(shed);
+    // its long walls' faces (shedFaces below): each 9 m out from the centerline, a few cm proud of the wall
+    for (const sd of [-1, 1]) { const nrm = { x: -u.y * sd, y: u.x * sd }; shedWalls.push({ c: { x: c.x + nrm.x * 9.03, y: c.y + nrm.y * 9.03 }, nrm, lettered: f.name.includes('Pier 3') && nrm.x < 0 }); }
   }
+  if (shedWalls.length) grp.add(shedFaces(shedWalls));
   // their decks, on their own outlines (geo/fortMason.ts), and the rows of concrete piles under them, the water running
   // through: a boat set onto them is caught (boat/physics.ts onPiles). The deck's height and the piles' size and spacing are
   // ESTIMATES (no survey found): a deck about 3 m above the water and 0.7 m thick, piles 0.6 m across about 4.5 m apart
@@ -606,6 +610,55 @@ export const bridgeLights: THREE.Object3D[] = [];
 export const sutroBeacons: { red?: THREE.Object3D; white?: THREE.Object3D } = {};
 /** Fort Mason's pier decks' top above the water, m (ESTIMATE: no survey found). */
 const PIER_DECK = 3;
+
+/** One long wall of a Fort Mason pier shed: its middle at the wall (sim m), its outward normal, and whether it carries the
+ * FORT MASON CENTER lettering. */
+interface ShedWall { c: { x: number; y: number }; nrm: { x: number; y: number }; lettered: boolean }
+/**
+ * The pier sheds' long walls, all in one mesh with one small texture: the cream wall, two rows of red-mullioned
+ * industrial windows to every bay (tall ones above, shallower below), and on Pier 3's west wall, the one facing
+ * Gashouse Cove, FORT MASON CENTER in black, widely spaced geometric capitals along the top, between the parapet and the
+ * upper windows' heads, from about the 5th bay from the Bay end to the 18th. From the owner's photos (Street View,
+ * reference only): reference/photos/fort-mason-center-pier-side.jpg and fort-mason-center-pier-end-oblique.jpg. Bays
+ * about 6 m (23 along the 140 m wall, counted in the photo); the heights as fractions of the wall, measured there.
+ */
+function shedFaces(walls: ShedWall[]): THREE.Mesh {
+  const LEN = 140, H = 13, BAYS = 23, W = 2048, ROW = 192; // (the texture: a plain wall above, the lettered one below)
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (const wl of walls) {
+    const r = { x: -wl.nrm.y, y: wl.nrm.x }, v0 = wl.lettered ? 0 : 0.5, k = pos.length / 3; // (r: the viewer's right, looking at it)
+    for (const [s, h, tu, tv] of [[-1, 0, 0, 0], [1, 0, 1, 0], [1, 1, 1, 0.5], [-1, 1, 0, 0.5]]) {
+      const p = P3(wl.c.x + r.x * s * LEN / 2, wl.c.y + r.y * s * LEN / 2, PIER_DECK + h * H); pos.push(p.x, p.y, p.z); uv.push(tu, v0 + tv);
+    }
+    idx.push(k, k + 1, k + 2, k, k + 2, k + 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({ color: 0xd9cfb8 });
+  if (typeof document !== 'undefined') {
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = ROW * 2; const x = cv.getContext('2d')!;
+    for (const lettered of [false, true]) {
+      const y0 = lettered ? ROW : 0; // (canvas rows run down: the plain wall at v 0.5–1 is the top half)
+      x.fillStyle = '#ffffff'; x.fillRect(0, y0, W, ROW); // (white: the material's cream color tints it)
+      const bay = W / BAYS;
+      for (let i = 0; i < BAYS; i++) for (const [top, bot, wid] of [[0.17, 0.41, 0.78], [0.60, 0.73, 0.78]]) {
+        const ww = bay * wid, wx = i * bay + (bay - ww) / 2, wy = y0 + top * ROW, wh = (bot - top) * ROW;
+        x.fillStyle = '#76736c'; x.fillRect(wx, wy, ww, wh); // (the glass, dark against the bright wall)
+        x.strokeStyle = '#9a3c2a'; x.lineWidth = 2.5; // (the red-painted steel sash, a grid of small panes)
+        for (let c = 0; c <= 6; c++) { x.beginPath(); x.moveTo(wx + c * ww / 6, wy); x.lineTo(wx + c * ww / 6, wy + wh); x.stroke(); }
+        for (let rr = 0; rr <= 3; rr++) { x.beginPath(); x.moveTo(wx, wy + rr * wh / 3); x.lineTo(wx + ww, wy + rr * wh / 3); x.stroke(); }
+      }
+      if (lettered) {
+        // looking at the west wall from the cove, the Bay end is on the left: the name from bay 5 to bay 18
+        const txt = 'FORT MASON CENTER', from = 4.3 * bay, to = 17.7 * bay, hgt = 0.15 * ROW;
+        x.fillStyle = '#16171a'; x.font = `700 ${hgt * 1.36}px "Futura", "Century Gothic", "Avenir", "Helvetica Neue", Arial, sans-serif`; x.textBaseline = 'middle';
+        const widths = [...txt].map(ch => x.measureText(ch).width), gap = (to - from - widths.reduce((a, b) => a + b, 0)) / (txt.length - 1);
+        let px = from; [...txt].forEach((ch, i) => { x.fillText(ch, px, y0 + 0.085 * ROW); px += widths[i] + gap; });
+      }
+    }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; mat.map = tex;
+  }
+  return new THREE.Mesh(g, mat);
+}
 
 /**
  * The Golden Gate Bridge from its published dimensions: a 1,280 m main span between towers 227 m above the
