@@ -289,7 +289,7 @@ export const CLOSE_M = 4 * LOA;
  * lastHitT and paddle (rule 42.3(h)'s contact time and the crutch), given mid-race, so a first bump doesn't add a field. (V8's
  * matter: Safari's engine keeps shapes its own way, and this costs it nothing.)
  */
-const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT'] as const;
+const LATER_FRACTIONS = ['lastTackT', 'penalty', 'penaltyTotal', 'penaltyTurned', 'penaltyDir', 'poleT', 'comingFor', 'jibHold'] as const;
 function asDoubles(b: Boat): Boat {
   const o = b as unknown as Record<string, number>;
   for (const k of LATER_FRACTIONS) { const v = o[k]; o[k] = 0.5; o[k] = v; }
@@ -1015,7 +1015,7 @@ export class World {
   /** The crutch's work each step it can have any (World.step): the crew's look for a jam, twice a second, then the paddling. */
   private paddleTick(dt: number): void {
     const u = this.user;
-    if (u.callWait) this.callWork(u); // (your call waiting on the crew: here, entered only while one is, as the paddle's)
+    if (u.callWait) this.callWork(u); // (your call waiting on the crew: looked at here, twice a second (no more in World.step itself: docs/CAPACITY.md 8a))
     if (this.steps % 30 === 0 && !u.handled) this.crewPaddleCall(u);
     this.paddleWork(u, dt);
   }
@@ -1287,7 +1287,7 @@ export class World {
     // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
     const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
     if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
-    if (this.user.paddle || this.user.callWait || this.steps % 30 === 0) this.paddleTick(dt); // (the crutch: a jam looked for twice a second, and the paddling while it's out; in a method of its own, entered only then: in World.step itself the two calls cost every step about 1%, perf-pair (Capacity))
+    if (this.user.paddle || this.steps % 30 === 0) this.paddleTick(dt); // (the crutch: a jam looked for twice a second, and the paddling while it's out; in a method of its own, entered only then: in World.step itself the two calls cost every step about 1%, perf-pair (Capacity))
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }

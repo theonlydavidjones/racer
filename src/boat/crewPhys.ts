@@ -323,10 +323,18 @@ export const pace = (p: Person) => 0.55 + 0.75 * attrOf(p, 'handling');
 /** Hiking endurance (s at a full hike, by fitness) and recovery time constant (s): Vogiatzis 1995 (above). */
 export const ENDURE = (p: Person) => 300 + 210 * attrOf(p, 'fitness'), RECOVER = 60;
 
+/** A person's fields that start whole and later hold fractions, made doubles as they're built (V8 would otherwise change
+ * their representation the first time, and every read of them after: docs/CAPACITY.md, world.ts asDoubles). */
+const ABOARD_FRACTIONS = ['fatigue', 'wBal', 'wUsed', 'wT', 'outUntil'] as const;
+function asFractions(a: Aboard): Aboard {
+  const o = a as unknown as Record<string, number>;
+  for (const k of ABOARD_FRACTIONS) { const v = o[k]!; o[k] = 0.5; o[k] = v; }
+  return a;
+}
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   attrCache.delete(spec);
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
-  const people: Aboard[] = allAboard(spec).map((p, i) => ({
+  const people: Aboard[] = allAboard(spec).map((p, i) => asFractions({
     x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0, ready: false, outUntil: 0
   }));
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own

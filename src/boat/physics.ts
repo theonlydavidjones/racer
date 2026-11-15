@@ -715,8 +715,12 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // faster than TURN_SEEN; yours by hand or the AI's alike. Fading as long again once it's past, so the turn itself still
   // finds it; no more than CUE_MAX, so a long luff doesn't count for a turn much later)
   // (under sail with way on: a boat paddled or motored round isn't a turn the crew work)
-  const rate = b.turnRate ?? 0, toWind = Math.sign(wrap(b.ww.from - b.h)), swinging = Math.abs(rate) > TURN_SEEN && b.v >= TURN_V && (b.rig?.mainUp ?? true);
-  const shows = swinging && ((twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind));
+  const rate = b.turnRate ?? 0;
+  let shows = false;
+  if (Math.abs(rate) > TURN_SEEN && b.v >= TURN_V && (b.rig?.mainUp ?? true)) { // (worked only while she's swinging: rarely)
+    const toWind = Math.sign(wrap(b.ww.from - b.h));
+    shows = (twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind);
+  }
   b.comingFor = shows ? Math.min(CUE_MAX, (b.comingFor ?? 0) + dt) : Math.max(0, (b.comingFor ?? 0) - dt);
   placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)

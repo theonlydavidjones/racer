@@ -283,6 +283,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   for (const k in out) out[k as Ctl] = undefined;
   if (!c) { for (const k in want) put(wk, k as Ctl, 1, want[k as Ctl]!); return out; }
   const n = c.spec.crew.length, ppl = pplOf(c), windward = c.wind;
+  // (anyone struck in a jibe and out of action, worked out once: nearly always nobody, and their pace then as it is)
+  let anyOut = false; for (let i = 0; i < c.people.length; i++) if (c.people[i]!.outUntil > (c.clock ?? 0)) { anyOut = true; break; }
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for):
@@ -423,10 +425,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const helmSheets = helmSheetsOf(c, n);
   for (const kk in want) {
     const k = kk as Ctl, who = workerOf(c, n, fwdL, ahead, main, k), a = c.people[who];
-    if (k === 'jibsheetW') { put(wk, k, paceOf(ppl[who], who, n, helmSheets) * outPace(c, who), want[k]!); continue; } // letting the lazy sheet fly is a flick of the wrist
+    if (k === 'jibsheetW') { const pc = paceOf(ppl[who], who, n, helmSheets); put(wk, k, anyOut ? pc * outPace(c, who) : pc, want[k]!); continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {
-      if (j.reach > 0) { j.reach -= dt; put(wk, k, 0, to); } else put(wk, k, paceOf(ppl[who], who, n, helmSheets) * outPace(c, who), to);
+      if (j.reach > 0) { j.reach -= dt; put(wk, k, 0, to); } else { const pc = paceOf(ppl[who], who, n, helmSheets); put(wk, k, anyOut ? pc * outPace(c, who) : pc, to); }
     } else put(wk, k, 0, to);
   }
   carJob(b, dt);
