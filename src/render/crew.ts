@@ -1345,7 +1345,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (struck by the boom, out of it a while; or ready for the turn coming: sat or hiking where they are, not on the way
     // anywhere, and not at a job)
     if (a && !role && !busy && !go && pdl?.f !== f) {
-      if (((a as { outUntil?: number }).outUntil ?? 0) > (c?.clock ?? 0))
+      if (a.outUntil > (c?.clock ?? 0))
         struck(want, f.scale, f.root.parent && f.cur ? f.root.parent.worldToLocal(f.head.localToWorld(_hd.set(0, 0.1, 0))) : null); // (the head's middle, above its pivot at the neck)
       else if (a.ready) ready(want, f.scale, windward, jibe, cr.crew.length < 2 || i === fore);
     }
