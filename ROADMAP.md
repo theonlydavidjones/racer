@@ -740,7 +740,11 @@ What's planned, roughly in order. Done work is described in the README.
      should be the same height as the auto-trim tab, and the same basic design." So it's a tab on the band's top
      edge: `.sb-tab` (07-band.css:55, 22 px, the same background, border and radius), in the center slot
      `.sb-tillerslot`, which has been empty since the tiller strip went. Three ways to fill it are shown in place: T1 a
-     slim bar, T2 a tilting mast glyph, T3 both. The owner's pick goes here.
+     slim bar, T2 a tilting mast glyph, T3 both. Then: "I feel like it needs to be centered to make sense. is there a
+     way to make the windex smaller and get the heel indicator into the main part of the panel, just above the windex?
+     or even as an outside ring on the top part of the windex, like from 10:00 to 2:00?" Two more are shown in place:
+     (R) a ring around the windex's top from 10:00 to 2:00, its mark at her heel angle one to one; and (S) the windex
+     about 20% smaller with the slim bar just above it. The owner's pick goes here.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
