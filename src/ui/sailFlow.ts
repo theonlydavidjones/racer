@@ -1,6 +1,6 @@
 import { CE_ABOVE_WL, RIG } from '../boat/balance';
 import type { Boat } from '../boat/boat';
-import { byHand, crewEaseBoom, sailFrame } from '../boat/physics';
+import { byHand, crewEasedOnPurpose, sailFrame } from '../boat/physics';
 import { SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
 import { boatTells, type TellState } from '../render/sails';
@@ -160,9 +160,9 @@ export function flowWords(st: FlowState, b: Boat, ctx: { preStart?: boolean } = 
       const how = main ? "Ease it till it's nearly square across the wind (the boom at the shrouds)" : st.awa > 155 ? 'Pole it out to windward (wing on wing)' : 'Keep it eased to leeward, just short of collapsing';
       p('fp-sail', `<b>${name[s.sail]}</b> off the wind: it works stalled, the air pushing on it, the telltales hanging. ${how}.`); continue;
     }
-    // (luffing because the crew's eased the boom down the traveller to depower, as far as that and no further, with
-    // nobody else holding the sheet or the traveller: the price of keeping her on her feet, not a mistake)
-    const ease = crewEaseBoom(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
+    // (luffing because the crew's eased the boom to depower, down the traveller or in a puff, as far as that and no
+    // further, with nobody else holding the sheet or the traveller: the price of keeping her on her feet, not a mistake)
+    const ease = crewEasedOnPurpose(b), eased = main && ease > 1 && !byHand(b, 'mainsheet') && !byHand(b, 'traveller') && -t.err <= ease + 3;
     // (the turn: only for a small error, and worked from the sim's wind; a sail far out is just trimmed in)
     const turn = by <= 10 ? `, or bear away about ${deg(turnFor(b, by))}` : '';
     const stallTell = main ? (t.amount > 0.12 ? 'the leech telltale hiding' : 'the flow breaking away before the leech') : 'leeward telltales drooping';
