@@ -117,7 +117,7 @@ const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-t
  * The windex, as you'd see it looking up at the masthead (in the band's middle, where the helm looks up past the
  * companionway): the boat from above, bow up; the vane points into the apparent wind; the white tabs at 28° either side
  * of the bow mark close-hauled, and the red wedge between them is too close to the wind to sail. The number is the
- * apparent wind angle. (The same geometry as the old top-centre windex: the UI session's mock-up, design/chase-view.)
+ * apparent wind angle; her point of sail is just below the windex (the owner, 15 Nov 2026). (The same geometry as the old top-centre windex: the UI session's mock-up, design/chase-view.)
  */
 const windexSvg = () => {
   const P = (deg: number, r: number) => [70 + Math.sin(deg * D2R) * r, 70 - Math.cos(deg * D2R) * r].map(n => n.toFixed(1));
@@ -136,7 +136,7 @@ const windexSvg = () => {
   <path d="M70 26 C 82 44, 84 70, 80 106 L 60 106 C 56 70, 58 44, 70 26 Z" fill="url(#sbWxHull)" opacity=".85"/>${tab(-1)}${tab(1)}
   <g class="sb-vane"><line x1="70" y1="106" x2="70" y2="26" stroke="#ff6a3d" stroke-width="3" stroke-linecap="round"/><path d="M70 10 L79 30 L70 25 L61 30 Z" fill="#ffb627" stroke="#1a1205" stroke-width="1"/><path d="M70 98 L77 108 L77 114 L70 106 L63 114 L63 108 Z" fill="#ff6a3d" stroke="#1a1205" stroke-width="1"/></g>
   <circle cx="70" cy="70" r="5" fill="#e9f2f5" stroke="#08141e" stroke-width="1.5"/>
-  <text class="sb-pos" x="70" y="119" text-anchor="middle"></text><text class="sb-awa" x="70" y="131" text-anchor="middle">0°</text></svg>`;
+  <text class="sb-awa" x="70" y="123" text-anchor="middle">0°</text></svg>`;
 };
 
 /**
@@ -229,7 +229,7 @@ export class SailBand {
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
-  <span class="sb-wx" role="img">${windexSvg()}${heelSvg()}<span class="sb-wx-hint">▴ Sail controls</span></span>
+  <span class="sb-wx" role="img">${windexSvg()}${heelSvg()}<span class="sb-pos"></span><span class="sb-wx-hint">▴ Sail controls</span></span>
   ${vert('vang', 'S')}${vert('outhaul', 'S')}${vert('jibCunningham', 'S')}${vert('jibHalyard', 'S')}
   <span class="sb-div"></span>${vert('jib', 'S')}${jcar('S')}
 </div>
