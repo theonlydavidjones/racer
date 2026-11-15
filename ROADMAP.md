@@ -464,6 +464,11 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
+     <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
+     gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
+     like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
+     shadows, or a shadow-map artifact. Find what casts them and stop it; check both sides on both tacks.
    - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
      The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
