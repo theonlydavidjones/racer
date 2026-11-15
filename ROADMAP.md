@@ -464,6 +464,17 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: lashing the tiller less than about 13° off the centerline lashes it amidships** (owner, 15 November; bug;
+     <1–2 h): "tiller lashing is glitching when I try to lash it less than 13ish degrees off centerline. it just lashes
+     it amidships." Leads in src/app.ts:
+     - The double-click route (around line 1192) records the first press's angle (`firstPress`), but the first click
+       also lets go of the tiller. Between the clicks the tiller springs back toward the center (`tillerSpring`, 2.5 a
+       second), so a small angle can reach zero first.
+     - Check that the right-click route keeps the angle too, and that `setTiller`, then the `lash` command (sim/commands.ts
+       line 120, which lashes at `u.tiller`), reach the worker in that order, with nothing in between zeroing a small
+       angle.
+     A test: lash at 5°, 10° and 15° each way, by right-click and by double-click; each must hold the angle it was
+     lashed at.
    - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
      <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
      gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
