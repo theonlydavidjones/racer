@@ -1337,7 +1337,7 @@ let boatPanel: BoatPanel;
 function lookOnly(a: BoatSpec, b: BoatSpec): boolean {
   const strip = (x: BoatSpec) => {
     const y = structuredClone(x) as BoatSpec & Record<string, unknown>;
-    for (const k of ['name', 'nameColor', 'deck', 'cabinTop', 'hatch', 'cockpit', 'navLights', 'poleSide', 'lineColors']) delete y[k];
+    for (const k of ['name', 'nameColor', 'deck', 'cabinTop', 'hatch', 'cockpit', 'navLights', 'poleSide', 'lineColors', 'instrument']) delete y[k];
     y.hull = { ...y.hull, upper: '', lower: '', stripe: '' };
     y.sails = { ...y.sails, color: 'white', number: '', numberColor: undefined, insigniaColor: undefined }; // (her country's her ensign too: a new World)
     return JSON.stringify(y);
