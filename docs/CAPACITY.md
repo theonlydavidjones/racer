@@ -544,6 +544,31 @@ run time. So **new per-step work goes behind one cheap test, in a method of its 
 PR that adds lines to World.step runs perf-pair even when the lines look free. (A profile of a bundled build didn't
 show this cost; one of the trees loaded as perf-pair loads them, by vite's runnerImport, did.)
 
+### 8b. The step's garbage (15 Nov 2026)
+
+The perf race made about 596 KB of garbage a step, and collecting it was about 3.7% of the step (the biggest line in
+an inlining-off profile). We measured it with V8's sampling heap profiler, collected objects included, over 2 minutes of
+the perf race (a scratch script driving `HeapProfiler.startSampling` with `includeObjectsCollectedByMajorGC/MinorGC`).
+Four lessons, all bit-identical (the fingerprint unchanged), took it to 488 KB and the step to **0.9868** against
+736afa84 (12 ratios):
+
+- **Math.hypot allocates.** V8's builtin makes a scratch array and a boxed result every call, and TurboFan doesn't
+  inline it. The step called it about 2,200 times. `core/math.ts` `hypot` is the same computation (the larger
+  magnitude out, the squares summed with Kahan's compensation, the root times it back) in the same order. It matches to
+  the last bit on 3·10⁷ random pairs and the edge cases. Use it, not `Math.hypot`, in the step's code.
+- **A fractional field read from objects of many shapes comes back boxed.** A point passed in as a boat, her bow, or a
+  plain `{x, y}` makes `p.x` a megamorphic load, and each such load of a double allocates. Read the coordinates once
+  into locals at the top of a hot helper (inPoly, segPt, hitsHarbor, endsOf), not once per vertex.
+- **Closures made per call are allocations.** `find` with a closure in a hot predicate (harborAt), and helper closures
+  inside a function called several times a step (sailForces' `one`), each cost one per call. Use an indexed loop, or a
+  module-level function with the captured values as arguments.
+- **One hidden class for the fleet bought nothing.** The 7 AI boats ended a race in 6 hidden classes: about 40 fields
+  are added as she sails, in each boat's own order. Declaring them all at birth gave all 7 one class, and measured
+  1.0040. The likely reason: a number field declared `undefined` can't keep V8's unboxed double, so every write then
+  allocates. Declaring them 0 isn't bit-identical, since most of them default to something else or test `== null`.
+  Also: **an object literal of more than 128 properties starts in V8's slow dictionary mode** (makeBoat's has 94), so
+  fields added at birth go in after the literal, not into it.
+
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
 v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):
