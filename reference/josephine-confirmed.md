@@ -81,3 +81,10 @@ showing it, and add to it whenever the owner confirms something. One line each; 
 - The jib, lowered, stays hanked on the forestay and is rolled on the foredeck: an even roll with square ends, as long
   as the sail's foot, tied with sail ties (either side is fine) (owner).
 - Mooring cleats (bow, stern, midships): the horns taper to slim tips, smooth, not stubby or paneled (owner).
+
+## Open: the hull's bow profile (owner, 14 Nov 2026; to work on later)
+- The owner: "the hull shape, particularly the profile of the prow, isn't matching the true Folkboat shape. current shape
+  is too full and round." References they sent: the class construction plan (Scandinavian Sailing Association / NFIA,
+  profile, half-breadth plan and midsection), an older lines-and-accommodation drawing, and a side photo of a clinker
+  wooden Folkboat on its trailer (an older boat, for context). In them the stem rakes forward in a long, fine, nearly
+  straight line from the forefoot to the stemhead, the forefoot cut well away, the sections forward fine and V'd.

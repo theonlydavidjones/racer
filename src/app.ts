@@ -3,7 +3,6 @@ import { trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
-import { OUTBOARDS } from './boat/motor';
 import { ghostGap, ghostsFor, loadGhost, setupKey, type Ghost } from './replay/ghost';
 import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
@@ -542,12 +541,14 @@ const band = new SailBand({
     const e = $('tpHelp'); e.hidden = !t; if (!t) return;
     const i = t.indexOf(': '), b = document.createElement('b');
     if (i > 0 && i < 40) { b.textContent = t.slice(0, i); e.replaceChildren(b, ' ' + t.slice(i + 2)); } else e.replaceChildren(t);
-  }
+  },
+  motorOn: () => !!w.user.motor && w.running && S.mode !== 'drill',
+  motorStart: () => motorStartUi()
 }, document.body);
-// the tiller strip on the band's top edge, and her outboard's control head above the band on the left. The tiller
+// the tiller strip on the band's top edge (her outboard's controls are the band's Motor tab: ui/sailBand.ts). The tiller
 // pilot goes bottom left with the Navigator, its panel opening along the bottom edge in place of its button, never up over
 // the boat (owner, v148: the pilot's panel over the band hid her hull)
-band.tillerSlot.append($('tiller'), $('motorHead'));
+band.tillerSlot.append($('tiller'));
 $('helmBar').append($('bPilot'), $('pilot'));
 function openLines(open = !band.open): void {
   band.show(open); S.band = open ? 1 : 0; saveSettings(S);
@@ -663,6 +664,7 @@ $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(dt: number): void {
+  document.body.classList.toggle('inLesson', !!w.lesson && w.running); // (the lesson's line at the top: 11-lessons.css)
   if (!w.running) { $('coachTip').classList.remove('on'); return; }
   if (w.lesson) { lessonTick(); return; }
   const u = w.user;
@@ -715,16 +717,21 @@ function lessonTick(): void {
   $('tpHint').textContent = L.cue + (L.progress > 0 && !L.passed ? ` · ${Math.round(L.progress * 100)}%` : '');
   $('tpSub').textContent = ''; $('tpHold').hidden = true; band.cue(null); // (a lesson's cue is the one note: the coach waits)
   $('tpHint').className = 'tp-hint ' + (L.passed ? 'done' : 'fix');
+  // the lesson's one line, at the top for as long as the lesson runs (in the chase view the coach's own tip is off, its
+  // words in the Coach card, where a lesson's went unseen: the owner, 14 Nov 2026), its progress filling under it
+  if (tip.textContent !== L.cue) tip.textContent = L.cue;
+  const cls = (w.paused ? '' : 'on ') + (L.passed ? 'done' : 'fix');
+  if (tip.className.replace(' flash', '') !== cls) tip.className = cls;
+  tip.style.setProperty('--p', (L.passed ? 1 : L.progress).toFixed(3));
   if (L.cue !== lessonCue) {
     lessonCue = L.cue;
-    if (!w.paused) { tip.textContent = L.cue; tip.className = 'on ' + (L.passed ? 'done' : 'fix'); coachTipUntil = performance.now() + 6000; }
+    tip.classList.remove('flash'); void tip.offsetWidth; tip.classList.add('flash'); // (a new step: lit a moment)
     if (L.passed && L.id !== 'case' && !(S.lessonsPassed ?? []).includes(L.id)) { S.lessonsPassed = [...(S.lessonsPassed ?? []), L.id]; saveSettings(S); }
     // passed: a moment to see it, then paused on the lessons, this one ticked (a Case sailed: back on it in the Rules
     // trainer, with how it came out)
     const R = w.caseRun;
     if (L.passed) setTimeout(() => { if (w.lesson === L) { send({ k: 'pause', on: true }); if (R) { $('replay').hidden = true; replayView.stop(); pendingPenalty = null; rulesTrainer.sailed(R.c.case, R.result === 'clear', `${w.user.name} (${w.user.no})`, R.fouls[0] ? foulTitle(R.fouls[0]) : '', R.free.map(l => `${l} (${w.boats.find(b => b.name === l)?.no ?? ''}) sailed free after the contact`).join(' · ')); } else setup.openLessons(); } }, 3000);
   }
-  tipFade();
 }
 function tipFade(): void { if (performance.now() > coachTipUntil || w.paused) $('coachTip').classList.remove('on'); }
 function stepCar(k: 'carFore' | 'carIn', d: number): void {
@@ -875,38 +882,14 @@ function ghostNote(): void {
   if (el.hidden !== !txt) el.hidden = !txt;
   if (el.textContent !== txt) el.textContent = txt;
 }
-/* ---------------- her outboard (boat/motor.ts): the Motor button and its control head ---------------- */
-let motorOpen = false;
-function motorUi(): void {
-  const m = w.user.motor, on = !!m && w.running && S.mode !== 'drill';
-  const btn = $('bMotor'); if (btn.hidden !== !on) btn.hidden = !on;
-  const head = $('motorHead'), show = on && motorOpen; if (head.hidden !== !show) head.hidden = !show;
-  btn.classList.toggle('on', !!m?.running);
-  if (!m || !show) return;
-  $('bMoTilt').textContent = m.down ? 'Tilt up' : 'Tilt down'; $('bMoStart').textContent = m.running || m.pulling ? 'Stop' : 'Start';
-  $('motorLab').textContent = `Motor ${m.hp} hp`;
-  for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.setAttribute('aria-pressed', String(b.dataset.mg === m.gear));
-  const hasR = OUTBOARDS[m.hp].reverse; $('bMoR').hidden = !hasR; $('bMoSwivel').hidden = hasR; $('bMoSwivel').classList.toggle('on', !!m.swivel);
-  const thr = $('moThrottle') as HTMLInputElement; if (document.activeElement !== thr) thr.value = String(Math.round(m.throttle * 100));
-  $('bMoCastOff').hidden = !(w.user.docked && m.running);
-  const read = !m.down ? 'Tilted up' : m.pulling ? 'Pulling the cord…' : !m.running ? 'Down · stopped' : m.gear === 'N' ? 'Running · neutral' : `Running · ${m.gear === 'R' || m.swivel ? 'astern' : 'ahead'} ${Math.round(m.throttle * 100)}%`;
-  if ($('motorRead').textContent !== read) $('motorRead').textContent = read;
-}
-$('bMotor').onclick = () => { motorOpen = !motorOpen; motorUi(); };
+/* ---------------- her outboard (boat/motor.ts): its controls are the band's Motor tab (ui/sailBand.ts) ---------------- */
 function motorStartUi(): void {
   const m = w.user.motor; if (!m) return;
   if (m.running || m.pulling) { send({ k: 'motor', op: 'stop' }); return; }
   // (racing, the motor means retiring (RRS 42.1): ask first)
   void host.ask({ k: 'motor', op: 'start', retireFirst: false }).then(r => { if (r === 'racing') { send({ k: 'pause', on: true }); $('motorAsk').hidden = false; ($('bMotorNo') as HTMLButtonElement).focus(); } });
 }
-for (const b of $('motorHead').querySelectorAll<HTMLButtonElement>('[data-mo]')) b.onclick = () => {
-  const k = b.dataset.mo;
-  if (k === 'tilt') send({ k: 'motor', op: 'tilt' }); else if (k === 'start') motorStartUi(); else if (k === 'swivel') send({ k: 'motor', op: 'swivel' }); else if (k === 'castoff') send({ k: 'castOff' });
-  motorUi();
-};
-for (const b of $('moGears').querySelectorAll<HTMLButtonElement>('[data-mg]')) b.onclick = () => { send({ k: 'motor', op: 'gear', gear: b.dataset.mg as 'F' | 'N' | 'R' }); motorUi(); };
-$('moThrottle').addEventListener('input', () => send({ k: 'motor', op: 'throttle', v: Number(($('moThrottle') as HTMLInputElement).value) / 100 }));
-$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); send({ k: 'motor', op: 'start', retireFirst: true }); word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); motorUi(); };
+$('bMotorYes').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); send({ k: 'motor', op: 'start', retireFirst: true }); word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); };
 $('bMotorNo').onclick = () => { $('motorAsk').hidden = true; send({ k: 'pause', on: false }); };
 
 /* ---------------- Home: send her back to her home slip (racing, it retires her first) ---------------- */
@@ -1331,7 +1314,7 @@ function frame(now: number): void {
   if (host instanceof WorkerHost) { const d = document.documentElement.dataset; d.syncFaults = String(host.faults); d.syncChecks = String(host.checks); } // (for the checks: the mirror's checks made and failed)
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
-  setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); motorUi(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
+  setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
