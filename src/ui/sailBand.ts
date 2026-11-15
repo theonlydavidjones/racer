@@ -60,6 +60,8 @@ export interface BandHost {
    * first: starting it retires her, RRS 42.1). */
   motorOn(): boolean;
   motorStart(): void;
+  /** She's racing (Definitions, Racing): her stowed outboard stays below. */
+  racing(): boolean;
 }
 
 type Side = 'P' | 'S';
@@ -95,20 +97,20 @@ const vert = (key: CtlKey | 'jib', side: Side) => {
   return `<div class="sb-v" data-line="${key}" data-side="${side}" style="--rope:${col}">
   <button type="button" class="sb-nm" data-act="name">${SHORT[k]}</button>
   <button type="button" class="sb-a" data-act="ease" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: ease">${chev('u')}</button>
-  <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span>
+  <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span>
   <button type="button" class="sb-a" data-act="pull" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: pull on">${chev('d')}</button></div>`;
 };
 /** The backstay's end on one side, pulled outboard. */
 const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="--rope:${ROPE.backstay}">
   <button type="button" class="sb-nm" data-act="name">Backstay</button>
   <span class="sb-hrow">${side === 'P'
-    ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
-    : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
+    ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
+    : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
 /** A track across the boat (port end left): the mainsheet's boom marker or the traveller's car. */
 const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="--rope:${ROPE.mainsheet}">
   <button type="button" class="sb-nm" data-act="name">${label}</button><span class="sb-end p">P</span>
   <button type="button" class="sb-a" data-act="left" aria-label="${k === 'mainsheet' ? 'Boom toward port' : 'Car to port'}">${chev('l')}</button>
-  <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
+  <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
   <button type="button" class="sb-a" data-act="right" aria-label="${k === 'mainsheet' ? 'Boom toward starboard' : 'Car to starboard'}">${chev('r')}</button><span class="sb-end s">S</span>${k === 'mainsheet' ? '<span class="sb-rin"></span><span class="sb-rtk"></span>' : ''}</div>`;
 /**
  * The windex, as you'd see it looking up at the masthead (in the band's middle, where the helm looks up past the
@@ -174,6 +176,10 @@ export class SailBand {
   private holdT = 0;
   private holding: CtlKey | null = null;
   private sel: CtlKey | null = null;
+  /** The coach's line, ringed, and where it should go (its ◆ on the track): the live note's (app.ts coachTick). */
+  private cueLine: string | null = null; private cueTo: number | null = null;
+  /** Point at a line for the coach: ring it and put its target on its track; null clears it. */
+  cue(line: string | null, to: number | null = null): void { this.cueLine = line; this.cueTo = to; }
   private lastTack: 'S' | 'P' | null = null;
   /** The boat whose rope colours the band shows (re-coloured when you change boats, or her colours). */
   private colorsOf: string | null = null;
@@ -197,7 +203,7 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="Paddle: one of your crew fetches the boom crutch from the cabin and paddles over the side you choose, pushing her along and swinging her bow away from that side: about a knot and a half in a calm. Tap the side again to stop. Racing, rule 42.1 forbids it, except to get clear after hitting something (42.3(h)) or to help someone in danger (42.3(g)). A good crew does it unasked when there's no wind and she's being set onto something."><span>Paddle</span><button type="button" data-act="padP">P</button><button type="button" data-act="padS">S</button></span><span class="sb-tab sb-motor" hidden data-help="Her outboard: tilt it down into the water, pull-start it (in neutral), then the gear and the throttle. Tilt it up to sail."><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="Paddle with the boom crutch over port (&lt;) or starboard (&gt;); click it again to stop. Racing, only as rule 42.3 allows."><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="Her outboard: tilt it down into the water, pull-start it (in neutral), then the gear and the throttle. Tilt it up to sail."><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
 <span class="sb-tillerslot"></span>
 <span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
@@ -441,6 +447,13 @@ export class SailBand {
       const from = this.moThr && this.moThr.until > now ? this.moThr.v : m.throttle, v = clamp(Math.round((from + (k === 'more' ? 0.1 : -0.1)) * 10) / 10, 0, 1);
       this.moThr = { v, until: now + 10000 }; this.host.send({ k: 'motor', op: 'throttle', v });
     } else if (k === 'castoff') this.host.send({ k: 'castOff' });
+    else if (k === 'stow') {
+      // (off the bracket into the lazarette, or back on: stopped and tilted up first; racing, it stays below. world.ts motorStow)
+      if (!m.stowed && (m.running || m.pulling)) { no('Stop it first', 'Stop the motor first, then it can come off the bracket.'); return; }
+      if (!m.stowed && m.down) { no('Tilt it up first', 'Tilt the motor up first, then it can come off the bracket.'); return; }
+      if (m.stowed && this.host.racing()) { no('Racing', 'Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
+      pend(m.stowed ? 'Shipping…' : 'Stowing…', x => !!x.shifting); this.host.send({ k: 'motor', op: 'stow' });
+    }
     this.motorTab(w.user as Boat);
   }
   private motorTab(u: Boat): void {
@@ -458,6 +471,12 @@ export class SailBand {
       const off = !!pend && k !== 'less' && k !== 'more' && k !== 'castoff'; if (el.disabled !== off) el.disabled = off; // (its row waits on the race)
       el.classList.toggle('pend', p);
     };
+    // stowed below (or on its way): only Ship (or its progress); on the bracket, Stow beside the tilt
+    const away = !!m.stowed || !!m.shifting;
+    hide(b('tilt'), away); hide(b('stow'), false); // (down or running, it's still there: a click says why it can't come off yet)
+    word('stow', m.shifting ? (m.shifting.to === 'stowed' ? 'Stowing…' : 'Shipping…') : m.stowed ? 'Ship' : 'Stow');
+    attr(b('stow'), 'title', m.stowed ? 'Ship it: the crew get it out of the lazarette and clamp it on the bracket' : 'Stow it: the crew slide it off the bracket into the lazarette (stopped and tilted up first)');
+    { const el = b('stow'), off = !!m.shifting || !!pend; if (el.disabled !== off) el.disabled = off; el.classList.toggle('pend', !!m.shifting); }
     word('tilt', m.down ? 'Up' : 'Down'); attr(b('tilt'), 'title', m.down ? 'Tilt it up, clear of the water (stops it)' : 'Tilt it down into the water');
     hide(b('start'), !m.down); word('start', m.pulling ? 'Pulling…' : m.running ? 'Stop' : 'Start');
     const g = tab.querySelector<HTMLElement>('.mo-g')!; hide(g, !m.down);
@@ -593,6 +612,10 @@ export class SailBand {
       const iv = ideal?.[k as keyof typeof ideal] as number | undefined;
       hide(mark, !mine || iv == null);
       if (iv != null) { const io = Math.round(onOf(k, iv) * 100) + '%'; if (horiz) { mark.style.left = d.dataset.side === 'P' ? `calc(100% - ${io})` : io; } else mark.style.top = io; }
+      // the coach's line: ringed, its target on the track (the lazy jib sheet never: the working one is the coach's)
+      const cued = this.cueLine === k, cue = d.querySelector<HTMLElement>('.sb-cue');
+      d.classList.toggle('cue-ring', cued);
+      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) { const co = Math.round(onOf(k, this.cueTo) * 100) + '%'; if (horiz) cue.style.left = d.dataset.side === 'P' ? `calc(100% - ${co})` : co; else cue.style.top = co; } }
     });
     // the mainsheet: the boom's end across the boat (sin of its angle, toward leeward); the crew's boom, dashed
     {
@@ -602,6 +625,9 @@ export class SailBand {
       boom.style.left = `${50 + x * 50}%`; d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'mainsheet');
       hide(mark, !mine || !ideal);
       if (ideal) mark.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: ideal.mainsheet, traveller: ideal.traveller }) * D2R) * 50}%`;
+      const cued = this.cueLine === 'mainsheet', cue = d.querySelector<HTMLElement>('.sb-cue');
+      d.classList.toggle('cue-ring', cued);
+      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: this.cueTo }) * D2R) * 50}%`; }
     }
     {
       const d = this.el.querySelector<HTMLElement>('.sb-trk[data-line="traveller"]')!, mine = byHand(u, 'traveller');
@@ -609,6 +635,9 @@ export class SailBand {
       d.classList.toggle('mine', mine); d.classList.toggle('sel', this.sel === 'traveller');
       const mark = d.querySelector<HTMLElement>('.sb-mark')!; hide(mark, !mine || !ideal);
       if (ideal) mark.style.left = `${50 + ideal.traveller * leeSign(u) * 50}%`;
+      const cued = this.cueLine === 'traveller', cue = d.querySelector<HTMLElement>('.sb-cue');
+      d.classList.toggle('cue-ring', cued);
+      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + this.cueTo * leeSign(u) * 50}%`; }
     }
     this.jumpers(u);
     // the jib cars: the crossbar on its row, the car on its pin; the leeward one is loaded

@@ -1365,7 +1365,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // tilted up toward the helm (render/tacktick.ts). The owner's photos: reference/photos/josephine-mast-cabin-vang-side-
   // starboard.png (the mount circled, the unit stowed) and josephine-vang-to-mast-base.jpg (the unit, from the cockpit)
   let instrument: Instrument | undefined;
-  if (b.isUser) {
+  if (b.isUser && b.spec?.instrument !== 'none') { // (the owner: optional in her setup; key 6 then has nothing to look at)
     instrument = buildInstrument();
     const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - UNIT.d / 2 - 0.01; // (its after face 1 cm forward of the runners' ends)
     instrument.grp.position.set(0, cabinTopAt(uAtZ(z), 0), z); grp.add(instrument.grp);

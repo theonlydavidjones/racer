@@ -4,7 +4,7 @@ import { ASTERN_DRAG, HOVE } from './physics';
 import { FULL_RUDDER, RUDDER } from './balance';
 import { displacement } from './crewPhys';
 import { condition } from './condition';
-import { motorForce } from './motor';
+import { motorForce, motorYaw } from './motor';
 import { clamp, D2R } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import type { Vec } from '../core/math';
@@ -118,11 +118,11 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   {
     const helm = clamp((b.steer ?? 0) - (b.tiller ?? 0), -1, 1), back = u < 0, vyR = HOVE.rudderFlow * (sw - r * RUDDER.arm);
     const aoa = (back ? -1 : 1) * helm * FULL_RUDDER * D2R + Math.atan2(vyR, Math.max(0.01, Math.abs(u)));
-    const yR = -0.5 * RHO * (u * u + vyR * vyR) * RUDDER.area * clamp(RUDDER.slope * aoa, -1.05, 1.05) * (back ? 0.7 : 1);
+    const yR = -0.5 * RHO * (u * u + vyR * vyR) * RUDDER.area * clamp(RUDDER.slope * aoa, -1.05, 1.05) * (back ? HANDLING.asternRudder : 1);
     Y += yR; M -= yR * RUDDER.arm;
   }
   // the motor, if it's driving (boat/motor.ts: its push along her heading, or its leg's drag)
-  X += motorForce(b);
+  X += motorForce(b); M += motorYaw(b); // (off her centerline, it turns her too: + her bow to starboard, as M here)
   // the wind on her, relative to her motion through the water (the wind's over the water: windOnWater): her bare hull and
   // rig, and any sail still hoisted, let fly and flogging (HANDLING.flogCdA, as dynamics.ts airDrag); its broadside push a
   // little ahead of the keel's centre, the mast being forward (HOVE.windLever)

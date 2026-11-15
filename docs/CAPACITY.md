@@ -308,7 +308,7 @@ The guard must keep watching the race-mode physics at full fidelity. The worker 
 | 5 | **The guards** (§3: spike, determinism, perf.cjs); the budget's new limit proposed to the owner with the measured room | 3–5 | with 3 | — |
 | | **total** | **26–42** | | |
 
-Laptop numbers are estimates from this container's calibration. The frame-time readout (F9, ui/perfMeter.ts) gives the real
+Laptop numbers are estimates from this container's calibration. The frame-time readout (Shift+F, ui/perfMeter.ts) gives the real
 ones: the owner's sim ms per frame at 4× in a full race, read once before step 2 and once after step 3, would settle
 the headroom on their actual machine.
 
@@ -567,7 +567,7 @@ v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (
 thread waiting on the software GPU: frame times, and their 95th and 99th percentiles, mean nothing here. What holds: the
 renderer's counts (draw calls, triangles, programs), the same run to run, the best measure here of what the GPU is asked
 to do; the JS a frame, noisy (±5 ms; a run's outlier can double a view), paired back to back so the drift lands on both;
-and the heap. The real machine's frame times are the readout's (ui/perfMeter.ts: the ` key, F9 from v190).
+and the heap. The real machine's frame times are the readout's (ui/perfMeter.ts: the ` key, F9 from v190, Shift+F from the no-F-keys ruling).
 
 **The gate** (scripts/check/perf-ab.cjs): this tree's page and another version's, each from its own dev server, measured
 by perf.cjs's seven views alternately, two rounds, at half size (the same shape). It fails on draw calls or triangles

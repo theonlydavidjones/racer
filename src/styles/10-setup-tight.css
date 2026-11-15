@@ -48,11 +48,13 @@ button.t-av.dim:hover{opacity:.8}
 .srow.always .srow-body{border-top:0}
 .srow .step{border-top:0;padding:0}
 .srow .step>span:first-child::before{content:none}
-#setup #row-fleet .step>span:first-child,#setup #row-boat .step>span:first-child,#setup #row-when .step>span:first-child{display:none}
+#setup #row-fleet .step>span:first-child,:is(#setup,#drillView,#seasonView) #row-boat .step>span:first-child,:is(#setup,#drillView,#seasonView) #row-when .step>span:first-child{display:none}
 #setup #oppList{display:flex;flex-direction:column;gap:0}
-#setup #crewRows{display:flex;flex-direction:column}
-#setup #crewRows .t-pickrow:first-child{margin-top:12px}
-#setup #crewField .t-pickrow .seg{max-width:420px}
+/* (the boat and crew row is docked into the Drill and Season pages too, setup.ts DOCKED: its rules go with it, else the
+   old .crewrows grid sets the seats side by side, off the panel) */
+:is(#setup,#drillView,#seasonView) #crewRows{display:flex;flex-direction:column}
+:is(#setup,#drillView,#seasonView) #crewRows .t-pickrow:first-child{margin-top:12px}
+:is(#setup,#drillView,#seasonView) #crewField .t-pickrow .seg{max-width:420px}
 /* the right column: the day as one strip over the graph; the other buttons smaller, Start big */
 #setSide{gap:12px}
 #setSide #tideNote{display:none}
@@ -63,8 +65,8 @@ button.t-av.dim:hover{opacity:.8}
 #setSide #bCond,#drillSide #bCond{padding:8px 10px;font-size:12px}
 #setSide .gobtns .ghost{padding:8px 10px;font-size:12px}
 #setSide #bGo{padding:18px;font-size:18px}
-#setup #crewRows{display:block;margin:0;font-size:inherit}
-#setup #crewRows .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:600 13px/1 var(--f-inst);padding:0}
+:is(#setup,#drillView,#seasonView) #crewRows{display:block;margin:0;font-size:inherit}
+:is(#setup,#drillView,#seasonView) #crewRows .linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;font:600 13px/1 var(--f-inst);padding:0}
 /* Drill, its own start-page section (the owner, 13 Nov 2026): the three drills, each Go, beside the setup's boat and
    crew, the day and the conditions (moved here while it's open) */
 .modes.four{grid-template-columns:repeat(4,minmax(0,1fr))}

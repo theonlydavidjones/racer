@@ -79,6 +79,51 @@ const HULL_DECL = `uniform float uHullOn; uniform mat4 uHullInv; uniform float u
 const HULL_CUT = `if (uHullOn > 0.5) { vec3 hl = (uHullInv * vec4(vPuffXZ.x, 0.0, vPuffXZ.y, 1.0)).xyz; float hu = (hl.z + ${(L / 2).toFixed(4)}) / ${L.toFixed(4)};
   if (hu > 0.0 && hu < 1.0) { float hf = hu * ${HULL_N}.0; int hi = int(min(floor(hf), ${HULL_N - 1}.0)); if (abs(hl.x) < mix(uHullHalf[hi], uHullHalf[hi + 1], hf - float(hi))) discard; } }
 `;
+/** The points of sail and the wind on the water round her (render/windRose.ts sets it): drawn in the water itself, so the
+ * waves carry it right up to her hull. Off unless uRoseOn. Bands by her true wind angle: uRoseE, the edges between in
+ * irons (0), close-hauled (1), close reach (2), beam reach (3), broad reach (4) and run (5). */
+const ROSE_DECL = `uniform float uRoseOn; uniform vec2 uRoseC; uniform float uRoseFrom; uniform float uRoseE[5]; uniform vec3 uRoseR; uniform vec2 uRoseLit; uniform float uRoseTgt;
+float roseChev(vec2 rp, float ang, float rad, float size, float way) { // a chevron at radius rad on compass bearing ang, pointing out along it (way 1) or in toward her (−1)
+  vec2 d = vec2(sin(radians(ang)), cos(radians(ang))), n = vec2(-d.y, d.x); vec2 q = vec2((dot(rp, d) - rad) * way, dot(rp, n));
+  return (1.0 - smoothstep(0.12 * size, 0.2 * size, abs(q.x - size * 0.5 + abs(q.y)))) * step(abs(q.y), size);
+}
+`;
+const ROSE_FRAGMENT = `
+#ifdef ROSE
+  if (uRoseOn > 0.5) {
+    vec2 rp = vWaveP - uRoseC; float rr = length(rp);
+    if (rr > uRoseR.x && rr < uRoseR.y + 16.0) {
+      float ra = degrees(atan(rp.x, rp.y)), rel = mod(uRoseFrom - ra + 540.0, 360.0) - 180.0, twa = abs(rel), side = rel >= 0.0 ? 1.0 : -1.0;
+      vec4 rc = vec4(0.0);
+      if (rr < uRoseR.y) {
+        float idx = twa < uRoseE[0] ? 0.0 : twa < uRoseE[1] ? 1.0 : twa < uRoseE[2] ? 2.0 : twa < uRoseE[3] ? 3.0 : twa < uRoseE[4] ? 4.0 : 5.0;
+        float de = 180.0; for (int i = 0; i < 5; i++) de = min(de, abs(twa - uRoseE[i])); // (to the nearest edge between points, °)
+        bool tgt = abs(idx - uRoseTgt) < 0.5, mine = abs(idx - uRoseLit.x) < 0.5 && side == uRoseLit.y;
+        // (on the target, her own sector stays amber with the teal as a ring round it, 0.8 m wide: a hit, not her marker
+        // gone; the Coordinator for the owner, 15 Nov 2026)
+        float edge = min(min(rr - uRoseR.x, uRoseR.y - rr), radians(de) * rr);
+        if (idx < 0.5) rc = vec4(0.78, 0.27, 0.23, 0.3); // (the no-go)
+        else if (tgt && mine) rc = edge < 0.8 ? vec4(0.23, 0.82, 0.76, 0.8) : vec4(1.0, 0.71, 0.15, 0.42);
+        else if (tgt) rc = vec4(0.23, 0.82, 0.76, 0.42); // (the lesson's target: --target)
+        else if (mine) rc = vec4(1.0, 0.71, 0.15, 0.36); // (her point, on her side: --accent)
+        // the dashed white rays between the points (a quarter of a meter wide, dashes 1.8 m in 3)
+        float ray = (1.0 - smoothstep(0.16, 0.3, radians(de) * rr)) * step(fract((rr - uRoseR.x) / 3.0), 0.6);
+        // a chevron on each point, both sides, pointing the way she'd sail on it
+        float ch = 0.0;
+        for (int i = 0; i < 5; i++) { float hi = i < 4 ? uRoseE[i + 1] : 180.0, mid = 0.5 * (uRoseE[i] + hi);
+          ch = max(ch, max(roseChev(rp, uRoseFrom - mid, uRoseR.z, 2.4, 1.0), roseChev(rp, uRoseFrom + mid, uRoseR.z, 2.4, 1.0))); }
+        rc = mix(rc, vec4(1.0, 1.0, 1.0, 0.8), max(ray, ch * 0.9));
+        rc.a *= smoothstep(uRoseR.x, uRoseR.x + 1.0, rr) * (1.0 - smoothstep(uRoseR.y - 1.0, uRoseR.y, rr));
+      }
+      // the wind: gold chevrons coming in from where it blows from, pointing at her
+      float wc = 0.0; for (int i = 0; i < 3; i++) wc = max(wc, roseChev(rp, uRoseFrom, uRoseR.y + 5.0 + 5.0 * float(i), 3.0, -1.0) * (1.0 - 0.2 * float(i)));
+      rc = mix(rc, vec4(1.0, 0.85, 0.29, 0.95), wc);
+      diffuseColor.rgb = mix(diffuseColor.rgb, rc.rgb * 0.55, rc.a);
+      totalEmissiveRadiance = mix(totalEmissiveRadiance, rc.rgb * 0.85 * max(uDay, 0.35), rc.a);
+    }
+  }
+#endif
+`;
 const WATER_FRAGMENT = `
   // the current where you are: the ripples drift with it (two-phase flow mapping), relative to the mean drift
   vec2 cuv = ((vWaveP - uCurO) / uCurCell + 0.5) / ${CUR_N}.0;
@@ -197,6 +242,13 @@ export class SceneView {
   private wtex: THREE.CanvasTexture;
   private tile: number;
   private boatMeshes: BoatMesh[] = [];
+  /** The perf meter's test switches (ui/perfMeter.ts): the sun's shadows, and the boats' sails, each on unless switched off for a reading. */
+  readonly test = { shadows: true, sails: true };
+  /** Shadows on or off for a reading: off, no shadow pass and no shadow sampling (every material recompiles once). */
+  setTestShadows(on: boolean): void {
+    this.test.shadows = on; this.renderer.shadowMap.enabled = on;
+    this.scene.traverse(o => { const m = (o as THREE.Mesh).material; if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true; });
+  }
   /** Crew overboard: the person in the water (made when first needed). */
   private mobMesh: THREE.Group | null = null;
   /** Your own boat's mesh (the first), for the cabin-top instrument's look (app.ts). */
@@ -309,6 +361,18 @@ export class SceneView {
    * inside her deck's outline, in her own frame (the waterline lies within it, at any heel she sails at).
    */
   private hullUni = { uHullOn: { value: 0 }, uHullInv: { value: new THREE.Matrix4() }, uHullHalf: { value: Array.from({ length: HULL_N + 1 }, (_, i) => halfBeam(i / HULL_N) + 0.02) } };
+  /** The points of sail on the water (ROSE_FRAGMENT; set by render/windRose.ts through rose()). */
+  private roseUni = { uRoseOn: { value: 0 }, uRoseC: { value: new THREE.Vector2() }, uRoseFrom: { value: 0 }, uRoseE: { value: [40, 51, 75, 105, 160] }, uRoseR: { value: new THREE.Vector3(9, 26, 19) }, uRoseLit: { value: new THREE.Vector2(-1, 1) }, uRoseTgt: { value: -1 } };
+  /** Show the points of sail round her on the water, or not (null): sim (x, y), the true wind's from (°), the band edges
+   * (TWA, °: no-go | close-hauled | close reach | beam | broad | run), radii (m: inner, outer, the marks), her band
+   * and side (+1 the wind over her starboard side), and the target band (−1, none). */
+  rose(r: { x: number; y: number; from: number; edges: number[]; r0: number; r1: number; rm: number; lit: number; side: number; target: number } | null): void {
+    // (compiled into the water only while it's shown: off, the water's shader is as it was, no cost a frame; the
+    // shader's rebuilt once each time it's turned on or off)
+    const m = this.water.material; if (!!r !== ('ROSE' in (m.defines ?? {}))) { m.defines = { ...(m.defines ?? {}) }; if (r) m.defines.ROSE = ''; else delete m.defines.ROSE; m.needsUpdate = true; }
+    const u = this.roseUni; u.uRoseOn.value = r ? 1 : 0; if (!r) return;
+    u.uRoseC.value.set(r.x, r.y); u.uRoseFrom.value = r.from; u.uRoseE.value = r.edges; u.uRoseR.value.set(r.r0, r.r1, r.rm); u.uRoseLit.value.set(r.lit, r.side); u.uRoseTgt.value = r.target;
+  }
   private waveUni = { uWaveA: { value: this.waveA }, uWaveB: { value: this.waveB }, uTime: { value: 0 }, uWaveO: { value: new THREE.Vector2() }, uHs: { value: new THREE.Vector2() }, uWhiteRef: { value: 0 } };
   private seaRef: SeaHere | null = null;
   /** Wakes, bow waves and spray. */
@@ -392,7 +456,7 @@ export class SceneView {
     // Phong for the sun's glitter path (the ripples, used as a bump map, break it into sparkles)
     const waterMat = new THREE.MeshPhongMaterial({ color: 0x3b6d84, map: wtex, bumpMap: wtex, bumpScale: 1.6, specular: 0x8a8a80, shininess: 140 });
     waterMat.onBeforeCompile = sh => {
-      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni);
+      Object.assign(sh.uniforms, this.puffUni, this.skyUni, this.waveUni, this.curUni, this.hullUni, this.roseUni);
       const decl = 'uniform sampler2D uPuff; uniform vec2 uPuffO; uniform float uPuffS; uniform float uMeanKt; uniform vec2 uPuffV; uniform vec2 uPuffOff; uniform vec2 uFoamOff; uniform vec2 uHs; uniform float uWhiteRef;\nuniform sampler2D uCur; uniform vec2 uCurO; uniform float uCurCell; uniform vec2 uCurMean; uniform mat3 uFlowM;\nvarying vec2 vPuffXZ; varying vec2 vWaveP; varying float vKW; varying float vKS; varying float vWhite;\n' + WAVE_GLSL;
       sh.vertexShader = sh.vertexShader
         .replace('#include <common>', '#include <common>\n' + decl)
@@ -411,8 +475,8 @@ export class SceneView {
           vMapUv = (mapTransform * vec3(wuv, 1.0)).xy;
           vBumpMapUv = (bumpMapTransform * vec3(wuv, 1.0)).xy;`);
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE + HULL_DECL)
-        .replace('#include <map_fragment>', HULL_CUT + WATER_FRAGMENT)
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkyCol; uniform float uDay;\n' + decl + VNOISE + HULL_DECL + ROSE_DECL)
+        .replace('#include <map_fragment>', HULL_CUT + WATER_FRAGMENT + ROSE_FRAGMENT)
         .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\nnormal = waveN;')
         // the ripple texture's bumps (about 12 cm a texel) fade where a pixel covers more water than they can show, so
         // the far water doesn't alias into rows parallel to the horizon
@@ -992,7 +1056,10 @@ export class SceneView {
     { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
       if (g) { const c = g.worldToLocal(this.hullCam.copy(camera.position)), uu = (c.z + L / 2) / L;
         if (uu > 0 && uu < 1 && Math.abs(c.x) < halfBeam(uu) && c.y < deckY(uu, c.x)) { h.uHullOn.value = 1; h.uHullInv.value.copy(g.matrixWorld).invert(); } } }
+    // (the perf meter's sails switch: every boat's main and jib hidden for this draw only, then as they were)
+    const hid = this.test.sails ? null : this.boatMeshes.map(m => { const v = [m.main.mesh.visible, m.jib.mesh.visible]; m.main.mesh.visible = m.jib.mesh.visible = false; return v; });
     this.renderer.render(this.scene, camera);
+    if (hid) this.boatMeshes.forEach((m, i) => { m.main.mesh.visible = hid[i][0]; m.jib.mesh.visible = hid[i][1]; }); // (each as it was: a lowered sail stays down)
   }
 }
 
