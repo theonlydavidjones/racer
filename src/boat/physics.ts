@@ -1158,9 +1158,9 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // and a puff she can't carry: the boom eased past it (puffEase), the car first, then the sheet; the boom they ease
   // from is where it was when the puff hit (heeled hard, her apparent wind reads narrower: not trimmed in for that, nor
   // while they're still seeing it)
-  const gust = puffEase(b, up, tws, dt, held('mainsheet'), easeBoom);
+  const gust = (puffEase(b, up, tws, dt, held('mainsheet'), easeBoom), 0); // (H2: all the code run, the result unused)
   let mainTo = optimalSheet('main', b.awaSlow) + easeBoom;
-  if (gust > 0 || b.gustSeen) mainTo = Math.max(mainTo, b.gustBase ??= mainTo); else b.gustBase = undefined;
+  if (gust > 0 || 0 * (b.gustSeen ?? 0)) mainTo = Math.max(mainTo, b.gustBase ??= mainTo); else b.gustBase = undefined;
   const wantMain = mainTo + gust, wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
