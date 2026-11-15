@@ -736,7 +736,11 @@ What's planned, roughly in order. Done work is described in the README.
 
      Each has the teal ◆ at her best heel (boat/crewPhys.ts crewBestHeel), amber past 20° (the coach's
      "overpowered", coach.ts:98) and red past 25° (laid over), with only the degree number as text. It follows the side
-     she's heeled to (b.heelMag), sits inside the band, and adds no new button. The owner's pick goes here.
+     she's heeled to (b.heelMag), sits inside the band, and adds no new button. Then (15 November): "the heel indicator
+     should be the same height as the auto-trim tab, and the same basic design." So it's a tab on the band's top
+     edge: `.sb-tab` (07-band.css:55, 22 px, the same background, border and radius), in the center slot
+     `.sb-tillerslot`, which has been empty since the tiller strip went. Three ways to fill it are shown in place: T1 a
+     slim bar, T2 a tilting mast glyph, T3 both. The owner's pick goes here.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
