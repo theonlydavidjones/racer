@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><title>bow lab</title>
+<body style="margin:0;background:#cfe3ee"><canvas id="c" width="900" height="600"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { hullGeometry, deckGeometry, keel, canoe, sheer, halfBeam, L } from '/src/render/hull.ts';
+const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true, preserveDrawingBuffer: true });
+r.setClearColor(0xcfe3ee); const sc = new THREE.Scene();
+sc.add(new THREE.HemisphereLight(0xffffff, 0x556677, 1.1)); const d = new THREE.DirectionalLight(0xffffff, 1.6); d.position.set(-3, 6, 4); sc.add(d);
+const hull = new THREE.Mesh(hullGeometry(), new THREE.MeshStandardMaterial({ color: 0xe8e4d8, vertexColors: false, roughness: 0.6, side: THREE.DoubleSide }));
+const deck = new THREE.Mesh(deckGeometry(), new THREE.MeshStandardMaterial({ color: 0x9db38c, roughness: 0.8, side: THREE.DoubleSide }));
+// the waterline plane, so the forefoot's depth reads
+const wl = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshBasicMaterial({ color: 0x3a7aa8, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); wl.rotation.x = -Math.PI / 2;
+sc.add(hull, deck, wl);
+window.shoot = (kind) => {
+  let cam;
+  const a = r.domElement.width / r.domElement.height;
+  if (kind === 'profile') { const h = 2.4; cam = new THREE.OrthographicCamera(-h * a, h * a, h * 0.8, -h * 1.2, 0.1, 50); cam.position.set(12, 0, -2.2); cam.up.set(0, 1, 0); cam.lookAt(0, 0, -2.2); }
+  else { cam = new THREE.PerspectiveCamera(34, a, 0.1, 80); const t = new THREE.Vector3(0, 0, -2.6);
+    const p = { bowon: [0, 0.6, -9], q_S: [5, 1.5, -8], q_P: [-5, 1.5, -8], low: [0, -0.4, -9] }[kind]; cam.position.set(...p); cam.lookAt(t); }
+  r.render(sc, cam);
+};
+window.profileData = () => { const o = []; for (let i = 0; i <= 200; i++) { const u = i / 200 * 0.62; o.push([u * L - L / 2, keel(u), canoe(u), sheer(u)]); } return o; };
+window.ready = true;
+</script>

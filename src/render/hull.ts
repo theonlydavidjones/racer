@@ -87,7 +87,7 @@ const BOW = 0.144; // where the keel's thickness begins, just aft of the stem's 
  */
 const U_HEEL = (HEEL.z + L / 2) / L;
 const ease2 = (a: number, b: number, t: number) => a + (b - a) * (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, t)))) / 2;
-const SLOPE_KNOTS: [number, number][] = [[0, -8.5], [0.3, -2.2], [0.43, -3.0], [0.55, -0.3]];
+const SLOPE_KNOTS: [number, number][] = [[0, -8.0], [0.14, -6.8], [0.22, -2.8], [0.34, -1.4], [0.55, -0.3]];
 const profileSlope = (u: number) => {
   let i = 0; while (i < SLOPE_KNOTS.length - 2 && u > SLOPE_KNOTS[i + 1][0]) i++;
   const [u0, m0] = SLOPE_KNOTS[i], [u1, m1] = SLOPE_KNOTS[i + 1]; return ease2(m0, m1, (u - u0) / (u1 - u0));
@@ -127,7 +127,7 @@ function sectionShape(u: number): { al: number; be: number } {
   // toward the transom the hollow gives way to a full, round run (Josephine hauled out: the owner's photo), so the
   // transom's foot is a broad, nearly flat U at about the waterline, not a point
   const mid = ease((u - 0.12) / 0.3), aft = ease((u - 0.62) / 0.38), tr = ease((u - 0.78) / 0.18);
-  return { al: 1.7 + 2.3 * mid + 1.8 * aft - 1.2 * tr, be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
+  return { al: 1.7 + 2.3 * mid + 1.8 * aft - 1.2 * tr - 0.65 * (1 - ease(u / 0.32)), be: 1.0 + 0.6 * mid + 0.9 * aft - 1.85 * tr };
 }
 
 /** 16 planks a side (CR 2.207.5: no fewer than 16 at station 8; 2.207.6: none but the keel plank over 130 mm wide), each lapping 13 mm over the one below (about the plank's thickness, CR 2.207.2) */
