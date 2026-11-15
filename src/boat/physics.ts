@@ -679,6 +679,12 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
   return b.powerK;
 }
 /** The fastest depowering step for her own crew as they are (how many, how heavy, how tired), in this wind. */
+/** The depowering her crew would sail a beat with now (her fastest step close-hauled in the wind she has): handed to the
+ * crew's own as she comes onto the wind after a leeward rounding (sim/world.ts roundingPrep). */
+export function beatDepower(b: Boat): number {
+  const tws = b.ww.kt, spec = b.crew?.spec ?? DEFAULT_CREW, cond = b.spec ? (b.cond ??= condition(b.spec)) : null;
+  return herFastestStep(b, beatAngle(tws), tws, sailPlan(b), displacement(spec) + (cond?.extraKg ?? 0)).d;
+}
 function herFastestStep(b: Boat, twa: number, tws: number, plan: SailPlan, disp: number): StepPick {
   const cs = b.crew, spec = cs?.spec ?? DEFAULT_CREW, twsR = Math.round(tws), twaR = 2 * Math.round(Math.abs(twa) / 2);
   // (each where they are: the deck's narrower aft, physics review)
@@ -1218,7 +1224,15 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // a rounding coming: the lines the crew set early for the next leg (sim/world.ts roundingPrep), to their plan for it
   const prep = b.crewPrep;
   if (prep) {
-    prep.plan ??= crewSolve(tws, prep.awa, b.tack, optimalSheet('main', prep.awa), optimalSheet('jib', prep.awa), undefined, mainRig(b), cond?.jib, prep.aws, prep.depower); // (once a rounding, from the same start: the next leg as she'll sail it)
+    if (!prep.plan) {
+      // (once a rounding, from the same start: the next leg as she'll sail it. A beat depowered as her fastest step for it
+      // is, as she'd set up for it from the start, below; a run with the backstay and Cunningham off, as crews ease them
+      // after the bear-away (Sail1Design, "rounding windward offset marks"; International Folkboat guide, North Sails: a
+      // loose Cunningham lets the draft go aft): the optimizer is all but indifferent to them on a run)
+      if (prep.up) { const spec = b.crew?.spec ?? DEFAULT_CREW; prep.depower = herFastestStep(b, beatAngle(tws), tws, plan, displacement(spec) + (cond?.extraKg ?? 0)).d; }
+      const P = crewSolve(tws, prep.awa, b.tack, optimalSheet('main', prep.awa), optimalSheet('jib', prep.awa), undefined, mainRig(b), cond?.jib, prep.aws, prep.depower);
+      prep.plan = prep.up ? P : { ...P, backstay: 0, cunningham: 0 };
+    }
     // (only the way the next leg takes them: eased bearing away, the vang first so the boom isn't broken; on, rounding up.
     // A line the run wants harder, the vang in a moderate breeze, they set once she's off; the beat's eased ones, once on it)
     for (const k of prep.lines) if (!b.isUser || !byHand(b, k)) want[k] = prep.up ? Math.max(c[k], prep.plan[k]) : Math.min(c[k], prep.plan[k]);

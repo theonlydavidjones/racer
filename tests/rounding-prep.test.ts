@@ -55,23 +55,24 @@ describe('Ready before the leeward mark', () => {
     const S = { ...DEFAULT_SETTINGS, mode: 'race' as const, course: 'ss2', windKt: kt, windKind: 'west' as const, current: 'slack', sea: 'flat' as const, traffic: 0 as const, fleet: 3, opponents: ['stock:1', 'stock:2', 'stock:3'] };
     const w = new World(courseFile('ss2'), S, 11);
     const ai = w.boats.filter(b => !b.isUser);
-    type Seen = { oAt?: number; oUp?: number; oBeat?: number; bsBeat?: number; bsAt?: number; bsUp?: number; prepUp?: boolean };
+    type Seen = { oAt?: number; oUp?: number; oBeat?: number; bsBeat?: number; bsAt?: number; bsUp?: number; tUp?: number; bs10?: number; prepUp?: boolean };
     const seen = new Map<number, Seen>(ai.map(b => [b.id, {}]));
     for (let i = 0; i < 60 * 1500; i++) {
       w.step(DT);
       for (const b of ai) {
-        const s = seen.get(b.id)!; if (s.oUp != null) continue;
+        const s = seen.get(b.id)!;
+        if (s.tUp != null) { if (s.bs10 == null && w.t - s.tUp >= 10) s.bs10 = b.ctl.backstay; continue; } // (and 10 s on, still)
         if (s.oAt == null && b.crewPrep?.up && b.crewPrep.lines.includes('outhaul')) { s.oAt = b.ctl.outhaul; s.bsAt = b.ctl.backstay; s.prepUp = true; }
         if (s.oAt != null && s.oBeat == null && b.crewPrep?.plan) { s.oBeat = b.crewPrep.plan.outhaul; s.bsBeat = b.crewPrep.plan.backstay; }
-        if (s.oAt != null && Math.abs(b.twa) < 70) { s.oUp = b.ctl.outhaul; s.bsUp = b.ctl.backstay; }
+        if (s.oAt != null && s.oUp == null && Math.abs(b.twa) < 70) { s.oUp = b.ctl.outhaul; s.bsUp = b.ctl.backstay; s.tUp = w.t; }
       }
-      if ([...seen.values()].some(s => s.oUp != null) && w.t > 0 && [...seen.values()].every(s => s.oUp != null || s.oAt == null) && [...seen.values()].filter(s => s.oUp != null).length >= 2) break;
+      if ([...seen.values()].some(s => s.oUp != null) && w.t > 0 && [...seen.values()].every(s => s.bs10 != null || s.oAt == null) && [...seen.values()].filter(s => s.bs10 != null).length >= 2) break;
     }
-    const done = [...seen.values()].filter(s => s.oUp != null);
+    const done = [...seen.values()].filter(s => s.bs10 != null);
     expect(done.length, 'some crew got ready before a leeward mark').toBeGreaterThan(0);
     if (kt === 14) expect(done.some(s => s.oBeat! > s.oAt! + 0.05), 'a crew whose run had the outhaul easier than the beat wants').toBe(true);
     // (in a breeze the beat wants the backstay on, depowered as a beat in this wind is: the plan says so, and it goes on)
-    if (kt === 18) for (const s of done) { expect(s.bsBeat!, 'the beat\'s backstay, depowered').toBeGreaterThan(0.3); expect(s.bsUp!, 'on by the time she\'s on the wind').toBeGreaterThan(s.bsAt! - 1e-9); }
+    if (kt === 18) for (const s of done) { expect(s.bsBeat!, 'the beat\'s backstay, depowered').toBeGreaterThan(0.3); expect(s.bsUp!, 'on by the time she\'s on the wind').toBeGreaterThan(s.bsAt! - 1e-9); expect(s.bs10!, 'and still on 10 s later: the crew\'s own depowering starts where they set her').toBeGreaterThan(0.8 * s.bsBeat! - 0.05); }
     for (const s of done) {
       expect(s.oUp!, 'the outhaul never eased on the way in').toBeGreaterThanOrEqual(s.oAt! - 1e-9);
       if (s.oBeat! > s.oAt! + 0.05) expect(s.oUp!, 'and on toward the beat\'s setting by the time she\'s on the wind').toBeGreaterThan(s.oAt!);
