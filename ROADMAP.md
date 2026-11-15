@@ -577,7 +577,7 @@ What's planned, roughly in order. Done work is described in the README.
      was made. Wanted:
      - The confirmation: the call itself, seen and heard where she's looking: the crew's "Ready to jibe" … "Jibe-ho"
        (or "Ready about" … "Helm's a-lee") as a brief call by the helm, and the crew visibly moving to it.
-     - The key: one key near the steering hand (A/D). Space is free; ask the owner before choosing, and keep it
+     - The key: Space (the owner chose it, 15 November), replacing Shift+J; keep it
        rebindable in Keys.
      - The how-to: no copy block; at most one short chip at the moment it's useful (bearing away toward a run, or
        close-hauled before a tack), e.g. "Space · jibe-ho", fading once she's used it a few times.
