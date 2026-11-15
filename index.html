@@ -266,9 +266,9 @@
         <section class="srow always" id="row-where" data-row="where">
           <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
           <div class="srow-body">
-        <div class="field step" id="whereField"><span>Where <button type="button" class="ghost sm" id="bPlanOpen" title="Both pins on one big chart: drag either, then Done">Plan on the big chart</button></span>
+        <div class="field step" id="whereField"><span>Where</span>
           <div class="seg" id="setupPinSeg"><button type="button" data-pin="from">Start</button><button type="button" data-pin="to">Destination</button></div>
-          <canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas>
+          <div class="setchart-wrap"><canvas id="setupChartC" class="setchart" aria-label="Chart: tap to put the start or the destination there; drag to move, scroll to zoom"></canvas><button type="button" class="chart-expand" id="bPlanOpen" title="Open the big chart: both pins on it, drag either, then Done" aria-label="Open the big chart">⤢</button></div>
           <p class="pins" id="setupPins"></p>
           <div class="pinbtns"><small id="setupChartHint"></small><button type="button" class="ghost sm" id="bPinSlip">Her slip</button><button type="button" class="ghost sm" id="bPinNone">Nowhere in particular</button></div></div>
           </div>
