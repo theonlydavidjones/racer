@@ -298,6 +298,15 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+   5. **Now — the hit at the edge** (owner, 15 November; physics; Bay East, Deep Physics reviewing; for v198): crossing
+      out of the cove's shelter, the full breeze and the ebb or flood hit her suddenly: she heels, jumps in speed, and is
+      set sideways. On main the wind's lee (harborLee.ts) and the current's basin calm (current.ts, BASIN_MOUTH 30 m) both
+      exist, but the current's edge widths are estimates with no measured source. Size how sharp the edge is from real
+      data (NOAA currents, observations at the Marina and Fort Mason), not invented numbers, and test that the heel, speed
+      and set all change within a few boat lengths of the entrance, on a flood and on an ebb.
+   6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
+      lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
+      and after pictures go to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
    Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
