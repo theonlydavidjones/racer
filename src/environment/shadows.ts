@@ -270,14 +270,16 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
   let worst = 0;
   for (const off of [-8, 0, 8]) {
     const u = V(from + off), side = off === 0 ? 1 : 0.85;
-    // the stretch being crossed: where the ray met it, its highest point so far; and the chain of stretches before it,
-    // parted only by dips: the chain's first shore, and how much the dips between have parted it (chainW: 1 one hill …
-    // 0 apart). A stretch ends where the ground falls below half its height so far (8 m at least): low flats between a
+    // the stretch being crossed: where the ray met it, its highest point so far; and the stretches before it, parted
+    // only by dips: their first shores, and how much the dips between have parted them (1 one hill … 0 apart). A stretch ends where the ground falls below half its height so far (8 m at least): low flats between a
     // spit and the ridge behind it (the marsh behind Strawberry Point) part them as water would, eased by how deep and
     // wide the dip is
-    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, chain = -1, chainW = 0, exitChain = -1, dip = 0, exitLevel = 8;
+    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, dip = 0, exitLevel = 8;
+    // (the stretches before this one it still joins: the one just left (a) and the best of those before it (b), each
+    // with its first shore and how much the dips between have parted them; and, at an exit, the same carried over)
+    let ca = -1, wa = 0, cb = -1, wb = 0, xEnter = -1, xa = -1, xwa = 0, xb = -1, xwb = 0;
     const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), cav = 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1); return (x < xr ? cav : cav * (xr / x) ** pe) * Math.min(1, (H - 8) / 8); };
-    const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), chain >= 0 ? chainW * lee(chain, top) : 0)); };
+    const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), ca >= 0 ? wa * lee(ca, top) : 0, cb >= 0 ? wb * lee(cb, top) : 0)); };
     const at = (L: number, d: number, h: number) => prevH === h ? prevD : prevD + (d - prevD) * (L - prevH) / (h - prevH); // (where the height passes L, between the samples)
     let step = 50;
     for (let d = 50; d <= 6000; d += step) {
@@ -293,7 +295,7 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
         const L = Math.max(8, 0.5 * top);
         if (h >= L) { top = Math.max(top, h); close(); } // (scored as the stretch rises, not only at its top: low ground
         // at the shore joined to high ground behind still makes a low hill's near-calm close in; a high hill's is gustier)
-        else { close(); exit = at(L, d, h); exitLevel = L; exitChain = chain >= 0 && chainW > 0 ? chain : enter; enter = -1; dip = h; }
+        else { close(); exit = at(L, d, h); exitLevel = L; xEnter = enter; xa = ca; xwa = wa; xb = cb; xwb = wb; enter = -1; dip = h; }
       } else {
         if (exit >= 0) dip = Math.min(dip, h);
         // the level that starts the next stretch: the last one's own, eased down to 8 m as the dip goes down to the water
@@ -305,8 +307,9 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
             // hardly does, a wide deep one entirely (squared: Deep Physics); the hill beyond still shelters from the first
             // shore by what's left
             const part = Math.min(1, (enter - exit) / DIP_GAP) * clamp(1 - dip / exitLevel, 0, 1), w = (1 - part) ** 2;
-            if (chain < 0 || chainW === 0) chain = exitChain;
-            chainW = w * (chainW > 0 ? chainW : 1); if (chainW < 1e-3) { chain = -1; chainW = 0; }
+            const older = xwa >= xwb ? [xa, xwa] : [xb, xwb];
+            ca = xEnter; wa = w; cb = older[0]; wb = older[1] * w;
+            if (wa < 1e-3) { ca = -1; wa = 0; } if (wb < 1e-3) { cb = -1; wb = 0; }
           }
           close();
         }
