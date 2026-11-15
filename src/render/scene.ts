@@ -96,7 +96,7 @@ const ROSE_FRAGMENT = `
       vec4 rc = vec4(0.0);
       if (rr < uRoseR.y) {
         float idx = twa < uRoseE[0] ? 0.0 : twa < uRoseE[1] ? 1.0 : twa < uRoseE[2] ? 2.0 : twa < uRoseE[3] ? 3.0 : twa < uRoseE[4] ? 4.0 : 5.0;
-        if (idx < 0.5) rc = vec4(0.78, 0.27, 0.23, 0.3); // (the no-go: in irons)
+        if (idx < 0.5) rc = vec4(0.78, 0.27, 0.23, 0.3); // (the no-go)
         else if (abs(idx - uRoseTgt) < 0.5) rc = vec4(0.23, 0.82, 0.76, 0.42); // (the lesson's target: --target)
         else if (abs(idx - uRoseLit.x) < 0.5 && side == uRoseLit.y) rc = vec4(1.0, 0.71, 0.15, 0.36); // (her point, on her side: --accent)
         // the dashed white rays between the points (a quarter of a meter wide, dashes 1.8 m in 3)
@@ -350,7 +350,7 @@ export class SceneView {
   /** The points of sail on the water (ROSE_FRAGMENT; set by render/windRose.ts through rose()). */
   private roseUni = { uRoseOn: { value: 0 }, uRoseC: { value: new THREE.Vector2() }, uRoseFrom: { value: 0 }, uRoseE: { value: [40, 51, 75, 105, 160] }, uRoseR: { value: new THREE.Vector3(9, 26, 19) }, uRoseLit: { value: new THREE.Vector2(-1, 1) }, uRoseTgt: { value: -1 } };
   /** Show the points of sail round her on the water, or not (null): sim (x, y), the true wind's from (°), the band edges
-   * (TWA, °: in irons | close-hauled | close reach | beam | broad | run), radii (m: inner, outer, the marks), her band
+   * (TWA, °: no-go | close-hauled | close reach | beam | broad | run), radii (m: inner, outer, the marks), her band
    * and side (+1 the wind over her starboard side), and the target band (−1, none). */
   rose(r: { x: number; y: number; from: number; edges: number[]; r0: number; r1: number; rm: number; lit: number; side: number; target: number } | null): void {
     const u = this.roseUni; u.uRoseOn.value = r ? 1 : 0; if (!r) return;

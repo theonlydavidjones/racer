@@ -11,7 +11,7 @@ import { D2R } from '../core/math';
  * wind coming in from upwind. The rose itself is drawn in the water (scene.ts ROSE_FRAGMENT), so the waves carry it right
  * up to her hull; the names stand just above it, here. It turns with every shift, the marks swinging round her while her
  * heading stays put. The bands are the lesson's (sim/lessons.ts POINTS), close-hauled from her own beat angle.
- * (Design: design/learn-to-sail. Not on in the app yet: the owner's choices of size and names drop in as `opts`.)
+ * (Design: design/learn-to-sail. On by default in lessons; outside them a Training views layer, app.ts roseOn.)
  */
 export interface RoseOpts {
   /** Inner and outer radii, and the radius of the marks (m). */
