@@ -307,6 +307,15 @@ What's planned, roughly in order. Done work is described in the README.
    6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
+8za. **Start practice teaches picking the favored end** (owner, 15 November: "start practice also needs to help me learn how
+   to pick the favored side. don't just tell me."; Debrief; design first): the player works it out the way sailors do,
+   then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
+   favored end), sighting the line square to the wind, and the line's compass bearing against the wind's. The drill hides
+   "favored" until the player commits to an end; the debrief scores the call; later attempts fade the help. A mock to
+   the owner before building.
+8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
+   the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
+   5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
    Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
@@ -458,6 +467,16 @@ What's planned, roughly in order. Done work is described in the README.
      racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
      The on-screen label is the owner's choice.
+   - **Now — the paddling drawn** (owner, 15 November: "there's no animation associated with paddling?"; Crew Figures):
+     the physics shipped in v196 but nothing is drawn. The crew member goes below for the boom crutch, comes up with it,
+     kneels at the rail on the called side and strokes, the blade dipping in time with the push; then stows it.
+   - **Paddling tires the paddler** (owner, 15 November: "paddling is exhausting… strength of paddling and duration
+     without rest should be tied to crew fitness"; Crew Model, Deep Physics reviewing): the stroke's power and how long
+     it lasts before a rest come from the paddler's fitness and the same fatigue model as hiking (crewPhys.ts), with a
+     sourced sustainable-power curve for one person paddling; a tired paddler slows, rests and can be swapped.
+   - **The paddle tab as arrows** (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
+     clickable arrows like < PADDLE >"; Crew Controls): ‹ paddles on port, › on starboard (the side the crew kneels on,
+     as you face forward); tap the lit one again to stop.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
    docs/UI-AUDIT.md: the setup screens, the Yacht Club, the logbook, past races, settings and the Keys; back-stack
@@ -498,6 +517,37 @@ What's planned, roughly in order. Done work is described in the README.
      happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
      takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
      the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
+   - **Start practice: restart without finishing** (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
+     like to be able to restart without having to finish the whole drill." The pause menu has a Restart (labeled
+     "Restart Race" here, since only drill and rounding say "Drill"), which the owner didn't find or which starts over
+     from scratch. Give a new countdown from the same setup at any time, keeping the session's starts table: a key
+     (listed in Keys) and the pause menu's Restart labeled for the drill. No new on-screen button.
+   - **A breeze (lesson 11): see the puffs coming** (owner, 15 November; feature; next; 2–3 h): "on the breeze drill, I
+     need more in-game guidance about when the puffs are coming." The water already darkens under a puff (render/scene.ts,
+     a 15% puff plainly darker), but nothing teaches her to look for it. Teach reading the water, as a real sailor does:
+     before each puff, mark its dark patch upwind (a ring or arrow on the water) with a short countdown cue ("Puff · 8 s"),
+     then "Ease" as it lands; fade the marker over the lesson so she ends up spotting the patches herself. Visual, no
+     copy; the puff's timing from the sim's own Puffs (environment/wind.ts), never invented.
+   - **The race strategist, redone as an expert at your side** (owner, 15 November, from a screenshot of the Strategist
+     tab; polish/feature; next; 6–10 h; mock-up to the owner first): "the race strategist tab ... is a mess. way too much
+     copy, way too much self-referential stuff ("sim physics"), etc. This page should feel like an expert racer is at
+     dockside or in your boat before a race, assessing the course and competition and conditions, and giving you easy to
+     understand advice about how to win. definitely should touch on how to find the favored start side, and any clues
+     about which side that might be, assuming those clues are discernible from pre-race context (i.e. we haven't had a
+     chance to get to the line and measure; make this real world). stacking all the legs into one advice column is too
+     much. one bit at a time." So: the voice of a racer, not of the sim (no "sim physics", no methods); short, sharp
+     calls; the course, the fleet (by sail number) and the conditions; one bit at a time (one leg, one point, stepped),
+     not all eight legs stacked. The start: how to find the favored end once she's at the line (the methods of the
+     favored-end drill below) and the pre-race clues a real racer would have: the forecast wind's direction against the
+     course's axis, a known shift (the sea breeze veering through the afternoon), the tide's set across the line, the
+     committee's habit; the researcher to source these for the Bay. Never the measured answer before she's measured it.
+     The researcher's first pass (15 November, search summaries only): the general clues are sourced (line bearing
+     against the wind, about 1/8 of the line per 5° of bias, sailmagazine.com/cruising/choose-wisely; oscillating vs
+     persistent, windcheckmagazine.com; a back before the start: start right and tack toward the veer, sailingworld.com).
+     The Bay's lore is not: the sea breeze veering as it fills (one unread blog), the ebb in the deep water (forum
+     posts). Nothing from St. Francis YC, GGYC or US Sailing yet, and no sourced committee-habit claim, so the strategist
+     says none of it as fact until better sources (the clubs' race and sailing-instruction pages; latitude38.com is
+     blocked here) are read.
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
@@ -548,11 +598,11 @@ What's planned, roughly in order. Done work is described in the README.
      same way.
    - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
-     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
+     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and jibes whenever she's
      more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
-     gybe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
-     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored gybe and use the
-     current, and never draw a track going backward. Fix: choose the angle and the gybes by speed made good over the
+     jibe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
+     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored jibe and use the
+     current, and never draw a track going backward. Fix: choose the angle and the jibes by speed made good over the
      ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
      changing the design). The AI's own leg planning shares sailLeg: check it too.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
