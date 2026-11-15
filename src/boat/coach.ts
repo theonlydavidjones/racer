@@ -309,73 +309,79 @@ function lineLesson(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheet
  * jib's three pairs on its luff, windward and leeward; the main's on its leech, one at each batten; none on its luff.
  */
 function lineWords(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheetW'>, to: number, l: Lesson): { now: string; short: string } {
+  // (the owner, 15 Nov 2026: plain sentences, what the line's doing and whether that's right, then why; no sources, no
+  // state-and-colon openings ("Eased:" read as neither good nor bad))
   const more = to > b.ctl[k], tws = Math.round(s.tws), tm = b.trim.main, tj = b.trim.jib, mineSheet = byHand(b, 'mainsheet');
   switch (k) {
     case 'mainsheet':
-      if (l.kind === 'info') return { now: 'Out against the shroud, stalled', short: 'It can\'t go further: come up, or bear away to a run.' };
-      if (l.head.startsWith('Ease the mainsheet')) return { now: 'Sheeted hard: the leech closed, too little twist', short: `The top of the main wants a little twist in ${tws} kt.` };
-      if (l.head.startsWith('Trim the mainsheet')) return { now: 'Leech twisting open: the top spilling wind', short: 'Sheet tension holds the leech.' };
-      if (!more) return s.awa > 110 ? { now: 'Eased right out: she wants to round up', short: 'In a touch and the helm lightens.' }
-        : tm.flow === 'luffing' ? { now: 'Eased: the main\'s luff lifting', short: 'A lifting luff isn\'t pulling.' } : { now: 'Further out than this angle wants', short: 'The main isn\'t pulling its weight.' };
-      return s.awa > 110 ? { now: 'In too far for this angle', short: 'Off the wind it pushes: out to the shroud.' }
-        : s.over ? { now: 'In hard, and she\'s overpowered', short: 'She heels and drags her rudder instead of driving.' }
+      if (l.kind === 'info') return { now: 'The boom is against the shroud and the main is stalled', short: 'It can\'t go out further: head up a little, or bear away to a run.' };
+      if (l.head.startsWith('Ease the mainsheet')) return { now: 'Sheeted too hard, so the top of the leech is closed', short: `In ${tws} kt the top of the main wants to twist open a little.` };
+      if (l.head.startsWith('Trim the mainsheet')) return { now: 'The leech is twisting open and the top is spilling wind', short: 'More sheet tension holds the leech.' };
+      if (!more) return s.awa > 110 ? { now: 'Eased so far that she wants to round up', short: 'A touch in and the helm lightens.' }
+        : tm.flow === 'luffing' ? { now: 'Eased too far, so the main\'s luff is lifting', short: 'A lifting luff isn\'t pulling.' } : { now: 'Further out than this wind angle wants', short: 'The main isn\'t pulling its weight.' };
+      return s.awa > 110 ? { now: 'Trimmed in too far for this angle', short: 'Off the wind it pushes: let it out to the shroud.' }
+        : s.over ? { now: 'Trimmed in hard while she\'s overpowered', short: 'She heels and drags her rudder instead of driving.' }
         // (the leech telltales curl only past a small stall, render/sails.ts leechTellState)
-        : tm.flow === 'stalled' && tm.amount > 0.12 ? { now: 'In too hard: its leech telltales curling', short: 'Stalled, it pushes her sideways.' } : { now: 'In past its best angle', short: 'Over-trimmed for this wind angle.' };
+        : tm.flow === 'stalled' && tm.amount > 0.12 ? { now: 'Trimmed too hard, so its leech telltales are curling behind the sail', short: 'A stalled main pushes her sideways.' } : { now: 'Trimmed past its best angle', short: 'It\'s over-trimmed for this wind angle.' };
     case 'jibsheet':
-      if (more) return s.awa > 115 ? { now: 'In too far for this angle', short: 'Off the wind it wants to be out, for area.' }
-        : tj?.flow === 'stalled' ? { now: 'In too hard: its leeward luff telltales drooping', short: 'A stalled jib pushes her sideways.' }
-        : { now: 'In past its best angle', short: 'Ease until the windward telltales just lift, then in a touch.' };
-      return tj?.flow === 'luffing' ? { now: 'Eased: the jib\'s windward luff telltales lifting', short: 'A luffing jib barely pulls.' }
-        : s.awa > 115 ? { now: 'Further out than this angle wants', short: 'In a little: it pulls harder.' } : { now: 'Eased past its best angle', short: 'In to where it pulls hardest.' };
+      if (more) return s.awa > 115 ? { now: 'Trimmed in too far for this angle', short: 'Off the wind it wants to be out, for area.' }
+        : tj?.flow === 'stalled' ? { now: 'Trimmed too hard, so its leeward luff telltales are drooping', short: 'A stalled jib pushes her sideways.' }
+        : { now: 'Trimmed past its best angle', short: 'It pulls hardest with the windward luff telltales just about to lift.' };
+      return tj?.flow === 'luffing' ? { now: 'Eased too far, so its windward luff telltales are lifting', short: 'A luffing jib barely pulls.' }
+        : s.awa > 115 ? { now: 'Further out than this angle wants', short: 'A little in and it pulls harder.' } : { now: 'Eased past its best angle', short: 'It isn\'t pulling as hard as it can.' };
     case 'traveller': {
       // with the crew on the mainsheet they re-sheet to keep the boom where they want it: then the car moves the leech,
       // not the boom (coach.ts withCrew; physics.ts trimSails)
-      const at = b.ctl.traveller > 0.1 ? 'Down to leeward' : b.ctl.traveller < -0.1 ? 'Up, but not far enough' : 'In the middle';
-      if (to < b.ctl[k]) return mineSheet ? { now: at, short: 'Boom to the centerline, leech still open: height.' } : { now: at, short: 'Up, and the sheet eases to match: the leech opens.' };
-      if (!mineSheet) return { now: 'Up to windward: the sheet eased to match, the leech open', short: 'Down, and the sheet pulls straighter: the leech closes.' };
-      return s.over ? { now: `Up, and she's overpowered in ${tws} kt`, short: 'Down: less heel and helm, same shape.' } : { now: 'Boom too close to the centerline', short: 'The main is over-trimmed.' };
+      const at = b.ctl.traveller > 0.1 ? 'The car is down to leeward' : b.ctl.traveller < -0.1 ? 'The car is up, but not far enough' : 'The car is in the middle';
+      if (to < b.ctl[k]) return mineSheet ? { now: at, short: 'Up, the boom comes to the centerline with the leech still open: that\'s height.' } : { now: at, short: 'Up, the sheet eases to match and the leech opens.' };
+      if (!mineSheet) return { now: 'The car is up to windward, with the sheet eased to match and the leech open', short: 'Down, the sheet pulls straighter and the leech closes.' };
+      return s.over ? { now: `The car is up and she's overpowered in ${tws} kt`, short: 'Down, she heels less and the helm lightens, with the same sail shape.' } : { now: 'The boom is too close to the centerline', short: 'The main is over-trimmed.' };
     }
-    case 'backstay': return more ? { now: 'Eased: both sails full', short: `In ${tws} kt she wants them flatter: drive, not heel.` }
-      : s.over ? { now: 'On hard: flatter than she needs', short: 'A little off: flat past this costs drive.' } : { now: 'On: both sails flat', short: `In ${tws} kt she wants power: fuller sails.` };
+    case 'backstay': return more ? { now: 'Too loose, so both sails are full', short: `In ${tws} kt she wants them flatter, to drive rather than heel.` }
+      : s.over ? { now: 'Tighter than she needs, so the sails are too flat', short: 'Flatter than this costs drive.' } : { now: 'Too tight, so both sails are flat', short: `In ${tws} kt she wants power: fuller sails.` };
     case 'vang': {
-      if (more) return s.awa > 70 ? { now: 'Off: the top of the main twisting away', short: 'Off the wind the sheet can\'t hold the boom down.' } : { now: 'Off: the leech opens as the sheet eases', short: 'It holds the leech, so the main keeps its shape.' };
-      // (too tight: the leech closed, or (North: "the kickingstrap pulls on the mast") the mast bent and the main flat)
+      if (more) return s.awa > 70 ? { now: 'Too loose, so the top of the main twists away', short: 'Off the wind the sheet can\'t hold the boom down.' } : { now: 'Too loose, so the leech opens as the sheet eases', short: 'Pulled on, it holds the leech and the main keeps its shape.' };
+      // (too tight: the leech closed, or (North Sails' Folkboat guide: "the kickingstrap pulls on the mast") the mast bent
+      // and the main flat)
       const t = targetShape('main', s.tws, s.awa, b.depower ?? 0).twist;
-      return b.shape.main.twist < t - 1 ? { now: 'Tight: the leech too closed', short: 'She needs more twist.' } : { now: 'Tight: bending the mast, the main flat', short: `In ${tws} kt she wants that depth.` };
+      return b.shape.main.twist < t - 1 ? { now: 'Too tight, so the leech is closed', short: 'She needs more twist at the top.' } : { now: 'Too tight, so it bends the mast and flattens the main', short: `In ${tws} kt she wants that depth.` };
     }
-    case 'outhaul': return more ? { now: 'Eased: the foot deep', short: `Power she can't use in ${tws} kt.` } : { now: 'Tight: the foot flat', short: 'A deeper foot is power.' };
-    case 'cunningham': case 'downhaul': return more ? { now: 'Eased: the draft blown aft', short: 'Luff tension pulls it forward.' } : { now: 'Tight: the draft too far forward', short: 'Back toward the middle: power.' };
-    case 'jibHalyard': return more ? { now: 'Soft: wrinkles off the hanks, the draft aft', short: 'Halyard tension pulls it forward.' } : { now: 'Tight: a crease up the luff', short: 'Lets the draft move back.' };
-    case 'jibCunningham': return more ? { now: 'Eased: the jib\'s draft blown aft', short: 'Luff tension brings it forward.' } : { now: 'Tight: the jib\'s draft too far forward', short: 'Draft back toward 40%: a finer entry points higher.' };
+    case 'outhaul': return more ? { now: 'Too loose, so the foot of the main is deep', short: `That's power she can't use in ${tws} kt.` } : { now: 'Too tight, so the foot of the main is flat', short: 'A deeper foot gives her power.' };
+    case 'cunningham': case 'downhaul': return more ? { now: 'Too loose, so the main\'s draft has blown aft', short: 'Luff tension pulls it forward.' } : { now: 'Too tight, so the main\'s draft is too far forward', short: 'Easing lets it move back toward the middle, for power.' };
+    case 'jibHalyard': return more ? { now: 'Too soft, so wrinkles run off the hanks and the draft sits aft', short: 'Halyard tension pulls the draft forward.' } : { now: 'Too tight, so a crease runs up the luff', short: 'Easing lets the draft move back.' };
+    case 'jibCunningham': return more ? { now: 'Too loose, so the jib\'s draft has blown aft', short: 'Luff tension brings it forward.' } : { now: 'Too tight, so the jib\'s draft is too far forward', short: 'Easing moves the draft back toward 40%: a finer entry points higher.' };
   }
   return { now: '', short: l.why };
 }
 /**
- * A line that's right (no fix worth saying): what it's doing, read from the boat, and whether it earns the ✓. The words
- * never claim a state they don't check (the review): a sail's flow, a line's setting, the shape's draft.
+ * A line that's right (no fix worth saying): what it's doing, read from the boat, why that's right, and whether it earns
+ * the ✓ (the owner, 15 Nov 2026: "I know they're good, but why are they good?"). The words never claim a state they
+ * don't check (the review): a sail's flow, a line's setting, the shape's draft.
  */
 function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boolean } {
-  const tm = b.trim.main, tj = b.trim.jib, c = b.ctl, upwind = s.awa < 40;
+  const tm = b.trim.main, tj = b.trim.jib, c = b.ctl, upwind = s.awa < 40, tws = Math.round(s.tws);
   switch (k) {
     case 'mainsheet':
-      if (b.sheets.main >= SAILS.main.max - 0.5 && tm.flow === 'stalled') return { text: 'Boom on the shroud: as far as it goes', tick: true };
-      if (tm.flow === 'luffing' && s.over) return { text: 'Eased on purpose: keeping her on her feet', tick: true };
-      return { text: s.awa > 110 ? 'Eased right out, boom by the shroud' : 'Drawing: its leech telltales streaming', tick: true };
+      if (b.sheets.main >= SAILS.main.max - 0.5 && tm.flow === 'stalled') return { text: 'Boom on the shroud: as far out as it goes', tick: true };
+      if (tm.flow === 'luffing' && s.over) return { text: 'Eased on purpose: the lifting luff keeps her on her feet in this breeze', tick: true };
+      return { text: s.awa > 110 ? 'Out by the shroud: right for this angle' : 'Drawing: its leech telltales streaming aft', tick: true };
     case 'jibsheet':
-      if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'Windward luff telltales lifting a little', tick: true };
-      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'Right out, at its stop: stalled on this broad reach', tick: true };
-      return { text: s.awa > 115 ? 'Eased right out' : 'Drawing: its luff telltales streaming, windward and leeward', tick: true };
-    case 'traveller': return { text: c.traveller > 0.1 ? 'Down to leeward' : c.traveller < -0.1 ? 'Up to windward' : 'In the middle', tick: true };
+      if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'Windward luff telltales just lifting: right on the edge', tick: true };
+      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'At its stop: on this broad reach it can\'t go further', tick: true };
+      return { text: s.awa > 115 ? 'Eased right out: right off the wind' : 'Drawing: its luff telltales streaming together, both sides', tick: true };
+    case 'traveller': return { text: c.traveller > 0.1 ? (s.over ? 'Down to leeward: less heel and helm in this breeze' : 'Down to leeward: the boom where this angle wants it') : c.traveller < -0.1 ? 'Up to windward: the boom near the centerline, for height' : 'In the middle: the boom where this wind wants it', tick: true };
     case 'vang':
-      // (North: "Never use the kickingstrap upwind in less than 18 knots"; on, it's worth too little to say so, but no ✓)
-      if (upwind && s.tws < 18) return c.vang <= 0.15 ? { text: 'Off: the sheet has the leech', tick: true } : { text: 'On, idle: the sheet has the leech (North: slack under 18 kt)', tick: false };
-      return { text: c.vang <= 0.15 ? 'Off' : 'On: holding the boom down', tick: true };
-    case 'outhaul': return { text: c.outhaul < 0.4 ? 'Eased: the foot full' : 'On the mark: the foot flat', tick: true };
-    case 'cunningham': case 'downhaul': return { text: `Draft ${Math.round(100 * b.shape.main.draft)}% back`, tick: true };
-    case 'jibHalyard': return { text: c.jibHalyard < 0.2 ? 'Soft: small wrinkles off the hanks' : c.jibHalyard <= 0.75 ? 'Luff just smooth' : 'Hard: the draft well forward', tick: true };
-    case 'jibCunningham': return { text: c.jibCunningham < 0.2 ? 'Off' : 'On: the draft forward', tick: true };
-    case 'backstay': return { text: `${c.backstay < 0.15 ? 'Off' : c.backstay > 0.7 ? 'On hard' : 'On'}: right for ${Math.round(s.tws)} kt`, tick: true };
-    case 'car': { const h = c.car[b.tack]; return { text: `Lead ${h.fore + 1} back, ${h.ins + 1} out`, tick: false }; } // (not priced: no ✓)
+      // (North Sails' Folkboat guide: "Never use the kickingstrap upwind in less than 18 knots"; on, it's worth too little
+      // to say so, but no ✓)
+      if (upwind && s.tws < 18) return c.vang <= 0.15 ? { text: 'Slack: right upwind in this wind, the mainsheet holds the leech', tick: true } : { text: 'Pulling down, but the mainsheet already holds the boom upwind: ease it off below 18 kt', tick: false };
+      return { text: c.vang <= 0.15 ? 'Slack: nothing for it to do at this angle' : 'On: holding the boom down so the leech keeps its shape', tick: true };
+    case 'outhaul': return { text: c.outhaul < 0.4 ? `Eased: a fuller foot for power in ${tws} kt` : `On: a flatter foot depowers the main in ${tws} kt`, tick: true };
+    case 'downhaul': return { text: `Hoisted to put the main's draft ${Math.round(100 * b.shape.main.draft)}% back: right for this wind`, tick: true };
+    case 'cunningham': return { text: c.cunningham < 0.15 ? 'Slack: the halyard alone sets the main\'s luff in this wind' : `On: holding the main's draft ${Math.round(100 * b.shape.main.draft)}% back in this wind`, tick: true };
+    case 'jibHalyard': return { text: c.jibHalyard < 0.2 ? 'Soft: small wrinkles off the hanks keep the jib full' : c.jibHalyard <= 0.75 ? 'Luff just smooth: the draft where it should be' : 'Hard: the draft well forward, for a breeze', tick: true };
+    case 'jibCunningham': return { text: c.jibCunningham < 0.2 ? 'Off: the halyard alone sets the luff in this wind' : 'On: holding the jib\'s draft forward', tick: true };
+    case 'backstay': return { text: c.backstay < 0.15 ? `Off: full sails for power in ${tws} kt` : c.backstay > 0.7 ? `On hard: flat sails for ${tws} kt` : `On: the sails flattened to suit ${tws} kt`, tick: true };
+    case 'car': { const h = c.car[b.tack]; return { text: `Set at lead ${h.fore + 1} back, ${h.ins + 1} out`, tick: false }; } // (not priced: no ✓)
   }
   return { text: 'Right', tick: true };
 }
@@ -656,7 +662,7 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   // (not the main eased on purpose in a breeze: that's the crew depowering)
   const lag = ([['main', b.trim.main, 'mainsheet'], ['jib', b.trim.jib, 'jibsheet']] as const).find(([n, t, k]) => t && t.flow !== 'good' && t.amount > 0.1 && !byHand(b, k) && !(b.sheets[n] >= SAILS[n].max - 0.5) && !(n === 'jib' && b.ctl.jibsheet <= 0.01 && t.flow === 'luffing') && !(n === 'main' && s.over && (b.depower ?? 0) > 0.6 && t.flow === 'luffing'));
   if (lag && s.awa < 110) return { ...base, kind: 'info', head: `The crew is catching up: the ${lag[0]} is ${lag[1]!.flow === 'stalled' ? 'stalled' : 'luffing'} for a moment.`, why: 'They trim at a human pace, a second or two behind a change of course or a shift.', look: lag[0] === 'jib' ? 'the jib\'s luff telltales: watch them settle' : lag[1]!.flow === 'stalled' ? 'the main\'s leech telltales: watch them stream again' : 'the luff of the main: watch it stop lifting' };
-  if (s.speedKt < 0.85 * s.targetKt && !s.over) return { ...base, kind: 'info', head: `Building speed: ${s.speedKt.toFixed(1)} kt, the polar's ${s.targetKt.toFixed(1)}.`, why: 'The sails are set: a two-tonne boat takes a while to get going. Sail her straight and let her build.', look: 'the speedo climbing' };
+  if (s.speedKt < 0.85 * s.targetKt && !s.over) return { ...base, kind: 'info', head: `Building speed: ${s.speedKt.toFixed(1)} kt of her target ${s.targetKt.toFixed(1)}.`, why: 'The sails are set: a two-tonne boat takes a while to get going. Sail her straight and let her build.', look: 'the speedo climbing' };
   // (a jib a degree or two off its best: its telltales show it before it's worth a lesson; say which, and the touch that
   // fixes it, so "right" never contradicts a lifting telltale)
   const tj = b.trim.jib, tells = s.awa <= 115; // (the telltales fly to 115° apparent, render/sails.ts)
@@ -669,9 +675,9 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   const travUp = byHand(b, 'traveller') && b.ctl.traveller < -0.2;
   if (s.over) return { ...base, head: `Trim's right for ${Math.round(s.tws)} kt: ${s.speedKt.toFixed(1)} kt.`,
     why: travUp ? 'The traveler up costs little here: the vang holds the leech while the crew eases the sheet. Most boats drop it in a breeze instead, so the boom goes down to leeward without the leech opening.'
-      : `The polar's ${s.targetKt.toFixed(1)} kt assumes she can carry full power; in this breeze she can't, so she's depowered.`,
+      : `Her target of ${s.targetKt.toFixed(1)} kt assumes she can carry full power; in this breeze she can't, so the crew flatten the sails.`,
     look: 'the heel: under about 20°, and a light helm' };
-  return { ...base, head: `Trim's right: ${s.speedKt.toFixed(1)} kt against the polar's ${s.targetKt.toFixed(1)}.`, why: '', look: steer };
+  return { ...base, head: `Trim's right: ${s.speedKt.toFixed(1)} kt against her target ${s.targetKt.toFixed(1)}.`, why: '', look: steer };
 }
 
 export function teach(b: Boat, ctx: CoachContext = {}): CoachView {
