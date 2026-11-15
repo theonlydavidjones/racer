@@ -100,6 +100,7 @@ export class BoatPanel {
       case 'navLights': this.set(b => { b.navLights = v === 'tricolour' ? 'tricolour' : 'deck'; }); return;
       case 'hatch': this.set(b => { b.hatch = v === 'acrylic' ? 'acrylic' : 'teak'; }); return;
       case 'cockpit': this.set(b => { b.cockpit = v === 'fiberglass' ? 'fiberglass' : 'teak'; }); return;
+      case 'instrument': this.set(b => { if (v === 'none') b.instrument = 'none'; else delete b.instrument; }); return;
       case 'companionway': this.set(b => { b.companionway = v === 'closed' ? 'closed' : 'open'; }); return;
       case 'nameColor': this.set(b => { if (/^#[0-9a-f]{6}$/i.test(v)) b.nameColor = v; else delete b.nameColor; }); return;
       case 'sailColor': this.set(b => { b.sails.color = v as 'white' | 'black'; }); return;
@@ -224,6 +225,7 @@ export class BoatPanel {
         <div class="field"><span>Forehatch</span>${seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic (smoked, aluminum frame)']], b.hatch ?? 'acrylic')}</div>
         <div class="field"><span>Cockpit</span>${seg('cockpit', [['teak', 'Teak'], ['fiberglass', 'Fiberglass']], b.cockpit ?? 'teak')}</div>
         <div class="field"><span>Companionway</span>${seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')}</div>
+        <div class="field"><span>Cabin-top instrument</span>${seg('instrument', [['fitted', 'Fitted'], ['none', 'None']], b.instrument ?? 'fitted')}</div>
         <div class="field"><span>Whisker pole stowed</span>${seg('poleSide', [['port', 'Port side deck'], ['starboard', 'Starboard side deck']], b.poleSide ?? 'port')}</div>
         <div class="field"><span>Navigation lights</span>${seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead tricolour']], b.navLights ?? 'deck')}</div>
       </section>
