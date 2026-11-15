@@ -80,6 +80,15 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
     const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`;
     if (d < 20 && !b.started) {
       const relH = wrap(bm - b.h), turn = wrap(desired - b.h), side = Math.sign(relH || 1);
+      // (a turn away from it through the wind, once begun, she finishes: a moment into it her heading has moved, the
+      // mark no longer lies inside the turn her course asks for, and let go she bore straight back onto the close-hauled
+      // course that was taking her into it, half a tack and back, twice, and sailed on into the committee boat)
+      const held = b.ai?.passing?.key === key && b.ai.passing.away === b.tack ? b.ai.passing : null;
+      if (held) {
+        desired = n360(bm + 180); near = key;
+        if (b.ai!.turnCommit !== -held.side) { b.ai!.turnCommit = -held.side; b.ai!.commitFor = desired; }
+        continue;
+      }
       if (Math.sign(relH) === Math.sign(turn) && Math.abs(relH) < Math.abs(turn) + need) {
         // (and that's the side she passes it on, until she's clear: the rule below would otherwise pick the other)
         // (and if passing it there would take her above close-hauled, she can't: pinned there, her leeway carries her on
@@ -89,7 +98,7 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
         const keepH = n360(bm - side * need), away = Math.abs(wrap(sailable(b, keepH) - keepH)) > 1;
         desired = away ? n360(bm + 180) : keepH; near = key;
         if (away && b.ai && b.ai.turnCommit !== -side) { b.ai.turnCommit = -side; b.ai.commitFor = desired; }
-        if (b.ai) b.ai.passing = { key, side };
+        if (b.ai) b.ai.passing = away ? { key, side, away: b.tack } : { key, side };
         continue;
       }
     }
