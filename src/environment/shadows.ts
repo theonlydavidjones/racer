@@ -1,7 +1,7 @@
 import { D2R, V, clamp, type Vec, hypot } from '../core/math';
 import { LAT0, LON0 } from '../geo/geo';
 import heights from './data/heights.json';
-import { landAt } from './sea';
+import { landGrid } from '../geo/shore';
 
 /**
  * Wind shadows: what the wind field from the NOAA records doesn't know about. Anything standing in the wind leaves a
@@ -169,17 +169,6 @@ const CITYFRONT = { south: 37.78, north: 37.8125, west: -122.49, east: -122.40 }
 const inCityfront = (p: Vec) => { const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON; return lat > CITYFRONT.south && lat < CITYFRONT.north + 0.0025 && lon > CITYFRONT.west && lon < CITYFRONT.east; };
 /** East–west position of the Golden Gate (the bridge): the hills either side of the gap are west of it. */
 const GATE_X = (-122.474 - LON0) * MLON;
-/** Height of the ground (m) at a point; 0 over water, off the map and along the Cityfront. */
-export function groundHeight(p: Vec): number {
-  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
-  if (lat > CITYFRONT.south && lat < CITYFRONT.north && lon > CITYFRONT.west && lon < CITYFRONT.east) return 0;
-  // (each cell is 4 × 4 of the terrain's samples, which sit at grid nodes. Read cell by cell: read bilinearly, a valley
-  // between two crests filled in and the lee ray took the two as one hill, from the nearer shore (the review, bay-east-16).
-  // The 200 m steps in the lee this leaves want the rays to part islands at their crests, not smoother heights)
-  const i = Math.floor(((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block), j = Math.floor(((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block);
-  if (i < 0 || j < 0 || i >= HM.nx || j >= HM.ny) return 0;
-  return HGRID[j * HM.nx + i] * HM.step;
-}
 /** How far inside the Cityfront box p is (m, 0 or less outside it). */
 function cityfrontDepth(p: Vec): number {
   const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
@@ -187,6 +176,17 @@ function cityfrontDepth(p: Vec): number {
 }
 /** Across this much of the Cityfront box's edge (m), the land's lee fades out, rather than stopping at a straight line. */
 const CF_FADE = 250;
+/**
+ * Fill the ground's lattice (groundHeightSmooth) within `half` m of each point now, at the race's set-up: a tile filled
+ * the first time a boat's rays reach it costs about a millisecond, which would otherwise land inside a step.
+ */
+export function prepareLee(pts: Vec[], half: number): void {
+  for (const c of pts) for (let y = c.y - half; y <= c.y + half; y += GL * GT) for (let x = c.x - half; x <= c.x + half; x += GL * GT) groundHeightSmooth({ x, y });
+}
+/** A dip between two stretches of land narrower than this (m) doesn't part them for the lee (terrainLeeRaw). */
+const DIP_GAP = 200;
+/** The mask's share of land (0..1, read bilinearly) from which the ground counts: its cells' own edge. */
+const LAND_FROM = 0.5;
 
 /**
  * The lee of the land at p, wind from `from` (deg): looking upwind along three rays (straight up, and the wake's
@@ -200,23 +200,132 @@ export function terrainLee(p: Vec, from: number, skipGate = false): number {
   const raw = terrainLeeRaw(p, from, skipGate);
   return inside > 0 ? 1 - (1 - raw) * (1 - inside / CF_FADE) : raw;
 }
-function terrainLeeRaw(p: Vec, from: number, skipGate: boolean): number {
+/**
+ * The ground's height (m) read bilinearly between the 200 m blocks' centers, times the 50 m mask's share of land (so the
+ * water beside an island isn't its hill), and eased out over the first 100 m inside the Cityfront box (whose shore's
+ * shelter is in the wind records): continuous everywhere. (Bilinear heights alone filled the water between two islands
+ * and the ray took them as one hill, from the nearer shore: the review, bay-east-16. The land's share keeps the water
+ * between them at nothing.)
+ */
+/**
+ * The share of land at p (0 water … 1 land), from the coastline's 50 m terrain cells (geo/shore.ts, what a boat runs
+ * aground on) read bilinearly between the cells' nodes: continuous, and the coast where it is a half. (The sea's land
+ * mask is 100 m cells: on Alcatraz, 180 m wide, it put the shore 150 m out.)
+ */
+const LG = landGrid(), LG_CW = (LG.east - LG.west) / (LG.nx - 1), LG_CH = (LG.north - LG.south) / (LG.ny - 1);
+function landShareAt(p: Vec): number {
+  const ci = (LON0 + p.x / MLON - LG.west) / LG_CW, cj = (LG.north - (LAT0 + p.y / MLAT)) / LG_CH;
+  const i = Math.floor(ci), j = Math.floor(cj), u = ci - i, v = cj - j;
+  const at = (a: number, b: number) => a < 0 || b < 0 || a >= LG.nx || b >= LG.ny ? 0 : LG.grid[b * LG.nx + a];
+  return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
+}
+function groundHeightAt(p: Vec): number {
+  const lat = LAT0 + p.y / MLAT, lon = LON0 + p.x / MLON;
+  const inCf = Math.min((lat - CITYFRONT.south) * MLAT, (CITYFRONT.north - lat) * MLAT, (lon - CITYFRONT.west) * MLON, (CITYFRONT.east - lon) * MLON);
+  const cf = inCf <= 0 ? 1 : Math.max(0, 1 - inCf / 100); if (cf === 0) return 0;
+  const ci = ((lon - HM.west) / (HM.east - HM.west) * (HM.samples[0] - 1) + 0.5) / HM.block - 0.5, cj = ((HM.north - lat) / (HM.north - HM.south) * (HM.samples[1] - 1) + 0.5) / HM.block - 0.5;
+  const i = Math.floor(ci), j = Math.floor(cj), u = ci - i, v = cj - j;
+  const at = (a: number, b: number) => a < 0 || b < 0 || a >= HM.nx || b >= HM.ny ? 0 : HGRID[b * HM.nx + a] * HM.step;
+  // the height among the land blocks only (Deep Physics): the water blocks round an island don't pull it down, so a
+  // one-block, flat-topped island (Alcatraz: cliffs, about 41 m) reads its height wherever it's land, as the block has it,
+  // not a tent full height at one point; inland it's plain bilinear. The land's share alone makes the edge
+  const h00 = at(i, j), h10 = at(i + 1, j), h01 = at(i, j + 1), h11 = at(i + 1, j + 1);
+  const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
+  const wl = (h00 > 0 ? w00 : 0) + (h10 > 0 ? w10 : 0) + (h01 > 0 ? w01 : 0) + (h11 > 0 ? w11 : 0);
+  if (wl < 0.02) return 0; // (all but out of the land blocks: the share is next to nothing there too)
+  const h = (h00 * w00 + h10 * w10 + h01 * w01 + h11 * w11) / wl;
+  // (the land counted from where the mask's share passes a half: a cell half land is the best estimate of where the coast
+  // is. From nothing, the ground began 20–30 m out from the mask's edge under high ground, 80 m before the coast on Angel)
+  return h * Math.min(1, Math.max(0, (landShareAt(p) - LAND_FROM) / (1 - LAND_FROM))) * cf;
+}
+/**
+ * groundHeightAt off a 50 m lattice, read bilinearly (continuous like it, and one read where it is eight): every boat's
+ * lee looks at some 600 points twice a second, and the planner's grids at thousands. Filled in tiles of 64 × 64 points
+ * (3.2 km) as the rays first reach them, each a few milliseconds.
+ */
+const GL = 50, GT = 64, glTiles = new Map<number, Float32Array>();
+let glKey = NaN, glTile: Float32Array | null = null; // (the last tile read: a ray's points mostly fall in the one before)
+function groundHeightSmooth(p: Vec): number {
+  const fx = p.x / GL, fy = p.y / GL;
+  if (!Number.isFinite(fx) || !Number.isFinite(fy)) return 0;
+  const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j, ti = Math.floor(i / GT), tj = Math.floor(j / GT), key = (ti + 4096) * 8192 + (tj + 4096);
+  let t = key === glKey ? glTile : glTiles.get(key);
+  if (!t) {
+    t = new Float32Array((GT + 1) * (GT + 1));
+    for (let b = 0; b <= GT; b++) for (let a = 0; a <= GT; a++) t[b * (GT + 1) + a] = groundHeightAt({ x: (ti * GT + a) * GL, y: (tj * GT + b) * GL });
+    glTiles.set(key, t);
+  }
+  glKey = key; glTile = t;
+  const a = i - ti * GT, b = j - tj * GT, k = b * (GT + 1) + a, n = GT + 1;
+  return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
+}
+/**
+ * Along each ray, every stretch of land shelters by its highest point, from where the ray meets it. Its inputs are
+ * continuous, so the lee has no seams: the heights read smoothly (groundHeightSmooth), the shore found between samples
+ * where the height crosses 8 m (not at the sample past it), and land only just over 8 m eased in. Read cell by cell, the
+ * 200 m blocks' heights and the 50 m steps of the shore made the lee step in plateaus a few hundred meters wide (1.1 →
+ * 1.8 → 3.1 kt in Yellow Bluff's lee), and the passage planner wandered between them.
+ */
+function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
   let worst = 0;
   for (const off of [-8, 0, 8]) {
-    const u = V(from + off);
-    let enter = -1, top = 0; // the island (stretch of land) the ray is crossing: where it met it, and its highest point
-    // the near-calm behind a low, steep island (Alcatraz: 80% less wind) eases behind high ground, where the air comes
-    // down the slopes in gusts (the NWS's 2.5 km model has the lee of the Marin hills at about 60% of the open-bay wind)
-    const lee = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5), cav = 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1), d = x < xr ? cav : cav * (xr / x) ** pe; worst = Math.max(worst, d * (off === 0 ? 1 : 0.85)); };
+    const u = V(from + off), side = off === 0 ? 1 : 0.85;
+    // the stretch being crossed: where the ray met it, its highest point so far; and the stretches before it, parted
+    // only by dips: their first shores, and how much the dips between have parted them (1 one hill … 0 apart). A stretch ends where the ground falls below half its height so far (8 m at least): low flats between a
+    // spit and the ridge behind it (the marsh behind Strawberry Point) part them as water would, eased by how deep and
+    // wide the dip is
+    let enter = -1, top = 0, prevD = 0, prevH = 0, exit = -1, dip = 0, exitLevel = 8;
+    // (the stretches before this one it still joins: the one just left (a) and the best of those before it (b), each
+    // with its first shore and how much the dips between have parted them; and, at an exit, the same carried over)
+    let ca = -1, wa = 0, cb = -1, wb = 0, xEnter = -1, xa = -1, xwa = 0, xb = -1, xwb = 0;
+    const cavOf = (H: number) => 0.8 - 0.35 * clamp((H - 60) / 120, 0, 1);
+    const shape = (x: number, H: number) => { const xr = 4 * H, pe = clamp(1.5 - (H - 50) / 300, 1, 1.5); return (x < xr ? 1 : (xr / x) ** pe) * Math.min(1, (H - 8) / 8); };
+    const lee = (x: number, H: number) => cavOf(H) * shape(x, H);
+    let rise = 0; // (the stretch's ground as it rises, scored from where it stands: the most of shape(d, height so far))
+    const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), cavOf(top) * rise, ca >= 0 ? wa * lee(ca, top) : 0, cb >= 0 ? wb * lee(cb, top) : 0)); };
+    const at = (L: number, d: number, h: number) => prevH === h ? prevD : prevD + (d - prevD) * (L - prevH) / (h - prevH); // (where the height passes L, between the samples)
     let step = 50;
     for (let d = 50; d <= 6000; d += step) {
-      step = d < 1000 ? 50 : 100; // finer close in, where it matters
-      // the heights are on a 200 m grid: check the 50 m land mask too, so water beside an island isn't counted as its hill
-      const q = { x: p.x + u.x * d, y: p.y + u.y * d }, h = skipGate && q.x < GATE_X ? 0 : landAt(q) === false ? 0 : groundHeight(q);
-      if (h > 8) { if (enter < 0) { enter = d - step / 2; top = 0; } top = Math.max(top, h); } // the shore is about half a step back
-      else if (enter >= 0) { lee(enter, top); enter = -1; }
+      step = d < 1000 ? 50 : 100;
+      // the ground the air comes over, averaged across the wind over a width that grows with the distance run (a lee's
+      // edge spreads as it goes: wakes mix at roughly 1 in 5 to 1 in 10 of the distance; the spread here, d/8 either
+      // side weighted ¼ ½ ¼, is an estimate, no figure measured for these shores). Close in it's under the coast's own
+      // 50 m cells and changes nothing; far off a narrow gap opens gradually, averaged with the land beside it
+      const q = { x: p.x + u.x * d, y: p.y + u.y * d }, a = d / 8, nx = u.y * a, ny = -u.x * a;
+      const g = (r: Vec) => skipGate && r.x < GATE_X ? 0 : groundHeightSmooth(r);
+      const h = 0.5 * g(q) + 0.25 * (g({ x: q.x + nx, y: q.y + ny }) + g({ x: q.x - nx, y: q.y - ny }));
+      if (enter >= 0) {
+        const L = Math.max(8, 0.5 * top);
+        // the ground as it rises, its reach scored from where it stands by the height reached so far (Deep Physics): 20 m
+        // reached 100 m up a hillside reaches only 80 m from there. How calm it is goes by the hill it's part of, its whole
+        // top (close): a hillside rising to a ridge is the ridge's gusty lee, not a low hill's near-calm. Low ground parted
+        // from the ridge behind by a dip is its own stretch, and keeps its own
+        if (h >= L) { top = Math.max(top, h); rise = Math.max(rise, shape(d, top)); }
+        else { close(); exit = at(L, d, h); exitLevel = L; xEnter = enter; xa = ca; xwa = wa; xb = cb; xwb = wb; enter = -1; dip = h; }
+      } else {
+        if (exit >= 0) dip = Math.min(dip, h);
+        // the level that starts the next stretch: the last one's own, eased down to 8 m as the dip goes down to the water
+        const L = exit >= 0 ? 8 + (exitLevel - 8) * clamp(dip / 8, 0, 1) : 8;
+        if (h > L) {
+          enter = prevH >= L ? prevD : at(L, d, h); top = h;
+          if (exit >= 0) {
+            // a dip parts the land by its width (DIP_GAP) and its depth under the level it fell from: a creek or a low neck
+            // hardly does, a wide deep one entirely (squared: Deep Physics); the hill beyond still shelters from the first
+            // shore by what's left
+            const part = Math.min(1, (enter - exit) / DIP_GAP) * clamp(1 - dip / exitLevel, 0, 1), w = (1 - part) ** 2;
+            // (a known small step, ~1.5% a meter, seen once 775 m off Yellow Bluff at 280°: when a dip upwind fills, two
+            // stretches merge, the merged top raises the level the next dip is measured from, and that dip's weight moves.
+            // Built into parting stretches at half their height; not worth more machinery)
+            const older = xwa >= xwb ? [xa, xwa] : [xb, xwb];
+            ca = xEnter; wa = w; cb = older[0]; wb = older[1] * w;
+            if (wa < 1e-3) { ca = -1; wa = 0; } if (wb < 1e-3) { cb = -1; wb = 0; }
+          }
+          rise = shape(d, top);
+        }
+      }
+      prevD = d; prevH = h;
     }
-    if (enter >= 0) lee(enter, top);
+    if (enter >= 0) close();
   }
   return 1 - worst;
 }
