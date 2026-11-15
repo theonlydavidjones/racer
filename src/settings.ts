@@ -32,7 +32,7 @@ export interface Settings {
   opponents: string[];
   seq: number; // start sequence, minutes
   /** The start-line drill: seconds to the gun when each attempt begins (60, 120 or 180), and whether you practise alone. */
-  drillFrom?: number; drillSolo?: boolean;
+  drillFrom?: number; drillSolo?: boolean; /** The start practice's fleet size (1 to MAX_OPPONENTS). */ drillFleetN?: number;
   /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
   rulesRight?: number[];
   /** Sail it yourself: the Case sailed (its number), with mode 'lesson' and lesson 'case'. */
@@ -82,11 +82,17 @@ export const DEFAULT_SETTINGS: Settings = { mode: 'race', course: 'ss2', windKt:
 const KEY = 'fbsim-settings-v2';
 /** The most boats you can race against. */
 export const MAX_OPPONENTS = 7;
-/** The start practice's fleet: "With the fleet" always brings boats. With nobody chosen to race (the setup's "Nobody: a
- *  solo race"), the club's three stock boats come out for it, so switching to the fleet between attempts brings a fleet
- *  (the owner, 15 Nov 2026: "I toggled on 'with the fleet,' but no fleet appeared"). Alone: as set. */
-export const drillFleet = <T extends Pick<Settings, 'opponents' | 'fleet'>>(s: T, solo: boolean): T =>
-  solo || s.fleet > 0 ? s : { ...s, opponents: DEFAULT_SETTINGS.opponents.slice(), fleet: DEFAULT_SETTINGS.opponents.length };
+/** The start practice's fleet: "With the fleet" brings `n` boats (the owner, 15 Nov 2026: "choose how many boats race"),
+ *  your chosen opponents first, then the club's stock boats and its generic Folkboats to make up the number, so it
+ *  brings a fleet even with nobody chosen to race ("I toggled on 'with the fleet,' but no fleet appeared"). Alone: as set.
+ *  `n` defaults to the fleet you race (or the club's three stock boats). */
+export const drillFleetSize = (s: Pick<Settings, 'fleet' | 'drillFleetN'>): number =>
+  Math.max(1, Math.min(MAX_OPPONENTS, Math.round(s.drillFleetN ?? (s.fleet > 0 ? s.fleet : DEFAULT_SETTINGS.opponents.length))));
+export const drillFleet = <T extends Pick<Settings, 'opponents' | 'fleet' | 'drillFleetN'>>(s: T, solo: boolean): T => {
+  if (solo) return s;
+  const n = drillFleetSize(s), pool = [...new Set([...(s.opponents ?? []), ...[1, 2, 3, 4, 5].map(i => `stock:${i}`), ...[1, 2, 3, 4, 5, 6, 7].map(i => `gen:${i}`)])];
+  return { ...s, opponents: pool.slice(0, n), fleet: n };
+};
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };

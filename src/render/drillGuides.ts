@@ -18,7 +18,7 @@ export interface GuideSpec {
   /** The lane to sail (water polylines, sim metres) and its half-width (m). */
   lane?: { pts: Pt[]; half: number }[];
   /** Where to start the turn: a bar across the lane. */
-  gate?: { p: Pt; h: number; half: number };
+  gate?: { p: Pt; h: number; half: number; hint?: string };
   /** A good crew's turn (white). */
   ideal?: Pt[];
   /** Gold arrowheads along the lane toward its end (the start: the approach, pointing at the line). */
@@ -73,15 +73,19 @@ export class DrillGuides {
   private wakeN = -1;
   private cueKey = '';
   private readonly tag: HTMLDivElement;
+  private readonly hit: HTMLDivElement;
+  private gateAt: Pt | null = null;
   constructor(private scene: THREE.Scene, private camera: THREE.Camera) {
     this.tag = document.createElement('div'); this.tag.className = 'dg-cue'; this.tag.hidden = true; this.tag.setAttribute('aria-live', 'polite');
     document.body.appendChild(this.tag);
+    // (the gate's hover: a small invisible patch over it on the screen, its line the gate's hint)
+    this.hit = document.createElement('div'); this.hit.className = 'dg-hit'; this.hit.hidden = true; document.body.appendChild(this.hit);
   }
   /** The guides on the water: rebuilt only when `key` changes (they're fixed for a rep). */
   set(g: GuideSpec | null, key: string): void {
     if (key === this.key) return; this.key = key;
     this.objs.forEach(o => { this.scene.remove(o); free(o); }); this.objs = [];
-    if (!g) return;
+    if (!g) { this.gateAt = null; this.hit.hidden = true; return; }
     const add = (o: THREE.Object3D) => { this.scene.add(o); this.objs.push(o); };
     for (const L of g.lane ?? []) {
       add(ribbon(L.pts, L.half * 2, GOLD, 0.10)); // (the lane itself, faint)
@@ -90,6 +94,7 @@ export class DrillGuides {
         add(ribbon(e, 0.5, GOLD, 0.75, 4));
       }
     }
+    this.gateAt = g.gate?.hint ? g.gate.p : null; this.hit.title = g.gate?.hint ?? '';
     if (g.gate) { const r = dir(g.gate.h + 90), p = g.gate.p; add(ribbon([{ x: p.x - r.x * g.gate.half, y: p.y - r.y * g.gate.half }, { x: p.x + r.x * g.gate.half, y: p.y + r.y * g.gate.half }], 1.4, GOLD, 0.95)); }
     if (g.ideal && g.ideal.length > 1) add(ribbon(g.ideal, 0.8, WHITE, 0.85));
     if (g.arrows) chevrons(g.arrows.p, g.arrows.h, g.arrows.n, GOLD).forEach(add);
@@ -118,6 +123,8 @@ export class DrillGuides {
    *  out of view" in the start practice, up under the top bar), and eased toward where it's going so the boat's pitch and
    *  the camera's sway don't shake it. */
   place(at: Pt | null): void {
+    if (this.gateAt) { const g = P3(this.gateAt.x, this.gateAt.y, 0.4).project(this.camera), on = g.z <= 1 && Math.abs(g.x) < 1 && Math.abs(g.y) < 1;
+      this.hit.hidden = !on; if (on) { this.hit.style.left = `${Math.round((g.x + 1) / 2 * innerWidth)}px`; this.hit.style.top = `${Math.round((1 - g.y) / 2 * innerHeight)}px`; } }
     if (this.tag.hidden || !at) return;
     const v = P3(at.x, at.y, 11.5).project(this.camera);
     if (v.z > 1) { this.tag.style.visibility = 'hidden'; this.held = null; return; } // (behind the camera)

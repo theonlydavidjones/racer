@@ -30,8 +30,13 @@ describe('the start-line drill', () => {
     expect(new World(TRAIN, drillFleet(none, false), 4, { startAt: 60, solo: false }).boats.length).toBe(4);
     expect(new World(TRAIN, drillFleet(none, true), 4, { startAt: 60, solo: true }).boats.length).toBe(1);
     const two = settings({ opponents: ['stock:2', 'stock:4'], fleet: 2 }); // (a chosen fleet is kept as chosen)
-    expect(drillFleet(two, false)).toBe(two);
+    expect(drillFleet(two, false).opponents).toEqual(['stock:2', 'stock:4']);
     expect(new World(TRAIN, drillFleet(two, false), 4, { startAt: 60 }).boats.length).toBe(3);
+    // the count chosen in the drill: the chosen boats first, then the club's to make it up; never past the club's maximum
+    expect(drillFleet({ ...two, drillFleetN: 5 }, false).opponents).toEqual(['stock:2', 'stock:4', 'stock:1', 'stock:3', 'stock:5']);
+    expect(drillFleet({ ...two, drillFleetN: 1 }, false).opponents).toEqual(['stock:2']);
+    expect(drillFleet({ ...none, drillFleetN: 99 }, false).fleet).toBe(7);
+    expect(new World(TRAIN, drillFleet({ ...none, drillFleetN: 7 }, false), 4, { startAt: 60 }).boats.length).toBe(8);
   }, 60_000);
 
   /** A world with your track replaced: from (d m below the line, along a), heading h, at v m/s, from t0 to the gun. */

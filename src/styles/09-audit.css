@@ -145,3 +145,6 @@ body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .
 .dlegend{display:flex;gap:16px;margin:6px 0 2px;font:600 11px/1 var(--f-inst);color:var(--muted);align-items:center}
 .dlegend .b{color:var(--accent)}
 .dlegend svg{vertical-align:-2px}
+/* the start practice's fleet size, inside "With the fleet": − and + beside it (setup and the results' next attempt) */
+.seg button.dfn{flex:0 0 30px;font-size:16px;padding-left:0;padding-right:0}
+.seg button.dfn[hidden]{display:none}

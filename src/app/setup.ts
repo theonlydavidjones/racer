@@ -15,7 +15,7 @@ import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
 import { laidUp, type BoatSpec } from '../boat/spec';
 import { V } from '../core/math';
-import { DEFAULT_SETTINGS, chooseWindKind, drillFleet, saveSettings, type Settings } from '../settings';
+import { DEFAULT_SETTINGS, MAX_OPPONENTS, chooseWindKind, drillFleet, drillFleetSize, saveSettings, type Settings } from '../settings';
 import { randomSeed } from '../core/rng';
 import { CONDITION_KEYS, World, describeTide } from '../sim/world';
 import { LocalHost, WorkerHost, type WorldArgs } from '../sim/host';
@@ -480,10 +480,17 @@ function dockSetup(view: 'setup' | 'drill' | 'season'): void {
 // the start drill's minutes to the gun, and alone or with the fleet (the debrief's own choices set these too)
 function paintDrillPage(): void {
   for (const b of $('drillFromSeg').querySelectorAll<HTMLElement>('[data-df]')) b.setAttribute('aria-pressed', String(+b.dataset.df! === (app.S.drillFrom ?? app.DRILL_FROM)));
-  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === (app.S.drillSolo ?? true)));
+  const solo = app.S.drillSolo ?? true;
+  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === solo));
+  $('drillSoloSeg').querySelector('[data-ds="0"]')!.textContent = `With the fleet · ${drillFleetSize(app.S)}`;
+  for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-fn]')) b.hidden = solo;
 }
 $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; app.S.drillFrom = +b.dataset.df!; saveSettings(app.S); paintDrillPage(); });
-$('drillSoloSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ds]'); if (!b) return; app.S.drillSolo = b.dataset.ds === '1'; saveSettings(app.S); paintDrillPage(); });
+$('drillSoloSeg').addEventListener('click', e => {
+  const t = e.target as HTMLElement, n = t.closest<HTMLElement>('[data-fn]'), b = t.closest<HTMLElement>('[data-ds]');
+  if (n) app.S.drillFleetN = Math.max(1, Math.min(MAX_OPPONENTS, drillFleetSize(app.S) + +n.dataset.fn!)); else if (b) app.S.drillSolo = b.dataset.ds === '1'; else return;
+  saveSettings(app.S); paintDrillPage();
+});
 function openSetupNow(view: 'setup' | 'drill' | 'season' = 'setup'): void {
   app.replayPin = null; // (back at the setup: an older race's pinned wind direction is done with)
   if (app.S.mode === 'drill' || app.S.mode === 'manoeuvres' || app.S.mode === 'roundings' || app.S.mode === 'lesson') { app.S.mode = 'race'; prepare(); }

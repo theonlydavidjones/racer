@@ -3,7 +3,7 @@
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
 import { type ReplayClip } from '../replay/replayView';
-import { saveSettings } from '../settings';
+import { MAX_OPPONENTS, drillFleetSize, saveSettings } from '../settings';
 import { windBand, type ManoeuvreScore } from '../sim/drill';
 import { roundingKey, type RoundingScore } from '../sim/roundings';
 import { startDebrief } from '../sim/startDebrief';
@@ -98,9 +98,12 @@ const closeDrill = () => { $('drill').hidden = true; app.drillView.stop(); };
 function drillOptions(): void {
   const from = app.S.drillFrom ?? app.DRILL_FROM, solo = app.S.drillSolo ?? true;
   $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
-    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet</button></div>`;
+    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet · ${drillFleetSize(app.S)}</button>`
+    + (solo ? '' : '<button type="button" class="dfn" data-fn="-1" aria-label="One boat fewer">−</button><button type="button" class="dfn" data-fn="1" aria-label="One boat more">+</button>') + '</div>';
 }
 $('dOpts').addEventListener('click', e => {
+  const n = (e.target as HTMLElement).closest<HTMLElement>('button[data-fn]');
+  if (n) { app.S.drillFleetN = Math.max(1, Math.min(MAX_OPPONENTS, drillFleetSize(app.S) + +n.dataset.fn!)); saveSettings(app.S); drillOptions(); return; }
   const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-v]'), g = b?.closest<HTMLElement>('[data-dopt]')?.dataset.dopt; if (!b || !g) return;
   if (g === 'from') app.S.drillFrom = +b.dataset.v!; else app.S.drillSolo = b.dataset.v === '1';
   saveSettings(app.S); drillOptions();
@@ -138,9 +141,9 @@ function drillTable(): void {
     return `<svg class="dend" viewBox="0 0 32 12" width="44" height="16" aria-label="${r.end}${ok ? ', favored end' : ''}"><line x1="3" y1="6" x2="29" y2="6"/><circle class="pin" cx="3" cy="6" r="2"/><rect class="rc" x="27" y="3.5" width="4" height="5"/><circle class="me${ok ? ' fav' : ''}" cx="${x}" cy="6" r="3"/></svg>`; };
   const cells = (r: typeof best) => r.grade === 'ocs' ? `<td class="ocs">over ${Math.round(-r.behindM)}</td><td>—</td>`
     : r.behindM < 0 ? `<td>past ${Math.round(-r.behindM)}</td><td>0</td>` : `<td>${Math.round(r.behindM)}</td><td>${r.lateS > 60 ? '60+' : Math.round(r.lateS)}</td>`;
-  const rows = app.drillRuns.slice(-10).map(r => `<tr class="${r === best ? 'best' : ''}${r === latest ? ' latest' : ''}"><td>${r === latest ? '▸' : ''}${r.n}${r === best ? ' ★' : ''}</td>${cells(r)}<td>${r.pct}</td><td>${endIcon(r)}</td><td>${r.grade}</td></tr>`).join('');
+  const rows = app.drillRuns.slice(-10).map(r => `<tr class="${r === best ? 'best' : ''}${r === latest ? ' latest' : ''}"><td>${r.n}${r === best ? ' ★' : ''}</td>${cells(r)}<td>${r.pct}</td><td>${endIcon(r)}</td><td>${r.grade}</td></tr>`).join('');
   $('dRuns').innerHTML = `<table class="res attempts dstarts"><thead><tr><th>#</th><th>Behind m</th><th>Late s</th><th>Speed %</th><th>End</th><th>Grade</th></tr></thead><tbody>${rows}</tbody></table>`
-    + `<div class="dlegend"><span>▸ latest</span><span class="b">★ best</span><span><svg class="dend" viewBox="0 0 12 12" width="12" height="12"><circle class="me fav" cx="6" cy="6" r="3"/></svg> favored end</span></div>`;
+    + `<div class="dlegend"><span class="b">★ best</span><span><svg class="dend" viewBox="0 0 12 12" width="12" height="12"><circle class="me fav" cx="6" cy="6" r="3"/></svg> favored end</span></div>`;
 }
 $('bDReplay').onclick = () => { if (drillClip) app.drillView.play(app.w, drillClip); };
 $('bDAgain').onclick = () => { closeDrill(); app.beginRace(app.w.seed); };

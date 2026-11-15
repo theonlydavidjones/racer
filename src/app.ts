@@ -611,7 +611,7 @@ function drillCues(): void {
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
   const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
-  const out = coach.tick({ t: w.t, user: u, drill: w.drill, rounding: R, start: mode === 'start' ? { pin: w.C.pin, committee: w.C.committee } : null }, mode);
+  const out = coach.tick({ t: w.t, user: u, drill: w.drill, rounding: R, start: mode === 'start' ? { pin: w.C.pin, committee: w.C.committee, others: w.boats.filter(b => b !== u).map(b => ({ x: b.x, y: b.y })) } : null }, mode);
   guides.set(out.spec, out.key); guides.wake(out.wake); guides.cue(out.cue); guides.place(u);
 }
 /** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
