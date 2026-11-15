@@ -37,7 +37,7 @@ import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
 import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
-import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Shadow } from '../environment/shadows';
+import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
@@ -524,6 +524,8 @@ export class World {
     // the harbors' still basins near the course, her start, her slip and where she's bound, worked out now, before the
     // start (environment/current.ts basinCalm), not the first time a boat comes near one mid-race; farther ones as she sails
     prepareBasins([this.C.center, this.user, ...(this.homeSlip ? [this.homeSlip.p] : []), ...(this.dest ? [this.dest.p] : [])], BASINS_NEAR);
+    // (and the ground the land's lee reads, within its rays' 6 km of the course and her start: shadows.ts prepareLee)
+    prepareLee([this.C.center, this.user], 7000);
     // (and the harbor mouths' gyres spun up through the tide's last 13 hours now, not in the race's first step: mouthFlows)
     this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
