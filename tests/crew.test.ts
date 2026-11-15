@@ -26,10 +26,13 @@ describe('Hiking a Folkboat, by the class rules', () => {
   });
   it('hiking tires them: after minutes on the rail they lean out less, and recover sitting in', () => {
     const twa = beatAngle(22), b = testBoat({ heading: 360 - twa, kt: 5, windKt: 22 });
-    // (fresh: once they've settled where they hike, aft in a breeze where the deck's narrower, half a minute in)
-    sail(b, 30, () => { b.h = 360 - twa; b.depower = 0; });
+    // (fresh: once they've settled where they hike, which can take them a minute or so (chooseFore: the trim and the deck's
+    // breadth), two minutes in, then started fresh; full power: none of the depowering, the helm's backstay neither)
+    sail(b, 120, () => { b.h = 360 - twa; b.depower = 0; b.helmBackstay = 0; });
+    for (const p of b.crew!.people) p.fatigue = 0;
+    sail(b, 2, () => { b.h = 360 - twa; b.depower = 0; b.helmBackstay = 0; });
     const fresh = Math.max(...b.crew!.people.slice(1).map(p => p.x));
-    sail(b, 395, () => { b.h = 360 - twa; b.depower = 0; });
+    sail(b, 395, () => { b.h = 360 - twa; b.depower = 0; b.helmBackstay = 0; });
     const tired = b.crew!.people.slice(1);
     expect(Math.max(...tired.map(p => p.fatigue))).toBeGreaterThan(0.3);
     expect(Math.max(...tired.map(p => p.x))).toBeLessThan(fresh - 0.03);

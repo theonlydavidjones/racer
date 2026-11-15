@@ -178,7 +178,7 @@ export interface SailRig { wear: SailWear; bend: number; tune?: TuneEffect }
 /** A new sail on an aluminium mast: the reference the trim settings were tuned on. */
 export const STD_RIG: SailRig = { wear: SAIL_WEAR.new, bend: 1 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-const smooth = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
+export const smooth = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
 const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp(t, 0, 1);
 
 const age = (sh: Shape, w: SailWear, aws: number): Shape => {
@@ -337,7 +337,7 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
   return {
     min: { outhaul: lo(Math.max(0, outhaul - 0.05 * (1 - over(12)))), // (above 12 kt "all the way to the mark")
       cunningham: lo(0.9 * over(15)), traveller: lo(-0.4 + 0.35 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
-    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(over(18)) } // (the vang "never" upwind under 18 kt: off, not just slack)
+    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(over(19)) } // (the vang "never" upwind in less than 18 kt: off to 18, then on over a couple of knots)
   };
 }
 
@@ -398,6 +398,15 @@ export function hoistDraw(h: number, sail: 'main' | 'jib'): number {
 /** The mainsheet "sheeted tight" in heavy air (its 0..1: the last few centimetres in hand, about a degree of boom off the
  * car, the vertical sheet holding the leech: mainShape's sheetT at 1). An estimate of the guide's "sheet tight". */
 const HEAVY_SHEET = 0.05;
+/**
+ * The guide's heavy-air traveller floor (see crewSolve): the car to leeward as far as it takes to put the boom at
+ * `mainAngle` with the sheet tight, from the guide's higher wind, upwind only; −1 (no floor) otherwise or with the
+ * mainsheet held. One place, read by crewSolve for the plan and by planWorth for whether it's worth the trip.
+ */
+export function heavyTraveller(tws: number, awa: number, mainAngle: number, sheetHeld = false): number {
+  const heavy = sheetHeld ? 0 : smooth((tws - 14) / 2) * smooth((60 - Math.abs(awa)) / 20);
+  return heavy > 0 ? heavy * travellerFor(mainAngle, HEAVY_SHEET, -1) + (1 - heavy) * -1 : -1;
+}
 export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}, floors?: Partial<CrewSettings>): CrewSettings {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
   // lines you hold are fixed where you have them: the crew sets the rest around them
@@ -413,8 +422,7 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
   // with the sheet tight (its last few centimetres in hand, HEAVY_SHEET), and only once it's at the end of the track does
   // the sheet ease. From the guide's higher wind (above its medium 6–14 kt), over a couple of knots; upwind only, as the
   // guide's other settings (guideLimits). The leech then opens on the backstay, as the guide has it, not on the sheet.
-  const heavy = fixed.mainsheet == null ? smooth((tws - 14) / 2) * smooth((60 - Math.abs(awa)) / 20) : 0;
-  const tightTrav = heavy > 0 ? heavy * travellerFor(mainAngle, HEAVY_SHEET, -1) + (1 - heavy) * -1 : -1;
+  const tightTrav = heavyTraveller(tws, awa, mainAngle, fixed.mainsheet != null);
   const lo = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? free.min.traveller : k === 'traveller' ? Math.max(lim.min.traveller ?? -1, tightTrav) : lim.min[k] != null || floors?.[k] != null ? Math.max(lim.min[k] ?? 0, floorOf(k)) : undefined) ?? (k === 'traveller' ? -1 : 0);
   const hi = (k: keyof CrewSettings) => fixed[k] ?? (k === 'traveller' && free ? 1 : lim.max[k]) ?? 1;
   // (the car's in-and-out is the sim's own choice, not the guide's: North's guide gives the track's centre, 58 cm out, and
@@ -479,17 +487,22 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
 
 /**
  * What moving each line from where it is to the crew's plan is worth: the drive it gains (a share: 0.002 = 0.2%), or 1
- * when the depowering steps call for it (she's overpowered: it's for her heel and helm, not the sail's shape). A crew
- * gets up to move a line only when it's worth it (crewWork.ts).
+ * when the depowering steps or the floors crewSolve holds call for it (she's overpowered: it's for her heel and helm,
+ * not the sail's shape; the guide's car down with the sheet tight, the backstay for the helm). A crew gets up to move a
+ * line only when it's worth it (crewWork.ts).
  */
-export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number): Partial<Record<keyof CrewSettings, number>> {
+export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number, floors?: Partial<CrewSettings>): Partial<Record<keyof CrewSettings, number>> {
   const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws);
+  const tightTrav = heavyTraveller(tws, awa, mainAngle, mainsheet != null);
   const loaded = loadedCar(c, tack);
   const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, jibHalyard: c.jibHalyard ?? 0.3, carFore: loaded.fore, carIn: loaded.ins };
   const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet), out: Partial<Record<keyof CrewSettings, number>> = {};
   for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
     const m = lim.min[k], mx = lim.max[k];
     if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) { out[k] = 1; continue; }
+    // (below a floor the plan holds, and the plan's up there: the same, for heel and helm)
+    const fl = k === 'traveller' ? tightTrav : floors?.[k];
+    if (fl != null && now[k] < fl - 0.02 && plan[k] > now[k] + 0.02) { out[k] = 1; continue; }
     // with your mainsheet held, the traveller is how they put the boom where it should be: that's the sheet's angle of
     // attack, worth more than any shape
     if (k === 'traveller' && mainsheet != null) { out[k] = Math.abs(plan.traveller - now.traveller) > 0.02 ? 1 : 0; continue; }

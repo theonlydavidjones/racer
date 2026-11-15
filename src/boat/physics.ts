@@ -18,7 +18,7 @@ import { bodyJob, crewJobs } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, smooth, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -1086,13 +1086,17 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const easeBoom = crewEaseBoom(b);
   const wantMain = optimalSheet('main', b.awaSlow) + easeBoom, wantJib = optimalSheet('jib', b.awaSlow);
   // the backstay for the helm (North Sails' Folkboat guide: "In heavy winds, sheet tight and pull the backstay until the
-  // rudder feels light again"): upwind in the guide's higher wind (from about 14 kt), while the helm she needs is past the
-  // top of the light band (IDEAL_HELM + 2°, the published 3–5°'s top: Deep Physics' reading, an estimate) the crew take up
-  // backstay, about all of it in 20 s; once it's light again (under IDEAL_HELM) they ease it off as slowly; between, they
-  // hold it. A floor on their plan: the speed search's depowering and the guide's settings still set it higher.
-  { const breeze = up && !b.hove ? clamp((tws - 13) / 2, 0, 1) : 0, hn = b.helmNeed ?? 0;
-    const dir = breeze > 0 && hn > IDEAL_HELM + 2 ? 1 : hn < IDEAL_HELM || breeze <= 0 ? -1 : 0;
-    b.helmBackstay = clamp((b.helmBackstay ?? 0) + dir * dt / 20, 0, 1) * (breeze > 0 ? 1 : 0); }
+  // rudder feels light again (but without losing pointing)"): upwind in the guide's higher wind (from 14 kt, over a
+  // couple of knots, and gone by 60° apparent, as the guide's other settings), while the helm she needs is past the top
+  // of the light band (IDEAL_HELM + 2°, the published 3–5°'s top: Deep Physics' reading, an estimate) the crew take up
+  // backstay, about all of it in 20 s; once it's half a degree back inside the band they ease it off as slowly, back to
+  // what the speed search would have (which already weighs the rudder's drag and the pointing, and settles at 2.7–3.7°
+  // in 16–25 kt: under the half degree, so the floor carries her through a heavy helm and never stays on once the helm
+  // is light). A floor on their plan, and the gate closing takes it off at the same rate, not at once.
+  { const gate = up && !b.hove ? smooth((tws - 14) / 2) * smooth((60 - Math.abs(b.awaSlow)) / 20) : 0, hn = b.helmNeed ?? 0;
+    const dir = gate > 0 && hn > IDEAL_HELM + 2 ? 1 : gate <= 0 || hn < IDEAL_HELM + 1.5 ? -1 : 0;
+    const hbs = clamp((b.helmBackstay ?? 0) + dir * dt / 20, 0, 1);
+    b.helmBackstay = hbs > gate ? Math.max(gate, (b.helmBackstay ?? 0) - dt / 20) : hbs; }
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
   // (when a line changes hands the crew thinks again at once, starting from what it has set: its other lines stay put
@@ -1119,7 +1123,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.helmBackstay ? { backstay: b.helmBackstay } : undefined); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet);
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, b.helmBackstay ? { backstay: b.helmBackstay } : undefined);
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
       const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
@@ -1140,8 +1144,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul) ? t.outhaul : c.outhaul;
     if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham) ? t.cunningham : c.cunningham;
     if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul) ? t.downhaul : c.downhaul;
-    // (the backstay they've taken up for the helm is worth the trip whatever it does for the drive: it's for the rudder)
-    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) || (b.helmBackstay ?? 0) > c.backstay + 0.05 ? t.backstay : c.backstay;
+    if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay) ? t.backstay : c.backstay;
     if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham) ? t.jibCunningham : c.jibCunningham;
     if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard) ? t.jibHalyard : c.jibHalyard;
     if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller) ? t.traveller : c.traveller; }
