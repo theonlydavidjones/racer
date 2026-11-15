@@ -974,11 +974,11 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
 // the map's layers: the same choices on the inset map and the full chart, saved with your settings
 {
   // (a field layer, the wind, the current, the waves or the fog, switched on puts the others off: one at a time)
-  // (the map's layers are the page's own settings, S: the race in its worker learns them by command, and its mirror,
-  // what the maps draw from, a frame or two later. So the chips and menus read S, and the maps redraw once the race
-  // has the change; drawn at once, from the mirror, a click showed nothing, and it took a second click: the owner's
-  // "these buttons are requiring two clicks")
-  const sendLayers = () => { send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); void host.ask({ k: 'settings', patch: {} }).then(() => { redraw(); menus.forEach(m => m()); }); };
+  // (the map's layers are the page's own settings, S, and the maps draw from them (hud.display), not from the race's
+  // copy: the race learns them by command, but only when it next runs, and in the setup nothing runs, so the planner's
+  // layers waited for the start (the owner, 15 Nov 2026: "takes forever"). So a click redraws at once, from S.)
+  hud.display = () => S;
+  const sendLayers = () => { send({ k: 'settings', patch: { mapLayers: S.mapLayers } }); saveSettings(S); syncField(); redraw(); menus.forEach(m => m()); };
   const setLayer = (k: LayerKey, on: boolean) => { S.mapLayers = withLayer(S, k, on); sendLayers(); };
   const redraw = () => { if (chart.isOpen) chart.draw(); if (planChart.isOpen) planChart.draw(); };
   // the chart's big picker for the field layer: Wind, Current, Waves, Fog, Off
