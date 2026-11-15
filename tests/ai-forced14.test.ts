@@ -82,4 +82,14 @@ describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a 
     aiThink(w, B, DT);
     expect(B.forced14).toBeNull();
   });
+  it('in a strong stream the same: the current carries both boats alike', () => {
+    // (2 m/s, about 4 kt, the ebb at the Golden Gate, setting across their tracks, both boats carried by it: passing end
+    // on with 2 m between the hulls, over the ground they still pass clear, and the call is the same as in slack water)
+    for (const set of [1, -1]) {
+      const { w, B, Y } = passing(4.2); const c = V(B.h + 90 * set);
+      for (const b of [B, Y]) { b.vx += 2 * c.x; b.vy += 2 * c.y; }
+      aiThink(w, B, DT);
+      expect(B.forced14, `set ${set > 0 ? 'to starboard' : 'to port'}`).toBeNull();
+    }
+  });
 });
