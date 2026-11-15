@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HARBORS, NO_WAY_OUT, SLIPS, berthClear, harborAt, hitsHarbor, inBasin, pushOffPlan, pushOffPoses, slipsIn, type Slip } from '../src/geo/marina';
 import { onLand } from '../src/geo/shore';
+import '../src/sim/world'; // (the World hands the planner her glide in the wind: geo/marina.ts useAsternGlide, the look the game uses)
 
 /**
  * Push off from every berth in every marina (geo/marina.ts pushOffPlan): the slow test (all ~1,400 berths planned and

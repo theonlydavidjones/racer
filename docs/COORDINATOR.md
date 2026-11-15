@@ -64,3 +64,20 @@ When one of these finishes its current item, archive it and start its successor 
 prompt (its branch, its queue, the rules): Crew Art, Boat Detail, Crew Controls, Marinas, Debrief, Charts, Rigging,
 UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, Rules, Skipper Model, Crew Model,
 Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
+
+### Handoffs (retired sessions)
+- **Crew Art** (retired 15 Nov 14:25): #418 coach no-write fix (pure `rigOf()` for the coach; physics keeps `mainRig()`;
+  fingerprints identical, perf-pair 0.9914) for v198, with #409, #410, #412. Unstarted, no PR: branch crew-summer
+  (cf066789), the crew dressed for rain and season, after the crew-figure order lands. Stills branch stills/flags-tile
+  can be deleted. Tips: headless Chromium runs 1–2 frames/s, so wait on state, not time; perf.test needs --silent=false
+  to print its ratio. Bay East wants to hear first if rain ever damps the sea or the wind.
+- **UI & Experience** (retired 15 Nov 10:15): #393 trim coach + keys, #400 map expand, #405 Tools tray, all in batch 42.
+  Branches ui/trim-coach, ui/map-expand, ui/tools-tray, design/features-tray (mock). Keys: no F-keys (tests/keys.test.ts);
+  Shift T Trim Notes, F frame readout, Z/X traveler, P points of sail, R drill restart, J jibe-ho; keydown via keyOf(e).
+  Follow-ups: a Points of sail tile in the Tools tray; Capacity's perf-readout words in it; ROADMAP "the trim coach's
+  promise in light air". Coach simguard write (coach.ts `{ ...b, tune: undefined, rigMain: undefined }`): since #393 the
+  coach runs in the worker; if it fires, look at the guarded proxy's spread and rigTune.ts/condition.ts writes.
+- **Crew Controls** (retired 15 Nov 09:20): #401 rounding prep is a draft on rounding-prep bde1024f, held on the crew
+  chain's +6.7% (prep alone 0.9904 vs 6009bb9c); once the chain lands, merge main, run npm test + perf-pair --ai.
+  #389, #376, #390 in batch 42 (stills on claude/setup-seats-shots). Not started: TACK_SETTLE exemption for the prep
+  when drive-blend lands (`&& !prep`); letting a held backed jib sheet fly (Deep Physics' made-fast sheet, branch turning).

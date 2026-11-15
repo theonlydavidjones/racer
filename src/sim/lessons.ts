@@ -112,6 +112,9 @@ const POINTS: { key: 'close' | 'closeReach' | 'beam' | 'broad' | 'run'; band: (b
   { key: 'broad', band: () => [105, 160], cue: 'Bear away to a broad reach: the wind on the quarter' },
   { key: 'run', band: () => [160, 180], cue: 'Bear away to a run: sheets out, wind from astern' }
 ];
+/** The point of sail lesson 4 is asking for now (render/windRose.ts shows it teal on the water), or null. */
+export const pointTarget = (L: { id: LessonId; step: number; passed: boolean } | null): 'close' | 'closeReach' | 'beam' | 'broad' | 'run' | null =>
+  L && L.id === 'points' && !L.passed ? POINTS[L.step]?.key ?? null : null;
 
 export class LessonTracker {
   readonly id: LessonId;

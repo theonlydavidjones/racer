@@ -144,6 +144,9 @@ export interface Boat {
   penaltyTotal: number; // 360 or 720
   penaltyTurned: number; // signed degrees turned since the penalty started
   penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
+  /** Her turns' tacks and jibes (physics.ts penaltyManeuver): how many counted, the last (1 a tack, 2 a jibe, 0 none),
+   * how far into her turns it was (degrees), and whether her penalty ends as the tack she's in completes. */
+  penaltyMoves: number; penaltyLastMove: 0 | 1 | 2; penaltyAt: number; penaltyEndOnTack: boolean;
   started: boolean;
   ocs: boolean;
   returning?: boolean; // Rule 21.1: after her start signal, not started, sailing back toward the pre-start side to start; kept by the World
@@ -187,6 +190,26 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** The tack she's gybing to, while her boom is on its way across: by the lee her tack is her mainsail's side (RRS
+   * Definitions), so it changes when the boom has crossed (physics.ts tackStep). */
+  gybeTo?: 'S' | 'P';
+  /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
+  turnCalledT?: number;
+  /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
+  byLee?: boolean;
+  /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
+   * wind means the jibe; a tap doesn't (physics.ts gybeMeant). */
+  steerSince?: number;
+  steerWas?: number;
+  /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
+   * (physics.ts boomStep). Undefined while the sheet has it. */
+  boomFree?: number;
+  /** When the wind took it, s. */
+  boomFreeT?: number;
+  /** The side it was on when the wind took it (+1 starboard, −1 port). */
+  boomFrom?: number;
+  /** When her boom last crashed across in a jibe the wind made (s): for the debrief and the tests. */
+  crashT?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
