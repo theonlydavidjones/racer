@@ -72,15 +72,17 @@ describe('Protests: the hail and the red flag (RRS 60.2(a)(1))', () => {
 });
 
 describe('Protests: the AI boats take their turns, or not, and protest (ai/conduct.ts fallbacks)', () => {
-  const sailed = (judging: 'protests' | 'umpired') => {
-    const w = new World(SS2, settings({ fleet: 7, judging }), 4);
+  const sailed = (judging: 'protests' | 'umpired', seed = 4) => {
+    const w = new World(SS2, settings({ fleet: 7, judging }), seed);
     for (let i = 0; i < 60 * 60 * 8; i++) { w.step(DT); w.drainEvents(); }
     return w;
   };
   it('an AI boat fouled hails "Protest!" at once (PROTEST_REACT after the incident), with the penalty owed or declined on record', () => {
-    const w = sailed('protests');
-    expect(w.protests.length).toBeGreaterThan(0);
-    for (const p of w.protests) {
+    // (two races: whether a fleet of eight fouls in eight minutes is the fleet's sailing, not what's tested here, and one
+    // race alone can go clean (seed 4, with the beat angle in chop as chop-beat.test has it))
+    const ws = [sailed('protests', 4), sailed('protests', 5)];
+    expect(ws.reduce((n, w) => n + w.protests.length, 0)).toBeGreaterThan(0);
+    for (const w of ws) for (const p of w.protests) {
       expect(p.hailT - p.t).toBeCloseTo(PROTEST_REACT, 1); // (within a step)
       expect(p.fouler).toBe(p.vs); // (the fallback protests only the engine's fouler)
       expect(typeof p.owed).toBe('boolean');
