@@ -411,7 +411,11 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
   // (from where the figure is, a stride on toward where the physics has them: they walk at their feet's pace, behind it
   // on a long way; from its place, the hands went to the mast and the foredeck 1.2 to 3 m ahead of the hips, the arms
   // flung out at full stretch. Once out of the cockpit: stepping up out of it, as before, over the coaming as the pose has it)
-  const cu = fig.cur?.hip; if (cu && !fig.cur!.feet.some(ft => inCockpit(Math.abs(ft.x), ft.z))) { const dx = x - cu.x, dz = z - cu.z, d = Math.hypot(dx, dz), lead = 0.35 * k; if (d > lead) { x = cu.x + dx * lead / d; z = cu.z + dz * lead / d; } }
+  const cu = fig.cur?.hip; if (cu && fig.cur!.feet.some(ft => inCockpit(Math.abs(ft.x), ft.z))) { const dz = z - cu.z, lead = 0.35 * k; if (Math.abs(dz) > lead) z = cu.z + Math.sign(dz) * lead; } // (along the boat only, a foot still in the cockpit: aimed straight at the mast, the hips cut across the cabin's after corner)
+  else if (cu) { const dx = x - cu.x, dz = z - cu.z, d = Math.hypot(dx, dz), lead = 0.35 * k; if (d > lead) { x = cu.x + dx * lead / d; z = cu.z + dz * lead / d; } }
+  // (along the side deck beside the cabin, facing along it, fore or aft, as it runs: not the way the physics' person
+  // heads, slantwise across the cabin top to the mast, which turned them to face out and leant them over the water)
+  if (!inCockpit(Math.abs(x), z) && z > CAB0 - 0.7 && z < COCK0 + 0.6) yaw = Math.cos(yaw) >= 0 ? 0 : Math.PI;
   const g = groundNear(x, z, 0.22), f = fwd(yaw), r = right(yaw), ph = fig.gait;
   if (!inCockpit(Math.abs(x), z) && z < COCK1) {
     // forward of the cockpit (along the side deck, on the foredeck): a low crouch, the knees bent and the weight over the
@@ -429,11 +433,13 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     // (and out to it before the cabin's end, coming aft off the foredeck: moved out only once beside it, the foot left
     // behind swung diagonally across its forward corner at the top's height)
     const chA = Math.max(ch(z), ch(z + fwd(yaw).z * 0.6 * k));
-    if (chA > 0.05) { const sd = fig.cur && Math.abs(fig.cur.hip.x) > 0.05 ? Math.sign(fig.cur.hip.x) : x >= 0 ? 1 : -1; x = sd * Math.max(Math.abs(x) * (Math.sign(x) === sd ? 1 : 0), chA + 0.18); }
+    if (chA > 0.05) { const sd = fig.cur && Math.abs(fig.cur.hip.x) > 0.05 ? Math.sign(fig.cur.hip.x) : x >= 0 ? 1 : -1; x = sd * Math.min(Math.max(Math.abs(x) * (Math.sign(x) === sd ? 1 : 0), chA + 0.1), Math.max(chA + 0.1, halfBeam(uAtZ(z)) - 0.22)); }
+    // (the hips over the inner part of the side deck, leaning in over the cabin's edge, its handrail in hand: the deck's
+    // only a quarter metre wide beside it, and with the hips 0.18 out from the cabin the body hung out over the water)
     // (from the deck under them, not the highest thing near them: beside the cabin that was its top, 0.36 m up, and they
     // walked stood up on straight legs)
     // (and lower in a seaway, the weight down over the feet: the owner, "slower and more on all fours in a seaway")
-    const s = x >= 0 ? 1 : -1, rl = z < COCK0 - 0.3 ? rough : 0, hip = V(x, ground(x, z) + (0.70 - 0.18 * rl) * k, z);
+    const s = x >= 0 ? 1 : -1, rl = z < COCK0 - 0.3 ? rough : 0, gx = ch(z) > 0.05 ? s * Math.max(Math.abs(x), ch(z) + 0.12) : x, hip = V(x, ground(gx, z) + (0.70 - 0.18 * rl) * k, z); // (over the side deck beside the cabin: from its height, the hips leaning in over the cabin's edge, not up on its top)
     // (beside the cabin, the feet on the side deck outboard of its side, not in over it: its side stands up to 0.38 m
     // above the deck aft, hull.ts cabinSideH)
     const outside = Math.abs(hip.x) > ch(hip.z);
@@ -441,6 +447,9 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
     // the stepping itself, lifting each clear and down again, is ease()'s)
     const feet = [0, 1].map(j => { const ft = hip.clone().addScaledVector(f, 0.17 * k * Math.sin(ph + j * Math.PI)).addScaledVector(r, (j ? 1 : -1) * 0.1 * k);
       if (outside) { const e = ch(ft.z) + 0.16; if (e > 0.16 && Math.abs(ft.x) < e) ft.x = s * e; }
+      // (and never down in the cockpit beside the cabin's after end: out on the side deck, past the coaming. A foot put in
+      // from the hips there stepped back down onto the bench, the shin through the cabin's corner)
+      if (ft.z > COCK0 - 0.05 && ft.z < COCK1 && Math.abs(ft.x) < chz(ft.z) + COAMING_T + 0.08) ft.x = s * (chz(ft.z) + COAMING_T + 0.1); // (clear of the coaming's top too: a foot on it goes inside it, onGround)
       const e2 = halfBeam(uAtZ(ft.z)) - 0.05; if (Math.abs(ft.x) > e2) ft.x = Math.sign(ft.x) * e2;
       return ft.setY(ground(ft.x, ft.z) + 0.07); }) as [THREE.Vector3, THREE.Vector3];
     const zh = z + f.z * 0.2 * k; // (a little ahead, the way they're going)
@@ -448,8 +457,8 @@ function moving(fig: Figure, x: number, z: number, yaw: number, k: number): Pose
       : Math.abs(z - MAST_Z) < 0.6 ? V(s * 0.07, g + 0.75 * k, MAST_Z) // (the mast)
       : V(hip.x - s * 0.18 * k, 0, zh).setY(ground(hip.x - s * 0.18 * k, zh) + 0.05); // (the deck ahead, inboard)
     const shroudZ = MAST_Z + 0.1, nearShroud = Math.abs(z - shroudZ) < 0.5;
-    const out = nearShroud ? V(s * (halfBeam(uAtZ(shroudZ)) - 0.08), deckY(uAtZ(shroudZ), halfBeam(uAtZ(shroudZ))) + 0.75 * k, shroudZ) // (the shroud, above its chainplate)
-      : rl > 0.4 ? (() => { const h = hip.clone().addScaledVector(f, 0.35 * k); h.x = s * Math.min(halfBeam(uAtZ(h.z)) - 0.1, Math.abs(hip.x) + 0.1 * k); return h.setY(ground(h.x, h.z) + 0.05); })() // (in a seaway, down on the deck ahead too: on all fours, near enough)
+    const out = nearShroud ? V(s * (halfBeam(uAtZ(shroudZ)) - 0.08), deckY(uAtZ(shroudZ), halfBeam(uAtZ(shroudZ))) + (0.75 - 0.3 * rl) * k, shroudZ) // (the shroud, above its chainplate)
+      : rl > 0.4 ? (() => { const h = hip.clone().addScaledVector(f, 0.55 * k); h.x = s * Math.min(halfBeam(uAtZ(h.z)) - 0.1, Math.abs(hip.x) + 0.1 * k); return h.setY(ground(h.x, h.z) + 0.05); })() // (in a seaway, down on the deck ahead too: on all fours, near enough)
       : hip.clone().addScaledVector(f, 0.3 * k).addScaledVector(r, s * Math.sign(r.x || 1) * 0.12 * k).setY(hip.y - 0.12 * k); // (on the knee)
     const rightIsIn = Math.sign(r.x) === -s;
     const p: PoseT = { hip, yaw, pitch: -0.55 - 0.3 * rl, roll: 0, feet, hands: rightIsIn ? [out, inb] : [inb, out], look: hip.clone().addScaledVector(f, 2).setY(hip.y + 0.4), step: true };
