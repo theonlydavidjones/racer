@@ -22,6 +22,15 @@ describe('the Yacht Club\'s members (phase 1)', () => {
     expect(s.boat.crewIds).toEqual(['crew-1', 'crew-2']);
     expect(ensureMembers(s, ms)).toBe(false); // (once)
   });
+  it('a boat of yours with no seats yet takes the crew you sail with on another, not your first two members', () => {
+    const s = settings({ n: 2, helm: { h: 1.8, w: 82 }, people: [{ h: 1.7, w: 70 }, { h: 1.9, w: 90 }] }); s.boat = s.boats[0];
+    const ms: Member[] = []; ensureMembers(s, ms);
+    ms.push({ ...ms[1], id: 'crew-3', name: 'Ruby' }, { ...ms[2], id: 'crew-4', name: 'Francisco' });
+    s.boats[0].crewIds = ['crew-3', 'crew-4'];
+    const other = { ...DEFAULT_BOAT, id: 'b2', crewIds: undefined }; s.boats.push(other); s.boat = other; s.boatId = 'b2';
+    expect(ensureMembers(s, ms)).toBe(true);
+    expect(other.crewIds).toEqual(['crew-3', 'crew-4']);
+  });
   it('the race\'s crew is your boat\'s seats; the count and the rows write back', () => {
     const s = settings({ n: 1, helm: { h: 1.8, w: 82 }, people: [{ h: 1.7, w: 70 }, { h: 1.9, w: 90 }] }); s.boat = s.boats[0];
     const ms: Member[] = []; ensureMembers(s, ms);
