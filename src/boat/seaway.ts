@@ -80,23 +80,34 @@ const CHOP_MEMO = 16, chopMemo = Array.from({ length: CHOP_MEMO }, () => ({ kt: 
 let chopNext = 0;
 
 /**
- * The middle of her groove to windward: each angle (in quarter degrees) weighed by how far her speed made good there
- * rises above GROOVE short of the best. In a chop the top is flat (at 6 kt in 0.6 m, 45–48° are within 0.06% of each
- * other, far less than a helmsman can feel or a puff changes), and the single best angle on it jumped 3° between ends
- * of the flat on a quarter-knot puff; the middle moves smoothly with the wind. It sits a little wide of the very best
- * where the pinching side falls away faster, as a sailor in a chop footing for speed would steer.
+ * Her best angle to windward in a chop: the flat-water beat angle (the polar's, ORC's), moved by how much the chop moves
+ * the middle of her groove. The groove: each angle (in quarter degrees) weighed by how far her speed made good there rises
+ * above GROOVE short of the best. In a chop the top is flat (at 6 kt in 0.6 m, 45–48° within 0.06% of each other, far
+ * less than a helmsman can feel or a puff changes), and the single best angle on it jumped 3° between ends of the flat on
+ * a quarter-knot puff; the middle moves smoothly with the wind. But the polar's own top is lopsided (flat on the pinching
+ * side of its beat angle, falling 0.4–0.6% a degree on the wide side), so the middle sits inside the best angle by
+ * 0.6–0.8°: taken against the same middle in flat water, that lean cancels, what's left is the chop's footing, and as the
+ * chop dies away the angle runs into the flat-water one.
  */
 const GROOVE = 0.004;
-function beatSearch(kt: number, hs: number, tp: number): number {
+function groove(kt: number, hs: number, tp: number): number {
   const vs: number[] = [];
   let top = -Infinity;
   for (let t = 30; t <= 65; t += 0.25) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); vs.push(v); if (v > top) top = v; }
   // (no headway at any angle, light air in a big chop: not "pinch hardest", as the first angle tried would say, but the
   // widest, footing off for speed being her only hope)
-  if (!(top > 0)) return 65;
+  if (!(top > 0)) return NaN;
   let s = 0, w = 0;
   for (let i = 0; i < vs.length; i++) { const k = vs[i] - (1 - GROOVE) * top; if (k > 0) { s += k * (30 + i * 0.25); w += k; } }
   return s / w;
+}
+const flatGroove = new Map<number, number>();
+function beatSearch(kt: number, hs: number, tp: number): number {
+  const g = groove(kt, hs, tp);
+  if (Number.isNaN(g)) return 65;
+  let g0 = flatGroove.get(kt);
+  if (g0 === undefined) { g0 = groove(kt, 0, 1); if (flatGroove.size > 4000) flatGroove.clear(); flatGroove.set(kt, g0); }
+  return Math.min(65, beatAngleCalm(kt) + g - g0);
 }
 const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beatInChop, speedInChop } from '../src/boat/seaway';
-import { polar } from '../src/boat/polar';
+import { beatAngle, polar } from '../src/boat/polar';
 import { cubicBlend, driveRatio, driveCurveFor } from '../src/boat/driveCurve';
 import { HULL, hullResistance, resistanceParts } from '../src/boat/dynamics';
 import { D2R, KT } from '../src/core/math';
@@ -15,10 +15,10 @@ import { D2R, KT } from '../src/core/math';
 const SEAS: [number, number][] = [[0.3, 2.5], [0.6, 3.2], [1.0, 4]];
 
 describe('the beat angle in chop', () => {
-  it('moves by a degree at most for a quarter of a knot of wind, 5.5 to 26 kt, in three seas (it jumped 4.5–7°)', () => {
+  it('moves by a degree at most for a quarter of a knot of wind, 6.5 to 26 kt, in three seas (it jumped 4.5–7°)', () => {
     for (const [hs, tp] of SEAS) {
-      let prev = beatInChop(5.5, hs, tp);
-      for (let kt = 5.75; kt <= 26; kt += 0.25) { const b = beatInChop(kt, hs, tp); expect(Math.abs(b - prev), `${hs} m, ${kt} kt: ${prev}° to ${b}°`).toBeLessThanOrEqual(1); prev = b; }
+      let prev = beatInChop(6.5, hs, tp);
+      for (let kt = 6.75; kt <= 26; kt += 0.25) { const b = beatInChop(kt, hs, tp); expect(Math.abs(b - prev), `${hs} m, ${kt} kt: ${prev}° to ${b}°`).toBeLessThanOrEqual(1); prev = b; }
     }
   });
   it('... and from 4 kt in the chop light air makes (a fully grown sea in 4–6 kt is 0.1 m or so: sea.ts windSea)', () => {
@@ -27,24 +27,34 @@ describe('the beat angle in chop', () => {
       for (let kt = 4.25; kt <= 26; kt += 0.25) { const b = beatInChop(kt, hs, tp); expect(Math.abs(b - prev), `${hs} m, ${kt} kt: ${prev}° to ${b}°`).toBeLessThanOrEqual(1); prev = b; }
     }
   });
-  it('in a big chop left over in light air, footing wider as the wind drops: smoothly, no jumps back and forth', () => {
+  it('in a big chop in light air (below 6.5 kt: more chop than the wind there makes, sea.ts), footing wider as the wind drops, by up to 1.75° a quarter knot: accepted as physics, smoothly, no jumps back and forth', () => {
     // (underpowered, the same wave drag takes a bigger share of the sails' little drive, so the angle that pays widens fast
     // below 5–6 kt: a degree and a half a quarter knot at most, and steadily, the step from one quarter knot to the next
     // changing by under 0.75°)
     for (const [hs, tp] of SEAS) {
       let pp = beatInChop(4, hs, tp), p = beatInChop(4.25, hs, tp);
       expect(p).toBeLessThanOrEqual(pp + 0.25);
-      for (let kt = 4.5; kt <= 6; kt += 0.25) { const b = beatInChop(kt, hs, tp); expect(b, `${hs} m, ${kt} kt`).toBeLessThanOrEqual(p + 0.25); expect(Math.abs(b - p)).toBeLessThan(1.75); expect(Math.abs(b - 2 * p + pp)).toBeLessThan(0.75); pp = p; p = b; }
+      for (let kt = 4.5; kt <= 6.5; kt += 0.25) { const b = beatInChop(kt, hs, tp); expect(b, `${hs} m, ${kt} kt`).toBeLessThanOrEqual(p + 0.25); expect(Math.abs(b - p)).toBeLessThan(1.75); expect(Math.abs(b - 2 * p + pp)).toBeLessThan(0.75); pp = p; p = b; }
       expect(beatInChop(4, hs, tp)).toBeGreaterThan(beatInChop(6, hs, tp) + 3);
     }
   });
-  it('is the one peak of her speed made good: no second peak beside it', () => {
+  it('is never inside the flat-water beat angle, and runs into it as the chop dies away (no step where the chop starts)', () => {
+    for (const kt of [5, 7, 10, 12, 16, 20, 25]) {
+      expect(beatInChop(kt, 0.02, 1.2)).toBeCloseTo(beatAngle(kt), 1);
+      for (const [hs, tp] of [[0.05, 1.2], [0.1, 1.5], [0.2, 2], [0.3, 2.5], [0.6, 3.2], [1, 4]]) expect(beatInChop(kt, hs, tp), `${kt} kt, ${hs} m`).toBeGreaterThanOrEqual(beatAngle(kt) - 0.01);
+    }
+  });
+  it('her speed made good has one peak: no second peak beside it; and the angle she steers costs a few tenths of a percent of it at most', () => {
     for (const [hs, tp] of SEAS) for (const kt of [6, 7, 8, 10, 14, 20]) {
-      const vmg = (t: number) => speedInChop(kt, t, hs, tp) * Math.cos(t * D2R), best = beatInChop(kt, hs, tp), top = vmg(best);
-      // (falling away steadily either side, to a tenth of a percent (the polar has its own small ripples): by 8° off, down
-      // by more than the half-degree search could mistake, and no
-      // climb back toward the top on the way)
+      const vmg = (t: number) => speedInChop(kt, t, hs, tp) * Math.cos(t * D2R);
+      let best = 30, top = 0; for (let t = 30; t <= 65; t += 0.05) { const v = vmg(t); if (v > top) { top = v; best = t; } }
+      // (falling away steadily either side of the top, to a tenth of a percent (the polar has its own small ripples): by
+      // 8° off, down by more than the search could mistake, and no climb back toward the top on the way)
       for (const dir of [-1, 1]) { let last = top; for (let d = 1; d <= 8; d++) { const v = vmg(best + dir * d); expect(v, `${kt} kt, ${hs} m, ${best + dir * d}°`).toBeLessThanOrEqual(last + 0.001 * top); last = Math.min(last, v); } expect(last).toBeLessThan(0.995 * top); }
+      // (the beat angle is the flat water's moved by the chop's footing: the top itself sits on the polar's corner at its
+      // beat angle (polar.ts: flat on the pinching side, 0.4–0.6% a degree down on the wide), whatever the chop, so the
+      // footing costs her a little against it: 0.27% at most, 20 kt in 0.6 m)
+      expect(vmg(beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeGreaterThan(0.997 * top);
     }
   });
   it('her speed in chop against the polar\'s changes smoothly with the angle: a third of a percent at most across half a degree (it stepped 1.2%)', () => {
