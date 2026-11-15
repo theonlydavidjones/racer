@@ -13,6 +13,12 @@ westerly turned −20° (from 255°), 10 kt, on the ebb (tests/passage-hairpin).
    the open water, accepting the lee's lighter air there, then crosses to the mark on one long board: 64 min, 6 jibes.
    (An earlier hand sketch here took her offshore into the breeze: it overlooked that foul tide, and is withdrawn.)
 
+4. **4-isochrone-router-reviewed-65min-5turns.png**: the router after its physics review (branch isochrone-router). The
+   lee is now read where she sails, not off 200 m blocks (the work-in-progress plan above was 64 min on paper but 78 by
+   the exact wind along its own track; this one is 65 on paper and 65 by the exact wind), and the plan keeps 50 m off the
+   shore. It works up the Marin shore past the mark's latitude in the weak stream there, then crosses on one board with
+   the ebb's set allowed for: 65 min, 5 jibes.
+
 Cyan is the plan, with its jibes circled. Orange dashes are the straight line. Pale water is under 85% of the breeze
 (a snapshot at 15:00; the plan's wind changes over its hours). Made with a script from each tree's own planner and
 wind, not the game's chart.
