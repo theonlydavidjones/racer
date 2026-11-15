@@ -359,29 +359,31 @@ function lineWords(b: Boat, s: Situation, k: Exclude<LineKey, 'car' | 'jibsheetW
  * don't check (the review): a sail's flow, a line's setting, the shape's draft.
  */
 function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boolean } {
+  // (one plain sentence each, no state-word-and-colon opening: the owner, 15 Nov 2026)
   const tm = b.trim.main, tj = b.trim.jib, c = b.ctl, upwind = s.awa < 40, tws = Math.round(s.tws);
+  const draft = Math.round(100 * b.shape.main.draft);
   switch (k) {
     case 'mainsheet':
-      if (b.sheets.main >= SAILS.main.max - 0.5 && tm.flow === 'stalled') return { text: 'Boom on the shroud: as far out as it goes', tick: true };
-      if (tm.flow === 'luffing' && s.over) return { text: 'Eased on purpose: the lifting luff keeps her on her feet in this breeze', tick: true };
-      return { text: s.awa > 110 ? 'Out by the shroud: right for this angle' : 'Drawing: its leech telltales streaming aft', tick: true };
+      if (b.sheets.main >= SAILS.main.max - 0.5 && tm.flow === 'stalled') return { text: 'Main out with the boom on the shroud, as far as it goes', tick: true };
+      if (tm.flow === 'luffing' && s.over) return { text: 'Main eased on purpose, its lifting luff keeping her on her feet in this breeze', tick: true };
+      return { text: s.awa > 110 ? 'Main out by the shroud, right for this angle' : 'Main drawing well, its leech telltales streaming aft', tick: true };
     case 'jibsheet':
-      if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'Windward luff telltales just lifting: right on the edge', tick: true };
-      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'At its stop: on this broad reach it can\'t go further', tick: true };
-      return { text: s.awa > 115 ? 'Eased right out: right off the wind' : 'Drawing: its luff telltales streaming together, both sides', tick: true };
-    case 'traveller': return { text: c.traveller > 0.1 ? (s.over ? 'Down to leeward: less heel and helm in this breeze' : 'Down to leeward: the boom where this angle wants it') : c.traveller < -0.1 ? 'Up to windward: the boom near the centerline, for height' : 'In the middle: the boom where this wind wants it', tick: true };
+      if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'Jib right on the edge, its windward luff telltales just lifting', tick: true };
+      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'Jib at its stop, as far out as it goes on this broad reach', tick: true };
+      return { text: s.awa > 115 ? 'Jib eased right out, right off the wind' : 'Jib drawing well, all its luff telltales streaming together, both sides', tick: true };
+    case 'traveller': return { text: c.traveller > 0.1 ? (s.over ? 'Traveler down to leeward, so she heels less and the helm stays light in this breeze' : 'Traveler down to leeward, putting the boom where this angle wants it') : c.traveller < -0.1 ? 'Traveler up to windward, bringing the boom near the centerline for height' : 'Traveler in the middle, the boom where this wind wants it', tick: true };
     case 'vang':
       // (North Sails' Folkboat guide: "Never use the kickingstrap upwind in less than 18 knots"; on, it's worth too little
       // to say so, but no ✓)
-      if (upwind && s.tws < 18) return c.vang <= 0.15 ? { text: 'Slack: right upwind in this wind, the mainsheet holds the leech', tick: true } : { text: 'Pulling down, but the mainsheet already holds the boom upwind: ease it off below 18 kt', tick: false };
-      return { text: c.vang <= 0.15 ? 'Slack: nothing for it to do at this angle' : 'On: holding the boom down so the leech keeps its shape', tick: true };
-    case 'outhaul': return { text: c.outhaul < 0.4 ? `Eased: a fuller foot for power in ${tws} kt` : `On: a flatter foot depowers the main in ${tws} kt`, tick: true };
-    case 'downhaul': return { text: `Hoisted to put the main's draft ${Math.round(100 * b.shape.main.draft)}% back: right for this wind`, tick: true };
-    case 'cunningham': return { text: c.cunningham < 0.15 ? 'Slack: the halyard alone sets the main\'s luff in this wind' : `On: holding the main's draft ${Math.round(100 * b.shape.main.draft)}% back in this wind`, tick: true };
-    case 'jibHalyard': return { text: c.jibHalyard < 0.2 ? 'Soft: small wrinkles off the hanks keep the jib full' : c.jibHalyard <= 0.75 ? 'Luff just smooth: the draft where it should be' : 'Hard: the draft well forward, for a breeze', tick: true };
-    case 'jibCunningham': return { text: c.jibCunningham < 0.2 ? 'Off: the halyard alone sets the luff in this wind' : 'On: holding the jib\'s draft forward', tick: true };
-    case 'backstay': return { text: c.backstay < 0.15 ? `Off: full sails for power in ${tws} kt` : c.backstay > 0.7 ? `On hard: flat sails for ${tws} kt` : `On: the sails flattened to suit ${tws} kt`, tick: true };
-    case 'car': { const h = c.car[b.tack]; return { text: `Set at lead ${h.fore + 1} back, ${h.ins + 1} out`, tick: false }; } // (not priced: no ✓)
+      if (upwind && s.tws < 18) return c.vang <= 0.15 ? { text: 'Vang slack, right upwind in this wind, with the mainsheet holding the leech', tick: true } : { text: 'Vang pulling down, but upwind the mainsheet already holds the boom, so ease it off below 18 kt', tick: false };
+      return { text: c.vang <= 0.15 ? 'Vang slack, with nothing for it to do at this angle' : 'Vang on, holding the boom down so the leech keeps its shape', tick: true };
+    case 'outhaul': return { text: c.outhaul < 0.4 ? `Outhaul eased for a fuller foot and more power in ${tws} kt` : `Outhaul on for a flatter foot, depowering the main in ${tws} kt`, tick: true };
+    case 'downhaul': return { text: `Main halyard hoisted to put the draft ${draft}% back, right for this wind`, tick: true };
+    case 'cunningham': return { text: c.cunningham < 0.15 ? 'Cunningham slack, the halyard alone setting the main\'s luff in this wind' : `Cunningham on, holding the main's draft ${draft}% back in this wind`, tick: true };
+    case 'jibHalyard': return { text: c.jibHalyard < 0.2 ? 'Jib halyard soft, small wrinkles off the hanks keeping the jib full' : c.jibHalyard <= 0.75 ? 'Jib halyard set with the luff just smooth and the draft where it should be' : 'Jib halyard hard, the draft well forward for a breeze', tick: true };
+    case 'jibCunningham': return { text: c.jibCunningham < 0.2 ? 'Jib Cunningham off, the halyard alone setting the luff in this wind' : 'Jib Cunningham on, holding the jib\'s draft forward', tick: true };
+    case 'backstay': return { text: c.backstay < 0.15 ? `Backstay off for full sails and power in ${tws} kt` : c.backstay > 0.7 ? `Backstay on hard for flat sails in ${tws} kt` : `Backstay on, the sails flattened to suit ${tws} kt`, tick: true };
+    case 'car': { const h = c.car[b.tack]; return { text: `Jib car set at lead ${h.fore + 1} back, ${h.ins + 1} out`, tick: false }; } // (not priced: no ✓)
   }
   return { text: 'Right', tick: true };
 }
