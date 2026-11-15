@@ -3,8 +3,9 @@ import train from '../src/courses/data/training-windward-return.json';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import type { CourseFile } from '../src/courses/course';
-import { DEFAULT_CREW, Z, atWinch, newCrew, type CrewPlace, type CrewSpec } from '../src/boat/crewPhys';
+import { DEFAULT_CREW, TWO_FWD, Z, atWinch, newCrew, type CrewPlace, type CrewSpec } from '../src/boat/crewPhys';
 import { testBoat, sail } from './helpers/testBoat';
+import { ownerOf } from '../src/boat/crewWork';
 import { beatAngle } from '../src/boat/polar';
 
 /**
@@ -22,14 +23,30 @@ export function stationMoves(kt: number) {
   // jobs and their trips. A new seat: the place they're making for moves more than 5 cm, from one seat to another)
   const prev = ai.map(b => b.crew!.people.map(() => NaN)), moves = ai.map(b => b.crew!.people.map(() => 0));
   const zWas = ai.map(b => b.crew!.people.map(a => a.z)), walked = ai.map(b => b.crew!.people.map(() => 0)), trips = ai.map(b => b.crew!.people.map(() => 0)), goalWas = ai.map(b => b.crew!.people.map(a => a.goal?.z ?? a.z));
+  // (each trip counted as well by the role its maker had then: the hand with the cabin-top lines, crewWork.ts ownerOf, the
+  // jib hand at their stations and the main trimmer once both are forward of the winch; or the hand who stays put)
+  const roles = ai.map(() => ({ lines: 0, stay: 0 }));
+  // (and the trips made for nothing: no job, not on the way back from one, and not as they went forward of the winch or
+  // aft again or to the mast, within 5 s: the jitter, the owner's "fore/aft movement")
+  const free = ai.map(b => b.crew!.people.map(() => 0)), evT = ai.map(() => -1e9), jobEnd = ai.map(b => b.crew!.people.map(() => -1e9)), had = ai.map(b => b.crew!.people.map(() => false));
+  const layWas = ai.map(b => `${b.crew!.layout}|${b.crew!.fore01}`);
+  const linesHand = (b: typeof ai[number]) => { const c = b.crew!, f = c.place?.fore ? { fwd: 1, mid: 0.5, aft: 0, deck: 1 }[c.place.fore] : c.fore01 ?? 0.5;
+    return ownerOf('cunningham', c.spec.crew.length, c.spec, c.layout ?? 'cockpit', c.spec.crew.length === 2 && f >= TWO_FWD); };
   let secs = 0;
   while (w.t < 800) {
     w.step(DT);
     if (w.t < 0) continue;
     secs += DT;
+    ai.forEach((b, k) => { const lay = `${b.crew!.layout}|${b.crew!.fore01}`; if (lay !== layWas[k]) { evT[k] = w.t; layWas[k] = lay; } });
     ai.forEach((b, k) => b.crew!.people.forEach((a, i) => {
       if (i === 0) return;
-      const g = a.goal?.z ?? a.z; if (Math.abs(g - goalWas[k][i]) > 0.3) { trips[k][i]++; } goalWas[k][i] = g;
+      if (had[k][i] && !a.job) jobEnd[k][i] = w.t; had[k][i] = !!a.job;
+      const g = a.goal?.z ?? a.z;
+      if (Math.abs(g - goalWas[k][i]) > 0.3) {
+        trips[k][i]++; roles[k][linesHand(b) === i ? 'lines' : 'stay']++;
+        if (!a.job && w.t - jobEnd[k][i] > 5 && w.t - evT[k] > 5) free[k][i]++;
+      }
+      goalWas[k][i] = g;
       const at = a.goal?.z ?? a.z, seat = !a.job && at >= 0.88 && !atWinch(at); // (the step in past the winch, on the way: not a seat)
       if (seat && !Number.isNaN(prev[k][i]) && Math.abs(at - prev[k][i]) > 0.05) moves[k][i]++;
       // (along the boat while their place is a seat: a job's trip, the mast and the run's foredeck aside)
@@ -39,7 +56,8 @@ export function stationMoves(kt: number) {
     }));
   }
   const per = (a: number[][]) => ai.flatMap((_, k) => a[k].slice(1)).map(m => +(m / (secs / 60)).toFixed(2));
-  return { seats: per(moves), trips: per(trips), walked: per(walked) };
+  const mins = secs / 60;
+  return { seats: per(moves), trips: per(trips), walked: per(walked), free: per(free), roles: roles.map(r => ({ lines: +(r.lines / mins).toFixed(2), stay: +(r.stay / mins).toFixed(2) })) };
 }
 
 describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () => {
@@ -52,7 +70,16 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
     for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
     m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
-    m.trips.forEach((t, j) => expect(t, `crew ${j % 2 + 1}: trips a minute`).toBeLessThan(j % 2 === 0 ? 0.1 : 1.4));
+    // (by role, as the crew's work falls: the hand with the cabin-top lines, crewWork.ts ownerOf (the jib hand at their
+    // stations, the main trimmer once both are forward of the winch, the helm on the main) makes the trips, under 1.4 a
+    // minute; and nobody makes one for nothing, no job and no move forward of the winch or to the mast, under 0.1 (0 to
+    // 0.07 measured over 5 to 16 kt after the stations swapped); each boat's two crew together, under 1.4)
+    m.roles.forEach((r, k) => expect(r.lines, `boat ${k + 1}: the hand with the cabin-top lines, trips a minute`).toBeLessThan(1.4));
+    // (and the other, who stays put: their jobs too, in light air forward of the winch the jib and the mast, 0.22 to 0.67
+    // a minute measured in 5 to 7 kt; from 10 kt up, at their stations, 0 measured)
+    m.roles.forEach((r, k) => expect(r.stay, `boat ${k + 1}: the hand who stays put, trips a minute`).toBeLessThan(kt >= 10 ? 0.1 : 0.7));
+    m.free.forEach((f, j) => expect(f, `crew ${j % 2 + 1}: trips a minute for no job`).toBeLessThan(0.1));
+    for (let k = 0; k < m.trips.length; k += 2) expect(m.trips[k] + m.trips[k + 1], `boat ${k / 2 + 1}: both crew's trips a minute`).toBeLessThan(1.4);
   }, 600_000);
 });
 
@@ -61,22 +88,40 @@ describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', (
   // (a puffy breeze, as the Bay's: the arms cross the deck's edge with the puffs)
   const beat = (kt: number, secs: number, place?: CrewPlace, skill = 0.9) => {
     const twa = beatAngle(kt), b = testBoat({ heading: 360 - twa, kt: 3, windKt: kt }); b.crew = newCrew(crewOf(skill), 'S'); if (place) b.crew.place = place;
-    const seats: number[][] = [[], []]; let inside = 0;
+    const seats: number[][] = [[], []], pianoT = [0, 0]; let inside = 0, tWas = 0;
+    const PIANO_SIT = 2; // (s: sat at the piano a moment after its job, before the walk back)
     sail(b, secs, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: kt + 1.5 * Math.sin(t * 2 * Math.PI / 30) };
-      b.crew!.people.slice(1).forEach((a, j) => { const g = a.goal?.z ?? a.z; if (!a.job && !atWinch(g) && !seats[j].includes(+g.toFixed(2))) seats[j].push(+g.toFixed(2));
-        // (settled at their place, not on the way: the walk round the winch and up beside the cabin are a trip's)
-        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02) inside++; }); });
+      b.crew!.people.slice(1).forEach((a, j) => { const g = a.goal?.z ?? a.z; if (!a.job && !atWinch(g) && Math.abs(g - Z.piano) > 0.02 && !seats[j].includes(+g.toFixed(2))) seats[j].push(+g.toFixed(2)); // (not the piano's own place: its job's)
+        // (settled at their place, not on the way, along the boat or across it: the walk round the winch and up beside
+        // the cabin, and out from the piano to the cabin's edge, are a trip's)
+        // (not at the piano, Z.piano, kneeling on the cockpit sole's forward end to work its lines, or sat there a moment
+        // before the walk back: that's the job's place, not a seat inside the cabin)
+        // (and not long: a couple of seconds there after the job, before the walk back, PIANO_SIT)
+        const atPiano = Math.abs(a.z - Z.piano) <= 0.02 && !a.job; pianoT[j] = atPiano ? pianoT[j] + (t - tWas) : 0;
+        if (a.z < 1.06 && Math.abs(a.x) < 0.5 && Math.abs(a.z - g) < 0.02 && Math.abs(a.x - (a.goal?.x ?? a.x)) < 0.02 && !a.job && (!atPiano || pianoT[j] > PIANO_SIT)) inside++; }); tWas = t; });
     return { b, seats, inside };
   };
   for (const kt of [5, 9]) it(`placed forward in ${kt} kt: the front hand on the cabin top's edge, never inside the cabin, and they stay put`, () => {
     const { b, seats, inside } = beat(kt, 240, { across: null, fore: 'fwd' });
     expect(inside, 'steps with the front hand inside the cabin').toBe(0);
-    expect(b.crew!.people[1].z).toBeCloseTo(Z.cabinSide, 1); expect(b.crew!.people[2].z).toBeCloseTo(Z.deckFwd, 1);
+    // (the jib hand, people[2], forward on the cabin's edge; the main trimmer beside the winch: crewPhys.ts slotOf)
+    expect(b.crew!.people[2].z).toBeCloseTo(Z.cabinSide, 1); expect(b.crew!.people[1].z).toBeCloseTo(Z.deckFwd, 1);
     for (const s of seats) expect(s.length, `seats taken: ${s}`).toBeLessThanOrEqual(2); // (where they start, and there)
   }, 120_000);
   it('on their own: forward of the winch after minutes of light air upwind, never in a breeze', () => {
     expect(beat(5, 300).b.crew!.fore01).toBe(1);
     expect(beat(16, 300).b.crew!.fore01).toBe(0);
+  }, 120_000);
+  it('forward of the winch, the helm takes the main (the owner): its sheet comes to the thwart behind them', () => {
+    expect(ownerOf('mainsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(0);
+    // (the jib to the one beside its winch, the middle crew; the cabin-top lines stay the forward crew's: the Coordinator)
+    expect(ownerOf('jibsheet', 2, DEFAULT_CREW, 'cockpit', true)).toBe(1);
+    expect(ownerOf('cunningham', 2, DEFAULT_CREW, 'cockpit', true)).toBe(2);
+    const { b } = beat(5, 300), c = b.crew!;
+    expect(c.fore01).toBe(1);
+    // (no crew holding the mainsheet from up forward, and the main still trimmed: the helm has it)
+    expect(c.people.slice(1).some(p => p.job?.line === 'mainsheet')).toBe(false);
+    expect(Math.abs(b.ctl.mainsheet - (b.ctlTarget?.mainsheet ?? b.ctl.mainsheet))).toBeLessThan(0.05);
   }, 120_000);
 });
 

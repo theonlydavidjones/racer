@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import train from '../src/courses/data/training-windward-return.json';
+import { DEFAULT_SETTINGS } from '../src/settings';
+import { DT, World } from '../src/sim/world';
+import type { CourseFile } from '../src/courses/course';
+import { JIB_WINCH_Z } from '../src/render/hull';
 import { newCrew } from '../src/boat/crewPhys';
-import { polar } from '../src/boat/polar';
+import { polar, beatAngle } from '../src/boat/polar';
 import { settleTrim } from '../src/boat/physics';
-import { KT } from '../src/core/math';
+import { KT, n360 } from '../src/core/math';
 import { testBoat, sail } from './helpers/testBoat';
 
 // The bow hand to the mast downwind without the pole (crewPhys.ts chooseLayout): judged at the speed she sails in the
@@ -31,4 +36,37 @@ describe('The bow hand to the mast, without the pole (crewPhys.ts chooseLayout)'
     expect(r.last).toBe('mast');
     expect(r.mastS).toBeGreaterThan(120);
   }, 300_000);
+  it('with the bow hand gone to the mast, the sheets are still trimmed: the helm takes them (crewWork.ts ownerOf)', () => {
+    // (bearing away from a beat to a run in 6 kt: as the bow hand went forward holding the mainsheet, the helm on the
+    // jib, neither sheet was trimmed again: 58/64 for minutes, against 70/68 with two crew)
+    const sheets = (n: number) => {
+      const W = 6, bt = beatAngle(W), b = testBoat({ heading: n360(bt), kt: 3, windKt: W }); b.crew = newCrew(spec(n), 'S'); settleTrim(b, b.ww.from, b.ww.kt);
+      sail(b, 200, t => { b.h = n360(t < 60 ? bt : Math.min(160, bt + (t - 60) * 8)); });
+      return { layout: b.crew!.layout, main: b.sheets.main, jib: b.sheets.jib };
+    };
+    const one = sheets(1), two = sheets(2);
+    expect(one.layout).toBe('mast');
+    expect(Math.abs(one.main - two.main), 'main').toBeLessThan(3);
+    expect(Math.abs(one.jib - two.jib), 'jib').toBeLessThan(3);
+  }, 300_000);
+  it('whoever trims the jib is at its winch (the Coordinator: the sheet goes to whoever is beside it): a crew member within reach of it fore and aft, the helm only with nobody else in the cockpit', () => {
+    // (a race in light air, where both go forward of the winch and the bow hand to the mast, and in a breeze; and a beat
+    // with them placed forward of the winch)
+    const bad: string[] = [];
+    const check = (b: ReturnType<typeof testBoat>, t: number) => {
+      const c = b.crew!; c.people.forEach((a, i) => {
+        if (a.job?.line !== 'jibsheet' || a.job.reach > 0) return;
+        const inCockpit = c.layout !== 'foredeck' && c.spec.crew.length > 0;
+        if (i === 0 ? inCockpit : Math.abs(a.z - JIB_WINCH_Z) > 0.5) bad.push(`t${t.toFixed(0)} p${i} at z ${a.z.toFixed(2)}, layout ${c.layout}, fore ${c.fore01}`);
+      });
+    };
+    for (const kt of [6, 14]) {
+      const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 2, opponents: ['stock:1', 'stock:2'] } as never, 1);
+      const ai = w.boats.filter(b => !b.isUser);
+      while (w.t < 600) { w.step(DT); if (w.t > 0) for (const b of ai) check(b, w.t); }
+    }
+    const kt = 5, twa = beatAngle(kt), b = testBoat({ heading: 360 - twa, kt: 3, windKt: kt }); b.crew = newCrew(spec(2), 'S'); b.crew.place = { across: null, fore: 'fwd' };
+    sail(b, 240, t => { b.h = 360 - twa; check(b, t); });
+    expect(bad.slice(0, 5)).toEqual([]);
+  }, 600_000);
 });

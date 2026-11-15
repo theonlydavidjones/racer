@@ -340,6 +340,10 @@ What's planned, roughly in order. Done work is described in the README.
      option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
      thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
      and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
+   - Open question (Coordinator, 14 November; from the physics review of claude/crew-mast-sheets): in about 16 kt and
+     up the crew won't leave the rail to set the lazy jib car (crewWork.ts carJob: not while she needs their weight), so
+     after a change of breeze she sails the next tack on the old car. Arguably right: a good crew stays hiked and sets
+     the car later, in a lull or before the tack. Left as it is until a source or the owner says otherwise.
 8x. ~~**URGENT — the whole new release stutters**~~ (fixed on main: each boat's fixed parts merged into one mesh per material, the hull in three levels of detail, small parts culled, fewer shader programs, page writes only on change, triangles back to v186's; a frame-time release gate, perf-ab.cjs, and the F9 frame-time readout) (regression, performance; owner, 14 November): "the whole new release is
    moving very, very slow. whitecaps on the water are stuttering. everything is stuttering." The boat editor's slowness
    (8v) is part of it. If the cause isn't found quickly, roll back to the last smooth version, then find it: compare

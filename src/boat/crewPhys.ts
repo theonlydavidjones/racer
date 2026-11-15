@@ -115,6 +115,8 @@ export interface Job {
   big?: boolean;
   /** a big lasting change of a cabin-top line (crewWork.ts LINE_URGENT): seen through, a jib tweak waits */
   urgent?: boolean;
+  /** (A cabin-top line) her true wind angle when they chose where to set it (crewWork.ts LINE_MOVED). */
+  refTwa?: number;
 }
 /** Where a job puts a person: across (m, + to windward), fore-and-aft (m), and how they're posed. */
 export interface Station { arm: number; z: number; pose: Pose }
@@ -132,7 +134,7 @@ export interface CrewState {
   /** Where you've put them (absent: the crew's own call). */
   place?: CrewPlace;
   /** A roll tack in progress: holding the old high side, then flattening; and its clock. */
-  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number } | null;
+  roll?: { phase: 'lead' | 'hold' | 'flatten'; t: number; heel0?: number } | null;
   /** The windward side last step (+1 starboard), to see a tack or gybe. */
   wind: number;
   // summaries, for the figures, the coach and tests
@@ -164,7 +166,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** her true wind angle over the last 20 s (crewWork.ts, LINE_TAU) */ twa20?: number; /** and their wish for it over a gust-lull cycle then (crewWork.ts LINE_MOVED) */ lineRef?: Record<string, number>; /** the wind and angle when each jib car was last set (crewWork.ts CAR_WIND) */ carSet?: Partial<Record<'S' | 'P', { tws: number; twa: number }>>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -248,9 +250,17 @@ export const stationZ = (j: number, count: number, f: number, deck: boolean) => 
   const z = za + (zf - za) * f;
   return deck && z > Z.deckFwd && z < Z.winchAft ? (z - Z.deckFwd < Z.winchAft - z ? Z.deckFwd : Z.winchAft) : z;
 };
+/**
+ * Crew member `j`'s (0-based) slot among `n` for stationZ. With two crew the jib hand (the forward crew, j 1) takes the
+ * front slot, between the cabin's after end and the winch, and the main trimmer (the middle crew, j 0) the one between
+ * the winch and the thwart, where the mainsheet comes down to the traveller (the owner: "front crew would be between the
+ * aft cabin wall and the winch, middle crew between the winch and the thwart", and "normally middle crew trims the main",
+ * crewWork.ts mainHand). Forward of the winch, the jib hand on the cabin's edge and the main trimmer beside the winch.
+ */
+export const slotOf = (j: number, n: number) => (n === 2 ? 1 - j : j);
 /** Within the jib winch's pedestal's reach on the side deck, fore and aft (between the seats either side of it). */
 /** Two crew forward of the winch together from this far along (stationZ's f): the band's Fwd and the foredeck. */
-const TWO_FWD = 0.999;
+export const TWO_FWD = 0.999;
 /** Sitting on the cabin top's edge beside its after end (z 0.90), the hips this far out (m): the cabin's side is at about
  * 0.7 there; outboard of DECK_ARM, so they're on the deck's side of the boat. An estimate. */
 const CABIN_EDGE = 0.62;
@@ -268,7 +278,8 @@ export const CAR_ARM = 0.8;
 /** The reference places (m) for the hull's trim: where the crew's weight trims her to her lines (trim 0), the helm at the
  * tiller. Only differences from it count for speed (hullTrim.ts TRIM.reach is reckoned from it), so it isn't moved with
  * the cockpit's stations: the crew can't all sit there now, but it's the hull's reference, not a seat. */
-const zRef = (i: number, n: number) => (i === 0 ? Z.helm : n === 1 ? 1.5 : i === 1 ? 1.2 : 1.8);
+// (two crew: the reference places follow their slots, slotOf: the jib hand's forward, the main trimmer's aft)
+const zRef = (i: number, n: number) => (i === 0 ? Z.helm : n === 1 ? 1.5 : slotOf(i - 1, n) === 0 ? 1.2 : 1.8);
 
 /** Arms (m from the centreline, + to windward) for a person: sitting up on the side deck, hiking flat out (by the deck's
  * half-breadth `edge` where they are). */
@@ -346,6 +357,15 @@ export interface CrewCall {
  */
 export const ROLL_HOLD = 2;
 /**
+ * And they go across at once when she has heeled this much more (deg) onto the new tack since she came through the
+ * wind: the new side's sails have filled, and the low side they're on is the leeward one now. Measured from her heel
+ * as she came through, which their own weight on the old rail already gives her (5 to 8°). In light air the sails
+ * heel her little and the hold runs on, as a roll tack does; in a breeze she heeled 20° in a second or so with them
+ * still on the low side (Crew Figures, watching a 14 kt race's tacks). Practice: in light air keep still and time the
+ * roll; in a breeze get to the new rail fast (North Sails, Sailing World, Yachting World on keelboat tacks). An estimate.
+ */
+export const ROLL_HEEL = 5;
+/**
  * How often a crew moves. A real crew moves on a puff, a lull, a tack or a job, and otherwise sits still: coaches have
  * the crew hold a steady angle of heel, not a precise one (weight first in light to moderate air, and once the boat is
  * set up only small, smooth moves: Sailing World, North Sails, Yachting World on keelboat heel), and the main is played
@@ -422,7 +442,10 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     c.roll.t += dt;
     // hold the old high side until she's well round onto the new tack (or a few seconds), then flatten hard
     if (c.roll.phase === 'lead' && (!k.tackComing && c.roll.t > 1 || c.roll.t > 8)) c.roll = null; // (no tack after all)
-    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD)) { c.roll.phase = 'flatten'; c.roll.t = 0; }
+    // (her heel as she came through, read on the hold's first step after the tack: on the step they see the tack it can
+    // still be to leeward of the old one, and read the next step on the new, a jump of twice the roll that ended the hold)
+    else if (c.roll.phase === 'hold' && c.roll.heel0 == null && !tacked) c.roll.heel0 = k.heel ?? 0;
+    else if (c.roll.phase === 'hold' && (k.twa > Math.min(k.beat - 12, 32) || c.roll.t > ROLL_HOLD || (c.roll.heel0 != null && (k.heel ?? 0) - c.roll.heel0 > ROLL_HEEL))) { c.roll.phase = 'flatten'; c.roll.t = 0; }
     // (flattening her to upright: once she's there, or after a second and a half, they settle onto the new side)
     else if (c.roll.phase === 'flatten' && (c.roll.t > 1.6 || (k.heel != null && c.roll.t > 0.3 && k.heel < 1))) c.roll = null;
   }
@@ -512,19 +535,20 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       // (two crew forward of the winch: the front hand sits on the cabin top's edge beside its after end, feet on the side
       // deck, on the side their weight is wanted: never in the middle at 0.90, which is inside the cabin (the physics review))
       // They keep that side until the next tack, not crossing over the cabin top with each puff and lull
-      if (c.spec.crew.length === 2 && i === 1 && foreF >= TWO_FWD) {
+      // (the front hand is the jib hand, people[2]: slotOf)
+      if (c.spec.crew.length === 2 && i === 2 && foreF >= TWO_FWD) {
         if (c.fwdSide == null || c.fwdTack !== k.tack) { c.fwdSide = arm < 0 ? -1 : 1; c.fwdTack = k.tack; }
         arm = c.fwdSide * Math.max(c.fwdSide > 0 ? arm : -arm, CABIN_EDGE);
-      } else if (i === 1) c.fwdSide = undefined;
+      } else if (i === 2) c.fwdSide = undefined;
       // (two crew: each keeps their own station while the other is away, at the mast or a job: they don't shift along)
-      const deck = Math.abs(arm) > DECK_ARM, z = c.spec.crew.length === 2 ? stationZ(i - 1, 2, foreF, deck) : stationZ(seats.indexOf(i), seats.length, foreF, deck);
+      const deck = Math.abs(arm) > DECK_ARM, z = c.spec.crew.length === 2 ? stationZ(slotOf(i - 1, 2), 2, foreF, deck) : stationZ(seats.indexOf(i), seats.length, foreF, deck);
       tgt[i] = { arm, z, pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
     });
     // (the front hand on the cabin top's edge forward of the winch: the middle hand makes up the moment they share, so
     // she has the heel wanted, not the edge's)
     if (c.spec.crew.length === 2 && foreF >= TWO_FWD && placed == null && !crewFull && free.includes(1) && free.includes(2)) {
-      const m = (W[1] + W[2]) * crewArm - W[1] * tgt[1].arm, a2 = clamp(m / W[2], leeArm(ppl[2], edges[2]), maxOf(2));
-      tgt[2] = { arm: a2, z: stationZ(1, 2, foreF, Math.abs(a2) > DECK_ARM), pose: a2 < -0.05 ? 'lee' : a2 > sitOf(2) + 0.04 ? 'hike' : 'sit' };
+      const m = (W[1] + W[2]) * crewArm - W[2] * tgt[2].arm, a1 = clamp(m / W[1], leeArm(ppl[1], edges[1]), maxOf(1));
+      tgt[1] = { arm: a1, z: stationZ(slotOf(0, 2), 2, foreF, Math.abs(a1) > DECK_ARM), pose: a1 < -0.05 ? 'lee' : a1 > sitOf(1) + 0.04 ? 'hike' : 'sit' };
     }
     // the roll tack: as she luffs up they're out on the windward side (in light air, from sitting to leeward), so she rolls
     // to windward through the wind and comes out heeled on the new tack; they hold there, then everyone out hard
@@ -694,7 +718,10 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // cabin top's edge at Z.cabinSide)
   for (const i of out) if (tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) put(i, Z.deckFwd);
   for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
-  // (in their order along the cockpit, front to back: the one whose place is forward keeps it)
+  // (in their order along the cockpit, front to back: the one whose place is forward keeps it. By their places, not
+  // their numbers: with two crew the jib hand, people[2], is the forward one, slotOf)
+  // (level, in their slots' order: the jib hand forward)
+  out.sort((i, j) => tgt[i].z - tgt[j].z || slotOf(i - 1, c.spec.crew.length) - slotOf(j - 1, c.spec.crew.length));
   for (let q = 1; q < out.length; q++) for (let r = 0; r < q; r++) {
     const a = tgt[out[r]], b = tgt[out[q]];
     // (and if there's no room aft for the one behind, the one ahead goes forward, as far as the winch lets them)
@@ -734,7 +761,7 @@ export const LAYOUT_STAY = 60;
 function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 'cockpit' | 'mast' | 'foredeck' {
   const cr = c.spec.crew, n = cr.length, m0 = k.extraMoment ?? 0, sea = k.sea ?? 0;
   // (two crew: the one left in the cockpit keeps their own station: stationZ)
-  const cockpitZ = (j: number, count: number) => stationZ(j, n === 2 ? 2 : count, foreF, outOnDeck(c, j + 1));
+  const cockpitZ = (j: number, count: number) => n === 2 ? stationZ(slotOf(j, 2), 2, foreF, outOnDeck(c, j + 1)) : stationZ(j, count, foreF, outOnDeck(c, j + 1));
   const dragAt = (v: number, zOf: (j: number) => number) => {
     let m = 0; cr.forEach((p, j) => { m += p.w * (zRef(j + 1, n) - zOf(j)); });
     return trimDrag(v, trimFromMoment(m0 + m), sea);
@@ -818,7 +845,7 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
   // in 8 to 10 kt the whole range is worth under 0.1%) they sit where the deck's wider rather than lean out harder for
   // nothing (1% a metre of half-breadth, about 0.08% over the range: the crew's preference, an estimate).
   const cr = c.spec.crew, W = cr.reduce((a, p) => a + p.w, 0);
-  const zOf = (j: number, x: number) => stationZ(j, n, x, outOnDeck(c, j + 1));
+  const zOf = (j: number, x: number) => stationZ(slotOf(j, n), n, x, outOnDeck(c, j + 1));
   const out = cr.map((_, j) => c.people[j + 1] ? c.people[j + 1].x * w : 0), windwardOut = out.every((a, j) => a > sitArm(cr[j], deckHalf(c.people[j + 1]?.z ?? 1.5)) - 0.05);
   const flatOut = windwardOut && cr.every((_, j) => (c.people[j + 1]?.lean ?? 0) > 0.85);
   const h = Math.abs(k.heel ?? 0), ref = crewBestHeel(k.twa, k.tws, skill), rm = Math.max(50, k.rmPerDeg ?? 250);
@@ -867,7 +894,7 @@ function chooseFore(c: CrewState, k: CrewCall, skill: number): number {
 function momentOfCrewFore(c: CrewState, f: number): number {
   const cr = c.spec.crew, n = cr.length; let m = 0;
   cr.forEach((p, j) => {
-    m += p.w * (zRef(j + 1, n) - stationZ(j, n, f, outOnDeck(c, j + 1)));
+    m += p.w * (zRef(j + 1, n) - stationZ(slotOf(j, n), n, f, outOnDeck(c, j + 1)));
   });
   return m;
 }

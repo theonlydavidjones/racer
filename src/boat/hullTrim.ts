@@ -60,8 +60,10 @@ export const TRIM = {
    * between the winch and the thwart, on the benches or out on the side deck; aft of the thwart is the skipper's: the
    * owner, 14 Nov 2026. A test keeps the two together. Both forward of the winch, when the weight's really wanted
    * forward, +0.019, pays its little beyond the polar in light air, as the foredeck does. Before the stations the
-   * crew's reach ran along the side deck to beside the after shelf, -0.041 to -0.006.) */
-  reach: [-0.0078, -0.0073] as [number, number]
+   * crew's reach ran along the side deck to beside the after shelf, -0.041 to -0.006. With the main trimmer by the
+   * thwart and the jib hand forward of the winch, crewPhys.ts slotOf, -0.0076 to -0.0070, was -0.0078 to -0.0073: a
+   * resistance change of about 2e-5.) */
+  reach: [-0.0076, -0.0070] as [number, number]
 };
 
 /** Moment to change trim one centimetre (kg·m/cm) at displacement `disp` kg. */
