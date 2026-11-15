@@ -752,7 +752,44 @@ What's planned, roughly in order. Done work is described in the README.
      - **Best heel:** a teal ◆ tucked tight outside the ring at her best heel; the circle may overlap it, so long as
        the ◆'s top half shows.
      - **Degrees:** just outside the ring at 1:30 or 10:30, on the side she's heeled to.
-     Drawings: the Roadmap session's scratchpad (heel/). It reads b.heelMag and crewBestHeel. No new button.
+     After two flat-bar variants (along the panel's top edge), the owner chose (15 November): "lets go back to the last
+     iteration of the curved dial. build that." **Final, to build (now; 2–3 h; UI & Experience):** the ring above,
+     with the windex at about 87% and raised a hair, the 4.5 px circle and the ◆ tucked tight. The stills are on branch
+     claude/hopeful-thompson-m94ahm, reference/screens/heel-ring/ (wp6, wp16, wp-26, heel-ring4). Draw it in
+     src/ui/sailBand.ts as an SVG layer over `.sb-wx`. It reads b.heelMag and her heel side, crewBestHeel
+     (boat/crewPhys.ts), and the thresholds: 20° (coach.ts:98) and 25°. No new button. Check both tacks, and send stills
+     to the owner before it ships.
+   - **Learn to sail, lesson 1 "The boat": teach the parts, then quiz them** (owner, 15 November; feature; next, "not
+     urgent"; 6–10 h; a design change to a lesson, so the design goes to the owner before it's built). The owner's
+     brief:
+     - **The problem.** For a total beginner it's a click-and-guess game. The cue says only "Find the <part> · n of 43"
+       (src/app/boatLesson.ts paint). A wrong click says only "That's the <other part>". The boat is never introduced,
+       and a part's explanation shows only after it's found, for 2.6 s (NOTE_MS). The boat spins all the time
+       (`open()` sets app.look.spin = true; only a drag stops it), so a beginner can't hold a view.
+     - **What the owner wants:**
+       1. Teach, don't hunt: walk the parts a few at a time, in the existing groups (src/render/boatParts.ts
+          PARTS[].set): the boat (hull and deck), the rig, the sails, the controls, the wind's sides.
+       2. Focus on each section: frame the camera on it (the rig, the sail corners, the cockpit and controls), mark the
+          part being taught, and dim or hide the rest. Keep the underwater view for the keel and rudder.
+       3. Name and explain each part as it's shown: its name and its one-line `what` on screen while she looks. A
+          "Next" step moves on, with nothing to find.
+       4. Stop the spin: the boat holds still while a part is taught, and dragging still looks round her. Anything that
+          turns is the camera moving to the next section, slowly and on purpose.
+       5. Quiz at the end, e.g. "Which one is the boom?" (tap it on the boat) or "What does the outhaul do?" (pick from
+          a few). A wrong answer shows the right part and asks again. Passing the quiz passes lesson 1, not the
+          walkthrough.
+       6. She can leave the quiz.
+     - **The owner's answers:**
+       - A core set of about 15 parts first, then the quiz on them, repeated set by set until all 43 are done.
+       - In the quiz, tap the part first; two wrong taps bring multiple choice.
+       - Missed parts come back until they're right.
+     - **Constraints:**
+       - No new buttons: use the showroom's cue bar (#showCue) and the lesson overlay.
+       - One short line per part, and a highlighted part over words. Learn to sail is the one place step-by-step
+         instruction belongs (VISION-ROADMAP.md:54).
+       - US spelling; keep the existing part names.
+       - The visual-checker, both sides and both tacks.
+       - Keep ASA 101 knowledge items 1–3 covered (design/ASA-101-CHECK.md).
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
