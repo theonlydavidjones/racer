@@ -629,13 +629,17 @@ What's planned, roughly in order. Done work is described in the README.
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
      to here", and nothing on the screen.
-   - **The navigator doesn't see piers** (owner, 15 November, from a chart screenshot; bug; next, "not urgent"; 1–3 h):
+   - **The navigator doesn't see piers** (owner, 15 November, from a chart screenshot; bug; next, "not urgent"; 2–4 h):
      "navigator not detecting this pier. I ran right into it." The planned track runs straight along a long NE–SW pier
      to its tip, in the Precautionary Area (20–39 ft charted). Suspects: the planner's land test (src/sim/routing.ts
      landDist, :47-66) uses the terrain's land mask and the Cityfront's hand-drawn shore, not the wharf layer
      (geo/shore.ts wharfNearest, imported but apparently unused there); and its grid cache and ring search can miss a
      pier about 30 m wide. The fix: every pier and wharf counts as land for routing, kept clear by at least half a
-     boat length plus a margin, with a test that a plan past each Embarcadero pier keeps clear.
+     boat length plus a margin, with a test that a plan past each Embarcadero pier keeps clear. Then (15 November): "it looks
+     like navigator is missing most of the piers actually. we're tacking toward one right now. not urgent but let's get
+     the coastlines updated." So it's all the piers, not one: bring every pier, wharf and breakwater the chart draws
+     into the planner's land, from the same source as the chart (NOAA ENC/OSM), and test along the whole Cityfront and
+     Embarcadero. 2–4 h.
    - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
      polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
