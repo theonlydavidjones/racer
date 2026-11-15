@@ -65,7 +65,7 @@ export interface AiState {
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
   goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
   /** A mark she's keeping clear of, and the side she's passing it on (+1: it to starboard), so she doesn't swap sides each second. */
-  passing?: { key: string; side: number } | null;
+  passing?: { key: string; side: number; away?: 'S' | 'P' } | null; // (away: turning away from it through the wind, begun on this tack, held until she's through)
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
   /** Her aim point (the mark, a detour round the land, or the line) upwind of her: within 44° of the wind, let go past
