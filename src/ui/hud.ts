@@ -225,7 +225,10 @@ export class Hud {
   private toldHelm = false;
   /** The race committee's flags flying now, what they mean, and the next signal. */
   private signals(w: SimView): void {
-    const show = !w.freeSail && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd || !!w.cancelled);
+    // (shown while the committee's flags matter, and only with something flying: no "none" tile after the gun; it's back
+    // the moment a flag goes up, the class and prep flags before the start, a recall, a postponement; the owner, 15 Nov)
+    const flying = w.flags.length > 0 || (!!w.courseSignal && !w.cancelled);
+    const show = !w.freeSail && flying && (w.t < 8 || w.flags.includes('X') || !!w.user.roundEnd || !!w.cancelled);
     const el = $('sigPanel'); el.hidden = !show; if (!show) return;
     const key = w.flags.join(',') + '|' + (w.courseSignal?.no ?? '');
     if (key !== this.sigKey) {
@@ -237,7 +240,6 @@ export class Hud {
       const over = w.flags.includes('A') ? w.flags.filter(f => f !== 'A') : [];
       if (over.length) { const col = document.createElement('span'); col.className = 'sig-over'; col.title = `${over.map(f => FLAG_NAME[f]).join(', ')} over A`; col.append(...over.map(flagPic), flagPic('A')); box.appendChild(col); }
       else for (const f of w.flags) box.appendChild(flagPic(f));
-      if (!w.flags.length) box.textContent = 'none';
       if (w.courseSignal && !w.cancelled) { // (once racing's called off, there's no course to sail) // the course number, in numeral pennants, top to bottom
         const col = document.createElement('span'); col.className = 'pennants'; col.title = `Course ${w.courseSignal.no}`;
         for (const d of String(w.courseSignal.no)) { const c = document.createElement('canvas'); c.width = 56; c.height = 28; c.getContext('2d')!.drawImage(pennantCanvas(d), 0, 0, 56, 28); col.appendChild(c); }
