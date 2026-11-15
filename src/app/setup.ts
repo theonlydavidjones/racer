@@ -167,11 +167,12 @@ function courseCard(): void {
     const slip = slipById(app.S.boat.slip);
     if (!slip && (app.S.sailFrom === 'slip' || app.S.sailTo === 'slip')) { if (app.S.sailFrom === 'slip') app.S.sailFrom = 'cityfront'; if (app.S.sailTo === 'slip') app.S.sailTo = ''; }
   }
-  // racing: an outboard on the transom bracket goes below (the class rules don't allow racing with it mounted aft: NFIA
-  // clarification, March 2006, under class rule 1.11); the bracket can stay
+  // racing: no outboard aboard (the class rules don't allow racing with it mounted aft: NFIA clarification, March 2006,
+  // under class rule 1.11; and racers leave it ashore, sim/world.ts makeBoat, no weight for it). Off the bracket, so she's
+  // drawn with a clean transom; aboard again for a cruise
   if (app.S.mode !== 'sail' && app.S.boat.perf.outboard === 'bracket') {
     app.S.boat.perf.outboard = 'stowed'; saveSettings(app.S); if (app.still) prepare(); else newGame();
-    toast('Her outboard\'s been taken off the bracket and stowed below for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). Put it back on the bracket in the Fleet for a cruise.', 7000);
+    toast('Her outboard stays ashore for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). It\'s aboard, stowed, for a cruise; ship it from the Motor tab.', 7000);
   }
   const cruise = app.S.mode === 'sail';
   for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;

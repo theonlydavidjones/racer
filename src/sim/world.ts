@@ -586,7 +586,11 @@ export class World {
       id: i, isUser, name: spec && !isUser ? titleCase(spec.name) || `Boat ${i}` : F.name, no: spec ? sailNo(spec) : F.no, color: spec && !isUser ? (isGeneric(spec.id) ? genericTag(spec.id) : OPP_TAGS[(i - 1) % OPP_TAGS.length]) : F.tag,
       hullColor: spec ? spec.hull.upper : F.hull, sailColor: spec ? boatLook(spec).sailColor : F.sail,
       build: spec ? { hull: spec.hull.material, spars: spec.perf.mast, boom: spec.perf.boom } : F.build,
-      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9), paint: boatLook(spec).paint } : { paint: F.paint }),
+      // (racing, no outboard aboard at all, hers or a rival's: the class rules never mention one, rule 1.11 has anything not
+      // clearly covered taken as illegal, and the class's Technical Committee ruled in March 2006 against racing with one
+      // mounted aft (NFIA clarifications); that racers leave it ashore rather than stowed below is our inference from those,
+      // not a rule's words. Its weight goes with it: none aboard, none aft. Cruising, it's aboard as her setup has it)
+      ...(spec ? { spec, cond: condition(spec, +this.raceDate.slice(5, 7) || 9, this.freeSail ? undefined : 'none'), paint: boatLook(spec).paint } : { paint: F.paint }),
       ...(spec?.perf.tune ? { tune: fixTune(spec.perf.tune) } : {}), // (her own tune, from the Boat panel)
       x: p.x, y: p.y, h, docked, ...(docked ? { rig: { main: 0, jib: 0, mainUp: false, jibUp: false } } : {}), v: startStill ? 0 : v0 ?? (isUser && this.startAt < 120 ? 2 : 1.5), vx: 0, vy: 0, tack: 'S', tacking: false, lastTackT: -999,
       steer: 0, tiller: 0, turnTarget: null, turnDir: 0, luff: false, desired: h,

@@ -190,3 +190,14 @@ describe('Stowing it below and shipping it again (the owner: off the sliding bra
     expect(stowedSpec('race').user.motor ?? null).toBeNull();
   });
 });
+
+describe('Racing, no outboard aboard (class rule 1.11; NFIA, 2006; racers leave it ashore)', () => {
+  it('a race carries none of its weight, a cruise carries it stowed', () => {
+    const boat = { ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, outboard: 'stowed' as const, outboardHp: 3.5 as const, gearKg: 0 } };
+    const mk = (mode: 'sail' | 'race') => { const s = { ...S, mode, boats: [boat], boat, boatId: boat.id, fleet: mode === 'race' ? 1 : 0, opponents: mode === 'race' ? DEFAULT_SETTINGS.opponents.slice(0, 1) : [] } as Settings; return mode === 'race' ? new World(COURSES[0], s, 1) : new World(COURSES[0], s, 1, { freeSail: true }); };
+    const race = mk('race'), cruise = mk('sail');
+    expect(race.user.cond!.extraKg).toBe(0); expect(race.user.cond!.extraMoment).toBe(0); expect(race.user.motor ?? null).toBeNull();
+    for (const b of race.boats) expect(b.cond?.extraKg ?? 0, `${b.name}: no outboard racing`).toBe(b.spec?.perf.gearKg ?? 0);
+    expect(cruise.user.cond!.extraKg).toBeCloseTo(OUTBOARDS[3.5].kg, 6); expect(cruise.user.motor?.stowed).toBe(true);
+  });
+});
