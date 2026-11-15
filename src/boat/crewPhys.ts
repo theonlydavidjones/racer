@@ -103,6 +103,8 @@ export interface Aboard {
   react: number; goal: { x: number; z: number } | null;
   /** On the footwell route to their goal (FOOTWELL_MOVE): in off the bench, fore or aft, then out. */
   via?: boolean;
+  /** Getting by this crewmate (their index), out to the side until a stride past (CREW_PASS). */
+  passing?: number;
   /** 0 fresh … 1 spent (hiking). */
   fatigue: number;
 }
@@ -245,6 +247,11 @@ export const DECK_ARM = 0.5;
  * step down and up at the ends a stride, FOOTWELL_STEP (m), taken as they start and finish along.
  * Estimates, from the cockpit's plan (render/hull.ts COCKPIT_FIT).
  */
+/**
+ * Two crew on the move along the deck: the one behind keeps CREW_SEP (m) back, about a stride; one passing another steps
+ * CREW_PASS (m) to the side first, about a body's width (estimates).
+ */
+export const CREW_SEP = 0.6, CREW_PASS = 0.4;
 export const FOOTWELL_MOVE = 0.4, FOOTWELL_X = 0.3, FOOTWELL_STEP = 0.15;
 /** Crew member `j`'s place fore and aft among `count` free crew, `f` of the way from the aft end to the forward end
  * (on a side deck, either side of the winch, never on it: a place within its pedestal's reach goes to the nearer side).
@@ -601,9 +608,33 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // (a step down and a step up, not a stop at each end: along once they're nearly in, out over the last of the way)
     const via = a.via && (inCockpit(a.z) || inCockpit(a.z + dz)) && Math.abs(goal.z - a.z) > FOOTWELL_STEP;
     const wide = via && Math.abs(a.x) > FOOTWELL_X + FOOTWELL_STEP;
-    const toX = via ? Math.sign(goal.x || a.x) * Math.min(Math.abs(goal.x), FOOTWELL_X) : goal.x;
+    let toX = via ? Math.sign(goal.x || a.x) * Math.min(Math.abs(goal.x), FOOTWELL_X) : goal.x, hold = wide;
+    // (two on the move along the deck, within a body's width of each other, CREW_PASS: nobody closes to within a stride,
+    // CREW_SEP, of a crewmate on the move, going their way or coming the other, but waits; one who has to get past a
+    // crewmate who's stopped, or coming the other way, steps aside first, to the side they're on of them, then goes by,
+    // and stays out until they're a stride past, not cutting back in across their toes. Up on the bench to let someone by
+    // is fine: the footwell's lane gives way to it)
+    if (i > 0) {
+      let by = a.passing != null ? c.people[a.passing] : undefined;
+      if (by && (Math.abs(by.z - a.z) >= CREW_SEP || Math.abs(goal.z - a.z) < 0.02)) { a.passing = undefined; by = undefined; }
+      const dir = Math.sign(dz);
+      for (let j = 1; j < c.people.length && dir; j++) {
+        if (j === i) continue;
+        const o = c.people[j], dxo = Math.abs(o.x - a.x), d0 = Math.abs(o.z - a.z), d1 = Math.abs(o.z - a.z - dz);
+        if (dxo >= CREW_PASS || d1 >= CREW_SEP || d1 >= d0) continue;
+        const og = o.goal ?? o, oDir = Math.sign(og.z - o.z) * (Math.abs(og.z - o.z) > 0.05 ? 1 : 0);
+        const past = (goal.z - o.z) * dir > 0.05;
+        if (past && oDir !== dir) { a.passing = j; by = o; hold = dxo < CREW_PASS - 0.05; }
+        else if (oDir !== 0) hold = true;
+      }
+      if (by) {
+        const away = a.x !== by.x ? Math.sign(a.x - by.x) : by.x >= 0 ? -1 : 1, room = Math.max(0.05, deckHalf(a.z) - 0.25);
+        toX = clamp(by.x + away * CREW_PASS, -room, room);
+        if (Math.abs(by.z - a.z) > 0.05 && (by.z - a.z) * dir < 0) hold = false; // (by them now: on, out to the side)
+      }
+    }
     a.x += clamp(toX - a.x, -vx * dt, vx * dt);
-    if (!wide) a.z += dz;
+    if (!hold) a.z += dz;
     // (in the cockpit, round the jib winch on the side deck, not through it: from one side of it to the other they step in
     // off the deck first, past it on the bench, and out again beyond it; nor out on the deck beside it. Going on forward
     // of the cockpit, to the mast, they climb past it)

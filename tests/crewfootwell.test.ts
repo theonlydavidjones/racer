@@ -17,7 +17,8 @@ describe('the crew walk the footwell along the cockpit (crewPhys.ts FOOTWELL_MOV
         const dz = Math.abs(p.z - was[i].z) * 60, inside = p.z > Z.bulkhead && p.z < Z.thwart;
         // (on a long way along: their goal still more than FOOTWELL_MOVE off; a shuffle along the rail hiking isn't one)
         const far = p.goal != null && Math.min(Math.max(p.z, p.goal.z), Z.thwart) - Math.max(Math.min(p.z, p.goal.z), Z.bulkhead) > FOOTWELL_MOVE;
-        if (i > 0 && inside && dz > 0.1 && far) { moves++; if (Math.abs(p.x) > FOOTWELL_X + FOOTWELL_STEP + 0.01) { wide++; worst = Math.max(worst, Math.abs(p.x)); } }
+        // (and not getting by a crewmate: up on the bench to let them pass, crewPhys.ts CREW_PASS)
+        if (i > 0 && inside && dz > 0.1 && far && p.passing == null) { moves++; if (Math.abs(p.x) > FOOTWELL_X + FOOTWELL_STEP + 0.01) { wide++; worst = Math.max(worst, Math.abs(p.x)); } }
         was[i].x = p.x; was[i].z = p.z;
       });
     };
