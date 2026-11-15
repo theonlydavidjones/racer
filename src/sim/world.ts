@@ -1,6 +1,6 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
-import { paddlePower, paddler } from '../boat/paddle';
+import { paddlePower, paddler, paddleStep } from '../boat/paddle';
 import { RoundingTracker } from './roundings';
 import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
@@ -908,9 +908,9 @@ export class World {
   paddle(side: 'P' | 'S' | null, back: boolean, auto: boolean): void {
     const u = this.user, was = u.paddle;
     // (you stopping the crew's own paddling sticks: they don't start again until the jam has passed. crewPaddleCall)
-    if (!side) { if (was) { u.paddle = null; this.paddleJob(u, null); if (!auto) { u.paddleOff = true; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
+    if (!side) { if (was) { this.paddleJob(u, null); u.paddle = null; if (!auto) { u.paddleOff = true; this.emit({ type: 'toast', msg: 'The crutch goes back below.' }); } } return; }
     if (u.docked || u.handled || u.pushing) { if (!auto) this.emit({ type: 'toast', msg: 'She\'s still alongside: push off first.' }); return; }
-    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t };
+    u.paddle = { side, t0: was ? was.t0 : this.t, auto, back, aimT: this.t, who: was?.who, rest: was?.rest ?? false, handT: was?.handT, rate: was?.rate ?? 0 }; // (the same spell: whoever has the crutch keeps it, resting or not)
     this.paddleJob(u, side);
     const solo = (u.crew?.spec.crew.length ?? 0) === 0, who = solo ? 'You fetch' : auto ? 'The crew fetch' : 'Your crew fetches';
     const verb = solo || auto ? (back ? 'back-paddle' : 'paddle') : (back ? 'back-paddles' : 'paddles'); // (agreeing with who)
@@ -938,9 +938,14 @@ export class World {
   }
   /** Each step: the paddling ends with the motor driving her or once she's made fast; racing, a breach of rule 42 is
    * flagged (rules: world.rule42, one penalty a spell). */
-  private paddleWork(b: Boat): void {
+  private paddleWork(b: Boat, dt: number): void {
     const p = b.paddle; if (!p) return;
     if (b.docked || b.handled || (b.motor?.running && b.motor.down && b.motor.gear !== 'N')) { this.paddle(null, false, true); return; }
+    // the paddler tiring (paddle.ts paddleStep): resting when spent, or the crutch handed to a fresher crewmate
+    const tired = paddleStep(b, this.t, dt);
+    if (tired === 'swap') { this.paddleJob(b, p.side); this.emit({ type: 'toast', msg: 'Your crew swap paddlers: a fresh pair of arms on the crutch.' }); }
+    else if (tired === 'rest') this.emit({ type: 'toast', msg: (b.crew?.spec.crew.length ?? 0) === 0 ? 'You\'re spent: a rest before you paddle on.' : 'Your paddler is spent: a rest before they paddle on.' });
+    else if (tired === 'resume') this.emit({ type: 'toast', msg: 'Paddling again.' });
     const job = b.crew?.people[paddler(b)]?.job; if (job?.line === 'paddle' && job.side !== b.tack) this.paddleJob(b, p.side);
     if (!this.racing(b) || this.paddleAllowed(b)) return;
     // the 42.3(h) window closing on a spell begun to get clear: the crew's own stops (they keep the rule); yours, a word
@@ -992,10 +997,10 @@ export class World {
   /** The 42.3(h) window's closing told, for each boat's spell (its t0, kept through a change of sides): when. */
   private r42warn = new Map<number, { t0: number; at: number }>();
   /** The crutch's work each step it can have any (World.step): the crew's look for a jam, twice a second, then the paddling. */
-  private paddleTick(): void {
+  private paddleTick(dt: number): void {
     const u = this.user;
     if (this.steps % 30 === 0 && !u.handled) this.crewPaddleCall(u);
-    this.paddleWork(u);
+    this.paddleWork(u, dt);
   }
   /**
    * A good crew paddles unasked in a jam (the owner: "Oh fuck, time to paddle"): no wind to sail by (under 3 kt) and
@@ -1036,7 +1041,7 @@ export class World {
     // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
     // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
     if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
-    else if (this.t - p.t0 > 180) this.paddle(null, false, true); // (worn out)
+    // (tired, they rest and paddle on, or swap: paddle.ts paddleStep; as long as the jam lasts)
   }
   /** Where she'll be on land, or within 10 m of a mark, drifting at `vel` (m/s over the ground) in the next minute, looking
    * every 5 s (at a 2 m/s Gate ebb, 10 m apart: a mark or a thin pier isn't stepped over). */
@@ -1263,7 +1268,7 @@ export class World {
     // (her time at 145° true or higher with it wanted: a shift of a few seconds doesn't bring it in)
     const u = this.user; u.poleHighAt = u.poleWant && u.twa <= 145 ? (u.poleHighAt ?? this.t) : undefined;
     if (u.poleWant) { const why = poleMustCome(u, this.t - (u.poleHighAt ?? this.t)); if (why) { u.poleWant = false; u.poleHighAt = undefined; this.emit({ type: 'toast', msg: `Crew: pole in, ${why}.`, ms: 3500 }); } }
-    if (this.user.paddle || this.steps % 30 === 0) this.paddleTick(); // (the crutch: a jam looked for twice a second, and the paddling while it's out; in a method of its own, entered only then: in World.step itself the two calls cost every step about 1%, perf-pair (Capacity))
+    if (this.user.paddle || this.steps % 30 === 0) this.paddleTick(dt); // (the crutch: a jam looked for twice a second, and the paddling while it's out; in a method of its own, entered only then: in World.step itself the two calls cost every step about 1%, perf-pair (Capacity))
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
       if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
