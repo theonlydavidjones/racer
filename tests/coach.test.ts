@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt, courseHeading } from './helpers/testBoat';
 import { takeLine } from '../src/boat/physics';
-import { CoachMemory, FIX_MIN, SETTLE_S, addLessonSource, lessons, lineNotes, teach } from '../src/boat/coach';
+import { CoachMemory, FIX_MIN, SETTLE_S, addLessonSource, lessons, lineNotes, situation, teach } from '../src/boat/coach';
 import type { Boat } from '../src/boat/boat';
 import type { SeaHere } from '../src/environment/sea';
 
@@ -199,3 +199,14 @@ describe('the trim coach: from the physics review', () => {
   });
 });
 
+
+describe('the trim coach: the wind\'s band', () => {
+  it('follows the wind as shown (a 7 is light, a 15 medium), and holds a half-knot past each edge once said', () => {
+    const at = (kt: number, band?: 'light' | 'medium' | 'heavy') => { const b = boat({ heading: 318, windKt: 10 }); b.ww.kt = kt; return situation(b, { band }).band; };
+    expect(at(7.4)).toBe('light'); expect(at(7.6)).toBe('medium'); expect(at(15.4)).toBe('medium'); expect(at(15.6)).toBe('heavy');
+    expect(at(7.8, 'light')).toBe('light'); expect(at(7.2, 'medium')).toBe('medium'); // (held about the edge)
+    expect(at(8.1, 'light')).toBe('medium'); expect(at(6.9, 'medium')).toBe('light'); // (past the half-knot: it moves)
+    expect(at(15.9, 'medium')).toBe('medium'); expect(at(15.1, 'heavy')).toBe('heavy');
+    expect(at(11, 'light')).toBe('medium');
+  });
+});

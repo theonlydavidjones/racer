@@ -14,7 +14,7 @@ import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
 import { ORIENT_LABEL, SceneView, VIEWS, overheadUp, type Overhead } from './render/scene';
-import { HELD, KeyMap, type Action } from './ui/keys';
+import { HELD, KeyMap, keyOf, type Action } from './ui/keys';
 import { KeysView } from './ui/keysView';
 import { D2R, V } from './core/math';
 import { EXONERATION, RULES, explain, scoreOrder, type Incident } from './rules';
@@ -648,7 +648,7 @@ let notesPaused = false;
 function openTrimNotes(): void {
   if (!w.running || !$('trimNotes').hidden) return;
   notesPaused = !w.paused; if (notesPaused) send({ k: 'pause', on: true });
-  const { s, notes } = lineNotes(w.user, { preStart: !w.freeSail && w.t < 0 });
+  const { s, notes } = lineNotes(w.user, { preStart: !w.freeSail && w.t < 0, band: coachShown?.view.situation.band }); // (the band the live note last said)
   $('trimNotesBody').innerHTML = trimNotesHtml(w.user, s, notes);
   $('trimNotes').hidden = false; $<HTMLButtonElement>('bTrimNotesX').focus();
 }
@@ -1102,7 +1102,7 @@ addEventListener('keydown', e => {
   if (!$('motorAsk').hidden) { if (e.key === 'Escape') $('bMotorNo').click(); return; }
   if (!$('homeAsk').hidden) { if (e.key === 'Escape') $('bHomeNo').click(); return; } // retire or keep racing first
   if (!$('leaveAsk').hidden) { if (e.key === 'Escape') $('bLeaveNo').click(); return; } // leave or keep racing first
-  const a = keymap.actionFor(e.key);
+  const a = keymap.actionFor(keyOf(e));
   if (e.key === 'Escape') {
     if (!$('trimNotes').hidden) { closeTrimNotes(); return; }
     if (!$('flagIndex').hidden) { hud.flagIndex(w, false); return; }
@@ -1159,14 +1159,14 @@ addEventListener('keydown', e => {
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
     case 'windLadder': windShow(!S.windLadder); break;
-    case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: F9 unless rebound; ` went to the wind indicator)
+    case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
     case 'lookAhead': lookAhead(); break;
     case 'orient': cycleOrient(); break;
     case 'recentre': recentre(); break;
   }
 });
 addEventListener('keyup', e => {
-  const a = keymap.actionFor(e.key);
+  const a = keymap.actionFor(keyOf(e));
   if (a && held.delete(a)) applyHeld();
 });
 addEventListener('blur', () => { held.clear(); applyHeld(); });

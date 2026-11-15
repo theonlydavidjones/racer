@@ -69,7 +69,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
-  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['F9'], trimNotes: ['F2'],
+  log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['Shift+F'], trimNotes: ['Shift+T'],
 };
 
 /** Keys you can't rebind (Esc cancels things; Tab moves focus). */
@@ -77,10 +77,18 @@ const RESERVED = new Set(['Escape', 'Tab']);
 const STORE = 'fbsim-keys-v1';
 
 /** A key as we store it: letters lower-case, space spelled out. */
+/**
+ * A key press as the key map names it: Shift+letter apart from the letter ("Shift+T"), told by the Shift key itself, so
+ * Caps Lock changes nothing. (No function keys: on a Mac F1–F12 are the brightness, volume and Mission Control keys
+ * unless Fn is held, the owner, 15 Nov 2026; every plain letter, digit and punctuation key is taken, so new keys are
+ * Shift+letter.)
+ */
+export function keyOf(e: { key: string; shiftKey?: boolean }): string { return e.shiftKey && /^[a-z]$/i.test(e.key) ? 'Shift+' + e.key.toUpperCase() : e.key; }
 export function normKey(k: string): string { return k === ' ' ? 'Space' : k.length === 1 ? k.toLowerCase() : k; }
 /** A key as people read it. */
 export function keyLabel(k: string): string {
   const names: Record<string, string> = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Space: 'Space', Enter: 'Enter', Backspace: '⌫' };
+  if (k.startsWith('Shift+')) return '⇧' + k.slice(6);
   return names[k] ?? (k.length === 1 ? k.toUpperCase() : k);
 }
 
@@ -97,6 +105,8 @@ export class KeyMap {
   actionFor(key: string): Action | null {
     const k = normKey(key);
     for (const a of Object.keys(this.keys) as Action[]) if (this.keys[a].includes(k)) return a;
+    // (Shift with a letter that has no Shift binding of its own: the letter, as before Shift+letter keys existed)
+    if (k.startsWith('Shift+')) return this.actionFor(k.slice(6).toLowerCase());
     return null;
   }
   /** Bind `key` to `action` (replacing its first key). Takes the key off any other action. Returns that action, if any. */

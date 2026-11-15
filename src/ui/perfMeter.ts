@@ -1,7 +1,7 @@
 import type * as THREE from 'three';
 
 /**
- * The frame-time readout (F9, or the key set in Keys; a developer's tool): frames per second and the slowest frame lately, the
+ * The frame-time readout (Shift+F, or the key set in Keys; a developer's tool): frames per second and the slowest frame lately, the
  * JavaScript time per frame by part (the sim's steps, the 3D scene, the rest: labels, HUD, maps), and what the GPU is
  * given (draw calls, triangles, shader programs, geometries and textures held) and the JS heap. For checking the
  * performance budget (ROADMAP, "Performance review") on a real machine. Stutter shows as the 95th-percentile frame and
