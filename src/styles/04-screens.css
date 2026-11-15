@@ -30,6 +30,12 @@ body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-inde
 #showBar label{display:flex;align-items:center;gap:8px}
 #showBar input{width:200px}
 #showBar b{min-width:92px;color:var(--text)}
+/* lesson 1 (app/boatLesson.ts): the bar is the lesson's one line, "Find the boom", centered under her */
+#showCue{display:none}
+body.partsLesson #showBar>:not(#showCue){display:none}
+body.partsLesson #showBar{right:auto;left:50%;transform:translateX(-50%);bottom:28px;padding:10px 18px;text-transform:none;letter-spacing:0;font:600 16px/1.2 var(--f-ui,inherit)}
+body.partsLesson #showCue{display:block;min-width:0}
+body.partsLesson #showCue.ok{color:#3fd197}
 body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom #sigPanel,body.showroom #situ,body.showroom #compassTape,body.showroom #coachPanel,body.showroom #coachTip,body.showroom #tillerGuide,body.showroom #dial{visibility:hidden}
 
 .garage{display:flex;flex-direction:column;gap:8px;padding:12px 18px;border-bottom:1px solid var(--rule)}
@@ -208,7 +214,12 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 #planC.grab{cursor:grab} #planC.grabbing{cursor:grabbing}
 #plan .ch-btns{align-items:center;flex-wrap:wrap;justify-content:flex-end}
 #planPinSeg button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
-#bPlanOpen{margin-left:8px;vertical-align:1px}
+/* the way onto the big chart: an expand icon in the small chart's corner (the owner, 15 Nov 2026: "kill the 'plan on the
+   big chart' button and just have an expand icon on the map itself") */
+.setchart-wrap{position:relative}
+.chart-expand{position:absolute;top:16px;right:8px;width:30px;height:30px;padding:0;border-radius:6px;border:1px solid var(--rule);
+  background:rgba(10,20,32,.78);color:var(--text);font:600 17px/1 var(--f-body);cursor:pointer;display:grid;place-items:center}
+.chart-expand:hover,.chart-expand:focus-visible{border-color:var(--accent);color:var(--accent)}
 #mapFx{border-radius:50%}
 /* the field layer picker: big, top left of the chart, where the eye goes first (one at a time, as Windy has it) */
 #chartField,#planField{position:absolute;left:12px;top:80px;z-index:2;display:flex;gap:4px;padding:4px;border-radius:24px;background:rgba(9,22,33,.9);box-shadow:0 2px 10px rgba(0,0,0,.3)}

@@ -68,7 +68,8 @@ export class ShadowLayer {
     const def = new Float32Array(nx * ny);
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       const sx = x0 + i * cellPx, sy = y0 + j * cellPx, p = inv(sx, sy);
-      if (p.x < WORLD.s.x || p.x > WORLD.n.x || p.y < WORLD.s.y || p.y > WORLD.n.y || onLand(p)) continue;
+      // (written as "not inside" so a point that isn't a number, from a chart not yet laid out, is skipped too)
+      if (!(p.x >= WORLD.s.x && p.x <= WORLD.n.x && p.y >= WORLD.s.y && p.y <= WORLD.n.y) || onLand(p)) continue;
       const d = 1 - wd.shadowAt(p).k; def[j * nx + i] = d;
       if (d > max && sx >= 0 && sx <= w && sy >= 0 && sy <= h) max = d; // (in view: for the key and the chart's note)
     }

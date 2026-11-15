@@ -314,25 +314,12 @@ physics, ranked like the ten above:
 |---|---:|---:|---|---|
 | RHO | 1025 | 21 | standard |  |
 | HP | 745.7 | 22 | standard |  |
-| OUTBOARDS.hp | 2.5 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.kg | 13 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.propD | 7… | 28 | estimate | 3.5's prop assumed for all |
-| OUTBOARDS.pitch | 7… | 28 | estimate | 3.5's prop assumed for all |
-| OUTBOARDS.rpm | 5500 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.gear | 2.15 | 28 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.hp | 3.5 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.kg | 18.4 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.propD | 7… | 29 | estimate | 3.5's prop assumed for all |
-| OUTBOARDS.pitch | 7… | 29 | estimate | 3.5's prop assumed for all |
-| OUTBOARDS.rpm | 5500 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.gear | 2.15 | 29 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.hp | 6 | 30 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.kg | 26 | 30 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.propD | 7… | 30 | estimate | 3.5's prop assumed for all |
-| OUTBOARDS.pitch | 7… | 30 | estimate | 3.5's prop assumed for all |
-| OUTBOARDS.rpm | 5500 | 30 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| OUTBOARDS.gear | 2.08 | 30 | sourced | Tohatsu specs via retailers (6 hp weight: to check) |
-| FIGURE_OF_MERIT | 0.55 | 33 | estimate |  |
+| OUTBOARDS (2.5) | 18.5 kg, no reverse, 5000 rpm, gear 2.15, prop 7.4 × 7.0 in | 41 | sourced | Tohatsu MFS2.5C/3.5C owner's manual and product page, read 14 Nov 2026 |
+| OUTBOARDS (3.5) | 18.5 kg, no reverse, 5500 rpm, gear 2.15, prop 7.4 × 7.0 in | 42 | sourced | the same |
+| OUTBOARDS (6) | 26 kg, reverse, 5500 rpm, gear 2.15, prop 7.8 × 8 in | 43 | sourced | Tohatsu MFS4C/5C/6C manual and product page; the prop from YACHT's 6 hp test (21 Sep 2023) |
+| PROP_WALK | 0.02 ahead, 0.04 in reverse gear | | estimate | no figure for an outboard was found |
+| MOUNT_X, OUTBOARD_PROP (outboardMount.ts) | 0.42 m to port; prop 0.17–0.22 m under, 4.15–4.18 m aft of her middle | | estimate | no Folkboat bracket's dimensions were found |
+| FIGURE_OF_MERIT | 0.56 | 46 | sourced for the 6, estimate for the 2.5 and 3.5 | YACHT's bollard pulls: Tohatsu MFS5/MFS6 0.61 kN on a 7.8 × 8 in prop |
 | REVERSE | 0.5 | 35 | estimate |  |
 | LEG_CDA | 0.010 | 39 | estimate |  |
 
@@ -345,6 +332,8 @@ physics, ranked like the ten above:
 | CREW_LAG | 0.8 | 27 | unsourced |  |
 | ASTERN_DRAG.c0 | 0.005 | 30 | unsourced |  |
 | ASTERN_DRAG.c1 | 0.035 | 30 | unsourced |  |
+| STEERS_ASTERN | 0.05 m/s | | estimate | above it a held tiller steers by the flow going astern; below, it sculls |
+| HANDLING.asternRudder | 0.7 | | estimate | the rudder's lift going astern over ahead (Molland & Turnock, second hand: 75–85%, earlier stall) |
 | POLE.set | 8 | 35 | unsourced |  |
 | POLE.stow | 5 | 35 | unsourced |  |
 | POLE.jibe | 8 | 35 | unsourced |  |
@@ -473,6 +462,25 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | P1 | 283.2 | 50 | sourced |  |
+
+### src/environment/harborMouth.ts
+
+| Constant | Value | Line | Class | Note |
+|---|---:|---:|---|---|
+| MOUTH.gyre | 0.25 | 81 | sourced | "a first guess": Bijvelds 1997 §3, after Booij 1986 (nearer 0.1 in the case he checks) |
+| MOUTH.peak, rim | 0.75, 1.25 | 83 | estimate | the gyre's shape: assumed |
+| MOUTH.beta | 0.59 | 85 | estimate | Langendoen's value for a square harbor open across its width; 0.4–1 with the shape |
+| MOUTH.spread | 0.23 | 88 | sourced | Booij's measurement in a harbor's mouth as B = ΔU/(dU/dy)max (Bijvelds 1997 §4) |
+| MOUTH.B0 | 1 | 88 | estimate | the layer's width at the corner |
+| MOUTH.spacing | 3 | 91 | estimate | the largest eddies' size (Tukker 1997, in Bijvelds), taken as their spacing |
+| MOUTH.carry | 0.5 | 91 | sourced | Bijvelds 1997 |
+| MOUTH.v | 0.1 | 91 | sourced | Uijttewaal & Tukker, in Bijvelds §2; all put in one row of eddies (upper bound) |
+| MOUTH.cf, depth | 0.0025, 3 | 94 | sourced | the usual tidal-model drag (not measured here); Coast Pilot 7's 8–12 ft |
+| MOUTH.free | 0.18 | 96 | sourced | Brown & Roshko 1974, Bijvelds eq. 3.6 |
+| MOUTH.reattach | 4 | | estimate | steps to come back to the wall after a knuckle: 6–7 behind a square step (Kim, Kline & Johnston 1980), less behind a 27° slope |
+| (the pile lee's reach) | 1–2 pier-heads | | estimate | not derived: see the module's comment |
+| (the layer's head start through the piles) | the pier's width | | estimate | nothing found on shear layers through pile fields |
+| (the still pool's reach) | 2 gyre radii | | estimate | |
 
 ### src/environment/pierWakes.ts
 
@@ -657,6 +665,13 @@ physics, ranked like the ten above:
 | COMPELLED_WINDOW | 3 | 78 | unsourced | RRS names the rule, not the number |
 | SHOVE | 0.5 | 109 | unsourced |  |
 | WALK | 0.45 | 111 | unsourced |  |
+| SHOVE_N | 265 N (27 kgf) | | sourced | one adult's initial push (Snook & Ciriello 1991, via the Liberty Mutual table) |
+| ASTERN_SHOVE | 0.64 m/s | | estimate | WALK plus SHOVE_N over 1 m of reach (the reach is the estimate) |
+| STEER_FOR | 13 s | | estimate | the steerage (over 0.3 m/s) the shove must give in the wind there is: the bar's 10 s and the scatter on an arc |
+| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 9 m | | derived / estimate | her still-air glide from the full shove (11.4 m); the clear water for which the way nearest the exit is taken |
+| ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 90 s, 1 m, 24 m | | estimate | the glide's one horizon; stopping short of the clear water's end; the furthest the planner looks |
+| DRIFT_PER_KT, DRIFT_PACE, DRIFT_FOR (geo/marina.ts) | 0.017 m/s per kt, 0.2 m/s, 60 s | | estimate | bare-poles drift to leeward allowed for along her run, measured in this sim |
+| ASTERN_WEST_KT, ASTERN_WEST_BAND (geo/marina.ts) | 6 kt, 45° | | estimate | NO_ASTERN_WEST's westerly: sailed at 4, 8 and 12 kt from 270, and at 12 kt from 225 and 315, only |
 | CREW_TURN | 2 | 111 | unsourced |  |
 | AI_CREW_SKILL.Red | 0.75 | 134 | design | fleet variety |
 | AI_CREW_SKILL.Blue | 0.6 | 134 | design | fleet variety |

@@ -24,7 +24,7 @@ export function crewWords(u: Boat): string {
   if (pl) {
     const across = pl.across == null ? '' : { lee: `sitting to leeward on the ${lw} side`, mid: 'in the middle', up: `sitting up on the ${ww} side`, hike: `hiking out on the ${ww} rail` }[pl.across];
     const fore = pl.fore == null ? '' : { fwd: 'weight forward', mid: 'weight in the middle', aft: 'weight aft', deck: n >= 2 ? 'up on the foredeck' : 'the crew at the mast' }[pl.fore];
-    where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; tap Crew for auto`;
+    where = `You: ${[across, fore].filter(Boolean).join(', ')}. They stay there through tacks and puffs; click Crew for auto`;
   } else {
     // (with the pole out on a run: where best practice has them, and how far they've followed it: crewPhys.ts chooseLayout)
     const pw = c.poleWhy, pole = pw && {
@@ -103,8 +103,8 @@ export function showCrewRow(u: Boat): void {
   const wind = document.getElementById('tpWind'); if (wind) wind.textContent = `Wind over the ${ww} side: ${ww} is windward, ${lw} is leeward`;
   const box = document.getElementById('tpCrewOpen'), line = document.getElementById('tpCrewLine');
   if (box) box.hidden = !open;
-  if (line) { line.setAttribute('aria-expanded', String(open)); line.classList.toggle('open', open); line.title = open ? (mine ? 'Placed by you: tap Crew to put them back on auto' : 'Tap to fold') : 'Tap to see where the crew can sit'; }
-  setWho('whoCrew', mine, mine ? 'You\'ve placed the crew: they stay there. Tap Crew to put them back on auto.' : 'On auto: the crew place their own weight. Tap You (or a place) to put them somewhere yourself.');
+  if (line) { line.setAttribute('aria-expanded', String(open)); line.classList.toggle('open', open); line.title = open ? (mine ? 'Placed by you: click Crew to put them back on auto' : 'Click to fold') : 'Click to see where the crew can sit'; }
+  setWho('whoCrew', mine, mine ? 'You\'ve placed the crew: they stay there. Click Crew to put them back on auto.' : 'On auto: the crew place their own weight. Click You (or a place) to put them somewhere yourself.');
 }
 
 /** A Crew · You switch: green Crew while the crew does it (auto), amber You once it's yours. */

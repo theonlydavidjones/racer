@@ -41,6 +41,10 @@ body.showroom #hudRight,body.showroom #flagIndex{visibility:hidden}
 #leftCol #sigPanel,#leftCol #dial{position:static}
 #nextCard{width:240px;box-sizing:border-box;background:var(--pod);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;line-height:1.35}
 #nextCard[hidden]{display:none}
+#nextCard{position:relative}
+.nc-restart{position:absolute;top:5px;right:6px;padding:3px 8px;border-radius:6px;border:1px solid var(--rule);background:var(--ink);color:var(--text);font:600 10.5px/1 var(--f-inst);letter-spacing:.06em;cursor:pointer}
+.nc-restart:hover{border-color:var(--accent);color:var(--accent)}
+.nc-restart[hidden]{display:none}
 .nc-h{font:600 9.5px/1 var(--f-inst);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .nc-row{display:flex;align-items:center;gap:8px}
 .nc-num{font:700 26px/1 var(--f-inst);font-variant-numeric:tabular-nums;min-width:60px}

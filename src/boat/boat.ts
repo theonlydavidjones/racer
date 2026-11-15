@@ -103,6 +103,12 @@ export interface Boat {
   astern?: number;
   /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
   motor?: import('./motor').MotorState;
+  /** The crew paddling her with the boom crutch (boat/paddle.ts): the side, since when, and whether they called it. */
+  paddle?: import('./paddle').PaddleState | null;
+  /** You stopped the crew's own paddling: they leave it to you until the jam has passed (world.ts crewPaddleCall). */
+  paddleOff?: boolean;
+  /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
+  lastHitT?: number;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
@@ -138,6 +144,9 @@ export interface Boat {
   penaltyTotal: number; // 360 or 720
   penaltyTurned: number; // signed degrees turned since the penalty started
   penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
+  /** Her turns' tacks and jibes (physics.ts penaltyManeuver): how many counted, the last (1 a tack, 2 a jibe, 0 none),
+   * how far into her turns it was (degrees), and whether her penalty ends as the tack she's in completes. */
+  penaltyMoves: number; penaltyLastMove: 0 | 1 | 2; penaltyAt: number; penaltyEndOnTack: boolean;
   started: boolean;
   ocs: boolean;
   returning?: boolean; // Rule 21.1: after her start signal, not started, sailing back toward the pre-start side to start; kept by the World
@@ -181,6 +190,26 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** The tack she's gybing to, while her boom is on its way across: by the lee her tack is her mainsail's side (RRS
+   * Definitions), so it changes when the boom has crossed (physics.ts tackStep). */
+  gybeTo?: 'S' | 'P';
+  /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
+  turnCalledT?: number;
+  /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
+  byLee?: boolean;
+  /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
+   * wind means the jibe; a tap doesn't (physics.ts gybeMeant). */
+  steerSince?: number;
+  steerWas?: number;
+  /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
+   * (physics.ts boomStep). Undefined while the sheet has it. */
+  boomFree?: number;
+  /** When the wind took it, s. */
+  boomFreeT?: number;
+  /** The side it was on when the wind took it (+1 starboard, −1 port). */
+  boomFrom?: number;
+  /** When her boom last crashed across in a jibe the wind made (s): for the debrief and the tests. */
+  crashT?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
@@ -262,7 +291,7 @@ export interface Boat {
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
-  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: the umpire's, for finishing with her penalty not taken)
+  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: disqualified: rule 42 (scored as entries + 1, A5.2), or the umpire's, for finishing with her penalty not taken)
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;

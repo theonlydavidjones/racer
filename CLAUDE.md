@@ -54,7 +54,7 @@ come later, once the physics and racing are dialed in.
 
 ```bash
 npm run test:fast        # ~40 s: everything but the whole-race runs; use while iterating
-npm test                 # ~23 min: the full suite (run before publishing)
+npm test                 # ~29 min: the full suite (run before publishing; perf.test alone is ~12 min)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
 node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headless Chromium, both ways it loads (blob modules,
@@ -68,6 +68,7 @@ npm run dev & node scripts/check/setup-map.cjs <url> [<out-dir>]  # ~1 min: the 
 npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in the page (the statement, a tow, her logbook, laid up, carry on)
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
+node scripts/check/perf-pair.mjs --ai         # ~11 min: an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), the mean
 node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
                                               # this tree and the published one back to back; fails on a clear regression
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
@@ -76,15 +77,33 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 
 - The step's speed (the owner, 14 Nov 2026): measured paired, both versions sailed by turns in one process, so the
   host's drift cancels (scripts/check/perf-pair.mjs, docs/CAPACITY.md §8). The budget holds: perf.test requires the
-  step within v168 × 1.019 (the same 43.1 as before, now without the drift). A PR that touches the step (src/boat,
+  step within v168 × 1.019 (the same 43.1 as before, now without the drift), on twelve ratios, six with each loaded
+  first (the owner, 14 Nov 2026). A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
+  A PR that changes how boats sail or are judged (src/ai, src/rules) uses `--ai` instead, the mean over ten races: it
+  changes the race itself, and one race's ratio then lands anywhere in ±3% of the mean (#276 against turning: 0.986 to
+  1.067 over the ten, 1.032 the mean; docs/CAPACITY.md §8).
+- World.step (Capacity, 14 Nov 2026): don't add per-step lines to World.step itself, even ones that return at once:
+  the paddle's two cost every step 1.3% with the race unchanged. New per-step work goes behind one cheap test, in a
+  method of its own (docs/CAPACITY.md §8a), and a PR that adds lines to World.step runs perf-pair however free they look.
 - Sail numbers (the owner, 13 Nov 2026): sailors in a fleet go by sail numbers, not names. Anywhere boats are listed
   (standings, results, chips), show country and sail number (e.g. USA 110) beside the name.
 - US spelling (the owner, 13 Nov 2026) in everything the player reads (UI text, messages, coach, help, README):
   practice, color, favor, meters, harbor, maneuver, center, gray, jibe ("Ready to jibe" … "Jibe-ho"; the owner, 13 Nov), -ize. New code comments use it too.
 - Before opening a PR (the owner, 13 Nov 2026, for faster releases): merge origin/main into your branch and run the
   full `npm test` on it, not only test:fast; say in the PR that it passed (or which load timeouts you reran alone).
+- The full suite on a shared host (the Coordinator, 15 Nov 2026): only the timing checks need a slot of their own.
+  A session's full `npm test` may run as two halves: correctness, `npx vitest run --exclude tests/perf.test.ts`, which
+  may run beside other sessions'; and the timing, `npx vitest run tests/perf.test.ts` (and any
+  perf-pair, perf-ab or deopt), only in a slot from Capacity, one timing job at a time; correctness may run beside it
+  (the Coordinator, 15 Nov 2026, on Capacity's measurement with six sessions' correctness running: the host's steal 0.6% with
+  4 vCPUs busy, and perf-pair main against itself 0.9950, its six ratios 0.977–1.004, as quiet). A timing result within
+  0.5% of its limit is rerun fully quiet before it counts. A correctness failure under load is
+  rerun alone before it's called a load timeout. Each session is its own VM of 4 vCPUs (`uptime`'s load is that
+  VM's own; other sessions reach it only as CPU steal): run one vitest process at a time in it, never two suites side by
+  side (Deep Physics, 15 Nov: two at once took 85 minutes and timed out 24 tests). The PR says both halves passed: "full npm test: correctness (under
+  load) + perf.test (timing slot)". The Coordinator's batch runs stay whole, on a quiet host.
 - How the Coordinator tests a batch (the owner, 13 Nov 2026): test:fast first on the merged batch (fail fast), then the
   tier the batch needs. A batch touching src/boat, src/environment, src/sim, src/ai, src/rules, src/core, tests or the
   data under src/ gets the full `npm test`. A batch touching only src/ui, src/render, styles, index.html, scripts or docs

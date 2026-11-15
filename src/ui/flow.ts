@@ -79,23 +79,29 @@ export class FlowField {
   /** samples worked out last time, and how long that took (ms): for the frame-cost check */
   lastSamples = 0; lastMs = 0;
   draw(ctx: CanvasRenderingContext2D, tf: Tf, w: number, h: number, scale: number, wd: SimView, kind: FlowKind, alpha: number, cellPx = 12, everyS = 60): void {
-    if (!(w > 0 && h > 0 && scale > 0 && cellPx > 0)) return; // (a map not laid out yet, or hidden)
-    const { m, inv } = affine(tf);
+    if (!this.ready(tf, w, h, scale, wd, kind, cellPx, everyS)) return;
+    const { m } = affine(tf);
+    // the image's pixel (i, j) is the sim's (x0 + i·d, y1 − j·d): that onto the screen through tf
+    ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = true;
+    ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); ctx.transform(this.d, 0, 0, -this.d, this.x0, this.y1);
+    ctx.drawImage(this.img!, -0.5, -0.5);
+    ctx.restore();
+  }
+  /** Built for this view, the clock's bucket and this kind (built now if not): false if there's nothing to draw. Also
+   * called with nothing drawn, to have a field ready before it's switched on (Hud: built while the page is idle). */
+  ready(tf: Tf, w: number, h: number, scale: number, wd: SimView, kind: FlowKind, cellPx = 12, everyS = 60): boolean {
+    if (!(w > 0 && h > 0 && scale > 0 && cellPx > 0)) return false; // (a map not laid out yet, or hidden)
+    const { inv } = affine(tf);
     const cs = [inv(0, 0), inv(w, 0), inv(0, h), inv(w, h)], xs = cs.map(p => p.x), ys = cs.map(p => p.y);
     const vx0 = Math.min(...xs), vx1 = Math.max(...xs), vy0 = Math.min(...ys), vy1 = Math.max(...ys);
     // (worked out again every `everyS` seconds of the sim's clock: the puffs drift, the tide turns)
     const d = cellPx / scale, bucket = Math.floor(wd.clockUtc * 60 / everyS);
     const key = `${kind}|${bucket}|${wd.seed}|${wd.wind.from.toFixed(0)}`;
     const inside = this.img && vx0 >= this.x0 && vx1 <= this.x0 + (this.nx - 1) * this.d && vy1 <= this.y1 && vy0 >= this.y1 - (this.ny - 1) * this.d;
-    if (![vx0, vx1, vy0, vy1, d].every(Number.isFinite)) return;
+    if (![vx0, vx1, vy0, vy1, d].every(Number.isFinite)) return false;
     if (!inside || key !== this.key || Math.abs(Math.log(d / this.d)) > 0.25) this.build(wd, kind, vx0, vx1, vy0, vy1, d, key);
     else this.lastSamples = 0;
-    if (!this.img) return;
-    // the image's pixel (i, j) is the sim's (x0 + i·d, y1 − j·d): that onto the screen through tf
-    ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = true;
-    ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); ctx.transform(this.d, 0, 0, -this.d, this.x0, this.y1);
-    ctx.drawImage(this.img!, -0.5, -0.5);
-    ctx.restore();
+    return !!this.img;
   }
   private build(wd: SimView, kind: FlowKind, vx0: number, vx1: number, vy0: number, vy1: number, d: number, key: string): void {
     const T0 = performance.now();

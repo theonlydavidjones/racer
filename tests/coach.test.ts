@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, kt, courseHeading } from './helpers/testBoat';
 import { takeLine } from '../src/boat/physics';
-import { CoachMemory, FIX_MIN, addLessonSource, teach } from '../src/boat/coach';
+import { CoachMemory, FIX_MIN, SETTLE_S, addLessonSource, lessons, lineNotes, situation, teach } from '../src/boat/coach';
 import type { Boat } from '../src/boat/boat';
 import type { SeaHere } from '../src/environment/sea';
 
@@ -35,6 +35,31 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
   // the depowering question (ROADMAP): North Sails has the outhaul to its mark above 12 kt, but in 18–20 kt the speed
   // search finds it worth next to nothing against the crew's other depowering
   it.todo('18–20 kt upwind, outhaul off: says to fix it, as North Sails does (the depowering question)');
+  // (the guide: "Never use the kickingstrap upwind in less than 18 knots"; the crew's own solver keeps to it, and so does
+  // the coach: with the main eased in light air, the cure is the sheet, not vang on hard)
+  it('7 kt upwind, main eased and vang off: never "vang on" (North Sails: no vang upwind under 18 kt)', () => {
+    const b = boat({ heading: 318, windKt: 7 }); takeLine(b, 'vang'); wrong(b, 'mainsheet', 0.45); (b.ctlTarget ??= {}).vang = 0; hold(b, 30);
+    const { list } = lessons(b), vang = list.find(l => l.line === 'vang');
+    expect(vang === undefined || (vang.to ?? 0) <= 0.1 + 1e-9).toBe(true);
+    expect(list[0]?.line).toBe('mainsheet');
+  });
+  // Trim Notes (the review): the crew's lines say what they're doing, never a fix (a one-line search at their steady
+  // state finds "fixes" that slow her); a ✓ only where the words are checked
+  it('Trim Notes: no fixes on the crew\'s lines; the vang on upwind in light air gets no ✓', () => {
+    const b = boat({ heading: 318, windKt: 26 }), n = lineNotes(b).notes;
+    for (const x of n) if (x.who === 'crew') expect(x.fix).toBeNull();
+    const b2 = boat({ heading: 318, windKt: 8 }); takeLine(b2, 'vang'); (b2.ctlTarget ??= {}).vang = 0.6; hold(b2, 20);
+    const v = lineNotes(b2).notes.find(x => x.line === 'vang')!;
+    if (!v.fix) expect(v.tick).toBe(false);
+  });
+  it('a fix that turns up while she settles is said once the quiet is over', () => {
+    const b = boat({ heading: 318, windKt: 10 }), m = new CoachMemory();
+    m.step(b, 0); m.quietUntil = 5; wrong(b, 'jibsheet', 0.6);
+    let said: string | null = null;
+    for (let t = 1; t < 5; t += 0.5) expect(m.step(b, t).fresh).toBeNull();
+    for (let t = 5; t < 8 && !said; t += 0.5) said = m.step(b, t).fresh;
+    expect(said).toMatch(/jib/i); expect(SETTLE_S).toBe(5);
+  });
   it('with two things wrong, the bigger loss comes first', () => {
     const b = boat({ heading: 318, windKt: 10 });
     takeLine(b, 'jibsheet'); takeLine(b, 'vang'); b.ctlTarget = { jibsheet: 0.3, vang: 0.4 }; hold(b, 30);
@@ -99,7 +124,7 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     b.ctlTarget = { jibsheet: first.view.top.to! };
     let done: string | null = null;
     hold(b, 20, () => { t += 1 / 60; if (Math.round(t * 60) % 30 === 0) { const r = m.step(b, t); done ??= r.done; } });
-    expect(done).toMatch(/^That's it: jib telltales streaming both sides, 3\.\d → [34]\.\d kt\./);
+    expect(done).toMatch(/^That's it: the jib's luff telltales streaming, windward and leeward, 3\.\d → [34]\.\d kt\./);
     expect(m.step(b, t).view.top.kind).toBe('ok');
   });
   it('more teachers can join (crew weight, say): ranked with the rest', () => {
@@ -174,3 +199,14 @@ describe('the trim coach: from the physics review', () => {
   });
 });
 
+
+describe('the trim coach: the wind\'s band', () => {
+  it('follows the wind as shown (a 7 is light, a 15 medium), and holds a half-knot past each edge once said', () => {
+    const at = (kt: number, band?: 'light' | 'medium' | 'heavy') => { const b = boat({ heading: 318, windKt: 10 }); b.ww.kt = kt; return situation(b, { band }).band; };
+    expect(at(7.4)).toBe('light'); expect(at(7.6)).toBe('medium'); expect(at(15.4)).toBe('medium'); expect(at(15.6)).toBe('heavy');
+    expect(at(7.8, 'light')).toBe('light'); expect(at(7.2, 'medium')).toBe('medium'); // (held about the edge)
+    expect(at(8.1, 'light')).toBe('medium'); expect(at(6.9, 'medium')).toBe('light'); // (past the half-knot: it moves)
+    expect(at(15.9, 'medium')).toBe('medium'); expect(at(15.1, 'heavy')).toBe('heavy');
+    expect(at(11, 'light')).toBe('medium');
+  });
+});
