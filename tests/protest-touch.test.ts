@@ -66,4 +66,35 @@ describe('Rule 31 under protests', () => {
     for (let i = 0; i < (PROTEST_REACT + 0.5) / DT; i++) { w.step(DT); w.drainEvents(); }
     expect(w.user.penalty).toBeGreaterThan(0); expect(w.protests).toEqual([]); expect(w.hailOption()?.kind).not.toBe('protest');
   });
+
+  it('a touch seen while a foul against you is still yours to protest: the Hail keeps "Protest!" for that foul', () => {
+    const w = new World(SS2, settings({ fleet: 2 }), 3); racing(w);
+    const d = w.boats[2];
+    w.userIncident = { vs: d.id, t: w.t, rule: '10', fouler: d.id, kind: 'contact' };
+    touch(w, 'them');
+    expect(w.hailOption()).toMatchObject({ kind: 'protest', to: d });
+  });
+
+  it('a touch exonerated (43.1): still yours to protest if you saw it, and the hearing finds the exoneration; no AI protest', () => {
+    const w = new World(SS2, settings({ fleet: 2 }), 3); racing(w);
+    const t = w.boats[1], m = w.C.marks[0].p; t.x = m.x + 3; t.y = m.y; w.user.x = m.x + 15; w.user.y = m.y; w.boats[2].x = m.x + 10; w.boats[2].y = m.y + 5;
+    (w as unknown as { touchSeen: (b: unknown, ex: boolean) => void }).touchSeen(t, true);
+    expect(w.hailOption()).toMatchObject({ kind: 'protest', to: t });
+    w.userHail();
+    expect(decide(w.protests[0], { id: t.id, racing: false, retired: false }).outcome).toBe('exonerated');
+    for (let i = 0; i < (PROTEST_REACT + 0.5) / DT; i++) { w.step(DT); w.drainEvents(); }
+    expect(w.protests.filter(p => p.by !== w.user.id && p.vs === t.id && p.kind === 'mark')).toEqual([]);
+  });
+
+  it('declined touch, then a foul in the same incident (44.1(a)): the foul\'s full penalty, and the touch\'s protest reads as owed', () => {
+    const w = new World(SS2, settings(), 3); racing(w);
+    const b = w.boats[1], x = w.user, W = w as unknown as { lastTouch: Map<number, unknown>; lastFoulVs: Map<number, unknown>; declined: Set<string> };
+    b.penalty = 360; b.penaltyTotal = 360; b.penaltyDir = 0; // (turns owed from before, not begun)
+    W.lastTouch.set(b.id, { t: w.t, near: [x.id], loaded: false }); W.declined.add(`${b.id}@${w.t}:31`);
+    w.protests.push({ by: x.id, vs: b.id, t: w.t, rule: '31', fouler: b.id, kind: 'mark', hailT: w.t, flagT: w.t, owed: false, turnsT: null });
+    W.lastFoulVs.set(b.id, { vs: x.id, t: w.t, clear: false });
+    w.assignPenalty(b);
+    expect(b.penalty).toBe(360 + w.penaltyDeg); // (nothing knocked off: no turn was loaded for the touch)
+    expect(w.protests[0].owed).toBe(true);
+  });
 });
