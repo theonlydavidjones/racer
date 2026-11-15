@@ -459,6 +459,53 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **The cruise planner's layers: slow to switch, streaks redrawn oddly** (owner, 15 November; not urgent; 1–2 h):
+     "toggling between current and waves in cruise planner takes forever, and the moving lines redraw themselves in
+     weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
+     recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
+     jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
+     cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
+     chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
+     toggles moved (8b), and its key working with the chart open. Check the strategist in a race the same way.
+   - **Bug: lashing the tiller less than about 13° off the centerline lashes it amidships** (owner, 15 November; bug;
+     <1–2 h): "tiller lashing is glitching when I try to lash it less than 13ish degrees off centerline. it just lashes
+     it amidships." Leads in src/app.ts:
+     - The double-click route (around line 1192) records the first press's angle (`firstPress`), but the first click
+       also lets go of the tiller. Between the clicks the tiller springs back toward the center (`tillerSpring`, 2.5 a
+       second), so a small angle can reach zero first.
+     - Check that the right-click route keeps the angle too, and that `setTiller`, then the `lash` command (sim/commands.ts
+       line 120, which lashes at `u.tiller`), reach the worker in that order, with nothing in between zeroing a small
+       angle.
+     A test: lash at 5°, 10° and 15° each way, by right-click and by double-click; each must hold the angle it was
+     lashed at.
+   - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
+     <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
+     gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
+     like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
+     shadows, or a shadow-map artifact. Find what casts them and stop it; check both sides on both tacks.
+   - **The flow view keeps the boat in the middle of the screen** (owner, 15 November; not urgent; polish; <1 h): "when
+     I engage wind-over-sails, don't bump the boat to the left. keep her center screen." Opening the flow view shouldn't
+     move the camera or shift the boat aside to make room. The flow panel sits over the scene, and the boat stays where
+     she was.
+   - **The flow view with one sail down** (owner, 15 November; not urgent; accuracy; 1–2 h): "check that the wind over
+     sails map is accounting for when I'm sailing on just jib or just main." A first look found nothing in
+     ui/sailFlow.ts or ui/flowPanel.ts that checks whether each sail is hoisted. With one sail down, the view should
+     draw and describe only the sail that's up. There's no slot then: no jib bending the flow onto the main's lee side,
+     no main's upwash on the jib. A lowered sail's telltales go too. The physics' own sail forces should be checked the
+     same way.
+   - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
+     the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
+     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
+     more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
+     gybe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
+     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored gybe and use the
+     current, and never draw a track going backward. Fix: choose the angle and the gybes by speed made good over the
+     ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
+     changing the design). The AI's own leg planning shares sailLeg: check it too.
+   - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
+     'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
+     icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
    - ~~**Bugs in the race setup's "When" section**~~ (done: 196e7db) (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
      - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
        off after the first week. It should open fully visible, flipping upward or scrolling the panel.
@@ -504,6 +551,20 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
+   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Experience to design,
+     to the owner before building): "there's a lot of really cool shit we've built, like wind-in-air and wind-over-sails,
+     but it's hard to find these things. I think we need a 'more' (not that copy though) button on the game surface for
+     all features that show up on the game surface itself." One button, an icon rather than the word "More", that opens a
+     tray of icon tiles, each turning one on-surface feature on or off and showing its key. The candidates, from the
+     Keys list: the wind indicator (wind in the air), the flow view (wind over the sails), the sail controls band, the
+     course and strategist or navigator, the cabin-top instrument, the paddle, the navigation lights, the hail, the
+     views, all messages and the frame-time readout. The owner asked for this button; it should also absorb scattered
+     on-screen toggles, so the surface ends up with fewer controls, not more. Ties in with the UI audit (#236).
+   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
+     on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
+     small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
+     far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
+     November the owner said "no tiller strip"; this is a needle, not the old strip).
    - **An audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
