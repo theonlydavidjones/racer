@@ -51,10 +51,9 @@ describe('the beat angle in chop', () => {
       // (falling away steadily either side of the top, to a tenth of a percent (the polar has its own small ripples): by
       // 8° off, down by more than the search could mistake, and no climb back toward the top on the way)
       for (const dir of [-1, 1]) { let last = top; for (let d = 1; d <= 8; d++) { const v = vmg(best + dir * d); expect(v, `${kt} kt, ${hs} m, ${best + dir * d}°`).toBeLessThanOrEqual(last + 0.001 * top); last = Math.min(last, v); } expect(last).toBeLessThan(0.995 * top); }
-      // (the beat angle is the flat water's moved by the chop's footing: the top itself sits on the polar's corner at its
-      // beat angle (polar.ts: flat on the pinching side, 0.4–0.6% a degree down on the wide), whatever the chop, so the
-      // footing costs her a little against it: 0.27% at most, 20 kt in 0.6 m)
-      expect(vmg(beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeGreaterThan(0.997 * top);
+      // (the beat angle is the flat water's moved by the chop's footing: with the polar's top smooth it lands within 0.3° of
+      // the true best, a hundredth of a percent of her VMG at most; on its old corner it cost 0.27%)
+      expect(vmg(beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeGreaterThan(0.9995 * top);
     }
   });
   it('in any chop the wind can make (up to half again a fully grown sea, for a current steepening it), a degree a quarter knot at most, 6.5 to 26 kt', () => {

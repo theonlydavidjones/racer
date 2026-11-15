@@ -84,10 +84,10 @@ let chopNext = 0;
  * the middle of her groove. The groove: each angle (in quarter degrees) weighed by how far her speed made good there rises
  * above GROOVE short of the best. In a chop the top is flat (at 6 kt in 0.6 m, 45–48° within 0.06% of each other, far
  * less than a helmsman can feel or a puff changes), and the single best angle on it jumped 3° between ends of the flat on
- * a quarter-knot puff; the middle moves smoothly with the wind. But the polar's own top is lopsided (flat on the pinching
- * side of its beat angle, falling 0.4–0.6% a degree on the wide side), so the middle sits inside the best angle by
- * 0.6–0.8°: taken against the same middle in flat water, that lean cancels, what's left is the chop's footing, and as the
- * chop dies away the angle runs into the flat-water one.
+ * a quarter-knot puff; the middle moves smoothly with the wind. Where the polar's own top is lopsided (its two sides
+ * curving differently), the middle sits a little off the best angle: taken against the same middle in flat water, that
+ * lean cancels, what's left is the chop's footing (within 0.3° of the true best in chop, polar.ts's smooth top), and as
+ * the chop dies away the angle runs into the flat-water one.
  */
 const GROOVE = 0.004;
 function groove(kt: number, hs: number, tp: number): number {

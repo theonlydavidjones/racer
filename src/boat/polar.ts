@@ -108,7 +108,7 @@ export class Polar {
         // Documentation 2022, §8.1.1), and reaching 52° at the slope on to 60°. Straight, the speed's slope stepped down
         // at the beat angle (10 kt: from 0.068 kt a degree to 0.048), a corner in her VMG that held the best angle
         // to windward on it whatever the chop. In between: an interpolation, not a measurement (ORC prints no angle
-        // between the two); it rises 0.03–0.07 kt above the straight line at the middle, steadily, no overshoot.
+        // between the two); it rises 0.01 (4 kt) to 0.07 kt above the straight line at the middle, steadily, no overshoot.
         if (a >= beat && clean.length >= 3 && a < clean[1][0]) {
           const [x0, y0] = clean[0], [x1, y1] = clean[1], [x2, y2] = clean[2], h = x1 - x0, t = (a - x0) / h, t2 = t * t, t3 = t2 * t;
           const m0 = y0 * Math.tan(x0 * D2R) * D2R, m1 = (y2 - y1) / (x2 - x1);
