@@ -109,6 +109,9 @@ export interface Aboard {
   /** Ready for a turn coming: warned by the call, or got ready as she turns (prepLeft; for the figures, a look up and a
    * hand to the sheet: render/crew.ts). */
   ready: boolean;
+  /** Struck by the boom or the mainsheet in a jibe (boat/calls.ts boomStrike): out of action until this crew clock time,
+   * where they are, their work at a fraction of its pace. 0 when not. */
+  outUntil: number;
 }
 /** A job: a line to work, the jib car to move, the pole; `reach` s still to get there; `work` s of work left (car, pole). */
 export interface Job {
@@ -310,6 +313,8 @@ export const reactTime = (p: Person) => 1.6 - 1.2 * attrOf(p, 'react');
  * do it before the helm puts her over; unwarned they start as they see her turning, and what's left of it comes after.
  * Estimates (boat/calls.ts). */
 export const PREPARED = 0.25, PREP_WORK = { novice: 4, expert: 0.5 };
+/** A turn under way (m/s): slower, she's drifting through the wind in irons, not tacking (as physics.ts jibLetGo). */
+export const TURN_V = 0.8;
 export const prepTime = (p: Person) => reactTime(p) + PREP_WORK.novice - (PREP_WORK.novice - PREP_WORK.expert) * attrOf(p, 'handling');
 /** What's left of getting ready (s): none if called; else their prepTime less the `coming` s they've seen her turning. */
 export const prepLeft = (p: Person, called: boolean, coming: number): number => called ? 0 : Math.max(0, prepTime(p) - coming);
@@ -322,7 +327,7 @@ export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   attrCache.delete(spec);
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
   const people: Aboard[] = allAboard(spec).map((p, i) => ({
-    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0, ready: false
+    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0, ready: false, outUntil: 0
   }));
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
   // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)
@@ -588,12 +593,14 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const tgt = c.tgt;
   // move each person toward their target: decide (after a reaction time, for a big change), then go at a human pace
   c.people.forEach((a, i) => {
+    // (struck in a jibe and out of action: they stay where they are, as long as it lasts: boat/calls.ts)
+    if (a.outUntil > c.clock!) { a.goal = { x: a.x, z: a.z }; a.react = 0; return; }
     const p = ppl[i], t = tgt[i], tx = t.arm * w, tz = t.z;
     const gx = a.goal ? a.goal.x : a.x, gz = a.goal ? a.goal.z : a.z;
     const big = Math.abs(tx - gx) > 0.25 || Math.abs(tz - gz) > 0.4;
     const rolling = c.roll?.phase === 'flatten' || (a.job && a.job.reach > 0);
     if (big && !rolling) {
-      if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = tacked ? PREPARED + prepLeft(p, !!k.called, k.coming ?? 0) : reactTime(p); // (at a turn: on the order once ready for it)
+      if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = tacked && k.v >= TURN_V ? PREPARED + prepLeft(p, !!k.called, k.coming ?? 0) : reactTime(p); // (at a turn under way: on the order once ready for it; drifting through the wind in irons, as before)
       a.react -= dt;
       if (a.react <= 0) { setGoal(a, tx, tz); a.react = 0; }
       else if (!a.goal) a.goal = { x: a.x, z: a.z };

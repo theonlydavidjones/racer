@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../src/boat/crewPhys';
-import { CALL_AT, callsTurn } from '../src/boat/calls';
+import { CALL_AT, boomStrike, callsTurn } from '../src/boat/calls';
 import { beatAngle } from '../src/boat/polar';
 import { World, DT } from '../src/sim/world';
 import { courseFile } from '../src/courses/registry';
@@ -99,4 +99,36 @@ describe('Your call: "Ready about", the crew get ready, then the helm puts her o
     expect(u.callWait?.notReady).toBe(true);
     expect(w.drainEvents().some(e => e.type === 'toast' && /Not ready/.test((e as { msg: string }).msg))).toBe(true);
   }, 120_000);
+});
+
+describe('A crash jibe and the crew in its way (calls.ts boomStrike)', () => {
+  /** An AI boat on a run, jibed on round unseen and uncalled, one crewmate held at `pose` (the cabin top's lines, or the
+   * bench). Who was struck, and for how long. */
+  const strike = (pose: 'piano' | 'sit', called: boolean) => {
+    const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false; b.crew = newCrew(crew(0.2), 'S');
+    sail(b, 30, () => held(b, 170));
+    // (at the cabin top's lines on a job, standing at its after end; or on the bench, as the crew sit)
+    const a = b.crew!.people[2]!, put = () => { if (pose === 'piano') a.job = { line: 'cunningham', reach: 0, work: 5, station: { arm: 0.3, z: 0.85, pose: 'piano' } }; };
+    let struck = false, outFor = 0;
+    sail(b, 30, t => { if (called) b.callT = t; if (!struck) put(); held(b, 170 + Math.min(50, 2 * t)); if (!struck && a.outUntil > 0) { struck = true; outFor = a.outUntil - (b.crew!.clock ?? 0); } });
+    return { struck, outFor, crashed: b.crashT != null };
+  };
+  it('standing at the cabin top\'s lines, unwarned: struck, and out of action for a while; ducked in time, or ready, not', () => {
+    // (the boom seen swinging at t = 0, across at `t`: a novice standing at the cabin top's after end, under the boom)
+    const at = (t: number, ready = false, pose: 'piano' | 'sit' | 'cross' = 'piano') => {
+      const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false; b.crew = newCrew(crew(0.2), 'S');
+      const a = b.crew!.people[2]!; a.pose = pose; a.x = 0.3; a.z = 0.85; a.ready = ready; b.boomSeenT = 0;
+      boomStrike(b, t, -95); return a.outUntil - (b.crew!.clock ?? 0);
+    };
+    expect(at(1), 'across a second after it was seen: struck').toBeGreaterThan(19);
+    expect(at(1)).toBeLessThan(61);
+    expect(at(3), 'three seconds: a novice has ducked').toBeLessThanOrEqual(0);
+    expect(at(1, true), 'ready for it (called)').toBeLessThanOrEqual(0);
+    expect(at(1, false, 'sit'), 'sitting: it passes over').toBeLessThanOrEqual(0);
+    expect(at(1, false, 'cross'), 'crouched crossing: under it').toBeLessThanOrEqual(0);
+  });
+  it('a crash jibe on the water: the crew sitting in the cockpit, the boom passes over their heads; a called jibe crashes nobody', () => {
+    const s = strike('sit', false); expect(s.crashed).toBe(true); expect(s.struck).toBe(false);
+    const c = strike('sit', true); expect(c.crashed).toBe(false); expect(c.struck).toBe(false);
+  }, 60_000);
 });

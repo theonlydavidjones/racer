@@ -875,6 +875,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
   if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
+  // an avoidance that takes her through the wind (a duck that becomes a tack, ducking astern on a run that becomes a
+  // gybe): a turn she's decided on, called by skill like any other (the owner, 15 Nov 2026: boat/calls.ts). Not a
+  // bear-away duck or a luff, which keep her on her side of the wind; and not dead downwind, where a degree flips it
+  if (avoiding && !ai.goTack && !ai.hailTack && Math.abs(wrap(ww.from - desired)) < 175 && (wrap(ww.from - desired) >= 0) !== ((b.rel ?? 0) >= 0)) decideTurn(b, w.t);
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
 }

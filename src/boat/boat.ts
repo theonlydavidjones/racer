@@ -208,7 +208,8 @@ export interface Boat {
   /** Turns her skipper has decided (the AI's call or not is worked from this: boat/calls.ts). */
   turnsDecided?: number;
   /** The windward jib sheet, made fast through the tack, held so many more seconds before the crew let it fly (s): an
-   * unwarned crew a reaction's worth, the jib backing meanwhile (physics.ts tackStep, trimSails). */
+   * unwarned crew a reaction's worth, the jib backing meanwhile (physics.ts tackStep, trimSails); −1 while it's let fly and
+   * running out, 0 otherwise. */
   jibHold?: number;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
   byLee?: boolean;
@@ -219,8 +220,9 @@ export interface Boat {
   /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
    * (physics.ts boomStep). Undefined while the sheet has it. */
   boomFree?: number;
-  /** When the wind took it, s. */
+  /** When the wind took it, s; and when it was first seen swinging (faster than BOOM_SEEN deg/s: boat/calls.ts). */
   boomFreeT?: number;
+  boomSeenT?: number;
   /** The side it was on when the wind took it (+1 starboard, −1 port). */
   boomFrom?: number;
   /** When her boom last crashed across in a jibe the wind made (s): for the debrief and the tests. */

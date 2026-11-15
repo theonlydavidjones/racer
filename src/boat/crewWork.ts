@@ -193,11 +193,14 @@ const DONE = 1e-4;
 export function workPace(b: Boat, who: number): number {
   const c = b.crew; if (!c) return 1;
   const n = c.spec.crew.length;
-  return paceOf(who === 0 ? c.spec.helm : c.spec.crew[who - 1], who, n, helmSheetsOf(c, n));
+  return paceOf(who === 0 ? c.spec.helm : c.spec.crew[who - 1], who, n, helmSheetsOf(c, n)) * outPace(c, who);
 }
 /** (the helm with a sheet while the crew are forward: a hand on the tiller, one on the sheet) */
 const helmSheetsOf = (c: CrewState, n: number) => (c.layout ?? 'cockpit') !== 'cockpit' || (n === 2 && foreOf(c) >= TWO_FWD);
 const paceOf = (p: Person, who: number, n: number, helmSheets: boolean) => pace(p) * (who === 0 && (n === 0 || helmSheets) ? 0.6 : 1);
+/** Struck in a jibe and out of action (boat/calls.ts boomStrike), a person works at a fraction of their pace (an estimate). */
+export const STRUCK_PACE = 0.2;
+const outPace = (c: CrewState, who: number) => (c.people[who]?.outUntil ?? 0) > (c.clock ?? 0) ? STRUCK_PACE : 1;
 const sheetOf = (k: string) => k === 'jibsheet' || k === 'mainsheet' || k === 'traveller';
 /** Who works a line now (crewJobs): its owner, or with the forward hand away at the cabin top or a car, the middle crew on the jib sheet meanwhile. */
 /** The jib winch along the boat (m: render/hull.ts JIB_WINCH_Z), and how far from it fore and aft a crew member can tail and grind. */
@@ -420,10 +423,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const helmSheets = helmSheetsOf(c, n);
   for (const kk in want) {
     const k = kk as Ctl, who = workerOf(c, n, fwdL, ahead, main, k), a = c.people[who];
-    if (k === 'jibsheetW') { put(wk, k, paceOf(ppl[who], who, n, helmSheets), want[k]!); continue; } // letting the lazy sheet fly is a flick of the wrist
+    if (k === 'jibsheetW') { put(wk, k, paceOf(ppl[who], who, n, helmSheets) * outPace(c, who), want[k]!); continue; } // letting the lazy sheet fly is a flick of the wrist
     const j = a?.job, to = j?.line === k && !sheetOf(k) ? j.to ?? want[k]! : want[k]!;
     if (j?.line === k) {
-      if (j.reach > 0) { j.reach -= dt; put(wk, k, 0, to); } else put(wk, k, paceOf(ppl[who], who, n, helmSheets), to);
+      if (j.reach > 0) { j.reach -= dt; put(wk, k, 0, to); } else put(wk, k, paceOf(ppl[who], who, n, helmSheets) * outPace(c, who), to);
     } else put(wk, k, 0, to);
   }
   carJob(b, dt);

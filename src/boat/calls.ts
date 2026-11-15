@@ -1,5 +1,5 @@
 import type { Boat } from './boat';
-import { prepTime, skillOf } from './crewPhys';
+import { prepTime, reactTime, skillOf, type Pose } from './crewPhys';
 
 /**
  * The helm's call for a turn ("Ready about" … "Tacking!", "Ready to jibe" … "Jibe-ho!") and what it does for her crew
@@ -63,4 +63,52 @@ export function crewAnswer(b: Boat, t: number): 'ready' | 'busy' | 'getting' {
     if (t - w.t0 < prepTime(p)) getting = true;
   }
   return getting ? 'getting' : 'ready';
+}
+
+/**
+ * A crash jibe: the boom (and its sheet) swept across, and anyone in its way who hadn't got their head down struck
+ * (boomStep, at the crossing). The Folkboat's boom is high, its underside 1.6 m over the cockpit sole, a metre over the
+ * deck at the mast (class rules 6.1.11, 9.25: the boom's top no lower than the mast's band 1000 ± 10 mm over the deck,
+ * folkboats.com; ORC's BAS 1.0; the model's deck, render/hull.ts deckY and COCKPIT_FIT: the benches 0.22, the side deck
+ * about 0.6, the sole −0.08), so sitting on the benches heads clear it: it's whoever is up, standing at the cabin top's
+ * lines, crouched high crossing, or sitting tall on the side deck, between the mast and the boom's end. The heights by
+ * pose are of the stature, an estimate: sitting height about 0.52 of it (ANSUR II's means, not checked here), standing
+ * all of it, crouched across 0.6, hiking (leaning out) 0.35, kneeling at a car 0.4. Ducked: down to a crouch on the seat or the
+ * deck, 0.3 of it, once they've seen it coming (ready for the jibe, or their reaction and DUCK_S since the boom was
+ * seen swinging, BOOM_SEEN: in 8 kt it takes some 4 s to come across, in 22 kt under 1.5, boomStep).
+ * Struck, they're out of action a while (in their place, working at STRUCK_PACE), the longer the harder: from 20 s to a
+ * minute by the boom's speed at its end, up to 10 m/s (estimates: the boom's speed is the model's, boomStep; no figure for
+ * injuries is published, UK Sailmakers' review of gybe accidents and the USCG statistics have none; there are deaths).
+ */
+export const BOOM = { low: 1.6, mastZ: -0.95, endZ: -0.95 + 3.38, length: 3.38, bench: 0.22, deck: 0.6, sole: -0.08, benchX: 0.5 };
+export const HEAD = { sit: 0.52, stand: 1, cross: 0.6, hike: 0.35, kneel: 0.4, ducked: 0.3 }, DUCK_S = 0.3, OUT_S = { min: 20, max: 60, atV: 10 };
+/** The boom's swing seen (deg/s): faster than this it's plainly coming across (an estimate; it starts from rest as the
+ * wind gets behind the leech, boomStep). */
+export const BOOM_SEEN = 20;
+/** The top of a person's head over the sole datum (m), by where and how they are. */
+export function headY(pose: Pose, x: number, h: number, ducked: boolean): number {
+  const deck = Math.abs(x) > BOOM.benchX, seat = deck ? BOOM.deck : BOOM.bench;
+  if (ducked) return (pose === 'cross' || pose === 'piano' ? BOOM.sole + 0.5 * h : seat + HEAD.ducked * h);
+  switch (pose) {
+    case 'piano': case 'mast': case 'fore': case 'bow': return BOOM.sole + HEAD.stand * h; // (standing up)
+    case 'cross': return BOOM.sole + HEAD.cross * h;
+    case 'hike': return BOOM.deck + HEAD.hike * h;
+    case 'car': return BOOM.deck + HEAD.kneel * h;
+    default: return seat + HEAD.sit * h; // (sitting: on the bench, or up on the side deck; the helm)
+  }
+}
+/** The boom crossing in a crash jibe at `w` deg/s: who's struck. Returns how many (and tells you, on your boat). */
+export function boomStrike(b: Boat, t: number, w: number, emit?: (e: { type: 'toast'; msg: string; ms?: number }) => void): number {
+  const c = b.crew; if (!c) return 0;
+  const v = Math.abs(w) * Math.PI / 180 * BOOM.length, out = OUT_S.min + (OUT_S.max - OUT_S.min) * Math.min(1, v / OUT_S.atV);
+  const ppl = [c.spec.helm, ...c.spec.crew]; let hit = 0;
+  for (let i = 0; i < c.people.length; i++) {
+    const a = c.people[i], p = ppl[i]; if (!a || !p || a.outUntil > (c.clock ?? 0)) continue;
+    if (a.z < BOOM.mastZ + 0.4 || a.z > BOOM.endZ) continue; // (forward at the mast, or aft of the boom's end: the helm)
+    const ducked = a.ready || t - (b.boomSeenT ?? t) >= reactTime(p) + DUCK_S;
+    if (headY(a.pose, a.x, p.h, ducked) < BOOM.low) continue;
+    a.outUntil = (c.clock ?? 0) + out; a.job = null; hit++;
+  }
+  if (hit && emit) emit({ type: 'toast', ms: 6000, msg: hit > 1 ? 'Crash jibe: the boom caught your crew. Call the jibe ("Ready to jibe") so they get their heads down.' : 'Crash jibe: the boom caught one of your crew. Call the jibe ("Ready to jibe") so they get their heads down.' });
+  return hit;
 }
