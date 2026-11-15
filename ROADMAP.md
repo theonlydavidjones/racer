@@ -469,6 +469,12 @@ What's planned, roughly in order. Done work is described in the README.
      gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
      like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
      shadows, or a shadow-map artifact. Find what casts them and stop it; check both sides on both tacks.
+   - **The flow view with one sail down** (owner, 15 November; not urgent; accuracy; 1–2 h): "check that the wind over
+     sails map is accounting for when I'm sailing on just jib or just main." A first look found nothing in
+     ui/sailFlow.ts or ui/flowPanel.ts that checks whether each sail is hoisted. With one sail down, the view should
+     draw and describe only the sail that's up. There's no slot then: no jib bending the flow onto the main's lee side,
+     no main's upwash on the jib. A lowered sail's telltales go too. The physics' own sail forces should be checked the
+     same way.
    - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
      The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
