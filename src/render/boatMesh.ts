@@ -131,7 +131,7 @@ const JIB_DEF: SailDef = (() => {
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
 export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
-const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }); // (one pass, not two: three draws a transparent DoubleSide material twice, back faces then front, re-deriving its program each time; a thin window faces the eye one way, so one pass draws the same pixels: Capacity, 15 Nov 2026)
 
 /** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
 export const REFLECTIVE: { mat: THREE.MeshPhongMaterial; amount: number }[] = [];
@@ -217,7 +217,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // syncNavLights sets how bright, on the boat-lights clock)
   // (clear glass in an aluminium frame, cut through the cabin side: the cabin's inside, lit by its lantern after dark,
   // is what shows through it)
-  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, forceSinglePass: true }); // (one pass: see WINDOW_MAT)
   for (const s of [1, -1]) {
     // (a patch over the light and its frame; the picture draws the tapered glass and the frame on it, the same shape both
     // sides: mirrored to port without turning the picture round)
