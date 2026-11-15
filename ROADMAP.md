@@ -459,6 +459,9 @@ What's planned, roughly in order. Done work is described in the README.
      behind it).
    - ~~Bug: the flag index doesn't scroll~~ (done: wheel and drag).
    - ~~The wind angle dial, when shown, under the inset map~~ (done: directly under the inset, which is at the top right) (owner, 13 November; polish; <1 h).
+   - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
+     'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
+     icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
    - ~~**Bugs in the race setup's "When" section**~~ (done: 196e7db) (owner, 13 November, from a screenshot; UI & Experience, #272; 1–2 h):
      - "date picker gets cropped at bottom of screen": the date picker opens below the Date field and the panel cuts it
        off after the first week. It should open fully visible, flipping upward or scrolling the panel.
