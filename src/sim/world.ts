@@ -38,7 +38,7 @@ import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, type Sha
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
-import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
@@ -179,26 +179,17 @@ export const SHOVE_N = 27 * 9.80665;
 /**
  * The shove astern as the crew steps aboard at the finger's end, m/s: she's already going astern at their walk, and the last
  * push, SHOVE_N over about a meter of reach, adds its work to that: ½·m·v² = ½·m·WALK² + F·d. About 0.64 m/s, a little
- * more than a slow walk (the reach, a step and the arms' length, an ESTIMATE). Only where there's less room than that
- * carries her (geo/marina.ts ASTERN_RUN) is she shoved more gently, down to ASTERN_STEERAGE.
+ * more than a slow walk (the reach, a step and the arms' length, an ESTIMATE). Where the clear water ahead of her stern is
+ * short (geo/marina.ts's plan) she's shoved more gently, to stop COAST_SHORT short of its end; but never under the speed
+ * that steers her STEER_FOR s in the wind there is, nor under her walk. Where that floor is more than the room allows, the
+ * floor is the shove, and she runs on past the plan at a crawl (the berths where that touches are kept fast: NO_ASTERN).
  */
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
-/**
- * Never gentler than this, m/s: way enough to steer her stern first for ten seconds and more on physics.ts's sternway
- * drag (ASTERN_DRAG: from 0.55 m/s she's above 0.3 for about 12.8 s in still air; a breeze on her bow carries her on longer,
- * one on her stern shortens it, to under 10 s in 12 kt dead astern of her;
- * the helm hard over turns her about 2 deg/s at it). Her coast from it (about 9.3 m) runs on past the clear water the planner found at the tightest berths: the rest is the
- * helmsman's, steering her on down the fairway, or a bump at a crawl.
- */
-export const ASTERN_STEERAGE = 0.55;
 /** How long she's to have steerage way stern first once she's shoved, s (over 0.3 m/s: about 1.3 deg/s with the helm hard
  * over): the bar's 10 s, and three more for the sim's scatter about asternGlide (0.4 s held straight, Deep Physics' check;
- * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air
- * that's about ASTERN_STEERAGE; a breeze on her stern asks more of the shove, one on her bow less. */
+ * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from about 0.6 m/s; a breeze on her
+ * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
-/** Her glide's gauged to stop this far short of the end of the clear water, m: her drift and the helm's scatter about the
- * plan take her on a little further (the every-berth sweep, 14 Nov 2026: touches at the very end of it, at a crawl). */
-const COAST_SHORT = 1;
 useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE); // (the planner's look along her glide)
 /**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
@@ -1790,8 +1781,8 @@ export class World {
     const slip = slipById(d.slip);
     // (the crew judge the breeze, not the gust passing: environment/gusts.ts)
     const wind = this.windHere(u, u, false), plan = slip ? pushOffPlan(slip, wind.from, wind.kt) : null;
-    // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast until it goes round, geo/marina.ts NO_ASTERN_WEST)
-    if (slip && plan?.kind === 'astern' && noAsternPushOff(slip, wind.from)) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in a westerly: motor out, or wait for the wind to go round.' : 'No room to push her off from this berth in a westerly: she stays fast until the wind goes round.' }); return false; }
+    // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast, geo/marina.ts NO_ASTERN, NO_ASTERN_WEST)
+    if (slip && plan?.kind === 'astern' && noAsternPushOff(slip, wind.from, wind.kt)) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in this wind: motor out, or wait for the wind to change.' : 'No room to push her off from this berth in this wind: she stays fast until it changes.' }); return false; }
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip || !plan) { u.v = SHOVE; return true; }
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };
@@ -1886,7 +1877,7 @@ export class World {
         // shoved off astern into the fairway, as hard as the crew shoves, or less if the room she has ahead of her stern is short
         // (her glide in the wind there is, heading held: physics.ts asternGlide; and never so gently she can't steer for
         // STEER_FOR s, in that wind: the breeze on her stern shortens it, on her bow lengthens it)
-        const ww = this.windHere(b, b, false), g = (v: number) => asternGlide(v, P.h, ww.from, ww.kt, 90); // (her whole glide, to where she's lost her way)
+        const ww = this.windHere(b, b, false), g = (v: number) => asternGlide(v, P.h, ww.from, ww.kt, ASTERN_GLIDE_S); // (her whole glide, to where she's lost her way)
         let lo = 0, hi = ASTERN_SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (g(m).dist < P.coast - COAST_SHORT) lo = m; else hi = m; }
         let flo = 0, fhi = ASTERN_SHOVE; for (let k = 0; k < 20; k++) { const m = (flo + fhi) / 2; if (g(m).steerable < STEER_FOR) flo = m; else fhi = m; }
         // (and never less than the way she has already, walked back at WALK: her crew can leave the last push out, but

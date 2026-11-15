@@ -661,9 +661,11 @@ physics, ranked like the ten above:
 | WALK | 0.45 | 111 | unsourced |  |
 | SHOVE_N | 265 N (27 kgf) | | sourced | one adult's initial push (Snook & Ciriello 1991, via the Liberty Mutual table) |
 | ASTERN_SHOVE | 0.64 m/s | | estimate | WALK plus SHOVE_N over 1 m of reach (the reach is the estimate) |
-| ASTERN_STEERAGE | 0.55 m/s | | estimate | the gentlest shove: 12.8 s above 0.3 m/s on ASTERN_DRAG in still air |
-| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 9 m | | derived | how far the two shoves coast on ASTERN_DRAG |
-| DRIFT_PER_KT, SAIL_ON (geo/marina.ts) | 0.017 m/s per kt, 20 s | | estimate | bare-poles drift allowed for while she gets sail on, measured in this sim |
+| STEER_FOR | 13 s | | estimate | the steerage (over 0.3 m/s) the shove must give in the wind there is: the bar's 10 s and the scatter on an arc |
+| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 9 m | | derived / estimate | her still-air glide from the full shove (11.4 m); the clear water for which the way nearest the exit is taken |
+| ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 90 s, 1 m, 24 m | | estimate | the glide's one horizon; stopping short of the clear water's end; the furthest the planner looks |
+| DRIFT_PER_KT, DRIFT_PACE, DRIFT_FOR (geo/marina.ts) | 0.017 m/s per kt, 0.2 m/s, 60 s | | estimate | bare-poles drift to leeward allowed for along her run, measured in this sim |
+| ASTERN_WEST_KT, ASTERN_WEST_BAND (geo/marina.ts) | 6 kt, 45° | | estimate | NO_ASTERN_WEST's westerly: sailed at 4, 8 and 12 kt from 225, 270, 315 only |
 | CREW_TURN | 2 | 111 | unsourced |  |
 | AI_CREW_SKILL.Red | 0.75 | 134 | design | fleet variety |
 | AI_CREW_SKILL.Blue | 0.6 | 134 | design | fleet variety |

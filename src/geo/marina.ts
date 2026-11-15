@@ -392,7 +392,8 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false, grow =
  * - **Shoving her off astern** (`astern`), where the fairway's too narrow to swing her: walked back until her bow is at the
  *   finger's end, then shoved off astern as the crew steps aboard (world.ts ASTERN_SHOVE: their walk and a last push) and
  *   steered stern first (`helm`), her stern swung round toward the way out, `coast` m on to where she has room to turn and
- *   sail off (no further than the shove carries her, ASTERN_RUN; where that's less, she's shoved more gently).
+ *   sail off (no further than her glide from the full shove, in the wind there is; where that's less, she's shoved more
+ *   gently, but never so gently she can't steer: world.ts)
  * - **Pushing her off an end tie** (`off`): the crew pushes her off the dock (`out`: where her middle's pushed to) and, if
  *   she'd otherwise be left head to wind, her bow off the wind (`h`), her stern quarter against the dock as the pivot.
  * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first). `setBack`: the wind's
@@ -445,9 +446,9 @@ function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
   return runAhead(e.c, e.h, s) >= 10 && pathClear(e.c, e.h, s, -Math.sign(off) * WANDER, 0) && pathClear(e.c, e.h, s, 0, Math.sign(off) * LEE_SAG);
 }
 /**
- * How far she glides stern first once she's shoved off astern, m: the crew's shove (world.ts ASTERN_SHOVE, about 0.64 m/s)
- * carries her about 11.5 m on physics.ts's sternway drag (ASTERN_DRAG) before her way's gone (tests/pushoff-astern.test.ts holds the two
- * together). The planner looks that far along the way she's steered: round, and on down the fairway.
+ * Her glide stern first in still air from the crew's full shove (world.ts ASTERN_SHOVE, about 0.64 m/s), to where she's lost
+ * her way, m: about 11.4 m on physics.ts's sternway drag (asternCoast; tests/pushoff-astern.test.ts holds the two together).
+ * What the planner looks along when it's given no glide (geo/ alone, in a test); the World gives it the glide in the wind.
  */
 export const ASTERN_RUN = 12;
 /** Her glide stern first under bare poles in the wind there is (physics.ts asternGlide), given to the planner by the World
@@ -455,14 +456,19 @@ export const ASTERN_RUN = 12;
 export type AsternGlide = (v0: number, heading: number, windFrom: number, windKt: number, secs?: number) => { dist: number; steerable: number; going: boolean };
 let glide: { f: AsternGlide; shove: number } | null = null;
 export const useAsternGlide = (f: AsternGlide, shove: number): void => { glide = { f, shove }; astern.clear(); plans.clear(); };
-/** How long the planner looks along her glide, s: until her crew has sail on her (about 20 s: the jib up, sheeted, an
- * ESTIMATE) and half as long again. */
-const ASTERN_LOOK_S = 30;
-/** The furthest it looks, m: with a breeze on her bow she glides on and on (20 m in 30 s in 20 kt), steered or sailed off well before. */
+/** The glide's horizon, s, for the planner's look and for the World's gauging of the shove alike (one horizon, so the full
+ * shove is what she's given where the water's clear): long enough that she has lost her way, short of a breeze on her bow. */
+export const ASTERN_GLIDE_S = 90;
+/** The World gauges her glide to stop this far short of the end of the clear water, m (an ESTIMATE: her drift and the
+ * helm's scatter about the plan take her a little further; the every-berth sweep, 14 Nov 2026). The planner looks that much
+ * further than her glide, so with the water clear the full shove is hers. */
+export const COAST_SHORT = 1;
+/** The furthest the planner looks, m (an ESTIMATE): with a breeze on her bow she glides on and on (20 m in 30 s in 20 kt), and
+ * is steered down the fairway or sailed off well before. */
 const ASTERN_LOOK_MAX = 24;
-/** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one: what a
- * shove of ASTERN_STEERAGE carries her (world.ts: steering for 10 s and more). */
-export const ASTERN_ENOUGH = 9; // (world.ts ASTERN_STEERAGE coasts her a little further: tests/pushoff-astern.test.ts)
+/** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one (an
+ * ESTIMATE: about what the gentlest shove that steers her 10 s in still air carries her). */
+export const ASTERN_ENOUGH = 9;
 /** The most she's turned stern first before she's straightened up, deg: her stern pointing down the fairway. */
 const ASTERN_TURN = 90;
 /**
@@ -681,16 +687,17 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
   // (clear all the way across the band from straight back to the helm hard over: she turns less than the full circle as her
   // yaw lags and her way falls off, and a helmsman's hand isn't exact; and a hand's breadth to spare all round, sampled finely)
   // (each way's poses every 0.5 m, worked out once; each pose checked once, quickly first)
-  // (as far as her glide from the full shove carries her in the wind there is, in ASTERN_LOOK_S: ASTERN_RUN in still air)
-  const look = glide ? Math.min(ASTERN_LOOK_MAX, Math.max(4, glide.f(glide.shove, s.heading, windFrom ?? 0, windFrom == null ? 0 : windKt, ASTERN_LOOK_S).dist)) : ASTERN_RUN;
+  // (as far as her glide from the full shove carries her in the wind there is, and COAST_SHORT more: 12.4 m in still air)
+  const look = glide ? Math.min(ASTERN_LOOK_MAX, Math.max(4, glide.f(glide.shove, s.heading, windFrom ?? 0, windFrom == null ? 0 : windKt, ASTERN_GLIDE_S).dist + COAST_SHORT)) : ASTERN_RUN;
   const STEP = 0.5, N = Math.round(look / STEP), arcs = new Map<number, { c: Vec; h: number }[]>(), okAt = new Map<string, boolean>();
   const arc = (hf: number) => { let a = arcs.get(hf); if (!a) { a = []; for (let k = 0; k <= N; k++) a.push(asternArc(c0, s.heading, hf, k * STEP)); arcs.set(hf, a); } return a; };
   // (the wind sets her to leeward as she goes: each pose checked where she'd have drifted to as well, by the time she's
   // got there at a slowing walk, a fifth of a meter a second on average, for up to a minute; and with a margin that grows with her run, the sim's own scatter about the plan: 0.12 m
   // and 3 cm a meter, to 0.6 m, ESTIMATES from the physics review's measured scatter, 14 Nov 2026)
-  const dw = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180), drift = DRIFT_PER_KT * windKt;
+  // (DRIFT_PACE, her pace down the run, 0.2 m/s on average, and DRIFT_FOR, a minute: ESTIMATES, from the every-berth sweeps)
+  const DRIFT_PACE = 0.2, DRIFT_FOR = 60, dw = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180), drift = DRIFT_PER_KT * windKt;
   const wide = (q: { c: Vec; h: number }, d: number) => {
-    const g = Math.min(0.6, 0.12 + 0.03 * d), off = drift * Math.min(2 * ASTERN_LOOK_S, d / 0.2), r = { x: q.c.x + dw.x * off, y: q.c.y + dw.y * off };
+    const g = Math.min(0.6, 0.12 + 0.03 * d), off = drift * Math.min(DRIFT_FOR, d / DRIFT_PACE), r = { x: q.c.x + dw.x * off, y: q.c.y + dw.y * off };
     return berthClear(q.c, q.h, s, false, g) && (!off || berthClear(r, q.h, s, false, g)) && berthClear(q.c, q.h, s, true, 0.12);
   };
   // (and finely, all along her run: it's never more than ASTERN_LOOK_MAX, among the boats and fingers)
@@ -733,25 +740,28 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
   if (!ok) SLIPS.splice(i, 1);
 }
 /**
+ * Berths she isn't shoved off astern from, kept as berths (the owner, 14 Nov 2026): her crew keeps her fast (world.ts
+ * pushOff) unless she can be swung out instead; she can be motored out. A walk-out on a stern line, next, is to open them.
+ * The bar is tests/pushoff-astern.test.ts's (her middle 7.6 m out, 10 s of steerage, nothing touched in the plan's clear
+ * water). These twelve, sailed unflagged, 14 Nov 2026:
+ * - NO_ASTERN, in any wind: they miss it in a calm, 2–12 kt from 270, and 12 kt from 225, 315, 0 and 90 (G88, E31, E35
+ *   and F2 short of the clearance or the steerage; F15 touching in the last meter from 270 and from 90; C22 from 225 as well
+ *   as 270, where the wind in its corner of Horseshoe Bay is under ASTERN_WEST_KT).
+ * - NO_ASTERN_WEST, in a westerly of ASTERN_WEST_KT and more: they pass in 4 kt from 270 and miss it in 8 and 12 (touching
+ *   in the last meter of the clear water, at a crawl). Only these winds were sailed: the band (within
+ *   ASTERN_WEST_BAND of 270) and the speed between 4 and 8 kt are ESTIMATES.
+ */
+export const NO_ASTERN = ['south-beach:G88', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2', 'south-beach:F15', 'horseshoe-bay:C22'];
+export const NO_ASTERN_WEST = ['west-harbor:507', 'gashouse-cove:124', 'gashouse-cove:212', 'south-beach:F25', 'south-beach:F49', 'south-beach:G89'];
+const ASTERN_WEST_KT = 6, ASTERN_WEST_BAND = 45;
+/** No shove off astern from this berth in this wind (NO_ASTERN, any; NO_ASTERN_WEST, a westerly of ASTERN_WEST_KT and more). */
+export const noAsternPushOff = (s: Slip, windFrom: number | undefined, windKt = 0): boolean =>
+  NO_ASTERN.includes(s.id) || (NO_ASTERN_WEST.includes(s.id) && windFrom != null && windKt >= ASTERN_WEST_KT && Math.abs(wrap180(windFrom - 270)) <= ASTERN_WEST_BAND);
+/**
  * And not the few she'd be shoved out of astern into a corner with no room to turn her (the first slips on four of Gashouse
  * Cove's docks, by the seawall and the shore; two by Horseshoe Bay's L dock): with no engine there's no getting out. Kept
  * up to date by tests/pushoff-all.test.ts.
  */
-/**
- * Berths she can't be shoved off astern from in a westerly: there, in 12 kt from 270, she can't be got half a fairway out
- * with 10 s of steerage, or her plan's clear water doesn't hold (tests/pushoff-astern.test.ts's bar, every berth swept, 14
- * Nov 2026). Kept, the owner's ruling (14 Nov 2026): in other winds she's got out as from any berth; in a westerly her
- * crew won't push her off (world.ts pushOff) until the wind goes round. A walk-out on a stern line, next, may open them.
- */
-export const NO_ASTERN_WEST = [
-  'south-beach:G88', 'horseshoe-bay:C22', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2',
-  // (seven more from the every-berth sweep with the wind in the plan, 1,293 astern plans: far enough out and steerable, but
-  // touching in the last meter of the water the plan found clear, 22–56 s after she's let go, at a crawl. The bar is no
-  // touch inside it, as written: the Coordinator, 14 Nov 2026)
-  'west-harbor:507', 'gashouse-cove:124', 'gashouse-cove:212', 'south-beach:F15', 'south-beach:F25', 'south-beach:F49', 'south-beach:G89'
-];
-/** No shove off astern from this berth in this wind (NO_ASTERN_WEST: the wind within 45 degrees of west). */
-export const noAsternPushOff = (s: Slip, windFrom: number | undefined): boolean => NO_ASTERN_WEST.includes(s.id) && windFrom != null && Math.abs(wrap180(windFrom - 270)) <= 45;
 export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-cove:82', 'gashouse-cove:2', 'horseshoe-bay:B1', 'horseshoe-bay:B2', 'richmond-yc:C2', 'richmond-yc:D4', 'richmond-yc:E29', 'richmond-yc:F4']; // (Richmond YC's: where OSM's docks close in on each other, laid out from the club's plan)
 
 const outOfUse = ALL_SLIPS.filter(s => NO_WAY_OUT.includes(s.id));
