@@ -317,6 +317,16 @@ What's planned, roughly in order. Done work is described in the README.
    6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
+   7. **The cove's edge: the harbor's buildings and trees** (Bay East, 15 November; physics; after the wind-shadow seams;
+      needs heights): by the shore's own physics the cove isn't in slower air than its mouth (docs/WIND-FETCH-CHECK.md),
+      so a sharper edge would come from the Golden Gate YC and St. Francis YC buildings on the moles, Marina Green's
+      trees and the cove's seawall with the land behind it. Built as harborLee obstacles if their heights can be sourced;
+      otherwise it waits.
+   8. **The shore's slowdown by fetch, everywhere** (Bay East, 15 November; physics; needs an open-water Bay wind
+      record): the slowdown by how far the air has come over the water, not the distance to the nearest shore, with
+      OPEN_WATER re-derived by direction at Fort Point. It moves the courses' wind by −15% to +12% by direction, so it
+      needs a record to check against (the pier stations are ruled by their own shelter) and then the owner's OK. The
+      check so far, and the code on branch bay-east-26: docs/WIND-FETCH-CHECK.md.
 8za. **Start practice teaches picking the favored end** (owner, 15 November: "start practice also needs to help me learn how
    to pick the favored side. don't just tell me."; Debrief; design first): the player works it out the way sailors do,
    then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
