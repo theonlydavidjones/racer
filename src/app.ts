@@ -1290,7 +1290,11 @@ function frame(now: number): void {
   setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
   keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
-  if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
+  // (in the showroom she's shown once the race has stepped: until the worker's first answer the page's copy of the race is
+  // the cold one, her sheets still eased, and she'd flash so before the settled trim arrives: sim/world.ts idle)
+  const um = view.userMesh, showroomOn = boatPanel.open || fleet.boatOpen;
+  if (um) um.grp.visible = !showroomOn || w.steps > 0;
+  if (showroomOn) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }
   else view.render(w, dt, now, viewMode, look, over);
   const t2 = performance.now();
   labels.update(w, view.camera, viewMode);
