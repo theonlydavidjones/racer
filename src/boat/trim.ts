@@ -40,6 +40,8 @@ export const SAILS: Record<SailName, SailSpec> = {
 
 /** Luffing starts this far (deg) below the best angle of attack and is complete 10° further on. */
 const LUFF_START = 2, LUFF_SPAN = 10;
+/** Eased this far past its best angle of attack (deg), a sail is half luffing: as far as a main still draws. */
+export const HALF_LUFF = LUFF_START + LUFF_SPAN / 2;
 /** Stalling starts this far above the best angle of attack. */
 const STALL_START = 4;
 

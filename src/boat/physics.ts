@@ -17,7 +17,7 @@ import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFact
 import { DEFAULT_CREW, STANDARD_DISP, allAboard, crewBestHeel, crewEdgeAt, reactTime, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs, mainHand } from './crewWork';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
-import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
+import { HALF_LUFF, SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, TRAVELLER_SWING, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
@@ -1384,7 +1384,12 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const gust = b.gustDeg || b.gustSeen || (up && tws - (b.twsSlow ?? tws) > PUFF_RIDE) ? puffEase(b, up, tws, dt, held('mainsheet'), easeBoom) : 0;
   let mainTo = optimalSheet('main', b.awaSlow) + easeBoom;
   if (gust > 0 || b.gustSeen) mainTo = Math.max(mainTo, b.gustBase ??= mainTo); else if (b.gustBase !== undefined) b.gustBase = undefined;
-  const wantMain = mainTo + gust, wantJib = optimalSheet('jib', b.awaSlow);
+  // (never let go past half luffing on the wind she has now, as the trimmer sees by the sail's own luff: a main let go
+  // past it flogs, and its drag is a hard brake, 5.4 to 1.8 kn in 30 s close-hauled in 18 kt (dynamics.ts flogCdA; Deep
+  // Physics, 15 Nov 2026). The rest of the puff is taken with the car, her heel and the helm)
+  const luffRoom = gust > 0 ? Math.max(0, Math.abs(awa) - SAILS.main.aoa + HALF_LUFF - mainTo) : 0;
+  if (gust > luffRoom) { b.gustDeg = luffRoom; b.gust = luffRoom / PUFF_MAX; }
+  const wantMain = mainTo + Math.min(gust, luffRoom), wantJib = optimalSheet('jib', b.awaSlow);
   // the crew works out its settings about once a second, for the conditions as they see them
   const cond = b.spec ? (b.cond ??= condition(b.spec)) : null; // the crew knows their sails and mast
   // (when a line changes hands the crew thinks again at once, starting from what it has set: its other lines stay put

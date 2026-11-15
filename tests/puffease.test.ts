@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 import { beatAngle } from '../src/boat/polar';
+import { sailTrim } from '../src/boat/trim';
 import { testBoat, sail, kt } from './helpers/testBoat';
 
 // A puff she can't carry, upwind (physics.ts puffEase): the boom eased to the wider apparent wind, the car down the
@@ -13,18 +14,22 @@ describe('A puff she can\'t carry: the car down, then the main (physics.ts puffE
     if (yours) { b.isUser = true; b.hand = { ...b.hand, mainsheet: true }; }
     sail(b, 90, () => { b.h = 360 - twa; });
     const trav0 = b.ctl.traveller, boom0 = b.sheets.main;
-    let helmIn = 0, helmMin = 99, heelIn = 0, heelHit = 0, carBy = Infinity, boomMin = 99, easedBy = Infinity, gustMax = 0, gustLate = 0, gustAfter = 1, v = 0, n = 0;
+    let helmIn = 0, helmMin = 99, heelIn = 0, heelHit = 0, carBy = Infinity, boomMin = 99, easedBy = Infinity, gustMax = 0, gustLate = 0, gustAfter = 1, v = 0, n = 0, luffMax = 0, luffAfter = 0;
     sail(b, 45, t => { b.h = 360 - twa; b.ww = { ...b.ww, kt: t > 5 && t < 25 ? gust : base };
       if (!answer) b.gustSeen = 0; // (nobody sees it: no answer)
       if (t > 5 && t < 7) { boomMin = Math.min(boomMin, b.sheets.main); heelHit = Math.max(heelHit, b.heelMag ?? 0); }
       // (after the trimmer's first answer, a few seconds in: the tiller and the heel through the rest of the puff)
       if (t > 9 && t < 25) { helmIn = Math.max(helmIn, b.helmNeed ?? 0); helmMin = Math.min(helmMin, b.helmNeed ?? 0); heelIn = Math.max(heelIn, b.heelMag ?? 0); }
       if (t > 5 && t < 35) { v += kt(b); n++; }
+      // (the main against the wind she has: through the puff, and as it passes, where this test's puff stops dead in one
+      // step, the apparent wind heading her at once, so the eased main luffs until it's in: for a moment only)
+      const m = sailTrim('main', b.awa, b.sheets.main), lf = m.flow === 'luffing' ? m.amount : 0;
+      if (t > 5 && t < 25) luffMax = Math.max(luffMax, lf); else if (t >= 25 && lf > 0.55) luffAfter += 1 / 60;
       if (t > 5 && b.ctl.traveller > 0.95 && carBy === Infinity) carBy = t - 5;
       if (t > 5 && (b.gustDeg ?? 0) > 1 && easedBy === Infinity) easedBy = t - 5;
       gustMax = Math.max(gustMax, b.gust ?? 0); if (t > 9 && t < 25) gustLate = Math.max(gustLate, b.gust ?? 0);
       if (t > 40) gustAfter = b.gust ?? 0; });
-    return { trav0, boom0, helmIn, helmMin, heelIn, heelHit, carBy, boomMin, easedBy, gustMax, gustLate, gustAfter, v: v / n };
+    return { trav0, boom0, helmIn, helmMin, heelIn, heelHit, carBy, boomMin, easedBy, gustMax, gustLate, gustAfter, luffMax, luffAfter, v: v / n };
   };
   for (const [base, gust] of [[13, 23], [18, 28], [22, 32]]) it(`${base} kt with a puff to ${gust}: steerable through it, as fast, and back as it passes`, () => {
     const r = puff(base, gust), none = puff(base, gust, { answer: false });
@@ -37,6 +42,8 @@ describe('A puff she can\'t carry: the car down, then the main (physics.ts puffE
     expect(r.heelIn, 'heel through it').toBeLessThan(30);
     expect(r.v, 'no slower through it than unanswered').toBeGreaterThan(none.v * 0.98);
     expect(r.gustAfter, 'sheeted back in once it has passed').toBe(0);
+    expect(r.luffMax, 'never let go past half luffing: a flogging main is a brake').toBeLessThanOrEqual(0.55);
+    expect(r.luffAfter, '... nor left flogging as it passes (s)').toBeLessThan(0.5);
   }, 120_000);
   for (const [base, gust] of [[8, 14], [10, 16]]) it(`${base} kt with a puff to ${gust}: one she can carry, power, not eased for`, () => {
     const r = puff(base, gust), none = puff(base, gust, { answer: false });
