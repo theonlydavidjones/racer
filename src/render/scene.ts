@@ -89,6 +89,7 @@ float roseChev(vec2 rp, float ang, float rad, float size, float way) { // a chev
 }
 `;
 const ROSE_FRAGMENT = `
+#ifdef ROSE
   if (uRoseOn > 0.5) {
     vec2 rp = vWaveP - uRoseC; float rr = length(rp);
     if (rr > uRoseR.x && rr < uRoseR.y + 16.0) {
@@ -121,6 +122,7 @@ const ROSE_FRAGMENT = `
       totalEmissiveRadiance = mix(totalEmissiveRadiance, rc.rgb * 0.85 * max(uDay, 0.35), rc.a);
     }
   }
+#endif
 `;
 const WATER_FRAGMENT = `
   // the current where you are: the ripples drift with it (two-phase flow mapping), relative to the mean drift
@@ -358,6 +360,9 @@ export class SceneView {
    * (TWA, °: no-go | close-hauled | close reach | beam | broad | run), radii (m: inner, outer, the marks), her band
    * and side (+1 the wind over her starboard side), and the target band (−1, none). */
   rose(r: { x: number; y: number; from: number; edges: number[]; r0: number; r1: number; rm: number; lit: number; side: number; target: number } | null): void {
+    // (compiled into the water only while it's shown: off, the water's shader is as it was, no cost a frame; the
+    // shader's rebuilt once each time it's turned on or off)
+    const m = this.water.material; if (!!r !== ('ROSE' in (m.defines ?? {}))) { m.defines = { ...(m.defines ?? {}) }; if (r) m.defines.ROSE = ''; else delete m.defines.ROSE; m.needsUpdate = true; }
     const u = this.roseUni; u.uRoseOn.value = r ? 1 : 0; if (!r) return;
     u.uRoseC.value.set(r.x, r.y); u.uRoseFrom.value = r.from; u.uRoseE.value = r.edges; u.uRoseR.value.set(r.r0, r.r1, r.rm); u.uRoseLit.value.set(r.lit, r.side); u.uRoseTgt.value = r.target;
   }
