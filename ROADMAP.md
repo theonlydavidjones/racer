@@ -464,6 +464,11 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: the start-line drill's cue card floats out of view** (owner, 15 November, from a screenshot; bug; <1 h): "this
+     floating guidance card in start-line trainer mode keeps floating out of view." The cue ("BUILD SPEED", "8 s · late
+     by 3 s") drifts up until the top bar cuts it off. It should stay fully on screen and steady: kept below the top bar
+     and clamped inside the view wherever the boat it's pinned to goes. Its faint second line also needs to be readable
+     against a pale sky.
    - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
      cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
      chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
