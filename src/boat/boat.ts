@@ -144,6 +144,7 @@ export interface Boat {
   penaltyTotal: number; // 360 or 720
   penaltyTurned: number; // signed degrees turned since the penalty started
   penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
+  penaltyTacks?: number; penaltyJibes?: number; // the tacks and jibes made in her turns (physics.ts penaltyManeuver)
   started: boolean;
   ocs: boolean;
   returning?: boolean; // Rule 21.1: after her start signal, not started, sailing back toward the pre-start side to start; kept by the World

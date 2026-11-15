@@ -69,7 +69,7 @@ const BASINS_NEAR = 4000;
 export const TWO_TURNS = 720;
 
 /** Start a penalty of `deg` degrees (360 = one turn, 720 = two). */
-export function startPenalty(b: Boat, deg: number): void { b.penalty = b.penaltyTotal = deg; b.penaltyTurned = 0; b.penaltyDir = 0; }
+export function startPenalty(b: Boat, deg: number): void { b.penalty = b.penaltyTotal = deg; b.penaltyTurned = 0; b.penaltyDir = 0; b.penaltyTacks = 0; b.penaltyJibes = 0; }
 /** Add `deg` degrees to a penalty she's already doing, or start one. */
 export function addPenalty(b: Boat, deg: number): void { if (b.penalty > 0) { b.penalty += deg; b.penaltyTotal += deg; } else startPenalty(b, deg); }
 

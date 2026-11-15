@@ -136,13 +136,27 @@ function crewPole(b: Boat, dt: number, emit: Emit): void {
  * that you are clearly beginning to make a penalty turn" (Perry, Understanding the Racing Rules of Sailing 2025–2028,
  * rule 21). A course change she then comes back from (a duck while getting clear) wasn't the turns: back within 10° of
  * where she began, it's undone. */
+/**
+ * A tack or jibe made in her turns. Her penalty is done with the last tack or jibe it needs: "each turn including one
+ * tack and one gybe" (44.2), so with those made she has made her turns, and needn't sail on round to where she began
+ * (Perry, Understanding the Racing Rules of Sailing, rule 44.2). Then she's no longer "taking a penalty" (21.2) and the
+ * rules of Section A apply to her again. Counted only in her turns' direction, once begun (not while she sails clear).
+ */
+function penaltyManeuver(b: Boat, twa: number, emit: Emit): void {
+  if (!(b.penalty > 0) || !b.penaltyDir || b.ai?.clearing) return;
+  if (twa < 90) b.penaltyTacks = (b.penaltyTacks ?? 0) + 1; else b.penaltyJibes = (b.penaltyJibes ?? 0) + 1;
+  const n = Math.round(b.penaltyTotal / 360);
+  if ((b.penaltyTacks ?? 0) >= n && (b.penaltyJibes ?? 0) >= n) penaltyDone(b, emit);
+}
+function penaltyDone(b: Boat, emit: Emit): void { b.penalty = 0; if (b.isUser) emit({ type: 'toast', msg: 'Penalty turns done. Back to racing.' }); }
+
 function countPenalty(b: Boat, dh: number, emit: Emit): void {
   if (!(b.penalty > 0)) return;
   if (!b.ai?.clearing) b.penaltyTurned += dh;
   if (!b.penaltyDir && Math.abs(b.penaltyTurned) > 30) b.penaltyDir = Math.sign(b.penaltyTurned);
-  else if (b.penaltyDir && b.penaltyTurned * b.penaltyDir < 10) { b.penaltyDir = 0; b.penaltyTurned = 0; b.penalty = b.penaltyTotal; }
+  else if (b.penaltyDir && b.penaltyTurned * b.penaltyDir < 10) { b.penaltyDir = 0; b.penaltyTurned = 0; b.penalty = b.penaltyTotal; b.penaltyTacks = 0; b.penaltyJibes = 0; }
   if (b.penaltyDir) b.penalty = Math.max(0, b.penaltyTotal - Math.max(0, b.penaltyTurned * b.penaltyDir));
-  if (b.penalty <= 0) { b.penalty = 0; if (b.isUser) emit({ type: 'toast', msg: 'Penalty turns done. Back to racing.' }); }
+  if (b.penalty <= 0) penaltyDone(b, emit);
 }
 
 /** Her sideways slip to leeward, m/s (hove to). */
@@ -254,7 +268,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
   if (twa > 176) tk = b.tack; // dead downwind: keep the tack you had until the boom crosses
-  if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); } // (head to wind: a tack; a gybe passes the wind astern)
+  if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); penaltyManeuver(b, twa, emit); } // (head to wind: a tack; a gybe passes the wind astern)
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false; // close-hauled (her course): Rule 13 ends
   crewRig(b, dt, emit);
   crewPole(b, dt, emit);
@@ -532,7 +546,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // tack and sails, as when sailing
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel); b.rel = rel; b.twa = twa;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P'; if (twa > 176) tk = b.tack;
-  if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); }
+  if (tk !== b.tack) { if (twa < 90) { b.tacking = true; b.headToWindT = t; } b.tack = tk; b.lastTackT = t; jibSheetsAtTack(b, emit); penaltyManeuver(b, twa, emit); }
   if (b.tacking && twa + leeSlip(b) >= Math.min(40, beatAngle(ww.kt) - 3)) b.tacking = false;
   crewRig(b, dt, emit); crewPole(b, dt, emit);
   // sway and yaw are kept in the boat's frame (+ starboard); here they're worked toward the wind and to leeward
