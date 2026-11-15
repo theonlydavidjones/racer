@@ -5,7 +5,7 @@ import { FULL_RUDDER, RUDDER } from './balance';
 import { displacement } from './crewPhys';
 import { condition } from './condition';
 import { motorForce, motorYaw } from './motor';
-import { clamp, D2R } from '../core/math';
+import { clamp, D2R, hypot } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import type { Vec } from '../core/math';
 
@@ -127,7 +127,7 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   // rig, and any sail still hoisted, let fly and flogging (HANDLING.flogCdA, as dynamics.ts airDrag); its broadside push a
   // little ahead of the keel's centre, the mast being forward (HOVE.windLever)
   const wTo = (wind.from + 180) * D2R, wv = wind.kt * 0.5144, vw = { x: vg.x - cur.x, y: vg.y - cur.y };
-  const ax = Math.sin(wTo) * wv - vw.x, ay = Math.cos(wTo) * wv - vw.y, aws = Math.hypot(ax, ay);
+  const ax = Math.sin(wTo) * wv - vw.x, ay = Math.cos(wTo) * wv - vw.y, aws = hypot(ax, ay);
   if (aws > 0.01) {
     const q = 0.5 * AIR * aws * aws, along = (ax * fwd.x + ay * fwd.y) / aws, across = (ax * stb.x + ay * stb.y) / aws;
     const cloth = Math.min(1, ((b.rig?.main ?? 0) + (b.rig?.jib ?? 0)) / 2);
@@ -136,7 +136,7 @@ export function dockStep(b: Boat, lines: DockLine[], wind: { from: number; kt: n
   }
   // the lines
   for (const L of [...lines]) {
-    const p = cleatOf(b, L), dx = L.to.x - p.x, dy = L.to.y - p.y, d = Math.hypot(dx, dy) || 1e-6;
+    const p = cleatOf(b, L), dx = L.to.x - p.x, dy = L.to.y - p.y, d = hypot(dx, dy) || 1e-6;
     const k = LINE_EA / Math.max(0.5, L.len), cDamp = 2 * LINE_ZETA * Math.sqrt(k * mx);
     // her cleat's speed over the ground (a turn to starboard, clockwise from above, moves a point ahead of her middle to
     // starboard), and how fast it's opening from the dock cleat

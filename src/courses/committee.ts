@@ -1,4 +1,4 @@
-import { D2R, KT, V, brg, cross, dot, sub, wrap, type Vec } from '../core/math';
+import { D2R, KT, V, brg, cross, dot, sub, wrap, type Vec, hypot } from '../core/math';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { CURRENTS, currentAt, currentVector } from '../environment/current';
 import { CurrentField, nextSaturday, sfLocalToUtcMin, stationsFor } from '../environment/tide';
@@ -80,7 +80,7 @@ export const ISLAND_ROUNDING_S = 360;
 
 /** Time (s) to sail from a to b, and how: tacking or gybing on the best angles, or straight there (crabbing across the current). */
 export function legTime(a: Vec, b: Vec, w: { kt: number; from: number }, c: Vec): { s: number; kind: LegKind } | null {
-  const L = sub(b, a), d = Math.hypot(L.x, L.y);
+  const L = sub(b, a), d = hypot(L.x, L.y);
   if (d < 1) return { s: 0, kind: 'reach' };
   const twa = Math.abs(wrap(brg(L.x, L.y) - w.from)), beat = beatAngle(w.kt), run = runAngle(w.kt);
   // two boards at ±angle off the wind: how long on each to make good L over the ground
@@ -120,7 +120,7 @@ export function estimateCourse(file: CourseFile, day: RaceDay, fleet = 3): Cours
     // the wind and tide when she's halfway down the leg (sail it once to find out when that is)
     let r = legTime(a, b, day.wind(mid, t / 60), day.current(mid, t / 60));
     r = legTime(a, b, day.wind(mid, (t + (r?.s ?? 600) / 2) / 60), day.current(mid, (t + (r?.s ?? 600) / 2) / 60));
-    const s = r ? r.s : 4 * 3600, dist = Math.hypot(b.x - a.x, b.y - a.y), sog = r && r.s > 0 ? dist / r.s / KT : 0;
+    const s = r ? r.s : 4 * 3600, dist = hypot(b.x - a.x, b.y - a.y), sog = r && r.s > 0 ? dist / r.s / KT : 0;
     legs.push({ to: names[i - 1], kind: r?.kind ?? 'beat', minutes: s / 60, sogKt: sog });
     if (dist > 50) slowest = Math.min(slowest, sog);
     t += s + (i < pts.length - 1 && C.marks[i - 1].type === 'round' ? ROUNDING_S : 0);
@@ -149,7 +149,7 @@ export function chooseCourse(courses: CourseFile[], S: Settings): CommitteeChoic
   const near = ranked.filter(r => r.s <= ranked[0].s + 0.05);
   const pick = near[hash(`${S.tideDate}|${S.tideTime}|${S.windKt}|${S.current}|${S.raceLength}`) % near.length].e;
   const at = buildCourse(pick.file, { bias: 0, fleet: S.fleet, windFrom: day.fromAtGun }).center, w = day.wind(at, 0), c = day.current(at, 0);
-  const ckt = Math.hypot(c.x, c.y) / KT, ebb = dot(c, V(270)) > 0;
+  const ckt = hypot(c.x, c.y) / KT, ebb = dot(c, V(270)) > 0;
   const tide = ckt < 0.2 ? 'slack water' : `${ebb ? 'an ebb' : 'a flood'} of ${ckt.toFixed(1)} kt at the line`;
   const why = `${WIND_KIND_LABEL[day.kind]}, ${Math.round(w.kt)} kt from ${Math.round(w.from)}°, and ${tide}: course ${pick.no} (${pick.file.distanceNm ?? '?'} nm) should take the leaders about ${Math.round(pick.minutes)} min, for a ${target}-minute race${pick.upwindStart ? ', starting to windward' : ''}.${!pick.upwindStart && ranked.some(r => r.e.upwindStart) ? ' The beat would leave the fleet stuck against the tide, so the first leg is off the wind.' : !pick.upwindStart ? ' The line runs north from the club and can\'t be moved, so in this wind no course starts to windward: it\'s a reaching start.' : ''}`;
   return { est: pick, target, why, considered: pool.length };

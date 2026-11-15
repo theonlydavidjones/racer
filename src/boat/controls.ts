@@ -21,6 +21,7 @@
  */
 import type { Tack } from './boat';
 import { jibTune, mainTune, type TuneEffect } from './rigTune';
+import { hypot } from '../core/math';
 
 export interface Controls {
   mainsheet: number; // 0 two-blocked (hard in) .. 1 fully eased
@@ -207,7 +208,7 @@ export function mainShape(c: Controls, tws: number, rig: SailRig = STD_RIG, aws 
   // below it: an estimate). With the sheet nearly straight down the crew can haul the leech closed; once it slants about
   // 25° (the boom end half a metre outboard of the car) the sail lifts the boom and the leech opens: the guide's light
   // air, cars to windward and the sheet eased "so that the top tell-tale flies straight". (The curve between, an estimate.)
-  const out = 3.38 * Math.sin(boomAngle(c) * Math.PI / 180) - 0.5 * c.traveller, vf = 1.25 / Math.hypot(1.25, out);
+  const out = 3.38 * Math.sin(boomAngle(c) * Math.PI / 180) - 0.5 * c.traveller, vf = 1.25 / hypot(1.25, out);
   const sheetT = smooth((vf - 0.9) / 0.09), vangT = c.vang * (0.12 + 0.88 * smooth(c.mainsheet / 0.4));
   const leech = Math.min(1.15, sheetT + 0.9 * vangT);
   // a mast that bends more or less than the average (rig.bend: 1 for aluminium and an average wooden mast) has more

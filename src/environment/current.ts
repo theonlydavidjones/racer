@@ -1,4 +1,4 @@
-import { KT, V, brg, clamp, type Vec } from '../core/math';
+import { KT, V, brg, clamp, type Vec, hypot } from '../core/math';
 import { PILE_PIERS, anyShoreDist, anyShoreDistNear, offPiles, flowShoreDist, flowShoreDistNear, inPilePier, pilePierDist, onLand, wharfDist, wharfShelter } from '../geo/shore';
 import { BREAKWATER_W, HARBORS, SHORE_W, harborAt, hitsWall, inBasin, type Harbor } from '../geo/marina';
 import type { Wind } from './wind';
@@ -106,7 +106,7 @@ function* buildCalm(g: Group): Generator<void, Calm> {
       const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x) - r - x0) / CELL)), i1 = Math.min(nx - 1, Math.ceil((Math.max(a.x, b.x) + r - x0) / CELL));
       const j0 = Math.max(0, Math.floor((Math.min(a.y, b.y) - r - y0) / CELL)), j1 = Math.min(ny - 1, Math.ceil((Math.max(a.y, b.y) + r - y0) / CELL));
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const p = at(i, j), u = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
-        if (Math.hypot(p.x - a.x - u * dx, p.y - a.y - u * dy) < r) solid[j * nx + i] = 1; } } };
+        if (hypot(p.x - a.x - u * dx, p.y - a.y - u * dy) < r) solid[j * nx + i] = 1; } } };
   for (const H of HARBORS) {
     if (H.reach.x1 < x0 || H.reach.x0 > x0 + nx * CELL || H.reach.y1 < y0 || H.reach.y0 > y0 + ny * CELL) continue;
     for (const b of H.breakwaters) line(b.area ? [...b.pts, b.pts[0]] : b.pts, b.area ? 0 : BREAKWATER_W / 2); // (an area's outline, so a thin one can't be slipped through either)
@@ -206,7 +206,7 @@ function calmIn(c: Calm, p: Vec): number {
 function calmAt(c: Calm, p: Vec, fx: number, fy: number, i: number, j: number, nearWall: boolean): number {
   const u = fx - i, v = fy - j; let s = 0, w = 0;
   const seen = (I: number, J: number) => { if (!nearWall) return true; const q = { x: c.x0 + I * CELL, y: c.y0 + J * CELL };
-    const L = Math.hypot(q.x - p.x, q.y - p.y), n = Math.max(1, Math.ceil(L / 0.5)); // (every half meter: a thin wall a meter off is still seen)
+    const L = hypot(q.x - p.x, q.y - p.y), n = Math.max(1, Math.ceil(L / 0.5)); // (every half meter: a thin wall a meter off is still seen)
     for (let m = 1; m < n; m++) { const r = { x: p.x + (q.x - p.x) * m / n, y: p.y + (q.y - p.y) * m / n }; if (hitsWall(r) || onLand(r)) return false; } return true; };
   for (const [a, b, ww] of [[0, 0, (1 - u) * (1 - v)], [1, 0, u * (1 - v)], [0, 1, (1 - u) * v], [1, 1, u * v]] as const) {
     const d = c.d[(j + b) * c.nx + i + a]; if (d < 0 || ww <= 0 || !seen(i + a, j + b)) continue;
@@ -304,5 +304,5 @@ export function currentAt(p: Vec, open: Vec, lattice = false): Vec {
 export function windOnWater(w: Wind, c: Vec): Wind {
   const a = V(w.from);
   const wx = -a.x * w.kt - c.x / KT, wy = -a.y * w.kt - c.y / KT;
-  return { from: brg(-wx, -wy), kt: Math.hypot(wx, wy) };
+  return { from: brg(-wx, -wy), kt: hypot(wx, wy) };
 }

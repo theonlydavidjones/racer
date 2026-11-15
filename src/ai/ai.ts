@@ -6,7 +6,7 @@ import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
-import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec } from '../core/math';
+import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
@@ -205,7 +205,7 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   const track = (hd: number, d: number) => { const u = V(hd), s = Math.max(1, b.v); return { x: b.x + (u.x * s + b.cur.x) * d / s, y: b.y + (u.y * s + b.cur.y) * d / s }; };
   // (her whole width, not just her centreline: a line 4 m either side too, so she doesn't brush a breakwater's end)
   const landOn = (hd: number, d: number) => {
-    const q = track(hd, d), dx = q.x - b.x, dy = q.y - b.y, L = Math.hypot(dx, dy) || 1, sx = -dy / L * 4, sy = dx / L * 4;
+    const q = track(hd, d), dx = q.x - b.x, dy = q.y - b.y, L = hypot(dx, dy) || 1, sx = -dy / L * 4, sy = dx / L * 4;
     return landAlong(b, q) < Infinity || landAlong({ x: b.x + sx, y: b.y + sy }, { x: q.x + sx, y: q.y + sy }) < Infinity || landAlong({ x: b.x - sx, y: b.y - sy }, { x: q.x - sx, y: q.y - sy }) < Infinity;
   };
   if (landOn(desired, 100)) {
@@ -626,7 +626,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
           const headed = ai.headedT > ai.kn.headerHoldS;
           const u = V(w.C.base), sv = { x: u.y, y: -u.x };
           const lat = (b.x - P.x) * sv.x + (b.y - P.y) * sv.y;
-          const width = ai.width * Math.min(1, Math.hypot(d.x, d.y) / 500) + 25;
+          const width = ai.width * Math.min(1, hypot(d.x, d.y) / 500) + 25;
           if (headed && w.rng() < dt * ai.kn.headerTackRate) doTack = true; // tack on headers
           else if ((ai.dirtyT ?? 0) > ai.kn.dirtyAirS && w.t - b.lastTackT > 15) doTack = true; // stuck in another boat's dirty air: tack for clear air
           // don't sail too far off the rhumb line (by where this tack takes her, her close-hauled course: not her heading,
@@ -676,7 +676,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         const lays = (tk: 'S' | 'P') => {
           const uu = V(tk === 'S' ? rS : rP), g = unit({ x: uu.x * vr + c.x, y: uu.y * vr + c.y });
           if (dot(g, d) <= 0) return false;
-          const sinA = cross(g, d) / Math.max(1, Math.hypot(d.x, d.y));
+          const sinA = cross(g, d) / Math.max(1, hypot(d.x, d.y));
           return tk === 'S' ? sinA < 0.05 : sinA > -0.05;
         };
         const other = b.tack === 'S' ? 'P' : 'S';
@@ -804,9 +804,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (parting, or closing slower than 0.15 m/s, about a quarter of a knot: judged by the rate the gap changes, which is
       // steady for boats sailing side by side, where the time to their closest approach swings about from moment to
       // moment and she'd swap between holding on and turning away)
-      const rangeRate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, Math.hypot(dx, dy));
+      const rangeRate = (dx * (o.vx - b.vx) + dy * (o.vy - b.vy)) / Math.max(0.1, hypot(dx, dy));
       if (rangeRate > -0.15 && hullGap(b, o) >= OPEN_GAP) {
-        if (clearanceOn(w, b, desired, o) < Math.hypot(dx, dy) - 0.5) desired = sailable(b, b.h);
+        if (clearanceOn(w, b, desired, o) < hypot(dx, dy) - 0.5) desired = sailable(b, b.h);
         if (o.id !== ai.hailTack?.with) avoiding = true;
         continue;
       }
@@ -842,7 +842,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // uncalled; that's the safe way to be wrong)
       // (and not once they're touching: that's a contact, its own incident, not a swerve to avoid one; held against her,
       // a swerve every step would keep the pair's tangle going (world.ts) and swallow a later breach of the other's)
-      if (Math.hypot(dx, dy) < 10 && (o.isUser || (hullGap(b, o) >= CONTACT_GAP && wouldTouch(b, o, lagT + 1)))) b.forced14 = o.id;
+      if (hypot(dx, dy) < 10 && (o.isUser || (hullGap(b, o) >= CONTACT_GAP && wouldTouch(b, o, lagT + 1)))) b.forced14 = o.id;
     }
   }
   for (const o of w.boats) {

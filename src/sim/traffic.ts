@@ -1,4 +1,4 @@
-import { D2R, brg, type Vec } from '../core/math';
+import { D2R, brg, type Vec, hypot } from '../core/math';
 import { LL } from '../geo/geo';
 
 /**
@@ -51,7 +51,7 @@ export const SERVICES: Service[] = [
 
 export interface Vessel { id: number; kind: VesselKind; x: number; y: number; h: number; v: number; moving: boolean }
 
-function lengths(r: Vec[]): number[] { const out = [0]; for (let i = 1; i < r.length; i++) out.push(out[i - 1] + Math.hypot(r[i].x - r[i - 1].x, r[i].y - r[i - 1].y)); return out; }
+function lengths(r: Vec[]): number[] { const out = [0]; for (let i = 1; i < r.length; i++) out.push(out[i - 1] + hypot(r[i].x - r[i - 1].x, r[i].y - r[i - 1].y)); return out; }
 const LEN = Object.fromEntries(Object.entries(ROUTES).map(([k, r]) => [k, lengths(r)]));
 
 /** Where a service is at time t (s): back and forth along its route (or round its loop), pausing at the ends. */
@@ -86,7 +86,7 @@ export class Traffic {
     const tan = Math.tan(19.47 * D2R);
     SERVICES.forEach((s, i) => {
       const now = at(s, i, t, this.seed), ty = VESSEL[s.kind];
-      if (Math.hypot(now.x - p.x, now.y - p.y) > 2500) return;
+      if (hypot(now.x - p.x, now.y - p.y) > 2500) return;
       for (let age = 4; age < 240; age += 4) {
         const q = at(s, i, t - age, this.seed);
         if (!q.moving) continue;

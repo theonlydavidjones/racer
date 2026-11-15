@@ -1,4 +1,4 @@
-import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
+import { KT, V, brg, cross, dist, dot, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { beatAngle, runAngle } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
 import { landAlong, onLand, shoreDist, wharfNearest } from '../geo/shore';
@@ -116,7 +116,7 @@ function windFor(o: Outlook, p: Vec, t: number, sc: Scenario): { kt: number; fro
   // wind felt on the water: the air's motion minus the water's (environment/current.ts windOnWater)
   const a = V(w.from + sc.dFrom), kt = w.kt * sc.kMul;
   const wx = -a.x * kt - c.x / KT, wy = -a.y * kt - c.y / KT;
-  return { kt: Math.hypot(wx, wy), from: brg(-wx, -wy) };
+  return { kt: hypot(wx, wy), from: brg(-wx, -wy) };
 }
 
 /** Heading that makes good a straight line toward `to` across the current, at speed v (m/s). */
@@ -433,7 +433,7 @@ function gridPath(a: Vec, b: Vec, cell: number, pad: number, blocked: (q: Vec) =
       const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
       const kk = jj * nx + ii; if (kk !== goal && isBlocked(kk)) continue;
       if (di && dj && (isBlocked(j * nx + ii) || isBlocked(jj * nx + i))) continue; // no cutting a corner of the land
-      const g = gs[k] + cell * Math.hypot(di, dj);
+      const g = gs[k] + cell * hypot(di, dj);
       if (g >= gs[kk]) continue;
       if (!edgeOk(k === start ? a : at(i, j), kk === goal ? b : at(ii, jj))) continue; // nor through a pier or a dock
       gs[kk] = g; from[kk] = k; push([g + h(kk), kk]);

@@ -1,4 +1,4 @@
-import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec } from '../core/math';
+import { LOA, V, ZONE, brg, clamp, markDist, dot, segPt, wrap, type Vec, hypot } from '../core/math';
 import { escapes, straightOn, type Pose } from '../boat/arcs';
 import { clearAstern, cpa, hullGap } from './geometry';
 import { returning, rightOfWay, takingPenalty } from './rightOfWay';
@@ -212,7 +212,7 @@ export function recordPose(b: RulesBoat, t: number): void {
   const c = b.cur, prev = r.n ? (r.i + RING - 1) % RING : -1, dt = prev >= 0 ? t - r.t[prev] : 0;
   r.dx[r.i] = (prev >= 0 ? r.dx[prev] : 0) + (c ? c.x * dt : 0); r.dy[r.i] = (prev >= 0 ? r.dy[prev] : 0) + (c ? c.y * dt : 0);
   r.t[r.i] = t; r.x[r.i] = b.x; r.y[r.i] = b.y; r.h[r.i] = b.h;
-  r.v[r.i] = b.v ?? Math.hypot(b.vx, b.vy);
+  r.v[r.i] = b.v ?? hypot(b.vx, b.vy);
   r.i = (r.i + 1) % RING; r.n = Math.min(RING, r.n + 1);
 }
 
@@ -278,7 +278,7 @@ export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): numbe
   const kOld = K.t[at(K, K.n - 1)], kw = Math.min(TURN_WINDOW, t0 - kOld), k0 = poseAt(K, t0);
   const kc0 = { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 }; // (over a window, through the waves' yaw)
   // the right-of-way boat's actual course from t0 (then on as she is)
-  const v = row.v ?? Math.hypot(row.vx, row.vy), last = poseAt(R, now);
+  const v = row.v ?? hypot(row.vx, row.vy), last = poseAt(R, now);
   const actual = (tau: number): Pose => {
     const t = t0 + tau;
     if (t <= now) return poseAt(R, t);
@@ -434,7 +434,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   // (the replying boat's speed at "You tack", taken at once, before any cooldown: slowing into the hailing boat's way is
   // not giving room. A modelling sign, and a big lull would read the same; it only counts at contact while the hail is live)
   const hr = rec.hail;
-  if (hr?.kind === 'room' && hr.replyAt != null && hr.replyV == null) { const Hd = hr.by === A.id ? B : A; hr.replyV = Math.hypot(Hd.vx, Hd.vy); }
+  if (hr?.kind === 'room' && hr.replyAt != null && hr.replyV == null) { const Hd = hr.by === A.id ? B : A; hr.replyV = hypot(Hd.vx, Hd.vy); }
   if (rec.cool > ctx.t) return { verdict: r, incident: null };
 
   // Rule 20: not responding to a hail for room to tack is a breach in itself (and so is the hailing
@@ -505,7 +505,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if (rec.grace > ctx.t && rec.by != null && rec.by !== r.kc.id && !r183b) {
     // Rule 15: she only just got right of way
     fouler = rec.by === A.id ? A : B; rule = '15'; byWhy = rec.byWhy;
-  } else if (youTack && (kc === youTack.hailed || turnedToward(youTack.hailed, youTack.hailer) > 0 || Math.hypot(youTack.hailed.vx, youTack.hailed.vy) < 0.6 * youTack.v0)) {
+  } else if (youTack && (kc === youTack.hailed || turnedToward(youTack.hailed, youTack.hailer) > 0 || hypot(youTack.hailed.vx, youTack.hailed.vy) < 0.6 * youTack.v0)) {
     // Rule 20.2(c): she replied "You tack" and didn't give the hailing boat room to tack and avoid her. Right of way
     // doesn't pass with that room (WS Case 101): the hailing boat keeps clear under 13, then 10, and if she tacks too
     // close or sails into the other boat that is hers. The replying boat failed to give the room if she turned toward the
@@ -570,7 +570,7 @@ function boatObstruction<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec
     // Case 125. Rule 19.2(a): the right-of-way boat chooses the side; the pair passing astern of her, it's that side)
     const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, wx = C.vx - (A.vx + B.vx) / 2, wy = C.vy - (A.vy + B.vy) / 2, ww = wx * wx + wy * wy;
     const tc = ww > 1e-4 ? clamp(-((C.x - mx) * wx + (C.y - my) * wy) / ww, 0, 15) : 0, cx = C.x + wx * tc, cy = C.y + wy * tc;
-    const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - cx) * u.x + (X.y - cy) * u.y, -LOA / 2, LOA / 2), dx = X.x - cx - u.x * k, dy = X.y - cy - u.y * k, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
+    const toward = (X: RulesBoat) => { const u = V(C.h), k = clamp((X.x - cx) * u.x + (X.y - cy) * u.y, -LOA / 2, LOA / 2), dx = X.x - cx - u.x * k, dy = X.y - cy - u.y * k, l = hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
     best = [{ d: dA, n: toward(A), continuing: false }, { d: dB, n: toward(B), continuing: false }]; bd = Math.min(dA, dB);
   }
   return best;
@@ -594,7 +594,7 @@ function obstructionsFor<B extends RulesBoat>(A: B, B: B, ctx: RulesContext, rec
  * where the sides don't tell, the nearer.
  */
 function insideAt<B extends RulesBoat>(A: B, B: B, oA: { d: number; n: Vec }, oB: { d: number; n: Vec }): B {
-  const ua = V(A.h), ub = V(B.h), mx = ua.x + ub.x, my = ua.y + ub.y, l = Math.hypot(mx, my);
+  const ua = V(A.h), ub = V(B.h), mx = ua.x + ub.x, my = ua.y + ub.y, l = hypot(mx, my);
   if (l > 0.2) {
     const ab = { x: -my / l, y: mx / l }; // square to the mean heading
     const sep = (A.x - B.x) * ab.x + (A.y - B.y) * ab.y, toward = -((oA.n.x + oB.n.x) * ab.x + (oA.n.y + oB.n.y) * ab.y); // (n points out from the obstruction)
