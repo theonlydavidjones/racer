@@ -26,5 +26,7 @@ describe("The tiller lashed where it's meant (sim/commands.ts lash)", () => {
     applyCommand(w, { k: 'tiller', v: 0.4 }); applyCommand(w, { k: 'lash', on: true }); expect(w.user.lashed).toBeCloseTo(0.4, 6);
     applyCommand(w, { k: 'tiller', v: -0.2 }); expect(w.user.lashed).toBeCloseTo(-0.2, 6);
     applyCommand(w, { k: 'lash', on: false }); expect(w.user.lashed).toBeNull();
+    // (an angle that isn't a number, a page with no width: where the tiller is, never NaN into the physics)
+    applyCommand(w, { k: 'tiller', v: 0.25 }); applyCommand(w, { k: 'lash', on: true, at: NaN }); expect(w.user.lashed).toBeCloseTo(0.25, 6);
   });
 });

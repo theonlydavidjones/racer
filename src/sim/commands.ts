@@ -119,7 +119,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
     case 'tiller': u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
-    case 'lash': if (c.on && c.at != null) u.tiller = Math.max(-1, Math.min(1, c.at)); u.lashed = c.on ? u.tiller : null; return;
+    case 'lash': if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-1, Math.min(1, c.at)); u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
     case 'lazyCar': takeLine(u, 'car'); moveLazyCar(u, c.fore, c.ins); return;
