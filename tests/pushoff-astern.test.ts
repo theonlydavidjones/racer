@@ -161,6 +161,11 @@ describe('pushed off astern', () => {
   // (a known failure, to come right when the planner allows for the lee's edge, ROADMAP: she's let go in 5 kt in the
   // harbor's lee and drifts out of it into 9 kt within 20 s; the end of her planned line is still in the lee. 15.0 m
   // sailed against 13.0. it.fails: it errors the day it passes, and then joins the sweep above)
+  it('Horseshoe Bay A27 in a 20 kt easterly: the known case is still the case (shoved astern, gliding free, 15–25% further than planned)', () => {
+    // (so the it.fails below can't go green for another reason: no astern plan, a touch, the berth gone)
+    const g = glideAt(slipById(LEE_EDGE.id)!, LEE_EDGE.from); expect(g, 'she is shoved astern and glides free').toBeTruthy();
+    const over = (g!.went - g!.want) / g!.want; expect(over).toBeGreaterThan(0.15); expect(over).toBeLessThan(0.25);
+  }, 120_000);
   it.fails('Horseshoe Bay A27 in a 20 kt easterly stops where the plan meant her to, within 15%: the wind she drifts into off the harbor\'s lee isn\'t the wind she was let go in', () => {
     const s = slipById(LEE_EDGE.id)!; expect(s.id).toBe(LEE_EDGE.id);
     const g = glideAt(s, LEE_EDGE.from); expect(g, 'she is shoved astern and glides free').toBeTruthy();

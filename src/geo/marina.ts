@@ -467,7 +467,7 @@ export const COAST_SHORT = 1;
  * is steered down the fairway or sailed off well before. */
 const ASTERN_LOOK_MAX = 24;
 /** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one (an
- * ESTIMATE: about what the gentlest shove that steers her 10 s in still air carries her). */
+ * ESTIMATE: about what the gentlest shove that steers her STEER_FOR s in still air, 0.555 m/s, carries her: 9.4 m). */
 export const ASTERN_ENOUGH = 9;
 /** The most she's turned stern first before she's straightened up, deg: her stern pointing down the fairway. */
 const ASTERN_TURN = 90;

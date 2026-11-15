@@ -182,12 +182,13 @@ export const SHOVE_N = 27 * 9.80665;
  * more than a slow walk (the reach, a step and the arms' length, an ESTIMATE). Where the clear water ahead of her stern is
  * short (geo/marina.ts's plan) she's shoved more gently, to stop COAST_SHORT short of its end; but never under the speed
  * that steers her STEER_FOR s in the wind there is, nor under her walk. Where that floor is more than the room allows, the
- * floor is the shove, and she runs on past the plan at a crawl (the berths where that touches are kept fast: NO_ASTERN).
+ * floor is the shove, and she runs on past the plan: at a crawl in light air (the berths where that touches are kept
+ * fast: NO_ASTERN), carried on faster by a fresh breeze on her bow, to be steered down the fairway or sailed off.
  */
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /** How long she's to have steerage way stern first once she's shoved, s (over 0.3 m/s: about 1.3 deg/s with the helm hard
  * over): the bar's 10 s, and three more for the sim's scatter about asternGlide (0.4 s held straight, Deep Physics' check;
- * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from about 0.6 m/s; a breeze on her
+ * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.555 m/s; a breeze on her
  * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
 useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE); // (the planner's look along her glide)
@@ -1881,8 +1882,8 @@ export class World {
         let lo = 0, hi = ASTERN_SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (g(m).dist < P.coast - COAST_SHORT) lo = m; else hi = m; }
         let flo = 0, fhi = ASTERN_SHOVE; for (let k = 0; k < 20; k++) { const m = (flo + fhi) / 2; if (g(m).steerable < STEER_FOR) flo = m; else fhi = m; }
         // (and never less than the way she has already, walked back at WALK: her crew can leave the last push out, but
-        // nothing takes her two tonnes' way off her at the finger's end. With a fresh breeze on her bow, which carries her
-        // on whatever they do, that's what she's let go at)
+        // checking her would leave her at the finger's end with no steerage. With a fresh breeze on her bow, which
+        // carries her on whatever they do, that's what she's let go at, steerable from the start)
         this.letGo(b, P.h, 0, Math.max(WALK, fhi, lo));
         // (told now, as she's shoved, not when the walk began a quarter of a minute before: the physics review)
         if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `Shoved off astern: ${P.helm ? `tiller to ${P.helm > 0 ? 'starboard' : 'port'}, and steer her stern down the fairway.` : 'steer her stern down the fairway.'}` });
