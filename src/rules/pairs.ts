@@ -143,8 +143,11 @@ function gapTo(b: RulesBoat, p: Vec): number {
 const windOf = (b: RulesBoat, ctx: RulesContext) => b.ww?.from ?? ctx.windFrom;
 /** True wind angle, deg (0..180), in the wind she's in. */
 const twaOf = (b: RulesBoat, ctx: RulesContext) => Math.abs(wrap(windOf(b, ctx) - b.h));
-/** The tack she'd be on sailing `course`. */
-const tackFor = (course: number, windFrom: number) => (wrap(windFrom - course) >= 0 ? 'S' : 'P');
+/** The tack she'd be on sailing `course`, now on `tack`: within RUN_HOLD of dead downwind her main stays where it is
+ * (boat/physics.ts), so she'd sail it on the tack she's on (Definitions, Tack: by the lee or dead downwind, her
+ * mainsail's side); otherwise the side the wind would come over. */
+const RUN_HOLD = 4;
+const tackFor = (course: number, windFrom: number, tack: 'S' | 'P') => Math.abs(wrap(windFrom + 180 - course)) <= RUN_HOLD ? tack : (wrap(windFrom - course) >= 0 ? 'S' : 'P');
 
 /**
  * Rule 18.4: an inside overlapped right-of-way boat that must gybe at the mark to sail her proper course shall, until
@@ -154,7 +157,7 @@ export function wideOfGybe(b: RulesBoat, idx: number, ctx: RulesContext): boolea
   const mk = ctx.marks[idx], next = ctx.marks[idx + 1];
   if (!next || mk.type !== 'round') return false;
   const course = brg(next.p.x - mk.p.x, next.p.y - mk.p.y);
-  const wf = windOf(b, ctx), mustGybe = twaOf(b, ctx) > 90 && Math.abs(wrap(wf - course)) > 60 && tackFor(course, wf) !== b.tack;
+  const wf = windOf(b, ctx), mustGybe = twaOf(b, ctx) > 90 && Math.abs(wrap(wf - course)) > 60 && tackFor(course, wf, b.tack) !== b.tack;
   if (!mustGybe) return false;
   const d = markDist(b, mk), away = d > 0 ? ((b.x - mk.p.x) * b.vx + (b.y - mk.p.y) * b.vy) / d : 0;
   return d > 1.2 * LOA && away > 0.3;
