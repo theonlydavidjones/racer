@@ -339,8 +339,7 @@ physics, ranked like the ten above:
 | PENALTY_TURN_RATE | 10 | 22 | unsourced |  |
 | SLOW_TACK | 1.3 | 24 | unsourced |  |
 | CREW_LAG | 0.8 | 27 | unsourced |  |
-| ASTERN_DRAG.c0 | 0.005 | 30 | unsourced |  |
-| ASTERN_DRAG.c1 | 0.035 | 30 | unsourced |  |
+| ASTERN | 2 | | estimate | her drag stern first over her hull's resistance ahead; no measurement found (14 Nov 2026); replaces the unsourced ASTERN_DRAG law |
 | POLE.set | 8 | 35 | unsourced |  |
 | POLE.stow | 5 | 35 | unsourced |  |
 | POLE.jibe | 8 | 35 | unsourced |  |

@@ -380,8 +380,8 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false): boole
  *   bow round whichever way points her down the fairway toward the way out. Then they slip the line and push her off
  *   forward with the boathook against the finger's end.
  * - **Shoving her off astern** (`astern`), where the fairway's too narrow to swing her: walked back until her bow is at the
- *   finger's end, then given a shove astern as the crew steps aboard, enough to coast her `coast` m on into the fairway on
- *   the water's drag (physics.ts asternCoast), steered stern first.
+ *   finger's end, then given a shove astern as the crew steps aboard, gauged to coast her `coast` m on into the fairway on
+ *   her hull's sternway drag (physics.ts asternCoast; never harder than one person shoves, world.ts SHOVE), steered stern first.
  * - **Pushing her off an end tie** (`off`): the crew pushes her off the dock (`out`: where her middle's pushed to) and, if
  *   she'd otherwise be left head to wind, her bow off the wind (`h`), her stern quarter against the dock as the pivot.
  * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first). `setBack`: the wind's

@@ -24,7 +24,7 @@
     "data:rain": "NODE_USE_ENV_PROXY=1 node scripts/fetch-rain.mjs",
     "data:rain-history": "NODE_USE_ENV_PROXY=1 node scripts/fetch-rain-history.mjs",
     "build:artifact": "vite build -c vite.artifact.config.ts && node scripts/make-artifact.mjs",
-    "test:fast": "vitest run --exclude 'tests/perf.test.ts' --exclude 'tests/approx.test.ts' --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts' --exclude 'tests/sim-ai.test.ts' --exclude 'tests/pushoff-all.test.ts' --exclude 'tests/pushoff-letgo.test.ts' --exclude 'tests/crewsettle.test.ts' --exclude 'tests/crewsettle-18.test.ts' --exclude 'tests/sim-realraces.test.ts' --exclude 'tests/roundings-crew.test.ts' --exclude 'tests/cove-drift.test.ts'"
+    "test:fast": "vitest run --exclude 'tests/perf.test.ts' --exclude 'tests/approx.test.ts' --exclude 'tests/sim-fleet.test.ts' --exclude 'tests/sim-starts.test.ts' --exclude 'tests/committee.test.ts' --exclude 'tests/courses.test.ts' --exclude 'tests/sim-ai.test.ts' --exclude 'tests/pushoff-all.test.ts' --exclude 'tests/pushoff-letgo.test.ts' --exclude 'tests/pushoff-astern.test.ts' --exclude 'tests/crewsettle.test.ts' --exclude 'tests/crewsettle-18.test.ts' --exclude 'tests/sim-realraces.test.ts' --exclude 'tests/roundings-crew.test.ts' --exclude 'tests/cove-drift.test.ts'"
   },
   "dependencies": {
     "three": "^0.186.1"
