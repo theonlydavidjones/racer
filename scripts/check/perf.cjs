@@ -32,6 +32,9 @@ const VIEWS = [
   { name: 'start_cockpit', mode: 1 },
   { name: 'overhead_out', mode: 3, zoomOut: 40 },
   { name: 'course_map', mode: 2, map: true },
+  // (the inset map with layers on: the wind field and the wind shadows, which the inset samples (ROADMAP 8b, the owner
+  // 15 Nov 2026: "inset map is really lagging again"); its own JS is the inset column, gated by perf-ab.cjs)
+  { name: 'inset_layers', mode: 2, layers: { wind: true, current: false, sea: false, fog: false, shadows: true, ships: true, laylines: true } },
   { name: 'night_east_span', night: true, cam: [LL(37.8070, -122.3520, 4), LL(37.8125, -122.3590, 80)] },
   { name: 'night_start', night: true, cam: [LL(37.8118, -122.4510, 2.5), LL(37.7980, -122.3900, 60)] },
   { name: 'night_bridge_whole', night: true, cam: [LL(37.8140, -122.3990, 5), LL(37.7980, -122.3740, 70)] },
@@ -63,17 +66,19 @@ const VIEWS = [
   await p.evaluate(() => { window.__reseed(); document.getElementById('bGo').click(); }); await p.waitForTimeout(4000); // (again at Go: the setup may make its race again, on its debounce, before)
   // the sim's steps and the scene's update/draw, timed inside the frame
   await p.evaluate(() => {
-    const w = window.sim(), v = window.__view, acc = window.__acc = { step: 0, render: 0 };
+    const w = window.sim(), v = window.__view, h = window.__hud, acc = window.__acc = { step: 0, render: 0, inset: 0 };
+    // (the inset map's own JS: its drawing, ten times a second, and its overlay every frame)
+    for (const k of ['map', 'insetStreaks']) { const f = h[k].bind(h); h[k] = (...a) => { const t0 = performance.now(); f(...a); acc.inset += performance.now() - t0; }; }
     const st = w.step.bind(w); w.step = dt => { const t0 = performance.now(); st(dt); acc.step += performance.now() - t0; };
     const rd = v.render.bind(v); v.render = (...a) => { const t0 = performance.now(); rd(...a); acc.render += performance.now() - t0; };
   });
   const measure = async (n = 6) => p.evaluate(n => new Promise(res => {
     let k = 0, acc; const f = () => {
       // (the first frame starts the count: the sum runs over the n − 1 whole frames after it)
-      if (k++ === 0) { acc = window.__acc; acc.step = 0; acc.render = 0; window.__frames.clear(); return requestAnimationFrame(f); }
+      if (k++ === 0) { acc = window.__acc; acc.step = 0; acc.render = 0; acc.inset = 0; window.__frames.clear(); return requestAnimationFrame(f); }
       if (k < n) return requestAnimationFrame(f);
       const fr = [...window.__frames.values()], tot = fr.reduce((a, x) => a + x, 0) / fr.length, info = window.__renderer.info;
-      res({ js: tot, step: acc.step / fr.length, render: acc.render / fr.length, calls: info.render.calls, tris: info.render.triangles, programs: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures });
+      res({ js: tot, step: acc.step / fr.length, render: acc.render / fr.length, inset: acc.inset / fr.length, calls: info.render.calls, tris: info.render.triangles, programs: info.programs.length, geo: info.memory.geometries, tex: info.memory.textures });
     }; requestAnimationFrame(f);
   }), n);
   const setNight = on => p.evaluate(on => { const w = window.sim(); if (!window.__gun0) window.__gun0 = w.gunUtc;
@@ -81,7 +86,7 @@ const VIEWS = [
     const d = new Date(window.__gun0 * 60000), loc = new Date(d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })), off = d.getTime() - loc.getTime();
     loc.setHours(20, 30, 0, 0); w.gunUtc = (loc.getTime() + off) / 60000 - w.t / 60; }, on);
   const rows = []; let over = false;
-  console.log('view                 calls      tris  progs  geo  tex   JS ms/frame (sim + scene + rest)');
+  console.log('view                 calls      tris  progs  geo  tex   JS ms/frame (sim + scene + rest; the inset of it)');
   const only = (process.env.PERF_ONLY || '').split(',').filter(Boolean);
   for (const V of VIEWS) {
     if (only.length && !only.includes(V.name)) continue;
@@ -90,6 +95,8 @@ const VIEWS = [
     if (V.zoomOut) { await p.keyboard.down('-'); await p.waitForTimeout(V.zoomOut * 100); await p.keyboard.up('-'); }
     if (V.cam) await p.evaluate(c => { window.__cam = { pos: c[0], at: c[1] }; }, V.cam);
     if (V.map) await p.keyboard.press('m');
+    // (the maps' layers, as the page's own choices: Hud.display, which the maps draw from; a version without it, as set)
+    if (V.layers) await p.evaluate(l => { const h = window.__hud; if ('display' in h) { window.__display = h.display; const d = h.display?.() ?? {}; h.display = () => ({ ...d, mapLayers: l }); } }, V.layers);
     await p.waitForTimeout(3000);
     await measure(3); // (a few frames first: the first frames in a new view upload what it hasn't drawn before)
     let cdp = null;
@@ -98,9 +105,10 @@ const VIEWS = [
     if (cdp) { const { profile } = await cdp.send('Profiler.stop'); require('fs').writeFileSync(`${out}/perf_${V.name}.cpuprofile`, JSON.stringify(profile)); }
     await p.screenshot({ path: `${out}/perf_${V.name}.png` });
     if (V.map) await p.keyboard.press('m');
+    if (V.layers) await p.evaluate(() => { if (window.__display !== undefined) { window.__hud.display = window.__display; window.__display = undefined; } });
     const bad = r.calls > BUDGET.calls || r.tris > BUDGET.tris || r.programs > BUDGET.programs || r.js > BUDGET.jsMs;
     over ||= bad; rows.push({ view: V.name, ...r });
-    console.log(`${V.name.padEnd(19)} ${String(r.calls).padStart(6)} ${String(r.tris).padStart(9)} ${String(r.programs).padStart(6)} ${String(r.geo).padStart(4)} ${String(r.tex).padStart(4)}   ${r.js.toFixed(1).padStart(5)} (${r.step.toFixed(1)} + ${r.render.toFixed(1)} + ${(r.js - r.step - r.render).toFixed(1)})${bad ? '  OVER BUDGET' : ''}`);
+    console.log(`${V.name.padEnd(19)} ${String(r.calls).padStart(6)} ${String(r.tris).padStart(9)} ${String(r.programs).padStart(6)} ${String(r.geo).padStart(4)} ${String(r.tex).padStart(4)}   ${r.js.toFixed(1).padStart(5)} (${r.step.toFixed(1)} + ${r.render.toFixed(1)} + ${(r.js - r.step - r.render).toFixed(1)}; inset ${r.inset.toFixed(2)})${bad ? '  OVER BUDGET' : ''}`);
   }
   await p.evaluate(() => { window.__cam = undefined; }); await setNight(false);
   // a long session: race after race (the setup's "start" each time); the GPU's geometries and textures and the JS heap
