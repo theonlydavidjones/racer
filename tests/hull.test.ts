@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { HEEL, TRANSOM_TOP, cockpitGeometry, hullGeometry, hullInnerHalf, uAtZ } from '../src/render/hull';
+import { HEEL, TRANSOM_TOP, cockpitGeometry, hullGeometry, hullGeometryFar, hullInnerHalf, sheer, uAtZ } from '../src/render/hull';
 
 /** The hull shell's edges that only one triangle uses (open edges: anything behind them shows through a gap). */
 function openEdges(g: THREE.BufferGeometry): [THREE.Vector3, THREE.Vector3][] {
@@ -15,6 +15,24 @@ function openEdges(g: THREE.BufferGeometry): [THREE.Vector3, THREE.Vector3][] {
   const v = (i: number) => new THREE.Vector3(P[3 * i], P[3 * i + 1], P[3 * i + 2]);
   return [...E.values()].filter(r => r.c === 1).map(r => [v(r.a), v(r.b)]);
 }
+
+describe('the hull from further off (its levels of detail)', () => {
+  const near = hullGeometry(), tris = (g: THREE.BufferGeometry) => g.index!.count / 3;
+  const lowestSheer = Math.min(...Array.from({ length: 101 }, (_, i) => sheer(i / 100)));
+  for (const level of [1, 2] as const) describe(`level ${level}`, () => {
+    const far = hullGeometryFar(level);
+    it('is a fraction of the near hull', () => expect(tris(far)).toBeLessThan(tris(near) / (level === 1 ? 3 : 4)));
+    it('is closed but for the sheer: no lands to hide, so nothing shows through', () => {
+      // every open edge along the top, at the sheer (under the deck's edge); (the laps run out to nothing at the transom: no edge)
+      for (const [a, b] of openEdges(far).filter(([a, b]) => a.distanceTo(b) > 1e-5)) expect(Math.min(a.y, b.y)).toBeGreaterThan(lowestSheer - 0.02);
+    });
+    it('has the same length, beam and draft', () => {
+      for (const g of [far, near]) g.computeBoundingBox();
+      const f = far.boundingBox!, n = near.boundingBox!;
+      for (const k of ['x', 'y', 'z'] as const) { expect(f.min[k]).toBeCloseTo(n.min[k], 1); expect(f.max[k]).toBeCloseTo(n.max[k], 1); }
+    });
+  });
+});
 
 describe('hull shell', () => {
   const open = openEdges(hullGeometry());

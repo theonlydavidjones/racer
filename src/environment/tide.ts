@@ -156,6 +156,9 @@ export function bayTide(station: string, ms: number): { h: number; rise: number 
   const a = at(ms - 300e3), b = at(ms), c = at(ms + 300e3);
   return { h: b, rise: (c - a) / 600 };
 }
+/** San Francisco's tide (9414290, the reference station): its height above its MLLW (m) at a time (ms UTC), from NOAA's
+ * harmonic constituents (bay-tides.json). */
+export const sfTide = (ms: number): number => predict(BT.refMsl, BT.hc, [ms])[0];
 /** Point San Quentin's tide (San Rafael Bay's). */
 export const sanQuentinTide = (ms: number) => bayTide('9414873', ms);
 
@@ -224,7 +227,34 @@ export const BAYS: Bay[] = [
 /** How far into a bay a point is (m) from its mouth. */
 const bayIn = (B: Bay, p: Vec): number => (p.x - B.q.x) * B.into.x + (p.y - B.q.y) * B.into.y;
 const inPolyV = (P: Vec[], p: Vec): boolean => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; };
-const bayAt = (p: Vec): Bay | null => { for (const B of BAYS) if (inPolyV(B.poly, p)) return B; return null; };
+/** Each bay's box (round its outline): a quick no, as the race water is kilometers from both. */
+const BAY_BOX = BAYS.map(B => ({ x0: Math.min(...B.poly.map(q => q.x)), x1: Math.max(...B.poly.map(q => q.x)), y0: Math.min(...B.poly.map(q => q.y)), y1: Math.max(...B.poly.map(q => q.y)) }));
+const bayAt = (p: Vec): Bay | null => { for (let i = 0; i < BAYS.length; i++) { const b = BAY_BOX[i]; if (p.x < b.x0 || p.x > b.x1 || p.y < b.y0 || p.y > b.y1) continue; if (inPolyV(BAYS[i].poly, p)) return BAYS[i]; } return null; };
+/**
+ * The tide's height (m above MLLW) at p and a time (ms UTC), for the water's depth over the chart's soundings. On each
+ * bay's depth grid (depthBand) it's that bay's own station's, the one the bay's stream fills it by (BAYS), so the water
+ * over a flat is the same to a boat's keel as to the current: Point San Quentin (9414873) on San Rafael Bay's (Corte
+ * Madera Creek's, 9414874, at the creek's mouth on the grid's south-west, has datums within a centimeter of it), and San
+ * Leandro Channel (9414724, inside the grid) on San Leandro Bay's. Both come 42–52 minutes after San Francisco, at
+ * 0.93–1.16 of its height (bay-tides.json, NOAA's offsets). Over a whole grid, to its edges: the tide just outside them
+ * isn't San Francisco's either (Point Orient's, Point San Pedro's, Oakland Airport's are as late), and off a grid the
+ * chart's depth comes from elsewhere anyway. Elsewhere, San Francisco's (9414290).
+ */
+export function tideHeightAt(p: Vec, ms: number): number {
+  const station = gridStation(p);
+  return station ? bayTide(station, ms).h : sfTide(ms);
+}
+/** Each depth grid's bay's tide station. */
+const GRID_STATIONS = DGRIDS.map(G => { const B = BAYS.find(b => b.name === G.name); if (!B) throw new Error(`depth grid ${G.name}: no bay`); return B.station; });
+/** The tide station of the depth grid p is on (as depthBand finds it), or null. */
+function gridStation(p: Vec): string | null {
+  const lat = LAT0 + p.y / D_MLAT, lon = LON0 + p.x / D_MLON;
+  for (let k = 0; k < DGRIDS.length; k++) { const G = DGRIDS[k];
+    const i = Math.floor((lon - G.west) / (G.east - G.west) * G.nx), j = Math.floor((G.north - lat) / (G.north - G.south) * G.ny);
+    if (i >= 0 && j >= 0 && i < G.nx && j < G.ny) return GRID_STATIONS[k];
+  }
+  return null;
+}
 /** A flow-only station's stream (kt, + its flood) at a time (minutes UTC), from its harmonic constants. */
 function inflowSpeed(id: string, tMin: number): number {
   const d = DEFS.find(x => x.id === id) as HarmonicDef | undefined;
@@ -358,7 +388,7 @@ export class CurrentField {
     this.lastKey = key; this.lastList = l;
     return l;
   }
-  at(p: Vec): Vec {
+  at(p: Vec, B: Bay | null = bayAt(p)): Vec {
     let wx = 0, wy = 0, ws = 0;
     const list = this.near(p), sx = this.sx, sy = this.sy, soft2 = this.soft2, stamp = this.stamp, epoch = this.epoch;
     for (let k = 0; k < list.length; k++) {
@@ -368,7 +398,6 @@ export class CurrentField {
       wx += v.x * w; wy += v.y * w; ws += w;
     }
     const c = ws > 0 ? { x: wx / ws, y: wy / ws } : { x: 0, y: 0 };
-    const B = bayAt(p);
     if (!B) return c;
     // (the open water's stream hands over to the bay's own across its mouth; and round where another channel comes in,
     // its stream, the stations', to the bay's across the same distance)
@@ -422,7 +451,7 @@ export class CurrentField {
     const B = bayAt(p);
     let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
     for (const k of B?.inflows ?? []) bay = Math.min(bay, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
-    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p);
+    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
     return { x: c.x * k, y: c.y * k };
   }
 }

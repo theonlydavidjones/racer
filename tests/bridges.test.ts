@@ -63,7 +63,7 @@ describe('the bridges\' towers and piers: solid', () => {
     }
   });
 
-  it('stops a boat sailing straight at each one, with a message saying what she hit', () => {
+  it('stops a boat sailing straight at each one, with a message saying what she hit (at 5 kn, her wreck)', () => {
     expect(OPEN).not.toContain(NORTH);
     for (const P of [...OPEN, NORTH]) {
       const w = new World(COURSES[0], S(), 7, { freeSail: true }), u = w.user, c = centre(P.pts);
@@ -77,7 +77,9 @@ describe('the bridges\' towers and piers: solid', () => {
       for (let i = 0; i < 60 * 90; i++) {
         u.h = h; u.tiller = 0; // (held on course: no helm, no pilot)
         w.step(DT);
-        for (const e of w.drainEvents()) if (e.type === 'toast' && /Collision/.test(e.msg)) hit = e.msg;
+        // (straight on at 2.5 m/s, about 5 kn, into concrete is a wreck now (boat/damage.ts; WRECK-PROPOSAL): the statement
+        // names what she hit, as the collision's toast did)
+        for (const e of w.drainEvents()) if ((e.type === 'toast' && /Collision/.test(e.msg)) || e.type === 'wrecked') hit = e.type === 'wrecked' ? e.how : e.msg;
         if (inPoly(bow(u), P.pts)) deepest = Math.max(deepest, 1);
       }
       expect(hit, P.name).toMatch(new RegExp((P.name ?? '').split(', ')[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));

@@ -1,5 +1,5 @@
-import { CASES, type CaseFrame, type RulesCase } from '../rules/cases';
-import { wrap } from '../core/math';
+import { CASES, poseAt, type RulesCase } from '../rules/cases';
+import { caseHelm, notSailableWhy, sailable } from '../sim/caseRun';
 
 /**
  * The Rules trainer (the owner's go, 13 Nov 2026; design/rules-trainer-mockup.png): a World Sailing Case (The Case Book
@@ -18,25 +18,23 @@ export const caseChoices = (c: RulesCase): string[] => [...c.boats.map(b => b.le
 const ink = (l: string, i: number) => INK[l] ?? ['#56b4e9', '#e8603c', '#1fbf8f', '#e69f00'][i % 4];
 const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
-/** A boat at time t: between her keyframes she sails on in a straight line, turning evenly. */
-function poseAt(F: CaseFrame[], t: number): { x: number; y: number; h: number } {
-  if (t <= F[0].t) return F[0];
-  for (let i = 1; i < F.length; i++) if (t <= F[i].t) {
-    const a = F[i - 1], b = F[i], f = (t - a.t) / Math.max(1e-6, b.t - a.t);
-    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, h: a.h + wrap(b.h - a.h) * f };
-  }
-  return F[F.length - 1];
-}
-
 export class RulesTrainer {
   private el: HTMLElement; private cv!: HTMLCanvasElement;
   private list = CASES.filter(c => c.teach);
   private k = 0; private t = 0; private t0 = 0; private raf = 0; private last = 0;
   private picked: string | null = null;
   /** Cases answered right at the first try, by number (kept with the settings by the page). */
-  constructor(host: HTMLElement, private right: () => number[], private onRight: (n: number) => void) { this.el = host; }
+  /** @param onSail Sail it yourself: the Case sailed on the water (sim/caseRun.ts), you at the helm of one of its boats. */
+  constructor(host: HTMLElement, private right: () => number[], private onRight: (n: number) => void, private onSail: (n: number) => void) { this.el = host; }
 
   open(): void { this.el.hidden = false; this.show(this.k); }
+  /** Back from sailing a Case: on that Case, answered, with how your sailing of it came out. */
+  sailed(n: number, ok: boolean, you: string, foul: string, also = ''): void {
+    const k = this.list.findIndex(c => c.case === n); this.el.hidden = false; this.show(k < 0 ? this.k : k);
+    this.answer(this.c.answer.who, false);
+    const a = this.el.querySelector<HTMLElement>('.rtSailed'); if (!a) return;
+    a.textContent = (ok ? `You sailed ${you} clear ✓` : `You sailed ${you}. Foul: ${foul}`) + (also ? ` · ${also}` : ''); a.className = 'rtSailed ' + (ok ? 'ok' : 'no'); a.hidden = false;
+  }
   close(): void { this.el.hidden = true; cancelAnimationFrame(this.raf); }
 
   private get c(): RulesCase { return this.list[this.k]; }
@@ -53,7 +51,8 @@ export class RulesTrainer {
         <p class="rtSetup">${esc(c.title)}.</p>
         <div class="rtChoices">${who.map(w => `<button type="button" class="rtChoice" data-who="${w}" disabled>${w === 'neither' ? 'Neither' : w}</button>`).join('')}</div>
         <div class="rtAnswer" hidden></div>
-        <div class="btnrow"><button type="button" class="ghost" data-rt="again">Watch again</button><button type="button" class="cta" data-rt="next">Next Case</button></div>
+        <div class="rtSailed" hidden></div>
+        <div class="btnrow"><button type="button" class="ghost" data-rt="again">Watch again</button><button type="button" class="ghost" data-rt="sail" disabled${sailable(c) ? ` title="You helm ${caseHelm(c)}"` : ` title="${notSailableWhy(c)}"`}>Sail it yourself</button><button type="button" class="cta" data-rt="next">Next Case</button></div>
         <details class="thow"><summary>The source</summary><p>World Sailing, The Case Book for 2025–2028, Case ${c.case}; the boats placed from its diagram.</p></details>
       </div>`;
     this.cv = this.el.querySelector('canvas')!;
@@ -128,10 +127,11 @@ export class RulesTrainer {
   }
 
   /** The answer: right or not, the Case's one line and its rules. */
-  private answer(who: string): void {
+  private answer(who: string, count = true): void {
     if (this.picked) return;
     const c = this.c, ok = who === c.answer.who; this.picked = who;
-    if (ok && !this.right().includes(c.case)) this.onRight(c.case);
+    if (count && ok && !this.right().includes(c.case)) this.onRight(c.case);
+    const sail = this.el.querySelector<HTMLButtonElement>('[data-rt="sail"]'); if (sail) sail.disabled = !sailable(c); // (once answered: then it's yours to sail)
     const n = this.right().filter(x => this.list.some(c2 => c2.case === x)).length, tile = this.el.querySelector('.rtTiles b'); if (tile) tile.textContent = `${n} / ${this.list.length}`;
     this.el.querySelectorAll<HTMLButtonElement>('.rtChoice').forEach(b => { b.disabled = true; b.classList.toggle('right', b.dataset.who === c.answer.who); b.classList.toggle('wrong', b.dataset.who === who && !ok); });
     const a = this.el.querySelector<HTMLElement>('.rtAnswer')!;
@@ -147,6 +147,7 @@ export class RulesTrainer {
     if (who) this.answer(who);
     else if (act === 'again') this.play(this.picked ? this.endT : this.askT);
     else if (act === 'next') this.show(this.k + 1);
+    else if (act === 'sail' && this.picked && sailable(this.c)) { this.close(); this.onSail(this.c.case); }
     else if (act === 'close') this.close();
   }
 }

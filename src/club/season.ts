@@ -43,8 +43,10 @@ export interface SeasonRace {
 export interface Series {
   id: string; title: string; host: string; club: string;
   races: SeasonRace[];
-  /** the races that make up the full series (the throwout comes only when all are sailed) */
+  /** the races that make up the full series (the throwout comes only when all are sailed): calendar.length */
   scheduled: number;
+  /** the series' race days as announced, published results or not (the season's overview shows those still to come) */
+  calendar: { no: number; date: string }[];
   /** the club's fleet: the opponents' ids (the race setup's), the same every race */
   fleet: string[];
   url: string;
@@ -60,9 +62,12 @@ type Raw = { id: string; name: string; url: string; races: { raceNo: number; dat
  * Five races make the full series, for the throwout: the series is run as five races (Latitude 38, 25 Apr 2025: "all
  * five races completed", above; the 2025–26 results have five).
  */
-const EVENTS = [
+const EVENTS: { event: string; id: string; title: string; dates?: string[] }[] = [
   { event: 'GGYC_T008047221', id: 'ggyc-seaweed-2025-26', title: 'Seaweed Soup 2025–26' },
-  { event: 'GGYC_T00227699', id: 'ggyc-seaweed-2026-27', title: 'Seaweed Soup 2026–27' }
+  // the race days as announced, before their results: Latitude 38's racing calendar, "GOLDEN GATE YC — Seaweed Soup:
+  // 11/7, 12/5, 1/2, 2/6, 3/6" (https://www.latitude38.com/calendar/, read 14 Nov 2026), the first Saturday of each month
+  // as the series has run. The start times aren't announced: a race's own comes with its results.
+  { event: 'GGYC_T00227699', id: 'ggyc-seaweed-2026-27', title: 'Seaweed Soup 2026–27', dates: ['2026-11-07', '2026-12-05', '2027-01-02', '2027-02-06', '2027-03-06'] }
 ];
 const SCHEDULED = 5;
 
@@ -75,8 +80,12 @@ export function seasons(): Series[] {
       const real = realRace(`${E.event}-r${r.raceNo}`), abandoned = r.boats.length > 0 && r.boats.every(b => b.code === 'ABN');
       return { no: r.raceNo, date: r.date, start: (r.start ?? '12:00').slice(0, 5), courseId: real?.courseId ?? RC_COURSE, courseNo: real?.courseNo ?? r.course, realId: real?.id ?? null, abandoned };
     });
+    // the calendar: the published races' own days, then the announced ones still to come
+    const calendar = races.map(r => ({ no: r.no, date: r.date }));
+    for (const [i, date] of (E.dates ?? []).entries()) if (!calendar.some(c => c.no === i + 1)) calendar.push({ no: i + 1, date });
+    calendar.sort((a, b) => a.no - b.no);
     out.push({
-      id: E.id, title: E.title, host: 'Golden Gate YC', club: 'ggyc', races, scheduled: Math.max(SCHEDULED, races.length),
+      id: E.id, title: E.title, host: 'Golden Gate YC', club: 'ggyc', races, calendar, scheduled: Math.max(SCHEDULED, calendar.length),
       // the five club boats and the first two of the club's other Folkboats: 8 entries with you, as the real fleet had
       fleet: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'], url: e.url
     });

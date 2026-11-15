@@ -107,15 +107,33 @@ function couldShelter(B: Body, qx: number, qy: number, e: Vec, slack: number): b
  * is asked about: almost always none (a boat's wind is asked for every boat, every step, and most of the walls near her
  * are downwind of her or off to the side). */
 const CELL_M = 50, NONE: Body[] = [];
-/** The cells over the box round every body's reach (BOX), indexed densely: each cell's slot in CELLS (+1; 0 not filed
+/** The cells over the box round every body's reach (BOX), indexed densely: each cell's slot in POOL (+1; 0 not filed
  * yet). A plain array read, not a hash: it's asked for every boat, every step. */
 let IDX: Int32Array | null = null, NX = 0, NY = 0;
-const CELLS: Body[][][] = [];
+// (each filed cell's 360 lists, stored compactly: one id per degree in POOL, at the cell's slot × 360, naming a list in
+// LISTS. Next degrees mostly share a list and cells next to each other share them too, so each distinct list is kept
+// once: 360 arrays a cell and one array a degree came to some 15 MB of the page's heap over a few races. The same lists,
+// in the same order: the same answers)
+const LISTS: Body[][] = [NONE], LIST_ID = new Map<string, number>([['', 0]]), BODY_NO = new Map<Body, number>();
+let POOL: Uint16Array | Uint32Array = new Uint16Array(360 * 64), FILED = 0;
+function listId(out: Body[]): number {
+  if (!out.length) return 0;
+  if (!BODY_NO.size) BODIES.forEach((B, n) => BODY_NO.set(B, n));
+  const key = out.map(B => BODY_NO.get(B)).join(',');
+  let id = LIST_ID.get(key);
+  if (id === undefined) {
+    id = LISTS.length; LISTS.push(out); LIST_ID.set(key, id);
+    if (id > 0xffff && POOL instanceof Uint16Array) POOL = Uint32Array.from(POOL); // (past 65,535 lists: wider ids, once)
+  }
+  return id;
+}
+let LAST_C = -1, LAST_S = 0; // (the cell last asked about and its slot: a boat's own point asked again)
 function cellBodies(p: Vec, from: number): Body[] {
   if (!IDX) { NX = Math.ceil((BOX.x1 - BOX.x0) / CELL_M) + 1; NY = Math.ceil((BOX.y1 - BOX.y0) / CELL_M) + 1; IDX = new Int32Array(NX * NY); }
   const i = Math.floor((p.x - BOX.x0) / CELL_M), j = Math.floor((p.y - BOX.y0) / CELL_M);
   if (i < 0 || j < 0 || i >= NX || j >= NY) return NONE;
-  let s = IDX[j * NX + i];
+  const c = j * NX + i;
+  let s = c === LAST_C ? LAST_S : IDX[c];
   if (s === 0) {
     const x0 = BOX.x0 + i * CELL_M, y0 = BOX.y0 + j * CELL_M, x1 = x0 + CELL_M, y1 = y0 + CELL_M, near: Body[] = [];
     for (const G of GROUPS) { if (G.box.x1 < x0 || G.box.x0 > x1 || G.box.y1 < y0 || G.box.y0 > y1) continue;
@@ -123,14 +141,16 @@ function cellBodies(p: Vec, from: number): Body[] {
     // each degree's list, tested from the cell's middle at the degree's middle: anywhere in the cell is within half its
     // diagonal of the middle, and anywhere in the degree turns a point |q| from the body by at most |q|·0.0088 (2 sin 0.25°)
     const cx = x0 + CELL_M / 2, cy = y0 + CELL_M / 2, rc = CELL_M * Math.SQRT1_2;
-    CELLS.push(Array.from({ length: 360 }, (_, k) => {
+    if ((FILED + 1) * 360 > POOL.length) { const P = new (POOL.constructor as Uint16ArrayConstructor)(POOL.length * 2); P.set(POOL); POOL = P; }
+    for (let k = 0; k < 360; k++) {
       const e = V(k + 0.5 + 180), out = near.filter(B => { const qx = cx - B.cx, qy = cy - B.cy; return couldShelter(B, qx, qy, e, rc + (Math.hypot(qx, qy) + rc) * 0.0088 + 0.01); });
-      return out.length ? out : NONE;
-    }));
-    s = CELLS.length; IDX[j * NX + i] = s;
+      const id = listId(out); POOL[FILED * 360 + k] = id; // (the id first: making it can widen POOL)
+    }
+    s = ++FILED; IDX[j * NX + i] = s;
   }
+  LAST_C = c; LAST_S = s;
   const k = Math.floor(from) % 360;
-  return CELLS[s - 1][k < 0 ? k + 360 : k];
+  return LISTS[POOL[(s - 1) * 360 + (k < 0 ? k + 360 : k)]];
 }
 /** Each breakwater's width across the wind, by wind direction (a tenth of a degree): it's asked for every piece, every boat. */
 const WALL_W = new Map<Vec[], Map<number, number>>();

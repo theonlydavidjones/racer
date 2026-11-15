@@ -29,7 +29,12 @@ const out = process.argv[2] || '.';
   if (past.days.length !== 5 || past.abn !== 1) fail('2025–26 doesn\'t show five race days with one abandoned');
   await page.selectOption('[data-f="sseason"]', 'ggyc-seaweed-2026-27'); await page.waitForTimeout(500);
   // 2. 2026–27 race 1, sailed by the AI's skipper to the finish
-  await page.click('.sday[data-v="ggyc-seaweed-2026-27|1"]'); await page.waitForTimeout(3000);
+  // (a race day opens the season's overview, then Sail Race 1 its setup, then Start sails it: the owner, design/season-flow)
+  await page.click('.sday[data-v="ggyc-seaweed-2026-27|1"]'); await page.waitForSelector('#seasonView:not([hidden])');
+  if (await page.evaluate(() => sim().running)) fail('a race day went straight to the water, not the season\'s overview');
+  await page.click('#bSailSeason'); await page.waitForSelector('#setup:not([hidden])');
+  if (await page.$eval('#bGo', e => e.textContent) !== 'Sail Race 1') fail('the setup\'s button isn\'t Sail Race 1');
+  await page.click('#bGo'); await page.waitForTimeout(3000);
   const set = await page.evaluate(() => { const w = sim(); return { date: w.raceDate, n: w.boats.length, names: w.boats.map(b => `${b.no} ${b.name}`) }; });
   console.log('race:', JSON.stringify(set));
   if (set.date !== '2026-11-07' || set.n !== 8) fail('race 1 isn\'t on its day with the 8-boat series fleet');

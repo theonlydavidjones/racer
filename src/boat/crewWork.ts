@@ -1,5 +1,5 @@
 import { clamp } from '../core/math';
-import type { Boat } from './boat';
+import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
@@ -179,7 +179,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         a.job = null;
       }
     }
-    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist') a.job = null;
+    else if (j.line !== 'car' && j.line !== 'pole' && j.line !== 'hoist' && j.line !== 'paddle') a.job = null; // (the paddle's job ends when she stops paddling: world.ts paddleWork)
   });
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for)
@@ -188,7 +188,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const o = ownerOf(k, n, c.spec, fwdL);
     if ((k === 'jibsheet' || k === 'jibsheetW') && n >= 2) {
       const j = c.people[o]?.job;
-      if (j?.station && (PIANO.has(j.line) || j.line === 'car')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
+      if (j?.station && (PIANO.has(j.line) || j.line === 'car' || j.line === 'paddle')) { const m = ownerOf('mainsheet', n, c.spec, fwdL); if (m !== o && !c.people[m]?.job?.station) return m; }
     }
     return o;
   };
@@ -239,7 +239,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (waits.includes(k) && !big) continue;
     // a sheet takes over from a control line (not from a job under way forward: they're up at the car or the mast)
     if (a.job) {
-      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist';
+      const committed = a.job.line === 'car' || a.job.line === 'pole' || a.job.line === 'hoist' || a.job.line === 'paddle'; // (paddling: on the side deck with the crutch, not trimming)
       const onSheet = a.job.line === 'jibsheet' || a.job.line === 'mainsheet';
       if (!sheet || committed || onSheet) continue;
       // (and not from a cabin-top line they're at, or on their way to, for a jib sheet's trim: a job of a few seconds,
@@ -274,6 +274,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   return out;
 }
 
+/** Whether a jib car is free to move: the windward (lazy) one, or either with the jib down and no sheet load on them
+ * (ROADMAP 8p; the owner: "with sails down, neither jib car should show as loaded"). */
+export const carFree = (b: Boat, side: Tack): boolean => side === b.tack || (b.rig?.jib ?? 1) <= 0.05;
+
 /** The lazy car the crew wants (from its plan) and how long they've wanted it; or your call (`b.carCmd`). */
 export const CAR = {
   /** How long a change has to have lasted before a crew bothers (s): an expert sooner, a novice later (estimates). */
@@ -285,11 +289,14 @@ export const CAR = {
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
 function carJob(b: Boat, dt: number): void {
   const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
-  const lazy = b.ctl.car[b.tack];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
-  // a job under way: on the car the boat has tacked onto, it's loaded now and can't be moved
+  // (your call for a car that's loaded now, the jib hoisted or a tack: it can't be carried out; dropped, never moved to the other car)
+  if (yours?.side && !carFree(b, yours.side)) { b.carCmd = null; if (a.job?.line === 'car') a.job = null; return; }
+  const side: Tack = yours?.side ?? b.tack, lazy = b.ctl.car[side];
+  // a job under way: on a car that's loaded now (the boat tacked onto it, or the jib went up), it can't be moved
   if (a.job?.line === 'car') {
-    if (a.job.side !== b.tack) { a.job = null; return; }
+    if (!carFree(b, a.job.side as Tack)) { a.job = null; return; }
+    const lazy = b.ctl.car[a.job.side as Tack];
     if (a.job.reach > 0) { a.job.reach -= dt; return; }
     a.job.work -= dt * workPace(b, who);
     if (a.job.work <= 0) {
@@ -311,7 +318,7 @@ function carJob(b: Boat, dt: number): void {
   // trip back aft and forward again; they set it on their way back, the car being aft of the mast. From the mast it's a
   // step aft. Your call, they come for)
   if (!yours && a.z < Z.mast - 0.5) return;
-  a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side: b.tack, target: { ...want } };
+  a.job = { line: 'car', reach: reachTime(a, { arm: CAR_ARM, z: Z.car, pose: 'car' }, c.wind, p), work: CAR.work, station: { arm: CAR_ARM, z: Z.car, pose: 'car' }, side, target: { ...want } };
 }
 
 

@@ -81,7 +81,7 @@ export interface RulesContext {
   keepsClearOf?: (a: RulesBoat, c: RulesBoat) => boolean;
 }
 
-export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23';
+export type RuleId = '10' | '11' | '12' | '13' | '15' | '16.1' | '16.2' | '17' | '18.2(a)' | '18.2(c)' | '18.3' | '18.4' | '19' | '20' | '21.1' | '21.2' | '21.3' | '23' | '42';
 
 /** Who was where when the first of two boats reached the zone. */
 export interface MarkRoomState {
@@ -189,5 +189,8 @@ export interface Incident<B> {
   /** Part 2 preamble: the boat that broke the rule wasn't racing (before her preparatory signal, after a postponement or
    * abandonment, or finished and clear, or retired), so she isn't penalized for it. */
   notRacing?: boolean;
+  /** Sail it yourself (sim/caseRun.ts): the boat that broke the rule is one of the Case's, sailing its track, not steered,
+   * so she couldn't keep clear: the rules' call stands, but no penalty for her. */
+  scripted?: boolean;
   verdict: Verdict<B>; // the plain right-of-way verdict at the moment of the incident
 }

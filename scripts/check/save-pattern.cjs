@@ -2,7 +2,9 @@
 /**
  * Saving in the Yacht Club and the boat editor (the owner): changes are a draft until Save; Save gives a quick "Saved" and
  * goes back; leaving with changes unsaved asks "Save changes?", Save or Discard. In the dev server (npm run dev -- --port 5199).
- *   node scripts/check/save-pattern.cjs <out-dir>   (screenshots → out-dir/save-*.png; exits 1 on a failure)
+ *   node scripts/check/save-pattern.cjs <out-dir> [page-url]   (screenshots → out-dir/save-*.png; exits 1 on a failure)
+ * With a page URL (e.g. file:///…/artifact/folkboat-racing-sim.html) it checks the built page instead. It also opens the
+ * editor on every boat (her sail number and home country shown: 8u) and sets a new boat's country (her ensign follows).
  */
 const { chromium } = require('playwright');
 const out = process.argv[2] || '.';
@@ -12,7 +14,18 @@ const out = process.argv[2] || '.';
   const errs = [], fail = m => { console.log('FAIL:', m); errs.push(m); };
   page.on('pageerror', e => errs.push(e.message));
   await page.routeWebSocket(/.*/, ws => ws.close()); // (no hot reload mid-run)
-  await page.goto('http://localhost:5199/'); await page.waitForTimeout(3000);
+  // (the page: the dev server by default; or the built page, e.g. file:///…/artifact/folkboat-racing-sim.html)
+  // (the built page loads three.js from jsDelivr: served here from node_modules, as smoke.cjs does)
+  await page.route('https://cdn.jsdelivr.net/npm/three@*/build/**', r => r.fulfill({ path: require('path').join(__dirname, '../../node_modules/three/build', require('path').basename(new URL(r.request().url()).pathname)), contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' } }));
+  await page.goto(process.argv[3] || 'http://localhost:5199/'); await page.waitForTimeout(process.argv[3] ? 8000 : 3000);
+  // (the owner's other boats beside Josephine, as they're named and numbered: each opened in the editor below)
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); if (!s.boats?.length) return;
+    for (const [id, name, country, number] of [['chk-ni', 'NO INHERITANCE', 'GBR', '1655'], ['chk-cv', 'CAVIARO', 'RSA', '100'], ['chk-st', 'SAILOR TWIFT', 'USA', '225']])
+      if (!s.boats.some(b => b.id === id)) { const b = structuredClone(s.boats[0]); Object.assign(b, { id, name }); b.sails = { ...b.sails, country, number }; delete b.slip; s.boats.push(b); }
+    localStorage.setItem('fbsim-settings-v2', JSON.stringify(s));
+  });
+  await page.reload(); await page.waitForTimeout(process.argv[3] ? 8000 : 3000);
   const click = sel => page.evaluate(s => document.querySelector(s).click(), sel);
   const has = sel => page.evaluate(s => !!document.querySelector(s), sel);
   const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'));
@@ -73,6 +86,26 @@ const out = process.argv[2] || '.';
   if (await page.evaluate(() => document.getElementById('boatPanel').hidden)) await click('[data-f="edit"]').catch(() => {}), await page.waitForTimeout(2500);
   if (!(await shown())) fail('a new boat\'s editor hides her sail number or home country');
   await page.screenshot({ path: out + '/save-boat-new.png' });
+  // 4. her home country sets her ensign: the new boat to GBR, saved; her card's ensign isn't the American one any more
+  const usa = await page.evaluate(() => document.querySelector('.fcard .fflag')?.title ?? '');
+  await page.evaluate(() => { const e = document.querySelector('#boatPanel [data-k="country"]'); e.value = 'GBR'; e.dispatchEvent(new Event('change', { bubbles: true })); }); await page.waitForTimeout(800);
+  await click('#boatPanel [data-act="save"]'); await page.waitForTimeout(1000);
+  if (await page.evaluate(() => !document.getElementById('boatPanel').hidden)) await click('#boatPanel [data-act="done"]').catch(() => {});
+  await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(600);
+  const gbr = await page.evaluate(() => [...document.querySelectorAll('.fcard')].find(c => /NEW BOAT/i.test(c.textContent))?.querySelector('.fflag')?.title ?? '');
+  console.log('ensign:', usa, '→', gbr);
+  if (!gbr || gbr === usa) fail(`her ensign didn't follow her country (${usa} → ${gbr})`);
+  // 5. every boat of yours: the editor shows her sail number and home country (8u: the owner's boats, and the new one)
+  const n = await page.evaluate(() => document.querySelectorAll('.fcard').length);
+  for (let i = 0; i < n; i++) {
+    await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(500);
+    await page.evaluate(k => document.querySelectorAll('.fcard')[k].click(), i); await page.waitForTimeout(1500);
+    await click('[data-f="edit"]'); await page.waitForTimeout(2000);
+    const who = await page.evaluate(() => { const c = document.querySelector('#boatPanel [data-k="country"]'), no = document.querySelector('#boatPanel [data-k="number"]'), nm = document.querySelector('#boatPanel [data-k="name"]'); return `${nm?.value} ${c?.value} ${no?.value}`; });
+    const ok = await shown(); console.log(`editor: ${who}: ${ok ? 'sail number and country shown' : 'HIDDEN'}`);
+    if (!ok) fail(`the editor hides ${who}'s sail number or home country`);
+    await click('#boatPanel [data-act="done"]').catch(() => {}); await page.waitForTimeout(800);
+  }
   console.log('ERRORS:', errs.join('\n') || 'none'); await browser.close();
   if (errs.length) process.exit(1);
 })();

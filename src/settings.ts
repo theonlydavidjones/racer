@@ -35,6 +35,8 @@ export interface Settings {
   drillFrom?: number; drillSolo?: boolean;
   /** The Rules trainer: the World Sailing Cases answered right at the first try, by number (ui/rulesTrainer.ts). */
   rulesRight?: number[];
+  /** Sail it yourself: the Case sailed (its number), with mode 'lesson' and lesson 'case'. */
+  rulesCase?: number;
   /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
   lesson?: LessonId; lessonsPassed?: LessonId[];
   /** The last float plan left with the club (Before you go): where, back by (hh:mm), how many aboard. */
@@ -42,6 +44,9 @@ export interface Settings {
   aids: 0 | 1; // line, zones and laylines drawn
   manualTrim: 0 | 1 | 2; // who trims: 0 the crew, 1 you trim the sheets (the crew does the rest), 2 you work every line
   penaltyTurns: 1 | 2;
+  /** The race applies Appendix P (special procedures for rule 42, judges on the water): a first rule 42 penalty is a
+   * Two-Turns Penalty (P2.1), a second means retiring (P2.2). Omitted: rule 42 is protested and the penalty is DSQ. */
+  appendixP?: boolean;
   /** On-the-water judging (the owner, 13 Nov 2026): 'protests', the fleet polices itself (a foul's turns are the fouler's
    * to take, rule 44.1, and the other boat may protest, rule 60); 'umpired', the sim calls each foul and the turns are owed.
    * A race only: the practice modes are always umpired. */

@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, newBoat, sailNo, type BoatSpec } from '../boat/spec';
+import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
 import { CLUBS, burgeeCanvas } from '../render/burgees';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
@@ -187,9 +187,9 @@ export class Fleet {
   private drawList(): void {
     const boats = this.S.boats;
     const body = this.view === 'grid'
-      ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}"><img class="fthumb" data-thumb="${b.id}" alt=""><b>${esc(b.name || 'Unnamed')}</b><span>${ensignImg(b)}${esc(sailNo(b))}</span></button>`).join('')}</div>`
+      ? `<div class="fgrid">${boats.map(b => `<button type="button" class="fcard" data-f="boat" data-v="${b.id}"><img class="fthumb" data-thumb="${b.id}" alt=""><b>${esc(b.name || 'Unnamed')}</b><span>${ensignImg(b)}${esc(sailNo(b))}${laidUp(b) ? ' · laid up' : ''}</span></button>`).join('')}</div>`
       : `<div class="ftable"><table><thead><tr><th>Sail no.</th><th>Name</th><th>Skipper</th><th>Club</th><th>Marina</th><th>Slip</th></tr></thead><tbody>${boats.map(b =>
-          `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${slipById(b.slip)?.label ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
+          `<tr data-f="boat" data-v="${b.id}" tabindex="0"><td>${ensignImg(b)}${esc(sailNo(b))}</td><td>${esc(b.name || 'Unnamed')}${laidUp(b) ? ' <span style="color:var(--muted)">laid up</span>' : ''}</td><td>${skipperName(b)}</td><td>${burgeeImg(b)}${esc(clubName(b.club) || '—')}</td><td>${esc(shortMarina(b.marina) || '—')}</td><td>${slipById(b.slip)?.label ?? '—'}</td></tr>`).join('')}</tbody></table></div>`;
     // the Yacht Club's tabs (docs/YACHT-CLUB.md): your boats, the members, the season (ui/season.ts); the club's sliders to come
     const tabs = `<div class="yctabs"><button type="button" data-f="tab" data-v="boats" aria-pressed="${this.tab === 'boats'}">Boats</button><button type="button" data-f="tab" data-v="members" aria-pressed="${this.tab === 'members'}">Members</button><button type="button" data-f="tab" data-v="season" aria-pressed="${this.tab === 'season'}">Season</button>${this.flash ? `<span class="gsaved on">${this.flash}</span>` : ''}</div>`;
     if (this.tab === 'season') {
@@ -253,7 +253,7 @@ export class Fleet {
       </div>
       <div class="bpbody">
       <section><h3>Particulars</h3><table class="ftab">
-        ${row('Sail number', esc(sailNo(b)))}
+        ${row('Sail number', esc(sailNo(b)))}${laidUp(b) ? row('Laid up', `for repairs, until ${esc(b.laidUpUntil!)}`) : ''}
         ${row('Country', esc(countryName(b.sails.country) || '—'))}
         ${row('Yacht club', esc(clubName(b.club) || 'None'))}
         ${row('Skipper', skipperName(b))}
@@ -307,6 +307,7 @@ function raceRow(e: LogEntry): string {
   return `<tr><td>${dayLabel(e)}</td><td>${esc(e.title)}<small>${esc(e.wind)}</small></td><td>${place}</td><td>${e.elapsed != null ? mmss(e.elapsed) : '—'}</td><td>${e.skipper === 'you' ? 'You' : 'AI'}</td></tr>`;
 }
 function crewRow(e: LogEntry): string {
-  const what = e.kind === 'race' ? `Race: ${esc(e.title)}` : `Cruise: ${esc(e.title)}${e.nm != null ? `, ${e.nm.toFixed(1)} nm` : ''}${e.arrived ? ' ✓' : ''}`;
+  const hurt = e.wreck ? `, wrecked${e.towed ? ', towed in' : ''}` : e.damage ? `, ${esc(e.damage)} damage` : '';
+  const what = (e.kind === 'race' ? `Race: ${esc(e.title)}` : `Cruise: ${esc(e.title)}${e.nm != null ? `, ${e.nm.toFixed(1)} nm` : ''}${e.arrived ? ' ✓' : ''}`) + hurt;
   return `<tr><td>${dayLabel(e)}</td><td>${what}</td><td>${e.skipper === 'you' ? 'You' : 'AI (generic)'}</td><td>${esc(e.crew)}</td></tr>`;
 }
