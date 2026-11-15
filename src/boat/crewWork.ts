@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
-import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
+import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, crewSkill, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
  * Who does what, and in what order. Each person works one thing at a time; to work a line they first have to get to
@@ -232,6 +232,22 @@ const newAngleOf = (c: CrewState, twa: number, k: string) => c.lineTwa?.[k] != n
 function realChangeOf(c: CrewState, twa: number, ls: Record<string, number>, k: string, skill: number): boolean {
   const ref = c.lineRef?.[k];
   return ref == null || newAngleOf(c, twa, k) || Math.abs((ls[k] ?? ref) - ref) >= LINE_MOVED * startThreshold(k, skill, ls[k]);
+}
+/**
+ * Where the crew are taking line `k`, by crewJobs' own decisions (the trim coach judges a fix against it, coach.ts
+ * withCrew): a job under way on it, the setting they're making; a cabin-top line they'll set once their waits let them
+ * (their 20 s wish off it by their start threshold, and a real change since they set it, not a line a placed crew
+ * leaves for a big change), that wish, which is what they set a cabin-top line to; otherwise undefined: it stays where it
+ * is. (Their thresholds at the crew's skill, where crewJobs takes the hand's own trim: near enough for the coach.) Not this moment's plan: that swings with each puff, which the crew don't chase.
+ */
+export function crewHeading(b: Boat, k: Ctl): number | undefined {
+  const c = b.crew; if (!c) return undefined;
+  for (const a of c.people) if (a.job?.line === k && a.job.to != null) return a.job.to;
+  if (!PIANO.has(k) || waitingLines(c).includes(k)) return undefined;
+  const lw = c.lineWant?.[k]; if (lw == null) return undefined;
+  const skill = crewSkill(c), now = b.ctl[k];
+  if (Math.abs(lw - now) < startThreshold(k, skill, lw) || !realChangeOf(c, b.twa ?? 0, c.lineSlow ?? {}, k, skill)) return undefined;
+  return lw;
 }
 /** The per-line results crewJobs hands back, kept per boat and filled in afresh each step (read within the step only:
  * physics.ts trimSails), so a step makes none: a line absent from `want` is undefined, as it was missing before. */

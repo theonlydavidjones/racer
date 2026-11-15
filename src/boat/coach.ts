@@ -3,6 +3,7 @@ import { bow, stern, type Boat, type LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
 import { CAR_FORE_PINS, boomAngle, crewSolve, depowerLimits, planWorth, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls, type CrewSettings, type Shape } from './controls';
 import { crewBestHeel, crewMass, crewMoment, crewSkill, displacement, specAttr } from './crewPhys';
+import { crewHeading } from './crewWork';
 import { condition, mainRig } from './condition';
 import { airDrag, driveSpeedRatio, hullResistance } from './dynamics';
 import { driveCurveFor } from './driveCurve';
@@ -239,12 +240,14 @@ const RANGE: Partial<Record<LineKey, [number, number]>> = { traveller: [-1, 1] }
  */
 export function withCrew(b: Boat, k: LineKey, v: number): Controls {
   const c = { ...b.ctl, [k]: v } as Controls, want = crewMainAngle(b);
-  // (and the crew's lines where they're already taking them: a cabin-top line they mean to set, worth the trip to them
-  // (physics.ts trimSails' pick, b.crewWorth), is judged at their setting, not where it is now on the way. Settling in,
-  // a vang eased over the next minute; promised against the line half-way, the fix was worth what the crew were about
-  // to give her anyway, and the boat left alone caught up: the promise didn't come true)
-  const plan0 = b.crewPlan, worth0 = b.crewWorth;
-  if (plan0 && worth0) { const min = 0.001 + 0.003 * (1 - crewSkill(b.crew)); for (const x of FIXABLE) if (x !== k && !byHand(b, x) && (worth0[x] ?? 0) >= min) c[x] = plan0[x]; }
+  // (and the crew's lines where they're already taking them, by their own decisions (crewWork.ts crewHeading): a line
+  // they're setting, or will once their waits let them, judged at their setting, not where it is now on the way.
+  // Settling in, a vang eased over the next minute; promised against the line half-way, the fix was worth what the crew
+  // were about to give her anyway, and the boat left alone caught up. A line they're holding (set a minute ago, a puff's
+  // swing, a placed crew's wait) stays where it is: judged at their plan, the coach priced a boat they weren't sailing)
+  for (const x of FIXABLE) if (x !== k && !byHand(b, x)) { const h = crewHeading(b, x); if (h != null) c[x] = h; }
+  // (and the car, the crew's with the sheet yours: they move it at once, to their plan, no waits)
+  if (k !== 'traveller' && byHand(b, 'mainsheet') && !byHand(b, 'traveller') && b.crewPlan) c.traveller = b.crewPlan.traveller;
   if (k === 'traveller' && !byHand(b, 'mainsheet')) c.mainsheet = mainsheetFor(want, v);
   // (a shape line moved under a main the crew trim: they set the car and the sheet around it as they do every second,
   // the lines you hold fixed where you have them (physics.ts trimSails, crewSolve): the vang off upwind, they sheet
@@ -265,6 +268,9 @@ export function withCrew(b: Boat, k: LineKey, v: number): Controls {
   return c;
 }
 const FIXABLE = ['vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const;
+/** Whether the crew are taking any of her other lines somewhere (withCrew): then the boat as she is isn't settled, and
+ * the base is priced as the candidates are, the depowering step free to move as theirs does (speedFactor's `now`). */
+const crewMoving = (b: Boat, k: LineKey) => FIXABLE.some(x => x !== k && !byHand(b, x) && crewHeading(b, x) != null);
 /** The best setting for one line with the crew answering it, and the speed it's worth. */
 function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: number; gain: number } {
   // (never past the most the crew themselves would set it: the North Sails guide's caps, controls.ts depowerLimits.
@@ -272,7 +278,7 @@ function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: numbe
   // use the kickingstrap upwind in less than 18 knots"; the cure there is the sheet. The guide's minimums aren't
   // applied: whether its outhaul-to-the-mark beats the speed search in a breeze is the open depowering question)
   const lim = depowerLimits(b.depower ?? 0, b.awa, b.ww.kt), [lo, hi0] = RANGE[k] ?? [0, 1];
-  const hi = Math.max(lo, Math.min(hi0, lim.max[k as keyof CrewSettings] ?? hi0)), base = speedFactor(b, withCrew(b, k, b.ctl[k]), true);
+  const hi = Math.max(lo, Math.min(hi0, lim.max[k as keyof CrewSettings] ?? hi0)), base = speedFactor(b, withCrew(b, k, b.ctl[k]), !crewMoving(b, k));
   // (with both sails flogging the drive is nil: a floor, so the line that brings one back still counts)
   let to = b.ctl[k], best = Math.max(base, 0);
   // (coarse, then fine about the best: a tenth of the range, then a fortieth either side of it, at half the looks of a
