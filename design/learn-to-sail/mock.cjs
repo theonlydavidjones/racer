@@ -10,6 +10,13 @@ const TEAL = '#2fd4c4', AMBER = '#ffb35c', GREEN = '#3fd197';
   await page.click('[data-home="drill"]'); await page.waitForTimeout(800); await page.click('#bLessons'); await page.waitForTimeout(1000);
   await page.click('[data-lesson="points"]'); await page.waitForTimeout(3000);
   await page.keyboard.press('y'); await page.waitForTimeout(400);
+  // the points of sail and the wind on the water (render/windRose.ts, branch design/wind-rose): the lesson's target teal
+  await page.evaluate(async () => {
+    const { WindRose } = await import('/src/render/windRose.ts'), { beatFor } = await import('/src/boat/seaway.ts');
+    const rose = new WindRose(window.__view.scene); window.__rose = { target: 'close' };
+    const tick = () => { const w = window.sim(), u = w.user; rose.update(u.x, u.y, u.ww.from, u.h, beatFor(u), window.__rose.target); requestAnimationFrame(tick); };
+    tick();
+  });
   const sail = (sec, rel) => page.evaluate(([n, rel]) => { const w = window.sim(), from = w.windModel.base; for (let i = 0; i < n; i++) { if (rel != null && w.pilot) w.pilot.course = (from + rel + 360) % 360; w.step(1 / 60); } return { twa: w.user.twa, arel: w.user.arel, tws: w.user.ww.kt, bsp: w.user.v, step: w.lesson.step }; }, [Math.round(sec * 60), rel]);
   // overlays: everything drawn in one layer, cleared per still
   const draw = async (o) => { if (o.line != null) { await page.evaluate(([c, p]) => { const L = window.sim().lesson; L.cue = c; L.progress = p; }, [o.line, o.done ? 1 : (o.p ?? 0)]); await page.waitForTimeout(900); } return page.evaluate(([o, C]) => {
@@ -85,7 +92,7 @@ const TEAL = '#2fd4c4', AMBER = '#ffb35c', GREEN = '#3fd197';
   // 3. in the band, holding: the fill along the line's foot, a ring round the windex filling with it
   s = await sail(25, 44);
   b = bandFor(s, 38, 49);
-  await draw({ line: 'Close-hauled: hold it, jib luff telltales streaming', p: .6, dots: { done: 0 }, tape: [38, 49], band: null, inBand: true }); await page.screenshot({ path: out + '/3-hold.jpg', quality: 85 });
+  await draw({ line: 'Hold it: jib luff telltales streaming, windward and leeward', p: .6, dots: { done: 0 }, tape: [38, 49], band: null, inBand: true }); await page.screenshot({ path: out + '/3-hold.jpg', quality: 85 });
   // 4. stuck (20 s and no nearer): the way to the band dashed on the windex, the tiller pilot's head ringed
   s = await sail(14, 82);
   b = bandFor(s, 38, 49);
@@ -95,6 +102,6 @@ const TEAL = '#2fd4c4', AMBER = '#ffb35c', GREEN = '#3fd197';
   // 5. passed: green ✓, the dot filled, a moment, then the next band
   s = await sail(25, 44);
   b = bandFor(s, 38, 49);
-  await draw({ line: 'Close-hauled ✓', p: 1, done: true, dots: { done: 1 }, tape: [56, 75], band: null, inBand: true }); await page.screenshot({ path: out + '/5-pass.jpg', quality: 85 });
+  await page.evaluate(() => { window.__rose.target = 'closeReach'; }); await draw({ line: 'Close-hauled ✓', p: 1, done: true, dots: { done: 1 }, tape: [56, 75], band: null, inBand: true }); await page.screenshot({ path: out + '/5-pass.jpg', quality: 85 });
   await browser.close();
 })();

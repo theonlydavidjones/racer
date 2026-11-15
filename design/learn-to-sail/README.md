@@ -88,29 +88,38 @@ Questions for the owner:
 - ½× by default, or only offered;
 - whether the start card shows on every attempt, or only the first.
 
-## The points of sail on the water (`6-rose-before.jpg`, `7-rose-after-shift.jpg`)
+## The points of sail on the water (`6-rose-before.jpg`, `7-rose-after-shift.jpg`, `8-rose-helm.jpg`, `9-rose-chase.jpg`)
 
-The owner, 14 Nov 2026: "in-situ wind indication … showing on the water where the wind is and the points of sail …
-if it could move with a wind shift to help teach the relativity of it all."
+The owner, 14 Nov 2026: "in-situ on-the-water points of sail and wind direction, similar to the tack drills, so a new
+learner can easily understand where these points of sail (and the wind) are relationally. also, that on-water marks would
+move around the boat as the wind shifts, helping user understand the relativity."
 
-- **What it is.** A rose of sectors flat on the water round her, 6–18 m out, laid out from the **true** wind where she
-  is, on both tacks:
-  - in irons (the no-go, faint red);
-  - close-hauled, close reach, beam reach, broad reach and run, from the lesson's own bands, close-hauled from her own
-    beat angle.
+Drawn on the water round her in the drill guides' style, from the **true** wind where she is, on both tacks:
+- **the wind:** gold chevrons coming in from where it blows from, and WIND;
+- **the no-go zone:** a faint red wedge either side of the wind, "No-go";
+- **the points of sail:** a dashed white ray between each two points, and on each point a chevron pointing the way she'd
+  sail on it, named: Close-hauled, Close reach, Beam reach, Broad reach, Run. The bands are the lesson's own, close-hauled
+  from her own beat angle;
+- **her point:** lit amber on her side of the wind;
+- **the lesson's target:** teal (`--target`), on both tacks.
 
-  WIND chevrons come in from upwind beyond it.
-- **How the sectors are marked:**
-  - the sector her heading is in is lit amber, with its name at the rim;
-  - the lesson's target is teal (`--target`), named too;
-  - the rest show only as thin white lines between them, so the water shows through.
-- **It turns with every shift.** In the pair, her compass course is held at 295° and the wind backs 18° (190° → 172°).
-  The whole rose swings: she goes from a beam reach to a broad reach without touching the helm, and the teal close-hauled
-  sector moves off to the side. That's the relativity lesson: the point of sail is the angle to the wind, not a heading.
-- **When it shows.** In lessons, on by default. In ordinary sailing, off, but a layer the player can switch on in the
-  inset map's layer row (beside the others there), and a key in the Keys list. No new button.
-- **Building it.** The prototype is `render/windRose.ts` on branch design/wind-rose; the stills are from it.
-  - It's drawn as a sheet just above the water. Close to the hull the waves, raised in the water's own shader, cover
-    it, so in the stills it shows from about 10 m out.
-  - Built, it's drawn in the water's shader (a decal the waves carry), right up to her hull. The words at the rim are
-    in it too, out of frame in these stills.
+**The shift pair** (6 and 7, from overhead). Her compass course is held at 292° while the wind backs 15° (195° → 180°):
+- before, she's on a beam reach (TWA 94°);
+- after, the whole rose has swung round her and she's on a broad reach (TWA 114°), her heading unchanged.
+
+That's the relativity lesson: the point of sail is the angle to the wind, not a heading.
+
+**From the helm and the chase view** (8 and 9), the names stand on the water ahead and abeam, readable as she sails, and
+the lit and target sectors lie on the water.
+
+**When it shows:**
+- in lessons, on by default;
+- in ordinary sailing, off, but a layer in the inset map's layer row and a key in the Keys list. No new button.
+
+**Building it.** The prototype is `render/windRose.ts` on branch design/wind-rose; every still here is from it.
+- Close to the boat, the water's own shader raises the waves over a flat sheet. So the prototype lies 16–40 m out, and
+  in the chase view the nearest part is under the waves.
+- Built, it's drawn in the water's shader, as a decal the waves carry, and can come in closer.
+
+The five lesson stills above (1–5) carry the rose too, with the lesson's target teal. After the pass (5), the next
+point, close reach, turns teal.
