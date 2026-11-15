@@ -42,17 +42,19 @@ export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c
  * (dynamics.ts airDrag, on the wind she feels: going astern she runs with a wind on her bow), a wind abaft the beam
  * drifts her ahead (the bare-poles drift, a tenth of the wind), and the water slows her sternway (ASTERN_DRAG). So a
  * wind on her stern shortens the glide and a wind on her bow carries her on, perhaps without stopping. Returns how far
- * she goes astern in `secs` (m), how long she keeps `steerage` m/s of sternway (s), and whether she's still going
- * astern at the end. Her set to leeward across the wind isn't in it.
+ * she goes astern in `secs` (m), how long from the start she keeps `steerage` m/s of sternway (s: until it first falls
+ * under it; way the wind gives her back later doesn't count, she has lain there unsteerable meanwhile), and whether
+ * she's still going astern at the end. Her set to leeward across the wind isn't in it.
  */
 export function asternGlide(v0: number, heading: number, windFrom: number, windKt: number, secs = 60, steerage = 0.3): { dist: number; steerable: number; going: boolean } {
   const twa = Math.abs(wrap(windFrom - heading)), drift = 0.1 * windKt * KT * Math.max(0, Math.min(1, (twa - 90) / 60)), dt = 1 / 60;
-  let ast = v0, dist = 0, steerable = 0;
+  let ast = v0, dist = 0, steerable = 0, steers = v0 > steerage;
   for (let t = 0; t < secs && ast > 0; t += dt) {
     const ap = sailWind(windFrom, windKt, heading, -ast);
     ast -= surgeAccel(0, drift, airDrag(ap.aws, ap.awa, 1, 0)) * dt; // (what would be headway comes off her sternway: one motion)
     if (ast > 0) ast = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
-    if (ast > 0) { dist += ast * dt; if (ast > steerage) steerable += dt; }
+    if (ast > 0) dist += ast * dt;
+    if (steers && ast > steerage) steerable += dt; else steers = false;
   }
   return { dist, steerable, going: ast > 0 };
 }

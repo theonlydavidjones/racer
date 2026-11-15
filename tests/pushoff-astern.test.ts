@@ -94,6 +94,20 @@ describe('pushed off astern', () => {
       else expect(u.handled?.plan.kind, `${id}: pushed off in a westerly, so not astern`).not.toBe('astern');
     }
   });
+  it('a fresh breeze on her bow carries her on whatever the crew do: she\'s let go with the way she has, their walk, never dead in the water', () => {
+    // (the physics review, 15 Nov 2026: gauged to her room, the shove came to nothing from 14 kt on her bow, and she lay
+    // at the finger's end with no steerage for 10–40 s)
+    let n = 0;
+    for (const s of SLIPS) {
+      if (n >= 4) break;
+      if (Math.abs(((s.heading - 270 + 540) % 360) - 180) <= 60) continue; // (not the westerly's flagged berths)
+      const w = sail(s.id, s.heading, 18), u = w.user; for (let k = 0; k < 30; k++) w.step(DT);
+      if (!w.pushOff() || u.handled?.plan.kind !== 'astern') continue;
+      for (let k = 0; k < 60 * 60 && u.handled; k++) w.step(DT);
+      expect(u.handled, s.id).toBeFalsy(); expect(u.astern ?? 0, `${s.id}: her way as she's let go`).toBeGreaterThan(0.43); n++;
+    }
+    expect(n).toBeGreaterThanOrEqual(2);
+  }, 120_000);
   it('kept fast with a motor on the bracket, the one line says to motor out', () => {
     expect(NO_ASTERN_WEST).toHaveLength(12);
     const id = NO_ASTERN_WEST.find(i => { const w = sail(i, 270, 12); for (let k = 0; k < 30; k++) w.step(DT); return !w.pushOff(); })!;

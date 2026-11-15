@@ -63,6 +63,12 @@ describe('steering astern, shoved off under bare poles', () => {
       expect(Math.abs(g.steerable - steerable), `steerage from ${v0} m/s`).toBeLessThan(Math.max(1, 0.15 * steerable));
     }
   });
+  it('her steerage is counted from the start: let go too slow to steer, the way a bow wind gives her later doesn\'t count', () => {
+    expect(asternGlide(0.1, 0, 0, 20, 60).steerable).toBe(0); // (though in 20 kt on her bow she's over 0.3 m/s within a quarter of a minute)
+    expect(asternGlide(0.1, 0, 0, 20, 60).going).toBe(true);
+    expect(asternGlide(0.5, 0, 0, 20, 60).steerable).toBeGreaterThan(59); // (from a walk, she never loses it)
+    const calm = asternGlide(0.55, 0, 90, 0, 60).steerable; expect(calm).toBeGreaterThan(12); expect(calm).toBeLessThan(14);
+  });
   it('a wind on her stern shortens the glide, a wind on her bow carries her on', () => {
     const calm = asternGlide(0.64, 0, 90, 0), stern = asternGlide(0.64, 0, 180, 20), bow = asternGlide(0.64, 0, 0, 20);
     expect(stern.dist).toBeLessThan(0.7 * calm.dist); expect(stern.going).toBe(false);

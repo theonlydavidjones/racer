@@ -1889,7 +1889,10 @@ export class World {
         const ww = this.windHere(b, b, false), g = (v: number) => asternGlide(v, P.h, ww.from, ww.kt, 90); // (her whole glide, to where she's lost her way)
         let lo = 0, hi = ASTERN_SHOVE; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (g(m).dist < P.coast - COAST_SHORT) lo = m; else hi = m; }
         let flo = 0, fhi = ASTERN_SHOVE; for (let k = 0; k < 20; k++) { const m = (flo + fhi) / 2; if (g(m).steerable < STEER_FOR) flo = m; else fhi = m; }
-        this.letGo(b, P.h, 0, Math.max(fhi, lo));
+        // (and never less than the way she has already, walked back at WALK: her crew can leave the last push out, but
+        // nothing takes her two tonnes' way off her at the finger's end. With a fresh breeze on her bow, which carries her
+        // on whatever they do, that's what she's let go at)
+        this.letGo(b, P.h, 0, Math.max(WALK, fhi, lo));
         // (told now, as she's shoved, not when the walk began a quarter of a minute before: the physics review)
         if (b.isUser) this.emit({ type: 'toast', ms: 7000, msg: `Shoved off astern: ${P.helm ? `tiller to ${P.helm > 0 ? 'starboard' : 'port'}, and steer her stern down the fairway.` : 'steer her stern down the fairway.'}` });
       }
