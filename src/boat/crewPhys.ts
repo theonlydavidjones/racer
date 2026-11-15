@@ -101,6 +101,8 @@ export interface Aboard {
   job: Job | null;
   /** Seconds until they act on a new call (reaction time), and the position they've decided on. */
   react: number; goal: { x: number; z: number } | null;
+  /** On the footwell route to their goal (FOOTWELL_MOVE): in off the bench, fore or aft, then out. */
+  via?: boolean;
   /** 0 fresh … 1 spent (hiking). */
   fatigue: number;
 }
@@ -200,7 +202,7 @@ export function deckHalf(z: number): number {
  * Sails' Nordic Folkboat tuning guide: the cabin-top lead 2.65 m from the forestay pin, the track centred 58 cm off the
  * centreline: on the cabin top about 0.6 m aft of the mast).
  */
-export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, cockpitAft: 1.88, cabinSide: 0.90, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0 };
+export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, cockpitAft: 1.88, cabinSide: 0.90, piano: 0.85, car: -3.82 + 0.8 + 2.65, mast: -0.95, gap: 0.5, bow: -3.82 + 0.8 - 0.3, foredeck: -2.0, bulkhead: 1.06, thwart: 2.025 };
 /**
  * Deep downwind with the pole out in light air, the crew go right forward to put her bow down (the owner, who races
  * them: "normally people sit all the way up on the foredeck. usually one crew will sit in front of the forestay with both
@@ -237,6 +239,13 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, 
  * as well put a crew member leaning on the coaming in a puffy 7 kt back and forth across it, 87 seat moves in ten
  * minutes against 75.) */
 export const DECK_ARM = 0.5;
+/**
+ * The footwell route: a move along the cockpit of more than FOOTWELL_MOVE (m) goes by the footwell, FOOTWELL_X (m) off the
+ * centreline (the sole between the benches), not along the bench or the side deck past the others and the winch; the
+ * step down and up at the ends a stride, FOOTWELL_STEP (m), taken as they start and finish along.
+ * Estimates, from the cockpit's plan (render/hull.ts COCKPIT_FIT).
+ */
+export const FOOTWELL_MOVE = 0.4, FOOTWELL_X = 0.3, FOOTWELL_STEP = 0.15;
 /** Crew member `j`'s place fore and aft among `count` free crew, `f` of the way from the aft end to the forward end
  * (on a side deck, either side of the winch, never on it: a place within its pedestal's reach goes to the nearer side).
  * Two crew at most (settings.ts). */
@@ -578,8 +587,23 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const crossing = Math.sign(goal.x) !== Math.sign(a.x) && Math.abs(goal.x - a.x) > 0.5;
     const vx = (crossing ? 1.0 : 0.7) * pace(p) * (c.roll?.phase === 'flatten' ? 1.3 : 1);
     const x0 = a.x, z0 = a.z;
-    a.x += clamp(goal.x - a.x, -vx * dt, vx * dt);
-    a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
+    // (along the cockpit any way that counts, FOOTWELL_MOVE, they don't shuffle down the bench or the side deck: they
+    // step down into the footwell first, FOOTWELL_X off the centreline, go fore or aft there, and out again once they're
+    // level with where they're going; forward of the cockpit, on to the mast or the cabin top, the side deck's theirs)
+    // (how much of the way is along the cockpit: from the forward end of the side deck on forward to the mast, a step
+    // or two of it, they keep to the deck)
+    const inCockpit = (z: number) => z > Z.bulkhead && z < Z.thwart;
+    const along = Math.min(Math.max(a.z, goal.z), Z.thwart) - Math.max(Math.min(a.z, goal.z), Z.bulkhead);
+    if (i > 0 && c.roll?.phase !== 'flatten' && !a.via && along > FOOTWELL_MOVE) a.via = true;
+    if (a.via && Math.abs(goal.z - a.z) < 0.02) a.via = false;
+    // (coming into the cockpit, from the cabin top or the mast: they step in at the bulkhead, then go aft)
+    const dz = clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
+    // (a step down and a step up, not a stop at each end: along once they're nearly in, out over the last of the way)
+    const via = a.via && (inCockpit(a.z) || inCockpit(a.z + dz)) && Math.abs(goal.z - a.z) > FOOTWELL_STEP;
+    const wide = via && Math.abs(a.x) > FOOTWELL_X + FOOTWELL_STEP;
+    const toX = via ? Math.sign(goal.x || a.x) * Math.min(Math.abs(goal.x), FOOTWELL_X) : goal.x;
+    a.x += clamp(toX - a.x, -vx * dt, vx * dt);
+    if (!wide) a.z += dz;
     // (in the cockpit, round the jib winch on the side deck, not through it: from one side of it to the other they step in
     // off the deck first, past it on the bench, and out again beyond it; nor out on the deck beside it. Going on forward
     // of the cockpit, to the mast, they climb past it)

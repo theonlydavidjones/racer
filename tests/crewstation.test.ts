@@ -49,8 +49,9 @@ export function stationMoves(kt: number) {
       goalWas[k][i] = g;
       const at = a.goal?.z ?? a.z, seat = !a.job && at >= 0.88 && !atWinch(at); // (the step in past the winch, on the way: not a seat)
       if (seat && !Number.isNaN(prev[k][i]) && Math.abs(at - prev[k][i]) > 0.05) moves[k][i]++;
-      // (along the boat while their place is a seat: a job's trip, the mast and the run's foredeck aside)
-      if (seat && a.z >= 0.88) walked[k][i] += Math.abs(a.z - zWas[k][i]);
+      // (along the boat while their place is a seat: a job's trip, the walk back from it in the 5 s after (as for the free
+      // trips), the mast and the run's foredeck aside)
+      if (seat && a.z >= 0.88 && w.t - jobEnd[k][i] > 5) walked[k][i] += Math.abs(a.z - zWas[k][i]);
       zWas[k][i] = a.z;
       prev[k][i] = seat ? at : NaN;
     }));
@@ -69,7 +70,8 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     const m = stationMoves(kt);
     // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
     for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
-    m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
+    // (0.03 at most before the footwell route, with the walk back from a job not counted; the old bound's 0.05 of room)
+    m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.08));
     // (by role, as the crew's work falls: the hand with the cabin-top lines, crewWork.ts ownerOf (the jib hand at their
     // stations, the main trimmer once both are forward of the winch, the helm on the main) makes the trips, under 1.4 a
     // minute; and nobody makes one for nothing, no job and no move forward of the winch or to the mast, under 0.1 (0 to
