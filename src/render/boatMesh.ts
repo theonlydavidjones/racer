@@ -12,7 +12,7 @@ import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
-import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
+import { buildInstrument, syncInstrument, RISE, UNIT, type Instrument } from './tacktick';
 import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -1369,6 +1369,11 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     instrument = buildInstrument();
     const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - UNIT.d / 2 - 0.01; // (its after face 1 cm forward of the runners' ends)
     instrument.grp.position.set(0, cabinTopAt(uAtZ(z), 0), z); grp.add(instrument.grp);
+    // its riser: a solid teak block, broader than the unit's foot and tapering a little to the top, through-bolted to the
+    // roof (the owner: wooden, and sturdier than a post). Sunk 2 cm so its foot meets the cambered roof all round.
+    const blk = new THREE.CylinderGeometry(Math.SQRT1_2, Math.SQRT1_2 * 1.18, 1, 4, 1).rotateY(Math.PI / 4).toNonIndexed();
+    blk.scale(0.13, RISE + 0.02, 0.075).translate(0, (RISE - 0.02) / 2, 0); blk.computeVertexNormals();
+    instrument.grp.add(new THREE.Mesh(grainUV(blk, true), teakMat().warm));
   }
   const JACKETS = [[0xc8372d, 0x2b4f8a, 0xe8b21c], [0x1f3a5f, 0xd8d4c8, 0xb03a2e], [0x2e6b4f, 0xf2c14e, 0x3a3f47], [0xe36a1e, 0x274060, 0xdedad0]];
   const spec = b.crew?.spec ?? DEFAULT_CREW;
