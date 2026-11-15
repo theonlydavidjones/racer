@@ -21,9 +21,16 @@ export class PerfMeter {
   /** The frames' intervals over the last WINDOW ms: when each ended, and how long it took (a ring, oldest first). */
   private span: { t: number; f: number }[] = [];
   private last = 0; private n = 0; private sum = { frame: 0, js: 0, sim: 0, scene: 0 }; private worst = 0; private shown = 0;
+  /**
+   * The browser's own work after our JS each frame: a message posted as the frame's callback ends runs as the next task,
+   * after the event loop's rendering step (style, layout, paint of the page's own labels and HUD, and handing the frame
+   * to the compositor), so the gap is that work, which the JS figures don't see. What's left of the frame is the wait:
+   * for the display's next refresh, or the GPU. Which one sets the pace is then on the readout itself.
+   */
+  private ch: MessageChannel | null = null; private sent = 0; private after = { ms: 0, n: 0 };
   get on(): boolean { return !!this.el; }
   toggle(): void {
-    if (this.el) { this.el.remove(); this.el = this.txt = null; return; }
+    if (this.el) { this.el.remove(); this.el = this.txt = null; this.ch?.port1.close(); this.ch = null; this.sent = 0; return; }
     const el = this.el = document.createElement('div');
     el.style.cssText = 'position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:99;background:rgba(0,0,0,.72);color:#cfe;font:11px/1.35 ui-monospace,monospace;padding:6px 8px;border-radius:4px;pointer-events:none;white-space:pre';
     this.txt = el.appendChild(document.createElement('div'));
@@ -44,6 +51,8 @@ export class PerfMeter {
   /** Once a frame: `now` the frame's timestamp, and the JS times (ms) of the whole frame, the sim's steps and the scene. */
   frame(now: number, js: number, sim: number, scene: number, r: THREE.WebGLRenderer): void {
     if (!this.el || !this.txt) return;
+    if (!this.ch) { this.ch = new MessageChannel(); this.ch.port1.onmessage = () => { if (this.sent) { this.after.ms += performance.now() - this.sent; this.after.n++; this.sent = 0; } }; }
+    this.sent = performance.now(); this.ch.port2.postMessage(0);
     if (this.last) { const f = now - this.last; this.sum.frame += f; this.worst = Math.max(this.worst, f); this.span.push({ t: now, f }); }
     while (this.span.length && now - this.span[0].t > WINDOW) this.span.shift();
     this.last = now; this.n++; this.sum.js += js; this.sim(sim, scene);
@@ -55,9 +64,10 @@ export class PerfMeter {
     this.txt.textContent = `${(1000 / fr).toFixed(0)} fps  ${fr.toFixed(1)} ms/frame  worst ${this.worst.toFixed(0)} ms\n`
       + `last ${secs.toFixed(0)} s: 95% of frames under ${p95.toFixed(1)} ms  ${long} long (> ${LONG} ms) of ${fs.length}\n`
       + `JS ${(this.sum.js / k).toFixed(1)} ms: sim ${(this.sum.sim / k).toFixed(1)}, scene ${(this.sum.scene / k).toFixed(1)}, rest ${((this.sum.js - this.sum.sim - this.sum.scene) / k).toFixed(1)}\n`
+      + (this.after.n ? `then the browser ${(this.after.ms / this.after.n).toFixed(1)} ms (style, layout, paint), waiting ${Math.max(0, fr - this.sum.js / k - this.after.ms / this.after.n).toFixed(1)} ms\n` : '')
       + `${i.render.calls} draw calls  ${(i.render.triangles / 1e6).toFixed(2)} M triangles  ${i.programs?.length ?? 0} programs\n`
       + `GPU: ${i.memory.geometries} geometries  ${i.memory.textures} textures${mem ? `  heap ${(mem.usedJSHeapSize / 1e6).toFixed(0)} MB` : ''}`;
-    this.shown = now; this.n = 0; this.last = now; this.worst = 0; this.sum = { frame: 0, js: 0, sim: 0, scene: 0 };
+    this.shown = now; this.n = 0; this.last = now; this.worst = 0; this.sum = { frame: 0, js: 0, sim: 0, scene: 0 }; this.after = { ms: 0, n: 0 };
   }
   private sim(sim: number, scene: number): void { this.sum.sim += sim; this.sum.scene += scene; }
 }
