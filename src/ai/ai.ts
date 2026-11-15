@@ -62,13 +62,20 @@ const DIRTY_RUN_K = 0.75;
  * dirtyAirS, but not within 20 s of her last gybe (a gybe costs her speed: back and forth, she'd lose more than the shadow). */
 const DIRTY_RUN_HOLD = 15;
 /** Nudge a heading so she passes a mark she could touch with room to spare, on the side it's already on. */
-function avoidMarks(w: World, b: Boat, desired: number): number {
+/** `keepingClear`: she's keeping clear of a boat this moment (aiThink's avoiding, or about to touch one: ai.urgent),
+ * which comes before finishing a turn away from a mark (that turn is then not held; held, it overrode the keep-clear
+ * move for the whole of it: physics review). */
+function avoidMarks(w: World, b: Boat, desired: number, keepingClear = false): number {
   let near: string | null = null;
   for (const m of w.touchableMarks(b)) {
     // (the nearest point of it: a buoy is a point, the committee boat a hull 12 m long, `p` to `q`)
     let np = m.p;
     if (m.q) { const ax = m.q.x - m.p.x, ay = m.q.y - m.p.y, k = clamp(((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay || 1), 0, 1); np = { x: m.p.x + ax * k, y: m.p.y + ay * k }; }
     const d = dist(b, np);
+    // (a turn away from this mark, held until she's through onto the other tack, 20 m off, or started: then it's over,
+    // and forgotten, or a later turn back onto that tack near it would set it going again, wherever the mark was then)
+    const pk = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`, pa = b.ai?.passing;
+    if (pa?.key === pk && pa.away && (b.tack !== pa.away || d >= 20 || b.started)) b.ai!.passing = { key: pa.key, side: pa.side };
     if (d > 30 || d < 0.5) continue;
     const bm = brg(np.x - b.x, np.y - b.y);
     // (room between her side and the mark's: MARK_ROOM, plus the mark's own radius and her half beam)
@@ -80,13 +87,16 @@ function avoidMarks(w: World, b: Boat, desired: number): number {
     const key = `${m.p.x.toFixed(0)},${m.p.y.toFixed(0)}`;
     if (d < 20 && !b.started) {
       const relH = wrap(bm - b.h), turn = wrap(desired - b.h), side = Math.sign(relH || 1);
-      // (a turn away from it through the wind, once begun, she finishes: a moment into it her heading has moved, the
+      // (a turn away from it through the wind, once begun, she finishes (until she's through it, head to wind: from there
+      // the physics carries her on round, midTack): a moment into it her heading has moved, the
       // mark no longer lies inside the turn her course asks for, and let go she bore straight back onto the close-hauled
       // course that was taking her into it, half a tack and back, twice, and sailed on into the committee boat)
-      const held = b.ai?.passing?.key === key && b.ai.passing.away === b.tack ? b.ai.passing : null;
+      const held = !keepingClear && !b.ai?.urgent && b.ai?.passing?.key === key && b.ai.passing.away === b.tack ? b.ai.passing : null;
       if (held) {
+        // (her commitment kept on the course away as it moves, close to the mark: let it lag past 45° and the physics drops
+        // it, and turns her the short way until she next thinks)
         desired = n360(bm + 180); near = key;
-        if (b.ai!.turnCommit !== -held.side) { b.ai!.turnCommit = -held.side; b.ai!.commitFor = desired; }
+        b.ai!.turnCommit = -held.side; b.ai!.commitFor = desired;
         continue;
       }
       if (Math.sign(relH) === Math.sign(turn) && Math.abs(relH) < Math.abs(turn) + need) {
@@ -880,7 +890,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
-  desired = sailable(b, avoidMarks(w, b, desired));
+  desired = sailable(b, avoidMarks(w, b, desired, avoiding));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
   // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
