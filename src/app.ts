@@ -1329,7 +1329,10 @@ let last = performance.now();
 let showroomTwa = 55;
 /** The destination the course on the water was last drawn to. */
 let shownDest: SimView['dest'] = null;
-const perf = new PerfMeter();
+const perf = new PerfMeter([ // (the GPU's share by part, on a real machine: ui/perfMeter.ts)
+  { label: 'shadows', on: () => view.test.shadows, set: v => view.setTestShadows(v) },
+  { label: 'sails', on: () => view.test.sails, set: v => { view.test.sails = v; } }
+]);
 function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
