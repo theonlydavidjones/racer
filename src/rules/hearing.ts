@@ -5,7 +5,7 @@
 /** A protest as the World records it (sim/world.ts Protest). */
 export interface ProtestRec {
   by: number; vs: number;
-  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | null;
+  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | 'mark' | null;
   hailT: number; flagT: number | null;
   owed: boolean | null; turnsT: number | null;
   exonerated?: boolean;

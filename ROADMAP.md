@@ -156,6 +156,9 @@ What's planned, roughly in order. Done work is described in the README.
      - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
      - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
        option.
+     - Rule 31 under protests (branch rules-31): a mark touch is any boat's to protest. The boats within four lengths
+       saw it: you may hail, and the nearest AI boat hails at once. The toucher's turn is her own choice, as for a foul.
+       The hearing decides it as a foul.
    - **Commercial traffic, the real Bay rule** (RYC SIs, YRA Appeal 08-02): a ship's five blasts lead to a race
      committee protest; the boat is presumed to have impeded; if upheld, a DNE DSQ. Built on the hearing.
    obstruction (rules 19 and 20.1, WS Case 11), 21.1 for any boat returning to start, the Definitions of Start and

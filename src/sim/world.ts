@@ -106,6 +106,9 @@ const JAM_MAX = 2 * TANGLE_MAX;
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
 const COMPELLED_WINDOW = 3;
+/** Who saw a boat touch a mark: the boats within four lengths of her, m (close quarters, World.closeQuarters' range;
+ * the rules don't limit who may protest, 60.2(a): a modeling choice for who'd see it happen). */
+const TOUCH_SEEN = 4 * LOA;
 /**
  * RRS 60.2(a)(1): a boat protesting an incident she saw "shall hail 'Protest' and ... conspicuously display a red flag, at
  * the first reasonable opportunity for each". The time after an incident she was in that the sim offers the hail, s
@@ -119,7 +122,7 @@ export const PROTEST_HAIL = 10;
 export interface Protest {
   by: number; vs: number;
   /** The incident: when, and the engine's call (null when the engine found no foul by the protestee). */
-  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | null;
+  t: number; rule: string | null; fouler: number | null; kind: 'contact' | 'swerve' | 'hail' | 'mark' | null;
   hailT: number; flagT: number | null;
   /** Her penalty for it: owed (she took it on), declined, or null (no foul by her to take one for); and when her turns
    * were done, if they were (RRS 60.5(c)(2): no further penalty). */
@@ -313,7 +316,7 @@ export class World {
   /** Protests made on the water (RRS 60), in order. */
   protests: Protest[] = [];
   /** The last incident the user was in: the boat, when, and the engine's call (for the Protest hail). */
-  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail'; part?: string; notRacing?: boolean; exonerated?: boolean } | null = null;
+  userIncident: { vs: number; t: number; rule: string; fouler: number; kind: 'contact' | 'swerve' | 'hail' | 'mark'; part?: string; notRacing?: boolean; exonerated?: boolean } | null = null;
   finishShown = false;
   /** This outing's gone into the boats' logbooks (boat/logbook.ts). */
   logged = false;
@@ -1213,17 +1216,22 @@ export class World {
         const pushed = !!byBoat && (byBoat.x - b.x) * (mp.x - b.x) + (byBoat.y - b.y) * (mp.y - b.y) < 0;
         const exonerated = !sameIncident && !!by && !!byBoat && this.t - by.on < COMPELLED_WINDOW && hullGap(b, byBoat) < ENGAGED
           && pushed && solidGap(by, by, touching) - touching.r < ENGAGED;
+        let declined = false;
         if (!sameIncident && !exonerated) {
-          addPenalty(b, ONE_TURN);
+          // (under protests her turn is her own choice, 44.1, as for a foul: the AI skipper's conduct decides)
+          declined = this.protestsOn && !!b.ai && !b.script && !takesPenalty({ fouled: true, since: 0 }, this.conductRng());
+          if (declined) this.declined.add(`${b.id}@${this.t}`);
+          else addPenalty(b, ONE_TURN);
           this.lastTouch.set(b.id, { t: this.t, near: this.boats.filter(o => o !== b && hullGap(b, o) < ENGAGED).map(o => o.id) });
+          if (this.protestsOn) this.touchSeen(b);
         }
         if (b.isUser) {
           if (!sameIncident && !exonerated) this.fouls++;
           this.emit({ type: 'toast', ms: 6000, msg: sameIncident
             ? `You touched ${touching.name} in the same incident as your foul. You only owe the penalty for the foul (Rule 44.1(a)).`
             : exonerated ? `You touched ${touching.name}, forced onto it by ${byBoat!.name}'s foul: no penalty (Rule 43.1).`
-            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a jibe.` });
-        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
+            : `You touched ${touching.name}. One-turn penalty (Rule 31): get clear of the mark and other boats, then turn one full circle, with a tack and a jibe.${this.protestsOn ? ' Skip it and you may be protested.' : ''}` });
+        } else if (!sameIncident && !exonerated) this.emit({ type: 'toast', ms: 3000, msg: declined ? `${b.name} touched ${touching.name}.` : `${b.name} touched ${touching.name} and owes a one-turn penalty.` });
       }
       b.markTouch = touching ? touching.name : stillNear ? b.markTouch : null;
     }
@@ -2293,6 +2301,20 @@ export class World {
   /** Is the fleet policing itself (a race, judged by protests), rather than umpired? */
   get protestsOn(): boolean { // (a club's race: the practice area, a course with no club, is umpired, like the drills)
     return this.settings.mode === 'race' && this.settings.judging === 'protests' && !!this.file.group; }
+
+  /**
+   * Under protests, a mark touch (rule 31) is any boat's to protest (60.2(a)): the boats close by saw it. You may hail
+   * "Protest!" for PROTEST_HAIL s, as for a foul you were in; the nearest AI boat that saw it hails at once (her
+   * reaction time: ai/conduct.ts protestAfter), before she knows if the other will turn. The hearing decides it as a foul:
+   * her turn taken, no further penalty; not, disqualified.
+   */
+  private touchSeen(b: Boat): void {
+    const inc: NonNullable<World['userIncident']> = { vs: b.id, t: this.t, rule: '31', fouler: b.id, kind: 'mark' };
+    const seen = this.boats.filter(o => o !== b && !o.retired && !o.finished && this.racing(o) && hullGap(o, b) < TOUCH_SEEN).sort((x, y) => hullGap(x, b) - hullGap(y, b));
+    if (seen.includes(this.user)) this.userIncident = inc;
+    const ai = seen.find(o => o.ai && !o.script), after = ai ? protestAfter({ fouled: false, since: 0 }) : null;
+    if (ai && after != null) this.pendingProtests.push({ by: ai.id, vs: b.id, at: this.t + after, inc });
+  }
 
   /** `by` hails "Protest!" at `vs` over the incident just now, and flies the red flag (RRS 60.2(a)(1): a Folkboat is over
    * 6 m). Recorded for the hearing. */

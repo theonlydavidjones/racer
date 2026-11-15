@@ -303,7 +303,7 @@ function protestSection(): void {
     const head = `<div class="pHead"><span>${nm(p.by)} protest${p.by === u.id ? '' : 's'} ${p.vs === u.id ? 'you' : nm(p.vs)} · ${rule}</span></div>`;
     if (owesAnswer(d)) return head + `<div><button type="button" class="ghost" data-pr="retire" data-key="${key}">Retire (RET)</button> <button type="button" class="ghost" data-pr="hearing" data-key="${key}">Hearing</button></div>`;
     const turns = p.owed == null ? '–' : !p.owed ? 'Declined' : p.turnsT != null ? 'Taken' : 'Not taken';
-    const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
+    const tiles = [['Contact', p.kind === 'contact' ? 'Yes' : p.kind === 'swerve' ? 'Forced to avoid' : p.kind === 'hail' ? 'A hail' : p.kind === 'mark' ? 'The mark' : '–'], ['Broke', p.fouler != null ? nm(p.fouler) : '–'], ['Turns', turns], ['Exonerated', p.exonerated ? 'Yes' : 'No']];
     return head + `<div>${tick(d.valid.hail, 'hailed')} &nbsp; ${tick(d.valid.flag, 'flag')} &nbsp; ${tick(true, 'in time')}${clipOf(p.t) ? ` &nbsp; <a href="#" data-pclip="${i}">▶ Replay</a>` : ''}</div>`
       + `<div class="pTiles">${tiles.map(([k, v]) => `<div class="pTile">${k}<b>${v}</b></div>`).join('')}</div>`
       + `<div class="pDec${d.outcome === 'DSQ' ? ' bad' : ''}">${d.outcome === 'DSQ' ? `${p.vs === u.id ? 'You' : w.boats[p.vs].name}: ` : ''}${OUT[d.outcome]}</div>`;
