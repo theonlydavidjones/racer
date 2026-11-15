@@ -298,6 +298,15 @@ What's planned, roughly in order. Done work is described in the README.
       water as the other eddies are. Deep Physics takes it after the turning model.
    Drawn as in the photos: the breakwater's end, its sign and light, and the pier's piles. A test: leaving in the
    common westerly on a flood and on an ebb, both doable by a skilled crew, and a careless exit set onto the piles.
+   5. **Now — the hit at the edge** (owner, 15 November; physics; Bay East, Deep Physics reviewing; for v198): crossing
+      out of the cove's shelter, the full breeze and the ebb or flood hit her suddenly: she heels, jumps in speed, and is
+      set sideways. On main the wind's lee (harborLee.ts) and the current's basin calm (current.ts, BASIN_MOUTH 30 m) both
+      exist, but the current's edge widths are estimates with no measured source. Size how sharp the edge is from real
+      data (NOAA currents, observations at the Marina and Fort Mason), not invented numbers, and test that the heel, speed
+      and set all change within a few boat lengths of the entrance, on a flood and on an ebb.
+   6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
+      lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
+      and after pictures go to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
    Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
@@ -464,6 +473,84 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **Bug: the start-line drill's cue card floats out of view** (owner, 15 November, from a screenshot; bug; <1 h): "this
+     floating guidance card in start-line trainer mode keeps floating out of view." The cue ("BUILD SPEED", "8 s · late
+     by 3 s") drifts up until the top bar cuts it off. It should stay fully on screen and steady: kept below the top bar
+     and clamped inside the view wherever the boat it's pinned to goes. Its faint second line also needs to be readable
+     against a pale sky.
+   - **Bug: the start-line drill's "With the fleet" brings no fleet** (owner, 15 November; bug; <1–2 h): "in start line
+     trainer, I started alone, then after a couple tries I toggled on 'with the fleet.' but no fleet appeared." Switching
+     mid-drill must bring the fleet in at the next attempt, at the latest (src/app/drills.ts, the drill's choices).
+     The owner also asked "I also don't understand what the yellow pathing is referring to. is it just pointing me to
+     the line?" The gold lane is the approach to the line (render/drillGuides.ts). It needs to show at a glance what it
+     is, without copy: for example, ending on the line at the spot to cross at the gun. It folds into the favored-end
+     work below, where the lane should lead to the favored end.
+   - **The start drill's results: "End" unclear; the table unreadable; the copy block** (owner, 15 November, from screenshots; now; 3–4 h): "don't know what
+     'end: middle' means (the column) in start practice." It's where along the line she crossed: the pin end, the
+     middle or the committee boat end (src/app/drills.ts endW). Make it plain without copy: a tiny line icon with her
+     crossing marked, the favored end lit once the favored-end work lands, so the column also says whether she started
+     at the right end.
+     Then (15 November, from a screenshot of the results; now; 2–3 h): "I can't read this table. I don't know which
+     session is my most recent; apparently the yellow is my best? and some of the times are preposterous. I didn't take
+     17m 8s to cross the line." And: "that copy block is insane. nobody will every read that. short, sharp takeaways."
+     The "At the gun" column reads "17 m · 8 s" (meters behind, seconds late) as a time; the latest start isn't marked;
+     gold for the best isn't explained; one row says "X" (the line's end mark) where the others say "middle". The "What
+     happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
+     takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
+     the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
+   - **Start practice: restart without finishing** (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
+     like to be able to restart without having to finish the whole drill." The pause menu has a Restart (labeled
+     "Restart Race" here, since only drill and rounding say "Drill"), which the owner didn't find or which starts over
+     from scratch. Give a new countdown from the same setup at any time, keeping the session's starts table: a key
+     (listed in Keys) and the pause menu's Restart labeled for the drill. No new on-screen button.
+   - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
+     line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
+     favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
+     water before the gun, with the answer only after you've judged:
+     - **Head to wind on the line:** luff head to wind at mid-line. The end the bow points nearer to is the favored end.
+     - **The compass:** sight down the line from one end for its bearing, then go head to wind for the wind's. If the
+       wind is more than 90° from the line toward one end, that end's favored. The tactical compass on the cabin top
+       (in progress) is the tool.
+     - **Sailing the line:** reach down the line, sails trimmed, and see which way the sails need easing or trimming.
+     - **The current:** watch the committee boat's anchor line, the pin's wake or a crab pot, to see where the stream
+       carries you at the gun.
+     - **The first beat:** which side pays, from the wind and tide (the strategist).
+     - **The crowd:** where the fleet bunches.
+     Each run asks you to call it ("which end?") before the reveal. Then it shows how you could have told: the square
+     line against the real one, and the bias in boat lengths. It also shows how your call and your start compared. The
+     wind's shifts stay real, so the favored end can change while you check it, as on the day. Pictures and actions,
+     not copy. Methods to be checked by the researcher against published racing guides (US Sailing, North U).
+
+   - **Bug: no way to the navigator from the expanded chart in a cruise** (owner, 15 November; bug; <1–2 h): "when in a
+     cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
+     chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
+     toggles moved (8b), and its key working with the chart open. Check the strategist in a race the same way.
+   - **Bug: lashing the tiller less than about 13° off the centerline lashes it amidships** (owner, 15 November; bug;
+     <1–2 h): "tiller lashing is glitching when I try to lash it less than 13ish degrees off centerline. it just lashes
+     it amidships." Leads in src/app.ts:
+     - The double-click route (around line 1192) records the first press's angle (`firstPress`), but the first click
+       also lets go of the tiller. Between the clicks the tiller springs back toward the center (`tillerSpring`, 2.5 a
+       second), so a small angle can reach zero first.
+     - Check that the right-click route keeps the angle too, and that `setTiller`, then the `lash` command (sim/commands.ts
+       line 120, which lashes at `u.tiller`), reach the worker in that order, with nothing in between zeroing a small
+       angle.
+     A test: lash at 5°, 10° and 15° each way, by right-click and by double-click; each must hold the angle it was
+     lashed at.
+   - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
+     <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
+     gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
+     like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
+     shadows, or a shadow-map artifact. Find what casts them and stop it; check both sides on both tacks.
+   - **The flow view keeps the boat in the middle of the screen** (owner, 15 November; not urgent; polish; <1 h): "when
+     I engage wind-over-sails, don't bump the boat to the left. keep her center screen." Opening the flow view shouldn't
+     move the camera or shift the boat aside to make room. The flow panel sits over the scene, and the boat stays where
+     she was.
+   - **The flow view with one sail down** (owner, 15 November; not urgent; accuracy; 1–2 h): "check that the wind over
+     sails map is accounting for when I'm sailing on just jib or just main." A first look found nothing in
+     ui/sailFlow.ts or ui/flowPanel.ts that checks whether each sail is hoisted. With one sail down, the view should
+     draw and describe only the sail that's up. There's no slot then: no jib bending the flow onto the main's lee side,
+     no main's upwash on the jib. A lowered sail's telltales go too. The physics' own sail forces should be checked the
+     same way.
    - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
      The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
@@ -521,6 +608,20 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
+   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Experience to design,
+     to the owner before building): "there's a lot of really cool shit we've built, like wind-in-air and wind-over-sails,
+     but it's hard to find these things. I think we need a 'more' (not that copy though) button on the game surface for
+     all features that show up on the game surface itself." One button, an icon rather than the word "More", that opens a
+     tray of icon tiles, each turning one on-surface feature on or off and showing its key. The candidates, from the
+     Keys list: the wind indicator (wind in the air), the flow view (wind over the sails), the sail controls band, the
+     course and strategist or navigator, the cabin-top instrument, the paddle, the navigation lights, the hail, the
+     views, all messages and the frame-time readout. The owner asked for this button; it should also absorb scattered
+     on-screen toggles, so the surface ends up with fewer controls, not more. Ties in with the UI audit (#236).
+   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
+     on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
+     small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
+     far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
+     November the owner said "no tiller strip"; this is a needle, not the old strip).
    - **An audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
