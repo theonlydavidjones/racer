@@ -535,6 +535,13 @@ physics, ranked like the ten above:
 | CITYFRONT.north | 37.8125 | 133 | numerical | geographic box / identity |
 | CITYFRONT.west | -122.49 | 133 | numerical | geographic box / identity |
 | CITYFRONT.east | -122.40 | 133 | numerical | geographic box / identity |
+| CF_FADE (obstacle side) | 100 m | 218 | estimate | the ground eased out across the Cityfront box's edge |
+| DIP_GAP | 200 m | 180 | estimate | a dip this wide parts two stretches of land fully (by its depth too) |
+| LAND_FROM | 0.5 | 182 | estimate | the coast where the 50 m cells' bilinear share is a half |
+| lee spread | d/8, ¼ ½ ¼ | 282 | estimate | the ground averaged across the wind as the lee runs (wakes mix ~1:5–1:10) |
+| dip level | ½ top, ≥ 8 m | 286 | estimate | a stretch ends where the ground falls below half its height so far |
+| low-land ease | 8–16 m | 272 | estimate | land just over 8 m eased into the lee |
+| land-block floor | 0.02 | 228 | numerical | height 0 where the land blocks' weight is next to nothing |
 
 ### src/environment/shifts.ts
 

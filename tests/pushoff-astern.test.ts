@@ -158,9 +158,10 @@ describe('pushed off astern', () => {
     }
     expect(n).toBeGreaterThanOrEqual(3); expect(bad).toEqual([]);
   }, 600_000);
-  // (Horseshoe Bay A27 in the easterly was held apart as a known failure, 15.4% over, let go in the harbor's lee and
-  // drifting out of it into more wind; with main's wind of 15 Nov 2026 merged she's 13.7% over, inside the bound, and is
-  // in the sweep above with the rest. The lee's edge is still on the ROADMAP for the planner)
+  // (Corinthian B16 in the northerly and Horseshoe Bay A27 in the easterly were each held apart for a time as known
+  // failures: let go in a lee, the land's or the harbor's, and drifting out of it into more wind, B16 sailed 17.7 m
+  // against a planned 14.0. The shove is now gauged to the wind along her line out and to leeward of it (World.windAstern),
+  // and both are in the sweep above with the rest: B16 16.2 m against 16.0, A27 15.1 against 16.0)
   // (headings in a westerly: the wind abeam, and her bow within a beat of it, where a held tiller once counted as sculling: the physics review)
   for (const h0 of [0, 270, 300, 230]) for (const til of [1, -1]) it(`the tiller going astern at 0.5 m/s with no sail up, heading ${h0} in a westerly, pushed to ${til > 0 ? 'starboard' : 'port'}: her bow goes that way (the rudder works backwards), by 10 deg and more in 10 s`, () => {
     const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 8, windDir: 270, mode: 'sail', tideDate: '2026-11-14', current: 'slack' } as Settings;
