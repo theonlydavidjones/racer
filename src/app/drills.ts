@@ -2,6 +2,7 @@
  * The practice drills: the tack and gybe drill and the mark-rounding drill (their lines in the Coach card and the Pause screen), and the start practice's debrief (its panel, the run of attempts, its buttons).
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
+import { fleetChoiceHtml } from '../ui/tiles';
 import { type ReplayClip } from '../replay/replayView';
 import { MAX_OPPONENTS, drillFleetSize, saveSettings } from '../settings';
 import { windBand, type ManoeuvreScore } from '../sim/drill';
@@ -98,7 +99,7 @@ const closeDrill = () => { $('drill').hidden = true; app.drillView.stop(); };
 function drillOptions(): void {
   const from = app.S.drillFrom ?? app.DRILL_FROM, solo = app.S.drillSolo ?? true;
   $('dOpts').innerHTML = `<span class="dlabel">Next attempt</span><div class="seg" data-dopt="from">${[60, 120, 180].map(s => `<button type="button" data-v="${s}" aria-pressed="${s === from}">${s / 60} min</button>`).join('')}</div>`
-    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">Alone</button><button type="button" data-v="0" aria-pressed="${!solo}">With the fleet · ${drillFleetSize(app.S)}</button>`
+    + `<div class="seg" data-dopt="solo"><button type="button" data-v="1" aria-pressed="${solo}">${fleetChoiceHtml(false, 0)}</button><button type="button" data-v="0" aria-pressed="${!solo}">${fleetChoiceHtml(true, drillFleetSize(app.S))}</button>`
     + (solo ? '' : '<button type="button" class="dfn" data-fn="-1" aria-label="One boat fewer">−</button><button type="button" class="dfn" data-fn="1" aria-label="One boat more">+</button>') + '</div>';
 }
 $('dOpts').addEventListener('click', e => {

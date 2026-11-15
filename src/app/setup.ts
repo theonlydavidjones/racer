@@ -2,6 +2,7 @@
  * The setup and the start of a sail: a new World for the setup's choices (prepare, newGame, setupChanged), the setup screen (the course picker and its card, the tide, the crew, the choices), the conditions dialog, and beginning a race or a cruise.
  * (A part of src/app.ts, as it was there: it reaches the app's own state through `app`, app.ts's ctx.)
  */
+import { fleetChoiceHtml } from '../ui/tiles';
 import { rainLevel } from '../environment/rain';
 import { PREP_MEANING } from '../sim/signals';
 import { LESSONS, type LessonId } from '../sim/lessons';
@@ -482,7 +483,8 @@ function paintDrillPage(): void {
   for (const b of $('drillFromSeg').querySelectorAll<HTMLElement>('[data-df]')) b.setAttribute('aria-pressed', String(+b.dataset.df! === (app.S.drillFrom ?? app.DRILL_FROM)));
   const solo = app.S.drillSolo ?? true;
   for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-ds]')) b.setAttribute('aria-pressed', String((b.dataset.ds === '1') === solo));
-  $('drillSoloSeg').querySelector('[data-ds="0"]')!.textContent = `With the fleet · ${drillFleetSize(app.S)}`;
+  $('drillSoloSeg').querySelector('[data-ds="1"]')!.innerHTML = fleetChoiceHtml(false, 0);
+  $('drillSoloSeg').querySelector('[data-ds="0"]')!.innerHTML = fleetChoiceHtml(true, drillFleetSize(app.S));
   for (const b of $('drillSoloSeg').querySelectorAll<HTMLElement>('[data-fn]')) b.hidden = solo;
 }
 $('drillFromSeg').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-df]'); if (!b) return; app.S.drillFrom = +b.dataset.df!; saveSettings(app.S); paintDrillPage(); });
