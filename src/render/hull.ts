@@ -93,7 +93,7 @@ const ease2 = (a: number, b: number, t: number) => a + (b - a) * (1 - Math.cos(M
  * stemhead to the waterline, so LWL stays 6.00 m) into a cut-away forefoot. To be replaced by readings off the plan:
  * these knots (u, slope in m per unit u) and BOW_FINE below are the only bow figures.
  */
-const SLOPE_KNOTS: [number, number][] = [[0, -8.0], [0.14, -6.8], [0.22, -2.8], [0.34, -1.4], [0.55, -0.3]];
+const SLOPE_KNOTS: [number, number][] = [[0, -8.0], [0.14, -6.8], [0.22, -2.8], [0.34, -1.0], [0.55, -1.33]];
 /** ESTIMATE: how much finer (V'd) the topsides' α is at the stem than amidships, easing out by u = BOW_FINE.u. */
 const BOW_FINE = { dAlpha: 0.65, u: 0.32 };
 const profileSlope = (u: number) => {
@@ -120,7 +120,7 @@ export function keel(u: number): number {
 /** Half-thickness of the keel (ballast keel and deadwood). */
 function keelHalf(u: number): number {
   if (u <= BOW) return 0;
-  return 0.03 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - BOW) / 0.73)), 0.7);
+  return 0.03 * ease((u - BOW) / 0.06) + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, (u - BOW) / 0.73)), 0.7);
 }
 /**
  * The sections' shape: the wineglass section of the class's construction plan (main section at St. 8): topsides
