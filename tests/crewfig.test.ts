@@ -103,6 +103,8 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     // (paddling with the boom crutch, on each side: fetched up from the companionway, carried out to the side deck, and
     // stroked over the side, ROADMAP 8c)
     ['paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22 }], ['paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22 }],
+    // (and alone: the helm paddles, off the tiller)
+    ['alone, paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22, n: 0 }], ['alone, paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22, n: 0 }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
   for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000);

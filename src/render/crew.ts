@@ -1203,7 +1203,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   else if (!paddle && cr.pd && cr.pd.end == null) cr.pd.end = poseClock;
   if (cr.pd?.end != null && poseClock - cr.pd.end > 2.5) cr.pd = undefined;
   if (cr.pd && paddle) cr.pdWho = paddle.who;
-  const pf = cr.pd ? (cr.pdWho ? cr.crew[cr.pdWho - 1] : undefined) : undefined;
+  const pf = cr.pd && cr.pdWho != null ? (cr.pdWho === 0 ? cr.helm : cr.crew[cr.pdWho - 1]) : undefined; // (alone, the helm: boat/paddle.ts paddler)
   pdl = cr.pd && pf ? { f: pf, e: poseClock - cr.pd.t0, fetch: paddle?.fetch ?? 0, sd: paddle?.side === 'S' ? 1 : paddle?.side === 'P' ? -1 : 0, back: !!paddle?.back, stop: cr.pd.end } : undefined;
   // (two of them on the same side don't sit in each other's laps: at least a shoulder's width apart fore and aft)
   // (out on a side deck, not forward of the winch there; in the middle, on the benches, on forward)
@@ -1303,11 +1303,15 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   // the helm
   const hp = ppl?.[0], h = cr.helm, x = hp ? hp.x : windward * 0.55, z = hp?.z ?? 2.95;
   cr.helmSide = Math.abs(x) > 0.05 ? Math.sign(x) : windward;
-  const away = hp?.pose === 'piano'; // single-handed, gone forward to the cabin-top lines
+  // single-handed, gone forward to the cabin-top lines, or paddling: off the tiller (the pilot or the lashing has her)
+  const paddling = pdl?.f === h, away = hp?.pose === 'piano' || paddling;
   const dir = track(h, x, z, sdt);
   const t = tip ?? V(0, 0.8, 2.6);
-  const want = away ? crewPose(h, x, z, hp?.lean ?? 0, 'piano', windward, h.speed > 0.18, dir, 9)
+  let want = paddling ? crewPose(h, x, z, 0, hp?.pose ?? 'car', windward, (h.going = travelling(h, hp, x)) && h.speed > 0.18, dir, 9)
+    : away ? crewPose(h, x, z, hp?.lean ?? 0, 'piano', windward, h.speed > 0.18, dir, 9)
     : (h.going = travelling(h, hp, x)) ? helmCrossing(h, x, z, dir, t) : helmPose(h, x, z, hp?.lean ?? 0, windward, t);
+  // (alone, the helm paddles: below for the crutch, out to the side deck with it, and over the side, as a crew member does)
+  if (paddling) want = paddleWant(h, want, pdl!, x, z, !!h.going, windward, 9);
   apply(h, ease(h, want, dt), upright(h, against(hp?.pose ?? 'helm'), dt), dt);
   h.root.visible = !hideHelm;
   // the extension, from the tiller's end to the helm's hand (and a little past it), unless they've let go
