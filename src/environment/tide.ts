@@ -65,9 +65,13 @@ function build(def: StationDef, from: number, to: number, cache: Map<string, Tid
 }
 
 /** All stations, predicted for a window of race time (minutes since epoch, UTC). */
-export function stationsFor(from: number, to: number): TideStation[] {
+export function stationsFor(from: number, to: number, near?: { at: readonly Vec[]; within: number }): TideStation[] {
   const cache = new Map<string, TideStation>();
-  return DEFS.filter(d => d.kind !== 'harmonic' || (!d.refOnly && !d.flowOnly)).map(d => build(d, from, to, cache));
+  // (`near`: only the stations within so far of any of these places, for a field asked only there: the stream at a
+  // point is its nearest stations' almost entirely, CurrentField.at's 1/d³, and predicting all of them costs ten times
+  // as much)
+  const by = (d: StationDef) => { if (!near) return true; const p = LL(d.lat, d.lon); return near.at.some(q => Math.hypot(p.x - q.x, p.y - q.y) < near.within); };
+  return DEFS.filter(d => (d.kind !== 'harmonic' || (!d.refOnly && !d.flowOnly)) && by(d)).map(d => build(d, from, to, cache));
 }
 
 /** Signed speed (kt, + flood) at a station at time `tMin` (minutes since epoch, UTC). */
