@@ -464,6 +464,15 @@ What's planned, roughly in order. Done work is described in the README.
      weird ways." Switching layers should be near instant: build each layer's field once and keep it, rather than
      recomputing it on each toggle. The moving streaks should carry on smoothly from where they were, not restart or
      jump. Likely the same code as the chart's rushing streaks and two-click layer row (8f, 8l), so fix them together.
+   - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
+     the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
+     The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and gybes whenever she's
+     more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
+     gybe that sails into it makes little or no ground, so the track doubles back on itself (the hairpins off Yellow
+     Bluff). A navigator would sail hotter angles nearer the straight course, or hold the favored gybe and use the
+     current, and never draw a track going backward. Fix: choose the angle and the gybes by speed made good over the
+     ground toward the destination, current included (an isochrone router is the full answer: ask the owner before
+     changing the design). The AI's own leg planning shares sailLeg: check it too.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
      'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
      icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
