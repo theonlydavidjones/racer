@@ -101,6 +101,8 @@ export interface Aboard {
   job: Job | null;
   /** Seconds until they act on a new call (reaction time), and the position they've decided on. */
   react: number; goal: { x: number; z: number } | null;
+  /** Getting by this crewmate (their index), out to the side until a stride past (CREW_PASS). */
+  passing?: number;
   /** 0 fresh … 1 spent (hiking). */
   fatigue: number;
 }
@@ -237,6 +239,11 @@ export const Z = { helm: 2.95, cockpitFwd: 1.35, deckFwd: 1.40, winchAft: 1.88, 
  * as well put a crew member leaning on the coaming in a puffy 7 kt back and forth across it, 87 seat moves in ten
  * minutes against 75.) */
 export const DECK_ARM = 0.5;
+/**
+ * Two crew on the move along the deck: the one behind keeps CREW_SEP (m) back, about a stride; one passing another steps
+ * CREW_PASS (m) to the side first, about a body's width (estimates).
+ */
+export const CREW_SEP = 0.6, CREW_PASS = 0.4;
 /** Crew member `j`'s place fore and aft among `count` free crew, `f` of the way from the aft end to the forward end
  * (on a side deck, either side of the winch, never on it: a place within its pedestal's reach goes to the nearer side).
  * Two crew at most (settings.ts). */
@@ -578,8 +585,33 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const crossing = Math.sign(goal.x) !== Math.sign(a.x) && Math.abs(goal.x - a.x) > 0.5;
     const vx = (crossing ? 1.0 : 0.7) * pace(p) * (c.roll?.phase === 'flatten' ? 1.3 : 1);
     const x0 = a.x, z0 = a.z;
-    a.x += clamp(goal.x - a.x, -vx * dt, vx * dt);
-    a.z += clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
+    const dz = clamp(goal.z - a.z, -0.6 * pace(p) * dt, 0.6 * pace(p) * dt);
+    let toX = goal.x, hold = false;
+    // (two on the move along the deck, within a body's width of each other, CREW_PASS: nobody closes to within a stride,
+    // CREW_SEP, of a crewmate on the move, going their way or coming the other, but waits; one who has to get past a
+    // crewmate who's stopped, or coming the other way, steps aside first, to the side they're on of them, then goes by,
+    // and stays out until they're a stride past, not cutting back in across their toes)
+    if (i > 0) {
+      let by = a.passing != null ? c.people[a.passing] : undefined;
+      if (by && (Math.abs(by.z - a.z) >= CREW_SEP || Math.abs(goal.z - a.z) < 0.02)) { a.passing = undefined; by = undefined; }
+      const dir = Math.sign(dz);
+      for (let j = 1; j < c.people.length && dir; j++) {
+        if (j === i) continue;
+        const o = c.people[j], dxo = Math.abs(o.x - a.x), d0 = Math.abs(o.z - a.z), d1 = Math.abs(o.z - a.z - dz);
+        if (dxo >= CREW_PASS || d1 >= CREW_SEP || d1 >= d0) continue;
+        const og = o.goal ?? o, oDir = Math.sign(og.z - o.z) * (Math.abs(og.z - o.z) > 0.05 ? 1 : 0);
+        const past = (goal.z - o.z) * dir > 0.05;
+        if (past && oDir !== dir) { a.passing = j; by = o; hold = dxo < CREW_PASS - 0.05; }
+        else if (oDir !== 0) hold = true;
+      }
+      if (by) {
+        const away = a.x !== by.x ? Math.sign(a.x - by.x) : by.x >= 0 ? -1 : 1, room = Math.max(0.05, deckHalf(a.z) - 0.25);
+        toX = clamp(by.x + away * CREW_PASS, -room, room);
+        if (Math.abs(by.z - a.z) > 0.05 && (by.z - a.z) * dir < 0) hold = false; // (by them now: on, out to the side)
+      }
+    }
+    a.x += clamp(toX - a.x, -vx * dt, vx * dt);
+    if (!hold) a.z += dz;
     // (in the cockpit, round the jib winch on the side deck, not through it: from one side of it to the other they step in
     // off the deck first, past it on the bench, and out again beyond it; nor out on the deck beside it. Going on forward
     // of the cockpit, to the mast, they climb past it)
@@ -711,12 +743,18 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // cabin-top lines from that side deck, whose place is fixed by the job)
   const seated = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
   const onDeckI = (i: number) => i > 0 && !!tgt[i] && Math.abs(tgt[i].arm) > DECK_ARM;
-  const out = tgt.map((t, i) => onDeckI(i) && seated(t) ? i : -1).filter(i => i > 0);
+  // (someone still on their way to their place, back from a job or coming along the footwell, ducks past whoever's
+  // sitting: they don't move a seated crewmate along for a place they're not at yet)
+  const there = (i: number) => Math.abs(c.people[i].z - tgt[i].z) < Z.gap;
+  const out = tgt.map((t, i) => onDeckI(i) && seated(t) && there(i) ? i : -1).filter(i => i > 0);
   const atJob = tgt.map((t, i) => onDeckI(i) && !seated(t) && t.z > Z.cockpitFwd - 0.5 ? i : -1).filter(i => i > 0);
   const put = (i: number, z: number) => { tgt[i].z = z; const hi = held[i]; if (hi) hi.z = z; };
   // (out on deck, nobody forward of the seat beside the cabin's after end, but the front hand forward of the winch, on the
   // cabin top's edge at Z.cabinSide)
-  for (const i of out) if (tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) put(i, Z.deckFwd);
+  // (the front hand's own seat there, when both are forward of the winch: back from the cabin top or a car with their
+  // place still where the job was, it's that seat they go to, not the deck forward of the winch and then on to it)
+  const fwdBoth = c.spec.crew.length === 2 && (c.place?.fore ? (c.place.fore === 'fwd' || c.place.fore === 'deck' ? 1 : c.place.fore === 'mid' ? 0.5 : 0) : c.fore01 ?? 0.5) >= TWO_FWD;
+  for (let i = 1; i < tgt.length; i++) if (onDeckI(i) && seated(tgt[i]) && tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) put(i, fwdBoth && slotOf(i - 1, 2) === 0 ? Z.cabinSide : Z.deckFwd);
   for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
   // (in their order along the cockpit, front to back: the one whose place is forward keeps it. By their places, not
   // their numbers: with two crew the jib hand, people[2], is the forward one, slotOf)
