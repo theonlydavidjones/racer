@@ -532,6 +532,11 @@ What's planned, roughly in order. Done work is described in the README.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
+   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
+     on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
+     small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
+     far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
+     November the owner said "no tiller strip"; this is a needle, not the old strip).
    - **An audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
