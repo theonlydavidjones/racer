@@ -714,7 +714,8 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // doing, not where she's aimed: close-hauled and turning up into the wind, or deep and turning her stern through it,
   // faster than TURN_SEEN; yours by hand or the AI's alike. Fading as long again once it's past, so the turn itself still
   // finds it; no more than CUE_MAX, so a long luff doesn't count for a turn much later)
-  const rate = b.turnRate ?? 0, toWind = Math.sign(wrap(b.ww.from - b.h)), swinging = Math.abs(rate) > TURN_SEEN;
+  // (under sail with way on: a boat paddled or motored round isn't a turn the crew work)
+  const rate = b.turnRate ?? 0, toWind = Math.sign(wrap(b.ww.from - b.h)), swinging = Math.abs(rate) > TURN_SEEN && b.v >= TURN_V && (b.rig?.mainUp ?? true);
   const shows = swinging && ((twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind));
   b.comingFor = shows ? Math.min(CUE_MAX, (b.comingFor ?? 0) + dt) : Math.max(0, (b.comingFor ?? 0) - dt);
   placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
@@ -1122,7 +1123,7 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
  * her on round as her stern passes the wind. A tap of a key isn't, and the tiller in your hand is literal: steered
  * through by the tiller, or held steady by the lee, nobody touches the main, and it stays until the wind takes it.
  */
-const KEY_HELD = 0.6;
+export const KEY_HELD = 0.6;
 function gybeMeant(b: Boat, to: 'S' | 'P', t: number): boolean {
   // (an AI boat: her crew bring the main across at once if her skipper called the jibe; caught unready, once the one on
   // the mainsheet has got ready, she sailing by the lee meanwhile, and if she's swung on round far enough first, the
@@ -1270,7 +1271,7 @@ export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.h
 function jibLetGo(b: Boat, emit: Emit): void {
   if (byHand(b, 'jibsheetW') || keepsHove(b) || !b.crew || sailPlan(b) !== 'jib' || b.v < TURN_V) return; // (a tack under way: not a drift through the wind in irons, where the jib's own model holds)
   const n = b.crew.spec.crew.length, who = ownerOf('jibsheet', n, b.crew.spec), p = who === 0 ? b.crew.spec.helm : b.crew.spec.crew[who - 1];
-  if (!p) return;
+  if (!p || who === 0) return; // (the helm's own jib, sailing alone: their own turn, nobody to warn)
   // (ready, they let it fly as the jib comes across, as before; not ready, it's held aback till they are)
   const left = prepLeft(p, !!b.callOn, b.comingFor ?? 0); if (left <= 0) return;
   b.ctl.jibsheetW = Math.min(b.ctl.jibsheetW, b.ctl.jibsheet); // (the old leeward sheet as it was trimmed, now to windward)
@@ -1282,6 +1283,7 @@ function jibLetGo(b: Boat, emit: Emit): void {
 function mainHandReady(b: Boat, t: number): boolean {
   const c = b.crew; if (!c) return true;
   const n = c.spec.crew.length, who = mainHand(n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), p = who === 0 ? c.spec.helm : c.spec.crew[who - 1];
+  if (who === 0) return true; // (the helm has the main: nobody needs warning of their own turn)
   return !p || (b.byLeeSince != null && t - b.byLeeSince >= PREPARED + prepLeft(p, false, b.byLeeCue ?? 0));
 }
 function jibSheetsAtTack(b: Boat, emit: Emit): void {

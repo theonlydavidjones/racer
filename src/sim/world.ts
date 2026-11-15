@@ -7,7 +7,7 @@ import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, POLE, apparent, asternGlide, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
+import { HOVE, KEY_HELD, POLE, apparent, asternGlide, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
@@ -2053,9 +2053,10 @@ export class World {
   private callWork(u: Boat): void {
     const w = u.callWait; if (!w) return;
     if (u.docked || u.handled || u.hove || u.lashed != null || u.atAnchor || u.mooring) { u.callWait = null; return; }
-    // (you've put her about yourself meanwhile, or are steering her, or it's waited long enough: the call stands, warned,
-    // but the helm doesn't then put her over again)
-    if (u.tack !== w.tack || u.steer !== 0 || this.t - w.t0 > CALL_WAIT_MAX) { u.callWait = null; return; }
+    // (you've put her about yourself meanwhile, or are steering her round (a key held, not a tap: physics.ts KEY_HELD), or
+    // it's waited long enough: the call stands, warned, but the helm doesn't then put her over again)
+    const steering = u.steer !== 0 && u.steerSince != null && this.t - u.steerSince >= KEY_HELD;
+    if (u.tack !== w.tack || steering || this.t - w.t0 > CALL_WAIT_MAX) { u.callWait = null; return; }
     const a = crewAnswer(u, this.t);
     if (a === 'ready') { u.callWait = null; u.callT = this.t; this.putOver(u); return; }
     if (a === 'busy' && !w.notReady && this.t - w.t0 > 0.6) { w.notReady = true; this.emit({ type: 'toast', ms: 4000, msg: '"Not ready!" Your crew are busy at a job: the helm waits (call again to go anyway).' }); }

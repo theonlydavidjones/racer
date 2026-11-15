@@ -62,8 +62,10 @@ describe('A tack, called or not (physics.ts jibLetGo, crewPhys.ts readyFor)', ()
 
 describe('A jibe on an AI boat, called or not (physics.ts gybeMeant, boomStep)', () => {
   // (turned on round through dead downwind at `rate` deg/s to 60° past it, her heading set by hand: no turn the crew see)
+  // (the middle crew on the mainsheet: a helm on it needs no warning of their own turn, mainHandReady; crewWork.ts mainHand)
   const jibe = (called: boolean, skill: number, rate: number) => {
-    const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false; b.crew = newCrew(crew(skill), 'S');
+    const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false;
+    b.crew = newCrew({ helm: { ...DEFAULT_CREW.helm, skill: Math.min(skill, 0.3) }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill: Math.max(skill, 0.35) })) }, 'S');
     sail(b, 30, () => held(b, 170));
     let byLee = NaN, across = NaN;
     sail(b, 30, t => { if (called) b.callT = t; held(b, 170 + Math.min(60, rate * t));
@@ -133,7 +135,7 @@ describe('A crash jibe and the crew in its way (calls.ts boomStrike)', () => {
   /** An AI boat on a run, jibed on round unseen and uncalled, one crewmate held at `pose` (the cabin top's lines, or the
    * bench). Who was struck, and for how long. */
   const strike = (pose: 'piano' | 'sit', called: boolean) => {
-    const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false; b.crew = newCrew(crew(0.2), 'S');
+    const b = testBoat({ heading: 170, kt: 4, windKt: 14 }); b.isUser = false; b.crew = newCrew({ helm: { ...DEFAULT_CREW.helm, skill: 0.3 }, crew: DEFAULT_CREW.crew.map(p => ({ ...p, skill: 0.35 })) }, 'S'); // (the middle crew on the main, slow)
     sail(b, 30, () => held(b, 170));
     // (at the cabin top's lines on a job, standing at its after end; or on the bench, as the crew sit)
     const a = b.crew!.people[2]!, put = () => { if (pose === 'piano') a.job = { line: 'cunningham', reach: 0, work: 5, station: { arm: 0.3, z: 0.85, pose: 'piano' } }; };
@@ -187,6 +189,26 @@ describe('Called, then put about by hand; a tack back in the hold; a turn decide
     const b = testBoat({ heading: 0, kt: 5, windKt: 10 }); b.crew = newCrew(crew(0.3), 'S');
     for (let k = 0; k < 50; k++) decideTurn(b, k * 0.05);
     expect(b.turnsDecided).toBe(1);
-    decideTurn(b, 20); expect(b.turnsDecided).toBe(2);
+    decideTurn(b, 20); expect(b.turnsDecided, 'still the same turn, not yet made').toBe(1);
+    b.lastTackT = 21; decideTurn(b, 22); expect(b.turnsDecided, 'made: the next is a new one').toBe(2);
   });
+});
+
+describe('Review round 2: sailing alone, a tap of the key, the helm on the main', () => {
+  it('sailing alone, a tack by hand is your own: no jib held aback, no word about a crew', () => {
+    const twa = beatAngle(12), b = testBoat({ heading: 360 - twa, kt: 5, windKt: 12 }); b.crew = newCrew({ helm: { ...DEFAULT_CREW.helm, skill: 0.2 }, crew: [] }, 'S');
+    sail(b, 60, () => { b.h = 360 - twa; });
+    startTack(b); let held = 0; sail(b, 15, () => { if ((b.jibHold ?? 0) > 0) held++; });
+    expect(b.tack).toBe('P'); expect(held).toBe(0);
+  }, 60_000);
+  it('a tap of a steering key while the crew get ready doesn\'t drop your call', () => {
+    const S = { ...DEFAULT_SETTINGS, mode: 'sail' as const, windKt: 12, windKind: 'west' as const, current: 'slack', sea: 'flat' as const, traffic: 0 as const, fleet: 0, opponents: [] };
+    const w = new World(courseFile('train'), S, 4242, { freeSail: true }); w.running = true;
+    for (let i = 0; i < 60 * 30; i++) w.step(DT);
+    const u = w.user; applyCommand(w, { k: 'turn' });
+    for (let i = 0; i < 30; i++) w.step(DT);
+    u.steer = 1; for (let i = 0; i < 6; i++) w.step(DT); u.steer = 0; // (a tenth of a second)
+    let went = false; for (let i = 0; i < 60 * 5 && !went; i++) { w.step(DT); went = u.turnTarget != null; }
+    expect(went).toBe(true);
+  }, 120_000);
 });

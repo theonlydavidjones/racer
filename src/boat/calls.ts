@@ -33,6 +33,8 @@ export const CALL_KEEP = 12;
 export const TURN_SEEN = 3, CUE_MAX = 6;
 /** Your call waiting on a busy crew is dropped after this long (s): an estimate, the job most likely done or the moment gone. */
 export const CALL_WAIT_MAX = 15;
+/** A decided turn held as one this long at most, waiting for her to make it (s): an estimate. */
+export const TURN_HOLD = 60;
 /** The share of decided turns an AI skipper calls at skill 0, and at 1 (estimates). */
 export const CALL_AT = { novice: 0.35, expert: 0.98 };
 /** The jobs a crew member can't leave mid-way to answer a call: they say "Not ready" (crewWork.ts's committed jobs). */
@@ -52,6 +54,9 @@ export function callsTurn(b: Boat, n: number): boolean {
  * calls). Once a turn: a decision held a while isn't a new one. */
 export function decideTurn(b: Boat, t: number, always = false): void {
   if (always) { b.decidedT = b.callT = t; return; }
+  // (one decision until the turn's made: a slow bear-away and jibe can take longer than CALL_KEEP to reach the wind, and
+  // isn't a new turn, nor its call let lapse meanwhile; not past TURN_HOLD, if she never makes it)
+  if (b.decidedT != null && (b.lastTackT ?? -Infinity) < b.decidedT && t - b.decidedT < TURN_HOLD) { if (b.callT != null && b.callT >= b.decidedT) b.callT = t; return; }
   if (b.decidedT != null && t - b.decidedT < CALL_KEEP) return;
   b.decidedT = t;
   const n = b.turnsDecided = (b.turnsDecided ?? 0) + 1;
