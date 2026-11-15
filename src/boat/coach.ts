@@ -379,7 +379,18 @@ function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boole
       if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'A jib is trimmed right when its windward luff telltales just lift.', tick: true };
       if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'On a broad reach, the jib goes out to its stop.', tick: true };
       return { text: s.awa > 115 ? 'Off the wind, the jib goes right out.' : 'A jib is trimmed right when all its luff telltales stream together, both sides.', tick: true };
-    case 'traveller': return { text: c.traveller > 0.1 ? (s.over ? 'When she\'s overpowered, a dropped traveler cuts heel and helm.' : s.awa > 60 ? 'Off the wind, the traveler goes down so the boom can swing out.' : `Upwind in ${air}, a traveler down to leeward eases heel and helm.`) : c.traveller < -0.1 ? `Upwind in ${air}, the traveler goes up to center the boom, for height.` : `In ${air}, the traveler in the middle balances height and heel.`, tick: true };
+    case 'traveller': {
+      // (sailing practice: upwind in light air the car goes up to windward, the boom to the centerline on an eased sheet;
+      // it comes down to leeward as the breeze builds, to ease heel and helm (North Sails' Folkboat guide). The ✓ only
+      // where the setting agrees: a car down upwind in light or medium air, not overpowered, gets the lesson and no ✓,
+      // whatever small gain the speed model finds either way)
+      const down = c.traveller > 0.1, up = c.traveller < -0.1, upw = s.awa <= 60;
+      if (down && !upw) return { text: 'Off the wind, the traveler goes down so the boom can swing out.', tick: true };
+      if (down && (s.over || s.band === 'heavy')) return { text: `In ${s.over ? 'a breeze' : air}, a traveler down to leeward eases heel and helm.`, tick: true };
+      if (down) return { text: s.band === 'light' ? 'Upwind in light air, the traveler goes up to bring the boom to the centerline.' : 'Upwind in medium air, the traveler sits near the middle; down is for when she\'s overpowered.', tick: false };
+      if (up && upw && s.band === 'heavy' && !s.over) return { text: 'In heavy air, the traveler comes down as she starts to heel too far.', tick: true };
+      return { text: up ? `Upwind in ${air}, the traveler goes up to center the boom, for height.` : `In ${air}, the traveler in the middle balances height and heel.`, tick: true };
+    }
     case 'vang':
       // (North Sails' Folkboat guide: "Never use the kickingstrap upwind in less than 18 knots"; on, it's worth too little
       // to say so, but no ✓)
