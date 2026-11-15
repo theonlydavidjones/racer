@@ -4,7 +4,7 @@
  * change: "it would make more sense to have mainsheet and traveler on top of each other like they are on the real
  * controls"). Opened paused, from the coach's note or its key. Every line, grouped as the band and the boat group them:
  * the jib's sheet over its car; the main's shape (halyard, Cunningham, outhaul, vang); the jib's luff; the backstay; the
- * mainsheet over the traveler. A line to fix is numbered by what it's worth, with NOW / SHOULD / WHY and its track
+ * mainsheet over the traveler. A line to fix is numbered by what it's worth, with NOW / IDEAL / WHY (the owner, 15 Nov: "instead of 'should' … say 'ideal'") and its track
  * (where it is, white; where it wants to be, the teal ◆); a line that's right, a ✓ and a few words.
  */
 import type { Boat, LineKey } from '../boat/boat';
@@ -19,7 +19,7 @@ const GROUPS: { name: string; lines: LineKey[]; wide?: boolean }[][] = [
 ];
 /** A line's setting as how much is on (0 … 1): a sheet's value is how far it's eased; the traveler runs −1 … +1. */
 const onOf = (k: LineKey, v: number) => (k === 'mainsheet' || k === 'jibsheet' ? 1 - v : k === 'traveller' ? (v + 1) / 2 : v);
-const SHORT_SHOULD = (head: string) => { const t = head.replace(/\.$/, '').replace(/^Trim the (jib|main) in, /, 'In, ').replace(/^Ease the (jib|main), /, 'Out, '); return t[0].toUpperCase() + t.slice(1); };
+const SHORT_IDEAL = (head: string) => { const t = head.replace(/\.$/, '').replace(/^Trim the (jib|main) in, /, 'In, ').replace(/^Ease the (jib|main), /, 'Out, '); return t[0].toUpperCase() + t.slice(1); };
 
 export function trimNotesHtml(u: Boat, s: Situation, notes: LineNote[]): string {
   const by = new Map(notes.map(n => [n.line, n])), fixes = notes.filter(n => n.fix).sort((a, b) => b.fix!.gain - a.fix!.gain);
@@ -38,7 +38,7 @@ export function trimNotesHtml(u: Boat, s: Situation, notes: LineNote[]): string 
     const r = rank.get(k), who = n.who === 'crew' ? '<span class="who">Crew</span>' : '';
     const head = `<div class="tn-h"><b>${NAME[k] ?? k}</b>${who}${r ? `<span class="tn-n">${r}</span>` : n.tick ? '<span class="cue-ok">✓</span>' : ''}</div>${track(k, n)}`;
     return n.fix
-      ? `<div class="tn-line fix" data-line="${k}">${head}<dl><dt>Now</dt><dd>${esc(n.fix.now ?? '')}</dd><dt>Should</dt><dd class="sh">${esc(SHORT_SHOULD(n.fix.head))}</dd><dt>Why</dt><dd>${esc(n.fix.short ?? n.fix.why)}</dd></dl></div>`
+      ? `<div class="tn-line fix" data-line="${k}">${head}<dl><dt>Now</dt><dd>${esc(n.fix.now ?? '')}</dd><dt>Ideal</dt><dd class="sh">${esc(SHORT_IDEAL(n.fix.head))}</dd><dt>Why</dt><dd>${esc(n.fix.short ?? n.fix.why)}</dd></dl></div>`
       : `<div class="tn-line ok" data-line="${k}">${head}<p>${esc(n.ok)}</p></div>`;
   };
   const rows = GROUPS.map(row => `<div class="tn-row${row.length === 2 ? ' two' : ''}">${row.map(g => {
