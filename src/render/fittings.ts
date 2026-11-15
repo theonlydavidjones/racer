@@ -49,3 +49,23 @@ export class FittingCull {
     }
   }
 }
+
+/** The least a boat's part must measure (its bounding sphere's radius, m) to cast a shadow worth drawing. */
+const CAST_MIN = 0.25;
+/**
+ * A boat's shadows from the parts that show in them (the hull, keel, rudder, mast, boom, sails, crew: the shadows a
+ * sailor sees on deck and on the water), not from her small fittings: a cleat's or a block's shadow is under a pixel of
+ * the sun's shadow map (2048 texels over its patch of sea), but each was a draw call in the shadow pass, about 235 of a
+ * start's 1,150 a frame. Every part still receives shadows.
+ */
+export function boatShadows(g: THREE.Object3D): void {
+  g.updateMatrixWorld(true);
+  const gs = g.matrixWorld.getMaxScaleOnAxis() || 1;
+  g.traverse(o => {
+    const m = o as THREE.Mesh; if (!m.isMesh) return;
+    m.receiveShadow = true;
+    if (m.userData.cullR !== undefined) { m.castShadow = false; return; } // (a merged set of small parts: FittingCull's)
+    if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+    m.castShadow = m.geometry.boundingSphere!.radius * m.matrixWorld.getMaxScaleOnAxis() / gs >= CAST_MIN;
+  });
+}

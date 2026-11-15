@@ -13,7 +13,7 @@ import { rainLevel } from '../environment/rain';
 import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
-import { FittingCull } from './fittings';
+import { FittingCull, boatShadows } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
 import type { Boat } from '../boat/boat';
@@ -445,7 +445,7 @@ export class SceneView {
     this.boatMeshes.forEach(m => this.scene.remove(m.grp));
     this.boatMeshes = w.boats.map(b => {
       const m = buildBoatMesh(b); this.scene.add(m.grp);
-      m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      boatShadows(m.grp); // (shadows cast by the parts that show in them: render/fittings.ts)
       return m;
     });
     this.fittings.set(this.boatMeshes.map(m => m.grp));
@@ -498,7 +498,7 @@ export class SceneView {
     const old = this.boatMeshes[i], b = w.boats[i]; if (!old || !b) return;
     const m = buildBoatMesh(b);
     m.grp.position.copy(old.grp.position); m.grp.quaternion.copy(old.grp.quaternion); m.grp.rotation.order = old.grp.rotation.order;
-    m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    boatShadows(m.grp);
     this.scene.remove(old.grp); this.scene.add(m.grp); this.boatMeshes[i] = m;
     this.fittings.set(this.boatMeshes.map(x => x.grp));
     disposeUnused([old.grp], this.scene);
