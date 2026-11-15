@@ -23,14 +23,13 @@ function plan(date: string, time: string, turn: number, kt: number) {
 }
 
 describe('the passage plan off Yellow Bluff, with the ebb across her course', () => {
-  // (held apart, the Coordinator's ruling: with the land's lee without seams (shadows.ts) the pocket 100 m off Yellow
-  // Bluff, 500 m along, is lighter, and with the ebb setting her on both gybes close the shore inside their minute and a
-  // half: a dead end on a run, which the rule-based planner can't get out of (its stand-off is a beat's). The isochrone
-  // router is the owner's decision; it removes the it.fails)
-  it.fails('known failure: in the land\'s lee off Yellow Bluff (about half the wind, 100 m off) with the ebb setting her on, the run gybes in a dead end, 63 turns, 158 m back (ROADMAP: the isochrone router) (main: 54 turns, 199 m back toward the start)', () => {
+  // (the isochrone router, sim/router.ts, the owner's decision: she cheats the ebb up the Marin shore, where it runs at
+  // 0.1–0.4 kt against 2–3 kt foul across the open water, and crosses to the mark: about an hour, a handful of jibes)
+  it('gets there without doubling back, cheating the ebb inshore: no hairpins, about an hour (main: 54 turns, 199 m back, 227 min)', () => {
     const { r, back, turns } = plan('2026-11-25', '15:00', -20, 10);
     expect(r.ok).toBe(true);
     expect(back, 'given back toward the start (m)').toBeLessThan(100);
     expect(turns).toBeLessThan(15);
+    expect(r.minutes).toBeLessThan(90);
   }, 120_000);
 });
