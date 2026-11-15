@@ -32,8 +32,9 @@ const worstStep = (a0: [number, number], b0: [number, number], every: number) =>
   return worst;
 };
 describe('the land\'s lee, without seams', () => {
-  // continuity: between points 1 m apart a seam is a jump (main: 30% off Yellow Bluff); the lee's own steepest slope is
-  // just past a low shore hill's near-calm (4H off), 1.5 × 0.8 / 4H a meter: 1.5% for a 20 m hill
+  // continuity: between points 1 m apart a seam is a jump (main: 30% off Yellow Bluff). The cap, 2%, sits just above the
+  // lee's own steepest slope, just past a low shore hill's near-calm (4H off), 1.5 × 0.8 / 4H a meter: 1.5% for a 20 m
+  // hill (Deep Physics, review round 3). Measured here: 0.2–1.5%
   for (const [name, a0, b0] of LINES) it(`${name}: under 2% between points 1 m apart, 150 m or more off the shore`, () => {
     expect(worstStep(a0, b0, 1)).toBeLessThan(0.02);
   }, 60_000);

@@ -313,6 +313,9 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
             // hardly does, a wide deep one entirely (squared: Deep Physics); the hill beyond still shelters from the first
             // shore by what's left
             const part = Math.min(1, (enter - exit) / DIP_GAP) * clamp(1 - dip / exitLevel, 0, 1), w = (1 - part) ** 2;
+            // (a known small step, ~1.5% a meter, seen once 775 m off Yellow Bluff at 280°: when a dip upwind fills, two
+            // stretches merge, the merged top raises the level the next dip is measured from, and that dip's weight moves.
+            // Built into parting stretches at half their height; not worth more machinery)
             const older = xwa >= xwb ? [xa, xwa] : [xb, xwb];
             ca = xEnter; wa = w; cb = older[0]; wb = older[1] * w;
             if (wa < 1e-3) { ca = -1; wa = 0; } if (wb < 1e-3) { cb = -1; wb = 0; }
