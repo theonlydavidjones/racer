@@ -19,8 +19,11 @@ describe('the keys', () => {
     const m = new KeyMap();
     expect(m.actionFor(keyOf({ key: 'T', shiftKey: true }))).toBe('trimNotes' as Action);
     expect(m.actionFor(keyOf({ key: 'T', shiftKey: false }))).toBe('takeTiller' as Action);
+    // the traveler beside the mainsheet (the owner, 15 Nov 2026): Shift+Z up to windward, Shift+X down to leeward
+    expect(m.actionFor(keyOf({ key: 'Z', shiftKey: true }))).toBe('travUp' as Action);
+    expect(m.actionFor(keyOf({ key: 'x', shiftKey: true }))).toBe('travDown' as Action);
     // (Shift with a letter that has no Shift binding: the letter, as before)
-    expect(m.actionFor(keyOf({ key: 'Z', shiftKey: true }))).toBe('mainIn' as Action);
+    expect(m.actionFor(keyOf({ key: 'S', shiftKey: true }))).toBe('luff' as Action);
     expect(keyLabel('Shift+T')).toBe('⇧T');
   });
 });

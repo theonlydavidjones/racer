@@ -1081,6 +1081,7 @@ function applyHeld(): void {
   const add = (k: CtlKey, d: number) => { if (d) cmd[k] = Math.max(-1, Math.min(1, (cmd[k] ?? 0) + d)); };
   add('mainsheet', (held.has('mainOut') ? 1 : 0) - (held.has('mainIn') ? 1 : 0));
   add('jibsheet', (held.has('jibOut') ? 1 : 0) - (held.has('jibIn') ? 1 : 0));
+  add('traveller', (held.has('travDown') ? 1 : 0) - (held.has('travUp') ? 1 : 0)); // (−1 windward … +1 leeward, at the car's own rate)
   const sel = CTL_UI[ctlSel];
   if (sel.key !== 'carFore' && sel.key !== 'carIn') add(sel.key, (held.has('ctlUp') ? 1 : 0) - (held.has('ctlDown') ? 1 : 0));
   if (steer && u.lashed != null) unlash(); // a hand on the tiller: the lashing comes off
@@ -1166,8 +1167,11 @@ addEventListener('keydown', e => {
   }
 });
 addEventListener('keyup', e => {
-  const a = keymap.actionFor(keyOf(e));
-  if (a && held.delete(a)) applyHeld();
+  // (a key let go with Shift up or down: both its forms are let go, so Shift released first doesn't leave the car running)
+  const k = e.key.length === 1 && /[a-z]/i.test(e.key) ? e.key.toLowerCase() : null;
+  const as = k ? [keymap.actionFor(k), keymap.actionFor('Shift+' + k.toUpperCase())] : [keymap.actionFor(keyOf(e))];
+  let any = false; for (const a of as) if (a && held.delete(a)) any = true;
+  if (any) applyHeld();
 });
 addEventListener('blur', () => { held.clear(); applyHeld(); });
 

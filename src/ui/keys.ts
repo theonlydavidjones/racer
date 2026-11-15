@@ -1,7 +1,7 @@
 /** Keyboard bindings: every action, its keys, and saving your changes in this browser. */
 export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'luff'
-  | 'mainIn' | 'mainOut' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
+  | 'mainIn' | 'mainOut' | 'travUp' | 'travDown' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft'
   | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
@@ -9,7 +9,7 @@ export type Action =
   | 'course' | 'log' | 'pause' | 'keys' | 'trimNotes';
 
 /** Actions that last while the key is held (the rest fire once per press). */
-export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
+export const HELD: ReadonlySet<Action> = new Set<Action>(['steerPort', 'steerStbd', 'luff', 'mainIn', 'mainOut', 'travUp', 'travDown', 'jibIn', 'jibOut', 'lookLeft', 'lookRight', 'lookUp', 'lookDown', 'zoomIn', 'zoomOut', 'ctlDown', 'ctlUp']);
 
 export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'takeTiller', label: 'Take or let go of the tiller (then the cursor steers)', group: 'Helm' },
@@ -20,6 +20,9 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'luff', label: 'Luff (ease both sails, hold)', group: 'Sails' },
   { id: 'mainIn', label: 'Trim the main in', group: 'Sails' },
   { id: 'mainOut', label: 'Ease the main', group: 'Sails' },
+  // (riding the traveler: the owner, 15 Nov 2026, "a big part of sailing"; beside the mainsheet's keys)
+  { id: 'travUp', label: 'Traveler up to windward (hold)', group: 'Sails' },
+  { id: 'travDown', label: 'Traveler down to leeward (hold)', group: 'Sails' },
   { id: 'jibIn', label: 'Trim the jib in', group: 'Sails' },
   { id: 'jibOut', label: 'Ease the jib', group: 'Sails' },
   { id: 'ctlPrev', label: 'Select the previous line (sail controls)', group: 'Sails' },
@@ -64,7 +67,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
 
 export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'],
-  luff: ['s'], mainIn: ['z'], mainOut: ['x'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
+  luff: ['s'], mainIn: ['z'], mainOut: ['x'], travUp: ['Shift+Z'], travDown: ['Shift+X'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
   viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
