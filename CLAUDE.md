@@ -54,7 +54,7 @@ come later, once the physics and racing are dialed in.
 
 ```bash
 npm run test:fast        # ~40 s: everything but the whole-race runs; use while iterating
-npm test                 # ~23 min: the full suite (run before publishing)
+npm test                 # ~29 min: the full suite (run before publishing; perf.test alone is ~12 min)
 npx tsc --noEmit -p .    # type check
 npm run build:artifact   # → artifact/folkboat-racing-sim.html (the published page)
 node scripts/check/smoke.cjs <out-dir>        # ~3 min: the built page in headless Chromium, both ways it loads (blob modules,
@@ -68,6 +68,7 @@ npm run dev & node scripts/check/setup-map.cjs <url> [<out-dir>]  # ~1 min: the 
 npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in the page (the statement, a tow, her logbook, laid up, carry on)
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
+node scripts/check/perf-pair.mjs --ai         # ~11 min: an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), the mean
 node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
                                               # this tree and the published one back to back; fails on a clear regression
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
@@ -76,9 +77,13 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 
 - The step's speed (the owner, 14 Nov 2026): measured paired, both versions sailed by turns in one process, so the
   host's drift cancels (scripts/check/perf-pair.mjs, docs/CAPACITY.md §8). The budget holds: perf.test requires the
-  step within v168 × 1.019 (the same 43.1 as before, now without the drift). A PR that touches the step (src/boat,
+  step within v168 × 1.019 (the same 43.1 as before, now without the drift), on twelve ratios, six with each loaded
+  first (the owner, 14 Nov 2026). A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
+  A PR that changes how boats sail or are judged (src/ai, src/rules) uses `--ai` instead, the mean over ten races: it
+  changes the race itself, and one race's ratio then lands anywhere in ±3% of the mean (#276 against turning: 0.986 to
+  1.067 over the ten, 1.032 the mean; docs/CAPACITY.md §8).
 - World.step (Capacity, 14 Nov 2026): don't add per-step lines to World.step itself, even ones that return at once:
   the paddle's two cost every step 1.3% with the race unchanged. New per-step work goes behind one cheap test, in a
   method of its own (docs/CAPACITY.md §8a), and a PR that adds lines to World.step runs perf-pair however free they look.
