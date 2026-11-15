@@ -31,8 +31,8 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   const run = (s: number) => {
     for (let i = 0; i < Math.round(s / DT); i++) {
       Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB });
-      if (bTurning) { B.penaltyDir = 1; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
-      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1 });
+      if (bTurning) { B.penaltyDir = 1; B.penaltyTurned = 90; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
+      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1, penaltyTurned: 90 }); // (her turns begun: 90° into them, physics.ts countPenalty)
       if (o.retired) { A.retired = true; A.penalty = A.penaltyTotal = 0; A.penaltyDir = 0; } // (not racing: her contacts carry no penalty)
       else { A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty); }
       w.step(DT); w.paused = false;
