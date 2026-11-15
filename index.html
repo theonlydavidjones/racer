@@ -26,7 +26,8 @@
   <!-- the app: small and dim -->
 <div class="ibar dim" id="appBar">
   <button class="ib" id="bPause" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12"/><path d="M13 4v12"/></svg><span class="w">Pause</span></button>
-  <button class="ib" id="bFast" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button>
+  <button class="ib" id="bTools" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/></svg><span class="w">Tools</span></button>
+  <button class="ib" id="bFast" type="button" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/></svg><span class="w">Speed 1×</span></button><!-- (time's speed is in Tools now; this stays for the setup and the checks that drive it) -->
   <button class="ib" id="bSound" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l5 4V4L6 8Z"/><path class="wave" d="M14 7a4 4 0 0 1 0 6"/><path class="mute" d="M14 7.5l4.5 5M18.5 7.5l-4.5 5"/></svg><span class="w">Sound</span></button>
   <button class="ib" id="bExit" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4H4v12h4"/><path d="M11 6l4 4-4 4"/><path d="M15 10H7"/></svg><span class="w">Exit</span></button>
 </div>
@@ -551,6 +552,8 @@
     <div class="btnrow"><button class="cta" type="button" id="bKeep">Save to her logbook</button><button class="ghost" type="button" id="bDiscard">Discard</button></div>
   </div>
 </div>
+<!-- Tools (ui/toolsTray.ts): on top of the HUD, the map and the scene (before the script: the build keeps the page up to it) -->
+<div class="tools-tray" id="toolsTray" hidden></div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
