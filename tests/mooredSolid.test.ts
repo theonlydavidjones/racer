@@ -21,3 +21,22 @@ describe('the moored boats are solid', () => {
     expect(told).toBe(true); expect(through).toBe(false);
   });
 });
+
+// (walked out to the fairway and turned there by hand, 8m2: every such plan, over every berth in three winds, points down
+// the fairway toward the way out, 60 degrees and more off the wind, with 10 m of clear water ahead of her)
+import { SLIPS, berthClear, harborOf, pushOffPlan, pushOffPoses, toExit } from '../src/geo/marina';
+describe('the walk-out to the fairway', () => {
+  it('every one, in three winds: pointed toward the way out, 60 degrees and more off the wind, 10 m clear ahead, and clear all the way round', () => {
+    const bad: string[] = []; let n = 0;
+    for (const [from, kt] of [[270, 12], [225, 15], [0, 12]] as const) for (const s of SLIPS) {
+      const p = pushOffPlan(s, from, kt); if (p.kind !== 'swing' || p.pivot !== 0) continue; n++;
+      const togo = toExit(harborOf(s.marina)!), poses = pushOffPoses(s, p), e = poses[poses.length - 1], v = { x: Math.sin(p.h * Math.PI / 180), y: Math.cos(p.h * Math.PI / 180) };
+      const toward = togo({ x: e.c.x - v.x * 12, y: e.c.y - v.y * 12 }) - togo({ x: e.c.x + v.x * 12, y: e.c.y + v.y * 12 }) > 0;
+      const off = Math.abs(((from - p.h + 540) % 360) - 180) >= 60;
+      const ahead = [2, 4, 6, 8, 10].every(d => berthClear({ x: e.c.x + v.x * d, y: e.c.y + v.y * d }, p.h, s));
+      const round = poses.every(q => berthClear(q.c, q.h, s));
+      if (!toward || !off || !ahead || !round) bad.push(`${s.id} from ${from}: ${toward ? '' : 'not toward the way out '}${off ? '' : 'near the wind '}${ahead ? '' : 'no room ahead '}${round ? '' : 'not clear round'}`);
+    }
+    expect(n).toBeGreaterThan(20); expect(bad).toEqual([]);
+  }, 600_000);
+});

@@ -301,10 +301,10 @@ export function slipTaken(s: Slip): boolean {
 }
 
 /** Whether a point is inside a boat lying in a slip (one that has a boat: mooredIn), as drawn: for her hull at the dock. */
-export function hitsMooredBoat(p: Vec, except?: Slip): boolean {
+export function hitsMooredBoat(p: Vec, except?: Slip | ReadonlySet<string>): boolean { // (`except`: her slip, or a set of slips left empty)
   const H = harborAt(p); if (!H) return false;
   for (const o of slipsNear(p, H.id)) {
-    if (!slipTaken(o) || o === except) continue;
+    if (!slipTaken(o) || o === except || (except instanceof Set && except.has(o.id))) continue;
     const dx = p.x - o.p.x, dy = p.y - o.p.y; if (dx * dx + dy * dy > 64) continue;
     const u = { x: Math.sin(o.heading * Math.PI / 180), y: Math.cos(o.heading * Math.PI / 180) }, b = boatIn(o);
     if (Math.abs(dx * u.x + dy * u.y) < b.half && Math.abs(dx * u.y - dy * u.x) < b.beam) return true;
@@ -670,7 +670,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // wind's swing about the bow line would point her away from the way out, or she'd be shoved off astern into less clear
   // water than her shove carries her (FAIRWAY_SHORT)
   // (not with the wind already ahead of her in her slip: then she's held head to wind for the main, or shoved off astern)
-  const fairway = () => headUp(s.heading, windFrom) ? null : fairwayWay(s, reach, togo, windFrom);
+  const fairway = () => headUp(s.heading, windFrom) ? null : fairwayWay(s, reach, togo, windFrom, windKt);
   if (best && !best.hold && best.gain < 0) { const f = fairway(); if (f) return f; } // (held head to wind for the main, she's pointed by the wind, not the way out)
   if (best) return { kind: 'swing', back: best.back, turn: best.turn, h: best.h, ...(best.hold ? { hold: best.hold } : {}), ...(headUp(best.h, windFrom) ? { headToWind: true } : {}) };
   // no room to swing her (or the wind would swing her into something): walked back until her bow's at the finger's end,
@@ -693,10 +693,18 @@ const DRIFT_PER_KT = 0.017;
  * Walked out of her slip into the fairway by hand, her middle in the middle of the clear water past the finger's end, and
  * turned there about her middle toward the way out (a crew member on the finger's end with a stern line, another with the
  * bow: one adult's sustained push, 186 N at the bow, 3.8 m from her middle, is about 700 N·m, against the wind's turning
- * of her bare rig, about 500 N·m in 12 kt beam on: Snook & Ciriello 1991's 19 kgf, as tabled by Bernard, and world.ts
- * windSwing; ESTIMATES). Pointed down the fairway with room ahead to gather way, or null where it doesn't fit.
+ * of her bare rig about her middle, about 100–150 N·m in 12 kt beam on (about her bow on a bow line it's nearer 500):
+ * Snook & Ciriello 1991's 19 kgf, as tabled by Bernard, and world.ts windSwing; ESTIMATES). Pointed down the fairway with
+ * room ahead to gather way, or null where it doesn't fit.
  */
-function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: number | undefined): PushOff | null {
+/**
+ * Above this wind, kt, she isn't turned by hand in the fairway: held beam on as she comes round, the wind's push on her
+ * bare rig (4.8 m² of side windage) is about 310 N in 20 kt and 490 N in 25, against about 370 N two crew can hold
+ * (Snook & Ciriello's 19 kgf each, sustained). Deep Physics' review, 15 Nov 2026; an ESTIMATE.
+ */
+const FAIRWAY_HOLD_KT = 21;
+function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: number | undefined, windKt = 0): PushOff | null {
+  if (windKt > FAIRWAY_HOLD_KT) return null; // (held beam on as she's turned, more wind than two crew can hold her against)
   const u = dirOf(s.heading), at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back }), tip = 0.45 * s.finger;
   const bowOut = tip + BOW + 0.5; if (reach < bowOut) return null;
   const back = (bowOut + reach) / 2, c = at(back);

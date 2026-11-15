@@ -466,7 +466,8 @@ export class World {
     this.rounding = settings.mode === 'roundings' ? new RoundingTracker(this.C) : null;
     this.courseSignal = this.freeSail ? null : opts.courseSignal ?? null;
     this.homeSlip = slipById(settings.boat?.slip);
-    mooredBoats.home = this.homeSlip; // (the boats in the other slips solid to her: physics.ts; her own, empty while she's out, not)
+    // (the boats in the other slips solid to her: physics.ts; the slips of the player's own boats empty, as the scene draws them)
+    mooredBoats.empty = new Set([this.homeSlip?.id, ...(settings.boats ?? []).map(b => slipById(b.slip)?.id)].filter((id): id is string => !!id));
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);

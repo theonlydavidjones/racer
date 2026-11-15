@@ -90,21 +90,34 @@ describe('pushed off astern', () => {
       const w = sail(id, from, kt), u = w.user; for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
       expect(u.docked?.slip, `${id}: a save naming it puts her there`).toBe(id);
       const ww = (w as unknown as { windHere: (a: unknown, b: unknown, c: boolean) => { from: number; kt: number } }).windHere(u, u, false);
-      const astern = pushOffPlan(slipById(id)!, ww.from, ww.kt).kind === 'astern', went = w.pushOff(), msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
-      return { astern, went, docked: !!u.docked, told: msgs.some(m => /^No room to push her off from this berth in this wind/.test(m)) };
+      const plan = pushOffPlan(slipById(id)!, ww.from, ww.kt), astern = plan.kind === 'astern', walked = plan.kind === 'swing' && plan.pivot === 0, went = w.pushOff(), msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
+      // (walked out to the fairway instead: held to the bar any push-off is, the physics review, 15 Nov 2026: let go, the
+      // jib up, touching nothing, her hull well out, with way on)
+      let clean = '';
+      if (went && walked) { // (walked out to the fairway, 8m2; a swing on the bow line is the older plan, its own tests')
+        const sl = slipById(id)!, bumps: string[] = [], seen = (m: string) => { if (/Bump|Collision|hit /.test(m)) bumps.push(m); };
+        for (let k = 0; k < 60 * 150 && (u.handled || u.pushing); k++) { w.step(DT); if (u.handled?.held) w.pushOff(); for (const e of w.drainEvents()) if (e.type === 'toast') seen(e.msg); }
+        // (hands off, the jib up, over the first 15 m she sails from where she's let go: the clear run ahead of her the plan
+        // promises, 10 m, and a little more; past it she's the helmsman's to steer on, as any boat leaving a slip)
+        w.setSail('jib', true); let way = 9; const x0 = u.x, y0 = u.y;
+        for (let k = 0; k < 60 * 60 && Math.hypot(u.x - x0, u.y - y0) < 15; k++) { w.step(DT); if (k > 60 * 5) way = Math.min(way, Math.hypot(u.vx, u.vy)); for (const e of w.drainEvents()) if (e.type === 'toast') seen(e.msg); }
+        const out = Math.hypot(u.x - sl.p.x, u.y - sl.p.y);
+        if (bumps.length || way <= 0.3 || out <= 12) clean = `${id} from ${from} at ${kt} kt: ${bumps[0] ?? ''} least way ${way.toFixed(2)} m/s, ${out.toFixed(0)} m out`;
+      }
+      return { astern, walked, went, docked: !!u.docked, told: msgs.some(m => /^No room to push her off from this berth in this wind/.test(m)), clean };
     };
     for (const id of [...NO_ASTERN, ...NO_ASTERN_WEST]) {
       expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
       const r = tryIt(id, 270, 12); // (planned astern there, kept fast and told; or walked out to the fairway instead, 8m2, and got out)
-      if (r.astern) { expect(r.went, id).toBe(false); expect(r.docked, id).toBe(true); expect(r.told, id).toBe(true); } else expect(r.went, id).toBe(true);
+      if (r.astern) { expect(r.went, id).toBe(false); expect(r.docked, id).toBe(true); expect(r.told, id).toBe(true); } else { expect(r.went, id).toBe(true); expect(r.clean).toBe(''); }
     }
     // (the edges of the westerly's band, and the six in a northerly: kept fast where the plan's astern, got out where it isn't)
     for (const [ids, from, kt] of [[NO_ASTERN_WEST, 225, 12], [NO_ASTERN_WEST, 315, 12], [NO_ASTERN, 0, 12]] as const) for (const id of ids) {
-      const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from}`).toBe(!r.astern); if (r.astern) expect(r.told, id).toBe(true);
+      const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from}`).toBe(!r.astern); if (r.astern) expect(r.told, id).toBe(true); else expect(r.clean).toBe('');
     }
     // (the westerly's six, in light air and in a northerly: shoved off as from any berth, where they're planned astern)
     let out = 0;
-    for (const [from, kt] of [[270, 4], [0, 12]] as const) for (const id of NO_ASTERN_WEST) { const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(true); if (r.went) out++; }
+    for (const [from, kt] of [[270, 4], [0, 12]] as const) for (const id of NO_ASTERN_WEST) { const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(true); expect(r.clean).toBe(''); if (r.went) out++; }
     expect(out).toBe(12);
   }, 300_000);
   it('a fresh breeze on her bow carries her on whatever the crew do: she\'s let go with the way she has, their walk, never dead in the water', () => {

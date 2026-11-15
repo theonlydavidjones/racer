@@ -1,4 +1,4 @@
-import { harborNear, hitsHarbor, hitsMooredBoat, hitsWall, type Slip } from '../geo/marina';
+import { harborNear, hitsHarbor, hitsMooredBoat, hitsWall } from '../geo/marina';
 import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage';
 import { KT, V, clamp, wrap, n360, D2R, type Vec } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
@@ -913,14 +913,15 @@ function closingAt(b: Boat, p: Vec): number {
  * ROADMAP's wreck item.) */
 /**
  * The boats lying in the other slips are solid to a boat sailing free (8m2, the owner: "i keep getting pushed into other
- * boats"): her own slip, the one she left, aside (the World sets it: mooredBoats.home). The same boats, as drawn
- * (geo/marina.ts hitsMooredBoat), that her lines and fenders keep her off at the dock.
+ * boats"): the slips of the player's own boats aside, which the scene leaves empty (render/scene.ts clearSlips; the World
+ * sets them: mooredBoats.empty). The same boats, as drawn (geo/marina.ts hitsMooredBoat), that her lines and fenders keep
+ * her off at the dock. One World a thread is assumed (the race's worker, or the page with ?inproc): the last made sets it.
  */
-export const mooredBoats: { home: Slip | null } = { home: null };
+export const mooredBoats: { empty: ReadonlySet<string> } = { empty: new Set() };
 /** Land, a dock, or (near a harbor: `nearHarbor`, looked up once a step) a boat lying in a slip: what stops her. */
-const solidAt = (p: Vec, nearHarbor: boolean): boolean => onLand(p) || (nearHarbor && hitsMooredBoat(p, mooredBoats.home ?? undefined));
+const solidAt = (p: Vec, nearHarbor: boolean): boolean => onLand(p) || (nearHarbor && hitsMooredBoat(p, mooredBoats.empty));
 function whatHit(hit: Vec): { kind: Struck; name: string } {
-  if (!onLand(hit) && hitsMooredBoat(hit, mooredBoats.home ?? undefined)) return { kind: 'boat', name: 'the boat in the next slip' };
+  if (!onLand(hit) && hitsMooredBoat(hit, mooredBoats.empty)) return { kind: 'boat', name: 'the boat in the next slip' };
   const piles = underPier(hit); if (piles) return { kind: 'piles', name: `the piles of ${piles.name}` };
   const pier = pierNear(hit, 6); if (pier) return { kind: 'concrete', name: `the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}` };
   if (hitsWall(hit)) return { kind: 'concrete', name: 'the breakwater' };
