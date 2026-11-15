@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -134,7 +134,29 @@ const onFootrest = (ax: number, z: number) => { const s = footrestOut(); return 
 const THWART = { z: COCKPIT_FIT.thwart.z, half: COCKPIT_FIT.thwart.half, top: thwartTop() };
 const coamH = COAMING_H;
 /** The sole's half-width at z (between the benches' fronts, narrowing aft with the hull: hull.ts cockpitGeometry). */
-const soleHalf = (z: number) => Math.min(COCKPIT_FIT.soleHalf, Math.max(0, hullInnerHalf(uAtZ(z), COCKPIT.sole) - 0.03));
+const soleHalf = (z: number) => Math.min(COCKPIT_FIT.soleHalf, Math.max(0, innerHalf(z, COCKPIT.sole) - 0.03));
+/**
+ * The hull's inner half-breadth over the cockpit's length (m, at z along her and y up), tabled once at 2 cm each way and
+ * read by bilinear interpolation (Capacity, 15 Nov 2026): hull.ts hullInnerHalf bisects her section 30 times a call,
+ * and ground() asked it 14 times a foot, every frame for every figure, the same answers again and again: about 2 ms of
+ * JS a frame headless, 0.4 ms on the owner's Mac. The section's a smooth curve: at 2 cm the table's within a millimetre
+ * of it over the cockpit (0.93 mm at worst: tests/crewground.test.ts). Outside the cockpit's length or height, and near the
+ * canoe body's bottom, the hull itself.
+ */
+const IN = { z0: 0.98, z1: 2.84, y0: COCKPIT.sole - 0.5, y1: 1.05, d: 0.02 }; // (the cockpit, the after bulkhead to its after end, and the footwell from half a metre under the sole: where ground() asks)
+let inTab: Float64Array | undefined, inBot: Float64Array | undefined;
+const inNz = Math.round((IN.z1 - IN.z0) / IN.d) + 1, inNy = Math.round((IN.y1 - IN.y0) / IN.d) + 1;
+export function innerHalf(z: number, y: number): number {
+  if (z < IN.z0 || z > IN.z1 || y < IN.y0 || y > IN.y1) return hullInnerHalf(uAtZ(z), y);
+  if (!inTab) {
+    inTab = new Float64Array(inNz * inNy); inBot = new Float64Array(inNz);
+    for (let i = 0; i < inNz; i++) { const u = uAtZ(IN.z0 + i * IN.d); inBot[i] = canoe(u); for (let j = 0; j < inNy; j++) inTab[i * inNy + j] = hullInnerHalf(u, IN.y0 + j * IN.d); }
+  }
+  const fz = (z - IN.z0) / IN.d, fy = (y - IN.y0) / IN.d, i = Math.min(inNz - 2, Math.floor(fz)), j = Math.min(inNy - 2, Math.floor(fy)), a = fz - i, b = fy - j, t = inTab, r = i * inNy + j;
+  // (near the canoe body's bottom the section turns sharply into the keel, too sharply for the table: there, the hull)
+  if (y < Math.max(inBot![i], inBot![i + 1]) + 0.06) return hullInnerHalf(uAtZ(z), y);
+  return (t[r] * (1 - b) + t[r + 1] * b) * (1 - a) + (t[r + inNy] * (1 - b) + t[r + inNy + 1] * b) * a;
+}
 /** The front edge of the bench beside the sole (|x|, m), where one runs: its depth from there out to the coaming. */
 const benchEdge = (z: number) => soleHalf(z);
 const chz = (z: number) => cockpitHalf(uAtZ(z));
@@ -171,7 +193,7 @@ export function ground(x: number, z: number): number {
     if (z < BENCH_AFT) return SEAT_Y; // (a bench)
     // (the footwell beside the sole: open to the hull's own inside, curving out and up to the deck)
     let lo = COCKPIT.sole - 0.5, hi = deckY(u, chz(z));
-    for (let q = 0; q < 14; q++) { const m = (lo + hi) / 2; if (hullInnerHalf(u, m) < ax) lo = m; else hi = m; }
+    for (let q = 0; q < 14; q++) { const m = (lo + hi) / 2; if (innerHalf(z, m) < ax) lo = m; else hi = m; }
     return hi;
   }
   if (z > CAB0 && z < COCK0 && ax < cabinHalf(u)) return cabinTopAt(u, ax);
