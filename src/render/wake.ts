@@ -73,7 +73,7 @@ export class Wakes {
         const a = (side * (NS + 1) + i) * NT + j, b = a + 1, c = a + NT, d = c + 1; bi.push(a, c, b, b, c, d);
       }
       bg.setIndex(bi);
-      const bow = new THREE.Mesh(bg, new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, specular: 0x8a8a80, shininess: 140 }));
+      const bow = new THREE.Mesh(bg, new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, specular: 0x8a8a80, shininess: 140, forceSinglePass: true })); // (one pass, not back then front: three re-derives the program for each; the wave sheet is thin)
       bow.frustumCulled = false; bow.renderOrder = 2; this.scene.add(bow);
       // spray: droplets, lit by the scene; after dark each also takes the colour of her own light that falls on it
       const spray = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), sprayMaterial(), MAXDROPS);

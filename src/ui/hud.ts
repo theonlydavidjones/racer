@@ -265,8 +265,17 @@ export class Hud {
     const u = w.user, ww = u.ww, m = w.nextMark(u);
     $('clock').textContent = fmtClock(w.t);
     $('clockLab').textContent = w.freeSail ? 'Sailing' : w.t < 0 ? 'Start in' : 'Race time';
-    $('clockSub').textContent = w.clock + ' · ' + (w.freeSail ? (w.lesson ? 'Lesson' : 'Cruising') : w.cancelled ? (w.cancelled.up[0] === 'N' ? 'Abandoned' : 'Postponed') : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
+    // a boat scored DSQ, UFD, BFD or ZFP while racing sees it here, first on the line, for the rest of her race (the
+    // Flags tile shows flags only: the owner, 12 Nov; the Coordinator's ruling, 15 Nov)
+    const code = !w.freeSail && !w.cancelled && !u.retired && w.t >= 0 && u.scoring ? u.scoring : '';
+    const sub = $('clockSub'), state = (w.freeSail ? (w.lesson ? 'Lesson' : 'Cruising') : w.cancelled ? (w.cancelled.up[0] === 'N' ? 'Abandoned' : 'Postponed') : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
       u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+    const subKey = code + '|' + w.clock + '|' + state;
+    if (sub.dataset.k !== subKey) { // (in the give-way red, the one word that has to be seen)
+      sub.dataset.k = subKey;
+      if (!code) sub.textContent = w.clock + ' · ' + state;
+      else { const c = document.createElement('span'); c.className = 'code'; c.textContent = code; sub.replaceChildren(w.clock + ' · ', c, ' · ' + state); }
+    }
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
     // (the windex is in the sail controls band: ui/sailBand.ts; the pole's tab too)

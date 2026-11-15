@@ -701,6 +701,7 @@ physics, ranked like the ten above:
 | SHOVE_N | 265 N (27 kgf) | | sourced | one adult's initial push (Snook & Ciriello 1991, via the Liberty Mutual table) |
 | ASTERN_SHOVE | 0.64 m/s | | estimate | WALK plus SHOVE_N over 1 m of reach (the reach is the estimate) |
 | STEER_FOR | 13 s | | estimate | the steerage (over 0.3 m/s) the shove must give in the wind there is: the bar's 10 s and the scatter on an arc |
+| ASTERN_WIND_FAR, ASTERN_SET_FAR, ASTERN_WIND_STEP, SET_PER_KT (sim/world.ts) | 40 m, 16 m, 4 m, 0.019 m/s per kt | | estimate | the wind the shove is gauged by, read along her line astern and to leeward of it once as she's let go; her set across her line lying stern first under bare poles, per knot on her beam (the sim's own: 0.15 m/s in 10.5 kt 49° off her bow) |
 | ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 9 m | | derived / estimate | her still-air glide from the full shove (11.4 m); the clear water for which the way nearest the exit is taken |
 | ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 90 s, 1 m, 24 m | | estimate | the glide's one horizon; stopping short of the clear water's end; the furthest the planner looks |
 | DRIFT_PER_KT, DRIFT_PACE, DRIFT_FOR (geo/marina.ts) | 0.017 m/s per kt, 0.2 m/s, 60 s | | estimate | bare-poles drift to leeward allowed for along her run, measured in this sim |
