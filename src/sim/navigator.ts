@@ -58,13 +58,15 @@ function rulesPassage(o: Outlook, route: Vec[], t: number): { ok: boolean; why?:
  */
 function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
   const a = route[0], b = route[route.length - 1];
+  // (first the old rules' plans over the way round the land, which take a moment: the router then has a time to beat, and
+  // searches no water it couldn't beat it from. The passage is the quicker: the router's 5° headings and 1-minute fronts
+  // can be a few minutes out on a reach the rules sail dead straight)
+  const rules = rulesPassage(o, route, t);
+  yield;
   // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
   // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried.
   // An estimate: docs/CONSTANTS.md)
-  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain);
-  // (and the old rules' plans over the way round the land, which take a moment: the passage is the quicker. The router's
-  // 5° headings and 1-minute fronts can be a few minutes out on a reach the rules sail dead straight)
-  const rules = rulesPassage(o, route, t);
+  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity);
   if (direct.ok && (!rules.ok || direct.minutes <= rules.minutes)) return { ok: true, minutes: direct.minutes, track: direct.path, legs: [direct] };
   if (rules.ok && (!direct.ok || rules.minutes < direct.minutes)) return rules;
   if (route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };

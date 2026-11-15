@@ -3,6 +3,7 @@ import { routeLeg } from '../src/sim/router';
 import type { Outlook } from '../src/sim/outlook';
 import { speedInChop } from '../src/boat/seaway';
 import { LL } from '../src/geo/geo';
+import { KT } from '../src/core/math';
 
 /**
  * The isochrone router (sim/router.ts) on open water, in a made-up day: the wind and current set by hand, so what it
@@ -21,7 +22,9 @@ const day = (kt: number, from: number, cur: { x: number; y: number }): Outlook =
 
 describe('the isochrone router', () => {
   it('a calm with the tide under her: she drifts there, not given up as land (Deep Physics, M1)', () => {
-    const r = routeLeg(day(0, 0, { x: 1, y: 0 }), A, B, 0); // (1 m/s east, no wind)
+    // (the air moving with the water, 1 m/s east: no wind on the water. Still air over a stream would give her the
+    // stream's own breeze, 1.9 kt from ahead, which she can sail)
+    const r = routeLeg(day(1 / KT, 270, { x: 1, y: 0 }), A, B, 0);
     expect(r.ok).toBe(true);
     expect(r.minutes).toBeGreaterThan(9); // (570 m to within 30 m of the mark at 1 m/s: 9.5 min)
     expect(r.minutes).toBeLessThan(10);

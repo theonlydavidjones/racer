@@ -27,6 +27,11 @@ import { LL } from '../geo/geo';
  * 65.2 at 20 m. Nearer than this only while she isn't closing the shore (leaving a berth or a shore she started by), and
  * by the mark as near as the mark is. */
 const SHORE = 50;
+/** The fastest she could possibly go over the ground (m/s): 8 kt through the water, above a Folkboat's best off the wind
+ * (hull speed about 6 kt on her 6 m waterline), and 7 kt of tide, above the strongest the sim's currents can run (NOAA's
+ * constituents at SFB1201, the Bay's entrance, add up to 6.7 kt: environment/data/sf-currents.json). An upper bound on
+ * purpose, so the bound it gives never drops a route that could win. */
+const OPTIMISTIC = 15 * KT;
 /** How finely the router works (estimates for the Bay's scales): a front every `step` minutes, headings `heading`° apart,
  * the front kept in `sector`° sectors round the start. FINE's sector is 1°: at 2°, 190 m wide 5 km out, light-air cases
  * lost the way round a point (Crissy Field to Belvedere in 6 kt: 332 min where 1° finds 66, the finest grain 66.5:
@@ -100,14 +105,16 @@ function clear(p: Vec, q: Vec, mark: Vec, arrive: number): boolean {
  * Route from a to b leaving at minute t0. `arrive`: how close counts as there (m). Gives up after `maxMin` minutes. The
  * result has sailLeg's form (routing.ts SailResult), so the passage, the chart and the laylines read it as they did.
  */
-export function routeLeg(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE): SailResult {
-  const g = routeLegSteps(o, a, b, t0, arrive, maxMin, grain); let r = g.next();
+export function routeLeg(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE, limit = Infinity): SailResult {
+  const g = routeLegSteps(o, a, b, t0, arrive, maxMin, grain, limit); let r = g.next();
   while (!r.done) r = g.next();
   return r.value;
 }
 /** routeLeg a little at a time: it yields every 16 points of a front and after each front, so a plan can be worked out a slice a frame
  * (sim/navigator.ts passageLive) instead of holding a frame up for a second or two. */
-export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE): Generator<void, SailResult, void> {
+/** `limit`: an arrival (minute since epoch UTC) another plan already makes. A point that couldn't get there sooner even
+ * at OPTIMISTIC over the ground is dropped, and the search ends there: it can't lose a quicker route. */
+export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE, limit = Infinity): Generator<void, SailResult, void> {
   const STEP_MIN = grain.step, HEADING_STEP = grain.heading, SECTOR = grain.sector;
   const nodes: Node[] = [{ p: { ...a }, t: t0, side: 0, parent: -1, turn: '', kt: 0, cur: 0 }];
   let front = [0], best = -1;
@@ -130,7 +137,8 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   // as the end at once, a light-air case (Horseshoe Bay to Yellow Bluff, 25 Nov 15:30, 6 kt) took the rules' 221 min
   // where the front, searching on, got there in 131. STALL is an estimate: docs/CONSTANTS.md)
   const STALL = 10; let nearD = dist(a, b), nearStep = 0, bound: { k: number; r: SailResult; t: number } | null = null;
-  for (let step = 0; step * STEP_MIN < maxMin && best < 0 && !(bound && t0 + step * STEP_MIN >= bound.t); step++) {
+  const beatBy = () => Math.min(limit, bound ? bound.t : Infinity);
+  for (let step = 0; step * STEP_MIN < maxMin && best < 0 && t0 + step * STEP_MIN < beatBy(); step++) {
     const sectors = new Map<number, Node>(); // sector → the point kept there (only those are stored: the rest are many)
     let worked = 0;
     for (const i of front) {
@@ -172,6 +180,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
           if (best < 0 || nodes[idx].t < nodes[best].t) best = idx;
           continue;
         }
+        if (n.t + STEP_MIN + dist(q, b) / OPTIMISTIC / 60 > beatBy()) continue; // (can't beat the plan already made)
         const r = sub(q, a), key = Math.round(brg(r.x, r.y) / SECTOR), cur = sectors.get(key);
         if (cur && score(q) <= score(cur.p)) continue;
         if (!clear(n.p, q, b, arrive)) continue;
