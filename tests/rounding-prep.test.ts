@@ -17,7 +17,7 @@ describe('Ready before the mark (crew prep for the next leg)', () => {
     const ai = w.boats.filter(b => !b.isUser && crewSkill(b.crew!) >= 0.4);
     expect(ai.length).toBeGreaterThan(0);
     // per boat: the backstay when the prep began, and when she'd borne away past 110° true; whether the prep ended after
-    const seen = new Map<number, { at?: number; d?: number; bsAt?: number; bsOff?: number; vAt?: number; vOff?: number; vRun?: number; bsMax?: number; bs2?: number; ended?: boolean; leg0: number }>();
+    const seen = new Map<number, { at?: number; d?: number; bsAt?: number; bsOff?: number; vAt?: number; vOff?: number; vRun?: number; bsMax?: number; bs2?: number; tack2?: string; twa2?: number; ended?: boolean; leg0: number }>();
     for (const b of ai) seen.set(b.id, { leg0: -1 });
     for (let i = 0; i < 60 * 900; i++) {
       w.step(DT);
@@ -27,7 +27,7 @@ describe('Ready before the mark (crew prep for the next leg)', () => {
         if (s.at == null && b.crewPrep?.lines.includes('vang')) { s.at = w.t; s.bsAt = b.ctl.backstay; s.vAt = b.ctl.vang; s.d = Math.hypot(b.x - w.C.marks[0].p.x, b.y - w.C.marks[0].p.y) / LOA; }
         if (s.at != null && s.vRun == null && b.crewPrep?.plan) s.vRun = b.crewPrep.plan.vang; // (what the run wants)
         // (from when the backstay joins the prep, as she starts to turn: never hauled back on through the rest of it)
-        if (s.at != null && s.bs2 == null && b.crewPrep?.lines.includes('backstay')) s.bs2 = b.ctl.backstay;
+        if (s.at != null && s.bs2 == null && b.crewPrep?.lines.includes('backstay')) { s.bs2 = b.ctl.backstay; s.tack2 = b.tack; s.twa2 = Math.abs(b.twa); }
         if (s.bs2 != null && s.bsOff == null) s.bsMax = Math.max(s.bsMax ?? 0, b.ctl.backstay);
         if (s.at != null && s.bsOff == null && Math.abs(b.twa) > 110) { s.bsOff = b.ctl.backstay; s.vOff = b.ctl.vang; }
         if (s.bsOff != null && !s.ended && b.crewPrep == null) s.ended = true;
@@ -40,6 +40,9 @@ describe('Ready before the mark (crew prep for the next leg)', () => {
     for (const s of done) {
       expect(s.d!, 'just before the mark (the vang, a few seconds out)').toBeLessThan(5);
       expect(s.bs2, 'the backstay joined the prep as she turned').not.toBeUndefined();
+      // (on the tack she rounds on, or once she's bearing away: not on the approach tack, before her last tack)
+      const roundTack = w.C.marks[0].side === 's' ? 'P' : 'S';
+      expect(s.tack2 === roundTack || s.twa2! > 55, `the backstay eased on the rounding tack (${s.tack2}, ${s.twa2?.toFixed(0)}°)`).toBe(true);
       expect(s.bsMax!, 'and was never harder than then, through the bear-away').toBeLessThanOrEqual(s.bs2! + 1e-9);
       expect(s.bsOff!, 'eased by the time she was off').toBeLessThanOrEqual(s.bs2! + 1e-9);
       // (the vang: eased before she bore away where it was harder than the run wants, North Sails: "or the boom might
@@ -63,7 +66,7 @@ describe('Ready before the leeward mark', () => {
         const s = seen.get(b.id)!;
         if (s.tUp != null) { if (s.bs10 == null && w.t - s.tUp >= 10) s.bs10 = b.ctl.backstay; continue; } // (and 10 s on, still)
         if (s.oAt == null && b.crewPrep?.up && b.crewPrep.lines.includes('outhaul')) { s.oAt = b.ctl.outhaul; s.bsAt = b.ctl.backstay; s.prepUp = true; }
-        if (s.oAt != null && s.oBeat == null && b.crewPrep?.plan) { s.oBeat = b.crewPrep.plan.outhaul; s.bsBeat = b.crewPrep.plan.backstay; }
+        if (s.oAt != null && s.oUp == null && b.crewPrep?.plan) { s.oBeat = b.crewPrep.plan.outhaul; s.bsBeat = b.crewPrep.plan.backstay; } // (the plan as it stands when she rounds: worked out again if the wind's changed)
         if (s.oAt != null && s.oUp == null && Math.abs(b.twa) < 70) { s.oUp = b.ctl.outhaul; s.bsUp = b.ctl.backstay; s.tUp = w.t; }
       }
       if ([...seen.values()].some(s => s.oUp != null) && w.t > 0 && [...seen.values()].every(s => s.bs10 != null || s.oAt == null) && [...seen.values()].filter(s => s.bs10 != null).length >= 2) break;

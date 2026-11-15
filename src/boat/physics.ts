@@ -679,6 +679,9 @@ function powerFactor(b: Boat, jibOn: { trim: NonNullable<Boat['trim']['jib']>; s
   return b.powerK;
 }
 /** The fastest depowering step for her own crew as they are (how many, how heavy, how tired), in this wind. */
+/** How far the wind may move (kt) before the crew rethink the beat's settings they're setting up for at a leeward mark
+ * (sim/world.ts roundingPrep): an ESTIMATE. */
+const PREP_RESOLVE_KT = 2;
 /** The depowering her crew would sail a beat with now (her fastest step close-hauled in the wind she has): handed to the
  * crew's own as she comes onto the wind after a leeward rounding (sim/world.ts roundingPrep). */
 export function beatDepower(b: Boat): number {
@@ -1224,7 +1227,11 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // a rounding coming: the lines the crew set early for the next leg (sim/world.ts roundingPrep), to their plan for it
   const prep = b.crewPrep;
   if (prep) {
+    // (a beat's plan worked out again if the wind's changed since by more than PREP_RESOLVE_KT: a lull or a puff at the
+    // moment they planned isn't the beat they'll sail)
+    if (prep.up && prep.plan && Math.abs(tws - (prep.tws ?? tws)) > PREP_RESOLVE_KT) prep.plan = null;
     if (!prep.plan) {
+      prep.tws = tws;
       // (once a rounding, from the same start: the next leg as she'll sail it. A beat depowered as her fastest step for it
       // is, as she'd set up for it from the start, below; a run with the backstay and Cunningham off, as crews ease them
       // after the bear-away (Sail1Design, "rounding windward offset marks"; International Folkboat guide, North Sails: a
