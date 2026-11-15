@@ -61,7 +61,7 @@ const CAST_MIN = 0.25;
  */
 export function boatShadows(g: THREE.Object3D): void {
   g.updateMatrixWorld(true);
-  const gs = g.matrixWorld.getMaxScaleOnAxis() || 1;
+  const gs = g.matrixWorld.getMaxScaleOnAxis() || 1, casters: THREE.Mesh[] = [];
   g.traverse(o => {
     const m = o as THREE.Mesh; if (!m.isMesh) return;
     m.receiveShadow = true;
@@ -72,5 +72,19 @@ export function boatShadows(g: THREE.Object3D): void {
     if ((m as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = false; return; }
     if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
     m.castShadow = m.geometry.boundingSphere!.radius * m.matrixWorld.getMaxScaleOnAxis() / gs >= CAST_MIN;
+    if (m.castShadow) casters.push(m);
   });
+  g.userData.casters = casters; g.userData.castOn = true;
+}
+
+/** Beyond this (m from the camera) a boat casts no shadow, and within CAST_BACK she casts again: the sun's 2048² map
+ * spreads over the shadow camera's span, so a far boat's shadow is under a texel (Capacity, 15 Nov 2026). The gap
+ * between the two keeps her from flickering as she sails across the line. */
+export const CAST_FAR = 150, CAST_BACK = 130;
+/** Her shadow on or off by her distance from the camera (m), with the hysteresis above. */
+export function farShadows(g: THREE.Object3D, dist: number): void {
+  const on = g.userData.castOn as boolean | undefined; if (on === undefined) return;
+  const want = on ? dist <= CAST_FAR : dist < CAST_BACK; if (want === on) return;
+  for (const m of g.userData.casters as THREE.Mesh[]) m.castShadow = want;
+  g.userData.castOn = want;
 }

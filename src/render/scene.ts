@@ -13,7 +13,7 @@ import { rainLevel } from '../environment/rain';
 import { LL } from '../geo/geo';
 import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
-import { FittingCull, boatShadows } from './fittings';
+import { FittingCull, boatShadows, farShadows } from './fittings';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from './boatMesh';
 import { ghostAt, type GhostPoint } from '../replay/ghost';
 import type { Boat, Tack } from '../boat/boat';
@@ -535,6 +535,7 @@ export class SceneView {
   private harborCam = new THREE.Vector3();
   private hullCam = new THREE.Vector3();
   private sunLit = true;
+  private readonly farCam = new THREE.Vector3();
   setWorld(w: SimView): void {
     this.harbor.clearSlips(w.settings.boats?.map(b => b.slip) ?? []);
     this.laylineAcc = 1; this.puffAcc = 1; this.puffT = null; this.skyAcc = 1; this.seaRef = null; this.seaGrid = null; this.seaAcc = 99;
@@ -1051,6 +1052,7 @@ export class SceneView {
     // the water follows the camera (snapped, so the fine mesh near you doesn't swim)
     this.water.position.set(Math.round(camera.position.x / 2) * 2, 0, Math.round(camera.position.z / 2) * 2);
     this.fittings.update(camera, size.y * this.renderer.getPixelRatio()); // (the boats' fittings too small to see from here)
+    { const cp = camera.getWorldPosition(this.farCam); for (const m of this.boatMeshes) farShadows(m.grp, m.grp.position.distanceTo(cp)); } // (far boats cast none)
     this.harbor.update(camera.getWorldPosition(this.harborCam)); // (the moored boats nearest the camera in detail)
     // the camera down inside her hull (below her deck, within its outline): the sea kept out of her (hullUni, above)
     { const g = this.boatMeshes[0]?.grp, h = this.hullUni; h.uHullOn.value = 0;
