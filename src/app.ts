@@ -38,6 +38,7 @@ import { WindLadder } from './render/windLadder';
 import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
+import { ToolsTray, type Tool } from './ui/toolsTray';
 import { degAndPoint, turnWords } from './core/compass';
 import { WIND_KIND_LABEL, type WindKind } from './environment/wind';
 import { sunPosition } from './environment/sun';
@@ -1094,6 +1095,7 @@ addEventListener('keydown', e => {
   if (!$('leaveAsk').hidden) { if (e.key === 'Escape') $('bLeaveNo').click(); return; } // leave or keep racing first
   const a = keymap.actionFor(e.key);
   if (e.key === 'Escape') {
+    if (tools.open) { tools.close(); return; } // (the Tools tray first: it sits over everything)
     if (!$('flagIndex').hidden) { hud.flagIndex(w, false); return; }
     if (raceReplay.isOpen) { raceReplay.close(); return; }
     if (courseView.isOpen) { courseView.close(); return; }
@@ -1123,6 +1125,10 @@ addEventListener('keydown', e => {
   if ((a === 'ctlUp' || a === 'ctlDown') && !e.repeat) { const k = CTL_UI[ctlSel].key; if (k === 'carFore' || k === 'carIn') { stepCar(k, a === 'ctlUp' ? 1 : -1); return; } }
   if (HELD.has(a)) { if (!e.repeat) { held.add(a); applyHeld(); } return; }
   if (e.repeat) return;
+  runAction(a);
+});
+/** What a key does (and the Tools tray's tile for it: ui/toolsTray.ts), once it's pressed. */
+function runAction(a: Action): void {
   switch (a) {
     case 'ctlPrev': ctlSel = (ctlSel + CTL_UI.length - 1) % CTL_UI.length; if (!band.open) openLines(true); break;
     case 'ctlNext': ctlSel = (ctlSel + 1) % CTL_UI.length; if (!band.open) openLines(true); break;
@@ -1154,7 +1160,7 @@ addEventListener('keydown', e => {
     case 'orient': cycleOrient(); break;
     case 'recentre': recentre(); break;
   }
-});
+}
 addEventListener('keyup', e => {
   const a = keymap.actionFor(e.key);
   if (a && held.delete(a)) applyHeld();
@@ -1287,6 +1293,26 @@ let showroomTwa = 55;
 /** The destination the course on the water was last drawn to. */
 let shownDest: SimView['dest'] = null;
 const perf = new PerfMeter();
+/* Tools (ui/toolsTray.ts): what shows on the surface, each tile its key's action, lit while it's on. Hail stays on the band,
+ * one press away (the owner); time's speed is the tray's last row. */
+const toggleCourse = () => { if (w.cruising) navView.toggle(w); else courseView.toggle(w); };
+const toolKey = (a: Action) => keymap.label(a);
+const TOOLS: Tool[] = [
+  { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
+  { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
+  { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
+  { id: 'course', label: 'Course chart', icon: 'chart', key: () => toolKey('course'), on: () => courseView.isOpen || navView.isOpen, act: toggleCourse },
+  { id: 'lookInstrument', label: 'Cabin-top instrument', icon: 'inst', key: () => toolKey('lookInstrument'), on: () => !!instLook, act: () => runAction('lookInstrument') },
+  { id: 'navLights', label: 'Nav lights', icon: 'lights', key: () => toolKey('navLights'), on: () => !w.user.lightsOff, act: () => runAction('navLights') },
+  { id: 'paddle', label: 'Paddle', icon: 'paddle', key: () => toolKey('paddle'), act: () => runAction('paddle') },
+  { id: 'log', label: 'Log', icon: 'log', key: () => toolKey('log'), on: () => !$('logView').hidden, act: () => { if ($('logView').hidden) openLog(); else $('logView').hidden = true; } },
+  { id: 'perfMeter', label: 'Frame readout', icon: 'perf', key: () => toolKey('perfMeter'), on: () => perf.on, act: () => runAction('perfMeter') },
+];
+const tools = new ToolsTray($('bTools'), $('toolsTray'), TOOLS, {
+  get: () => speedSet,
+  set: v => { speedSet = v; send({ k: 'speed', v }); word('bFast', 'Speed ' + v + '×'); },
+});
+$('bTools').title = 'Tools: what you can show on screen, with their keys';
 function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
@@ -1306,7 +1332,7 @@ function frame(now: number): void {
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); drills.drillTick(); drills.roundTick();
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(dt); windTick(); if (tools.open) tools.refresh(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   boatLesson.tick();
   if (boatPanel.open || fleet.boatOpen) { look.shift = Math.min(440, innerWidth) / 2; look.chase = 10; view.render(w, dt, now, 3, look, over); }

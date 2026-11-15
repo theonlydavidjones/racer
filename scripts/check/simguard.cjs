@@ -28,7 +28,7 @@ const out = process.argv[2] || '.';
   // (the race sails in its worker, the page reading its mirror: sim/host.ts WorkerHost)
   const mode = await p.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode); if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
   const faultsNow = () => p.evaluate(() => document.documentElement.dataset.syncFaults);
-  await step('speed', async () => { await click('#bFast'); await click('#bFast'); });
+  await step('speed', async () => { await click('#bTools'); await click('#toolsTray [data-speed="4"]'); await click('#toolsTray [data-speed="1"]'); await click('#bTools'); }); // (time's speed: in Tools)
   await step('steer', async () => { await key('a', 600); await key('d', 600); });
   await step('sheets', async () => { for (const k of ['z', 'x', ',', '.', 's', ';', "'", ']', ';']) await key(k, 300); });
   await step('tiller', async () => { await key('t'); await p.mouse.move(800, 400); await p.waitForTimeout(300); await p.mouse.move(500, 400); await key('t'); });
