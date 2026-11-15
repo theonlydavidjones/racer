@@ -42,11 +42,19 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 ## Owner preferences
 CLAUDE.md has the standing rules (science is prime, ask before big design changes, desktop only, don't relabel). Refer to sessions by name. Plain, short updates.
 
-## Overnight plan (owner, 13 Nov 2026, late)
-1. Crew fidgeting (top): Crew Figures leads with Crew Model and Crew Art; crewsettle extended to cruising and all points of sail; no crew-animation merges until calm; live clips to the owner in the morning. crew-anim (owner-approved look) lands on top after.
-2. Skipper Model: clear air downwind (the real Nov 1 race), then the avoidance-redesign design note.
-3. Rules: findings 4–6; the jibe-as-tack bug with Deep Physics.
-4. Deep Physics: #165 after #196, stand-off spacing, then car-lead, 105–115°, z0.
-5. Owner feedback: two mid-air lines at the mast (Rigging); slower streaks, none on the inset, separate wind/current choice (Charts); race-setup buttons' feedback (UI).
-6. New tonight: start-line drill (Debrief), tack and jibe drill (Crew Controls), constants audit (Bay East), ghost races (Marinas).
-Morning for the owner: the second probe (https://claude.ai/artifact/MrGSH6p7nzwa2M2RV9kWpJ), the crew clips, the band's ▾, the vang.
+## Overnight plan (15 Nov 2026)
+**v197 (batch 42), cut at 10:00 UTC** with whatever has passed its gates; the rest rolls to v198. Already in: rule 31, the
+navigator in the big chart (#383), the trim coach (light/medium/heavy air, IDEAL; last copy fixes in), the confetti fix,
+the protest flag, #367–#381, #335–#366, the debrief telltale tip. In if they clear tonight: the push-off, the crew chain
+(#347 → #348 → seat-swap → #377 bow walk), the Bay East planner, tiller lash, chart expand (top-right), instrument riser.
+NOW items, who has them:
+- Start drill (cue card, no fleet, results table and copy, restart key): Debrief, one PR, stills to the owner.
+- Gashouse push-off: Deep Physics + Marinas, in review. The cove's sudden wind/current edge (8n.5): Bay East, v198.
+- Backwards arms: Crew Figures confirms every pose from both sides as part of #377; then the paddling animation.
+- Aquatic Park seawall (navigator): #337, in v197. Chart layers: Charts, layer-toggle speed PR. Navigator in the big chart: #383.
+- Confetti on the sails: fixed (rope shadows), in v197. Lashing under 13°: Crew Art. Jib cars / boom in the slip: small fixes
+  with Rigging after its depower PR. Chart subtitle: Charts after the layers.
+- Tools tray (compact, "Tools", Hail stays top level, no F-keys): UI & Experience, stills first.
+- Paddle: fatigue by fitness (Crew Model, after the crew chain); ‹ PADDLE › arrows (Crew Controls).
+- Fort Mason Center lettering (8n.6): waits on the owner's photo or the photo sites.
+Morning for the owner: v197 live, stills for the Tools tray, the start-drill screen, the chart expand.
