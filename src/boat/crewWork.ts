@@ -1,5 +1,5 @@
 import { clamp } from '../core/math';
-import { SETTLE, type Boat, type Tack } from './boat';
+import type { Boat, Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, crewSkill, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
@@ -392,7 +392,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
     // and swinging, or just settled from it, a cabin-top line that only gains a little waits (physics.ts SETTLE_S): what
     // the depowering steps or the guide need goes at once (planWorth's 1)
-    if (PIANO.has(k) && (b.settle?.[SETTLE.left] ?? 0) > 0 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
+    if (PIANO.has(k) && (b.settleLeft ?? 0) > 0 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
     // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
     // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them
