@@ -11,12 +11,12 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
+import { buildCrew, dockhand, syncCrew, tillerRootAt, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerPath, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -372,6 +372,10 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   rg.blade.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
+  // the rudder head's cheeks: two bronze plates either side of its top, the tiller's root held between them (bolted
+  // through), so it reads as fitted into the head, not standing on it
+  { const [root, next] = tillerPath(12), d = next.clone().sub(root).normalize(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
+    for (const sx of [1, -1]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.07, 0.15), BRONZE); ch.quaternion.copy(q); ch.position.copy(root).addScaledVector(d, 0.03).setX(sx * 0.031); turn.add(ch); } }
   grp.add(rud);
   // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
   // prop turning, from the motor's state (syncBoatMesh)
@@ -1552,6 +1556,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const live = !hold || m.liveT == null, ldt = m.liveT == null || m.liveT < 0 ? dt : Math.min(0.15, Math.max(0, t - m.liveT));
   if (live) m.liveT = t;
   const pd = b.paddle, who = pd ? paddler(b) : 0;
+  if (live) m.crew.tillerRoot = tillerRootAt(m.rudder);
   if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
   if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward

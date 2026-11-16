@@ -691,24 +691,26 @@ export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number),
  */
 export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
 /**
- * The tiller's shape (ESTIMATE: the class rules give none, CR 5.50). Her hinge is raked 46° from upright, so a tiller
- * turned about it drops as it swings: a straight one, 12° above level, put hard over (75°, physics' HARD_OVER: the owner's
- * own boat goes nearly flush with the transom) came down through the toerail, its end 14 cm below the deck's edge, out
- * over the side. So a Folkboat's tiller rises from the rudder head: here its fitting 8 cm up, then a neck 35 cm long
- * climbing at 60° (in the boat's frame, amidships), then on forward at 8°; 1.2 m in all. At every angle to 75° it and
- * its end clear the deck, the toerail and the coaming by 3 cm or more (tests/tillerClear.test.ts).
+ * The tiller's shape (ESTIMATE: the class rules give none, CR 5.50: wood, removable, above the deck, not divided or
+ * hooped). Her hinge is raked 46° from upright (the class's rudder, CR 5.20, hung from the keel's heel to the transom
+ * top), so a tiller turned about it drops as it swings unless it leaves the head square to the hinge. A straight one,
+ * 12° above level, put hard over (75°, physics' HARD_OVER: the owner's own boat goes nearly flush with the transom) came
+ * down through the toerail, its end 14 cm below the deck's edge. So it's one smooth bow, as a laminated tiller is: from
+ * the rudder head's cheeks, 45° above level (amidships, in the boat's frame), bending evenly to 5° at its end; 1.1 m in
+ * all. At every angle to 75° it clears the deck, the toerail and the coaming by 5 cm or more (tests/tillerClear.test.ts).
  */
-export const TILLER = { headRise: 0.08, neck: 60, neckLen: 0.35, run: 8, len: 1.2 };
+export const TILLER = { headRise: 0.04, rise0: 45, rise1: 5, len: 1.1 };
 /** The tiller's center line, head to end, in the rudder's frame (rudderGeometry's: y up the hinge from the heel, z aft). */
 export function tillerPath(n = 24): THREE.Vector3[] {
   const r = RUDDER_RAKE, toWL = -HEEL.y / Math.cos(r), s0 = toWL - 1.528;
   // (a direction `deg` above level in the boat's frame, amidships, worked back into the rudder's raked frame)
   const d = (deg: number) => { const up = deg * Math.PI / 180, wy = Math.sin(up), wz = -Math.cos(up); return new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize(); };
-  const head = new THREE.Vector3(0, s0 + 2.62 + TILLER.headRise, 0.06), bend = head.clone().addScaledVector(d(TILLER.neck), TILLER.neckLen);
-  const out: THREE.Vector3[] = [];
-  for (let i = 0; i <= n; i++) { const t = TILLER.len * i / n; out.push(t <= TILLER.neckLen ? head.clone().addScaledVector(d(TILLER.neck), t) : bend.clone().addScaledVector(d(TILLER.run), t - TILLER.neckLen)); }
+  // (bending evenly along its length: its rise falls from rise0 to rise1, a circle's arc)
+  const p = new THREE.Vector3(0, s0 + 2.62 + TILLER.headRise, 0.06), out = [p.clone()], m = 8 * n;
+  for (let i = 0; i < m; i++) { p.addScaledVector(d(TILLER.rise0 + (TILLER.rise1 - TILLER.rise0) * (i + 0.5) / m), TILLER.len / m); if ((i + 1) % 8 === 0) out.push(p.clone()); }
   return out;
 }
+
 function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
   // the class's rudder (CR 5.20): breadth square off the fore edge (the hinge), at distances up the fore edge from the
   // blade's lower edge, ±20 mm; 1528 mm up is at the waterline, and the head runs on, 160 mm wide, to 2700 mm
