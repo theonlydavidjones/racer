@@ -888,7 +888,7 @@ function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<ty
     // (the mouth: the open cell nearest the entrance's middle)
     let best: Vec | null = null, bd = Infinity;
     // (anywhere in the basin: an entrance's middle may lie between the breakwater ends, outside the basin's own outline)
-    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) { if (++work % 256 === 0) yield; const q = { x, y }, dd = Math.hypot(q.x - e.x, q.y - e.y); if (dd < bd && open(q)) { bd = dd; best = q; } }
+    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) { if (++work % 256 === 0) yield; const q = { x, y }, dd = hypot(q.x - e.x, q.y - e.y); if (dd < bd && open(q)) { bd = dd; best = q; } }
     if (best && !from.has(key(best))) { from.set(key(best), null); at.set(key(best), best); fr.push(best); }
   }
   while (fr.length) {
@@ -922,7 +922,7 @@ export function* harborRouteSteps(s: Slip): Generator<void, HarborRoute | null, 
   const cells: Vec[] = []; let k: string | null = F.key(approach);
   while (k) { cells.push(F.at.get(k)!); k = F.from.get(k) ?? null; }
   cells.reverse();
-  const sight = (p: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 0.75)); for (let i = 1; i < n; i++) if (!F.open({ x: p.x + (q.x - p.x) * i / n, y: p.y + (q.y - p.y) * i / n })) return false; return true; };
+  const sight = (p: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(hypot(q.x - p.x, q.y - p.y) / 0.75)); for (let i = 1; i < n; i++) if (!F.open({ x: p.x + (q.x - p.x) * i / n, y: p.y + (q.y - p.y) * i / n })) return false; return true; };
   const path = [cells[0]]; let i = 0;
   while (i < cells.length - 1) { let j = cells.length - 1; while (j > i + 1 && !sight(cells[i], cells[j])) j--; path.push(cells[j]); i = j; }
   const r = { entry: cells[0], path, approach };
