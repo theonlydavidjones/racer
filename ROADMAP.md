@@ -782,8 +782,12 @@ What's planned, roughly in order. Done work is described in the README.
      each time, never finishing. Finish (or carry on) the search under way rather than restart it, and give a new
      destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
      at 6 kt (tests/insetRoute).
-   - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
-     polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
+   - **A clicked destination shown as a pin, not coordinates, and moved when the destination changes** (owner, 16
+     November: "bug: when I change sailing destinations, the destination pin on the horizon doesn't seem to update. we
+     could bundle this fix with the earlier request to use pins instead of coordinates for non-named destinations."; bug
+     and polish; now; 1–2 h). The 3D marker's place and label follow every change of destination (a click on the chart,
+     a choice in the navigator, Sail Home, cleared), with a test that changes it twice and checks the marker each time.
+     Earlier (owner, 15 November, from a screenshot of the 3D view; polish): "destination indicator can just be a pin or something if it's not a named
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
