@@ -576,6 +576,42 @@ Four lessons, all bit-identical (the fingerprint unchanged), took it to 488 KB a
   Also: **an object literal of more than 128 properties starts in V8's slow dictionary mode** (makeBoat's has 94), so
   fields added at birth go in after the literal, not into it.
 
+### 8c. Where new per-step fields cost: memory, and the harness's imports (16 Nov 2026)
+
+Crew Model's crewSettle (claude/crewstation-8seeds) computes seven numbers a boat-step: the guide's angle and wind, a
+heading swing, a settle timer and two smoothed headings. It cost 1.5–2.5% of the step while deciding nothing. An "inert"
+copy computed every value but fed none into a decision (the fingerprint equal to main's): over four runs 1.013–1.027
+against its base, and 0.989 with only the call removed. Not garbage (the sampling heap profiler: 472.8 against 473.9 KB
+a step), not the boats' hidden classes (the same map groups, 112 keys at birth), not deopts (the same counts as main's),
+not the inlining (crewSettle is called, not inlined, both ways). What it was, timed around the call in the race (a
+`performance.now()` pair; an empty function there reads 2 µs a step, the timer's floor):
+
+| crewSettle | µs a step in the call |
+|---|---|
+| seven Boat fields, imports used directly | 18 |
+| one `Float64Array` per boat for the seven | 10 |
+| the array, and its imports read once into module-level consts | 5 |
+
+perf-pair `--ai`, the last against the same base: **0.9967**. Two lessons:
+
+- **A boat's double fields are scattered in memory.** With pointer compression V8 keeps a field holding a fraction as
+  a pointer to a separate HeapNumber (LATER_FRACTIONS makes them mutable in place, so writes don't allocate, but every
+  read and write follows the pointer). Seven such fields on eight boats are cache misses in a real race, which a loop
+  over one boat never shows: crewSettle ran 0.6 µs a call in a warm loop and 2 µs in the race. A group of numbers
+  updated together each step goes in one typed array on the boat, declared at birth.
+- **Under vite's module runner every imported name is a getter.** perf-pair and perf.test load the tree with
+  `runnerImport`: each module's exports are a dictionary-mode object (`%HasFastProperties` false for core/math,
+  boat/controls, boat/crewWork, boat/physics) with a getter per name, and the code reads `__vite_ssr_import_N__.wrap`
+  at every use. crewSettle used about 20 a call (constants, wrap, n360, clamp): 630 ns a call loaded this way, 220 ns as
+  plain JS. The published page is bundled and has direct references, so this is the harness's cost, but the gate
+  measures it. A hot function new to the step reads its imports once into module-level consts
+  (`const wrap_ = wrap`, the same function and value, the race bit-identical).
+
+Also measured: the double `%` in wrap and n360 is a call to C's fmod (about 10 ns each). For |t| < 360,
+`t % 360 === t`, and a fast path that adds 360 and subtracts it back when needed is bit-identical (0 mismatches over
+2·10⁷ inputs, every value within 64 ulps of a multiple of 180 included) at about half the time. The step makes about 346
+such calls, so roughly 0.4% to gain; not yet applied.
+
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
 v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):
