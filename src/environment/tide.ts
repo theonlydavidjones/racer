@@ -1,5 +1,5 @@
 import { shoreRelief } from './current';
-import { KT, V, type Vec } from '../core/math';
+import { KT, V, type Vec, hypot } from '../core/math';
 import { LAT0, LL, LON0 } from '../geo/geo';
 import depthGrid from './data/depth-grid.json';
 import bayTides from './data/bay-tides.json';
@@ -70,7 +70,7 @@ export function stationsFor(from: number, to: number, near?: { at: readonly Vec[
   // (`near`: only the stations within so far of any of these places, for a field asked only there: the stream at a
   // point is its nearest stations' almost entirely, CurrentField.at's 1/d³, and predicting all of them costs ten times
   // as much)
-  const by = (d: StationDef) => { if (!near) return true; const p = LL(d.lat, d.lon); return near.at.some(q => Math.hypot(p.x - q.x, p.y - q.y) < near.within); };
+  const by = (d: StationDef) => { if (!near) return true; const p = LL(d.lat, d.lon); return near.at.some(q => hypot(p.x - q.x, p.y - q.y) < near.within); };
   return DEFS.filter(d => (d.kind !== 'harmonic' || (!d.refOnly && !d.flowOnly)) && by(d)).map(d => build(d, from, to, cache));
 }
 
@@ -207,7 +207,7 @@ interface Bay {
   inflows: { station: string; c: Vec; across: Vec; mouth: Vec }[];
 }
 const bay = (name: string, station: string, poly: Vec[], q: Vec, m: Vec, hand: number, inflows: Bay['inflows'] = []): Bay => {
-  const L = Math.hypot(m.x - q.x, m.y - q.y); let into = { x: -(m.y - q.y) / L, y: (m.x - q.x) / L };
+  const L = hypot(m.x - q.x, m.y - q.y); let into = { x: -(m.y - q.y) / L, y: (m.x - q.x) / L };
   const cx = poly.reduce((t, p) => t + p.x, 0) / poly.length, cy = poly.reduce((t, p) => t + p.y, 0) / poly.length;
   if ((cx - q.x) * into.x + (cy - q.y) * into.y < 0) into = { x: -into.x, y: -into.y };
   return { name, station, poly, q, m, into, hand, inflows };
@@ -326,7 +326,7 @@ export class CurrentField {
     this.vecs = stations.map(() => ({ x: 0, y: 0 }));
     this.soft2 = Float64Array.from(stations, (s, i) => {
       let dn = Infinity;
-      stations.forEach((o, j) => { if (j !== i) dn = Math.min(dn, Math.hypot(s.p.x - o.p.x, s.p.y - o.p.y)); });
+      stations.forEach((o, j) => { if (j !== i) dn = Math.min(dn, hypot(s.p.x - o.p.x, s.p.y - o.p.y)); });
       return Math.max(10, Math.min(150, dn / 4)) ** 2; // (10 m at least: two stations at one spot would otherwise divide by zero)
     });
   }
@@ -374,7 +374,7 @@ export class CurrentField {
       let low = 0;
       for (let i = 0; i < n; i++) {
         if (!seen[i]) continue;
-        const s = this.stations[i].p, d = Math.hypot(cx - s.x, cy - s.y), dmin = Math.max(0, d - R), dmax = d + R;
+        const s = this.stations[i].p, d = hypot(cx - s.x, cy - s.y), dmin = Math.max(0, d - R), dmax = d + R;
         hi[i] = 1 / (dmin * dmin + this.soft2[i]) ** 1.5; low += 1 / (dmax * dmax + this.soft2[i]) ** 1.5;
       }
       // the weakest go, for as long as all that's gone could weigh no more than 0.1% of the rest
@@ -402,7 +402,7 @@ export class CurrentField {
     // (the open water's stream hands over to the bay's own across its mouth; and round where another channel comes in,
     // its stream, the stations', to the bay's across the same distance)
     let f = Math.min(1, Math.max(0, bayIn(B, p) / B.hand));
-    for (const k of B.inflows) f = Math.min(f, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B.hand);
+    for (const k of B.inflows) f = Math.min(f, hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B.hand);
     const u = this.bayStream(B, p);
     return { x: c.x * (1 - f) + B.into.x * u * f, y: c.y * (1 - f) + B.into.y * u * f };
   }
@@ -450,7 +450,7 @@ export class CurrentField {
     // (not in the bays filled by continuity, whose stream already runs slower over their shallower edges)
     const B = bayAt(p);
     let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
-    for (const k of B?.inflows ?? []) bay = Math.min(bay, Math.hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
+    for (const k of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
     const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
     return { x: c.x * k, y: c.y * k };
   }

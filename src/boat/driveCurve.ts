@@ -1,4 +1,4 @@
-import { D2R, KT, clamp } from '../core/math';
+import { D2R, KT, clamp, hypot } from '../core/math';
 import { CE_ABOVE_WL, sailForces } from './balance';
 import { targetShape } from './controls';
 import { optimalSheet, sailTrim } from './trim';
@@ -25,7 +25,7 @@ const cache = new Float64Array(41 * 64 * 32);
 /** The sails' drive (N) along her course at speed u (m/s) in tws kt at twa deg, trimmed for that apparent wind. */
 function sailDrive(tws: number, twa: number, u: number): number {
   const vt = tws * KT * GRADIENT, r = twa * D2R, along = vt * Math.cos(r) + u, across = vt * Math.sin(r);
-  const aws = Math.hypot(along, across), awa = Math.atan2(across, along) / D2R;
+  const aws = hypot(along, across), awa = Math.atan2(across, along) / D2R;
   const sm = optimalSheet('main', awa), sj = optimalSheet('jib', awa);
   const sf = sailForces(aws, awa, { trim: sailTrim('main', awa, sm), shape: targetShape('main', tws, awa), out: sm }, { trim: sailTrim('jib', awa, sj), shape: targetShape('jib', tws, awa) }, false);
   return sf.main.drive + sf.jib.drive;

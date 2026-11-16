@@ -1,4 +1,4 @@
-import { V, ZONE, brg, markDist, wrap } from '../core/math';
+import { V, ZONE, brg, markDist, wrap, hypot } from '../core/math';
 import { clearAstern } from './geometry';
 import type { PairRecord, RulesBoat, RulesContext, Verdict } from './types';
 
@@ -89,7 +89,7 @@ export function rightOfWay<B extends RulesBoat>(A: B, B_: B, ctx: RulesContext, 
 function windward<B extends RulesBoat>(A: B, B: B, ctx: RulesContext): B {
   const ua = V(A.h), ub = V(B.h);
   let mx = ua.x + ub.x, my = ua.y + ub.y;
-  if (Math.hypot(mx, my) < 0.2) { const n = V(ctx.windFrom); mx = n.y; my = -n.x; } // nearly opposite headings: fall back to the wind
+  if (hypot(mx, my) < 0.2) { const n = V(ctx.windFrom); mx = n.y; my = -n.x; } // nearly opposite headings: fall back to the wind
   const stbd = { x: my, y: -mx }, side = A.tack === 'S' ? 1 : -1;
   const aOut = ((A.x - B.x) * stbd.x + (A.y - B.y) * stbd.y) * side;
   return aOut > 0 ? A : B;

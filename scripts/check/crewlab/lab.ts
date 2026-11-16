@@ -29,7 +29,7 @@ let b: Boat, m: BoatMesh | null = null, t = 0, cam = { yaw: 90, pitch: 15, dist:
 // (the sun's shadows, as in the game: render/scene.ts, every boat mesh casting and receiving)
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 200 }); sun.shadow.bias = -0.0004; scene.add(sun.target);
 function render(): void {
-  syncBoatMesh(m!, b, t);
+  syncBoatMesh(m!, b, t, undefined, (lab as any).farOn && (lab as any).farN % 3 !== 0);
   sun.target.position.copy(m!.grp.position); sun.position.copy(m!.grp.position).add(new THREE.Vector3(-30, 50, 20));
   sea.position.set(m!.grp.position.x, 0, m!.grp.position.z);
   m!.grp.updateMatrixWorld(true);
@@ -69,7 +69,9 @@ const lab = {
     render();
   },
   /** Sail `s` seconds drawing every frame, calling `shot(i)` every `every` frames (for sequences through a tack). */
-  frames(s: number) { const hold = (lab as any).hold; for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { if (hold != null && b.turnTarget == null && !b.tacking) b.h = hold; t += 1 / 60; }); const A = (lab as any).seaA; syncBoatMesh(m!, b, t, A ? { heave: 0, pitch: A * Math.sin(2 * Math.PI * t / 2.6), roll: 0 } : undefined); } render(); },
+  frames(s: number) { const hold = (lab as any).hold; for (let i = 0; i < Math.round(s * 60); i++) { sail(b, 1 / 60, () => { if (hold != null && b.turnTarget == null && !b.tacking) b.h = hold; t += 1 / 60; }); const A = (lab as any).seaA; syncBoatMesh(m!, b, t, A ? { heave: 0, pitch: A * Math.sin(2 * Math.PI * t / 2.6), roll: 0 } : undefined, (lab as any).farOn && ++(lab as any).farN % 3 !== 0); } render(); },
+  /** As a boat far off is drawn in the game (scene.ts FAR_SYNC): her crew and cloth posed every third frame. */
+  far(on: boolean) { (lab as any).farOn = on; (lab as any).farN = 0; },
   tack() { (lab as any).hold = null; startTack(b); },
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */

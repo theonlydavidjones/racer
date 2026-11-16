@@ -169,6 +169,10 @@ What's planned, roughly in order. Done work is described in the README.
    a measured yaw time constant. The class rules fix the rudder's outline (about 490 mm wide, NFIA 2025–2028 §5) but not
    its angle. So the owner's own boat is the reference: their ~150° tiller arc and how she answers. Physics-reviewer and
    perf-pair as usual.
+   Confirmed by a seasoned skipper (the owner, 15 November): the feedback came from a seasoned skipper, for whom "it
+   was immediately apparent that the tiller was wrong. sixty degrees turning radius is 'crazy'", and "the boat is
+   promptly responsive to tiller turning IRL (unless she has no momentum obviously)." That's a practitioner's account,
+   the best evidence there is short of a logged sea trial, and it's to be cited as such in the code's comments.
    Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder (in PR #289; sternway in PR #317). Sculling comes
    from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
@@ -391,7 +395,12 @@ What's planned, roughly in order. Done work is described in the README.
    then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
    favored end), sighting the line square to the wind, and the line's compass bearing against the wind's. The drill hides
    "favored" until the player commits to an end; the debrief scores the call; later attempts fade the help. A mock to
-   the owner before building.
+   the owner before building. (Built: the head-to-wind read on the water, the call in the start line's card, the call
+   scored first in the debrief, the read drawn for the first three calls; design/favored-end on design/learn-to-sail.)
+   Later (owner OK'd, not built):
+   - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
+     gap between them is the bias;
+   - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
 8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
@@ -732,7 +741,60 @@ What's planned, roughly in order. Done work is described in the README.
 
      Each has the teal ◆ at her best heel (boat/crewPhys.ts crewBestHeel), amber past 20° (the coach's
      "overpowered", coach.ts:98) and red past 25° (laid over), with only the degree number as text. It follows the side
-     she's heeled to (b.heelMag), sits inside the band, and adds no new button. The owner's pick goes here.
+     she's heeled to (b.heelMag), sits inside the band, and adds no new button. Then (15 November): "the heel indicator
+     should be the same height as the auto-trim tab, and the same basic design." So it's a tab on the band's top
+     edge: `.sb-tab` (07-band.css:55, 22 px, the same background, border and radius), in the center slot
+     `.sb-tillerslot`, which has been empty since the tiller strip went. Three ways to fill it are shown in place: T1 a
+     slim bar, T2 a tilting mast glyph, T3 both. Then: "I feel like it needs to be centered to make sense. is there a
+     way to make the windex smaller and get the heel indicator into the main part of the panel, just above the windex?
+     or even as an outside ring on the top part of the windex, like from 10:00 to 2:00?" Two more are shown in place:
+     (R) a ring around the windex's top from 10:00 to 2:00, its mark at her heel angle one to one; and (S) the windex
+     about 20% smaller with the slim bar just above it. The owner picked R, then refined it in place (15 November):
+     - **Ring:** a thin ring hugging the windex's top from 10:00 to 2:00, one to one with her heel, all inside the
+       panel. The windex is a little smaller (about 87%) and set a hair lower, clear of the mainsheet row.
+     - **Mark:** a small circle on the ring, white, then amber past 20° and red past 25°, with the ring's amber and red
+       zones behind it.
+     - **Best heel:** a teal ◆ tucked tight outside the ring at her best heel; the circle may overlap it, so long as
+       the ◆'s top half shows.
+     - **Degrees:** just outside the ring at 1:30 or 10:30, on the side she's heeled to.
+     After two flat-bar variants (along the panel's top edge), the owner chose (15 November): "lets go back to the last
+     iteration of the curved dial. build that." **Final, to build (now; 2–3 h; UI & Experience):** the ring above,
+     with the windex at about 87% and raised a hair, the 4.5 px circle and the ◆ tucked tight. The stills are on branch
+     claude/hopeful-thompson-m94ahm, reference/screens/heel-ring/ (wp6, wp16, wp-26, heel-ring4). Draw it in
+     src/ui/sailBand.ts as an SVG layer over `.sb-wx`. It reads b.heelMag and her heel side, crewBestHeel
+     (boat/crewPhys.ts), and the thresholds: 20° (coach.ts:98) and 25°. No new button. Check both tacks, and send stills
+     to the owner before it ships.
+   - **Learn to sail, lesson 1 "The boat": teach the parts, then quiz them** (owner, 15 November; feature; next, "not
+     urgent"; 6–10 h; a design change to a lesson, so the design goes to the owner before it's built). The owner's
+     brief:
+     - **The problem.** For a total beginner it's a click-and-guess game. The cue says only "Find the <part> · n of 43"
+       (src/app/boatLesson.ts paint). A wrong click says only "That's the <other part>". The boat is never introduced,
+       and a part's explanation shows only after it's found, for 2.6 s (NOTE_MS). The boat spins all the time
+       (`open()` sets app.look.spin = true; only a drag stops it), so a beginner can't hold a view.
+     - **What the owner wants:**
+       1. Teach, don't hunt: walk the parts a few at a time, in the existing groups (src/render/boatParts.ts
+          PARTS[].set): the boat (hull and deck), the rig, the sails, the controls, the wind's sides.
+       2. Focus on each section: frame the camera on it (the rig, the sail corners, the cockpit and controls), mark the
+          part being taught, and dim or hide the rest. Keep the underwater view for the keel and rudder.
+       3. Name and explain each part as it's shown: its name and its one-line `what` on screen while she looks. A
+          "Next" step moves on, with nothing to find.
+       4. Stop the spin: the boat holds still while a part is taught, and dragging still looks round her. Anything that
+          turns is the camera moving to the next section, slowly and on purpose.
+       5. Quiz at the end, e.g. "Which one is the boom?" (tap it on the boat) or "What does the outhaul do?" (pick from
+          a few). A wrong answer shows the right part and asks again. Passing the quiz passes lesson 1, not the
+          walkthrough.
+       6. She can leave the quiz.
+     - **The owner's answers:**
+       - A core set of about 15 parts first, then the quiz on them, repeated set by set until all 43 are done.
+       - In the quiz, tap the part first; two wrong taps bring multiple choice.
+       - Missed parts come back until they're right.
+     - **Constraints:**
+       - No new buttons: use the showroom's cue bar (#showCue) and the lesson overlay.
+       - One short line per part, and a highlighted part over words. Learn to sail is the one place step-by-step
+         instruction belongs (VISION-ROADMAP.md:54).
+       - US spelling; keep the existing part names.
+       - The visual-checker, both sides and both tacks.
+       - Keep ASA 101 knowledge items 1–3 covered (design/ASA-101-CHECK.md).
    - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
@@ -793,8 +855,21 @@ What's planned, roughly in order. Done work is described in the README.
      **The isochrone router** (the owner's decision, asked 15 November): the rule-based planner can't get out of a dead end
      on a run, light air in a lee with the tide setting her on (the owner's own route off Yellow Bluff, 25 Nov 15:00,
      with the land's lee without seams: tests/passage-hairpin's it.fails). A router spreading out every minute on every
-     heading, with the real wind, lee and current, keeps the fastest way to each place; 6–10 h, a plan in 1–3 s, nothing
-     per step.
+     heading, with the real wind, lee and current, keeps the fastest way to each place; a plan in 3–7 s cold, worked out
+     between frames, nothing per step. (Built: sim/router.ts, the passage planner's; the owner said yes, 15 November;
+     physics review two rounds, Deep Physics.)
+     **The router's pruning by place, not by bearing** (Deep Physics, review round 2): the front keeps one point per 1°
+     sector of bearing from the start, so two points on one bearing either side of a point of land share a sector, and
+     the one kept can be in a dead-end bay. Alcatraz to Clipper in 6 kt shows it: finer grains plan 14% slower than FINE,
+     whose route sails true. Tried and failed (15 November): pure 100 m cells by tack (the front floods the Bay, out of
+     memory); cells added to the sectors, a cell never taken twice (a light-air boat can't leave its cell in a minute,
+     worse everywhere); the same with 3 minutes' grace (still worse). Next to try: a dominance test on time-of-arrival
+     per cell, keeping the sectors as the bound.
+     **The router off the page's thread** (Capacity's suggestion, 15 November; the Coordinator to decide): 3–7 s of CPU,
+     sliced 2 ms a frame, puts the first plan up in about 50 s. In its own worker, or as a job in the sim's worker
+     between steps, it would show in about 6 s with nothing on the frame.
+     **Next: the race brief and the AI's leg planning onto the router** (the Coordinator, 15 November): strategist.ts
+     comparePlans and the AI still sail the old rules (routing.ts sailLeg). Moved later, with the race's own timing in mind.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
      'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
      icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
@@ -897,7 +972,7 @@ as it is.
 - The rules trainer: "Sail it yourself". A World Sailing Case laid out on the water, you helm the boat it's about; 23
   Cases sailed and taught.
 - Wrecks, built from Marinas' design: every contact graded (boat/damage.ts); a hard blow, a ship, or being pinned in
-  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, and she's laid up for repairs.
+  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, laying up for repairs is off for now (the owner, 15 Nov 2026: "silly and punitive in its current state"; to come back to later; boat/spec.ts LAY_UP).
 - The season's flow as approved: Race → Season → the overview → Sail race N → its setup; the announced 2026–27 race days.
 - The drills' cues by the boat and guides on the water (8b and Training tools 3, as approved).
 - No on-screen tiller instructions outside the Learn to sail lessons.

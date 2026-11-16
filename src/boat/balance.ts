@@ -1,4 +1,4 @@
-import { D2R, clamp } from '../core/math';
+import { D2R, clamp, hypot } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import type { Shape } from './controls';
 import type { SailTrim } from './trim';
@@ -213,6 +213,19 @@ export const RIG = {
 const EFF_SPAN = 1.1 + 0.08 * (RIG.roach - 0.2) + 0.5 * (0.68 + 0.31 * RIG.frac + 0.075 * RIG.overlap - 1.1);
 const kheff = (awa: number) => 1.451 + (0.80 - 1.451) * clamp((awa - 20) / 60, 0, 1);
 
+// (sailForces' helpers, out here rather than as closures in it: it runs several times a step for every boat, and each
+// closure, with the context holding what it captured, was an allocation every call. The same arithmetic)
+const trimK = (t: SailTrim) => (t.flow === 'luffing' ? 1 - t.amount * 0.92 : t.flow === 'stalled' ? 1 - 0.18 * t.amount : 1);
+const flatOf = (s: Shape, full: number) => clamp(s.depth / full, 0.42, 1);
+/** One sail's force: its lift from its depth against its fullest (flat), its trim and a worn sail's lost lift (sailForces) */
+function oneSail(q: number, a: number, ce: number, luffing: boolean, area: number, clmax: number, cd0: number, flat: number, jibSail: boolean, t: SailTrim, s: Shape): SailForce {
+  if (luffing) return { heel: q * area * 0.06 * Math.cos(a), drive: 0 };
+  const cl = clmax * flat * trimK(t) * (s.clMul ?? 1), m = tab(FCD.f, FCD.m, flat);
+  const cd = (jibSail ? cd0 * flat * m : cd0) + ((s.cd0 ?? 0.07) - 0.07) + ce * cl * cl * m; // (a worn sail's hooked leech adds its own profile drag)
+  const L = q * area * cl, D = q * area * cd;
+  return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
+}
+
 /** Heeling force (N, across the mast), drive (N) from both sails, and the height of their centre of effort above the hull's centre of pressure (m, `ceh`), for the apparent wind at the sails `aws` (m/s) at `awa` (deg). */
 export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean): { main: SailForce; jib: SailForce; twist: number; ceh: number; flat: number } {
   const q = 0.5 * RHO_AIR * aws * aws, b = clamp(Math.abs(awa), 0, 180), a = b * D2R;
@@ -228,20 +241,11 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   const heff = EFF_SPAN * kheff(b) * (RIG.P + RIG.BAS + RIG.hbi);
   const ce = kpp + Aref / (Math.PI * heff * heff);
   // how much lift each sail makes: its depth against its fullest (flat), its trim, a worn sail's lost lift
-  const trimK = (t: SailTrim) => (t.flow === 'luffing' ? 1 - t.amount * 0.92 : t.flow === 'stalled' ? 1 - 0.18 * t.amount : 1);
-  const flatOf = (s: Shape, full: number) => clamp(s.depth / full, 0.42, 1);
   const fM = flatOf(main.shape, RIG.fullDepth.main), fJ = jib ? flatOf(jib.shape, RIG.fullDepth.jib) : 1;
-  const one = (area: number, clmax: number, cd0: number, flat: number, jibSail: boolean, t: SailTrim, s: Shape): SailForce => {
-    if (luffing) return { heel: q * area * 0.06 * Math.cos(a), drive: 0 };
-    const cl = clmax * flat * trimK(t) * (s.clMul ?? 1), m = tab(FCD.f, FCD.m, flat);
-    const cd = (jibSail ? cd0 * flat * m : cd0) + ((s.cd0 ?? 0.07) - 0.07) + ce * cl * cl * m; // (a worn sail's hooked leech adds its own profile drag)
-    const L = q * area * cl, D = q * area * cd;
-    return { heel: Math.max(0, L * Math.cos(a) + D * Math.sin(a)), drive: L * Math.sin(a) - D * Math.cos(a), ceAft: s.ceAft };
-  };
-  const mainF = one(Am, clM, cdM, fM, false, main.trim, main.shape);
-  const jibF = jib ? one(Aj, clJ, cdJ, fJ, true, jib.trim, jib.shape) : { heel: 0, drive: 0 };
+  const mainF = oneSail(q, a, ce, luffing, Am, clM, cdM, fM, false, main.trim, main.shape);
+  const jibF = jib ? oneSail(q, a, ce, luffing, Aj, clJ, cdJ, fJ, true, jib.trim, jib.shape) : { heel: 0, drive: 0 };
   // centre of effort (eq. 5.39), lowered as she's depowered (eq. 5.40), above the hull's centre of pressure
-  const wM = Math.hypot(clM, cdM) * Am, wJ = Math.hypot(clJ, cdJ) * Aj;
+  const wM = hypot(clM, cdM) * Am, wJ = hypot(clJ, cdJ) * Aj;
   const flat = (fM * Am + fJ * Aj) / Aref;
   const zce = (RIG.zMain * wM + RIG.zJib * wJ) / Math.max(1e-6, wM + wJ);
   const low = (0.5 * (1 - flat) + 0.902 * (1 - flat) * (1 - RIG.frac)) * (1 - (RIG.overlap - 0.9) / 0.6);

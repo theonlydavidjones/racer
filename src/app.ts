@@ -101,6 +101,7 @@ const ctx = {
   get showroom() { return showroom; },
   get newGame() { return setup.newGame; },
   get drillRuns() { return drillRuns; },
+  get favCall() { return favCall; },
   get drillShown() { return drillShown; }, set drillShown(v) { drillShown = v; },
   get drillView() { return drillView; },
   get esc() { return esc; },
@@ -188,6 +189,9 @@ const raceReplay = new RaceReplay($('raceReplay'));
 const DRILL_FROM = 120, DRILL_DEBRIEF_AT = 15;
 /** The start-line drill's attempts this session, for the run to compare (newest last). */
 const drillRuns: (StartStats & { n: number; from: number; solo: boolean })[] = [];
+/** The start practice's favored-end call this attempt (8za: the player reads the line and calls an end in the start
+ *  line's card before the gun; the debrief scores it). */
+let favCall: 'pin' | 'committee' | null = null;
 let drillShown = false;
 
 /** The race: the host runs it (sim/host.ts); the page reads it through the view `w` and changes it only by `send`. */
@@ -644,11 +648,12 @@ const coach = new DrillCoach(), guides = new DrillGuides(view.scene, view.camera
 let coachW: unknown = null;
 function drillCues(): void {
   const rs = S.mode !== 'drill' || drillShown || !w.running; if ($('ncRestart').hidden !== rs) $('ncRestart').hidden = rs;
-  if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); } // (a new race: nothing carried over)
+  if (w !== coachW) { coachW = w; coach.reset(); guides.clear(); favCall = null; hud.favCall = null; } // (a new race: nothing carried over)
+  hud.favAsk = S.mode === 'drill' ? 'ask' : 'off';
   const mode = !w.running || w.paused ? null : S.mode === 'manoeuvres' ? 'manoeuvres' : S.mode === 'roundings' ? 'roundings' : S.mode === 'drill' ? 'start' : null;
   if (!mode) { guides.clear(); coach.tick(w as never, null); return; }
   const u = w.user, R = w.rounding as unknown as { marks: { p: { x: number; y: number } }[]; leg?: number; list: never[] } | null;
-  const out = coach.tick({ t: w.t, user: u, drill: w.drill, rounding: R, start: mode === 'start' ? { pin: w.C.pin, committee: w.C.committee, others: w.boats.filter(b => b !== u).map(b => ({ x: b.x, y: b.y })) } : null }, mode);
+  const out = coach.tick({ t: w.t, user: u, drill: w.drill, rounding: R, start: mode === 'start' ? { pin: w.C.pin, committee: w.C.committee, others: w.boats.filter(b => b !== u).map(b => ({ x: b.x, y: b.y })), call: favCall, read: (S.favCalls ?? 0) < 3, names: [w.C.pinLabel, w.C.committeeLabel] } : null }, mode);
   guides.set(out.spec, out.key); guides.wake(out.wake); guides.cue(out.cue); guides.place(u);
 }
 /** The Rules trainer (ui/rulesTrainer.ts): World Sailing Cases on the water, paused at the moment, asked and answered;
@@ -1012,6 +1017,11 @@ $('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle
 // the same as Shift+R, until the results open
 $('ncRestart').addEventListener('click', e => { e.stopPropagation(); if (S.mode === 'drill') results.restartDrill(); });
 $('ncRestart').addEventListener('keydown', e => e.stopPropagation());
+// the favored-end call, in the start line's card (8za): which end you've read as favored, before the gun
+$('ncAsk').addEventListener('click', e => {
+  e.stopPropagation(); const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-end]'); if (!b || w.t >= 0) return;
+  favCall = b.dataset.end === 'pin' ? 'pin' : 'committee'; hud.favCall = favCall;
+});
 $('nextCard').addEventListener('click', () => (w.cruising ? navView.toggle(w) : courseView.toggle(w)));
 $('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navView.toggle(w) : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));

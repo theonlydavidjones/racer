@@ -1,4 +1,4 @@
-import { V, type Vec } from '../core/math';
+import { V, type Vec, hypot } from '../core/math';
 import { HARBORS } from '../geo/marina';
 import { PILE_PIERS, SHORE } from '../geo/shore';
 import { WindSum, bluffDeficit } from './shadows';
@@ -67,17 +67,17 @@ const reach = (k: Kind, H: number) => k === 'fence' ? 80 * H : k === 'step' ? 15
 const BODIES: Body[] = (() => {
   const out: Body[] = [];
   const add = (kind: Kind, pts: Vec[], H: number, wall?: Vec[]) => { const r = reach(kind, H);
-    const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length, cy = pts.reduce((a, q) => a + q.y, 0) / pts.length, R = Math.max(...pts.map(q => Math.hypot(q.x - cx, q.y - cy))) + 1e-6;
+    const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length, cy = pts.reduce((a, q) => a + q.y, 0) / pts.length, R = Math.max(...pts.map(q => hypot(q.x - cx, q.y - cy))) + 1e-6;
     out.push({ kind, pts, H, wall, cx, cy, R, wKey: NaN, wVal: 0, eFrom: NaN, pa: new Float64Array(pts.length), pn: new Float64Array(pts.length), a0: 0, a1: 0, n0: 0, n1: 0, cross: 0, box: { x0: Math.min(...pts.map(q => q.x)) - r, x1: Math.max(...pts.map(q => q.x)) + r, y0: Math.min(...pts.map(q => q.y)) - r, y1: Math.max(...pts.map(q => q.y)) + r } }); }; // (every field there from the start: one shape for all of them, so the loop over them reads each the same fast way)
   // each breakwater a run of wall pieces (its line's segments; an area's outline's)
   for (const h of HARBORS) for (const b of h.breakwaters) {
     const pts = b.area ? [...b.pts, b.pts[0]] : b.pts;
-    for (let i = 1; i < pts.length; i++) if (Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) > 0.5) add('fence', [pts[i - 1], pts[i]], WALL_H, b.pts);
+    for (let i = 1; i < pts.length; i++) if (hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) > 0.5) add('fence', [pts[i - 1], pts[i]], WALL_H, b.pts);
   }
   // the seawalls: the coastline within each harbor's works (Gashouse Cove's west side is the Marina Green's)
   for (const h of HARBORS) { const r = h.reach;
     for (let k = 1; k < SHORE.length; k++) { const a = SHORE[k - 1], b = SHORE[k], m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      if (m.x > r.x0 - 10 && m.x < r.x1 + 10 && m.y > r.y0 - 10 && m.y < r.y1 + 10 && Math.hypot(b.x - a.x, b.y - a.y) > 0.5) add('step', [a, b], WALL_H); } }
+      if (m.x > r.x0 - 10 && m.x < r.x1 + 10 && m.y > r.y0 - 10 && m.y < r.y1 + 10 && hypot(b.x - a.x, b.y - a.y) > 0.5) add('step', [a, b], WALL_H); } }
   for (const P of PILE_PIERS) add('shed', P.pts, P.height);
   return out;
 })();
@@ -143,7 +143,7 @@ function cellBodies(p: Vec, from: number): Body[] {
     const cx = x0 + CELL_M / 2, cy = y0 + CELL_M / 2, rc = CELL_M * Math.SQRT1_2;
     if ((FILED + 1) * 360 > POOL.length) { const P = new (POOL.constructor as Uint16ArrayConstructor)(POOL.length * 2); P.set(POOL); POOL = P; }
     for (let k = 0; k < 360; k++) {
-      const e = V(k + 0.5 + 180), out = near.filter(B => { const qx = cx - B.cx, qy = cy - B.cy; return couldShelter(B, qx, qy, e, rc + (Math.hypot(qx, qy) + rc) * 0.0088 + 0.01); });
+      const e = V(k + 0.5 + 180), out = near.filter(B => { const qx = cx - B.cx, qy = cy - B.cy; return couldShelter(B, qx, qy, e, rc + (hypot(qx, qy) + rc) * 0.0088 + 0.01); });
       const id = listId(out); POOL[FILED * 360 + k] = id; // (the id first: making it can widen POOL)
     }
     s = ++FILED; IDX[j * NX + i] = s;

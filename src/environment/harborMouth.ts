@@ -1,4 +1,4 @@
-import { clamp, segPt, type Vec } from '../core/math';
+import { clamp, segPt, type Vec, hypot } from '../core/math';
 import { HARBORS, type Harbor } from '../geo/marina';
 import { PILE_PIERS, landDist, pilePierDist } from '../geo/shore';
 import { PILE_FLOW, basinFloor } from './current';
@@ -143,7 +143,7 @@ function nearestOn(p: Vec, pts: Vec[]): { q: Vec; d: number } {
   let best = { q: pts[0], d: Infinity };
   for (let i = 0; i < pts.length; i++) {
     const a = pts[i], b = pts[(i + 1) % pts.length], dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
-    const u = L2 > 0 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1) : 0, q = { x: a.x + dx * u, y: a.y + dy * u }, d = Math.hypot(p.x - q.x, p.y - q.y);
+    const u = L2 > 0 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1) : 0, q = { x: a.x + dx * u, y: a.y + dy * u }, d = hypot(p.x - q.x, p.y - q.y);
     if (d < best.d) best = { q, d };
   }
   return best;
@@ -157,7 +157,7 @@ function build(id: string): Mouth | null {
   const near = bodies.map(B => ({ B, ...nearestOn(mid, B.pts) })).sort((p, q) => p.d - q.d);
   const first = near[0], second = near.find(n => n !== first && (n.q.x - mid.x) * (first.q.x - mid.x) + (n.q.y - mid.y) * (first.q.y - mid.y) < 0);
   if (!second) return null;
-  const a = first.q, b = second.q, W = Math.hypot(b.x - a.x, b.y - a.y), along = { x: (b.x - a.x) / W, y: (b.y - a.y) / W };
+  const a = first.q, b = second.q, W = hypot(b.x - a.x, b.y - a.y), along = { x: (b.x - a.x) / W, y: (b.y - a.y) / W };
   // into the basin: toward the middle of the harbor's own outline
   const cx = h.basin.reduce((s, p) => s + p.x, 0) / h.basin.length, cy = h.basin.reduce((s, p) => s + p.y, 0) / h.basin.length;
   let into = { x: -along.y, y: along.x }; if ((cx - mid.x) * into.x + (cy - mid.y) * into.y < 0) into = { x: -into.x, y: -into.y };
@@ -182,10 +182,10 @@ function build(id: string): Mouth | null {
   if (R < 5) return null;
   // each corner's wall beyond the gap: toward the point of its outline furthest out to the Bay within 70 m
   // (the steepest line from the corner to a point of its outline on the far side of it from the gap)
-  const wall = (B: { pts: Vec[] }, q: Vec, away: number) => { let k = 0; for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > 5 && l > -3 && Math.hypot(o, l) < 90) k = Math.max(k, o / Math.max(l, 1)); } return Math.min(5, k); };
+  const wall = (B: { pts: Vec[] }, q: Vec, away: number) => { let k = 0; for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > 5 && l > -3 && hypot(o, l) < 90) k = Math.max(k, o / Math.max(l, 1)); } return Math.min(5, k); };
   // a solid corner's knuckle: the point of its wall furthest out toward the Bay within 90 m, where a stream coming along
   // that wall leaves it (how far out of the mouth's line, and how far back along it from the corner)
-  const knuckle = (B: { pts: Vec[]; pile: boolean }, q: Vec, away: number) => { let out = 0, back = 0; if (!B.pile) for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > out && l > 5 && Math.hypot(o, l) < 90) { out = o; back = l; } } return out > 5 ? { out, back } : { out: 0, back: 0 }; };
+  const knuckle = (B: { pts: Vec[]; pile: boolean }, q: Vec, away: number) => { let out = 0, back = 0; if (!B.pile) for (const p of B.pts) { const o = -((p.x - q.x) * into.x + (p.y - q.y) * into.y), l = ((p.x - q.x) * along.x + (p.y - q.y) * along.y) * away; if (o > out && l > 5 && hypot(o, l) < 90) { out = o; back = l; } } return out > 5 ? { out, back } : { out: 0, back: 0 }; };
   const kA = knuckle(first.B, a, -1), kB = knuckle(second.B, b, 1);
   const pileA = reach(first.B), pileB = reach(second.B), far = Math.max(2 * pileA, 2 * pileB, W, kA.back + kA.out, kB.back + kB.out) + 10, r = Math.max(far, MOUTH.rim * R + W);
   return { harbor: h, a, b, along, into, W, pileA, pileB, widthA: width(first.B), widthB: width(second.B), c, R, turn: (into.y * along.x - into.x * along.y) > 0 ? 1 : -1, wallA: wall(first.B, a, -1), wallB: wall(second.B, b, 1), stepA: kA.out, backA: kA.back, stepB: kB.out, backB: kB.back, floor: basinFloor(h),
@@ -301,7 +301,7 @@ export function withHarborMouths(p: Vec, c: Vec, k: number, S: MouthState, t: nu
       sx *= lee; sy *= lee;
     }
     // the gyre: within its radius the water is its own, and the harbor's (slow) water comes back in over its rim
-    const gx = p.x - M.c.x, gy = p.y - M.c.y, s = Math.hypot(gx, gy) / M.R;
+    const gx = p.x - M.c.x, gy = p.y - M.c.y, s = hypot(gx, gy) / M.R;
     // (round it, out to twice its radius, the pool's other water is the harbor's stillest: the stream doesn't turn in
     // through the mouth, whatever the harbor's own calm, measured through the water from the open Bay, leaves there)
     let keep = 1, wx = 0, wy = 0;

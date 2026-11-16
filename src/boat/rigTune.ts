@@ -1,3 +1,4 @@
+import { hypot } from '../core/math';
 /**
  * The rig's tune: how the mast and its standing rigging are set up at the dock, and what that does to the sails.
  *
@@ -127,7 +128,7 @@ export function fixTune(t: Partial<RigTune> | undefined): RigTune {
 /** The forestay meets the deck 2.00 m ahead of the mast's fore side (CR 6.1.7: 1990–2000 mm) and the mast 6.50 m up
  * (CR 6.1.11: no more than 5.50 m above the lower band, which is 1.00 m above the deck). */
 const STAY = { run: 2.0, rise: 6.5 };
-const STAY_LEN = Math.hypot(STAY.run, STAY.rise);
+const STAY_LEN = hypot(STAY.run, STAY.rise);
 /**
  * Lengthen the forestay by dL and the hounds go aft by dL·L/run (the stay pivots about its deck fitting, the shrouds
  * hold the hounds' height): 3.4 cm per cm. The mast pivots about the deck, so a point h up moves aft by that × h/rise.
