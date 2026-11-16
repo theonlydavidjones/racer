@@ -30,6 +30,13 @@ import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLi
 export const PENALTY_TURN_RATE = 10;
 /** Below this speed (m/s, ~2.5 kt) the AI won't try to tack: she'd stall head to wind. */
 export const SLOW_TACK = 1.3;
+/** Below this speed (m/s, about 0.8 kn) a tack may not get her through the wind, and the helm gybes round instead. The
+ * sim's own turns, an AI boat close-hauled at a held speed, then turned through the wind (16 Nov 2026, light-air review: 2, 4,
+ * 6 and 10 kt): from 0.6 m/s up she was through and on the new tack in 11–26 s at every wind, the gybe round from the
+ * same start 25–90 s or never in 2 kt; from 0.3 m/s down a tack in 6 kt or less didn't finish within 30 s. Not
+ * SLOW_TACK's 1.3 m/s, which is near a Folkboat's close-hauled speed in 5 kt (polar.ts): there she gybed round 280°
+ * where she'd have tacked through 80°. */
+export const TACK_GYBE = 0.4;
 
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
@@ -290,10 +297,10 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     if (ai && !midTack && ai.turnCommit !== 0 && (Math.abs(err) < 15 || (!(ai.tackNow && ai.commitHail) && Math.abs(wrap(b.desired - ai.commitFor)) > 45))) ai.turnCommit = 0;
     if (ai && !midTack && ai.turnCommit === 0 && Math.abs(err) > 30) {
       // Starting a big turn: choose once which way to go, and finish it (no bailing out halfway through a
-      // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
+      // tack). Too slow to tack (TACK_GYBE)? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      ai.turnCommit = throughWind && b.v < TACK_GYBE && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {

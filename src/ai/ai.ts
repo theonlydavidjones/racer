@@ -6,7 +6,7 @@ import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
-import { SLOW_TACK, yawLag } from '../boat/physics';
+import { TACK_GYBE, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
@@ -165,6 +165,14 @@ export function crabFor(brgT: number, v: number, cur: Vec): number {
   return n360(brgT - Math.asin(k) / (Math.PI / 180));
 }
 
+/** Too slow to tack well: she bears away a little and builds speed first, below BUILD_SPEED of her close-hauled speed
+ * for the wind she has (polar: about 0.75 m/s in 4 kt, 1.6 in 12), and never below what carries her through
+ * (physics.ts TACK_GYBE). (Not a fixed 1.5 m/s: in light air that's faster than she sails close-hauled at all, and she
+ * bore away to build speed she'd never reach instead of tacking.) BUILD_SPEED is a judgement. */
+const BUILD_SPEED = 0.6;
+const DRIFT_LO = 2, DRIFT_HI = 4;
+const tooSlowToTack = (b: Boat): boolean => b.v < Math.max(TACK_GYBE * 1.15, BUILD_SPEED * targetFor(b, beatFor(b)));
+
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
   const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1;
@@ -221,7 +229,7 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   const beating = Math.abs(wrap(from - desired)) < beat + 5;
   // the land within 100 m along her track over the ground (her heading through the water and the current's set): off it.
   // Beating, she tacks, with way enough to (below about 1.5 m/s a tack becomes a gybe right round: physics.ts
-  // SLOW_TACK), and not onto land; else, or slow, she bears away to build speed and clear it
+  // tooSlowToTack), and not onto land; else, or slow, she bears away to build speed and clear it
   const track = (hd: number, d: number) => { const u = V(hd), s = Math.max(1, b.v); return { x: b.x + (u.x * s + b.cur.x) * d / s, y: b.y + (u.y * s + b.cur.y) * d / s }; };
   // (her whole width, not just her centreline: a line 4 m either side too, so she doesn't brush a breakwater's end)
   const landOn = (hd: number, d: number) => {
@@ -230,7 +238,7 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   };
   if (landOn(desired, 100)) {
     const other = n360(from + (b.tack === 'S' ? 1 : -1) * (beat + 1));
-    if (beating && b.v > SLOW_TACK * 1.15 && w.t - b.lastTackT > 4 && !landOn(other, 60)) desired = other;
+    if (beating && !tooSlowToTack(b) && w.t - b.lastTackT > 4 && !landOn(other, 60)) desired = other;
     else for (const k of [20, 40, 60, 90]) { const cand = sailable(b, desired + (b.tack === 'S' ? -k : k)); if (!landOn(cand, 100)) { desired = cand; break; } }
   }
   return { desired, luff: false, beating };
@@ -610,7 +618,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // short swing of 2–3° carrying it back and forth. The 4° between in and out is a little more than that swing. Each
     // leg decides afresh: carried over a rounding, a close reach at 44–48° would have been sailed as a beat)
     if (ai.upwindLeg !== b.leg) { ai.upwind = undefined; ai.upwindLeg = b.leg; }
-    const rel = Math.abs(wrap(ww.from - bP)), ra = runAngle(ww.kt);
+    // (in a drifter, beating or reaching, running or not, by the wind's mean, her compass's minute (avgFrom), not the
+    // moment's: under 2 kt the wind swung 40° in seconds, her mark's angle crossed the 44° line with it, and each crossing
+    // put her course on the other side of the wind; at half a knot she never finished one turn before the next, and went
+    // round in circles for minutes. A skipper in a drifter picks a side by the mean and stays with it. All the mean
+    // below DRIFT_LO kt, none above DRIFT_HI, between the two in proportion: judgements)
+    const drift = clamp((DRIFT_HI - ww.kt) / (DRIFT_HI - DRIFT_LO), 0, 1), fromM = ai.avgFrom == null ? ww.from : n360(ww.from + wrap(ai.avgFrom - ww.from) * drift);
+    const rel = Math.abs(wrap(fromM - bP)), ra = runAngle(ww.kt);
     const upwind = (ai.upwind = ai.upwind ? rel < 48 : rel < 44) && !b.ocs;
     // the course she'd steer to make good the straight line to it, up-current of it by as much as the current across
     // her track would set her down (a crew that reckons with the current allows for all of it, the others for some)
@@ -619,7 +633,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // the angle and steering at the mark as the wind swings about it. By the course she'd steer, not the bearing: a
     // current across a broad reach can put that course past dead downwind, and the run's held gybe then decides the
     // gybe, once; steered as a reach she gybed back and forth across it every few seconds: physics review)
-    const relC = Math.abs(wrap(ww.from - crab));
+    const relC = Math.abs(wrap(fromM - crab));
     ai.running = b.started && !b.ocs && (ai.running ? relC > ra - 8 : relC > ra - 2);
     const mode = upwind ? 'beat' : ai.running ? 'run' : 'reach';
     if (ai.goTack && (b.tack === ai.goTack.to && !b.tacking || w.t - ai.goTack.at > 20 || ai.goTack.mode !== mode || ai.goTack.leg !== b.leg)) ai.goTack = null;
@@ -658,11 +672,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
           // which swings across the course's axis as she tacks)
           else if (Math.abs(lat) > width && dot(V(b.tack === 'S' ? csS : csP), sv) * lat > 0) doTack = true;
         }
-        // (too slow to tack, she'd stall head to wind or the turn would become a gybe right round (physics.ts SLOW_TACK):
+        // (too slow to tack, she'd stall head to wind or the turn would become a gybe right round (physics.ts TACK_GYBE, tooSlowToTack):
         // a sailor bears away a little and builds speed first)
         // (nor does she tack onto a course the shore blocks close ahead: the shore check would only tack her straight back)
         if (doTack && blocked(w, b, other === 'S' ? csS : csP, 60)) doTack = false;
-        if (doTack && b.v < SLOW_TACK * 1.15) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
+        if (doTack && tooSlowToTack(b)) desired = b.tack === 'S' ? n360(csS - 10) : n360(csP + 10);
         else if (doTack) { ai.goTack = { to: other, at: w.t, mode, leg: b.leg }; desired = other === 'S' ? csS : csP; planned = desired; decideTurn(b, w.t); } // (called or not, by her skipper: boat/calls.ts)
       }
     } else if (mode === 'run') {
