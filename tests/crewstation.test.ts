@@ -57,18 +57,24 @@ export function stationMoves(kt: number, seed = 1) {
   }
   const per = (a: number[][]) => ai.flatMap((_, k) => a[k].slice(1)).map(m => +(m / (secs / 60)).toFixed(2));
   const mins = secs / 60;
-  return { seats: per(moves), trips: per(trips), walked: per(walked), free: per(free), roles: roles.map(r => ({ lines: +(r.lines / mins).toFixed(2), stay: +(r.stay / mins).toFixed(2) })) };
+  // (and the counts themselves, for the bounds over several races: each rate rounded once, from its own count, not a sum
+  // of rounded rates: tripsVerdict)
+  return { seats: per(moves), trips: per(trips), walked: per(walked), free: per(free), roles: roles.map(r => ({ lines: +(r.lines / mins).toFixed(2), stay: +(r.stay / mins).toFixed(2) })),
+    counts: { mins, lines: roles.map(r => r.lines), both: ai.map((_, k) => trips[k].slice(1).reduce((a, n) => a + n, 0)) } };
 }
 
-type Moves = Pick<ReturnType<typeof stationMoves>, 'trips' | 'roles'>;
+type Moves = Pick<ReturnType<typeof stationMoves>, 'counts'>;
 /** What's over the trips' bounds across the races (empty: none): each boat's hand with the cabin-top lines, and its two
- * crew together, under TRIPS_MEAN a minute on the mean of the races, and no more than TRIPS_CAP in any one (the base's
- * own seed 2 in 12 kt is 1.50, boat 1, step 3 alone: 3586f4e8 + 41f59fd5). */
+ * crew together, under TRIPS_MEAN a minute on the mean of the races, and no more than TRIPS_CAP in any one. Each rate
+ * from its own count, rounded once to 2 places (as the bounds were always read). The cap is the base's own worst race:
+ * 1.50 in 12 kt, seed 2, boat 1, 20 trips in 800 s (3586f4e8 + 41f59fd5); one trip more, 1.57, is over. It's a
+ * backstop at the most seen, not a margin above it (the Coordinator, 16 Nov 2026). */
 export const TRIPS_MEAN = 1.4, TRIPS_CAP = 1.5;
 export function tripsVerdict(runs: Moves[]): string[] {
-  const out: string[] = [], boats = runs[0]!.roles.length;
+  const out: string[] = [], boats = runs[0]!.counts.lines.length;
+  const rate = (n: number, mins: number) => +(n / mins).toFixed(2);
   for (let k = 0; k < boats; k++) {
-    const lines = runs.map(r => r.roles[k]!.lines), both = runs.map(r => r.trips[2 * k]! + r.trips[2 * k + 1]!);
+    const lines = runs.map(r => rate(r.counts.lines[k]!, r.counts.mins)), both = runs.map(r => rate(r.counts.both[k]!, r.counts.mins));
     const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length, show = (x: number[]) => x.map(v => v.toFixed(2)).join(', ');
     if (mean(lines) >= TRIPS_MEAN) out.push(`boat ${k + 1}: the hand with the cabin-top lines, trips a minute over the races (${show(lines)})`);
     if (mean(both) >= TRIPS_MEAN) out.push(`boat ${k + 1}: both crew's trips a minute over the races (${show(both)})`);
@@ -79,16 +85,20 @@ export function tripsVerdict(runs: Moves[]): string[] {
 }
 
 describe('The trips\' bounds over three races (tripsVerdict): a crew that over-trips still fails', () => {
-  // (made-up races, as stationMoves reports them: two boats, their crew's trips a minute)
-  const race = (lines: number, other: number): Moves => ({ trips: [lines, other, lines, other], roles: [{ lines, stay: other }, { lines, stay: other }] });
+  // (made-up races of 800 s, as stationMoves counts them: two boats, the hand with the lines' trips and both crew's)
+  const MINS = 800 / 60, race = (lines: number, both: number): Moves => ({ counts: { mins: MINS, lines: [lines, lines], both: [both, both] } });
   it('a crew at their usual rate passes; one cabin-top trip a minute more, injected, fails the mean', () => {
-    const usual = [race(1.0, 0.1), race(1.2, 0.05), race(0.9, 0.1)];
+    const usual = [race(13, 14), race(15, 16), race(12, 13)];
     expect(tripsVerdict(usual)).toEqual([]);
-    const over = usual.map(r => race(r.roles[0]!.lines + 1, r.roles[0]!.stay));
+    const over = usual.map(r => race(r.counts.lines[0]! + 13, r.counts.both[0]! + 13)); // (one a minute more: 13 in 800 s)
     expect(tripsVerdict(over).some(v => /over the races/.test(v))).toBe(true);
   });
-  it('one race far over the cap fails even when the mean is under it', () => {
-    expect(tripsVerdict([race(0.6, 0), race(0.6, 0), race(1.6, 0)]).some(v => /seed 3/.test(v))).toBe(true);
+  it('the cap at its boundary: 20 trips in a race (1.50) passes, 21 (1.57) fails, even with the mean under', () => {
+    expect(tripsVerdict([race(10, 10), race(10, 10), race(20, 20)])).toEqual([]);
+    expect(tripsVerdict([race(10, 10), race(10, 10), race(21, 21)]).some(v => /seed 3/.test(v))).toBe(true);
+  });
+  it('both crew read from their summed count: 15 + 5 trips is 1.50, as one hand\'s 20, not 0.38 + 1.13', () => {
+    expect(tripsVerdict([race(10, 10), race(10, 10), race(15, 20)])).toEqual([]);
   });
 });
 

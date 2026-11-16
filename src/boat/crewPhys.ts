@@ -521,7 +521,11 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // fore and aft: the trim with least resistance (hullTrim.ts) for a crew good at trim; a novice stays in the middle
     // (they think about it every second or so, not every moment)
     c.foreT = (c.foreT ?? 0) - Math.max(dt, 0.05); // (this runs 20 times a second)
-    if (c.fore01 == null || c.foreT <= 0) { chooseFore(c, k, skill); c.foreT = 1; }
+    // (not re-thought through a tack or gybe, nor in the roll's lead up to it: she's slowing through the wind, and the trim
+    // the hull wants for those few seconds isn't anywhere anyone moves to. They keep their places fore and aft till she's
+    // sailing again; re-thought mid-tack, the two forward of the winch went to new seats and back within two seconds, the
+    // owner's "fussing": the Coordinator's ruling, 16 Nov 2026)
+    if (c.fore01 == null || (c.foreT <= 0 && !(tacked || c.roll || c.clock! - (c.settleT ?? -1e9) < HOLD.settle))) { chooseFore(c, k, skill); c.foreT = 1; }
     const foreF = pl?.fore ? { fwd: 1, mid: 0.5, aft: 0, deck: 1 }[pl.fore] : c.fore01!;
     // downwind, a good crew goes forward: with the pole out and two crew, both right up on the foredeck as it goes out
     // (unless there's a breeze: chooseLayout); without it, the bow hand to the mast when the hull's trim says it pays

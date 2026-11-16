@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
-import { DEFAULT_CREW, newCrew, type CrewSpec } from '../src/boat/crewPhys';
+import { DEFAULT_CREW, newCrew, placeCrew, type CrewSpec } from '../src/boat/crewPhys';
 import { AI_WAIT_MAX, CALL_AT, HAIL_WAIT, aiCrewReady, boomStrike, callsTurn, decideTurn } from '../src/boat/calls';
 import { beatAngle } from '../src/boat/polar';
 import { World, DT } from '../src/sim/world';
@@ -223,5 +223,23 @@ describe('An AI boat waits for her crew on a called turn, as your helm does (the
     expect(ready(0.2, 3)).toBe(false); expect(ready(0.2, 5)).toBe(true);
     expect(ready(0, 5.5), 'the slowest, 5.6 s').toBe(false); expect(ready(0, AI_WAIT_MAX)).toBe(true);
     expect(ready(0.2, HAIL_WAIT, HAIL_WAIT), 'within rule 20.2\'s time').toBe(true);
+  });
+});
+
+describe('Through a tack the crew keep their places fore and aft (crewPhys.ts placeCrew: chooseFore not re-thought)', () => {
+  // (placeCrew driven directly: a beat, then the wind over the other side, a tack; through the tack and its settling they
+  // don't re-think where to be fore and aft, after it they do)
+  it('on each tack, their fore-and-aft choice isn\'t re-thought till she\'s settled, and is after', () => {
+    for (const from of ['S', 'P'] as const) {
+      const c = newCrew(crew(0.45), from), w0 = from === 'S' ? 1 : -1, to = from === 'S' ? 'P' : 'S';
+      const call = (w: number, tack: 'S' | 'P', twa: number) => ({ need: 2000, twa, tws: 6, v: 1.2, pole: false, tack, windward: w, beat: 43, heel: 5 });
+      for (let i = 0; i < 120; i++) placeCrew(c, call(w0, from, 43), 1 / 60);
+      // (a re-think resets their clock for the next to a second, crewPhys.ts foreT: watched for that)
+      let rethought = 0, last = c.foreT ?? 0;
+      for (let i = 0; i < 60 * 3; i++) { placeCrew(c, call(-w0, to, i < 60 ? 20 : 43), 1 / 60); if ((c.foreT ?? 0) > last + 0.5) rethought++; last = c.foreT ?? 0; } // (through the wind, slow, then sailing)
+      expect(rethought, `onto ${to}: not re-thought through the tack's settling`).toBe(0);
+      for (let i = 0; i < 60 * 6; i++) { placeCrew(c, call(-w0, to, 43), 1 / 60); if ((c.foreT ?? 0) > last + 0.5) rethought++; last = c.foreT ?? 0; }
+      expect(rethought, 'thought about again once she\'s sailing').toBeGreaterThan(0);
+    }
   });
 });
