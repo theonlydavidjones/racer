@@ -1808,7 +1808,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
     // onto the cockpit seat)
     const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
     at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
-    at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
+    // (or, the working sheet in a hiker's hand, across the cockpit to it: Crew.sheetHand)
+    const sh = (m.crew as { sheetHand?: THREE.Vector3 }).sheetHand;
+    if (sh && loaded) at(20, sh.x, sh.y, sh.z); else at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
   }
   q.needsUpdate = true;
 }
