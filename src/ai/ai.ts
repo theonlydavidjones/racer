@@ -1,6 +1,6 @@
 import type { PrepFlag } from '../sim/signals';
 import { aiCrewReady, decideTurn } from '../boat/calls';
-import { bow, stern, type Boat } from '../boat/boat';
+import { SETTLE, bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
@@ -930,9 +930,22 @@ export function aiThink(w: World, b: Boat, dt: number): void {
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0 || inBasin(b)) b.poleWant = false;
-  else if (twa > 157) b.poleWant = true;
+  // (and called once the run's settled, not the moment her course crosses 157°: swinging through the run, it was set as
+  // she passed it and stowed seconds later, four trips forward and back each time, crewstation's 6 kt seed 21. Set once
+  // she's been past 157° POLE_SET s and not swinging (Boat.settle's since); stowed once she's been below 150° POLE_STOW s,
+  // so a brief luff doesn't take it in, or at once below 145°, where the poled-out jib does nothing (polar.ts jibEfficiency).
+  // The times are estimates: the skipper's call as the run settles, and a luff of a few seconds to keep clear. Not
+  // crewWork.ts courseHeld: her heading's 20 s mean takes about 25 s to come to it after a bear-away round the windward
+  // mark, every run's pole that late; the 8 s past 157° unbroken and no swing keep a course swinging through it from
+  // calling it, the Coordinator, 16 Nov 2026. The timers aren't saved with the race: a restored boat starts them afresh)
+  const p = poleT.get(b) ?? { hi: NaN, lo: NaN }; poleT.set(b, p);
+  p.hi = twa > 157 ? (p.hi === p.hi ? p.hi : w.t) : NaN; p.lo = twa < 150 ? (p.lo === p.lo ? p.lo : w.t) : NaN;
+  if (w.t < 0 || nearMark || jibDown || b.docked || b.penalty > 0 || inBasin(b) || twa < 145 || w.t - p.lo >= POLE_STOW) b.poleWant = false;
+  else if (w.t - p.hi >= POLE_SET && (b.settle?.[SINCE] ?? 1e9) >= POLE_SET) b.poleWant = true;
 }
+const POLE_SET = 8, POLE_STOW = 4, SINCE = SETTLE.since; // (read once at load: docs/CAPACITY.md)
+/** When each AI boat's angle last went past 157° and below 150° (crewPoleCall; NaN while it isn't). */
+const poleT = new WeakMap<Boat, { hi: number; lo: number }>();
 /**
  * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come
  * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts
