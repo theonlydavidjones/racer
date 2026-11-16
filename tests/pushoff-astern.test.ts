@@ -74,8 +74,9 @@ describe('pushed off astern', () => {
       }
     }
     // (in a calm the crew can swing her out from most: few are shoved off astern; and since 8m3, where there's no swing that
-    // lets her go with clear water, she's walked out to the fairway first, so fewer in a breeze too)
-    expect(n).toBeGreaterThanOrEqual(kt ? 12 : 5);
+    // lets her go with clear water, she's walked out to the fairway first, and an astern shove whose coast ends with none is
+    // kept fast (or one that would leave her within 60 degrees of the wind), so fewer in a breeze too)
+    expect(n).toBeGreaterThanOrEqual(kt ? 6 : 5);
     expect(bad).toEqual([]);
   }, 600_000);
 
@@ -106,7 +107,7 @@ describe('pushed off astern', () => {
         const out = Math.hypot(u.x - sl.p.x, u.y - sl.p.y);
         if (bumps.length || way <= 0.3 || out <= 12) clean = `${id} from ${from} at ${kt} kt: ${bumps[0] ?? ''} least way ${way.toFixed(2)} m/s, ${out.toFixed(0)} m out`;
       }
-      return { astern, walked, went, docked: !!u.docked, told: msgs.some(m => /^No room to push her off from this berth in this wind/.test(m)), clean };
+      return { astern, walked, went, noRoom: plan.kind === 'astern' && !!plan.noRoom, docked: !!u.docked, told: msgs.some(m => /^No room to push her off from this berth in this wind/.test(m)), clean };
     };
     for (const id of [...NO_ASTERN, ...NO_ASTERN_WEST]) {
       expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
@@ -117,10 +118,15 @@ describe('pushed off astern', () => {
     for (const [ids, from, kt] of [[NO_ASTERN_WEST, 225, 12], [NO_ASTERN_WEST, 315, 12], [NO_ASTERN, 0, 12]] as const) for (const id of ids) {
       const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from}`).toBe(!r.astern); if (r.astern) expect(r.told, id).toBe(true); else expect(r.clean).toBe('');
     }
-    // (the westerly's six, in light air and in a northerly: shoved off as from any berth, where they're planned astern)
+    // (the westerly's six, in light air and in a northerly: shoved off as from any berth, where they're planned astern; or,
+    // since 8m3, kept fast and told like any berth whose coast would end with no clear water to sail off in)
     let out = 0;
-    for (const [from, kt] of [[270, 4], [0, 12]] as const) for (const id of NO_ASTERN_WEST) { const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(true); expect(r.clean).toBe(''); if (r.went) out++; }
-    expect(out).toBe(12);
+    for (const [from, kt] of [[270, 4], [0, 12]] as const) for (const id of NO_ASTERN_WEST) {
+      const r = tryIt(id, from, kt);
+      if (r.noRoom) { expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(false); expect(r.told, id).toBe(true); continue; }
+      expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(true); expect(r.clean).toBe(''); out++;
+    }
+    expect(out).toBeGreaterThanOrEqual(6);
   }, 300_000);
   it('a fresh breeze on her bow carries her on whatever the crew do: she\'s let go with the way she has, their walk, never dead in the water', () => {
     // (the physics review, 15 Nov 2026: gauged to her room, the shove came to nothing from 14 kt on her bow, and she lay

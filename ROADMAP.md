@@ -322,12 +322,12 @@ What's planned, roughly in order. Done work is described in the README.
    - **Done (geo/marina.ts clearRun):** a let-go with only the crew's push for way needs her hull half a meter bigger all
      round clear for her first 15 m, sagging 1.75 m to leeward in 12 kt (in proportion to the wind), and in a breeze 60
      degrees and more off the wind. The walk-out is held to the same, and is tried before the astern shove wherever no
-     swing passes. The same 1,604 cases now: 1,296 walked out, 148 held for the main, 118 on the bow line, none touching
-     a boat or a dock; 42 shoved off astern; none kept fast. West Harbor 507 in a 12 kt northwesterly is walked out, 68
-     degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test).
-   - **Still to do: the astern shove.** Held to nothing like this, it touches in 27 of those 42 (most in a 225 wind, after
-     the coast). Held to clearRun at the coast's end, those berths would be kept fast in those winds: a call for the
-     coordinator.
+     swing passes. The astern shove too, where her coast ends (the coordinator's ruling, 16 Nov 2026): where the clear
+     water isn't there, she's kept fast and told, the motor offered where she has one. The same 1,604 cases now: 1,296
+     walked out, 148 held for the main, 118 on the bow line, 11 shoved off astern (steered as the plan says), none
+     touching a boat or a dock; 31 kept fast (before, the astern shove touched in 27 of its 42). West Harbor 507 in a
+     12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
+     held to zero touches).
 
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:

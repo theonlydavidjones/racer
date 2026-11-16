@@ -399,7 +399,7 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false, grow =
  * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first). `setBack`: the wind's
  *   blowing her back onto the dock (ONTO_DOCK and more across her): her bow's pushed well off, so she goes out at an angle.
  */
-export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number }; /** the point she's turned about, m ahead of her middle: her bow on the bow line (absent), or her middle, walked out into the fairway (0) */ pivot?: number } | { kind: 'astern'; back: number; coast: number; /** the way she's steered stern first: +1 her bow to starboard (the tiller pushed to starboard), −1 to port, 0 straight back */ helm: 1 | -1 | 0 } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
+export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number }; /** the point she's turned about, m ahead of her middle: her bow on the bow line (absent), or her middle, walked out into the fairway (0) */ pivot?: number } | { kind: 'astern'; back: number; coast: number; /** the way she's steered stern first: +1 her bow to starboard (the tiller pushed to starboard), −1 to port, 0 straight back */ helm: 1 | -1 | 0; /** where her coast ends, no clear water to sail off in (clearRun, 8m3): kept fast, not shoved off */ noRoom?: boolean } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
 /**
  * A breeze this strong (kt) blowing her onto the dock she's lying alongside and she's pushed off at an angle, not
  * straight out: the same 4 kt as WIND_SWINGS, where the wind on her bare rig starts to have the say over the crew's hands.
@@ -703,6 +703,14 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // stern swung round toward the way out with the helm hard over, or straight back where that's the clear way
   const a = asternWay(s, reach, windFrom, windKt);
   if (a.kind === 'astern' && a.coast < FAIRWAY_SHORT) { const f = fairway(); if (f) return f; }
+  // (shoved off astern and let go where her coast ends, she's held to the same clear water as any let-go, 8m3: the
+  // coordinator's ruling, 16 Nov 2026. Where it isn't there, her crew keep her fast rather than shove her into the boats)
+  // (and in a breeze, 60 degrees and more off the wind as any let-go: left nearer head to wind, the jib can't fill and the
+  // breeze on her bow carries her on astern past her coast, into whatever's behind her)
+  if (a.kind === 'astern' && windFrom != null) {
+    const e = pushOffPoses(s, a).at(-1)!, headUpThere = windKt >= WIND_SWINGS && Math.abs(wrap180(windFrom - e.h)) < 60;
+    if (headUpThere || !clearRun(e.c, e.h, s, windFrom, windKt)) return { ...a, noRoom: true };
+  }
   return a;
 }
 /** Clear water astern shorter than this, m, and she's walked out to the fairway and turned there instead, where that fits:
