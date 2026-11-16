@@ -798,9 +798,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   //   sternway alone, 16. Slow and head to wind, the helm's own way out (physics.ts: the gybe round, sculling) serves.
   {
     const rel0 = wrap(ww.from - b.h), astern = b.astern ?? 0, inIrons = Math.abs(rel0) < beat + 15;
-    const reachV = targetFor(b, beat + 25);
+    // (her reach's speed looked up only while she's gathering way, to know when she has it: every boat's every think,
+    // the polar's lookup cost the step 3%, perf-pair --ai)
     if (astern > 0.05) ai.gather = true;
-    else if (b.v > Math.min(1.0, 0.6 * reachV)) ai.gather = false;
+    else if (ai.gather && b.v > Math.min(1.0, 0.6 * targetFor(b, beat + 25))) ai.gather = false;
     if (ai.gather) {
       luff = false;
       if (inIrons && Math.abs(wrap(ww.from - desired)) < beat + 25) {
