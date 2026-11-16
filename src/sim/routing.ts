@@ -374,14 +374,19 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
 /** Her width each side of a way round the land, near its ends (m): half her beam (1.1) and room to steer, the same 4 m
  * either side of her track that ai.ts homeCourse looks along (an estimate). */
 export const HULL_CLEAR = 4;
+/** The least a way round the land keeps off it, away from its ends, where nothing wider leads there (m): two of her
+ * lengths and a margin either side of a channel's middle, an estimate. */
+const MIN_ROOM = 30;
 export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] { return drive(routeAroundSteps(a, b, clear)); }
 /** routeAround a little at a time (on a long leg its look along the line alone is ~100 ms): for the page's plans. */
 export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, Vec[], void> {
   const nearEnd = (q: Vec) => dist(q, a) < 400 || dist(q, b) < 400;
+  // (how far off the land the way keeps: `clear`, or less where nothing wider leads there: the Estuary, below)
+  let room = clear;
   const blocked = (q: Vec) => {
     if (onLand(q)) return true;
     if (nearEnd(q)) return false;
-    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * room, y: q.y + Math.cos(t) * room })) return true; }
     return false;
   };
   // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
@@ -414,7 +419,7 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
   const blocked2 = (q: Vec) => {
     if (onLand(q)) return true;
     if (near2(q)) return false;
-    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * clear, y: q.y + Math.cos(t) * clear })) return true; }
+    for (let k = 0; k < 8; k++) { const t = k * Math.PI / 4; if (onLand({ x: q.x + Math.sin(t) * room, y: q.y + Math.cos(t) * room })) return true; }
     return false;
   };
   // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier; and near the
@@ -435,6 +440,11 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
     const m2 = A2 === A && B2 === B ? null : yield* grid(A2, B2);
     if (m2) { ea.splice(0, ea.length, ...ea2); eb.splice(0, eb.length, ...eb2); mid = m2; }
   }
+  // (a channel narrower than twice `clear` leads there, the only way by water: the Oakland Estuary, a few hundred meters
+  // wide, between Alameda and Oakland. At 120 m off the land every cell of it but its ends was blocked, and the way out of
+  // its harbors to the Bay fell back to the straight line, through Alameda. Then keep half as far off, and half again,
+  // down to MIN_ROOM: still the middle of the channel, as near the land as it is)
+  while (!mid && room / 2 >= MIN_ROOM) { room /= 2; mid = yield* grid(A, B); }
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
