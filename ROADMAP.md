@@ -363,6 +363,32 @@ What's planned, roughly in order. Done work is described in the README.
    leaves her pointing out, a short hand-over is enough; giving her sails during the walk drove her back into the
    slips in the replay.
 
+8m3. **Let go from the bow-line swing with room to sail off** (Marinas, 15 November; found once the moored boats were solid,
+   8m2; on the coordinator's call, ahead of the navigator). A sweep (every berth whose plan was the swing on her bow line, in
+   12 and 15 kt from 270, 225 and 000: 1,604 cases at 753 berths) found the crew's swing itself touches no moored boat
+   anywhere. But let go at the finger's end, the jib going up, she hit a boat within 15 m in 1,124 cases (593 berths), even
+   with her heading held: let go along the row, the next boat's stern just off her bow, and set 1–2 m to leeward as she
+   gathered way. The planner's clear run ahead was checked every 2 m with no margin.
+   - **Done (geo/marina.ts clearRun):** a let-go with only the crew's push for way needs her hull half a meter bigger all
+     round clear for her first 15 m, sagging 1.75 m to leeward in 12 kt (in proportion to the wind), and in a breeze 60
+     degrees and more off the wind. The walk-out is held to the same, and is tried before the astern shove wherever no
+     swing passes. The astern shove too, where her coast ends (the coordinator's ruling, 16 Nov 2026): where the clear
+     water isn't there, she's kept fast and told, the motor offered where she has one. The same 1,604 cases now: 1,296
+     walked out, 148 held for the main, 118 on the bow line, 11 shoved off astern (steered as the plan says), none
+     touching a boat or a dock; 31 kept fast (before, the astern shove touched in 27 of its 42). West Harbor 507 in a
+     12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
+     held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
+   - **Still to do (Deep Physics' review, 16 Nov 2026):**
+     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
+       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
+       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
+       or motored out. The sweep test fails if the count rises.
+     - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
+       astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
+       the test.
+     - **The sag is gauged at the slip's own wind:** the lee's edge a few meters out, where the breeze is fresher, isn't
+       in it.
+
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
    reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg (the exit from inside: the breakwater's end with
