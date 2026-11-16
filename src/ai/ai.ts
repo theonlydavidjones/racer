@@ -457,6 +457,27 @@ function wouldTouch(b: Boat, o: Boat, T: number): boolean {
   return false;
 }
 
+/** Way on, first (aiThink): going astern she sets about gathering way, and while she does it, her course onto a close
+ * reach if her bow's near the wind; done once she has way to steer. Returns her course. */
+function gatherWay(w: World, b: Boat, beat: number, desired: number): number {
+  const ai = b.ai!, ww = b.ww, rel0 = wrap(ww.from - b.h), inIrons = Math.abs(rel0) < beat + 15;
+  if ((b.astern ?? 0) > 0.05) ai.gather = true;
+  else if (b.v > Math.min(1.0, 0.6 * targetFor(b, beat + 25))) ai.gather = false; // (her reach's speed, looked up only now)
+  if (ai.gather && inIrons && Math.abs(wrap(ww.from - desired)) < beat + 25) {
+    const side = rel0 >= 0 ? -1 : 1, hd = (s: number) => n360(ww.from + s * (beat + 25));
+    // (her side, unless the land's on it and the other's clear, however far her bow's fallen off: review)
+    return blocked(w, b, hd(side), 60) && !blocked(w, b, hd(-side), 60) ? hd(-side) : hd(side);
+  }
+  return desired;
+}
+
+/** Her sails kept eased (aiThink, gathering way) for a boat she must keep clear of within KEEP_EASED_M of her hull, drawing
+ * again only past KEEP_EASED_M + 2. */
+function keepEased(b: Boat, near: { o: Boat; r: { kc: Boat | null } }[]): boolean {
+  const lim = b.ai!.keptEased ? KEEP_EASED_M + 2 : KEEP_EASED_M;
+  return near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
+}
+
 /** One decision step for an AI boat: sets b.desired and b.luff. */
 export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
@@ -796,21 +817,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   //   kept drawing through every tack, the fleet fouled more round the start than main's, 28 to 39 penalties in
   //   fouls-start's sixteen starts against 22 (a boat sheeted in at a crawl beside another sags down onto her); by
   //   sternway alone, 16. Slow and head to wind, the helm's own way out (physics.ts: the gybe round, sculling) serves.
-  {
-    const rel0 = wrap(ww.from - b.h), astern = b.astern ?? 0, inIrons = Math.abs(rel0) < beat + 15;
-    // (her reach's speed looked up only while she's gathering way, to know when she has it: every boat's every think,
-    // the polar's lookup cost the step 3%, perf-pair --ai)
-    if (astern > 0.05) ai.gather = true;
-    else if (ai.gather && b.v > Math.min(1.0, 0.6 * targetFor(b, beat + 25))) ai.gather = false;
-    if (ai.gather) {
-      luff = false;
-      if (inIrons && Math.abs(wrap(ww.from - desired)) < beat + 25) {
-        const side = rel0 >= 0 ? -1 : 1, hd = (s: number) => n360(ww.from + s * (beat + 25));
-        // (her side, unless the land's on it and the other's clear, however far her bow's fallen off: review)
-        desired = blocked(w, b, hd(side), 60) && !blocked(w, b, hd(-side), 60) ? hd(-side) : hd(side);
-      }
-    }
-  }
+  // (in a function of its own, entered only going astern or while gathering: a few lines added to aiThink itself
+  // cost every boat's every think 2–3%, however little they did (docs/CAPACITY.md §8a))
+  if ((b.astern ?? 0) > 0.05 || ai.gather) { const g = gatherWay(w, b, beat, desired); desired = g; if (ai.gather) luff = false; }
   // First, her right of way. Rule 16.1: a right-of-way boat changing course must give the other boat room to keep
   // clear, so if the turn she wants would close on a boat close by she turns only as far as still leaves it that room.
   // (Room: 8 m between centres, a little more than a Folkboat's length (7.6 m); with less than that already, she
@@ -954,9 +963,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // leeward, toward the leeward boat. Eased within KEEP_EASED_M, drawing again only past KEEP_EASED_M + 2: at the edge
   // her sails would go in and out each moment she thought. Her tacks are left as they were: kept drawing through every
   // one, beside other boats round the start, the fleet fouled more, fouls-start)
-  const lim = ai.keptEased ? KEEP_EASED_M + 2 : KEEP_EASED_M;
-  ai.keptEased = avoiding && near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
-  if (luff && !ai.urgent && ai.gather && !ai.keptEased) luff = false;
+  if (ai.gather) { ai.keptEased = avoiding && keepEased(b, near); if (luff && !ai.urgent && !ai.keptEased) luff = false; }
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
 }
