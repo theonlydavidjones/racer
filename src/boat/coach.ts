@@ -212,9 +212,10 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, d
   const lw = lw0 + lwFor(sf.main.heel + sf.jib.heel, heelC) - lwFor(b.forces?.heel ?? sf.main.heel + sf.jib.heel, b.heelMag ?? 0);
   const crs = Math.min(180, b.twa + Math.max(0, lw)), vt0 = Math.max(0.5, polar(tws, crs0, plan));
   // (the drive's share turned into speed from the heeled hull's own speed, as the step does it (physics.ts: vB, then
-  // speedForDrive there): near hull speed the resistance's slope changes within a few cm/s, so the same share weighed
-  // from the upright polar speed came to half the step's. In 20 kt the coach had the boat as she was 0.14% slower than
-  // she sailed and promised a third more than the outhaul paid: found on the boom's place on a beat, 16 Nov 2026)
+  // speedForDrive there). Weighed from the upright polar speed it came out differently, because near hull speed the
+  // resistance's slope changes within a few cm/s (its table's corners: dynamics.ts RESIDUARY). Close-hauled in 20 kt
+  // with a line set wrong the coach's estimate of her as she is sat 0.08 to 0.10% off her settled speed; now 0.03%, its
+  // standing offset in every wind. Measured on main, 16 Nov 2026; tests/coach-self)
   const vB = f * Math.max(0.5, polar(tws, crs, plan));
   const vT = speedForDrive(vB, K, driveCurveFor(tws, crs, vB));
   // the sails flogging, as the boat counts it (physics.ts sailFlog, pinchFlog; dynamics.ts airDrag): a main eased till it

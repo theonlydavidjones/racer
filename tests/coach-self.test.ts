@@ -12,8 +12,8 @@ describe('the trim coach: its estimate of her as she is', () => {
   // Every gain the coach promises is a ratio against this estimate, so an error here is an error in the promise. Heeled
   // well past her best in 20 kt, with a line set wrong, the coach turned her drive into speed from the upright polar
   // speed where the step does it from the heeled hull's (physics.ts: vB, speedForDrive): near hull speed the
-  // resistance's slope changes within a few cm/s, and the estimate sat 0.08–0.10% off, a fifth of what it promised for
-  // the outhaul. Settled, it is now within 0.05% in each case (0.03% is its standing offset in every wind).
+  // resistance's slope changes within a few cm/s, and the estimate sat 0.08–0.10% off (measured on main, 16 Nov 2026),
+  // against promises of half a percent. Settled, it is now within 0.05% in each case (0.03% is its standing offset in every wind).
   it('is her settled speed to 0.05%, close-hauled in 20 kt with a line set wrong', () => {
     for (const [k, v] of [['outhaul', 0], ['backstay', 0], ['vang', 1]] as const) {
       const b = testBoat({ heading: 316, kt: 5, windKt: 20 }); sail(b, 30, () => { b.h = courseHeading(b, 316); });
