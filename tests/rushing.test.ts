@@ -44,6 +44,16 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
   it('in a race: at the boat and 200 m, 1 km and 3 km off, every wave at its own speed', () => {
     expect(run('race', {}, {}).worst).toBeLessThan(0.05);
   }, 300_000);
+  it('on a day sailed from the observed record, the course\'s mean wind stepping each minute (it rushed there after the weather refresh of 16 Nov 2026)', () => {
+    // (14 Nov 2026 is in Fort Point's observed record: the mean wind comes round 7° in the race's first three minutes,
+    // a step a minute. The field's turn is capped, so no wave anywhere within 3 km runs off its own speed for it:
+    // without the cap this fails at 1.3 to 4.4 times; environment/waveField.ts turnCap)
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14' } as Settings, 1, {} as never);
+    const base = () => (w as unknown as { windModel: { base: number } }).windModel.base, b0 = base(); let steps = 0, was = b0;
+    for (let i = 0; i < 60 * 360; i++) { w.step(DT); if (Math.abs(base() - was) > 0.5) { steps++; was = base(); } }
+    expect(steps, 'the mean wind steps on this day').toBeGreaterThan(2);
+    expect(run('observed', { tideDate: '2026-11-14' }, {}).worst).toBeLessThan(0.05);
+  }, 300_000);
   it('sailing free from the Gate (the swell turned by the bar as she sails; this rushed in v176)', () => {
     expect(run('cruise', { mode: 'sail', sailFrom: 'gate', sailTo: '' } as Partial<Settings>, { freeSail: true }).worst).toBeLessThan(0.05);
   }, 300_000);

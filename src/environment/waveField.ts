@@ -60,6 +60,25 @@ function windSpectrum(tp: number): void {
   specTot = tot || 1; specTp = tp;
 }
 
+/**
+ * How fast a set of waves may turn (deg/s): a STOPGAP that stops the sweep. The field is plane waves turned about your
+ * boat, so at a distance R from her a turn at rate r carries each pattern sideways, its phase running k·R·r faster or
+ * slower than its own ω. Held to SWEEP_MAX of ω out to SWEEP_R for the set's slowest wave (r = SWEEP_MAX·c/R, c = ω/k):
+ * for the chop's shortest, 1.6 m/s, about 4° an hour. On a day sailed from the observed record the course's mean wind
+ * steps a degree or two every minute (Fort Point's 6-minute record), the field eased after it at 5% a second, and at
+ * 200 m to 3 km the short waves ran at 1.3 to 4.4 times their own speed for a moment each minute: the owner's "rushing
+ * water", back with the weather refresh of 16 Nov 2026 (tests/rushing).
+ * Not true to life: real short chop comes round to a new wind in ten minutes or so, the old waves dying as new ones
+ * grow; here it lags a big shift for hours. The true model, two seas cross-faded, is on the ROADMAP.
+ */
+const SWEEP_MAX = 0.04, SWEEP_R = 3000;
+function turnCap(f: WaveField, from: number, to: number): number {
+  let c = Infinity;
+  for (let i = from; i < to; i++) if (f.k[i] > 0) c = Math.min(c, f.w[i] / f.k[i]);
+  return Number.isFinite(c) ? SWEEP_MAX * c / SWEEP_R / D2R : 0;
+}
+const clampTurn = (d: number, cap: number) => Math.max(-cap, Math.min(cap, d));
+
 export class WaveField {
   /** Per component (wind sea first, then swell): its direction of travel (deg), wavenumber (rad/m), frequency (rad/s), height (m), phase (rad), crest sharpening (Gerstner Q), and 1 for swell. */
   readonly dir = new Float64Array(N_WAVES);
@@ -114,12 +133,12 @@ export class WaveField {
     };
     const travel = windFrom + 180;
     if (Number.isNaN(this.windDir)) this.windDir = travel;
-    this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
+    this.windDir += clampTurn((((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05), turnCap(this, 0, N_WIND) * dt);
     // (the swell eases round as the chop does: a direction that jumped, even turned about `about`, swept the pattern past
     // everywhere else at many times its own speed: the owner's "rushing water", v176)
     const swellTravel = s.fromS + 180;
     if (Number.isNaN(this.swellDir)) this.swellDir = swellTravel;
-    this.swellDir += (((swellTravel - this.swellDir + 540) % 360) - 180) * Math.min(1, dt * 0.05);
+    this.swellDir += clampTurn((((swellTravel - this.swellDir + 540) % 360) - 180) * Math.min(1, dt * 0.05), turnCap(this, N_WIND, N_WAVES) * dt);
     const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
     // (never quite flat: a reference sea in a lee would leave nothing for the rougher water elsewhere to scale up)
     const hsW = Math.max(0.05, s.hsW), hsS = Math.max(0.05, s.hsS);
