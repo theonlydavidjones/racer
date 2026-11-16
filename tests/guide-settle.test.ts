@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 import { beatAngle } from '../src/boat/polar';
-import type { Boat } from '../src/boat/boat';
+import { SETTLE, type Boat } from '../src/boat/boat';
 import { depowerLimits } from '../src/boat/controls';
 import { LINE_GAP } from '../src/boat/crewWork';
 
@@ -60,7 +60,7 @@ describe('In light air the crew set the lines for her course, not the angles she
     const steady = run(false), worked = run(true);
     expect(worked.first.outhaul, 'the outhaul flattened within a gust-lull cycle of the breeze').toBeLessThan(120 + LINE_GAP);
     expect(Math.abs(worked.first.outhaul! - steady.first.outhaul!), 'as soon as with a steady helm').toBeLessThan(5);
-    const b = worked.b, L = depowerLimits(b.depower ?? 0, b.awaSlow, 16, b.guideAwa);
+    const b = worked.b, L = depowerLimits(b.depower ?? 0, b.awaSlow, 16, b.settle![SETTLE.guideAwa]);
     for (const k of ['outhaul', 'cunningham'] as const) expect(b.ctl[k], `${k} up to its floor`).toBeGreaterThan((L.min[k] ?? 0) - 0.05);
   });
   it('a steady close reach is read the same whichever way she came to it: the guide\'s angle and its ceiling, from the beat or from a broad reach', () => {
@@ -69,7 +69,7 @@ describe('In light air the crew set the lines for her course, not the angles she
     const reach = (from: number) => {
       const b: Boat = testBoat({ heading: 360 - from, kt: 4, windKt: 8 }); b.crew = newCrew(JSON.parse(JSON.stringify(DEFAULT_CREW)), 'S');
       sail(b, 420, t => { const a = t < 60 ? from : from + (85 - from) * Math.min(1, (t - 60) / 20); b.h = (360 - a) % 360; });
-      return { ga: b.guideAwa!, cap: depowerLimits(b.depower ?? 0, b.awaSlow, 8, b.guideAwa).max.vang ?? 1, awa: Math.abs(b.awaSlow) };
+      return { ga: b.settle![SETTLE.guideAwa], cap: depowerLimits(b.depower ?? 0, b.awaSlow, 8, b.settle![SETTLE.guideAwa]).max.vang ?? 1, awa: Math.abs(b.awaSlow) };
     };
     const up = reach(42), down = reach(120);
     expect(Math.abs(up.ga - up.awa), 'come to her angle from the beat').toBeLessThan(1);
