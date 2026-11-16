@@ -59,7 +59,7 @@ const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toU
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { chartDepth, landAt } from '../environment/sea';
-import { toLL } from '../geo/geo';
+import { LL, toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
 
@@ -2284,26 +2284,26 @@ export class World {
    * pattern past everywhere but her, the owner's "rushing water" in v176). Worked out twice a second.
    */
   private waveRefSea: SeaHere | null = null;
-  /** The chart's depth at the waves' reference place, kept while the place moves less than 100 m (chartDepth reads the
-   * whole chart): the place, and its depth below MLLW (m, null off the chart). */
+  /** The chart's depth for the waves (below MLLW, m; null: deep) and the place the tide's read at: worked out once. */
   private waveChart: { p: Vec; d: number | null } | null = null;
   waveRef(): SeaHere {
     if (this.waveRefSea) return this.waveRefSea;
     const own = this.freeSail || this.cruising, mid = this.seaHere(this.C.center), s = own ? this.user.sea ?? FLAT_SEA : mid;
     // (the waves' length for the water's depth: the chart's, NOAA's ENC depth areas at the middle of their band (a band
     // 9–18 m deep reads 13.6 m: coarse, an estimate of the depth at any one place), and the tide's height above the
-    // chart's datum, MLLW, now (waveField.ts setDepth). Cruising, the water about her boat. Racing, the course's water:
-    // its line and marks, each by the swell there (the swell is the wave the depth lengthens or shortens, and the
-    // biggest where the course runs out toward the Gate), worked out once: an estimate, one depth for the whole field)
-    const at = own ? this.user : this.C.center;
-    if (!this.waveChart || (own && hypot(at.x - this.waveChart.p.x, at.y - this.waveChart.p.y) > 100)) {
-      let d: number | null = null;
-      if (own) d = chartDepth(at);
-      else { let sum = 0, wt = 0; for (const q of [this.C.center, ...this.C.marks.map(m => m.p)]) { const dq = chartDepth(q); if (dq == null) continue; const k = this.seaHere(q).hsS + 0.05; sum += k * dq; wt += k; } d = wt > 0 ? sum / wt : null; }
-      this.waveChart = { p: { x: at.x, y: at.y }, d };
+    // chart's datum, MLLW, now (waveField.ts setDepth). Racing, the course's water: its line and marks, each by the swell
+    // there (the swell is the wave the depth lengthens or shortens, and the biggest where the course runs out toward the
+    // Gate). Cruising, the Central Bay's, the same way, over a kilometer's grid from the Gate to the Bay Bridge. Each
+    // worked out once, an estimate, one depth for the whole field: a depth that followed her boat changed every wave's
+    // length as she sailed, and the field, a sum of plane waves, ran past by the change times the distance from her,
+    // many times the waves' own speed 3 km off (tests/rushing.test.ts). Only the tide moves it, slowly.
+    if (!this.waveChart) {
+      const pts = own ? Array.from({ length: 8 * 13 }, (_, n) => LL(37.79 + 0.01 * Math.floor(n / 13), -122.50 + 0.01 * (n % 13))).filter(q => !onLand(q)) : [this.C.center, ...this.C.marks.map(m => m.p)];
+      let sum = 0, wt = 0; for (const q of pts) { const dq = chartDepth(q); if (dq == null) continue; const k = this.seaHere(q).hsS + 0.05; sum += k * dq; wt += k; }
+      this.waveChart = { p: own ? LL(37.82, -122.43) : { ...this.C.center }, d: wt > 0 ? sum / wt : null };
     }
     const d = this.waveChart.d;
-    this.waves.setDepth(d == null ? null : d + tideHeightAt(at, this.clockUtc * 60000));
+    this.waves.setDepth(d == null ? null : d + tideHeightAt(this.waveChart.p, this.clockUtc * 60000));
     return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 

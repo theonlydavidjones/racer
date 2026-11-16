@@ -1797,7 +1797,8 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
   - **True refraction** (crests bending toward a shoal across the field): the field is a sum of plane waves, one
     direction each, the same everywhere, so it can't. It needs a field for each place (or rays traced from the Gate).
     And with it each place's own depth: racing, the field takes the course's water's (its line and marks, by the swell
-    at each), cruising the water about her boat, one depth for all the water you see.
+    at each), cruising the Central Bay's, one depth for all the water you see. (A depth that followed her boat ran the
+    far water past as it changed: a sum of plane waves can't change its lengths in one place only.)
   - **The depths are the ENC's band middles** (a band 9–18 m deep reads 13.6 m). Open question: the chart reads 2.7 m
     (its 1.8–3.6 m band) for the Berkeley Circle at 37.857 N, 122.345 W; NOAA ENC (src/geo/data/enc-chart.json). Is
     that the band the Circle is in, or the polygon's edge? To check against chart 18649.

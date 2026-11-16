@@ -160,8 +160,8 @@ export class WaveField {
     // the change at `about`, as for a turn, so the surface there doesn't move. Away from `about` the change runs the
     // pattern by at R·Δk/k a second, R from her: so no wavenumber changes by more than DLNK a second (at 1 km the
     // water then runs by at 3 m/s at most, the far waves small to the eye; eased as the turn is it reached 21 m/s, the
-    // physics review). Cruising out of a harbor's 3 m into the Central Bay's 14 m the swell takes some five minutes
-    // to lengthen (at 0.1% a second, a quarter of an hour: too long), as the field stands for the water about her.
+    // physics review). The World gives one depth for the field, the course's or the Central Bay's, and only the tide
+    // moves it (World.waveRef): this easing is for the first depth after a change of conditions, and for the tide.
     // (deep water, Infinity, eases from 1000 m: there even a 20 s swell is within 1e-8 of its deep-water length)
     const d0 = this.depth, dTo = Math.min(this.depthTo, 1e3), dFrom = Math.min(d0, 1e3);
     let d = dTo;
