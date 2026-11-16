@@ -332,7 +332,7 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  * 40-60° apparent doesn't send them to the cabin top for one set and back for the other (the Coordinator, 16 Nov 2026).
  * An estimate: North's Folkboat guide gives no angle for changing over, and no reaching settings at all. The wind it's
  * read for is the breeze she's sailing in, her true wind over about 20 s (Boat.twsSlow, as her depowering step reads
- * it), not each puff's: its settings are by the wind's range ("very light winds (0-5 knots)", "medium winds (5-12
+ * it; the 20 s an estimate, the guide gives no time), not each puff's: its settings are by the wind's range ("very light winds (0-5 knots)", "medium winds (5-12
  * knots)"), and read in the gust, a 6 kt breeze's puffs and lulls crossing 5 kt sent the crew to the outhaul and back
  * through a beat. */
 export const GUIDE_BACKLASH = 10;

@@ -34,6 +34,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **AI steering in a dying breeze** (Skipper Model, after their irons PR; the Coordinator, 16 November; found by Crew
+  Model's crewstation work): in races whose 6 kt westerly dies to 1–4 kt, the AI's tacks stall at about 2.3 kn and fall
+  off the long way round through a jibe, and its desired heading flips 190↔284 every 10–20 s, or zig-zags 55°↔105–160°
+  true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
+  tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 14, 20 and 21: held there as an `it.fails` case,
+  which goes red when this is fixed and is then switched to a normal test.
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.

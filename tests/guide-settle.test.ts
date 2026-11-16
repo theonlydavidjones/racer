@@ -4,6 +4,7 @@ import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 import { beatAngle } from '../src/boat/polar';
 import type { Boat } from '../src/boat/boat';
 import { depowerLimits } from '../src/boat/controls';
+import { LINE_GAP } from '../src/boat/crewWork';
 
 // A crew resets the cabin top's lines for the course she's on, not for the angles she swings through (physics.ts
 // trimSails: settled first; controls.ts GUIDE_BACKLASH). North Sails' Nordic Folkboat guide: "Never use the kickingstrap
@@ -42,18 +43,24 @@ describe('In light air the crew set the lines for her course, not the angles she
     const r = steer(5, 400, t => t < 60 ? beat + 20 : beat + 20 + 15 * Math.sin(((t - 60) / 90) * Math.PI));
     expect(r.started.filter(s => s.t >= 60).length, 'cabin-top trips as she wanders').toBeLessThanOrEqual(1);
   });
-  it('the breeze coming on while you work the helm: they depower at once, the helm\'s corrections no swing (the physics review)', () => {
+  it('the breeze coming on while you work the helm: they depower as soon as with a steady helm, the helm\'s corrections no swing (the physics review)', () => {
     // (a beat in 8 kt; at 120 s, 16 kt and staying; your helm tapping a key a fifth of a second every 4 s, each way: up to
-    // 5°/s for a moment. Before the gate read a kept-up turn, that held the outhaul's trip to 226 s and the jib halyard
-    // unset after 6 minutes; with no gate at all they went at 123 s)
-    const b: Boat = testBoat({ heading: 360 - beatAngle(8), kt: 4, windKt: 8 }); b.crew = newCrew(JSON.parse(JSON.stringify(DEFAULT_CREW)), 'S');
-    const had = b.crew.people.map(() => null as string | null), first: Record<string, number> = {};
-    sail(b, 300, t => {
-      b.ww.kt = t < 120 ? 8 : 16; const u = t % 4; b.steer = u < 0.2 ? 1 : u >= 2 && u < 2.2 ? -1 : 0;
-      b.crew!.people.forEach((a, i) => { const j = a.job?.line ?? null; if (j && j !== had[i] && TOP.has(j) && t >= 120) first[j] ??= t; had[i] = j; });
-    });
-    expect(first.outhaul, 'the outhaul flattened within seconds of the breeze').toBeLessThan(130);
-    const L = depowerLimits(b.depower ?? 0, b.awaSlow, 16, b.guideAwa);
+    // 5°/s for a moment. Before the gate read a kept-up turn, that held the outhaul's trip 100 s behind a steady helm's,
+    // and the jib halyard unset after 6 minutes. The guide reads the breeze she's sailing in, her 20 s wind, so the new
+    // breeze is seen within a gust-lull cycle, LINE_GAP, either way)
+    const run = (tap: boolean) => {
+      const b: Boat = testBoat({ heading: 360 - beatAngle(8), kt: 4, windKt: 8 }); b.crew = newCrew(JSON.parse(JSON.stringify(DEFAULT_CREW)), 'S');
+      const had = b.crew.people.map(() => null as string | null), first: Record<string, number> = {};
+      sail(b, 300, t => {
+        b.ww.kt = t < 120 ? 8 : 16; const u = t % 4; b.steer = !tap ? 0 : u < 0.2 ? 1 : u >= 2 && u < 2.2 ? -1 : 0;
+        b.crew!.people.forEach((a, i) => { const j = a.job?.line ?? null; if (j && j !== had[i] && TOP.has(j) && t >= 120) first[j] ??= t; had[i] = j; });
+      });
+      return { b, first };
+    };
+    const steady = run(false), worked = run(true);
+    expect(worked.first.outhaul, 'the outhaul flattened within a gust-lull cycle of the breeze').toBeLessThan(120 + LINE_GAP);
+    expect(Math.abs(worked.first.outhaul! - steady.first.outhaul!), 'as soon as with a steady helm').toBeLessThan(5);
+    const b = worked.b, L = depowerLimits(b.depower ?? 0, b.awaSlow, 16, b.guideAwa);
     for (const k of ['outhaul', 'cunningham'] as const) expect(b.ctl[k], `${k} up to its floor`).toBeGreaterThan((L.min[k] ?? 0) - 0.05);
   });
   it('a steady close reach is set the same whichever way she came to it: from the beat or from a broad reach', () => {

@@ -76,16 +76,27 @@ type Moves = Pick<ReturnType<typeof stationMoves>, 'counts'>;
  * is judged over seeds 1-24 at both winds, and the cap is 2.0, a backstop, well over any race seen with the crew settled
  * before they reset their lines (22 trips, 1.65). */
 export const TRIPS_MEAN = 1.4, TRIPS_CAP = 2.0;
-export function tripsVerdict(runs: Moves[]): string[] {
+/**
+ * The races the backstop is held off, by wind, till their cause is fixed (the Coordinator, 16 Nov 2026; ROADMAP, "AI
+ * steering in a dying breeze"): 6 kt seeds 4, 14, 20 and 21 die to 1-4 kt, and the AI zig-zags 55° to 105-160° true,
+ * each course held 20-100 s (seed 14, boat 2: four times, the vang on for each reach at 1-1.7% of drive and off again,
+ * as the guide says, for the beat at 55°: 16 trips of its 36). Her crew are trimming for real changes of course, not
+ * fidgeting; the mean is judged on these races still, and the backstop on them is an `it.fails` case below, which goes
+ * red when the steering's fixed: then it's a normal test and this list goes.
+ */
+export const CAP_HELD: Record<number, readonly number[]> = { 6: [4, 14, 20, 21] };
+/** (`skipCap`: seeds whose races the backstop isn't judged on here, the mean still is: CAP_HELD; `capOnly`: the backstop alone) */
+export function tripsVerdict(runs: Moves[], o: { skipCap?: readonly number[]; capOnly?: boolean; seeds?: readonly number[] } = {}): string[] {
   const out: string[] = [], boats = runs[0]!.counts.lines.length;
   const rate = (n: number, mins: number) => +(n / mins).toFixed(2);
   for (let k = 0; k < boats; k++) {
     const lines = runs.map(r => rate(r.counts.lines[k]!, r.counts.mins)), both = runs.map(r => rate(r.counts.both[k]!, r.counts.mins));
     const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length, show = (x: number[]) => x.map(v => v.toFixed(2)).join(', ');
-    if (mean(lines) >= TRIPS_MEAN) out.push(`boat ${k + 1}: the hand with the cabin-top lines, trips a minute over the races (${show(lines)})`);
-    if (mean(both) >= TRIPS_MEAN) out.push(`boat ${k + 1}: both crew's trips a minute over the races (${show(both)})`);
-    lines.forEach((v, q) => { if (v > TRIPS_CAP) out.push(`boat ${k + 1}: the hand with the cabin-top lines, seed ${q + 1}: ${v.toFixed(2)}`); });
-    both.forEach((v, q) => { if (v > TRIPS_CAP) out.push(`boat ${k + 1}: both crew, seed ${q + 1}: ${v.toFixed(2)}`); });
+    const seedOf = (q: number) => o.seeds?.[q] ?? q + 1, capped = (q: number) => !o.skipCap?.includes(seedOf(q));
+    if (!o.capOnly && mean(lines) >= TRIPS_MEAN) out.push(`boat ${k + 1}: the hand with the cabin-top lines, trips a minute over the races (${show(lines)})`);
+    if (!o.capOnly && mean(both) >= TRIPS_MEAN) out.push(`boat ${k + 1}: both crew's trips a minute over the races (${show(both)})`);
+    lines.forEach((v, q) => { if (capped(q) && v > TRIPS_CAP) out.push(`boat ${k + 1}: the hand with the cabin-top lines, seed ${seedOf(q)}: ${v.toFixed(2)}`); });
+    both.forEach((v, q) => { if (capped(q) && v > TRIPS_CAP) out.push(`boat ${k + 1}: both crew, seed ${seedOf(q)}: ${v.toFixed(2)}`); });
   }
   return out;
 }
@@ -128,8 +139,12 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     m.free.forEach((f, j) => expect(f, `crew ${j % 2 + 1}: trips a minute for no job`).toBeLessThan(0.1));
     // (the trips, the crew's typical rate: over 24 races, seeds 1 to 24, so the race's chance, where it puts a trip or
     // two, doesn't decide it (tripsVerdict: the cap's history); and no race over the backstop)
-    expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => stationMoves(kt, j + 2))])).toEqual([]);
+    expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => stationMoves(kt, j + 2))], { skipCap: CAP_HELD[kt] })).toEqual([]);
   }, 1_200_000);
+  // (the races held off the backstop: over it now, from the AI's steering in a dying breeze; red when that's fixed)
+  for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: the AI's steering in a dying breeze, ROADMAP)`, () => {
+    expect(tripsVerdict(seeds.map(s => stationMoves(+kt, s)), { capOnly: true, seeds })).toEqual([]);
+  }, 600_000);
 });
 
 describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', () => {
