@@ -860,7 +860,7 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
   // (the traveller's tail hanging from its cam on the thwart's windward end, just below it)
   // (the traveller's tail from its cam on the thwart's windward end up to the hand, as the sheet's: boatMesh.ts leads it
   // there, Crew.travHand. Fully hiked out the cam itself is beyond an arm's reach, and the tail's what they hold)
-  const cam = V(s * (TRAV_END + 0.12), THWART.top - 0.12, THWART.z - THWART.half - 0.02), tv = trav ? c.clone().add(cam.clone().sub(c).setLength(Math.min(cam.distanceTo(c), reach * 0.9))) : null;
+  const cam = V(s * (TRAV_END + 0.12), THWART.top - 0.12, THWART.z - THWART.half - 0.02), tv = trav ? c.clone().add(cam.clone().sub(c).setLength(Math.min(cam.distanceTo(c), 0.36 * k))).add(V(0, 0.06 * k, 0)) : null; // (held in front of the chest, above the knees, the tail taut from the cam: down at full stretch it was lost among the knees, the owner's "gripping air")
   const near = (q: THREE.Vector3) => p.hands[0].distanceToSquared(q) <= p.hands[1].distanceToSquared(q) ? 0 : 1;
   // (the middle hand, at the traveller beside the thwart: the aft leg tucked under the thwart for a purchase, the foot in
   // under it near its end (the owner: "often tucking their aft leg under the thwart for stability"))

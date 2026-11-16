@@ -850,7 +850,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
     // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
-    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl);
+    const tl = line([end.clone(), end.clone(), cam, cam.clone(), cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl); // (its last two: over the hiker's lap and into the hand, or falling from the cam)
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
@@ -1721,7 +1721,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // (the windward traveller line's tail up to the hiker holding it, if one is: Crew.travHand; else hanging from its cam)
   { const th = (m.crew as { travHand?: THREE.Vector3 }).travHand;
     for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
-      const e = tailEnd(tmpG.set(pa.getX(2) - side * 0.02, pa.getY(2) - 0.2, pa.getZ(2) - 0.03), th, side); pa.setXYZ(3, e.x, e.y, e.z);
+      const e = tailEnd(tmpG.set(pa.getX(2) - side * 0.02, pa.getY(2) - 0.2, pa.getZ(2) - 0.03), th, side), held = e === th;
+      // (held: up from the cam and over the knees, the lap, to the hand: not straight through the thighs between them)
+      if (held) pa.setXYZ(3, (pa.getX(2) + e.x) / 2, Math.max(pa.getY(2), e.y) + 0.12, (pa.getZ(2) + e.z) / 2); else pa.setXYZ(3, pa.getX(2), pa.getY(2), pa.getZ(2));
+      pa.setXYZ(4, e.x, e.y, e.z);
       pa.needsUpdate = true; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
