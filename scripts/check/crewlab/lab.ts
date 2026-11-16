@@ -13,6 +13,7 @@ import { buildBoatMesh, syncBoatMesh, type BoatMesh } from '../../../src/render/
 import { newCrew, DEFAULT_CREW, type CrewPlace } from '../../../src/boat/crewPhys';
 import { testBoat, sail, startTack } from '../../../tests/helpers/testBoat';
 import { beatAngle } from '../../../src/boat/polar';
+import { FULL_RUDDER } from '../../../src/boat/balance';
 import type { Boat } from '../../../src/boat/boat';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -29,6 +30,7 @@ let b: Boat, m: BoatMesh | null = null, t = 0, cam = { yaw: 90, pitch: 15, dist:
 // (the sun's shadows, as in the game: render/scene.ts, every boat mesh casting and receiving)
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 200 }); sun.shadow.bias = -0.0004; scene.add(sun.target);
 function render(): void {
+  if ((lab as any).rud != null) b.helm = (lab as any).rud / FULL_RUDDER; // (the tiller held at an angle: lab.rudder)
   syncBoatMesh(m!, b, t, undefined, (lab as any).farOn && (lab as any).farN % 3 !== 0);
   sun.target.position.copy(m!.grp.position); sun.position.copy(m!.grp.position).add(new THREE.Vector3(-30, 50, 20));
   sea.position.set(m!.grp.position.x, 0, m!.grp.position.z);
@@ -47,13 +49,14 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; ensign?: Boat['ensign'] }) {
     (lab as any).seaA = o.sea ?? 0; // (pitching in a seaway: that many radians either way every 2.6 s, crew.ts rough)
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
     b.crew = newCrew({ helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) }, tack);
     if (o.place) b.crew.place = o.place;
     if (o.pole) b.poleWant = true;
+    if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: 'us', …)
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
     m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)
@@ -73,6 +76,8 @@ const lab = {
   /** As a boat far off is drawn in the game (scene.ts FAR_SYNC): her crew and cloth posed every third frame. */
   far(on: boolean) { (lab as any).farOn = on; (lab as any).farN = 0; },
   tack() { (lab as any).hold = null; startTack(b); },
+  /** The rudder (and tiller) held at `deg` (+ the blade to starboard, as b.helm), or null to let the physics have it. */
+  rudder(deg: number | null) { (lab as any).rud = deg; for (let i = 0; i < 60; i++) { if (deg != null) b.helm = deg / FULL_RUDDER; syncBoatMesh(m!, b, t += 1 / 60); } render(); },
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */
   wind(kt: number) { b.ww = { ...b.ww, kt }; },

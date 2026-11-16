@@ -1320,9 +1320,12 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), flagBlock(1), 0.25, rig); clubHoist(-1); }
   else clubHoist(1);
   if (b.ensign) {
-    // on an ensign staff in a socket on the starboard quarter, close to the centreline (the backstay and tiller have the
-    // middle of the transom), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly)
-    const ens = flagArtCanvas(b.ensign), staffH = 1.0, rake = 0.22, base = new THREE.Vector3(0.3, sheer(1) + 0.02, L / 2 - 0.08);
+    // on an ensign staff in a bracket on the transom's face, to starboard (the backstay and the rudder head have its
+    // middle), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly). On the after deck, in a socket
+    // 8 cm forward of the transom, it stood in the tiller's sweep: put hard over to starboard, the tiller swings across
+    // the quarter at the deck's height, through the staff's foot. On the transom's face it's aft of all of it (about 10 cm clear
+    // at 75°)
+    const ens = flagArtCanvas(b.ensign), staffH = 1.0, rake = 0.22, base = new THREE.Vector3(0.38, sheer(1) - 0.04, L / 2 + 0.03);
     const staffG = new THREE.Group(); grp.add(staffG);
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, staffH, 6), MAT.wood);
     const top = base.clone().add(new THREE.Vector3(0, Math.cos(rake) * staffH, Math.sin(rake) * staffH));

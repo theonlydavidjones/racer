@@ -772,7 +772,18 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   const k = fig.scale, s = Math.abs(x) > 0.05 ? Math.sign(x) : windward, u = uAtZ(z), e = halfBeam(u);
   const hx = Math.min(e - 0.04 + 0.06 * lean, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * lean));
   const hip = V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw = s * (0.55 + 0.5 * lean), r = right(yaw);
-  const fz = COCK1 - 0.24, fc = chz(fz) - 0.16; // (feet on the seat inside the coaming, the shins clear of it)
+  // (the tiller hard over away from them, to 75°: its end across the far quarter, out of reach of the extension and an
+  // arm from where they sit. They slide aft and in along the after deck toward it, as a helm does, as far as they need
+  // and up to 0.35 m; their feet come aft with them)
+  let fz = COCK1 - 0.24;
+  { const far = Math.hypot(tip.x - hip.x, tip.z - hip.z) - (0.95 + 0.5 * k);
+    if (far > 0) {
+      const dx = tip.x - hip.x, dz = tip.z - hip.z, n = Math.hypot(dx, dz) || 1, go = Math.min(0.35, far);
+      const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nx = s * Math.max(0.25, s * (hip.x + go * dx / n)), nu = uAtZ(nz);
+      fz = Math.min(COCK1 - 0.12, fz + (nz - hip.z));
+      hip.set(nx, Math.max(deckY(nu, Math.min(Math.abs(nx), halfBeam(nu))), ground(nx, nz)) + 0.09 * k, nz);
+    } }
+  const fc = chz(fz) - 0.16; // (feet on the seat inside the coaming, the shins clear of it)
   const foot = (j: number) => { const q = V(s * Math.min(fc - 0.1 * lean, Math.max(0.12, hx - (0.3 + 0.2 * lean) * k)), 0, fz).addScaledVector(r, (j ? 1 : -1) * 0.12 * k); q.x = Math.sign(q.x) * Math.min(Math.abs(q.x), chz(q.z) - 0.16); onGround(q);
     // (sitting out on the side deck, the knees over the coaming: the feet hang from them, on the footrest or just off it)
     if (hx > chz(fz) - 0.05) q.y = Math.max(q.y, deckY(uAtZ(fz), chz(fz)) + coamH(fz) + 0.04 - BONE.shin * k);
