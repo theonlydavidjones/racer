@@ -126,7 +126,8 @@ physics, ranked like the ten above:
 | RUDDER.slope | 3.0 | 91 | estimate |  |
 | RUDDER.arm | 2.6 | 91 | unsourced |  |
 | RUDDER.aspect | 1.4 | 91 | unsourced |  |
-| FULL_RUDDER | 30 | 93 | unsourced |  |
+| FULL_RUDDER | 30 | 93 | unsourced | the helm's unit, and the most the AI and the tiller pilot use |
+| HARD_OVER, RUDDER_STALL (balance.ts) | 75°, 40° | | estimate | the tiller's swing each side (the owner, of his boat, and a seasoned skipper's account, 15 Nov 2026); the stall for a keel-hung blade working as the keel's flap. No Folkboat measurement found. rudderTurn's rounding from 30° to the stall (a sixth more turn at 40°) and the stalled plate past it (Kirchhoff; Hoerner), and rudderBrake, are estimates on these |
 | IDEAL_HELM | 2.5 | 95 | unsourced |  |
 | MAIN_C.kpp | 0.01379 | 127 | sourced |  |
 | JIB_C.kpp | 0.016 | 135 | sourced |  |
@@ -347,7 +348,7 @@ physics, ranked like the ten above:
 | HOVE.dragAft | 0.3 | 387 | estimate |  |
 | HOVE.swayAdded | 0.9 | 389 | estimate |  |
 | HOVE.yawAdded | 0.4 | 389 | estimate |  |
-| HOVE.gyration | 0.25 | 391 | estimate |  |
+| HOVE.gyration | 0.19 | 391 | estimate | worked from her ballast keel (52% of her weight at about 0.7 m, the rest at about 2.0 m); was 0.25, "the usual figure for a yacht". Sets yawLag: 0.36 s at 4.7 kt |
 | HOVE.windSide | 5.5 | 393 | estimate |  |
 | HOVE.windLever | 0.3 | 393 | estimate |  |
 | HOVE.rudderFlow | 0.5 | 395 | estimate |  |
