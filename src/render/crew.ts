@@ -26,6 +26,8 @@ import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe,
 export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
+  /** the foot hooked under the thwart (or on its way out from under it): ease reads what's under it at its height */
+  hookFoot?: number;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
@@ -221,7 +223,7 @@ function groundNear(x: number, z: number, r: number): number {
 
 /** A pose in the boat's frame: the hips, which way they face (yaw: 0 forward, + turning to port), the torso's lean
  * (+ back, − forward) and roll, the ankles and the hands (left, right), and what they're looking at. */
-interface PoseT { /** the feet hang free over the deck's edge (sat on the bow): what's under them is only the deck itself, not its margin */ hang?: boolean; /** walking along the side deck (deckWalk): both feet up out of the cockpit at once */ deck?: boolean; /** which way the knees point (boat frame), if not forward */ knee?: THREE.Vector3; /** how far that's taken over from forward, 0 to 1 (eased: a knee doesn't flip in a frame) */ kneeW?: number; /** the knees come round slowly (sitting down on the side deck, the hips held up clear) */ kneeSlow?: boolean; hip: THREE.Vector3; yaw: number; pitch: number; roll: number; feet: [THREE.Vector3, THREE.Vector3]; hands: [THREE.Vector3, THREE.Vector3]; look: THREE.Vector3; /** walking or crawling: the feet step (planted, then swung) */ step?: boolean; /** which way an elbow points for an arm that isn't down and back (torso frame), by hand */ elbow?: [THREE.Vector3 | undefined, THREE.Vector3 | undefined] }
+interface PoseT { /** the foot (0, 1) hooked under the thwart: what's under it read at its own height (ground, the thwart a beam) */ hook?: number; /** the feet hang free over the deck's edge (sat on the bow): what's under them is only the deck itself, not its margin */ hang?: boolean; /** walking along the side deck (deckWalk): both feet up out of the cockpit at once */ deck?: boolean; /** which way the knees point (boat frame), if not forward */ knee?: THREE.Vector3; /** how far that's taken over from forward, 0 to 1 (eased: a knee doesn't flip in a frame) */ kneeW?: number; /** the knees come round slowly (sitting down on the side deck, the hips held up clear) */ kneeSlow?: boolean; hip: THREE.Vector3; yaw: number; pitch: number; roll: number; feet: [THREE.Vector3, THREE.Vector3]; hands: [THREE.Vector3, THREE.Vector3]; look: THREE.Vector3; /** walking or crawling: the feet step (planted, then swung) */ step?: boolean; /** which way an elbow points for an arm that isn't down and back (torso frame), by hand */ elbow?: [THREE.Vector3 | undefined, THREE.Vector3 | undefined] }
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** The figure's forward and right in the boat frame for a yaw (it faces −z at yaw 0). */
 const fwd = (yaw: number) => V(-Math.sin(yaw), 0, -Math.cos(yaw)), right = (yaw: number) => V(Math.cos(yaw), 0, -Math.sin(yaw));
@@ -850,6 +852,12 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
   // (the traveller's tail hanging from its cam on the thwart's windward end, just below it)
   const cam = V(s * (TRAV_END + 0.12), THWART.top - 0.12, THWART.z - THWART.half - 0.02), tv = trav ? at(cam) : null;
   const near = (q: THREE.Vector3) => p.hands[0].distanceToSquared(q) <= p.hands[1].distanceToSquared(q) ? 0 : 1;
+  // (the middle hand, at the traveller beside the thwart: the aft leg tucked under the thwart for a purchase, the foot in
+  // under it near its end (the owner: "often tucking their aft leg under the thwart for stability"))
+  if (tv && Math.abs(p.hip.z - THWART.z) < 0.45 && p.hip.z < THWART.z) {
+    const j = p.feet[0].z >= p.feet[1].z ? 0 : 1, x = s * (cockpitHalf(uAtZ(THWART.z)) - 0.16);
+    p.feet[j] = V(x, Math.max(ground(x, THWART.z, 0) + 0.08, thwartBottom(x) - 0.2), THWART.z - THWART.half + 0.04); p.hook = j; // (low, so the shin from the knee over the coaming passes well under the beam's forward edge)
+  }
   if (sheet && tv) { const i = near(sheet); p.hands[i] = sheet; p.hands[1 - i] = tv; }
   else if (sheet) p.hands[near(sheet)] = sheet;
   else if (tv) p.hands[near(tv)] = tv;
@@ -1142,11 +1150,17 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       const going = foot.distanceTo(want.feet[i]) > 0.15;
       // (sat on the bow, the legs over its edge: down past it once outboard of the deck, not held up on ground()'s margin
       // beside it, which propped the feet on the stemhead)
-      const gr = want.hang ? (gx: number, gz: number) => Math.abs(gx) < halfBeam(uAtZ(gz)) && gz > -L / 2 ? ground(gx, gz) : -1 : ground;
+      // (a foot hooked under the thwart, or still under it coming out: what's under it read at its own height, the thwart a
+      // beam; coming out, straight forward from under it first, then where it's going)
+      if (want.hook === i) f.hookFoot = i;
+      const hooked = f.hookFoot === i, under = hooked && Math.abs(foot.z - THWART.z) < THWART.half + 0.03;
+      if (hooked && want.hook !== i && !under) f.hookFoot = undefined;
+      const gr = want.hang ? (gx: number, gz: number) => Math.abs(gx) < halfBeam(uAtZ(gz)) && gz > -L / 2 ? ground(gx, gz) : -1
+        : hooked ? (gx: number, gz: number) => ground(gx, gz, foot.y) : ground;
       const fx = foot.x, fz = foot.z, fy = foot.y;
       // (a foot down on the sole is a little in from the bench's face, not tucked under its lip with the knee still out over
       // the bench, the shin through its edge: getting down off the bench by the winch in a tack)
-      const ft = want.feet[i].y < SEAT_Y - 0.1 ? keepOnSole(_fw.copy(want.feet[i])) : want.feet[i];
+      const ft = hooked && want.hook !== i && under ? _fw.set(foot.x, foot.y, THWART.z - THWART.half - 0.1) : want.hook === i ? want.feet[i] : want.feet[i].y < SEAT_Y - 0.1 ? keepOnSole(_fw.copy(want.feet[i])) : want.feet[i];
       toward(foot, ft, a, LIMB_SPEED * dt * (rising ? 0.3 : 1));
       // (coming to a step up, the bench's edge or the coaming: it stops and lifts to it at a foot's pace, never snapped up)
       if (gr(foot.x, foot.z) + 0.06 > fy + LIMB_SPEED * dt) { foot.x = fx; foot.z = fz; foot.y = Math.max(fy, gr(fx, fz) + 0.06) + LIMB_SPEED * dt; }
