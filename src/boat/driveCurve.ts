@@ -16,7 +16,8 @@ const polarSpeed = (w: number, a: number) => polar(w, a, 'jib');
  * and above that.
  *
  * The wind at the sails' height by ORC's log profile (VPP Documentation §7.1, z0 = 0.005 m), as physics.ts sailWind; her
- * course's angle (the polar's), upright. Cached by the knot, 5° of angle and a twentieth of the speed ratio.
+ * course's angle (the polar's), upright. Tabled by the knot, 5° of angle and a twentieth of the speed ratio, and read
+ * between the knots and the angles (place, below).
  */
 const GRADIENT = Math.log(CE_ABOVE_WL / 0.005) / Math.log(10 / 0.005);
 /** The ratios, filled in as asked for (0: not yet): a flat table, as the AI's predictions ask thousands of times a step. */
@@ -31,25 +32,39 @@ function sailDrive(tws: number, twa: number, u: number): number {
   return sf.main.drive + sf.jib.drive;
 }
 
+/**
+ * Where a wind and an angle lie in the table: the row below in each (whole knots, 5° of angle) and how far on toward
+ * the next (0..1). The table's ratios are read between its rows, in the wind and in the angle, not at the nearest: read
+ * at the nearest, her speed in a chop stepped at every 5° and every knot, the speed made good to windward had two
+ * near-equal peaks either side of a step, and the best beat angle (seaway.ts beatInChop) swung 5 to 7 degrees on a
+ * quarter-knot puff, the AI's target angle and the laylines with it.
+ */
+function place(tws: number, twa: number): { w0: number; fw: number; a0: number; fa: number } {
+  const w = clamp(tws, 2, 40), w0 = Math.min(39, Math.floor(w)), a = clamp(twa, 30, 180) / 5, a0 = Math.min(35, Math.floor(a));
+  return { w0, fw: w - w0, a0, fa: a - a0 };
+}
 /** Drive at speed v over drive at the polar's speed vt (both m/s), for tws kt at the course's angle twa. 1 at v = vt. */
 export function driveRatio(tws: number, twa: number, v: number, vt: number): number {
-  if (vt <= 0.05) return 1;
-  const w = Math.round(clamp(tws, 2, 40)), a = Math.round(clamp(twa, 30, 180) / 5) * 5, x = clamp(v / vt * 20, 0, 29.999), q = Math.floor(x), f = x - q;
-  return at(w, a, q) * (1 - f) + at(w, a, q + 1) * f;
+  return driveCurveFor(tws, twa, vt)(v);
 }
 /**
- * driveRatio as a curve for one wind, angle and polar speed: the rounding and the row worked out once, so each look is
- * a multiply and two reads of the table (the AI's predictions step a speed along it hundreds of times).
+ * driveRatio as a curve for one wind, angle and polar speed: the rows and their shares worked out once, so each look is
+ * a multiply and a few reads of the table (the AI's predictions step a speed along it hundreds of times). Rows with no
+ * share (a whole knot, an angle on the 5°) aren't read.
  */
 export function driveCurveFor(tws: number, twa: number, vt: number): (v: number) => number {
   if (vt <= 0.05) return () => 1;
-  const w = Math.round(clamp(tws, 2, 40)), a = Math.round(clamp(twa, 30, 180) / 5) * 5, row = (w * 64 + a / 5) * 32, s = 20 / vt;
+  const { w0, fw, a0, fa } = place(tws, twa), s = 20 / vt;
+  const k00 = (1 - fw) * (1 - fa), k01 = (1 - fw) * fa, k10 = fw * (1 - fa), k11 = fw * fa;
+  const r00 = (w0 * 64 + a0) * 32, r01 = r00 + 32, r10 = r00 + 64 * 32, r11 = r10 + 32;
+  const read = (row: number, q: number) => { const k = cache[row + q]; return k === 0 ? at(row >> 11, ((row >> 5) & 63) * 5, q) : k; };
   return (v: number) => {
     const x = clamp(v * s, 0, 29.999), q = Math.floor(x), f = x - q;
-    let k0 = cache[row + q], k1 = cache[row + q + 1];
-    if (k0 === 0) k0 = at(w, a, q);
-    if (k1 === 0) k1 = at(w, a, q + 1);
-    return k0 * (1 - f) + k1 * f;
+    let lo = k00 * read(r00, q), hi = k00 * read(r00, q + 1);
+    if (k01 > 0) { lo += k01 * read(r01, q); hi += k01 * read(r01, q + 1); }
+    if (k10 > 0) { lo += k10 * read(r10, q); hi += k10 * read(r10, q + 1); }
+    if (k11 > 0) { lo += k11 * read(r11, q); hi += k11 * read(r11, q + 1); }
+    return lo * (1 - f) + hi * f;
   };
 }
 function at(w: number, a: number, q: number): number {
