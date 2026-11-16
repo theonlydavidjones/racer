@@ -649,7 +649,7 @@ and threw each one away ("Maps became deprecated during optimization"), 14 s of 
   rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
   nothing.
 
-## A behaviour's cost: the puff response (15 Nov 2026)
+## A behavior's cost: the puff response (15 Nov 2026)
 
 The auto crew's heavy-air puff response (physics.ts puffEase, on branch claude/puff-response) failed perf-pair --ai at
 1.041 against main. Split into what its code costs and what the different race costs (Crew Model with Capacity, each pair
