@@ -773,6 +773,15 @@ What's planned, roughly in order. Done work is described in the README.
        src/geo/marina.ts), finishing with the docking hand-over;
      - (3) moored boats solid, the same fix as slip 572 (8m2);
      - (4) a test that the navigator brings her home from the Bay to slip 572 with no contact.
+   - **Bug: "Sail Home" from Mile Rock still plotting after ten minutes** (owner, 16 November; bug; now; 2–4 h): "I was
+     sailing outside of the gate, with a destination near the old mile rock lighthouse. when I got near to the
+     lighthouse, I went into the nav view and clicked Sail Home. It appears that my destination has updated, but we're a
+     full ten minutes in and the course is still plotting in the nav map. I need that to move more quickly." Lead: since
+     #440 (navroute-sliced, 5fe08a2a) the route is worked out 2 ms in every 16 (hud.ts navRoute, routing.ts
+     routeAroundSteps) and re-planned every 100 m sailed; on a long passage the search may outlast 100 m and start over
+     each time, never finishing. Finish (or carry on) the search under way rather than restart it, and give a new
+     destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
+     at 6 kt (tests/insetRoute).
    - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
      polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
