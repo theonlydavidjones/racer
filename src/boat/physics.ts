@@ -18,7 +18,7 @@ import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, 
 import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
-import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
+import { MAIN_TWIST_MID, SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
 import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
@@ -793,7 +793,7 @@ export function sailPush(tws: number, twa: number, plan: SailPlan, main: Shape, 
   return netDrive(intendedForces(cap(main, full.main), jib ? cap(jib, full.jib) : null, w.aws, w.awa, stepBoom(w.awa, depower)), heel, vP);
 }
 /** The boom where the crew wants it at depowering step d: eased down the traveller on the last steps (crewEaseBoom). */
-const stepBoom = (awa: number, d: number) => clamp(optimalSheet('main', awa) + (awa < 70 ? 7 * clamp((d - 0.6) / 0.4, 0, 1) : 0), SAILS.main.min, SAILS.main.max);
+const stepBoom = (awa: number, d: number) => clamp(optimalSheet('main', awa) + (awa < 70 ? CREW_EASE * clamp((d - 0.6) / 0.4, 0, 1) : 0), SAILS.main.min, SAILS.main.max);
 /** The sails' forces at the crew's intended sheeting: the boom at `mainOut`, the jib (when it's drawing) at its best. */
 const intendedForces = (m: Shape, j: Shape | null, aws: number, awa: number, mainOut: number) =>
   sailForces(aws, awa, { trim: sailTrim('main', awa, mainOut), shape: m, out: mainOut }, j ? { trim: sailTrim('jib', awa, optimalSheet('jib', awa)), shape: j } : null, false);
@@ -1243,8 +1243,12 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 
-/** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step: up to about 7°). */
-export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? 7 * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
+/** How far the crew eases the boom past its best angle to keep her on her feet (the last depowering step): to the same
+ * place of the boom as it always was, 7° past where the main begins to lift, so with the boom's best angle now measured
+ * at the boom (trim.ts MAIN_TWIST_MID further in) the ease from it is that much more. Without it the last step no
+ * longer reached the luff and she lay over at 32° in 28 kt, where she had sailed at 25°. */
+export const CREW_EASE = 7 + MAIN_TWIST_MID;
+export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? CREW_EASE * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
 /** The boom angle the crew is aiming for. */
 export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaSlow) + crewEaseBoom(b);
 
