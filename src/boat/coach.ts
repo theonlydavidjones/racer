@@ -257,11 +257,11 @@ export function withCrew(b: Boat, k: LineKey, v: number): Controls {
     const fixed: Partial<CrewSettings> = {};
     for (const x of FIXABLE) if (x === k || byHand(b, x)) fixed[x] = c[x];
     const tws = b.ww.kt, cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
-    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed, b.guideAwa, b.twsSlow);
+    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed, b.guideAwa, b.guideKt ?? b.ww.kt);
     // (and only if it's worth the trip to them, as they judge it: physics.ts trimSails, controls.ts planWorth; a skilled
     // crew moves the car for ~0.1% of drive, a novice for ~0.4%)
     // (every line of theirs, as trimSails applies the plan: the outhaul off, they may take the backstay up as well)
-    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower, undefined, undefined, b.guideAwa, b.twsSlow), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
+    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower, undefined, undefined, b.guideAwa, b.guideKt ?? b.ww.kt), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
     for (const x of ['traveller', ...FIXABLE] as const) if (fixed[x as keyof CrewSettings] == null && (worth[x] ?? 1) >= minGain) c[x] = plan[x];
     c.mainsheet = mainsheetFor(want, c.traveller);
   }
@@ -277,7 +277,7 @@ function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: numbe
   // Without them the coach found "vang on, hard" upwind in 6–8 kt with the main eased, which the guide forbids: "Never
   // use the kickingstrap upwind in less than 18 knots"; the cure there is the sheet. The guide's minimums aren't
   // applied: whether its outhaul-to-the-mark beats the speed search in a breeze is the open depowering question)
-  const lim = depowerLimits(b.depower ?? 0, b.awa, b.twsSlow ?? b.ww.kt, b.guideAwa), [lo, hi0] = RANGE[k] ?? [0, 1];
+  const lim = depowerLimits(b.depower ?? 0, b.awa, b.guideKt ?? b.ww.kt, b.guideAwa), [lo, hi0] = RANGE[k] ?? [0, 1];
   const hi = Math.max(lo, Math.min(hi0, lim.max[k as keyof CrewSettings] ?? hi0)), base = speedFactor(b, withCrew(b, k, b.ctl[k]), !crewMoving(b, k));
   // (with both sails flogging the drive is nil: a floor, so the line that brings one back still counts)
   let to = b.ctl[k], best = Math.max(base, 0);

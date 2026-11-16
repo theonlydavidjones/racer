@@ -63,7 +63,7 @@ describe('In light air the crew set the lines for her course, not the angles she
     const b = worked.b, L = depowerLimits(b.depower ?? 0, b.awaSlow, 16, b.guideAwa);
     for (const k of ['outhaul', 'cunningham'] as const) expect(b.ctl[k], `${k} up to its floor`).toBeGreaterThan((L.min[k] ?? 0) - 0.05);
   });
-  it('a steady close reach is set the same whichever way she came to it: from the beat or from a broad reach', () => {
+  it('a steady close reach is read the same whichever way she came to it: the guide\'s angle and its ceiling, from the beat or from a broad reach', () => {
     // (the backlash stops a wandering course flipping the guide's settings, then gives way to her angle: held at the
     // beat's for the leg, the vang stayed off for the reach, against the guide's top batten parallel to the boom)
     const reach = (from: number) => {
@@ -74,6 +74,6 @@ describe('In light air the crew set the lines for her course, not the angles she
     const up = reach(42), down = reach(120);
     expect(Math.abs(up.ga - up.awa), 'come to her angle from the beat').toBeLessThan(1);
     expect(Math.abs(down.ga - down.awa), 'and from a broad reach').toBeLessThan(1);
-    expect(Math.abs(up.cap - down.cap), 'the guide\'s vang ceiling the same either way').toBeLessThan(0.02);
+    expect(Math.abs(up.cap - down.cap), 'the guide\'s vang ceiling the same either way, within its deadband (GUIDE_DEAD)').toBeLessThan(0.05);
   });
 });

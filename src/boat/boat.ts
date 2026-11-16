@@ -223,6 +223,11 @@ export interface Boat {
   settleLeft?: number;
   /** Her heading a few seconds back, smoothed (deg): physics.ts SWING_TAU. */
   hSwing?: number;
+  /** Her true wind over a few seconds (kt: controls.ts GUIDE_FAST), the wind the guide's settings are read for (kt:
+   * GUIDE_KT), and how long she has held her course since she last swung (s). */
+  twsFast?: number; guideKt?: number;
+  /** Her heading over LINE_TAU (deg), and the heading the guide's settings were last read at (physics.ts NEW_COURSE). */
+  hHeld?: number; hGuide?: number;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
   byLee?: boolean;
   /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the

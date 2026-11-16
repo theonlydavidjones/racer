@@ -330,17 +330,14 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
 /** The guide's beat settings give way to the crew's own off the wind over this much apparent angle (deg) of backlash:
  * the angle they're read at (Boat.guideAwa) follows hers only once she's this far past it, so a course swinging about
  * 40-60° apparent doesn't send them to the cabin top for one set and back for the other (the Coordinator, 16 Nov 2026).
- * An estimate: North's Folkboat guide gives no angle for changing over, and no reaching settings at all. The wind it's
- * read for is the breeze she's sailing in, her true wind over about 20 s (Boat.twsSlow, as her depowering step reads
- * it; the 20 s an estimate, the guide gives no time), not each puff's: its settings are by the wind's range ("very light winds (0-5 knots)", "medium winds (5-12
- * knots)"), and read in the gust, a 6 kt breeze's puffs and lulls crossing 5 kt sent the crew to the outhaul and back
- * through a beat. */
-export const GUIDE_BACKLASH = 10;
-/** How far over the guide's ceiling (of a line's range) before it's a trip of its own, not a gain to be weighed: a tenth,
- * as the guide's settings are read by eye (an estimate; North gives its outhaul in 1.5 cm steps on a 4 m foot). Crossing
- * its blend on a reach, she drifting a couple of degrees, the vang's ceiling slid 0.08 under where they'd set it, and
- * sent them back up to ease it. */
-export const GUIDE_OVER = 0.1;
+ * An estimate: North's Folkboat guide gives no angle for changing over, and no reaching settings at all. Past it, the
+ * angle comes to hers over a gust-lull cycle (physics.ts), but not for a drift of GUIDE_DEAD or less.
+ *
+ * The wind the guide's read for (Boat.guideKt) is the breeze she's sailing in: its settings are by the wind's range
+ * ("very light winds (0-5 knots)", "medium winds (5-12 knots)", North Sails' Nordic Folkboat Tuning Guide). A build is
+ * read again only once it's GUIDE_KT from where it was read: up to her wind over GUIDE_FAST s as it builds, down to her
+ * wind over 20 s (Boat.twsSlow) as it falls. Estimates: the guide gives no time, and "flatten as it comes on" is the usual practice. */
+export const GUIDE_BACKLASH = 10, GUIDE_DEAD = 3, GUIDE_FAST = 5, GUIDE_KT = 1;
 export function guideLimits(tws: number, awa: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>> } {
   // (the guide's settings are for sailing upwind: full to 40° apparent, gone by a close reach at 60°, where the crew sets
   // the lines for shape alone)
@@ -500,9 +497,7 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
   const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet), out: Partial<Record<keyof CrewSettings, number>> = {};
   for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
     const m = lim.min[k], mx = lim.max[k];
-    // (over the guide's ceiling, its own settings read by eye on the boat, a mark on the boom or a band on the luff: a
-    // line a little over it isn't a trip by itself, GUIDE_OVER; under a depowering floor, for her heel, it is)
-    if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + GUIDE_OVER)) { out[k] = 1; continue; }
+    if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) { out[k] = 1; continue; }
     // with your mainsheet held, the traveller is how they put the boom where it should be: that's the sheet's angle of
     // attack, worth more than any shape
     if (k === 'traveller' && mainsheet != null) { out[k] = Math.abs(plan.traveller - now.traveller) > 0.02 ? 1 : 0; continue; }

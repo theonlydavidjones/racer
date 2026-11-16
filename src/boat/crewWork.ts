@@ -374,7 +374,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       const newCourse = newAngleOf(c, twa, k);
       // (a walk for a real change: a new point of sail, their wish over the cycle well away from the setting (LINE_MOVED), or a line
       // they've not set yet. Urgent too: the wish over the cycle well off counts only once it has moved since the set)
-      const real = realChangeOf(c, twa, ls, k, skill);
+      // (and a line outside what the depowering steps or the guide allow for the breeze and angle she's in is a real change
+      // by definition, planWorth's 1: judged only by its wish's drift, a vang over the guide's ceiling was left there for
+      // minutes, the physics review)
+      const real = (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 0) >= 1 || realChangeOf(c, twa, ls, k, skill);
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
