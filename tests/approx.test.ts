@@ -73,17 +73,24 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
   // one-sided 99% bound under no effect, t(0.99, 47 df) = 2.408 standard errors (the sample's own). Resampling those 64
   // measured pairs: with no effect it fails about one run in a hundred (the old test, one in twenty); a real rise of half
   // again in the fouls (+1 a race) it catches 99 times in 100 (the old, 73); of a third (+0.6 a race), 65 (the old, 38).
-  it('sails no further from the every-step race than a 0.1% change in the current does, over sixteen races, with no more fouls (48)', async () => {
+  it('sails no further from the every-step race than a 0.1% change in the current does, over 48 races, with no more fouls', async () => {
     const dev: number[] = [], nudge: number[] = [];
     let penE = 0, penD = 0;
     const pens = (r: ReturnType<typeof race>) => r.fouls;
-    // (the 64 races sailed side by side on the pool's threads; then, seed by seed as before)
+    // (the 192 races sailed side by side on the pool's threads; then, seed by seed as before)
     const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [0, 11], [0, 12], [0, 13], [0, 14], [1, 7], [1, 8], [1, 9], [1, 10], [1, 15], [1, 16], [1, 17], [1, 18]] as const;
     const jobs = SEEDS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }],
       [i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }], [i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }]]);
     // (the fouls only: 32 more seeds, each sailed both ways; seeds 19–50, the courses in turn)
     const MORE = Array.from({ length: 32 }, (_, k) => [k % 2, 19 + k] as const);
-    jobs.push(...MORE.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }]]));
+    // (and, since 15 Nov 2026, the current's yardstick for those 32 as well, so the deviation is taken over all 48 seeds,
+    // fixed from now on (3–18 and 19–50, as written here): a failure is read against this same set, never one chosen
+    // again. Why: over the sixteen alone its mean has a standard error of about half a point, and with every boat
+    // answering her helm sooner (physics.ts HOVE.gyration) the sixteen drew two wild races near 9.7%: 3.75% against a bound
+    // of 3.58%, where the 32 others gave 1.92% against 3.46%, and all 48 2.53% against 3.49%. Deep Physics' measurement,
+    // Capacity's ruling: more seeds and the same formula, not a looser bound.)
+    jobs.push(...MORE.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }],
+      [i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }], [i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }]]));
     const R = await sail('approxRace', jobs);
     const diff: number[] = []; // (per seed: twenty a second's fouls minus every step's)
     SEEDS.forEach((_, k) => {
@@ -91,7 +98,12 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
       dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR));
       nudge.push((Math.abs(fleetV(upR.boats) / ex - 1) + Math.abs(fleetV(downR.boats) / ex - 1)) / 2);
     });
-    MORE.forEach((_, k) => { const [exR, dR] = R.slice(4 * SEEDS.length + 2 * k, 4 * SEEDS.length + 2 * k + 2); penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR)); });
+    MORE.forEach((_, k) => {
+      const [exR, dR, upR, downR] = R.slice(4 * SEEDS.length + 4 * k, 4 * SEEDS.length + 4 * k + 4), ex = fleetV(exR.boats);
+      dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR));
+      nudge.push((Math.abs(fleetV(upR.boats) / ex - 1) + Math.abs(fleetV(downR.boats) / ex - 1)) / 2);
+    });
+    expect(dev.length).toBe(48);
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(mean(dev), `twenty a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
     const n = diff.length, dm = mean(diff), sd = Math.sqrt(diff.reduce((a, x) => a + (x - dm) ** 2, 0) / (n - 1)), T99 = 2.408; // (t, 47 df)

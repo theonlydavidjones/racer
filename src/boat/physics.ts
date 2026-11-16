@@ -250,6 +250,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const tau = yawLag(b.v + astern), r0 = b.turnRate ?? 0;
   let bladeFlip = astern > b.v && !b.isUser; // (going stern first and steering by the flow: the blade's the other way to the turn)
   let handHelm: number | undefined; // (the helm as your hand holds it, past full helm too: for the blade's drawing and its braking)
+  let flowMost = flow; // (the most the flow past her rudder is turning her this step: more than that is sculling)
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
@@ -260,7 +261,9 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // (the tiller in your hand swings to hard over, HELM_MAX: the turn grows with it to the rudder's stall and falls
       // off past it, where the blade brakes more than it turns (balance.ts rudderTurn). A steering key asks her
       // helmsman for her quickest turn: the helm at the stall, no farther)
-      const helm = clamp(b.steer * HELM_STALL - b.tiller, -HELM_MAX, HELM_MAX);
+      // (a key held with the tiller already over the same way doesn't push it past the stall: the hand alone does that)
+      const hand = -b.tiller, key = b.steer * HELM_STALL;
+      const helm = clamp(key !== 0 && Math.sign(hand) === Math.sign(key) ? Math.sign(key) * Math.max(Math.abs(hand), Math.abs(key)) : hand + key, -HELM_MAX, HELM_MAX);
       if (helm !== 0) b.turnTarget = null;
       // going astern the rudder works backwards: the bow goes the way you push the tiller. Sculled (where that turns her
       // faster than the flow does), she turns the way the tiller's pumped, as with way on, whichever way she's drifting
@@ -270,11 +273,13 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // (that's the tiller in your hand, which is where you put it. A steering key asks for the turn: her helmsman
       // works the helm for it, sculling her round where the rule allows, as before, sternway or none)
       const sculls = b.steer !== 0 || !(sternFirst && astern > STEERS_ASTERN);
-      const byFlow = dirFlow * rudderTurn(Math.abs(helm)) * flow, sculled = sculls && d && scullOK(d) ? d * Math.min(1, Math.abs(helm)) * HANDLING.minTurnRate : 0;
+      // (never past her hard-over rate, HANDLING.maxTurnRate, however fast she's going)
+      const byFlow = dirFlow * Math.min(rudderTurn(Math.abs(helm)) * flow, Math.max(flow, HANDLING.maxTurnRate)), sculled = sculls && d && scullOK(d) ? d * Math.min(1, Math.abs(helm)) * HANDLING.minTurnRate : 0;
       rate = Math.abs(sculled) > Math.abs(byFlow) ? sculled : byFlow;
       if (sternFirst && rate === byFlow) bladeFlip = true;
       // (the blade where your hand has it, the way she's turning: drawn there, at rest too)
       handHelm = (Math.sign(rate) || dirFlow) * Math.abs(helm);
+      flowMost = Math.max(flow, Math.abs(byFlow)); // (past full helm the flow turns her faster than `flow`: that isn't sculling)
     }
     rudder = handHelm ?? clamp(rate / Math.max(1e-6, maxRate), -1, 1);
     if (b.turnTarget == null) rate += balRate + motRate; // let go of the tiller and she rounds up (or bears away), or the motor swings her
@@ -312,8 +317,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     rudder = clamp((rate - balRate - motRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
   }
   // (sculling in use: she's turning faster than the flow alone would turn her; latched to that way until close-hauled)
-  if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flow + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
-  if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
+  if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flowMost + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
+  if (bladeFlip && Math.abs(rate) > flowMost + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
   b.helm = clamp(bladeFlip ? -rudder : rudder, -HELM_MAX, HELM_MAX); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
   b.weatherHeld = -helmSide * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
   // (paddling on one side swings her too, against the same inertia and the water's resistance to her turning: paddle.ts)
@@ -551,11 +556,11 @@ export function turnBleed(rate: number, v: number, h: number, windFrom: number, 
 /**
  * How long (s) her turn takes to answer the helm at speed u (m/s) through the water: the time constant of a first-order
  * (Nomoto) yaw response, her yaw inertia over the water's yaw damping, from her own hove-to model (HOVE, heaveTo): the
- * moment of inertia, with the water's added mass, I = m·(0.25·LOA)²·1.4, against the damping the hull's strips and the
+ * moment of inertia, with the water's added mass, I = m·(HOVE.gyration·LOA)²·1.4, against the damping the hull's strips and the
  * rudder give as she turns, both growing with her speed (the keel's lift ½ρ·A·(πAR/2)·u·L²/12 and the rudder's
- * ½ρ·u·A_R·slope·flow·arm²). 0.6 s at 4.7 kt, 1.4 s at 2 kt, 2.8 s at 1 kt. (No measured value for a yacht was found.
+ * ½ρ·u·A_R·slope·flow·arm²). 0.36 s at 4.7 kt, 0.85 s at 2 kt, 1.7 s at 1 kt (with HOVE.gyration 0.19). (No measured value for a yacht was found.
  * The broadside cross-flow drag damps her turn too, which this linear figure leaves out: about 20% quicker at 4.7 kt
- * turning hard. At a standstill it's all there is: sculled at 4°/s it gives 7–8 s, near the 5.8 s the speed's floor,
+ * turning hard. At a standstill it's all there is: sculled at 4°/s it gives 7–8 s (4–5 with the lighter inertia), near the 3.4 s the speed's floor,
  * 0.25 m/s, gives.)
  */
 let yawK = 0, yawPerU = 0;
@@ -618,9 +623,10 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const ww = b.ww, toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, D = D2R;
   const RHO = 1025, RHO_A = 1.225;
   // the helm: lashed, or wherever you hold it, or hard over through a tack or gybe you've called for (+ turns her to starboard)
-  // (past full helm the blade's stalled: no more side force than at full helm here, an estimate. Drawn where it's held)
+  // (past full helm the blade's side force is no more than at full helm here, and past the stall it falls off as it does
+  // sailing: balance.ts rudderTurn, an estimate. Drawn where it's held)
   const held = clamp(b.steer - b.tiller, -HELM_MAX, HELM_MAX);
-  let helm = clamp(held, -1, 1);
+  let helm = Math.sign(held) * Math.min(1, rudderTurn(Math.abs(held)));
   if (b.turnTarget != null && b.steer === 0) {
     const err = wrap(b.turnTarget - b.h);
     if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) b.turnTarget = null; else helm = b.turnDir;

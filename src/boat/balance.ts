@@ -117,27 +117,34 @@ export const HELM_MAX = HARD_OVER / FULL_RUDDER, HELM_STALL = RUDDER_STALL / FUL
  * Hoerner, Fluid-Dynamic Drag, ch. 3: 2π·sin a / (4 + π·sin a); 0.88 square on). */
 const plateCn = (a: number) => 2 * Math.PI * Math.sin(a) / (4 + Math.PI * Math.sin(a));
 const STALL_SIDE = plateCn(RUDDER_STALL * D2R) * Math.cos(RUDDER_STALL * D2R), STALL_DRAG = plateCn(RUDDER_STALL * D2R) * Math.sin(RUDDER_STALL * D2R);
+/** The most turn the rudder gives, at the stall, as a multiple of full helm's: see rudderTurn. */
+const TURN_PEAK = 1 + (HELM_STALL - 1) / 2;
 /**
- * The turn the rudder gives at `helm` (its units, 0 and up), as a multiple of full helm's (FULL_RUDDER's): in step with the
- * angle up to the stall (a third more turn at 40 degrees than at 30: a 6.8 m radius for 9), then falling as a stalled
- * plate's side force does, its normal force's part across the flow (0.94 of the most at 50 degrees, 0.79 at 60, 0.43 at
- * 75: hard over she turns less than half as fast as at the stall, and stops).
+ * The turn the rudder gives at `helm` (its units, 0 and up), as a multiple of full helm's (FULL_RUDDER's). In step with
+ * the angle up to full helm, as it has always been here. From there to the stall it rounds off, as a flap's lift does
+ * well before it stalls (a parabola from full helm's slope to none at the stall): a sixth more turn at 40 degrees than
+ * at 30, a 7.7 m radius for 9. Past the stall it falls as a stalled plate's side force does, its normal force's part
+ * across the flow (0.94 of the most at 50 degrees, 0.79 at 60, 0.43 at 75: hard over she turns half as fast as at full
+ * helm, and stops). The shape past full helm is an ESTIMATE (the physics review, 15 Nov 2026: growth in step with the
+ * angle all the way to 40 degrees would ask a lift coefficient over 2 of the blade).
  */
 export function rudderTurn(helm: number): number {
-  if (helm <= HELM_STALL) return helm;
+  if (helm <= 1) return helm;
+  if (helm <= HELM_STALL) return 1 + (helm - 1) - (helm - 1) ** 2 / (2 * (HELM_STALL - 1));
   const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
-  return HELM_STALL * plateCn(a) * Math.cos(a) / STALL_SIDE;
+  return TURN_PEAK * plateCn(a) * Math.cos(a) / STALL_SIDE;
 }
 /**
- * The stalled rudder's braking, N, at `helm` (its units) and v m/s: a flat plate's drag at that angle, ½ρv²·A·Cn·sin a,
- * less the part the turn's own bleed of speed already has (physics.ts turnBleed, which goes by how fast she's turning:
- * the drag at the stall, in the measure of the turn she still gets). Hard over at 4.7 kt, about 800 N: with nothing
- * else, a knot off her in under 2 s.
+ * The stalled rudder's braking, N, at `helm` (its units) and v m/s (ahead: sternway isn't braked by it here): a flat
+ * plate's drag at that angle, ½ρv²·A·Cn·sin a, less a share for what the turn's own bleed of speed already has
+ * (physics.ts turnBleed, which goes by how fast she's turning: the plate's drag at the stall, in the measure of the turn
+ * she still gets). Nothing at the stall, about 800 N hard over at 4.7 kt: with the turn's bleed, some 10 to 15% under
+ * the plate's drag alone there (the physics review's sum), an ESTIMATE. With nothing else, a knot off her in under 2 s.
  */
 export function rudderBrake(helm: number, v: number): number {
   if (helm <= HELM_STALL) return 0;
   const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
-  return 0.5 * RHO_W * v * v * RUDDER.area * (plateCn(a) * Math.sin(a) - STALL_DRAG * rudderTurn(helm) / HELM_STALL);
+  return 0.5 * RHO_W * v * v * RUDDER.area * (plateCn(a) * Math.sin(a) - STALL_DRAG * rudderTurn(helm) / TURN_PEAK);
 }
 /**
  * Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. Sailing texts put it at about 3–5°
