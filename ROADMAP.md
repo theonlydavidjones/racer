@@ -500,6 +500,10 @@ What's planned, roughly in order. Done work is described in the README.
      option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
      thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
      and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
+   - **Bug: a crewmate standing upright on the rail** (owner, 16 November, a screenshot: "bro just out here standing on
+     the rail"; bug; now; 1–3 h): a crew figure stands straight-legged on the side deck at the rail, leaning outboard,
+     with no seat under him. Find the state that poses it (a move or a hike pose before he sits), and a test in
+     tests/crewfig.test.ts that no hand is standing on the deck while she's sailing and he isn't moving.
    - Hands on what they'd really hold, hiking on a beat (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
      out, crew seem to be holding on to thin air. IRL, when beating, forward crew would be holding the lee jib sheet, and
      middle crew would be holding the traveller and/or mainsheet, often tucking their aft leg under the thwart for
@@ -880,6 +884,14 @@ What's planned, roughly in order. Done work is described in the README.
      have two separate maps: one for conditions and one for navigation." The passage plan (destination, track, hazards)
      drawn on the inset and the expanded chart beside the wind, current and wave layers; the separate navigator panel
      retired. Supersedes the fix above once built.
+   - **The boat's own controls, in one menu** (owner, 16 November; feature; next, not urgent; 4–6 h; placement shown to
+     the owner first): "I want to make certain boat controls available during cruising and racing: opening/closing the
+     companionway door and hatch, turning the cabin lantern on and off, turning nav lights on and off, raising or
+     striking the burgee and other flags. they should all be tucked into the same menu somewhere. find a good place and
+     show me when the time is right." Today the companionway and hatch are set only in the boat editor. Proposed home:
+     one "Boat" group in the Tools tray, no new button; the mock-up once the UI audit and the one-chart work have
+     settled the tray. Science: navigation lights sunset to sunrise and in restricted visibility (COLREGs rules 20, 25),
+     the ensign's hours kept; later, an open companionway counts in a knockdown's downflooding.
    - **Bug: lashing the tiller less than about 13° off the centerline lashes it amidships** (owner, 15 November; bug;
      <1–2 h): "tiller lashing is glitching when I try to lash it less than 13ish degrees off centerline. it just lashes
      it amidships." Leads in src/app.ts:
