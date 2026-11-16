@@ -35,6 +35,11 @@ export const TURN_SEEN = 3, CUE_MAX = 6;
 export const CALL_WAIT_MAX = 15;
 /** A decided turn held as one this long at most, waiting for her to make it (s): an estimate. */
 export const TURN_HOLD = 60;
+/** An AI helm waits for her crew this long at most (s): past the slowest crew's getting ready. */
+export const AI_WAIT_MAX = 6;
+/** ... and on a tack to answer a hail, at most this (s): within rule 20.2's time for the hailed boat to begin her tack,
+ * HAIL_RESPONSE 5 s with her crew's getting ready in it (WS Case 54), and the hailer's following within a couple of seconds. */
+export const HAIL_WAIT = 2;
 /** The share of decided turns an AI skipper calls at skill 0, and at 1 (estimates). */
 export const CALL_AT = { novice: 0.35, expert: 0.98 };
 /** The jobs a crew member can't leave mid-way to answer a call: they say "Not ready" (crewWork.ts's committed jobs). */
@@ -63,6 +68,15 @@ export function decideTurn(b: Boat, t: number, always = false): void {
   if (always || callsTurn(b, n)) b.callT = t;
 }
 
+/** An AI boat's crew ready for the turn her skipper has called: each has had their prepTime since the call (a job they
+ * can't leave doesn't hold her: her skipper calls with it in mind; `most` at most). The owner, 16 Nov 2026: AI boats wait
+ * for their crew as your helm does, on a planned turn (ai.ts: never one to keep clear of anything). */
+export function aiCrewReady(b: Boat, t: number, most = AI_WAIT_MAX): boolean {
+  const c = b.crew, t0 = b.decidedT; if (!c || t0 == null) return true; // (from when it was called, the decision: the call itself is kept fresh till she turns, decideTurn)
+  if (t - t0 >= most) return true;
+  for (let i = 0; i < c.spec.crew.length; i++) if (t - t0 < prepTime(c.spec.crew[i]!)) return false;
+  return true;
+}
 /** Your call, waiting on the crew: ready once each has had their prepTime since the call, and none is busy at a job
  * they can't leave. 'busy' if someone is. */
 export function crewAnswer(b: Boat, t: number): 'ready' | 'busy' | 'getting' {

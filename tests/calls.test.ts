@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
 import { DEFAULT_CREW, newCrew, type CrewSpec } from '../src/boat/crewPhys';
-import { CALL_AT, boomStrike, callsTurn, decideTurn } from '../src/boat/calls';
+import { AI_WAIT_MAX, CALL_AT, HAIL_WAIT, aiCrewReady, boomStrike, callsTurn, decideTurn } from '../src/boat/calls';
 import { beatAngle } from '../src/boat/polar';
 import { World, DT } from '../src/sim/world';
 import { courseFile } from '../src/courses/registry';
@@ -211,4 +211,17 @@ describe('Review round 2: sailing alone, a tap of the key, the helm on the main'
     let went = false; for (let i = 0; i < 60 * 5 && !went; i++) { w.step(DT); went = u.turnTarget != null; }
     expect(went).toBe(true);
   }, 120_000);
+});
+
+describe('An AI boat waits for her crew on a called turn, as your helm does (the owner, 16 Nov 2026: calls.ts aiCrewReady)', () => {
+  const ready = (skill: number, after: number, most?: number) => {
+    const b = testBoat({ heading: 0, kt: 5, windKt: 12 }); b.isUser = false; b.crew = newCrew(crew(skill), 'S');
+    b.decidedT = 10; b.callT = 10; return aiCrewReady(b, 10 + after, most);
+  };
+  it('an expert crew is ready in about a second, a novice in four or five; never more than AI_WAIT_MAX; a hail\'s tack HAIL_WAIT', () => {
+    expect(ready(0.95, 0.5)).toBe(false); expect(ready(0.95, 1.2)).toBe(true);
+    expect(ready(0.2, 3)).toBe(false); expect(ready(0.2, 5)).toBe(true);
+    expect(ready(0, 5.5), 'the slowest, 5.6 s').toBe(false); expect(ready(0, AI_WAIT_MAX)).toBe(true);
+    expect(ready(0.2, HAIL_WAIT, HAIL_WAIT), 'within rule 20.2\'s time').toBe(true);
+  });
 });
