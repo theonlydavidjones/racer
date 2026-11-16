@@ -39,6 +39,18 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
   Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
   perf-pair --ai, then the physics-reviewer.
+- **The way round the land out of the Estuary runs through Alameda** (Bay East, 16 Nov 2026, found reviewing #442; the
+  Coordinator: Bay East's, next): sim/routing.ts routeAround from the Estuary's harbors (Encinal, Oakland YC, Marina
+  Village, Fortmann, Grand Marina, Alameda Marina) to the central Bay (Pier 39, Alcatraz) gives a single straight leg
+  through Alameda, on main as on #442: 186 of 1356 ways out of the harbors' entrances. The way out is down the Estuary
+  and round Alameda's west end. Found: at 120 m off the land every cell of the Estuary was blocked. Fixed on
+  estuary-route: where no way is found, half as far off and half again, down to 30 m, her width kept on every leg then;
+  0 of 156 harbor-to-harbor ways now cross the land. And the call-off's ways home are worked out a slice a step (from off
+  Emeryville the fleet's took ~400 ms in each of three steps).
+- **A room for each cell of the way round the land** (the physics review of estuary-route; the Coordinator, 16 Nov 2026:
+  a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
+  Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
+  120/60/30 m it allows, or a cost for less, so only the narrow reach is sailed close.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
@@ -350,6 +362,32 @@ What's planned, roughly in order. Done work is described in the README.
    Symptom (b), sails dead while she's handled, is the scripted push-off by design (world.ts:1283). Once the walk
    leaves her pointing out, a short hand-over is enough; giving her sails during the walk drove her back into the
    slips in the replay.
+
+8m3. **Let go from the bow-line swing with room to sail off** (Marinas, 15 November; found once the moored boats were solid,
+   8m2; on the coordinator's call, ahead of the navigator). A sweep (every berth whose plan was the swing on her bow line, in
+   12 and 15 kt from 270, 225 and 000: 1,604 cases at 753 berths) found the crew's swing itself touches no moored boat
+   anywhere. But let go at the finger's end, the jib going up, she hit a boat within 15 m in 1,124 cases (593 berths), even
+   with her heading held: let go along the row, the next boat's stern just off her bow, and set 1–2 m to leeward as she
+   gathered way. The planner's clear run ahead was checked every 2 m with no margin.
+   - **Done (geo/marina.ts clearRun):** a let-go with only the crew's push for way needs her hull half a meter bigger all
+     round clear for her first 15 m, sagging 1.75 m to leeward in 12 kt (in proportion to the wind), and in a breeze 60
+     degrees and more off the wind. The walk-out is held to the same, and is tried before the astern shove wherever no
+     swing passes. The astern shove too, where her coast ends (the coordinator's ruling, 16 Nov 2026): where the clear
+     water isn't there, she's kept fast and told, the motor offered where she has one. The same 1,604 cases now: 1,296
+     walked out, 148 held for the main, 118 on the bow line, 11 shoved off astern (steered as the plan says), none
+     touching a boat or a dock; 31 kept fast (before, the astern shove touched in 27 of its 42). West Harbor 507 in a
+     12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
+     held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
+   - **Still to do (Deep Physics' review, 16 Nov 2026):**
+     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
+       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
+       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
+       or motored out. The sweep test fails if the count rises.
+     - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
+       astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
+       the test.
+     - **The sag is gauged at the slip's own wind:** the lee's edge a few meters out, where the breeze is fresher, isn't
+       in it.
 
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
