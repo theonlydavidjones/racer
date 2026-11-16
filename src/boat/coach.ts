@@ -277,7 +277,7 @@ function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: numbe
   // Without them the coach found "vang on, hard" upwind in 6–8 kt with the main eased, which the guide forbids: "Never
   // use the kickingstrap upwind in less than 18 knots"; the cure there is the sheet. The guide's minimums aren't
   // applied: whether its outhaul-to-the-mark beats the speed search in a breeze is the open depowering question)
-  const lim = depowerLimits(b.depower ?? 0, b.awa, b.ww.kt), [lo, hi0] = RANGE[k] ?? [0, 1];
+  const lim = depowerLimits(b.depower ?? 0, b.awa, b.ww.kt, b.guideAwa), [lo, hi0] = RANGE[k] ?? [0, 1];
   const hi = Math.max(lo, Math.min(hi0, lim.max[k as keyof CrewSettings] ?? hi0)), base = speedFactor(b, withCrew(b, k, b.ctl[k]), !crewMoving(b, k));
   // (with both sails flogging the drive is nil: a floor, so the line that brings one back still counts)
   let to = b.ctl[k], best = Math.max(base, 0);

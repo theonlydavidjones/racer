@@ -15,11 +15,13 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
+import { LINE_GAP, bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
-/** Settled on her course (s) before her crew go to the cabin top's lines; and how far off the course she's after (deg) counts as
- * swinging still (estimates: a turn's own settling, crewPhys.ts HOLD.settle, and the heel and speed coming back). */
-const SETTLE_S = 5, SWING_OFF = 30;
+/** Swinging: her heading this far (deg) past where it has been over SWING_TAU (s), a turn kept up at over about
+ * SWING_DEG / SWING_TAU, 3.2°/s; and settled this long after it (s) before her crew go to the cabin top for a small gain
+ * (estimates: past a helm's correction, a key's tap at 5°/s for a fraction of a second; a turn's settling, crewPhys.ts
+ * HOLD.settle's 4 s and her speed and heel coming back). */
+const SWING_DEG = 8, SWING_TAU = 2.5, SETTLE_S = 5;
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
@@ -1389,13 +1391,17 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   const mineNow = b.isUser ? linesByHand(b).join() : '';
   if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; }
   // (the angle the guide's settings are read at: hers, but past a backlash: controls.ts GUIDE_BACKLASH)
-  { const a = Math.abs(b.awaSlow); b.guideAwa = b.crewReady ? clamp(b.guideAwa ?? a, a - GUIDE_BACKLASH, a + GUIDE_BACKLASH) : a; }
-  // (swinging, through a turn or a long way off the course she's after, they're on the sheets, not the cabin top: the
-  // lines that need a trip wait till she's settled, SETTLE_S after, as a crew resets them for the course she's on, not
-  // the angles she passes through. A failed tack in a drifter falling off and round through a jibe swept her 14 to 100°
-  // apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
-  const swinging = Math.abs(b.turnRate ?? 0) > TURN_SEEN || (!b.isUser && b.desired != null && Math.abs(wrap(b.desired - b.h)) > SWING_OFF);
-  b.settleLeft = swinging ? SETTLE_S : Math.max(0, (b.settleLeft ?? 0) - dt);
+  // (and once she holds a course it comes to hers, over a gust-lull cycle, LINE_GAP: the backlash stops a wandering
+  // course flipping their settings, but doesn't keep a reach on the beat's settings for the leg, the Deep Physics review)
+  { const a = Math.abs(b.awaSlow);
+    b.guideAwa = b.crewReady ? clamp(b.guideAwa ?? a, a - GUIDE_BACKLASH, a + GUIDE_BACKLASH) : a; b.guideAwa += (a - b.guideAwa) * Math.min(1, dt / LINE_GAP); }
+  // (swinging, her heading running away from where it was a few seconds ago, SWING_DEG past her heading over SWING_TAU:
+  // a turn kept up at over about 3°/s, not a helm's correction; then they're on the sheets, and the cabin-top lines that
+  // only gain a little wait till she's settled, SETTLE_S after (crewWork.ts): a crew resets them for the course she's on,
+  // not the angles she passes through. A failed tack in a drifter falling off and round through a jibe swept her 14 to
+  // 100° apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
+  b.hSwing = b.hSwing == null || !b.crewReady ? b.h : n360(b.hSwing + wrap(b.h - b.hSwing) * Math.min(1, dt / SWING_TAU));
+  b.settleLeft = Math.abs(wrap(b.h - b.hSwing)) > SWING_DEG ? SETTLE_S : Math.max(0, (b.settleLeft ?? 0) - dt);
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
@@ -1436,14 +1442,13 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // (and the small ones together when they add up to a trip's worth: controls.ts worthTogether)
   { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, also = ready ? b.crewTogether : undefined;
     const pick = (w: number | undefined, k: string) => (w ?? 1) >= minGain || !ready || (also !== undefined && also.has(k));
-    const settled = !ready || !(b.settleLeft! > 0), top = (w: number | undefined, k: string) => settled && pick(w, k);
-    if (!user || !byHand(b, 'vang')) want.vang = top(W?.vang, 'vang') ? t.vang : c.vang;
-    if (!user || !byHand(b, 'outhaul')) want.outhaul = top(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
-    if (!user || !byHand(b, 'cunningham')) want.cunningham = top(W?.cunningham, 'cunningham') ? t.cunningham : c.cunningham;
-    if (!user || !byHand(b, 'downhaul')) want.downhaul = top(W?.downhaul, 'downhaul') ? t.downhaul : c.downhaul;
+    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang, 'vang') ? t.vang : c.vang;
+    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
+    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham, 'cunningham') ? t.cunningham : c.cunningham;
+    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul, 'downhaul') ? t.downhaul : c.downhaul;
     if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay, 'backstay') ? t.backstay : c.backstay;
-    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = top(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
-    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = top(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
+    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
+    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
     if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller, 'traveller') ? t.traveller : c.traveller; }
   if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!held('jibsheetW')) want.jibsheetW = 1;
