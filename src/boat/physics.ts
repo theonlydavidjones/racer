@@ -1359,8 +1359,14 @@ function crewSettle(b: Boat, dt: number): void {
   // its setting and sent them up to ease it)
   // (wider in light air, controls.ts GUIDE_LIGHT_, read for the guide's wind as it was last read)
   { const a = Math.abs(b.awaSlow), bl = GUIDE_BACKLASH_ + GUIDE_LIGHT_ * clamp_((GUIDE_LIGHT_KT_ + 5 - s[SETTLE.guideKt]) / 5, 0, 1);
-    s[SETTLE.guideAwa] = b.crewReady ? clamp_(s[SETTLE.guideAwa], a - bl, a + bl) : a;
-    const off = a - s[SETTLE.guideAwa]; if (Math.abs(off) > GUIDE_DEAD_) s[SETTLE.guideAwa] += (off - Math.sign(off) * GUIDE_DEAD_) * Math.min(1, dt / LINE_GAP_); }
+    // (not while she's swinging, or till she's held a course NEW_HELD after: the angles she turns through aren't a course.
+    // Dragged round by a slow penalty circle on the beat, it came back through the backlash and the blend over a minute,
+    // and the vang came off in two trips, crewstation's 6 kt seed 14; a new course is read at once when it's held, below)
+    if (!b.crewReady) s[SETTLE.guideAwa] = a;
+    else if (s[SETTLE.since] >= NEW_HELD) {
+      s[SETTLE.guideAwa] = clamp_(s[SETTLE.guideAwa], a - bl, a + bl);
+      const off = a - s[SETTLE.guideAwa]; if (Math.abs(off) > GUIDE_DEAD_) s[SETTLE.guideAwa] += (off - Math.sign(off) * GUIDE_DEAD_) * Math.min(1, dt / LINE_GAP_);
+    } }
   // (and the wind it's read for: the breeze she's sailing in, not each puff. Read again only once it's GUIDE_KT_ from where
   // it was read: up to her wind over a few seconds as it builds, down to her wind over 20 s as it falls. In 4-6 kt, a
   // breeze wandering across the guide's 5 kt step sent them to the outhaul and back, three times in a beat)
@@ -1396,6 +1402,9 @@ function crewSettle(b: Boat, dt: number): void {
   if (!b.crewReady) { s[SETTLE.twaGuide] = twa; s[SETTLE.hGuide] = b.h; }
   else if (Math.abs(twa - s[SETTLE.twaGuide]) > NEW_COURSE_ && Math.abs(wrap_(b.h - s[SETTLE.hGuide])) > NEW_HEADING && Math.abs(wrap_(b.h - s[SETTLE.hSwing])) < 1
     && ((s[SETTLE.since] >= NEW_HELD && s[SETTLE.since] < LINE_GAP_) || Math.abs(wrap_(b.h - s[SETTLE.hHeld])) < HELD_DEG)) { s[SETTLE.twaGuide] = twa; s[SETTLE.hGuide] = b.h; s[SETTLE.guideAwa] = Math.abs(b.awaSlow); }
+  // (and back on the course it was read for after a swing, held NEW_HELD: read at her angle now, as it was held through
+  // the swing, above)
+  else if (s[SETTLE.since] >= NEW_HELD && s[SETTLE.since] - dt < NEW_HELD && Math.abs(twa - s[SETTLE.twaGuide]) <= NEW_COURSE_) s[SETTLE.guideAwa] = Math.abs(b.awaSlow);
 }
 
 /**

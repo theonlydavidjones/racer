@@ -679,7 +679,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // (and while they've yet to react to a new place, as they were: not drawn at the mast, sat in the cockpit, for the
     // second before they get up to go there; then up and across, and at the mast as they come to it, one trip, not the mast's
     // pose, a crossing and the mast's again, crewcruise's 6 kt beam reach, seed 2)
-    const tPose: Pose = a.react > 0 ? a.pose : t.pose;
+    const tPose: Pose = a.react > 0 && !a.job ? a.pose : t.pose;
     const free = tPose === 'sit' || tPose === 'hike' || tPose === 'lee';
     // (with a dead band: someone sat on the edge of hiking, their weight going out and in a little with each puff, is
     // still sitting there, not drawn flicking from sitting to hiking and back several times a second)
