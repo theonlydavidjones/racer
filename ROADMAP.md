@@ -29,11 +29,16 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; ~~chunky generic moored boats in the marinas~~ (done: the slips within 120 m of the camera drawn in detail, boot stripe and bottom paint, cockpit well, raked cabin with its windows, shrouds and spreaders, pulpits and lifelines; the rest with bottom paint, shrouds and a cockpit sole; render/mooredNear.ts). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
-- **The beat angle in chop jumps** (now, Deep Physics, 16 November, sent by the Roadmap session; for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
+- ~~**The beat angle in chop jumps**~~ (done: the angle's choice blended, 8e8e7c06; Deep Physics, 16 November; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
+  estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
+  put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
+  Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
+  perf-pair --ai, then the physics-reviewer.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
