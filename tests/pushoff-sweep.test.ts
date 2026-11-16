@@ -67,12 +67,13 @@ describe('every berth has a plan that passes: a sample of the bow-in berths in s
     // since a walk-out in mid-fairway with nobody on the dock to turn her, and with no set to leeward as she came round,
     // was let go where a real crew couldn't turn her; held to the force a crew has, the hand's 186 N and the slip line's
     // 271 N against the wind, and to the set it lets her take, some can't be. From here it should only go down: ROADMAP 8m3)
-    expect(count).toEqual({ 'walked out, stern line': 48, 'walked out, slip line': 343, 'kept fast': 31, 'bow line': 9, 'held for the main': 3 });
+    expect(count).toEqual({ 'walked out, stern line': 8, 'walked out, slip line': 383, 'kept fast': 31, 'bow line': 9, 'held for the main': 3 });
   }, 1_800_000);
-  it.skipIf(ALL)('the slip line, held and not: set no more than 2 m while the crew\'s haul holds her, her bare-rig drift for the whole turn beyond (about 16 kt)', () => {
+  it.skipIf(ALL)('the slip line, held and not: set no more than 2 m while the crew\'s haul holds her (about 16 kt), rising to her bare-rig drift as the wind overpowers it', () => {
     expect(slipLineSet(90, 12)).toBe(2); expect(slipLineSet(30, 6)).toBeCloseTo(0.017 * 6 * 15, 6); // (held: a short turn in light air sets her less)
-    expect(slipLineSet(90, 18)).toBeCloseTo(0.017 * 18 * 45, 6); expect(slipLineSet(90, 18)).toBeGreaterThan(2); // (beyond the haul: the whole drift, 45 s of it)
-    expect(slipLineSet(90, 16)).toBe(2); expect(slipLineSet(90, 17)).toBeGreaterThan(2);
+    expect(slipLineSet(90, 20)).toBeCloseTo(0.017 * 20 * 45, 6); // (the wind's push beating the haul outright: the whole drift, 45 s of it)
+    expect(slipLineSet(90, 16)).toBe(2); const s17 = slipLineSet(90, 17), s18 = slipLineSet(90, 18); // (between: the line eased as it's overpowered)
+    expect(s17).toBeGreaterThan(2); expect(s18).toBeGreaterThan(s17); expect(s18).toBeLessThan(0.017 * 18 * 45);
   });
   it.skipIf(ALL)('three found on the way, 16 Nov 2026: let go nearer the wind, she sags further; and never let go pointing back into her own slip', () => {
     // (West Harbor 757 in 15 kt from 225: let go 61 degrees off the wind on a slip line, she sagged 2.4 m over her first 14 m,

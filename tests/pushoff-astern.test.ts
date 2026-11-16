@@ -177,22 +177,24 @@ describe('pushed off astern', () => {
     for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); if (!berthClear(u, u.h, s) || w.drainEvents().some(e => e.type === 'toast' && /Bump|Collision|hit /.test(e.msg))) return null; } // (stopped by a dock or a moored boat: no glide to compare)
     return { went, want };
   };
-  for (const [from, name, kt, floor] of [[0, 'northerly', 20, 0], [90, 'easterly', 20, 0], [0, 'northerly', 12, 1]] as const) it(`in a ${kt} kt ${name}, she stops where the plan meant her to (a meter short of its clear water, or her steerage floor's glide): within 15%, stern first, the helm amidships`, () => {
-    // (up to six berths a harbor, spread along its docks, as ever; up to a dozen shoves she's let go from among them, only
-    // as a time limit. Since the walk-out and the shove are held to the force a crew has and to clear water, 16 Nov 2026,
-    // few are let go astern in a breeze: in this sample none in 20 kt from the east, and the 12 kt northerly is the case that
-    // must have one, the property tested in a breeze there)
+  for (const [from, name, kt, wide] of [[0, 'northerly', 20, true], [90, 'easterly', 20, true], [0, 'northerly', 12, false]] as const) it(`in a ${kt} kt ${name}, she stops where the plan meant her to (a meter short of its clear water, or her steerage floor's glide): within 15%, stern first, the helm amidships`, () => {
+    // (up to six berths a harbor, spread along its docks, as ever; in 20 kt, where since the walk-out and the shove are held
+    // to the force a crew has and to clear water (16 Nov 2026) few are let go astern, every bow-in berth, for the cases there
+    // are. Up to a dozen shoves she's let go from, only as a time limit. A property of every such shove: at least one case)
     const bad: string[] = []; let n = 0;
-    for (const H of HARBORS) {
-      const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
-      const k = Math.min(6, all.length);
-      for (let i = 0; i < k && n < 12; i++) {
-        const s = all[Math.floor(i * all.length / k)];
-        const g = glideAt(s, from, kt); if (!g) continue;
-        n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
-      }
+    const pick = wide ? SLIPS.filter(s => s.kind === 'bow-in' && [kt, kt - 4].some(k => { const p = pushOffPlan(s, from, k); return p.kind === 'astern' && !p.noRoom; }))
+      : HARBORS.flatMap(H => { const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'), k = Math.min(6, all.length); return Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]); });
+    for (const s of pick) {
+      if (n >= 12) break;
+      const g = glideAt(s, from, kt); if (!g) continue;
+      n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
     }
-    expect(n).toBeGreaterThanOrEqual(floor); expect(bad).toEqual([]); // (a property of every such shove: at least one case, where one's let go)
+    // (in a 20 kt northerly, no berth anywhere has a shove she's let go from, 16 Nov 2026: one planned at the open wind's
+    // lighter edge, and in the World's own wind at her slip she's walked out or kept fast instead. So the property can't be
+    // tested there: none, exactly, a tripwire. The 12 kt northerly tests it in that wind. Should a 20 kt northerly shove
+    // come back, this fails, and asks for it to be held to the glide as the rest are)
+    if (from === 0 && kt === 20) expect(n).toBe(0); else expect(n).toBeGreaterThanOrEqual(1);
+    expect(bad).toEqual([]);
   }, 600_000);
   // (Corinthian B16 in the northerly and Horseshoe Bay A27 in the easterly were each held apart for a time as known
   // failures: let go in a lee, the land's or the harbor's, and drifting out of it into more wind, B16 sailed 17.7 m
