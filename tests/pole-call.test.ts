@@ -21,6 +21,18 @@ describe('The AI crew\'s pole call (ai.ts crewPoleCall)', () => {
     });
     expect(calls, 'pole calls while circling').toBe(0);
   });
+  it('a circle too slow to be a swing (2.5°/s), through the run: the pole is never called for either', () => {
+    // (under about 3°/s she's not swinging, Boat.settle's since, and is past 157° some 18 s unbroken: her heading's
+    // turned more than POLE_TURN by then, the physics review)
+    const b = testBoat({ heading: 315, kt: 3, windKt: 6 }); b.crew = crew(); const w = world();
+    let h = 315, calls = 0, was = false;
+    sail(b, 300, t => {
+      if (t > 30) { h = (h + 2.5 / 60) % 360; b.h = h; b.desired = h; }
+      (w as { t: number }).t = t; crewPoleCall(w, b);
+      if (b.poleWant && !was) calls++; was = !!b.poleWant;
+    });
+    expect(calls, 'pole calls while circling').toBe(0);
+  });
   it('a run held: the pole is called for within a quarter of a minute, and a 3 s luff to 148° doesn\'t take it in', () => {
     const b = testBoat({ heading: 180 - 15, kt: 3, windKt: 6 }); b.crew = crew(); const w = world();
     let at: number | null = null, stowed = false;

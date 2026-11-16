@@ -532,11 +532,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
     if (!ai.clearing) decideTurn(b, w.t, true); // (spinning her turns: a skipper always calls those, boat/calls.ts)
-    b.luff = false; return;
+    b.luff = false; crewPoleCall(w, b); return; // (the pole in for the turns: the physics review)
   }
   ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
   const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
-  if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
+  if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; crewPoleCall(w, b); return; }
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % (2 * AI_EVERY) === 0; // heavy predictions 10× a second (every other think outside close quarters, as before the speed pass)
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
@@ -1012,14 +1012,18 @@ export function crewPoleCall(w: World, b: Boat): void {
   // crewWork.ts courseHeld: her heading's 20 s mean takes about 25 s to come to it after a bear-away round the windward
   // mark, every run's pole that late; the 8 s past 157° unbroken and no swing keep a course swinging through it from
   // calling it, the Coordinator, 16 Nov 2026. The timers aren't saved with the race: a restored boat starts them afresh)
-  const p = poleT.get(b) ?? { hi: NaN, lo: NaN }; poleT.set(b, p);
-  p.hi = twa > 157 ? (p.hi === p.hi ? p.hi : w.t) : NaN; p.lo = twa < 150 ? (p.lo === p.lo ? p.lo : w.t) : NaN;
+  // (the hold kept while she stays past the 154.5° crossover, polar.ts, so a light, shifty run hovering about 157° isn't
+  // restarted by each dip; and her heading still within POLE_TURN of where it began, so a circle too slow to be a swing,
+  // under about 3°/s, doesn't pass it either: the physics review)
+  const p = poleT.get(b) ?? { hi: NaN, lo: NaN, h: 0 }; poleT.set(b, p);
+  if (p.hi === p.hi ? twa < 154.5 : twa > 157) { p.hi = twa > 157 ? w.t : NaN; p.h = b.h; }
+  p.lo = twa < 150 ? (p.lo === p.lo ? p.lo : w.t) : NaN;
   if (w.t < 0 || nearMark || jibDown || b.docked || b.penalty > 0 || inBasin(b) || twa < 145 || w.t - p.lo >= POLE_STOW) b.poleWant = false;
-  else if (w.t - p.hi >= POLE_SET && (b.settle?.[SINCE] ?? 1e9) >= POLE_SET) b.poleWant = true;
+  else if (w.t - p.hi >= POLE_SET && (b.settle?.[SINCE] ?? 1e9) >= POLE_SET && Math.abs(wrap(b.h - p.h)) < POLE_TURN) b.poleWant = true;
 }
-const POLE_SET = 8, POLE_STOW = 4, SINCE = SETTLE.since; // (read once at load: docs/CAPACITY.md)
-/** When each AI boat's angle last went past 157° and below 150° (crewPoleCall; NaN while it isn't). */
-const poleT = new WeakMap<Boat, { hi: number; lo: number }>();
+const POLE_SET = 8, POLE_STOW = 4, POLE_TURN = 15, SINCE = SETTLE.since; // (read once at load: docs/CAPACITY.md)
+/** When each AI boat's angle last went past 157° (and her heading then) and below 150° (crewPoleCall; NaN while it isn't). */
+const poleT = new WeakMap<Boat, { hi: number; lo: number; h: number }>();
 /**
  * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come
  * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts
