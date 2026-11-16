@@ -121,7 +121,8 @@ export function driveSpeed(b: Boat, K: number): number {
 /** How far under the crew's 6° of helm the coach's own forecast of it must be before it counts on them coming back off
  * their depowering: its helm runs within a few tenths of the boat's (4.54° against 4.50°, 6.0° against 6.12°), and at
  * the limit itself it promised the whole step's gain for a sheet eased to where the boat still held 6.1° and the crew
- * stayed put (old sails, 20 kt, the main bar-tight: 0.29 m/s promised, 0.08 paid). */
+ * stayed put (old sails, 20 kt, the main bar-tight: 0.29 m/s promised, 0.08 paid). AN ESTIMATE of the margin: twice
+ * the widest gap seen between the two (0.12°), not a fitted figure. */
 const HELM_SURE = 0.3;
 export function speedFactor(b: Boat, c: Controls, now = false): number {
   // (twice: her heel with these sails changes the wind the sails see (heeled, the apparent wind across them is the
