@@ -855,7 +855,7 @@ function struck(p: PoseT, k: number, head: THREE.Vector3 | null): void {
 /** How fast a knee or an elbow swings round to point a new way (rad/s), and this frame's time step. */
 const BEND_RATE = 8; let ikDt = 1 / 30, ikFrame = 0;
 /** How fast an elbow goes round the shoulder at most (m/s): a quick reach, not a flick. */
-const ELBOW_SPEED = 3;
+const ELBOW_SPEED = 3, KNEE_SPEED = 4;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _a = V(0, 0, 0), _b = V(0, 0, 0), _c = V(0, 0, 0), _d = V(0, 0, 0), _x = V(0, 0, 0), _y = V(0, 0, 0), _z = V(0, 0, 0);
 /**
  * Two bones from `base` (the joint's position in the parent's frame) to `target` (in the same frame), lengths l1 and l2,
@@ -889,10 +889,12 @@ function ik(limb: Limb, base: THREE.Vector3, target: THREE.Vector3, l1: number, 
   // centimeters of the hand and the shoulder rising as they come up off the rail turned the arm's plane half a radian a
   // frame, the elbow whipping round at 6 m/s as a tack ended. Held, the forearm points at the hand from where the elbow
   // has got to, and catches up in a frame or two)
-  if (back < 0) {
+  // (a knee likewise, at KNEE_SPEED: a foot brought up under the hips, the leg folded right up, a lull sending a hiker
+  // forward to the cabin-top lines, swung the knee 0.3 m in a frame as the foot came up past it)
+  {
     const ud = limb.root.userData;
     if (ud.uf !== ikFrame) { ud.uf = ikFrame; ud.u0 = ud.u1 ? (ud.u0 ?? new THREE.Vector3()).copy(ud.u1) : undefined; }
-    const u0 = ud.u0 as THREE.Vector3 | undefined, max = ELBOW_SPEED * ikDt / l1;
+    const u0 = ud.u0 as THREE.Vector3 | undefined, max = (back < 0 ? ELBOW_SPEED : KNEE_SPEED) * ikDt / l1;
     if (u0) { const ang = Math.acos(Math.max(-1, Math.min(1, u0.dot(u1))));
       if (ang > max) { const ax = _y.crossVectors(u0, u1); if (ax.lengthSq() > 1e-10) { ax.normalize(); u1.copy(u0).applyAxisAngle(ax, max); } } }
     (ud.u1 ??= new THREE.Vector3()).copy(u1);
@@ -1339,7 +1341,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // their weight was, and were carried there at 3.7 m/s as it began; then back out to the new rail)
     const inboard = !a || Math.abs(a.x) < benchEdge(a.z) || pose === 'cross';
     const wasTack = !!f.tack;
-    f.tack = !busy && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go));
+    // (and let go once the physics has them out on the new rail, still on the move: with the boom in on a beat (North's
+    // guides) her tack runs so that a hiker's weight is out on the new side before she's done turning; held at the winch
+    // to the end, they were then slid across stood up as the pose eased, an arm bent back as they turned)
+    const outNew = !!a && !!f.tack && go && pose === 'hike' && f.cur != null && f.cur.hip.x * a.x < 0 && Math.abs(a.x) > benchEdge(a.z);
+    f.tack = !busy && !outNew && ((tackOn && (inboard || !!f.tack)) || (!!f.tack && go));
     // (back from facing aft at the mainsheet, round through facing inboard, away from the bench they're going to: round the
     // other way, the knee of a foot planted on the sole swung out over the bench, the shin through its edge)
     // (the side they're going to, the physics' own: at the role's end they can be just across the middle from it)

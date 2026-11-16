@@ -303,7 +303,9 @@ describe('No backwards arms anywhere (render/crew.ts)', () => {
       const at = `${label} t ${w.t.toFixed(2)}`;
       [['helm', cr.helm], ...cr.crew.map((f, i) => [`crew${i + 1}`, f] as const)].forEach(([who, f], k) => {
         const fig = f as Figure; if (!fig.root.visible) return; fig.root.updateMatrixWorld(true);
-        const pose = b.crew!.people[k].pose; if (pose !== held[k].pose || fig.going || fig.route) { held[k] = { pose, t: w.t }; }
+        // (a change of pose, a walk, a route, or the tack's role (the crossing as drawn, crew.ts f.tack): each a transition;
+        // settled half a second after it's done)
+        const pose = b.crew!.people[k].pose; if (pose !== held[k].pose || fig.going || fig.route || fig.tack) { held[k] = { pose, t: w.t }; }
         const settled = w.t - held[k].t > 0.5;
         const wv = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), fw = fig.root.localToWorld(new THREE.Vector3(0, 0, -1)).sub(wv(fig.root)).setY(0);
         fig.arm.forEach((a, i) => {
