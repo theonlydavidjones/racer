@@ -868,8 +868,9 @@ export interface HarborRoute { entry: Vec; path: Vec[]; approach: Vec }
 /** How far the navigator's way in keeps off the docks and the moored boats, m: her half-beam (1.1) and as much again to spare (an ESTIMATE). */
 const ROUTE_CLEAR = 2.5;
 const harborFloods = new Map<string, { key: (q: Vec) => string; from: Map<string, string | null>; at: Map<string, Vec>; open: (q: Vec) => boolean }>();
-function harborFlood(H: Harbor) {
+function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<typeof harborFloods.get>>, void> {
   let f = harborFloods.get(H.id); if (f) return f;
+  let work = 0; // (a yield every few hundred cells looked at: the flood is 75–385 ms at once, a frame's worth many times over)
   const G = 1.5, key = (q: Vec) => `${Math.round(q.x / G)},${Math.round(q.y / G)}`;
   const ring = Array.from({ length: 8 }, (_, k) => [Math.sin(k * Math.PI / 4), Math.cos(k * Math.PI / 4)]);
   const openMemo = new Map<string, boolean>();
@@ -887,12 +888,13 @@ function harborFlood(H: Harbor) {
     // (the mouth: the open cell nearest the entrance's middle)
     let best: Vec | null = null, bd = Infinity;
     // (anywhere in the basin: an entrance's middle may lie between the breakwater ends, outside the basin's own outline)
-    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) { const q = { x, y }, dd = Math.hypot(q.x - e.x, q.y - e.y); if (dd < bd && open(q)) { bd = dd; best = q; } }
+    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) { if (++work % 256 === 0) yield; const q = { x, y }, dd = Math.hypot(q.x - e.x, q.y - e.y); if (dd < bd && open(q)) { bd = dd; best = q; } }
     if (best && !from.has(key(best))) { from.set(key(best), null); at.set(key(best), best); fr.push(best); }
   }
   while (fr.length) {
     const nx: Vec[] = [];
     for (const p of fr) for (const [dx, dy] of [[G, 0], [-G, 0], [0, G], [0, -G]]) {
+      if (++work % 64 === 0) yield;
       const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
       if (from.has(k) || !open(q)) continue;
       from.set(k, key(p)); at.set(k, q); nx.push(q);
@@ -903,9 +905,14 @@ function harborFlood(H: Harbor) {
 }
 const harborRoutes = new Map<string, HarborRoute | null>();
 export function harborRoute(s: Slip): HarborRoute | null {
+  const g = harborRouteSteps(s); let r = g.next(); while (!r.done) r = g.next(); return r.value;
+}
+/** harborRoute a little at a time, for the page (sim/navigator.ts, the passage home): the harbor's flood, the first time,
+ * is 75–385 ms at once, so it yields as it goes; the same answer as harborRoute. */
+export function* harborRouteSteps(s: Slip): Generator<void, HarborRoute | null, void> {
   if (harborRoutes.has(s.id)) return harborRoutes.get(s.id)!;
   const H = harborOf(s.marina); if (!H) return null;
-  const F = harborFlood(H), u = dirOf(s.heading), tip = 0.45 * s.finger;
+  const F = yield* harborFloodSteps(H), u = dirOf(s.heading), tip = 0.45 * s.finger;
   // (the approach: in the fairway square off her slip, past her finger's end by her length and a half, or as far as is open)
   let approach: Vec | null = null;
   for (let back = tip + 1.5 * 2 * BOW; back >= tip + 2; back -= 0.5) { const q = { x: s.p.x - u.x * back, y: s.p.y - u.y * back }, k = F.key(q); if (F.from.has(k)) { approach = F.at.get(k)!; break; } }
