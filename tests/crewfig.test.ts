@@ -66,20 +66,25 @@ function elbows(cr: Crew, label: string, bad: string[]): void {
   }
 }
 
-function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean; sea?: number; paddle?: 'P' | 'S' }, label: string): string[] {
+function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean; sea?: number; paddle?: 'P' | 'S'; called?: boolean; struck?: boolean }, label: string): string[] {
   const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
   const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) };
   b.crew = newCrew(spec, 'S'); if (o.place) b.crew.place = o.place;
   const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
   let hold = true, tt = 0;
   sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
-  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); tt += 1 / 30; syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking, o.sea ? o.sea * Math.sin(2 * Math.PI * tt / 2.6) : undefined, pd); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
+  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); tt += 1 / 30; syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking, o.sea ? o.sea * Math.sin(2 * Math.PI * tt / 2.6) : undefined, pd, Math.abs(b.rel) > 110); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
   // (paddling: as world.ts paddle() and paddleJob set it, the paddler's job the side deck on the side called)
   let pd: PaddleDraw | null = null;
   if (o.paddle) { const who = paddler(b), windward = (b.tack === 'S') === (o.paddle === 'S') ? 1 : -1; b.paddle = { side: o.paddle, t0: 0, auto: false };
     b.crew.people[who].job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' }, side: b.tack };
     pd = { side: o.paddle, back: false, fetch: PADDLE.fetchS, who, key: 0 }; }
   frames(3);
+  // (the turn called and the crew ready for it, a few seconds before she goes: the helper's clock starts again each frame,
+  // so a call at 0 is always just made)
+  if (o.called) { b.callT = 0; frames(4); }
+  // (struck by the boom: out of it, slumped where they are, for the rest of the run)
+  if (o.struck) { for (const a of b.crew.people.slice(1)) (a as { outUntil?: number }).outUntil = Infinity; frames(6); }
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
   else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
   else if (o.paddle) frames(o.secs ?? 20);
@@ -105,6 +110,11 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     ['paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22 }], ['paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22 }],
     // (and alone: the helm paddles, off the tiller)
     ['alone, paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22, n: 0 }], ['alone, paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22, n: 0 }],
+    // (ready for the turn coming: the call heard, a look up and a hand to the sheet, then the turn itself; a jibe, heads down)
+    ['a called tack, sat', { kt: 8, tack: true, called: true }], ['a called tack, hiking', { kt: 18, tack: true, called: true }],
+    ['a called jibe', { kt: 12, twa: 160, tack: true, called: true }], ['three aboard, a called tack', { kt: 12, tack: true, called: true, n: 3 }],
+    // (struck by the boom: slumped where they sit, a hand to the head)
+    ['struck, sat', { kt: 8, struck: true }], ['struck, hiking', { kt: 18, struck: true }], ['struck, downwind', { kt: 12, twa: 160, struck: true }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
   for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000);

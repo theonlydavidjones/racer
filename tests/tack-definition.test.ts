@@ -55,6 +55,7 @@ describe('her tack, by the definitions', () => {
       let jibWas = Math.sign(b.jib);
       sail(b, 40, t => {
         held(b, 170 + Math.min(30, t)); // (a degree a second, to 20° by the lee)
+        if (!user) b.callT = t; // (her skipper calls the jibe: boat/calls.ts)
         if (Math.abs(b.boom) >= 1 && byBoom(b) !== b.tack) wrong++;
         if (b.gybeTo) { gybing++; expect(b.gybeTo).toBe('S'); expect(b.tack).toBe('P'); expect(Math.sign(b.jib), 'the jib stays on her tack\'s side until she has gybed').toBe(jibWas); }
         else if (b.tack === 'P') jibWas = Math.sign(b.jib);

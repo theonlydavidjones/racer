@@ -1548,7 +1548,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const live = !hold || m.liveT == null, ldt = m.liveT == null || m.liveT < 0 ? dt : Math.min(0.15, Math.max(0, t - m.liveT));
   if (live) m.liveT = t;
   const pd = b.paddle, who = pd ? paddler(b) : 0;
-  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
+  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
   if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;

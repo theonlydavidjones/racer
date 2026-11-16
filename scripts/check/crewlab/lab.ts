@@ -73,6 +73,11 @@ const lab = {
   /** As a boat far off is drawn in the game (scene.ts FAR_SYNC): her crew and cloth posed every third frame. */
   far(on: boolean) { (lab as any).farOn = on; (lab as any).farN = 0; },
   tack() { (lab as any).hold = null; startTack(b); },
+  /** The helm calls the turn ("Ready about", "Ready to jibe"): the crew get ready for it (the helper's clock starts again
+   * each step, so a call at 0 is always just made). */
+  call() { b.callT = 0; },
+  /** The crew struck by the boom, out of it for good (crewPhys.ts outUntil). */
+  strike() { for (const a of b.crew!.people.slice(1)) (a as { outUntil?: number }).outUntil = Infinity; },
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */
   wind(kt: number) { b.ww = { ...b.ww, kt }; },

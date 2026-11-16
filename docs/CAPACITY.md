@@ -662,7 +662,7 @@ run alone, perf race and --ai):
 - **Cuts, about 2.8% back, the race bit-identical (7905d3b8):** the seven fields declared in makeBoat (each boat
   otherwise gained them at its first puff, mid-race: 0.7%), and the call gated to steps with a puff on, one being seen, or
   something still eased (nearly every step has none).
-- **Behaviour, about 2%:** the boats sail a different race with the main eased in the gusts. Profiled with
+- **Behavior, about 2%:** the boats sail a different race with the main eased in the gusts. Profiled with
   `--max-inlined-bytecode-size=0` (puff on against H2, so the code is alike and only the race differs), the extra time is
   spread: moveBoat, step and trimSails a few per cent each, aiThink +14%, the crew's hold +25%, clearAstern +14%. No
   function is new work. A first profile pinned it on heaveTo's strip model; counted, no boat was ever hove to or had her
