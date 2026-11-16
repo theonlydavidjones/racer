@@ -336,7 +336,7 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  * The wind the guide's read for (Boat.guideKt) is the breeze she's sailing in: its settings are by the wind's range
  * ("very light winds (0-5 knots)", "medium winds (5-12 knots)", North Sails' Nordic Folkboat Tuning Guide). A build is
  * read again only once it's GUIDE_KT from where it was read: up to her wind over GUIDE_FAST s as it builds, down to her
- * wind over 20 s (Boat.twsSlow) as it falls. Estimates: the guide gives no time, and "flatten as it comes on" is the usual practice. */
+ * wind over 20 s (Boat.twsSlow) as it falls. Estimates: the guide gives no time; reading a build sooner than a lull is this model's choice, unsourced. */
 export const GUIDE_BACKLASH = 10, GUIDE_DEAD = 3, GUIDE_FAST = 5, GUIDE_KT = 1;
 export function guideLimits(tws: number, awa: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>> } {
   // (the guide's settings are for sailing upwind: full to 40° apparent, gone by a close reach at 60°, where the crew sets

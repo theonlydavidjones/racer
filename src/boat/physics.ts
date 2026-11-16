@@ -1408,8 +1408,13 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     b.twsFast = b.twsFast == null || !b.crewReady ? kt : b.twsFast + (kt - b.twsFast) * Math.min(1, dt / GUIDE_FAST);
     const slow = b.twsSlow ?? kt;
     if (b.guideKt == null || !b.crewReady) b.guideKt = kt;
-    else if (b.twsFast > b.guideKt + GUIDE_KT) b.guideKt = b.twsFast;
-    else if (slow < b.guideKt - GUIDE_KT) b.guideKt = slow; }
+    // (up when her few seconds' wind is a knot past it, or past it and well over her 20 s wind: a build under way, read
+    // right up to it, not a knot short; down when both her winds are a knot under it, or under it with her 20 s wind well
+    // over her few seconds': a lull settled in. Each only past both, so a build doesn't flip it from one to the other
+    // each step, the physics review: 2022 times in 38 s after a step to 12 kt)
+    else { const hi = Math.max(slow, b.twsFast);
+      if (b.twsFast > b.guideKt + GUIDE_KT || (b.twsFast > b.guideKt && b.twsFast - slow > GUIDE_KT / 2)) b.guideKt = b.twsFast;
+      else if (hi < b.guideKt - GUIDE_KT || (hi < b.guideKt && slow - b.twsFast > GUIDE_KT / 2)) b.guideKt = hi; } }
   // (swinging, her heading running away from where it was a few seconds ago, SWING_DEG past her heading over SWING_TAU:
   // a turn kept up at over about 3°/s, not a helm's correction; then they're on the sheets, and the cabin-top lines that
   // only gain a little wait till she's settled, SETTLE_S after (crewWork.ts): a crew resets them for the course she's on,
@@ -1417,13 +1422,14 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // 100° apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
   b.hSwing = b.hSwing == null || !b.crewReady ? b.h : n360(b.hSwing + wrap(b.h - b.hSwing) * Math.min(1, dt / SWING_TAU));
   b.settleLeft = Math.abs(wrap(b.h - b.hSwing)) > SWING_DEG ? SETTLE_S : Math.max(0, (b.settleLeft ?? 0) - dt);
-  // (on a new course, NEW_COURSE from where they last read the guide and held there LINE_TAU, the guide's settings are
-  // read at her angle now, not past the backlash, which is for a course wandering, not a new one: bearing away onto a
-  // reach, held 10° short, the vang went on in two trips. Not sooner: a course held for less, her crew don't reset the
-  // kicker for it, the physics review: holds of 20 s between swings of 60° had them up at it each time)
+  // (on a new course, NEW_COURSE from where they last read the guide and held there, her heading within HELD_DEG of
+  // its own over LINE_TAU and not turning, the guide's settings are read at her angle now, not past the backlash, which is
+  // for a course wandering, not a new one: bearing away onto a reach, held 10° short, the vang went on in two trips. Not
+  // turning: on any turn back toward where she was, her heading crosses its own 20 s average for a moment, and the read
+  // fired mid-turn, the physics review)
   b.hHeld = b.hHeld == null || !b.crewReady ? b.h : n360(b.hHeld + wrap(b.h - b.hHeld) * Math.min(1, dt / LINE_TAU));
   if (b.hGuide == null || !b.crewReady) b.hGuide = b.h;
-  else if (Math.abs(wrap(b.h - b.hGuide)) > NEW_COURSE && Math.abs(wrap(b.h - b.hHeld)) < HELD_DEG) { b.hGuide = b.h; b.guideAwa = Math.abs(b.awaSlow); }
+  else if (Math.abs(wrap(b.h - b.hGuide)) > NEW_COURSE && Math.abs(wrap(b.h - b.hHeld)) < HELD_DEG && !(b.settleLeft! > 0) && Math.abs(wrap(b.h - b.hSwing)) < 1) { b.hGuide = b.h; b.guideAwa = Math.abs(b.awaSlow); }
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};

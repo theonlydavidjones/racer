@@ -74,6 +74,6 @@ describe('In light air the crew set the lines for her course, not the angles she
     const up = reach(42), down = reach(120);
     expect(Math.abs(up.ga - up.awa), 'come to her angle from the beat').toBeLessThan(1);
     expect(Math.abs(down.ga - down.awa), 'and from a broad reach').toBeLessThan(1);
-    expect(Math.abs(up.cap - down.cap), 'the guide\'s vang ceiling the same either way, within its deadband (GUIDE_DEAD)').toBeLessThan(0.05);
+    expect(Math.abs(up.cap - down.cap), 'the guide\'s vang ceiling the same either way (read at her angle once she holds the new course: physics.ts NEW_COURSE)').toBeLessThan(0.05);
   });
 });
