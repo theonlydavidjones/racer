@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { testBoat, sail, startTack, courseHeading } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew, slotOf, type CrewPlace } from '../src/boat/crewPhys';
-import { buildCrew, ground, syncCrew, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
+import { buildCrew, ground, syncCrew, tailEnd, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
 import { PADDLE, paddler } from '../src/boat/paddle';
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
@@ -335,4 +335,25 @@ describe('No backwards arms anywhere (render/crew.ts)', () => {
       const w = new World(COURSES[0], S, 1, { freeSail: true }); watch('dock', w, w.user, 15, bad); }
     expect(bad.slice(0, 8)).toEqual([]);
   }, 300_000);
+});
+
+// Hiking, the lines in the hands, not air (the owner, 16 Nov: the middle hand "doesn't appear to be holding anything
+// (looks like gripping air)"): the lee jib sheet's tail and the traveller's each end at a hand as drawn (boatMesh.ts
+// leads them there through tailEnd), on both tacks, in a breeze and hiked right out.
+describe('Hiking, the lines end in the hands (render/crew.ts hikeHold, tailEnd)', () => {
+  for (const kt of [15, 18]) for (const tack of ['S', 'P'] as const) it(`${kt} kt, ${tack === 'S' ? 'starboard' : 'port'} tack`, () => {
+    const twa = beatAngle(kt), b = testBoat({ heading: tack === 'S' ? 360 - twa : twa, kt: 4, windKt: kt }); b.tack = tack;
+    const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, 2) };
+    b.crew = newCrew(spec, tack);
+    const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), w = tack === 'S' ? 1 : -1;
+    sail(b, 20); for (let i = 0; i < 120; i++) { sail(b, 1 / 30); syncCrew(cr, w, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); }
+    expect(b.crew.people.slice(1).every(p => p.pose === 'hike'), 'both hiking').toBe(true);
+    const hands = cr.crew.flatMap(f => f.cur!.hands);
+    // (as boatMesh.ts calls it: the working jib sheet led to the hand wherever it is; the windward traveller line on its side)
+    for (const [name, h, side] of [['the lee jib sheet', cr.sheetHand, undefined], ['the traveller', cr.travHand, w]] as const) {
+      expect(h, `${name}: held`).toBeTruthy();
+      const end = tailEnd(new THREE.Vector3(9, 9, 9), h, side);
+      expect(Math.min(...hands.map(q => q.distanceTo(end))), `${name}: its end at a hand, m`).toBeLessThan(1e-6);
+    }
+  });
 });

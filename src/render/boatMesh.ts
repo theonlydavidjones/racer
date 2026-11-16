@@ -10,7 +10,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
+import { buildCrew, dockhand, syncCrew, tailEnd, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -1721,7 +1721,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // (the windward traveller line's tail up to the hiker holding it, if one is: Crew.travHand; else hanging from its cam)
   { const th = (m.crew as { travHand?: THREE.Vector3 }).travHand;
     for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
-      if (th && Math.sign(th.x) === side) pa.setXYZ(3, th.x, th.y, th.z); else pa.setXYZ(3, pa.getX(2) - side * 0.02, pa.getY(2) - 0.2, pa.getZ(2) - 0.03);
+      const e = tailEnd(tmpG.set(pa.getX(2) - side * 0.02, pa.getY(2) - 0.2, pa.getZ(2) - 0.03), th, side); pa.setXYZ(3, e.x, e.y, e.z);
       pa.needsUpdate = true; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
@@ -1815,7 +1815,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
     // (or, the working sheet in a hiker's hand, across the cockpit to it: Crew.sheetHand)
     const sh = (m.crew as { sheetHand?: THREE.Vector3 }).sheetHand;
-    if (sh && loaded) at(20, sh.x, sh.y, sh.z); else at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
+    { const e = tailEnd(tmpG.set(side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3), loaded ? sh : undefined); at(20, e.x, e.y, e.z); }
   }
   q.needsUpdate = true;
 }

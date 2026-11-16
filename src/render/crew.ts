@@ -39,6 +39,14 @@ type Limb = Body['arm'][number];
 /** A sailor (crewBody.ts): their body, and the state the posing keeps. */
 const figure = (p: Person, jacket: number, seed: number): Figure => ({ ...buildBody(p, jacket, seed), gait: 0, speed: 0, swing: [null, null] });
 
+/**
+ * Where a line's tail ends (boatMesh.ts, the jib sheet's and the traveller's): in the hand of whoever holds it
+ * (Crew.sheetHand, led across the cockpit; Crew.travHand, on that side only), else where it falls, `rest`. One place, so a test can check the line ends at the
+ * hand.
+ */
+export function tailEnd(rest: THREE.Vector3, hand?: THREE.Vector3, side?: number): THREE.Vector3 {
+  return hand && (side == null || Math.sign(hand.x) === side) ? hand : rest; // (a side given: only a hand on it, the traveller's own end)
+}
 export function buildCrew(helm: Person, people: Person[], jackets: number[], seed: number): Crew {
   const group = new THREE.Group();
   const h = figure(helm, jackets[0], seed); group.add(h.root);
