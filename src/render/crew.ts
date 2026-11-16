@@ -29,7 +29,7 @@ export interface Figure extends Body {
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
-export interface Crew { group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
+export interface Crew { /** where the hiker holding the lee jib sheet has its tail (boat frame), for boatMesh.ts to lead it to the hand; none if nobody does */ sheetHand?: THREE.Vector3; group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
    * +x), for boatMesh.ts to draw the handle where the hand has it */ winch?: { side: 1 | -1; turn: number } }
 type Limb = Body['arm'][number];
@@ -132,6 +132,8 @@ export function setFootrest(back: number): void { footrestBack = Math.max(0, Mat
 const footrestOut = () => FOOTREST.out * (1 - footrestBack);
 const onFootrest = (ax: number, z: number) => { const s = footrestOut(); return z >= COCK1 - s && ax < footrestEdge(z + s); };
 const THWART = { z: COCKPIT_FIT.thwart.z, half: COCKPIT_FIT.thwart.half, top: thwartTop() };
+/** The traveller track's half-length (boatMesh.ts TRAV_HALF): its control lines' cams are just beyond its ends. */
+const TRAV_END = 0.5;
 const coamH = COAMING_H;
 /** The sole's half-width at z (between the benches' fronts, narrowing aft with the hull: hull.ts cockpitGeometry). */
 const soleHalf = (z: number) => Math.min(COCKPIT_FIT.soleHalf, Math.max(0, innerHalf(z, COCKPIT.sole) - 0.03));
@@ -833,6 +835,29 @@ function ready(p: PoseT, k: number, windward: number, jibe: boolean, jibHand: bo
   reachTo(p, jibHand ? winchAt(windward) : V(0, 0.95, THWART.z - 0.25), k); // (the mainsheet's tail in front of the thwart, as tacking it: tackRole 'main')
 }
 /**
+ * Hiking, the hands on what a hiker holds (the owner, 16 Nov: "when hiking out, crew seem to be holding on to thin air.
+ * IRL, when beating, forward crew would be holding the lee jib sheet, and middle crew would be holding the traveller
+ * and/or mainsheet ... if only one crew, they would hold the jib sheet and the traveller"): the lee jib sheet's tail,
+ * led across the cockpit from its winch to the hand (boatMesh.ts draws it there: Crew.sheetHand); the traveller's tail at
+ * its cam on the windward end of the thwart. Each as far as an arm reaches from the chest, or not at all. Returns where
+ * the sheet's in the hand, if it is.
+ */
+function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): THREE.Vector3 | undefined {
+  const c = chest(p, k), reach = 0.58 * k, at = (to: THREE.Vector3) => { const d = to.clone().sub(c); return d.length() <= reach + 0.25 ? c.clone().add(d.setLength(Math.min(d.length(), reach))) : null; };
+  // (the sheet from the leeward winch across to them: the hand on it out toward the winch, an arm's length)
+  const lw = winchAt(-s), sheet = jib ? c.clone().add(lw.clone().add(V(0, 0.15, 0)).sub(c).setLength(reach * 0.9)) : null;
+  // (the traveller's tail hanging from its cam on the thwart's windward end, just below it)
+  const cam = V(s * (TRAV_END + 0.12), THWART.top - 0.12, THWART.z - THWART.half - 0.02), tv = trav ? at(cam) : null;
+  const near = (q: THREE.Vector3) => p.hands[0].distanceToSquared(q) <= p.hands[1].distanceToSquared(q) ? 0 : 1;
+  if (sheet && tv) { const i = near(sheet); p.hands[i] = sheet; p.hands[1 - i] = tv; }
+  else if (sheet) p.hands[near(sheet)] = sheet;
+  else if (tv) p.hands[near(tv)] = tv;
+  else return undefined;
+  p.elbow = undefined;
+  return sheet ?? undefined;
+}
+
+/**
  * Struck by the boom in a crash jibe (crewPhys.ts `outUntil`): slumped forward where they sit, the head in a hand,
  * looking down.
  */
@@ -1308,6 +1333,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   cr.crew.forEach((f, i) => { if (inMid[i] && f.benchSide != null) onBench[i] = true; });
   const tackOn = !!c && (tacking || !!c.roll);
   const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
+  let sheetHand: THREE.Vector3 | undefined;
   cr.crew.forEach((f, i) => {
     const a = ppl?.[i + 1];
     let x = a ? a.x : windward * 0.8;
@@ -1353,6 +1379,12 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
         struck(want, f.scale, f.root.parent && f.cur ? f.root.parent.worldToLocal(f.head.localToWorld(_hd.set(0, 0.1, 0))) : null); // (the head's middle, above its pivot at the neck)
       else if (a.ready) ready(want, f.scale, windward, jibe, cr.crew.length < 2 || i === fore);
     }
+    // (hiking, hands on the lines: the forward hand (or a lone one) the lee jib sheet, the middle hand (or a lone one too)
+    // the traveller)
+    if (a && !role && !busy && !go && pose === 'hike' && lean > 0.3 && !a.ready && !(((a as { outUntil?: number }).outUntil ?? 0) > (c?.clock ?? 0))) {
+      const lone = cr.crew.length < 2, jibH = lone || i === fore, sh = hikeHold(want, f.scale, Math.sign(x) || windward, jibH, lone || !jibH);
+      if (sh) sheetHand = sh;
+    }
     if (pdl?.f === f) want = paddleWant(f, want, pdl, x, a?.z ?? z, go, windward, i);
     // (on the way along the side deck, and settling into the new place after it)
     const routed = route(f, want, dt, f.scale);
@@ -1360,6 +1392,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     apply(f, ease(f, routed ?? want, dt), upright(f, against(pose), dt), dt);
     f.root.visible = true;
   });
+  // (the lee jib sheet's tail to the hiker's hand on it, where it's drawn this frame: eased there as the hand is)
+  cr.sheetHand = sheetHand && cr.crew.find(f => f.cur && f.cur.hands.some(h => h.distanceTo(sheetHand!) < 0.25))?.cur?.hands.reduce((a, h) => h.distanceTo(sheetHand!) < a.distanceTo(sheetHand!) ? h : a);
   // (boatMesh.ts turns the handle with the hand: where the hand has got to, a step behind the stroke it's making, so the
   // grip's in it, not a few centimetres ahead)
   const ck = cranked as Cranked | undefined; // (set while posing them, above)
