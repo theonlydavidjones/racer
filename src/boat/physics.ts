@@ -1460,16 +1460,16 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // (held there, but inside the band for the wind and their depowering floor, controls.ts depowerLimits, which doesn't
     // depend on your sheet: the car still goes down as the breeze builds, up in a drifter, and from the start when you
     // trim the sheets from the off)
-    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, b.guideKt ?? tws, b.guideAwa); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
+    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, tws, b.awaSlow); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
-    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.guideAwa, b.guideKt); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)), b.guideAwa, b.guideKt);
+    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.awaSlow, tws); b.crewPlanT = 1;
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)), b.awaSlow, tws);
     b.crewTogether = worthTogether(b.crewWorth); // (worked out with the worth, once a second: not looked up each step)
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
-      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}, b.guideAwa, b.guideKt) : b.crewPlan;
+      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}, b.awaSlow, tws) : b.crewPlan;
       b.crewIdeal = { ...free, mainsheet: mainsheetFor(wantMain, free.traveller), jibsheet: jibsheetFor(wantJib, c, b.tack) };
     }
   }

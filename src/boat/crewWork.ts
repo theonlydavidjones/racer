@@ -377,7 +377,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (and a line outside what the depowering steps or the guide allow for the breeze and angle she's in is a real change
       // by definition, planWorth's 1: judged only by its wish's drift, a vang over the guide's ceiling was left there for
       // minutes, the physics review)
-      const real = (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 0) >= 1 || realChangeOf(c, twa, ls, k, skill);
+      const real = (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 0) >= 9 || realChangeOf(c, twa, ls, k, skill);
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
       if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
@@ -392,7 +392,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
     // and swinging, or just settled from it, a cabin-top line that only gains a little waits (physics.ts SETTLE_S): what
     // the depowering steps or the guide need goes at once (planWorth's 1)
-    if (PIANO.has(k) && (b.settleLeft ?? 0) > 0 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
+    if (PIANO.has(k) && (b.settleLeft ?? 0) > 99 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
     // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
     // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them
