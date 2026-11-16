@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, JIB_WINCH_Z, L, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut, TILLER, tillerRestDir } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, JIB_WINCH_Z, L, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut, TILLER, tillerRestDir, RUDDER_RAKE } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -45,7 +45,7 @@ const figure = (p: Person, jacket: number, seed: number): Figure => ({ ...buildB
  * its joint (the origin) along +y, EXT_LEN to the grip's far side.
  */
 function extensionGeometry(): THREE.BufferGeometry {
-  const outer = new THREE.CylinderGeometry(0.013, 0.013, 0.5, 8).translate(0, 0.27, 0), inner = new THREE.CylinderGeometry(0.011, 0.011, 0.32, 8).translate(0, 0.66, 0);
+  const outer = new THREE.CylinderGeometry(0.013, 0.013, 0.32, 8).translate(0, 0.17, 0), inner = new THREE.CylinderGeometry(0.011, 0.011, 0.2, 8).translate(0, 0.4, 0);
   // the D: a loop of a 0.05 m radius, in the plane of the stick, its near side across the tube's end
   const loop = new THREE.TorusGeometry(0.05, 0.012, 6, 18).translate(0, EXT_LEN - 0.06, 0);
   const g = mergeGeometries([outer, inner, loop].map(q => q.toNonIndexed()));
@@ -106,9 +106,9 @@ let poseClock = 0;
  * the Bay's westerly sea about 0.006 rad/s at 6 kt, 0.025 at 14, 0.066 at 22 (measured, an AI boat racing on the default
  * course). Going forward in it, a crew goes lower and slower, both hands down. */
 let rough = 0;
-/** The tiller extension's length (m): ESTIMATE, a typical one for a boat her size (the owner: "most Folkboat skippers use
- * a tiller extension"). And the tiller's root this frame (syncCrew), for folding it back along the tiller. */
-const EXT_LEN = 0.95;
+/** The tiller extension's length (m): about half the tiller's (the owner: a long one is "visually intrusive and not true
+ * to life"), ESTIMATE. And the tiller's root this frame (syncCrew), for folding it back along the tiller. */
+const EXT_LEN = 0.6;
 let tRoot: THREE.Vector3 | undefined;
 /** Back along the top of the tiller from its end, toward the rudder head: the stowed extension's way. */
 const extAlong = (tip: THREE.Vector3) => tRoot ? tRoot.clone().sub(tip).normalize().add(V(0, 0.05, 0)).normalize() : V(0, 0.1, 1).normalize();
@@ -807,7 +807,7 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   // arm from where they sit. They slide aft and in along the after deck toward it, as a helm does, as far as they need
   // and up to 0.35 m; their feet come aft with them)
   let fz = COCK1 - 0.24;
-  { const far = Math.hypot(tip.x - hip.x, tip.z - hip.z) - (0.95 + 0.5 * k);
+  { const far = Math.hypot(tip.x - hip.x, tip.z - hip.z) - (EXT_LEN + 0.5 * k);
     if (far > 0) {
       const dx = tip.x - hip.x, dz = tip.z - hip.z, n = Math.hypot(dx, dz) || 1, go = Math.min(0.35, far);
       const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nx = s * Math.max(0.25, s * (hip.x + go * dx / n)), nu = uAtZ(nz);
@@ -819,7 +819,7 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
     // (sitting out on the side deck, the knees over the coaming: the feet hang from them, on the footrest or just off it)
     if (hx > chz(fz) - 0.05) q.y = Math.max(q.y, deckY(uAtZ(fz), chz(fz)) + coamH(fz) + 0.04 - BONE.shin * k);
     return q; }
-  // the extension (EXT_LEN, on its universal joint at the tiller's end: the owner). Stowed (extOut 0), lying back along
+  // the extension (EXT_LEN, on its universal joint on the tiller's top, EXT_AFT short of its end: the owner). Stowed (extOut 0), lying back along
   // the top of the tiller, the hand on the tiller just short of its end (the owner's photo of hers); swung out, its grip in
   // the hand: out toward where a hand rests in front of them, or as far toward the tiller's end as they reach when it's
   // across the far quarter. Between, the hand carries the grip round on the joint
@@ -1172,6 +1172,9 @@ function toward(p: THREE.Vector3, q: THREE.Vector3, a: number, max: number): voi
 /** Where the tiller's end is in the boat's frame, from the rudder (boatMesh.ts: the group turned to steer). */
 // (the tiller's end and its pin, in the tiller's own frame: it's turned with the rudder and lifted on its pin, boatMesh.ts)
 const TILLER_TIP = tillerRestDir().multiplyScalar(TILLER.len), TILLER_PIN = V(0, 0, 0);
+/** The extension's universal joint: on the tiller's top, 18 cm short of its end (the owner: 6–8 in), ESTIMATE. */
+const EXT_AFT = 0.18, TILLER_JOINT = (() => { const d = tillerRestDir(), r = RUDDER_RAKE, up = V(0, Math.cos(r), -Math.sin(r)); // (the boat's up, in the rudder's frame)
+  up.addScaledVector(d, -up.dot(d)).normalize(); return d.clone().multiplyScalar(TILLER.len - EXT_AFT).addScaledVector(up, 0.03); })();
 const onTiller = (turn: THREE.Object3D, local: THREE.Vector3) => {
   const rud = turn.parent!, til = turn.children[1]; til.updateMatrix(); turn.updateMatrix(); rud.updateMatrix();
   return local.clone().applyMatrix4(til.matrix).applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
@@ -1180,6 +1183,8 @@ const onTiller = (turn: THREE.Object3D, local: THREE.Vector3) => {
 export const tillerRootAt = (turn: THREE.Object3D) => onTiller(turn, TILLER_PIN);
 /** Where the tiller's end is in the boat's frame, from the rudder (boatMesh.ts: the group turned to steer). */
 export const tillerTip = (turn: THREE.Object3D) => onTiller(turn, TILLER_TIP);
+/** Where the extension's joint is in the boat's frame: the helm's hold on the tiller, whichever way they steer. */
+export const tillerJointAt = (turn: THREE.Object3D) => onTiller(turn, TILLER_JOINT);
 
 /**
  * (Moving, and which way: from where the physics has them now against last frame, over the time the race moved

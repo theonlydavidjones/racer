@@ -11,7 +11,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tillerRootAt, tillerTip, type Crew } from './crew';
+import { buildCrew, dockhand, syncCrew, tillerJointAt, tillerRootAt, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -1558,7 +1558,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   if (live) m.liveT = t;
   const pd = b.paddle, who = pd ? paddler(b) : 0;
   if (live) m.crew.tillerRoot = tillerRootAt(m.rudder);
-  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
+  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerJointAt(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null);
   if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
