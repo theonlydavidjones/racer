@@ -1017,6 +1017,10 @@ export function crewPoleCall(w: World, b: Boat): void {
   // under about 3°/s, doesn't pass it either: the physics review)
   const p = poleT.get(b) ?? { hi: NaN, lo: NaN, h: 0 }; poleT.set(b, p);
   if (p.hi === p.hi ? twa < 154.5 : twa > 157) { p.hi = twa > 157 ? w.t : NaN; p.h = b.h; }
+  // (and the heading's mark moved on while she's swinging or just steadied: after a bear-away deep onto the run, or a
+  // gybe in the hold, it's her new course's, and the pole goes out once she's held it; a circle too slow to be a swing
+  // keeps the mark where she crossed 157°. Fixed there, a gybe or a bear-away to 172° kept it in for the leg, the review)
+  if ((b.settle?.[SINCE] ?? 1e9) < POLE_SET) p.h = b.h;
   p.lo = twa < 150 ? (p.lo === p.lo ? p.lo : w.t) : NaN;
   if (w.t < 0 || nearMark || jibDown || b.docked || b.penalty > 0 || inBasin(b) || twa < 145 || w.t - p.lo >= POLE_STOW) b.poleWant = false;
   else if (w.t - p.hi >= POLE_SET && (b.settle?.[SINCE] ?? 1e9) >= POLE_SET && Math.abs(wrap(b.h - p.h)) < POLE_TURN) b.poleWant = true;

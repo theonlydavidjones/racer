@@ -167,7 +167,7 @@ export interface CrewState {
   fore01?: number; foreT?: number;
   /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
    * whether, with the pole out, both crew right forward on the foredeck pays more: `layout`, and seconds since it changed. */
-  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; twsAvg?: number; twaAvg?: number; poleWas?: boolean;
+  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; twsAvg?: number; twaAvg?: number; /** the course's angle the mean last snapped for (placeCrew, CrewCall.courseTwa) */ courseSeen?: number; poleWas?: boolean;
   /** With the pole out: whether best practice has them forward, how long it's said so (s), and what they're doing about
    * it, in the status line's terms (ui/crewWords.ts). */
   poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'soonMast' | 'stay' | 'aft' | 'late' | 'wrong';
@@ -345,7 +345,7 @@ export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
   // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)
   const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0,
-    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, pianoWho: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined, sc: scratchFor(people.length) };
+    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, courseSeen: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, pianoWho: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined, sc: scratchFor(people.length) };
   summarise(c, w);
   return c;
 }
@@ -548,8 +548,13 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // 120° and the bow hand went to the mast, crewcruise's 6 kt seeds 2 and 6)
     // (and only while her angle is on that course still: a shift that has come to stay under a held heading, or a slow
     // bear-away with no swing, isn't thrown back to a course she's left; the minute's mean follows it, the physics review)
+    // (once for each course read: held there again and again, a shift wandering either side of the snap's edge threw the
+    // mean back to the course each time it dipped, and the bow hand went forward and back, the physics review)
     const course = k.courseTwa ?? k.twa;
-    if ((k.steadyFor ?? 1e9) >= STEADY_NEW && Math.abs(course - c.twaAvg) > NEW_ANGLE && Math.abs(k.twa - course) <= NEW_ANGLE) c.twaAvg = course;
+    if ((k.steadyFor ?? 1e9) >= STEADY_NEW && course !== c.courseSeen) {
+      c.courseSeen = course;
+      if (Math.abs(course - c.twaAvg) > NEW_ANGLE && Math.abs(k.twa - course) <= NEW_ANGLE) c.twaAvg = course;
+    }
     // (without the pole only a good crew thinks of the mast; with it out everyone decides, as well as their skill lets them)
     // (with the pole set they stay with it, though she comes up past a run for a few seconds to keep clear: sent aft as she
     // passed 120° and forward again as she bore away, Deep Physics' trace, 12 kt seed 1; struck, the pole's no reason)

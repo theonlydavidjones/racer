@@ -33,6 +33,21 @@ describe('The AI crew\'s pole call (ai.ts crewPoleCall)', () => {
     });
     expect(calls, 'pole calls while circling').toBe(0);
   });
+  it('a bear-away deep onto the run, and a gybe in the first seconds past 157°: the pole goes out on the course she holds', () => {
+    // (her heading's mark for the slow-circle check taken where she crossed 157°: a bear-away to 175° or a gybe in the
+    // hold took her past it for good, and the pole stayed in for the leg, the physics review)
+    // (the wind from 0°: her heading is her true wind angle to 180°, and 195° is 165° on the other gybe)
+    for (const [to, what] of [[178, 'a deep run'], [195, 'gybed 38° on from where she crossed 157°']] as const) {
+      const b = testBoat({ heading: 90, kt: 3, windKt: 6 }); b.crew = crew(); const w = world();
+      let h = 90, at: number | null = null;
+      sail(b, 90, t => {
+        if (t > 10) h = Math.min(to, h + 6 / 60);
+        b.h = h; b.desired = h; (w as { t: number }).t = t; crewPoleCall(w, b);
+        if (b.poleWant && at == null) at = t;
+      });
+      expect(at, `the pole out on ${what}`).not.toBeNull();
+    }
+  });
   it('a run held: the pole is called for within a quarter of a minute, and a 3 s luff to 148° doesn\'t take it in', () => {
     const b = testBoat({ heading: 180 - 15, kt: 3, windKt: 6 }); b.crew = crew(); const w = world();
     let at: number | null = null, stowed = false;

@@ -97,6 +97,19 @@ describe('Up at the cabin top, they see to what\'s coming due there in the same 
     expect(atMast, 'the bow hand forward at some point').toBeGreaterThan(0);
     expect(bad.slice(0, 5), 'posed forward with their place still in the cockpit').toEqual([]);
   });
+  it('a shift that stays under a held heading, wandering about 15° past the course read: the bow hand isn\'t sent forward and back', () => {
+    // (the course read at 110° true; then the breeze backs 17° and stays, wandering ±5°: her angle 122-132°. Snapped back
+    // to the course read each time it came within 15° of it, the minute's mean saw-toothed about 120° and the bow hand went
+    // to the mast and back, the physics review: the snap is once for each course read)
+    const b: Boat = testBoat({ heading: 110, kt: 3, windKt: 6 }); b.crew = crew();
+    const moves: string[] = []; let lay = 'cockpit';
+    sail(b, 600, t => {
+      b.h = 110; b.desired = 110;
+      if (t > 60) b.ww.from = n360(-17 + 5 * Math.sin(2 * Math.PI * t / 40));
+      const l = b.crew!.layout ?? 'cockpit'; if (t > 150 && l !== lay) moves.push(`${t.toFixed(0)} s: ${lay} → ${l}`); lay = l;
+    });
+    expect(moves.length, moves.join(', ')).toBeLessThanOrEqual(1);
+  });
   it('sent up for the Cunningham, the outhaul a little off is trimmed while they\'re there, not a trip of its own later', () => {
     // (a beat in 16 kt, settled; then the Cunningham let right off, below the guide's floor, a trip at once, and the outhaul 3% off where they want it, not urgent
     // want it, set half a minute ago, so a trip for it waits till a minute, LINE_GAP. Before, it got a trip of its own when the wait ran out:
