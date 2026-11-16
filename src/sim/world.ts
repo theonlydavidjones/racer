@@ -1712,6 +1712,21 @@ export class World {
   }
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
+  /**
+   * Racing called off, however it was (N, N over H, N over A): no penalty is left to take. "A race that a race committee
+   * … abandons is void but may be resailed" (Definitions, Abandon); a boat is racing only "until the race committee
+   * signals a general recall, postponement or abandonment" (Definitions, Racing), and a penalty is for an incident "while
+   * racing" (44.1). (So Appendix P3 for its own penalty: "the penalty is cancelled".) A resail is a new race: nothing owed
+   * carries into it, but rules 30.3 and 30.4's disqualifications, which say so, and do (scored as they are). Each step
+   * while called off: whatever calls it off, and a penalty given in the same step, are covered.
+   */
+  private penaltiesVoid(): void {
+    for (const b of this.boats) if (b.penalty > 0 || b.penaltyDir) {
+      b.penalty = 0; b.penaltyTotal = 0; b.penaltyTurned = 0; b.penaltyDir = 0; b.penaltyMoves = 0; b.penaltyLastMove = 0; b.penaltyAt = 0; b.penaltyEndOnTack = false;
+      if (b.ai) b.ai.clearing = false;
+    }
+  }
+
   private signals(prevT: number): void {
     // too much wind: from two minutes before the warning signal until the race is over, the committee watches the wind
     // over the course (its middle and the marks: its own boat may sit in a lee) over a couple of minutes, and at the
@@ -1725,11 +1740,10 @@ export class World {
       if (!this.cancelled && this.settings.mode !== 'drill' && this.cbWin.length >= 240 && this.t >= this.sequence[0].t - 120 && !this.boats.some(b => b.finished) && this.cbMean! >= CANCEL_KT) {
         const sig = cancelSignal(this.t >= 0, this.cbMean!);
         this.cancelled = { t: this.t, kt: this.cbMean, up: sig.up, say: sig.say };
-        for (const b of this.boats) { b.penalty = 0; b.penaltyTurned = 0; } // (no race, no penalty left to take)
         for (let i = 0; i < sig.sounds; i++) this.emit({ type: 'horn', dur: 0.8, delayMs: i * 1100 });
         this.emit({ type: 'toast', ms: 9000, msg: sig.say });
       } }
-    if (this.cancelled) { this.flags = [...this.cancelled.up]; return; }
+    if (this.cancelled) { this.flags = [...this.cancelled.up]; this.penaltiesVoid(); return; }
     if (this.steps === 1 && this.t < 0) {
       const T = this.lineTransit;
       if (T) this.emit({ type: 'toast', ms: 6000, msg: `Sight the line: from the ${this.C.committeeLabel} end, ${this.C.pinLabel} lines up with ${T.name}. Near the line, when ${this.C.pinLabel} and ${T.name} are in line, you're on it.` });
