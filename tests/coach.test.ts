@@ -109,7 +109,7 @@ describe('the trim coach: one thing at a time, and the right thing', () => {
     const b = testBoat({ heading: 318, kt: 4.5, windKt: 15 }); sail(b, 30);
     takeLine(b, 'jibsheetW'); (b.ctlTarget ??= {}).jibsheetW = 0; sail(b, 20);
     expect(teach(b).top.id).toBe('hove:takemain');
-    takeLine(b, 'mainsheet'); b.ctlTarget.mainsheet = 0.55; sail(b, 20);
+    takeLine(b, 'mainsheet'); b.ctlTarget.mainsheet = 0.62; sail(b, 20); // (eased till she luffs: 0.55 did it while the boom's best place was 6° further out; there she now draws 85% still, and the coach rightly asks for more)
     expect(teach(b).top.id).toBe('hove:lash');
     b.lashed = -0.7; sail(b, 120);
     const v = teach(b);

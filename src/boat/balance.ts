@@ -1,7 +1,7 @@
 import { D2R, clamp, hypot } from '../core/math';
 import orc from './data/nordic-folkboat-orc.json';
 import type { Shape } from './controls';
-import type { SailTrim } from './trim';
+import { downwindness, mainBandLoss, type SailTrim } from './trim';
 
 /**
  * Heel and helm balance, from the forces on the sails and the hull.
@@ -178,7 +178,7 @@ function oneSail(q: number, a: number, ce: number, luffing: boolean, area: numbe
 }
 
 /** Heeling force (N, across the mast), drive (N) from both sails, and the height of their centre of effort above the hull's centre of pressure (m, `ceh`), for the apparent wind at the sails `aws` (m/s) at `awa` (deg). */
-export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean): { main: SailForce; jib: SailForce; twist: number; ceh: number; flat: number } {
+export function sailForces(aws: number, awa: number, main: { trim: SailTrim; shape: Shape; out: number }, jib: { trim: SailTrim; shape: Shape } | null, luffing: boolean, bandRate?: number): { main: SailForce; jib: SailForce; twist: number; ceh: number; flat: number } {
   const q = 0.5 * RHO_AIR * aws * aws, b = clamp(Math.abs(awa), 0, 180), a = b * D2R;
   const Am = AREA.main, Aj = jib ? AREA.jib : 0, Aref = Am + Aj;
   // each sail's maximum lift and parasitic drag at this wind angle (the jib blanketed by the main on a run, §5.6.2)
@@ -195,6 +195,10 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   const fM = flatOf(main.shape, RIG.fullDepth.main), fJ = jib ? flatOf(jib.shape, RIG.fullDepth.jib) : 1;
   const mainF = oneSail(q, a, ce, luffing, Am, clM, cdM, fM, false, main.trim, main.shape);
   const jibF = jib ? oneSail(q, a, ce, luffing, Aj, clJ, cdJ, fJ, true, jib.trim, jib.shape) : { heel: 0, drive: 0 };
+  // the main eased across the band between its best place and the luff (trim.ts mainBandLoss, measured on Fujin): its
+  // heeling force goes at 2.5% a degree, and the rig's drive in step with the rig's side force
+  const band = luffing ? 0 : mainBandLoss(main.trim.err, bandRate) * (1 - downwindness(b));
+  if (band > 0) { const cut = mainF.heel * band, side = mainF.heel + jibF.heel; if (side > 1) mainF.drive -= (cut / side) * (mainF.drive + jibF.drive); mainF.heel -= cut; }
   // centre of effort (eq. 5.39), lowered as she's depowered (eq. 5.40), above the hull's centre of pressure
   const wM = hypot(clM, cdM) * Am, wJ = hypot(clJ, cdJ) * Aj;
   const flat = (fM * Am + fJ * Aj) / Aref;

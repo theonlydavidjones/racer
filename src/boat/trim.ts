@@ -60,6 +60,35 @@ const LUFF_START = 2, LUFF_SPAN = 10;
  * "The boom's place on a beat").
  */
 const luffStart = (sail: SailName) => (sail === 'main' ? LUFF_START + MAIN_TWIST_MID : LUFF_START);
+/**
+ * The traveler's play: what the main loses as the boom is eased across the band between its best place and where it
+ * begins to lift (the first LUFF_START degrees cost nothing, as ever; then MAIN_TWIST_MID more).
+ *
+ * MEASURED, on another boat: Tahara, Masuyama, Fukasawa & Katori, "Sail Performance Analysis of Sailing Yachts by
+ * Numerical Calculations and Experiments" (in Fluid Dynamics, Computational Modeling and Applications, InTech 2012;
+ * docs/sources), section 5.3.2, Fig. 15 and Table 3: the sail dynamometer boat Fujin under sail, main and 130% jib,
+ * apparent wind 30 +/- 2 degrees at 7.2 m/s, the boom held on the centerline with the traveler and the mainsheet eased,
+ * the jib untouched. From 8.2 to 24.1 degrees of twist (boom to the chord at 80% of the height), for the whole rig:
+ *   side force CY 1.37 -> 1.23 (-10%), drive CX 0.37 -> 0.33 (-11%), the center of effort 5.96 -> 5.47 m (-8%),
+ *   her heel 16.8 -> 12.3 degrees. Over the series (4.5 to 24.9 degrees) CY 1.39 -> 1.16, CX 0.33 to 0.39 with the
+ *   most drive "at a twist angle of around 15 degrees". Each point carries error bars of about +/- 0.1.
+ * So what heels her, CY x the center's height, fell 17.6% over 15.9 degrees of twist: 1.1% a degree.
+ *
+ * CARRIED ACROSS, as ESTIMATES:
+ * - twist at 80% of the height to the ease of the sail as a whole: about half (the twist grows from nothing at the boom,
+ *   and most of the cloth is low), so 2.2% of the rig's heeling moment per degree of mean ease;
+ * - to this boat: Fujin is a 10.35 m, 3.86 t fractional sloop whose main is 56% of her sail area; the Folkboat's is
+ *   about 70%, and the loss is put on the main's own heeling force here: 2.5% a degree (the Coordinator's ruling,
+ *   16 Nov 2026; with the error bars it could be half or nearly twice that);
+ * - the drive: flat to the best trim, then falling in step with the side force (Table 3: -11% against -10%), the same
+ *   share of the rig's drive as of its side force.
+ * Past the band she luffs as she always has: the luff's width and what a luffing main costs are unchanged.
+ */
+export const BAND_HEEL_PER_DEG = 0.025;
+/** Degrees the main is eased into the band (0 to MAIN_TWIST_MID), from its trim's `err`. */
+export const mainBandDeg = (err: number): number => clamp(-err - LUFF_START, 0, MAIN_TWIST_MID);
+/** The share of the main's heeling force lost there, at `rate` a degree (BAND_HEEL_PER_DEG; a test tries others). */
+export const mainBandLoss = (err: number, rate = BAND_HEEL_PER_DEG): number => Math.min(1, rate * mainBandDeg(err));
 /** Stalling starts this far above the best angle of attack. */
 const STALL_START = 4;
 
@@ -92,6 +121,9 @@ export function sailTrim(sail: SailName, awa: number, sheet: number): SailTrim {
   const ls = luffStart(sail);
   if (err < -ls) { amount = clamp((-err - ls) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
   else if (err > STALL_START) { amount = clamp((err - STALL_START) / 25, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
+  // (the main eased across the band: the rig's drive goes in step with its side force, the main making
+  // SAILS.main.share of both; as a share of the main's own drive, for trimDrive's weighing)
+  if (sail === 'main') effUp *= 1 - mainBandLoss(err);
   // downwind: drive comes from area presented to the wind, so trimmed in means less drive
   const effDown = 0.4 + 0.6 * Math.sin(clamp(sheet, 0, 90) * Math.PI / 180) / Math.sin(clamp(optimalSheet(sail, a), 1, 90) * Math.PI / 180);
   if (dw > 0.5) { flow = 'good'; amount = 0; } // stalled is normal downwind; the telltales just hang

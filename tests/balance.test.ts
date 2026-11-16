@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
-import type { Controls } from '../src/boat/controls';
+import { TRAVELLER_SWING, type Controls } from '../src/boat/controls';
 import type { Boat } from '../src/boat/boat';
-import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
-import { netDrive } from '../src/boat/balance';
+import { DEFAULT_CREW, crewMass, crewMoment, displacement, newCrew } from '../src/boat/crewPhys';
+import { hullRighting, netDrive } from '../src/boat/balance';
+import { BAND_HEEL_PER_DEG, SAILS } from '../src/boat/trim';
 import { takeLine } from '../src/boat/physics';
 import { polar } from '../src/boat/polar';
 import { KT } from '../src/core/math';
@@ -48,7 +49,26 @@ describe('Heel from the forces on the sails', () => {
     expect(beat(22, c => { c.backstay = 1; }).heelMag!).toBeLessThan(base);
     // (the outhaul's on its band already in 22 kt, North Sails: easing it heels her more)
     expect(beat(22, c => { c.outhaul = 0; }).heelMag!).toBeGreaterThan(base);
-    expect(beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); }).heelMag!).toBeLessThan(base - 4);
+    // The traveler dropped 0.6 of its travel: how much heel that takes off is Fujin's measurement carried to this boat,
+    // worked out here from the paper and the boat's own figures, not from what the sim then does (the Coordinator,
+    // 16 Nov 2026). The bound before was "more than 4° off", set from the earlier sail model, in which the eased main
+    // shed its heeling force at about 7.5% a degree; superseded by Fujin (Tahara et al. 2012, Table 3: trim.ts).
+    //  - the car's 0.6 swings the boom 0.6 × TRAVELLER_SWING = 5.7°; the first 2° cost nothing, so 3.7° of it count;
+    //  - the main's heeling force goes at 2.5% a degree (BAND_HEEL_PER_DEG): 9.3%; the main is SAILS.main.share of the
+    //    rig, so the rig's heeling moment falls 6.5%;
+    //  - her heel is where that moment meets her righting moment, hull and crew (hullRighting, crewMoment), from the
+    //    heel she had: `predicted` below. The sails' gain as she stands up isn't in it.
+    //  - the band: Fujin's points carry ±0.1 on CY of about 1.3, so the change between two of them (0.14) is known to
+    //    about ±75%: from a quarter of the prediction to one and three quarters of it. Too little fails, and too much.
+    const b0 = beat(22, undefined, true), eased = beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); });
+    const righting = (h: number) => hullRighting(h, displacement(b0.crew!.spec), crewMass(b0.crew!.spec)) + crewMoment(b0.crew!, h);
+    const heelFor = (moment: number) => { let lo = 0, hi = 60; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (righting(m) < moment) lo = m; else hi = m; } return (lo + hi) / 2; };
+    const predictedOff = (rate: number) => b0.heelMag! - heelFor(righting(b0.heelMag!) * (1 - SAILS.main.share * rate * (0.6 * TRAVELLER_SWING - 2)));
+    const predicted = predictedOff(BAND_HEEL_PER_DEG), off = b0.heelMag! - eased.heelMag!;
+    expect(off, `the traveler's 0.6 takes off ${off.toFixed(1)}°; Fujin's figures give ${predicted.toFixed(1)}°`).toBeGreaterThan(0.25 * predicted);
+    expect(off).toBeLessThan(1.75 * predicted);
+    // (the check itself: the earlier model's rate, 7.5% a degree, is outside the band)
+    expect(predictedOff(0.075)).toBeGreaterThan(1.75 * predicted);
     expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 1); // fuller: more power, more heel
   });
   it('in a moderate breeze the crew hike to hold her; depowering lets them hike less', () => {
@@ -101,8 +121,17 @@ describe('Helm balance (weather helm)', () => {
     // where they want it, so it doesn't ease the boom)
     expect(beat(16, c => { c.traveller = 1; c.mainsheet = Math.min(1, c.mainsheet + 0.12); }).helmNeed!).toBeLessThan(base - 2);
     expect(beat(16, c => { c.backstay = 1; }).helmNeed!).toBeLessThan(base);
-    // (eased until it's luffing hard: the main's flogging slows her too, physics.ts sailFlog)
-    expect(beat(16, c => { c.mainsheet += 0.25; }).helmNeed!).toBeLessThan(0);
+    // The main eased a quarter of the sheet, across the whole band and into the luff: her helm moves toward lee by at
+    // least what the band alone gives. Fujin measured forces, not helm, so the floor is from the moment arm: the
+    // weather helm the sails ask for is in proportion to their side force (the lever to the keel held), the main is
+    // SAILS.main.share of it, and across the band's 6° it loses 6 × BAND_HEEL_PER_DEG of its own: 10.5% of the helm.
+    // (Before: "lee helm, under 0", set from the earlier sail model, superseded by Fujin 2012. That an eased, luffing
+    // main brings lee helm is what sailors say; no measurement of it was found, so it isn't required here: with the
+    // Coordinator, 16 Nov 2026.)
+    const easedHelm = beat(16, c => { c.mainsheet += 0.25; }).helmNeed!, floor = SAILS.main.share * 6 * BAND_HEEL_PER_DEG * base;
+    expect(base - easedHelm, `helm ${base.toFixed(2)}° to ${easedHelm.toFixed(2)}°, the band alone gives ${floor.toFixed(2)}°`).toBeGreaterThan(floor);
+    // (the check itself: a main that kept all its side force across the band, the helm unmoved, fails)
+    expect(base - base).not.toBeGreaterThan(floor);
   });
   it('let go of the tiller with weather helm and she rounds up into the wind', () => {
     const b = beat(16), twa0 = b.twa;
