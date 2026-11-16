@@ -229,13 +229,14 @@ describe('sail trim', async () => {
   const { optimalSheet, sailTrim, SAILS } = await import('../src/boat/trim');
 
   it('best sheet angles: tight close-hauled, eased on a reach, all the way out on a run', () => {
-    expect(optimalSheet('main', 30)).toBeCloseTo(8, 0);
+    // (the boom on the centerline close-hauled: 22° at mid height and 6 of twist from the boom, trim.ts MAIN_TWIST_MID; North's guides)
+    expect(optimalSheet('main', 30)).toBeCloseTo(2, 0);
     // (the jib close-hauled sheets inside Josephine's car track, North's guide's 58 cm out and a 2.65 m tape from the
     // stay's pin: tight, and reachable on the boat; in the lightest beat it's at the inner hole, or just outside it)
     expect(optimalSheet('jib', 30)).toBeGreaterThanOrEqual(carLead(0));
     expect(optimalSheet('jib', 30)).toBeLessThanOrEqual(carLead(CAR_IN_PINS - 1));
     expect(optimalSheet('jib', 28.5) - carLead(0)).toBeLessThan(0.5);
-    expect(optimalSheet('main', 65)).toBeCloseTo(43, 0);
+    expect(optimalSheet('main', 65)).toBeCloseTo(37, 0);
     expect(optimalSheet('main', 170)).toBeCloseTo(SAILS.main.max, 0);
   });
 

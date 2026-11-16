@@ -51,6 +51,15 @@ export const SAILS: Record<SailName, SailSpec> = {
 
 /** Luffing starts this far (deg) below the best angle of attack and is complete 10° further on. */
 const LUFF_START = 2, LUFF_SPAN = 10;
+/**
+ * ... and for the main, measured at the boom, that far past where it began before the boom's best place moved in
+ * (MAIN_TWIST_MID): eased from the centerline, the main starts to lift at the same place of the boom as it always has
+ * here, and costs there what it cost. So the boom's best place is North's, and between it and where the luff begins
+ * (some 8°: the traveler's play in a puff) she loses nothing by the ease, as before. The luff's width and what a
+ * luffing main costs are left as they were on purpose: they wait on the owner's answer on the flogging main (ROADMAP,
+ * "The boom's place on a beat").
+ */
+const luffStart = (sail: SailName) => (sail === 'main' ? LUFF_START + MAIN_TWIST_MID : LUFF_START);
 /** Stalling starts this far above the best angle of attack. */
 const STALL_START = 4;
 
@@ -80,7 +89,8 @@ export function sailTrim(sail: SailName, awa: number, sheet: number): SailTrim {
   const err = (a - sheet) - SAILS[sail].aoa;
   // flow along the sail (upwind/reaching)
   let effUp = 1, flow: Flow = 'good', amount = 0;
-  if (err < -LUFF_START) { amount = clamp((-err - LUFF_START) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
+  const ls = luffStart(sail);
+  if (err < -ls) { amount = clamp((-err - ls) / LUFF_SPAN, 0, 1); effUp = 1 - amount * amount; flow = 'luffing'; }
   else if (err > STALL_START) { amount = clamp((err - STALL_START) / 25, 0, 1); effUp = 1 - 0.5 * Math.pow(amount, 1.3); flow = 'stalled'; }
   // downwind: drive comes from area presented to the wind, so trimmed in means less drive
   const effDown = 0.4 + 0.6 * Math.sin(clamp(sheet, 0, 90) * Math.PI / 180) / Math.sin(clamp(optimalSheet(sail, a), 1, 90) * Math.PI / 180);
