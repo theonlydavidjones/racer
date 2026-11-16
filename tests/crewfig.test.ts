@@ -294,31 +294,57 @@ describe('Two crew keep to themselves (render/crew.ts)', () => {
  *   on the mainsheet at the thwart behind them while facing forward, 0.31 m behind the shoulder: reached through the
  *   elbow. A hiker's hand on the rail beside the hip, leaning out, is up to 0.16.
  */
+/**
+ * One figure's arms this frame, as the race watch judges them: a hand reached back behind the shoulder, ever; an elbow
+ * forward of its shoulder-to-wrist line, once the figure has settled. Its intent: an arm is judged once a transition is
+ * over, and a change of the physics' pose, a walk, a route or the tack's role (the crossing as drawn, crew.ts f.tack) is
+ * one; it's settled half a second after the last of them. The bound (0.06 m) is the same whenever it looks.
+ */
+function armCheck(fig: Figure, who: string, k: number, pose: string, held: { pose: string; t: number }, t: number, at: string, bad: string[]): void {
+  if (!fig.root.visible) return; fig.root.updateMatrixWorld(true);
+  if (pose !== held.pose || fig.going || fig.route || fig.tack) { held.pose = pose; held.t = t; }
+  const settled = t - held.t > 0.5;
+  const wv = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), fw = fig.root.localToWorld(new THREE.Vector3(0, 0, -1)).sub(wv(fig.root)).setY(0);
+  fig.arm.forEach((a, i) => {
+    const sh = wv(a.root), el = wv(a.mid), wr = wv(a.mid, -BONE.fore);
+    // (behind along the way they face, level: a hiker leaning back with the sheet in front of them has the hand behind
+    // the leaning torso's own front, which isn't this)
+    // (and bent at the elbow: an arm reaching straight back, the helm passing the tiller extension behind them as they
+    // cross, is a shoulder's reach, not a forearm folded back)
+    const back = -wr.clone().sub(sh).dot(fw) / fw.length(), bent = wr.distanceTo(sh) < 0.9 * (BONE.upper + BONE.fore) * fig.scale;
+    // (the crew: the helm crossing passes the stick behind them on purpose, helmCrossing)
+    if (k > 0 && back > 0.2 && bent) bad.push(`${at}: ${who} ${pose} arm${i} hand ${back.toFixed(2)} m behind its shoulder`);
+    const line = wr.clone().sub(sh), tt = el.clone().sub(sh).dot(line) / line.lengthSq(), off = el.clone().sub(sh.clone().addScaledVector(line, tt)), ahead = off.dot(fw) / fw.length();
+    if (settled && ahead > 0.06 && -off.y < ahead) bad.push(`${at}: ${who} ${pose} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
+  });
+}
 describe('No backwards arms anywhere (render/crew.ts)', () => {
+  // (the check waits out a transition and no more: an arm still bent wrong half a second after the tack's role has let
+  // go is caught, at the same bound)
+  it('an elbow still forward after the tack\'s role lets go fails it, once half a second has passed', () => {
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1); new THREE.Group().add(cr.group);
+    const b = testBoat({ heading: 320, kt: 4, windKt: 12 }); b.crew = newCrew(DEFAULT_CREW, 'S');
+    for (let i = 0; i < 30; i++) syncCrew(cr, 1, b.crew, 1 / 30, false, undefined, 0, false);
+    const fig = cr.crew[0], arm = fig.arm[0];
+    // (the arm bent the wrong way, the elbow pointing forward)
+    const bend = () => { arm.root.rotation.set(2.25, 0, 0); arm.mid.rotation.set(2.5, 0, 0); }; // (its elbow 0.25 m forward of the line)
+    const held = { pose: 'hike', t: 0 }, found: number[] = [];
+    for (let i = 0; i <= 45; i++) { // (in the tack's role for half a second, then let go and still bent for a second)
+      const t = i / 30; fig.tack = t < 0.5 ? 'jib' as never : undefined as never; bend();
+      const bad: string[] = []; armCheck(fig, 'crew1', 1, 'hike', held, t, `t ${t.toFixed(2)}`, bad);
+      if (bad.some(m => m.includes('elbow'))) found.push(t);
+    }
+    // (nothing while in the role or in the half second after; caught from then on)
+    expect(found.length, 'the bent elbow is caught').toBeGreaterThan(0);
+    expect(Math.min(...found), 'not before the transition is over').toBeGreaterThan(0.5 + 0.5 - 1e-6);
+  });
   function watch(label: string, w: World, b: World['boats'][number], secs: number, bad: string[]): void {
     const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1); new THREE.Group().add(cr.group);
     const end = w.t + secs, held = [0, 1, 2].map(() => ({ pose: '', t: w.t }));
     while (w.t < end) {
       w.step(DT); syncCrew(cr, b.rel >= 0 ? 1 : -1, b.crew, DT, false, undefined, b.heel, b.tacking);
       const at = `${label} t ${w.t.toFixed(2)}`;
-      [['helm', cr.helm], ...cr.crew.map((f, i) => [`crew${i + 1}`, f] as const)].forEach(([who, f], k) => {
-        const fig = f as Figure; if (!fig.root.visible) return; fig.root.updateMatrixWorld(true);
-        const pose = b.crew!.people[k].pose; if (pose !== held[k].pose || fig.going || fig.route) { held[k] = { pose, t: w.t }; }
-        const settled = w.t - held[k].t > 0.5;
-        const wv = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), fw = fig.root.localToWorld(new THREE.Vector3(0, 0, -1)).sub(wv(fig.root)).setY(0);
-        fig.arm.forEach((a, i) => {
-          const sh = wv(a.root), el = wv(a.mid), wr = wv(a.mid, -BONE.fore);
-          // (behind along the way they face, level: a hiker leaning back with the sheet in front of them has the hand behind
-          // the leaning torso's own front, which isn't this)
-          // (and bent at the elbow: an arm reaching straight back, the helm passing the tiller extension behind them as they
-          // cross, is a shoulder's reach, not a forearm folded back)
-          const back = -wr.clone().sub(sh).dot(fw) / fw.length(), bent = wr.distanceTo(sh) < 0.9 * (BONE.upper + BONE.fore) * fig.scale;
-          // (the crew: the helm crossing passes the stick behind them on purpose, helmCrossing)
-          if (k > 0 && back > 0.2 && bent) bad.push(`${at}: ${who} ${pose} arm${i} hand ${back.toFixed(2)} m behind its shoulder`);
-          const line = wr.clone().sub(sh), t = el.clone().sub(sh).dot(line) / line.lengthSq(), off = el.clone().sub(sh.clone().addScaledVector(line, t)), ahead = off.dot(fw) / fw.length();
-          if (settled && ahead > 0.06 && -off.y < ahead) bad.push(`${at}: ${who} ${pose} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
-        });
-      });
+      [['helm', cr.helm], ...cr.crew.map((f, i) => [`crew${i + 1}`, f] as const)].forEach(([who, f], k) => armCheck(f as Figure, who as string, k, b.crew!.people[k].pose, held[k], w.t, at, bad));
     }
   }
   it('racing (the start and its tacks, 16 kt), cruising (close-hauled, a reach, a run, 12 kt), at the dock', () => {
