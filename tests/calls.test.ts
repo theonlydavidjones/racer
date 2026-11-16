@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail, startTack } from './helpers/testBoat';
-import { DEFAULT_CREW, newCrew, placeCrew, type CrewSpec } from '../src/boat/crewPhys';
+import { DEFAULT_CREW, Z, newCrew, placeCrew, type CrewSpec } from '../src/boat/crewPhys';
 import { AI_WAIT_MAX, CALL_AT, HAIL_WAIT, aiCrewReady, boomStrike, callsTurn, decideTurn } from '../src/boat/calls';
 import { beatAngle } from '../src/boat/polar';
 import { World, DT } from '../src/sim/world';
@@ -226,20 +226,26 @@ describe('An AI boat waits for her crew on a called turn, as your helm does (the
   });
 });
 
-describe('Through a tack the crew keep their places fore and aft (crewPhys.ts placeCrew: chooseFore not re-thought)', () => {
-  // (placeCrew driven directly: a beat, then the wind over the other side, a tack; through the tack and its settling they
-  // don't re-think where to be fore and aft, after it they do)
-  it('on each tack, their fore-and-aft choice isn\'t re-thought till she\'s settled, and is after', () => {
-    for (const from of ['S', 'P'] as const) {
-      const c = newCrew(crew(0.45), from), w0 = from === 'S' ? 1 : -1, to = from === 'S' ? 'P' : 'S';
-      const call = (w: number, tack: 'S' | 'P', twa: number) => ({ need: 2000, twa, tws: 6, v: 1.2, pole: false, tack, windward: w, beat: 43, heel: 5 });
-      for (let i = 0; i < 120; i++) placeCrew(c, call(w0, from, 43), 1 / 60);
-      // (a re-think resets their clock for the next to a second, crewPhys.ts foreT: watched for that)
-      let rethought = 0, last = c.foreT ?? 0;
-      for (let i = 0; i < 60 * 3; i++) { placeCrew(c, call(-w0, to, i < 60 ? 20 : 43), 1 / 60); if ((c.foreT ?? 0) > last + 0.5) rethought++; last = c.foreT ?? 0; } // (through the wind, slow, then sailing)
-      expect(rethought, `onto ${to}: not re-thought through the tack's settling`).toBe(0);
-      for (let i = 0; i < 60 * 6; i++) { placeCrew(c, call(-w0, to, 43), 1 / 60); if ((c.foreT ?? 0) > last + 0.5) rethought++; last = c.foreT ?? 0; }
-      expect(rethought, 'thought about again once she\'s sailing').toBeGreaterThan(0);
+describe('Through a roll tack the crew forward of the winch keep their seats (crewPhys.ts placeCrew: the roll\'s targets)', () => {
+  // (placeCrew driven directly, the reproduction from Deep Physics' review: both crew forward of the winch, the front hand
+  // away at the jib car when she tacks and the job ending at the tack, two seconds slow near head to wind, then sailing.
+  // Held fore and aft where she stood, short of any seat, the roll's hold put her at the middle hand's seat and the
+  // spacing sent him aft and back)
+  it('on each tack, the middle hand\'s seat (Z.deckFwd) is his throughout, and the front hand makes for hers', () => {
+    for (const first of ['S', 'P'] as const) {
+      const c = newCrew(JSON.parse(JSON.stringify(DEFAULT_CREW)) as CrewSpec, first), other = first === 'S' ? 'P' : 'S';
+      const k = (tack: 'S' | 'P', twa: number) => ({ need: 300, twa, tws: 6, v: 1.1, pole: false, tack, windward: tack === 'S' ? 1 : -1, beat: 45, heel: 3, bestHeel: 6, rmPerDeg: 250 });
+      const step = (tack: 'S' | 'P', twa: number, job: boolean) => {
+        c.fore01 = 1;
+        c.people[2]!.job = job ? { line: 'car', reach: 0, work: 1, station: { arm: 0.8, z: -0.37, pose: 'car' } } as never : null;
+        placeCrew(c, k(tack, twa) as never, 1 / 60);
+      };
+      for (let i = 0; i < 60 * 30; i++) step(first, 45, i > 60 * 15);
+      expect(c.people[2]!.z, 'the front hand at the car').toBeLessThan(0);
+      const zs: number[] = [];
+      for (let i = 0; i < 60 * 12; i++) { step(other, i < 120 ? 4 : 45, false); zs.push(c.tgt![1]!.z); }
+      expect(Math.max(...zs.map(z => Math.abs(z - Z.deckFwd))), `onto ${other}: the middle hand never sent from his seat`).toBeLessThan(0.05);
+      expect(c.tgt![2]!.z, 'the front hand back at hers, beside the cabin').toBeCloseTo(Z.cabinSide, 2);
     }
   });
 });
