@@ -39,6 +39,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
   Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
   perf-pair --ai, then the physics-reviewer.
+- **Prepare for the rounding** (Crew Model; the Coordinator, 16 November): with a mark close ahead, the crew get ready for
+  the rounding (the pole, the vang, the jib car for the next leg) and make no small-gain cabin-top trips for this leg:
+  within about 30 s of a mark (an ESTIMATE, to be sourced if possible). Found on the shelved back-up-to-speed branch
+  (claude/back-to-speed, 60e0dbb4): waiting for her speed after a tack moved a jib-halyard trim to five seconds before
+  the windward mark, undone after the bear-away (12 kt seed 6: three extra trips). Back-up-to-speed returns on top of
+  this and the AI's light-air steering.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
