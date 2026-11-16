@@ -1,6 +1,7 @@
 import { clamp } from '../core/math';
 import { SETTLE, type Boat, type Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
+import { beatAngle, polar } from './polar';
 import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, crewSkill, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
@@ -83,6 +84,18 @@ const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+/**
+ * Back up to speed first (Crew Model's design, from drive-blend's bdb6710a and 3feb71c2): after a tack or a gybe the helm
+ * and the sheets build her speed again, and nobody goes to the cabin top for a line that isn't urgent until she's going,
+ * at TACK_SPEED of the polar's speed, for TACK_SETTLE at most. Her speed to be back up to is the polar's along her course
+ * through the water, her leeway and all, and no closer to the wind than its beat angle (as physics.ts reads it): at her
+ * heading's angle, 4° above her course, it read low, and the trips went at 91% of her speed. Both figures estimates: no
+ * sailing text gives a share or a time, only the order (speed first, then the fine trim).
+ */
+export const TACK_SETTLE = 60, TACK_SPEED = 0.95;
+// (its imports read once at load: through a module runner each use is a lookup and a getter call, docs/CAPACITY.md)
+const polar_ = polar, beatAngle_ = beatAngle;
+const settleSpeed = (b: Boat): number => polar_(b.ww.kt, Math.max(beatAngle_(b.ww.kt), Math.min(180, Math.abs(b.twa ?? 0) + (b.leeway ?? 0))));
 const NO_WAITS: readonly string[] = [], CREW_WAITS: readonly string[] = ['cunningham', 'downhaul', 'jibHalyard'], ALONE_WAITS: readonly string[] = [...PIANO];
 export function waitingLines(c: CrewState): readonly string[] {
   if (c.place?.across == null) return NO_WAITS;
@@ -286,6 +299,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // (anyone struck in a jibe and out of action, worked out once: nearly always nobody, and their pace then as it is)
   let anyOut = false; for (let i = 0; i < c.people.length; i++) if (c.people[i]!.outUntil > (c.clock ?? 0)) { anyOut = true; break; }
   const waits = waitingLines(c), placed = c.place?.across != null && n > 0;
+  if (b.tacking) c.tackedAt = c.clock ?? 0; // (the crew's own clock: TACK_SETTLE)
   // who works a line now: its owner, but with the forward hand away at the cabin top or a car, the middle crew takes the
   // jib sheet from them meanwhile (as crews do: the jib stays trimmed, and the forward hand finishes what they went for):
   // workerOf
@@ -390,6 +404,8 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const sheet = sheetOf(k);
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
+    // and after it, back up to speed first (TACK_SETTLE): a line knocked well off still goes at once
+    if (c.tackedAt != null && (c.clock ?? 0) - c.tackedAt < TACK_SETTLE && PIANO.has(k) && !urgentTo && b.v < TACK_SPEED * settleSpeed(b)) continue;
     // and swinging, or just settled from it, a cabin-top line that only gains a little waits (physics.ts SETTLE_S): what
     // the depowering steps or the guide need goes at once (planWorth's 1)
     if (PIANO.has(k) && (b.settle?.[SETTLE.left] ?? 0) > 0 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
