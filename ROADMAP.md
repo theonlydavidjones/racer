@@ -500,6 +500,12 @@ What's planned, roughly in order. Done work is described in the README.
      option-2 layout of 12 November: crew 1 from the cabin's after bulkhead to the winch, crew 2 from the winch to the
      thwart, aft of the thwart the skipper's alone. That shifts the fore-and-aft trim, so the calibration is re-tied
      and reviewed. It also likely retires the parked "crew pass close mid-cockpit" item.
+   - Hands on what they'd really hold, hiking on a beat (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
+     out, crew seem to be holding on to thin air. IRL, when beating, forward crew would be holding the lee jib sheet, and
+     middle crew would be holding the traveller and/or mainsheet, often tucking their aft leg under the thwart for
+     stability. if only one crew, they would hold the jib sheet and the traveller." The hands go on the lee jib sheet's
+     tail and the traveller or mainsheet; the middle hand's aft foot hooked under the thwart. Checked from both sides on
+     both tacks.
    - Open question (Coordinator, 14 November; from the physics review of claude/crew-mast-sheets): in about 16 kt and
      up the crew won't leave the rail to set the lazy jib car (crewWork.ts carJob: not while she needs their weight), so
      after a change of breeze she sails the next tack on the old car. Arguably right: a good crew stays hiked and sets
