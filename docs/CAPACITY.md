@@ -547,7 +547,7 @@ show this cost; one of the trees loaded as perf-pair loads them, by vite's runne
 **The same in aiThink** (irons, #441, 16 Nov 2026): the AI's way out of irons added about fifteen lines inline in aiThink,
 nearly all of them returning at once (a boat going astern is rare). perf-pair --ai against its main: 1.0301 inline;
 1.0224 with its one real cost (a polar lookup every think) made lazy; **1.0015** with the same lines moved into two
-functions of their own, entered from aiThink only behind one test (`b.astern > 0.05 || ai.gather`). The race the same.
+functions of their own, entered from aiThink only behind one test (`b.astern > 0.05 || ai.gather`), the logic unchanged (not checked race for race).
 So the rule holds for aiThink as for World.step: any large function a step runs, new work goes behind one cheap test,
 in a function of its own.
 
