@@ -38,8 +38,9 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   Model's crewstation work): in races whose 6 kt westerly dies to 1–4 kt, the AI's tacks stall at about 2.3 kn and fall
   off the long way round through a jibe, and its desired heading flips 190↔284 every 10–20 s, or zig-zags 55°↔105–160°
   true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
-  tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 11 and 15 (14, 20 and 21 pass since the crew's light-air habits): held there as an `it.fails` case,
-  which goes red when this is fixed and is then switched to a normal test.
+  tests/crewstation.test.ts's 2.0 backstop failed on 6 kt seeds 4, 11 and 15; since the AI's pole call waits for the run to
+  hold and the guide's angle holds through a swing (claude/crew-habits), all 24 seeds pass it and nothing is held. The
+  steering itself is still to fix.
 - **The outhaul in a breeze wandering across the guide's steps** (Crew Model; the physics review of the crew habits,
   16 November): two cases left after the guide's steps were read as its ranges (controls.ts guideLimits):
   - a light-air beat whose breeze swings across both 4 and 5 kt (3.5 to 5.7 kt read) still has them at the outhaul
