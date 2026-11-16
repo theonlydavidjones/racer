@@ -164,18 +164,21 @@ describe('pushed off astern', () => {
   });
   // (the planner's and the shove's glide, from physics.ts asternGlide, against what she sails: a breeze along her line)
   /** One berth's glide in 20 kt from `from`: null if she isn't shoved astern or is stopped by a dock or a boat (no glide to compare); else how far she sailed and how far the plan meant, m. */
-  const glideAt = (s: (typeof SLIPS)[number], from: number, kt = 20): { went: number; want: number } | null => {
+  // (`back`: her heading swung round as the shove's glide begins, so she runs back into her own slip: the check that a shove
+  // that collides is caught, not skipped)
+  const glideAt = (s: (typeof SLIPS)[number], from: number, kt = 20, back = false): { went: number; want: number; hit: string } | null => {
     const w = sail(s.id, from, kt), u = w.user;
     w.pushOff(); const plan = u.handled?.plan; if (plan?.kind !== 'astern') return null;
     for (let j = 0; j < 60 * 60 && u.handled; j++) w.step(DT);
+    if (back) u.h = (u.h + 180) % 360;
     const v0 = u.astern ?? 0, h = u.h, ww = (w as unknown as { windHere: (a: unknown, b: unknown, c: boolean) => { from: number; kt: number } }).windHere(u, u, false);
     // (gauged to stop COAST_SHORT short of the plan's clear water, unless the steerage floor is more: then that floor's glide)
     // (the glide in the wind along her line out, as the shove was gauged: World.windAstern)
     const meant = asternGlide(v0, h, ww.from, ww.kt, ASTERN_GLIDE_S, undefined, w.windAstern(u, h)).dist;
     const gauged = Math.max(plan.coast - COAST_SHORT, 0), floored = meant > gauged + 0.5;
     const want = floored ? meant : gauged; let went = 0;
-    for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); if (!berthClear(u, u.h, s) || w.drainEvents().some(e => e.type === 'toast' && /Bump|Collision|hit /.test(e.msg))) return null; } // (stopped by a dock or a moored boat: no glide to compare)
-    return { went, want };
+    for (let t = 0; t < ASTERN_GLIDE_S; t += DT) { u.tiller = 0; u.h = h; const x = u.x, y = u.y; w.step(DT); const hu = { x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) }; went += Math.max(0, -((u.x - x) * hu.x + (u.y - y) * hu.y)); const hit = !berthClear(u, u.h, s) ? 'her hull on a dock or a moored boat' : (w.drainEvents().find(e => e.type === 'toast' && /Bump|Collision|hit /.test(e.msg)) as { msg: string } | undefined)?.msg; if (hit) return { went, want, hit: `${hit} at ${went.toFixed(1)} m` }; } // (stopped by a dock or a moored boat: a shove that collides, a failure, never skipped)
+    return { went, want, hit: '' };
   };
   for (const [from, name, kt, wide] of [[0, 'northerly', 20, true], [90, 'easterly', 20, true], [0, 'northerly', 12, false]] as const) it(`in a ${kt} kt ${name}, she stops where the plan meant her to (a meter short of its clear water, or her steerage floor's glide): within 15%, stern first, the helm amidships`, () => {
     // (up to six berths a harbor, spread along its docks, as ever; in 20 kt, where since the walk-out and the shove are held
@@ -187,7 +190,7 @@ describe('pushed off astern', () => {
     for (const s of pick) {
       if (n >= 12) break;
       const g = glideAt(s, from, kt); if (!g) continue;
-      n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
+      n++; if (g.hit) bad.push(`${s.id}: shoved off astern into something: ${g.hit}`); else if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
     }
     // (in a 20 kt northerly, no berth anywhere has a shove she's let go from, 16 Nov 2026: one planned at the open wind's
     // lighter edge, and in the World's own wind at her slip she's walked out or kept fast instead. So the property can't be
@@ -195,6 +198,14 @@ describe('pushed off astern', () => {
     // come back, this fails, and asks for it to be held to the glide as the rest are)
     if (from === 0 && kt === 20) expect(n).toBe(0); else expect(n).toBeGreaterThanOrEqual(1);
     expect(bad).toEqual([]);
+  }, 600_000);
+  it('a shove that collides fails the glide check, never skipped: her heading swung round, she runs back into her slip, and it says so', () => {
+    // (the first berth of the 12 kt northerly's sample with a shove she's let go from)
+    const pick = HARBORS.flatMap(H => { const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'), k = Math.min(6, all.length); return Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]); });
+    let g: ReturnType<typeof glideAt> = null, id = '';
+    for (const s of pick) { if (!glideAt(s, 0, 12)) continue; g = glideAt(s, 0, 12, true); id = s.id; break; }
+    expect(g, 'a berth with a shove let go').not.toBeNull();
+    expect(g!.hit, `${id}: run back into her slip`).not.toBe('');
   }, 600_000);
   // (Corinthian B16 in the northerly and Horseshoe Bay A27 in the easterly were each held apart for a time as known
   // failures: let go in a lee, the land's or the harbor's, and drifting out of it into more wind, B16 sailed 17.7 m
