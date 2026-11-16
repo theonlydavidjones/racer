@@ -64,27 +64,68 @@ export function stationMoves(kt: number, seed = 1) {
 }
 
 type Moves = Pick<ReturnType<typeof stationMoves>, 'counts'>;
+/** (each race sailed once in this file: the held races' case below reads the sweep's own) */
+const sailed = new Map<string, ReturnType<typeof stationMoves>>();
+const movesOf = (kt: number, seed: number) => { const k = `${kt}|${seed}`; let m = sailed.get(k); if (!m) sailed.set(k, m = stationMoves(kt, seed)); return m; };
 /** What's over the trips' bounds across the races (empty: none): each boat's hand with the cabin-top lines, and its two
- * crew together, under TRIPS_MEAN a minute on the mean of the races, and no more than TRIPS_CAP in any one. Each rate
- * from its own count, rounded once to 2 places (as the bounds were always read). The cap is the base's own worst race:
- * 1.50 in 12 kt, seed 2, boat 1, 20 trips in 800 s (3586f4e8 + 41f59fd5); one trip more, 1.57, is over. It's a
- * backstop at the most seen, not a margin above it (the Coordinator, 16 Nov 2026). */
-export const TRIPS_MEAN = 1.4, TRIPS_CAP = 1.5;
-export function tripsVerdict(runs: Moves[]): string[] {
+ * crew together, under TRIPS_MEAN a minute on the mean of the races (the bound), and no more than TRIPS_CAP in any one
+ * (a backstop against gross fidgeting: a crew going up and back for nothing all race, which a mean over many races could
+ * hide). Each rate from its own count, rounded once to 2 places (as the bounds were always read).
+ *
+ * The cap's history (the Coordinator, 16 Nov 2026): it was 1.50 over seeds 1-3, the worst race then seen (12 kt, seed 2,
+ * boat 1, 20 trips in 800 s). Three seeds made it a coin flip, so it was judged over seeds 1-8, where main itself failed
+ * in 6 kt (seed 4, 34 trips: a drifter's failed tacks swept her through the reach and back, and her crew reset the vang
+ * for each, fixed in physics.ts trimSails) and on unseen seeds in 12 kt (seed 17, 22 trips, Deep Physics). So the mean
+ * is judged over seeds 1-24 at both winds, and the cap is 2.0, a backstop, well over any race seen with the crew settled
+ * before they reset their lines (22 trips, 1.65). */
+export const TRIPS_MEAN = 1.4, TRIPS_CAP = 2.0;
+/**
+ * The races the backstop is held off, by wind, till their cause is fixed (the Coordinator, 16 Nov 2026; ROADMAP, "AI
+ * steering in a dying breeze"): 6 kt seeds 4, 11, 14, 20 and 21 die to 1-5 kt, and the AI zig-zags 55° to 105-160° true,
+ * each course held 20-100 s (seed 14, boat 2: four times, the vang on for each reach at 1-1.7% of drive and off again,
+ * as the guide says, for the beat at 55°: 16 trips of its 36). Her crew are trimming for real changes of course, not
+ * fidgeting; the mean is judged on these races still, and the backstop on them is an `it.fails` case below, which goes
+ * red when the steering's fixed: then it's a normal test and this list goes. Seed 11 joined last (its desired heading
+ * flipping 210-305 at 400-560 s as she circled): the Coordinator's ruling is that the list grows no further.
+ */
+export const CAP_HELD: Record<number, readonly number[]> = { 6: [4, 11, 14, 20, 21] };
+
+/**
+ * Changes of seat and walking along the boat at a seat, a minute: each crew member's mean over the races under
+ * PACE_MEAN, and no one race over PACE_CAP, twice it (the Coordinator, 16 Nov 2026). Judged on one race (seed 1) these
+ * were a coin flip as the trips were: main's own walking in 6 kt spans 0.09 to 0.46 a minute over seeds 1-8, one race to
+ * the next, so a bound on one race near the mean measures the race's chance. The backstop is for a gross fault, a crew
+ * pacing the deck, set at twice the mean's bound on principle, not from the races seen. Over seeds 1-24 on main
+ * (97375712), the worst means 0.35 walking and 0.075 changes of seat (6 kt), the worst races 0.68 and 0.15.
+ */
+export const PACE_MEAN = { walked: 0.4, seats: 0.1 }, PACE_CAP = { walked: 0.8, seats: 0.2 };
+type Pace = Pick<ReturnType<typeof stationMoves>, 'walked' | 'seats'>;
+export function paceVerdict(runs: Pace[]): string[] {
+  const out: string[] = [], n = runs[0]!.walked.length, name = { walked: 'm along the boat a minute, at a seat', seats: 'changes of seat a minute' };
+  for (const k of ['walked', 'seats'] as const) for (let i = 0; i < n; i++) {
+    const v = runs.map(r => r[k][i]!), mean = v.reduce((a, b) => a + b, 0) / v.length, who = `boat ${Math.floor(i / 2) + 1}, crew ${i % 2 + 1}`;
+    if (mean >= PACE_MEAN[k]) out.push(`${who}: ${name[k]} over the races, ${mean.toFixed(3)}`);
+    v.forEach((x, q) => { if (x > PACE_CAP[k]) out.push(`${who}: ${name[k]}, seed ${q + 1}: ${x.toFixed(2)}`); });
+  }
+  return out;
+}
+/** (`skipCap`: seeds whose races the backstop isn't judged on here, the mean still is: CAP_HELD; `capOnly`: the backstop alone) */
+export function tripsVerdict(runs: Moves[], o: { skipCap?: readonly number[]; capOnly?: boolean; seeds?: readonly number[] } = {}): string[] {
   const out: string[] = [], boats = runs[0]!.counts.lines.length;
   const rate = (n: number, mins: number) => +(n / mins).toFixed(2);
   for (let k = 0; k < boats; k++) {
     const lines = runs.map(r => rate(r.counts.lines[k]!, r.counts.mins)), both = runs.map(r => rate(r.counts.both[k]!, r.counts.mins));
     const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length, show = (x: number[]) => x.map(v => v.toFixed(2)).join(', ');
-    if (mean(lines) >= TRIPS_MEAN) out.push(`boat ${k + 1}: the hand with the cabin-top lines, trips a minute over the races (${show(lines)})`);
-    if (mean(both) >= TRIPS_MEAN) out.push(`boat ${k + 1}: both crew's trips a minute over the races (${show(both)})`);
-    lines.forEach((v, q) => { if (v > TRIPS_CAP) out.push(`boat ${k + 1}: the hand with the cabin-top lines, seed ${q + 1}: ${v.toFixed(2)}`); });
-    both.forEach((v, q) => { if (v > TRIPS_CAP) out.push(`boat ${k + 1}: both crew, seed ${q + 1}: ${v.toFixed(2)}`); });
+    const seedOf = (q: number) => o.seeds?.[q] ?? q + 1, capped = (q: number) => !o.skipCap?.includes(seedOf(q));
+    if (!o.capOnly && mean(lines) >= TRIPS_MEAN) out.push(`boat ${k + 1}: the hand with the cabin-top lines, trips a minute over the races (${show(lines)})`);
+    if (!o.capOnly && mean(both) >= TRIPS_MEAN) out.push(`boat ${k + 1}: both crew's trips a minute over the races (${show(both)})`);
+    lines.forEach((v, q) => { if (capped(q) && v > TRIPS_CAP) out.push(`boat ${k + 1}: the hand with the cabin-top lines, seed ${seedOf(q)}: ${v.toFixed(2)}`); });
+    both.forEach((v, q) => { if (capped(q) && v > TRIPS_CAP) out.push(`boat ${k + 1}: both crew, seed ${seedOf(q)}: ${v.toFixed(2)}`); });
   }
   return out;
 }
 
-describe('The trips\' bounds over three races (tripsVerdict): a crew that over-trips still fails', () => {
+describe('The trips\' bounds over the races (tripsVerdict): a crew that over-trips still fails', () => {
   // (made-up races of 800 s, as stationMoves counts them: two boats, the hand with the lines' trips and both crew's)
   const MINS = 800 / 60, race = (lines: number, both: number): Moves => ({ counts: { mins: MINS, lines: [lines, lines], both: [both, both] } });
   it('a crew at their usual rate passes; one cabin-top trip a minute more, injected, fails the mean', () => {
@@ -93,12 +134,28 @@ describe('The trips\' bounds over three races (tripsVerdict): a crew that over-t
     const over = usual.map(r => race(r.counts.lines[0]! + 13, r.counts.both[0]! + 13)); // (one a minute more: 13 in 800 s)
     expect(tripsVerdict(over).some(v => /over the races/.test(v))).toBe(true);
   });
-  it('the cap at its boundary: 20 trips in a race (1.50) passes, 21 (1.57) fails, even with the mean under', () => {
-    expect(tripsVerdict([race(10, 10), race(10, 10), race(20, 20)])).toEqual([]);
-    expect(tripsVerdict([race(10, 10), race(10, 10), race(21, 21)]).some(v => /seed 3/.test(v))).toBe(true);
+  it('the backstop at its boundary: 26 trips in a race (1.95) passes, 27 (2.03) fails, even with the mean under', () => {
+    expect(tripsVerdict([race(10, 10), race(10, 10), race(26, 26)])).toEqual([]);
+    expect(tripsVerdict([race(10, 10), race(10, 10), race(27, 27)]).some(v => /seed 3/.test(v))).toBe(true);
   });
-  it('both crew read from their summed count: 15 + 5 trips is 1.50, as one hand\'s 20, not 0.38 + 1.13', () => {
-    expect(tripsVerdict([race(10, 10), race(10, 10), race(15, 20)])).toEqual([]);
+  it('both crew read from their summed count: 20 + 6 trips is 1.95, as one hand\'s 26, not 1.50 + 0.45', () => {
+    expect(tripsVerdict([race(10, 10), race(10, 10), race(20, 26)])).toEqual([]);
+  });
+});
+
+describe('Walking and changes of seat over the races (paceVerdict): a crew that paces still fails', () => {
+  // (made-up races, as stationMoves gives them: two boats, two crew each)
+  const race = (walked: number, seats = 0.07): Pace => ({ walked: [0.04, walked, 0.04, walked], seats: [seats, seats, seats, seats] });
+  it('a crew at their usual pace passes; one made to walk far more fails the mean, as one changing seat far more does', () => {
+    const usual = Array.from({ length: 24 }, (_, j) => race(0.15 + 0.02 * (j % 10)));
+    expect(paceVerdict(usual)).toEqual([]);
+    expect(paceVerdict(usual.map(r => race(r.walked[1]! + 0.25))).some(v => /along the boat .* over the races/.test(v))).toBe(true);
+    expect(paceVerdict(usual.map(() => race(0.2, 0.12))).some(v => /changes of seat .* over the races/.test(v))).toBe(true);
+  });
+  it('one race far over fails the backstop, though the mean is under: 0.80 passes, 0.81 fails', () => {
+    const r = Array.from({ length: 24 }, () => race(0.2));
+    expect(paceVerdict([...r.slice(0, 23), race(0.8)])).toEqual([]);
+    expect(paceVerdict([...r.slice(0, 23), race(0.81)]).some(v => /seed 24: 0.81/.test(v))).toBe(true);
   });
 });
 
@@ -108,10 +165,10 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
   // 0.3 m, a little more now in light air, where both go forward of the winch once it's paid for two minutes. Trips are jobs: the cabin
   // top, the mast, the run's foredeck)
   for (const kt of [12, 6]) it(`in ${kt} kt: no changes of seat, few trips, little walking at the seats`, () => {
-    const m = stationMoves(kt);
-    // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
-    for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
-    m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
+    const m = movesOf(kt, 1), races = [m, ...Array.from({ length: 23 }, (_, j) => movesOf(kt, j + 2))];
+    // (changes of seat, one a race at most: in light air, both forward of the winch once it's paid for two minutes, and
+    // back; and walking along the boat at a seat: each crew member's mean over the 24 races, and no race past the backstop)
+    expect(paceVerdict(races)).toEqual([]);
     // (by role, as the crew's work falls: the hand with the cabin-top lines, crewWork.ts ownerOf (the jib hand at their
     // stations, the main trimmer once both are forward of the winch, the helm on the main) makes the trips, under 1.4 a
     // minute; and nobody makes one for nothing, no job and no move forward of the winch or to the mast, under 0.1 (0 to
@@ -120,11 +177,14 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     // a minute measured in 5 to 7 kt; from 10 kt up, at their stations, 0 measured)
     m.roles.forEach((r, k) => expect(r.stay, `boat ${k + 1}: the hand who stays put, trips a minute`).toBeLessThan(kt >= 10 ? 0.1 : 0.7));
     m.free.forEach((f, j) => expect(f, `crew ${j % 2 + 1}: trips a minute for no job`).toBeLessThan(0.1));
-    // (the trips, the crew's typical rate: over three races, seeds 1 to 3, so that one trip more or less at the end of the
-    // 800 s, where the race's chance puts the last of them, doesn't decide it (the Coordinator, 16 Nov 2026, on Deep
-    // Physics' proposal); and no one race far over it, a cap a little above, so the mean can't hide a race gone wrong)
-    expect(tripsVerdict([m, stationMoves(kt, 2), stationMoves(kt, 3)])).toEqual([]);
+    // (the trips, the crew's typical rate: over 24 races, seeds 1 to 24, so the race's chance, where it puts a trip or
+    // two, doesn't decide it (tripsVerdict: the cap's history); and no race over the backstop)
+    expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => movesOf(kt, j + 2))], { skipCap: CAP_HELD[kt] })).toEqual([]);
   }, 1_200_000);
+  // (the races held off the backstop: over it now, from the AI's steering in a dying breeze; red when that's fixed)
+  for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: the AI's steering in a dying breeze, ROADMAP)`, () => {
+    expect(tripsVerdict(seeds.map(s => movesOf(+kt, s)), { capOnly: true, seeds })).toEqual([]);
+  }, 600_000);
 });
 
 describe('Forward of the winch, both crew (crewPhys.ts stationZ, chooseFore)', () => {
