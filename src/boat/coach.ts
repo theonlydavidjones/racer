@@ -11,7 +11,7 @@ import { beatAngle, polar } from './polar';
 import { byHand, crewEaseBoom, crewMainAngle, leeDrift, pinchFlog, sailFrame, sailPlan, sailPush, sailWind } from './physics';
 import orc from './data/nordic-folkboat-orc.json';
 const DRAFT = orc.boat.draft;
-import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
+import { MAIN_TWIST_MID, SAILS, mainBandDeg, optimalSheet, sailTrim, trimDrive } from './trim';
 import { D2R, KT, V, clamp, hypot } from '../core/math';
 import { inBasin } from '../geo/marina';
 import { TUNE_PRESETS, forestayTension, presetFor, tuneName, tuneWords } from './rigTune';
@@ -560,7 +560,7 @@ function helmLessons(b: Boat, s: Situation, lineFixes: number): Lesson[] {
 function hoveLessons(b: Boat, s: Situation): Lesson[] {
   if (!b.hove) return [];
   const lee = kt(leeDrift(b)), ahead = s.speedKt, twa = s.twa, lashed = b.lashed != null;
-  const mid = lashed && Math.abs(b.lashed!) < 0.04, toLee = lashed && !mid && (b.lashed! < 0) === (b.tack === 'S'), mainDrawing = b.trim.main.flow !== 'luffing' || b.trim.main.amount < 0.15;
+  const mid = lashed && Math.abs(b.lashed!) < 0.04, toLee = lashed && !mid && (b.lashed! < 0) === (b.tack === 'S'), mainDrawing = b.trim.main.flow !== 'luffing' && mainBandDeg(b.trim.main.err) < MAIN_TWIST_MID - 1; // (eased to where she begins to lift, or past it, the main is spilling: across the band it has given up a fifth of its drive already, trim.ts)
   if (lashed && toLee && twa >= 35 && twa <= 75 && ahead < 2.2) return [{ id: 'hove:balanced', who: 'you', kind: 'ok', gain: 0,
     head: `Hove to and balanced: bow ${deg(twa)} off the wind, ${ahead.toFixed(1)} kt ahead, slipping ${lee.toFixed(1)} kt to leeward.`,
     why: 'The backed jib pushes her bow off; the eased main and the lashed tiller turn her back up. The main is the trim tab.',
