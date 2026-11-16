@@ -371,6 +371,9 @@ export function bestPlan(r: Record<Plan, SailResult>): Plan {
  * metres off the land, or else the shortest way through the water on a 50 m grid (10 m by the Wharf; A*), pulled straight between the
  * turns. Near either end (a slip, a cove) it may come closer, as it has to.
  */
+/** Her width each side of a way round the land, near its ends (m): half her beam (1.1) and room to steer, the same 4 m
+ * either side of her track that ai.ts homeCourse looks along (an estimate). */
+export const HULL_CLEAR = 4;
 export function routeAround(a: Vec, b: Vec, clear = 120): Vec[] { return drive(routeAroundSteps(a, b, clear)); }
 /** routeAround a little at a time (on a long leg its look along the line alone is ~100 ms): for the page's plans. */
 export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, Vec[], void> {
@@ -383,7 +386,17 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
   };
   // (the Wharf's piers, breakwaters and docks are 1–10 m wide, the Marina's jetty 17 m: sampling would step over them, so
   // the line itself is tested exactly)
-  const visible = function* (p: Vec, q: Vec): Generator<void, boolean, void> { if (landAlong(p, q) < Infinity) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) { if (k % 8 === 0) yield; if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; } return true; };
+  // (and near either end, where blocked() asks no clearance, her whole width: lines HULL_CLEAR either side of the leg as
+  // well as its middle, exactly, as ai.ts homeCourse looks ahead. A way out from beside a breakwater's end passed it
+  // 0.25 m off at West Harbor, and through the corner of Gashouse Cove's and South Beach's: the centreline alone was
+  // clear. The first and last HULL_CLEAR of the leg are hers already, so she can leave a wall she lies beside)
+  const wide = (p: Vec, q: Vec): boolean => {
+    const L = dist(p, q); if (L <= 2 * HULL_CLEAR) return true;
+    const ux = (q.x - p.x) / L, uy = (q.y - p.y) / L, sx = -uy * HULL_CLEAR, sy = ux * HULL_CLEAR;
+    const p0 = { x: p.x + ux * HULL_CLEAR, y: p.y + uy * HULL_CLEAR }, q0 = { x: q.x - ux * HULL_CLEAR, y: q.y - uy * HULL_CLEAR };
+    return landAlong({ x: p0.x + sx, y: p0.y + sy }, { x: q0.x + sx, y: q0.y + sy }) === Infinity && landAlong({ x: p0.x - sx, y: p0.y - sy }, { x: q0.x - sx, y: q0.y - sy }) === Infinity;
+  };
+  const visible = function* (p: Vec, q: Vec): Generator<void, boolean, void> { if (landAlong(p, q) < Infinity) return false; if ((nearEnd(p) || nearEnd(q)) && !wide(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) { if (k % 8 === 0) yield; if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; } return true; };
   if (yield* visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.
@@ -398,7 +411,17 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
     return false;
   };
   // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier)
-  const mid = yield* gridPathSteps(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
+  let mid = yield* gridPathSteps(A, B, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
+  // (in a corner by the land, a harbor's entrance or a cove, the 50 m grid can't see the way out: first out to open
+  // water on the 10 m grid, as from among the Wharf's piers, then the rest. Without it the way fell back to the straight
+  // line, through the land: out of Gashouse Cove's and South Beach's entrances)
+  if (!mid) {
+    const out = function* (p: Vec): Generator<void, Vec[], void> { return (yield* gridPathSteps(p, p, 10, 700, onLand, (u, v) => landAlong(u, v) === Infinity, q => landDist(q) >= 100, 0)) ?? [p]; };
+    const ea2 = [...ea, ...(yield* out(A)).slice(1)], eb2 = [...(yield* out(B)).reverse().slice(0, -1), ...eb];
+    const A2 = ea2[ea2.length - 1], B2 = eb2[0];
+    const m2 = A2 === A && B2 === B ? null : yield* gridPathSteps(A2, B2, 50, 2500, blocked2, (p, q) => landAlong(p, q) === Infinity);
+    if (m2) { ea.splice(0, ea.length, ...ea2); eb.splice(0, eb.length, ...eb2); mid = m2; }
+  }
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight
