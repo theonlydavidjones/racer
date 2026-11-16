@@ -17,10 +17,13 @@ import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFact
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
+/** Settled on her course (s) before her crew go to the cabin top's lines; and how far off the course she's after (deg) counts as
+ * swinging still (estimates: a turn's own settling, crewPhys.ts HOLD.settle, and the heel and speed coming back). */
+const SETTLE_S = 5, SWING_OFF = 30;
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, GUIDE_BACKLASH, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -1385,6 +1388,14 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // unless the change calls for moving them)
   const mineNow = b.isUser ? linesByHand(b).join() : '';
   if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; }
+  // (the angle the guide's settings are read at: hers, but past a backlash: controls.ts GUIDE_BACKLASH)
+  { const a = Math.abs(b.awaSlow); b.guideAwa = b.crewReady ? clamp(b.guideAwa ?? a, a - GUIDE_BACKLASH, a + GUIDE_BACKLASH) : a; }
+  // (swinging, through a turn or a long way off the course she's after, they're on the sheets, not the cabin top: the
+  // lines that need a trip wait till she's settled, SETTLE_S after, as a crew resets them for the course she's on, not
+  // the angles she passes through. A failed tack in a drifter falling off and round through a jibe swept her 14 to 100°
+  // apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
+  const swinging = Math.abs(b.turnRate ?? 0) > TURN_SEEN || (!b.isUser && b.desired != null && Math.abs(wrap(b.desired - b.h)) > SWING_OFF);
+  b.settleLeft = swinging ? SETTLE_S : Math.max(0, (b.settleLeft ?? 0) - dt);
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
@@ -1400,16 +1411,16 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // (held there, but inside the band for the wind and their depowering floor, controls.ts depowerLimits, which doesn't
     // depend on your sheet: the car still goes down as the breeze builds, up in a drifter, and from the start when you
     // trim the sheets from the off)
-    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, tws); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
+    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, tws, b.guideAwa); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
-    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)));
+    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.guideAwa); b.crewPlanT = 1;
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)), b.guideAwa);
     b.crewTogether = worthTogether(b.crewWorth); // (worked out with the worth, once a second: not looked up each step)
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
-      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
+      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}, b.guideAwa) : b.crewPlan;
       b.crewIdeal = { ...free, mainsheet: mainsheetFor(wantMain, free.traveller), jibsheet: jibsheetFor(wantJib, c, b.tack) };
     }
   }
@@ -1425,13 +1436,14 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // (and the small ones together when they add up to a trip's worth: controls.ts worthTogether)
   { const W = b.crewWorth, ready = !!b.crewReady, user = b.isUser, also = ready ? b.crewTogether : undefined;
     const pick = (w: number | undefined, k: string) => (w ?? 1) >= minGain || !ready || (also !== undefined && also.has(k));
-    if (!user || !byHand(b, 'vang')) want.vang = pick(W?.vang, 'vang') ? t.vang : c.vang;
-    if (!user || !byHand(b, 'outhaul')) want.outhaul = pick(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
-    if (!user || !byHand(b, 'cunningham')) want.cunningham = pick(W?.cunningham, 'cunningham') ? t.cunningham : c.cunningham;
-    if (!user || !byHand(b, 'downhaul')) want.downhaul = pick(W?.downhaul, 'downhaul') ? t.downhaul : c.downhaul;
+    const settled = !ready || !(b.settleLeft! > 0), top = (w: number | undefined, k: string) => settled && pick(w, k);
+    if (!user || !byHand(b, 'vang')) want.vang = top(W?.vang, 'vang') ? t.vang : c.vang;
+    if (!user || !byHand(b, 'outhaul')) want.outhaul = top(W?.outhaul, 'outhaul') ? t.outhaul : c.outhaul;
+    if (!user || !byHand(b, 'cunningham')) want.cunningham = top(W?.cunningham, 'cunningham') ? t.cunningham : c.cunningham;
+    if (!user || !byHand(b, 'downhaul')) want.downhaul = top(W?.downhaul, 'downhaul') ? t.downhaul : c.downhaul;
     if (!user || !byHand(b, 'backstay')) want.backstay = pick(W?.backstay, 'backstay') ? t.backstay : c.backstay;
-    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = pick(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
-    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = pick(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
+    if (!user || !byHand(b, 'jibCunningham')) want.jibCunningham = top(W?.jibCunningham, 'jibCunningham') ? t.jibCunningham : c.jibCunningham;
+    if (!user || !byHand(b, 'jibHalyard')) want.jibHalyard = top(W?.jibHalyard, 'jibHalyard') ? t.jibHalyard : c.jibHalyard;
     if (!user || !byHand(b, 'traveller')) want.traveller = pick(W?.traveller, 'traveller') ? t.traveller : c.traveller; }
   if (!held('mainsheet')) want.mainsheet = mainsheetFor(wantMain, c.traveller);
   if (!held('jibsheetW')) want.jibsheetW = 1;

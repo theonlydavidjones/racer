@@ -217,6 +217,10 @@ export interface Boat {
    * unwarned crew a reaction's worth, the jib backing meanwhile (physics.ts tackStep, trimSails); −1 while it's let fly and
    * running out, 0 otherwise. */
   jibHold?: number;
+  /** The apparent angle the guide's settings are read at (deg, 0..180): hers past a backlash (controls.ts GUIDE_BACKLASH). */
+  guideAwa?: number;
+  /** Seconds till she's settled enough for her crew to go to the cabin top's lines (physics.ts trimSails). */
+  settleLeft?: number;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
   byLee?: boolean;
   /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the

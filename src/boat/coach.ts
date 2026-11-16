@@ -257,11 +257,11 @@ export function withCrew(b: Boat, k: LineKey, v: number): Controls {
     const fixed: Partial<CrewSettings> = {};
     for (const x of FIXABLE) if (x === k || byHand(b, x)) fixed[x] = c[x];
     const tws = b.ww.kt, cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
-    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed);
+    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed, b.guideAwa);
     // (and only if it's worth the trip to them, as they judge it: physics.ts trimSails, controls.ts planWorth; a skilled
     // crew moves the car for ~0.1% of drive, a novice for ~0.4%)
     // (every line of theirs, as trimSails applies the plan: the outhaul off, they may take the backstay up as well)
-    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
+    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower, undefined, undefined, b.guideAwa), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
     for (const x of ['traveller', ...FIXABLE] as const) if (fixed[x as keyof CrewSettings] == null && (worth[x] ?? 1) >= minGain) c[x] = plan[x];
     c.mainsheet = mainsheetFor(want, c.traveller);
   }
