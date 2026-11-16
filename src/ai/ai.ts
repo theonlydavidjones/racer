@@ -1,5 +1,5 @@
 import type { PrepFlag } from '../sim/signals';
-import { AI_WAIT_MAX, HAIL_WAIT, aiCrewReady, decideTurn } from '../boat/calls';
+import { aiCrewReady, decideTurn } from '../boat/calls';
 import { bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
@@ -459,6 +459,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // (the heading a planned turn set this think, a goTack, or a tack to answer a hail: the turns her helm may hold for her
   // crew to be ready, boat/calls.ts aiCrewReady. Never a turn to keep clear of anything: Skipper Model, 16 Nov 2026)
   let planned: number | null = null, hailed: number | null = null;
+  const NEAR_PLAN = 10; // (deg)
   const beat = beatFor(b), csS = n360(ww.from - beat), csP = n360(ww.from + beat);
   let desired = b.h, luff = false, beating = false;
   let aim: Vec | null = null; // (the point she's steering for, racing)
@@ -905,12 +906,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     decideTurn(b, w.t);
     // (called, her helm puts her over once her crew are ready, as yours does: the owner, 16 Nov 2026. Meanwhile she holds
     // her course on this side of the wind; her skipper's call allows for it, ai.ts's decisions. Uncalled, she goes at once)
-    // (only a planned turn, its heading unchanged since, and nothing to keep clear of; a hail's tack within rule 20's
-    // time, HAIL_RESPONSE's 5 s including her crew's getting ready (WS Case 54): at most HAIL_WAIT. The start mark's
-    // turn-away (ai.passing.away) and the shore never wait)
-    const plan = planned != null && planned === desired && !avoiding && !ai.urgent && !ai.passing?.away;
-    const hail = hailed != null && hailed === desired && !ai.urgent;
-    if ((plan || hail) && b.callT != null && b.callT >= (b.decidedT ?? -Infinity) && !aiCrewReady(b, w.t, hail ? HAIL_WAIT : AI_WAIT_MAX)) desired = b.desired;
+    // (only a planned turn, the same since, and nothing to keep clear of. The start mark's turn-away (ai.passing.away),
+    // the shore and an avoidance never wait)
+    // (the same turn: the heading on the same side of the wind and within NEAR_PLAN of it, through sailable's groove and the
+    // leeway allowance after it, a few degrees; the shore's or an avoidance's turn is far more, and excluded besides)
+    const near = (h: number | null) => h != null && (wrap(ww.from - desired) >= 0) === (wrap(ww.from - h) >= 0) && Math.abs(wrap(desired - h)) < NEAR_PLAN;
+    // (a tack to answer a hail doesn't wait: the hail is the crew's warning too, heard as she's hailed, and rule 20.2's
+    // clock and the chain of hails passed on are timed to her answering at once: rules-finish, 20.3)
+    const plan = near(planned) && near(hailed) === false && !avoiding && !ai.urgent && !ai.passing?.away;
+    if (plan && b.callT != null && b.callT >= (b.decidedT ?? -Infinity) && !aiCrewReady(b, w.t)) desired = b.desired;
   }
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
