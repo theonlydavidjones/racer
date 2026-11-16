@@ -870,6 +870,16 @@ What's planned, roughly in order. Done work is described in the README.
      cruise, if I expand the inset map I can no longer find navigator mode." Once the inset map is expanded, the full
      chart must still offer the navigator (the passage plan): an icon in the chart's own row, where the layer and flag
      toggles moved (8b), and its key working with the chart open. Check the strategist in a race the same way.
+   - **Bug: the navigator opened from the inset map comes up without its map** (owner, 16 November; bug; now; 1–2 h):
+     "when in inset map, clicking the navigator button opens the navigator modal, which fails to populate with the
+     map." The navigator's own panel (ui/navView.ts) opens empty of its chart. Fix, with a test that its chart draws
+     (scripts/check/setup-map.cjs's way), from the inset and from the expanded chart.
+   - **One chart: the navigator as a layer on the map, not a map of its own** (owner, 16 November; feature, design;
+     next; 4–8 h; mock-up to the owner first): "tapping the navigator button should just surface the navigation map on
+     the map directly, or as its own layer, rather than opening a separate map. I see no reason why an IRL sailor would
+     have two separate maps: one for conditions and one for navigation." The passage plan (destination, track, hazards)
+     drawn on the inset and the expanded chart beside the wind, current and wave layers; the separate navigator panel
+     retired. Supersedes the fix above once built.
    - **Bug: lashing the tiller less than about 13° off the centerline lashes it amidships** (owner, 15 November; bug;
      <1–2 h): "tiller lashing is glitching when I try to lash it less than 13ish degrees off centerline. it just lashes
      it amidships." Leads in src/app.ts:
