@@ -48,6 +48,23 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   0 of 156 harbor-to-harbor ways now cross the land. And the call-off's ways home are worked out a slice a step (from off
   Emeryville the fleet's took ~400 ms in each of three steps).
 - ~~**The AI keeps way on in irons; no penalties left to take once racing's called off; the inset's route worked out without freezing (#440)**~~ (done: claude/irons-main, rules-abandon, batch48; navroute-sliced, batch47b).
+- **Fort Point: its rocks solid, and its surf** (owner, 16 November; accuracy; not urgent; next; 8–14 h in two parts;
+  for Bay East or Deep Physics): "lets look into the area around fort point, especially inside the gate, to be sure
+  we accounting for all the rocks and jagged coastline there. also look into the waves there; this is a popular surfing
+  spot in the right conditions, and very very dangerous for boats, but I'm not seeing that reflected in the sim."
+  Found (Roadmap, 16 Nov): the NOAA ENC in src/geo/data/enc-chart.json already holds 1051 charted hazards, 33 of them
+  around Fort Point (lon −122.485 to −122.46, lat 37.800–37.815: 28 rocks that cover and uncover, 2 awash, 2 always
+  under, 1 obstruction) and 17 at Mile Rocks, but only the chart draws them (ui/encChart.ts): nothing in the sim hits
+  them, the router and navigator don't avoid them, and damage.ts's 'rock' is never set by them.
+  - (1) The rocks solid (4–6 h): each charted rock a hazard by its water level (S-57 WATLEV) and the tide's height
+    (tide.ts): a strike graded by damage.ts as 'rock'; routing.ts and the navigator keep clear; the shore under the fort
+    as riprap, its outline checked against the ENC's coastline at the chart's largest scale.
+  - (2) The surf (4–8 h): waves shoaling and breaking over the rocks and shallows under the fort and the south tower,
+    from the real swell (NDBC 46237, San Francisco Bar; 46026) and the current (NOAA SFB1201, Bay Entrance: ebb toward
+    239°, to 4.8 kt this November; flood toward 061°, to 3.1 kt): breaking where the depth is under about 1.3 times the
+    wave height, and steeper on an ebb against a westerly swell; shown as breakers and felt by the boat. Sources to
+    confirm first (blocked from here: nauticalcharts.noaa.gov for Coast Pilot 7 and charts 18649/18650): the break's
+    swell (W–NW, about 4–8 ft, low tide, by surf reports only), and the Coast Pilot's warnings at the Gate.
 - **A room for each cell of the way round the land** (the physics review of estuary-route; the Coordinator, 16 Nov 2026:
   a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
   Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
