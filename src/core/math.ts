@@ -13,6 +13,8 @@ export interface Vec { x: number; y: number }
 export const wrap = (a: number): number => ((a + 180) % 360 + 360) % 360 - 180;
 /** Normalize an angle to [0, 360). */
 export const n360 = (a: number): number => ((a % 360) + 360) % 360;
+/** Eases angle `from` toward `to` (degrees) by the fraction k, the shorter way round, the result kept in [0, 360). */
+export const easeAngle = (from: number, to: number, k: number): number => n360(from + wrap(to - from) * k);
 /** Unit vector pointing along compass heading h. */
 export const V = (h: number): Vec => ({ x: Math.sin(h * D2R), y: Math.cos(h * D2R) });
 /** Compass bearing of the vector (dx, dy). */
