@@ -54,6 +54,14 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
     expect(steps, 'the mean wind steps on this day').toBeGreaterThan(2);
     expect(run('observed', { tideDate: '2026-11-14' }, {}).worst).toBeLessThan(0.05);
   }, 300_000);
+  it('a change of conditions sets the sea to the new wind at once (the cap on its turn is for the wind coming round, not for a new day)', () => {
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', windKind: 'west', windKt: 12 } as Settings, 1, {} as never);
+    for (let i = 0; i < 600; i++) w.step(DT);
+    w.applyConditions({ ...w.settings, windKind: 'north' } as Settings);
+    for (let i = 0; i < 60; i++) w.step(DT);
+    const base = (w as unknown as { windModel: { base: number } }).windModel.base, off = Math.abs(((w.waves.windDir - (base + 180) + 540) % 360) - 180);
+    expect(off, `the chop runs ${off.toFixed(1)}° off the new wind a second after the change`).toBeLessThan(2);
+  }, 60_000);
   it('sailing free from the Gate (the swell turned by the bar as she sails; this rushed in v176)', () => {
     expect(run('cruise', { mode: 'sail', sailFrom: 'gate', sailTo: '' } as Partial<Settings>, { freeSail: true }).worst).toBeLessThan(0.05);
   }, 300_000);

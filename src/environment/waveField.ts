@@ -17,8 +17,8 @@ import type { SeaHere } from './sea';
  * It belongs to the World and steps with it, on the race's clock, so the race (in its worker) and the page's mirror
  * hold the same field (sim/sync.ts) and every boat rides the waves you see. The reference sea is the World's (World.waveRef:
  * the course's middle in a race, so the fleet's waves don't depend on where your boat is), eased in; the field turns with
- * the course's mean wind about your boat (so turning it doesn't sweep the pattern past you: the turn's slow, 5% of the
- * difference a second, so a boat a few hundred metres off sees her waves' phase run a little fast or slow for a while).
+ * the course's mean wind about your boat (so turning it doesn't sweep the pattern past you), and slowly: no faster than
+ * keeps every wave within 3 km at its own speed (turnCap, a stopgap), set at once to a new wind when the conditions change.
  * All of it is the World's own state, not the camera's.
  */
 
