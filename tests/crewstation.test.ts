@@ -81,13 +81,34 @@ const movesOf = (kt: number, seed: number) => { const k = `${kt}|${seed}`; let m
 export const TRIPS_MEAN = 1.4, TRIPS_CAP = 2.0;
 /**
  * The races the backstop is held off, by wind, till their cause is fixed (the Coordinator, 16 Nov 2026; ROADMAP, "AI
- * steering in a dying breeze"): 6 kt seeds 4, 14, 20 and 21 die to 1-4 kt, and the AI zig-zags 55° to 105-160° true,
+ * steering in a dying breeze"): 6 kt seeds 4, 11, 14, 20 and 21 die to 1-5 kt, and the AI zig-zags 55° to 105-160° true,
  * each course held 20-100 s (seed 14, boat 2: four times, the vang on for each reach at 1-1.7% of drive and off again,
  * as the guide says, for the beat at 55°: 16 trips of its 36). Her crew are trimming for real changes of course, not
  * fidgeting; the mean is judged on these races still, and the backstop on them is an `it.fails` case below, which goes
- * red when the steering's fixed: then it's a normal test and this list goes.
+ * red when the steering's fixed: then it's a normal test and this list goes. Seed 11 joined last (its desired heading
+ * flipping 210-305 at 400-560 s as she circled): the Coordinator's ruling is that the list grows no further.
  */
-export const CAP_HELD: Record<number, readonly number[]> = { 6: [4, 14, 20, 21] };
+export const CAP_HELD: Record<number, readonly number[]> = { 6: [4, 11, 14, 20, 21] };
+
+/**
+ * Changes of seat and walking along the boat at a seat, a minute: each crew member's mean over the races under
+ * PACE_MEAN, and no one race over PACE_CAP, twice it (the Coordinator, 16 Nov 2026). Judged on one race (seed 1) these
+ * were a coin flip as the trips were: main's own walking in 6 kt spans 0.09 to 0.46 a minute over seeds 1-8, one race to
+ * the next, so a bound on one race near the mean measures the race's chance. The backstop is for a gross fault, a crew
+ * pacing the deck, set at twice the mean's bound on principle, not from the races seen. Over seeds 1-24 on main
+ * (97375712), the worst means 0.35 walking and 0.075 changes of seat (6 kt), the worst races 0.68 and 0.15.
+ */
+export const PACE_MEAN = { walked: 0.4, seats: 0.1 }, PACE_CAP = { walked: 0.8, seats: 0.2 };
+type Pace = Pick<ReturnType<typeof stationMoves>, 'walked' | 'seats'>;
+export function paceVerdict(runs: Pace[]): string[] {
+  const out: string[] = [], n = runs[0]!.walked.length, name = { walked: 'm along the boat a minute, at a seat', seats: 'changes of seat a minute' };
+  for (const k of ['walked', 'seats'] as const) for (let i = 0; i < n; i++) {
+    const v = runs.map(r => r[k][i]!), mean = v.reduce((a, b) => a + b, 0) / v.length, who = `boat ${Math.floor(i / 2) + 1}, crew ${i % 2 + 1}`;
+    if (mean >= PACE_MEAN[k]) out.push(`${who}: ${name[k]} over the races, ${mean.toFixed(3)}`);
+    v.forEach((x, q) => { if (x > PACE_CAP[k]) out.push(`${who}: ${name[k]}, seed ${q + 1}: ${x.toFixed(2)}`); });
+  }
+  return out;
+}
 /** (`skipCap`: seeds whose races the backstop isn't judged on here, the mean still is: CAP_HELD; `capOnly`: the backstop alone) */
 export function tripsVerdict(runs: Moves[], o: { skipCap?: readonly number[]; capOnly?: boolean; seeds?: readonly number[] } = {}): string[] {
   const out: string[] = [], boats = runs[0]!.counts.lines.length;
@@ -122,16 +143,32 @@ describe('The trips\' bounds over the races (tripsVerdict): a crew that over-tri
   });
 });
 
+describe('Walking and changes of seat over the races (paceVerdict): a crew that paces still fails', () => {
+  // (made-up races, as stationMoves gives them: two boats, two crew each)
+  const race = (walked: number, seats = 0.07): Pace => ({ walked: [0.04, walked, 0.04, walked], seats: [seats, seats, seats, seats] });
+  it('a crew at their usual pace passes; one made to walk far more fails the mean, as one changing seat far more does', () => {
+    const usual = Array.from({ length: 24 }, (_, j) => race(0.15 + 0.02 * (j % 10)));
+    expect(paceVerdict(usual)).toEqual([]);
+    expect(paceVerdict(usual.map(r => race(r.walked[1]! + 0.25))).some(v => /along the boat .* over the races/.test(v))).toBe(true);
+    expect(paceVerdict(usual.map(() => race(0.2, 0.12))).some(v => /changes of seat .* over the races/.test(v))).toBe(true);
+  });
+  it('one race far over fails the backstop, though the mean is under: 0.80 passes, 0.81 fails', () => {
+    const r = Array.from({ length: 24 }, () => race(0.2));
+    expect(paceVerdict([...r.slice(0, 23), race(0.8)])).toEqual([]);
+    expect(paceVerdict([...r.slice(0, 23), race(0.81)]).some(v => /seed 24: 0.81/.test(v))).toBe(true);
+  });
+});
+
 describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () => {
   // (on this race, before the stations (claude/crew-winch-seats) and now, a minute: changes of seat 0 and 0; the forward
   // hand's trips 1.5 and 1.27 in 12 kt, the other crew's 0.07 and 0; along the boat while at a seat, a few centimetres to
   // 0.3 m, a little more now in light air, where both go forward of the winch once it's paid for two minutes. Trips are jobs: the cabin
   // top, the mast, the run's foredeck)
   for (const kt of [12, 6]) it(`in ${kt} kt: no changes of seat, few trips, little walking at the seats`, () => {
-    const m = movesOf(kt, 1);
-    // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
-    for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
-    m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
+    const m = movesOf(kt, 1), races = [m, ...Array.from({ length: 23 }, (_, j) => movesOf(kt, j + 2))];
+    // (changes of seat, one a race at most: in light air, both forward of the winch once it's paid for two minutes, and
+    // back; and walking along the boat at a seat: each crew member's mean over the 24 races, and no race past the backstop)
+    expect(paceVerdict(races)).toEqual([]);
     // (by role, as the crew's work falls: the hand with the cabin-top lines, crewWork.ts ownerOf (the jib hand at their
     // stations, the main trimmer once both are forward of the winch, the helm on the main) makes the trips, under 1.4 a
     // minute; and nobody makes one for nothing, no job and no move forward of the winch or to the mast, under 0.1 (0 to
