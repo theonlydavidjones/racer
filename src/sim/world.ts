@@ -894,9 +894,10 @@ export class World {
    * islands and hills, and the wakes of boats (their sails), ships and the committee boat. `self`: the boat asking
    * (her own wake doesn't count; her land lee is cached, refreshed every half second).
    */
-  shadowAt(p: Vec, self?: Boat): Shadow {
+  shadowAt(p: Vec, self?: Boat, landK?: number): Shadow {
     const sum = new WindSum(this.wind.from), kt = this.wind.kt, from = this.wind.from;
-    const lee = self?.leeK ?? landLee(p, from);
+    // (the land's lee: hers, worked out with her step; or the caller's, the map's own lattice of it, ui/shadowLayer.ts)
+    const lee = landK ?? self?.leeK ?? landLee(p, from);
     for (const o of this.boats) {
       if (o === self) continue;
       const dx = p.x - o.x, dy = p.y - o.y; if (dx * dx + dy * dy > 120 * 120) continue;
