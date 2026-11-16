@@ -44,12 +44,12 @@ describe('waves for the depth', () => {
     for (let i = 0; i < N_WIND; i++) expect(w.waves.k[i] / (w.waves.w[i] ** 2 / G)).toBeLessThan(1.02);
   }, 60_000);
 
-  it('as the depth changes the surface where she is stays put, the water a km off runs by at no more than 1 m/s, and it gets there', () => {
+  it('as the depth changes the surface where she is stays put, the water a km off runs by at no more than 3 m/s, and it gets there', () => {
     const f = new WaveField(14), about = { x: 1234, y: -567 }, s = { ...FLAT_SEA, hsW: 0.6, tpW: 3, hsS: 0.4, tpS: 14 };
     f.update(s, 270, 0, about);
     const t = 50, h0 = f.height(about, t, 1, 1);
     f.setDepth(3); let worst = 0;
-    // (deep water to 3 m: the 20 s swell's wavenumber 75% more, some half an hour at the most it may change; steps of
+    // (deep water to 3 m: the 20 s swell's wavenumber 75% more, some ten minutes at the most it may change; steps of
     // half a second here, the rate per second the same)
     const dt = 0.5;
     for (let n = 0; n < 2 * 60 * 60 && f.depth !== 3; n++) {
@@ -57,7 +57,7 @@ describe('waves for the depth', () => {
       // (the pattern 1 km off runs by at R·Δk/k a second)
       for (let i = 0; i < N_WAVES; i++) worst = Math.max(worst, 1000 * Math.abs(f.k[i] - k0[i]) / k0[i] / dt);
     }
-    expect(worst).toBeLessThan(1.05); // (the last step snaps onto the depth: a few percent over)
+    expect(worst).toBeLessThan(3.15); // (3 m/s at 1 km: the last step snaps onto the depth, a few percent over)
     expect(f.height(about, t, 1, 1)).toBeCloseTo(h0, 3);
     expect(f.depth).toBe(3);
     // (and the crests no sharper than in deep water: the sum never loops)

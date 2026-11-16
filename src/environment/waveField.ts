@@ -35,7 +35,7 @@ const G = 9.81;
 export const N_WAVES = 15;
 export const N_WIND = 12;
 /** The most any component's wavenumber changes with the depth, as a fraction a second (update). */
-const DLNK = 1e-3;
+const DLNK = 3e-3;
 const WIND_L = Array.from({ length: N_WIND }, (_, i) => 1.6 * Math.pow(24 / 1.6, i / (N_WIND - 1)));
 // directions: the twelve quantiles of a cos^2s(θ/2) spread with s = 8 (close to a normal spread of σ ≈ 27°: ±3, 9, 15,
 // 22, 31, 47°), dealt out left and right of the wind so no two neighbours run within 10° of each other; the widest
@@ -159,8 +159,9 @@ export class WaveField {
     // the depth: at once on the first update, then slowly: each component's wavenumber for it, and its phase taking up
     // the change at `about`, as for a turn, so the surface there doesn't move. Away from `about` the change runs the
     // pattern by at R·Δk/k a second, R from her: so no wavenumber changes by more than DLNK a second (at 1 km the
-    // water then runs by at 1 m/s at most; eased as the turn is it reached 21 m/s, the physics review). Cruising from
-    // 14 m to 95 m of water the swell takes some ten minutes to lengthen, as the field stands for the water about her.
+    // water then runs by at 3 m/s at most, the far waves small to the eye; eased as the turn is it reached 21 m/s, the
+    // physics review). Cruising out of a harbor's 3 m into the Central Bay's 14 m the swell takes some five minutes
+    // to lengthen (at 0.1% a second, a quarter of an hour: too long), as the field stands for the water about her.
     // (deep water, Infinity, eases from 1000 m: there even a 20 s swell is within 1e-8 of its deep-water length)
     const d0 = this.depth, dTo = Math.min(this.depthTo, 1e3), dFrom = Math.min(d0, 1e3);
     let d = dTo;
