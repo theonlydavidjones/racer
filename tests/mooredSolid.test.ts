@@ -25,14 +25,19 @@ describe('the moored boats are solid', () => {
 // (walked out to the fairway and turned there by hand, 8m2: every such plan, over every berth in three winds, points down
 // the fairway toward the way out, 60 degrees and more off the wind, with 10 m of clear water ahead of her)
 import { SLIPS, berthClear, harborOf, pushOffPlan, pushOffPoses, toExit } from '../src/geo/marina';
+/** Let go 60 degrees and more off the real wind, where a sail fills as it goes up. */
+const offWind = (from: number, h: number) => Math.abs(((from - h + 540) % 360) - 180) >= 60;
 describe('the walk-out to the fairway', () => {
+  it('the bar itself: let go 55 degrees off the real wind fails it, 60 passes (the planner meets it on the wind rounded to 10: 5 more)', () => {
+    expect(offWind(225, 225 - 55)).toBe(false); expect(offWind(225, 225 + 55)).toBe(false); expect(offWind(225, 225 - 60)).toBe(true); expect(offWind(5, 300)).toBe(true); expect(offWind(5, 310)).toBe(false);
+  });
   it('every one, in three winds: pointed toward the way out, 60 degrees and more off the wind, 10 m clear ahead, and clear all the way round', () => {
     const bad: string[] = []; let n = 0;
     for (const [from, kt] of [[270, 12], [225, 15], [0, 12]] as const) for (const s of SLIPS) {
       const p = pushOffPlan(s, from, kt); if (p.kind !== 'swing' || p.pivot !== 0) continue; n++;
       const togo = toExit(harborOf(s.marina)!), poses = pushOffPoses(s, p), e = poses[poses.length - 1], v = { x: Math.sin(p.h * Math.PI / 180), y: Math.cos(p.h * Math.PI / 180) };
       const toward = togo({ x: e.c.x - v.x * 12, y: e.c.y - v.y * 12 }) - togo({ x: e.c.x + v.x * 12, y: e.c.y + v.y * 12 }) > 0;
-      const off = Math.abs(((Math.round(from / 10) * 10 - p.h + 540) % 360) - 180) >= 60; // (off the wind the crew judge it by, to 10 degrees: pushOffPlan)
+      const off = offWind(from, p.h); // (against the real wind: the sea doesn't round it)
       const ahead = [2, 4, 6, 8, 10].every(d => berthClear({ x: e.c.x + v.x * d, y: e.c.y + v.y * d }, p.h, s));
       const round = poses.every(q => berthClear(q.c, q.h, s));
       if (!toward || !off || !ahead || !round) bad.push(`${s.id} from ${from}: ${toward ? '' : 'not toward the way out '}${off ? '' : 'near the wind '}${ahead ? '' : 'no room ahead '}${round ? '' : 'not clear round'}`);

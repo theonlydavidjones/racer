@@ -487,7 +487,20 @@ export function pushOffPlan(s: Slip, windFrom?: number, windKt = 0): PushOff {
   const from = windFrom == null ? undefined : Math.round(windFrom / 10) * 10, kt = from == null ? 0 : Math.round(windKt / 2) * 2; // (the wind to 10 degrees, 2 knots)
   const k = `${s.id}:${from ?? ''}:${kt}`;
   let p = plans.get(k); if (!p) { p = planPushOff(s, from, kt); plans.set(k, p); }
+  // (let go within 60 degrees of the real wind, on the plan made for it rounded: made again for the wind to the degree)
+  if (windFrom != null && kt >= WIND_SWINGS && !offRealWind(s, p, windFrom)) {
+    const f1 = Math.round(windFrom), k1 = `${s.id}:${f1}:${kt}:1`;
+    let q = plans.get(k1);
+    if (!q) { LET_GO_OFF = 60.5; try { q = planPushOff(s, f1, kt); } finally { LET_GO_OFF = 60; } plans.set(k1, q); }
+    p = q;
+  }
   return p;
+}
+/** A let-go off the crew's push alone (a swing not held for the main, a walk-out, a shove astern she's let go from) is 60
+ * degrees and more off this wind; a plan with none (held for the main, pushed off an end tie, kept fast) passes. */
+function offRealWind(s: Slip, p: PushOff, windFrom: number): boolean {
+  const h = p.kind === 'swing' ? (p.hold ? null : p.h) : p.kind === 'astern' ? (p.noRoom ? null : pushOffPoses(s, p).at(-1)!.h) : null;
+  return h == null || Math.abs(wrap180(windFrom - h)) >= 60;
 }
 const dirOf = (h: number) => ({ x: Math.sin(h * Math.PI / 180), y: Math.cos(h * Math.PI / 180) });
 const wrap180 = (a: number) => ((a + 540) % 360) - 180;
@@ -542,6 +555,13 @@ function runAhead(c: Vec, h: number, s: Slip): number {
  * and 000 (and holds in 20 from 270), not in every wind (tests/pushoff-sweep.test.ts says where it doesn't yet).
  */
 const LET_GO_MARGIN = 0.5, LET_GO_RUN = 15, LET_GO_SAG = 1.75;
+/**
+ * Let go with only the crew's push for way, she's pointed this far off the wind and more, deg: 60, where a sail fills as it
+ * goes up (nearer, she carries her way toward the wind and stops in irons). Against the real wind (the coordinator, 16 Nov
+ * 2026: the sea doesn't round it): the plan's made for the wind to the nearest 10 degrees, and where its let-go would be
+ * within 60 of the real wind, it's made again for the wind to the degree, with half a degree to spare (pushOffPlan).
+ */
+let LET_GO_OFF = 60;
 function clearRun(c: Vec, h: number, s: Slip, windFrom: number | undefined, windKt = 12): boolean {
   const v = dirOf(h), n = { x: v.y, y: -v.x }, w = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180), lee = n.x * w.x + n.y * w.y >= 0 ? 1 : -1;
   const sag = windFrom == null ? 0 : LET_GO_SAG * windKt / 12;
@@ -683,7 +703,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
         // (let go with no sail up and only the crew's push for way, 8m3: 60 degrees and more off the wind, as the walk-outs are,
         // where a sail fills as it goes up; and the clear water to gather way in, clearRun. Held head to wind for the main,
         // she's pushed off with her main drawing: letGoClear's own room)
-        const letGo = hold || windFrom == null || ((windKt < WIND_SWINGS || Math.abs(wrap180(windFrom - h)) >= 60) && clearRun(end.c, h, s, windFrom, windKt));
+        const letGo = hold || windFrom == null || ((windKt < WIND_SWINGS || Math.abs(wrap180(windFrom - h)) >= LET_GO_OFF) && clearRun(end.c, h, s, windFrom, windKt));
         if (run >= (hold ? 8 : 12) && letGo) ways.push({ back, turn, h, gain: Number.isFinite(gain) ? gain : 0, run, hold });
         if (swings) break; // (one way round, by the wind)
       }
@@ -717,7 +737,7 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   const walkOut = () => fairwayWay(s, reach, togo, windFrom, windKt);
   if (a.kind === 'astern' && noAsternPushOff(s, windFrom, windKt)) { const f = walkOut(); if (f) return f; }
   if (a.kind === 'astern' && windFrom != null) {
-    const e = pushOffPoses(s, a).at(-1)!, headUpThere = windKt >= WIND_SWINGS && Math.abs(wrap180(windFrom - e.h)) < 60;
+    const e = pushOffPoses(s, a).at(-1)!, headUpThere = windKt >= WIND_SWINGS && Math.abs(wrap180(windFrom - e.h)) < LET_GO_OFF;
     if (headUpThere || !clearRun(e.c, e.h, s, windFrom, windKt)) { const f = walkOut(); if (f) return f; return { ...a, noRoom: true }; }
   }
   return a;
@@ -759,7 +779,7 @@ function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: 
     const end = about(c, s.heading, 0, turn), h = (end.h + 720) % 360;
     // (60 degrees and more off the wind, where a sail fills as it goes up: nearer it, let go with no sail up she'd carry her
     // way toward the wind and stop in irons)
-    if (gainOf(turn) > 0 && (windFrom == null || Math.abs(wrap180(windFrom - h)) >= 60) && runAhead(end.c, h, s) >= 10 && (windFrom == null || clearRun(end.c, h, s, windFrom, windKt))) return { kind: 'swing', back, turn, h, pivot: 0 };
+    if (gainOf(turn) > 0 && (windFrom == null || Math.abs(wrap180(windFrom - h)) >= LET_GO_OFF) && runAhead(end.c, h, s) >= 10 && (windFrom == null || clearRun(end.c, h, s, windFrom, windKt))) return { kind: 'swing', back, turn, h, pivot: 0 };
   }
   return null;
 }
