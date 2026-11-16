@@ -38,7 +38,7 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   Model's crewstation work): in races whose 6 kt westerly dies to 1–4 kt, the AI's tacks stall at about 2.3 kn and fall
   off the long way round through a jibe, and its desired heading flips 190↔284 every 10–20 s, or zig-zags 55°↔105–160°
   true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
-  tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 11, 14, 20 and 21: held there as an `it.fails` case,
+  tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 11 and 15 (14, 20 and 21 pass since the crew's light-air habits): held there as an `it.fails` case,
   which goes red when this is fixed and is then switched to a normal test.
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,

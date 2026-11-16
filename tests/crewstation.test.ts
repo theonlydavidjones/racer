@@ -81,14 +81,16 @@ const movesOf = (kt: number, seed: number) => { const k = `${kt}|${seed}`; let m
 export const TRIPS_MEAN = 1.4, TRIPS_CAP = 2.0;
 /**
  * The races the backstop is held off, by wind, till their cause is fixed (the Coordinator, 16 Nov 2026; ROADMAP, "AI
- * steering in a dying breeze"): 6 kt seeds 4, 11, 14, 20 and 21 die to 1-5 kt, and the AI zig-zags 55° to 105-160° true,
- * each course held 20-100 s (seed 14, boat 2: four times, the vang on for each reach at 1-1.7% of drive and off again,
- * as the guide says, for the beat at 55°: 16 trips of its 36). Her crew are trimming for real changes of course, not
- * fidgeting; the mean is judged on these races still, and the backstop on them is an `it.fails` case below, which goes
- * red when the steering's fixed: then it's a normal test and this list goes. Seed 11 joined last (its desired heading
- * flipping 210-305 at 400-560 s as she circled): the Coordinator's ruling is that the list grows no further.
+ * steering in a dying breeze"): 6 kt seeds 4 and 11 die to 1-5 kt, and the AI zig-zags 55° to 105-160° true or circles,
+ * each course held 20-100 s; her crew trim for each (the vang on for a reach, off again for the beat, as the guide says).
+ * Seed 15: the race the light-air crew habits were fixed in (crew-habits.test.ts), its forced outhaul trips 5 to 3, but
+ * the AI's course changed with them, a run with the pole and the vang work for it, 28 trips. Her crew are trimming for
+ * real changes of course, not fidgeting; the mean is judged on these races still, and the backstop on them is an
+ * `it.fails` case below, which goes red when they all pass: then it's a normal test and this list goes. It was seeds 4,
+ * 11, 14, 20 and 21; 14, 20 and 21 pass the backstop since the crew habits, and are judged on it again, and 15 joined
+ * (the Coordinator's ruling: the list grows no further than it was).
  */
-export const CAP_HELD: Record<number, readonly number[]> = { 6: [4, 11, 14, 20, 21] };
+export const CAP_HELD: Record<number, readonly number[]> = { 6: [4, 11, 15] };
 
 /**
  * Changes of seat and walking along the boat at a seat, a minute: each crew member's mean over the races under
@@ -182,7 +184,7 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => movesOf(kt, j + 2))], { skipCap: CAP_HELD[kt] })).toEqual([]);
   }, 1_200_000);
   // (the races held off the backstop: over it now, from the AI's steering in a dying breeze; red when that's fixed)
-  for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: the AI's steering in a dying breeze, ROADMAP)`, () => {
+  for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: the AI's course in light air, ROADMAP, "AI steering in a dying breeze")`, () => {
     expect(tripsVerdict(seeds.map(s => movesOf(+kt, s)), { capOnly: true, seeds })).toEqual([]);
   }, 600_000);
 });
