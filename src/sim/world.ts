@@ -17,7 +17,7 @@ import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
 import { bodyJob } from '../boat/crewWork';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
-import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
+import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor, tideHeightAt } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
 import { waveMotion } from '../boat/seaway';
@@ -58,7 +58,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
-import { landAt } from '../environment/sea';
+import { chartDepth, landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
@@ -2267,9 +2267,19 @@ export class World {
    * pattern past everywhere but her, the owner's "rushing water" in v176). Worked out twice a second.
    */
   private waveRefSea: SeaHere | null = null;
+  /** The chart's depth at the waves' reference place, kept while the place moves less than 100 m (chartDepth reads the
+   * whole chart): the place, and its depth below MLLW (m, null off the chart). */
+  private waveChart: { p: Vec; d: number | null } | null = null;
   waveRef(): SeaHere {
     if (this.waveRefSea) return this.waveRefSea;
-    const mid = this.seaHere(this.C.center), s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : mid;
+    const own = this.freeSail || this.cruising, mid = this.seaHere(this.C.center), s = own ? this.user.sea ?? FLAT_SEA : mid;
+    // (the waves' length for the water's depth there: the chart's, NOAA's ENC depth areas at the middle of their band (a
+    // band 9–18 m deep reads 13.6 m: coarse, an estimate of the depth at any one place), and the tide's height above the
+    // chart's datum, MLLW, now (waveField.ts setDepth))
+    const at = own ? this.user : this.C.center;
+    if (!this.waveChart || hypot(at.x - this.waveChart.p.x, at.y - this.waveChart.p.y) > 100) this.waveChart = { p: { x: at.x, y: at.y }, d: chartDepth(at) };
+    const d = this.waveChart.d;
+    this.waves.setDepth(d == null ? null : d + tideHeightAt(at, this.clockUtc * 60000));
     return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 
