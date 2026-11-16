@@ -14,7 +14,7 @@ import { HAIL_RESPONSE, cpa, situationText } from '../rules';
 import { youTackPays } from '../sim/world';
 import type { SimView } from '../sim/host';
 import { $, setHidden, setHtml, setText, setTitle } from './dom';
-import { routeAround } from '../sim/routing';
+import { routeAroundSteps } from '../sim/routing';
 import { passageLive, type PassageNow } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
 import { pennantCanvas, signalCanvas } from '../render/flags';
@@ -920,13 +920,40 @@ function drawTrack(ctx: CanvasRenderingContext2D, tf: Tf, plan: PassageNow, I: I
 }
 
 /** The navigator's route to the destination (routeAround: the passage plan's way round the land), re-planned as she
- * goes: when the destination changes, or she's 100 m from where it was last planned from (at most every 2 s: it's an A*
- * search on a 50 m grid when the land is in the way). */
+ * goes: when the destination changes, or she's 100 m from where it was last planned from (at most every 2 s). On a long
+ * leg the search takes 60–200 ms, which held a frame up every 2 s while she cruised (Capacity, 15 Nov 2026), so it's
+ * worked out in the background a little at a time (routing.ts routeAroundSteps), 2 ms in every 16, and the last route
+ * stays drawn until the new one is in (for a new destination, the straight line to it until then). */
 let routeMemo: { dest: CourseMark; from: Vec; at: number; pts: Vec[] } | null = null;
+let routeJob: { dest: CourseMark; from: Vec; at: number; g: Generator<void, Vec[], void> } | null = null;
+const ROUTE_SLICE_MS = 2, ROUTE_TICK_MS = 16;
 export function navRoute(u: { x: number; y: number }, dest: CourseMark): Vec[] {
   const now = performance.now(), here = { x: u.x, y: u.y }, m = routeMemo;
-  if (!m || m.dest !== dest || (dist(m.from, here) > 100 && now - m.at > 2000)) routeMemo = { dest, from: here, at: now, pts: routeAround(here, dest.p) };
-  return routeMemo!.pts;
+  const stale = !m || m.dest !== dest || (dist(m.from, here) > 100 && now - m.at > 2000);
+  if (stale && (!routeJob || routeJob.dest !== dest)) {
+    const fresh = !routeJob;
+    routeJob = { dest, from: here, at: now, g: routeAroundSteps(here, dest.p) };
+    if (fresh) setTimeout(pumpRoute, 0);
+  }
+  return m && m.dest === dest ? m.pts : [here, { ...dest.p }];
+}
+/** One slice of the route's search, then the next a frame on, until it's done. */
+function pumpRoute(): void {
+  const job = routeJob; if (!job) return;
+  const t = performance.now();
+  for (;;) {
+    const r = job.g.next();
+    if (r.done) { if (routeJob === job) { routeMemo = { dest: job.dest, from: job.from, at: job.at, pts: r.value }; routeJob = null; } return; }
+    if (routeJob !== job) { setTimeout(pumpRoute, 0); return; } // (replaced by a new destination's: that one next)
+    if (performance.now() - t > ROUTE_SLICE_MS) break;
+  }
+  setTimeout(pumpRoute, ROUTE_TICK_MS);
+}
+/** Finish the route being worked out, at once (the tests: the same route, arrived at in slices). */
+export function navRouteFinish(): void {
+  const job = routeJob; if (!job) return;
+  let r = job.g.next(); while (!r.done) r = job.g.next();
+  routeMemo = { dest: job.dest, from: job.from, at: job.at, pts: r.value }; routeJob = null;
 }
 
 /**
