@@ -189,7 +189,9 @@ export function sailable(b: Boat, desired: number): number {
  * Berkeley a fleet of 7 took ~400 ms in each of three steps (measured 16 Nov 2026). */
 const HOME_SLICES = 64;
 /** Each boat's way home while it's being worked out, and the world's slices spent this step (kept here, not in the World:
- * a generator is no state the page's mirror can hold, sim/sync.ts, and the mirror never sails the AI). */
+ * a generator is no state the page's mirror can hold, sim/sync.ts. If the worker fails and the mirror sails on,
+ * sim/host.ts fail(), the ways not yet worked out start afresh from where the boats are then: a small divergence on a
+ * path that already diverges, each side's random streams). */
 const homeWork = new WeakMap<Boat, { cancelled: object; g: Generator<void, Vec[], void>; stand: Vec }>();
 const homeSpent = new WeakMap<World, { step: number; n: number }>();
 function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beating: boolean } {
@@ -209,7 +211,12 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
     let spent = homeSpent.get(w); if (!spent || spent.step !== w.steps) { spent = { step: w.steps, n: 0 }; homeSpent.set(w, spent); }
     let r = spent.n < HOME_SLICES ? job.g.next() : null;
     while (r && !r.done && ++spent.n < HOME_SLICES) r = job.g.next();
-    if (!r?.done) return { desired: n360(from + (b.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (lying to while her skipper looks at the chart)
+    if (!r?.done) {
+      // (her way not yet worked out, a few seconds: she sails for her spot meanwhile, as a crew who see N over A do, not
+      // rounding up all together; the shore guard, the rules and the marks still steer her after this)
+      const bq = brg(job.stand.x - b.x, job.stand.y - b.y), desired = sailable(b, crabFor(bq, targetFor(b, Math.abs(wrap(from - bq))) * 0.9, b.cur));
+      return { desired, luff: false, beating: Math.abs(wrap(from - desired)) < beat + 5 };
+    }
     homeWork.delete(b);
     // (the way starts where she was when it was asked: she lay to, a few meters off it, the while)
     ai.home = { route: r.value, i: 0, at: job.stand, lying: false };

@@ -32,7 +32,10 @@ describe("the call-off's ways home, a slice a step", () => {
     expect(homed(a), 'some still working hers out after the first step').toBeLessThan(a.boats.filter(o => !o.isUser && !o.finished).length);
     for (let k = 0; k < 900; k++) { a.step(DT); b.step(DT); }
     expect(state(a)).toBe(state(b));
-    expect(homed(a)).toBeGreaterThan(0);
+    // (every boat sailing home, not spinning a penalty, has hers within 15 s of the call-off)
+    const due = a.boats.filter(o => !o.isUser && !o.finished && !o.penalty);
+    expect(due.length).toBeGreaterThan(0);
+    expect(due.filter(o => !o.ai?.home).map(o => o.name)).toEqual([]);
   }, 120_000);
 
   it('her half-done way lost: she starts it afresh, the same in every copy, and it keeps off the land', () => {
