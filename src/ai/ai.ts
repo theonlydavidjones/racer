@@ -11,7 +11,7 @@ import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCro
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
-import { routeAround } from '../sim/routing';
+import { routeAround, routeAroundSteps } from '../sim/routing';
 import { HARBORS, inBasin } from '../geo/marina';
 import { AI_EVERY, type World } from '../sim/world';
 
@@ -184,16 +184,35 @@ export function sailable(b: Boat, desired: number): number {
  * sails back. The rest is her ordinary sailing (aiThink): the shore, the marks, and the right-of-way rules, which still
  * apply between boats that have been racing (Part 2 preamble), though a boat not racing takes no penalty for breaking one.
  */
+/** How much of the fleet's ways home is worked out in one step of the world, in routeAroundSteps' slices (each ~0.1 ms:
+ * so about 7 ms a step at most). Worked out all at once, the call-off stalled the race: from off Emeryville home to
+ * Berkeley a fleet of 7 took ~400 ms in each of three steps (measured 16 Nov 2026). */
+const HOME_SLICES = 64;
+/** Each boat's way home while it's being worked out, and the world's slices spent this step (kept here, not in the World:
+ * a generator is no state the page's mirror can hold, sim/sync.ts, and the mirror never sails the AI). */
+const homeWork = new WeakMap<Boat, { cancelled: object; g: Generator<void, Vec[], void>; stand: Vec }>();
+const homeSpent = new WeakMap<World, { step: number; n: number }>();
 function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beating: boolean } {
   const ai = b.ai!, from = b.ww.from, beat = beatFor(b);
   if (!ai.home) {
-    let at = w.C.center, best = Infinity;
-    for (const H of HARBORS) for (const e of H.exits) { const d = dist(e, w.C.center); if (d < best) { best = d; at = e; } }
-    // (the fleet's places worked out once, when racing's called off, with the course's wind then, and kept: every boat
-    // reads hers from the same list)
-    const places = w.cancelled ? (w.cancelled.places ??= standOffPlaces(w, at, w.wind.from)) : standOffPlaces(w, at, w.wind.from);
-    const stand = places[w.boats.filter(o => !o.isUser).indexOf(b)] ?? at;
-    ai.home = { route: routeAround(b, stand, 120), i: 0, at: stand, lying: false };
+    let job = homeWork.get(b);
+    if (!job || job.cancelled !== w.cancelled) {
+      let at = w.C.center, best = Infinity;
+      for (const H of HARBORS) for (const e of H.exits) { const d = dist(e, w.C.center); if (d < best) { best = d; at = e; } }
+      // (the fleet's places worked out once, when racing's called off, with the course's wind then, and kept: every boat
+      // reads hers from the same list)
+      const places = w.cancelled ? (w.cancelled.places ??= standOffPlaces(w, at, w.wind.from)) : standOffPlaces(w, at, w.wind.from);
+      const stand = places[w.boats.filter(o => !o.isUser).indexOf(b)] ?? at;
+      job = { cancelled: w.cancelled!, g: routeAroundSteps({ x: b.x, y: b.y }, stand, 120), stand }; homeWork.set(b, job);
+    }
+    // (the fleet's slices for this step shared out boat by boat, in the order they think: the same race every time)
+    let spent = homeSpent.get(w); if (!spent || spent.step !== w.steps) { spent = { step: w.steps, n: 0 }; homeSpent.set(w, spent); }
+    let r = spent.n < HOME_SLICES ? job.g.next() : null;
+    while (r && !r.done && ++spent.n < HOME_SLICES) r = job.g.next();
+    if (!r?.done) return { desired: n360(from + (b.tack === 'S' ? -90 : 90)), luff: true, beating: false }; // (lying to while her skipper looks at the chart)
+    homeWork.delete(b);
+    // (the way starts where she was when it was asked: she lay to, a few meters off it, the while)
+    ai.home = { route: r.value, i: 0, at: job.stand, lying: false };
   }
   const h = ai.home, toLee = (p: Vec, d: number) => { const u = V(from + 180); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; };
   // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
@@ -247,7 +266,7 @@ function clearRound(p: Vec, r: number): boolean {
  * across, so the fleet isn't all on one point. All the fleet's places (non-user boats, in order).
  */
 function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
-  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && anyShoreDist(p) > 100 && clearRound(p, 100) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity;
+  const lee = V(from + 180), clearLee = (p: Vec) => !onLand(p) && landAlong(p, { x: p.x + lee.x * 500, y: p.y + lee.y * 500 }) === Infinity && anyShoreDist(p) > 100 && clearRound(p, 100);
   // The fleet's one spot first (open water, the nearer and the more upwind of the entrance the better); then each boat
   // her own place 80 m apart across the wind from it, alternately either side. (Each choosing her own best spot with
   // the spread added, they all chose points round the same corner of open water, 11–32 m apart, and those sailing back
@@ -256,7 +275,7 @@ function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
   let base: Vec | null = null, cost = Infinity;
   for (let r = 150; r <= 800; r += 50) for (let a = 0; a < 360; a += 15) {
     const u = V(a), p = { x: h.x + u.x * r, y: h.y + u.y * r };
-    if (!clearLee(p) || landAlong(h, p) < Infinity) continue;
+    if (onLand(p) || landAlong(h, p) < Infinity || !clearLee(p)) continue; // (the cheap tests first: the same places, 64 ms off Berkeley the other way round, 15 ms so)
     open.push(p);
     const q = r + 100 * (1 - Math.cos((a - from) * Math.PI / 180)) / 2;
     if (q < cost) { cost = q; base = p; }
@@ -268,7 +287,7 @@ function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
   // beating back up through hers. Clear: 60 m apart across the wind, or more than her drift along it.
   const across = V(from + 90), taken: Vec[] = [];
   const clearOf = (p: Vec) => taken.every(q => { const dx = p.x - q.x, dy = p.y - q.y; return Math.abs(dx * across.x + dy * across.y) >= 60 || Math.abs(dx * lee.x + dy * lee.y) > 300; });
-  const ok = (p: Vec) => clearLee(p) && landAlong(base!, p) === Infinity && clearOf(p);
+  const ok = (p: Vec) => clearOf(p) && landAlong(base!, p) === Infinity && clearLee(p); // (the cheap tests first)
   for (let k = 0; k < fleet.length; k++) {
     const side = k % 2 ? 1 : -1, spread = side * Math.ceil(k / 2) * 80;
     let spot: Vec | null = null;

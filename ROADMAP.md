@@ -43,8 +43,14 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   Coordinator: Bay East's, next): sim/routing.ts routeAround from the Estuary's harbors (Encinal, Oakland YC, Marina
   Village, Fortmann, Grand Marina, Alameda Marina) to the central Bay (Pier 39, Alcatraz) gives a single straight leg
   through Alameda, on main as on #442: 186 of 1356 ways out of the harbors' entrances. The way out is down the Estuary
-  and round Alameda's west end (why the search misses it isn't found yet). A test that fails on main first, then the
-  physics review.
+  and round Alameda's west end. Found: at 120 m off the land every cell of the Estuary was blocked. Fixed on
+  estuary-route: where no way is found, half as far off and half again, down to 30 m, her width kept on every leg then;
+  0 of 156 harbor-to-harbor ways now cross the land. And the call-off's ways home are worked out a slice a step (from off
+  Emeryville the fleet's took ~400 ms in each of three steps).
+- **A room for each cell of the way round the land** (the physics review of estuary-route; the Coordinator, 16 Nov 2026:
+  a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
+  Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
+  120/60/30 m it allows, or a cost for less, so only the narrow reach is sailed close.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
