@@ -807,13 +807,17 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   {
     const rel0 = wrap(ww.from - b.h), astern = b.astern ?? 0, inIrons = Math.abs(rel0) < beat + 15;
     const reachV = targetFor(b, beat + 25);
-    if (astern > 0.05 || (inIrons && b.v < Math.min(0.4, reachV / 3))) ai.gather = true;
+    // (before the gun, burning time on her approach she coasts with her sails let go on purpose, slow, and her timing
+    // (ai.plan) counts on it: there only going astern sets her gathering way, not being slow)
+    const burning = w.t < 0 && ai.mode === 'approach';
+    if (astern > 0.05 || (!burning && inIrons && b.v < Math.min(0.4, reachV / 3))) ai.gather = true;
     else if (b.v > Math.min(1.0, 0.6 * reachV)) ai.gather = false;
     if (ai.gather) {
       luff = false;
       if (inIrons && Math.abs(wrap(ww.from - desired)) < beat + 25) {
         const side = rel0 >= 0 ? -1 : 1, hd = (s: number) => n360(ww.from + s * (beat + 25));
-        desired = Math.abs(rel0) < 20 && blocked(w, b, hd(side), 60) && !blocked(w, b, hd(-side), 60) ? hd(-side) : hd(side);
+        // (her side, unless the land's on it and the other's clear, however far her bow's fallen off: review)
+        desired = blocked(w, b, hd(side), 60) && !blocked(w, b, hd(-side), 60) ? hd(-side) : hd(side);
       }
     }
   }
@@ -958,8 +962,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // off leaving her going astern for a quarter of a minute. But not close to a boat she must keep clear of, within
   // KEEP_EASED_M of her hull, nor about to touch one (rule 14): there easing is how a slow boat keeps clear, and with
   // her sails drawing at a crawl she sags off to leeward, toward the leeward boat)
-  if (luff && !ai.urgent && (ai.gather || throughWind(b, desired))
-    && !(avoiding && w.boats.some(o => o !== b && !o.finished && hullGap(b, o) < KEEP_EASED_M && w.rights(b, o).kc === b))) luff = false;
+  // (eased within KEEP_EASED_M, drawing again only past KEEP_EASED_M + 2: at the edge her sails would go in and out each
+  // moment she thought)
+  const lim = ai.keptEased ? KEEP_EASED_M + 2 : KEEP_EASED_M;
+  ai.keptEased = avoiding && near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
+  if (luff && !ai.urgent && (ai.gather || throughWind(b, desired)) && !ai.keptEased) luff = false;
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
 }

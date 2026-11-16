@@ -38,6 +38,7 @@ export interface AiState {
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
   /** Stopped or going astern: sheets in, and off the wind if she's in irons, until she has way on again (ai.ts). */
+  keptEased?: boolean; // (irons: her sails kept eased for a boat close by she must keep clear of, ai.ts, with a band)
   gather?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
