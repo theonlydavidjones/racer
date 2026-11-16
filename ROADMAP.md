@@ -40,6 +40,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
   tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 11 and 15 (14, 20 and 21 pass since the crew's light-air habits): held there as an `it.fails` case,
   which goes red when this is fixed and is then switched to a normal test.
+- **The outhaul in a breeze wandering across the guide's steps** (Crew Model; the physics review of the crew habits,
+  16 November): two cases left after the guide's steps were read as its ranges (controls.ts guideLimits):
+  - a light-air beat whose breeze swings across both 4 and 5 kt (3.5 to 5.7 kt read) still has them at the outhaul
+    every 70-90 s, 0.05 to 0.45 and back: what the guide says for those winds, but more than a crew would do;
+  - in 11.5 ± 1.2 kt the outhaul creeps off the mark in six trips, a trip each 95 s, for one ease.
+  Both want the trip judged against what it's worth and the wait since the last, not forced by the band.
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.

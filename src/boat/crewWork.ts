@@ -83,6 +83,11 @@ const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+/** At the cabin top already for another line, the share of a trip's start threshold they'll trim a line in reach for
+ * (an estimate: a fraction of what's worth the walk, as the walk's done). */
+export const BATCH = 0.5;
+/** How far along the boat (m) a line is still within the same visit: a step, not a walk (an estimate). */
+const STEP_ALONG = 1;
 /**
  * Holding a course, for the crew's place fore and aft (crewPhys.ts CrewCall.held): her heading within CIRCLING of its own over LINE_TAU, which a turn kept
  * up at more than about a degree and a quarter a second isn't, a slow penalty circle included, and a seaway's wander or a
@@ -101,7 +106,7 @@ export function courseHeld(b: Boat): boolean {
  * a minute, and easing for the run is part of bearing away. */
 export function guideUnread(b: Boat): boolean {
   const s = b.settle; if (!s) return false;
-  return Math.abs(Math.abs(b.twa ?? 0) - s[SETTLE.twaGuide]) > NEW_COURSE && s[SETTLE.since] < LINE_GAP;
+  return Math.abs(Math.abs(b.twa ?? 0) - s[SETTLE.twaGuide]) > NEW_COURSE && Math.abs(wrapW(b.h - s[SETTLE.hGuide])) > 10 && s[SETTLE.since] < LINE_GAP; // (10: physics.ts NEW_HEADING)
 }
 const NO_WAITS: readonly string[] = [], CREW_WAITS: readonly string[] = ['cunningham', 'downhaul', 'jibHalyard'], ALONE_WAITS: readonly string[] = [...PIANO];
 export function waitingLines(c: CrewState): readonly string[] {
@@ -369,12 +374,18 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
       // (each against its own threshold: the fine one for a line wanted right to its stop is for setting it there, not for
       // a trip to move it 2% because this moment's wish is at the stop and the lasting one isn't)
-      const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
-      if (Math.abs(dl) < startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
-      // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
-      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
       // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
       const there = a.job?.station?.pose === 'piano' || a.pose === 'piano';
+      // (and at it, free, with this line in reach: what's coming due there they see to now, at BATCH of the threshold a
+      // trip takes and none of the walk's waits, rather than come back for it a minute later, as crews do: the Cunningham
+      // and the outhaul a trip each, 94 s apart, crewcruise's 6 kt beam reach, the Coordinator, 16 Nov 2026)
+      // (free there, or just done with a line there and not yet gone back: the job's end and their step aft are the same
+      // moment; and this line a step along the cabin top from them, the Cunningham's place to the piano's, 0.75 m)
+      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
+      const atIt = !a.job && (there || trip < 1) && Math.abs((stationFor(k, who, windward, false)?.z ?? a.z) - a.z) < STEP_ALONG, f = atIt ? BATCH : 1;
+      const th = f * startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
+      if (Math.abs(dl) < f * startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
+      // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
       // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the
       // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed; and only
       // for a line here they'd see to now: off, and for a real change)
@@ -399,7 +410,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // minutes, the physics review)
       const real = (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 0) >= 1 || realChangeOf(c, twa, ls, k, skill);
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
-      if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
+      if (walk && !urgent && !atIt && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
       // Set right through to a puff's wish, they were back seven seconds later as it passed, the vang 0.17, 0.89, 0.58)
       if (walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;

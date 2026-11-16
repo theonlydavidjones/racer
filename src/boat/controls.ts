@@ -339,6 +339,11 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  * read again only once it's GUIDE_KT from where it was read: up to her wind over GUIDE_FAST s as it builds, down to her
  * wind over 20 s (Boat.twsSlow) as it falls. Estimates: the guide gives no time; reading a build sooner than a lull is this model's choice, unsourced. */
 export const GUIDE_BACKLASH = 10, GUIDE_DEAD = 3, GUIDE_FAST = 5, GUIDE_KT = 1;
+/** ... and in light air this much more (deg), full at GUIDE_LIGHT_KT and gone by GUIDE_LIGHT_KT + 5: in a light breeze
+ * the wind's direction wanders more and her apparent angle swings with each change of her speed, so on a held heading in
+ * 3-5 kt it wandered 39-76° (crewcruise's 6 kt beam reach, seed 2), and the vang was eased and set again. A new course
+ * she's steered is read at once whatever this is (physics.ts NEW_HEADING). Estimates. */
+export const GUIDE_LIGHT = 10, GUIDE_LIGHT_KT = 5;
 export function guideLimits(tws: number, awa: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>> } {
   // (the guide's settings are for sailing upwind: full to 40° apparent, gone by a close reach at 60°, where the crew sets
   // the lines for shape alone)
