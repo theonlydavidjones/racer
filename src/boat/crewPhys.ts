@@ -688,6 +688,9 @@ function holdHelmLight(c: CrewState, tgt: Target[], held: (Held | null)[], reset
   return i === 0 && c.spec.crew.length > 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
 }
 const seatedPose = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
+/** Got to their place: on its side of the boat and within SPACED_AT of it along the deck (hold's spacing, through a tack). */
+const SPACED_AT = 0.2;
+const spacedFrom = (a: Aboard, t: Target) => Math.sign(a.x) === Math.sign(t.arm) && Math.abs(a.z - t.z) < SPACED_AT;
 function holdPut(tgt: Target[], held: (Held | null)[], i: number, z: number): void { tgt[i]!.z = z; const hi = held[i]; if (hi) hi.z = z; }
 
 function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: number[], maxes: number[]): void {
@@ -784,7 +787,11 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   // (out on deck, nobody forward of the seat beside the cabin's after end, but the front hand forward of the winch, on the
   // cabin top's edge at Z.cabinSide)
   for (const i of out) if (tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) holdPut(tgt, held, i, Z.deckFwd);
-  for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) holdPut(tgt, held, i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
+  // (through a tack's crossing, only for a crewmate who's got to their new place: one whose target is still settling, about
+  // to be somewhere else, doesn't send a seated one aft and back again a second later: the owner's "fussing", Coordinator
+  // 16 Nov 2026. Settled, the spacing as ever)
+  const crossingNow = now - (c.settleT ?? -1e9) < HOLD.settle, there = (j: number) => !crossingNow || spacedFrom(c.people[j]!, tgt[j]!);
+  for (const i of out) for (const j of atJob) if (there(j) && Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) holdPut(tgt, held, i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
   // (in their order along the cockpit, front to back: the one whose place is forward keeps it. By their places, not
   // their numbers: with two crew the jib hand, people[2], is the forward one, slotOf)
   // (level, in their slots' order: the jib hand forward)
@@ -792,7 +799,7 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   for (let q = 1; q < out.length; q++) for (let r = 0; r < q; r++) {
     const a = tgt[out[r]], b = tgt[out[q]];
     // (and if there's no room aft for the one behind, the one ahead goes forward, as far as the winch lets them)
-    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) {
+    if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6 && there(out[r]) && there(out[q])) {
       if (a.z + Z.gap <= Z.cockpitAft) holdPut(tgt, held, out[q], a.z + Z.gap);
       else { holdPut(tgt, held, out[q], Z.cockpitAft); holdPut(tgt, held, out[r], Math.max(Z.deckFwd, Z.cockpitAft - Z.gap)); }
     }
