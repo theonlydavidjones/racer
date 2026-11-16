@@ -26,7 +26,7 @@ const NS = 10, NT = 5;
 
 const KELVIN = Math.tan(19.47 * D2R);
 
-interface Trail { pts: { x: number; y: number; v: number; t: number }[]; acc: number; mesh: THREE.Mesh; bow: THREE.Mesh; spray: THREE.InstancedMesh; drops: { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; r: number }[]; lastPitch: number }
+interface Trail { pts: { x: number; y: number; v: number; t: number }[]; acc: number; mesh: THREE.Mesh; bow: THREE.Mesh; spray: THREE.InstancedMesh; drops: { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; r: number }[]; lastPitch: number; par: number }
 
 let foamTex: THREE.CanvasTexture | null = null;
 function foam(): THREE.CanvasTexture {
@@ -80,7 +80,7 @@ export class Wakes {
       spray.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       spray.geometry.setAttribute('aGlow', new THREE.InstancedBufferAttribute(new Float32Array(MAXDROPS * 3), 3).setUsage(THREE.DynamicDrawUsage));
       spray.count = 0; spray.frustumCulled = false; this.scene.add(spray);
-      return { pts: [], acc: 0, mesh, bow, spray, drops: [], lastPitch: 0 };
+      return { pts: [], acc: 0, mesh, bow, spray, drops: [], lastPitch: 0, par: 0 };
     });
   }
 
@@ -94,7 +94,12 @@ export class Wakes {
       const tr = this.trails[k]; if (!tr) return;
       const u = { x: Math.sin(b.h * D2R), y: Math.cos(b.h * D2R) }, stern = { x: b.x - u.x * HALF, y: b.y - u.y * HALF };
       tr.acc += dt;
-      if (tr.acc >= SAMPLE || !tr.pts.length) { tr.acc = 0; tr.pts.unshift({ x: stern.x, y: stern.y, v: b.v, t }); if (tr.pts.length > N) tr.pts.pop(); }
+      // (the sea's height under the trail, every other point a frame, the rest kept from the last: the trail lies on the
+      // water where she left it, and a wave lifts it at most a couple of centimeters in a frame. Every point on a frame a
+      // new one is laid, when they all move up one place. The height was some 5,000 lookups a frame for the fleet, most
+      // of the wakes' cost)
+      const laid = tr.acc >= SAMPLE || !tr.pts.length; tr.par ^= 1;
+      if (laid) { tr.acc = 0; tr.pts.unshift({ x: stern.x, y: stern.y, v: b.v, t }); if (tr.pts.length > N) tr.pts.pop(); }
       else { tr.pts[0].x = stern.x; tr.pts[0].y = stern.y; tr.pts[0].v = b.v; } // the newest point rides with the stern
       const geo = tr.mesh.geometry, P = geo.attributes.position.array as Float32Array, C = geo.attributes.color.array as Float32Array, UV = geo.attributes.uv.array as Float32Array;
       const n = tr.pts.length;
@@ -110,7 +115,7 @@ export class Wakes {
         const cx = p.x + nx * off, cy = p.y + ny * off;
         for (let e = 0; e < 2; e++) {
           const side = e ? 1 : -1, x = cx + nx * half * side, y = cy + ny * half * side, o = ((s * N + i) * 2 + e);
-          P[o * 3] = x; P[o * 3 + 1] = sea(x, y) + 0.05; P[o * 3 + 2] = -y;
+          P[o * 3] = x; if (laid || i === 0 || (i & 1) === tr.par) P[o * 3 + 1] = sea(x, y) + 0.05; P[o * 3 + 2] = -y;
           C[o * 4] = C[o * 4 + 1] = C[o * 4 + 2] = 1; C[o * 4 + 3] = alpha;
           UV[o * 2] = e; UV[o * 2 + 1] = (p.t * 0.6 + s * 0.33) % 1000;
         }

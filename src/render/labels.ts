@@ -7,13 +7,15 @@ import { P3 } from './coords';
 interface MarkTag { el: HTMLDivElement; p: Vec; z: number; idx: number[] }
 
 /** HTML tags floating over boats and marks, positioned by projecting through the 3D camera. */
+/** How long the order ("Tacking!", "Jibe-ho!") shows once given (s). */
+const ORDER_S = 1.2;
 export class Labels {
   private tagEls: (HTMLDivElement | null)[] = [];
   private markTags: MarkTag[] = [];
   /** Coming in to a berth: the one-word cue by your boat (Closer, Too fast, Step, Made fast, Bump: sim/world.ts mooringStep). */
   private cueEl: HTMLDivElement | null = null;
   /** The helm's call by her (the owner, 15 Nov 2026: "some kind of confirmation when I call jibe ho"): "Ready to jibe" …
-   *  "Jibe-ho!" (or "Ready about" … "Tacking!") for as long as the crew turn her, and a moment after. */
+   *  "Jibe-ho!" (or "Ready about" … "Tacking!"): the warning while the crew get ready, the order for a moment (ORDER_S). */
   private callEl: HTMLDivElement | null = null;
   private call: { kind: 'jibe' | 'tack'; t0: number; doneT: number | null } | null = null;
   /** The one-line hint, at the moment the call is useful (a run: jibe-ho; close-hauled: tack), until it's been used a few
@@ -81,15 +83,22 @@ export class Labels {
     // the cue while it's news (a few seconds), or for as long as it holds while the hand waits at the shrouds
     const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
     if (c) { if (!word) { if (!c.hidden) c.hidden = true; } else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
-    // the helm's call: the warning first (a second and a half: the crew to their places), then the order, held while she
-    // turns (her turn target set: sim/world.ts callTurn, boat/physics.ts) and a second and a half after
+    // the helm's call: the warning first, while the crew get to their places, then the order as she's put over (sim/world.ts
+    // callTurn, boat/physics.ts), a moment only
     const k = this.call, ce = this.callEl;
     if (k && w.t < k.t0 - 1) this.call = null; // (a new race: the clock went back)
     let say = '';
     if (k && this.call) {
-      const turning = u.turnTarget != null; if (!turning && k.doneT == null && w.t - k.t0 > 1.5) k.doneT = w.t;
-      if (k.doneT != null && w.t - k.doneT > 1.5) this.call = null;
-      else say = w.t - k.t0 < 1.5 ? (k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
+      // (the warning held while the crew get ready, as the sim holds the turn: world.ts callTurn, boat/calls.ts; a crewmate
+      // busy at a job answers "Not ready!")
+      // (then the order, for a moment only: once called, it's called. The owner, 15 Nov 2026)
+      // (the race's copy here hears of the call a moment after you make it: a third of a second's grace before reading it)
+      const waiting = !!u.callWait, heard = w.t - k.t0 > 0.3;
+      // (a call dropped, not put over, she not turning: no order said)
+      const dropped = heard && !waiting && k.doneT == null && u.turnTarget == null && !u.tacking && u.gybeTo == null;
+      if (heard && !waiting && k.doneT == null) k.doneT = w.t;
+      if (dropped || (k.doneT != null && w.t - k.doneT > ORDER_S)) this.call = null;
+      else say = waiting && u.callWait!.notReady ? 'Not ready!' : waiting || !heard ? (k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
     }
     if (ce) { if (!say || word) { if (!ce.hidden) ce.hidden = true; } else { this.place(ce, camera, u.x, u.y, 3.2); if (ce.textContent !== say) ce.textContent = say; } }
     // the hint: on a run (from 150° off the wind) or close-hauled (to 50°), held two seconds there, she not turning

@@ -83,8 +83,22 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-motor .mo-thr{min-width:30px;text-align:center;font-variant-numeric:tabular-nums}
 .sb-pen{color:var(--accent)!important;cursor:default}
 /* the windex between the two vangs: looking up at the masthead */
-.sb-wx{width:92px;height:92px;flex:none;align-self:center;margin:0 4px}
+.sb-wx{width:80px;height:80px;flex:none;align-self:center;margin:0 4px;transform:translateY(-3px)}
 .sb-wx svg{width:100%;height:100%;display:block}
+/* her heel: a ring over the windex's top, in its coordinates (sailBand.ts heelSvg), on a layer 182/140 its size */
+.sb-wx svg.sb-heel{position:absolute;left:-15%;top:-15%;width:130%;height:130%;overflow:visible;pointer-events:none}
+.sb-heel path{fill:none;stroke-width:3.4;stroke-linecap:butt}
+.sb-heel .hr-base{stroke:#3c5566}
+.sb-heel .hr-amber{stroke:var(--accent)}
+.sb-heel .hr-red{stroke:#e8513f}
+.sb-heel .hr-best{fill:var(--target);stroke:#0a141c;stroke-width:1.6}
+.sb-heel .hr-dot{fill:#f1f6f8;stroke:#0a141c;stroke-width:2.6}
+.sb-heel .hr-dot.amber{fill:var(--accent)}
+.sb-heel .hr-dot.red{fill:#e8513f}
+.sb-heel .hr-deg{fill:#e9f2f5;font:700 15px var(--f-inst);dominant-baseline:middle}
+.sb-heel .hr-deg.amber{fill:var(--accent)}
+.sb-heel .hr-deg.red{fill:#e8513f}
+.sailband.shut .sb-heel{visibility:visible}
 .sb-awa{fill:#cfdbe1;font:700 12px var(--f-inst);letter-spacing:1px}
 .sb-top{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
 .sb-div{width:1px;align-self:stretch;background:var(--rule);margin:4px 2px}
@@ -170,7 +184,8 @@ body:has(.overlay:not([hidden])) .sailband{visibility:hidden}
 /* (the messages stop above the band while it is open) */
 body.band-open #msgLog{max-height:calc(100vh - 356px - 196px)}
 
-.sb-pos{fill:#ffffff;font:700 10.5px var(--f-inst);letter-spacing:.04em;paint-order:stroke;stroke:#08141e;stroke-width:3px} /* the windex's point of sail (ROADMAP 8j) */
+/* the windex's point of sail (ROADMAP 8j), just below the windex (the owner, 15 Nov 2026) */
+.sb-pos{position:absolute;left:50%;top:calc(100% + 1px);transform:translateX(-50%);white-space:nowrap;pointer-events:none;color:#fff;font:700 10px/1 var(--f-inst);letter-spacing:.04em;text-shadow:0 0 2px #08141e,0 0 2px #08141e}
 /* the pilot refused, or sounded its alarm: the reason in a word on its button (or its readout), in the caution color, for
    3 s (app.ts pilotRefused) */
 #bPilot.refused,.sb-tillerslot #bPilot.refused{border-color:var(--caution);color:var(--caution)}

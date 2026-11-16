@@ -137,7 +137,7 @@ describe('a gybe that\'s meant', () => {
   });
   it('an AI boat doesn\'t sail by the lee: past 4° her crew gybe at once, as before', () => {
     const b = testBoat({ heading: 170, kt: 4, windKt: 12 }); b.isUser = false; sail(b, 30, () => held(b, 170));
-    sail(b, 30, t => held(b, 170 + Math.min(20, t)));
+    sail(b, 30, t => { b.callT = t; held(b, 170 + Math.min(20, t)); }); // (her skipper calls the jibe: boat/calls.ts; uncalled, tests/calls.test.ts)
     expect(b.tack).toBe('S'); expect(b.boom).toBeLessThan(-40); expect(b.crashT).toBeUndefined();
   });
 });
