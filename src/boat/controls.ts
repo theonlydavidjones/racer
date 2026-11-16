@@ -330,7 +330,11 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
 /** The guide's beat settings give way to the crew's own off the wind over this much apparent angle (deg) of backlash:
  * the angle they're read at (Boat.guideAwa) follows hers only once she's this far past it, so a course swinging about
  * 40-60° apparent doesn't send them to the cabin top for one set and back for the other (the Coordinator, 16 Nov 2026).
- * An estimate: North's Folkboat guide gives no angle for changing over, and no reaching settings at all. */
+ * An estimate: North's Folkboat guide gives no angle for changing over, and no reaching settings at all. The wind it's
+ * read for is the breeze she's sailing in, her true wind over about 20 s (Boat.twsSlow, as her depowering step reads
+ * it), not each puff's: its settings are by the wind's range ("very light winds (0-5 knots)", "medium winds (5-12
+ * knots)"), and read in the gust, a 6 kt breeze's puffs and lulls crossing 5 kt sent the crew to the outhaul and back
+ * through a beat. */
 export const GUIDE_BACKLASH = 10;
 export function guideLimits(tws: number, awa: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>> } {
   // (the guide's settings are for sailing upwind: full to 40° apparent, gone by a close reach at 60°, where the crew sets
@@ -401,8 +405,8 @@ export function hoistDraw(h: number, sail: 'main' | 'jib'): number {
   return h >= 1 - th ? 1 - 0.08 * (1 - h) / th : 0.92 * (0.33 + 0.67 * h / (1 - th));
 }
 
-export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}, guideAwa = awa): CrewSettings {
-  const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws, guideAwa);
+export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, from?: Partial<CrewSettings>, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, fixed: Partial<CrewSettings> & { mainsheet?: number } = {}, guideAwa = awa, guideKt = tws): CrewSettings {
+  const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, guideKt, guideAwa);
   // lines you hold are fixed where you have them: the crew sets the rest around them
   // (with your mainsheet held, the traveller is their only way to put the boom where it should be: the guide's traveller
   // settings assume a main sheeted for the conditions, so then only the depowering floor holds it)
@@ -484,8 +488,8 @@ const TOP_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham',
  * when the depowering steps call for it (she's overpowered: it's for her heel and helm, not the sail's shape). A crew
  * gets up to move a line only when it's worth it (crewWork.ts).
  */
-export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number, minGain?: number, guideAwa = awa): Partial<Record<keyof CrewSettings, number>> {
-  const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, tws, guideAwa);
+export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: number, tack: Tack, mainAngle: number, jibAng: number, rig: SailRig = STD_RIG, jibWear: SailWear = SAIL_WEAR.new, aws = tws, depower?: number, mainsheet?: number, minGain?: number, guideAwa = awa, guideKt = tws): Partial<Record<keyof CrewSettings, number>> {
+  const tm = targetShape('main', tws, awa, depower), tj = targetShape('jib', tws, awa, depower), lim = depowerLimits(depower ?? 0, awa, guideKt, guideAwa);
   const loaded = loadedCar(c, tack);
   const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, jibHalyard: c.jibHalyard ?? 0.3, carFore: loaded.fore, carIn: loaded.ins };
   const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet), out: Partial<Record<keyof CrewSettings, number>> = {};
