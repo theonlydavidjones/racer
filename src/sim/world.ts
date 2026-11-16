@@ -2056,7 +2056,9 @@ export class World {
     }
     const hoist = plan.headToWind ? ' She\'ll be head to wind: get the main up first (U), or she\'ll soon stop.' : '';
     this.emit({ type: 'toast', ms: 7000, msg: plan.kind === 'swing'
-      ? plan.hold
+      ? plan.pivot === 0 // (walked out to the fairway on her lines and turned there: 8m2, and the stern-line walk-out, 8m3)
+        ? `Pushing off: your crew walks her out into the fairway on her bow and stern lines, turns her there, and lets her go. Steer her out (she has a little way on).${hoist}`
+        : plan.hold
         ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'

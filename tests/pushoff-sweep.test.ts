@@ -11,7 +11,8 @@ import BOWLINE_1604 from './fixtures/pushoff-bowline-1604.json';
  * 20 kt from 270, pushed off in a full World with the moored boats solid, then let go hands off with the jib going up for
  * her first 15 m. Swung on her bow line, held head to wind for the main, walked out to the fairway, or shoved off astern,
  * she touches no boat and no dock; where none of those has the clear water, she's kept fast and told (the coordinator's
- * ruling, 16 Nov 2026). And how many get each plan, exactly as today: a planner change that moves a berth from one to
+ * ruling, 16 Nov 2026), or walked out on her lines first wherever that fits (the stern-line walk-out, the same day: kept
+ * fast went from 90 to 19). And how many get each plan, exactly as today: a planner change that moves a berth from one to
  * another fails here, and has to say why in its PR. (Before 8m3, a sweep of all 1,604 bow-line swings in the six winds
  * touched the boat in the next slip in 1,124: let go beside it, its stern just off her bow, with no clear water to gather
  * way in. geo/marina.ts clearRun.)
@@ -60,8 +61,8 @@ describe('every berth has a plan that passes: a sample of the bow-in berths in s
     }
     expect(bad).toEqual([]);
     expect(BERTHS.length).toBe(62);
-    // (16 Nov 2026. Kept fast is the stern-line walk-out's target, ROADMAP: it should only go down)
-    expect(count).toEqual({ 'walked out': 314, 'kept fast': 90, astern: 17, 'bow line': 10, 'held for the main': 3 });
+    // (16 Nov 2026, with the stern-line walk-out. Kept fast should only go down: the five berths left, ROADMAP 8m3)
+    expect(count).toEqual({ 'walked out': 385, 'kept fast': 19, astern: 17, 'bow line': 10, 'held for the main': 3 });
   }, 1_800_000);
   it.runIf(ALL)('the whole sweep: the 1,604 cases once swung on her bow line, no boat or dock touched', () => {
     const cases = BOWLINE_1604 as [string, number, number][];

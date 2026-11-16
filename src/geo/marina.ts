@@ -710,9 +710,15 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // coordinator's ruling, 16 Nov 2026. Where it isn't there, her crew keep her fast rather than shove her into the boats)
   // (and in a breeze, 60 degrees and more off the wind as any let-go: left nearer head to wind, the jib can't fill and the
   // breeze on her bow carries her on astern past her coast, into whatever's behind her)
+  // (where the shove would leave her kept fast, she's walked out on her lines instead, as a crew does it: the stern-line
+  // walk-out, 8m3, the coordinator's call, 16 Nov 2026. Even from a slip the wind blows straight out of, where the
+  // walk-out isn't tried first: walked back out with the wind on her bow, turned in the fairway on a stern line and a bow
+  // line, and let go 60 degrees and more off the wind with clear water ahead, as any walk-out)
+  const walkOut = () => fairwayWay(s, reach, togo, windFrom, windKt);
+  if (a.kind === 'astern' && noAsternPushOff(s, windFrom, windKt)) { const f = walkOut(); if (f) return f; }
   if (a.kind === 'astern' && windFrom != null) {
     const e = pushOffPoses(s, a).at(-1)!, headUpThere = windKt >= WIND_SWINGS && Math.abs(wrap180(windFrom - e.h)) < 60;
-    if (headUpThere || !clearRun(e.c, e.h, s, windFrom, windKt)) return { ...a, noRoom: true };
+    if (headUpThere || !clearRun(e.c, e.h, s, windFrom, windKt)) { const f = walkOut(); if (f) return f; return { ...a, noRoom: true }; }
   }
   return a;
 }

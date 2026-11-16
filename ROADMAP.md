@@ -329,10 +329,16 @@ What's planned, roughly in order. Done work is described in the README.
      12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
      held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
    - **Still to do (Deep Physics' review, 16 Nov 2026):**
-     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
-       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
-       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
-       or motored out. The sweep test fails if the count rises.
+     - **~~The berths kept fast: the stern-line walk-out's target~~** (done, 16 Nov 2026, the coordinator's call). Where
+       the shove would leave her kept fast, she's walked out on her lines instead, even from a slip the wind blows
+       straight out of (geo/marina.ts planPushOff). Over the sample of every 25th bow-in berth in seven winds, kept fast
+       went from 90 of 434 to 19 (walked out 314 to 385), none touching; in 12 kt from 180, from 23 to 2. Left kept fast,
+       five berths: West Harbor 535 (westerly) and 313 (northerly), where the only turn toward the way out leaves her
+       within 60 degrees of the wind; South Beach G1, no room ahead in any direction; Horseshoe Bay A30 (northerly),
+       nearly calm at her slip, and the turn toward the way out too near the wind; Richmond YC E76, a fairway too tight
+       to turn her in. Turned away from the way out instead she'd have to come round in a 12 m fairway: the motor's their
+       way out. The 1,604 once swung on the bow line are unchanged (31 kept fast: these are among them). In 12 kt from 090
+       the sample still keeps 34 of 62 fast: the easterly, rare on the Bay, isn't in the sweep test.
      - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
        astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
        the test.

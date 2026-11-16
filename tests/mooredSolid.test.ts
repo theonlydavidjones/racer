@@ -32,7 +32,7 @@ describe('the walk-out to the fairway', () => {
       const p = pushOffPlan(s, from, kt); if (p.kind !== 'swing' || p.pivot !== 0) continue; n++;
       const togo = toExit(harborOf(s.marina)!), poses = pushOffPoses(s, p), e = poses[poses.length - 1], v = { x: Math.sin(p.h * Math.PI / 180), y: Math.cos(p.h * Math.PI / 180) };
       const toward = togo({ x: e.c.x - v.x * 12, y: e.c.y - v.y * 12 }) - togo({ x: e.c.x + v.x * 12, y: e.c.y + v.y * 12 }) > 0;
-      const off = Math.abs(((from - p.h + 540) % 360) - 180) >= 60;
+      const off = Math.abs(((Math.round(from / 10) * 10 - p.h + 540) % 360) - 180) >= 60; // (off the wind the crew judge it by, to 10 degrees: pushOffPlan)
       const ahead = [2, 4, 6, 8, 10].every(d => berthClear({ x: e.c.x + v.x * d, y: e.c.y + v.y * d }, p.h, s));
       const round = poses.every(q => berthClear(q.c, q.h, s));
       if (!toward || !off || !ahead || !round) bad.push(`${s.id} from ${from}: ${toward ? '' : 'not toward the way out '}${off ? '' : 'near the wind '}${ahead ? '' : 'no room ahead '}${round ? '' : 'not clear round'}`);

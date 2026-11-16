@@ -131,7 +131,7 @@ describe('pushed off astern', () => {
     expect(got).toEqual({
       west12: { out: 8, kept: ['south-beach:G88', 'richmond-yc:F2', 'horseshoe-bay:C22', 'west-harbor:507'] },
       sw: { out: 6, kept: [] }, nw: { out: 6, kept: [] },
-      north: { out: 3, kept: ['south-beach:G88', 'richmond-yc:E31', 'richmond-yc:E35'] },
+      north: { out: 6, kept: [] }, // (G88, E31 and E35 walked out on their lines since the stern-line walk-out, 16 Nov 2026)
       light: { out: 5, kept: ['west-harbor:507'] }, northWest: { out: 6, kept: [] },
     });
   }, 300_000);

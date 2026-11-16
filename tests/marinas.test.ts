@@ -189,7 +189,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
   it('the wind straight out of her slip: she\'s already head to wind, so she\'s walked out and held for the main, not turned across it', () => {
     let n = 0;
     for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 4 === 0)) {
-      const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
+      const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing' || p.pivot === 0) continue; // (walked out on her lines where she couldn't be held for the main, 8m3: the walk-out's own tests')
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
     expect(n).toBeGreaterThan(8); // (was 20: since she must have 20 m clear along her path as she gathers way, main alone and hands off (pushoff-letgo.test.ts), many narrow berths shove her off astern instead)
