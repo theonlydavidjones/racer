@@ -966,7 +966,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // moment she thought)
   const lim = ai.keptEased ? KEEP_EASED_M + 2 : KEEP_EASED_M;
   ai.keptEased = avoiding && near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
-  if (luff && !ai.urgent && (ai.gather || throughWind(b, desired)) && !ai.keptEased) luff = false;
+  // (through the wind, never eased: she's the keep-clear boat to all of them while she tacks (rule 13), and eased she'd
+  // only be longer about it, slow and head to wind in their way: the fleet's starts took two rule-13 fouls so, tacking
+  // eased beside a boat. The keep-clear easing is for gathering way beside a boat, not for a turn)
+  if (luff && !ai.urgent && (throughWind(b, desired) || (ai.gather && !ai.keptEased))) luff = false;
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
 }
