@@ -690,6 +690,25 @@ export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number),
  * heel, z aft. Put the group at HEEL rotated by RUDDER_RAKE about x; turn it about its y axis to steer.
  */
 export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
+/**
+ * The tiller's shape (ESTIMATE: the class rules give none, CR 5.50). Her hinge is raked 46° from upright, so a tiller
+ * turned about it drops as it swings: a straight one, 12° above level, put hard over (75°, physics' HARD_OVER: the owner's
+ * own boat goes nearly flush with the transom) came down through the toerail, its end 14 cm below the deck's edge, out
+ * over the side. So a Folkboat's tiller rises from the rudder head: here its fitting 8 cm up, then a neck 35 cm long
+ * climbing at 60° (in the boat's frame, amidships), then on forward at 8°; 1.2 m in all. At every angle to 75° it and
+ * its end clear the deck, the toerail and the coaming by 3 cm or more (tests/tillerClear.test.ts).
+ */
+export const TILLER = { headRise: 0.08, neck: 60, neckLen: 0.35, run: 8, len: 1.2 };
+/** The tiller's center line, head to end, in the rudder's frame (rudderGeometry's: y up the hinge from the heel, z aft). */
+export function tillerPath(n = 24): THREE.Vector3[] {
+  const r = RUDDER_RAKE, toWL = -HEEL.y / Math.cos(r), s0 = toWL - 1.528;
+  // (a direction `deg` above level in the boat's frame, amidships, worked back into the rudder's raked frame)
+  const d = (deg: number) => { const up = deg * Math.PI / 180, wy = Math.sin(up), wz = -Math.cos(up); return new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize(); };
+  const head = new THREE.Vector3(0, s0 + 2.62 + TILLER.headRise, 0.06), bend = head.clone().addScaledVector(d(TILLER.neck), TILLER.neckLen);
+  const out: THREE.Vector3[] = [];
+  for (let i = 0; i <= n; i++) { const t = TILLER.len * i / n; out.push(t <= TILLER.neckLen ? head.clone().addScaledVector(d(TILLER.neck), t) : bend.clone().addScaledVector(d(TILLER.run), t - TILLER.neckLen)); }
+  return out;
+}
 function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
   // the class's rudder (CR 5.20): breadth square off the fore edge (the hinge), at distances up the fore edge from the
   // blade's lower edge, ±20 mm; 1528 mm up is at the waterline, and the head runs on, 160 mm wide, to 2700 mm
@@ -704,12 +723,13 @@ function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.Buf
   // shape (x, y) → (z, y); extrusion → x, centred
   blade.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.018, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
   blade.computeVertexNormals();
-  // tiller (CR 5.50, above the deck): from the rudder head, forward over the after deck and a little up into the
-  // cockpit, about 12° above level in the boat's frame (worked back into the rudder's raked frame)
-  const up = 12 * Math.PI / 180, r = RUDDER_RAKE, wy = Math.sin(up), wz = -Math.cos(up);
-  const dir = new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize();
-  const head = new THREE.Vector3(0, s0 + 2.62, 0.06), tl = 1.3, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 8);
-  tiller.translate(0, tl / 2, 0); tiller.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)); tiller.translate(head.x, head.y, head.z);
+  // tiller (CR 5.50: wood, removable, above the deck, not divided or hooped; an extension optional): along tillerPath,
+  // tapering from the head to its end
+  const path = tillerPath(), curve = new THREE.CatmullRomCurve3(path), seg = 40, rad = 8;
+  const tiller = new THREE.TubeGeometry(curve, seg, 1, rad, false), tp = tiller.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i <= seg; i++) { const c = curve.getPointAt(i / seg), r = 0.028 + (0.018 - 0.028) * i / seg;
+    for (let j = 0; j <= rad; j++) { const k = i * (rad + 1) + j; tp.setXYZ(k, c.x + (tp.getX(k) - c.x) * r, c.y + (tp.getY(k) - c.y) * r, c.z + (tp.getZ(k) - c.z) * r); } }
+  tiller.computeVertexNormals();
   return { blade, tiller };
 }
 
