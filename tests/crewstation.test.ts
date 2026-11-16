@@ -64,6 +64,9 @@ export function stationMoves(kt: number, seed = 1) {
 }
 
 type Moves = Pick<ReturnType<typeof stationMoves>, 'counts'>;
+/** (each race sailed once in this file: the held races' case below reads the sweep's own) */
+const sailed = new Map<string, ReturnType<typeof stationMoves>>();
+const movesOf = (kt: number, seed: number) => { const k = `${kt}|${seed}`; let m = sailed.get(k); if (!m) sailed.set(k, m = stationMoves(kt, seed)); return m; };
 /** What's over the trips' bounds across the races (empty: none): each boat's hand with the cabin-top lines, and its two
  * crew together, under TRIPS_MEAN a minute on the mean of the races (the bound), and no more than TRIPS_CAP in any one
  * (a backstop against gross fidgeting: a crew going up and back for nothing all race, which a mean over many races could
@@ -125,7 +128,7 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
   // 0.3 m, a little more now in light air, where both go forward of the winch once it's paid for two minutes. Trips are jobs: the cabin
   // top, the mast, the run's foredeck)
   for (const kt of [12, 6]) it(`in ${kt} kt: no changes of seat, few trips, little walking at the seats`, () => {
-    const m = stationMoves(kt);
+    const m = movesOf(kt, 1);
     // (one a race at most: in light air, both forward of the winch once it's paid for two minutes, and back)
     for (const s of m.seats) expect(s, 'changes of seat a minute').toBeLessThan(0.1);
     m.walked.forEach(x => expect(x, 'm along the boat a minute, at a seat').toBeLessThan(0.4));
@@ -139,11 +142,11 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     m.free.forEach((f, j) => expect(f, `crew ${j % 2 + 1}: trips a minute for no job`).toBeLessThan(0.1));
     // (the trips, the crew's typical rate: over 24 races, seeds 1 to 24, so the race's chance, where it puts a trip or
     // two, doesn't decide it (tripsVerdict: the cap's history); and no race over the backstop)
-    expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => stationMoves(kt, j + 2))], { skipCap: CAP_HELD[kt] })).toEqual([]);
+    expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => movesOf(kt, j + 2))], { skipCap: CAP_HELD[kt] })).toEqual([]);
   }, 1_200_000);
   // (the races held off the backstop: over it now, from the AI's steering in a dying breeze; red when that's fixed)
   for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: the AI's steering in a dying breeze, ROADMAP)`, () => {
-    expect(tripsVerdict(seeds.map(s => stationMoves(+kt, s)), { capOnly: true, seeds })).toEqual([]);
+    expect(tripsVerdict(seeds.map(s => movesOf(+kt, s)), { capOnly: true, seeds })).toEqual([]);
   }, 600_000);
 });
 
