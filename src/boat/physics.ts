@@ -1401,7 +1401,11 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // not the angles she passes through. A failed tack in a drifter falling off and round through a jibe swept her 14 to
   // 100° apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
   b.hSwing = b.hSwing == null || !b.crewReady ? b.h : n360(b.hSwing + wrap(b.h - b.hSwing) * Math.min(1, dt / SWING_TAU));
+  const wasSettling = (b.settleLeft ?? 0) > 0;
   b.settleLeft = Math.abs(wrap(b.h - b.hSwing)) > SWING_DEG ? SETTLE_S : Math.max(0, (b.settleLeft ?? 0) - dt);
+  // (settled after a turn, on a new course: the guide's settings are read at her angle now, not past the backlash, which
+  // is for a course wandering, not a new one: bearing away onto a reach, held 10° short, the vang went on in two trips)
+  if (wasSettling && b.settleLeft === 0) b.guideAwa = Math.abs(b.awaSlow);
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
