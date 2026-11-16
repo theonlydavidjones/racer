@@ -8,9 +8,9 @@ import { aiThink } from '../src/ai/ai';
 import { beatFor } from '../src/boat/seaway';
 import { V, n360, wrap } from '../src/core/math';
 
-// The AI in irons (ai.ts, "Way on, first"): stopped head to wind or going astern, she sheets in and bears away onto a
-// close reach until she has way to steer (US Sailing, "Getting in and out of irons"); but not before the gun while
-// she's burning time on her approach, coasting slow with her sails let go on purpose, which her timing counts on.
+// The AI in irons (ai.ts, "Way on, first"): going astern, she sheets in and bears away onto a close reach until she
+// has way to steer (US Sailing, "Getting in and out of irons"). Only going astern, not merely slow: a boat coasting
+// slow (burning time before the gun, or slow head to wind) is left to her helm, as main's fleet sailed round the start.
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, current: 'slack', tideDate: '2026-11-14', traffic: 0, ...o });
 function alone(t: number) {
   const w = new World(ss2 as unknown as CourseFile, settings({ fleet: 2 }), 1);
@@ -37,12 +37,14 @@ describe('the AI in irons gathers way (ai.ts gather)', () => {
     expect(off(F, B), 'a close reach').toBeGreaterThan(beat + 10);
     expect(off(F, B)).toBeLessThan(beat + 35);
   });
-  it('before the gun, burning time on her approach (coasting slow, sails let go): left to it', () => {
-    const { w, B, F, put } = alone(-40);
-    B.ai!.mode = 'approach';
-    put(n360(F - 45), 0.2, 0); // (close-hauled, slow, no sternway)
-    aiThink(w, B, DT);
-    expect(B.ai!.gather ?? false).toBe(false);
+  it('slow but not going astern, before the gun or racing: left to her helm', () => {
+    for (const t of [-40, 300]) {
+      const { w, B, F, put } = alone(t);
+      if (t < 0) B.ai!.mode = 'approach';
+      put(n360(F - 20), 0.2, 0); // (20° off the wind, slow, no sternway)
+      aiThink(w, B, DT);
+      expect(B.ai!.gather ?? false, `t ${t}`).toBe(false);
+    }
   });
   it('but going astern on her approach, she does gather way', () => {
     const { w, B, F, put } = alone(-40);

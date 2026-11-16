@@ -293,16 +293,6 @@ function standOffPlaces(w: World, h: Vec, from: number): Vec[] {
  * (above): somewhat more than a Folkboat's length (7.6 m), the gaps the keep-clear moves work in (the 8 m room of rule
  * 16.1 below is between centres). */
 const KEEP_EASED_M = 10;
-/** Turning through the wind: past head to wind and not yet close-hauled (b.tacking), or set on a turn that takes her
- * through it, the helm's commitment or the turn to desired. */
-function throughWind(b: Boat, desired: number): boolean {
-  if (b.tacking) return true;
-  const ai = b.ai!, toWind = wrap(b.ww.from - b.h);
-  let err = ai.turnCommit !== 0 ? wrap(ai.commitFor - b.h) : wrap(desired - b.h);
-  // (committed, the way the helm's taking her: a slow boat goes the long way round, a gybe, physics.ts bigTurnWay)
-  if (ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) err += ai.turnCommit * 360;
-  return Math.abs(err) > 30 && Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-}
 /** Land (or, mid-race, the start/finish line) within d m on heading h? The whole way, exactly: a pier or a breakwater
  * a few metres wide is in the way even if the water beyond it is clear. */
 function blocked(w: World, b: Boat, h: number, d: number): boolean {
@@ -794,23 +784,22 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (dx * dx + dy * dy > 3600) continue;
     near.push({ o, dx, dy, r: w.rights(b, o), cp: cpa(b, o) });
   }
-  // Way on, first. A boat stopped or going astern can't steer much and can't tack: she gets way on again before
-  // anything else her plan wants (US Sailing, "Getting in and out of irons": fall off, then "pull in the sheets ... to
-  // stop the luffing"). The rules still change her course after this.
-  // - Stopped with her bow near the wind, or going astern: sheets in, and in irons she bears away onto a close reach,
-  //   until she has way enough to steer: about 2 kt, as in the pre-start above, or in light air 0.6 of what she can
-  //   make on that reach (polar.ts), which may be less. The side: the tack her bow has fallen to, as a boat stopped
-  //   head to wind falls off; from within 20° of the wind the other if that's clear of the land and hers isn't. Not
-  //   while her plan's course is already well off the wind (bearing away from the line, say): that gets her way on too.
-  // - Stopped means slower than 0.4 m/s or a third of that reach's speed (a Folkboat nearly stopped: the rudder barely
-  //   turns her, physics.ts flowTurnRate); going astern, faster than 0.05 m/s, past a drifting stop.
+  // Way on, first. A boat going astern can't steer as she means to and can't tack: she gets way on again before anything
+  // else her plan wants (US Sailing, "Getting in and out of irons": fall off, then "pull in the sheets ... to stop the
+  // luffing"). The rules still change her course after this.
+  // - Going astern (faster than 0.05 m/s, past a drifting stop): sheets in, and with her bow near the wind she bears away
+  //   onto a close reach, until she has way enough to steer: about 2 kt, or in light air 0.6 of what she can make on
+  //   that reach (polar.ts), which may be less. The side: the tack her bow has fallen to, as a boat stopped head to wind
+  //   falls off, unless the land's on it and the other side's clear. Not while her plan's course is already well off the
+  //   wind (bearing away from the line, say): that gets her way on too.
+  // - Only going astern, not merely slow: set by slowness too (under 0.4 m/s with her bow near the wind), with her sails
+  //   kept drawing through every tack, the fleet fouled more round the start than main's, 28 to 39 penalties in
+  //   fouls-start's sixteen starts against 22 (a boat sheeted in at a crawl beside another sags down onto her); by
+  //   sternway alone, 16. Slow and head to wind, the helm's own way out (physics.ts: the gybe round, sculling) serves.
   {
     const rel0 = wrap(ww.from - b.h), astern = b.astern ?? 0, inIrons = Math.abs(rel0) < beat + 15;
     const reachV = targetFor(b, beat + 25);
-    // (before the gun, burning time on her approach she coasts with her sails let go on purpose, slow, and her timing
-    // (ai.plan) counts on it: there only going astern sets her gathering way, not being slow)
-    const burning = w.t < 0 && ai.mode === 'approach';
-    if (astern > 0.05 || (!burning && inIrons && b.v < Math.min(0.4, reachV / 3))) ai.gather = true;
+    if (astern > 0.05) ai.gather = true;
     else if (b.v > Math.min(1.0, 0.6 * reachV)) ai.gather = false;
     if (ai.gather) {
       luff = false;
@@ -957,19 +946,16 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     const plan = near(planned) && near(hailed) === false && !avoiding && !ai.urgent && !ai.passing?.away;
     if (plan && b.callT != null && b.callT >= (b.decidedT ?? -Infinity) && !aiCrewReady(b, w.t)) desired = b.desired;
   }
-  // (and the sails stay drawing while she turns through the wind or gets way on, whatever her plan or a keep-clear move
-  // wanted: eased then, she stops head to wind or lies in irons going astern, a keep-clear luff held for a boat 30 m
-  // off leaving her going astern for a quarter of a minute. But not close to a boat she must keep clear of, within
-  // KEEP_EASED_M of her hull, nor about to touch one (rule 14): there easing is how a slow boat keeps clear, and with
-  // her sails drawing at a crawl she sags off to leeward, toward the leeward boat)
-  // (eased within KEEP_EASED_M, drawing again only past KEEP_EASED_M + 2: at the edge her sails would go in and out each
-  // moment she thought)
+  // (and the sails stay drawing while she gets way on, whatever her plan or a keep-clear move wanted: eased then, she
+  // lies in irons going astern, a keep-clear luff held for a boat 30 m off leaving her going astern for a quarter of a
+  // minute. But not close to a boat she must keep clear of, within KEEP_EASED_M of her hull, nor about to touch one
+  // (rule 14): there easing is how a slow boat keeps clear, and with her sails drawing at a crawl she sags off to
+  // leeward, toward the leeward boat. Eased within KEEP_EASED_M, drawing again only past KEEP_EASED_M + 2: at the edge
+  // her sails would go in and out each moment she thought. Her tacks are left as they were: kept drawing through every
+  // one, beside other boats round the start, the fleet fouled more, fouls-start)
   const lim = ai.keptEased ? KEEP_EASED_M + 2 : KEEP_EASED_M;
   ai.keptEased = avoiding && near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
-  // (through the wind, never eased: she's the keep-clear boat to all of them while she tacks (rule 13), and eased she'd
-  // only be longer about it, slow and head to wind in their way: the fleet's starts took two rule-13 fouls so, tacking
-  // eased beside a boat. The keep-clear easing is for gathering way beside a boat, not for a turn)
-  if (luff && !ai.urgent && (throughWind(b, desired) || (ai.gather && !ai.keptEased))) luff = false;
+  if (luff && !ai.urgent && ai.gather && !ai.keptEased) luff = false;
   b.desired = desired; b.luff = luff;
   crewPoleCall(w, b);
 }
