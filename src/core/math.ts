@@ -9,10 +9,20 @@ export const D2R = Math.PI / 180;
 
 export interface Vec { x: number; y: number }
 
+/**
+ * ((t % 360) + 360) % 360, the same to the last bit, without the double `%` (a call to C's fmod) for |t| < 360, where
+ * every angle in the step lands: there t % 360 is t itself, u = t + 360 (rounded as before) lies in [0, 720], and u % 360
+ * is u below 360, u − 360 (exact) from 360, and 0 at 720 itself (Capacity, 16 Nov 2026: 0 mismatches over 2·10⁷ inputs,
+ * every value within 64 ulps of a multiple of 180 included; docs/CAPACITY.md §8c).
+ */
+const mod360 = (t: number): number => {
+  if (t > -360 && t < 360) { const u = t + 360; return u < 360 ? u : u < 720 ? u - 360 : 0; }
+  return (t % 360 + 360) % 360;
+};
 /** Wrap an angle to [-180, 180). */
-export const wrap = (a: number): number => ((a + 180) % 360 + 360) % 360 - 180;
+export const wrap = (a: number): number => mod360(a + 180) - 180;
 /** Normalize an angle to [0, 360). */
-export const n360 = (a: number): number => ((a % 360) + 360) % 360;
+export const n360 = (a: number): number => mod360(a);
 /** Unit vector pointing along compass heading h. */
 export const V = (h: number): Vec => ({ x: Math.sin(h * D2R), y: Math.cos(h * D2R) });
 /** Compass bearing of the vector (dx, dy). */
