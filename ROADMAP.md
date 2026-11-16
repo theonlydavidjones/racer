@@ -1140,6 +1140,11 @@ is now "much better" (owner).
    pitch and heave, its light following) (owner, "would love for that lantern to swing with the motion
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
+   - **Bug: in heavy weather the lantern swings up through the cabin top** (owner, 16 November, a screenshot; bug;
+     next, not urgent; 1–2 h; Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
+     The pendulum's angle is unbounded, so a big roll swings it up past the overhead and it shows above the deck. Stop
+     its swing where the lantern meets the cabin top or the bulkhead (it knocks against it and falls back), so it never
+     leaves the cabin; check at 25 kt on both tacks.
 6. ~~**True-to-life rigging, the owner's most important boat item**~~ (done: rigging-gear #159 and rigging-deck; the piano in the band's order, the halyard tackles, the jib sheet as Josephine has it) (12 November, from the owner's boat review; Rigging,
    after its current PRs; a big job, about 8–14 h): the blocks for the jib and main at the mast and the boom's junction,
    the Cunninghams, and the lines visible along the traveler, each led as on Josephine (the Full sail controls
