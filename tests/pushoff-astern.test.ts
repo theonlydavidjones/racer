@@ -73,7 +73,9 @@ describe('pushed off astern', () => {
         if (hard >= DAMAGE_V.scrape) bad.push(`${s.id}: touched at ${hard.toFixed(2)} m/s past it`);
       }
     }
-    expect(n).toBeGreaterThanOrEqual(kt ? 20 : 5); // (in a calm the crew can swing her out from most: few are shoved off astern)
+    // (in a calm the crew can swing her out from most: few are shoved off astern; and since 8m3, where there's no swing that
+    // lets her go with clear water, she's walked out to the fairway first, so fewer in a breeze too)
+    expect(n).toBeGreaterThanOrEqual(kt ? 12 : 5);
     expect(bad).toEqual([]);
   }, 600_000);
 
