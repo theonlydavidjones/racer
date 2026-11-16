@@ -216,5 +216,9 @@ export function localDay(plus = 0): string {
   const d = new Date(); d.setDate(d.getDate() + plus);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/** Laying up after a wreck or damage is off for now (the owner, 15 Nov 2026: "silly and punitive in its current state";
+ * they want to come back to it, ROADMAP "Wrecks"). Set it true to bring it back as it was: the lay-up, the Yacht Club's
+ * "laid up" and the refused cast off all follow it. Days already saved in BoatSpec.laidUpUntil are kept but ignored. */
+export const LAY_UP = false;
 /** Laid up for repairs today (BoatSpec.laidUpUntil: after a wreck or damage, docs/WRECK-PROPOSAL.md). */
-export const laidUp = (b: { laidUpUntil?: string }): boolean => !!b.laidUpUntil && b.laidUpUntil >= localDay();
+export const laidUp = (b: { laidUpUntil?: string }): boolean => LAY_UP && !!b.laidUpUntil && b.laidUpUntil >= localDay();

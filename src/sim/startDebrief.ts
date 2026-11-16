@@ -1,4 +1,4 @@
-import { D2R, KT, LOA, V, brg, clamp, dot, sub, wrap } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, dot, sub, wrap, hypot } from '../core/math';
 import { windOnWater } from '../environment/current';
 import { polar } from '../boat/polar';
 import type { SimView } from './host';
@@ -35,7 +35,7 @@ export function finalApproach(w: SimView): Approach | null {
   while (i > 0 && d(i) - d(i - 1) > 0.33) i--;
   if (k - i < 5) return null; // (no run to speak of: sitting on the line, or reaching along it)
   let path = 0;
-  for (let j = i + 1; j <= k; j++) { const a = F[j - 1].b[u], b = F[j].b[u]; if (a && b) path += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  for (let j = i + 1; j <= k; j++) { const a = F[j - 1].b[u], b = F[j].b[u]; if (a && b) path += hypot(b[0] - a[0], b[1] - a[1]); }
   const dur = F[k].t - F[i].t;
   return { t0: F[i].t, fromM: -d(i), dur, meanV: path / Math.max(1, dur), toward: path > 0 ? (d(k) - d(i)) / path : 1 };
 }

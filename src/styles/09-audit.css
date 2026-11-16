@@ -152,3 +152,9 @@ body:has(#keysView:not([hidden])) :is(#home, #pause, #raceChoose, #pastView) > .
 .fsail path{fill:var(--muted)}
 .seg button[aria-pressed="true"] .fsail path{fill:var(--text)}
 .fsail.you path{fill:var(--accent)!important}
+/* the start practice's favored-end call, first in the debrief (drills.ts callLine) */
+#dTips .dcall{list-style:none;margin:0 0 6px -18px;display:flex;align-items:center;gap:12px;font-size:15px}
+#dTips .dcall b.ok{color:var(--row)} #dTips .dcall b.bad{color:#ff6b6b}
+.dcall-pic line{stroke:#9fb0bd;stroke-width:1.6} .dcall-pic circle{fill:none;stroke:#9fb0bd;stroke-width:1.2} .dcall-pic rect{fill:#9fb0bd}
+.dcall-pic line.sq{stroke:#fff;stroke-width:1.2;stroke-dasharray:2.5 2} .dcall-pic line.wd{stroke:var(--accent);stroke-width:2}
+.dcall-dots{margin-left:auto;color:var(--muted);font-size:12px;letter-spacing:2px;cursor:help}

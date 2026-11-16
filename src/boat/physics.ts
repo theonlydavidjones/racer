@@ -1,6 +1,6 @@
 import { harborNear, hitsHarbor, hitsMooredBoat, hitsWall } from '../geo/marina';
 import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage';
-import { KT, V, clamp, wrap, n360, D2R, type Vec } from '../core/math';
+import { KT, V, clamp, wrap, n360, D2R, type Vec, hypot } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
@@ -14,8 +14,9 @@ import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
-import { DEFAULT_CREW, STANDARD_DISP, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs } from './crewWork';
+import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
+import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
+import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
@@ -596,7 +597,7 @@ export function driveShare(tws: number, twa: number, u: number): number {
 }
 
 function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
-  b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; // (hove to, her main's sheeted: the sheet has it)
+  b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.boomSeenT = undefined; // (hove to, her main's sheeted: the sheet has it)
   const ww = b.ww, toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, D = D2R;
   const RHO = 1025, RHO_A = 1.225;
   // the helm: lashed, or wherever you hold it, or hard over through a tack or gybe you've called for (+ turns her to starboard)
@@ -709,7 +710,19 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
   // (a tack coming: turning up toward the wind with a good way still to go, close-hauled; yours or the AI's)
   const aim = b.turnTarget ?? (b.isUser ? null : b.desired), dAim = aim == null ? 0 : wrap(aim - b.h);
   const tackComing = aim != null && twa < 60 && Math.abs(dAim) > 40 && Math.sign(dAim) === Math.sign(wrap(b.ww.from - b.h));
-  placeCrew(cs, { need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  // (and how long a turn has visibly been coming, for the crew getting ready without a call (boat/calls.ts): what she's
+  // doing, not where she's aimed: close-hauled and turning up into the wind, or deep and turning her stern through it,
+  // faster than TURN_SEEN; yours by hand or the AI's alike. Fading as long again once it's past, so the turn itself still
+  // finds it; no more than CUE_MAX, so a long luff doesn't count for a turn much later)
+  // (under sail with way on: a boat paddled or motored round isn't a turn the crew work)
+  const rate = b.turnRate ?? 0;
+  let shows = false;
+  if (Math.abs(rate) > TURN_SEEN && b.v >= TURN_V && (b.rig?.mainUp ?? true)) { // (worked only while she's swinging: rarely)
+    const toWind = Math.sign(wrap(b.ww.from - b.h));
+    shows = (twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind);
+  }
+  b.comingFor = shows ? Math.min(CUE_MAX, (b.comingFor ?? 0) + dt) : Math.max(0, (b.comingFor ?? 0) - dt);
+  placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -893,7 +906,7 @@ export function outward(p: Vec): Vec {
   for (const r of [1, 2, 4]) { // (further out if she's deeper in than a metre)
     let x = 0, y = 0;
     for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8, q = { x: p.x + r * Math.sin(a), y: p.y + r * Math.cos(a) }; if (!onLand(q)) { x += Math.sin(a); y += Math.cos(a); } }
-    const l = Math.hypot(x, y); if (l > 1e-6) return { x: x / l, y: y / l };
+    const l = hypot(x, y); if (l > 1e-6) return { x: x / l, y: y / l };
   }
   return { x: 0, y: 0 };
 }
@@ -988,7 +1001,7 @@ function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, hit: Ve
   // SAME_SPELL s. Fended a hand's breadth off with next to no wind she takes longer than PINNED_GAP to drift back, and
   // it's the same spell. And told again at once if it has got worse: touching gently, then set on them, then damage)
   const told = pileTold.get(b) ?? -99, at = pileAt.get(b), kind = level === 'damage' ? 2 : closing >= PIN_V ? 1 : 0, worse = !!at && kind > at.kind && t - told < SAME_SPELL;
-  const still = !!at && t - told < SAME_SPELL && Math.hypot(b.x - at.x, b.y - at.y) < 2 && !worse;
+  const still = !!at && t - told < SAME_SPELL && hypot(b.x - at.x, b.y - at.y) < 2 && !worse;
   const tell = b.isUser && (t - told > PINNED_GAP || worse);
   // (sliding along them untold, the worst she's been told of this spell is kept: not told again every couple of meters)
   pileTold.set(b, t); if (!still) pileAt.set(b, { x: b.x, y: b.y, kind: tell || !at || t - told >= SAME_SPELL ? kind : Math.max(kind, at.kind) });
@@ -1086,6 +1099,7 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
 function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, sheets: boolean): void {
   const mainUp = b.rig?.mainUp ?? true;
   if (b.turnTarget != null) b.turnCalledT = t; // (a called turn under way: gybeMeant)
+  b.callOn = b.callT != null && t - b.callT < CALL_KEEP; // (her crew warned of the turn: boat/calls.ts)
   if (b.steer === 0) b.steerSince = undefined; else if (b.steerSince == null || b.steer !== b.steerWas) b.steerSince = t; // (how long a steering key has been held)
   b.steerWas = b.steer;
   let tk: 'S' | 'P' = rel >= 0 ? 'S' : 'P';
@@ -1098,16 +1112,21 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
     // gybe it if she's being turned through a gybe; otherwise it lies where it is until the wind gets behind it
     const across = tk === 'S' ? -1 : 1; // (the boom's side on the new tack: to port on starboard)
     if (Math.sign(b.boom) !== across && Math.abs(b.boom) >= 1) {
+      if (b.byLeeSince == null) { b.byLeeSince = t; b.byLeeCue = b.comingFor ?? 0; } // (when, and how much of the turn they'd seen: gybeMeant)
       if (b.boomFree == null && gybeMeant(b, tk, t)) b.gybeTo = tk;
       b.byLee = true; return;
     }
   }
+  b.byLeeSince = undefined;
   if (tk === b.tack) { if (b.boomFree == null) b.gybeTo = undefined; b.byLee = false; return; } // (the wind back on her main's side before the crew had gybed it)
   // head to wind: a tack. Not if the wind came round her stern and her tack is only now catching up (her boom still
   // uncrossed as she reaches up on the new side, hove to or spun round in light air): that's a gybe, however late
   const tacked = twa < 90 && !b.byLee;
   if (tacked) { b.tacking = true; b.headToWindT = t; }
   b.byLee = false; b.tack = tk; b.gybeTo = undefined; b.lastTackT = t; if (sheets) jibSheetsAtTack(b, emit);
+  // (back through the wind while the old sheet is still made fast: it's her leeward sheet again, and the jib fills on it)
+  if ((b.jibHold ?? 0) > 0) { b.jibHold = 0; b.ctl.jibsheetW = 1; }
+  else if (tacked) jibLetGo(b, emit);
   penaltyManeuver(b, tacked ? twa : 180, emit); // (a tack or a jibe of her penalty turns, rule 44.2)
 }
 
@@ -1119,9 +1138,12 @@ function tackStep(b: Boat, rel: number, twa: number, t: number, emit: Emit, shee
  * her on round as her stern passes the wind. A tap of a key isn't, and the tiller in your hand is literal: steered
  * through by the tiller, or held steady by the lee, nobody touches the main, and it stays until the wind takes it.
  */
-const KEY_HELD = 0.6;
+export const KEY_HELD = 0.6;
 function gybeMeant(b: Boat, to: 'S' | 'P', t: number): boolean {
-  if (!b.isUser) return true;
+  // (an AI boat: her crew bring the main across at once if her skipper called the jibe; caught unready, once the one on
+  // the mainsheet has got ready, she sailing by the lee meanwhile, and if she's swung on round far enough first, the
+  // wind takes it before they do: a crash jibe, boomStep. boat/calls.ts)
+  if (!b.isUser) return !!b.callOn || mainHandReady(b, t);
   if (b.turnCalledT != null && t - b.turnCalledT < 3) return true; // (tackStep keeps the time)
   // (onto starboard she's turning to starboard: her stern through the wind, which comes round onto her starboard quarter)
   return b.steer === (to === 'S' ? 1 : -1) && b.steerSince != null && t - b.steerSince >= KEY_HELD;
@@ -1175,13 +1197,14 @@ function boomStep(b: Boat, arel: number, aws: number, dt: number, t: number, emi
   const fold = Math.min(1, (t - (b.boomFreeT ?? t)) * Math.max(1, aws) / MAIN_CHORD);
   const was = b.boomFrom ?? side, hook = Math.sign(b.boom) === was ? was * leechHook(b) * (1 + fold) : 0;
   // (the wind back on the main's own side before it had gone: it fills again, and the sheet has it)
-  if (Math.sign(b.boom) === was && was * windAstern(arel) <= 0) { b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.gybeTo = undefined; return false; }
+  if (Math.sign(b.boom) === was && was * windAstern(arel) <= 0) { b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.boomSeenT = undefined; b.gybeTo = undefined; return false; }
   // (the air's damping: the sail's own swing changes the wind it feels by arm·ω, and its force goes as that wind squared)
   const M = K * Math.sin((b.boom - hook - windAstern(arel)) * D2R) - 2 * K * BOOM_ARM * (b.boomFree * D2R) / Math.max(1, aws);
   b.boomFree += M / BOOM_I / D2R * dt;
   b.boom += b.boomFree * dt;
+  if (b.boomSeenT == null && Math.abs(b.boomFree) > BOOM_SEEN) b.boomSeenT = t; // (swinging fast enough to see: the crew's cue to duck)
   // (across her centerline: her mainsail's side is her leeward side from this step, so her tack changes with it)
-  if (b.gybeTo && Math.sign(b.boom) === -was) { b.tack = b.gybeTo; b.gybeTo = undefined; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); penaltyManeuver(b, 180, emit); }
+  if (b.gybeTo && Math.sign(b.boom) === -was) { b.tack = b.gybeTo; b.gybeTo = undefined; b.lastTackT = t; if (b.isUser) jibSheetsAtTack(b, emit); penaltyManeuver(b, 180, emit); boomStrike(b, t, b.boomFree, b.isUser ? emit : undefined); } // (anyone in its way, head up: boat/calls.ts)
   // fetched up on the sheet on the new side (or blown back out on the old one: the wind came back)
   const stop = b.luff ? SAILS.main.max : Math.max(5, b.sheets.main);
   if (Math.abs(b.boom) >= stop && Math.sign(b.boom) === Math.sign(b.boomFree)) {
@@ -1195,7 +1218,7 @@ function boomStep(b: Boat, arel: number, aws: number, dt: number, t: number, emi
       b.crashT = t;
       if (b.isUser) emit({ type: 'toast', ms: 5000, msg: 'Crash jibe: the wind got behind the main. By the lee, head up sooner or call the jibe.' });
     }
-    b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; if (!crossed) b.gybeTo = undefined;
+    b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.boomSeenT = undefined; if (!crossed) b.gybeTo = undefined;
   }
   return true;
 }
@@ -1210,7 +1233,13 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
   // Jib: to leeward normally (to windward when backed); poled out square to windward when wing-on-wing; hanging
   // centred while the crew works the pole.
   const jibT = plan === 'wing' ? -jibSide * 82 : plan === 'main' ? jibSide * 10 : jibSide * (b.luff && !b.jibBacked ? SAILS.jib.max : b.sheets.jib);
-  if (b.boomFree == null) b.boom += (side * boomT - b.boom) * Math.min(1, dt * 4); // (free, the wind has it: boomStep)
+  if (b.boomFree == null) {
+    let to = b.boom + (side * boomT - b.boom) * Math.min(1, dt * 4); // (free, the wind has it: boomStep)
+    // (handed across in a jibe it can pass her centerline in one step, some 9°: held a moment at it, so her tack changes
+    // with it (tackStep, the next step) and never lags the boom by a step, Definitions)
+    if (b.gybeTo && Math.sign(to) === side && Math.sign(b.boom) !== side && Math.abs(to) > 0.9) to = side * 0.9;
+    b.boom = to;
+  }
   b.jib += (jibT - b.jib) * Math.min(1, dt * (plan === 'wing' ? 1.2 : 3));
 }
 
@@ -1255,6 +1284,29 @@ export function allToCrew(b: Boat): void { b.manualTrim = b.trimAll = false; b.h
  * the sheets change roles as they really do, the one you had trimmed becoming the windward sheet with the jib aback
  * (the classic way to heave to: tack and leave the jib sheet made fast).
  */
+/**
+ * Through the wind, the old leeward jib sheet is the windward one: still made fast, it holds the jib aback until the
+ * crew let it fly. Ready (called, or got ready as she turned), they let it go as the jib comes across; caught unready,
+ * once they are, the jib backed meanwhile, which costs her way (boat/calls.ts). Yours if you hold it.
+ */
+function jibLetGo(b: Boat, emit: Emit): void {
+  if (byHand(b, 'jibsheetW') || keepsHove(b) || !b.crew || sailPlan(b) !== 'jib' || b.v < TURN_V) return; // (a tack under way: not a drift through the wind in irons, where the jib's own model holds)
+  const n = b.crew.spec.crew.length, who = ownerOf('jibsheet', n, b.crew.spec), p = who === 0 ? b.crew.spec.helm : b.crew.spec.crew[who - 1];
+  if (!p || who === 0) return; // (the helm's own jib, sailing alone: their own turn, nobody to warn)
+  // (ready, they let it fly as the jib comes across, as before; not ready, it's held aback till they are)
+  const left = prepLeft(p, !!b.callOn, b.comingFor ?? 0); if (left <= 0) return;
+  b.ctl.jibsheetW = Math.min(b.ctl.jibsheetW, b.ctl.jibsheet); // (the old leeward sheet as it was trimmed, now to windward)
+  b.jibHold = PREPARED + left;
+  if (b.isUser && b.jibHold > 1) emit({ type: 'toast', ms: 4500, msg: 'Uncalled tack: the jib backed.' });
+}
+/** The one on the mainsheet is ready to bring it across, unwarned: by the lee long enough to finish getting ready, from
+ * what of the turn they'd seen (prepLeft, PREPARED). */
+function mainHandReady(b: Boat, t: number): boolean {
+  const c = b.crew; if (!c) return true;
+  const n = c.spec.crew.length, who = mainHand(n, c.spec, (c.layout ?? 'cockpit') !== 'cockpit'), p = who === 0 ? c.spec.helm : c.spec.crew[who - 1];
+  if (who === 0) return true; // (the helm has the main: nobody needs warning of their own turn)
+  return !p || (b.byLeeSince != null && t - b.byLeeSince >= PREPARED + prepLeft(p, false, b.byLeeCue ?? 0));
+}
 function jibSheetsAtTack(b: Boat, emit: Emit): void {
   // (the crew holding her hove to, and she's gone through the wind all the same, a shift or the lashed tiller moved: the
   // sheet made fast is the leeward one now, so the jib fills on it and the old leeward sheet, let fly, is the lazy one;
@@ -1417,6 +1469,8 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // needs the winch)
   const wSlack = jibClew({ ...c, jibsheet: 1 }, b.tack) > jibAngle(c, b.tack) + 3;
   if (wMine) hand('jibsheetW', wSlack ? SLACK_RATE : CONTROL_RATE.jibsheetW * winchFactor(tws, going('jibsheetW') < 0));
+  else if ((b.jibHold ?? 0) > 0) { b.jibHold = b.jibHold! - dt; if (b.jibHold <= 0) b.jibHold = -1; } // (made fast through the tack, till they let it fly: jibLetGo)
+  else if ((b.jibHold ?? 0) < 0) { move('jibsheetW', 1, SLACK_RATE); if (c.jibsheetW >= 0.95) b.jibHold = 0; } // (let fly off the winch: it runs)
   else move('jibsheetW', 1, CONTROL_RATE.jibsheetW * winchFactor(tws, false)); // the crew leaves the lazy sheet slack
   // you're holding the clew to windward with the windward sheet (backing the jib): the crew lets the leeward one fly
   const backing = wMine && jibClew({ ...c, jibsheet: 1 }, b.tack) < jibAngle(c, b.tack);
@@ -1457,7 +1511,7 @@ export function apparent(from: number, windKt: number, h: number, v: number, swa
   const vt = windKt * KT, rel = wrap(from - h) * D2R;
   const along = vt * Math.cos(rel) + v, across = vt * Math.sin(rel) * Math.cos(heelDeg * D2R) + sway;
   const arel = Math.atan2(across, along) / D2R;
-  return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
+  return { aws: hypot(along, across), arel, awa: Math.abs(arel) };
 }
 
 /**
@@ -1477,7 +1531,7 @@ function windAtZ(from: number, windKt: number, h: number, v: number, g: number, 
   const vt = windKt * KT * g, rel = wrap(from - h) * D2R, c = Math.cos(heelDeg * D2R);
   const along = vt * Math.cos(rel) + v, across = vt * Math.sin(rel) * c + sway; // (+: air coming from ahead / from starboard)
   const arel = Math.atan2(across, along) / D2R;
-  return { aws: Math.hypot(along, across), arel, awa: Math.abs(arel) };
+  return { aws: hypot(along, across), arel, awa: Math.abs(arel) };
 }
 /**
  * The wind she feels at `z` m above the water (the midair wind indicator, render/windLadder.ts):
@@ -1546,7 +1600,7 @@ export function tackTarget(b: Boat): { dir: number; target: number } {
  * (Tests that put a boat somewhere new call it too: she arrives trimmed and upright for her new heading.)
  */
 export function settleTrim(b: Boat, from: number, windKt: number): void {
-  b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.gybeTo = undefined; // (set down somewhere new: her boom where her sheet puts it)
+  b.boomFree = undefined; b.boomFrom = undefined; b.boomFreeT = undefined; b.boomSeenT = undefined; b.gybeTo = undefined; // (set down somewhere new: her boom where her sheet puts it)
   const rel = wrap(from - b.h), ap = apparent(from, windKt, b.h, b.v), sw = sailWind(from, windKt, b.h, b.v), c = b.ctl;
   b.rel = rel; b.twa = Math.abs(rel); b.tack = rel >= 0 ? 'S' : 'P';
   b.arel = ap.arel; b.awa = ap.awa; b.aws = ap.aws; b.awaSlow = sw.awa;

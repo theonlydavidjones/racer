@@ -29,11 +29,16 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; ~~chunky generic moored boats in the marinas~~ (done: the slips within 120 m of the camera drawn in detail, boot stripe and bottom paint, cockpit well, raked cabin with its windows, shrouds and spreaders, pulpits and lifelines; the rest with bottom paint, shrouds and a cockpit sole; render/mooredNear.ts). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
-- **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
+- **The beat angle in chop jumps** (fixed on a branch, 8e8e7c06, the angle's choice blended; awaiting the batch; Deep Physics, 16 November; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
+  estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
+  put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
+  Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
+  perf-pair --ai, then the physics-reviewer.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
@@ -143,6 +148,36 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
+   **Now, first in the pass: the helm's travel and response** (owner, 15 November; accuracy; now; 3–5 h): "the turning
+   radius is too slow and not wide enough when I'm tacking ... short tacks in the marina. I need to be able to push the
+   tiller about 50% wider, and I would expect the tiller to be much more reactive ... There should be no delay in the
+   turn of the boat and the push of the tiller ... exactly in line." The owner's answers:
+   - It's the mouse on the tiller, and the keys too.
+   - The tiller doesn't go far enough: "the tiller handle should be pushable to where it's almost flush to the transom;
+     the entire radius of the tiller handle is maybe 150º or so."
+   - The delay is from tiller to boat.
+   - Responsiveness shouldn't depend on her speed, as long as she's moving.
+
+   Today:
+   - The rudder stops at ±30° (FULL_RUDDER, src/boat/balance.ts:99), a 60° arc against the owner's ~150°.
+   - The mouse span is TILLER_SPAN 0.35 of the window (app.ts:450).
+   - The turn radius at full helm is 9 m, an estimate (dynamics.ts:46), capped at 22°/s.
+   - The turn reaches the helm's rate through yawLag (physics.ts:544), the delay the owner feels.
+
+   The fix:
+   - The tiller swings about ±75°. Past about 35–45° the rudder stalls and brakes more than it turns, as a real one does,
+     so the extra travel is for short-tacking, sculling and braking, not a free tighter circle.
+   - The yaw response is tightened until the turn visibly starts with the tiller. Test it on the water at slow speeds
+     in a fairway.
+
+   The researcher (15 November) found no source for the rudder's stop, the tiller's swing, a Folkboat turning circle or
+   a measured yaw time constant. The class rules fix the rudder's outline (about 490 mm wide, NFIA 2025–2028 §5) but not
+   its angle. So the owner's own boat is the reference: their ~150° tiller arc and how she answers. Physics-reviewer and
+   perf-pair as usual.
+   Confirmed by a seasoned skipper (the owner, 15 November): the feedback came from a seasoned skipper, for whom "it
+   was immediately apparent that the tiller was wrong. sixty degrees turning radius is 'crazy'", and "the boat is
+   promptly responsive to tiller turning IRL (unless she has no momentum obviously)." That's a practitioner's account,
+   the best evidence there is short of a logged sea trial, and it's to be cited as such in the code's comments.
    Approved by the owner (13 November): Deep Physics' force-based turning model with the class rudder (in PR #289; sternway in PR #317). Sculling comes
    from the rudder's real oscillating force in that build, with rule 42's limits kept. Deep Physics
    (now session_012Uu5QjUo5M6STTKgfgRYcx) and the physics-reviewer run on Fable 5.2, as a trial.
@@ -282,7 +317,10 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
-8m2. **Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid** (owner, 15 November; bug;
+8m3. **The bow-line let-go bumps the next boat in a northerly** (now, Marinas; from their own work, 16 November; their entry and fix land in v201).
+   Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
+
+8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
    now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
    main issue is that her bow starts turning west, since the wind is pushing her hard. ... she doesn't seem to get
    underway until the pushoff animation stops ... so i keep getting pushed into other boats long before i have a chance
@@ -391,7 +429,12 @@ What's planned, roughly in order. Done work is described in the README.
    then is told whether they were right and why. The real methods: head to wind on the line (the bow points nearer the
    favored end), sighting the line square to the wind, and the line's compass bearing against the wind's. The drill hides
    "favored" until the player commits to an end; the debrief scores the call; later attempts fade the help. A mock to
-   the owner before building.
+   the owner before building. (Built: the head-to-wind read on the water, the call in the start line's card, the call
+   scored first in the debrief, the read drawn for the first three calls; design/favored-end on design/learn-to-sail.)
+   Later (owner OK'd, not built):
+   - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
+     gap between them is the bias;
+   - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
 8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
@@ -712,7 +755,7 @@ What's planned, roughly in order. Done work is described in the README.
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
-   - **The inset map is lagging again** (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
+   - ~~**The inset map is lagging again**~~ (done, v200: claude/inset-lag) (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
      again." Recent changes to the chart: dbb27a7e (the layers switch at once: each field kept, each kind's streaks its
      own), caae0506 (chart-skip-3d, batch 42b), the harbor lee's cells (3c80d150) and the wind shadows' skip
      (aa6471f7). Measure the inset's draw time per frame against the published version before these (perf-ab's views,
@@ -723,7 +766,70 @@ What's planned, roughly in order. Done work is described in the README.
      from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
      move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
      it and it can't bring back the rushing water.
-   - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
+   - **A heel indicator at the top-center of the sail controls** (owner, 15 November; feature; next; 2–3 h; drawings first):
+     "at top-center of the sail controls, I want a heel indicator. show me drawings before building anything." Then:
+     "need to see it in situ with the sail panel." Three options shown in place on the real band:
+     - (A) an arc with a mast that tilts;
+     - (B) a tiny hull and mast from astern;
+     - (C) a flat bubble bar like the band's tracks.
+
+     Each has the teal ◆ at her best heel (boat/crewPhys.ts crewBestHeel), amber past 20° (the coach's
+     "overpowered", coach.ts:98) and red past 25° (laid over), with only the degree number as text. It follows the side
+     she's heeled to (b.heelMag), sits inside the band, and adds no new button. Then (15 November): "the heel indicator
+     should be the same height as the auto-trim tab, and the same basic design." So it's a tab on the band's top
+     edge: `.sb-tab` (07-band.css:55, 22 px, the same background, border and radius), in the center slot
+     `.sb-tillerslot`, which has been empty since the tiller strip went. Three ways to fill it are shown in place: T1 a
+     slim bar, T2 a tilting mast glyph, T3 both. Then: "I feel like it needs to be centered to make sense. is there a
+     way to make the windex smaller and get the heel indicator into the main part of the panel, just above the windex?
+     or even as an outside ring on the top part of the windex, like from 10:00 to 2:00?" Two more are shown in place:
+     (R) a ring around the windex's top from 10:00 to 2:00, its mark at her heel angle one to one; and (S) the windex
+     about 20% smaller with the slim bar just above it. The owner picked R, then refined it in place (15 November):
+     - **Ring:** a thin ring hugging the windex's top from 10:00 to 2:00, one to one with her heel, all inside the
+       panel. The windex is a little smaller (about 87%) and set a hair lower, clear of the mainsheet row.
+     - **Mark:** a small circle on the ring, white, then amber past 20° and red past 25°, with the ring's amber and red
+       zones behind it.
+     - **Best heel:** a teal ◆ tucked tight outside the ring at her best heel; the circle may overlap it, so long as
+       the ◆'s top half shows.
+     - **Degrees:** just outside the ring at 1:30 or 10:30, on the side she's heeled to.
+     After two flat-bar variants (along the panel's top edge), the owner chose (15 November): "lets go back to the last
+     iteration of the curved dial. build that." **Final, to build (now; 2–3 h; UI & Experience):** the ring above,
+     with the windex at about 87% and raised a hair, the 4.5 px circle and the ◆ tucked tight. The stills are on branch
+     claude/hopeful-thompson-m94ahm, reference/screens/heel-ring/ (wp6, wp16, wp-26, heel-ring4). Draw it in
+     src/ui/sailBand.ts as an SVG layer over `.sb-wx`. It reads b.heelMag and her heel side, crewBestHeel
+     (boat/crewPhys.ts), and the thresholds: 20° (coach.ts:98) and 25°. No new button. Check both tacks, and send stills
+     to the owner before it ships.
+   - **Learn to sail, lesson 1 "The boat": teach the parts, then quiz them** (owner, 15 November; feature; next, "not
+     urgent"; 6–10 h; a design change to a lesson, so the design goes to the owner before it's built). The owner's
+     brief:
+     - **The problem.** For a total beginner it's a click-and-guess game. The cue says only "Find the <part> · n of 43"
+       (src/app/boatLesson.ts paint). A wrong click says only "That's the <other part>". The boat is never introduced,
+       and a part's explanation shows only after it's found, for 2.6 s (NOTE_MS). The boat spins all the time
+       (`open()` sets app.look.spin = true; only a drag stops it), so a beginner can't hold a view.
+     - **What the owner wants:**
+       1. Teach, don't hunt: walk the parts a few at a time, in the existing groups (src/render/boatParts.ts
+          PARTS[].set): the boat (hull and deck), the rig, the sails, the controls, the wind's sides.
+       2. Focus on each section: frame the camera on it (the rig, the sail corners, the cockpit and controls), mark the
+          part being taught, and dim or hide the rest. Keep the underwater view for the keel and rudder.
+       3. Name and explain each part as it's shown: its name and its one-line `what` on screen while she looks. A
+          "Next" step moves on, with nothing to find.
+       4. Stop the spin: the boat holds still while a part is taught, and dragging still looks round her. Anything that
+          turns is the camera moving to the next section, slowly and on purpose.
+       5. Quiz at the end, e.g. "Which one is the boom?" (tap it on the boat) or "What does the outhaul do?" (pick from
+          a few). A wrong answer shows the right part and asks again. Passing the quiz passes lesson 1, not the
+          walkthrough.
+       6. She can leave the quiz.
+     - **The owner's answers:**
+       - A core set of about 15 parts first, then the quiz on them, repeated set by set until all 43 are done.
+       - In the quiz, tap the part first; two wrong taps bring multiple choice.
+       - Missed parts come back until they're right.
+     - **Constraints:**
+       - No new buttons: use the showroom's cue bar (#showCue) and the lesson overlay.
+       - One short line per part, and a highlighted part over words. Learn to sail is the one place step-by-step
+         instruction belongs (VISION-ROADMAP.md:54).
+       - US spelling; keep the existing part names.
+       - The visual-checker, both sides and both tacks.
+       - Keep ASA 101 knowledge items 1–3 covered (design/ASA-101-CHECK.md).
+   - ~~**The start-line drill teaches you to find the favored end yourself**~~ (done, v200: favored-end) (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
      water before the gun, with the answer only after you've judged:
@@ -771,7 +877,7 @@ What's planned, roughly in order. Done work is described in the README.
      draw and describe only the sail that's up. There's no slot then: no jib bending the flow onto the main's lee side,
      no main's upwash on the jib. A lowered sail's telltales go too. The physics' own sail forces should be checked the
      same way.
-   - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
+   - ~~**The passage plan's track: hairpins and doubling back**~~ (done, v200: the isochrone router) (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
      The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and jibes whenever she's
      more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
@@ -783,8 +889,21 @@ What's planned, roughly in order. Done work is described in the README.
      **The isochrone router** (the owner's decision, asked 15 November): the rule-based planner can't get out of a dead end
      on a run, light air in a lee with the tide setting her on (the owner's own route off Yellow Bluff, 25 Nov 15:00,
      with the land's lee without seams: tests/passage-hairpin's it.fails). A router spreading out every minute on every
-     heading, with the real wind, lee and current, keeps the fastest way to each place; 6–10 h, a plan in 1–3 s, nothing
-     per step.
+     heading, with the real wind, lee and current, keeps the fastest way to each place; a plan in 3–7 s cold, worked out
+     between frames, nothing per step. (Built: sim/router.ts, the passage planner's; the owner said yes, 15 November;
+     physics review two rounds, Deep Physics.)
+     **The router's pruning by place, not by bearing** (Deep Physics, review round 2): the front keeps one point per 1°
+     sector of bearing from the start, so two points on one bearing either side of a point of land share a sector, and
+     the one kept can be in a dead-end bay. Alcatraz to Clipper in 6 kt shows it: finer grains plan 14% slower than FINE,
+     whose route sails true. Tried and failed (15 November): pure 100 m cells by tack (the front floods the Bay, out of
+     memory); cells added to the sectors, a cell never taken twice (a light-air boat can't leave its cell in a minute,
+     worse everywhere); the same with 3 minutes' grace (still worse). Next to try: a dominance test on time-of-arrival
+     per cell, keeping the sectors as the bound.
+     **The router off the page's thread** (Capacity's suggestion, 15 November; the Coordinator to decide): 3–7 s of CPU,
+     sliced 2 ms a frame, puts the first plan up in about 50 s. In its own worker, or as a job in the sim's worker
+     between steps, it would show in about 6 s with nothing on the frame.
+     **Next: the race brief and the AI's leg planning onto the router** (the Coordinator, 15 November): strategist.ts
+     comparePlans and the AI still sail the old rules (routing.ts sailLeg). Moved later, with the race's own timing in mind.
    - **The cruise setup: an expand icon on the map, not a button** (owner, 15 November; not urgent; <1 h): "kill the
      'plan on the big chart' button and just have an expand icon on the map itself." The small map gets an expand
      icon in its corner that opens the big chart; the "Plan on the big chart" button goes.
@@ -887,7 +1006,7 @@ as it is.
 - The rules trainer: "Sail it yourself". A World Sailing Case laid out on the water, you helm the boat it's about; 23
   Cases sailed and taught.
 - Wrecks, built from Marinas' design: every contact graded (boat/damage.ts); a hard blow, a ship, or being pinned in
-  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, and she's laid up for repairs.
+  Fort Mason's piles wrecks her; then ashore, a tow or carry on; her logbook keeps it, laying up for repairs is off for now (the owner, 15 Nov 2026: "silly and punitive in its current state"; to come back to later; boat/spec.ts LAY_UP).
 - The season's flow as approved: Race → Season → the overview → Sail race N → its setup; the announced 2026–27 race days.
 - The drills' cues by the boat and guides on the water (8b and Training tools 3, as approved).
 - No on-screen tiller instructions outside the Learn to sail lessons.
@@ -1471,7 +1590,7 @@ Also asked for:
 - **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
 - **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
 - **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
-  - **The boom's place on a beat** (Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
+  - **The boom's place on a beat** (next for Deep Physics, after the beat angle in chop; Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
   conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
   competition, and trim and tuning by phase ("it starts light, so…; it'll build late, so watch…"), with specifics.

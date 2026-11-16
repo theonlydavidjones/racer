@@ -551,6 +551,31 @@ of them, undefined until given, as makeBoat does the Boat's. With that, and the 
 from 1.0148 to **1.0053** on the default race (12 ratios) and from 1.0193 to **1.0042** on `--ai` (ten races), the race
 bit-identical. A new field on CrewState (or on Aboard, a person aboard) goes in newCrew's literal.
 
+### 8b. The step's garbage (15 Nov 2026)
+
+The perf race made about 596 KB of garbage a step, and collecting it was about 3.7% of the step (the biggest line in
+an inlining-off profile). We measured it with V8's sampling heap profiler, collected objects included, over 2 minutes of
+the perf race (a scratch script driving `HeapProfiler.startSampling` with `includeObjectsCollectedByMajorGC/MinorGC`).
+Four lessons, all bit-identical (the fingerprint unchanged), took it to 488 KB and the step to **0.9868** against
+736afa84 (12 ratios):
+
+- **Math.hypot allocates.** V8's builtin makes a scratch array and a boxed result every call, and TurboFan doesn't
+  inline it. The step called it about 2,200 times. `core/math.ts` `hypot` is the same computation (the larger
+  magnitude out, the squares summed with Kahan's compensation, the root times it back) in the same order. It matches to
+  the last bit on 3·10⁷ random pairs and the edge cases. Use it, not `Math.hypot`, in the step's code.
+- **A fractional field read from objects of many shapes comes back boxed.** A point passed in as a boat, her bow, or a
+  plain `{x, y}` makes `p.x` a megamorphic load, and each such load of a double allocates. Read the coordinates once
+  into locals at the top of a hot helper (inPoly, segPt, hitsHarbor, endsOf), not once per vertex.
+- **Closures made per call are allocations.** `find` with a closure in a hot predicate (harborAt), and helper closures
+  inside a function called several times a step (sailForces' `one`), each cost one per call. Use an indexed loop, or a
+  module-level function with the captured values as arguments.
+- **One hidden class for the fleet bought nothing.** The 7 AI boats ended a race in 6 hidden classes: about 40 fields
+  are added as she sails, in each boat's own order. Declaring them all at birth gave all 7 one class, and measured
+  1.0040. The likely reason: a number field declared `undefined` can't keep V8's unboxed double, so every write then
+  allocates. Declaring them 0 isn't bit-identical, since most of them default to something else or test `== null`.
+  Also: **an object literal of more than 128 properties starts in V8's slow dictionary mode** (makeBoat's has 94), so
+  fields added at birth go in after the literal, not into it.
+
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
 v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):
@@ -624,7 +649,7 @@ and threw each one away ("Maps became deprecated during optimization"), 14 s of 
   rather than frame time. Safari's engine (JavaScriptCore) keeps shapes its own way: not measured, and the fix costs it
   nothing.
 
-## A behaviour's cost: the puff response (15 Nov 2026)
+## A behavior's cost: the puff response (15 Nov 2026)
 
 The auto crew's heavy-air puff response (physics.ts puffEase, on branch claude/puff-response) failed perf-pair --ai at
 1.041 against main. Split into what its code costs and what the different race costs (Crew Model with Capacity, each pair
@@ -637,7 +662,7 @@ run alone, perf race and --ai):
 - **Cuts, about 2.8% back, the race bit-identical (7905d3b8):** the seven fields declared in makeBoat (each boat
   otherwise gained them at its first puff, mid-race: 0.7%), and the call gated to steps with a puff on, one being seen, or
   something still eased (nearly every step has none).
-- **Behaviour, about 2%:** the boats sail a different race with the main eased in the gusts. Profiled with
+- **Behavior, about 2%:** the boats sail a different race with the main eased in the gusts. Profiled with
   `--max-inlined-bytecode-size=0` (puff on against H2, so the code is alike and only the race differs), the extra time is
   spread: moveBoat, step and trimSails a few per cent each, aiThink +14%, the crew's hold +25%, clearAstern +14%. No
   function is new work. A first profile pinned it on heaveTo's strip model; counted, no boat was ever hove to or had her

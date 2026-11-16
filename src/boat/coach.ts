@@ -12,7 +12,7 @@ import { byHand, crewEaseBoom, crewMainAngle, leeDrift, pinchFlog, sailFrame, sa
 import orc from './data/nordic-folkboat-orc.json';
 const DRAFT = orc.boat.draft;
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
-import { D2R, KT, V, clamp } from '../core/math';
+import { D2R, KT, V, clamp, hypot } from '../core/math';
 import { inBasin } from '../geo/marina';
 import { TUNE_PRESETS, forestayTension, presetFor, tuneName, tuneWords } from './rigTune';
 
@@ -389,7 +389,7 @@ function okWords(b: Boat, s: Situation, k: LineKey): { text: string; tick: boole
       return { text: s.awa > 110 ? 'Off the wind, the main goes out by the shroud.' : 'A main is trimmed right when its leech telltales stream aft.', tick: true };
     case 'jibsheet':
       if (tj?.flow === 'luffing' && s.awa <= 115) return { text: 'A jib is trimmed right when its windward luff telltales just lift.', tick: true };
-      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'On a broad reach, the jib goes out to its stop.', tick: true };
+      if (tj?.flow === 'stalled' && b.sheets.jib >= SAILS.jib.max - 0.5 && s.awa <= 115) return { text: 'On a broad reach, the jib can\'t ease past the shrouds: it\'s as far out as it goes.', tick: true };
       return { text: s.awa > 115 ? 'Off the wind, the jib goes right out.' : 'A jib is trimmed right when all its luff telltales stream together, both sides.', tick: true };
     case 'traveller': {
       // (sailing practice: upwind in light air the car goes up to windward, the boom to the centerline on an eased sheet;
@@ -683,7 +683,7 @@ function confirmation(b: Boat, s: Situation, ctx: CoachContext): Lesson {
   // pushed off with no sail up and stopped in a harbor: no way on, so the rudder can't turn her (8m, the owner at Gashouse
   // Cove). The ways out a sailor has: a sail up for way (the jib goes up at any angle but head to wind), the main hoisted at
   // the dock held head to wind, or a paddle (Crew Controls' 8c, to add here when it lands)
-  if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && Math.hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
+  if (!b.handled && !b.pushing && !b.mooring && inBasin(b) && (b.rig?.main ?? 1) === 0 && (b.rig?.jib ?? 1) === 0 && hypot(b.vx ?? 0, b.vy ?? 0) < 0.3)
     return { ...base, kind: 'info', head: 'No way on, no sail up: she can\'t steer. Get the jib up (J) for way.', why: '', look: 'which way the wind is setting her' };
   // set toward Fort Mason's piers with little way on (the Gashouse Cove entrance, 8n): the stream or the wind carries her
   // onto the piles in seconds (physics.ts piles); way on, and steer off

@@ -1,4 +1,4 @@
-import { inPoly, segPt, type Vec } from '../core/math';
+import { inPoly, segPt, type Vec, hypot } from '../core/math';
 import { LL } from './geo';
 import { HANDLING } from '../boat/dynamics';
 import westHarbor from './data/west-harbor.json';
@@ -62,14 +62,14 @@ const v = (pts: LLs) => pts.map(([la, lo]) => LL(la, lo));
 function meetEdge(pts: Vec[], others: Vec[][], otherW: number): Vec[] {
   const out = pts.map(p => ({ ...p }));
   for (const [i, j] of [[0, 1], [out.length - 1, out.length - 2]]) {
-    const p = out[i], q = out[j], L = Math.hypot(p.x - q.x, p.y - q.y); if (L < 0.5) continue;
+    const p = out[i], q = out[j], L = hypot(p.x - q.x, p.y - q.y); if (L < 0.5) continue;
     const t = { x: (p.x - q.x) / L, y: (p.y - q.y) / L }; // pointing out of the dock, toward the end
     let best: { s: number; sin: number } | null = null;
     for (const o of others) for (let k = 1; k < o.length; k++) {
       const a = o[k - 1], b = o[k], dx = b.x - a.x, dy = b.y - a.y, den = t.x * dy - t.y * dx; if (Math.abs(den) < 1e-6) continue;
       const s = ((a.x - p.x) * dy - (a.y - p.y) * dx) / den, r = ((a.x - p.x) * t.y - (a.y - p.y) * t.x) / den; // p + t·s meets a + (b−a)·r
       if (r < -0.02 || r > 1.02 || Math.abs(s) > 4) continue;
-      const sin = Math.abs(den) / Math.hypot(dx, dy);
+      const sin = Math.abs(den) / hypot(dx, dy);
       if (!best || Math.abs(s) < Math.abs(best.s)) best = { s, sin };
     }
     if (best) { const s = best.s - otherW / 2 / Math.max(0.3, best.sin); out[i] = { x: p.x + t.x * s, y: p.y + t.y * s }; }
@@ -102,6 +102,7 @@ export interface Harbor {
 interface Box { x0: number; x1: number; y0: number; y1: number }
 const boxOf = (ps: Vec[], pad = 0): Box => ({ x0: Math.min(...ps.map(p => p.x)) - pad, x1: Math.max(...ps.map(p => p.x)) + pad, y0: Math.min(...ps.map(p => p.y)) - pad, y1: Math.max(...ps.map(p => p.y)) + pad });
 const inBox = (p: Vec, b: Box) => p.x > b.x0 && p.x < b.x1 && p.y > b.y0 && p.y < b.y1;
+const inBoxXY = (x: number, y: number, b: Box) => x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1; // (p's coordinates read once: inPoly)
 
 export const HARBORS: Harbor[] = SOURCES.map(({ id, name, short, data: D }) => {
   const walks = D.walkways.map(v), fingers = D.fingers.map(v);
@@ -120,11 +121,13 @@ export const HARBOR = HARBORS[0];
 export const harborOf = (id: string | undefined): Harbor | null => HARBORS.find(h => h.id === id) ?? null;
 
 /** The harbor whose basin (the water inside its breakwaters) this is in, if any. */
-export const harborAt = (p: Vec): Harbor | null => HARBORS.find(h => inBox(p, h.box) && inPoly(p, h.basin)) ?? null;
+// (indexed loops, not find with a closure: asked for every boat's every land check, and each find's closure over p was
+// an allocation. The same harbor, the first that holds p)
+export const harborAt = (p: Vec): Harbor | null => { const px = p.x, py = p.y; for (let i = 0; i < HARBORS.length; i++) { const h = HARBORS[i]; if (inBoxXY(px, py, h.box) && inPoly(p, h.basin)) return h; } return null; };
 /** In a harbor's basin? */
 export const inBasin = (p: Vec): boolean => harborAt(p) !== null;
 /** The harbor whose basin, breakwaters and docks reach to here (for saying where something happened). */
-export const harborNear = (p: Vec): Harbor | null => HARBORS.find(h => inBox(p, h.reach)) ?? null;
+export const harborNear = (p: Vec): Harbor | null => { for (let i = 0; i < HARBORS.length; i++) if (inBox(p, HARBORS[i].reach)) return HARBORS[i]; return null; };
 
 /** Within `half` of a dock's centre line, square at its ends (as the docks are built), and round only at its bends. */
 const nearLine = (p: Vec, pts: Vec[], half: number) => {
@@ -166,10 +169,11 @@ export function harborIndex(H: Harbor): HarborIndex {
 /** A dock, a pier or a breakwater here (solid: a boat stops against it)? Only meaningful in or by a harbor. */
 export function hitsHarbor(p: Vec): boolean {
   // (indexed loops: asked for every boat several times a step, and a for...of's iterator isn't always optimized away)
+  const px = p.x, py = p.y; // (read once: inPoly)
   for (let h = 0; h < HARBORS.length; h++) {
     const H = HARBORS[h];
-    if (!inBox(p, H.reach)) continue;
-    const ix = harborIndex(H), i = Math.floor((p.x - ix.x0) / ix.C), j = Math.floor((p.y - ix.y0) / ix.C);
+    if (!inBoxXY(px, py, H.reach)) continue;
+    const ix = harborIndex(H), i = Math.floor((px - ix.x0) / ix.C), j = Math.floor((py - ix.y0) / ix.C);
     if (i < 0 || j < 0 || i >= ix.nx || j >= ix.ny) continue;
     const cell = ix.cells[j * ix.nx + i];
     for (let k = 0; k < cell.length; k++) { const s = cell[k]; if (s.poly ? inPoly(p, s.pts) : nearLine(p, s.pts, s.half)) return true; }
@@ -207,15 +211,15 @@ export const SLIPS: Slip[] = ALL_SLIPS.filter(s => {
 const END_TIES: Slip[] = HARBORS.flatMap(H => {
   const out: Slip[] = [], mine = SLIPS.filter(s => s.marina === H.id), count = new Map<string, number>();
   for (const w of H.walkways) for (const [i, j] of [[w.length - 1, w.length - 2], [0, 1]]) {
-    const e = w[i], f = w[j], L = Math.hypot(e.x - f.x, e.y - f.y); if (L < 8) continue;
+    const e = w[i], f = w[j], L = hypot(e.x - f.x, e.y - f.y); if (L < 8) continue;
     const u = { x: (e.x - f.x) / L, y: (e.y - f.y) / L }; // along the dock, out toward its end
     if (H.walkways.some(o => o !== w && o.some((q, k) => k > 0 && segPt(e, o[k - 1], q) < 3))) continue; // it runs into another dock: not a free end
-    const near = mine.filter(s => Math.hypot(s.p.x - e.x, s.p.y - e.y) < 40).sort((a, b) => Math.hypot(a.p.x - e.x, a.p.y - e.y) - Math.hypot(b.p.x - e.x, b.p.y - e.y))[0];
+    const near = mine.filter(s => hypot(s.p.x - e.x, s.p.y - e.y) < 40).sort((a, b) => hypot(a.p.x - e.x, a.p.y - e.y) - hypot(b.p.x - e.x, b.p.y - e.y))[0];
     if (!near) continue;
     for (const side of [1, -1]) {
       const n = { x: u.y * side, y: -u.x * side }, c = { x: e.x - u.x * 4.6 + n.x * (WALKWAY_W / 2 + 1.1 + 0.3), y: e.y - u.y * 4.6 + n.y * (WALKWAY_W / 2 + 1.1 + 0.3) };
       const h = (Math.atan2(u.x, u.y) * 180 / Math.PI + 360) % 360;
-      if (!hullClear(c, h) || mine.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 9) || out.some(s => Math.hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
+      if (!hullClear(c, h) || mine.some(s => hypot(s.p.x - c.x, s.p.y - c.y) < 9) || out.some(s => hypot(s.p.x - c.x, s.p.y - c.y) < 4.5)) continue;
       let run = 0; while (run < 12 && hullClear({ x: c.x + u.x * (run + 2), y: c.y + u.y * (run + 2) }, h)) run += 2;
       if (run < 12) continue; // no open water ahead to leave by
       const k = (count.get(near.dock) ?? 0) + 1; count.set(near.dock, k);
@@ -590,7 +594,7 @@ export function toExit(H: Harbor): (q: Vec) => number {
   for (const e of H.exits) {
     let best: Vec | null = null, bd = Infinity;
     for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
-      const q = { x, y }, dd = Math.hypot(q.x - e.x, q.y - e.y);
+      const q = { x, y }, dd = hypot(q.x - e.x, q.y - e.y);
       if (dd < bd && harborAt(q) === H && ![[0, 0], [1.1, 0], [-1.1, 0], [0, 1.1], [0, -1.1]].some(([ex, ey]) => hitsHarbor({ x: q.x + ex, y: q.y + ey }))) { bd = dd; best = q; }
     }
     if (best && !d.has(key(best.x, best.y))) { d.set(key(best.x, best.y), bd); fr.push(best); }
@@ -790,7 +794,7 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
   const rests = (helm: number, L: number) => {
     for (let k = Math.round(Math.min(L, look) / STEP); k > 0; k--) {
       const q = arc(helm)[k], d = k * STEP;
-      if (Math.hypot(q.c.x - s.p.x, q.c.y - s.p.y) - tip < BOW) break;
+      if (hypot(q.c.x - s.p.x, q.c.y - s.p.y) - tip < BOW) break;
       const v = dirOf(q.h), by = [-1.5, 0, 1.5].every(k => Number.isFinite(togo({ x: q.c.x + v.x * k, y: q.c.y + v.y * k }))); // (in the open water the flood reaches, her whole length)
       if (by && ok(helm, k) && berthClear(q.c, q.h, s, true, 0.12) && [1, -1].some(sg => { for (let k = 1; k <= 12; k++) if (!berthClear(q.c, q.h + sg * 90 * k / 12, s)) return false; return true; })) return d;
     }
@@ -846,7 +850,7 @@ export const NO_WAY_OUT = ['gashouse-cove:330', 'gashouse-cove:170', 'gashouse-c
 const outOfUse = ALL_SLIPS.filter(s => NO_WAY_OUT.includes(s.id));
 for (let i = SLIPS.length - 1; i >= 0; i--) if (NO_WAY_OUT.includes(SLIPS[i].id)) SLIPS.splice(i, 1);
 for (const o of outOfUse) {
-  const near = SLIPS.filter(s => s.marina === o.marina && s.dock === o.dock && s.kind === o.kind).sort((a, b) => Math.hypot(a.p.x - o.p.x, a.p.y - o.p.y) - Math.hypot(b.p.x - o.p.x, b.p.y - o.p.y))[0];
+  const near = SLIPS.filter(s => s.marina === o.marina && s.dock === o.dock && s.kind === o.kind).sort((a, b) => hypot(a.p.x - o.p.x, a.p.y - o.p.y) - hypot(b.p.x - o.p.x, b.p.y - o.p.y))[0];
   if (near) MOVED.set(o.id, near);
 }
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);

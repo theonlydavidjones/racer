@@ -1,4 +1,4 @@
-import { D2R, V, clamp, type Vec } from '../core/math';
+import { D2R, V, clamp, type Vec, hypot } from '../core/math';
 import { LAT0, LON0 } from '../geo/geo';
 import heights from './data/heights.json';
 import { landGrid } from '../geo/shore';
@@ -68,7 +68,7 @@ export class WindSum {
       this.x -= a * this.fx + c * this.fy; this.y -= a * this.fy - c * this.fx; this.along2 = this.across = 0;
     }
     if (this.x === 0 && this.y === 0) return NO_SHADOW;
-    const f = V(from + 180), fx = f.x + this.x, fy = f.y + this.y, k = Math.hypot(fx, fy);
+    const f = V(from + 180), fx = f.x + this.x, fy = f.y + this.y, k = hypot(fx, fy);
     const flowNow = Math.atan2(fx, fy) / D2R, flowWas = from + 180;
     let shift = flowNow - flowWas; shift = ((shift + 540) % 360) - 180;
     return { k: Math.max(0.05, k), shift };
@@ -93,9 +93,9 @@ export function addBoatWake(sum: WindSum, c: Caster, p: Vec, trueKt: number): vo
   { const ddx = p.x - c.x, ddy = p.y - c.y, R = 12 * H + 1e-6; if (ddx * ddx + ddy * ddy > R * R) return; }
   const e = V(c.h + c.arel + 180); // downstream, along her apparent wind
   const lw0 = c.arel >= 0 ? V(c.h - 90) : V(c.h + 90), dot = lw0.x * e.x + lw0.y * e.y; // to her leeward side, square to the wake
-  let lx = lw0.x - dot * e.x, ly = lw0.y - dot * e.y; const ln = Math.hypot(lx, ly) || 1; lx /= ln; ly /= ln;
+  let lx = lw0.x - dot * e.x, ly = lw0.y - dot * e.y; const ln = hypot(lx, ly) || 1; lx /= ln; ly /= ln;
   const dx = p.x - c.x, dy = p.y - c.y, x = dx * e.x + dy * e.y, y = dx * lx + dy * ly; // y > 0 to her leeward
-  const r = Math.hypot(x, y); if (r > 12 * H) return;
+  const r = hypot(x, y); if (r > 12 * H) return;
   // luffing (sails eased right out to kill time before a start): hardly any lift, a little flogging drag
   const scale = vaKt / trueKt, breeze = clamp((c.ww.kt - 8) / 8, 0, 1), cl = c.luff ? 0.1 : clFor(c.awa) / 1.2;
   if (x > 0) {
@@ -139,7 +139,7 @@ export const SHIP_AIR: Record<string, number> = { container: 45, tanker: 30, fer
 /** A moving ship's wind shadow at p, added to `sum`. Her wake follows her own relative wind. */
 export function addShipWake(sum: WindSum, from: number, trueKt: number, v: { x: number; y: number; h: number; v: number }, air: number, len: number, beam: number, p: Vec): void {
   const wf = V(from + 180), vs = V(v.h), kt = 1 / 0.5144;
-  const rx = wf.x * trueKt - vs.x * v.v * kt, ry = wf.y * trueKt - vs.y * v.v * kt, rel = Math.hypot(rx, ry); // her relative wind (kt)
+  const rx = wf.x * trueKt - vs.x * v.v * kt, ry = wf.y * trueKt - vs.y * v.v * kt, rel = hypot(rx, ry); // her relative wind (kt)
   if (rel < 0.5 || trueKt < 0.5) return;
   const ex = rx / rel, ey = ry / rel, dx = p.x - v.x, dy = p.y - v.y, x = dx * ex + dy * ey, y = dx * ey - dy * ex;
   const sinA = Math.abs(vs.x * ey - vs.y * ex), cosA = Math.abs(vs.x * ex + vs.y * ey);

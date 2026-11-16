@@ -2,7 +2,8 @@
 /**
  * Wrecks in the page (docs/WRECK-PROPOSAL.md, the owner's answers): a cruise, set onto West Harbor's breakwater at 2 m/s.
  * The statement of how and where, then a tow: the Keep prompt, her logbook entry ("towed in"), her laid-up date, the
- * Yacht Club showing it, and a second cast off refused while she's laid up. Then, from fresh, Carry on: she sails on.
+ * Yacht Club showing it, and a second cast off refused while she's laid up. (Laying up is off for now, boat/spec.ts LAY_UP:
+ * the check holds that she isn't laid up, the club doesn't say so, and she casts off again.) Then, from fresh, Carry on: she sails on.
  * Needs the dev server: npm run dev -- --port 5173 (the race in the page's thread, ?inproc).
  *   node scripts/check/wreck.cjs <out-dir>   (screenshots → out-dir/wreck-*.png; exits 1 on a failure)
  */
@@ -40,14 +41,14 @@ const from = LL(37.8098, -122.4410), at = { x: from.x, y: from.y - 176 + 2 + 3.8
   await p.click('#bKeep'); await p.waitForTimeout(800);
   const st = await p.evaluate(() => { const log = JSON.parse(localStorage.getItem('fbsim-logbook-v1') || '[]'), s = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); const b = (s.boats ?? []).find(x => x.id === s.boatId); return { last: log[log.length - 1], laid: b?.laidUpUntil }; });
   console.log('logbook:', JSON.stringify(st.last && { wreck: st.last.wreck, towed: st.last.towed }), 'laid up until', st.laid);
-  if (!st.last?.wreck || !st.last?.towed) fail('logbook entry lacks the wreck or the tow'); if (!st.laid) fail('not laid up');
+  if (!st.last?.wreck || !st.last?.towed) fail('logbook entry lacks the wreck or the tow'); if (st.laid) fail('laid up, but laying up is off (boat/spec.ts LAY_UP)');
   await p.evaluate(() => document.querySelector('[data-home="fleet"]').click()); await p.waitForTimeout(1000);
-  const club = await p.evaluate(() => document.body.innerText.includes('laid up')); if (!club) fail('the Yacht Club doesn\'t show her laid up');
+  const club = await p.evaluate(() => document.body.innerText.includes('laid up')); if (club) fail('the Yacht Club shows her laid up, but laying up is off');
   await p.screenshot({ path: `${out}/wreck-club.png` });
   await p.evaluate(() => document.getElementById('bHomeFromClub')?.click()); await p.goto('http://localhost:5173/?inproc'); await p.waitForTimeout(4000);
   await castOff(p);
   const refused = await p.evaluate(() => document.getElementById('msgRecent')?.textContent ?? '');
-  console.log('second cast off:', refused.slice(0, 120)); if (!/laid up for repairs/.test(refused)) fail('a laid-up boat was taken out');
+  console.log('second cast off:', refused.slice(0, 120)); if (/laid up for repairs/.test(refused)) fail('the cast off was refused, but laying up is off');
   await p.close();
 
   // carry on

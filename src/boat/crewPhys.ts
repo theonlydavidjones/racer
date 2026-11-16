@@ -103,6 +103,15 @@ export interface Aboard {
   react: number; goal: { x: number; z: number } | null;
   /** 0 fresh … 1 spent (hiking). */
   fatigue: number;
+  /** Paddling (paddle.ts): the share of their W′ left (1 fresh), the share of their endurance used (0 fresh), and when
+   * those were worked out (sim time). */
+  wBal: number; wUsed: number; wT: number;
+  /** Ready for a turn coming: warned by the call, or got ready as she turns (prepLeft; for the figures, a look up and a
+   * hand to the sheet: render/crew.ts). */
+  ready: boolean;
+  /** Struck by the boom or the mainsheet in a jibe (boat/calls.ts boomStrike): out of action until this crew clock time,
+   * where they are, their work at a fraction of its pace. 0 when not. */
+  outUntil: number;
 }
 /** A job: a line to work, the jib car to move, the pole; `reach` s still to get there; `work` s of work left (car, pole). */
 export interface Job {
@@ -129,6 +138,9 @@ export interface CrewPlace { across: PlaceAcross | null; fore: PlaceFore | null 
 
 export interface CrewState {
   spec: CrewSpec;
+  /** placeCrew's working space, made once and reused at each decision (20 times a second: rebuilt, it was most of what a
+   * step allocated, docs/CAPACITY.md): each one's deck edge and reach, who's free and who has a seat, and the targets. */
+  sc?: { edges: number[]; maxes: number[]; free: number[]; seats: number[]; out: number[]; atJob: number[]; tgt: (Target | undefined)[]; pool: Target[] };
   /** [helm, crew…]. */
   people: Aboard[];
   /** Where you've put them (absent: the crew's own call). */
@@ -298,21 +310,42 @@ export const helmArms = (p: Person, fatigue = 0) => {
 const leanCap = (p: Person, fatigue: number) => (0.55 + 0.45 * attrOf(p, 'fitness')) * (1 - 0.6 * fatigue);
 /** Reaction time (s) to a new call: an expert ~0.4 s, a novice ~1.6 s (simple visual reaction is 0.2–0.3 s; choosing what to do takes longer). Estimates. */
 export const reactTime = (p: Person) => 1.6 - 1.2 * attrOf(p, 'react');
+/** Ready for a turn, a person moves on the order after a prepared reaction (s). Getting ready takes them prepTime: seeing
+ * it's coming (their reaction), then the work, the working sheet freed ready to run and the lazy one loaded, and to
+ * their place (by their handling: about a second in all for an expert, nearly five for a novice). Warned by the call they
+ * do it before the helm puts her over; unwarned they start as they see her turning, and what's left of it comes after.
+ * Estimates (boat/calls.ts). */
+export const PREPARED = 0.25, PREP_WORK = { novice: 4, expert: 0.5 };
+/** A turn under way (m/s): slower, she's drifting through the wind in irons, not tacking (as physics.ts jibLetGo). */
+export const TURN_V = 0.8;
+export const prepTime = (p: Person) => reactTime(p) + PREP_WORK.novice - (PREP_WORK.novice - PREP_WORK.expert) * attrOf(p, 'handling');
+/** What's left of getting ready (s): none if called; else their prepTime less the `coming` s they've seen her turning. */
+export const prepLeft = (p: Person, called: boolean, coming: number): number => called ? 0 : Math.max(0, prepTime(p) - coming);
 /** Pace of a person's work and movement against a club crew (1 at handling 0.6): an expert ~1.3×, a novice ~0.55×. Estimate. */
 export const pace = (p: Person) => 0.55 + 0.75 * attrOf(p, 'handling');
 /** Hiking endurance (s at a full hike, by fitness) and recovery time constant (s): Vogiatzis 1995 (above). */
 export const ENDURE = (p: Person) => 300 + 210 * attrOf(p, 'fitness'), RECOVER = 60;
 
+/** A person's fields that start whole and later hold fractions, made doubles as they're built (V8 would otherwise change
+ * their representation the first time, and every read of them after: docs/CAPACITY.md, world.ts asDoubles). */
+const ABOARD_FRACTIONS = ['fatigue', 'wBal', 'wUsed', 'wT', 'outUntil'] as const;
+function asFractions(a: Aboard): Aboard {
+  const o = a as unknown as Record<string, number>;
+  for (const k of ABOARD_FRACTIONS) { const v = o[k]!; o[k] = 0.5; o[k] = v; }
+  return a;
+}
+/** placeCrew's working space for a crew of `n` aboard (CrewState.sc). */
+const scratchFor = (n: number): NonNullable<CrewState['sc']> => ({ edges: [], maxes: [], free: [], seats: [], out: [], atJob: [], tgt: [], pool: Array.from({ length: n }, () => ({ arm: 0, z: 0, pose: 'sit' as Pose })) });
 export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   attrCache.delete(spec);
   const w = tack === 'S' ? 1 : -1, n = spec.crew.length;
-  const people: Aboard[] = allAboard(spec).map((p, i) => ({
-    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0
+  const people: Aboard[] = allAboard(spec).map((p, i) => asFractions({
+    x: w * (i === 0 ? helmArms(p).sit : sitArm(p)), z: i === 0 ? zRef(i, n) : clamp(zRef(i, n), Z.cockpitFwd, Z.cockpitAft), lean: 0, pose: i === 0 ? 'helm' : 'sit', job: null, react: 0, goal: null, fatigue: 0, wBal: 1, wUsed: 0, wT: 0, ready: false, outUntil: 0
   }));
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
   // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)
   const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0,
-    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined };
+    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined, sc: scratchFor(people.length) };
   summarise(c, w);
   return c;
 }
@@ -349,6 +382,10 @@ export interface CrewCall {
   bestHeel?: number;
   /** A tack is coming: she's turning up toward the wind to tack (a roll tack starts here). */
   tackComing?: boolean;
+  /** The helm has called the turn (physics.ts tackStep, boat/calls.ts), and how long a turn has visibly been coming (s,
+   * fading as long again once it's past): who's ready for it moves at once (prepLeft, PREPARED). */
+  called?: boolean;
+  coming?: number;
   /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
   rmPerDeg?: number;
 }
@@ -425,6 +462,10 @@ interface Held { arm: number; z: number; since: number; off: number; cross?: num
  */
 export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
   const s = c.spec, ppl = c.ppl ??= allAboard(s), W = c.W ??= ppl.map(p => p.w), total = c.total ??= W.reduce((a, b) => a + b, 0), n = s.crew.length;
+  // who's ready for a turn coming (the call, or got ready as she turns: prepLeft), for the figures; only while one is, or was
+  const coming = k.coming ?? 0;
+  let was = false; for (let i = 1; i <= n; i++) if (c.people[i]?.ready) { was = true; break; }
+  if (k.called || coming > 0 || was) for (let i = 1; i <= n; i++) { const a = c.people[i]; if (a) a.ready = (k.called || coming > 0) && prepLeft(ppl[i]!, !!k.called, coming) === 0; }
   const w = k.windward;
   // the crew's judgement of where to be (trim) and their boat handling: the average of the crew (alone: the helm's)
   const skill = specAttr(s, 'trim'), handling = specAttr(s, 'handling');
@@ -460,11 +501,17 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // across: the average arm the crew want, as before by the conditions, by their skill
     const breeze = clamp((k.tws - 6) / 2, 0, 1);
     const HELM = helmArms(s.helm, c.people[0].fatigue);
-    const edges = ppl.map((_, i) => crewEdge(c, i)), sitOf = (i: number) => sitArm(ppl[i], edges[i]);
-    const maxes = ppl.map((p, i) => (i === 0 ? HELM.max : hikeArm(p, leanCap(p, c.people[i].fatigue), edges[i]))), maxOf = (i: number) => maxes[i];
-    const maxArm = ppl.reduce((a, p, i) => a + p.w * maxOf(i), 0) / total;
-    const minArm = (s.helm.w * HELM.lee + s.crew.reduce((a, p, j) => a + p.w * leeArm(p, edges[j + 1]), 0)) / total;
-    const sit = (s.helm.w * HELM.sit + s.crew.reduce((a, p, j) => a + p.w * sitOf(j + 1), 0)) / total;
+    // (in reused arrays, and sums in loops: the same arithmetic in the same order as the maps and reduces they replace)
+    const sc = c.sc ??= scratchFor(ppl.length), edges = sc.edges, maxes = sc.maxes, np = ppl.length;
+    edges.length = np; maxes.length = np;
+    for (let i = 0; i < np; i++) edges[i] = crewEdge(c, i);
+    for (let i = 0; i < np; i++) maxes[i] = i === 0 ? HELM.max : hikeArm(ppl[i], leanCap(ppl[i], c.people[i].fatigue), edges[i]);
+    let maxSum = 0; for (let i = 0; i < np; i++) maxSum = maxSum + ppl[i].w * maxes[i];
+    const maxArm = maxSum / total;
+    let leeSum = 0; for (let j = 0; j < s.crew.length; j++) leeSum = leeSum + s.crew[j].w * leeArm(s.crew[j], edges[j + 1]);
+    const minArm = (s.helm.w * HELM.lee + leeSum) / total;
+    let sitSum = 0; for (let j = 0; j < s.crew.length; j++) sitSum = sitSum + s.crew[j].w * sitArm(ppl[j + 1], edges[j + 1]);
+    const sit = (s.helm.w * HELM.sit + sitSum) / total;
     const needArm = k.need / (total * 9.81);
     let want = downwind ? clamp(needArm, minArm, maxArm)
       : breeze <= 0 ? clamp(needArm, minArm, maxArm) * smoothSkill(skill) + 0.1 * (1 - smoothSkill(skill)) // light air: a good crew as far to leeward as gives her the light-air heel; a novice in the middle
@@ -497,22 +544,23 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     else if (!canGo) { c.layout = 'cockpit'; c.foredeck = false; }
     const atMast = c.layout === 'mast' || c.layout === 'foredeck', forward = c.layout === 'foredeck';
     // targets for each person: jobs first, then the helm, then the free crew share what's left of the wanted moment
-    const tgt: Target[] = new Array(ppl.length);
+    // (each one's target is theirs from the pool, filled in: setTarget(tgt, pool, i, …) gives it to them for this decision)
+    const tgt = sc.tgt, pool = sc.pool; tgt.length = np; for (let i = 0; i < np; i++) tgt[i] = undefined;
     let fixedM = 0, freeW = 0;
-    const free: number[] = [];
+    const free = sc.free; free.length = 0;
     // (the cockpit's places are for everyone whose place is in it, those away at a job for a moment too: one going to the
     // cabin top or the winch doesn't move the others to new seats, half a metre aft and back again when they return)
-    const seats: number[] = [];
-    c.people.forEach((a, i) => {
-      const st = a.job?.station;
+    const seats = sc.seats; seats.length = 0;
+    for (let i = 0; i < c.people.length; i++) {
+      const a = c.people[i]!, st = a.job?.station;
       if (i > 0 && !(i === n && (forward || atMast)) && !(i === n - 1 && forward)) seats.push(i);
-      if (st) { tgt[i] = { ...st }; fixedM += W[i] * st.arm; }
+      if (st) { setTarget(tgt, pool, i, st.arm, st.z, st.pose); fixedM += W[i] * st.arm; }
       else if (i === 0) { /* the helm: below */ }
-      else if (i === n && forward) { tgt[i] = { arm: 0, z: Z.bow, pose: 'bow' }; }
-      else if (i === n - 1 && forward) { tgt[i] = { arm: 0.15, z: Z.foredeck, pose: 'fore' }; fixedM += W[i] * 0.15; }
-      else if (i === n && atMast) { tgt[i] = { arm: 0.25, z: Z.mast, pose: 'mast' }; fixedM += W[i] * 0.25; }
+      else if (i === n && forward) { setTarget(tgt, pool, i, 0, Z.bow, 'bow'); }
+      else if (i === n - 1 && forward) { setTarget(tgt, pool, i, 0.15, Z.foredeck, 'fore'); fixedM += W[i] * 0.15; }
+      else if (i === n && atMast) { setTarget(tgt, pool, i, 0.25, Z.mast, 'mast'); fixedM += W[i] * 0.25; }
       else { free.push(i); freeW += W[i]; }
-    });
+    }
     // the helm sits to windward at the tiller (to leeward in light air); leans out only when the crew can't do more
     const helmBusy = !!tgt[0];
     let helmArm = want < 0 ? HELM.lee : HELM.sit;
@@ -521,20 +569,21 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     let crewFull = false;
     let crewArm = freeW > 0 ? (want * total - fixedM) / freeW : 0;
     if (!helmBusy && freeW > 0) {
-      const crewMax = free.reduce((a, i) => a + W[i] * maxOf(i), 0) / freeW;
+      let cm = 0; for (let f = 0; f < free.length; f++) cm = cm + W[free[f]!] * maxes[free[f]!];
+      const crewMax = cm / freeW;
       crewFull = crewArm >= crewMax - 1e-6; // (all the moment there is: each out as far as they go where they sit)
       if (crewArm > crewMax) { // the crew are out as far as they go: the helm leans out too
         const short = (crewArm - crewMax) * freeW;
         const h2 = clamp(helmArm + short / W[0], helmArm, HELM.max); crewArm = crewMax + (short - (h2 - helmArm) * W[0]) / freeW; helmArm = h2;
       }
     } else if (!helmBusy) helmArm = clamp((want * total - (fixedM - W[0] * helmArm)) / W[0], HELM.lee, HELM.max);
-    if (!helmBusy) tgt[0] = { arm: helmArm, z: Z.helm, pose: 'helm' };
+    if (!helmBusy) setTarget(tgt, pool, 0, helmArm, Z.helm, 'helm');
     // the free crew, front to back in the cockpit, sharing the moment (each within their own reach)
     // (where you've put them: each of them there, not just their average)
     const placed = pl?.across ? { lee: -Infinity, mid: 0.1, up: NaN, hike: Infinity }[pl.across] : null;
-    free.forEach(i => {
-      const lo = leeArm(ppl[i], edges[i]);
-      let arm = placed == null ? (crewFull ? maxOf(i) : clamp(crewArm, lo, maxOf(i))) : clamp(Number.isNaN(placed) ? sitOf(i) : placed, lo, maxOf(i));
+    for (let f = 0; f < free.length; f++) {
+      const i = free[f]!, lo = leeArm(ppl[i], edges[i]);
+      let arm = placed == null ? (crewFull ? maxes[i] : clamp(crewArm, lo, maxes[i])) : clamp(Number.isNaN(placed) ? sitArm(ppl[i], edges[i]) : placed, lo, maxes[i]);
       // (two crew forward of the winch: the front hand sits on the cabin top's edge beside its after end, feet on the side
       // deck, on the side their weight is wanted: never in the middle at 0.90, which is inside the cabin (the physics review))
       // They keep that side until the next tack, not crossing over the cabin top with each puff and lull
@@ -545,33 +594,40 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       } else if (i === 2) c.fwdSide = undefined;
       // (two crew: each keeps their own station while the other is away, at the mast or a job: they don't shift along)
       const deck = Math.abs(arm) > DECK_ARM, z = c.spec.crew.length === 2 ? stationZ(slotOf(i - 1, 2), 2, foreF, deck) : stationZ(seats.indexOf(i), seats.length, foreF, deck);
-      tgt[i] = { arm, z, pose: arm < -0.05 ? 'lee' : arm > sitOf(i) + 0.04 ? 'hike' : 'sit' };
-    });
+      setTarget(tgt, pool, i, arm, z, arm < -0.05 ? 'lee' : arm > sitArm(ppl[i], edges[i]) + 0.04 ? 'hike' : 'sit');
+    }
     // (the front hand on the cabin top's edge forward of the winch: the middle hand makes up the moment they share, so
     // she has the heel wanted, not the edge's)
     if (c.spec.crew.length === 2 && foreF >= TWO_FWD && placed == null && !crewFull && free.includes(1) && free.includes(2)) {
-      const m = (W[1] + W[2]) * crewArm - W[2] * tgt[2].arm, a1 = clamp(m / W[1], leeArm(ppl[1], edges[1]), maxOf(1));
-      tgt[1] = { arm: a1, z: stationZ(slotOf(0, 2), 2, foreF, Math.abs(a1) > DECK_ARM), pose: a1 < -0.05 ? 'lee' : a1 > sitOf(1) + 0.04 ? 'hike' : 'sit' };
+      const m = (W[1] + W[2]) * crewArm - W[2] * tgt[2]!.arm, a1 = clamp(m / W[1], leeArm(ppl[1], edges[1]), maxes[1]);
+      setTarget(tgt, pool, 1, a1, stationZ(slotOf(0, 2), 2, foreF, Math.abs(a1) > DECK_ARM), a1 < -0.05 ? 'lee' : a1 > sitArm(ppl[1], edges[1]) + 0.04 ? 'hike' : 'sit');
     }
     // the roll tack: as she luffs up they're out on the windward side (in light air, from sitting to leeward), so she rolls
     // to windward through the wind and comes out heeled on the new tack; they hold there, then everyone out hard
-    if (c.roll?.phase === 'lead') for (const i of free) tgt[i] = { arm: Math.max(c.people[i].x * w, sitOf(i)), z: c.people[i].z, pose: 'sit' };
-    if (c.roll?.phase === 'hold') for (const i of free) tgt[i] = { arm: Math.min(c.people[i].x * w, -sitOf(i)), z: c.people[i].z, pose: 'sit' };
-    if (c.roll?.phase === 'flatten') for (const i of free) tgt[i] = { arm: maxOf(i), z: tgt[i].z, pose: 'hike' };
-    if (c.roll?.phase === 'hold' && !helmBusy) tgt[0] = { arm: c.people[0].x * w, z: Z.helm, pose: 'helm' };
-    hold(c, tgt, k, tacked, W, maxOf);
-    c.tgt = tgt;
+    // (each where they are fore and aft, if that's a seat; one not at one, back from the jib car as she tacks, makes for
+    // their own station: held where they stood, the cabin top's edge forward of the winch took them, and the spacing sent
+    // the crewmate seated there aft and back within the roll's two seconds: the owner's "fussing", Deep Physics, 16 Nov 2026)
+    const rollZ = (i: number) => { const z = c.people[i]!.z; return z < Z.deckFwd - 1e-6 && Math.abs(z - Z.cabinSide) > 1e-6 ? tgt[i]!.z : z; };
+    if (c.roll?.phase === 'lead') for (const i of free) setTarget(tgt, pool, i, Math.max(c.people[i].x * w, sitArm(ppl[i], edges[i])), rollZ(i), 'sit');
+    if (c.roll?.phase === 'hold') for (const i of free) setTarget(tgt, pool, i, Math.min(c.people[i].x * w, -sitArm(ppl[i], edges[i])), rollZ(i), 'sit');
+    if (c.roll?.phase === 'flatten') for (const i of free) setTarget(tgt, pool, i, maxes[i], tgt[i]!.z, 'hike');
+    if (c.roll?.phase === 'hold' && !helmBusy) setTarget(tgt, pool, 0, c.people[0].x * w, Z.helm, 'helm');
+    hold(c, tgt as Target[], k, tacked, W, maxes);
+    c.tgt = tgt as Target[];
   }
   c.clock = (c.clock ?? 0) + dt;
   const tgt = c.tgt;
   // move each person toward their target: decide (after a reaction time, for a big change), then go at a human pace
-  c.people.forEach((a, i) => {
+  for (let i = 0; i < c.people.length; i++) {
+    const a = c.people[i]!;
+    // (struck in a jibe and out of action: they stay where they are, as long as it lasts: boat/calls.ts)
+    if (a.outUntil > c.clock!) { setGoal(a, a.x, a.z); a.react = 0; continue; }
     const p = ppl[i], t = tgt[i], tx = t.arm * w, tz = t.z;
     const gx = a.goal ? a.goal.x : a.x, gz = a.goal ? a.goal.z : a.z;
     const big = Math.abs(tx - gx) > 0.25 || Math.abs(tz - gz) > 0.4;
     const rolling = c.roll?.phase === 'flatten' || (a.job && a.job.reach > 0);
     if (big && !rolling) {
-      if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = reactTime(p);
+      if (a.react <= 0 && a.goal && (Math.abs(tx - a.goal.x) > 0.25 || Math.abs(tz - a.goal.z) > 0.4)) a.react = tacked && k.v >= TURN_V ? PREPARED + prepLeft(p, !!k.called, k.coming ?? 0) : reactTime(p); // (at a turn under way: on the order once ready for it; drifting through the wind in irons, as before)
       a.react -= dt;
       if (a.react <= 0) { setGoal(a, tx, tz); a.react = 0; }
       else if (!a.goal) a.goal = { x: a.x, z: a.z };
@@ -607,7 +663,7 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
     a.fatigue = clamp(a.fatigue + dt * (e * e / ENDURE(p) - (1 - e) * a.fatigue / RECOVER), 0, 1);
-  });
+  }
   summarise(c, w, downwind, k.pole, k.extraMoment ?? 0);
 }
 
@@ -615,7 +671,30 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
  * The dead band (HOLD): each free person (and the helm, when not steering from a job) stays where they've settled
  * unless the new place is worth a move. Run as the crew decide (20 times a second); changes `tgt` in place.
  */
-function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: number[], maxOf: (i: number) => number): void {
+/** Person i's target for this decision, in their pooled object (placeCrew). */
+function setTarget(tgt: (Target | undefined)[], pool: Target[], i: number, arm: number, z: number, pose: Pose): Target { const t = pool[i]!; t.arm = arm; t.z = z; t.pose = pose; return (tgt[i] = t); }
+/** hold's pieces (module functions, not closures made at every decision). Stay put: sitting, hiking or to leeward by
+ * where they stay, but no further out than they can reach now. */
+function holdStay(c: CrewState, ppl: Person[], maxes: number[], i: number, h: Held, t: Target): void {
+  h.arm = Math.min(h.arm, maxes[i]!);
+  t.arm = h.arm; t.z = h.z;
+  if (i === 0) t.pose = 'helm';
+  else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i]!, crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
+}
+/** A move across the boat on a run. */
+function holdCrossing(tgt: Target[], held: (Held | null)[], reset: boolean, k: CrewCall, i: number): boolean {
+  const t = tgt[i], h = held[i];
+  return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+}
+/** The helm across in light air on a reach. */
+function holdHelmLight(c: CrewState, tgt: Target[], held: (Held | null)[], reset: boolean, k: CrewCall, i: number): boolean {
+  const t = tgt[i], h = held[i];
+  return i === 0 && c.spec.crew.length > 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+}
+const seatedPose = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
+function holdPut(tgt: Target[], held: (Held | null)[], i: number, z: number): void { tgt[i]!.z = z; const hi = held[i]; if (hi) hi.z = z; }
+
+function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: number[], maxes: number[]): void {
   const held = c.held ??= [], now = c.clock ?? 0, step = Math.max(0, now - (c.holdT ?? now));
   c.holdT = now;
   const key = c.place ? `${c.place.across}/${c.place.fore}` : '';
@@ -626,31 +705,22 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
   c.placeKey = key;
   // the arm a move has to be worth: the dead band's heel over her stiffness, as if the whole crew moved by it (with one
   // of them away at a job, a move by the rest is needed more, not less)
-  const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * W.reduce((a, w) => a + w, 0));
+  let wSum = 0; for (let q = 0; q < W.length; q++) wSum = wSum + W[q]!;
+  const dead = HOLD.heel * (k.rmPerDeg ?? 250) / (9.81 * wSum);
   const ppl = c.ppl!;
   // (stay put: sitting, hiking or to leeward by where they stay, but no further out than they can reach now)
-  const stay = (i: number, h: Held, t: Target) => {
-    h.arm = Math.min(h.arm, maxOf(i));
-    t.arm = h.arm; t.z = h.z;
-    if (i === 0) t.pose = 'helm';
-    else if (t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee') t.pose = h.arm < -0.05 ? 'lee' : h.arm > sitArm(ppl[i], crewEdge(c, i)) + 0.04 ? 'hike' : 'sit';
-  };
+
   // (a move across the boat on a run; and the heel she's carrying, which is what a move across would be for)
-  const crossing = (i: number) => {
-    const t = tgt[i], h = held[i];
-    return !reset && k.twa > 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
-  };
+
   const heelLee = k.heel ?? 0; // (+ to leeward: physics.ts heelMag)
-  const helmLight = (i: number) => {
-    const t = tgt[i], h = held[i];
-    return i === 0 && c.spec.crew.length > 0 && !reset && !c.roll && k.tws < 8 && k.twa > k.beat + 15 && k.twa <= 120 && !!t && !!h && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
-  };
-  c.people.forEach((a, i) => {
+
+  for (let i = 0; i < c.people.length; i++) {
+    const a = c.people[i]!;
     const t = tgt[i], h = held[i];
     // (at a job or the mast: settled afresh wherever they come back to)
-    if (!t || a.job?.station || t.pose === 'mast' || t.pose === 'bow' || t.pose === 'fore') { held[i] = null; return; }
+    if (!t || a.job?.station || t.pose === 'mast' || t.pose === 'bow' || t.pose === 'fore') { held[i] = null; continue; }
     // (and back from forward of the cockpit, the mast or the foredeck, they come all the way back, not stop on the way)
-    if (reset || !h || a.z < Z.cockpitFwd - 0.5 || h.z < Z.cockpitFwd - 0.5) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; return; }
+    if (reset || !h || a.z < Z.cockpitFwd - 0.5 || h.z < Z.cockpitFwd - 0.5) { held[i] = { arm: t.arm, z: t.z, since: 0, off: 0 }; continue; }
     h.since += step;
     // (out on the rail, hiking harder in a puff and easing in a lull, or leaning in as they tire or sitting up on the rail
     // again, is the body, not a move)
@@ -669,58 +739,56 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
       // (h.push, HOLD.urgent), straight through: a sailor's hiking harder within a second of the heel)
       if (t.arm > h.want + dead || (h.push && h.since < HOLD.last && t.arm > h.want)) h.want = t.arm;
       const tau = h.want > h.arm ? reactTime(ppl[i]) : HOLD.body;
-      h.arm = Math.min(h.arm + (h.want - h.arm) * Math.min(1, step / tau), maxOf(i)); h.z = t.z; t.arm = h.arm; return; // (no further out than they can reach now)
+      h.arm = Math.min(h.arm + (h.want - h.arm) * Math.min(1, step / tau), maxes[i]); h.z = t.z; t.arm = h.arm; continue; // (no further out than they can reach now)
     }
     h.want = undefined; // (not out on the rail: from scratch when they next are)
     const dArm = Math.abs(t.arm - h.arm), dz = Math.abs(t.z - h.z), out = t.arm > h.arm;
     // (on a run, across to the other side only for a real heel: lasting, or at once in a puff that needs them out;
     // HOLD.crossHeel, crossLast)
-    if (crossing(i)) {
+    if (holdCrossing(tgt, held, reset, k, i)) {
       // (the heel this move would take off: to windward against a heel to leeward, to leeward against one to windward; a
       // roll the other way is no reason to cross, and a dip under it counts down, not from scratch)
       const fixes = out ? heelLee : -heelLee;
       h.cross = fixes > HOLD.crossHeel ? (h.cross ?? 0) + step : Math.max(0, (h.cross ?? 0) - step);
       const puff = out && heelLee > 2 * HOLD.crossHeel && dArm > HOLD.urgent * dead;
-      if (!puff && h.cross < HOLD.crossLast) { h.off = 0; stay(i, h, t); return; }
+      if (!puff && h.cross < HOLD.crossLast) { h.off = 0; holdStay(c, ppl, maxes, i, h, t); continue; }
     } else h.cross = 0;
     // (the helm in light air on a reach, across only for a heel error the move takes off, lasting:
     // HOLD.helmHeel, helmLast)
-    if (helmLight(i)) {
+    if (holdHelmLight(c, tgt, held, reset, k, i)) {
       const err = heelLee - (k.bestHeel ?? heelLee), fixes = out ? err : -err;
       h.helm = fixes > HOLD.helmHeel ? (h.helm ?? 0) + step : Math.max(0, (h.helm ?? 0) - step);
       const puff = out && fixes > 2 * HOLD.helmHeel && dArm > HOLD.urgent * dead;
-      if (!puff && h.helm < HOLD.helmLast) { h.off = 0; stay(i, h, t); return; }
+      if (!puff && h.helm < HOLD.helmLast) { h.off = 0; holdStay(c, ppl, maxes, i, h, t); continue; }
     } else h.helm = 0;
     const worth = dArm > dead || dz > HOLD.fore;
     h.off = worth ? h.off + step : 0;
     // (sent out by a puff that's still filling in: they keep going as it asks for more, out along the deck, rather than
     // stop at the seat the puff's first moment called for and make a second move out a few seconds later. Carrying on
     // with a move already started isn't a new one; their reaction time, placeCrew's reactTime, is still the only wait)
-    if (h.push && h.since < HOLD.last && out) { h.arm = t.arm; h.z = t.z; h.off = 0; return; }
+    if (h.push && h.since < HOLD.last && out) { h.arm = t.arm; h.z = t.z; h.off = 0; continue; }
     // a puff that needs them out goes now (the reaction time is the only wait: they hike as it hits); a lull, or a
     // change of place for the trim, waits until it has lasted, and the dwell
     // (in light air, across the boat to leeward waits for a lull that has lasted, HOLD.leeLast: one of a few seconds had
     // them across and, the wind back through 6 kt, straight back out again)
     // (not for the helm where helmLight's own wait has been served, nor on a run, where the run rule's has)
-    const leeCross = !out && k.tws < 8 && k.twa <= 120 && !helmLight(i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
+    const leeCross = !out && k.tws < 8 && k.twa <= 120 && !holdHelmLight(c, tgt, held, reset, k, i) && Math.sign(t.arm) !== Math.sign(h.arm) && Math.min(Math.abs(t.arm), Math.abs(h.arm)) > 0.1;
     const urgent = out && dArm > HOLD.urgent * dead;
     const go = urgent || (worth && h.off >= (leeCross ? HOLD.leeLast : HOLD.last) && (out || h.since >= HOLD.dwell));
-    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; h.push = urgent; return; } // (moved: the waits start afresh)
-    stay(i, h, t);
-  });
+    if (go) { h.arm = t.arm; h.z = t.z; h.since = 0; h.off = 0; h.cross = 0; h.helm = 0; h.push = urgent; continue; } // (moved: the waits start afresh)
+    holdStay(c, ppl, maxes, i, h, t);
+  }
   // (whatever each has held, two out on the same side deck are a shoulder's width apart: one moving up to the winch
   // while the other stays put would otherwise put them in each other's laps)
   // (and none of them out on a side deck within the jib winch's reach, held or not; and clear of a crewmate working the
   // cabin-top lines from that side deck, whose place is fixed by the job)
-  const seated = (t: Target) => t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
-  const onDeckI = (i: number) => i > 0 && !!tgt[i] && Math.abs(tgt[i].arm) > DECK_ARM;
-  const out = tgt.map((t, i) => onDeckI(i) && seated(t) ? i : -1).filter(i => i > 0);
-  const atJob = tgt.map((t, i) => onDeckI(i) && !seated(t) && t.z > Z.cockpitFwd - 0.5 ? i : -1).filter(i => i > 0);
-  const put = (i: number, z: number) => { tgt[i].z = z; const hi = held[i]; if (hi) hi.z = z; };
+  // (in reused arrays, by index: the same ones in the same order as the maps and filters they replace)
+  const sc = c.sc ??= scratchFor(c.people.length), out = sc.out, atJob = sc.atJob; out.length = 0; atJob.length = 0;
+  for (let i = 1; i < tgt.length; i++) { const t = tgt[i]; if (!t || !(Math.abs(t.arm) > DECK_ARM)) continue; if (seatedPose(t)) out.push(i); else if (t.z > Z.cockpitFwd - 0.5) atJob.push(i); }
   // (out on deck, nobody forward of the seat beside the cabin's after end, but the front hand forward of the winch, on the
   // cabin top's edge at Z.cabinSide)
-  for (const i of out) if (tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) put(i, Z.deckFwd);
-  for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) put(i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
+  for (const i of out) if (tgt[i].z < Z.deckFwd - 1e-6 && Math.abs(tgt[i].z - Z.cabinSide) > 1e-6) holdPut(tgt, held, i, Z.deckFwd);
+  for (const i of out) for (const j of atJob) if (Math.sign(tgt[i].arm) === Math.sign(tgt[j].arm) && Math.abs(tgt[i].z - tgt[j].z) < Z.gap - 1e-6) holdPut(tgt, held, i, Math.min(Z.cockpitAft, tgt[j].z + Z.gap));
   // (in their order along the cockpit, front to back: the one whose place is forward keeps it. By their places, not
   // their numbers: with two crew the jib hand, people[2], is the forward one, slotOf)
   // (level, in their slots' order: the jib hand forward)
@@ -729,8 +797,8 @@ function hold(c: CrewState, tgt: Target[], k: CrewCall, tacked: boolean, W: numb
     const a = tgt[out[r]], b = tgt[out[q]];
     // (and if there's no room aft for the one behind, the one ahead goes forward, as far as the winch lets them)
     if (Math.sign(a.arm) === Math.sign(b.arm) && b.z < a.z + Z.gap - 1e-6) {
-      if (a.z + Z.gap <= Z.cockpitAft) put(out[q], a.z + Z.gap);
-      else { put(out[q], Z.cockpitAft); put(out[r], Math.max(Z.deckFwd, Z.cockpitAft - Z.gap)); }
+      if (a.z + Z.gap <= Z.cockpitAft) holdPut(tgt, held, out[q], a.z + Z.gap);
+      else { holdPut(tgt, held, out[q], Z.cockpitAft); holdPut(tgt, held, out[r], Math.max(Z.deckFwd, Z.cockpitAft - Z.gap)); }
     }
   }
 }

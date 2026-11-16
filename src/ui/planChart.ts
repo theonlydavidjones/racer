@@ -8,7 +8,7 @@ import { chartPoint } from './chart';
 import { brg, dist, wrap, type Vec } from '../core/math';
 import type { SetupPicks } from './setupChart';
 import type { SimView } from '../sim/host';
-import { passageNow, whyNot } from '../sim/navigator';
+import { passageLive, whyNot } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
 import { mins } from '../sim/brief';
 
@@ -174,7 +174,7 @@ export class PlanChart {
       const twa = Math.abs(wrap(w.wind.from - b)), kind = twa < 45 ? 'a beat' : twa < 70 ? 'a close reach' : twa < 110 ? 'a beam reach' : twa < 155 ? 'a broad reach' : 'a run';
       way = `<p>${(L / 1852).toFixed(1)} nm by the navigator's route${r.length > 2 && L > dist(a, w.dest.p) * 1.02 ? ` round the land (${(dist(a, w.dest.p) / 1852).toFixed(1)} nm straight)` : ''}; bearing ${String(Math.round(b) % 360).padStart(3, '0')}°, ${kind} in the wind as it is now.</p>`;
       // the course she'd sail leaving now (sim/navigator.ts passageNow): over the ground, tacks and gybes, and when she'd get there
-      const pn = passageNow(w);
+      const pn = passageLive(w);
       if (pn) {
         const turns = [pn.tacks.length ? `${pn.tacks.length} tack${pn.tacks.length > 1 ? 's' : ''}` : '', pn.gybes.length ? `${pn.gybes.length} jibe${pn.gybes.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ');
         way += pn.ok

@@ -1,4 +1,4 @@
-import { V, brg, dist, dot, sub, unit, wrap, type Vec } from '../core/math';
+import { V, brg, dist, dot, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { LL } from '../geo/geo';
 import { onLand } from '../geo/shore';
 import type { RulesMark } from '../rules/types';
@@ -168,7 +168,7 @@ function prepCourse(C: Course): Course {
       m.sv = m.side === 's' ? { x: -d.y, y: d.x } : { x: d.y, y: -d.x };
     } else {
       const ui = unit(sub(prev, m.p)), uo = unit(sub(next, m.p)), s = { x: ui.x + uo.x, y: ui.y + uo.y };
-      if (Math.hypot(s.x, s.y) < 0.2) { const t = { x: -ui.x, y: -ui.y }; m.r = m.side === 's' ? { x: -t.y, y: t.x } : { x: t.y, y: -t.x }; }
+      if (hypot(s.x, s.y) < 0.2) { const t = { x: -ui.x, y: -ui.y }; m.r = m.side === 's' ? { x: -t.y, y: t.x } : { x: t.y, y: -t.x }; }
       else m.r = unit({ x: -s.x, y: -s.y });
     }
   });
