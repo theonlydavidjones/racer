@@ -544,6 +544,13 @@ run time. So **new per-step work goes behind one cheap test, in a method of its 
 PR that adds lines to World.step runs perf-pair even when the lines look free. (A profile of a bundled build didn't
 show this cost; one of the trees loaded as perf-pair loads them, by vite's runnerImport, did.)
 
+**The same in aiThink** (irons, #441, 16 Nov 2026): the AI's way out of irons added about fifteen lines inline in aiThink,
+nearly all of them returning at once (a boat going astern is rare). perf-pair --ai against its main: 1.0301 inline;
+1.0224 with its one real cost (a polar lookup every think) made lazy; **1.0015** with the same lines moved into two
+functions of their own, entered from aiThink only behind one test (`b.astern > 0.05 || ai.gather`). The race the same.
+So the rule holds for aiThink as for World.step: any large function a step runs, new work goes behind one cheap test,
+in a function of its own.
+
 **The crew's state is built whole, as the Boat is** (the crew chain, 15 Nov 2026). CrewState's optional fields given
 mid-race, in a different order on each boat, made every read of them polymorphic: crewPhys.ts newCrew now declares all
 of them, undefined until given, as makeBoat does the Boat's. With that, and the together-set worked once with the worth
