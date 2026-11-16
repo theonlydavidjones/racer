@@ -221,7 +221,7 @@ export interface Boat {
    * angle (deg, 0..180) and the wind (kt) the tuning guide's settings are read at; her true wind over a few seconds (kt);
    * her heading smoothed over a few seconds and over LINE_TAU, and her true wind angle (unsigned) the guide was last read at (deg); and the
    * seconds till she's settled enough for her crew to go to the cabin top's lines, and since she last swung. In one Float64Array: read and written each
-   * step for each boat, as seven fields of their own each was a pointer to its own number elsewhere in memory, seven
+   * step for each boat, as fields of their own each was a pointer to its own number elsewhere in memory, seven
    * scattered reads a boat a step, and crewSettle took 18 µs a step in the race against 10 (Capacity, 16 Nov 2026). */
   settle?: Float64Array;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */

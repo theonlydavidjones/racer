@@ -324,8 +324,9 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   luff." The guide gives no jib Cunningham setting: the halyard is the jib's luff control (as on Josephine). Its
  *   most: 0.3 (the default, small wrinkles) below 5 kt, 0.6 (just smooth) to 15 kt, then free, as the main's Cunningham
  *   goes hard above 15 kt. The 0.3 and 0.6 are estimates of where the wrinkles go, not measured.
- * Each line's least and most, upwind (`tws` kt); off the wind, the crew sets them for shape alone. A setting changes
- * over a knot or so either side of the guide's wind, as a crew would.
+ * Each line's least and most, upwind (`tws` kt); off the wind, the crew sets them for shape alone. In the knot below
+ * each of the guide's wind ranges' edges either range's setting is the guide's (guideLimits, below); the kicker's rule
+ * holds from 18 kt itself.
  */
 /** The guide's beat settings give way to the crew's own off the wind over this much apparent angle (deg) of backlash:
  * the angle they're read at (Boat.settle, SETTLE.guideAwa) follows hers only once she's this far past it, so a course swinging about
@@ -343,19 +344,22 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
   // the lines for shape alone)
   const u = smooth((60 - Math.abs(awa)) / 20);
   if (u <= 0) return { min: {}, max: {} };
-  // (each of the guide's steps, its wind ranges' edges, a knot either side of it: there either range's setting is the
+  // (each of the guide's steps, its wind ranges' edges, and the knot below it: there either range's setting is the
   // guide's, so its floors are the lower range's, `down`, and its ceilings the higher's, `up`. Blended across the knot,
   // the band was a tenth of the outhaul's travel wide and slid a quarter of it a knot: a light breeze wandering across
   // 5 kt moved it out from under the setting each time, and the crew went up to move the outhaul 1.5 cm and back, every
   // minute and a half, Deep Physics' trace, 6 kt seed 15. North gives the ranges, "very light winds (0-5 knots)",
   // "medium winds (5-12 knots)", not a setting between them)
-  const down = (kt: number) => (tws >= kt + 1 ? 1 : 0), up = (kt: number) => (tws > kt - 1 ? 1 : 0);
+  // (floors from the range's edge itself, "above 15 knots", "5-12 knots"; ceilings a knot early, either range's setting
+  // in that knot: the window's one knot, not two, as the guide's wind is read with a knot's backlash already, guideKt.
+  // The kicker's ceiling is no range but a rule, "Never use the kickingstrap upwind in less than 18 knots": from 18 itself)
+  const down = (kt: number) => (tws >= kt ? 1 : 0), up = (kt: number) => (tws > kt - 1 ? 1 : 0);
   const outLo = 0.5 * down(5) + 0.5 * down(12), outHi = 0.5 * up(5) + 0.5 * up(12);
   const lo = (v: number, free = 0) => free + (v - free) * u, hi = (v: number) => 1 + (v - 1) * u;
   return {
     min: { outhaul: lo(Math.max(0, outLo - 0.05 * (1 - down(12)))), // (above 12 kt "all the way to the mark")
       cunningham: lo(0.9 * down(15)), traveller: lo(-0.4 + 0.35 * down(6) + 0.05 * down(14), -1), vang: lo(0.3 * down(18)) },
-    max: { outhaul: hi(Math.min(1, outHi + 0.05)), cunningham: hi(up(5)), jibHalyard: hi(0.3 + 0.3 * up(5) + 0.4 * up(15)), traveller: hi(-0.3 + 0.35 * up(6) + 0.95 * up(14)), vang: hi(0.1 + 0.9 * up(18)) }
+    max: { outhaul: hi(Math.min(1, outHi + 0.05)), cunningham: hi(up(5)), jibHalyard: hi(0.3 + 0.3 * up(5) + 0.4 * up(15)), traveller: hi(-0.3 + 0.35 * up(6) + 0.95 * up(14)), vang: hi(0.1 + 0.9 * down(18)) }
   };
 }
 

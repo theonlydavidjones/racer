@@ -1333,7 +1333,6 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
   else if (!leeMine) emit({ type: 'toast', msg: 'The jib sheets changed sides: the one you held is now the leeward sheet, and yours to trim (tap its Auto to give it to the crew).', ms: 5000 });
 }
 
-
 /** (crewSettle's imports, read once at load: loaded through a module runner, as perf-pair and perf.test load the sim,
  * each use of an imported name is a lookup in the module's namespace and a call to its getter, about 20 a call here:
  * Capacity, 16 Nov 2026) */

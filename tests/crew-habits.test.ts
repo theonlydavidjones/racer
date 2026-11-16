@@ -6,7 +6,7 @@ import type { Boat } from '../src/boat/boat';
 // Two of the crew's habits in light air, from Deep Physics' traces of crewstation's 6 kt races (16 Nov 2026).
 const crew = () => newCrew(JSON.parse(JSON.stringify(DEFAULT_CREW)), 'S');
 
-describe('Not moved for a point of sail she only passes through (physics.ts courseHeld, crewPhys.ts CrewCall.held)', () => {
+describe('Not moved for a point of sail she only passes through (crewWork.ts courseHeld, crewPhys.ts CrewCall.held)', () => {
   it('a slow penalty circle in 6 kt: nobody goes forward for the run, nor back for the beat', () => {
     // (a minute on a beat, then circling at 4°/s with a quarter of a knot of way, as a penalty turned at a crawl: before,
     // the bow hand went to the mast each time she passed about 120° off the wind and back as she came up)
