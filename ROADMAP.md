@@ -1799,6 +1799,9 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
     And with it each place's own depth: racing, the field takes the course's water's (its line and marks, by the swell
     at each), cruising the Central Bay's, one depth for all the water you see. (A depth that followed her boat ran the
     far water past as it changed: a sum of plane waves can't change its lengths in one place only.)
+  - **The depth varying across the water** (the Coordinator, 16 Nov 2026): one depth a World for now, so a boat sailing
+    into the South Bay's or San Pablo Bay's shoal water doesn't meet their shorter, steeper chop. It comes with Deep
+    Physics' (b), the old sea dying and a new one growing, where the field can change without sweeping the far water.
   - **The depths are the ENC's band middles** (a band 9–18 m deep reads 13.6 m). Open question: the chart reads 2.7 m
     (its 1.8–3.6 m band) for the Berkeley Circle at 37.857 N, 122.345 W; NOAA ENC (src/geo/data/enc-chart.json). Is
     that the band the Circle is in, or the polygon's edge? To check against chart 18649.

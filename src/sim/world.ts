@@ -2296,7 +2296,9 @@ export class World {
     // Gate). Cruising, the Central Bay's, the same way, over a kilometer's grid from the Gate to the Bay Bridge. Each
     // worked out once, an estimate, one depth for the whole field: a depth that followed her boat changed every wave's
     // length as she sailed, and the field, a sum of plane waves, ran past by the change times the distance from her,
-    // many times the waves' own speed 3 km off (tests/rushing.test.ts). Only the tide moves it, slowly.
+    // many times the waves' own speed 3 km off (tests/rushing.test.ts). Only the tide moves it, slowly. One depth a World
+    // for now: sailing on into the South Bay's or San Pablo Bay's shoal water she doesn't yet meet their shorter, steeper
+    // chop (ROADMAP: with the old sea dying and a new one growing, where the field can change without sweeping).
     if (!this.waveChart) {
       const pts = own ? Array.from({ length: 8 * 13 }, (_, n) => LL(37.79 + 0.01 * Math.floor(n / 13), -122.50 + 0.01 * (n % 13))).filter(q => !onLand(q)) : [this.C.center, ...this.C.marks.map(m => m.p)];
       let sum = 0, wt = 0; for (const q of pts) { const dq = chartDepth(q); if (dq == null) continue; const k = this.seaHere(q).hsS + 0.05; sum += k * dq; wt += k; }
