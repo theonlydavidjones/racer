@@ -152,11 +152,33 @@ export class Hud {
    * for the heading she'd sail on the other tack (or after a gybe), a white one for her average close-hauled heading
    * on this tack. Steer above the average and she's lifted, below it headed: the pod's label says by how much.
    */
+  /** What the compass tape last drew (compass): its size and its angles, to a twentieth of a degree. */
+  private tapeKey: number[] = [];
   private compass(w: SimView, u: Boat, dt: number): void {
-    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), cx = W / 2, span = 50, px = (W - 12) / (2 * span);
+    // (the state first, every frame: the heading's figure, the close-hauled mean and its lifted/headed note)
+    const h = u.h, hdg = String(Math.round(n360(h)) % 360).padStart(3, '0') + '°', hEl = $('hdg');
+    if (hEl.textContent !== hdg) hEl.textContent = hdg;
+    const upwind = u.twa < 80, from = u.ww.from;
+    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
+    // average close-hauled heading on this tack: a slow running mean while you're close-hauled
+    if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
+    const mean = this.meanHdg[u.tack], lift = $('hdgLift');
+    let note = '', cls = '';
+    if (upwind && mean != null) {
+      const d = wrap(h - mean) * (u.tack === 'S' ? -1 : 1); // starboard: lifted when heading is higher (smaller) than the mean
+      if (Math.abs(d) >= 3) { note = d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`; cls = d > 0 ? 'lift' : 'head'; }
+    }
+    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls; }
+    const m = w.nextMark(u), markB = m ? brg(m.p.x - u.x, m.p.y - u.y) : null;
+    // the tape: drawn again only when something on it has moved (a twentieth of a degree is about a tenth of a pixel on
+    // it) or it's changed size. Steady on a course it was the same picture redrawn every frame
+    const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), q = (a: number) => Math.round(a * 20);
+    const key = [W, H, q(h), q(other), upwind && mean != null ? q(mean) : -1, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
+    if (k0.length === key.length && key.every((v, i) => v === k0[i])) return;
+    this.tapeKey = key;
+    const cx = W / 2, span = 50, px = (W - 12) / (2 * span);
     ctx.clearRect(0, 0, W, H);
-    const h = u.h, x = (b: number) => cx + wrap(b - h) * px;
-    $('hdg').textContent = String(Math.round(n360(h)) % 360).padStart(3, '0') + '°';
+    const x = (b: number) => cx + wrap(b - h) * px;
     // ticks every 5°, longer every 10°, numbers every 30° (N E S W at the cardinals)
     ctx.strokeStyle = 'rgba(150,196,218,.45)'; ctx.fillStyle = '#9fb3bf'; ctx.font = '700 9px system-ui, sans-serif'; ctx.textAlign = 'center';
     for (let d = Math.ceil((h - span) / 5) * 5; d <= h + span; d += 5) {
@@ -174,25 +196,14 @@ export class Hud {
     };
     // a small tick under the tape (the other tack, the average): only while it's on the tape
     const low = (b: number, col: string) => { const X = x(b); if (X < 2 || X > W - 2) return; ctx.fillStyle = col; ctx.fillRect(X - 1, H - 10, 2, 10); };
-    const upwind = u.twa < 80, from = u.ww.from;
-    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
     low(other, '#7f949f');
-    // average close-hauled heading on this tack: a slow running mean while you're close-hauled
-    if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
-    const mean = this.meanHdg[u.tack], lift = $('hdgLift');
-    let note = '', cls = '';
-    if (upwind && mean != null) {
-      low(mean, '#e8e8e8');
-      const d = wrap(h - mean) * (u.tack === 'S' ? -1 : 1); // starboard: lifted when heading is higher (smaller) than the mean
-      if (Math.abs(d) >= 3) { note = d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`; cls = d > 0 ? 'lift' : 'head'; }
-    }
-    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls; }
+    if (upwind && mean != null) low(mean, '#e8e8e8');
     top(from, '#6fb7ff');
-    const m = w.nextMark(u);
-    if (m) top(brg(m.p.x - u.x, m.p.y - u.y), '#ffd21a');
+    if (markB != null) top(markB, '#ffd21a');
     // the lubber line
     ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
   }
+
 
   private trCache: { key: string; t: ReturnType<SimView['laylineTransit']> } = { key: '', t: null };
   /**

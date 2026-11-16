@@ -315,7 +315,10 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
-8m2. **Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid** (owner, 15 November; bug;
+8m3. **The bow-line let-go bumps the next boat in a northerly** (now, Marinas; from their own work, 16 November; their entry and fix land in v201).
+   Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
+
+8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
    now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
    main issue is that her bow starts turning west, since the wind is pushing her hard. ... she doesn't seem to get
    underway until the pushoff animation stops ... so i keep getting pushed into other boats long before i have a chance
@@ -724,7 +727,7 @@ What's planned, roughly in order. Done work is described in the README.
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
-   - **The inset map is lagging again** (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
+   - ~~**The inset map is lagging again**~~ (done, v200: claude/inset-lag) (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
      again." Recent changes to the chart: dbb27a7e (the layers switch at once: each field kept, each kind's streaks its
      own), caae0506 (chart-skip-3d, batch 42b), the harbor lee's cells (3c80d150) and the wind shadows' skip
      (aa6471f7). Measure the inset's draw time per frame against the published version before these (perf-ab's views,
@@ -798,7 +801,7 @@ What's planned, roughly in order. Done work is described in the README.
        - US spelling; keep the existing part names.
        - The visual-checker, both sides and both tacks.
        - Keep ASA 101 knowledge items 1–3 covered (design/ASA-101-CHECK.md).
-   - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
+   - ~~**The start-line drill teaches you to find the favored end yourself**~~ (done, v200: favored-end) (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
      water before the gun, with the answer only after you've judged:
@@ -846,7 +849,7 @@ What's planned, roughly in order. Done work is described in the README.
      draw and describe only the sail that's up. There's no slot then: no jib bending the flow onto the main's lee side,
      no main's upwash on the jib. A lowered sail's telltales go too. The physics' own sail forces should be checked the
      same way.
-   - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
+   - ~~**The passage plan's track: hairpins and doubling back**~~ (done, v200: the isochrone router) (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
      The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and jibes whenever she's
      more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
@@ -1559,7 +1562,7 @@ Also asked for:
 - **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
 - **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
 - **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
-  - **The boom's place on a beat** (Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
+  - **The boom's place on a beat** (next for Deep Physics, after the beat angle in chop; Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
   conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
   competition, and trim and tuning by phase ("it starts light, so…; it'll build late, so watch…"), with specifics.
