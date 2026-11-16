@@ -92,7 +92,7 @@ describe('pushed off astern', () => {
       const w = sail(id, from, kt), u = w.user; for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
       expect(u.docked?.slip, `${id}: a save naming it puts her there`).toBe(id);
       const ww = (w as unknown as { windHere: (a: unknown, b: unknown, c: boolean) => { from: number; kt: number } }).windHere(u, u, false);
-      const plan = pushOffPlan(slipById(id)!, ww.from, ww.kt), astern = plan.kind === 'astern', walked = plan.kind === 'swing' && plan.pivot === 0, went = w.pushOff(), msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
+      const plan = pushOffPlan(slipById(id)!, ww.from, ww.kt), astern = plan.kind === 'astern', walked = plan.kind === 'swing' && !!plan.walk, went = w.pushOff(), msgs = w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg);
       // (walked out to the fairway instead: held to the bar any push-off is, the physics review, 15 Nov 2026: let go, the
       // jib up, touching nothing, her hull well out, with way on)
       let clean = '';
@@ -128,10 +128,13 @@ describe('pushed off astern', () => {
       sw: run(NO_ASTERN_WEST, 225, 12), nw: run(NO_ASTERN_WEST, 315, 12), north: run(NO_ASTERN, 0, 12), // (the edges of the westerly's band, and the six in a northerly)
       light: run(NO_ASTERN_WEST, 270, 4), northWest: run(NO_ASTERN_WEST, 0, 12), // (the westerly's six, in light air and in a northerly: shoved off as from any berth where they're planned astern, or kept fast as any berth without clear water)
     };
+    // (16 Nov 2026, with the walk-out turned by a hand on the dock, or on a slip line round the cleat in 15 kt and less, set
+    // to leeward as she comes round: the physics review. Walked out to mid-fairway and turned there with nobody on the dock,
+    // most of these got out before)
     expect(got).toEqual({
-      west12: { out: 8, kept: ['south-beach:G88', 'richmond-yc:F2', 'horseshoe-bay:C22', 'west-harbor:507'] },
+      west12: { out: 7, kept: ['south-beach:G88', 'richmond-yc:E31', 'richmond-yc:F2', 'horseshoe-bay:C22', 'west-harbor:507'] },
       sw: { out: 6, kept: [] }, nw: { out: 6, kept: [] },
-      north: { out: 6, kept: [] }, // (G88, E31 and E35 walked out on their lines since the stern-line walk-out, 16 Nov 2026)
+      north: { out: 4, kept: ['south-beach:G88', 'richmond-yc:E31'] },
       light: { out: 5, kept: ['west-harbor:507'] }, northWest: { out: 6, kept: [] },
     });
   }, 300_000);
@@ -174,17 +177,21 @@ describe('pushed off astern', () => {
     return { went, want };
   };
   for (const [from, name] of [[0, 'northerly'], [90, 'easterly']] as const) it(`in a 20 kt ${name}, she stops where the plan meant her to (a meter short of its clear water, or her steerage floor's glide): within 15%, stern first, the helm amidships`, () => {
+    // (the berths whose plan in that wind, or the lighter wind a lee gives her, is a shove she's let go from: since the walk-out
+    // and the shove are held to the force a crew has and to clear water, 16 Nov 2026, few are; up to a dozen of them)
     const bad: string[] = []; let n = 0;
-    for (const H of HARBORS) {
-      const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
-      const k = Math.min(6, all.length);
-      for (let i = 0; i < k; i++) {
-        const s = all[Math.floor(i * all.length / k)];
-        const g = glideAt(s, from); if (!g) continue;
-        n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
-      }
+    // (every third bow-in berth looked at: planning them all is minutes)
+    for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 3 === 0)) {
+      if (n >= 12) break;
+      if (![20, 16, 12].some(kt => { const p = pushOffPlan(s, from, kt); return p.kind === 'astern' && !p.noRoom; })) continue;
+      const g = glideAt(s, from); if (!g) continue;
+      n++; if (Math.abs(g.went - g.want) > 0.15 * g.want) bad.push(`${s.id}: sailed ${g.went.toFixed(1)} m against ${g.want.toFixed(1)}`);
     }
-    expect(n).toBeGreaterThanOrEqual(3); expect(bad).toEqual([]);
+    // (in a 20 kt northerly no berth is shoved off astern and let go any more, 16 Nov 2026: the shove would leave her within
+    // 60 degrees of the wind or pointing back into her slip, and she's walked out or kept fast. The easterly keeps the
+    // property tested; should a northerly shove come back, this asks for it to be held to the glide too)
+    if (from === 0) expect(n).toBe(0); else expect(n).toBeGreaterThanOrEqual(1); // (a property of every such shove: at least one case)
+    expect(bad).toEqual([]);
   }, 600_000);
   // (Corinthian B16 in the northerly and Horseshoe Bay A27 in the easterly were each held apart for a time as known
   // failures: let go in a lee, the land's or the harbor's, and drifting out of it into more wind, B16 sailed 17.7 m
