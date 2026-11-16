@@ -746,7 +746,7 @@ export class World {
   get cruising(): boolean { return this.freeSail || !!this.user?.retired; }
   nextMark(b: Boat): CourseMark | null { if (this.rounding && b === this.user) return this.rounding.mark; return this.freeSail || (b.isUser && b.retired) ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
-  obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
+  obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !this.cancelled && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; } // (called off, she's not racing: no penalty for crossing it on her way home)
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
     const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
@@ -1716,9 +1716,11 @@ export class World {
    * Racing called off, however it was (N, N over H, N over A): no penalty is left to take. "A race that a race committee
    * … abandons is void but may be resailed" (Definitions, Abandon); a boat is racing only "until the race committee
    * signals a general recall, postponement or abandonment" (Definitions, Racing), and a penalty is for an incident "while
-   * racing" (44.1). (So Appendix P3 for its own penalty: "the penalty is cancelled".) A resail is a new race: nothing owed
-   * carries into it, but rules 30.3 and 30.4's disqualifications, which say so, and do (scored as they are). Each step
-   * while called off: whatever calls it off, and a penalty given in the same step, are covered.
+   * racing" (44.1). (So Appendix P3 for its own penalty: "the penalty is cancelled".) A resail is a new race: a breach in
+   * the first "shall not … cause a boat to be penalized except under rule 2, 30.2, 30.4 or 69 or under rule 14 when she has
+   * caused injury or serious damage" (rule 36(b)); turns owed under 44.1 aren't among them, and 30.3's UFD lapses ("but
+   * not if the race is restarted or resailed"). Each step while called off: whatever calls it off, and a penalty given in
+   * the same step, are covered.
    */
   private penaltiesVoid(): void {
     for (const b of this.boats) if (b.penalty > 0 || b.penaltyDir) {
@@ -2786,6 +2788,7 @@ export class World {
    * conduct (ai/conduct.ts) decides; you take yours or not by steering them. Umpired, it's owed. `t`: the incident's time.
    */
   penaltyFor(b: Boat, t = this.userIncident?.t ?? this.t): void {
+    if (this.cancelled) return; // (an incident reviewed after the call-off: no race left to take it in)
     if (this.protestsOn && b.ai && !takesPenalty({ fouled: true, since: this.t - t }, this.conductRng())) { this.declined.add(`${b.id}@${t}`); return; }
     this.assignPenalty(b);
   }
@@ -2798,7 +2801,7 @@ export class World {
     }
     // (turns done count only before she finishes: at or near the line her hull must be on the course side before she
     // finishes, 44.2, and the sim doesn't have her finish again)
-    for (const p of this.protests) { const vs = this.boats[p.vs]; if (p.owed && p.turnsT == null && !vs.finished && vs.penalty <= 0) p.turnsT = this.t; }
+    for (const p of this.protests) { const vs = this.boats[p.vs]; if (p.owed && p.turnsT == null && !vs.finished && vs.penalty <= 0 && !this.cancelled) p.turnsT = this.t; } // (a penalty voided by the call-off wasn't taken: rule 36(b))
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
