@@ -118,6 +118,11 @@ export function driveSpeed(b: Boat, K: number): number {
  * How fast she'd go with these settings, relative (the same factors physics.ts multiplies the polar by: the sails'
  * angle of attack and shape as drive, heel past her best, and the drag of the helm the sails demand).
  */
+/** How far under the crew's 6° of helm the coach's own forecast of it must be before it counts on them coming back off
+ * their depowering: its helm runs within a few tenths of the boat's (4.54° against 4.50°, 6.0° against 6.12°), and at
+ * the limit itself it promised the whole step's gain for a sheet eased to where the boat still held 6.1° and the crew
+ * stayed put (old sails, 20 kt, the main bar-tight: 0.29 m/s promised, 0.08 paid). */
+const HELM_SURE = 0.3;
 export function speedFactor(b: Boat, c: Controls, now = false): number {
   // (twice: her heel with these sails changes the wind the sails see (heeled, the apparent wind across them is the
   // narrower), and the crew sheet to that wind as she comes up or goes down (physics.ts crewMainAngle, on awaSlow), so a
@@ -132,7 +137,7 @@ export function speedFactor(b: Boat, c: Controls, now = false): number {
   const up = Math.abs(b.awaSlow) < 70, cs0 = b.crew, maxed = !cs0 || !!cs0.place?.across || !!cs0.allOut;
   const goal = b.depowerBest ?? (up ? clamp((b.ww.kt - 14) / 10, 0, 1) : 0), slack = 0.03 + 0.07 * (1 - crewSkill(b.crew));
   // (her lines as they are: she's settled there already, at the step they hold (near 6° of helm it rests on that limit))
-  let d1 = now || !up ? d0 : Math.abs(first.helm) > 6 && maxed ? 1 : d0 > goal + slack && Math.abs(first.helm) < 6 ? goal + slack : d0 < goal - slack && maxed ? goal - slack : d0; // (they stop once within their slack of it)
+  let d1 = now || !up ? d0 : Math.abs(first.helm) > 6 && maxed ? 1 : d0 > goal + slack && Math.abs(first.helm) < 6 - HELM_SURE ? goal + slack : d0 < goal - slack && maxed ? goal - slack : d0; // (they stop once within their slack of it)
   // (coming back off the steps, they stop where the helm reaches 6° again, if it does before their fastest step: there
   // the helm holds them, as the step's own rule does)
   if (!now && d1 === goal + slack && d0 > d1) {

@@ -196,7 +196,7 @@ export function sailForces(aws: number, awa: number, main: { trim: SailTrim; sha
   const mainF = oneSail(q, a, ce, luffing, Am, clM, cdM, fM, false, main.trim, main.shape);
   const jibF = jib ? oneSail(q, a, ce, luffing, Aj, clJ, cdJ, fJ, true, jib.trim, jib.shape) : { heel: 0, drive: 0 };
   // the main eased across the band between its best place and the luff (trim.ts mainBandLoss, measured on Fujin): its
-  // heeling force goes at 2.5% a degree, and the rig's drive in step with the rig's side force
+  // heeling force goes at 3.4% a degree, and the rig's drive in step with the rig's side force
   const band = luffing ? 0 : mainBandLoss(main.trim.err, bandRate) * (1 - downwindness(b));
   if (band > 0) { const cut = mainF.heel * band, side = mainF.heel + jibF.heel; if (side > 1) mainF.drive -= (cut / side) * (mainF.drive + jibF.drive); mainF.heel -= cut; }
   // centre of effort (eq. 5.39), lowered as she's depowered (eq. 5.40), above the hull's centre of pressure

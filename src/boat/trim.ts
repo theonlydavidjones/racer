@@ -77,14 +77,18 @@ const luffStart = (sail: SailName) => (sail === 'main' ? LUFF_START + MAIN_TWIST
  * CARRIED ACROSS, as ESTIMATES:
  * - twist at 80% of the height to the ease of the sail as a whole: about half (the twist grows from nothing at the boom,
  *   and most of the cloth is low), so 2.2% of the rig's heeling moment per degree of mean ease;
- * - to this boat: Fujin is a 10.35 m, 3.86 t fractional sloop whose main is 56% of her sail area; the Folkboat's is
- *   about 70%, and the loss is put on the main's own heeling force here: 2.5% a degree (the Coordinator's ruling,
- *   16 Nov 2026; with the error bars it could be half or nearly twice that);
+ * - to the main alone: only the main was eased, so all of that loss was the main's. Her main makes between 56% of the
+ *   rig's heeling moment (its share of the sail area, 33.2 of 59.3 m2) and 68% (area times the height of each sail's
+ *   centroid, about 6.2 m against 3.7 m), so the main lost 2.2 / 0.68 to 2.2 / 0.56 = 3.2 to 3.9% of its own a degree;
+ *   3.4% here, toward the low end as the heavier weighting is the truer one for a moment (the Coordinator's ruling,
+ *   16 Nov 2026: the main alone, at the middle of the range). With the error bars it could be half or nearly twice that;
+ * - to this boat: Fujin is a 10.35 m, 3.86 t fractional sloop; the Folkboat's main is about 70% of her sail area, so
+ *   the same loss on her main takes a little more off the whole rig;
  * - the drive: flat to the best trim, then falling in step with the side force (Table 3: -11% against -10%), the same
  *   share of the rig's drive as of its side force.
  * Past the band she luffs as she always has: the luff's width and what a luffing main costs are unchanged.
  */
-export const BAND_HEEL_PER_DEG = 0.025;
+export const BAND_HEEL_PER_DEG = 0.034;
 /** Degrees the main is eased into the band (0 to MAIN_TWIST_MID), from its trim's `err`. */
 export const mainBandDeg = (err: number): number => clamp(-err - LUFF_START, 0, MAIN_TWIST_MID);
 /** The share of the main's heeling force lost there, at `rate` a degree (BAND_HEEL_PER_DEG; a test tries others). */

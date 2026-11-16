@@ -54,21 +54,26 @@ describe('Heel from the forces on the sails', () => {
     // 16 Nov 2026). The bound before was "more than 4° off", set from the earlier sail model, in which the eased main
     // shed its heeling force at about 7.5% a degree; superseded by Fujin (Tahara et al. 2012, Table 3: trim.ts).
     //  - the car's 0.6 swings the boom 0.6 × TRAVELLER_SWING = 5.7°; the first 2° cost nothing, so 3.7° of it count;
-    //  - the main's heeling force goes at 2.5% a degree (BAND_HEEL_PER_DEG): 9.3%; the main is SAILS.main.share of the
-    //    rig, so the rig's heeling moment falls 6.5%;
+    //  - Fujin's rig lost 17.6% of what heels her (CY × the center's height: 1.37 × 5.96 to 1.23 × 5.47) over 15.9° of
+    //    twist at 80% of the height, about 8° of ease for the sail as a whole: FUJIN_RIG = 2.2% a degree, for the whole
+    //    rig. (The paper's figure, not the sim's constant: trim.ts BAND_HEEL_PER_DEG is that carried to the main alone.)
+    //    So 3.7° takes 8.1% off the rig's heeling moment;
     //  - her heel is where that moment meets her righting moment, hull and crew (hullRighting, crewMoment), from the
     //    heel she had: `predicted` below. The sails' gain as she stands up isn't in it.
     //  - the band: Fujin's points carry ±0.1 on CY of about 1.3, so the change between two of them (0.14) is known to
     //    about ±75%: from a quarter of the prediction to one and three quarters of it. Too little fails, and too much.
+    const FUJIN_RIG = 0.022;
     const b0 = beat(22, undefined, true), eased = beat(22, c => { c.traveller = Math.min(1, c.traveller + 0.6); });
     const righting = (h: number) => hullRighting(h, displacement(b0.crew!.spec), crewMass(b0.crew!.spec)) + crewMoment(b0.crew!, h);
     const heelFor = (moment: number) => { let lo = 0, hi = 60; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (righting(m) < moment) lo = m; else hi = m; } return (lo + hi) / 2; };
-    const predictedOff = (rate: number) => b0.heelMag! - heelFor(righting(b0.heelMag!) * (1 - SAILS.main.share * rate * (0.6 * TRAVELLER_SWING - 2)));
-    const predicted = predictedOff(BAND_HEEL_PER_DEG), off = b0.heelMag! - eased.heelMag!;
+    const predictedOff = (rigRate: number) => b0.heelMag! - heelFor(righting(b0.heelMag!) * (1 - rigRate * (0.6 * TRAVELLER_SWING - 2)));
+    const predicted = predictedOff(FUJIN_RIG), off = b0.heelMag! - eased.heelMag!;
     expect(off, `the traveler's 0.6 takes off ${off.toFixed(1)}°; Fujin's figures give ${predicted.toFixed(1)}°`).toBeGreaterThan(0.25 * predicted);
     expect(off).toBeLessThan(1.75 * predicted);
-    // (the check itself: the earlier model's rate, 7.5% a degree, is outside the band)
-    expect(predictedOff(0.075)).toBeGreaterThan(1.75 * predicted);
+    // (the check itself: the earlier model's rate, 7.5% of the main's a degree, SAILS.main.share of that for the rig, is
+    // outside the band; and so is a main that sheds nothing)
+    expect(predictedOff(SAILS.main.share * 0.075)).toBeGreaterThan(1.75 * predicted);
+    expect(predictedOff(0)).toBeLessThan(0.25 * predicted);
     expect(beat(22, c => { c.backstay = 0; c.outhaul = 0; }).heelMag!).toBeGreaterThan(base + 1); // fuller: more power, more heel
   });
   it('in a moderate breeze the crew hike to hold her; depowering lets them hike less', () => {
@@ -130,8 +135,10 @@ describe('Helm balance (weather helm)', () => {
     // Coordinator, 16 Nov 2026.)
     const easedHelm = beat(16, c => { c.mainsheet += 0.25; }).helmNeed!, floor = SAILS.main.share * 6 * BAND_HEEL_PER_DEG * base;
     expect(base - easedHelm, `helm ${base.toFixed(2)}° to ${easedHelm.toFixed(2)}°, the band alone gives ${floor.toFixed(2)}°`).toBeGreaterThan(floor);
-    // (the check itself: a main that kept all its side force across the band, the helm unmoved, fails)
-    expect(base - base).not.toBeGreaterThan(floor);
+    // (the check itself: with the main only 2° eased, inside the part that costs nothing, the helm hasn't moved by the
+    // floor: so the floor is passed by the band's loss, not by any ease at all)
+    const hardly = beat(16, c => { c.traveller = Math.min(1, c.traveller + 1.5 / TRAVELLER_SWING); }).helmNeed!;
+    expect(base - hardly).toBeLessThan(floor);
   });
   it('let go of the tiller with weather helm and she rounds up into the wind', () => {
     const b = beat(16), twa0 = b.twa;
