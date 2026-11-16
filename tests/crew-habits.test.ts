@@ -98,13 +98,13 @@ describe('Up at the cabin top, they see to what\'s coming due there in the same 
     expect(bad.slice(0, 5), 'posed forward with their place still in the cockpit').toEqual([]);
   });
   it('sent up for the Cunningham, the outhaul a little off is trimmed while they\'re there, not a trip of its own later', () => {
-    // (a beat in 16 kt, settled; then the Cunningham let right off, below the guide's floor, a trip at once, and the outhaul a tenth off where they
+    // (a beat in 16 kt, settled; then the Cunningham let right off, below the guide's floor, a trip at once, and the outhaul 3% off where they want it, not urgent
     // want it, set half a minute ago, so a trip for it waits till a minute, LINE_GAP. Before, it got a trip of its own when the wait ran out:
     // the Cunningham and the outhaul a trip each, 94 s apart, crewcruise's 6 kt beam reach)
     const b: Boat = testBoat({ heading: 315, kt: 5, windKt: 16 }); b.crew = crew();
     const c = b.crew, jobs: { t: number; line: string }[] = [], had = c.people.map(() => null as string | null);
     sail(b, 300, t => {
-      if (Math.abs(t - 120) < 1 / 120) { b.ctl.cunningham = 0; b.ctl.outhaul = Math.max(0, (b.crewPlan?.outhaul ?? b.ctl.outhaul) - 0.1); (c.lineSet ??= {}).outhaul = (c.clock ?? 0) - 30; }
+      if (Math.abs(t - 120) < 1 / 120) { b.ctl.cunningham = 0; b.ctl.outhaul = Math.max(0, (b.crewPlan?.outhaul ?? b.ctl.outhaul) - 0.03); (c.lineSet ??= {}).outhaul = (c.clock ?? 0) - 30; }
       c.people.forEach((a, i) => { const j = a.job?.line ?? null; if (j && j !== had[i] && t > 120 && (j === 'cunningham' || j === 'outhaul')) jobs.push({ t, line: j }); had[i] = j; });
     });
     const cun = jobs.find(j => j.line === 'cunningham'), out = jobs.find(j => j.line === 'outhaul');

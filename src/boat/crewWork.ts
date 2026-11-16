@@ -334,7 +334,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         // sheet or the pole, is still to do, and isn't left wrong for LINE_GAP)
         // (and what it was set for: the angle and the wish when they chose where to set it, at the start; stamped at the
         // end, a line set through a bear-away was judged against the run's angle and left at the reach's setting)
-        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; (c.lineTwa ??= {})[j.line] = j.refTwa ?? b.twa ?? 0; (c.lineRef ??= {})[j.line] = j.to ?? b.ctl[j.line as Ctl]; }
+        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; c.pianoWho = i; (c.lineTwa ??= {})[j.line] = j.refTwa ?? b.twa ?? 0; (c.lineRef ??= {})[j.line] = j.to ?? b.ctl[j.line as Ctl]; }
         a.job = null;
       }
     }
@@ -382,8 +382,11 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (free there, or just done with a line there and not yet gone back: the job's end and their step aft are the same
       // moment; and this line a step along the cabin top from them, the Cunningham's place to the piano's, 0.75 m)
       const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
-      const atIt = !a.job && (there || trip < 1) && Math.abs((stationFor(k, who, windward, false)?.z ?? a.z) - a.z) < STEP_ALONG, f = atIt ? BATCH : 1;
-      const th = f * startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
+      // (theirs: the hand who was there, not a mate sat within a step of it; and the wish over the cycle off the same way
+      // too, by as much: not a 20 s puff's setting, to be undone with a walk of its own, the physics review)
+      const atIt0 = !a.job && (there || (trip < 1 && c.pianoWho === who)) && Math.abs((stationFor(k, who, windward, false)?.z ?? a.z) - a.z) < STEP_ALONG;
+      const th0 = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k], dc = ls[k] - b.ctl[k];
+      const atIt = atIt0 && dc * dn > 0 && Math.abs(dc) >= BATCH * th0, f = atIt ? BATCH : 1, th = f * th0;
       if (Math.abs(dl) < f * startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
       // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
       // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the

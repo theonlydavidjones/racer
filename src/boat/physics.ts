@@ -1362,11 +1362,13 @@ function crewSettle(b: Boat, dt: number): void {
     // (not while she's swinging, or till she's held a course NEW_HELD after: the angles she turns through aren't a course.
     // Dragged round by a slow penalty circle on the beat, it came back through the backlash and the blend over a minute,
     // and the vang came off in two trips, crewstation's 6 kt seed 14; a new course is read at once when it's held, below)
+    // (held only against loosening: coming up through the swing, the beat's settings, the vang's ceiling under 18 kt, come
+    // in as she comes up, as before; frozen, they came 10 s after a rounding, the physics review)
     if (!b.crewReady) s[SETTLE.guideAwa] = a;
     else if (s[SETTLE.since] >= NEW_HELD) {
       s[SETTLE.guideAwa] = clamp_(s[SETTLE.guideAwa], a - bl, a + bl);
       const off = a - s[SETTLE.guideAwa]; if (Math.abs(off) > GUIDE_DEAD_) s[SETTLE.guideAwa] += (off - Math.sign(off) * GUIDE_DEAD_) * Math.min(1, dt / LINE_GAP_);
-    } }
+    } else s[SETTLE.guideAwa] = Math.min(s[SETTLE.guideAwa], a + bl); }
   // (and the wind it's read for: the breeze she's sailing in, not each puff. Read again only once it's GUIDE_KT_ from where
   // it was read: up to her wind over a few seconds as it builds, down to her wind over 20 s as it falls. In 4-6 kt, a
   // breeze wandering across the guide's 5 kt step sent them to the outhaul and back, three times in a beat)
