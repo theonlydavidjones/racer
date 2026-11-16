@@ -1718,6 +1718,11 @@ function syncLines(m: BoatMesh, b: Boat): void {
   const L2 = m.lines, c = b.ctl, lee = b.tack === 'S' ? -1 : 1; // the leeward side (x sign)
   // traveller car: +1 is to leeward; the mainsheet runs from the boom end down to it
   const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
+  // (the windward traveller line's tail up to the hiker holding it, if one is: Crew.travHand; else hanging from its cam)
+  { const th = (m.crew as { travHand?: THREE.Vector3 }).travHand;
+    for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
+      if (th && Math.sign(th.x) === side) pa.setXYZ(3, th.x, th.y, th.z); else pa.setXYZ(3, pa.getX(2) - side * 0.02, pa.getY(2) - 0.2, pa.getZ(2) - 0.03);
+      pa.needsUpdate = true; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
   // (four parts between the car's block and the two blocks under the boom, the after one then the forward one, then the
