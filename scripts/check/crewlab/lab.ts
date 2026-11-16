@@ -78,6 +78,11 @@ const lab = {
   tack() { (lab as any).hold = null; startTack(b); },
   /** The rudder (and tiller) held at `deg` (+ the blade to starboard, as b.helm), or null to let the physics have it. */
   rudder(deg: number | null) { (lab as any).rud = deg; for (let i = 0; i < 60; i++) { if (deg != null) b.helm = deg / FULL_RUDDER; syncBoatMesh(m!, b, t += 1 / 60); } render(); },
+  /** The helm calls the turn ("Ready about", "Ready to jibe"): the crew get ready for it (the helper's clock starts again
+   * each step, so a call at 0 is always just made). */
+  call() { b.callT = 0; },
+  /** The crew struck by the boom, out of it for good (crewPhys.ts outUntil). */
+  strike() { for (const a of b.crew!.people.slice(1)) (a as { outUntil?: number }).outUntil = Infinity; },
   holdNow() { (lab as any).hold = b.h; },
   /** The wind on the water now (kt): a puff or a lull. */
   wind(kt: number) { b.ww = { ...b.ww, kt }; },

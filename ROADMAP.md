@@ -29,11 +29,22 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   reefing (reefing still waits on a Folkboat source); a cruising log.
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; ~~chunky generic moored boats in the marinas~~ (done: the slips within 120 m of the camera drawn in detail, boot stripe and bottom paint, cockpit well, raked cabin with its windows, shrouds and spreaders, pulpits and lifelines; the rest with bottom paint, shrouds and a cockpit sole; render/mooredNear.ts). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
-- **The beat angle in chop jumps** (for Deep Physics; from the cross-World leak's review): speedInChop × cos(twa) has
+- **The beat angle in chop jumps** (fixed on a branch, 8e8e7c06, the angle's choice blended; awaiting the batch; Deep Physics, 16 November; from the cross-World leak's review): speedInChop × cos(twa) has
   steps where driveCurveFor (boat/driveCurve.ts) rounds the angle to 5° bins and the wind to whole knots, unblended,
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **AI steering in a dying breeze** (Skipper Model, after their irons PR; the Coordinator, 16 November; found by Crew
+  Model's crewstation work): in races whose 6 kt westerly dies to 1–4 kt, the AI's tacks stall at about 2.3 kn and fall
+  off the long way round through a jibe, and its desired heading flips 190↔284 every 10–20 s, or zig-zags 55°↔105–160°
+  true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
+  tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 11, 14, 20 and 21: held there as an `it.fails` case,
+  which goes red when this is fixed and is then switched to a normal test.
+- **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
+  estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
+  put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
+  Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
+  perf-pair --ai, then the physics-reviewer.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
@@ -316,7 +327,10 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
-8m2. **Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid** (owner, 15 November; bug;
+8m3. **The bow-line let-go bumps the next boat in a northerly** (now, Marinas; from their own work, 16 November; their entry and fix land in v201).
+   Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
+
+8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
    now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
    main issue is that her bow starts turning west, since the wind is pushing her hard. ... she doesn't seem to get
    underway until the pushoff animation stops ... so i keep getting pushed into other boats long before i have a chance
@@ -725,7 +739,7 @@ What's planned, roughly in order. Done work is described in the README.
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
-   - **The inset map is lagging again** (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
+   - ~~**The inset map is lagging again**~~ (done, v200: claude/inset-lag) (owner, 15 November; regression; now; 1–3 h): "inset map is really lagging
      again." Recent changes to the chart: dbb27a7e (the layers switch at once: each field kept, each kind's streaks its
      own), caae0506 (chart-skip-3d, batch 42b), the harbor lee's cells (3c80d150) and the wind shadows' skip
      (aa6471f7). Measure the inset's draw time per frame against the published version before these (perf-ab's views,
@@ -799,7 +813,7 @@ What's planned, roughly in order. Done work is described in the README.
        - US spelling; keep the existing part names.
        - The visual-checker, both sides and both tacks.
        - Keep ASA 101 knowledge items 1–3 covered (design/ASA-101-CHECK.md).
-   - **The start-line drill teaches you to find the favored end yourself** (owner, 15 November; feature; 4–6 h): "start
+   - ~~**The start-line drill teaches you to find the favored end yourself**~~ (done, v200: favored-end) (owner, 15 November; feature; 4–6 h): "start
      line training also needs to help me learn which side is favored and why." Then: "don't just show me which line is
      favored. help me learn how to find that out myself." The drill teaches the methods racers actually use, done on the
      water before the gun, with the answer only after you've judged:
@@ -847,7 +861,7 @@ What's planned, roughly in order. Done work is described in the README.
      draw and describe only the sail that's up. There's no slot then: no jib bending the flow onto the main's lee side,
      no main's upwash on the jib. A lowered sail's telltales go too. The physics' own sail forces should be checked the
      same way.
-   - **The passage plan's track: hairpins and doubling back** (owner, 15 November, from a screenshot of Horseshoe Bay to
+   - ~~**The passage plan's track: hairpins and doubling back**~~ (done, v200: the isochrone router) (owner, 15 November, from a screenshot of Horseshoe Bay to
      the Berkeley side; accuracy; 3–6 h): "explain this routing to me. why does it need that awkward first big jibe?"
      The plan (sim/routing.ts sailLeg, plan 'middle') sails the run at her deepest VMG angle and jibes whenever she's
      more than 12% of the leg's length off the straight line, measured over the ground. In a strong cross-current the
@@ -1560,7 +1574,7 @@ Also asked for:
 - **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
 - **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
 - **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
-  - **The boom's place on a beat** (Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
+  - **The boom's place on a beat** (next for Deep Physics, after the beat angle in chop; Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
   conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
   competition, and trim and tuning by phase ("it starts light, so…; it'll build late, so watch…"), with specifics.

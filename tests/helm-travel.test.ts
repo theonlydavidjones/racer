@@ -25,9 +25,11 @@ const circle = (kt: number, til: number) => {
   return { v0, half, rate, v: u.v, radius: u.v / Math.max(1e-6, rate * D2R) };
 };
 /** A tack from close-hauled, the tiller held at `til` until she's 42 degrees off the wind on the new tack: its time, and how far she carried on along her old course. */
-const tack = (kt: number, til: number) => {
+const tack = (kt: number, til: number, called = true) => {
   const w = mk(kt), u = w.user; settle(w, 45); const d = V(u.h), x0 = u.x, y0 = u.y; let t = 0, adv = 0;
-  for (; t < 40; t += DT) { const rel = wrap(w.windHere(u, u, false).from - u.h); if (rel >= 42) break; u.steer = 0; u.tiller = til; w.step(DT); adv = Math.max(adv, (u.x - x0) * d.x + (u.y - y0) * d.y); }
+  // ("Ready about" is called, as a helmsman tacks her: uncalled, the crew hold the jib until they've seen the turn, and
+  // the quicker she turns the less warning they have (crewPhys.ts prepLeft), which hides part of what the helm gains)
+  for (; t < 40; t += DT) { const rel = wrap(w.windHere(u, u, false).from - u.h); if (rel >= 42) break; u.steer = 0; u.tiller = til; if (called) u.callT = w.t; w.step(DT); adv = Math.max(adv, (u.x - x0) * d.x + (u.y - y0) * d.y); }
   return { t, adv, v: u.v };
 };
 
@@ -60,6 +62,8 @@ describe('the helm\'s travel: the tiller to 75 degrees, the rudder stalling past
       expect(stall.t, `${kt} kt`).toBeLessThan(8); expect(stall.adv, `${kt} kt`).toBeLessThan(8.6);
       expect(full.t - stall.t, `${kt} kt`).toBeGreaterThan(1); expect(full.adv - stall.adv, `${kt} kt`).toBeGreaterThan(1);
     }
+    // (uncalled, the tack at the stall in 14 kt is a fifth of a second slower: the crew late on the jib)
+    expect(tack(14, HELM_STALL, false).t).toBeGreaterThan(tack(14, HELM_STALL).t + 0.1);
     const hard = tack(8, HELM_MAX), stall = tack(8, HELM_STALL);
     expect(hard.t).toBeGreaterThan(2 * stall.t); expect(hard.v).toBeLessThan(0.6 * stall.v);
   }, 120_000);

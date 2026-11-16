@@ -65,7 +65,7 @@ export interface AiState {
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
   goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
   /** A mark she's keeping clear of, and the side she's passing it on (+1: it to starboard), so she doesn't swap sides each second. */
-  passing?: { key: string; side: number } | null;
+  passing?: { key: string; side: number; away?: 'S' | 'P' } | null; // (away: turning away from it through the wind, begun on this tack, held until she's through)
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
   /** Her aim point (the mark, a detour round the land, or the line) upwind of her: within 44° of the wind, let go past
@@ -195,6 +195,35 @@ export interface Boat {
   gybeTo?: 'S' | 'P';
   /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
   turnCalledT?: number;
+  /** When the helm last called a turn ("Ready about", "Ready to jibe"), s: her crew warned of it get ready, and work it
+   * at once on the order (crewPhys.ts PREPARED). Uncalled, they react as they see it (boat/calls.ts). */
+  callT?: number;
+  /** Your call, held until the crew answer ready (world.ts callTurn): when it was made, whether one has said "Not
+   * ready" (busy at a job), and her tack then. The turn starts once they're ready, or at once if you call it again; you
+   * steering her yourself meanwhile, or CALL_WAIT_MAX s gone, and it's dropped (still a call: the crew were warned). */
+  callWait?: { t0: number; notReady: boolean; tack: 'S' | 'P' } | null;
+  /** Her crew warned of the turn coming (a call within CALL_KEEP s: tackStep), and how long it has visibly been coming
+   * (s: the helm turning her up to tack, or down through a run to jibe), which the experienced read without a call. */
+  callOn?: boolean;
+  comingFor?: number;
+  /** When she went by the lee with a jibe wanted, and how much of the turn her crew had seen then (physics.ts gybeMeant). */
+  byLeeSince?: number;
+  byLeeCue?: number;
+  /** When her skipper last decided a turn, called or not (boat/calls.ts decideTurn: once a turn). */
+  decidedT?: number;
+  /** Turns her skipper has decided (the AI's call or not is worked from this: boat/calls.ts). */
+  turnsDecided?: number;
+  /** The windward jib sheet, made fast through the tack, held so many more seconds before the crew let it fly (s): an
+   * unwarned crew a reaction's worth, the jib backing meanwhile (physics.ts tackStep, trimSails); −1 while it's let fly and
+   * running out, 0 otherwise. */
+  jibHold?: number;
+  /** What the crew's trim reads its guide by and waits on (physics.ts crewSettle), by SETTLE's places: the apparent
+   * angle (deg, 0..180) and the wind (kt) the tuning guide's settings are read at; her true wind over a few seconds (kt);
+   * her heading smoothed over a few seconds and over LINE_TAU, and the heading the guide was last read at (deg); and the
+   * seconds till she's settled enough for her crew to go to the cabin top's lines. In one Float64Array: read and written each
+   * step for each boat, as seven fields of their own each was a pointer to its own number elsewhere in memory, seven
+   * scattered reads a boat a step, and crewSettle took 18 µs a step in the race against 10 (Capacity, 16 Nov 2026). */
+  settle?: Float64Array;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
   byLee?: boolean;
   /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
@@ -204,8 +233,9 @@ export interface Boat {
   /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
    * (physics.ts boomStep). Undefined while the sheet has it. */
   boomFree?: number;
-  /** When the wind took it, s. */
+  /** When the wind took it, s; and when it was first seen swinging (faster than BOOM_SEEN deg/s: boat/calls.ts). */
   boomFreeT?: number;
+  boomSeenT?: number;
   /** The side it was on when the wind took it (+1 starboard, −1 port). */
   boomFrom?: number;
   /** When her boom last crashed across in a jibe the wind made (s): for the debrief and the tests. */
@@ -352,3 +382,6 @@ export const FLEET: FleetEntry[] = [
   { name: 'Black', hull: '#26272b', sail: '#efe9dc', tag: '#c9cdd4', no: 'US 120', build: WOOD, paint: { deck: '#cdbb94', boot: '#d4b05a', bottom: '#2a2d33' } },
   { name: 'Varnish', hull: '#9a6a36', sail: '#f3ecdc', tag: '#e2b071', no: 'US 63', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } }
 ];
+
+/** Places in Boat.settle (physics.ts crewSettle). */
+export const SETTLE = { guideAwa: 0, guideKt: 1, twsFast: 2, hSwing: 3, hHeld: 4, hGuide: 5, left: 6 } as const;
