@@ -157,9 +157,9 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
       expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading))); // (the bow comes round toward the wind: the stern goes downwind)
       if (p.hold) { held++; expect(Math.abs(rel(from, s.heading + p.turn))).toBeLessThan(6); expect(Math.abs(p.hold.off)).toBeGreaterThanOrEqual(30); expect(Math.abs(p.hold.off)).toBeLessThanOrEqual(60); } // (held head to wind, then her bow pushed off)
     }
-    // (in a fresh breeze across a narrow fairway she can't be let swing: shoved off astern instead; and since 8m3 most of
-    // these are walked out to the fairway, where the swing would leave her beside a moored boat with no clear water)
-    expect(n).toBeGreaterThan(12); expect(held).toBeGreaterThan(10);
+    // (a property of every swing on the bow line the plan makes, not a count of them: at least one case of each, so the test
+    // isn't empty. How many berths get which plan is tests/pushoff-sweep.test.ts's to hold, exactly)
+    expect(n).toBeGreaterThanOrEqual(1); expect(held).toBeGreaterThanOrEqual(1);
     // in her slip with a breeze across it: pushed off, she's swung round head to wind and held; main up, push off again, and away
     // (West Harbor's 135: the first of its berths still held head to wind now the let-go needs 20 m of clear water along her
     // path as she rounds up and sags (pushoff-letgo.test.ts); 677, old A7, is shoved off astern instead)

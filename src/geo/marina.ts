@@ -537,6 +537,9 @@ function runAhead(c: Vec, h: number, s: Slip): number {
  * less, she hit the boat in the next slip within 15 m in 1,124, mostly the stern of the next boat just off her bow. The
  * sag is the sim's own, at the wind her slip has (which the plan is made for): 1.1–1.5 m over her first 15 m in 9–10 kt,
  * about 1.2 in 12, 1.8–2.0 in 15, with the jib going up (ESTIMATES, from the sim, not from life).
+ * Two limits (Deep Physics' review, 16 Nov 2026): the sag is gauged at the wind her slip has, so where she sails out past
+ * the lee's edge a few meters on into a fresher breeze, that isn't in it; and it was gauged in 12 and 15 kt from 270, 225
+ * and 000 (and holds in 20 from 270), not in every wind (tests/pushoff-sweep.test.ts says where it doesn't yet).
  */
 const LET_GO_MARGIN = 0.5, LET_GO_RUN = 15, LET_GO_SAG = 1.75;
 function clearRun(c: Vec, h: number, s: Slip, windFrom: number | undefined, windKt = 12): boolean {

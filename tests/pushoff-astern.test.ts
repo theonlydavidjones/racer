@@ -73,10 +73,9 @@ describe('pushed off astern', () => {
         if (hard >= DAMAGE_V.scrape) bad.push(`${s.id}: touched at ${hard.toFixed(2)} m/s past it`);
       }
     }
-    // (in a calm the crew can swing her out from most: few are shoved off astern; and since 8m3, where there's no swing that
-    // lets her go with clear water, she's walked out to the fairway first, and an astern shove whose coast ends with none is
-    // kept fast (or one that would leave her within 60 degrees of the wind), so fewer in a breeze too)
-    expect(n).toBeGreaterThanOrEqual(kt ? 6 : 5);
+    // (a property of every astern shove the plan makes, not a count of them: at least one case, so the test isn't empty. How
+    // many berths get which plan is tests/pushoff-sweep.test.ts's to hold, exactly)
+    expect(n).toBeGreaterThanOrEqual(1);
     expect(bad).toEqual([]);
   }, 600_000);
 
@@ -109,24 +108,32 @@ describe('pushed off astern', () => {
       }
       return { astern, walked, went, noRoom: plan.kind === 'astern' && !!plan.noRoom, docked: !!u.docked, told: msgs.some(m => /^No room to push her off from this berth in this wind/.test(m)), clean };
     };
-    for (const id of [...NO_ASTERN, ...NO_ASTERN_WEST]) {
-      expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
-      const r = tryIt(id, 270, 12); // (planned astern there, kept fast and told; or walked out to the fairway instead, 8m2, and got out)
-      if (r.astern) { expect(r.went, id).toBe(false); expect(r.docked, id).toBe(true); expect(r.told, id).toBe(true); } else { expect(r.went, id).toBe(true); expect(r.clean).toBe(''); }
-    }
-    // (the edges of the westerly's band, and the six in a northerly: kept fast where the plan's astern, got out where it isn't)
-    for (const [ids, from, kt] of [[NO_ASTERN_WEST, 225, 12], [NO_ASTERN_WEST, 315, 12], [NO_ASTERN, 0, 12]] as const) for (const id of ids) {
-      const r = tryIt(id, from, kt); expect(r.went, `${id} from ${from}`).toBe(!r.astern); if (r.astern) expect(r.told, id).toBe(true); else expect(r.clean).toBe('');
-    }
-    // (the westerly's six, in light air and in a northerly: shoved off as from any berth, where they're planned astern; or,
-    // since 8m3, kept fast and told like any berth whose coast would end with no clear water to sail off in)
-    let out = 0;
-    for (const [from, kt] of [[270, 4], [0, 12]] as const) for (const id of NO_ASTERN_WEST) {
-      const r = tryIt(id, from, kt);
-      if (r.noRoom) { expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(false); expect(r.told, id).toBe(true); continue; }
-      expect(r.went, `${id} from ${from} at ${kt} kt`).toBe(true); expect(r.clean).toBe(''); out++;
-    }
-    expect(out).toBeGreaterThanOrEqual(6);
+    // (each run, the berths kept fast and told, by name, and how many get out, exactly as today, 16 Nov 2026: a change to
+    // the planner that moves a berth between them has to say why. Kept fast: planned astern and flagged, NO_ASTERN and
+    // NO_ASTERN_WEST, or since 8m3 an astern shove whose coast would end with no clear water to sail off in. Got out:
+    // walked out to the fairway, swung, or shoved off, and held to the bar any push-off is)
+    const run = (ids: readonly string[], from: number, kt: number) => {
+      const kept: string[] = []; let out = 0;
+      for (const id of ids) {
+        expect(SLIPS.some(s => s.id === id), id).toBe(true); expect(slipById(id)?.id).toBe(id);
+        const r = tryIt(id, from, kt);
+        if (!r.went) { expect(r.docked, id).toBe(true); expect(r.told, `${id} from ${from} at ${kt} kt: kept fast and told`).toBe(true); kept.push(id); }
+        else { expect(r.astern && !r.noRoom ? true : !r.astern, id).toBe(true); expect(r.clean).toBe(''); out++; }
+      }
+      return { out, kept };
+    };
+    const twelve = [...NO_ASTERN, ...NO_ASTERN_WEST];
+    const got = {
+      west12: run(twelve, 270, 12), // (planned astern there, kept fast and told; or walked out to the fairway instead, 8m2, and got out)
+      sw: run(NO_ASTERN_WEST, 225, 12), nw: run(NO_ASTERN_WEST, 315, 12), north: run(NO_ASTERN, 0, 12), // (the edges of the westerly's band, and the six in a northerly)
+      light: run(NO_ASTERN_WEST, 270, 4), northWest: run(NO_ASTERN_WEST, 0, 12), // (the westerly's six, in light air and in a northerly: shoved off as from any berth where they're planned astern, or kept fast as any berth without clear water)
+    };
+    expect(got).toEqual({
+      west12: { out: 8, kept: ['south-beach:G88', 'richmond-yc:F2', 'horseshoe-bay:C22', 'west-harbor:507'] },
+      sw: { out: 6, kept: [] }, nw: { out: 6, kept: [] },
+      north: { out: 3, kept: ['south-beach:G88', 'richmond-yc:E31', 'richmond-yc:E35'] },
+      light: { out: 5, kept: ['west-harbor:507'] }, northWest: { out: 6, kept: [] },
+    });
   }, 300_000);
   it('a fresh breeze on her bow carries her on whatever the crew do: she\'s let go with the way she has, their walk, never dead in the water', () => {
     // (the physics review, 15 Nov 2026: gauged to her room, the shove came to nothing from 14 kt on her bow, and she lay

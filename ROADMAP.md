@@ -327,7 +327,17 @@ What's planned, roughly in order. Done work is described in the README.
      walked out, 148 held for the main, 118 on the bow line, 11 shoved off astern (steered as the plan says), none
      touching a boat or a dock; 31 kept fast (before, the astern shove touched in 27 of its 42). West Harbor 507 in a
      12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
-     held to zero touches).
+     held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
+   - **Still to do (Deep Physics' review, 16 Nov 2026):**
+     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
+       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
+       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
+       or motored out. The sweep test fails if the count rises.
+     - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
+       astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
+       the test.
+     - **The sag is gauged at the slip's own wind:** the lee's edge a few meters out, where the breeze is fresher, isn't
+       in it.
 
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
