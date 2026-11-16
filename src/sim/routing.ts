@@ -406,7 +406,7 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
   // the docks than before. Those legs start or end on that way out's own points)
   const pierWay = new Set<Vec>();
   const amongPiers = (p: Vec, q: Vec) => pierWay.has(p) || pierWay.has(q);
-  const visible = function* (p: Vec, q: Vec, hull = true): Generator<void, boolean, void> { if (landAlong(p, q) < Infinity) return false; if (hull && (nearEnd(p) || nearEnd(q)) && !amongPiers(p, q) && !wide(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) { if (k % 8 === 0) yield; if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; } return true; };
+  const visible = function* (p: Vec, q: Vec, hull = true): Generator<void, boolean, void> { if (landAlong(p, q) < Infinity) return false; if (hull && (nearEnd(p) || nearEnd(q) || room < clear) && !amongPiers(p, q) && !wide(p, q)) return false; const n = Math.max(2, Math.ceil(dist(p, q) / 40)); for (let k = 1; k < n; k++) { if (k % 8 === 0) yield; if (blocked({ x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n })) return false; } return true; };
   if (yield* visible(a, b)) return [a, b];
   // Near the Wharf the fairways between piers and docks are 20–30 m wide: first find the way out on a 10 m grid (the
   // nearest water clear of them), then the rest of the way on the usual 50 m grid.
@@ -425,16 +425,17 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
   // (each step between cells tested exactly too: a 50 m step can cross the Marina's 17 m jetty, or a pier; and near the
   // ends, her width as well, as for the legs below: the way's own steps there were the ones that passed a breakwater's
   // end close (Horseshoe Bay's, 0.75 m). Where that finds no way, the steps by their middle alone, as before)
-  const step = (p: Vec, q: Vec) => landAlong(p, q) === Infinity, wideStep = (p: Vec, q: Vec) => step(p, q) && (!near2(p) && !near2(q) || amongPiers(p, q) || wide(p, q));
+  const step = (p: Vec, q: Vec) => landAlong(p, q) === Infinity, wideStep = (p: Vec, q: Vec) => step(p, q) && (!near2(p) && !near2(q) && room === clear || amongPiers(p, q) || wide(p, q));
   const grid = function* (p: Vec, q: Vec): Generator<void, Vec[] | null, void> { return (yield* gridPathSteps(p, q, 50, 2500, blocked2, wideStep)) ?? (yield* gridPathSteps(p, q, 50, 2500, blocked2, step)); };
   let mid = yield* grid(A, B);
+  let ea2 = ea, eb2 = eb;
   // (in a corner by the land, a harbor's entrance or a cove, the 50 m grid can't see the way out: first out to open
   // water on the 10 m grid, as from among the Wharf's piers, then the rest. Without it the way fell back to the straight
   // line, through the land: out of Gashouse Cove's and South Beach's entrances)
   if (!mid) {
     // (not from an end that's on land itself, a point picked on the chart: there's no way out of it to find)
     const out = function* (p: Vec): Generator<void, Vec[], void> { return onLand(p) ? [p] : (yield* gridPathSteps(p, p, 10, 700, onLand, step, q => landDist(q) >= 100, 0)) ?? [p]; };
-    const ea2 = [...ea, ...(yield* out(A)).slice(1)], eb2 = [...(yield* out(B)).reverse().slice(0, -1), ...eb];
+    ea2 = [...ea, ...(yield* out(A)).slice(1)]; eb2 = [...(yield* out(B)).reverse().slice(0, -1), ...eb];
     const A2 = ea2[ea2.length - 1], B2 = eb2[0];
     ends.push(A2, B2); // (the water got out to counts as an end too: no clearance asked round it)
     const m2 = A2 === A && B2 === B ? null : yield* grid(A2, B2);
@@ -443,8 +444,17 @@ export function* routeAroundSteps(a: Vec, b: Vec, clear = 120): Generator<void, 
   // (a channel narrower than twice `clear` leads there, the only way by water: the Oakland Estuary, a few hundred meters
   // wide, between Alameda and Oakland. At 120 m off the land every cell of it but its ends was blocked, and the way out of
   // its harbors to the Bay fell back to the straight line, through Alameda. Then keep half as far off, and half again,
-  // down to MIN_ROOM: still the middle of the channel, as near the land as it is)
-  while (!mid && room / 2 >= MIN_ROOM) { room /= 2; mid = yield* grid(A, B); }
+  // down to MIN_ROOM. Each time from the ends as they are and, failing that, from the water stepped out to above: from
+  // Gashouse Cove to the Estuary the way needs both. 30 m is what the cells' 8 probes look, not a clearance (a thin
+  // breakwater's end can lie between two of them), so once room is less, every leg and step, not only those near the
+  // ends, keeps her width too, as above. The room is one for the whole way: in the open Bay too it keeps only as far off)
+  // (the middle of a channel is a chart line, not the rule: a boat keeps to the starboard side of a narrow channel, and
+  // out of the way of a ship that can sail only in it, COLREGS/Inland Rule 9(a)(i) and (b), USCG Navigation Rules)
+  const A2 = ea2[ea2.length - 1], B2 = eb2[0];
+  while (!mid && room / 2 >= MIN_ROOM) {
+    room /= 2; mid = yield* grid(A, B);
+    if (!mid && (A2 !== A || B2 !== B)) { const m2 = yield* grid(A2, B2); if (m2) { ea.splice(0, ea.length, ...ea2); eb.splice(0, eb.length, ...eb2); mid = m2; } }
+  }
   if (!mid) return [a, b]; // (nowhere to go by water: the land closes it off)
   const pts = [...ea, ...mid.slice(1, -1), ...eb];
   // pull it straight: from each turn, on to the farthest point in clear sight

@@ -71,3 +71,22 @@ describe("down the Estuary's narrowest reach, her full width clear", () => {
     expect(near, legs).toBe(Infinity);
   }, 60_000);
 });
+
+describe('between Gashouse Cove and the Estuary, and home to Berkeley from off Emeryville', () => {
+  // (the physics review, 16 Nov 2026: these needed both the step out of the cove and the lesser room, and went through the
+  // land; and from 300 m east of Emeryville home to Berkeley's entrance at room 30 a way threaded a gap 4.5 m off a
+  // breakwater's end, its whole width now asked away from the ends too)
+  const exit15 = (id: string) => { const e = HARBORS.find(h => h.id === id)!.exits[0]; return { x: e.x + 15, y: e.y + 15 }; };
+  for (const [from, to] of [['gashouse-cove', 'oakland-yc'], ['gashouse-cove', 'fortmann'], ['oakland-yc', 'gashouse-cove'], ['fortmann', 'gashouse-cove']] as const)
+    it(`${from} to ${to}: through nothing`, () => {
+      const r = routeAround(exit15(from), exit15(to));
+      expect(r.slice(1).every((p, i) => landAlong(r[i], p) === Infinity), JSON.stringify(r.map(p => [Math.round(p.x), Math.round(p.y)]))).toBe(true);
+    }, 60_000);
+  it('off Emeryville home to Berkeley: nothing within 4 m of any leg', () => {
+    const c = place('emeryville'), e = HARBORS.find(h => h.id === 'berkeley')!.exits.find(x => Math.round(x.x) === 10982)!;
+    const r = routeAround({ x: c.x + 300, y: c.y }, e, 120), legs = JSON.stringify(r.map(p => [Math.round(p.x), Math.round(p.y)]));
+    expect(r.slice(1).every((p, i) => landAlong(r[i], p) === Infinity), legs).toBe(true);
+    expect(measure(r, HULL_CLEAR).near, legs).toBe(Infinity);
+  }, 60_000);
+});
+
