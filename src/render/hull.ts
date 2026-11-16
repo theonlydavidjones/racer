@@ -691,24 +691,51 @@ export function rail(pts: THREE.Vector3[], hh: number | ((i: number) => number),
  */
 export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y);
 /**
- * The tiller's shape (ESTIMATE: the class rules give none, CR 5.50: wood, removable, above the deck, not divided or
- * hooped). Her hinge is raked 46° from upright (the class's rudder, CR 5.20, hung from the keel's heel to the transom
- * top), so a tiller turned about it drops as it swings unless it leaves the head square to the hinge. A straight one,
- * 12° above level, put hard over (75°, physics' HARD_OVER: the owner's own boat goes nearly flush with the transom) came
- * down through the toerail, its end 14 cm below the deck's edge. So it's one smooth bow, as a laminated tiller is: from
- * the rudder head's cheeks, 45° above level (amidships, in the boat's frame), bending evenly to 5° at its end; 1.1 m in
- * all. At every angle to 75° it clears the deck, the toerail and the coaming by 5 cm or more (tests/tillerClear.test.ts).
+ * The tiller (CR 5.50: wood, removable, above the deck, not divided or hooped): a rigid, straight spar on a horizontal
+ * pin through the rudder head's cheeks (the owner's photo of a Folkboat at the dock, her tiller stood up on its pin with
+ * the extension lashed along it). At rest it lies 4° above level, its end just over the coaming's top (the owner's photo
+ * of hers); its only motions are turning with the rudder about her hinge (raked 46°: the class profile, the transom top
+ * to the keel's heel, about 45° on both drawings) and lifting on the pin. Turned far over, a tiller hung on that hinge
+ * would come down onto the deck, so past about 45° it rides up on the pin over the coaming and the rail (tillerLift), to
+ * about 20° at 75°. ESTIMATES: its length, rest angle and the pin's height (the rudder head's top, 12 cm above the
+ * transom), measured against the photos, not a drawing (tests/tillerClear.test.ts).
  */
-export const TILLER = { headRise: 0.04, rise0: 45, rise1: 5, len: 1.1 };
-/** The tiller's center line, head to end, in the rudder's frame (rudderGeometry's: y up the hinge from the heel, z aft). */
-export function tillerPath(n = 24): THREE.Vector3[] {
-  const r = RUDDER_RAKE, toWL = -HEEL.y / Math.cos(r), s0 = toWL - 1.528;
-  // (a direction `deg` above level in the boat's frame, amidships, worked back into the rudder's raked frame)
-  const d = (deg: number) => { const up = deg * Math.PI / 180, wy = Math.sin(up), wz = -Math.cos(up); return new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize(); };
-  // (bending evenly along its length: its rise falls from rise0 to rise1, a circle's arc)
-  const p = new THREE.Vector3(0, s0 + 2.62 + TILLER.headRise, 0.06), out = [p.clone()], m = 8 * n;
-  for (let i = 0; i < m; i++) { p.addScaledVector(d(TILLER.rise0 + (TILLER.rise1 - TILLER.rise0) * (i + 0.5) / m), TILLER.len / m); if ((i + 1) % 8 === 0) out.push(p.clone()); }
-  return out;
+export const TILLER = { rest: 4, len: 1.2 };
+/** In the rudder's frame (rudderGeometry's: y up the hinge from the heel, z aft): the pin, and the tiller's way from it at
+ * rest (`deg` above level in the boat's frame, amidships). */
+export function tillerPivot(): THREE.Vector3 { const toWL = -HEEL.y / Math.cos(RUDDER_RAKE); return new THREE.Vector3(0, toWL - 1.528 + 2.62, 0.06); }
+export function tillerRestDir(): THREE.Vector3 {
+  const r = RUDDER_RAKE, up = TILLER.rest * Math.PI / 180, wy = Math.sin(up), wz = -Math.cos(up);
+  return new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize();
+}
+const _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0);
+/** How far up off the deck a point `s` m along the tiller is (m, its round less), turned `turn` rad and lifted `lift`
+ * rad on its pin: the least, all along it, over the deck, the toerail (3.5 cm on the sheer), the coaming and, out past the
+ * rail, the deck's edge. */
+export function tillerClearance(turn: number, lift: number, n = 40): number {
+  const piv = tillerPivot(), d = tillerRestDir().applyAxisAngle(_X, lift), c1 = -L / 2 + COCKPIT.u1 * L; let w = 9;
+  for (let i = 0; i <= n; i++) {
+    const p = piv.clone().addScaledVector(d, TILLER.len * i / n).applyAxisAngle(_Y, turn).applyAxisAngle(_X, RUDDER_RAKE).add(new THREE.Vector3(0, HEEL.y, HEEL.z));
+    const u = uAtZ(p.z); if (u > 1) continue; // (aft of the transom: the rudder head, over the water)
+    const hb = halfBeam(u), a = Math.abs(p.x), rad = 0.028 - 0.01 * i / n;
+    let f = a < hb ? deckY(u, a) : sheer(u);
+    if (a > hb - 0.08) f = Math.max(f, sheer(u) + 0.035);
+    if (p.z < c1 + 0.02 && a > cockpitHalf(u) - 0.02 && a < cockpitHalf(u) + 0.06) f = Math.max(f, deckY(u, a) + COAMING_H(p.z));
+    w = Math.min(w, p.y - rad - f);
+  }
+  return w;
+}
+/** How far the tiller's lifted on its pin (rad) when turned `turn` rad: as far as it rides up to clear by a centimeter;
+ * none while it clears lying at rest. Worked out once, a degree apart, and read between. */
+let liftTab: Float64Array | null = null;
+export function tillerLift(turn: number): number {
+  if (!liftTab) { liftTab = new Float64Array(91);
+    for (let g = 0; g <= 90; g++) { const th = g * Math.PI / 180;
+      if (tillerClearance(th, 0) >= 0.01 && tillerClearance(-th, 0) >= 0.01) continue;
+      let lo = 0, hi = 1.4; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (tillerClearance(th, m) >= 0.01 && tillerClearance(-th, m) >= 0.01) hi = m; else lo = m; }
+      liftTab[g] = Math.max(hi, liftTab[g - 1] ?? 0); } } // (never less as it goes further over)
+  const g = Math.min(89.999, Math.abs(turn) * 180 / Math.PI), i = Math.floor(g);
+  return liftTab[i] + (liftTab[i + 1] - liftTab[i]) * (g - i);
 }
 
 function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
@@ -725,13 +752,9 @@ function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.Buf
   // shape (x, y) → (z, y); extrusion → x, centred
   blade.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, -0.018, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
   blade.computeVertexNormals();
-  // tiller (CR 5.50: wood, removable, above the deck, not divided or hooped; an extension optional): along tillerPath,
-  // tapering from the head to its end
-  const path = tillerPath(), curve = new THREE.CatmullRomCurve3(path), seg = 40, rad = 8;
-  const tiller = new THREE.TubeGeometry(curve, seg, 1, rad, false), tp = tiller.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i <= seg; i++) { const c = curve.getPointAt(i / seg), r = 0.028 + (0.018 - 0.028) * i / seg;
-    for (let j = 0; j <= rad; j++) { const k = i * (rad + 1) + j; tp.setXYZ(k, c.x + (tp.getX(k) - c.x) * r, c.y + (tp.getY(k) - c.y) * r, c.z + (tp.getZ(k) - c.z) * r); } }
-  tiller.computeVertexNormals();
+  // the tiller: a straight, tapered spar from its pin (the origin: boatMesh.ts puts it at tillerPivot and lifts it there)
+  const tl = TILLER.len, tiller = new THREE.CylinderGeometry(0.018, 0.028, tl, 10);
+  tiller.translate(0, tl / 2, 0); tiller.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tillerRestDir()));
   return { blade, tiller };
 }
 

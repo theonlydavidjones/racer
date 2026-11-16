@@ -16,7 +16,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerPath, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerLift, tillerPivot, tillerRestDir, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -371,10 +371,10 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const cols = new Float32Array(rg.blade.attributes.position.count * 3).fill(1);
   rg.blade.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
-  turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
+  { const til = new THREE.Mesh(rg.tiller, MAT.tiller); til.position.copy(tillerPivot()); turn.add(til); } // (on its pin: lifted there in syncBoatMesh)
   // the rudder head's cheeks: two bronze plates either side of its top, the tiller's root held between them (bolted
   // through), so it reads as fitted into the head, not standing on it
-  { const [root, next] = tillerPath(12), d = next.clone().sub(root).normalize(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
+  { const root = tillerPivot(), d = tillerRestDir(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
     for (const sx of [1, -1]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.07, 0.15), BRONZE); ch.quaternion.copy(q); ch.position.copy(root).addScaledVector(d, 0.03).setX(sx * 0.031); turn.add(ch); } }
   grp.add(rud);
   // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
@@ -1520,6 +1520,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     u.uLampUp.value.set(0, 1, 0).applyQuaternion(m.lantern.arm.quaternion); }
   const want = Math.max(-HARD_OVER, Math.min(HARD_OVER, (b.helm ?? 0) * FULL_RUDDER)) * D2R; // (the blade and the tiller where they are: to hard over, almost flush with the transom)
   m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 20); // (with your hand: no slower than a tiller swings)
+  m.rudder.children[1].rotation.x = tillerLift(m.rudder.rotation.y); // (riding up on its pin over the coaming and the rail, turned far over)
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);

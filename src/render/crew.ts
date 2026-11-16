@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, JIB_WINCH_Z, L, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut, tillerPath } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, JIB_WINCH_Z, L, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut, TILLER, tillerRestDir } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -1170,17 +1170,16 @@ function toward(p: THREE.Vector3, q: THREE.Vector3, a: number, max: number): voi
 }
 
 /** Where the tiller's end is in the boat's frame, from the rudder (boatMesh.ts: the group turned to steer). */
-const TILLER_TIP = tillerPath().at(-1)!; // (in the hinge's frame: hull.ts, the tiller's shape)
-const TILLER_ROOT = tillerPath()[0];
-/** Where the tiller's root is (on the rudder head) in the boat's frame. */
-export function tillerRootAt(turn: THREE.Object3D): THREE.Vector3 {
-  const rud = turn.parent!; turn.updateMatrix(); rud.updateMatrix();
-  return TILLER_ROOT.clone().applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
-}
-export function tillerTip(turn: THREE.Object3D): THREE.Vector3 {
-  const rud = turn.parent!; turn.updateMatrix(); rud.updateMatrix();
-  return TILLER_TIP.clone().applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
-}
+// (the tiller's end and its pin, in the tiller's own frame: it's turned with the rudder and lifted on its pin, boatMesh.ts)
+const TILLER_TIP = tillerRestDir().multiplyScalar(TILLER.len), TILLER_PIN = V(0, 0, 0);
+const onTiller = (turn: THREE.Object3D, local: THREE.Vector3) => {
+  const rud = turn.parent!, til = turn.children[1]; til.updateMatrix(); turn.updateMatrix(); rud.updateMatrix();
+  return local.clone().applyMatrix4(til.matrix).applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
+};
+/** Where the tiller's pin (its root, on the rudder head) is in the boat's frame. */
+export const tillerRootAt = (turn: THREE.Object3D) => onTiller(turn, TILLER_PIN);
+/** Where the tiller's end is in the boat's frame, from the rudder (boatMesh.ts: the group turned to steer). */
+export const tillerTip = (turn: THREE.Object3D) => onTiller(turn, TILLER_TIP);
 
 /**
  * (Moving, and which way: from where the physics has them now against last frame, over the time the race moved
