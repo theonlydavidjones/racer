@@ -2273,11 +2273,18 @@ export class World {
   waveRef(): SeaHere {
     if (this.waveRefSea) return this.waveRefSea;
     const own = this.freeSail || this.cruising, mid = this.seaHere(this.C.center), s = own ? this.user.sea ?? FLAT_SEA : mid;
-    // (the waves' length for the water's depth there: the chart's, NOAA's ENC depth areas at the middle of their band (a
-    // band 9–18 m deep reads 13.6 m: coarse, an estimate of the depth at any one place), and the tide's height above the
-    // chart's datum, MLLW, now (waveField.ts setDepth))
+    // (the waves' length for the water's depth: the chart's, NOAA's ENC depth areas at the middle of their band (a band
+    // 9–18 m deep reads 13.6 m: coarse, an estimate of the depth at any one place), and the tide's height above the
+    // chart's datum, MLLW, now (waveField.ts setDepth). Cruising, the water about her boat. Racing, the course's water:
+    // its line and marks, each by the swell there (the swell is the wave the depth lengthens or shortens, and the
+    // biggest where the course runs out toward the Gate), worked out once: an estimate, one depth for the whole field)
     const at = own ? this.user : this.C.center;
-    if (!this.waveChart || hypot(at.x - this.waveChart.p.x, at.y - this.waveChart.p.y) > 100) this.waveChart = { p: { x: at.x, y: at.y }, d: chartDepth(at) };
+    if (!this.waveChart || (own && hypot(at.x - this.waveChart.p.x, at.y - this.waveChart.p.y) > 100)) {
+      let d: number | null = null;
+      if (own) d = chartDepth(at);
+      else { let sum = 0, wt = 0; for (const q of [this.C.center, ...this.C.marks.map(m => m.p)]) { const dq = chartDepth(q); if (dq == null) continue; const k = this.seaHere(q).hsS + 0.05; sum += k * dq; wt += k; } d = wt > 0 ? sum / wt : null; }
+      this.waveChart = { p: { x: at.x, y: at.y }, d };
+    }
     const d = this.waveChart.d;
     this.waves.setDepth(d == null ? null : d + tideHeightAt(at, this.clockUtc * 60000));
     return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
@@ -2505,7 +2512,7 @@ export class World {
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
     this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
-    this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
+    this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t), this.user); // (the new day's swell, the waves where she is carried on)
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();

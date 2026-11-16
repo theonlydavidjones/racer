@@ -30,9 +30,11 @@ describe('waves for the depth', () => {
   it("off the Cityfront the swell is a shallow-water wave: its length and speed for the chart's depth and the tide", () => {
     const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, current: 'slack', tideDate: '2026-11-14', traffic: 0, fleet: 0, opponents: [] } as Settings, 1);
     for (let k = 0; k < 120; k++) w.step(DT);
-    const c = w.C.center, d = chartDepth(c)! + tideHeightAt(c, w.clockUtc * 60000);
-    expect(d).toBeGreaterThan(5); expect(d).toBeLessThan(40);
-    expect(w.waves.depth).toBeCloseTo(d, 1);
+    // (the course's water: its line and marks, by the swell at each; the line's own depth and the deepest mark's bound it)
+    const c = w.C.center, tide = tideHeightAt(c, w.clockUtc * 60000), ds = [c, ...w.C.marks.map(m => m.p)].map(q => chartDepth(q)).filter((x): x is number => x != null);
+    const d = w.waves.depth;
+    expect(d).toBeGreaterThanOrEqual(Math.min(...ds) + tide - 0.01); expect(d).toBeLessThanOrEqual(Math.max(...ds) + tide + 0.01);
+    expect(d).toBeGreaterThan(5); expect(d).toBeLessThan(60);
     for (let i = N_WIND; i < N_WAVES; i++) {
       const T = 2 * Math.PI / w.waves.w[i], L = 2 * Math.PI / w.waves.k[i], L0 = G * T * T / (2 * Math.PI);
       expect(Math.abs(G * w.waves.k[i] * Math.tanh(w.waves.k[i] * d) - w.waves.w[i] ** 2)).toBeLessThan(1e-3 * w.waves.w[i] ** 2);
@@ -42,15 +44,26 @@ describe('waves for the depth', () => {
     for (let i = 0; i < N_WIND; i++) expect(w.waves.k[i] / (w.waves.w[i] ** 2 / G)).toBeLessThan(1.02);
   }, 60_000);
 
-  it('as the depth changes the surface where she is stays put, and the waves shorten smoothly', () => {
+  it('as the depth changes the surface where she is stays put, the water a km off runs by at no more than 1 m/s, and it gets there', () => {
     const f = new WaveField(14), about = { x: 1234, y: -567 }, s = { ...FLAT_SEA, hsW: 0.6, tpW: 3, hsS: 0.4, tpS: 14 };
     f.update(s, 270, 0, about);
     const t = 50, h0 = f.height(about, t, 1, 1);
-    f.setDepth(3); let last = f.k[N_WIND + 1], jumps = 0;
-    for (let n = 0; n < 600; n++) { f.update(s, 270, DT, about); const k = f.k[N_WIND + 1]; if (k / last > 1.01) jumps++; last = k; }
-    expect(jumps).toBe(0);
+    f.setDepth(3); let worst = 0;
+    // (deep water to 3 m: the 20 s swell's wavenumber 75% more, some half an hour at the most it may change; steps of
+    // half a second here, the rate per second the same)
+    const dt = 0.5;
+    for (let n = 0; n < 2 * 60 * 60 && f.depth !== 3; n++) {
+      const k0 = Array.from(f.k); f.update(s, 270, dt, about);
+      // (the pattern 1 km off runs by at R·Δk/k a second)
+      for (let i = 0; i < N_WAVES; i++) worst = Math.max(worst, 1000 * Math.abs(f.k[i] - k0[i]) / k0[i] / dt);
+    }
+    expect(worst).toBeLessThan(1.05); // (the last step snaps onto the depth: a few percent over)
     expect(f.height(about, t, 1, 1)).toBeCloseTo(h0, 3);
-    expect(f.depth).toBeLessThan(100);
+    expect(f.depth).toBe(3);
+    // (and the crests no sharper than in deep water: the sum never loops)
+    // (Σ Q·k·a against the deep water's, with the crests' sharpening as set there: 0.45 the chop's, 0.3 the swell's)
+    let deep = 0, here = 0; for (let i = 0; i < N_WAVES; i++) { deep += (i < N_WIND ? 0.45 : 0.3) * f.w[i] ** 2 / G * f.amp[i]; here += f.q[i] * f.k[i] * f.amp[i]; }
+    expect(here).toBeLessThanOrEqual(deep * 1.0001);
   });
 });
 
@@ -58,11 +71,11 @@ import { EnvelopeFrame } from '../src/render/waterFrame';
 describe("the drawn wave groups as the depth changes", () => {
   it('they move past a still boat no faster than their own group speed, the depth easing from deep to 3 m', () => {
     const f = new WaveField(14), about = { x: 800, y: 300 }, s = { ...FLAT_SEA, hsW: 0.6, tpW: 3, hsS: 0.4, tpS: 14 };
-    f.update(s, 270, 0, about);
+    f.setDepth(50); f.update(s, 270, 0, about); // (from 50 m, as cruising in from the Gate)
     const env = new EnvelopeFrame(), e = new Float32Array(N_WAVES * 2), o = { x: 0, y: 0 };
-    let t = 2000; env.pack(f, e, t, o, about); let prev = Array.from({ length: N_WAVES }, (_, i) => env.at(e, i, about, o).x);
+    let t = 2000; env.pack(f, e, t, o, about); const prev = Array.from({ length: N_WAVES }, (_, i) => env.at(e, i, about, o).x);
     f.setDepth(3); let worst = 0;
-    for (let n = 0; n < 900; n++) {
+    for (let n = 0; n < 9000; n++) {
       f.update(s, 270, DT, about); t += DT; env.pack(f, e, t, o, about);
       for (let i = 0; i < N_WAVES; i++) {
         const x = env.at(e, i, about, o).x, kd = f.k[i] * f.depth, cg = 0.5 * (1 + (kd < 20 ? 2 * kd / Math.sinh(2 * kd) : 0)) * f.w[i] / f.k[i];
