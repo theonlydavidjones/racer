@@ -343,13 +343,19 @@ export function guideLimits(tws: number, awa: number): { min: Partial<Record<key
   // the lines for shape alone)
   const u = smooth((60 - Math.abs(awa)) / 20);
   if (u <= 0) return { min: {}, max: {} };
-  const over = (kt: number) => smooth((tws - kt + 1) / 2); // 0 below the guide's wind, 1 above, over ±1 kt
-  const outhaul = 0.5 * over(5) + 0.5 * over(12);
+  // (each of the guide's steps, its wind ranges' edges, a knot either side of it: there either range's setting is the
+  // guide's, so its floors are the lower range's, `down`, and its ceilings the higher's, `up`. Blended across the knot,
+  // the band was a tenth of the outhaul's travel wide and slid a quarter of it a knot: a light breeze wandering across
+  // 5 kt moved it out from under the setting each time, and the crew went up to move the outhaul 1.5 cm and back, every
+  // minute and a half, Deep Physics' trace, 6 kt seed 15. North gives the ranges, "very light winds (0-5 knots)",
+  // "medium winds (5-12 knots)", not a setting between them)
+  const down = (kt: number) => (tws >= kt + 1 ? 1 : 0), up = (kt: number) => (tws > kt - 1 ? 1 : 0);
+  const outLo = 0.5 * down(5) + 0.5 * down(12), outHi = 0.5 * up(5) + 0.5 * up(12);
   const lo = (v: number, free = 0) => free + (v - free) * u, hi = (v: number) => 1 + (v - 1) * u;
   return {
-    min: { outhaul: lo(Math.max(0, outhaul - 0.05 * (1 - over(12)))), // (above 12 kt "all the way to the mark")
-      cunningham: lo(0.9 * over(15)), traveller: lo(-0.4 + 0.35 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
-    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(0.1 + 0.9 * over(18)) }
+    min: { outhaul: lo(Math.max(0, outLo - 0.05 * (1 - down(12)))), // (above 12 kt "all the way to the mark")
+      cunningham: lo(0.9 * down(15)), traveller: lo(-0.4 + 0.35 * down(6) + 0.05 * down(14), -1), vang: lo(0.3 * down(18)) },
+    max: { outhaul: hi(Math.min(1, outHi + 0.05)), cunningham: hi(up(5)), jibHalyard: hi(0.3 + 0.3 * up(5) + 0.4 * up(15)), traveller: hi(-0.3 + 0.35 * up(6) + 0.95 * up(14)), vang: hi(0.1 + 0.9 * up(18)) }
   };
 }
 

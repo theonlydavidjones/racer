@@ -83,6 +83,18 @@ const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+/**
+ * Holding a course, for the crew's place fore and aft and their small-gain trips to the cabin top (crewPhys.ts
+ * CrewCall.held, crewJobs): settled (physics.ts crewSettle), and not on a new course the guide hasn't been read for yet,
+ * her true wind angle NEW_COURSE (deg) from where it was last read, on either tack (a tack isn't a new course for it), unless that's been LINE_GAP since she last swung. In a seaway her heading
+ * wanders well off its own mean on a held course, so it isn't judged on that: the bow hand was kept in the cockpit for
+ * two minutes of a broad reach. The guide's read once she's steady on it (physics.ts crewSettle, NEW_HELD).
+ */
+export const NEW_COURSE = 15;
+export function courseHeld(b: Boat): boolean {
+  const s = b.settle; if (!s) return true;
+  return !(s[SETTLE.left] > 0) && !(Math.abs(Math.abs(b.twa ?? 0) - s[SETTLE.twaGuide]) > NEW_COURSE && s[SETTLE.since] < LINE_GAP);
+}
 const NO_WAITS: readonly string[] = [], CREW_WAITS: readonly string[] = ['cunningham', 'downhaul', 'jibHalyard'], ALONE_WAITS: readonly string[] = [...PIANO];
 export function waitingLines(c: CrewState): readonly string[] {
   if (c.place?.across == null) return NO_WAITS;
@@ -390,9 +402,11 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const sheet = sheetOf(k);
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
-    // and swinging, or just settled from it, a cabin-top line that only gains a little waits (physics.ts SETTLE_S): what
-    // the depowering steps or the guide need goes at once (planWorth's 1)
-    if (PIANO.has(k) && (b.settle?.[SETTLE.left] ?? 0) > 0 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
+    // and swinging, or just settled from it, or not yet holding the course she's come to (courseHeld), a cabin-top line
+    // that only gains a little waits: what the depowering steps or the guide need goes at once (planWorth's 1). After a
+    // bear-away onto a reach the vang went on short, capped by the guide still read for the beat, and again once it was
+    // read for the reach: two trips for one change, crewcruise's 6 kt beam reach
+    if (PIANO.has(k) && !courseHeld(b) && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
     // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
     // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them

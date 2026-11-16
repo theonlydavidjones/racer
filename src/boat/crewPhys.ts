@@ -388,6 +388,9 @@ export interface CrewCall {
   coming?: number;
   /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
   rmPerDeg?: number;
+  /** She's holding a course, not swinging through one (physics.ts crewSettle: settled, her heading near its own over
+   * LINE_TAU): false, they don't move to the mast for a run she's only passing through, nor back from it (unset: held). */
+  held?: boolean;
 }
 
 /**
@@ -540,6 +543,9 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
       // sent forward by you (the owner: "send the crew forward"): two right up on the foredeck, one to the mast
       const l = n >= 2 ? 'foredeck' : 'mast'; if (c.layout !== l) c.layoutT = 0;
       c.layout = l; c.foredeck = n >= 2; c.poleWhy = undefined;
+    } else if (k.held === false && !k.pole) {
+      // (swinging through a point of sail, not on it, they stay as they are: in a slow penalty circle the bow hand went
+      // forward for each pass through the run and back for each through the beat, Deep Physics' trace, 6 kt seed 24)
     } else if (c.foreT === 1 && canGo) c.layout = chooseLayout(c, k, foreF, skill);
     else if (!canGo) { c.layout = 'cockpit'; c.foredeck = false; }
     const atMast = c.layout === 'mast' || c.layout === 'foredeck', forward = c.layout === 'foredeck';
