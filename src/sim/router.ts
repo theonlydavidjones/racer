@@ -199,9 +199,9 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   const beatBy = () => Math.min(limit, bound ? bound.t : Infinity);
   for (let step = 0; step * STEP_MIN < maxMin && best < 0 && t0 + step * STEP_MIN < beatBy(); step++) {
     const sectors = new Map<number, Node>(); // sector → the point kept there (only those are stored: the rest are many)
-    let worked = 0;
     for (const i of front) {
-      if (++worked % 4 === 0) yield; // (a front can take tens of ms cold: the page's slices stop between its points)
+      yield; // (a front can take tens of ms cold, and a point a few: the page's slices stop between its points. Every fourth
+      // point, four cold ones ran a slice to 32 ms from Mile Rock, its budget 6)
       const n = nodes[i], w = windOn(o, n.p, n.t), c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
       // (becalmed here, under 0.5 kt on the water: she can't sail, but the tide still carries her. The front keeps her,
       // drifting the minute on the same board with no turn, so a hole in the breeze doesn't delete the routes through it:
@@ -220,7 +220,9 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
           for (let k = 0; k < 2; k++) { const hm = crabTo(toB, c, v0), tw = Math.abs(wrap(w.from - hm)); if (tw >= beat) { v0 = chopSpeed(w.kt, tw, ch.hs, ch.tp); if (k === 1) cand.push([tw, wrap(w.from - hm) >= 0 ? 1 : -1]); } else break; }
         }
       }
+      let tried = 0;
       for (const [twa, sd] of cand) {
+        if (++tried % 6 === 0) yield; // (and between a point's headings: each one's exact check against the land and the piers, clear; a point's 30-odd ran a slice long)
         const h = w.from - sd * twa, v = twa === twa ? chopSpeed(w.kt, twa, ch.hs, ch.tp) : 0; // (sd +1: wind from starboard, starboard tack/jibe)
         // a tack or jibe costs its time, drifting with the current: the minute's sailing is that much shorter
         const turn: Node['turn'] = v && n.side && sd !== n.side ? (twa < 90 ? 'tack' : 'gybe') : '', lost = turn ? manoeuvreS(turn, w.kt, ch.hs) : 0;

@@ -190,6 +190,8 @@ const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<v
 const SLICE_MS = 2, SLICE_NEW_MS = 6, TICK_MS = 16;
 /** Each slice's length (ms), the latest LIVE_KEEP: for the tests (tests/insetRoute.test.ts), that none runs over its budget. */
 export const liveSlices: number[] = [];
+/** How many live plans have been started (the tests: one for a passage sailed, not one each 150 m). */
+export const liveStarts = { n: 0 };
 const LIVE_KEEP = 2000, noteSlice = (ms: number) => { liveSlices.push(ms); if (liveSlices.length > LIVE_KEEP) liveSlices.splice(0, liveSlices.length - LIVE_KEEP); };
 /** The destination's part of a plan's key (where she's going, not where she is or when). */
 const destOf = (key: string) => key.slice(0, key.indexOf('|'));
@@ -203,7 +205,7 @@ export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
   // once it's in)
   const same = !!j && destOf(j.key) === destOf(k.key) && j.refs.every((r, i) => r === k.refs[i]);
   if (!j || !same) {
-    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job);
+    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job); liveStarts.n++;
     const first = !m || destOf(m.key) !== destOf(k.key); // (nothing yet to show for where she's going)
     const pump = () => {
       if (jobs.get(w) !== job) return; // (a newer plan took its place)
