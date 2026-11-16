@@ -97,7 +97,7 @@ function nearCell(p: Vec): number {
 }
 /** Clear water along a segment, at least SHORE m from the land: if the land is farther from its middle than half its
  * length and SHORE (and a cell's error), no point of it is nearer; otherwise looked at every 25 m. */
-function clear(p: Vec, q: Vec, mark: Vec, arrive: number): boolean {
+function clear(p: Vec, q: Vec, mark: Vec, arrive: number, shore = true): boolean {
   const L = dist(p, q), m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
   // (the terrain has no piers in it: an Embarcadero pier reaches 250 m out from a shore the terrain puts far off, so the
   // structures are looked for as well before a segment is passed as clear without the exact test)
@@ -109,7 +109,7 @@ function clear(p: Vec, q: Vec, mark: Vec, arrive: number): boolean {
   for (let k = 1; k <= n; k++) {
     const x = { x: p.x + (q.x - p.x) * k / n, y: p.y + (q.y - p.y) * k / n };
     if (dist(x, mark) < SHORE + arrive) continue; // (by the mark she goes as near as it is)
-    if (landNear(x) < SHORE + 50) {
+    if (shore && landNear(x) < SHORE + 50) {
       const d = shoreNear(x);
       if (d < SHORE) {
         if (d0 !== d0) d0 = shoreNear(p);
@@ -147,10 +147,17 @@ function structureDist(p: Vec): number {
   }
   return d;
 }
-/** Does a track cross anything a boat runs aground on, segment by segment (exactly: geo/shore.ts landAlong)? */
-export function trackCrosses(track: { p: Vec }[]): boolean {
-  for (let k = 1; k < track.length; k++) if (landAlong(track[k - 1].p, track[k].p) !== Infinity) return true;
-  return false;
+/**
+ * Is a track from the old rules (routing.ts sailLeg: the stall's rescue, the last board laid exactly, the rules' plan)
+ * as clear of the piers, wharves, breakwaters and docks as the router's own segments: nothing crossed (exactly), and none
+ * nearer than WHARF_CLEAR except leaving one she started by and by the mark? The rules sail in 10 s steps and look only
+ * for land under her, so their track can pass within a few metres of a pier end; how near depends on her speed, so it
+ * has to be checked, not assumed (the Coordinator, 16 Nov 2026: a plan 14 m off a pier when the drive's table was read
+ * more smoothly). The natural shore's SHORE isn't asked of them: theirs is their own lane rules'.
+ */
+export function trackClear(track: { p: Vec }[], mark: Vec, arrive: number): boolean {
+  for (let k = 1; k < track.length; k++) if (!clear(track[k - 1].p, track[k].p, mark, arrive, false)) return false;
+  return true;
 }
 
 /**
@@ -247,7 +254,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     if (dk < nearD - 10) { nearD = dk; nearStep = step; }
     else if ((step - nearStep) * STEP_MIN >= STALL) {
       const n = nodes[k], r = yield* sailLegSteps(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
-      if (r.ok && (!bound || n.t + r.minutes < bound.t) && !trackCrosses(r.path)) bound = { k, r, t: n.t + r.minutes }; // (the rules sample every 10 s: a pier can slip between)
+      if (r.ok && (!bound || n.t + r.minutes < bound.t) && trackClear(r.path, b, arrive)) bound = { k, r, t: n.t + r.minutes }; // (the rules sample every 10 s: a pier can slip between)
       nearStep = step; // (and tries again after another stall, from wherever the front has got to)
     }
     yield;
@@ -273,7 +280,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     if (ok && !rescue) find: for (const li of turnsAt) for (const plan of ['middle', 'left', 'right'] as const) {
       // (left starts on starboard, right on port, looking up the wind: whichever lays it on one board)
       const from = chain[li - 1], r = yield* sailLegSteps(o, from.p, b, from.t, plan, undefined, arrive, 90);
-      if (r.ok && r.turns.length <= 1 && from.t + r.minutes <= endT + slack && !trackCrosses(r.path)) { tail = r; tailKind = chain[li].turn as 'tack' | 'gybe'; chain = chain.slice(0, li); break find; }
+      if (r.ok && r.turns.length <= 1 && from.t + r.minutes <= endT + slack && trackClear(r.path, b, arrive)) { tail = r; tailKind = chain[li].turn as 'tack' | 'gybe'; chain = chain.slice(0, li); break find; }
     }
     // (a point every half step: the drawn track's points are no farther apart than a boat sails in 30 s)
     const path: { p: Vec; t: number }[] = [];

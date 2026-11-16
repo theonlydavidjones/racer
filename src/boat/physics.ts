@@ -28,7 +28,11 @@ import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLi
  * turning (turnDrag bleeds her speed through the turns, toward this floor) and 30-40 s sailing clear first. Bay East's
  * audit puts a 720 in a small keelboat at more like 30-45 s in a breeze, also unconfirmed. The owner is to time one. */
 export const PENALTY_TURN_RATE = 10;
-/** Below this speed (m/s, ~2.5 kt) the AI won't try to tack: she'd stall head to wind. */
+/** Below this speed (m/s, ~2.5 kt) the AI won't try to tack: she'd stall head to wind. UNCITED AND UNDER REVIEW (the
+ * Coordinator, 16 Nov 2026): don't tune around it. Measured in the sim, an AI boat committed to a tack gets through
+ * from 0.6 m/s at 2–10 kt, in 11–26 s, so this gybes her round 280° in light air where she'd tack; but lowering it alone
+ * slowed light-air races (claude/light-air: more slow tacks and time in irons). Being redone with the AI's irons
+ * seamanship (claude/irons) and Deep Physics' measure of how she gathers way after a slow tack. */
 export const SLOW_TACK = 1.3;
 
 /** The crew's reaction time to a change in apparent wind angle, s. */

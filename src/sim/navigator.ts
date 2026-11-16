@@ -6,7 +6,7 @@ import { place } from './places';
 import { ROUTES, SERVICES, VESSEL } from './traffic';
 import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
-import { FINE, routeLegSteps, trackCrosses, type Grain } from './router';
+import { FINE, routeLegSteps, trackClear, type Grain } from './router';
 import { groundLaylines, landDist, routeAroundSteps, sailLegSteps, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
 import { harborAt } from '../geo/marina';
@@ -39,9 +39,10 @@ function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { o
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
   for (let i = 1; i < route.length; i++) {
     const arrive = i === route.length - 1 ? 30 : 120;
-    // (each plan's track checked segment by segment against everything she'd run aground on: the rules sail in 10 s
-    // steps, ~30 m, and a pier can lie between two of them)
-    const sound = (q: SailResult): SailResult => q.ok && trackCrosses(q.path) ? { ...q, ok: false, why: 'land' } : q;
+    // (each plan's track held, segment by segment, to the router's own test against the piers, wharves, breakwaters and
+    // docks: nothing crossed, nothing nearer than WHARF_CLEAR. The rules sail in 10 s steps, ~30 m, and look only for
+    // land under her: a pier can lie between two of them, or a few metres off her track)
+    const sound = (q: SailResult): SailResult => q.ok && !trackClear(q.path, route[i], arrive) ? { ...q, ok: false, why: 'land' } : q;
     let r = sound(yield* sailLegSteps(o, at, route[i], tt, 'middle', undefined, arrive, 360));
     if (!r.ok && r.why === 'land') for (const pl of ['left', 'right'] as const) { const q = sound(yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360)); if (q.ok && (!r.ok || q.minutes < r.minutes)) r = q; }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
@@ -84,7 +85,7 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
     // (the router couldn't: the old rules, up the middle, then the long board first to one side or the other)
     if (!r.ok) for (const pl of ['middle', 'left', 'right'] as const) {
       const q = yield* sailLegSteps(o, at, route[i], tt, pl, undefined, arrive, 360);
-      if (q.ok && !trackCrosses(q.path) && (!r.ok || q.minutes < r.minutes)) r = q;
+      if (q.ok && trackClear(q.path, route[i], arrive) && (!r.ok || q.minutes < r.minutes)) r = q;
     }
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
