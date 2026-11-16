@@ -27,6 +27,17 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   - **The Palace of Fine Arts, refined** (2–4 h).
 - **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
   reefing (reefing still waits on a Folkboat source); a cruising log.
+  - **The Farallon Islands, built out and reachable** (owner, 16 November; feature; later, not urgent; 20–40 h, an
+    estimate): "built out the farallon islands and make them an attainable destination on the map. many sailors
+    consider a rounding of the islands from the Bay to be a test of whether a sailor and vessel are ready for true blue
+    water passages, as it's one of the trickiest and most demanding passages you can do." The islands lie about 27 nmi
+    west of the Gate, far outside today's map (its west edge is 122.61°W): the map, the chart (NOAA ENC), the sea and
+    the wind extended out to them; the islands themselves at real scale (Southeast Farallon, its lighthouse and station,
+    Maintop, the Middle and North Farallons, Fanny Shoal, Noonday Rock) as a named destination and a rounding, Bay to
+    Bay. The open ocean done honestly: the full swell and wind sea from the buoys (NDBC 46026, 46237), the shipping
+    lanes, the sanctuary's rules. To research first: positions, heights and hazards from the chart and Coast Pilot 7,
+    and the real races that round them (the Singlehanded and Doublehanded Farallones, the OYRA Full Crew Farallones),
+    their courses and times, as the yardstick.
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; ~~chunky generic moored boats in the marinas~~ (done: the slips within 120 m of the camera drawn in detail, boot stripe and bottom paint, cockpit well, raked cabin with its windows, shrouds and spreaders, pulpits and lifelines; the rest with bottom paint, shrouds and a cockpit sole; render/mooredNear.ts). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **The beat angle in chop jumps** (fixed on a branch, 8e8e7c06, the angle's choice blended; awaiting the batch; Deep Physics, 16 November; from the cross-World leak's review): speedInChop × cos(twa) has
