@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, uAtZ, benchOut } from './hull';
+import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, thwartBottom, uAtZ, benchOut } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -181,14 +181,15 @@ const deckZ = (z: number) => {
 };
 const benchZ = (z: number) => Math.min(ZC_AFT, Math.max(ZC_FWD, z));
 const inCockpit = (ax: number, z: number) => z > COCK0 && z < COCK1 && ax < chz(z);
-/** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, footrest, thwart, coaming, deck, cabin top. */
-export function ground(x: number, z: number): number {
+/** The top of whatever is at (x, z) in the boat's frame (m above the waterline): sole, bench, footwell side, footrest, thwart, coaming, deck, cabin top.
+ * Given a height `y`, at that height: the thwart is a beam (hull.ts thwartBottom), so under it, what's below it. */
+export function ground(x: number, z: number, y?: number): number {
   const ax = Math.abs(x), u = uAtZ(z);
   // (the companionway, open in the cabin's after end down to its sill: hull.ts COMPANIONWAY; a hand reaches down into it
   // for the boom crutch below)
   if (ax < COMPANIONWAY.hw - 0.02 && z < COCK0 + 0.03 && z > COCK0 - COMPANIONWAY.len + 0.02) return COMPANIONWAY.sill; // (through the after bulkhead too: the opening's cut down to the sill)
   if (inCockpit(ax, z)) {
-    if (Math.abs(z - THWART.z) < THWART.half) return THWART.top;
+    if (Math.abs(z - THWART.z) < THWART.half && !(y != null && y < thwartBottom(x) - 0.01)) return THWART.top;
     if (onFootrest(ax, z)) return SEAT_Y; // (the footrest, across)
     const sh = soleHalf(z);
     if (ax < sh) return COCKPIT.sole;
