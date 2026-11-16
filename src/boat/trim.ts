@@ -33,8 +33,19 @@ export interface SailSpec {
  * light air (apparent wind 28.5°, the inner holes) to a breeze (32°, eased off the outer ones), as a Folkboat sails;
  * at 18° the inner hole was too wide for the beat itself in 8 kt, the jib luffing a little at its own best course.
  */
+/**
+ * The main's twist between the boom and mid height, deg: `aoa` is the angle at mid height, and the sheet's angle is the
+ * boom's, so the boom lies this much nearer the centerline than the mid-height chord. Half the head's twist with the
+ * leech closed for a beat (controls.ts mainShape: about 12° at the head in a working breeze). Without it the boom sat 6 to
+ * 8° out on a beat at 6 to 12 kt, the traveler car down to leeward with it; sailors carry the boom on the centerline
+ * there: North Sails' Nordic Folkboat tuning guide has the traveler cars 15 to 20 cm to windward in 0 to 6 kt, in the
+ * middle from 6 to 14 and to leeward above; North's IF-boat guide the boom about 200 mm to leeward in very light air
+ * and on the centerline from 6 kt (as the researcher read them, 15 Nov 2026). An ESTIMATE of the twist; the boom's
+ * place is the sourced figure it's set to meet.
+ */
+export const MAIN_TWIST_MID = 6;
 export const SAILS: Record<SailName, SailSpec> = {
-  main: { aoa: 22, min: 2, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
+  main: { aoa: 22 + MAIN_TWIST_MID, min: 0, max: BOOM_STOP, crewRate: 9, handRate: 12, share: 0.7 }, // (max: the boom on the shroud, controls.ts)
   jib: { aoa: 16.5, min: carLead(0), max: 68, crewRate: 14, handRate: 16, share: 0.3 }, // (min: the car's innermost lead, controls.ts)
 };
 
