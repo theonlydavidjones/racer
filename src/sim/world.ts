@@ -2115,7 +2115,8 @@ export class World {
           // the bow held at the finger's end, the stern swinging out across the fairway: as fast as the wind on her side
           // swings her against the water's resistance (if it's helping), or the crew walks the bow round
           const rel = wrap(ww.from - n360(H.h0 + H.a)), helps = Math.sign(rel) === Math.sign(P.turn);
-          const rate = Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
+          // (on a slip line, hauled round at the crew's pace, as the plan's set to leeward was gauged: geo/marina.ts SLIP_TURN)
+          const rate = P.slip ? CREW_TURN : Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
           // (the tiller can't hurry or slow it: the water crosses the rudder broadside)
           H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + rate * dt);
           const q = swingAbout(start, H.h0, P.pivot ?? 3.8, H.a), f = Math.abs(H.a / P.turn); b.x = q.c.x + (P.slip ? P.slip.x * f : 0); b.y = q.c.y + (P.slip ? P.slip.y * f : 0); b.h = n360(q.h); b.astern = 0; // (on a slip line: set to leeward as she comes round, as the plan has it) // (about her bow on the bow line, or the point beside the finger's end she's walked round about)

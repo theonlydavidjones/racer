@@ -773,27 +773,42 @@ const DRIFT_PER_KT = 0.017;
  */
 /**
  * Turned in the fairway on a slip line (the coordinator's ruling, 16 Nov 2026): a stern line led from aboard round the
- * finger's cleat and back aboard, doubled, so the crew hauling one end has the pull of both parts on her (2:1, less the
- * cleat's friction); hauled in as she comes round, it brings her stern round and holds it near the cleat, then one end's
- * let go and the line pulled aboard. The wind's push on her bare rig beam on is about 310 N in 20 kt (4.8 m² of side
- * windage, Deep Physics' review of 15 Nov 2026), as the square of the wind; one adult's sustained haul is 186 N (Snook &
- * Ciriello 1991's 19 kgf, as tabled by Bernard), 372 N on her at 2:1. They're equal at about 22 kt; up to this wind, kt,
- * with a third to spare, the haul holds her: 19 kt, not the 15 first guessed. Held, her stern's kept within about
- * SLIP_HELD m of where it started (the line taken up as she turns); above it, she's set at her bare-rig drift as she comes
- * round, the line paid out. ESTIMATES.
+ * finger's cleat and back aboard, doubled; hauled in as she comes round, it brings her stern round and holds her near the
+ * cleat, then one end's let go and the line pulled aboard. Hauling, the part beyond the cleat carries the haul less the
+ * cleat's friction, T·e^(−μθ), μ about 0.25 for rope on a cleat and θ about π round it (an ESTIMATE): about 1.46 times
+ * one adult's sustained 186 N on her (Snook & Ciriello 1991's 19 kgf, as tabled by Bernard), 271 N. The wind's push on
+ * her bare rig beam on is about 310 N in 20 kt (4.8 m² of side windage, Deep Physics' review of 15 Nov 2026), as the
+ * square of the wind. With a third to spare, the haul holds her up to SLIP_LINE_KT, about 16 kt (the physics review of
+ * 16 Nov). Held, she's set no more than SLIP_HELD m to leeward as she comes round (her whole hull, as she turns about
+ * her middle: her stern's own path is that turn and the set, and the poses check it); above it, she's set at her
+ * bare-rig drift, the line paid out. ESTIMATES.
  */
-const SLIP_LINE_KT = 19, SLIP_HELD = 2;
-/** How fast the crew haul her round on the slip line, deg/s: as fast as they walk her bow round by hand (world.ts CREW_TURN), so the wind has as long to set her. An ESTIMATE. */
+const SLIP_HAUL = 186 * (1 + Math.exp(-0.25 * Math.PI)), SLIP_LINE_KT = 20 * Math.sqrt(SLIP_HAUL * 0.75 / 310), SLIP_HELD = 2;
+/** How far she's set to leeward over a turn of `turn` deg on the slip line, m: held to SLIP_HELD while the haul can hold her, her bare-rig drift for the whole turn beyond. */
+export function slipLineSet(turn: number, windKt: number): number {
+  const free = DRIFT_PER_KT * windKt * Math.abs(turn) / SLIP_TURN;
+  return windKt <= SLIP_LINE_KT ? Math.min(free, SLIP_HELD) : free;
+}
+/** How fast the crew haul her round on the slip line, deg/s: as fast as they walk her bow round by hand (world.ts CREW_TURN, which the World turns her at on it), so the wind has as long to set her. An ESTIMATE. */
 const SLIP_TURN = 2;
 /**
- * Above this wind, kt, she isn't turned by hand: held beam on by the stern line as she comes round, the wind's push on her
- * bare rig (4.8 m² of side windage, about her middle) is about 250 N in 18 kt and 310 N in 20; about her bow, the line at
- * her stern takes half of it, against about 186 N one adult can hold (Snook & Ciriello's 19 kgf, sustained): 18 kt, with
- * a third to spare. Deep Physics' reviews, 15 and 16 Nov 2026; an ESTIMATE.
+ * How hard a wind, kt, the hand on the dock can swing her round against with the stern line, her bow `gap` m past the
+ * finger's end (the physics review, 16 Nov 2026). The hand stands on the finger's end, about HAND_LAT to the side of her
+ * centerline and `gap` aft of her bow, so the line to her stern, 7.6 m from her bow, runs nearly through the pivot: its
+ * lever about her bow is 7.6·HAND_LAT over the line's length, 1.1–1.4 m (it grows as she comes round; it's least at the
+ * start, where she has to be broken out of the slip's line). One adult's sustained 186 N (Snook & Ciriello 1991's 19 kgf,
+ * as tabled by Bernard) on that is 210–260 N·m; the wind's turning of her bare rig about her bow, beam on, is
+ * ½·ρ·A·v²·3.8 with A her 4.8 m² of side windage (physics.ts HOVE.windSide; world.ts windSwing), about 425 N·m in 12 kt.
+ * With a third to spare, 7–8 kt. Against the wind, that is: the way the wind swings her, it does the turning. ESTIMATES.
  */
-const FAIRWAY_HOLD_KT = 18;
+const HAND_LAT = 1.5;
+function sternLineKt(gap: number): number {
+  const lever = 2 * BOW * HAND_LAT / Math.hypot(HAND_LAT, gap + 2 * BOW), hand = 186 * lever * 0.75; // (N·m, a third to spare)
+  return Math.sqrt(hand / (0.5 * 1.225 * 4.8 * BOW)) / 0.5144; // (m/s to kt)
+}
 function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: number | undefined, windKt = 0): PushOff | null {
-  if (windKt > FAIRWAY_HOLD_KT) return null; // (held beam on as she's turned, more wind than the hand on her stern line can hold)
+  // (the way the wind would swing her stern: the hand on the dock turns her against it only as far as sternLineKt)
+  const windTurn = windFrom == null ? 0 : Math.sign(wrap180(windFrom - s.heading)) || 1;
   const u = dirOf(s.heading), at = (back: number) => ({ x: s.p.x - u.x * back, y: s.p.y - u.y * back }), tip = 0.45 * s.finger;
   for (const gap of [0.5, 1, 1.5, 2, 2.5]) { // (her bow past the finger's end: as little as clears the boats either side)
     const back = tip + BOW + gap; if (back > reach) break;
@@ -801,6 +816,7 @@ function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: 
     const gainOf = (turn: number) => { const q = about(c, s.heading, BOW, turn), v = dirOf(q.h); return togo({ x: q.c.x - v.x * 12, y: q.c.y - v.y * 12 }) - togo({ x: q.c.x + v.x * 12, y: q.c.y + v.y * 12 }); };
     const signs = [1, -1].sort((a, b) => gainOf(b * 90) - gainOf(a * 90));
     for (const sign of signs) for (const sq of [90, 75, 105, 60, 120, 45, 135]) {
+      if (windFrom != null && windKt >= WIND_SWINGS && sign !== windTurn && windKt > sternLineKt(gap)) continue; // (against the wind, more than the hand can turn her against)
       const turn = sign * sq, end = about(c, s.heading, BOW, turn), h = (end.h + 720) % 360;
       // (pointed toward the way out, and 60 degrees and more off the wind, where a sail fills as it goes up: nearer it, let
       // go with no sail up she'd carry her way toward the wind and stop in irons. The quick checks first)
@@ -817,10 +833,10 @@ function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: 
   // comes round, held by the line)
   const bowOut = tip + BOW + 0.5; if (reach < bowOut) return null;
   const back = (bowOut + reach) / 2, c = at(back);
-  const lee = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180), drift = windFrom == null ? 0 : DRIFT_PER_KT * windKt;
+  const lee = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180);
   // (her pose at a fraction of the turn: turned about her middle, and set to leeward evenly as she comes round, by as much
   // as the hauled-in line lets her go, or her bare-rig drift for the whole turn where the haul can't hold her)
-  const setFor = (turn: number) => { const free = drift * Math.abs(turn) / SLIP_TURN; return windKt <= SLIP_LINE_KT ? Math.min(free, SLIP_HELD) : free; };
+  const setFor = (turn: number) => windFrom == null ? 0 : slipLineSet(turn, windKt);
   const poseAt = (turn: number, f: number) => {
     const q = about(c, s.heading, 0, turn * f), set = setFor(turn) * f;
     q.c = { x: q.c.x + lee.x * set, y: q.c.y + lee.y * set };

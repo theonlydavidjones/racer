@@ -332,12 +332,14 @@ What's planned, roughly in order. Done work is described in the README.
      - **~~The berths kept fast: the stern-line walk-out's target~~** (done, 16 Nov 2026, the coordinator's calls). Where
        the shove would leave her kept fast, she's walked out by hand instead, even from a slip the wind blows straight out
        of, and turned the way a crew does it (the physics review): about her bow at the finger's end by a hand on the dock
-       with a stern line, who then steps aboard (18 kt and less), or, where the fairway's too narrow for that, out in it
-       about her middle on a slip line round the finger's cleat, all hands aboard, hauled in as she comes round (her stern
-       held within 2 m while the crew's 2:1 haul beats the wind's push, to 19 kt with a third to spare; set at her bare-rig
-       drift beyond). Every let-go 60 degrees and more off the real wind. Sample of every 25th bow-in berth in seven winds:
-       kept fast 90 of 434 to 31 (165 by a hand on the dock, 226 on a slip line), none touching. The 1,604 once swung on
-       the bow line: see the sweep test. In 20 kt from the north no berth is shoved off astern any more: walked out or
+       with a stern line, who then steps aboard (against the wind in about 8 kt and less: the line to her stern runs
+       nearly through her bow, a lever of 1.1–1.4 m), or, where that won't do, out in the fairway about her middle on a
+       slip line round the finger's cleat, all hands aboard, hauled in as she comes round (set no more than 2 m to leeward
+       while the crew's haul, 271 N on her less the cleat's friction, beats the wind's push, to about 16 kt with a third to
+       spare; set at her bare-rig drift beyond). Every let-go 60 degrees and more off the real wind. Sample of every 25th
+       bow-in berth in seven winds: kept fast 90 of 434 to 31 (48 by a hand on the dock, 343 on a slip line), none
+       touching. The 1,604 once swung on the bow line: 1,254 on a slip line, 106 kept fast (31 before the review), none
+       touching. In 20 kt from the north no berth is shoved off astern any more: walked out or
        kept fast. In 12 kt from 090, the easterly, rare on the Bay, the sample still keeps most fast: not in the sweep test.
      - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
        astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
