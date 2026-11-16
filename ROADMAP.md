@@ -39,7 +39,7 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
   Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
   perf-pair --ai, then the physics-reviewer.
-- **The way round the land out of the Estuary runs through Alameda** (Bay East, 16 Nov 2026, found reviewing #442; the
+- ~~**The way round the land out of the Estuary runs through Alameda**~~ (done: estuary-route and ai-calloff-clear, batch48; Bay East, 16 Nov 2026, found reviewing #442; the
   Coordinator: Bay East's, next): sim/routing.ts routeAround from the Estuary's harbors (Encinal, Oakland YC, Marina
   Village, Fortmann, Grand Marina, Alameda Marina) to the central Bay (Pier 39, Alcatraz) gives a single straight leg
   through Alameda, on main as on #442: 186 of 1356 ways out of the harbors' entrances. The way out is down the Estuary
@@ -47,6 +47,7 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   estuary-route: where no way is found, half as far off and half again, down to 30 m, her width kept on every leg then;
   0 of 156 harbor-to-harbor ways now cross the land. And the call-off's ways home are worked out a slice a step (from off
   Emeryville the fleet's took ~400 ms in each of three steps).
+- ~~**The AI keeps way on in irons; no penalties left to take once racing's called off; the inset's route worked out without freezing (#440)**~~ (done: claude/irons-main, rules-abandon, batch48; navroute-sliced, batch47b).
 - **A room for each cell of the way round the land** (the physics review of estuary-route; the Coordinator, 16 Nov 2026:
   a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
   Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
@@ -329,7 +330,7 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
-8m3. **The bow-line let-go bumps the next boat in a northerly** (now, Marinas; from their own work, 16 November; their entry and fix land in v201).
+8m3. ~~**The bow-line let-go bumps the next boat in a northerly**~~ (done: 94c34591, batch48; Marinas; from their own work, 16 November; their entry and fix land in v201).
    Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
 
 8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
@@ -688,7 +689,7 @@ What's planned, roughly in order. Done work is described in the README.
      happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
      takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
      the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
-   - **Start practice: restart without finishing** (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
+   - ~~**Start practice: restart without finishing**~~ (done: start-drill-check, batch44) (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
      like to be able to restart without having to finish the whole drill." The pause menu has a Restart (labeled
      "Restart Race" here, since only drill and rounding say "Drill"), which the owner didn't find or which starts over
      from scratch. Give a new countdown from the same setup at any time, keeping the session's starts table: a key
@@ -719,7 +720,7 @@ What's planned, roughly in order. Done work is described in the README.
      posts). Nothing from St. Francis YC, GGYC or US Sailing yet, and no sourced committee-habit claim, so the strategist
      says none of it as fact until better sources (the clubs' race and sailing-instruction pages; latitude38.com is
      blocked here) are read.
-   - **Jibe-ho: a confirmation, a reachable key, and how to use it** (owner, 15 November; polish; now; 1–2 h): "I need to
+   - ~~**Jibe-ho: a confirmation, a reachable key, and how to use it**~~ (done: jibe-ho, batch44) (owner, 15 November; polish; now; 1–2 h): "I need to
      see some kind of confirmation when I call jibe ho during a jibe. and the shift-j command is too hard. those keys are
      too far away from each other. need a better option, clearer instructions on how to use it." Today turnHo is
      Shift+J (src/ui/keys.ts:73; app.ts:1223 sends {k:'turn'}), J is also the jib halyard, and nothing shows the call
@@ -874,7 +875,7 @@ What's planned, roughly in order. Done work is described in the README.
        angle.
      A test: lash at 5°, 10° and 15° each way, by right-click and by double-click; each must hold the angle it was
      lashed at.
-   - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
+   - ~~**Bug: "gray confetti" running up the sails**~~ (done: 705ab35c, her ropes cast no shadow) (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
      <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
      gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
      like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast
