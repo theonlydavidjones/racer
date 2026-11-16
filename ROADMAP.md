@@ -39,6 +39,19 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
   Fit both smoothly (monotone cubic or similar), then calibrate afresh against the polar and the Delft resistance;
   perf-pair --ai, then the physics-reviewer.
+- ~~**The way round the land out of the Estuary runs through Alameda**~~ (done: estuary-route and ai-calloff-clear, batch48; Bay East, 16 Nov 2026, found reviewing #442; the
+  Coordinator: Bay East's, next): sim/routing.ts routeAround from the Estuary's harbors (Encinal, Oakland YC, Marina
+  Village, Fortmann, Grand Marina, Alameda Marina) to the central Bay (Pier 39, Alcatraz) gives a single straight leg
+  through Alameda, on main as on #442: 186 of 1356 ways out of the harbors' entrances. The way out is down the Estuary
+  and round Alameda's west end. Found: at 120 m off the land every cell of the Estuary was blocked. Fixed on
+  estuary-route: where no way is found, half as far off and half again, down to 30 m, her width kept on every leg then;
+  0 of 156 harbor-to-harbor ways now cross the land. And the call-off's ways home are worked out a slice a step (from off
+  Emeryville the fleet's took ~400 ms in each of three steps).
+- ~~**The AI keeps way on in irons; no penalties left to take once racing's called off; the inset's route worked out without freezing (#440)**~~ (done: claude/irons-main, rules-abandon, batch48; navroute-sliced, batch47b).
+- **A room for each cell of the way round the land** (the physics review of estuary-route; the Coordinator, 16 Nov 2026:
+  a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
+  Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
+  120/60/30 m it allows, or a cost for less, so only the narrow reach is sailed close.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
@@ -317,7 +330,7 @@ What's planned, roughly in order. Done work is described in the README.
      asserted at 12 kt, not at 8; at the six any-wind berths with no motor, "stays fast until it changes" promises a wind
      that may not come (the stern-line walk-out is the answer); and no flag covers 20 kt on her stern (9.5 s of steerage,
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
-8m3. **The bow-line let-go bumps the next boat in a northerly** (now, Marinas; from their own work, 16 November; their entry and fix land in v201).
+8m3. ~~**The bow-line let-go bumps the next boat in a northerly**~~ (done: 94c34591, batch48; Marinas; from their own work, 16 November; their entry and fix land in v201).
    Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
 
 8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
@@ -350,6 +363,32 @@ What's planned, roughly in order. Done work is described in the README.
    Symptom (b), sails dead while she's handled, is the scripted push-off by design (world.ts:1283). Once the walk
    leaves her pointing out, a short hand-over is enough; giving her sails during the walk drove her back into the
    slips in the replay.
+
+8m3. **Let go from the bow-line swing with room to sail off** (Marinas, 15 November; found once the moored boats were solid,
+   8m2; on the coordinator's call, ahead of the navigator). A sweep (every berth whose plan was the swing on her bow line, in
+   12 and 15 kt from 270, 225 and 000: 1,604 cases at 753 berths) found the crew's swing itself touches no moored boat
+   anywhere. But let go at the finger's end, the jib going up, she hit a boat within 15 m in 1,124 cases (593 berths), even
+   with her heading held: let go along the row, the next boat's stern just off her bow, and set 1–2 m to leeward as she
+   gathered way. The planner's clear run ahead was checked every 2 m with no margin.
+   - **Done (geo/marina.ts clearRun):** a let-go with only the crew's push for way needs her hull half a meter bigger all
+     round clear for her first 15 m, sagging 1.75 m to leeward in 12 kt (in proportion to the wind), and in a breeze 60
+     degrees and more off the wind. The walk-out is held to the same, and is tried before the astern shove wherever no
+     swing passes. The astern shove too, where her coast ends (the coordinator's ruling, 16 Nov 2026): where the clear
+     water isn't there, she's kept fast and told, the motor offered where she has one. The same 1,604 cases now: 1,296
+     walked out, 148 held for the main, 118 on the bow line, 11 shoved off astern (steered as the plan says), none
+     touching a boat or a dock; 31 kept fast (before, the astern shove touched in 27 of its 42). West Harbor 507 in a
+     12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
+     held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
+   - **Still to do (Deep Physics' review, 16 Nov 2026):**
+     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
+       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
+       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
+       or motored out. The sweep test fails if the count rises.
+     - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
+       astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
+       the test.
+     - **The sag is gauged at the slip's own wind:** the lee's edge a few meters out, where the breeze is fresher, isn't
+       in it.
 
 8n. **The Gashouse Cove exit, true to life** (partly done: the Fort Mason pile fields and wrecks, 0e6f3e0, 91e1146, 7a508da; the shelter inside and the exposure outside in PRs #300 and #338; the eddies and gyre in PR #308; the exit test on branch bay-east-23) (owner, 13 November; accuracy; next, with 8m; 4–6 h): "it's one of the
    trickiest marina entries/exits… it's a big challenge, and I want the sim to get it right." Photos:
@@ -600,14 +639,14 @@ What's planned, roughly in order. Done work is described in the README.
      racing breaks rule 42: the debrief and the protest logic should know it. Cruising: no limit.
    - On the screen rule: the call goes inside an existing element (the sail band's crew tab, or a key), not a new button.
      The on-screen label is the owner's choice.
-   - **Now — the paddling drawn** (owner, 15 November: "there's no animation associated with paddling?"; Crew Figures):
+   - ~~**The paddling drawn**~~ (done: claude/paddle-drawn-r3, 8596bedf) (owner, 15 November: "there's no animation associated with paddling?"; Crew Figures):
      the physics shipped in v196 but nothing is drawn. The crew member goes below for the boom crutch, comes up with it,
      kneels at the rail on the called side and strokes, the blade dipping in time with the push; then stows it.
-   - **Paddling tires the paddler** (owner, 15 November: "paddling is exhausting… strength of paddling and duration
+   - ~~**Paddling tires the paddler**~~ (done, v200: claude/paddle-fatigue) (owner, 15 November: "paddling is exhausting… strength of paddling and duration
      without rest should be tied to crew fitness"; Crew Model, Deep Physics reviewing): the stroke's power and how long
      it lasts before a rest come from the paddler's fitness and the same fatigue model as hiking (crewPhys.ts), with a
      sourced sustainable-power curve for one person paddling; a tired paddler slows, rests and can be swapped.
-   - **The paddle tab as arrows** (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
+   - ~~**The paddle tab as arrows**~~ (done: paddle-arrows) (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
      clickable arrows like < PADDLE >"; Crew Controls): ‹ paddles on port, › on starboard (the side the crew kneels on,
      as you face forward); tap the lit one again to stop.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
@@ -650,7 +689,7 @@ What's planned, roughly in order. Done work is described in the README.
      happened" block (about ten sentences) breaks the standing rule: replace it with two or three short, sharp
      takeaways (the biggest loss first, with the fix), the rest behind one hover or cut. Make the table read at a glance:
      the latest start marked, distance and time apart with units that can't be misread, prefer visuals to words.
-   - **Start practice: restart without finishing** (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
+   - ~~**Start practice: restart without finishing**~~ (done: start-drill-check, batch44) (owner, 15 November; feature; now; <1 h): "in start line mode, I'd
      like to be able to restart without having to finish the whole drill." The pause menu has a Restart (labeled
      "Restart Race" here, since only drill and rounding say "Drill"), which the owner didn't find or which starts over
      from scratch. Give a new countdown from the same setup at any time, keeping the session's starts table: a key
@@ -681,7 +720,7 @@ What's planned, roughly in order. Done work is described in the README.
      posts). Nothing from St. Francis YC, GGYC or US Sailing yet, and no sourced committee-habit claim, so the strategist
      says none of it as fact until better sources (the clubs' race and sailing-instruction pages; latitude38.com is
      blocked here) are read.
-   - **Jibe-ho: a confirmation, a reachable key, and how to use it** (owner, 15 November; polish; now; 1–2 h): "I need to
+   - ~~**Jibe-ho: a confirmation, a reachable key, and how to use it**~~ (done: jibe-ho, batch44) (owner, 15 November; polish; now; 1–2 h): "I need to
      see some kind of confirmation when I call jibe ho during a jibe. and the shift-j command is too hard. those keys are
      too far away from each other. need a better option, clearer instructions on how to use it." Today turnHo is
      Shift+J (src/ui/keys.ts:73; app.ts:1223 sends {k:'turn'}), J is also the jib halyard, and nothing shows the call
@@ -836,7 +875,7 @@ What's planned, roughly in order. Done work is described in the README.
        angle.
      A test: lash at 5°, 10° and 15° each way, by right-click and by double-click; each must hold the angle it was
      lashed at.
-   - **Bug: "gray confetti" running up the sails** (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
+   - ~~**Bug: "gray confetti" running up the sails**~~ (done: 705ab35c, her ropes cast no shadow) (owner, 15 November, from a screenshot of USA 122 on the wind; bug;
      <1–2 h): "a weird animation effect running up the sails in the form of these odd rectangular shadows. look like
      gray confetti flying up the sail." Small dark rectangles, in a diagonal band, travel up the mainsail. They look
      like shadows cast by something small and moving (spray, wind or flow particles, telltales) that shouldn't cast

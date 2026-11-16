@@ -746,7 +746,7 @@ export class World {
   get cruising(): boolean { return this.freeSail || !!this.user?.retired; }
   nextMark(b: Boat): CourseMark | null { if (this.rounding && b === this.user) return this.rounding.mark; return this.freeSail || (b.isUser && b.retired) ? (b.isUser && this.arrivedT == null ? this.dest : null) : b.leg < this.C.marks.length ? this.C.marks[b.leg] : null; }
   /** Mid-race, the start/finish line is an obstruction for this boat. */
-  obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; }
+  obstructed(b: Boat): boolean { return this.C.obstruction && this.t > 0 && !this.cancelled && !b.retired && b.started && b.leg >= 1 && b.leg < this.C.marks.length; } // (called off, she's not racing: no penalty for crossing it on her way home)
   /** The current at p (m/s): the tide's (or the chosen preset's), eased near the shore, with the bridges' piers' wakes in it. */
   currentAt(p: Vec, lattice = false): Vec {
     const c = withPierWakes(p, this.streamAt(p, lattice), this.pierFlows(), this.t), k = basinCalm(p); // (near slack inside a harbor's breakwaters)
@@ -1712,6 +1712,23 @@ export class World {
   }
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
+  /**
+   * Racing called off, however it was (N, N over H, N over A): no penalty is left to take. "A race that a race committee
+   * … abandons is void but may be resailed" (Definitions, Abandon); a boat is racing only "until the race committee
+   * signals a general recall, postponement or abandonment" (Definitions, Racing), and a penalty is for an incident "while
+   * racing" (44.1). (So Appendix P3 for its own penalty: "the penalty is cancelled".) A resail is a new race: a breach in
+   * the first "shall not … cause a boat to be penalized except under rule 2, 30.2, 30.4 or 69 or under rule 14 when she has
+   * caused injury or serious damage" (rule 36(b)); turns owed under 44.1 aren't among them, and 30.3's UFD lapses ("but
+   * not if the race is restarted or resailed"). Each step while called off: whatever calls it off, and a penalty given in
+   * the same step, are covered.
+   */
+  private penaltiesVoid(): void {
+    for (const b of this.boats) if (b.penalty > 0 || b.penaltyDir) {
+      b.penalty = 0; b.penaltyTotal = 0; b.penaltyTurned = 0; b.penaltyDir = 0; b.penaltyMoves = 0; b.penaltyLastMove = 0; b.penaltyAt = 0; b.penaltyEndOnTack = false;
+      if (b.ai) b.ai.clearing = false;
+    }
+  }
+
   private signals(prevT: number): void {
     // too much wind: from two minutes before the warning signal until the race is over, the committee watches the wind
     // over the course (its middle and the marks: its own boat may sit in a lee) over a couple of minutes, and at the
@@ -1725,11 +1742,10 @@ export class World {
       if (!this.cancelled && this.settings.mode !== 'drill' && this.cbWin.length >= 240 && this.t >= this.sequence[0].t - 120 && !this.boats.some(b => b.finished) && this.cbMean! >= CANCEL_KT) {
         const sig = cancelSignal(this.t >= 0, this.cbMean!);
         this.cancelled = { t: this.t, kt: this.cbMean, up: sig.up, say: sig.say };
-        for (const b of this.boats) { b.penalty = 0; b.penaltyTurned = 0; } // (no race, no penalty left to take)
         for (let i = 0; i < sig.sounds; i++) this.emit({ type: 'horn', dur: 0.8, delayMs: i * 1100 });
         this.emit({ type: 'toast', ms: 9000, msg: sig.say });
       } }
-    if (this.cancelled) { this.flags = [...this.cancelled.up]; return; }
+    if (this.cancelled) { this.flags = [...this.cancelled.up]; this.penaltiesVoid(); return; }
     if (this.steps === 1 && this.t < 0) {
       const T = this.lineTransit;
       if (T) this.emit({ type: 'toast', ms: 6000, msg: `Sight the line: from the ${this.C.committeeLabel} end, ${this.C.pinLabel} lines up with ${T.name}. Near the line, when ${this.C.pinLabel} and ${T.name} are in line, you're on it.` });
@@ -2071,8 +2087,9 @@ export class World {
     const slip = slipById(d.slip);
     // (the crew judge the breeze, not the gust passing: environment/gusts.ts)
     const wind = this.windHere(u, u, false), plan = slip ? pushOffPlan(slip, wind.from, wind.kt) : null;
-    // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast, geo/marina.ts NO_ASTERN, NO_ASTERN_WEST)
-    if (slip && plan?.kind === 'astern' && noAsternPushOff(slip, wind.from, wind.kt)) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in this wind: motor out, or wait for the wind to change.' : 'No room to push her off from this berth in this wind: she stays fast until it changes.' }); return false; }
+    // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast, geo/marina.ts NO_ASTERN, NO_ASTERN_WEST;
+    // or where her coast would end with no clear water to sail off in, 8m3)
+    if (slip && plan?.kind === 'astern' && (plan.noRoom || noAsternPushOff(slip, wind.from, wind.kt))) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in this wind: motor out, or wait for the wind to change.' : 'No room to push her off from this berth in this wind: she stays fast until it changes.' }); return false; }
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip || !plan) { u.v = SHOVE; return true; }
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };
@@ -2789,6 +2806,7 @@ export class World {
    * conduct (ai/conduct.ts) decides; you take yours or not by steering them. Umpired, it's owed. `t`: the incident's time.
    */
   penaltyFor(b: Boat, t = this.userIncident?.t ?? this.t): void {
+    if (this.cancelled) return; // (an incident reviewed after the call-off: no race left to take it in)
     if (this.protestsOn && b.ai && !takesPenalty({ fouled: true, since: this.t - t }, this.conductRng())) { this.declined.add(`${b.id}@${t}`); return; }
     this.assignPenalty(b);
   }
@@ -2801,7 +2819,7 @@ export class World {
     }
     // (turns done count only before she finishes: at or near the line her hull must be on the course side before she
     // finishes, 44.2, and the sim doesn't have her finish again)
-    for (const p of this.protests) { const vs = this.boats[p.vs]; if (p.owed && p.turnsT == null && !vs.finished && vs.penalty <= 0) p.turnsT = this.t; }
+    for (const p of this.protests) { const vs = this.boats[p.vs]; if (p.owed && p.turnsT == null && !vs.finished && vs.penalty <= 0 && !this.cancelled) p.turnsT = this.t; } // (a penalty voided by the call-off wasn't taken: rule 36(b))
   }
 
   /** Start a two-turns penalty for a boat after an incident has been reviewed. */
