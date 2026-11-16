@@ -31,15 +31,28 @@ describe('the beat angle in chop holds steady through a puff', () => {
       if (top > 0) expect(1 - got / top, `${kt} kt, ${hs} m at ${a.toFixed(1)}`).toBeLessThan(0.01);
     }
   });
-  it('the sails\' drive against her speed runs smoothly across the table\'s angles and knots: no step at a 5° or a whole-knot line', () => {
+  it('more chop moves it smoothly too: a step of the sea\'s height (0.02 m) or period (0.1 s) under a degree', () => {
+    for (const [k0, k1, hs, tp] of SEAS) for (let kt = k0; kt <= k1; kt += 1) {
+      const a = beatInChop(kt, hs, tp);
+      expect(Math.abs(beatInChop(kt, hs + 0.02, tp) - a), `${kt} kt, ${hs} m, higher`).toBeLessThan(1);
+      expect(Math.abs(beatInChop(kt, hs, tp + 0.1) - a), `${kt} kt, ${hs} m, longer`).toBeLessThan(1);
+    }
+  });
+  it('the sails\' drive against her speed runs smoothly across the table\'s own lines (every 5°, every knot) and between them: no step', () => {
     let worst = 0;
-    for (const kt of [6.5, 9.5, 12.5, 17.5, 22.5]) for (const a of [42.5, 47.5, 52.5, 87.5, 132.5]) for (const x of [0.3, 0.6, 0.85, 1.1]) {
+    // (on the table's lines, 45° and 12 kt and the like, where a wrong neighbor row would show; and midway, where the
+    // nearest row used to change)
+    for (const kt of [6, 6.5, 9, 12, 12.5, 17.5, 22]) for (const a of [40, 42.5, 45, 47.5, 50, 90, 132.5, 135]) for (const x of [0.3, 0.6, 0.85, 1.1]) {
       const vt = polar(kt, a);
       worst = Math.max(worst, Math.abs(driveRatio(kt, a + 0.01, x * vt, vt) - driveRatio(kt, a - 0.01, x * vt, vt)), Math.abs(driveRatio(kt + 0.005, a, x * vt, vt) - driveRatio(kt - 0.005, a, x * vt, vt)));
     }
-    expect(worst).toBeLessThan(0.002); // (it stepped by up to several percent at each line)
-    // (on a table line, exactly the table's own row: nothing changed there)
-    const vt = polar(12, 45), k = driveCurveFor(12, 45, vt);
-    expect(k(vt)).toBeCloseTo(1, 6); expect(driveRatio(12, 45, 0.5 * vt, vt)).toBeCloseTo(k(0.5 * vt), 12);
+    expect(worst).toBeLessThan(0.002); // (it stepped by up to several percent midway between the lines)
+    // (midway between two angles' rows, the mean of the two rows; and of two knots' rows: each read on its own line)
+    const at = (kt: number, a: number, x: number) => { const vt = polar(kt, a); return driveRatio(kt, a, x * vt, vt); };
+    for (const x of [0.3, 0.6, 0.85]) {
+      expect(at(12, 47.5, x)).toBeCloseTo((at(12, 45, x) + at(12, 50, x)) / 2, 9);
+      expect(at(12.5, 45, x)).toBeCloseTo((at(12, 45, x) + at(13, 45, x)) / 2, 9);
+    }
+    const vt = polar(12, 45); expect(driveCurveFor(12, 45, vt)(vt)).toBeCloseTo(1, 6);
   });
 });
