@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
-import { buildCrew, syncCrew, travCam, travTail, type Crew, type Figure } from '../src/render/crew';
+import { buildCrew, fistAt, ground, syncCrew, travCam, travTail, type Crew, type Figure } from '../src/render/crew';
 import { BONE } from '../src/render/crewBody';
 import { thwartTop, COCKPIT_FIT } from '../src/render/hull';
 
@@ -21,9 +21,9 @@ function travLine(cr: Crew, side: number): THREE.Vector3[] {
   return [block, cam, ...travTail(cam, cr.travHand, side)];
 }
 const world = (o: THREE.Object3D, y = 0) => o.localToWorld(V(0, y, 0));
-/** Which hand holds it: the figure and arm whose wrist is at Crew.travHand. */
-function holder(cr: Crew): { f: Figure; i: number } {
-  for (const f of cr.crew) for (const i of [0, 1]) if (f.cur!.hands[i].distanceTo(cr.travHand!) < 1e-6) return { f, i };
+/** Which hand holds it: the figure and arm whose wrist or fist is at Crew.travHand. */
+function holder(cr: Crew): { f: Figure; i: 0 | 1 } {
+  for (const f of cr.crew) for (const i of [0, 1] as const) if (f.cur!.hands[i].distanceTo(cr.travHand!) < 1e-6 || fistAt(f, i).distanceTo(cr.travHand!) < 1e-6) return { f, i };
   throw new Error('nobody holds it');
 }
 /**
@@ -45,6 +45,11 @@ function parts(f: Figure): { name: string; a: THREE.Vector3; b: THREE.Vector3; r
   return out;
 }
 const segDist = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3) => { const ab = b.clone().sub(a), t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / Math.max(1e-9, ab.lengthSq()))); return p.distanceTo(a.clone().addScaledVector(ab, t)); };
+/** How far a point is above the boat's surface, and whether it's in the boat: under the surface there and all round it
+ * (1 cm each way), not just lying against a face or on an edge (ground's a height field: a face is a step in it). */
+const ROUND = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]];
+const above = (p: THREE.Vector3, d: number) => Math.min(...ROUND.map(([i, j]) => Math.abs(p.y - ground(p.x + i * d, p.z + j * d, p.y))));
+const inBoat = (p: THREE.Vector3) => ROUND.every(([i, j]) => p.y < ground(p.x + i * 0.01, p.z + j * 0.01, p.y) - 0.005);
 const turn = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => b.clone().sub(a).angleTo(c.clone().sub(b)) * DEG;
 
 describe("The hiker's traveller line, as drawn: held in the fist, clear of the body, no false corners (crew.ts travTail)", () => {
@@ -65,11 +70,11 @@ describe("The hiker's traveller line, as drawn: held in the fist, clear of the b
       // (the glove is drawn closed, the one shape it has: the fingers curled round to the palm, crewBody.ts. The line's
       // end in the hollow they close round, within 2 cm of the palm's middle, not at the cuff or beyond the fingers)
       expect(end.distanceTo(h.at), 'from the middle of the fist, m').toBeLessThan(0.02 * f.scale);
-      // (and into it across the palm, square-ish to the forearm: not along it, out of the cuff)
-      expect(into.angleTo(h.axis) * DEG, 'its way in, against the forearm, deg').toBeGreaterThan(50);
-      expect(into.angleTo(h.axis) * DEG, 'its way in, against the forearm, deg').toBeLessThan(130);
+      // (and into it from the load, across the palm or out past the little finger as a pulled line goes, never in at the
+      // cuff up along the forearm: its way in at least 60° off the way the forearm points, elbow to wrist)
+      expect(into.angleTo(h.axis) * DEG, 'its way in, against the forearm, deg').toBeGreaterThan(60);
     });
-    it(`${name}: no part of it through anyone`, () => {
+    it(`${name}: no part of it through anyone, or the boat`, () => {
       const { cr, line, f, i } = setup(), bad: string[] = [], h = fist(f, i);
       const figs: [string, Figure][] = [['helm', cr.helm], ...cr.crew.map((g, j) => [`crew${j + 1}`, g] as [string, Figure])];
       // (from the cam on: the run along the thwart's top and face is the boat's, under nobody)
@@ -80,14 +85,19 @@ describe("The hiker's traveller line, as drawn: held in the fist, clear of the b
           for (const [who, g] of figs) for (const c of parts(g)) { const d = segDist(p, c.a, c.b); if (d < c.r) bad.push(`${who} ${c.name}: ${((c.r - d) * 100).toFixed(1)} cm into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`); }
         }
       }
+      // (nor through the boat: from 3 cm past the cam, in its jaws on the thwart's face, never inside it)
+      for (let s = 1; s < line.length - 1; s++) for (let q = 0; q <= 20; q++) { const p = line[s].clone().lerp(line[s + 1], q / 20);
+        if (p.distanceTo(line[1]) < 0.03) continue; if (inBoat(p)) bad.push(`the boat: ${((ground(p.x, p.z, p.y) - p.y) * 100).toFixed(1)} cm under its surface at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`); }
       expect([...new Set(bad)].slice(0, 8)).toEqual([]);
       void i;
     });
     it(`${name}: no corner but the block, the cam and the hand`, () => {
       const { line } = setup(), bad: string[] = [];
       // (line[0] the block, line[1] the cam, the last the hand: every point between them a gentle curve, a line's own
-      // sag or its sweep over a lap, never more than 20° at one point)
-      for (let j = 2; j < line.length - 1; j++) { const a = turn(line[j - 1], line[j], line[j + 1]); if (a > 20) bad.push(`point ${j}: turns ${a.toFixed(0)}°`); }
+      // sag, never more than 20° at one point; or where it lies over an edge of the boat, the coaming's, and turns on it:
+      // a point within 1.5 cm of the surface there, a fairlead of a sort. Never a corner in the air)
+      for (let j = 2; j < line.length - 1; j++) { const a = turn(line[j - 1], line[j], line[j + 1]), p = line[j], onEdge = above(p, 0.015) < 0.015;
+        if (a > 20 && !onEdge) bad.push(`point ${j}: turns ${a.toFixed(0)}° in the air, ${((p.y - ground(p.x, p.z, p.y)) * 100).toFixed(1)} cm above the surface`); }
       expect(bad).toEqual([]);
     });
   }

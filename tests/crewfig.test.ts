@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { testBoat, sail, startTack, courseHeading } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew, slotOf, type CrewPlace } from '../src/boat/crewPhys';
-import { buildCrew, ground, syncCrew, tailEnd, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
+import { buildCrew, fistAt, ground, syncCrew, tailEnd, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
 import { PADDLE, paddler } from '../src/boat/paddle';
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
@@ -348,7 +348,7 @@ describe('Hiking, the lines end in the hands (render/crew.ts hikeHold, tailEnd)'
     const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), w = tack === 'S' ? 1 : -1;
     sail(b, 20); for (let i = 0; i < 120; i++) { sail(b, 1 / 30); syncCrew(cr, w, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); }
     expect(b.crew.people.slice(1).every(p => p.pose === 'hike'), 'both hiking').toBe(true);
-    const hands = cr.crew.flatMap(f => f.cur!.hands);
+    const hands = cr.crew.flatMap(f => [...f.cur!.hands, fistAt(f, 0), fistAt(f, 1)]); // (a wrist, or the middle of a fist: the traveller's in the fist, crewlines.test.ts)
     // (as boatMesh.ts calls it: the working jib sheet led to the hand wherever it is; the windward traveller line on its side)
     for (const [name, h, side] of [['the lee jib sheet', cr.sheetHand, undefined], ['the traveller', cr.travHand, w]] as const) {
       expect(h, `${name}: held`).toBeTruthy();
