@@ -27,6 +27,17 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   - **The Palace of Fine Arts, refined** (2–4 h).
 - **A robust open-Bay cruising mode:** passages with goals; seamanship challenges such as anchoring, docking and
   reefing (reefing still waits on a Folkboat source); a cruising log.
+  - **The Farallon Islands, built out and reachable** (owner, 16 November; feature; later, not urgent; 20–40 h, an
+    estimate): "built out the farallon islands and make them an attainable destination on the map. many sailors
+    consider a rounding of the islands from the Bay to be a test of whether a sailor and vessel are ready for true blue
+    water passages, as it's one of the trickiest and most demanding passages you can do." The islands lie about 27 nmi
+    west of the Gate, far outside today's map (its west edge is 122.61°W): the map, the chart (NOAA ENC), the sea and
+    the wind extended out to them; the islands themselves at real scale (Southeast Farallon, its lighthouse and station,
+    Maintop, the Middle and North Farallons, Fanny Shoal, Noonday Rock) as a named destination and a rounding, Bay to
+    Bay. The open ocean done honestly: the full swell and wind sea from the buoys (NDBC 46026, 46237), the shipping
+    lanes, the sanctuary's rules. To research first: positions, heights and hazards from the chart and Coast Pilot 7,
+    and the real races that round them (the Singlehanded and Doublehanded Farallones, the OYRA Full Crew Farallones),
+    their courses and times, as the yardstick.
 
 - ~~**West Harbor**~~ (done: docks, slips, sailing in and out, your boats' slips) ~~and Gashouse Cove, South Beach and the Corinthian~~ (done). ~~Horseshoe Bay~~ (done, v81: Travis Marina at Fort Baker, 79 slips on docks A–C (the sim's own letters), the breakwater from NOAA ENC, docks on white piles, shelter from the harbor walls). Noticed there, later (polish): a coarse 50 m terrain strip about 20 m off the breakwater's outer face; the Golden Gate Bridge's blocky north anchorage; ~~chunky generic moored boats in the marinas~~ (done: the slips within 120 m of the camera drawn in detail, boot stripe and bottom paint, cockpit well, raked cabin with its windows, shrouds and spreaders, pulpits and lifelines; the rest with bottom paint, shrouds and a cockpit sole; render/mooredNear.ts). Later: the other Bay marinas (Sausalito, Richmond, Berkeley, Alameda); ~~the real slip numbers~~ (done: South Beach's docks and slips, and West Harbor's and Gashouse Cove's slip numbers and Docks E, F, G, from the harbors' maps, the order along a dock inferred where the maps don't show it; the Corinthian's A dock is real, its others and its numbers aren't published); ~~boats in neighboring slips drawn as real boats~~ (done: lofted hulls, cabins, rigs and covers, a share of powerboats; their proportions and the power share are estimates still to check against sources); docking lines and an outboard for getting in and out.
 - **The beat angle in chop jumps** (fixed on a branch, 8e8e7c06, the angle's choice blended; awaiting the batch; Deep Physics, 16 November; from the cross-World leak's review): speedInChop × cos(twa) has
@@ -34,6 +45,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **The sea turning with the wind, truly** (for Deep Physics, next after the boom's place on a beat; the Coordinator,
+  16 November; Capacity to check the frame's cost): the wave field is plane waves turned about your boat, so any turn
+  sweeps the pattern sideways at a distance; its turn is now capped at about 4° an hour (environment/waveField.ts
+  turnCap), a stopgap that stops the "rushing water" on days sailed from the observed record but leaves the chop
+  lagging a big shift for hours. Real short chop comes round in ten minutes or so, the old waves dying as new ones
+  grow from the new direction: model that, two seas cross-faded, and take the cap out.
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
@@ -48,6 +65,23 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   0 of 156 harbor-to-harbor ways now cross the land. And the call-off's ways home are worked out a slice a step (from off
   Emeryville the fleet's took ~400 ms in each of three steps).
 - ~~**The AI keeps way on in irons; no penalties left to take once racing's called off; the inset's route worked out without freezing (#440)**~~ (done: claude/irons-main, rules-abandon, batch48; navroute-sliced, batch47b).
+- **Fort Point: its rocks solid, and its surf** (owner, 16 November; accuracy; not urgent; next; 8–14 h in two parts;
+  for Bay East or Deep Physics): "lets look into the area around fort point, especially inside the gate, to be sure
+  we accounting for all the rocks and jagged coastline there. also look into the waves there; this is a popular surfing
+  spot in the right conditions, and very very dangerous for boats, but I'm not seeing that reflected in the sim."
+  Found (Roadmap, 16 Nov): the NOAA ENC in src/geo/data/enc-chart.json already holds 1051 charted hazards, 33 of them
+  around Fort Point (lon −122.485 to −122.46, lat 37.800–37.815: 28 rocks that cover and uncover, 2 awash, 2 always
+  under, 1 obstruction) and 17 at Mile Rocks, but only the chart draws them (ui/encChart.ts): nothing in the sim hits
+  them, the router and navigator don't avoid them, and damage.ts's 'rock' is never set by them.
+  - (1) The rocks solid (4–6 h): each charted rock a hazard by its water level (S-57 WATLEV) and the tide's height
+    (tide.ts): a strike graded by damage.ts as 'rock'; routing.ts and the navigator keep clear; the shore under the fort
+    as riprap, its outline checked against the ENC's coastline at the chart's largest scale.
+  - (2) The surf (4–8 h): waves shoaling and breaking over the rocks and shallows under the fort and the south tower,
+    from the real swell (NDBC 46237, San Francisco Bar; 46026) and the current (NOAA SFB1201, Bay Entrance: ebb toward
+    239°, to 4.8 kt this November; flood toward 061°, to 3.1 kt): breaking where the depth is under about 1.3 times the
+    wave height, and steeper on an ebb against a westerly swell; shown as breakers and felt by the boat. Sources to
+    confirm first (blocked from here: nauticalcharts.noaa.gov for Coast Pilot 7 and charts 18649/18650): the break's
+    swell (W–NW, about 4–8 ft, low tide, by surf reports only), and the Coast Pilot's warnings at the Gate.
 - **A room for each cell of the way round the land** (the physics review of estuary-route; the Coordinator, 16 Nov 2026:
   a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
   Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
@@ -332,6 +366,13 @@ What's planned, roughly in order. Done work is described in the README.
      under the 10 s bar) or 16 kt and more on her bow (carried on at over 0.5 m/s): the bar is stated for a 12 kt westerly.
 8m3. ~~**The bow-line let-go bumps the next boat in a northerly**~~ (done: 94c34591, batch48; Marinas; from their own work, 16 November; their entry and fix land in v201).
    Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
+
+8m4. **Gashouse Cove's entrance sign as it really is** (owner, 16 November, a screenshot and a Street View photo of the
+   entrance; polish; next, not urgent; 1–2 h; Marinas): "text on this sign is crowded. second pic shows what the sign
+   looks like entering the harbor." Today (render/marina.ts noWakeBoard) "IDLE SPEED / NO WAKE" in 48 px letters on a
+   1.2 × 0.9 m board, cut off at its edges, on the red beacon's post. The real one: a square, weathered gray-white board
+   with an orange circle and "5 MPH" in it (the US regulatory "controlled area" mark), on a pipe frame on top of the
+   concrete seawall's end, the red light on its top. Draw that, readable from the fairway, both ways.
 
 8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
    now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
@@ -782,8 +823,12 @@ What's planned, roughly in order. Done work is described in the README.
      each time, never finishing. Finish (or carry on) the search under way rather than restart it, and give a new
      destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
      at 6 kt (tests/insetRoute).
-   - **A clicked destination shown as a pin, not coordinates** (owner, 15 November, from a screenshot of the 3D view;
-     polish; next, "not urgent"; <1 h): "destination indicator can just be a pin or something if it's not a named
+   - **A clicked destination shown as a pin, not coordinates, and moved when the destination changes** (owner, 16
+     November: "bug: when I change sailing destinations, the destination pin on the horizon doesn't seem to update. we
+     could bundle this fix with the earlier request to use pins instead of coordinates for non-named destinations."; bug
+     and polish; now; 1–2 h). The 3D marker's place and label follow every change of destination (a click on the chart,
+     a choice in the navigator, Sail Home, cleared), with a test that changes it twice and checks the marker each time.
+     Earlier (owner, 15 November, from a screenshot of the 3D view; polish): "destination indicator can just be a pin or something if it's not a named
      destination. the long coordinate string is ugly and not useful." The cruise's destination label in the scene reads
      "37°50.92'N 122°26.85'W" for an unnamed point. Give it a plain pin (a marker, no text). A named destination keeps
      its name. Coordinates at most behind a hover on the chart.
