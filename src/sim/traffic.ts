@@ -146,11 +146,13 @@ const PATH: Record<string, Path> = Object.fromEntries(Object.entries(ROUTES).map
  * rounds it: within `armOf` either side, her line is a curve from one leg to the next (a quadratic Bézier on the corner),
  * and she's set off along its own square, so her way is smooth round the bend: no corner to it, and no jump.
  */
-function pathAt(P: Path, s: number, lat: number): Vec {
+/** The point `s` m along a route, `lat` m to its right, into `out` (no new object: the step asks for places many times over). */
+function pathInto(out: Vec, P: Path, s: number, lat: number): Vec {
   s = Math.max(0, Math.min(P.total, s));
   let i = 1; while (i < P.L.length - 1 && P.L[i] < s) i++;
   // (the corner she's rounding, if any: the one ahead at this leg's end, or the one behind at its start)
-  for (const j of [i, i - 1]) {
+  for (let jj = 0; jj < 2; jj++) {
+    const j = i - jj;
     if (j < 1 || j > P.L.length - 2) continue;
     const r = P.arm[j]; if (!(r > 0)) continue;
     const u = (s - (P.L[j] - r)) / (2 * r);
@@ -159,10 +161,10 @@ function pathAt(P: Path, s: number, lat: number): Vec {
     const ax = V.x - t0.x * r, ay = V.y - t0.y * r, bx = V.x + t1.x * r, by = V.y + t1.y * r;
     const x = (1 - u) ** 2 * ax + 2 * u * (1 - u) * V.x + u * u * bx, y = (1 - u) ** 2 * ay + 2 * u * (1 - u) * V.y + u * u * by;
     const tx = (1 - u) * t0.x + u * t1.x, ty = (1 - u) * t0.y + u * t1.y, l = hypot(tx, ty) || 1;
-    return { x: x + ty / l * lat, y: y - tx / l * lat };
+    out.x = x + ty / l * lat; out.y = y - tx / l * lat; return out;
   }
   const a = P.r[i - 1], f = (s - P.L[i - 1]) / Math.max(1e-6, P.L[i] - P.L[i - 1]), b = P.r[i], t = P.t[i - 1];
-  return { x: a.x + (b.x - a.x) * f + t.y * lat, y: a.y + (b.y - a.y) * f - t.x * lat };
+  out.x = a.x + (b.x - a.x) * f + t.y * lat; out.y = a.y + (b.y - a.y) * f - t.x * lat; return out;
 }
 
 /** A number in [0, 1) from the run's seed and three integers, the same every time. */
@@ -225,9 +227,13 @@ const ramp = (x: number) => x >= ROOM_EASE ? x : x <= -ROOM_EASE ? 0 : (x + ROOM
 /** min(a, b), its corner rounded over ROOM_EASE. */
 const softMin = (a: number, b: number, e = ROOM_EASE) => { const h = Math.max(e - Math.abs(a - b), 0) / e; return Math.min(a, b) - h * h * e / 4; };
 /** Her place s m along her route, `off` m to starboard of her line as far as `room` lets her, going `dir`. */
-function placeAt(P: Path, s: number, dir: number, off: number): Vec {
-  return pathAt(P, s, off === 0 ? 0 : held(off, room(P, s)) * dir); // (on her line: no room to look up)
+function placeAt(P: Path, s: number, dir: number, off: number): Vec { return placeInto({ x: 0, y: 0 }, P, s, dir, off); }
+/** placeAt into `out`. */
+function placeInto(out: Vec, P: Path, s: number, dir: number, off: number): Vec {
+  return pathInto(out, P, s, off === 0 ? 0 : held(off, room(P, s)) * dir); // (on her line: no room to look up)
 }
+/** Scratch places for the step's own working (each filled and read before the next use). */
+const SP = { x: 0, y: 0 }, SQ = { x: 0, y: 0 }, S0 = { x: 0, y: 0 }, SL = { x: 0, y: 0 }, S1 = { x: 0, y: 0 }, S2 = { x: 0, y: 0 }, S3 = { x: 0, y: 0 };
 /** Her offset `off` held within ±lim, smoothly: near `off` itself well inside the limit, closing on the limit beyond it,
  * with no corner where it takes over (a hard one turned her 14° at once) and no flat spot near her line. */
 const held = (off: number, lim: number) => { if (lim <= 1e-6) return 0; const r = off / lim, r2 = r * r; return off / Math.sqrt(Math.sqrt(1 + r2 * r2)); }; // (the fourth root as two square roots: pow is several times slower)
@@ -242,26 +248,37 @@ function stretch(P: Path, s: number, dir: number, off: number): number {
 const madeGood = (v: number, slow: number, rate: number) => Math.sqrt(Math.max(0, (v * slow) ** 2 - rate * rate));
 /** The vessel itself, from her schedule and her give-way state (`hist`: her state then, for her wake). Her heading and
  * speed are the way she's actually moving: along her line, and across it as she alters. */
-function vesselOf(sv: Service, id: number, t: number, seed: number, w?: Way, then?: { off: number; lag: number; slow: number; h: number }): Vessel {
+/** Each vessel's pose kept: x, y, heading, speed, under way (1/0). */
+const POSE = 5;
+/** The vessel at t, as numbers: x, y, heading, speed, under way (1/0), into `out` from index `b`. */
+function poseInto(out: Float64Array, b: number, sv: Service, id: number, t: number, seed: number, w?: Way, then?: { off: number; lag: number; slow: number; h: number }): void {
   const P = PATH[sv.route], st = then ?? w, o = at(sv, id, t - (st?.lag ?? 0), seed);
-  const off = o.off + (st?.off ?? 0), p = placeAt(P, o.s, o.dir, off);
-  if (!o.moving) { const q = placeAt(P, o.s - o.dir, o.dir, off); return { id, kind: sv.kind, x: p.x, y: p.y, h: brg(p.x - q.x, p.y - q.y), v: 0, moving: false }; }
-  // (her speed over the ground, slowed and less what she gives to crossing her line, made good along her line: a meter
-  // of it is `stretch` m of her own way round a bend or out to an offset, so her line goes by that much slower)
-  const rate = then ? 0 : w?.rate ?? 0, made = madeGood(o.v, st?.slow ?? 1, rate), known = st?.h;
+  const off = o.off + (st?.off ?? 0), p = placeInto(SP, P, o.s, o.dir, off);
+  out[b] = p.x; out[b + 1] = p.y;
+  if (!o.moving) { const q = placeInto(SQ, P, o.s - o.dir, o.dir, off); out[b + 2] = brg(p.x - q.x, p.y - q.y); out[b + 3] = 0; out[b + 4] = 0; return; }
+  const rate = then ? 0 : w?.rate ?? 0, made = madeGood(o.v, st?.slow ?? 1, rate), known = st?.h, end = o.s + o.dir < 0 || o.s + o.dir > P.total;
+  out[b + 4] = 1;
   if (made < 1e-3) { // (stopped out on the water: heading along her own way there)
-    const end = o.s + o.dir < 0 || o.s + o.dir > P.total, q = placeAt(P, end ? o.s - o.dir : o.s + o.dir, o.dir, off);
-    return { id, kind: sv.kind, x: p.x, y: p.y, h: known != null && known === known ? known : end ? brg(p.x - q.x, p.y - q.y) : brg(q.x - p.x, q.y - p.y), v: 0, moving: true };
+    if (known != null && known === known) out[b + 2] = known;
+    else { const q = placeInto(SQ, P, end ? o.s - o.dir : o.s + o.dir, o.dir, off); out[b + 2] = end ? brg(p.x - q.x, p.y - q.y) : brg(q.x - p.x, q.y - p.y); }
+    out[b + 3] = 0; return;
   }
+  const sp = o.v * (st?.slow ?? 1);
+  out[b + 3] = sp; // (advance keeps her moving at just this speed)
+  // (where advance has stepped her, the way she actually moved last: that's her heading)
+  if (known != null && known === known) { out[b + 2] = known; return; }
   // (her heading: along her own way at her offset (at her route's end, the meter before), turned by her crossing it at
   // `rate`; that turn fading as she nearly stops, where crossing and going ahead fall away together)
-  const sp = o.v * (st?.slow ?? 1);
-  // (where advance has stepped her, the way she actually moved last: that's her heading)
-  if (known != null && known === known) return { id, kind: sv.kind, x: p.x, y: p.y, h: known, v: sp, moving: true }; // (advance keeps her moving at just this speed)
-  const end = o.s + o.dir < 0 || o.s + o.dir > P.total;
-  const q = end ? placeAt(P, o.s - o.dir, o.dir, off) : placeAt(P, o.s + o.dir, o.dir, off);
+  const q = placeInto(SQ, P, end ? o.s - o.dir : o.s + o.dir, o.dir, off);
   const way = end ? brg(p.x - q.x, p.y - q.y) : brg(q.x - p.x, q.y - p.y), crab = Math.atan2(rate, made) / D2R * Math.min(1, sp / 2);
-  return { id, kind: sv.kind, x: p.x, y: p.y, h: (way + crab + 360) % 360, v: sp, moving: true };
+  out[b + 2] = (way + crab + 360) % 360;
+}
+const VP = new Float64Array(POSE);
+/** The vessel itself, from her schedule and her give-way state (`then`: her state then). Her heading and speed are the
+ * way she's actually moving. */
+function vesselOf(sv: Service, id: number, t: number, seed: number, w?: Way, then?: { off: number; lag: number; slow: number; h: number }): Vessel {
+  poseInto(VP, 0, sv, id, t, seed, w, then);
+  return { id, kind: sv.kind, x: VP[0], y: VP[1], h: VP[2], v: VP[3], moving: VP[4] === 1 };
 }
 
 /** Closest approach of two straight tracks over the next `horizon` s: when (s) and how near (m). */
@@ -274,8 +291,6 @@ export function closest(ax: number, ay: number, avx: number, avy: number, bx: nu
 /** A boat a vessel keeps clear of: where she is and how she's moving over the ground. */
 export interface Craft { x: number; y: number; vx: number; vy: number }
 
-/** Each vessel's pose kept: x, y, heading, speed, under way (1/0). */
-const POSE = 5;
 /** Her wake's look back (s), and how often it keeps where she was (s). */
 const RING_S = 244, RING_DT = 1, RING_N = Math.ceil(RING_S / RING_DT) + 2;
 
@@ -332,7 +347,7 @@ export class Traffic {
         if (t < this.quiet[id]) return;
         let near = false, gap = Infinity;
         for (let k = 0, s = o.s; k <= ACT_S + 60 && !near; k += 8, s += o.dir * v * 8) {
-          const q = placeAt(P, Math.max(0, Math.min(P.total, s)), o.dir, o.off);
+          const q = placeInto(SQ, P, Math.max(0, Math.min(P.total, s)), o.dir, o.off);
           for (const b of boats) { const d = hypot(b.x + b.vx * k - q.x, b.y + b.vy * k - q.y) - (2 * sep + 100); if (d < 0) { near = true; break; } if (d < gap) gap = d; }
         }
         if (!near) { this.quiet[id] = t + Math.min(30, gap / (v + 15)); return; }
@@ -459,8 +474,7 @@ export class Traffic {
     // each vessel's pose, once: what vessels() and the wake read this step (a give-way vessel under way's is advance's own)
     for (let id = 0; id < SERVICES.length; id++) {
       if (this.posed[id]) continue;
-      const v = vesselOf(SERVICES[id], id, t, this.seed, ways[id]), b = id * POSE, P = this.pose;
-      P[b] = v.x; P[b + 1] = v.y; P[b + 2] = v.h; P[b + 3] = v.v; P[b + 4] = v.moving ? 1 : 0;
+      poseInto(this.pose, id * POSE, SERVICES[id], id, t, this.seed, ways[id]);
     }
     this.poseT = t;
     // (the first step: where each vessel was for her wake's look back, from her schedule, so the ring is full from the start)
@@ -468,8 +482,7 @@ export class Traffic {
       for (let m = RING_N - 1; m >= 1; m--) {
         const tp = t - m * RING_DT, k = (this.ringAt - m + RING_N) % RING_N; this.ringT[k] = tp;
         for (let id = 0; id < SERVICES.length; id++) {
-          const v = vesselOf(SERVICES[id], id, tp, this.seed), b = (k * SERVICES.length + id) * POSE, R = this.ring;
-          R[b] = v.x; R[b + 1] = v.y; R[b + 2] = v.h; R[b + 3] = v.v; R[b + 4] = v.moving ? 1 : 0;
+          poseInto(this.ring, (k * SERVICES.length + id) * POSE, SERVICES[id], id, tp, this.seed);
         }
       }
     }
@@ -496,7 +509,7 @@ export class Traffic {
         w.rate = Math.max(-top, Math.min(top, w.rate));
         // (where she was: last step's pose, as worked out then, when there was one)
         const sPrev = Math.max(0, Math.min(P.total, o.s - o.dir * o.v * dt)), b0 = id * POSE, offWas = w.off;
-        const p0 = this.poseT === t - dt && this.pose[b0 + 4] === 1 && w.h === w.h ? { x: this.pose[b0], y: this.pose[b0 + 1] } : placeAt(P, sPrev, o.dir, o.off + w.off);
+        let p0: Vec; if (this.poseT === t - dt && this.pose[b0 + 4] === 1 && w.h === w.h) { S0.x = this.pose[b0]; S0.y = this.pose[b0 + 1]; p0 = S0; } else p0 = placeInto(S0, P, sPrev, o.dir, o.off + w.off);
         w.off += w.rate * dt;
         if (Math.abs(aim - w.off) < 1e-3 && Math.abs(w.rate) < acc * dt) { w.off = aim; w.rate = 0; } // (a millimeter: a step is only some 15 cm, and a bigger snap turned her heading 15° at once)
         // (and never past twice her room, should her room close faster than she can ease in: her offset can't run on past
@@ -507,7 +520,7 @@ export class Traffic {
         // goes the long way round the outside of a bend, and across her line as she alters): the rest is lag. (Her way's
         // length grows as the root of its two parts' squares: across, fixed by her offset; along, by how far she goes)
         // (her offset unchanged this step: across her line she's where she was, and pl is p0)
-        const pl = w.rate === 0 && w.off === offWas ? p0 : placeAt(P, sPrev, o.dir, o.off + w.off), p1 = placeAt(P, o.s, o.dir, o.off + w.off);
+        const pl = w.rate === 0 && w.off === offWas ? p0 : placeInto(SL, P, sPrev, o.dir, o.off + w.off), p1 = placeInto(S1, P, o.s, o.dir, o.off + w.off);
         const d0 = (pl.x - p0.x) ** 2 + (pl.y - p0.y) ** 2, d1 = (p1.x - p0.x) ** 2 + (p1.y - p0.y) ** 2, g = (sp * dt) ** 2;
         // (a step that began or ended at her berth is only partly under way: taken as it comes)
         const clipped = sPrev !== o.s - o.dir * o.v * dt;
@@ -515,12 +528,12 @@ export class Traffic {
         if (Math.abs(frac - 1) < 1e-9) frac = 1; // (her full step along her line, to rounding: p1 is where she is)
         if (!clipped && frac > 0 && Math.abs(frac - 1) > 0.02) { // (and corrected once by how far that actually takes her: inside a sharp corner her way bends hard)
           frac = Math.min(frac, 10);
-          const p2 = placeAt(P, sPrev + o.dir * o.v * dt * frac, o.dir, o.off + w.off), d2 = hypot(p2.x - p0.x, p2.y - p0.y);
+          const p2 = placeInto(S2, P, sPrev + o.dir * o.v * dt * frac, o.dir, o.off + w.off), d2 = hypot(p2.x - p0.x, p2.y - p0.y);
           if (d2 > 1e-9) frac *= Math.sqrt(g) / d2;
         }
         w.lag += dt * (1 - Math.min(frac, 10));
         // (her heading: the way she actually moved this step; and her pose, kept for the step)
-        const p3 = frac === 1 ? p1 : placeAt(P, sPrev + o.dir * o.v * dt * Math.min(frac, 10), o.dir, o.off + w.off); // (frac 1: where p1 is)
+        const p3 = frac === 1 ? p1 : placeInto(S3, P, sPrev + o.dir * o.v * dt * Math.min(frac, 10), o.dir, o.off + w.off); // (frac 1: where p1 is)
         if (hypot(p3.x - p0.x, p3.y - p0.y) > 1e-4) w.h = brg(p3.x - p0.x, p3.y - p0.y);
         if (w.h === w.h && !clipped) { const Q = this.pose; Q[b0] = p3.x; Q[b0 + 1] = p3.y; Q[b0 + 2] = w.h; Q[b0 + 3] = o.v * w.slow; Q[b0 + 4] = 1; this.posed[id] = 1; }
       } else { // (alongside, on her line, making up lost time, or waiting out what she gained on the inside of a bend)
