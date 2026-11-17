@@ -542,7 +542,7 @@ export class World {
     this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
-    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
+    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user, this.windModel.kt); // (the waves already running at the first frame)
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
@@ -1314,7 +1314,7 @@ export class World {
     // the waves: the field eased to its reference sea (waveRef) and turning with the course's mean wind about your boat,
     // and every boat's heave and pitch on it (boat/seaway.ts waveMotion)
     if (this.steps % 30 === 1) this.waveRefSea = null;
-    this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
+    this.waves.update(this.waveRef(), this.windModel.base, dt, this.user, this.windModel.kt);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0, this.mobEnv); // (a lesson: its check, on the boat as she sails)
@@ -2273,7 +2273,7 @@ export class World {
     if (!waves) return;
     // (the waves run on, and she rides them, as on the water: the setup's and the showroom's sea isn't glassy)
     if (this.steps % 30 === 1) this.waveRefSea = null;
-    this.waves.update(this.waveRef(), this.windModel.base, dt, u); waveMotion(u, this.waves, waveTime(this.t), dt);
+    this.waves.update(this.waveRef(), this.windModel.base, dt, u, this.windModel.kt); waveMotion(u, this.waves, waveTime(this.t), dt);
   }
 
   /**
