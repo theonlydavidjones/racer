@@ -1,3 +1,4 @@
+import { clubInfo, clubIdFromResultCode } from '../club/clubs';
 import { standings, type LiveBoat, type SeasonResult, type Series, type StandingRow } from '../club/season';
 
 /**
@@ -31,9 +32,12 @@ export function standingsTable(series: Series, res: Record<number, SeasonResult>
     return `<td class="n${s.out ? ' drop' : ''}">${s.out ? `(${t})` : t}</td>`;
   };
   return rows.length ? `<table class="standings"><thead><tr><th></th><th>Sail no.</th><th>Boat</th>${raceCols}<th>Place by race</th><th class="n">Total</th><th class="n">Nett</th></tr></thead><tbody>${rows.map(r =>
-    `<tr${r.you ? ' class="you"' : ''}><td class="pl">${r.rank}</td><td class="no">${esc(r.sail)}</td><td>${boatChip(r.name, r.hull)}${r.club ? ` <span class="sclub">${esc(r.club.toUpperCase())}</span>` : ''}</td>${series.races.map(x => cell(r, x.no, x.abandoned)).join('')}<td class="sp">${spark(r, sailed, of)}</td><td class="n mu">${r.total}</td><td class="n nett">${r.nett}</td></tr>`).join('')}</tbody></table>`
+    `<tr${r.you ? ' class="you"' : ''}><td class="pl">${r.rank}</td><td class="no">${esc(r.sail)}</td><td>${boatChip(r.name, r.hull)}${clubTag(r.club) ? ` <span class="sclub">${esc(clubTag(r.club))}</span>` : ''}</td>${series.races.map(x => cell(r, x.no, x.abandoned)).join('')}<td class="sp">${spark(r, sailed, of)}</td><td class="n mu">${r.total}</td><td class="n nett">${r.nett}</td></tr>`).join('')}</tbody></table>`
     : '<p class="lede">No races sailed yet. Pick a day to sail its race.</p>';
 }
+
+/** A boat's club tag in the standings: its short form, from a club id or a published-results code; nothing for a club we have no parody for. */
+const clubTag = (c: string | undefined): string => (clubInfo(c) ?? clubInfo(clubIdFromResultCode(c)))?.short ?? '';
 
 export function seasonHtml(series: Series, res: Record<number, SeasonResult>, all: Series[] = [series], live?: LiveBoat): string {
   const { sailed, discards } = standings(series, res, live);

@@ -7,6 +7,8 @@
  * (Alameda, Ballena Bay, Sierra Point) aren't drawn yet.
  */
 
+import { clubFullName } from '../club/clubs';
+
 export interface Burgee {
   id: string; club: string;
   /** Fly length over hoist (3:2 unless the burgee is longer). */
@@ -38,11 +40,11 @@ const edge = (x: number, W: number, H: number) => x / W * H / 2;
 
 export const BURGEES: Burgee[] = [
   {
-    id: 'byc', club: 'Berkeley Yacht Club',
+    id: 'byc', club: "Bishop's Yacht Club",
     draw: (g, W, H) => { field(g, W, H, BLUE); g.fillStyle = YELLOW; g.beginPath(); g.arc(W * 0.36, H / 2, H * 0.22, 0, 7); g.fill(); text(g, 'B', W * 0.36, H * 0.52, H * 0.32, BLUE); }
   },
   {
-    id: 'bvbc', club: 'Bay View Boat Club', ratio: 2.3,
+    id: 'bvbc', club: 'Dry Dock Boat Club', ratio: 2.3,
     // yellow, with a blue compass: a ring with the four cardinal points and a needle
     draw: (g, W, H) => {
       field(g, W, H, YELLOW);
@@ -54,7 +56,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'cyc', club: 'Corinthian Yacht Club (Tiburon)', ratio: 1.6,
+    id: 'cyc', club: 'Olympian Yacht Club', ratio: 1.6,
     // blue, a white stripe to the point, and a red hoist triangle edged in white with a white star
     draw: (g, W, H) => {
       field(g, W, H, BLUE);
@@ -65,7 +67,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'cpyc', club: 'Coyote Point Yacht Club',
+    id: 'cpyc', club: 'Wolf Point Yacht Club',
     // blue at the hoist, red to the fly, a white diamond with a red star on the line between
     draw: (g, W, H) => {
       field(g, W, H, RED);
@@ -75,11 +77,11 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'eyc', club: 'Encinal Yacht Club',
+    id: 'eyc', club: 'Live Oak Yacht Club',
     draw: (g, W, H) => { field(g, W, H, RED); poly(g, WHITE, [0, 0], [0, H], [W * 0.33, H / 2]); star(g, W * 0.1, H * 0.49, H * 0.1, NAVY); }
   },
   {
-    id: 'ggyc', club: 'Golden Gate Yacht Club', ratio: 1.67,
+    id: 'ggyc', club: 'Dorado Yacht Club', ratio: 1.67,
     // blue, with a white diamond along the middle and the bridge on it in red
     draw: (g, W, H) => {
       field(g, W, H, BLUE);
@@ -93,7 +95,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'iyc', club: 'Island Yacht Club (Alameda)', ratio: 2,
+    id: 'iyc', club: 'Sandbar Yacht Club', ratio: 2,
     // red over yellow, a blue hoist triangle, and the interlaced letters I Y C in black over it
     draw: (g, W, H) => {
       poly(g, RED, [0, 0], [0, H / 2], [W, H / 2]); poly(g, YELLOW, [0, H / 2], [0, H], [W, H / 2]);
@@ -105,7 +107,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'mbyc', club: 'Marina Bay Yacht Club (Richmond)', ratio: 2,
+    id: 'mbyc', club: 'Riveter Bay Yacht Club', ratio: 2,
     draw: (g, W, H) => {
       field(g, W, H, BLUE);
       poly(g, YELLOW, [W * 0.26, H / 2], [W * 0.6, H * 0.36], [W, H / 2], [W * 0.6, H * 0.64]);
@@ -113,14 +115,14 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'oyc', club: 'Oakland Yacht Club',
+    id: 'oyc', club: 'Oaktown Yacht Club',
     draw: (g, W, H) => {
       field(g, W, H, BLUE); poly(g, WHITE, [0, 0], [0, H], [W * 0.5, H / 2]);
       g.strokeStyle = RED; g.lineWidth = H * 0.03; g.beginPath(); g.ellipse(W * 0.12, H / 2, W * 0.07, H * 0.2, 0, 0, 7); g.stroke();
     }
   },
   {
-    id: 'ryc', club: 'Richmond Yacht Club',
+    id: 'ryc', club: 'Brickyard Racing Club',
     draw: (g, W, H) => {
       field(g, W, H, RED);
       poly(g, NAVY, [0, 0], [0, H], [W * 0.43, H / 2]); poly(g, WHITE, [0, H * 0.05], [0, H * 0.95], [W * 0.39, H / 2]);
@@ -128,7 +130,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'sfyc', club: 'San Francisco Yacht Club', ratio: 1.67,
+    id: 'sfyc', club: 'Belvedere Cove Yacht Club', ratio: 1.67,
     // red at the hoist with a white triangle from the middle of the hoist bearing a red star; the fly blue with a white star
     draw: (g, W, H) => {
       field(g, W, H, RED);
@@ -138,7 +140,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'slyc', club: 'San Leandro Yacht Club', ratio: 1.67,
+    id: 'slyc', club: 'Cherry Harbor Yacht Club', ratio: 1.67,
     // white, bordered red, a red cross and a red compass star where its arms meet
     draw: (g, W, H) => {
       field(g, W, H, RED); inset(g, W, H, WHITE, 0.06);
@@ -147,11 +149,11 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'ssyc', club: 'Sausalito Yacht Club',
+    id: 'ssyc', club: 'Willow Grove Yacht Club',
     draw: (g, W, H) => { field(g, W, H, NAVY); star(g, W * 0.2, H * 0.47, H * 0.22, RED); star(g, W * 0.2, H * 0.47, H * 0.17, WHITE); }
   },
   {
-    id: 'seqyc', club: 'Sequoia Yacht Club',
+    id: 'seqyc', club: 'Evergreen Yacht Club',
     // gold, bordered green, a green redwood at the hoist
     draw: (g, W, H) => {
       field(g, W, H, GREEN); inset(g, W, H, GOLD, 0.07);
@@ -160,7 +162,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'sbyc', club: 'South Beach Yacht Club', ratio: 1.47,
+    id: 'sbyc', club: 'China Basin Yacht Club', ratio: 1.47,
     // navy blue, with a white wave of two breaking crests running from the hoist to the fly (traced from the club's own
     // image of it, southbeachyachtclub.org)
     draw: (g, W, H) => {
@@ -171,7 +173,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'stfyc', club: 'St. Francis Yacht Club',
+    id: 'stfyc', club: 'St. Bartholomew Yacht Club',
     // Bylaws 2.1: two-thirds as wide as long; two white triangles at the hoist, each half the width and half the length,
     // with a red star 22% of the hoist across, a third of the way along the field; navy between them; red at the fly
     draw: (g, W, H) => {
@@ -182,7 +184,7 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'tyc', club: 'Tiburon Yacht Club', ratio: 1.8,
+    id: 'tyc', club: 'Shark Point Yacht Club', ratio: 1.8,
     // white, a blue triangle along the middle to the point, a red hoist triangle with a white T
     draw: (g, W, H) => {
       field(g, W, H, WHITE);
@@ -192,12 +194,12 @@ export const BURGEES: Burgee[] = [
     }
   },
   {
-    id: 'tiyc', club: 'Treasure Island Yacht Club',
+    id: 'tiyc', club: 'Clipper Cove Yacht Club',
     // FOTW: "Blue field charges with the black letters TI on a horizontal 1 unit-wide yellow band" (their image shows the letters in the field's blue)
     draw: (g, W, H) => { field(g, W, H, '#3d3f96'); g.fillStyle = YELLOW; g.fillRect(0, H * 0.375, W, H * 0.25); text(g, 'TI', W * 0.3, H * 0.51, H * 0.24, '#3d3f96', 'serif'); }
   },
   {
-    id: 'vyc', club: 'Vallejo Yacht Club',
+    id: 'vyc', club: 'Mare Island Strait Yacht Club',
     draw: (g, W, H) => { field(g, W, H, RED); inset(g, W, H, WHITE, 0.045); inset(g, W, H, BLUE, 0.075); star(g, W * 0.17, H / 2, H * 0.13, WHITE); }
   }
 ];
@@ -225,7 +227,7 @@ export type OfficerRule = 'replace' | 'below';
 const OFFICER_RULE: Record<string, { rule: OfficerRule; source: string }> = {};
 
 /** The clubs a boat can belong to (each with its burgee drawn above). */
-export const CLUBS: { id: string; club: string; officer: OfficerRule; officerSource: string }[] = BURGEES.map(b => ({ id: b.id, club: b.club }))
+export const CLUBS: { id: string; club: string; officer: OfficerRule; officerSource: string }[] = BURGEES.map(b => ({ id: b.id, club: clubFullName(b.id) || b.club }))
   .map(c => ({ ...c, officer: OFFICER_RULE[c.id]?.rule ?? 'replace', officerSource: OFFICER_RULE[c.id]?.source ?? 'the usual US rule (USPS): in place of the burgee' }))
   .sort((a, b) => a.club.localeCompare(b.club));
 export const officerRule = (club: string | undefined): OfficerRule => CLUBS.find(c => c.id === club)?.officer ?? 'replace';

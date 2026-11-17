@@ -389,7 +389,7 @@ function drawHeads(): void {
   if (burgee == null && !practice) { try { burgee = burgeeCanvas(host)?.toDataURL() ?? ''; } catch { burgee = ''; } burgeeUrls.set(host, burgee); }
   const C = w.C, nm = courseFileNow?.distanceNm;
   const title = C.title.replace(/^Seaweed Soup · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
-  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Golden Gate Yacht Club">` : '',
+  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Dorado Yacht Club">` : '',
     `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailing instructions|Practice): /, ''))}</span></span>`);
   // the fleet: a tile each, and + to add one
   const fl = app.fleetChosen;
