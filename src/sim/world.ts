@@ -1059,7 +1059,7 @@ export class World {
     }
     // clear: the stream no longer setting her onto anything, with way on (either way) or wind to sail by
     // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
-    // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
+    // 0.2 m/s at most against her drag going astern, physics.ts asternDrag: paddle.test)
     if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
     // (tired, they rest and paddle on, or swap, as long as the jam lasts: paddle.ts paddleStep. Resting once she's clear of
     // it, they put the crutch away rather than paddle again to make way)
