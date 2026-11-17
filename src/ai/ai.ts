@@ -353,7 +353,10 @@ export function aimPoint(w: World, b: Boat): Vec {
   if (d > 35) {
     const e = dist(b, M), dx = (M.x - b.x) / e, dy = (M.y - b.y) / e;
     P = off(m.side === 's' ? { x: -dy, y: dx } : { x: dy, y: -dx }, 10);
-  } else P = off(m.r, 12);
+  } else P = off(m.r, clamp(dot(sub(b, M), m.r), 12, 30));
+  // (the gate's ray at her own distance out, 12 m at the least: rounding wide, outside a boat with room, she steered back
+  // in for the point 12 m off, crossed the ray heading near the way she'd come, then turned back the other way for the
+  // next mark, through a gybe, into the boats still coming in: the owner's race with the shallow-water waves (#454))
   return m.reach ? aroundIsland(m, b, P, w.wind.from) : P;
 }
 
