@@ -20,16 +20,22 @@ const stroke = (g: G, c: string, w: number, ...p: P[]) => { g.strokeStyle = c; g
 const arc = (g: G, c: string, w: number, x: number, y: number, r: number, a0: number, a1: number) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'butt'; g.beginPath(); g.arc(x, y, r, a0, a1); g.stroke(); };
 const half = (g: G, W: number, H: number, a: string, b: string) => { rect(g, a, 0, 0, W, H / 2); rect(g, b, 0, H / 2, W, H / 2); };
 
+/** One feather: a long teardrop from (x, y) out along `ang`, `len` long and `wid` across. */
+const feather = (g: G, c: string, x: number, y: number, ang: number, len: number, wid: number) => { g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = c; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.45, -wid, len, 0); g.quadraticCurveTo(len * 0.45, wid, 0, 0); g.fill(); g.restore(); };
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
 export const PARODY_BURGEES: Burgee[] = [
   // ---- Tier 1 · San Francisco city front
-  { id: 'stfyc', shape: 'swallow', ratio: 1.6, // classic, prestige: very dark blue and red, divided per pale, a white fimbriation, one gold crown
-    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.56, 0, W * 0.035, H); rect(g, RED, W * 0.595, 0, W * 0.405, H);
-      const x = W * 0.27, y = H * 0.56;
-      poly(g, GOLD, [x - H * 0.24, y], [x - H * 0.28, y - H * 0.28], [x - H * 0.12, y - H * 0.13], [x, y - H * 0.32], [x + H * 0.12, y - H * 0.13], [x + H * 0.28, y - H * 0.28], [x + H * 0.24, y]);
-      rect(g, GOLD, x - H * 0.24, y + H * 0.04, H * 0.48, H * 0.07); border(g, W, H, 'swallow', WHITE, 0.035); } },
+  { id: 'stfyc', shape: 'swallow', ratio: 1.6, // classic, prestige: very dark blue and red per pale, a white fimbriation; one gold phoenix, the city's own emblem, rising from red flames
+    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.57, 0, W * 0.035, H); rect(g, RED, W * 0.605, 0, W * 0.395, H);
+      const x = W * 0.29, y = H * 0.5, u = H, d = Math.PI / 180;
+      for (const s of [-1, 1]) for (const [a, l] of [[-48, 0.3], [-26, 0.35], [-4, 0.34], [18, 0.27]] as P[]) feather(g, GOLD, x + s * u * 0.04, y - u * 0.03, s > 0 ? a * d : Math.PI - a * d, u * l, u * 0.07); // the wings, four feathers fanned up
+      oval(g, GOLD, x, y + u * 0.02, u * 0.06, u * 0.13); // the body
+      rect(g, GOLD, x - u * 0.03, y - u * 0.16, u * 0.06, u * 0.12); dot(g, GOLD, x, y - u * 0.2, u * 0.065); poly(g, GOLD, [x + u * 0.05, y - u * 0.23], [x + u * 0.15, y - u * 0.18], [x + u * 0.05, y - u * 0.14]); // the head, the beak
+      for (const a of [76, 90, 104]) feather(g, GOLD, x, y + u * 0.1, a * d, u * 0.22, u * 0.045); // the tail
+      poly(g, RED, [x - u * 0.2, y + u * 0.36], [x - u * 0.13, y + u * 0.22], [x - u * 0.065, y + u * 0.3], [x, y + u * 0.17], [x + u * 0.065, y + u * 0.3], [x + u * 0.13, y + u * 0.22], [x + u * 0.2, y + u * 0.36]); // rising from the flames
+      border(g, W, H, 'swallow', WHITE, 0.035); } },
   { id: 'ggyc', shape: 'pennant', ratio: 1.67, // scrappy: blue and gold, one leaping dorado
     draw: (g, W, H) => { fill(g, W, H, BLUE); g.save(); g.translate(W * 0.22, H * 0.5); g.rotate(-0.45); oval(g, GOLD, 0, 0, W * 0.14, H * 0.17); poly(g, GOLD, [W * 0.1, 0], [W * 0.2, -H * 0.16], [W * 0.2, H * 0.16]); g.restore(); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
