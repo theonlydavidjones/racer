@@ -202,7 +202,9 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     for (const i of front) {
       yield; // (a front can take tens of ms cold, and a point a few: the page's slices stop between its points. Every fourth
       // point, four cold ones ran a slice to 32 ms from Mile Rock, its budget 6)
-      const n = nodes[i], w = windOn(o, n.p, n.t), c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
+      const n = nodes[i];
+      if (o.chopSteps) { yield* o.chopSteps(n.p, n.t); } // (the chop's cell made ready a piece a slice, cold)
+      const w = windOn(o, n.p, n.t); yield; const c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
       // (becalmed here, under 0.5 kt on the water: she can't sail, but the tide still carries her. The front keeps her,
       // drifting the minute on the same board with no turn, so a hole in the breeze doesn't delete the routes through it:
       // Deep Physics' review, M1)

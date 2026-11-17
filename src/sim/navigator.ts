@@ -192,7 +192,7 @@ const SLICE_MS = 2, SLICE_NEW_MS = 6, TICK_MS = 16;
 export const liveSlices: number[] = [];
 /** How many live plans have been started (the tests: one for a passage sailed, not one each 150 m). */
 export const liveStarts = { n: 0 };
-const LIVE_KEEP = 2000, noteSlice = (ms: number) => { liveSlices.push(ms); if (liveSlices.length > LIVE_KEEP) liveSlices.splice(0, liveSlices.length - LIVE_KEEP); };
+const LIVE_KEEP = 50000, noteSlice = (ms: number) => { liveSlices.push(ms); if (liveSlices.length > LIVE_KEEP) liveSlices.splice(0, liveSlices.length - LIVE_KEEP); };
 /** The destination's part of a plan's key (where she's going, not where she is or when). */
 const destOf = (key: string) => key.slice(0, key.indexOf('|'));
 export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
