@@ -22,15 +22,21 @@ export interface Burgee {
  */
 export const BURGEES: Burgee[] = [];
 
+/** A burgee's cut: a pennant, or a swallowtail, which as real ones are tapers: the fly is shorter than the hoist and forked. */
+export function burgeePath(g: CanvasRenderingContext2D, W: number, H: number, shape?: 'pennant' | 'swallow'): void {
+  g.beginPath();
+  if (shape === 'swallow') { g.moveTo(0, 0); g.lineTo(W, H * 0.17); g.lineTo(W * 0.78, H / 2); g.lineTo(W, H * 0.83); g.lineTo(0, H); }
+  else { g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); }
+  g.closePath();
+}
+
 /** A burgee as a texture: the pennant on a transparent canvas. Its aspect is the burgee's own (fly over hoist). */
 export function burgeeCanvas(id: string): HTMLCanvasElement | null {
   const b = BURGEES.find(x => x.id === id); if (!b) return null;
   const H = 128, W = Math.round(H * (b.ratio ?? 1.5)), c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
-  g.save(); g.beginPath();
-  if (b.shape === 'swallow') { g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W * 0.84, H / 2); g.lineTo(W, H); g.lineTo(0, H); }
-  else { g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); }
-  g.closePath(); g.clip();
+  g.save(); burgeePath(g, W, H, b.shape);
+  g.clip();
   b.draw(g, W, H); g.restore();
   return c;
 }
