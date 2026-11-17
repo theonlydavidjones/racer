@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { dist, type Vec } from '../core/math';
 import type { SimView } from '../sim/host';
 import { P3 } from './coords';
+import { isSpot } from '../sim/places';
 
 interface MarkTag { el: HTMLDivElement; p: Vec; z: number; idx: number[] }
 
@@ -12,6 +13,11 @@ const ORDER_S = 1.2;
 export class Labels {
   private tagEls: (HTMLDivElement | null)[] = [];
   private markTags: MarkTag[] = [];
+  /** Cruising, where she's heading: one tag that follows the destination however it changes (the chart, the navigator,
+   * Home, or cleared), checked every frame, since nothing rebuilds the labels mid-sail (the owner, 16 Nov 2026: "the
+   * destination pin on the horizon doesn't seem to update"). A named place shows its name; a spot on open water, a pin. */
+  private destEl: HTMLDivElement | null = null;
+  private destOf: SimView['dest'] | undefined = undefined;
   /** Coming in to a berth: the one-word cue by your boat (Closer, Too fast, Step, Made fast, Bump: sim/world.ts mooringStep). */
   private cueEl: HTMLDivElement | null = null;
   /** The helm's call by her (the owner, 15 Nov 2026: "some kind of confirmation when I call jibe ho"): "Ready to jibe" …
@@ -41,11 +47,11 @@ export class Labels {
       this.root.appendChild(d); this.tagEls.push(d);
     }
     const mk = (txt: string) => { const d = document.createElement('div'); d.className = 'tag mk'; d.textContent = txt; this.root.appendChild(d); return d; };
-    this.markTags = [];
+    this.markTags = []; this.destEl = null;
     const seen: Record<string, number> = {};
     if (w.freeSail) { // just sailing: only where you're heading
       if (w.rounding) for (const m of w.rounding.marks) this.markTags.push({ el: mk(m.name), p: m.p, z: 4, idx: [] }); // the rounding drill's marks
-      if (w.dest) this.markTags.push({ el: mk(w.dest.name), p: w.dest.p, z: 6, idx: [] });
+      this.destEl = mk(''); this.destEl.hidden = true; this.destOf = undefined;
       return;
     }
     w.C.marks.forEach((m, i) => {
@@ -80,6 +86,17 @@ export class Labels {
       if (el.lastChild!.textContent !== txt) el.lastChild!.textContent = txt;
     });
     for (const mt of this.markTags) { this.place(mt.el, camera, mt.p.x, mt.p.y, mt.z); mt.el.classList.toggle('next', mt.idx.includes(u.leg) && w.t > 0); }
+    const de = this.destEl;
+    if (de) {
+      const d = w.dest;
+      if (d !== this.destOf) { // (a new destination, or none: its words and its look, once)
+        this.destOf = d;
+        const pin = !!d && isSpot(d.name);
+        de.textContent = d && !pin ? d.name : ''; if (pin) de.appendChild(document.createElement('b')); de.className = pin ? 'tag mk pin' : 'tag mk';
+        if (pin) de.title = d!.name; else de.removeAttribute('title');
+      }
+      if (d) this.place(de, camera, d.p.x, d.p.y, 6); else if (!de.hidden) de.hidden = true;
+    }
     // the cue while it's news (a few seconds), or for as long as it holds while the hand waits at the shrouds
     const m = u.mooring, c = this.cueEl, word = m?.cue && (m.phase === 'ready' || w.t - (m.cueT ?? -99) < 4) ? m.cue : '';
     if (c) { if (!word) { if (!c.hidden) c.hidden = true; } else { this.place(c, camera, u.x, u.y, 3.2); if (c.textContent !== word) c.textContent = word; } }
