@@ -135,6 +135,22 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**Every owner request is also kept in Owner's Requests** (https://claude.ai/artifact/9LqaHyCJvUStsifA29UAj3; the owner,
+17 November: "I feel like features I've requested are being lost"): one row per request, ranked now · next · later ·
+done, in the artifact's own database, so it survives compaction. Each new request goes there as well as here, and moves
+to done there when it ships.
+
+- **Motor sailing: her speed with the sails up and the motor on** (owner, 17 November; accuracy; later, "low priority";
+  1–3 h; Deep Physics): "motoring speed should account for sails being up. sails should impact physics when motor
+  sailing, if they don't already." Found (Roadmap, 17 Nov): physics.ts already adds the outboard's thrust (motor.ts
+  motorForce) to the sails' drive and drag in the one surge equation, so the sails do count. To check and test: motor
+  alone against motor and sails on a reach and close-hauled (faster, toward hull speed), head to wind (the flogging
+  sails slow her), and the apparent wind the sails see while she motors (her motored speed in it); then the physics
+  review.
+- **Mounting the outboard takes far too long: 5 seconds at most** (owner, 17 November; polish; later, "low priority";
+  1–2 h; Marinas): "mounting the motor takes way, way too long. 5 seconds max." The crew's lowering and mounting of the
+  outboard on its bracket, from the call to running, in 5 s or less.
+
 ## Priorities (owner's ranking, November 2026)
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
