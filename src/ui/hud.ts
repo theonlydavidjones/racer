@@ -15,7 +15,7 @@ import { youTackPays } from '../sim/world';
 import type { SimView } from '../sim/host';
 import { $, setHidden, setHtml, setText, setTitle } from './dom';
 import { routeAroundSteps } from '../sim/routing';
-import { passageLive, type PassageNow } from '../sim/navigator';
+import { passageLive, passagePlanLater, type PassageNow, type PassagePlan } from '../sim/navigator';
 import { clockOf } from '../sim/outlook';
 import { pennantCanvas, signalCanvas } from '../render/flags';
 import { FLAG_NAME, type Flag } from '../sim/signals';
@@ -99,10 +99,42 @@ export class Hud {
     if (!wd.dest) return null;
     const u = wd.user, m = this.navMemo;
     if (!m || m.dest !== wd.dest || wd.clockUtc - m.t >= 1 || Math.hypot(u.x - m.x, u.y - m.y) > 300) {
-      const pn = passageLive(wd); if (!pn) return null;
+      const pn = passageLive(wd, this.bumpNav); if (!pn) return m && m.dest === wd.dest ? m.pn : null;
       this.navMemo = { pn, t: wd.clockUtc, x: u.x, y: u.y, dest: wd.dest };
     }
     return this.navMemo!.pn;
+  }
+  /** Bumped when a passage or a plan the maps draw comes in: the full chart, drawn on demand, draws again (ui/chart.ts). */
+  navRev = 0;
+  private bumpNav = (): void => { this.navRev++; };
+  /**
+   * The navigator's plan for the chart's layer (the owner, 17 Nov 2026: the navigator as a layer on the one chart, its
+   * panel retired): the current gates on the way and where the wind's strongest (sim/navigator.ts passagePlan), worked out
+   * between frames when she has a new destination, or she's sailed NAV_PLAN_M on or NAV_PLAN_MIN minutes have passed
+   * since it was planned; only while it's shown, and the last one drawn until the next is in.
+   */
+  private planMemo: { plan: PassagePlan | null; dest: unknown; t: number; x: number; y: number } | null = null;
+  private planJob: { dest: unknown; stop: () => void } | null = null;
+  navPlan(wd: SimView): PassagePlan | null {
+    if (!wd.dest || !wd.cruising && wd.running) return null;
+    const u = wd.user, m = this.planMemo;
+    const stale = !m || m.dest !== wd.dest || wd.clockUtc - m.t >= NAV_PLAN_MIN || Math.hypot(u.x - m.x, u.y - m.y) > NAV_PLAN_M;
+    if (stale && this.planJob?.dest !== wd.dest) {
+      this.planJob?.stop();
+      const at = { dest: wd.dest, t: wd.clockUtc, x: u.x, y: u.y };
+      const job = { dest: wd.dest, stop: () => {} };
+      this.planJob = job;
+      job.stop = passagePlanLater(wd, plan => { if (this.planJob === job) this.planJob = null; this.planMemo = { plan, ...at }; this.navRev++; });
+    }
+    return m && m.dest === wd.dest ? m.plan : null;
+  }
+  /** The chart's one line about the passage (ui/chart.ts): where to, how long, and when she'd get there; null with none. */
+  navLine(wd: SimView): string | null {
+    if (!wd.dest || !wd.freeSail) return null;
+    const pn = this.navPassage(wd); if (!pn) return null;
+    const to = wd.dest.name.replace(/^Off /, 'off ');
+    if (!pn.ok || pn.eta == null) return `To ${to}: no passage leaving now`;
+    return `To ${to} · ${Math.max(1, Math.round(pn.eta - wd.clockUtc))} min · ETA ${clockOf(pn.eta)}`;
   }
   private warm = 0;
   /** Build the full chart's other field (the wind's or the current's, whichever isn't shown) when the page is next idle,
@@ -679,7 +711,6 @@ export class Hud {
       const y = h - 34 - (fog ? 12 : 0), turns = nav.tacks.length + nav.gybes.length;
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif';
       say(nav.ok ? `${(nav.sailedM / 1852).toFixed(1)} NM · ARRIVE ${clockOf(nav.eta!)}${turns ? ` · ${nav.tacks.length ? `${nav.tacks.length} TACK${nav.tacks.length > 1 ? 'S' : ''}` : `${nav.gybes.length} JIBE${nav.gybes.length > 1 ? 'S' : ''}`}` : ''}` : 'CAN\'T GET THERE FROM HERE', w / 2, y, 'center');
-      ctx.font = '600 9px "Saira Semi Condensed", sans-serif'; say('TAP FOR THE PASSAGE PLAN', w / 2, y + 12, 'center');
     } else if (kind) {
       const [a, b] = readout(wd, kind, u, u.ww, u.cur), y = h - 34 - (fog ? 12 : 0);
       ctx.font = '700 11px "Saira Semi Condensed", sans-serif'; say(a.toUpperCase(), w / 2, y, 'center');
@@ -832,7 +863,7 @@ export class Hud {
     this.drawn[detail] = { tf, w, h, scale, kind };
     // (before she leaves, in the setup and the planner: the course she'd sail leaving now, tacks, gybes and all, and the
     // laylines she'd sail into the destination on, from the same passage: sim/navigator.ts passageNow)
-    const plan = detail === 'inset' && this.insetPlan ? this.insetPlan : wd.freeSail && !wd.running && wd.dest ? passageLive(wd) : null;
+    const plan = detail === 'inset' ? this.insetPlan ?? (wd.freeSail && !wd.running && wd.dest ? passageLive(wd) : null) : wd.freeSail && wd.dest ? (wd.running ? this.navPassage(wd) : passageLive(wd)) : null;
     const fog = field === 'fog' && detail === 'chart' ? visibilityFor(wd.raceDate, wd.clockUtc) : null; // (the inset gives fog in words only)
     const L = plan && wd.dest ? (plan.laylines ? { mark: wd.dest, kind: plan.laylines.kind === 'beat' ? 'up' as const : 'down' as const, tracks: plan.laylines.tracks } : null) : laylinesFor(wd, u);
     // what this map shows, for its key
@@ -863,6 +894,8 @@ export class Hud {
     if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     if (wd.freeSail) {
       drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
+      // the navigator's layer (the owner's, 17 Nov 2026): on the full chart, and on the inset in its navigator's view
+      if (wd.dest && plan && (detail === 'chart' || this.insetPlan)) drawNavLayer(ctx, tf, wd.dest, plan, this.navPlan(wd), I, detail === 'chart');
       // a lesson's buoy (the tiller: steer for it), a filled yellow dot while it's the one to reach
       if (wd.lesson?.buoy && wd.lesson.step === 0) { const s = tf(wd.lesson.buoy.x, wd.lesson.buoy.y); ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 6, 0, 6.29); ctx.fill(); ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, 6.29); ctx.fill(); }
     } else drawCourse(ctx, wd.C, !!S.aids, tf, scale, u.leg < wd.C.marks.length ? u.leg : -1, I);
@@ -992,4 +1025,42 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
     const ex = a[0] + dx * k, ey = a[1] + dy * k, ang = Math.atan2(dy, dx);
     shape([[ex + Math.cos(ang) * 8, ey + Math.sin(ang) * 8], [ex + Math.cos(ang + 2.5) * 8, ey + Math.sin(ang + 2.5) * 8], [ex + Math.cos(ang - 2.5) * 8, ey + Math.sin(ang - 2.5) * 8]]);
   }
+}
+
+/** How long, minutes, and how far on, m, before the chart's plan (its gates and strongest wind) is worked out again. */
+const NAV_PLAN_MIN = 10, NAV_PLAN_M = 1852;
+/** The current gates' and the strongest wind's colors on the navigator's layer. */
+const NAV_GATE = '#6fd0ff', NAV_WIND = '#e9f2f5';
+/**
+ * The navigator's layer over her course (drawTrack): a tick and the clock every 15 minutes along it (the full chart), the
+ * current gates she passes (blue circles: when the tide there turns with her or against her) and where the wind's
+ * strongest on the way (a white triangle: its knots), named on the full chart, and when she'd get there by the
+ * destination. Not the ship and ferry routes she crosses: the owner, 17 Nov 2026, "should just be common knowledge to look
+ * out for", and the ferries don't keep to a line or a time.
+ */
+function drawNavLayer(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark, now: PassageNow, plan: PassagePlan | null, I: Ink, chart: boolean): void {
+  ctx.save(); ctx.lineJoin = 'round';
+  const say = (t: string, x: number, y: number, col: string, font: string) => { ctx.font = font; ctx.textAlign = 'left'; ctx.lineWidth = 3.5; ctx.strokeStyle = I.halo; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y); };
+  const tr = now.track;
+  if (chart && tr.length > 1) {
+    const step = 15; let next = Math.ceil(tr[0].t / step) * step; if (next - tr[0].t < 3) next += step; // (none on top of her)
+    for (const q of tr) if (q.t >= next) {
+      const s = tf(q.p.x, q.p.y);
+      ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.edge; ctx.beginPath(); ctx.arc(s[0], s[1], 2, 0, 6.29); ctx.fill();
+      say(clockOf(q.t), s[0] + 6, s[1] + 3, I.edge, '600 10px "Saira Semi Condensed", sans-serif');
+      while (next <= q.t) next += step;
+    }
+  }
+  for (const m of plan?.marks ?? []) {
+    if (m.kind === 'lane') continue;
+    const s = tf(m.p.x, m.p.y), r = chart ? 7 : 5;
+    ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(s[0], s[1], r + 2, 0, 6.29); ctx.fill();
+    ctx.fillStyle = m.kind === 'gate' ? NAV_GATE : NAV_WIND; ctx.strokeStyle = I.edge; ctx.lineWidth = 1.2; ctx.beginPath();
+    if (m.kind === 'wind') { ctx.moveTo(s[0], s[1] - r - 1); ctx.lineTo(s[0] + r, s[1] + r); ctx.lineTo(s[0] - r, s[1] + r); ctx.closePath(); } else ctx.arc(s[0], s[1], r, 0, 6.29);
+    ctx.fill(); ctx.stroke();
+    if (chart) say(m.label, s[0] + r + 5, s[1] + 4, I.edge, '600 11px "Saira Semi Condensed", sans-serif');
+  }
+  // (the inset gives when she'd get there once, in its own words at its foot: ui/hud.ts map)
+  if (chart && now.ok && now.eta != null) { const s = tf(dest.p.x, dest.p.y); say(`ETA ${clockOf(now.eta)}`, s[0] + 11, s[1] + 18, '#e8601c', '700 12px "Saira Semi Condensed", sans-serif'); }
+  ctx.restore();
 }
