@@ -949,6 +949,8 @@ function pumpRoute(): void {
   }
   setTimeout(pumpRoute, ROUTE_TICK_MS);
 }
+/** Whether a route is still being worked out (the passage panel draws the way round the land until it's in). */
+export function navRoutePending(): boolean { return routeJob !== null; }
 /** Finish the route being worked out, at once (the tests: the same route, arrived at in slices). */
 export function navRouteFinish(): void {
   const job = routeJob; if (!job) return;
