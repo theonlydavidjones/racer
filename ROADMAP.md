@@ -120,6 +120,9 @@ What's planned, roughly in order. Done work is described in the README.
 17 November: "I feel like features I've requested are being lost"): one row per request, ranked now · next · later ·
 done, in the artifact's own database, so it survives compaction. Each new request goes there as well as here, and moves
 to done there when it ships.
+**Every finished feature is kept in Finished Features** (https://claude.ai/artifact/RzR3C42c24ZiGNCWsrPn7Q; the owner,
+17 November, for documentation later): one row per feature, by area, with what it does, its key, the version and its
+sources. Each shipped item is added there when it's published.
 
 - **Motor sailing: her speed with the sails up and the motor on** (owner, 17 November; accuracy; later, "low priority";
   1–3 h; Deep Physics): "motoring speed should account for sails being up. sails should impact physics when motor
