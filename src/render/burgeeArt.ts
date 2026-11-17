@@ -119,8 +119,13 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'ggyc', shape: 'pennant', ratio: 1.5, // scrappy fishermen's club (Puerto d'Oro), from the owner's second template: the bridge's orange cut by a slanting white band, one dark-blue hook in it (to flag for IP review: the template is a real layout)
     draw: (g, W, H) => { fill(g, W, H, '#c0362c'); poly(g, WHITE, [0, 0], [W * 0.222, 0], [W * 0.8, H * 1.2], [W * 0.555, H * 1.2]);
       hook(g, W * 0.356, H * 0.5, H * 0.36, '#1b2285'); } },
-  { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
-    draw: (g, W, H) => { fill(g, W, H, '#0f5f99'); rect(g, '#f08a1c', W * 0.05, H * 0.62, W * 0.3, H * 0.09); arc(g, '#f08a1c', H * 0.1, W * 0.2, H * 0.62, H * 0.2, Math.PI, 0); } },
+  { id: 'sbyc', shape: 'swallow', ratio: 1.64, // China Basin, from the owner's reference (to flag for IP review: the layout is a real club's): navy swallowtail, one white star between the letters C and B
+    draw: (g, W, H) => { fill(g, W, H, '#14195c');
+      const cx = W * 0.445, cy = H * 0.5, R = H * 0.23, r = R * 0.42, pts: P[] = [];
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? r : R; pts.push([cx + Math.cos(a) * k, cy + Math.sin(a) * k]); }
+      poly(g, WHITE, ...pts);
+      g.fillStyle = WHITE; g.font = `bold ${Math.round(H * 0.24)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('C', W * 0.2, H * 0.5 + H * 0.01); g.fillText('B', W * 0.69, H * 0.5 + H * 0.01); } },
   { id: 'bvbc', shape: 'pennant', ratio: 1.6, // Dry Dock: working waterfront, so a yellow field and one dark-blue ship's wheel toward the hoist
     draw: (g, W, H) => { fill(g, W, H, '#f2c200'); wheel(g, W * 0.27, H * 0.5, H * 0.29, '#14295c', '#f2c200'); } },
   { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // Monarch Point: three equal bands, one for each club that merged in 1974: monarch orange, sunflower yellow, harbor teal
