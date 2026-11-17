@@ -303,7 +303,7 @@ export class Traffic {
             s = Math.max(0, Math.min(P.total, s + o.dir * ground * ratio));
           }
           const p = placeAt(P, s, o.dir, o.off + side);
-          if (n > 0) { const moved = Math.hypot(p.x - pts[n - 1].x, p.y - pts[n - 1].y), step = Math.abs(s - (n > 1 ? sPrevPlan : o.s)); if (moved > 1e-6 && step > 1e-6) ratio = step / moved; }
+          if (n > 0) { const moved = hypot(p.x - pts[n - 1].x, p.y - pts[n - 1].y), step = Math.abs(s - (n > 1 ? sPrevPlan : o.s)); if (moved > 1e-6 && step > 1e-6) ratio = step / moved; }
           sPrevPlan = s;
           pts.push(p); lats.push(held(o.off + side, room(P, s)));
         }
@@ -428,13 +428,13 @@ export class Traffic {
         let frac = clipped ? 1 : d1 - d0 > 1e-12 ? Math.sqrt(Math.max(0, (g - d0) / (d1 - d0))) : w.slow;
         if (!clipped && frac > 0) { // (and corrected once by how far that actually takes her: inside a sharp corner her way bends hard)
           frac = Math.min(frac, 10);
-          const p2 = placeAt(P, sPrev + o.dir * o.v * dt * frac, o.dir, o.off + w.off), d2 = Math.hypot(p2.x - p0.x, p2.y - p0.y);
+          const p2 = placeAt(P, sPrev + o.dir * o.v * dt * frac, o.dir, o.off + w.off), d2 = hypot(p2.x - p0.x, p2.y - p0.y);
           if (d2 > 1e-9) frac *= Math.sqrt(g) / d2;
         }
         w.lag += dt * (1 - Math.min(frac, 10));
         // (her heading: the way she actually moved this step)
         const p3 = placeAt(P, sPrev + o.dir * o.v * dt * Math.min(frac, 10), o.dir, o.off + w.off);
-        if (Math.hypot(p3.x - p0.x, p3.y - p0.y) > 1e-4) w.h = brg(p3.x - p0.x, p3.y - p0.y);
+        if (hypot(p3.x - p0.x, p3.y - p0.y) > 1e-4) w.h = brg(p3.x - p0.x, p3.y - p0.y);
       } else { // (alongside, on her line, making up lost time, or waiting out what she gained on the inside of a bend)
         w.off = w.tgt = w.rate = 0; w.slow = w.slowTgt = 1; w.h = NaN;
         // (her clock held only while that keeps her alongside: held at the step she came in, she'd read as still under way)
