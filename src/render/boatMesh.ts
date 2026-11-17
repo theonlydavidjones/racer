@@ -8,7 +8,8 @@ import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
-import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
+import { ROPES, type BoatSpec, type LineColorKey } from '../boat/spec';
+import { ROPE_LAYERS, ROPE_TILE, ropeLook, ropeTile } from './ropeLook';
 import { P3 } from './coords';
 import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
@@ -737,22 +738,64 @@ function keyMat(hex: string): THREE.LineBasicMaterial {
  * braid, the wire 7 mm, CR 7.10), in its colour, all one instanced mesh, following the lines each frame as they move.
  * The thin screen lines under them still show the rig from afar, where 8 mm is less than a pixel.
  */
-interface Ropes { mesh: THREE.InstancedMesh; lines: { l: THREE.Line; r: number }[] }
-function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineColors'> | null): Ropes {
-  const lines: Ropes['lines'] = [], colors: THREE.Color[] = [];
+interface Ropes { mesh: THREE.InstancedMesh; lines: { l: THREE.Line; r: number }[]; look: THREE.InstancedBufferAttribute }
+/**
+ * The braid's texture, one layer per colorway (render/ropeLook.ts), made once and shared by every boat; mipmapped, so a
+ * rope far off reads as its colorway's blend rather than shimmering.
+ */
+let ROPE_TEX: THREE.DataArrayTexture | null = null;
+function ropeTexture(): THREE.DataArrayTexture {
+  if (ROPE_TEX) return ROPE_TEX;
+  const { around: W, along: H } = ROPE_TILE, data = new Uint8Array(W * H * 4 * ROPE_LAYERS);
+  data.set(ropeTile(), 0); ROPES.forEach((r, i) => data.set(ropeTile(r), W * H * 4 * (i + 1)));
+  const t = new THREE.DataArrayTexture(data, W, H, ROPE_LAYERS);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+  return ROPE_TEX = t;
+}
+/**
+ * The rope's material: lit, with the braid's layer wrapped around each piece. Each piece carries its length, how far
+ * along its line it starts (so the braid runs on unbroken from piece to piece) and its colorway's layer.
+ */
+let ROPE_MESH_MAT: THREE.MeshLambertMaterial | null = null;
+function ropeMaterial(): THREE.MeshLambertMaterial {
+  if (ROPE_MESH_MAT) return ROPE_MESH_MAT;
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uRope = { value: ropeTexture() };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+attribute vec3 aRope;
+varying vec3 vRope;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+vRope = vec3(uv.x, (aRope.y + uv.y * aRope.x) / ${ROPE_TILE.length.toFixed(4)}, aRope.z);`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+uniform highp sampler2DArray uRope;
+varying vec3 vRope;`).replace('#include <color_fragment>', `#include <color_fragment>
+diffuseColor.rgb *= texture(uRope, vec3(vRope.x, vRope.y, floor(vRope.z + 0.5))).rgb;`);
+  };
+  m.customProgramCacheKey = () => 'rope-braid';
+  return ROPE_MESH_MAT = m;
+}
+function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineColors' | 'lineRopes'> | null): Ropes {
+  const lines: Ropes['lines'] = [], colors: THREE.Color[] = [], layers: number[] = [];
   grp.traverse(o => {
     const l = o as THREE.Line; if (!l.isLine) return;
     const role = l.userData.rope as Rope | undefined, wire = l.material === MAT.wire, key = l.userData.key as LineColorKey | undefined;
     if (!role && !wire) return;
     lines.push({ l, r: wire ? 0.0035 : 0.004 });
-    if (key) l.material = keyMat(lineColor(spec, key));
-    const c = new THREE.Color(key ? lineColor(spec, key) : ROPE_COLOR[role ?? 'wire']);
-    for (let i = 0; i < l.geometry.attributes.position.count - 1; i++) colors.push(c);
+    // its colorway (or its band color on plain braid); the wire and the uncolored lines plain, in their own colors
+    const look = key ? ropeLook(spec, key) : null;
+    if (look) { l.material = keyMat(look.far); l.userData.ropeLayer = look.layer; l.userData.ropeId = look.rope?.id; }
+    const c = new THREE.Color(look ? look.tint : ROPE_COLOR[role ?? 'wire']);
+    for (let i = 0; i < l.geometry.attributes.position.count - 1; i++) { colors.push(c); layers.push(look ? look.layer : 0); }
   });
-  const mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, colors.length));
+  const geo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), n = Math.max(1, colors.length);
+  const look = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3); look.setUsage(THREE.DynamicDrawUsage);
+  layers.forEach((z, i) => look.setZ(i, z));
+  geo.setAttribute('aRope', look);
+  const mesh = new THREE.InstancedMesh(geo, ropeMaterial(), n);
   colors.forEach((c, i) => mesh.setColorAt(i, c));
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; grp.add(mesh);
-  return { mesh, lines };
+  return { mesh, lines, look };
 }
 const R_M = new THREE.Matrix4(), R_T = new THREE.Matrix4(), R_ZERO = new THREE.Matrix4().makeScale(0, 0, 0), R_A = new THREE.Vector3(), R_B = new THREE.Vector3(), R_Q = new THREE.Quaternion(), R_S = new THREE.Vector3(), R_UP = new THREE.Vector3(0, 1, 0), R_D = new THREE.Vector3();
 const ROPE_BASE = Object.fromEntries(Object.entries(ROPE_MAT).map(([k, mt]) => [k, mt.color.clone()])) as Record<Rope, THREE.Color>;
@@ -761,7 +804,7 @@ function syncRopes(m: BoatMesh): void {
   const day = 1 - 0.85 * NIGHT.uNight.value;
   for (const k of Object.keys(ROPE_MAT) as Rope[]) ROPE_MAT[k].color.copy(ROPE_BASE[k]).multiplyScalar(day);
   for (const { mat, base } of KEY_MATS.values()) mat.color.copy(base).multiplyScalar(day);
-  const { mesh, lines } = m.ropes; let k = 0;
+  const { mesh, lines, look } = m.ropes; let k = 0;
   for (const { l, r } of lines) {
     // (a line that never moves in the boat's frame is laid once)
     if (l.userData.fixed && l.userData.laid) { k += l.geometry.attributes.position.count - 1; continue; }
@@ -770,15 +813,17 @@ function syncRopes(m: BoatMesh): void {
     R_M.identity(); let shown = true;
     for (let o: THREE.Object3D | null = l; o && o !== m.grp; o = o.parent) { if (!o.visible) shown = false; o.updateMatrix(); R_M.premultiply(o.matrix); }
     const P = l.geometry.attributes.position, n = P.count;
+    let along = 0; // (how far along the line each piece starts, within one tile: the braid runs on unbroken)
     for (let i = 0; i < n - 1; i++, k++) {
       R_A.fromBufferAttribute(P, i).applyMatrix4(R_M); R_B.fromBufferAttribute(P, i + 1).applyMatrix4(R_M);
       const len = R_D.subVectors(R_B, R_A).length();
+      look.setXY(k, len, along); along = (along + len) % ROPE_TILE.length;
       if (!shown || len < 1e-4) { mesh.setMatrixAt(k, R_ZERO); continue; }
       R_Q.setFromUnitVectors(R_UP, R_D.divideScalar(len));
       mesh.setMatrixAt(k, R_T.compose(R_A.add(R_B).multiplyScalar(0.5), R_Q, R_S.set(r, len, r)));
     }
   }
-  mesh.instanceMatrix.needsUpdate = true;
+  mesh.instanceMatrix.needsUpdate = true; look.needsUpdate = true;
 }
 
 /**

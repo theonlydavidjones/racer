@@ -1458,12 +1458,12 @@ function frame(now: number): void {
 
 /* Your boat: the panel, with the boat in the showroom view beside it. */
 let boatPanel: BoatPanel;
-/** Whether two specs of a boat differ only in how she looks (paint, hatch, cockpit, lettering, sail numbers, line colors):
+/** Whether two specs of a boat differ only in how she looks (paint, hatch, cockpit, lettering, sail numbers, line colors and ropes):
  * none of it touches how she sails, so the showroom can restyle her where she lies. */
 function lookOnly(a: BoatSpec, b: BoatSpec): boolean {
   const strip = (x: BoatSpec) => {
     const y = structuredClone(x) as BoatSpec & Record<string, unknown>;
-    for (const k of ['name', 'nameColor', 'deck', 'cabinTop', 'hatch', 'cockpit', 'navLights', 'poleSide', 'lineColors', 'instrument']) delete y[k];
+    for (const k of ['name', 'nameColor', 'deck', 'cabinTop', 'hatch', 'cockpit', 'navLights', 'poleSide', 'lineColors', 'lineRopes', 'instrument']) delete y[k];
     y.hull = { ...y.hull, upper: '', lower: '', stripe: '' };
     y.sails = { ...y.sails, color: 'white', number: '', numberColor: undefined, insigniaColor: undefined }; // (her country's her ensign too: a new World)
     return JSON.stringify(y);

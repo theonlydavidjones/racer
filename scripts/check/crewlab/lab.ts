@@ -2,11 +2,12 @@
  * Crew lab (dev only: npm run dev, then http://localhost:5173/scripts/check/crewlab/): one boat sailing with the real
  * physics in steady wind on flat water, and a camera you put anywhere around her crew. For checking the crew's seats,
  * paths and poses from both sides on both tacks (scripts/check/crew.cjs drives it).
- *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n?, pole?, sea? (pitch amplitude, rad) })  then lab.sail(seconds)
+ *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n?, pole?, sea? (pitch amplitude, rad), spec? (her BoatSpec) })  then lab.sail(seconds)
  *   lab.tack()  (starts a tack; then lab.sail(s) in small steps to see the crossing)
  *   lab.cam(yawDeg, pitchDeg, dist, [x, y, z] boat-frame target)  (yaw 0: from dead astern; 90: from starboard)
  *   lab.mesh()  (the boat's mesh, its crew figures in .crew: for finding which part of whom is where)
  */
+import { DEFAULT_BOAT, type BoatSpec } from '../../../src/boat/spec';
 import '../../../src/render/three-setup';
 import * as THREE from 'three';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from '../../../src/render/boatMesh';
@@ -50,13 +51,14 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; spec?: Partial<BoatSpec> }) {
     (lab as any).seaA = o.sea ?? 0; // (pitching in a seaway: that many radians either way every 2.6 s, crew.ts rough)
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
     b.crew = newCrew({ helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) }, tack);
     if (o.place) b.crew.place = o.place;
     if (o.pole) b.poleWant = true;
+    if (o.spec) b.spec = { ...structuredClone(DEFAULT_BOAT), ...o.spec }; // (her looks: the boat editor's choices, e.g. her lines' colorways)
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
     m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)
