@@ -174,6 +174,6 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'mbyc', shape: 'pennant', ratio: 2, // Riveter Bay: dark blue with a safety-yellow band, and a row of rivets the whole way along the band
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); rect(g, '#f2c200', 0, H * 0.4, W, H * 0.2);
       for (let i = 0; i < 10; i++) dot(g, '#2c3238', W * (0.06 + i * 0.08), H * 0.5, H * 0.042); } },
-  { id: 'slyc', shape: 'pennant', ratio: 1.67, // dark green with two cherries
-    draw: (g, W, H) => { fill(g, W, H, '#124d33'); stroke(g, '#7fc050', H * 0.06, [W * 0.1, H * 0.58], [W * 0.17, H * 0.28], [W * 0.24, H * 0.58]); dot(g, '#c3122f', W * 0.1, H * 0.6, H * 0.13); dot(g, '#c3122f', W * 0.24, H * 0.6, H * 0.13); } }
+  { id: 'slyc', shape: 'pennant', ratio: 1.5, // Cherry Harbor: quartered in cherry red and cream, in the old signal-flag manner; the cherry is in the color alone
+    draw: (g, W, H) => { fill(g, W, H, '#f6ecd4'); rect(g, '#e0242e', 0, 0, W * 0.45, H / 2); rect(g, '#e0242e', W * 0.45, H / 2, W * 0.55, H / 2); } }
 ];
