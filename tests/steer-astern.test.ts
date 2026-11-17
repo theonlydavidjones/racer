@@ -66,7 +66,9 @@ describe('steering astern, shoved off under bare poles', () => {
     expect(asternGlide(0.1, 0, 0, 20, 60).steerable).toBe(0); // (though in 20 kt on her bow she's over 0.3 m/s within a quarter of a minute)
     expect(asternGlide(0.1, 0, 0, 20, 60).going).toBe(true);
     expect(asternGlide(0.5, 0, 0, 20, 60).steerable).toBeGreaterThan(59); // (from a walk, she never loses it)
-    const calm = asternGlide(0.55, 0, 90, 0, 60).steerable; expect(calm).toBeGreaterThan(12); expect(calm).toBeLessThan(14);
+    // (let go at 0.55 m/s in a calm she keeps steerage way, over 0.3 m/s, for 37.7 s. Sim-measured on the sourced sternway
+    // drag, twice her hull's resistance (physics.ts ASTERN), 17 Nov 2026; on the earlier unsourced drag it was 13 s)
+    const calm = asternGlide(0.55, 0, 90, 0, 60).steerable; expect(calm).toBeGreaterThan(35); expect(calm).toBeLessThan(40);
   });
   it('in irons with sternway, a steering key held still sculls her round (rule 42.3(d)): the tiller in your hand is literal, a key asks for the turn', () => {
     // (the batch's rule 21.2 test, 15 Nov 2026: helmed back and forth across the wind by the keys she no longer got across)
@@ -74,8 +76,13 @@ describe('steering astern, shoved off under bare poles', () => {
       const b = testBoat({ heading: 5, kt: 0, windKt: 10, windFrom: 0 }) as Helm; b.isUser = true; b.v = 0; b.astern = 0.3;
       sail(b, 8, () => helm(b)); return wrap(b.h - 5);
     };
-    expect(turn(b => { b.steer = 1; })).toBeGreaterThan(10); // (sculled to starboard, toward 4 deg/s as her turn gathers: the way the key asks)
-    expect(Math.abs(turn(b => { b.tiller = -1; b.steer = 0; b.handsOff = true; }))).toBeLessThan(6); // (the held tiller: by the flow past her rudder, little at 0.3 m/s)
+    const key = turn(b => { b.steer = 1; }), hand = Math.abs(turn(b => { b.tiller = -1; b.steer = 0; b.handsOff = true; }));
+    expect(key).toBeGreaterThan(10); // (sculled to starboard, toward 4 deg/s as her turn gathers: the way the key asks)
+    // (the held tiller: by the flow past her rudder, little at 0.3 m/s. Sim-measured on the sourced sternway drag,
+    // 17 Nov 2026: 6.79 degrees in the 8 s; it was 5.87, under a bound of 6, on the earlier unsourced drag, which took her
+    // sternway off sooner: here she still has 0.42 m/s of it at the end, so the flow steers her the whole time. And what
+    // the case is about, the contrast: well under half the key's turn, 17.3)
+    expect(hand).toBeLessThan(8); expect(hand).toBeLessThan(0.4 * key);
   });
   it('a wind on her stern shortens the glide, a wind on her bow carries her on', () => {
     const calm = asternGlide(0.64, 0, 90, 0), stern = asternGlide(0.64, 0, 180, 20), bow = asternGlide(0.64, 0, 0, 20);
