@@ -151,10 +151,19 @@ function outOfBasin(p: Vec): Vec {
   let e = H.exits[0]; for (const x of H.exits) if (dist(x, p) < dist(e, p)) e = x;
   return { ...e };
 }
+/** The page's plans' outlook, one for a World in its conditions: its caches (the lee, the wind, the current, the chop, by
+ * place and time) are memos of the day, so a plan after the first reads them warm (a new outlook for each, every re-plan
+ * under way filled them again, ~45 s of work from Mile Rock: the physics review of nav-pace). */
+const outlooks = new WeakMap<SimView, { refs: unknown[]; o: ReturnType<typeof outlookFor> }>();
+function sharedOutlook(w: SimView) {
+  const refs = [w.weather, w.tide, w.windModel, w.sea, w.settings, w.gunUtc], m = outlooks.get(w);
+  if (m && m.refs.every((r, i) => r === refs[i])) return m.o;
+  const o = outlookFor(w); outlooks.set(w, { refs, o }); return o;
+}
 function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> {
   const dest = w.dest; if (!dest) return null;
   const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
-  const o = outlookFor(w);
+  const o = sharedOutlook(w);
   yield;
   const route = yield* routeAroundSteps(from, to);
   const r = yield* passageSteps(o, route, t0);
@@ -184,28 +193,54 @@ export function passageNow(w: SimView): PassageNow | null {
  * draws only on demand: the setup's tide graph).
  */
 const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<void, PassageNow | null, void>; ready?: () => void }>();
-/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (an eighth of a 60 fps frame: a design choice inside Capacity's frame budget). */
-const SLICE_MS = 2, TICK_MS = 16;
+/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (an eighth of a 60 fps frame: a design
+ * choice inside Capacity's frame budget); SLICE_NEW_MS while there's no plan at all for where she's going (a destination
+ * just chosen: the player's waiting on it), or the passage panel's plan, asked for and waited on. */
+const SLICE_MS = 2, SLICE_NEW_MS = 6, TICK_MS = 16;
+/** For the tests (tests/sailHome-mileRock.test.ts), kept only while `on`: each slice's length (ms), that none runs over
+ * its budget, and how many live plans were started (one for a passage sailed, not one each 150 m). */
+export const liveLog = { on: false, slices: [] as number[], starts: 0 };
+const noteSlice = (ms: number) => { if (liveLog.on) liveLog.slices.push(ms); };
+/** The destination's part of a plan's key (where she's going, not where she is or when). */
+const destOf = (key: string) => key.slice(0, key.indexOf('|'));
 export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
   const k = nowKey(w, LIVE_M, LIVE_MIN); if (!k) return null;
   const m = nowMemo.get(w); if (fresh(m, k)) return m!.v;
   const j = jobs.get(w);
-  if (!j || !fresh(j, k)) {
-    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job);
+  // (a plan being worked out for the same destination in the same conditions is let finish, though she's sailed on or the
+  // clock's turned since it began: started again each 150 m, a long first plan (Mile Rock to Gashouse Cove, ~39 s of work)
+  // never finished under way: the owner's "ten minutes in, still plotting", ROADMAP 8b. The next starts from where she is
+  // once it's in)
+  const same = !!j && sameAim(j, k);
+  if (j && same && ready && j.ready !== ready) { const a = j.ready; j.ready = () => { a?.(); ready(); }; } // (each caller told when it's in)
+  if (!j || !same) {
+    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job); if (liveLog.on) liveLog.starts++;
+    const first = !m || !sameAim(m, k); // (nothing yet to show for where she's going, in these conditions)
     const pump = () => {
       if (jobs.get(w) !== job) return; // (a newer plan took its place)
-      const t = performance.now();
+      const t = performance.now(), budget = first ? SLICE_NEW_MS : SLICE_MS;
       for (;;) {
         const r = job.g.next();
-        if (r.done) { if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
-        if (performance.now() - t > SLICE_MS) break;
+        if (r.done) { noteSlice(performance.now() - t); if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
+        if (performance.now() - t > budget) break;
       }
+      noteSlice(performance.now() - t);
       setTimeout(pump, TICK_MS);
     };
     setTimeout(pump, 0);
   }
-  return m?.v ?? null; // (the last plan, until the new one is in)
+  return m && sameAim(m, k) ? m.v : null; // (the last plan for where she's going in these conditions, until the new one is in)
 }
+/** Two plans' keys for the same destination in the same conditions (where she is, and when, aside). */
+const sameAim = (a: { key: string; refs: unknown[] }, b: { key: string; refs: unknown[] }) => destOf(a.key) === destOf(b.key) && a.refs.every((r, i) => r === b.refs[i]);
+/** The live plan for where she's going, if it's recent enough for the panel to brief from: begun within 300 m of her and
+ * five minutes of now. */
+function liveFor(w: SimView): PassageNow | null {
+  const k = nowKey(w), m = nowMemo.get(w); if (!k || !m || !sameAim(m, k)) return null;
+  return dist(m.v.route[0], outOfBasin({ x: w.user.x, y: w.user.y })) < 300 && Math.abs(w.clockUtc - m.v.leave) <= 5 ? m.v : null;
+}
+/** Panels waiting on the live plan (passagePlanSteps): their pumps idle meanwhile, not spinning on its yields. */
+const waiting = new WeakSet<SimView>();
 
 /** Why a passage can't be sailed, in words: the planner's course ran ashore, or it took too long. */
 export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
@@ -213,7 +248,7 @@ export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
   : 'it takes too long, becalmed or against a foul tide somewhere on the way';
 
 /** passagePlanSteps worked out at once (the tests). */
-export function passagePlan(w: SimView): PassagePlan | null { const g = passagePlanSteps(w); let r = g.next(); while (!r.done) r = g.next(); return r.value; }
+export function passagePlan(w: SimView): PassagePlan | null { const g = passagePlanSteps(w, false); let r = g.next(); while (!r.done) r = g.next(); return r.value; }
 /**
  * passagePlanSteps a slice at a time between frames (it sails the passage leaving now and up to five times later, a
  * second or two each), then `done` with the plan. Returns a function that stops it (the panel closed, or another asked).
@@ -222,20 +257,31 @@ export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => vo
   const g = passagePlanSteps(w); let stopped = false;
   const pump = () => {
     if (stopped) return;
+    if (waiting.has(w) && jobs.get(w)) { setTimeout(pump, TICK_MS); return; } // (the live plan's own pump is at it)
     const t = performance.now();
-    for (;;) { const r = g.next(); if (r.done) { done(r.value); return; } if (performance.now() - t > SLICE_MS) break; }
+    for (;;) { const r = g.next(); if (r.done) { done(r.value); return; } if (performance.now() - t > SLICE_NEW_MS) break; } // (the panel's: asked for and waited on)
     setTimeout(pump, TICK_MS);
   };
   setTimeout(pump, 0);
   return () => { stopped = true; };
 }
-function* passagePlanSteps(w: SimView): Generator<void, PassagePlan | null, void> {
+/** `live`: between frames, the passage leaving now taken from the page's live plan (waited on); at once (the tests), worked out here. */
+function* passagePlanSteps(w: SimView, live = true): Generator<void, PassagePlan | null, void> {
   const dest = w.dest; if (!dest) return null;
-  const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
+  const o = sharedOutlook(w), u = w.user, t0 = w.clockUtc;
   const from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
   // (the same passage the chart and the setup show: passageNow)
-  const k = nowKey(w)!, m = nowMemo.get(w), pn = fresh(m, k) ? m!.v : (yield* passageNowSteps(w))!, route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
+  // (the passage leaving now: the live plan's, the one the inset and the HUD draw, if it's recent; else that plan, started
+  // or joined and waited on. Worked out here a second time, it was ~45 s more of the page's thread from Mile Rock)
+  const k = nowKey(w)!, m = nowMemo.get(w);
+  let pn = fresh(m, k) ? m!.v : live ? liveFor(w) : (yield* passageNowSteps(w));
+  while (!pn && live) {
+    passageLive(w); waiting.add(w); yield; waiting.delete(w);
+    if (!jobs.get(w)) { pn = liveFor(w) ?? nowMemo.get(w)?.v ?? null; if (!pn) { pn = (yield* passageNowSteps(w)); break; } }
+  }
+  if (!pn) return null;
+  const route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
   const cant = whyNot(pn.why);
   const straight = dist(from, to), routeLen = route.slice(1).reduce((a, p, i) => a + dist(route[i], p), 0);
   const fromName = w.fromSlip && !w.running ? `her slip (${w.homeSlip?.id})` : place(w.settings.sailFrom)?.name.replace(/^Off /, 'off ') ?? 'here';
