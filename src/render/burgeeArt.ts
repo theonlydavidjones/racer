@@ -89,18 +89,8 @@ export const PARODY_BURGEES: Burgee[] = [
   // ---- East Bay
   { id: 'ryc', shape: 'pennant', ratio: 1.5, // DIY: brick red, black and white; one kiln chimney
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
-  { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; one gold campanile (a plain tall shaft, a clock, a belfry of three arches, a steep spire) on the hoist stripe
-    draw: (g, W, H) => { const BLU = '#003262', GLD = '#fdb515', X = W * 0.1, w = H * 0.11, yb = H * 0.86, Th = H * 0.7, y = (t: number) => yb - t * Th;
-      fill(g, W, H, BLU); rect(g, GLD, W * 0.2, 0, W * 0.2, H); rect(g, GLD, W * 0.6, 0, W * 0.2, H);
-      rect(g, GLD, X - w / 2, y(0.56), w, y(0) - y(0.56)); // the plain shaft
-      for (const t of [0.12, 0.24]) rect(g, BLU, X - H * 0.005, y(t + 0.05), H * 0.01, y(t) - y(t + 0.05)); // two narrow windows
-      dot(g, BLU, X, y(0.43), H * 0.026); dot(g, GLD, X, y(0.43), H * 0.012); // the clock
-      rect(g, GLD, X - w * 0.64, y(0.575), w * 1.28, y(0.56) - y(0.575)); // the cornice under the belfry
-      rect(g, GLD, X - w * 0.54, y(0.76), w * 1.08, y(0.575) - y(0.76)); // the belfry
-      for (const a of [-1, 0, 1]) { const ax = X + a * H * 0.027; rect(g, BLU, ax - H * 0.009, y(0.69), H * 0.018, y(0.6) - y(0.69)); dot(g, BLU, ax, y(0.69), H * 0.009); } // its three tall arches
-      rect(g, GLD, X - w * 0.64, y(0.775), w * 1.28, y(0.76) - y(0.775)); // the cornice above it
-      for (const s of [-1, 1]) poly(g, GLD, [X + s * w * 0.6 - H * 0.006, y(0.775)], [X + s * w * 0.6, y(0.82)], [X + s * w * 0.6 + H * 0.006, y(0.775)]); // the corner pinnacles
-      poly(g, GLD, [X - w * 0.5, y(0.775)], [X, y(1)], [X + w * 0.5, y(0.775)]); } }, // the steep spire
+  { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; no charge (the name does the work)
+    draw: (g, W, H) => { fill(g, W, H, '#003262'); rect(g, '#fdb515', W * 0.2, 0, W * 0.2, H); rect(g, '#fdb515', W * 0.6, 0, W * 0.2, H); } },
   { id: 'csc', shape: 'pennant', ratio: 1.5, // modern co-op: bright green and yellow, one rising sun
     draw: (g, W, H) => { fill(g, W, H, '#2fa04a'); rect(g, '#f6d21a', 0, H * 0.7, W, H * 0.3); dot(g, '#f6d21a', W * 0.2, H * 0.46, H * 0.2); } },
   { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
