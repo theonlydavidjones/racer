@@ -34,8 +34,17 @@ describe('the ferries give way, the longer checks', () => {
       const m = meeting(id, seed, T, [across(id, seed, T, 160, side)], 320, trafficWater);
       const margin = m.nearest[0] - (CLEAR * 0.8 + VESSEL[kind].len / 2);
       if (margin < worst) { worst = margin; at = `${kind} seed ${seed} side ${side}: ${m.nearest[0].toFixed(0)} m`; }
+      expect(m.kink, `${kind} seed ${seed} side ${side}: her heading's largest turn in one step (°)`).toBeLessThan(2);
     }
-    console.log(`the closest of 64 crossings, against 0.8 × CLEAR past her half-length: ${at}`);
+    // (and the reviews' own cases: the Sausalito ferry's 31 m (seed 9) and the Coast Guard boat's 113 m (seed 14), a boat
+    // 450 m abeam meeting her in 150 s)
+    for (const [kind, seed, trial] of [['ferry', 9, 8], ['coastguard', 14, 13]] as const) for (const side of [1, -1]) {
+      const id = SERVICES.findIndex(s => s.kind === kind), T = when(id, seed, T0 + trial * 1777, 150, (a, b) => a.moving && b.moving);
+      const m = meeting(id, seed, T, [across(id, seed, T, 150, side)], 300, trafficWater);
+      const margin = m.nearest[0] - (CLEAR * 0.8 + VESSEL[kind].len / 2);
+      if (margin < worst) { worst = margin; at = `${kind} seed ${seed} trial ${trial} side ${side}: ${m.nearest[0].toFixed(0)} m`; }
+    }
+    console.log(`the closest of 68 crossings, against 0.8 × CLEAR past her half-length: ${at}`);
     expect(worst, at).toBeGreaterThan(0);
   }, 300_000);
   it('no vessel jumps: every service for an hour, on her line and 300 m off it, a step (1/60 s) at a time; and on her line alongside', () => {

@@ -114,25 +114,29 @@ const HIST_N = 4; // (off, lag, slow, h in each slot)
 const HIST = 60, HIST_S = 4;
 
 /** A route's geometry: its points, the distance along it to each, and each leg's direction. */
-interface Path { r: Vec[]; L: number[]; total: number; t: Vec[]; c: { k: number; rc: number }[]; turnR: number }
+interface Path { r: Vec[]; L: number[]; total: number; t: Vec[]; c: { k: number; rc: number }[]; turnR: number; arm: number[] }
 /** At corner j of a route (between leg j−1 and leg j): how sharply it turns, cos²(θ/2)/sin(θ/2) (the rounding's least
  * radius for each meter of its arms: Infinity for no turn), and the most its arms can be (nearly half of either leg). */
 function cornerOf(t: Vec[], L: number[], j: number): { k: number; rc: number } {
   const a = t[j - 1], b = t[j], half = Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y))) / 2;
   return { k: half < 1e-3 ? Infinity : Math.cos(half) ** 2 / Math.sin(half), rc: 0.45 * Math.min(L[j] - L[j - 1], L[j + 1] - L[j]) };
 }
+/** The arm (m) of the rounding at a corner, for a vessel `lat` m off the line: her offset and 40 m, and long enough
+ * that the rounding's tightest radius is her turning radius (turnR) and a quarter more than her offset (so on the inside
+ * she never folds back, and on her line she turns no faster than TURN_DEG_S); no longer than nearly half of either leg. */
+const armOf = (c: { k: number; rc: number }, lat: number, turnR: number) => Math.min(c.rc, Math.max(40 + Math.abs(lat), (1.25 * Math.abs(lat) + turnR) / c.k));
 const PATH: Record<string, Path> = Object.fromEntries(Object.entries(ROUTES).map(([k, r]) => {
   const L = [0], t: Vec[] = [];
   for (let i = 1; i < r.length; i++) { const dx = r[i].x - r[i - 1].x, dy = r[i].y - r[i - 1].y, l = hypot(dx, dy); L.push(L[i - 1] + l); t.push({ x: dx / l, y: dy / l }); }
   const c = r.map((_, j) => j >= 1 && j <= r.length - 2 ? cornerOf(t, L, j) : { k: Infinity, rc: 0 });
   // (the radius the fastest vessel on the route turns in at TURN_DEG_S: her corners are rounded no tighter)
   const vmax = Math.max(...SERVICES.filter(sv => sv.route === k).map(sv => VESSEL[sv.kind].kt * 0.5144));
-  return [k, { r, L, total: L[L.length - 1], t, c, turnR: vmax / (TURN_DEG_S * D2R) }];
+  const turnR = vmax / (TURN_DEG_S * D2R);
+  // (each corner's rounding fixed for the farthest she can be off her line there, not her offset now: grown with her
+  // offset, it slid her along her line as it grew and kinked her way 10–20° in a step when it reached its cap)
+  const arm = c.map(cj => cj.k === Infinity ? 0 : armOf(cj, Math.min(MAX_OFF + XTRACK, 0.8 * cj.k * cj.rc), turnR));
+  return [k, { r, L, total: L[L.length - 1], t, c, turnR, arm }];
 }));
-/** The arm (m) of the rounding at a corner, for a vessel `lat` m off the line: her offset and 40 m, and long enough
- * that the rounding's tightest radius is her turning radius (turnR) and a quarter more than her offset (so on the inside
- * she never folds back, and on her line she turns no faster than TURN_DEG_S); no longer than nearly half of either leg. */
-const armOf = (c: { k: number; rc: number }, lat: number, turnR: number) => Math.min(c.rc, Math.max(40 + Math.abs(lat), (1.25 * Math.abs(lat) + turnR) / c.k));
 /**
  * The point `s` m along a route, set `lat` m to the right of the way it's drawn (+ to the right). At each corner she
  * rounds it: within `armOf` either side, her line is a curve from one leg to the next (a quadratic Bézier on the corner),
@@ -144,7 +148,8 @@ function pathAt(P: Path, s: number, lat: number): Vec {
   // (the corner she's rounding, if any: the one ahead at this leg's end, or the one behind at its start)
   for (const j of [i, i - 1]) {
     if (j < 1 || j > P.L.length - 2) continue;
-    const c = P.c[j], r = armOf(c, lat, P.turnR), u = (s - (P.L[j] - r)) / (2 * r);
+    const r = P.arm[j]; if (!(r > 0)) continue;
+    const u = (s - (P.L[j] - r)) / (2 * r);
     if (u <= 0 || u >= 1) continue;
     const V = P.r[j], t0 = P.t[j - 1], t1 = P.t[j];
     const ax = V.x - t0.x * r, ay = V.y - t0.y * r, bx = V.x + t1.x * r, by = V.y + t1.y * r;
@@ -282,16 +287,27 @@ export class Traffic {
       // her way ahead holding offset g at speed share sf: getting to g at the alteration's rate, making v·sf·cos along
       // her line meanwhile; past her route's end, at her berth. Each point and how far off her line she is there
       // (her turn builds up at TURN_DEG_S: across her line she gets ½·acc·k² until she's crossing it at full rate)
+      let sPrevPlan = o.s;
       const plan = (g: number, sf: number) => {
         const pts: Vec[] = [], lats: number[] = [], lat = Math.max(1e-6, v * sf * sinA), acc = Math.max(1e-6, v * sf * TURN_DEG_S * D2R), tr = lat / acc;
         const d = Math.abs(g - w.off), across = (k: number) => Math.min(d, k < tr ? 0.5 * acc * k * k : 0.5 * acc * tr * tr + lat * (k - tr));
         const T = d <= 0.5 * acc * tr * tr ? Math.sqrt(2 * d / acc) : tr + (d - 0.5 * acc * tr * tr) / lat;
+        // (along her line by what she makes good over the ground: v·sf a second, less what goes to crossing her line,
+        // and her line going by faster on the inside of a bend, slower on the outside: each step scaled by how far the
+        // last one actually took her, as advance does)
+        let s = o.s, ratio = 1 / stretch(P, o.s, o.dir, o.off + w.off);
         for (let n = 0; n <= N; n++) {
           const k = n * K, side = w.off + Math.sign(g - w.off) * across(k);
-          const s = o.s + o.dir * (v * sf * k - v * sf * (1 - Math.cos(ALTER_DEG * D2R)) * Math.min(k, T)), lim = room(P, s);
-          pts.push(placeAt(P, s, o.dir, o.off + side)); lats.push(held(o.off + side, lim));
+          if (n > 0) {
+            const ground = v * sf * K * (k - K < T ? Math.cos(ALTER_DEG * D2R) : 1);
+            s = Math.max(0, Math.min(P.total, s + o.dir * ground * ratio));
+          }
+          const p = placeAt(P, s, o.dir, o.off + side);
+          if (n > 0) { const moved = Math.hypot(p.x - pts[n - 1].x, p.y - pts[n - 1].y), step = Math.abs(s - (n > 1 ? sPrevPlan : o.s)); if (moved > 1e-6 && step > 1e-6) ratio = step / moved; }
+          sPrevPlan = s;
+          pts.push(p); lats.push(held(o.off + side, room(P, s)));
         }
-        return { pts, lats };
+        return { pts, lats, T };
       };
       // (the boats she could meet: within reach, not already past (abaft her beam and drawing away), and not so far
       // from her way that no offset could bring them near)
@@ -334,8 +350,11 @@ export class Traffic {
       const choose = (slowed: boolean) => {
         let best: { g: number; sf: number } | null = null, bestCost = Infinity;
         const tried: { g: number; sf: number; worst: number; when: number }[] = [];
+        // (coming back up to speed, not an offset she can't get to and back from before her berth)
+        const toBerth = (o.dir > 0 ? P.total - o.s : o.s) / v;
         const consider = (g: number, sf: number) => {
           const p = plan(g, sf); if (!water(p)) return;
+          if (!slowed && 2 * p.T + 30 > toBerth && g !== 0) return;
           const m = meet(p); tried.push({ g, sf, worst: m.worst, when: m.when });
           if (m.worst < MARGIN) return;
           const cost = Math.abs(g - w.off) + (m.ahead ? 150 : 0) + (g < w.off ? 20 : 0) + (1 - sf) * 300;
@@ -349,7 +368,7 @@ export class Traffic {
         return { best: best as { g: number; sf: number } | null, tried };
       };
       const now = meet(cur, true);
-      if (!now.close && now.worst >= 0 && water(cur)) { // nothing to clear where she's going (her choice holds while it clears)
+      if (!now.close && now.worst >= MARGIN / 2 && water(cur)) { // nothing to clear where she's going (her choice holds while it clears by half her margin)
         if (w.tgt !== 0 || w.slowTgt !== 1) {
           // back to her line once that's clear too (of every boat about, those she's past as well: going back across her
           // line she mustn't close one astern of her beam); slowed, back up to speed as soon as any offset allows it

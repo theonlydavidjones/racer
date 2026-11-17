@@ -111,7 +111,10 @@ describe('the ferries give way in the harder meetings too', () => {
       for (const crossing of [false, true]) {
         const boats: Craft[] = [{ x: v.x + u.x * 600, y: v.y + u.y * 600, vx: u.x * V, vy: u.y * V }];
         if (crossing) boats.push(across(id, 3, T, 170, 1));
-        const m = meeting(id, 3, T, boats, 400, trafficWater);
+        const m = meeting(id, 3, T, boats, 400, trafficWater, 120);
+        // (coming back up to speed near her berth she mustn't swing out over the shore: 5 m from it at least, outside
+        // the last 120 m in to her berth, where her own line runs close in)
+        expect(m.land, `${kind}${crossing ? ', and a crossing boat' : ''}: her nearest to land or a pier (m)`).toBeGreaterThan(5);
         // (following a boat ahead she can't yet pass is seamanlike, near her berth where her room is small; stopping for one is not)
         expect(m.slowFar, `${kind}${crossing ? ', and a crossing boat' : ''}: her least speed with no boat within a minute of her`).toBeGreaterThan(0.25);
         for (const d of m.nearest) expect(d, `${kind}: the nearest she came`).toBeGreaterThan(VESSEL[kind].len / 2 + 20);

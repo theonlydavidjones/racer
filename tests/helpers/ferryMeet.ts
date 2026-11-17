@@ -44,7 +44,7 @@ export function crossing(kind: string, side: 1 | -1, seed: number) {
  * is from how fast she actually moved (worst share), how often her chosen side flips, her least share of speed while
  * no boat is within a minute of her, and her nearest to land or a pier away from her berths (m, her middle).
  */
-export function meeting(id: number, seed: number, T: number, boats: Craft[], secs: number, clearOf: (p: Vec) => boolean = () => true) {
+export function meeting(id: number, seed: number, T: number, boats: Craft[], secs: number, clearOf: (p: Vec) => boolean = () => true, endsOff = 500) {
   const tr = new Traffic(true, seed), ways = newWays(), dt = 1 / 60, nearest = boats.map(() => Infinity), sv = SERVICES[id];
   const vs = VESSEL[sv.kind].kt * 0.5144, ends = [ROUTES[sv.route][0], ROUTES[sv.route][ROUTES[sv.route].length - 1]];
   let last = tr.vessels(T, ways)[id], jump = 0, turn = 0, speedErr = 0, flips = 0, side = 0, slowFar = 1, land = Infinity, skew = 0, kink = 0, frozen = 0, still = 0, slowedS = 0;
@@ -69,7 +69,7 @@ export function meeting(id: number, seed: number, T: number, boats: Craft[], sec
     const sd = Math.sign(ways[id].tgt); if (sd !== 0 && side !== 0 && sd !== side) flips++; if (sd !== 0) side = sd;
     const gap = Math.min(...now.map(b => Math.hypot(b.x - v.x, b.y - v.y) / Math.max(1, v.v + 3)));
     if (v.moving && gap > 60) { slowFar = Math.min(slowFar, ways[id].slow); if (ways[id].slow < 0.95) slowedS += dt; }
-    if (v.moving && Math.min(...ends.map(e => Math.hypot(v.x - e.x, v.y - e.y))) > 500) land = Math.min(land, terrainLandDist(v), shoreDist(v), wharfNearest(v, 200)?.d ?? Infinity);
+    if (v.moving && Math.min(...ends.map(e => Math.hypot(v.x - e.x, v.y - e.y))) > endsOff) land = Math.min(land, terrainLandDist(v), shoreDist(v), wharfNearest(v, 200)?.d ?? Infinity);
     last = v;
     now.forEach((b, j) => { nearest[j] = Math.min(nearest[j], Math.hypot(v.x - b.x, v.y - b.y)); });
   }
