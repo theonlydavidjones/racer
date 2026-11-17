@@ -56,10 +56,14 @@ export const PARODY_BURGEES: Burgee[] = [
       poly(g, RED, [0, 0], [W * 0.25, H * 0.125], [W * 0.355, H * 0.5], [W * 0.25, H * 0.875], [0, H]);
       poly(g, NAVY, [W * 0.5, H * 0.25], [W, H * 0.5], [W * 0.5, H * 0.75], [W * 0.605, H * 0.5]); // (the white between them is a third shorter than the first draft's, along the edges and the middle)
       const x = W * 0.165, y = H * 0.5, r = H * 0.13, d = Math.PI / 180;
-      for (const s of [-1, 1]) { // two branches from the bottom, each a stem with leaves pairing off it, growing up
-        const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.024, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
-        for (let i = 0; i < 5; i++) { const a = (s > 0 ? 70 - i * 24 : 110 + i * 24) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
-          for (const k of [-1, 1]) { const dir = grow + k * 0.75; oval(g, GOLD, px + Math.cos(dir) * H * 0.04, py + Math.sin(dir) * H * 0.04, H * 0.043, H * 0.02, dir); } } } } },
+      const leaf = (px: number, py: number, dir: number, len: number, wid: number) => { g.save(); g.translate(px, py); g.rotate(dir); g.fillStyle = GOLD; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(len * 0.4, -wid, len, 0); g.quadraticCurveTo(len * 0.4, wid, 0, 0); g.fill(); g.restore(); };
+      for (const s of [-1, 1]) { // two branches from the bottom: a stem, six pairs of leaves growing up it (smaller toward the tip), a leaf at the end
+        const a0 = (s > 0 ? 80 : 100) * d, a1 = (s > 0 ? -34 : 214) * d; arc(g, GOLD, H * 0.022, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
+        for (let i = 0; i < 6; i++) { const a = (s > 0 ? 72 - i * 21 : 108 + i * 21) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r, k = 1 - i * 0.07;
+          for (const t of [-1, 1]) leaf(px, py, grow + t * 0.8, H * 0.085 * k, H * 0.028 * k); }
+        const e = (s > 0 ? -34 : 214) * d; leaf(x + Math.cos(e) * r, y + Math.sin(e) * r, e + s * -Math.PI / 2, H * 0.07, H * 0.022); }
+      for (const t of [-1, 1]) poly(g, WHITE, [x, y + r + H * 0.01], [x + t * H * 0.09, y + r + H * 0.1], [x + t * H * 0.04, y + r + H * 0.11]); // the ribbon tying the stems
+      dot(g, WHITE, x, y + r + H * 0.015, H * 0.022); } },
   { id: 'tyc', shape: 'pennant', ratio: 1.8, // mid-century: deep blue over gray water, one white fin
     draw: (g, W, H) => { rect(g, '#16386b', 0, 0, W, H * 0.64); rect(g, '#8d99a6', 0, H * 0.64, W, H * 0.36); poly(g, WHITE, [W * 0.09, H * 0.64], [W * 0.17, H * 0.22], [W * 0.27, H * 0.64]); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
