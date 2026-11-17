@@ -314,7 +314,7 @@ function* passagePlanSteps(w: SimView): Generator<void, PassagePlan | null, void
       // what the traffic model says will be near then: what AIS would show you
       let ais = '';
       if (w.traffic.on) {
-        for (const dtm of [0, -2, 2, -4, 4, -6, 6, -8, 8, -10, 10]) { if (ais) break; for (const v of w.traffic.vessels(((q.t + dtm) * 60) % 86400)) {
+        for (const dtm of [0, -2, 2, -4, 4, -6, 6, -8, 8, -10, 10]) { if (ais) break; for (const v of w.traffic.vessels((q.t + dtm) * 60, w.ways)) { // (her give-way offset and delay as they are now)
           const svc = SERVICES[v.id]; if (svc.route !== id || !v.moving) continue;
           const d = dist(v, q.p);
           if (d < 1852 * 0.8) {

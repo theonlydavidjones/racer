@@ -26,7 +26,7 @@ import { Puffs, breezeAt, landLee, windAt, windTerrain, type Breeze, type Wind, 
 import { ShiftField, shiftStats } from '../environment/shifts';
 import { GUSTS, GustField, sigmaU } from '../environment/gusts';
 import { SUBSTANTIAL_TURN, hailRange, obstructionAhead } from './obstruction';
-import { SHORE, alongside, landAlong, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
+import { SHORE, alongside, landAlong, landDist as terrainLandDist, onLand, shoreDist, shoreNearest, terrainNearest, wharfNearest } from '../geo/shore';
 import { RECORD_EVERY_STEPS, RECORD_KEEP, TRACK_EVERY_STEPS, TRACK_FROM, snapshot, trackSnapshot, type Frame } from '../replay/recorder';
 import { CONTACT_GAP, INCIDENT_COOLDOWN, ROOM_GAP, RULE16_WINDOW, assessPair, notRacing, type Incident, clearAstern, cpa, hullGap, newPairRecord, rightOfWay, type PairRecord, type RulesContext, type Verdict } from '../rules';
 import type { RuleId } from '../rules/types';
@@ -36,7 +36,7 @@ import type { Settings } from '../settings';
 import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
-import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
+import { GIVES_WAY, Traffic, VESSEL, closest, newWays, vesselHull, type Vessel, type Way } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
@@ -53,6 +53,16 @@ import { TUNE_PRESETS, fixTune, heikkilaFor, presetFor, type RigTune } from '../
 import { outlookFor } from './outlook';
 import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 
+/** Water a ferry may turn into to keep clear (sim/traffic.ts decide): 100 m off the terrain's land and the drawn shore,
+ * 60 m off any pier or wharf (estimates: room for her to turn back, and for the shoaling off a shore). */
+const trafficWaterAt = new Map<number, boolean>();
+const trafficWater = (p: Vec): boolean => {
+  // (kept by 25 m cell, its middle's answer: the same place is asked about every half second while she keeps clear)
+  const i = Math.round(p.x / 25), j = Math.round(p.y / 25), k = (i + 1e5) * 2e5 + (j + 1e5);
+  let v = trafficWaterAt.get(k);
+  if (v === undefined) { const q = { x: i * 25, y: j * 25 }; v = terrainLandDist(q) > 100 && shoreDist(q) > 100 && wharfNearest(q, 60) === null; if (trafficWaterAt.size > 100000) trafficWaterAt.clear(); trafficWaterAt.set(k, v); }
+  return v;
+};
 /** Map and label colours for your own boats when they race against you (the stock boats have their own). */
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
@@ -333,6 +343,8 @@ export class World {
   /** Ship traffic, and where the vessels are now. */
   traffic: Traffic;
   vessels: Vessel[] = [];
+  /** Each service's give-way (sim/traffic.ts Way): stepped with the race, so her course depends on the boats about her. */
+  ways: Way[] = newWays();
   private warned = new Map<number, number>();
   /** The waves: chop from the wind and current, swell through the Gate (or flat water). */
   sea: SeaField;
@@ -1268,14 +1280,18 @@ export class World {
       b.forced14 = null; b.cur = this.currentAt(b, true); b.ww = windOnWater(this.windHere(b, b), b.cur);
       b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
     }
-    this.vessels = this.traffic.vessels(this.trafficT);
+    // the ferries keep out of the boats' way (Rule 18), deciding twice a second; the ships in the channel hold on. (Every
+    // boat under way, under sail or motoring: a ferry keeps clear of small craft either way, as good seamanship has it (Rule 2))
+    this.traffic.advance(this.trafficT, dt, this.ways);
+    if (this.steps % 30 === 7) this.traffic.decide(this.trafficT, this.ways, this.boats.filter(b => !b.docked), trafficWater);
+    this.vessels = this.traffic.vessels(this.trafficT, this.ways);
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour
     // (under way as COLREGS Rule 3(i) has it: not made fast to the shore, not at anchor; going ahead, astern or stopped)
     if (this.steps % 30 === 1) for (const b of this.boats) if (b.ensign) { const n = !ensignDue(this.clockUtc, inBasin(b), !b.docked && !b.atAnchor); if (b.ensignNight !== n) b.ensignNight = n; }
     if (this.steps % 30 === 1) for (const b of this.boats) {
       b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q));
-      const wk = this.traffic.wakeAt(b, this.trafficT);
+      const wk = this.traffic.wakeAt(b, this.trafficT, this.ways);
       if (wk) b.sea = { ...b.sea, wake: wk };
     }
     // the AI boats think 20 times a second, each on her own step (a helmsman's reaction is a few tenths of a second; the
@@ -1786,8 +1802,9 @@ export class World {
     return lineTransit({ x: mark.x - track.x * 1000, y: mark.y - track.y * 1000 }, mark, p => landAt(p), toLL);
   }
 
-  /** The traffic's clock: seconds since midnight UTC of the race day, so the ships keep their schedule through the day. */
-  get trafficT(): number { return (this.clockUtc * 60) % 86400; }
+  /** The traffic's clock: seconds since the epoch, UTC, so the ships keep their schedule through the day and on past
+   * midnight UTC (4 pm in San Francisco), where a clock of the day's seconds started every vessel's schedule afresh. */
+  get trafficT(): number { return this.clockUtc * 60; }
 
   /** AI boats keep well clear of ships and ferries: they pass astern of anything that would come close. */
   private keepClearOfShips(b: Boat): void {
@@ -1795,6 +1812,10 @@ export class World {
       if (!v.moving) continue;
       const ty = VESSEL[v.kind], u = V(v.h), c = cpa(b, { x: v.x, y: v.y, vx: u.x * v.v, vy: u.y * v.v });
       if (c.d > ty.len / 2 + 70 || dist(b, v) > 900) continue;
+      // (a ferry keeps out of her way, and she holds her course for it (Rule 17(a)(i)), until it's plain the ferry isn't
+      // keeping clear: closing to within 40 m of her side inside 30 s, as both are going (17(a)(ii) and (b)). Then she
+      // passes astern of it)
+      if (GIVES_WAY[v.kind]) { const k = closest(b.x, b.y, b.vx, b.vy, v.x, v.y, u.x * v.v, u.y * v.v, 30); if (k.d > ty.len / 2 + 40 || k.t >= 30) continue; }
       const aim = { x: v.x - u.x * (ty.len * 0.8 + 60), y: v.y - u.y * (ty.len * 0.8 + 60) }; // behind her stern
       b.desired = sailable(b, brg(aim.x - b.x, aim.y - b.y)); b.luff = false;
     }
@@ -1825,16 +1846,20 @@ export class World {
       if (dist(u, v) > 1500 || c.d > close + 120) continue;
       if (this.t - last > 90) {
         this.warned.set(v.id, this.t);
-        const big = v.kind === 'container' || v.kind === 'tanker';
-        this.emit({ type: 'toast', ms: 7000, msg: big
-          ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
-          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
+        // (one line, what to do: a ship in the channel can't turn for her (COLREGS Rules 9 and 10); a ferry gives way to
+        // sail (Rule 18), and she's to hold her course and speed so it can (Rule 17(a)))
+        const motoring = !!u.motor?.running && u.motor.gear !== 'N'; // (under power she's a power-driven vessel: Rule 3(c))
+        this.emit({ type: 'toast', ms: 6000, msg: GIVES_WAY[v.kind] && motoring
+          ? `${ty.name} closing at ${Math.round(v.v / 0.5144)} kt. Under power the crossing rules apply: keep clear of her if she's on your starboard side (Rule 15).`
+          : GIVES_WAY[v.kind]
+          ? `${ty.name} closing at ${Math.round(v.v / 0.5144)} kt: she gives way to sail. Hold your course (Rule 17).`
+          : `${ty.name} in the channel at ${Math.round(v.v / 0.5144)} kt: she can't turn for you. Keep clear (Rule 9).` });
       }
       // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
       if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
         this.warned.set(-1 - v.id, this.t);
         for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
-        this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+        this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. Bear away and pass astern of her.` });
       }
     }
   }
@@ -2517,7 +2542,7 @@ export class World {
     // (and the new wind's sea runs its way at once: the field's turn is capped at a few degrees an hour, waveField.ts
     // turnCap, so left to ease round after a change of conditions the chop would run askew of the wind for a day)
     this.waves.windDir = this.waves.swellDir = NaN;
-    if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
+    if ((s.traffic !== 0) !== (this.traffic.on)) { this.traffic = n.traffic; this.ways = newWays(); } // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();
     if (this.tide) this.updateTide();
