@@ -45,12 +45,14 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
-- **The sea turning with the wind, truly** (for Deep Physics, next after the boom's place on a beat; the Coordinator,
-  16 November; Capacity to check the frame's cost): the wave field is plane waves turned about your boat, so any turn
-  sweeps the pattern sideways at a distance; its turn is now capped at about 4° an hour (environment/waveField.ts
-  turnCap), a stopgap that stops the "rushing water" on days sailed from the observed record but leaves the chop
-  lagging a big shift for hours. Real short chop comes round in ten minutes or so, the old waves dying as new ones
-  grow from the new direction: model that, two seas cross-faded, and take the cap out.
+- ~~**The sea turning with the wind, truly**~~ (done on branch sea-born, Deep Physics, 17 November; awaiting the batch):
+  no wave of the chop turns now. Its components change direction in pairs, one dying into its neighbor and born again
+  for the new wind, the pair's energy kept, so the old sea fades as the new one grows across it and nothing sweeps at
+  any distance (environment/waveField.ts update); the cap on the chop's turn is gone, and the boat's wave drag reads
+  the chop's direction from the same components. The time is the wind's input to waves as measured (Snyder et al.
+  1981, Komen et al. 1984): in 10 kt the 1 s waves in about 8 minutes, the main chop in about an hour. (The earlier
+  line here, and #450, said real chop "comes round in ten minutes or so": that was unsourced, and true only of the
+  shortest waves in a breeze.)
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.

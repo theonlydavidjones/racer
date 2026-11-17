@@ -485,6 +485,7 @@ export class World {
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs, total: undefined } : sw, settings.chop ?? 1);
       this.sea.duration = this.seaDurationAt(this.clockUtc);
       this.waves = new WaveField(this.sea.swell?.tp ?? 12);
+      this.sea.chopFrom = () => this.waves.chopFrom; // (the wave drag meets the sea that's drawn)
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -2512,7 +2513,7 @@ export class World {
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
-    this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
+    this.sea = n.sea; this.sea.chopFrom = () => this.waves.chopFrom; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
     // (and the new wind's sea runs its way at once: the field's turn is capped at a few degrees an hour, waveField.ts
     // turnCap, so left to ease round after a change of conditions the chop would run askew of the wind for a day)

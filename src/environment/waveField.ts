@@ -60,17 +60,6 @@ function windSpectrum(tp: number): void {
   specTot = tot || 1; specTp = tp;
 }
 
-/**
- * How fast a set of waves may turn (deg/s): a STOPGAP that stops the sweep. The field is plane waves turned about your
- * boat, so at a distance R from her a turn at rate r carries each pattern sideways, its phase running k·R·r faster or
- * slower than its own ω. Held to SWEEP_MAX of ω out to SWEEP_R for the set's slowest wave (r = SWEEP_MAX·c/R, c = ω/k):
- * for the chop's shortest, 1.6 m/s, about 4° an hour. On a day sailed from the observed record the course's mean wind
- * steps a degree or two every minute (Fort Point's 6-minute record), the field eased after it at 5% a second, and at
- * 200 m to 3 km the short waves ran at 1.3 to 4.4 times their own speed for a moment each minute: the owner's "rushing
- * water", back with the weather refresh of 16 Nov 2026 (tests/rushing).
- * Not true to life: real short chop comes round to a new wind in ten minutes or so, the old waves dying as new ones
- * grow; here it lags a big shift for hours. The true model, two seas cross-faded, is on the ROADMAP.
- */
 /** How far (deg) the wind may go from the direction a pair was born for before the pair changes over: past a gust's
  * wobble and the minute's easing. AN ESTIMATE, the model's own. */
 const REAIM_OFF = 12;
@@ -80,7 +69,8 @@ const REAIM_OFF = 12;
  * waves and Komen et al. (1984) put it on the friction velocity, the form the wave models use (read in van Agthoven
  * 1994, TU Delft, eq. 3.4): energy grows at 0.25·(rho_air/rho_water)·(28·ustar/c − 1)·omega, the height at half that;
  * nothing for a wave the wind can't keep up with. ustar from the 10 m wind by a drag coefficient of 1.2e-3 (Large &
- * Pond 1981's value under 11 m/s, quoted from memory, not re-read). In 10 kt: a 1 s wave in about 8 minutes, a 2 s
+ * Pond 1981's value under 11 m/s, FROM MEMORY: a search on 17 Nov 2026 could not open it or another drag law to read;
+ * the one figure read, an often-used constant of 1.5e-3, would make these times about a fifth shorter). In 10 kt: a 1 s wave in about 8 minutes, a 2 s
  * wave in an hour; in 20 kt, 2 and 8 minutes. And never longer than the waves take to cross the fetch at their group
  * speed (update): past that every wave at a place was raised by the new wind. CARRIED from open-water measurements to
  * a bay, where the sea's height is the sea model's (sea.ts, by fetch and duration): this only times the change. The
@@ -92,6 +82,15 @@ function lifeTime(k: number, w: number, kt: number): number {
   const c = w / k, us = Math.sqrt(CD10) * Math.max(2, kt) * KT_MS, g = 0.25 * RHO_RATIO * (28 * us / c - 1) * w;
   return g > 0 ? Math.max(20, 2 / g) : Infinity;
 }
+/**
+ * How fast the swell may turn (deg/s). Its three components are plane waves turned together about your boat (its
+ * direction changes with where she is, over the bar), so at a distance R from her a turn at rate r carries each pattern
+ * sideways, its phase running k·R·r faster or slower than its own ω. Held to SWEEP_MAX of ω out to SWEEP_R for the
+ * slowest of them (r = SWEEP_MAX·c/R, c = ω/k): about 46° an hour at a 12 s period, which the swell never asks for.
+ * (The chop was turned the same way, and capped the same way for a release, at 4° an hour: on a day sailed from the
+ * observed record its turning swept the short waves past at 1.3 to 4.4 times their own speed, the owner's "rushing
+ * water" of 16 Nov 2026, tests/rushing. It no longer turns at all: update.)
+ */
 const SWEEP_MAX = 0.04, SWEEP_R = 3000;
 function turnCap(f: WaveField, from: number, to: number): number {
   let c = Infinity;
@@ -118,6 +117,10 @@ export class WaveField {
   windDir = NaN; swellDir = NaN;
   /** Set once the heights have been set (the first update sets them; later ones ease toward the sea). */
   primed = false;
+  /** Where the chop as a whole comes from (deg): the mean of its components' directions by their energy. Through a
+   *  shift it goes from the old wind's to the new as the energy does. (Two seas crossing are read as one from between:
+   *  good to a right angle or so; past that the mean says little, and a new day's wind sets the sea at once anyway.) */
+  chopFrom = 270;
   /** The chop's components in pairs of neighbors in wavelength (update): each pair's stage in a change of direction
    *  (0 steady, 1 the first dying into the second, 2 the first reborn and taking it all, 3 the second reborn and both
    *  back to their shares), the first's share of the pair's energy, and each component's height for the sea alone. */
@@ -199,6 +202,8 @@ export class WaveField {
       else if (st === 2 && x >= 1) { setDir(this, j, this.windDir + WIND_SPREAD[j]); this.stage[p] = 3; }
       else if (st === 3 && Math.abs(x - home) < 1e-9) this.stage[p] = 0;
     }
+    { let sx = 0, sy = 0; for (let i = 0; i < N_WIND; i++) { const e = this.amp[i] * this.amp[i]; sx += e * this.sd[i]; sy += e * this.cd[i]; }
+      if (sx * sx + sy * sy > 1e-18) this.chopFrom = ((Math.atan2(sx, sy) / D2R + 180) % 360 + 360) % 360; }
     for (let j = 0; j < SWELL_F.length; j++) {
       const i = N_WIND + j, target = (j === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
       this.amp[i] += (target - this.amp[i]) * ease; turn(i, this.swellDir + SWELL_SPREAD[j]); this.q[i] = 0.3;
