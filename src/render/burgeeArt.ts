@@ -135,7 +135,7 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
     draw: (g, W, H) => { fill(g, W, H, '#2a62b8'); poly(g, '#2f7d4a', [W * 0.05, H * 0.7], [W * 0.2, H * 0.28], [W * 0.35, H * 0.7]); poly(g, WHITE, [W * 0.155, H * 0.42], [W * 0.2, H * 0.28], [W * 0.245, H * 0.42]); } },
   { id: 'sryc', shape: 'pennant', ratio: 1.5, // Mission Canal: one mission bell (the owner's drawing) at the top-left, its axis toward the corner, cream on mission-tile red, a plain field
-    draw: (g, W, H) => { fill(g, W, H, '#8f3b2b'); bell(g, H * 0.21, H * 0.27, H * 0.224, -Math.PI / 4, '#f1e3c6'); } },
+    draw: (g, W, H) => { fill(g, W, H, '#8f3b2b'); bell(g, H * 0.2, H * 0.27, H * 0.269, -Math.PI / 4, '#f1e3c6'); } },
   { id: 'ryc', shape: 'pennant', ratio: 1.5, // DIY: brick red, black and white; one kiln chimney
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
   { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; no charge (the name does the work)
