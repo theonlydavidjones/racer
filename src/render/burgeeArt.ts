@@ -200,9 +200,9 @@ export const PARODY_BURGEES: Burgee[] = [
       shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and two white crossed cannon barrels toward the hoist
     draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); crossedGuns(g, W * 0.2, H * 0.5, H * 0.5, WHITE, '#8fc4ea'); } },
-  { id: 'ssyc', shape: 'pennant', ratio: 1.7, // Willow Grove, from the owner's reference: bold diagonal stripes in teal and cream, a teal stripe starting at the top corner
-    draw: (g, W, H) => { fill(g, W, H, '#efe6c8'); const pitch = W * 0.27, wid = W * 0.135, lean = H * 0.545;
-      for (let i = -2; i < 5; i++) poly(g, '#0f5b63', [i * pitch, 0], [i * pitch + wid, 0], [i * pitch + wid + lean, H], [i * pitch + lean, H]); } },
+  { id: 'ssyc', shape: 'pennant', ratio: 1.7, // Willow Grove, traced from the owner's reference: stripes of one width leaning 0.56 across for each 1 down, pitch 0.27 of the length, the first teal stripe's right edge at 0.042 of the length along the top
+    draw: (g, W, H) => { fill(g, W, H, '#efe6c8'); const pitch = W * 0.27, wid = W * 0.135, lean = H * 0.56, off = -W * 0.093;
+      for (let i = -2; i < 5; i++) poly(g, '#0f5b63', [off + i * pitch, 0], [off + i * pitch + wid, 0], [off + i * pitch + wid + lean, H], [off + i * pitch + lean, H]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
     draw: (g, W, H) => { fill(g, W, H, '#2a62b8'); poly(g, '#2f7d4a', [W * 0.05, H * 0.7], [W * 0.2, H * 0.28], [W * 0.35, H * 0.7]); poly(g, WHITE, [W * 0.155, H * 0.42], [W * 0.2, H * 0.28], [W * 0.245, H * 0.42]); } },
   { id: 'sryc', shape: 'pennant', ratio: 1.5, // Mission Canal: one mission bell (the owner's drawing) at the top-left, its axis pointing straight at the corner, cream on mission-tile red, a plain field
