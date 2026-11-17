@@ -111,7 +111,9 @@ const STEERAGE = 0.5, JAM_CLOSING = 0.4;
 /** Pressed together: never more than this past touching (CONTACT_GAP) since the last contact, m. A modelling choice: the
  * contact response (boat/contact.ts) holds boats lying together at touching, give or take the step's motion. */
 const PRESSED_SLACK = 0.3;
-/** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modelling cap). */
+/** A jam that has come and gone (the boats closing at more than JAM_CLOSING at some touch, so not stuck): a contact this
+ * long after its first is a new incident, s (a modelling cap). A jam that holds is one incident however long it lasts:
+ * see `stuck` on the tangle. */
 const JAM_MAX = 2 * TANGLE_MAX;
 
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
@@ -392,8 +394,13 @@ export class World {
    * the next touch the pair's cooldown allows) it's one collision going on, however long it lasts. A contact that carried
    * no penalty (exonerated, 43.1(a); not racing; 23.1) opens one too, `pen` false, which holds only for her own touches
    * while they stay pressed together: a compelled boat isn't charged for being held against the other, but a touch she
-   * chooses later, or the other boat's own breach, is judged afresh. */
-  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean }>();
+   * chooses later, or the other boat's own breach, is judged afresh. Stuck (`stuck`: jammed at the last contact and at
+   * this one, and neither boat with steerage way for COMPELLED_WINDOW since (`freed`), nor a length apart): one incident
+   * however long it lasts and whoever touches, with or without a penalty. Rule 44.1 has a penalty for "an incident";
+   * US Appeal 65's test is whether the second occurrence was "the inevitable result of the first", and two boats lying
+   * stopped together, pinned by the current against a jetty or at a mark in the ebb, can choose nothing between touches
+   * (Deep Physics, sim-fleet seed 16, 17 Nov 2026: nine two-turn penalties in ten minutes, one a JAM_MAX). */
+  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean; stuck: boolean; freeT: number | null; freed: boolean }>();
   private lastTouch = new Map<number, { t: number; near: number[]; loaded?: boolean }>(); // (the boats within ENGAGED of her as she touched; whether her turn for it was loaded, or she declined it)
   /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
    * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
@@ -1607,7 +1614,7 @@ export class World {
       const untangle = (X: Boat, Y: Boat) => { const lf = this.lastFoulVs.get(X.id); if (lf && lf.vs === Y.id && !lf.clear && hullGap(X, Y) > LOA) lf.clear = true; };
       untangle(A, B); untangle(B, A); // (each way round, as before; no arrays a pair a step)
       const tg = this.tangles.get(key);
-      if (tg && !tg.clear) { const g = hullGap(A, B); if (g > LOA) tg.clear = true; if (g > Math.max(tg.g0, CONTACT_GAP) + 1) tg.parted = true; if (g > CONTACT_GAP + PRESSED_SLACK) tg.opened = true; const fb = tg.fouler === A.id ? A : B; if (fb.v + (fb.astern ?? 0) >= STEERAGE) { tg.wayT ??= this.t; if (this.t - tg.wayT >= COMPELLED_WINDOW) tg.steered = true; } else tg.wayT = null; }
+      if (tg && !tg.clear) { const g = hullGap(A, B); if (g > LOA) tg.clear = true; if (g > Math.max(tg.g0, CONTACT_GAP) + 1) tg.parted = true; if (g > CONTACT_GAP + PRESSED_SLACK) tg.opened = true; const fb = tg.fouler === A.id ? A : B; if (fb.v + (fb.astern ?? 0) >= STEERAGE) { tg.wayT ??= this.t; if (this.t - tg.wayT >= COMPELLED_WINDOW) tg.steered = true; } else tg.wayT = null; if (Math.max(A.v + (A.astern ?? 0), B.v + (B.astern ?? 0)) >= STEERAGE) { tg.freeT ??= this.t; if (this.t - tg.freeT >= COMPELLED_WINDOW) tg.freed = true; } else tg.freeT = null; }
       if (!this.exactPairs && this.apart(A, B, rec, ctx)) continue;
       const answered = rec.hail?.clearAt != null;
       // Rule 20.3: a hail passed on. Bring the hailed boat's record up to date with how the boat she passed it to answered
@@ -1681,17 +1688,18 @@ export class World {
       // choose anything)
       // (pressed together, one collision going on: however long it lasts, no cap)
       const pressed = !!prior && prior.contact && !prior.opened && this.t - prior.t <= INCIDENT_COOLDOWN + 1;
-      const inWindow = !!prior && (pressed || (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX));
+      const stuck = !!prior && jammed && prior.stuck && !prior.freed;
+      const inWindow = !!prior && (pressed || stuck || (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX));
       if (incident.kind !== 'hail' && prior && !prior.clear && inWindow && (prior.pen
         ? (!f.penaltyDir || jammed || (prior.fouler === f.id && !prior.steered) || !prior.parted) && (prior.fouler === f.id || jammed || !prior.parted)
-        : pressed && prior.fouler === f.id)) {
-        prior.t = this.t; prior.parted = false; prior.steered = false; prior.wayT = null; prior.opened = false; prior.contact = incident.kind === 'contact'; prior.g0 = hullGap(A, B); // (the tangle goes on)
+        : (pressed && prior.fouler === f.id) || stuck)) {
+        prior.t = this.t; prior.parted = false; prior.steered = false; prior.wayT = null; prior.opened = false; prior.contact = incident.kind === 'contact'; prior.g0 = hullGap(A, B); prior.stuck = jammed; prior.freeT = null; prior.freed = false; // (the tangle goes on)
         if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} ${prior.pen ? 'are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).' : 'are still pressed together: the same incident.'}` });
         continue;
       }
       // (a tangle with no penalty doesn't take the place of one with a penalty still running: her next touch is that one's)
       const pen = incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1';
-      if (incident.kind !== 'hail' && !(prior && prior.pen && !pen && !prior.clear && this.t - prior.t0 < TANGLE_MAX)) this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B), steered: false, wayT: null, pen, contact: incident.kind === 'contact', opened: false });
+      if (incident.kind !== 'hail' && !(prior && prior.pen && !pen && !prior.clear && this.t - prior.t0 < TANGLE_MAX)) this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B), steered: false, wayT: null, pen, contact: incident.kind === 'contact', opened: false, stuck: jammed, freeT: null, freed: false });
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       this.onIncident?.(A, B, incident);

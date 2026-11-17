@@ -12,7 +12,7 @@ import { LOA, V } from '../src/core/math';
 // incident if they haven't parted, or she's had no steerage way since; a new breach if she has, so could have kept
 // clear. Built by hand, so it doesn't hang on how one race sails (Crew Model's crew-stations race, 14 Nov 2026: the hulls
 // overlapped at a touch (g0 = 0), a metre's drift read as parting, and a second touch 12 s on counted anew).
-function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean; every?: number; n?: number; thenB?: boolean }) {
+function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean; every?: number; n?: number; thenB?: boolean; thenWay?: boolean }) {
   const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', fleet: 2, current: 'slack' } as Settings, 7);
   w.t = 60; w.exactPairs = true;
   const A = o.user ? w.user : w.boats[1], B = w.boats[2];
@@ -51,7 +51,12 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   // (then B, taking a penalty now (21.2: she keeps clear of A), touches her, still within a metre of her: B's own breach)
   if (o.thenB) { off = o.apart; run(7); bTurning = true; off = 2; run(1); return byB.length; }
   // (alongside: held `apart` off, a touch every `every` s, n of them)
-  if (o.every) { for (let k = 1; k < (o.n ?? 4); k++) { off = o.apart; run(o.every - 1); off = 2; run(1); } return got.length; }
+  if (o.every) {
+    for (let k = 1; k < (o.n ?? 4); k++) { off = o.apart; run(o.every - 1); off = 2; run(1); }
+    // (then A gets way on, past a helmsman's reaction, and touches again: she could have kept clear)
+    if (o.thenWay) { o.vA = 1.5; off = o.apart; run(5); off = 2; run(1); }
+    return got.length;
+  }
   for (let k = 0; k < 2; k++) { off = o.apart; run(4.5); off = 0; run(INCIDENT_COOLDOWN - 4.5 + 0.5); }
   expect(got.every(g => g.kind === 'contact'), JSON.stringify(got)).toBe(true);
   return got.length;
@@ -90,6 +95,13 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
   it('after a touch with no penalty, the other boat\'s own breach a few seconds on, still within a metre: hers, not swallowed', () => {
     expect(tangle({ vA: 1.5, apart: JUST, retired: true, thenB: true })).toBe(1);
   }, 60000);
+  it('two boats lying stopped together (neither with steerage way, never a length apart), touching every 20 s for ten minutes: one incident, not one a minute', () => {
+    expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 30 })).toBe(1);
+    expect(tangle({ user: true, vA: 0.08, apart: NEAR, every: 20, n: 30 })).toBe(1);
+  }, 120000);
+  it('but once one of them has had steerage way, the next touch is a new incident', () => {
+    expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 6, thenWay: true })).toBe(2);
+  }, 120000);
   it('and once they have been a length apart, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.3, apart: FAR })).toBe(3);
   }, 60000);
