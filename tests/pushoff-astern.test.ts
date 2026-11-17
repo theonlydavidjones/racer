@@ -30,7 +30,11 @@ describe('pushed off astern', () => {
     for (const H of HARBORS) {
       const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
       const k = Math.min(20, all.length); // (each berth once: no repeats in a small harbor; and the twelve kept from a shove astern, every run)
-      const pick = [...new Set([...Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]), ...all.filter(s => NO_ASTERN.includes(s.id) || NO_ASTERN_WEST.includes(s.id))])];
+      // (and every berth planned a shove astern in this wind, up to three a harbor: on the sourced drag, 17 Nov 2026, even the
+      // gentlest shove glides her 22 m in still air, and few berths have that much clear water astern; none of the spread
+      // sample did)
+      const shoved = all.filter(s => { const p = pushOffPlan(s, 270, kt); return p.kind === 'astern' && !p.noRoom; }).slice(0, 3);
+      const pick = [...new Set([...Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]), ...all.filter(s => NO_ASTERN.includes(s.id) || NO_ASTERN_WEST.includes(s.id)), ...shoved])];
       for (const s of pick) {
         const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
         const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: Math.max(kt, 0.01), windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
@@ -196,7 +200,9 @@ describe('pushed off astern', () => {
     // lighter edge, and in the World's own wind at her slip she's walked out or kept fast instead. So the property can't be
     // tested there: none, exactly, a tripwire. The 12 kt northerly tests it in that wind. Should a 20 kt northerly shove
     // come back, this fails, and asks for it to be held to the glide as the rest are)
-    if (from === 0 && kt === 20) expect(n).toBe(0); else expect(n).toBeGreaterThanOrEqual(1);
+    // (17 Nov 2026, on the sourced sternway drag, Deep Physics: the planner looks along her whole glide, 30 m in still air
+    // against 12, and four berths have a shove in a 20 kt northerly again: held to the glide as the rest are, as asked)
+    expect(n).toBeGreaterThanOrEqual(1);
     expect(bad).toEqual([]);
   }, 600_000);
   it('a shove that collides fails the glide check, never skipped: her heading swung round, she runs back into her slip, and it says so', () => {
