@@ -26,6 +26,8 @@ import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe,
 export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
+  /** walking this frame: the pose's feet step (syncCrew) */
+  walking?: boolean;
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
@@ -629,6 +631,11 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   // feet together and gliding up a metre onto the cabin top)
   else if (job === 'mast' && fig.cur && Math.abs(fig.cur.hip.z - Math.max(z, CAB0 + 0.45)) > 0.4) { isMoving = true; dest = z; } // (where its pose kneels: below)
   if (z < COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) isMoving = true;
+  // (sat beside the cabin's after end, by the physics, while they're out on the side deck aft of it, as when the cabin-top
+  // lines are done from there and the physics sits them down where its weight is: they stay sat on the deck at its
+  // forward end, half a meter aft. Eased up on to the cabin top's edge, the hips came up over the deck's corner on the
+  // way and they stood straight-legged at the rail (the owner: "bro just out here standing on the rail"))
+  else if (z < COCK0 && z >= COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike') && fig.cur && fig.cur.hip.z > COCK0 && Math.abs(fig.cur.hip.x) > chz(fig.cur.hip.z) - 0.05) z = DECK_FWD;
   // (at the station beside the cabin's after end, sat there: on the cabin top's edge, the side the weight's on)
   else if (!isMoving && z < COCK0 && (job === 'sit' || job === 'lee' || job === 'hike')) return onCabinSide(Math.abs(x) > 0.05 ? Math.sign(x) : windward, z, lean, k);
   // (seated along the cockpit, they're on its benches or the side deck beside them: the weight's place from the physics,
@@ -1355,6 +1362,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     }
     if (pdl?.f === f) want = paddleWant(f, want, pdl, x, a?.z ?? z, go, windward, i);
     // (on the way along the side deck, and settling into the new place after it)
+    f.walking = !!want.step; // (on their feet going somewhere, a step at a time)
     const routed = route(f, want, dt, f.scale);
     if (routed) f.walked = true; else if (f.walked && f.cur && f.cur.hip.distanceTo(want.hip) < 0.03) f.walked = false;
     apply(f, ease(f, routed ?? want, dt), upright(f, against(pose), dt), dt);
