@@ -160,7 +160,9 @@ const hash = (s: string) => { let h = 2166136261; for (const ch of s) h = Math.i
 /**
  * How far off the target time a course still fits it, as |log(minutes / target)|: 0.35 is about 30% short or 40% long.
  * It's the margin the committee has always given a course that starts with a beat over one that doesn't (a beat that
- * far off the time was taken over a reach right on it). The manuals give no number; this is the sim's estimate.
+ * far off the time was taken over a reach right on it). The manuals give no number; this is the sim's estimate. Swept
+ * over 444 winds, tides and race lengths (races more than 35% off the target / starting with a beat): 0.25 gives 24 / 255,
+ * 0.35 gives 55 / 278, 0.45 gives 95 / 305. At 0.35 the beats dropped are courses 45-57% over the target time.
  */
 export const TIME_FIT = 0.35;
 /** When no course fits the time, the committee looks at this many nearest it. */
