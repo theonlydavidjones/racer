@@ -138,9 +138,12 @@ export const PARODY_BURGEES: Burgee[] = [
         for (let i = 0; i < 6; i++) { const a = (s > 0 ? 72 - i * 21 : 108 + i * 21) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r, k = 1 - i * 0.07;
           for (const t of [-1, 1]) leaf(px, py, grow + t * 0.8, H * 0.085 * k, H * 0.028 * k); }
         const e = (s > 0 ? -34 : 214) * d; leaf(x + Math.cos(e) * r, y + Math.sin(e) * r, e + s * -Math.PI / 2, H * 0.07, H * 0.022); } } },
-  { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): white above a scalloped water line, navy water below, one red shark across the line at the hoist
-    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#14295c', 0, H * 0.5, W, H * 0.5);
-      const rx = W * 0.045; for (let i = 0; i < 11; i++) { g.fillStyle = '#14295c'; g.beginPath(); g.ellipse(rx * (2 * i + 1), H * 0.5, rx, H * 0.035, 0, Math.PI, 2 * Math.PI); g.fill(); }
+  { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): white above a water line of sharp crests, navy water below, one red shark across the line at the hoist
+    draw: (g, W, H) => { fill(g, W, H, WHITE);
+      // The water line: sharp crests pointing up, wide rounded troughs between them
+      const per = W * 0.2, top = H * 0.46, dip = H * 0.09; g.fillStyle = '#14295c'; g.beginPath(); g.moveTo(0, top);
+      for (let i = 0; i < 6; i++) g.ellipse(per * (i + 0.5), top, per / 2, dip, 0, Math.PI, 0, true);
+      g.lineTo(W * 1.2, H); g.lineTo(0, H); g.closePath(); g.fill();
       shark(g, W * 0.255, H * 0.52, H * 0.52, '#c8102e'); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.58, 0, W * 0.42, H); const x = W * 0.25, y = H * 0.42, r = H * 0.15; stroke(g, GOLD, H * 0.1, [x - r, y - H * 0.14], [x - r, y]); stroke(g, GOLD, H * 0.1, [x + r, y - H * 0.14], [x + r, y]); arc(g, GOLD, H * 0.1, x, y, r, 0, Math.PI); } },
