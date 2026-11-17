@@ -138,10 +138,9 @@ export const PARODY_BURGEES: Burgee[] = [
         for (let i = 0; i < 6; i++) { const a = (s > 0 ? 72 - i * 21 : 108 + i * 21) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r, k = 1 - i * 0.07;
           for (const t of [-1, 1]) leaf(px, py, grow + t * 0.8, H * 0.085 * k, H * 0.028 * k); }
         const e = (s > 0 ? -34 : 214) * d; leaf(x + Math.cos(e) * r, y + Math.sin(e) * r, e + s * -Math.PI / 2, H * 0.07, H * 0.022); } } },
-  { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): white above, navy below, a gold line along the top and bottom edges, one red shark across the center line at the hoist
-    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#14295c', 0, H * 0.5, W, H * 0.5);
-      g.strokeStyle = '#f2b705'; g.lineWidth = H * 0.09; for (const y of [0, H]) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, H / 2); g.stroke(); } // gold along the top and bottom edges
-      shark(g, W * 0.255, H * 0.52, H * 0.52, '#c8102e'); } },
+  { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): navy field, a thin red border, one white shark at the hoist
+    draw: (g, W, H) => { fill(g, W, H, '#14295c'); border(g, W, H, 'pennant', '#c8102e', 0.025);
+      shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.58, 0, W * 0.42, H); const x = W * 0.25, y = H * 0.42, r = H * 0.15; stroke(g, GOLD, H * 0.1, [x - r, y - H * 0.14], [x - r, y]); stroke(g, GOLD, H * 0.1, [x + r, y - H * 0.14], [x + r, y]); arc(g, GOLD, H * 0.1, x, y, r, 0, Math.PI); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.5, // artsy: cream, teal and willow green; one drooping branch
