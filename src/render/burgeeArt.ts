@@ -112,7 +112,7 @@ export const PARODY_BURGEES: Burgee[] = [
       oakLeaf(g, X0, H * 0.515, H * 0.58, 0.3, WHITE); // one white oak leaf, leaning a little toward the fly, well inside the panel
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.667, // Oaktown YC, after the City of Oakland's flag (the owner's): its green for the field, its yellow for one acorn
-    draw: (g, W, H) => { fill(g, W, H, '#005e00'); acorn(g, W * 0.21, H * 0.52, H * 0.6, -0.2, '#f5dc0e'); } },
+    draw: (g, W, H) => { fill(g, W, H, '#005e00'); acorn(g, W * 0.225, H * 0.5, H * 0.54, -0.2, '#f5dc0e'); } },
   { id: 'iyc', shape: 'pennant', ratio: 2, // modern, thrifty: sand, white and teal stripes
     draw: (g, W, H) => { rect(g, '#e6cf99', 0, 0, W, H / 3); rect(g, WHITE, 0, H / 3, W, H / 3); rect(g, '#16a0a6', 0, H * 2 / 3, W, H / 3); oval(g, '#e6cf99', W * 0.16, H / 2, W * 0.1, H * 0.08); } },
   { id: 'aeyc', shape: 'pennant', ratio: 1.6, // mid-century: sky blue and white, one wind swirl
