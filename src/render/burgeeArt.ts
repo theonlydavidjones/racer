@@ -1,4 +1,4 @@
-import type { Burgee } from './burgees';
+import { burgeePath, type Burgee } from './burgees';
 
 /**
  * The parody burgees (the owner's brief, 17 Nov 2026: the Burgee style guide and each club's guidance; then "too many have
@@ -20,11 +20,16 @@ const stroke = (g: G, c: string, w: number, ...p: P[]) => { g.strokeStyle = c; g
 const arc = (g: G, c: string, w: number, x: number, y: number, r: number, a0: number, a1: number) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'butt'; g.beginPath(); g.arc(x, y, r, a0, a1); g.stroke(); };
 const half = (g: G, W: number, H: number, a: string, b: string) => { rect(g, a, 0, 0, W, H / 2); rect(g, b, 0, H / 2, W, H / 2); };
 
+/** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
+const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
+
 export const PARODY_BURGEES: Burgee[] = [
   // ---- Tier 1 · San Francisco city front
-  { id: 'stfyc', shape: 'swallow', ratio: 1.6, // classic, prestige: dark blue and red, one gold crown
-    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.6, 0, W * 0.4, H);
-      poly(g, GOLD, [W * 0.11, H * 0.66], [W * 0.09, H * 0.34], [W * 0.16, H * 0.5], [W * 0.225, H * 0.28], [W * 0.29, H * 0.5], [W * 0.36, H * 0.34], [W * 0.34, H * 0.66]); } },
+  { id: 'stfyc', shape: 'swallow', ratio: 1.6, // classic, prestige: very dark blue and red, divided per pale, a white fimbriation, one gold crown
+    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.56, 0, W * 0.035, H); rect(g, RED, W * 0.595, 0, W * 0.405, H);
+      const x = W * 0.27, y = H * 0.56;
+      poly(g, GOLD, [x - H * 0.24, y], [x - H * 0.28, y - H * 0.28], [x - H * 0.12, y - H * 0.13], [x, y - H * 0.32], [x + H * 0.12, y - H * 0.13], [x + H * 0.28, y - H * 0.28], [x + H * 0.24, y]);
+      rect(g, GOLD, x - H * 0.24, y + H * 0.04, H * 0.48, H * 0.07); border(g, W, H, 'swallow', WHITE, 0.035); } },
   { id: 'ggyc', shape: 'pennant', ratio: 1.67, // scrappy: blue and gold, one leaping dorado
     draw: (g, W, H) => { fill(g, W, H, BLUE); g.save(); g.translate(W * 0.22, H * 0.5); g.rotate(-0.45); oval(g, GOLD, 0, 0, W * 0.14, H * 0.17); poly(g, GOLD, [W * 0.1, 0], [W * 0.2, -H * 0.16], [W * 0.2, H * 0.16]); g.restore(); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
