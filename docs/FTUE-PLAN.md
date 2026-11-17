@@ -113,6 +113,10 @@ After the first run, Learn to sail is easier to find **without a new button**: t
 
 ## 6. Platform and accounts (my engineering recommendation)
 
+**Decided (the owner, 17 Nov 2026): Electron.** A Unity or Unreal rewrite was considered and set aside: about one to three
+months with Claude Code, the physics revalidated, everything else paused. Revisit only if graphics hit a real ceiling or
+consoles become a goal.
+
 - **Steam:** wrap the browser build in **Electron**, not Tauri. Electron ships its own Chromium, so WebGL, the Web Worker
   and our perf numbers behave exactly as they do in our headless Chromium tests. Tauri uses the system's web view
   (WebKit on Mac), where WebGL and timing differ. The work involved: an Electron shell, a Steamworks binding (an npm
