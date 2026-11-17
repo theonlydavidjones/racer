@@ -56,17 +56,11 @@ export const PARODY_BURGEES: Burgee[] = [
       poly(g, GOLD, q(-0.045, 0.1), q(-0.11, 0.31), q(-0.04, 0.23), q(0, 0.33), q(0.04, 0.23), q(0.11, 0.31), q(0.045, 0.1)); // the tail
       poly(g, RED, q(-0.2, 0.33), q(-0.13, 0.2), q(-0.07, 0.28), q(0, 0.15), q(0.07, 0.28), q(0.13, 0.2), q(0.2, 0.33)); // rising from the flames
       border(g, W, H, 'swallow', WHITE, 0.035); } },
-  { id: 'ggyc', shape: 'pennant', ratio: 1.67, // scrappy and proud (Puerto d'Oro): sea green with a gold border, one gold dorado, blunt head and long dorsal
-    draw: (g, W, H) => { fill(g, W, H, '#0d5a47'); border(g, W, H, 'pennant', '#f2b705', 0.04);
-      const L = W * 0.5, x0 = W * 0.06, y0 = H * 0.52, gold = '#f2b705';
-      const T = ([x, y]: P): P => [x0 + x * L, y0 + y * L];
-      const smooth = (pts: P[]) => { g.beginPath(); const n = pts.length, q = pts.map(T); g.moveTo((q[0][0] + q[n - 1][0]) / 2, (q[0][1] + q[n - 1][1]) / 2); for (let i = 0; i < n; i++) { const a = q[i], b = q[(i + 1) % n]; g.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } g.closePath(); g.fill(); };
-      g.fillStyle = gold;
-      smooth([[1, .02], [.98, -.09], [.9, -.15], [.62, -.11], [.3, -.05], [.18, -.025], [.18, .03], [.32, .06], [.55, .1], [.8, .11], [.95, .08]]); // the body: blunt brow, long and slim to the tail
-      poly(g, gold, ...([[.92, -.14], [.84, -.2], [.55, -.19], [.3, -.14], [.2, -.05], [.4, -.07], [.7, -.1]] as P[]).map(T)); // the long dorsal, one piece with the back
-      poly(g, gold, ...([[.2, -.025], [0, -.19], [.07, 0], [0, .19], [.2, .035]] as P[]).map(T)); // the forked tail
-      poly(g, gold, ...([[.36, .07], [.44, .15], [.58, .1]] as P[]).map(T)); // the anal fin
-      oval(g, '#0d5a47', x0 + .88 * L, y0 - .05 * L, L * .03, L * .03); } },
+  { id: 'ggyc', shape: 'pennant', ratio: 1.67, // scrappy fishermen's club (Puerto d'Oro), from the owner's template: dark blue, a thin white line inside the cut, one hook in the bridge's orange (to flag for IP review: the template is the real club's layout)
+    draw: (g, W, H) => { fill(g, W, H, '#1b2285'); border(g, W, H, 'pennant', WHITE, 0.075); border(g, W, H, 'pennant', '#1b2285', 0.052);
+      g.save(); g.translate(W * 0.265, H * 0.535); g.scale(1.25, 1.25); g.strokeStyle = '#c0362c'; g.fillStyle = '#c0362c'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = H * 0.075;
+      const r = H * 0.1; g.beginPath(); g.moveTo(r, -H * 0.2); g.lineTo(r, 0); g.arc(0, 0, r, 0, Math.PI); g.lineTo(-r, -H * 0.07); g.stroke(); // the shank, the bend and the point
+      g.beginPath(); g.moveTo(-r, -H * 0.17); g.lineTo(-r + H * 0.085, -H * 0.06); g.lineTo(-r - H * 0.02, -H * 0.04); g.closePath(); g.fill(); g.restore(); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
     draw: (g, W, H) => { fill(g, W, H, '#0f5f99'); rect(g, '#f08a1c', W * 0.05, H * 0.62, W * 0.3, H * 0.09); arc(g, '#f08a1c', H * 0.1, W * 0.2, H * 0.62, H * 0.2, Math.PI, 0); } },
   { id: 'bvbc', shape: 'pennant', ratio: 1.5, // working waterfront: dark blue, rust, cream; a keel in its cradle
