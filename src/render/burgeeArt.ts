@@ -104,9 +104,12 @@ const GUNS: P[][] = [
   [[0.0315, 0.9243], [0.0442, 0.9274], [0.0789, 0.9621], [0.0662, 0.9842], [0.0473, 0.9874], [0.0189, 0.9685], [0.0158, 0.9401]],
   [[0.9621, 0.9243], [0.9748, 0.9274], [0.9842, 0.9401], [0.9811, 0.9685], [0.9621, 0.9842], [0.9338, 0.9842], [0.9211, 0.9653]],
 ];
-function crossedGuns(g: G, cx: number, cy: number, h: number, c: string): void {
+function crossedGuns(g: G, cx: number, cy: number, h: number, c: string, ground: string): void {
   g.save(); g.translate(cx - GUNS_W * h / 2, cy - h / 2); g.scale(h, h); g.fillStyle = c;
   for (const ring of GUNS) { g.beginPath(); ring.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py))); g.closePath(); g.fill(); }
+  // Where the barrels cross, the one in front (rising to the right) gets a gap down both long sides, so its white never runs into the white of the barrel behind it.
+  g.strokeStyle = ground; g.lineWidth = 0.02; g.lineCap = 'butt';
+  for (const [a, b] of [[[0.679, 0.466], [0.458, 0.697]], [[0.526, 0.32], [0.305, 0.551]]]) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
   g.restore();
 }
 
@@ -190,7 +193,7 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); border(g, W, H, 'pennant', '#c8102e', 0.025);
       shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and two white crossed cannon barrels toward the hoist
-    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); crossedGuns(g, W * 0.2, H * 0.5, H * 0.5, WHITE); } },
+    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); crossedGuns(g, W * 0.2, H * 0.5, H * 0.5, WHITE, '#8fc4ea'); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.5, // artsy: cream, teal and willow green; one drooping branch
     draw: (g, W, H) => { fill(g, W, H, '#f0e9d0'); rect(g, '#1f8c8a', 0, 0, W * 0.07, H); stroke(g, '#3d7a35', H * 0.07, [W * 0.12, H * 0.3], [W * 0.3, H * 0.3]); for (const x of [0.15, 0.21, 0.27]) stroke(g, '#3d7a35', H * 0.06, [W * x, H * 0.3], [W * x, H * 0.62]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
