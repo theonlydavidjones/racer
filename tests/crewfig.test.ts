@@ -294,6 +294,39 @@ describe('Two crew keep to themselves (render/crew.ts)', () => {
  *   on the mainsheet at the thwart behind them while facing forward, 0.31 m behind the shoulder: reached through the
  *   elbow. A hiker's hand on the rail beside the hip, leaning out, is up to 0.16.
  */
+/**
+ * Nobody stands on the deck with no seat under them while she's sailing (the owner, 16 Nov, a screenshot: "bro just out
+ * here standing on the rail"). A crew figure, not walking: its hips high over the deck (more than 0.45 m above what's
+ * under them) with both feet out on the side deck. Seated on the cabin top's edge, what's under the hips is the cabin top;
+ * stood on the side deck, it's the deck. (Walking, the feet stepping, is moving.) Sailing in a breeze, close-hauled, reaching and running, one and two crew: the
+ * cabin-top lines' work done from the side deck, the crew member was sat down where the physics had them, beside the
+ * cabin, half a meter forward, not walked there, and stood at the rail on the way.
+ */
+describe('Nobody stands on the rail (render/crew.ts)', () => {
+  for (const [n, kt, twa] of [[1, 24, -110], [1, 20, -110], [1, 20, 150], [2, 20, 150], [2, 24, -110], [2, 16, 45], [1, 12, 90]] as const)
+    it(`${n} crew, ${kt} kt, ${twa}° off the wind`, () => {
+      const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0, crew: { ...DEFAULT_SETTINGS.crew, n } } as Settings;
+      const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user, p = LL(37.835, -122.40); u.x = p.x; u.y = p.y;
+      w.step(DT); u.h = n360(u.ww.from + twa); u.v = 2.5; engage(u, w.pilot, 'auto');
+      const cr = buildCrew(u.crew!.spec.helm, u.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
+      const end = w.t + 40, movedT = cr.crew.map(() => -9);
+      while (w.t < end) {
+        w.step(DT); syncCrew(cr, u.rel >= 0 ? 1 : -1, u.crew, DT, false, undefined, u.heel, u.tacking);
+        if (u.v < 0.5) continue;
+        cr.crew.forEach((f, i) => {
+          // (judged once he's settled: half a second after a walk, a route or the physics' move, as the arms are; the bound the
+          // same whenever it looks. Main's case stands there with no move at all)
+          const c = f.cur, a = u.crew!.people[i + 1]; if (f.going || f.route || f.walking) movedT[i] = w.t;
+          if (!c || !f.root.visible || w.t - movedT[i] < 0.5 || a.pose === 'mast' || a.pose === 'bow' || a.pose === 'fore') return;
+          const outside = (q: THREE.Vector3) => Math.abs(q.x) > halfBeam(uAtZ(q.z)) - 0.35 && Math.abs(q.x) < halfBeam(uAtZ(q.z)) + 0.05;
+          const high = c.hip.y - ground(c.hip.x, c.hip.z);
+          if (high > 0.45 && outside(c.feet[0]) && outside(c.feet[1])) bad.push(`t ${w.t.toFixed(1)}: crew${i + 1} (${a.pose}) stood ${high.toFixed(2)} m over the deck at (${c.hip.x.toFixed(2)}, ${c.hip.z.toFixed(2)})`);
+        });
+      }
+      expect(bad.slice(0, 5)).toEqual([]);
+    }, 120_000);
+});
+
 describe('No backwards arms anywhere (render/crew.ts)', () => {
   function watch(label: string, w: World, b: World['boats'][number], secs: number, bad: string[]): void {
     const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1); new THREE.Group().add(cr.group);
