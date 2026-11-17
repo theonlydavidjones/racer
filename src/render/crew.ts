@@ -1098,7 +1098,12 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // under the deck's edge to it, not down through the deck)
       const gw = want.hands[i], inTo = !passes && underDeck(gw.x, gw.y, gw.z) && !underDeck(hd.x, hd.y, hd.z) && Math.abs(hd.y - gw.y) > 0.03;
       if (inTo) _w.set(Math.sign(gw.x) * (chz(gw.z) - 0.08), gw.y, gw.z);
-      toward(hd, passes || inTo ? _w : gw, a, LIMB_SPEED * dt);
+      // (and coming out from under it, the other way round: in to the cockpit's edge below the deck first, then up. Rising
+      // where it was, it came up past the deck's underside and was put on top of the deck in a frame, 0.27 m: a hand at
+      // the winch's grip off forward to the cabin top's lines)
+      const wasUnder = underDeck(hx, hy, hz), outOf = !passes && !inTo && wasUnder && !underDeck(gw.x, gw.y, gw.z);
+      if (outOf) _w.set(Math.sign(hx) * (chz(hz) - 0.08), Math.min(hy, gw.y), hz);
+      toward(hd, passes || inTo || outOf ? _w : gw, a, LIMB_SPEED * dt);
       // (coming to a step up, the bench's edge or the coaming, it stops and rises to it at a hand's pace: never snapped up onto it)
       if (handFloor(hd.x, hd.y, hd.z) + 0.02 > hy + LIMB_SPEED * dt) { hd.x = hx; hd.z = hz; hd.y = Math.max(hy, handFloor(hx, hy, hz) + 0.02) + LIMB_SPEED * dt; }
       // (rising early to clear an edge it's coming to, at a hand's pace; never inside what's under it)
@@ -1109,7 +1114,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       if (far && !inTo) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
       // (the rise from where it was this frame, at a hand's pace in all: not that on top of the move toward its place)
-      hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
+      hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02);
+      // (still in under the side deck: below its underside, never up through it)
+      if (wasUnder && underDeck(hd.x, SEAT_Y + 0.01, hd.z)) hd.y = Math.min(hd.y, deckY(uAtZ(hd.z), Math.abs(hd.x)) - 0.031); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step || sw) {
       // walking or crawling (and a step under way is finished, whatever comes next): each foot stays planted until it's left behind, then swings (lifted) to a new place
