@@ -71,6 +71,14 @@ function shark(g: G, cx: number, cy: number, h: number, c: string): void {
   g.restore();
 }
 
+/** A ship's wheel: a rim, eight spokes ending in handles, a hub with a hole; r is the radius to the handles' ends. */
+function wheel(g: G, cx: number, cy: number, r: number, c: string, ground: string): void {
+  g.save(); g.translate(cx, cy); g.strokeStyle = c; g.fillStyle = c; g.lineCap = 'round';
+  g.lineWidth = r * 0.13; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9); g.stroke(); dot(g, c, Math.cos(a) * r * 0.93, Math.sin(a) * r * 0.93, r * 0.12); }
+  g.lineWidth = r * 0.17; g.beginPath(); g.arc(0, 0, r * 0.62, 0, 7); g.stroke();
+  dot(g, c, 0, 0, r * 0.22); dot(g, ground, 0, 0, r * 0.09); g.restore();
+}
+
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
@@ -113,8 +121,8 @@ export const PARODY_BURGEES: Burgee[] = [
       hook(g, W * 0.356, H * 0.5, H * 0.36, '#1b2285'); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
     draw: (g, W, H) => { fill(g, W, H, '#0f5f99'); rect(g, '#f08a1c', W * 0.05, H * 0.62, W * 0.3, H * 0.09); arc(g, '#f08a1c', H * 0.1, W * 0.2, H * 0.62, H * 0.2, Math.PI, 0); } },
-  { id: 'bvbc', shape: 'pennant', ratio: 1.5, // working waterfront: dark blue, rust, cream; a keel in its cradle
-    draw: (g, W, H) => { fill(g, W, H, '#27415f'); rect(g, '#a4502d', 0, H * 0.7, W, H * 0.3); poly(g, '#efe3c6', [W * 0.08, H * 0.3], [W * 0.3, H * 0.3], [W * 0.24, H * 0.64], [W * 0.14, H * 0.64]); } },
+  { id: 'bvbc', shape: 'pennant', ratio: 1.6, // Dry Dock: working waterfront, so a yellow field and one dark-blue ship's wheel toward the hoist
+    draw: (g, W, H) => { fill(g, W, H, '#f2c200'); wheel(g, W * 0.27, H * 0.5, H * 0.29, '#14295c', '#f2c200'); } },
   { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // Monarch Point: three equal bands, one for each club that merged in 1974: monarch orange, sunflower yellow, harbor teal
     draw: (g, W, H) => { rect(g, '#e8590c', 0, 0, W, H / 3); rect(g, '#f6c026', 0, H / 3, W, H / 3); rect(g, '#0f5d6b', 0, H * 2 / 3, W, H / 3); } },
   { id: 'tiyc', shape: 'pennant', ratio: 1.5, // small and friendly: blue and white, a clipper under sail, a gold hull
