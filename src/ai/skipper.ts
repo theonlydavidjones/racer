@@ -37,6 +37,11 @@ export interface SkipperKnobs {
   keepClearM: number;
   /** ...within this time (s). */
   keepClearS: number;
+  /** Her reaction time (s): how long after a boat she must keep clear of looks set to come too close before her helm goes over. */
+  reactS: number;
+  /** The hull-to-hull gap (m) she keeps, beyond the contact distance (rules CONTACT_GAP), from a boat she must keep clear
+   * of: the space that lets the other boat sail on without needing to act (Definitions, Keep Clear). A nervous helm keeps more. */
+  clearGapM: number;
 }
 
 /** The knobs as the AI had them before the skipper model: the same for every boat but for the current, from her dice. */
@@ -48,6 +53,11 @@ export function legacyKnobs(aware: boolean): SkipperKnobs {
     headerDeg: 4, headerHoldS: 15, headerTackRate: 0.35,
     dirtyAirS: 6,
     // (slow, heavy boats need time to respond: she starts keeping clear 12 s out)
-    keepClearM: 14, keepClearS: 12
+    keepClearM: 14, keepClearS: 12,
+    // (estimates, to be set by the foul census against the real fleets' rate (docs/SKIPPER-MODEL-PROPOSAL.md): a second
+    // to see a boat as a danger and judge it, about a driver's for an unexpected hazard; a metre and a half more than the
+    // contact distance between the hulls, two-thirds of a Folkboat's 2.2 m beam, for the error in judging another boat's
+    // course a few lengths off)
+    reactS: 1, clearGapM: 1.5
   };
 }

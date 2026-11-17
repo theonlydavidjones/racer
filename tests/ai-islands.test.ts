@@ -99,7 +99,10 @@ describe('the AI at an island and downwind', () => {
     const [, , C] = w.boats;
     expect(w.rights(B, C).kc).toBe(C); // she's the leeward boat
     run(8, 0.5);
-    expect(Math.abs(wrap(F - B.desired)), 'not above her run').toBeGreaterThanOrEqual(Math.abs(wrap(F - clean)) - 2);
+    // (not headed up out of the shadow, DIRTY_RUN_UP's 25°: the first few degrees of her gybe away, which rule 16.1
+    // holds back with the other boat alongside, are no luff. Asked within 2° before the AI's rule 14 stopped answering
+    // a boat sailing alongside at a steady distance, November 2026: that false escape was setting her course here)
+    expect(Math.abs(wrap(F - B.desired)), 'not headed up out of the shadow').toBeGreaterThanOrEqual(Math.abs(wrap(F - clean)) - 10);
     expect(B.ai!.goTack?.to, 'gybing away').toBe('P');
   });
 });

@@ -41,10 +41,38 @@ describe('AI collision avoidance: two obligations at once', () => {
     // she turns away from X (heads up), opening the room to her
     expect(wrap(withY - B.h)).toBeGreaterThan(5); // up, toward the wind (starboard: wind on her right)
     expect(sep(B, X, withY)).toBeGreaterThan(sep(B, X, B.h) + 1);
-    // and the third boat doesn't undo it: the same move as with Y out of the way
+    // and the third boat doesn't undo it, nor does keeping clear of X cost Y the room she's owed when it needn't: the
+    // turn keeps clear of X and gives Y room to keep clear (Rule 16.1 binds her whatever else she must do, and here
+    // both can be done). With Y out of the way she heads up at least as far. (Before November 2026 this asked for the
+    // very same move with Y there or not: the room owed to Y was dropped whenever she had a boat to keep clear of, and
+    // she turned into Y when keeping clear of X didn't need it, the physics review's 16.1 finding.)
+    const room = Math.min(8, sep(B, Y, B.h));
+    expect(sep(B, Y, withY), 'room for Y').toBeGreaterThanOrEqual(room - 0.5);
     put(w, Y, at, 5000, -5000, 0); B.desired = B.h;
     aiThink(w, B, DT);
-    expect(Math.abs(wrap(withY - B.desired))).toBeLessThan(3);
+    expect(wrap(B.desired - B.h)).toBeGreaterThanOrEqual(wrap(withY - B.h) - 3);
+  });
+  it('a boat she must keep clear of but is in no danger of doesn\'t switch off the room she owes another (Rule 16.1)', () => {
+    // as above, without X: B on starboard wants to head up; Y on port crossing ahead must keep clear of her, and heading
+    // up closes on Y, so she turns only as far as leaves Y room. L, a boat on her course 14 m ahead (she's clear astern:
+    // she must keep clear of L, Rule 12), is in no danger from her at all: it mustn't change that.
+    const turnWith = (withL: boolean) => {
+      const w = new World(ss2 as unknown as CourseFile, settings({ fleet: 3 }), 1);
+      w.t = -30;
+      const [, B, L, Y] = w.boats, F = w.wind.from, cs = n360(F - 75);
+      const at = { x: w.center.x - w.N.x * 300, y: w.center.y - w.N.y * 300 };
+      const ahead = V(cs), right = V(cs + 90);
+      const rel = (f: number, s2: number) => ({ x: ahead.x * f + right.x * s2, y: ahead.y * f + right.y * s2 });
+      for (const b of w.boats) put(w, b, at, 5000, 5000, 0);
+      put(w, B, at, 0, 0, cs);
+      const py = rel(16, 3); put(w, Y, at, py.x, py.y, n360(F + 42));
+      if (withL) { const pl = rel(14, 0); put(w, L, at, pl.x, pl.y, cs); }
+      aiThink(w, B, DT);
+      return { d: B.desired, sepY: sep(B, Y, B.desired), room: Math.min(8, sep(B, Y, B.h)) };
+    };
+    const alone = turnWith(false), withL = turnWith(true);
+    expect(withL.sepY, 'room for Y with L there').toBeGreaterThanOrEqual(withL.room - 0.5);
+    expect(Math.abs(wrap(withL.d - alone.d)), `alone ${alone.d.toFixed(0)}, with L ${withL.d.toFixed(0)}`).toBeLessThan(5);
   });
   it('windward and overlapped but already parting with room (Rule 11): she sails on, not easing and heading up on until she stalls', () => {
     // B on starboard on a reach, X to leeward abeam, two beams of water between them and X heading a little lower, so
