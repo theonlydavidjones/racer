@@ -1252,7 +1252,17 @@ function sailVisuals(b: Boat, plan: SailPlan, dt: number): void {
  * at the boom (trim.ts MAIN_TWIST_MID further in) the ease from it is that much more. Without it the last step no
  * longer reached the luff and she lay over at 32° in 28 kt, where she had sailed at 25°. */
 export const CREW_EASE = 7 + MAIN_TWIST_MID;
-export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? CREW_EASE * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) : 0);
+/**
+ * In very light air the crew carry the boom a little to leeward of its best place, the sheet eased for the twist the
+ * light-air main wants: North Sails' IF-boat guide has the boom "about 200 mm to leeward" in very light air and on the
+ * centerline from 6 kt (as the researcher read it, 15 Nov 2026); at the boom's end, 3.38 m out, that is 3.4°. All of
+ * it to 4 kt, none from 6. (The IF is the Folkboat's near sister; the Nordic Folkboat guide gives the car's place, 15 to
+ * 20 cm to windward, not the boom's.) Held on the centerline with the car at North's limit the sheet came too tight
+ * for the twist: 7.7° where the light-air main wants 12.6°.
+ */
+const LIGHT_BOOM = 3.4;
+const lightEase = (b: Boat) => LIGHT_BOOM * clamp((6 - (b.twsSlow ?? b.ww.kt)) / 2, 0, 1);
+export const crewEaseBoom = (b: Boat) => (Math.abs(b.awaSlow) < 70 ? CREW_EASE * clamp(((b.depower ?? 0) - 0.6) / 0.4, 0, 1) + lightEase(b) : 0);
 /** The boom angle the crew is aiming for. */
 export const crewMainAngle = (b: Boat) => optimalSheet('main', b.awaSlow) + crewEaseBoom(b);
 
