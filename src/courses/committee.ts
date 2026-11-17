@@ -140,14 +140,19 @@ const BEAT_TWA = 55;
  * of this and because an upwind start is the fairest, a race should start with a beat or have a beating leg as soon as
  * possible after the start"; and (J.3.1) "sufficient distance between the start line and mark 1 to allow the fleet to
  * spread out before reaching mark 1". On the Bay's fixed marks the line can't move and in a southerly no course starts
- * with a beat, so the committee takes the one nearest it: the score grows with the first leg's angle off a beat, up to
- * FIRST_OFF_BEAT for a dead run. And a first leg shorter than SPREAD_MIN minutes costs up to FIRST_SHORT (a mark two
- * minutes off the line has the whole fleet there inside 30 s). The weights and the five minutes are the sim's
- * estimates, set so either outweighs a few minutes off the target time; the manuals give no numbers.
+ * with a beat, so the committee takes the one nearest it. Not a beat costs NOT_BEAT outright (a beat on offer is taken
+ * over a reach for anything short of a much better time), and then more with the first leg's angle off a beat, up to
+ * FIRST_OFF_BEAT more for a dead run; and a first leg off the wind shorter than SPREAD_MIN minutes costs up to
+ * FIRST_SHORT more, all of it at SHORT_MIN or less (a reach to a mark two minutes off the line has the whole fleet there
+ * inside 30 s). A beat, however short, costs nothing: it spreads the fleet (J.2.2), and the club's own sheet starts
+ * many courses with a short beat to A. The weights and the
+ * minutes are the sim's estimates, set so each outweighs a fair way off the target time (0.35 is the time 40% off);
+ * the manuals give no numbers.
  */
-const FIRST_OFF_BEAT = 0.6, FIRST_SHORT = 0.3, SPREAD_MIN = 5;
-export const firstLegScore = (e: CourseEstimate): number =>
-  FIRST_OFF_BEAT * Math.max(0, e.firstTwa - BEAT_TWA) / (180 - BEAT_TWA) + FIRST_SHORT * Math.max(0, 1 - (e.legs[0]?.minutes ?? SPREAD_MIN) / SPREAD_MIN);
+const NOT_BEAT = 0.35, FIRST_OFF_BEAT = 0.6, FIRST_SHORT = 0.35, SPREAD_MIN = 5, SHORT_MIN = 2;
+export const firstLegScore = (e: CourseEstimate): number => e.upwindStart ? 0
+  : NOT_BEAT + FIRST_OFF_BEAT * Math.max(0, e.firstTwa - BEAT_TWA) / (180 - BEAT_TWA)
+  + FIRST_SHORT * Math.min(1, Math.max(0, (SPREAD_MIN - (e.legs[0]?.minutes ?? SPREAD_MIN)) / (SPREAD_MIN - SHORT_MIN)));
 
 export interface CommitteeChoice { est: CourseEstimate; target: number; why: string; considered: number }
 
@@ -170,6 +175,6 @@ export function chooseCourse(courses: CourseFile[], S: Settings): CommitteeChoic
   const at = buildCourse(pick.file, { bias: 0, fleet: S.fleet, windFrom: day.fromAtGun }).center, w = day.wind(at, 0), c = day.current(at, 0);
   const ckt = hypot(c.x, c.y) / KT, ebb = dot(c, V(270)) > 0;
   const tide = ckt < 0.2 ? 'slack water' : `${ebb ? 'an ebb' : 'a flood'} of ${ckt.toFixed(1)} kt at the line`;
-  const why = `${WIND_KIND_LABEL[day.kind]}, ${Math.round(w.kt)} kt from ${Math.round(w.from)}°, and ${tide}: course ${pick.no} (${pick.file.distanceNm ?? '?'} nm) should take the leaders about ${Math.round(pick.minutes)} min, for a ${target}-minute race${pick.upwindStart ? ', starting to windward' : ''}.${!pick.upwindStart && ranked.some(r => r.e.upwindStart) ? ' The beat would leave the fleet stuck against the tide, so the first leg is off the wind.' : !pick.upwindStart ? ' The line runs north from the club and can\'t be moved, so in this wind no course starts to windward: it\'s a reaching start.' : ''}`;
+  const why = `${WIND_KIND_LABEL[day.kind]}, ${Math.round(w.kt)} kt from ${Math.round(w.from)}°, and ${tide}: course ${pick.no} (${pick.file.distanceNm ?? '?'} nm) should take the leaders about ${Math.round(pick.minutes)} min, for a ${target}-minute race${pick.upwindStart ? ', starting to windward' : ''}.${!pick.upwindStart && ranked.some(r => r.e.upwindStart) ? (ranked.filter(r => r.e.upwindStart).every(r => r.e.slowestKt < 1) ? ' The beat would leave the fleet stuck against the tide, so the first leg is off the wind.' : ' The courses that start with a beat run too long or too short for the time, so the first leg is off the wind.') : !pick.upwindStart ? ' The line runs north from the club and can\'t be moved, so in this wind no course starts to windward: it\'s a reaching start.' : ''}`;
   return { est: pick, target, why, considered: pool.length };
 }
