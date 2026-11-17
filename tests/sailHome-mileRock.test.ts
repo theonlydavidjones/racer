@@ -5,12 +5,15 @@
 // restarts. Sailed here as the page does: a frame every 16 ms, she at 6 kt toward the Gate, both asked for each frame.
 // - The way round the land (ui/hud.ts navRoute), which the passage panel draws until the timed plan's in: within 5 s.
 // - The timed plan: one plan, not one each 150 m, and in within PLAN_S. PLAN_S is today's measured time with a margin
-//   (154–184 s alone, over 240 in the full suite's load, 16–17 Nov 2026: the first plan's cold fill of the router's
-//   outlook), not a goal: the cold fill is its own work (the corridor-only lee, next). What tells this from main is the
-//   one plan: main started one each 150 m, and the way round the land wasn't on the map at all.
+//   (154–192 s alone, 16–17 Nov 2026: the first plan's cold fill of the router's outlook), not a goal: the cold fill is
+//   its own work (the corridor-only lee, next). What tells this from main is the one plan: main started one each 150 m,
+//   and the way round the land wasn't on the map at all.
+// - Its bars are wall clock, as perf.test's are (the Coordinator, 17 Nov 2026): a failure under the full suite's load is
+//   run again alone, once, and counts only if it fails again (in the full suite, 16 Nov, the plan ran past 240 s; alone,
+//   192 s). The bars aren't widened for the load.
 // - The page's thread held no longer than SLICE_MAX at the 99.9th percentile: its budget (6 ms, a new destination's) and
-//   one step of the work past it (a step can't be stopped part way; the longest left, a cold wind reading, ~12 ms), and
-//   the shared host's load (16 ms alone, 22.5 in the full suite). Main's worst frame on this
+//   one step of the work past it (a step can't be stopped part way; the longest left, a cold wind reading, ~12 ms):
+//   13–16 ms alone. Main's worst frame on this
 //   passage was 38 ms over its 16, and a cold chop cell's swell (no part of the chop) held one 100 ms.
 // - Then the passage panel's plan (navView: passagePlanLater, leaving now and later): it briefs from the live plan, not a
 //   second one of its own (that was ~45 s more of the page's thread), and is in within PANEL_S, measured likewise.
@@ -23,7 +26,7 @@ import { LL } from '../src/geo/geo';
 import { liveLog, passageLive, passagePlanLater, type PassagePlan } from '../src/sim/navigator';
 import { navRoute, navRoutePending } from '../src/ui/hud';
 
-const PLAN_S = 600, SLICE_MAX = 30, PANEL_S = 300;
+const PLAN_S = 240, SLICE_MAX = 20, PANEL_S = 120;
 
 describe('Sail Home from Mile Rock: the way drawn at once, the plan in while she sails', () => {
   it('the route within 5 s, the timed plan once and within PLAN_S, every slice within its budget', async () => {
