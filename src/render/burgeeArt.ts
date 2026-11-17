@@ -63,9 +63,9 @@ export const PARODY_BURGEES: Burgee[] = [
       const smooth = (pts: P[]) => { g.beginPath(); const n = pts.length, q = pts.map(T); g.moveTo((q[0][0] + q[n - 1][0]) / 2, (q[0][1] + q[n - 1][1]) / 2); for (let i = 0; i < n; i++) { const a = q[i], b = q[(i + 1) % n]; g.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } g.closePath(); g.fill(); };
       g.fillStyle = gold;
       smooth([[1, .02], [.98, -.09], [.9, -.15], [.62, -.11], [.3, -.05], [.18, -.025], [.18, .03], [.32, .06], [.55, .1], [.8, .11], [.95, .08]]); // the body: blunt brow, long and slim to the tail
-      poly(g, gold, ...[[.92, -.14], [.84, -.2], [.55, -.19], [.3, -.14], [.2, -.05], [.4, -.07], [.7, -.1]].map(T)); // the long dorsal, one piece with the back
-      poly(g, gold, ...[[.2, -.025], [0, -.19], [.07, 0], [0, .19], [.2, .035]].map(T)); // the forked tail
-      poly(g, gold, ...[[.36, .07], [.44, .15], [.58, .1]].map(T)); // the anal fin
+      poly(g, gold, ...([[.92, -.14], [.84, -.2], [.55, -.19], [.3, -.14], [.2, -.05], [.4, -.07], [.7, -.1]] as P[]).map(T)); // the long dorsal, one piece with the back
+      poly(g, gold, ...([[.2, -.025], [0, -.19], [.07, 0], [0, .19], [.2, .035]] as P[]).map(T)); // the forked tail
+      poly(g, gold, ...([[.36, .07], [.44, .15], [.58, .1]] as P[]).map(T)); // the anal fin
       oval(g, '#0d5a47', x0 + .88 * L, y0 - .05 * L, L * .03, L * .03); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
     draw: (g, W, H) => { fill(g, W, H, '#0f5f99'); rect(g, '#f08a1c', W * 0.05, H * 0.62, W * 0.3, H * 0.09); arc(g, '#f08a1c', H * 0.1, W * 0.2, H * 0.62, H * 0.2, Math.PI, 0); } },
