@@ -36,32 +36,15 @@ function oakLeaf(g: G, x: number, y: number, len: number, ang: number, c: string
   g.beginPath(); OAK_LEAF.forEach(([a, b], i) => i ? g.lineTo(a * len, b * len) : g.moveTo(a * len, b * len)); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 
-/**
- * The letters of the City of Oakland's flag, traced from the owner's picture of it: O, A, K, L, N and D, each straightened
- * from its arc and outlined (counters included), in units of the cap height (x from the letter's left, y down). The T and W
- * that word needs are not in that picture, so they are built in the same style from its measured strokes: a stem 0.26 wide, a
- * bar 0.25 thick, the diagonals 0.26 across.
- */
-const OAKLAND_GLYPHS: Record<string, { w: number; outer: P[]; holes: P[][] }> = {"O":{"w":1.048,"outer":[[0.503,-0.014],[0.676,0.007],[0.793,0.055],[0.862,0.103],[0.986,0.248],[1.021,0.324],[1.048,0.434],[1.048,0.572],[1.034,0.641],[0.979,0.766],[0.917,0.848],[0.848,0.91],[0.759,0.966],[0.634,1.007],[0.552,1.014],[0.386,1.0],[0.255,0.945],[0.179,0.89],[0.09,0.793],[0.041,0.703],[0.014,0.621],[0.0,0.51],[0.028,0.338],[0.117,0.179],[0.186,0.11],[0.276,0.048],[0.379,0.007]],"holes":[[[0.503,0.214],[0.586,0.221],[0.683,0.269],[0.745,0.345],[0.779,0.448],[0.779,0.572],[0.752,0.655],[0.676,0.745],[0.628,0.772],[0.559,0.786],[0.476,0.786],[0.379,0.745],[0.317,0.676],[0.29,0.621],[0.269,0.51],[0.276,0.421],[0.317,0.324],[0.393,0.248]]]},"A":{"w":1.014,"outer":[[0.386,-0.003],[0.614,0.003],[1.014,0.976],[0.766,0.976],[0.703,0.803],[0.607,0.803],[0.324,0.803],[0.255,0.983],[0.0,1.003]],"holes":[[[0.503,0.293],[0.621,0.603],[0.503,0.61],[0.393,0.61]]]},"K":{"w":0.945,"outer":[[0.041,-0.003],[0.276,0.003],[0.276,0.362],[0.614,0.017],[0.91,0.024],[0.51,0.438],[0.945,0.997],[0.903,1.003],[0.621,0.99],[0.324,0.624],[0.262,0.693],[0.255,0.983],[0.0,0.997],[0.014,0.1],[0.021,0.003]],"holes":[]},"L":{"w":0.662,"outer":[[0.014,0.003],[0.276,0.01],[0.262,0.755],[0.276,0.769],[0.662,0.776],[0.655,0.997],[0.0,0.99]],"holes":[]},"N":{"w":0.972,"outer":[[0.021,-0.003],[0.269,0.003],[0.69,0.562],[0.703,0.555],[0.717,0.01],[0.972,0.017],[0.959,1.003],[0.945,1.003],[0.703,0.99],[0.276,0.424],[0.262,0.431],[0.255,0.597],[0.255,0.983],[0.0,0.99],[0.007,0.224]],"holes":[]},"D":{"w":0.917,"outer":[[0.069,0.0],[0.352,0.014],[0.579,0.048],[0.641,0.069],[0.759,0.138],[0.862,0.262],[0.897,0.345],[0.917,0.469],[0.91,0.607],[0.883,0.71],[0.828,0.814],[0.766,0.883],[0.676,0.945],[0.607,0.972],[0.4,1.0],[0.0,0.986]],"holes":[[[0.317,0.234],[0.428,0.241],[0.545,0.283],[0.6,0.331],[0.634,0.4],[0.641,0.559],[0.621,0.641],[0.6,0.683],[0.552,0.731],[0.49,0.759],[0.379,0.779],[0.283,0.772]]]}};
-const STEM = 0.262, BAR = 0.25;
-const OAKLAND_BUILT: Record<string, { w: number; polys: P[][] }> = {
-  T: { w: 0.86, polys: [[[0, 0.5 - 0.5], [0.86, 0], [0.86, BAR], [0, BAR]], [[0.43 - STEM / 2, BAR - 0.01], [0.43 + STEM / 2, BAR - 0.01], [0.43 + STEM / 2, 1], [0.43 - STEM / 2, 1]]] },
-  W: (() => { const w = 1.55, s = STEM; const st = (xt: number, xb: number): P[] => [[xt - s / 2, 0], [xt + s / 2, 0], [xb + s / 2, 1], [xb - s / 2, 1]]; return { w, polys: [st(s / 2, w * 0.27), st(w * 0.5, w * 0.27), st(w * 0.5, w * 0.73), st(w - s / 2, w * 0.73)] }; })()
-};
-/** A word's letters along the pennant's middle line, each as tall as `k` of the flag's height where it stands (so they taper with the cloth); k is found so the word ends at `endX`. */
-function pennantWord(g: G, word: string, c: string, W: number, H: number, startX: number, endX: number): void {
-  const wOf = (ch: string) => OAKLAND_GLYPHS[ch]?.w ?? OAKLAND_BUILT[ch].w;
-  const layout = (k: number) => { let x = startX; const out: { ch: string; x: number; h: number }[] = [];
-    for (const ch of word) { let h = k * H * (1 - x / W); for (let i = 0; i < 3; i++) h = k * H * (1 - (x + wOf(ch) * h / 2) / W); out.push({ ch, x, h }); x += wOf(ch) * h + 0.14 * h; }
-    return { out, end: x - 0.14 * out[out.length - 1].h }; };
-  let lo = 0.05, hi = 0.6; for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; layout(m).end > endX ? hi = m : lo = m; }
-  g.fillStyle = c;
-  for (const { ch, x, h } of layout(Math.min(lo, 0.5)).out) {
-    g.save(); g.translate(x, H / 2 - h / 2); g.scale(h, h);
-    const gl = OAKLAND_GLYPHS[ch];
-    if (gl) { g.beginPath(); for (const ring of [gl.outer, ...gl.holes]) { ring.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); } g.fill('evenodd'); }
-    else for (const poly of OAKLAND_BUILT[ch].polys) { g.beginPath(); poly.forEach(([a, b], i) => i ? g.lineTo(a, b) : g.moveTo(a, b)); g.closePath(); g.fill(); }
-    g.restore(); }
+/** An acorn, in one color on the field's: a stem, a domed cap of scales, a gap, a round nut with a highlight. (x, y) is its middle, `len` its height, `ang` its lean. */
+function acorn(g: G, x: number, y: number, len: number, ang: number, c: string, field: string): void {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(len, len); g.fillStyle = c;
+  g.fillRect(-0.03, -0.5, 0.06, 0.14); // the stem
+  g.beginPath(); g.moveTo(-0.32, -0.12); g.ellipse(0, -0.12, 0.32, 0.27, 0, Math.PI, 2 * Math.PI); g.quadraticCurveTo(0, -0.04, -0.32, -0.12); g.closePath(); g.fill(); // the cap
+  g.fillStyle = field; for (const [row, n] of [[-0.3, 3], [-0.21, 4], [-0.13, 3]] as [number, number][]) for (let i = 0; i < n; i++) { g.beginPath(); g.arc((i - (n - 1) / 2) * 0.17, row, 0.027, 0, 7); g.fill(); } // its scales
+  g.fillStyle = c; g.beginPath(); g.moveTo(-0.27, -0.03); g.bezierCurveTo(-0.34, 0.2, -0.17, 0.42, 0, 0.5); g.bezierCurveTo(0.17, 0.42, 0.34, 0.2, 0.27, -0.03); g.quadraticCurveTo(0, -0.09, -0.27, -0.03); g.closePath(); g.fill(); // the nut
+  g.strokeStyle = field; g.lineWidth = 0.03; g.lineCap = 'round'; g.beginPath(); g.moveTo(-0.19, 0.06); g.quadraticCurveTo(-0.23, 0.22, -0.12, 0.34); g.stroke(); // its highlight
+  g.restore();
 }
 
 export const PARODY_BURGEES: Burgee[] = [
@@ -130,8 +113,8 @@ export const PARODY_BURGEES: Burgee[] = [
       for (let k = 0; W * (0.4 + (2 * k + 1) * 0.0625) < W; k++) rect(g, RED, W * (0.4 + (2 * k + 1) * 0.0625), 0, W * 0.0625, H); // the stripes, red and white
       oakLeaf(g, X0, H * 0.515, H * 0.58, 0.3, WHITE); // one white oak leaf, leaning a little toward the fly, well inside the panel
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
-  { id: 'oyc', shape: 'pennant', ratio: 1.667, // Oaktown YC, after the City of Oakland's flag (the owner's): its exact yellow, its exact green, the word OAKTOWN down the middle in its lettering, tapering with the cloth
-    draw: (g, W, H) => { fill(g, W, H, '#f5dc0e'); pennantWord(g, 'OAKTOWN', '#005e00', W, H, W * 0.07, W * 0.84); } },
+  { id: 'oyc', shape: 'pennant', ratio: 1.667, // Oaktown YC, after the City of Oakland's flag (the owner's): its green for the field, its yellow for one acorn
+    draw: (g, W, H) => { fill(g, W, H, '#005e00'); acorn(g, W * 0.21, H * 0.52, H * 0.6, -0.2, '#f5dc0e', '#005e00'); } },
   { id: 'iyc', shape: 'pennant', ratio: 2, // modern, thrifty: sand, white and teal stripes
     draw: (g, W, H) => { rect(g, '#e6cf99', 0, 0, W, H / 3); rect(g, WHITE, 0, H / 3, W, H / 3); rect(g, '#16a0a6', 0, H * 2 / 3, W, H / 3); oval(g, '#e6cf99', W * 0.16, H / 2, W * 0.1, H * 0.08); } },
   { id: 'aeyc', shape: 'pennant', ratio: 1.6, // mid-century: sky blue and white, one wind swirl
