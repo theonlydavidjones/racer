@@ -853,26 +853,6 @@ What's planned, roughly in order. Done work is described in the README.
        src/geo/marina.ts), finishing with the docking hand-over;
      - (3) moored boats solid, the same fix as slip 572 (8m2);
      - (4) a test that the navigator brings her home from the Bay to slip 572 with no contact.
-     Where it stands (17 November, after the physics review; the owner's ruling, through the coordinator): the pilot
-     takes her to her harbor's mouth and hands her over there, outside, 20 s out at her speed (at least 30 m; 150 m
-     under sail), with "At the harbor mouth: she's yours."; already inside, at once. A person brings her in along the
-     fairways, as with a real tiller pilot (marinas-nav). Still to come:
-     - **The way in drawn on the chart** (geo/marina.ts harborRoute: mouth, entry, the turns, the fairway off her slip),
-       and the passage plan ending at the same mouth as the pilot (sim/navigator.ts outOfBasin picks the nearest
-       entrance as the crow flies; 431 of South Beach's slips differ). After nav-pace merges (it's in those files).
-     - **West Harbor's entrance**: its data (data/west-harbor.json) has no exits, so its mouth is the light on the
-       breakwater's end, with no water inside in sight of it. Its real entrance, from the chart.
-     - **Slips with no way in**: 12 bow-in at Richmond YC (B2–B22 evens, F2) and 12 end ties (West Harbor's G and two
-       others, Richmond's C and D), down from 35. Why each is shut out (ROUTE_CLEAR's 2.5 m in a narrow fairway?).
-     - **The pilot's look ahead misses land a couple of meters off its line** (boat/autopilot.ts: landAlong sees the
-       shore's outline): off Horseshoe Bay it steered her along the shore 2 m off.
-     - **(b) later, maybe: a pilot that steers her in along the fairways** (the review's design, 17 November): the turns
-       filleted into arcs that fit the open water, each corner's most speed for her turn, a check at the mouth that she's
-       slow enough, and the hand-over by time. It hit docks steered in on the old pilot because her 9 m turn (with the
-       ram's lag) cuts about 3.7 m inside a 90-degree corner the route hugs at 2.5 m.
-     - **For Deep Physics**: HANDLING.turnRadius (9 m) and minTurnRate (4 deg/s) are uncited estimates
-       (boat/dynamics.ts), and they decide whether she can turn in a fairway at all; an outboard swiveled on its bracket
-       turns her tighter under power, and isn't modeled.
    - **Bug: "Sail Home" from Mile Rock still plotting after ten minutes** (owner, 16 November; bug; now; 2–4 h): "I was
      sailing outside of the gate, with a destination near the old mile rock lighthouse. when I got near to the
      lighthouse, I went into the nav view and clicked Sail Home. It appears that my destination has updated, but we're a
