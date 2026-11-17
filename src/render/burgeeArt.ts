@@ -58,7 +58,7 @@ export const PARODY_BURGEES: Burgee[] = [
       border(g, W, H, 'swallow', WHITE, 0.035); } },
   { id: 'ggyc', shape: 'pennant', ratio: 1.67, // scrappy fishermen's club (Puerto d'Oro), from the owner's template: dark blue, a thin white line inside the cut, one hook in the bridge's orange (to flag for IP review: the template is the real club's layout)
     draw: (g, W, H) => { fill(g, W, H, '#1b2285'); border(g, W, H, 'pennant', WHITE, 0.075); border(g, W, H, 'pennant', '#1b2285', 0.052);
-      g.save(); g.translate(W * 0.265, H * 0.535); g.scale(1.25, 1.25); g.strokeStyle = '#c0362c'; g.fillStyle = '#c0362c'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = H * 0.075;
+      g.save(); g.translate(W * 0.25, H * 0.55); g.scale(1.1, 1.1); g.strokeStyle = '#c0362c'; g.fillStyle = '#c0362c'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = H * 0.075;
       const r = H * 0.1; g.beginPath(); g.moveTo(r, -H * 0.2); g.lineTo(r, 0); g.arc(0, 0, r, 0, Math.PI); g.lineTo(-r, -H * 0.07); g.stroke(); // the shank, the bend and the point
       g.beginPath(); g.moveTo(-r, -H * 0.17); g.lineTo(-r + H * 0.085, -H * 0.06); g.lineTo(-r - H * 0.02, -H * 0.04); g.closePath(); g.fill(); g.restore(); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
