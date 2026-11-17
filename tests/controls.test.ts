@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultControls, jibShape, mainShape, shapeEfficiency, targetShape, winchFactor, boomAngle, mainsheetFor } from '../src/boat/controls';
-import { moveLazyCar } from '../src/boat/physics';
+import { crewEaseBoom, moveLazyCar } from '../src/boat/physics';
+import type { Boat } from '../src/boat/boat';
 import { courseHeading, kt, sail, testBoat } from './helpers/testBoat';
 
 describe('what each control does to the sails', () => {
@@ -67,6 +68,16 @@ describe('the crew', () => {
       expect(b.shape.eff).toBeGreaterThan(0.985);
     });
   }
+  it('in very light air carries the boom 200 mm to leeward of its best place: 3.4° to 4 kt, none from 6 kt (North Sails\' IF-boat guide)', () => {
+    const ease = (kt: number) => crewEaseBoom({ awaSlow: 27, depower: 0, twsSlow: kt, ww: { from: 0, kt } } as unknown as Boat);
+    expect(ease(3)).toBeCloseTo(3.4, 6); expect(ease(4)).toBeCloseTo(3.4, 6); // (200 mm at the boom's end, 3.38 m out)
+    expect(ease(5)).toBeCloseTo(1.7, 6); // (between the guide's two ends: an estimate)
+    expect(ease(6)).toBe(0); expect(ease(10)).toBe(0);
+    // (and sailed: the boom's end 190 to 210 mm to leeward in 4 kt, on the centerline in 6)
+    const end = (tws: number) => { const b = testBoat({ heading: 318, kt: 4, windKt: tws }); sail(b, 40, () => { b.h = courseHeading(b, 318); }); return 3380 * Math.sin(boomAngle(b.ctl) * Math.PI / 180); };
+    expect(end(4)).toBeGreaterThan(190); expect(end(4)).toBeLessThan(210);
+    expect(Math.abs(end(6))).toBeLessThan(10);
+  });
   it('flattens and depowers in a breeze, eases everything in light air (as North Sails\' Folkboat guide sets them)', () => {
     const light = testBoat({ heading: 318, kt: 3, windKt: 4 }), heavy = testBoat({ heading: 318, kt: 5, windKt: 20 });
     sail(light, 40); sail(heavy, 40);
