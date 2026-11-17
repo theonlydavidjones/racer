@@ -89,15 +89,18 @@ export const PARODY_BURGEES: Burgee[] = [
   // ---- East Bay
   { id: 'ryc', shape: 'pennant', ratio: 1.5, // DIY: brick red, black and white; one kiln chimney
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
-  { id: 'byc', shape: 'pennant', ratio: 1.6, // Berkeley's own blue and gold, a gold fimbriation, one gold Campanile (Sather Tower) on the blue, the fly tip gold, divided on the diagonal (the bishop's move)
-    draw: (g, W, H) => { const BLU = '#0e3a7d', X = W * 0.215, yb = H * 0.79, Th = H * 0.59, y = (t: number) => yb - t * Th;
+  { id: 'byc', shape: 'pennant', ratio: 1.6, // Campanile YC (Berkeley, 1929): Berkeley's own blue and gold, a gold fimbriation, one gold campanile on the blue (a plain tall shaft, a clock, a belfry of three arches, a steep spire), the fly gold, divided on the diagonal
+    draw: (g, W, H) => { const BLU = '#0e3a7d', X = W * 0.215, w = H * 0.095, yb = H * 0.8, Th = H * 0.62, y = (t: number) => yb - t * Th;
       fill(g, W, H, GOLD); poly(g, BLU, [0, 0], [W * 0.36, 0], [W * 0.66, H], [0, H]);
-      rect(g, GOLD, X - H * 0.085, y(0.06), H * 0.17, y(0) - y(0.06)); // the plinth
-      rect(g, GOLD, X - H * 0.055, y(0.58), H * 0.11, y(0.06) - y(0.58)); // the shaft
-      for (const t of [0.15, 0.27, 0.39]) rect(g, BLU, X - H * 0.006, y(t + 0.04), H * 0.012, H * 0.05); // its tall narrow windows
-      rect(g, GOLD, X - H * 0.07, y(0.7), H * 0.14, y(0.58) - y(0.7)); dot(g, BLU, X, y(0.64), H * 0.03); dot(g, GOLD, X, y(0.64), H * 0.012); // the clock stage and its clock
-      rect(g, GOLD, X - H * 0.06, y(0.8), H * 0.12, y(0.7) - y(0.8)); for (const a of [-1, 0, 1]) { rect(g, BLU, X + a * H * 0.032 - H * 0.008, y(0.77), H * 0.016, H * 0.03); } // the belfry and its arches
-      poly(g, GOLD, [X - H * 0.068, y(0.8)], [X, y(1)], [X + H * 0.068, y(0.8)]); // the pyramid cap
+      rect(g, GOLD, X - w / 2, y(0.56), w, y(0) - y(0.56)); // the plain shaft
+      for (const t of [0.12, 0.24]) rect(g, BLU, X - H * 0.005, y(t + 0.05), H * 0.01, y(t) - y(t + 0.05)); // two narrow windows
+      dot(g, BLU, X, y(0.43), H * 0.026); dot(g, GOLD, X, y(0.43), H * 0.012); // the clock
+      rect(g, GOLD, X - w * 0.64, y(0.575), w * 1.28, y(0.56) - y(0.575)); // the cornice under the belfry
+      rect(g, GOLD, X - w * 0.54, y(0.76), w * 1.08, y(0.575) - y(0.76)); // the belfry
+      for (const a of [-1, 0, 1]) { const ax = X + a * H * 0.027; rect(g, BLU, ax - H * 0.009, y(0.69), H * 0.018, y(0.6) - y(0.69)); dot(g, BLU, ax, y(0.69), H * 0.009); } // its three tall arches
+      rect(g, GOLD, X - w * 0.64, y(0.775), w * 1.28, y(0.76) - y(0.775)); // the cornice above it
+      for (const s of [-1, 1]) poly(g, GOLD, [X + s * w * 0.6 - H * 0.006, y(0.775)], [X + s * w * 0.6, y(0.82)], [X + s * w * 0.6 + H * 0.006, y(0.775)]); // the corner pinnacles
+      poly(g, GOLD, [X - w * 0.5, y(0.775)], [X, y(1)], [X + w * 0.5, y(0.775)]); // the steep spire
       border(g, W, H, 'pennant', GOLD, 0.04); } },
   { id: 'csc', shape: 'pennant', ratio: 1.5, // modern co-op: bright green and yellow, one rising sun
     draw: (g, W, H) => { fill(g, W, H, '#2fa04a'); rect(g, '#f6d21a', 0, H * 0.7, W, H * 0.3); dot(g, '#f6d21a', W * 0.2, H * 0.46, H * 0.2); } },

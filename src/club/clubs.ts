@@ -43,7 +43,7 @@ export const CLUB_TABLE: ClubInfo[] = [
   C('sryc', 'Mission Canal Yacht Club', 'MCYC', 'sryc'),
   // Tier 1 · East Bay
   C('ryc', 'Brickyard Racing Club', 'BRC', 'ryc', 1, { harbor: 'richmond-yc' }),
-  C('byc', "Bishop's Yacht Club", 'BpYC', 'byc', 1, { harbor: 'berkeley' }),
+  C('byc', 'Campanile Yacht Club', 'CamYC', 'byc', 1, { harbor: 'berkeley' }),
   C('csc', "People's Sailing Club", 'PSC', 'csc', 1, { base: [37.86307, -122.31383] }), // base: OSM way 454025334, building footprint
   C('emyc', 'Mudflat Yacht Club', 'MfYC', 'emyc'),
   C('eyc', 'Live Oak Yacht Club', 'LOYC', 'eyc', 1, { harbor: 'encinal' }),

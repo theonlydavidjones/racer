@@ -46,7 +46,7 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
   // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
   // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
-  { id: 'berkeley', name: 'Berkeley Marina (Bishop\'s Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
+  { id: 'berkeley', name: 'Berkeley Marina (Campanile Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
   { id: 'richmond-yc', name: 'Brickyard Racing Club, Brickyard Cove', short: 'Brickyard RC', data: richmondYc as unknown as HarborData },
   { id: 'encinal', name: 'Live Oak Yacht Club, Alameda', short: 'Live Oak YC', data: encinal as unknown as HarborData },
   { id: 'oakland-yc', name: 'Oaktown Yacht Club, Alameda', short: 'Oaktown YC', data: oaklandYc as unknown as HarborData },

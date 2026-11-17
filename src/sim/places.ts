@@ -67,7 +67,7 @@ export const PLACES: Place[] = [
   // breakwater" (BYC's 2026–27 Friday Night / Chowder courses, Attachment 1: 37°52.07′ N 122°19.56′ W, "for guidance
   // only"). Its sheet also gives D (the Berkeley Marina light "3", the sim's DOC, within 6 m), and X and F about 220 m
   // from the YRA's XOC and FOC: derived from D on a nominal circle, so the YRA's own positions are kept.
-  P('m-BYC', 'BpYC · Bishop\'s YC start mark', 37.86783, -122.32600, { shape: 'column', look: 'Y' }),
+  P('m-BYC', 'CamYC · Campanile YC start mark', 37.86783, -122.32600, { shape: 'column', look: 'Y' }),
   P('m-XOC', 'XOC · Berkeley Circle "Bobbi Tosse"', 37.873333, -122.358333, { shape: 'cylinder' }),
   P('m-FOC', 'FOC · Berkeley Circle', 37.865, -122.376667, { shape: 'cylinder' }),
   P('m-DOC', 'DOC · Berkeley Marina G "3"', 37.85767, -122.34943, { shape: 'beacon', look: 'G' }),
