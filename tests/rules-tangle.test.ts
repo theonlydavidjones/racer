@@ -54,7 +54,7 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   if (o.every) {
     for (let k = 1; k < (o.n ?? 4); k++) { off = o.apart; run(o.every - 1); off = 2; run(1); }
     // (then A gets way on, past a helmsman's reaction, and touches again: she could have kept clear)
-    if (o.thenWay) { o.vA = 1.5; off = o.apart; run(5); off = 2; run(1); }
+    if (o.thenWay) { o.vA = 1.5; off = o.apart; run(5); o.vA = 0.08; run(3); off = 2; run(1); }
     return got.length;
   }
   for (let k = 0; k < 2; k++) { off = o.apart; run(4.5); off = 0; run(INCIDENT_COOLDOWN - 4.5 + 0.5); }
@@ -95,12 +95,20 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
   it('after a touch with no penalty, the other boat\'s own breach a few seconds on, still within a metre: hers, not swallowed', () => {
     expect(tangle({ vA: 1.5, apart: JUST, retired: true, thenB: true })).toBe(1);
   }, 60000);
-  it('two boats lying stopped together (neither with steerage way, never a length apart), touching every 20 s for ten minutes: one incident, not one a minute', () => {
+  // (pinned: Deep Physics' seed 16 on sea-born, 17 Nov 2026, a boat held against the Marina jetty at 0.00-0.03 m/s and
+  // touched again a minute on, given a second two-turn penalty, and more: nine in ten minutes among three boats)
+  it('the boat at fault pinned, lying stopped against the other (never way on, never parted past the push apart), touching every 20 s for ten minutes: one incident, not one a minute', () => {
     expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 30 })).toBe(1);
     expect(tangle({ user: true, vA: 0.08, apart: NEAR, every: 20, n: 30 })).toBe(1);
   }, 120000);
-  it('but once one of them has had steerage way, the next touch is a new incident', () => {
+  it('but once she has had way on since, stopping again, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 6, thenWay: true })).toBe(2);
+  }, 120000);
+  it('a boat with steerage way creeping into another, touching every 20 s for ten minutes, isn\'t pinned: she could keep clear, a new incident each time the tangle runs out', () => {
+    expect(tangle({ vA: 0.6, apart: NEAR, every: 20, n: 30 })).toBeGreaterThan(4);
+  }, 120000);
+  it('lying stopped but well off between touches (a few meters of water: she could have kept clear), each new touch past the tangle\'s time a new incident', () => {
+    expect(tangle({ vA: 0.08, apart: CONTACT_GAP + 4, every: 40, n: 6 })).toBeGreaterThan(1);
   }, 120000);
   it('and once they have been a length apart, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.3, apart: FAR })).toBe(3);
