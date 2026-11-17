@@ -81,8 +81,15 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#2fa04a'); rect(g, '#f6d21a', 0, H * 0.7, W, H * 0.3); dot(g, '#f6d21a', W * 0.2, H * 0.46, H * 0.2); } },
   { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
     draw: (g, W, H) => { fill(g, W, H, '#8ec7e8'); rect(g, '#6b5338', 0, H * 0.62, W, H * 0.38); rect(g, '#4c7a3a', 0, H * 0.5, W, H * 0.12); } },
-  { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic: dark blue, white and red; one green oak leaf
-    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.42, 0, W * 0.07, H); rect(g, RED, W * 0.49, 0, W * 0.51, H); oval(g, '#2e8b3e', W * 0.2, H / 2, W * 0.09, H * 0.2, 0.6); } },
+  { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic, 1890: red over white over dark blue, in bands that run to the point; one green oak leaf, lobed, on the white
+    draw: (g, W, H) => { rect(g, RED, 0, 0, W, H * 0.27); rect(g, WHITE, 0, H * 0.27, W, H * 0.46); rect(g, NAVY, 0, H * 0.73, W, H * 0.27);
+      const G = '#2f7d3a', L = H * 0.4, ax = W * 0.115, ay = H * 0.55;
+      g.save(); g.translate(ax, ay); g.rotate(-0.28);
+      rect(g, G, -L * 0.1, -H * 0.012, L * 0.14, H * 0.024); // the stem
+      oval(g, G, L * 0.5, 0, L * 0.5, H * 0.06); // the blade
+      for (const t of [0.2, 0.42, 0.64]) for (const s of [-1, 1]) dot(g, G, L * t, s * H * 0.065, H * (0.05 - t * 0.02)); // the lobes
+      dot(g, G, L * 0.9, 0, H * 0.035);
+      g.restore(); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.5, // established: navy, white and green; one oak tree
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.18, H * 0.56, W * 0.04, H * 0.2); dot(g, '#2e8b3e', W * 0.2, H * 0.42, H * 0.17); } },
   { id: 'iyc', shape: 'pennant', ratio: 2, // modern, thrifty: sand, white and teal stripes
