@@ -32,6 +32,21 @@ function hook(g: G, cx: number, cy: number, h: number, c: string, rot = 0, lw = 
   g.drawImage(t, 0, 0);
 }
 
+/** A raised fist, traced from the owner's reference image (unit points, fist height 1): the palm and each knuckle are separate pieces, so the creases between them stay open. */
+const FIST_W = 0.567839;
+const FIST: P[][] = [
+  [[0.196, 0], [0.221, 0], [0.291, 0.04], [0.286, 0.08], [0.246, 0.166], [0.231, 0.176], [0.126, 0.136], [0.126, 0.116], [0.146, 0.075]],
+  [[0.317, 0.07], [0.352, 0.08], [0.397, 0.116], [0.397, 0.131], [0.367, 0.191], [0.347, 0.216], [0.317, 0.211], [0.266, 0.186], [0.266, 0.166]],
+  [[0.412, 0.151], [0.437, 0.151], [0.457, 0.161], [0.487, 0.186], [0.492, 0.216], [0.407, 0.342], [0.392, 0.357], [0.372, 0.362], [0.337, 0.352], [0.327, 0.342], [0.327, 0.317], [0.357, 0.276], [0.367, 0.256], [0.372, 0.216]],
+  [[0.101, 0.161], [0.136, 0.161], [0.181, 0.176], [0.322, 0.231], [0.337, 0.246], [0.332, 0.281], [0.302, 0.312], [0.246, 0.312], [0.196, 0.302], [0.181, 0.302], [0.171, 0.312], [0.181, 0.322], [0.256, 0.332], [0.291, 0.352], [0.327, 0.417], [0.347, 0.508], [0.357, 0.497], [0.357, 0.457], [0.337, 0.377], [0.362, 0.387], [0.387, 0.382], [0.427, 0.412], [0.462, 0.427], [0.487, 0.422], [0.513, 0.407], [0.523, 0.412], [0.492, 0.548], [0.457, 0.608], [0.452, 0.633], [0.452, 0.965], [0.442, 0.99], [0.432, 0.995], [0.407, 1], [0.151, 1], [0.126, 0.99], [0.116, 0.97], [0.121, 0.593], [0, 0.382], [0.005, 0.322], [0.08, 0.176]],
+  [[0.513, 0.236], [0.523, 0.236], [0.563, 0.276], [0.568, 0.312], [0.492, 0.397], [0.482, 0.402], [0.442, 0.397], [0.417, 0.377], [0.417, 0.357], [0.492, 0.251]],
+];
+function fist(g: G, cx: number, cy: number, h: number, c: string): void {
+  g.save(); g.translate(cx - FIST_W * h / 2, cy - h / 2); g.scale(h, h); g.fillStyle = c;
+  for (const ring of FIST) { g.beginPath(); ring.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); }
+  g.restore();
+}
+
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
@@ -114,8 +129,8 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
   { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; no charge (the name does the work)
     draw: (g, W, H) => { fill(g, W, H, '#003262'); rect(g, '#fdb515', W * 0.2, 0, W * 0.2, H); rect(g, '#fdb515', W * 0.6, 0, W * 0.2, H); } },
-  { id: 'csc', shape: 'pennant', ratio: 1.5, // modern co-op: bright green and yellow, one rising sun
-    draw: (g, W, H) => { fill(g, W, H, '#2fa04a'); rect(g, '#f6d21a', 0, H * 0.7, W, H * 0.3); dot(g, '#f6d21a', W * 0.2, H * 0.46, H * 0.2); } },
+  { id: 'csc', shape: 'pennant', ratio: 1.667, // People's: a co-op, so deep red and white; one raised fist on a white disc
+    draw: (g, W, H) => { fill(g, W, H, '#a81f2b'); dot(g, WHITE, W * 0.21, H * 0.5, H * 0.26); fist(g, W * 0.21, H * 0.5, H * 0.39, '#a81f2b'); } },
   { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
     draw: (g, W, H) => { fill(g, W, H, '#8ec7e8'); rect(g, '#6b5338', 0, H * 0.62, W, H * 0.38); rect(g, '#4c7a3a', 0, H * 0.5, W, H * 0.12); } },
   { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic, 1890 (the owner's template): a dark-blue hoist panel bearing one white oak leaf, then red and white stripes to the point, a gold border, a white hoist band
