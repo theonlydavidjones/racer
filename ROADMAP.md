@@ -121,6 +121,13 @@ What's planned, roughly in order. Done work is described in the README.
 done, in the artifact's own database, so it survives compaction. Each new request goes there as well as here, and moves
 to done there when it ships.
 
+- **Motor sailing: her speed with the sails up and the motor on** (owner, 17 November; accuracy; later, "low priority";
+  1–3 h; Deep Physics): "motoring speed should account for sails being up. sails should impact physics when motor
+  sailing, if they don't already." Found (Roadmap, 17 Nov): physics.ts already adds the outboard's thrust (motor.ts
+  motorForce) to the sails' drive and drag in the one surge equation, so the sails do count. To check and test: motor
+  alone against motor and sails on a reach and close-hauled (faster, toward hull speed), head to wind (the flogging
+  sails slow her), and the apparent wind the sails see while she motors (her motored speed in it); then the physics
+  review.
 - **Mounting the outboard takes far too long: 5 seconds at most** (owner, 17 November; polish; later, "low priority";
   1–2 h; Marinas): "mounting the motor takes way, way too long. 5 seconds max." The crew's lowering and mounting of the
   outboard on its bracket, from the call to running, in 5 s or less.
