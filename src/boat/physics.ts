@@ -101,7 +101,7 @@ export function asternGlide(v0: number, heading: number, windFrom: number, windK
     if (windAt) { const w = windAt(dist, t); windFrom = w.from; windKt = w.kt; drift = driftIn(windFrom, windKt); }
     const ap = sailWind(windFrom, windKt, heading, -ast);
     ast -= surgeAccel(0, drift, airDrag(ap.aws, ap.awa, 1, 0)) * dt; // (what would be headway comes off her sternway: one motion)
-    if (ast > 0) { const left = ast - asternDrag(ast) * dt; ast = left > 1e-4 ? left : 0; } // (as travel slows her)
+    if (ast > 0) { const left = ast - asternDrag(ast) * dt; ast = left > 1e-6 ? left : 0; } // (as travel slows her)
     if (ast > 0) dist += ast * dt;
     if (steers && ast > steerage) steerable += dt; else steers = false;
   }
@@ -1057,8 +1057,10 @@ function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: nu
   // two-tonne boat glides a long way: from a shove of 0.5 m/s, five lengths in four minutes)
   const ast = b.astern ?? 0;
   // (her hull's resistance going through the water, and twice it stern first: ASTERN, an estimate. It falls away with
-  // her speed, so her last way dies slowly; under a tenth of a millimeter a second she's taken as stopped)
-  if (ast > 0) { const left = ast - asternDrag(ast) * dt; b.astern = left > 1e-4 ? left : 0; }
+  // her speed, so her last way dies slowly; under a micron a second she's taken as stopped. Not higher: head to wind in
+  // 3 to 6 kt the wind's push adds less than a tenth of a millimeter a second each step, and at that cutoff she never
+  // began to go astern, then made a third of a meter a second from 7.5 kt: the physics review, 17 Nov 2026)
+  if (ast > 0) { const left = ast - asternDrag(ast) * dt; b.astern = left > 1e-6 ? left : 0; }
   // sideways too, while she's slipping (hove to)
   const sw = b.sway ?? 0, stb = V(b.h + 90);
   b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;

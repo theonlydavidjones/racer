@@ -38,6 +38,17 @@ describe('the wind on her with no way on (bare poles)', () => {
     expect(u.v).toBe(0); expect(as / n).toBeGreaterThan(0.7 * s); expect(as / n).toBeLessThan(1.3 * s);
     expect(s).toBeGreaterThan(0.7); expect(s).toBeLessThan(1.5); // (about 1 m/s in 15 kt)
   });
+  it('in a light air too: head to wind in 5 kt she gathers sternway from rest, to the same balance (no wind too light to start her)', () => {
+    // (the physics review, 17 Nov 2026: a stop taken at a tenth of a millimeter a second wiped out each step's push in
+    // 3 to 6 kt, more than the push added, so she lay dead still up to 6.6 kt and made a third of a meter a second at 7.5)
+    const { w, u } = world(5);
+    let a2 = 0, as = 0, n = 0;
+    for (let i = 0; i < 60 * 240; i++) { hold(w, w.windHere(u, u).from); w.step(DT); if (i >= 60 * 180) { a2 += u.aws ** 2; as += u.astern ?? 0; n++; } }
+    const V = Math.sqrt(a2 / n) * Math.log(4.29 / 0.005) / Math.log(10 / 0.005), push = 0.5 * 1.225 * V * V * HANDLING.windageCdA;
+    let lo = 0, hi = 3; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (ASTERN * hullResistance(m) < push) lo = m; else hi = m; }
+    expect(lo).toBeGreaterThan(0.05); // (the balance itself is a real sternway: about 0.2 m/s)
+    expect(as / n).toBeGreaterThan(0.7 * lo); expect(as / n).toBeLessThan(1.3 * lo);
+  });
   it('beam-on she\'s set to leeward, to where the wind on her side (windSide) meets her hull and keel broadside (crossCd)', () => {
     const { w, u } = world(15);
     for (let i = 0; i < 60 * 60; i++) { hold(w, w.windHere(u, u).from + 90); u.v = 0; u.astern = 0; w.step(DT); }
