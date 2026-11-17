@@ -36,7 +36,7 @@ describe('the wind on her with no way on (bare poles)', () => {
     let lo = 0, hi = 3; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (ASTERN * hullResistance(m) < push) lo = m; else hi = m; }
     const s = lo;
     expect(u.v).toBe(0); expect(as / n).toBeGreaterThan(0.7 * s); expect(as / n).toBeLessThan(1.3 * s);
-    expect(s).toBeGreaterThan(0.7); expect(s).toBeLessThan(1.5); // (about 1 m/s in 15 kt)
+    expect(s).toBeGreaterThan(0.7); expect(s).toBeLessThan(1.5); // (about 1 m/s in 15 kt: the window re-derived from the sourced drag's balance, 17 Nov 2026; it was 0.4 to 1.0 on the unsourced one)
   });
   it('in a light air too: head to wind in 5 kt she gathers sternway from rest, to the same balance (no wind too light to start her)', () => {
     // (the physics review, 17 Nov 2026: a stop taken at a tenth of a millimeter a second wiped out each step's push in
@@ -61,8 +61,10 @@ describe('the wind on her with no way on (bare poles)', () => {
     const { w, u } = world(15);
     for (let i = 0; i < 60 * 30; i++) { hold(w, w.windHere(u, u).from); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
     expect(u.astern ?? 0).toBeGreaterThan(0.3);
-    // (three minutes, not one: on her hull's own drag she carries more sternway into the turn, and takes longer to lose it)
-    for (let i = 0; i < 60 * 180; i++) { hold(w, w.windHere(u, u).from + 150); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
+    // (95 s. Sim-measured on the sourced sternway drag, 17 Nov 2026: she carries 0.60 m/s of sternway into the turn, loses
+    // it in 42.5 s and is making 0.2 m/s ahead at 61.5 s. On the earlier unsourced drag: 0.39 m/s, 18.9 s and 38.7 s,
+    // under an allowance of 60 s. The same headroom: 61.5 x 60 / 38.7 = 95. The Coordinator's ruling, 17 Nov 2026)
+    for (let i = 0; i < 60 * 95; i++) { hold(w, w.windHere(u, u).from + 150); w.step(DT); expect(u.v > 0 && (u.astern ?? 0) > 0).toBe(false); }
     expect(u.v).toBeGreaterThan(0.2); expect(u.astern ?? 0).toBe(0); // (blown off downwind on her bare rig, ahead now)
   });
   it('in irons with her sails up she gathers sternway, faster than on her bare rig (the flogging cloth\'s windage too)', () => {

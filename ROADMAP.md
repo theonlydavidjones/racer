@@ -99,6 +99,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
   yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
   sternway; ~~the end tie's push-off doesn't allow for the wind setting her back onto the dock~~ (done: her bow's pushed off to close-hauled, away from the dock; a boat set sideways now stops against a dock or the shore instead of passing through).
+- **Her bare hull's windage at its own height, and the bare-poles drift ahead** (physics review of the sternway drag,
+  17 Nov 2026; for Deep Physics, later): the wind on her bare hull and rig (windageCdA 2.0, ORC) is all taken at the
+  sails' height (4.29 m), but about 1.17 m² of it is hull near 0.6 m, where the log profile gives 0.63 of the wind
+  against 0.889: weighted by height the push falls about 30% and her terminal sternway about 15%. And a wind abaft the
+  beam drifts her ahead at a tenth of the wind (1.03 m/s in 20 kt), unsourced, where a force balance on the same
+  windage gives about 1.4 m/s; stern first she now makes 1.07 m/s against twice the drag.
 - ~~**The sea inside the marinas**~~ (done, bay-east-7: the swell diffracts through each entrance by the exact gap solution, scripts/make-gap-diffraction.py, the Penney & Price problem the Shore Protection Manual draws for B/L 0.5–5; the fetch is traced finely just outside a marina as well as inside, every 2° by one, and blended between its 10 m nodes;
   swell running past an entrance bends round its breakwater head by Sommerfeld's half-plane solution; over a swell's
   spread of directions, Mitsuyasu/Goda s 75. Left out, from review: the basin's own walls reflecting the waves (Gashouse
@@ -313,6 +319,11 @@ What's planned, roughly in order. Done work is described in the README.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **A gentler way out than the walk-pace shove (Marinas; from the sourced sternway drag, 17 Nov 2026):** the gentlest
+     shove the crew give is their walk, 0.45 m/s, which now glides her 23 m in still air, so six South Beach berths
+     (D2, E1, E2, F1, F2, G1; 9–12 m of clear water astern) are kept fast in a dead calm. A real crew hands her out
+     slower, checks her on a line, or paddles. And the plan is judged over 90 s, after which she still has about
+     0.2 m/s and creeps on some 14 m: judge it to her way lost, with a longer look.
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
      from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. The lee's edge is allowed for in the shove (done,
      Deep Physics: gauged to the wind along her line out and to leeward of it, World.windAstern; Corinthian B16 in a 20 kt

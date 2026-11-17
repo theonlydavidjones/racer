@@ -24,7 +24,7 @@ describe('steering astern, shoved off under bare poles', () => {
     for (const helm of [key, tiller]) {
       const r = shoved(0.5, helm);
       expect(Math.abs(r.turned)).toBeGreaterThan(10); expect(Math.abs(r.turned)).toBeLessThan(30);
-      expect(r.astern).toBeGreaterThan(0.35); expect(r.ahead).toBe(0);
+      expect(r.astern).toBeGreaterThan(0.35); expect(r.ahead).toBe(0); // (0.35, tightened 17 Nov 2026 on the sourced sternway drag: it was 0.25, with 0.31 left, on the unsourced one)
     }
   });
   it('the helm works the other way round from going ahead: the same key swings her bow the opposite way', () => {
@@ -82,7 +82,8 @@ describe('steering astern, shoved off under bare poles', () => {
     // 17 Nov 2026: 6.79 degrees in the 8 s; it was 5.87, under a bound of 6, on the earlier unsourced drag, which took her
     // sternway off sooner: here she still has 0.42 m/s of it at the end, so the flow steers her the whole time. And what
     // the case is about, the contrast: well under half the key's turn, 17.3)
-    expect(hand).toBeLessThan(8); expect(hand).toBeLessThan(0.4 * key);
+    // (7: the old bound's headroom, 6 over 5.87, on the new measurement. The Coordinator's ruling, 17 Nov 2026)
+    expect(hand).toBeLessThan(7); expect(hand).toBeLessThan(0.4 * key);
   });
   it('a wind on her stern shortens the glide, a wind on her bow carries her on', () => {
     const calm = asternGlide(0.64, 0, 90, 0), stern = asternGlide(0.64, 0, 180, 20), bow = asternGlide(0.64, 0, 0, 20);
