@@ -130,9 +130,10 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#f2c200'); wheel(g, W * 0.27, H * 0.5, H * 0.29, '#14295c', '#f2c200'); } },
   { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // Monarch Point: three equal bands, one for each club that merged in 1974: monarch orange, sunflower yellow, harbor teal
     draw: (g, W, H) => { rect(g, '#e8590c', 0, 0, W, H / 3); rect(g, '#f6c026', 0, H / 3, W, H / 3); rect(g, '#0f5d6b', 0, H * 2 / 3, W, H / 3); } },
-  { id: 'tiyc', shape: 'pennant', ratio: 1.6, // Clipper Cove, from the owner's reference (to flag for IP review: the layout is a real club's): a red hoist panel bearing the gold letters CCYC on a diagonal, then navy and white stripes to the point
-    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#d8312b', 0, 0, W * 0.41, H);
-      for (let i = 0; i < 9; i += 2) rect(g, '#14196b', W * (0.41 + i * 0.07), 0, W * 0.07, H);
+  { id: 'tiyc', shape: 'pennant', ratio: 1.6, // Clipper Cove, from the owner's reference (to flag for IP review: the layout is a real club's): a dark-blue hoist panel bearing the gold letters CCYC on a diagonal, then red and white stripes to the point
+    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#14196b', 0, 0, W * 0.41, H);
+      // red and white stripes: six of one width, then the last red one runs the rest of the way, so the stripe at the point has width
+      for (let i = 0; i < 7; i += 2) rect(g, '#d8312b', W * (0.41 + i * 0.075), 0, i === 6 ? W : W * 0.075, H);
       g.fillStyle = '#f4c542'; g.font = `bold ${Math.round(H * 0.19)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
       'CCYC'.split('').forEach((ch, i) => g.fillText(ch, W * (0.075 + i * 0.08), H * (0.3 + i * 0.13))); } },
   // ---- Marin
