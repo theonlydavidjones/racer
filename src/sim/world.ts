@@ -205,7 +205,8 @@ export const SHOVE_N = 27 * 9.80665;
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /** How long she's to have steerage way stern first once she's shoved, s (over 0.3 m/s: about 1.3 deg/s with the helm hard
  * over): the bar's 10 s, and three more for the sim's scatter about asternGlide (0.4 s held straight, Deep Physics' check;
- * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.555 m/s; a breeze on her
+ * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.362 m/s on the sourced drag
+ * (0.555 on the old: Deep Physics, 17 Nov 2026), and the gentlest such shove glides her 19 m in 90 s; a breeze on her
  * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
 /** How far along her line astern the crew read the breeze before the shove, how far to leeward of it, and how often, m
@@ -214,7 +215,7 @@ const STEER_FOR = 13;
  * wind in 20 m). And her set to leeward, m/s per knot of the breeze on her beam, lying stern first with no sail up: the
  * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. */
 const ASTERN_WIND_FAR = 40, ASTERN_SET_FAR = 16, ASTERN_WIND_STEP = 4, SET_PER_KT = 0.019;
-useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE); // (the planner's look along her glide)
+useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE, WALK, STEER_FOR); // (the planner's look along her glide, and the gentlest shove's)
 /**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
  * ½·ρ·Cd·∫r³dA along her length (the lateral area spread evenly over it: A·L³/4). About 1×10⁵: at 3°/s about 300 N·m.

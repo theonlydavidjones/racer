@@ -451,15 +451,35 @@ function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
 }
 /**
  * Her glide stern first in still air from the crew's full shove (world.ts ASTERN_SHOVE, about 0.64 m/s), to where she's lost
- * her way, m: about 11.4 m on physics.ts's sternway drag (asternCoast; tests/pushoff-astern.test.ts holds the two together).
- * What the planner looks along when it's given no glide (geo/ alone, in a test); the World gives it the glide in the wind.
+ * her way, m: about 44.5 m on physics.ts's sourced sternway drag (asternCoast, twice her resistance ahead, Deep Physics,
+ * 17 Nov 2026; 11.4 m on the old law; tests/pushoff-astern.test.ts holds the two together). What the planner looks along
+ * when it's given no glide (geo/ alone, in a test), up to ASTERN_LOOK_MAX; the World gives it the glide in the wind.
  */
-export const ASTERN_RUN = 12;
+export const ASTERN_RUN = 45;
 /** Her glide stern first under bare poles in the wind there is (physics.ts asternGlide), given to the planner by the World
  * (geo/ can't import the physics: it's imported by it), with the crew's full shove (world.ts ASTERN_SHOVE). */
 export type AsternGlide = (v0: number, heading: number, windFrom: number, windKt: number, secs?: number) => { dist: number; steerable: number; going: boolean };
-let glide: { f: AsternGlide; shove: number } | null = null;
-export const useAsternGlide = (f: AsternGlide, shove: number): void => { glide = { f, shove }; astern.clear(); plans.clear(); };
+let glide: { f: AsternGlide; shove: number; least: number; steerFor: number } | null = null;
+/** `least`: the gentlest shove her crew give (their walk back, world.ts WALK); `steerFor`: the steerage she's to have, s
+ * (world.ts STEER_FOR), which may ask more of it. */
+export const useAsternGlide = (f: AsternGlide, shove: number, least = 0, steerFor = 0): void => { glide = { f, shove, least, steerFor }; astern.clear(); plans.clear(); floors.clear(); };
+/**
+ * How far the gentlest shove she's given carries her, stern first in the wind there is, m: her crew's walk, or more where
+ * that wouldn't steer her STEER_FOR s, as the World gauges it (world.ts). Shoved into less clear water than this, she runs
+ * on past it whatever they do: 22 m in still air on the sourced drag (17 Nov 2026), more with a breeze on her bow. Without
+ * the World's glide (geo/ alone), ASTERN_ENOUGH.
+ */
+const floors = new Map<string, number>();
+function leastGlide(heading: number, windFrom: number | undefined, windKt: number): number {
+  if (!glide) return ASTERN_ENOUGH;
+  const G = glide, wf = windFrom ?? 0, wk = windFrom == null ? 0 : windKt, k = `${Math.round(heading)}:${Math.round(wf)}:${Math.round(wk * 2) / 2}`;
+  let d = floors.get(k);
+  if (d == null) {
+    let lo = 0, hi = G.shove; for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; if (G.f(m, heading, wf, wk, ASTERN_GLIDE_S).steerable < G.steerFor) lo = m; else hi = m; }
+    d = G.f(Math.max(G.least, hi), heading, wf, wk, ASTERN_GLIDE_S).dist; floors.set(k, d);
+  }
+  return d;
+}
 /** The glide's horizon, s, for the planner's look and for the World's gauging of the shove alike (one horizon, so the full
  * shove is what she's given where the water's clear): long enough that she has lost her way, short of a breeze on her bow. */
 export const ASTERN_GLIDE_S = 90;
@@ -467,12 +487,14 @@ export const ASTERN_GLIDE_S = 90;
  * helm's scatter about the plan take her a little further; the every-berth sweep, 14 Nov 2026). The planner looks that much
  * further than her glide, so with the water clear the full shove is hers. */
 export const COAST_SHORT = 1;
-/** The furthest the planner looks, m (an ESTIMATE): with a breeze on her bow she glides on and on (20 m in 30 s in 20 kt), and
- * is steered down the fairway or sailed off well before. */
-const ASTERN_LOOK_MAX = 24;
-/** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one (an
- * ESTIMATE: about what the gentlest shove that steers her STEER_FOR s in still air, 0.555 m/s, carries her: 9.4 m). */
-export const ASTERN_ENOUGH = 9;
+/** The furthest the planner looks, m: her whole glide from the full shove in still air over ASTERN_GLIDE_S (30.1 m on the
+ * sourced drag, 17 Nov 2026), and a meter to spare. With a breeze on her bow she glides on and on (54 m in 90 s in 12 kt),
+ * and is steered down the fairway or sailed off well before. */
+const ASTERN_LOOK_MAX = 32;
+/** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one: what the
+ * gentlest shove that steers her STEER_FOR s in still air carries her over ASTERN_GLIDE_S (0.362 m/s, 19.4 m on the sourced
+ * drag, 17 Nov 2026; 0.555 m/s and 9.4 m on the old). */
+export const ASTERN_ENOUGH = 19;
 /** The most she's turned stern first before she's straightened up, deg: her stern pointing down the fairway. */
 const ASTERN_TURN = 90;
 /**
@@ -734,8 +756,12 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // no room to swing her (or the wind would swing her into something): walked back until her bow's at the finger's end,
   // then shoved off astern into the fairway at a walk and more (world.ts ASTERN_SHOVE), and steered stern first: her
   // stern swung round toward the way out with the helm hard over, or straight back where that's the clear way
-  const a = asternWay(s, reach, windFrom, windKt);
+  let a = asternWay(s, reach, windFrom, windKt);
   if (a.kind === 'astern' && a.coast < FAIRWAY_SHORT) { const f = fairway(); if (f) return f; }
+  // (nor shoved into less clear water than the gentlest shove carries her in this wind: she'd run on past it into whatever's
+  // there, unsteerable at a crawl. West Harbor 231 in a 20 kt northerly on the sourced drag, 17 Nov 2026: 20.8 m into a
+  // moored boat. Walked out instead where that fits, else kept fast)
+  if (a.kind === 'astern' && !a.noRoom && a.coast < leastGlide(s.heading, windFrom, windKt) + COAST_SHORT) { const f = fairwayWay(s, reach, togo, windFrom, windKt); if (f) return f; a = { ...a, noRoom: true }; }
   // (shoved off astern and let go where her coast ends, she's held to the same clear water as any let-go, 8m3: the
   // coordinator's ruling, 16 Nov 2026. Where it isn't there, her crew keep her fast rather than shove her into the boats)
   // (and in a breeze, 60 degrees and more off the wind as any let-go: left nearer head to wind, the jib can't fill and the
@@ -756,8 +782,9 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   return a;
 }
 /** Clear water astern shorter than this, m, and she's walked out to the fairway and turned there instead, where that fits:
- * the shove carries her about 11 m in still air (ASTERN_RUN), and in less she runs on past it (an ESTIMATE). */
-const FAIRWAY_SHORT = 10;
+ * even the gentlest shove that steers her carries her 19 m in still air on the sourced drag (ASTERN_ENOUGH; 9.4 m on the
+ * old, when this was 10), and in less she runs on past the clear water, unsteerable at a crawl. */
+const FAIRWAY_SHORT = ASTERN_ENOUGH;
 
 /**
  * Her drift to leeward with no sail up, m/s per knot of wind: about 0.2 m/s in 12 kt, beam on (the sim's own, measured by
@@ -875,8 +902,8 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
   // (clear all the way across the band from straight back to the helm hard over: she turns less than the full circle as her
   // yaw lags and her way falls off, and a helmsman's hand isn't exact; and a hand's breadth to spare all round, sampled finely)
   // (each way's poses every 0.5 m, worked out once; each pose checked once, quickly first)
-  // (as far as her glide from the full shove carries her in the wind there is, and COAST_SHORT more: 12.4 m in still air)
-  const look = glide ? Math.min(ASTERN_LOOK_MAX, Math.max(4, glide.f(glide.shove, s.heading, windFrom ?? 0, windFrom == null ? 0 : windKt, ASTERN_GLIDE_S).dist + COAST_SHORT)) : ASTERN_RUN;
+  // (as far as her glide from the full shove carries her in the wind there is, and COAST_SHORT more: 31.1 m in still air)
+  const look = glide ? Math.min(ASTERN_LOOK_MAX, Math.max(4, glide.f(glide.shove, s.heading, windFrom ?? 0, windFrom == null ? 0 : windKt, ASTERN_GLIDE_S).dist + COAST_SHORT)) : Math.min(ASTERN_LOOK_MAX, ASTERN_RUN);
   const STEP = 0.5, N = Math.round(look / STEP), arcs = new Map<number, { c: Vec; h: number }[]>(), okAt = new Map<string, boolean>();
   const arc = (hf: number) => { let a = arcs.get(hf); if (!a) { a = []; for (let k = 0; k <= N; k++) a.push(asternArc(c0, s.heading, hf, k * STEP)); arcs.set(hf, a); } return a; };
   // (the wind sets her to leeward as she goes: each pose checked where she'd have drifted to as well, by the time she's
