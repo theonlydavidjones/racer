@@ -381,9 +381,10 @@ describe('Hiking, the lines end in the hands (render/crew.ts hikeHold, tailEnd)'
     const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), w = tack === 'S' ? 1 : -1;
     sail(b, 20); for (let i = 0; i < 120; i++) { sail(b, 1 / 30); syncCrew(cr, w, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); }
     expect(b.crew.people.slice(1).every(p => p.pose === 'hike'), 'both hiking').toBe(true);
-    const hands = cr.crew.flatMap(f => [...f.cur!.hands, fistAt(f, 0), fistAt(f, 1)]); // (a wrist, or the middle of a fist: the traveller's in the fist, crewlines.test.ts)
-    // (as boatMesh.ts calls it: the working jib sheet led to the hand wherever it is; the windward traveller line on its side)
-    for (const [name, h, side] of [['the lee jib sheet', cr.sheetHand, undefined], ['the traveller', cr.travHand, w]] as const) {
+    // (the traveller's in the middle of a fist, crewlines.test.ts; the jib sheet still at a wrist, until it's led into the
+    // fist too)
+    const wrists = cr.crew.flatMap(f => f.cur!.hands), fists = cr.crew.flatMap(f => [fistAt(f, 0), fistAt(f, 1)]);
+    for (const [name, h, side, hands] of [['the lee jib sheet', cr.sheetHand, undefined, wrists], ['the traveller', cr.travHand, w, fists]] as const) {
       expect(h, `${name}: held`).toBeTruthy();
       const end = tailEnd(new THREE.Vector3(9, 9, 9), h, side);
       expect(Math.min(...hands.map(q => q.distanceTo(end))), `${name}: its end at a hand, m`).toBeLessThan(1e-6);

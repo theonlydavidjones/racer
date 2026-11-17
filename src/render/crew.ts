@@ -49,6 +49,19 @@ const figure = (p: Person, jacket: number, seed: number): Figure => ({ ...buildB
 export function tailEnd(rest: THREE.Vector3, hand?: THREE.Vector3, side?: number): THREE.Vector3 {
   return hand && (side == null || Math.sign(hand.x) === side) ? hand : rest; // (a side given: only a hand on it, the traveller's own end)
 }
+/** The jib sheet's winch (boatMesh.ts winches: the drum's top, where the sheet comes off it to its tail). */
+export const jibWinch = (s: number) => winchAt(s);
+/**
+ * The jib sheet's tail from its winch (boatMesh.ts draws the sheet through these, after the winch): to the hand of the
+ * hiker holding the working sheet (Crew.sheetHand), else over the coaming and down onto the seat. One place, so a test
+ * can check the line as drawn.
+ */
+export function sheetTail(wv: THREE.Vector3, side: number, hand: THREE.Vector3 | undefined): THREE.Vector3[] {
+  // (off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down onto the
+  // cockpit seat; or, the working sheet in a hiker's hand, across the cockpit to it)
+  const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
+  return [V(side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04), tailEnd(V(side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3), hand).clone()];
+}
 /** The traveller's control line's cam: on the thwart's forward face, just outboard of the track's end (boatMesh.ts). */
 export const travCam = (s: number) => V(s * (TRAV_END + 0.12), THWART.top - 0.06, THWART.z - THWART.half);
 /**

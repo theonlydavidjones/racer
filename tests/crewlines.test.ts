@@ -3,12 +3,13 @@ import * as THREE from 'three';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
-import { buildCrew, fistAt, ground, syncCrew, travCam, travTail, type Crew, type Figure } from '../src/render/crew';
+import { buildCrew, fistAt, ground, jibWinch, sheetTail, syncCrew, travCam, travTail, type Crew, type Figure } from '../src/render/crew';
 import { BONE } from '../src/render/crewBody';
 import { thwartTop, COCKPIT_FIT } from '../src/render/hull';
 
-// The hiker's traveller line, as drawn (boatMesh.ts: from the car's end to the block at the track's end, down to its cam
-// on the thwart's face, then travTail to the hand). The owner on a picture that passed "the lines end in the hands": "middle
+// The hikers' lines, as drawn: the traveller's (boatMesh.ts: from the car's end to the block at the track's end, down to
+// its cam on the thwart's face, then travTail to the middle hand) and the working jib sheet's (from the lee winch,
+// sheetTail, across the cockpit to the forward hand). The owner on a picture that passed "the lines end in the hands": "middle
 // crew is not gripping the line, which instead appears to penetrate his thigh, turn unnaturally at a nearly right angle,
 // then travel parallel to his forearm to terminate in mid air." So: in the fist, clear of the body, and no corners but
 // the ones a real line makes.
@@ -21,9 +22,19 @@ function travLine(cr: Crew, side: number): THREE.Vector3[] {
   return [block, cam, ...travTail(cam, cr.travHand, side)];
 }
 const world = (o: THREE.Object3D, y = 0) => o.localToWorld(V(0, y, 0));
-/** Which hand holds it: the figure and arm whose wrist or fist is at Crew.travHand. */
-function holder(cr: Crew): { f: Figure; i: 0 | 1 } {
-  for (const f of cr.crew) for (const i of [0, 1] as const) if (f.cur!.hands[i].distanceTo(cr.travHand!) < 1e-6 || fistAt(f, i).distanceTo(cr.travHand!) < 1e-6) return { f, i };
+/** The working jib sheet from its winch (the line comes onto the drum from forward, the fairlead), to its tail's end. */
+function jibLine(cr: Crew, side: number): THREE.Vector3[] {
+  const wv = jibWinch(side);
+  return [wv.clone().setZ(wv.z - 0.1), wv, ...sheetTail(wv, side, cr.sheetHand)];
+}
+/** The lines a hiker holds: how each is drawn, from the fitting before it (line[1]: where its tail starts), and its hand. */
+const LINES = [
+  { name: 'the traveller', line: (cr: Crew, w: number) => travLine(cr, w), hand: (cr: Crew) => cr.travHand, from: 'the cam' },
+  { name: 'the jib sheet', line: (cr: Crew, w: number) => jibLine(cr, -w), hand: (cr: Crew) => cr.sheetHand, from: 'the winch' },
+];
+/** Which hand holds it: the figure and arm whose wrist or fist is at `at`. */
+function holder(cr: Crew, at: THREE.Vector3): { f: Figure; i: 0 | 1 } {
+  for (const f of cr.crew) for (const i of [0, 1] as const) if (f.cur!.hands[i].distanceTo(at) < 1e-6 || fistAt(f, i).distanceTo(at) < 1e-6) return { f, i };
   throw new Error('nobody holds it');
 }
 /**
@@ -52,7 +63,7 @@ const above = (p: THREE.Vector3, d: number) => Math.min(...ROUND.map(([i, j]) =>
 const inBoat = (p: THREE.Vector3) => ROUND.every(([i, j]) => p.y < ground(p.x + i * 0.01, p.z + j * 0.01, p.y) - 0.005);
 const turn = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => b.clone().sub(a).angleTo(c.clone().sub(b)) * DEG;
 
-describe("The hiker's traveller line, as drawn: held in the fist, clear of the body, no false corners (crew.ts travTail)", () => {
+for (const L of LINES) describe(`Hiking, ${L.name} as drawn: held in the fist, clear of the body, no false corners (crew.ts travTail, sheetTail)`, () => {
   for (const kt of [15, 18]) for (const tack of ['S', 'P'] as const) {
     const setup = () => {
       const twa = beatAngle(kt), b = testBoat({ heading: tack === 'S' ? 360 - twa : twa, kt: 4, windKt: kt }); b.tack = tack;
@@ -61,8 +72,8 @@ describe("The hiker's traveller line, as drawn: held in the fist, clear of the b
       const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), w = tack === 'S' ? 1 : -1;
       sail(b, 20); for (let i = 0; i < 120; i++) { sail(b, 1 / 30); syncCrew(cr, w, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); }
       expect(b.crew.people.slice(1).every(p => p.pose === 'hike'), 'both hiking').toBe(true);
-      expect(cr.travHand, 'the traveller held').toBeTruthy();
-      return { cr, w, line: travLine(cr, w), ...holder(cr) };
+      const at = L.hand(cr); expect(at, `${L.name} held`).toBeTruthy();
+      return { cr, w, line: L.line(cr, w), ...holder(cr, at!) };
     };
     const name = `${kt} kt, ${tack === 'S' ? 'starboard' : 'port'} tack`;
     it(`${name}: its end inside the closed fist, across the palm`, () => {
@@ -77,7 +88,7 @@ describe("The hiker's traveller line, as drawn: held in the fist, clear of the b
     it(`${name}: no part of it through anyone, or the boat`, () => {
       const { cr, line, f, i } = setup(), bad: string[] = [], h = fist(f, i);
       const figs: [string, Figure][] = [['helm', cr.helm], ...cr.crew.map((g, j) => [`crew${j + 1}`, g] as [string, Figure])];
-      // (from the cam on: the run along the thwart's top and face is the boat's, under nobody)
+      // (from where its tail starts on: the traveller's run along the thwart's top and face is the boat's, under nobody)
       for (let s = 1; s < line.length - 1; s++) {
         const a = line[s], b = line[s + 1], n = Math.max(2, Math.ceil(a.distanceTo(b) / 0.01));
         for (let q = 0; q <= n; q++) { const p = a.clone().lerp(b, q / n);
@@ -85,15 +96,15 @@ describe("The hiker's traveller line, as drawn: held in the fist, clear of the b
           for (const [who, g] of figs) for (const c of parts(g)) { const d = segDist(p, c.a, c.b); if (d < c.r) bad.push(`${who} ${c.name}: ${((c.r - d) * 100).toFixed(1)} cm into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`); }
         }
       }
-      // (nor through the boat: from 3 cm past the cam, in its jaws on the thwart's face, never inside it)
+      // (nor through the boat: from 3 cm past the cam (in its jaws on the thwart's face) or the winch, never inside it)
       for (let s = 1; s < line.length - 1; s++) for (let q = 0; q <= 20; q++) { const p = line[s].clone().lerp(line[s + 1], q / 20);
         if (p.distanceTo(line[1]) < 0.03) continue; if (inBoat(p)) bad.push(`the boat: ${((ground(p.x, p.z, p.y) - p.y) * 100).toFixed(1)} cm under its surface at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`); }
       expect([...new Set(bad)].slice(0, 8)).toEqual([]);
       void i;
     });
-    it(`${name}: no corner but the block, the cam and the hand`, () => {
+    it(`${name}: no corner but ${L.from} and the hand`, () => {
       const { line } = setup(), bad: string[] = [];
-      // (line[0] the block, line[1] the cam, the last the hand: every point between them a gentle curve, a line's own
+      // (line[1] the cam or the winch, the last the hand: every point between them a gentle curve, a line's own
       // sag, never more than 20° at one point; or where it lies over an edge of the boat, the coaming's, and turns on it:
       // a point within 1.5 cm of the surface there, a fairlead of a sort. Never a corner in the air)
       for (let j = 2; j < line.length - 1; j++) { const a = turn(line[j - 1], line[j], line[j + 1]), p = line[j], onEdge = above(p, 0.015) < 0.015;

@@ -10,7 +10,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tailEnd, tillerTip, travCam, travTail, type Crew } from './crew';
+import { buildCrew, dockhand, sheetTail, syncCrew, tillerTip, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -1807,13 +1807,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
     for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(13 + k, x, restOn(x, z) + 0.012, z); }
     at(17, fl.x, fl.y + 0.035, fl.z);
     const wv = L2.winches[tk]; at(18, wv.x, wv.y, wv.z);
-    // (the tail: off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down
-    // onto the cockpit seat)
-    const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
-    at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
-    // (or, the working sheet in a hiker's hand, across the cockpit to it: Crew.sheetHand)
+    // (the tail: crew.ts sheetTail, over the coaming onto the seat, or across to the hand of the hiker who has the working
+    // sheet: Crew.sheetHand)
     const sh = (m.crew as { sheetHand?: THREE.Vector3 }).sheetHand;
-    { const e = tailEnd(tmpG.set(side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3), loaded ? sh : undefined); at(20, e.x, e.y, e.z); }
+    sheetTail(wv, side, loaded ? sh : undefined).forEach((p, j) => at(19 + j, p.x, p.y, p.z));
   }
   q.needsUpdate = true;
 }
