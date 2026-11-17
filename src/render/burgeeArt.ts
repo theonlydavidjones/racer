@@ -47,6 +47,18 @@ function fist(g: G, cx: number, cy: number, h: number, c: string): void {
   g.restore();
 }
 
+/** A mission bell, traced from the owner's reference image (unit points, bell height 1): the dome, and the band with the clapper below it, are separate pieces. */
+const BELL_W = 0.894886;
+const BELL: P[][] = [
+  [[0.4318, 0], [0.4602, 0.0028], [0.4801, 0.0114], [0.5085, 0.0369], [0.5284, 0.0767], [0.5398, 0.0881], [0.6193, 0.1222], [0.6648, 0.1534], [0.7216, 0.2074], [0.7557, 0.2528], [0.7955, 0.3324], [0.821, 0.4261], [0.8267, 0.4744], [0.8267, 0.5511], [0.821, 0.5682], [0.8097, 0.5767], [0.6932, 0.608], [0.6222, 0.6193], [0.5142, 0.6278], [0.3835, 0.6278], [0.1989, 0.608], [0.0682, 0.5739], [0.0597, 0.5028], [0.0653, 0.4403], [0.0909, 0.3409], [0.125, 0.267], [0.1619, 0.2159], [0.2216, 0.1562], [0.267, 0.125], [0.3438, 0.0909], [0.3551, 0.0795], [0.375, 0.0426], [0.4034, 0.0142]],
+  [[0.8125, 0.6619], [0.8295, 0.6619], [0.8949, 0.8267], [0.7955, 0.8523], [0.6932, 0.8608], [0.6307, 0.8722], [0.5824, 0.8722], [0.5795, 0.8807], [0.5852, 0.9091], [0.5682, 0.9489], [0.5398, 0.9744], [0.4943, 0.9943], [0.4602, 1], [0.4148, 1], [0.3835, 0.9915], [0.3466, 0.9716], [0.3182, 0.946], [0.3097, 0.9318], [0.3097, 0.8665], [0.2188, 0.8636], [0.1477, 0.8551], [0, 0.8267], [0.0426, 0.6705], [0.0909, 0.6733], [0.1619, 0.6903], [0.2869, 0.7017], [0.4006, 0.6989], [0.4432, 0.7045], [0.5653, 0.7074], [0.6932, 0.6932]],
+];
+function bell(g: G, cx: number, cy: number, h: number, rot: number, c: string): void {
+  g.save(); g.translate(cx, cy); g.rotate(rot); g.translate(-BELL_W * h / 2, -h / 2); g.scale(h, h); g.fillStyle = c;
+  for (const ring of BELL) { g.beginPath(); ring.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); }
+  g.restore();
+}
+
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
@@ -122,9 +134,8 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#f0e9d0'); rect(g, '#1f8c8a', 0, 0, W * 0.07, H); stroke(g, '#3d7a35', H * 0.07, [W * 0.12, H * 0.3], [W * 0.3, H * 0.3]); for (const x of [0.15, 0.21, 0.27]) stroke(g, '#3d7a35', H * 0.06, [W * x, H * 0.3], [W * x, H * 0.62]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
     draw: (g, W, H) => { fill(g, W, H, '#2a62b8'); poly(g, '#2f7d4a', [W * 0.05, H * 0.7], [W * 0.2, H * 0.28], [W * 0.35, H * 0.7]); poly(g, WHITE, [W * 0.155, H * 0.42], [W * 0.2, H * 0.28], [W * 0.245, H * 0.42]); } },
-  { id: 'sryc', shape: 'pennant', ratio: 1.5, // quiet: deep blue and white, one sandstone bell
-    draw: (g, W, H) => { fill(g, W, H, '#17386e'); rect(g, WHITE, W * 0.52, 0, W * 0.48, H); poly(g, '#d2a46e', [W * 0.07, H * 0.66], [W * 0.12, H * 0.58], [W * 0.13, H * 0.38], [W * 0.2, H * 0.25], [W * 0.27, H * 0.38], [W * 0.28, H * 0.58], [W * 0.33, H * 0.66]); } },
-  // ---- East Bay
+  { id: 'sryc', shape: 'pennant', ratio: 1.5, // Mission Canal: one mission bell (the owner's drawing) at the top-left, its axis toward the corner, cream on mission-tile red, a plain field
+    draw: (g, W, H) => { fill(g, W, H, '#8f3b2b'); bell(g, H * 0.39, H * 0.49, H * 0.56, -Math.PI / 4, '#f1e3c6'); } },
   { id: 'ryc', shape: 'pennant', ratio: 1.5, // DIY: brick red, black and white; one kiln chimney
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
   { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; no charge (the name does the work)
