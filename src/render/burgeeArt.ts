@@ -52,8 +52,13 @@ export const PARODY_BURGEES: Burgee[] = [
       g.strokeStyle = S; g.lineWidth = u * 0.04; g.beginPath(); g.arc(x, y - u * 0.26, u * 0.05, 0, 7); g.stroke(); // the ring
       arc(g, S, u * 0.05, x, y + u * 0.02, u * 0.2, 0.12 * Math.PI, 0.88 * Math.PI); // the arms
       for (const s of [-1, 1]) poly(g, S, [x + s * u * 0.14, y + u * 0.2 - u * 0.03], [x + s * u * 0.27, y + u * 0.05], [x + s * u * 0.14, y + u * 0.08]); } },
-  { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic: dark blue over red, one gold torch
-    draw: (g, W, H) => { half(g, W, H, NAVY, RED); poly(g, GOLD, [W * 0.16, H * 0.56], [W * 0.26, H * 0.56], [W * 0.24, H * 0.7], [W * 0.18, H * 0.7]); poly(g, GOLD, [W * 0.21, H * 0.2], [W * 0.27, H * 0.38], [W * 0.21, H * 0.5], [W * 0.15, H * 0.38]); } },
+  { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic, the amateur's club: dark blue over red, a white line between, one gold laurel wreath (the Greek games) on the line
+    draw: (g, W, H) => { half(g, W, H, NAVY, RED); rect(g, WHITE, 0, H * 0.5 - H * 0.018, W, H * 0.036);
+      const x = W * 0.235, y = H * 0.5, r = H * 0.2, d = Math.PI / 180;
+      for (const s of [-1, 1]) { // two branches from the bottom, each a stem with leaves pairing off it, growing up
+        const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.035, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
+        for (let i = 0; i < 5; i++) { const a = (s > 0 ? 70 - i * 24 : 110 + i * 24) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+          for (const k of [-1, 1]) { const dir = grow + k * 0.75; oval(g, GOLD, px + Math.cos(dir) * H * 0.06, py + Math.sin(dir) * H * 0.06, H * 0.065, H * 0.028, dir); } } } } },
   { id: 'tyc', shape: 'pennant', ratio: 1.8, // mid-century: deep blue over gray water, one white fin
     draw: (g, W, H) => { rect(g, '#16386b', 0, 0, W, H * 0.64); rect(g, '#8d99a6', 0, H * 0.64, W, H * 0.36); poly(g, WHITE, [W * 0.09, H * 0.64], [W * 0.17, H * 0.22], [W * 0.27, H * 0.64]); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
