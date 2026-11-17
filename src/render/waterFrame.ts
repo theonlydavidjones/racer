@@ -63,7 +63,6 @@ export class FoamFrame {
 export class EnvelopeFrame {
   private readonly sd = new Float64Array(N_WAVES); private readonly cd = new Float64Array(N_WAVES);
   private readonly ua = new Float64Array(N_WAVES); private readonly uc = new Float64Array(N_WAVES);
-  private readonly cg = new Float64Array(N_WAVES);
   private primed = false;
   pack(f: WaveField, e: Float32Array, t: number, o: Vec, about: Vec): void {
     for (let i = 0; i < N_WAVES; i++) {
@@ -74,12 +73,7 @@ export class EnvelopeFrame {
         this.uc[i] += about.x * (-this.cd[i] + c) + about.y * (this.sd[i] - s);
       }
       this.sd[i] = s; this.cd[i] = c;
-      // (the groups run at the group speed, c·n: n = ½ in deep water, toward 1 in shallow, n = ½(1 + 2kd / sinh 2kd),
-      // linear theory, Dean & Dalrymple ch. 3. When the depth changes it, the groups where they are carry on: the change
-      // times the wave time, thousands of seconds, would otherwise slide them across the water)
-      const k = f.k[i], kd = k * f.depth, n = kd < 20 ? 0.5 * (1 + 2 * kd / Math.sinh(2 * kd)) : 0.5, cg = k > 0 ? n * f.w[i] / k : 0;
-      if (this.primed && cg !== this.cg[i]) this.ua[i] += (cg - this.cg[i]) * t;
-      this.cg[i] = cg;
+      const cg = f.k[i] > 0 ? 0.5 * f.w[i] / f.k[i] : 0;
       e[i * 2] = o.x * s + o.y * c - cg * t + this.ua[i];
       e[i * 2 + 1] = 0.4 * (-o.x * c + o.y * s + this.uc[i]);
     }
