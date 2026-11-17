@@ -473,7 +473,6 @@ export class World {
     this.homeSlip = slipById(settings.boat?.slip);
     // (the boats in the other slips solid to her: physics.ts; the slips of the player's own boats empty, as the scene draws them)
     mooredBoats.empty = new Set([this.homeSlip?.id, ...(settings.boats ?? []).map(b => slipById(b.slip)?.id)].filter((id): id is string => !!id));
-    if (this.homeSlip && this.freeSail) harborRoute(this.homeSlip); // (her way home, worked out now, not mid-cruise: navTarget)
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
@@ -2563,8 +2562,10 @@ export class World {
     // its water runs out past the breakwater ends, as at Richmond)
     if (harborAt(b) === H) { yours(this.homeOut ? 'At the harbor mouth' : 'In the harbor'); this.homeOut = false; return null; }
     this.homeOut = true;
-    // (the way in, all at once: worked out when she's given her slip (the constructor) or sent home, so where she's steered
-    // never hangs on how fast the host is; worked out a slice at a time against the clock, the same race sailed twice went
+    // (the way in, all at once: worked out when she's sent home, or here the first time the pilot asks (a cruise begun
+    // bound for her slip), so where she's steered never hangs on how fast the host is. Not when the World's made: a
+    // harbor's flood held in memory alongside the page's own planning, in one process, doubled the Sail Home test's plan
+    // from Mile Rock (17 Nov 2026); worked out a slice at a time against the clock, the same race sailed twice went
     // two ways at South Beach and Berkeley, the second review, 17 Nov 2026. Each harbor's flood once, cached)
     let mouth = harborRoute(slip)?.mouth;
     if (!mouth) { mouth = H.exits[0]; for (const e of H.exits) if (dist(e, slip.p) < dist(mouth, slip.p)) mouth = e; }
