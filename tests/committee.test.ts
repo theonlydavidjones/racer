@@ -5,7 +5,7 @@ import { DT, World } from '../src/sim/world';
 import { D2R, KT, V, brg, sub, wrap } from '../src/core/math';
 import { buildCourse, type CourseFile } from '../src/courses/course';
 import { beatAngle, polar, runAngle } from '../src/boat/polar';
-import { TARGET_MIN, chooseCourse, estimateCourse, legTime, raceDay } from '../src/courses/committee';
+import { TARGET_MIN, TIME_FIT, chooseCourse, estimateCourse, legTime, raceDay } from '../src/courses/committee';
 
 const settings = (o: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, windKind: 'west', tideDate: '2026-11-14', tideTime: '13:00', traffic: 0, ...o });
 const NM = 1852, still = { x: 0, y: 0 };
@@ -95,14 +95,28 @@ describe('a start to leeward (the courses starting east)', () => {
 });
 
 describe('The first leg (World Sailing Race Management Manual J.2.2: "a race should start with a beat or have a beating leg as soon as possible after the start")', () => {
-  it('a southerly day where no course starts with a beat (12 Nov 2026, 14:35, 11.9 kt from 203°, a short race): the first leg nearest a beat the courses have, and not a two-minute dash to a mark', () => {
-    const S = { ...DEFAULT_SETTINGS, course: 'rc', windKind: 'auto', windKt: 0, windDay: 0, tideDate: '2026-11-12', tideTime: '14:35', raceLength: 'short', current: 'real', fleet: 7 } as Settings;
-    const pool = COURSES.filter(c => c.group?.startsWith('Seaweed Soup')), day = raceDay(S, pool[0].windBase);
-    // (each course's first leg, off the wind at the line: worked out here from the course itself)
-    const twa1 = (f: CourseFile) => { const C = buildCourse(f, { bias: 0, fleet: 7, windFrom: day.fromAtGun }), d = sub(C.marks[0].p, C.center); return Math.abs(wrap(brg(d.x, d.y) - day.wind(C.center, 0).from)); };
-    const best = Math.min(...pool.map(twa1));
-    const pick = chooseCourse(COURSES, S)!.est;
-    expect(twa1(pick.file)).toBeLessThanOrEqual(best + 5);
-    expect(estimateCourse(pick.file, day, 7).legs[0].minutes).toBeGreaterThan(5);
+  const pool = COURSES.filter(c => c.group?.startsWith('Seaweed Soup'));
+  /** Worked out here from the courses themselves: those that fit the time, and each one's first leg off the wind. */
+  const committee = (S: Settings) => {
+    const day = raceDay(S, pool[0].windBase), target = TARGET_MIN[S.raceLength as 'short'];
+    const off = (f: CourseFile) => { const e = estimateCourse(f, day, S.fleet); return Math.abs(Math.log(e.minutes / target)) + (e.slowestKt < 1 ? 1 : 0); };
+    const fits = pool.filter(f => off(f) <= TIME_FIT);
+    const twa1 = (f: CourseFile) => { const C = buildCourse(f, { bias: 0, fleet: S.fleet, windFrom: day.fromAtGun }), d = sub(C.marks[0].p, C.center); return Math.abs(wrap(brg(d.x, d.y) - day.wind(C.center, 0).from)); };
+    const leg1 = (f: CourseFile) => estimateCourse(f, day, S.fleet).legs[0].minutes;
+    return { fits, twa1, off, leg1, pick: chooseCourse(COURSES, S)!.est.file };
+  };
+  it('a southerly day where no course starts with a beat (12 Nov 2026, 14:35, a short race): of the courses that fit the time, the one whose first leg is nearest a beat and long enough to spread the fleet (J.3.1), not a two-minute dash to a mark', () => {
+    const { fits, twa1, off, leg1, pick } = committee({ ...DEFAULT_SETTINGS, course: 'rc', windKind: 'auto', windKt: 0, windDay: 0, tideDate: '2026-11-12', tideTime: '14:35', raceLength: 'short', current: 'real', fleet: 7 } as Settings);
+    expect(fits.length).toBeGreaterThan(0);
+    expect(off(pick)).toBeLessThanOrEqual(TIME_FIT); // (it fits the time)
+    const spread = fits.filter(f => leg1(f) > 5);
+    expect(leg1(pick)).toBeGreaterThan(5);
+    expect(twa1(pick)).toBeLessThanOrEqual(Math.min(...spread.map(twa1)) + 5);
+  });
+  it('a westerly: a course that fits the time and starts with a beat', () => {
+    const { fits, twa1, off, pick } = committee({ ...DEFAULT_SETTINGS, course: 'rc', windKind: 'west', windKt: 14, current: 'slack', raceLength: 'medium', tideDate: '2026-11-14', tideTime: '13:00' } as Settings);
+    expect(fits.some(f => twa1(f) < 55)).toBe(true);
+    expect(off(pick)).toBeLessThanOrEqual(TIME_FIT);
+    expect(twa1(pick)).toBeLessThan(55);
   });
 });
