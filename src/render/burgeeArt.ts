@@ -130,24 +130,11 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#f2c200'); wheel(g, W * 0.27, H * 0.5, H * 0.29, '#14295c', '#f2c200'); } },
   { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // Monarch Point: three equal bands, one for each club that merged in 1974: monarch orange, sunflower yellow, harbor teal
     draw: (g, W, H) => { rect(g, '#e8590c', 0, 0, W, H / 3); rect(g, '#f6c026', 0, H / 3, W, H / 3); rect(g, '#0f5d6b', 0, H * 2 / 3, W, H / 3); } },
-  { id: 'tiyc', shape: 'pennant', ratio: 1.6, // Clipper Cove, from the owner's reference (to flag for IP review: the layout is a real club's): a red hoist panel bearing one gold clipper under sail, then navy and white stripes to the point
+  { id: 'tiyc', shape: 'pennant', ratio: 1.6, // Clipper Cove, from the owner's reference (to flag for IP review: the layout is a real club's): a red hoist panel bearing the gold letters SSYC on a diagonal, then navy and white stripes to the point
     draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#d8312b', 0, 0, W * 0.41, H);
       for (let i = 0; i < 9; i += 2) rect(g, '#14196b', W * (0.41 + i * 0.07), 0, W * 0.07, H);
-      const gold = '#f4c542', x0 = W * 0.05, y0 = H * 0.25, w = W * 0.28, h = H * 0.54;
-      const X = (x: number) => x0 + x * w, Y = (y: number) => y0 + y * h;
-      g.fillStyle = gold; g.strokeStyle = gold; g.lineCap = 'butt';
-      // the hull: a long, low, sweeping sheer, the stern a little raised, the bow raked
-      g.beginPath(); g.moveTo(X(0.0), Y(0.7)); g.quadraticCurveTo(X(0.5), Y(0.84), X(1.04), Y(0.66)); g.lineTo(X(0.9), Y(0.93)); g.quadraticCurveTo(X(0.5), Y(1.0), X(0.1), Y(0.94)); g.closePath(); g.fill();
-      g.lineWidth = h * 0.045; g.beginPath(); g.moveTo(X(1.0), Y(0.68)); g.lineTo(X(1.17), Y(0.56)); g.stroke(); // the bowsprit
-      // three masts, each carrying two billowed square sails with a gap between
-      for (const m of [0.2, 0.46, 0.72]) {
-        g.lineWidth = h * 0.03; g.beginPath(); g.moveTo(X(m), Y(0.74)); g.lineTo(X(m - 0.015), Y(0.04)); g.stroke();
-        for (const [t, b, hw] of [[0.07, 0.3, 0.075], [0.36, 0.69, 0.11]]) {
-          g.beginPath(); g.moveTo(X(m - hw), Y(t)); g.lineTo(X(m + hw), Y(t)); g.lineTo(X(m + hw * 1.06), Y(b));
-          g.quadraticCurveTo(X(m), Y(b + 0.05), X(m - hw * 1.06), Y(b)); g.closePath(); g.fill();
-        }
-      }
-      g.beginPath(); g.moveTo(X(0.84), Y(0.68)); g.lineTo(X(0.84), Y(0.26)); g.lineTo(X(1.12), Y(0.62)); g.closePath(); g.fill(); } },
+      g.fillStyle = '#f4c542'; g.font = `bold ${Math.round(H * 0.19)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      'SSYC'.split('').forEach((ch, i) => g.fillText(ch, W * (0.075 + i * 0.08), H * (0.3 + i * 0.13))); } },
   // ---- Marin
   { id: 'sfyc', shape: 'swallow', ratio: 1.67, // the reference classic, the oldest club: strict red, white and dark blue; a white field under a double border, one dark-blue anchor (the first to drop one on this coast)
     draw: (g, W, H) => { fill(g, W, H, WHITE); border(g, W, H, 'swallow', RED, 0.075); border(g, W, H, 'swallow', NAVY, 0.045);
