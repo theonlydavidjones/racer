@@ -15,6 +15,7 @@ const poly = (g: G, c: string, ...p: P[]) => { g.fillStyle = c; g.beginPath(); p
 const rect = (g: G, c: string, x: number, y: number, w: number, h: number) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
 const fill = (g: G, W: number, H: number, c: string) => rect(g, c, 0, 0, W, H);
 const dot = (g: G, c: string, x: number, y: number, r: number) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+const oval = (g: G, c: string, x: number, y: number, rx: number, ry: number, rot = 0) => { g.fillStyle = c; g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, 7); g.fill(); };
 const stroke = (g: G, c: string, w: number, ...p: P[]) => { g.strokeStyle = c; g.lineWidth = w; g.lineJoin = 'round'; g.lineCap = 'butt'; g.beginPath(); p.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
 const arc = (g: G, c: string, w: number, x: number, y: number, r: number, a0: number, a1: number) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'butt'; g.beginPath(); g.arc(x, y, r, a0, a1); g.stroke(); };
 
@@ -216,8 +217,8 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#003262'); rect(g, '#fdb515', W * 0.2, 0, W * 0.2, H); rect(g, '#fdb515', W * 0.6, 0, W * 0.2, H); } },
   { id: 'csc', shape: 'pennant', ratio: 1.667, // People's: a co-op, so deep red and white; one raised fist on a white disc
     draw: (g, W, H) => { fill(g, W, H, '#a81f2b'); dot(g, WHITE, W * 0.21, H * 0.5, H * 0.26); fist(g, W * 0.21, H * 0.5, H * 0.39, '#a81f2b'); } },
-  { id: 'emyc', shape: 'pennant', ratio: 1.5, // Mudflat, proposal: three plain bands to the point: sky, reed green, mud
-    draw: (g, W, H) => { fill(g, W, H, '#8ec7e8'); rect(g, '#4c7a3a', 0, H / 3, W, H / 3); rect(g, '#6b5338', 0, H * 2 / 3, W, H / 3); } },
+  { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
+    draw: (g, W, H) => { fill(g, W, H, '#8ec7e8'); rect(g, '#6b5338', 0, H * 0.62, W, H * 0.38); rect(g, '#4c7a3a', 0, H * 0.5, W, H * 0.12); } },
   { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic, 1890 (the owner's template): a dark-blue hoist panel bearing one white oak leaf, then red and white stripes to the point, a gold border, a white hoist band
     draw: (g, W, H) => { const X0 = W * 0.215, BORDER = '#f0b323';
       fill(g, W, H, WHITE);
@@ -227,23 +228,23 @@ export const PARODY_BURGEES: Burgee[] = [
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.667, // Oaktown YC, after the City of Oakland's flag (the owner's): its green for the field, its yellow for one acorn
     draw: (g, W, H) => { fill(g, W, H, '#005e00'); acorn(g, W * 0.225, H * 0.5, H * 0.54, -0.2, '#f5dc0e'); } },
-  { id: 'iyc', shape: 'pennant', ratio: 1.7, // Sandbar, proposal: teal water, one sand mound rising from the foot (a bar: flat band plus a dome)
-    draw: (g, W, H) => { fill(g, W, H, '#1a8a8f'); rect(g, '#e6cf99', 0, H * 0.7, W, H * 0.3); g.fillStyle = '#e6cf99'; g.beginPath(); g.arc(W * 0.2, H * 0.7, H * 0.32, Math.PI, 0); g.fill(); } },
-  { id: 'aeyc', shape: 'pennant', ratio: 1.6, // Zephyr, proposal: sky blue and one windsock, five bands, orange and white, mouth to the hoist
-    draw: (g, W, H) => { fill(g, W, H, '#7cc0ec'); const x0 = W * 0.07, x1 = W * 0.43, h0 = H * 0.22, h1 = H * 0.09; for (let i = 0; i < 5; i++) { const a = i / 5, b = (i + 1) / 5, ya = h0 + (h1 - h0) * a, yb = h0 + (h1 - h0) * b, xa = x0 + (x1 - x0) * a, xb = x0 + (x1 - x0) * b + 1; poly(g, i % 2 ? WHITE : '#e8590c', [xa, H / 2 - ya], [xb, H / 2 - yb], [xb, H / 2 + yb], [xa, H / 2 + ya]); } } },
-  { id: 'bbyc', shape: 'pennant', ratio: 1.6, // Orca Bay, proposal: ocean blue over a white waterline band, one black dorsal fin
-    draw: (g, W, H) => { fill(g, W, H, '#0e63a8'); rect(g, WHITE, 0, H * 0.7, W, H * 0.3); g.fillStyle = BLACK; g.beginPath(); g.moveTo(W * 0.1, H * 0.7); g.quadraticCurveTo(W * 0.13, H * 0.36, W * 0.32, H * 0.2); g.quadraticCurveTo(W * 0.3, H * 0.5, W * 0.4, H * 0.7); g.closePath(); g.fill(); } },
+  { id: 'iyc', shape: 'pennant', ratio: 2, // modern, thrifty: sand, white and teal stripes
+    draw: (g, W, H) => { rect(g, '#e6cf99', 0, 0, W, H / 3); rect(g, WHITE, 0, H / 3, W, H / 3); rect(g, '#16a0a6', 0, H * 2 / 3, W, H / 3); oval(g, '#e6cf99', W * 0.16, H / 2, W * 0.1, H * 0.08); } },
+  { id: 'aeyc', shape: 'pennant', ratio: 1.6, // mid-century: sky blue and white, one wind swirl
+    draw: (g, W, H) => { fill(g, W, H, '#7cc0ec'); const pts: P[] = []; for (let i = 0; i <= 30; i++) { const a = i / 30 * Math.PI * 2.6, r = H * (0.05 + 0.17 * (1 - i / 30)); pts.push([W * 0.2 + Math.cos(a) * r, H * 0.5 + Math.sin(a) * r]); } stroke(g, WHITE, H * 0.09, ...pts); } },
+  { id: 'bbyc', shape: 'pennant', ratio: 1.6, // modern: ocean blue, black and white; one orca
+    draw: (g, W, H) => { fill(g, W, H, '#0e63a8'); g.save(); g.translate(W * 0.2, H * 0.5); g.rotate(-0.4); oval(g, BLACK, 0, 0, W * 0.13, H * 0.15); poly(g, BLACK, [W * 0.1, 0], [W * 0.18, -H * 0.15], [W * 0.18, H * 0.15]); poly(g, BLACK, [-W * 0.03, -H * 0.12], [W * 0.02, -H * 0.3], [W * 0.05, -H * 0.1]); oval(g, WHITE, -W * 0.01, H * 0.09, W * 0.07, H * 0.045); g.restore(); } },
   // ---- North Bay / Peninsula
-  { id: 'vyc', shape: 'pennant', ratio: 1.5, // Mare Island Strait, proposal: navy, a red fly, one heavy white anchor
-    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.56, 0, W * 0.44, H); const x = W * 0.22, w = H * 0.1; stroke(g, WHITE, w, [x, H * 0.24], [x, H * 0.72]); stroke(g, WHITE, w, [x - H * 0.17, H * 0.36], [x + H * 0.17, H * 0.36]); arc(g, WHITE, w, x, H * 0.5, H * 0.24, 0.15, Math.PI - 0.15); } },
-  { id: 'bnyc', shape: 'pennant', ratio: 1.6, // Carquinez, proposal: gold field, one heavy navy arch (the bridge's span)
-    draw: (g, W, H) => { fill(g, W, H, GOLD); arc(g, NAVY, H * 0.15, W * 0.22, H * 0.66, H * 0.25, Math.PI, Math.PI * 2); rect(g, NAVY, W * 0.22 - H * 0.325, H * 0.64, H * 0.15, H * 0.12); rect(g, NAVY, W * 0.22 + H * 0.175, H * 0.64, H * 0.15, H * 0.12); } },
-  { id: 'seqyc', shape: 'pennant', ratio: 1.5, // Evergreen, proposal: forest green, a blue fly, one white fir of three stacked tiers
-    draw: (g, W, H) => { fill(g, W, H, '#1d6b3a'); rect(g, BLUE, W * 0.55, 0, W * 0.45, H); const cx = W * 0.2; for (const [a, b, h] of [[0.16, 0.4, 0.12], [0.3, 0.58, 0.17], [0.44, 0.76, 0.22]]) poly(g, WHITE, [cx, H * a], [cx + H * h, H * b], [cx - H * h, H * b]); rect(g, WHITE, cx - H * 0.035, H * 0.76, H * 0.07, H * 0.1); } },
-  { id: 'cpyc', shape: 'pennant', ratio: 1.5, // Wolf Point, proposal: steel gray, a blue fly, one white crescent moon (no wolf: too literal)
-    draw: (g, W, H) => { fill(g, W, H, '#6c7886'); rect(g, BLUE, W * 0.56, 0, W * 0.44, H); dot(g, WHITE, W * 0.2, H * 0.5, H * 0.28); dot(g, '#6c7886', W * 0.2 + H * 0.11, H * 0.5 - H * 0.04, H * 0.24); } },
-  { id: 'spyc', shape: 'pennant', ratio: 1.6, // Cordillera Point, proposal: slate blue, one white range of two peaks
-    draw: (g, W, H) => { fill(g, W, H, '#3b5a7a'); poly(g, WHITE, [W * 0.04, H * 0.7], [W * 0.19, H * 0.26], [W * 0.34, H * 0.7]); poly(g, WHITE, [W * 0.26, H * 0.7], [W * 0.36, H * 0.44], [W * 0.46, H * 0.7]); } },
+  { id: 'vyc', shape: 'pennant', ratio: 1.5, // naval flavor: dark blue, white and red; one anchor
+    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.56, 0, W * 0.44, H); const x = W * 0.2; stroke(g, WHITE, H * 0.08, [x, H * 0.26], [x, H * 0.7]); stroke(g, WHITE, H * 0.08, [x - H * 0.14, H * 0.36], [x + H * 0.14, H * 0.36]); arc(g, WHITE, H * 0.08, x, H * 0.52, H * 0.2, 0.15, Math.PI - 0.15); } },
+  { id: 'bnyc', shape: 'pennant', ratio: 1.6, // history-minded: navy, white and gold; one capitol dome
+    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.06, H * 0.64, W * 0.3, H * 0.08); g.fillStyle = GOLD; g.beginPath(); g.arc(W * 0.21, H * 0.64, W * 0.11, Math.PI, 0); g.fill(); rect(g, GOLD, W * 0.2, H * 0.22, W * 0.02, H * 0.1); } },
+  { id: 'seqyc', shape: 'pennant', ratio: 1.5, // established: green, white and blue; one pine cone
+    draw: (g, W, H) => { fill(g, W, H, '#1d6b3a'); rect(g, BLUE, W * 0.55, 0, W * 0.45, H); poly(g, WHITE, [W * 0.2, H * 0.22], [W * 0.31, H * 0.42], [W * 0.27, H * 0.7], [W * 0.2, H * 0.78], [W * 0.13, H * 0.7], [W * 0.09, H * 0.42]); stroke(g, '#1d6b3a', H * 0.06, [W * 0.1, H * 0.46], [W * 0.3, H * 0.46]); stroke(g, '#1d6b3a', H * 0.06, [W * 0.11, H * 0.6], [W * 0.29, H * 0.6]); } },
+  { id: 'cpyc', shape: 'pennant', ratio: 1.5, // mid-century: steel gray, blue and white; one wolf's head
+    draw: (g, W, H) => { fill(g, W, H, '#6c7886'); rect(g, BLUE, W * 0.56, 0, W * 0.44, H); poly(g, WHITE, [W * 0.08, H * 0.26], [W * 0.15, H * 0.4], [W * 0.25, H * 0.4], [W * 0.32, H * 0.26], [W * 0.33, H * 0.5], [W * 0.2, H * 0.74], [W * 0.07, H * 0.5]); } },
+  { id: 'spyc', shape: 'pennant', ratio: 1.6, // modern, minimal: mountain gray and blue; one white ridge
+    draw: (g, W, H) => { fill(g, W, H, '#6e7a85'); rect(g, '#2f6fb5', 0, 0, W, H * 0.38); poly(g, WHITE, [W * 0.06, H * 0.7], [W * 0.15, H * 0.4], [W * 0.22, H * 0.56], [W * 0.31, H * 0.34], [W * 0.42, H * 0.7]); } },
   // ---- Tier 2 (no guidance in the file)
   { id: 'mbyc', shape: 'pennant', ratio: 2, // Riveter Bay: dark blue with a safety-yellow band, and a row of rivets the whole way along the band
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); rect(g, '#f2c200', 0, H * 0.4, W, H * 0.2);
