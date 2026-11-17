@@ -53,13 +53,13 @@ export const PARODY_BURGEES: Burgee[] = [
       for (const s of [-1, 1]) poly(g, S, [x + s * u * 0.14, y + u * 0.2 - u * 0.03], [x + s * u * 0.27, y + u * 0.05], [x + s * u * 0.14, y + u * 0.08]); } },
   { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic, the amateur's club (the owner's layout): a red hoist panel coming to a single point, a white middle, a dark-blue tip with a chevron notch; one gold laurel wreath (the Greek games) on the red
     draw: (g, W, H) => { fill(g, W, H, WHITE);
-      poly(g, RED, [0, 0], [W * 0.2, 0], [W * 0.355, H * 0.5], [W * 0.2, H], [0, H]);
-      poly(g, NAVY, [W * 0.544, 0], [W, 0], [W, H], [W * 0.544, H], [W * 0.659, H * 0.5]); // (the white between them is 20% shorter than the first draft's)
-      const x = W * 0.185, y = H * 0.5, r = H * 0.15, d = Math.PI / 180;
+      poly(g, RED, [0, 0], [W * 0.25, H * 0.125], [W * 0.355, H * 0.5], [W * 0.25, H * 0.875], [0, H]);
+      poly(g, NAVY, [W * 0.5, H * 0.25], [W, H * 0.5], [W * 0.5, H * 0.75], [W * 0.605, H * 0.5]); // (the white between them is a third shorter than the first draft's, along the edges and the middle)
+      const x = W * 0.165, y = H * 0.5, r = H * 0.13, d = Math.PI / 180;
       for (const s of [-1, 1]) { // two branches from the bottom, each a stem with leaves pairing off it, growing up
-        const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.028, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
+        const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.024, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
         for (let i = 0; i < 5; i++) { const a = (s > 0 ? 70 - i * 24 : 110 + i * 24) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
-          for (const k of [-1, 1]) { const dir = grow + k * 0.75; oval(g, GOLD, px + Math.cos(dir) * H * 0.045, py + Math.sin(dir) * H * 0.045, H * 0.049, H * 0.022, dir); } } } } },
+          for (const k of [-1, 1]) { const dir = grow + k * 0.75; oval(g, GOLD, px + Math.cos(dir) * H * 0.04, py + Math.sin(dir) * H * 0.04, H * 0.043, H * 0.02, dir); } } } } },
   { id: 'tyc', shape: 'pennant', ratio: 1.8, // mid-century: deep blue over gray water, one white fin
     draw: (g, W, H) => { rect(g, '#16386b', 0, 0, W, H * 0.64); rect(g, '#8d99a6', 0, H * 0.64, W, H * 0.36); poly(g, WHITE, [W * 0.09, H * 0.64], [W * 0.17, H * 0.22], [W * 0.27, H * 0.64]); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
