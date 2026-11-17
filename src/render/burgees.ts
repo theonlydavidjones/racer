@@ -1,10 +1,6 @@
 /**
- * Bay Area yacht club burgees, drawn on a canvas: a triangular pennant, hoist on the left, fly to the right.
- *
- * Drawn from the images and descriptions on Flags of the World (crwflags.com/fotw/flags/us~yc*.html), and the
- * St. Francis Yacht Club's bylaws (2.1) for theirs; South Beach Yacht Club's from the club's own image of it. FOTW notes that GGYC's own website shows its burgee "somewhat
- * different" from their image, so GGYC's may not match the cloth exactly. Swallowtail burgees with detailed artwork
- * (Alameda, Ballena Bay, Sierra Point) aren't drawn yet.
+ * The game's yacht club burgees, drawn on a canvas: a triangular pennant, hoist on the left, fly to the right. Each is the
+ * owner's parody of a Bay club's (club/clubs.ts), designed here and unlike the real one in colors and design.
  */
 
 import { clubFullName } from '../club/clubs';
@@ -16,192 +12,82 @@ export interface Burgee {
   draw: (g: CanvasRenderingContext2D, W: number, H: number) => void;
 }
 
-const NAVY = '#1c2466', RED = '#d61a1f', WHITE = '#ffffff', BLUE = '#1a3fc4', YELLOW = '#ffd60a', GREEN = '#169b2c', GOLD = '#f6c440', BLACK = '#111111';
+const WHITE = '#ffffff', GOLD = '#f6c440', BLACK = '#111111';
 
 type P = [number, number];
 function poly(g: CanvasRenderingContext2D, color: string, ...pts: P[]): void { g.fillStyle = color; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); }
 /** The whole pennant in one colour. */
 const field = (g: CanvasRenderingContext2D, W: number, H: number, c: string) => poly(g, c, [0, 0], [0, H], [W, H / 2]);
-/** The pennant shrunk by a border `d` (in units of the hoist): what's left inside the border. */
-const inset = (g: CanvasRenderingContext2D, W: number, H: number, c: string, d: number) => {
-  const k = d * H, m = H / 2 / W, s = Math.hypot(1, m); // the slanted edges move in by k measured square to them
-  poly(g, c, [k, k * s + k * m], [k, H - k * s - k * m], [W - k * s / m, H / 2]);
-};
-function star(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, color: string, points = 5, inner = 0.4, rot = 0): void {
-  g.fillStyle = color; g.beginPath();
-  for (let i = 0; i < points * 2; i++) { const a = -Math.PI / 2 + rot + i * Math.PI / points, rr = i % 2 ? r * inner : r; g.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
-  g.closePath(); g.fill();
-}
-function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, color: string, font = 'sans-serif'): void {
-  g.fillStyle = color; g.font = `bold ${Math.round(size)}px ${font}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, x, y);
-}
-/** Where the pennant's top edge is at x (the bottom edge is H minus this). */
-const edge = (x: number, W: number, H: number) => x / W * H / 2;
 
+const TEAL = '#0e8a8a', PURPLE = '#5b2a86', ORANGE = '#f28c1c', GREY = '#5d6470', BROWN = '#7a4a2a', CREAM = '#f3e9d2', SKY = '#8fcdf0', OLIVE = '#6b7a2a', BRICK = '#a8452a', SAND = '#e3c98a', VIOLET = '#7a3fb0', STEEL = '#8a96a6', CRIMSON = '#b3122f';
+const dot = (g: CanvasRenderingContext2D, x: number, y: number, r: number, c: string) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+const ring = (g: CanvasRenderingContext2D, x: number, y: number, r: number, w: number, c: string) => { g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); };
+const line = (g: CanvasRenderingContext2D, c: string, w: number, ...pts: P[]) => { g.strokeStyle = c; g.lineWidth = w; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
+const band = (g: CanvasRenderingContext2D, W: number, H: number, c: string, y0: number, y1: number) => { g.fillStyle = c; g.fillRect(0, H * y0, W, H * (y1 - y0)); };
+
+/**
+ * The game's own burgees (the owner's parodies, 17 Nov 2026): each clearly unlike the real club's, in colors and in design,
+ * and drawn from the parody name. Real burgees are trademarks; none of their art is used here.
+ */
 export const BURGEES: Burgee[] = [
-  {
-    id: 'byc', club: "Bishop's Yacht Club",
-    draw: (g, W, H) => { field(g, W, H, BLUE); g.fillStyle = YELLOW; g.beginPath(); g.arc(W * 0.36, H / 2, H * 0.22, 0, 7); g.fill(); text(g, 'B', W * 0.36, H * 0.52, H * 0.32, BLUE); }
-  },
-  {
-    id: 'bvbc', club: 'Dry Dock Boat Club', ratio: 2.3,
-    // yellow, with a blue compass: a ring with the four cardinal points and a needle
-    draw: (g, W, H) => {
-      field(g, W, H, YELLOW);
-      const cx = W * 0.19, cy = H / 2, r = H * 0.25;
-      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2, u = [Math.sin(a), -Math.cos(a)], v = [-u[1], u[0]]; poly(g, BLUE, [cx + u[0] * r * 1.55, cy + u[1] * r * 1.55], [cx + v[0] * r * 0.3, cy + v[1] * r * 0.3], [cx - v[0] * r * 0.3, cy - v[1] * r * 0.3]); }
-      g.strokeStyle = BLUE; g.lineWidth = H * 0.06; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
-      g.fillStyle = YELLOW; g.beginPath(); g.arc(cx, cy, r - H * 0.03, 0, 7); g.fill();
-      const a = 0.35; poly(g, BLUE, [cx + Math.sin(a) * r * 0.85, cy - Math.cos(a) * r * 0.85], [cx + Math.cos(a) * r * 0.12, cy + Math.sin(a) * r * 0.12], [cx - Math.sin(a) * r * 0.85, cy + Math.cos(a) * r * 0.85], [cx - Math.cos(a) * r * 0.12, cy - Math.sin(a) * r * 0.12]);
-    }
-  },
-  {
-    id: 'cyc', club: 'Olympian Yacht Club', ratio: 1.6,
-    // blue, a white stripe to the point, and a red hoist triangle edged in white with a white star
-    draw: (g, W, H) => {
-      field(g, W, H, BLUE);
-      g.fillStyle = WHITE; g.fillRect(0, H * 0.44, W, H * 0.12);
-      poly(g, WHITE, [0, 0], [0, H], [W * 0.31, H / 2]);
-      poly(g, RED, [0, H * 0.06], [0, H * 0.94], [W * 0.27, H / 2]);
-      star(g, W * 0.09, H / 2, H * 0.12, WHITE);
-    }
-  },
-  {
-    id: 'cpyc', club: 'Wolf Point Yacht Club',
-    // blue at the hoist, red to the fly, a white diamond with a red star on the line between
-    draw: (g, W, H) => {
-      field(g, W, H, RED);
-      const d = 0.4; poly(g, BLUE, [0, 0], [0, H], [W * d, H - edge(W * d, W, H)], [W * d, edge(W * d, W, H)]);
-      const cx = W * d, cy = H / 2; poly(g, WHITE, [cx, cy - H * 0.27], [cx + W * 0.1, cy], [cx, cy + H * 0.27], [cx - W * 0.1, cy]);
-      star(g, cx, cy, H * 0.12, RED);
-    }
-  },
-  {
-    id: 'eyc', club: 'Live Oak Yacht Club',
-    draw: (g, W, H) => { field(g, W, H, RED); poly(g, WHITE, [0, 0], [0, H], [W * 0.33, H / 2]); star(g, W * 0.1, H * 0.49, H * 0.1, NAVY); }
-  },
-  {
-    id: 'ggyc', club: 'Dorado Yacht Club', ratio: 1.67,
-    // blue, with a white diamond along the middle and the bridge on it in red
-    draw: (g, W, H) => {
-      field(g, W, H, BLUE);
-      poly(g, WHITE, [W * 0.15, H / 2], [W * 0.3, H * 0.22], [W * 0.86, H / 2], [W * 0.3, H * 0.78]);
-      g.strokeStyle = RED; g.fillStyle = RED; g.lineCap = 'round';
-      const y = H * 0.52, x0 = W * 0.25, x1 = W * 0.53, t1 = W * 0.32, t2 = W * 0.46, top = H * 0.37;
-      g.fillRect(x0, y - H * 0.025, x1 - x0, H * 0.05); // the deck
-      for (const tx of [t1, t2]) { g.fillRect(tx - W * 0.012, top, W * 0.024, H * 0.27); g.fillRect(tx - W * 0.02, H * 0.6, W * 0.04, H * 0.04); } // towers and piers
-      g.lineWidth = H * 0.025; g.beginPath(); g.moveTo(t1, top + H * 0.01); g.quadraticCurveTo((t1 + t2) / 2, y + H * 0.02, t2, top + H * 0.01); g.stroke(); // the main span's cable
-      g.beginPath(); g.moveTo(t1, top + H * 0.01); g.lineTo(x0, y - H * 0.02); g.moveTo(t2, top + H * 0.01); g.lineTo(x1, y - H * 0.02); g.stroke(); // side spans
-    }
-  },
-  {
-    id: 'iyc', club: 'Sandbar Yacht Club', ratio: 2,
-    // red over yellow, a blue hoist triangle, and the interlaced letters I Y C in black over it
-    draw: (g, W, H) => {
-      poly(g, RED, [0, 0], [0, H / 2], [W, H / 2]); poly(g, YELLOW, [0, H / 2], [0, H], [W, H / 2]);
-      poly(g, BLUE, [0, 0], [0, H], [W * 0.27, H / 2]);
-      const cx = W * 0.16, lw = H * 0.075; g.strokeStyle = BLACK; g.lineWidth = lw; g.lineCap = 'butt';
-      g.beginPath(); g.arc(cx, H * 0.55, H * 0.28, Math.PI * 0.28, Math.PI * 1.72); g.stroke(); // C
-      g.beginPath(); g.moveTo(cx - W * 0.07, H * 0.2); g.lineTo(cx, H * 0.45); g.lineTo(cx + W * 0.07, H * 0.2); g.moveTo(cx, H * 0.45); g.lineTo(cx, H * 0.84); g.stroke(); // Y (and I)
-      g.lineWidth = lw * 0.8; g.beginPath(); g.moveTo(cx - W * 0.05, H * 0.86); g.lineTo(cx + W * 0.05, H * 0.86); g.moveTo(cx - W * 0.045, H * 0.17); g.lineTo(cx + W * 0.045, H * 0.17); g.stroke(); // serifs
-    }
-  },
-  {
-    id: 'mbyc', club: 'Riveter Bay Yacht Club', ratio: 2,
-    draw: (g, W, H) => {
-      field(g, W, H, BLUE);
-      poly(g, YELLOW, [W * 0.26, H / 2], [W * 0.6, H * 0.36], [W, H / 2], [W * 0.6, H * 0.64]);
-      star(g, W * 0.2, H * 0.48, H * 0.18, YELLOW, 5, 0.42, 0.3);
-    }
-  },
-  {
-    id: 'oyc', club: 'Oaktown Yacht Club',
-    draw: (g, W, H) => {
-      field(g, W, H, BLUE); poly(g, WHITE, [0, 0], [0, H], [W * 0.5, H / 2]);
-      g.strokeStyle = RED; g.lineWidth = H * 0.03; g.beginPath(); g.ellipse(W * 0.12, H / 2, W * 0.07, H * 0.2, 0, 0, 7); g.stroke();
-    }
-  },
-  {
-    id: 'ryc', club: 'Brickyard Racing Club',
-    draw: (g, W, H) => {
-      field(g, W, H, RED);
-      poly(g, NAVY, [0, 0], [0, H], [W * 0.43, H / 2]); poly(g, WHITE, [0, H * 0.05], [0, H * 0.95], [W * 0.39, H / 2]);
-      text(g, 'R', W * 0.13, H * 0.53, H * 0.5, NAVY);
-    }
-  },
-  {
-    id: 'sfyc', club: 'Belvedere Cove Yacht Club', ratio: 1.67,
-    // red at the hoist with a white triangle from the middle of the hoist bearing a red star; the fly blue with a white star
-    draw: (g, W, H) => {
-      field(g, W, H, RED);
-      const x = W * 0.48, e = edge(x, W, H);
-      poly(g, WHITE, [0, H / 2], [x, e], [x, H - e]); poly(g, BLUE, [x, e], [W, H / 2], [x, H - e]);
-      star(g, W * 0.33, H / 2, H * 0.1, RED); star(g, W * 0.62, H / 2, H * 0.1, WHITE);
-    }
-  },
-  {
-    id: 'slyc', club: 'Cherry Harbor Yacht Club', ratio: 1.67,
-    // white, bordered red, a red cross and a red compass star where its arms meet
-    draw: (g, W, H) => {
-      field(g, W, H, RED); inset(g, W, H, WHITE, 0.06);
-      g.fillStyle = RED; g.fillRect(0, H * 0.485, W, H * 0.03); g.fillRect(W * 0.27, 0, H * 0.03, H);
-      star(g, W * 0.28, H / 2, H * 0.17, RED, 8, 0.5);
-    }
-  },
-  {
-    id: 'ssyc', club: 'Willow Grove Yacht Club',
-    draw: (g, W, H) => { field(g, W, H, NAVY); star(g, W * 0.2, H * 0.47, H * 0.22, RED); star(g, W * 0.2, H * 0.47, H * 0.17, WHITE); }
-  },
-  {
-    id: 'seqyc', club: 'Evergreen Yacht Club',
-    // gold, bordered green, a green redwood at the hoist
-    draw: (g, W, H) => {
-      field(g, W, H, GREEN); inset(g, W, H, GOLD, 0.07);
-      const cx = W * 0.2; for (const [y0, w] of [[0.22, 0.09], [0.34, 0.12], [0.46, 0.15]] as P[]) poly(g, GREEN, [cx, H * y0], [cx + W * w, H * (y0 + 0.2)], [cx - W * w, H * (y0 + 0.2)]);
-      g.fillStyle = GREEN; g.fillRect(cx - W * 0.015, H * 0.66, W * 0.03, H * 0.13);
-    }
-  },
-  {
-    id: 'sbyc', club: 'China Basin Yacht Club', ratio: 1.47,
-    // navy blue, with a white wave of two breaking crests running from the hoist to the fly (traced from the club's own
-    // image of it, southbeachyachtclub.org)
-    draw: (g, W, H) => {
-      field(g, W, H, '#0d2d84');
-      const top: P[] = [[0.002,0.511],[0.013,0.508],[0.024,0.505],[0.036,0.498],[0.047,0.492],[0.058,0.485],[0.069,0.479],[0.080,0.469],[0.091,0.459],[0.102,0.449],[0.114,0.439],[0.125,0.426],[0.136,0.413],[0.147,0.400],[0.158,0.387],[0.169,0.370],[0.180,0.351],[0.192,0.331],[0.203,0.308],[0.214,0.279],[0.225,0.282],[0.236,0.325],[0.247,0.354],[0.258,0.377],[0.269,0.397],[0.281,0.413],[0.292,0.430],[0.303,0.443],[0.314,0.456],[0.325,0.466],[0.336,0.475],[0.347,0.485],[0.359,0.495],[0.370,0.502],[0.381,0.508],[0.392,0.511],[0.403,0.518],[0.414,0.521],[0.425,0.521],[0.437,0.525],[0.448,0.525],[0.459,0.525],[0.470,0.521],[0.481,0.521],[0.492,0.518],[0.503,0.511],[0.514,0.508],[0.526,0.498],[0.537,0.492],[0.548,0.482],[0.559,0.472],[0.570,0.462],[0.581,0.449],[0.592,0.433],[0.604,0.416],[0.615,0.400],[0.626,0.380],[0.637,0.361],[0.648,0.384],[0.659,0.407],[0.670,0.423],[0.682,0.439],[0.693,0.449],[0.704,0.462],[0.715,0.472],[0.726,0.479],[0.737,0.485],[0.748,0.492],[0.759,0.495],[0.771,0.498],[0.782,0.502],[0.793,0.505],[0.804,0.505],[0.815,0.505],[0.826,0.505],[0.837,0.505],[0.849,0.502],[0.860,0.502],[0.927,0.479],[0.938,0.472],[0.949,0.466],[0.960,0.459],[0.971,0.452]], bot: P[] = [[0.002,0.590],[0.013,0.587],[0.024,0.584],[0.036,0.580],[0.047,0.574],[0.058,0.564],[0.069,0.557],[0.080,0.548],[0.091,0.538],[0.102,0.528],[0.114,0.515],[0.125,0.505],[0.136,0.492],[0.147,0.479],[0.158,0.466],[0.169,0.452],[0.180,0.436],[0.192,0.423],[0.203,0.407],[0.214,0.390],[0.225,0.413],[0.236,0.439],[0.247,0.462],[0.258,0.482],[0.269,0.498],[0.281,0.511],[0.292,0.525],[0.303,0.534],[0.314,0.544],[0.325,0.554],[0.336,0.561],[0.347,0.567],[0.359,0.574],[0.370,0.577],[0.381,0.580],[0.392,0.584],[0.403,0.587],[0.414,0.590],[0.425,0.590],[0.437,0.590],[0.448,0.590],[0.459,0.590],[0.470,0.587],[0.481,0.584],[0.492,0.580],[0.503,0.577],[0.514,0.574],[0.526,0.567],[0.537,0.561],[0.548,0.554],[0.559,0.548],[0.570,0.538],[0.581,0.528],[0.592,0.515],[0.604,0.502],[0.615,0.489],[0.626,0.472],[0.637,0.452],[0.648,0.462],[0.659,0.475],[0.670,0.489],[0.682,0.495],[0.693,0.505],[0.704,0.511],[0.715,0.518],[0.726,0.525],[0.737,0.531],[0.748,0.534],[0.759,0.538],[0.771,0.541],[0.782,0.544],[0.793,0.544],[0.804,0.544],[0.815,0.544],[0.826,0.541],[0.837,0.538],[0.849,0.538],[0.860,0.534],[0.927,0.498],[0.938,0.489],[0.949,0.479],[0.960,0.469],[0.971,0.456]];
-      g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); g.closePath(); g.clip();
-      poly(g, WHITE, ...[...top, ...bot.slice().reverse()].map(([x, y]) => [x * W, y * H] as P)); g.restore();
-    }
-  },
-  {
-    id: 'stfyc', club: 'St. Bartholomew Yacht Club',
-    // Bylaws 2.1: two-thirds as wide as long; two white triangles at the hoist, each half the width and half the length,
-    // with a red star 22% of the hoist across, a third of the way along the field; navy between them; red at the fly
-    draw: (g, W, H) => {
-      const hm: P = [0, H / 2], tm: P = [W / 2, H / 4], bm: P = [W / 2, 3 * H / 4];
-      poly(g, WHITE, [0, 0], hm, tm); poly(g, WHITE, hm, [0, H], bm);
-      poly(g, NAVY, hm, tm, bm); poly(g, RED, tm, [W, H / 2], bm);
-      star(g, W / 6, H / 4, H * 0.11, RED); star(g, W / 6, 3 * H / 4, H * 0.11, RED);
-    }
-  },
-  {
-    id: 'tyc', club: 'Shark Point Yacht Club', ratio: 1.8,
-    // white, a blue triangle along the middle to the point, a red hoist triangle with a white T
-    draw: (g, W, H) => {
-      field(g, W, H, WHITE);
-      poly(g, BLUE, [W * 0.15, H * 0.29], [W * 0.15, H * 0.71], [W, H / 2]);
-      poly(g, RED, [0, 0], [0, H], [W * 0.25, H / 2]);
-      text(g, 'T', W * 0.08, H * 0.53, H * 0.38, WHITE, 'serif');
-    }
-  },
-  {
-    id: 'tiyc', club: 'Clipper Cove Yacht Club',
-    // FOTW: "Blue field charges with the black letters TI on a horizontal 1 unit-wide yellow band" (their image shows the letters in the field's blue)
-    draw: (g, W, H) => { field(g, W, H, '#3d3f96'); g.fillStyle = YELLOW; g.fillRect(0, H * 0.375, W, H * 0.25); text(g, 'TI', W * 0.3, H * 0.51, H * 0.24, '#3d3f96', 'serif'); }
-  },
-  {
-    id: 'vyc', club: 'Mare Island Strait Yacht Club',
-    draw: (g, W, H) => { field(g, W, H, RED); inset(g, W, H, WHITE, 0.045); inset(g, W, H, BLUE, 0.075); star(g, W * 0.17, H / 2, H * 0.13, WHITE); }
-  }
+  { id: 'stfyc', club: '', // teal with a gold palm (the island)
+    draw: (g, W, H) => { field(g, W, H, TEAL); line(g, GOLD, H * 0.06, [W * 0.13, H * 0.78], [W * 0.15, H * 0.42]); for (const a of [-2.5, -1.9, -1.25, -0.6]) line(g, GOLD, H * 0.05, [W * 0.15, H * 0.42], [W * 0.15 + Math.cos(a) * H * 0.3, H * 0.42 + Math.sin(a) * H * 0.3 + H * 0.08]); } },
+  { id: 'ggyc', club: '', ratio: 1.67, // emerald with a golden fish (the dorado)
+    draw: (g, W, H) => { field(g, W, H, '#0b6b3a'); g.fillStyle = GOLD; g.beginPath(); g.ellipse(W * 0.27, H / 2, W * 0.15, H * 0.17, 0, 0, 7); g.fill(); poly(g, GOLD, [W * 0.4, H / 2], [W * 0.5, H * 0.38], [W * 0.5, H * 0.62]); dot(g, W * 0.18, H * 0.46, H * 0.03, '#0b6b3a'); } },
+  { id: 'sbyc', club: '', ratio: 1.47, // slate with an orange dockside crane
+    draw: (g, W, H) => { field(g, W, H, '#37424f'); line(g, ORANGE, H * 0.06, [W * 0.08, H * 0.82], [W * 0.17, H * 0.28], [W * 0.26, H * 0.82]); line(g, ORANGE, H * 0.05, [W * 0.17, H * 0.28], [W * 0.46, H * 0.36]); line(g, ORANGE, H * 0.025, [W * 0.4, H * 0.37], [W * 0.4, H * 0.58]); } },
+  { id: 'bvbc', club: '', ratio: 2.3, // maroon with a white anchor
+    draw: (g, W, H) => { field(g, W, H, '#6e1f2e'); const x = W * 0.17; line(g, WHITE, H * 0.07, [x, H * 0.24], [x, H * 0.78]); line(g, WHITE, H * 0.06, [x - H * 0.14, H * 0.36], [x + H * 0.14, H * 0.36]); g.strokeStyle = WHITE; g.lineWidth = H * 0.07; g.beginPath(); g.arc(x, H * 0.58, H * 0.22, 0.2, Math.PI - 0.2); g.stroke(); ring(g, x, H * 0.19, H * 0.05, H * 0.04, WHITE); } },
+  { id: 'mhpyc', club: '', // orange with a black butterfly (the monarch)
+    draw: (g, W, H) => { field(g, W, H, ORANGE); const x = W * 0.2; for (const s of [-1, 1]) { g.fillStyle = BLACK; g.beginPath(); g.ellipse(x - W * 0.04, H / 2 + s * H * 0.16, H * 0.2, H * 0.12, s * 0.5, 0, 7); g.fill(); } line(g, BLACK, H * 0.04, [x + W * 0.04, H / 2], [x - W * 0.1, H / 2]); } },
+  { id: 'tiyc', club: '', // white with a green clipper's two sails
+    draw: (g, W, H) => { field(g, W, H, WHITE); poly(g, '#14804a', [W * 0.1, H * 0.78], [W * 0.1, H * 0.22], [W * 0.26, H * 0.74]); poly(g, '#14804a', [W * 0.3, H * 0.74], [W * 0.3, H * 0.3], [W * 0.43, H * 0.7]); band(g, W, H, '#14804a', 0.8, 0.84); } },
+  { id: 'sfyc', club: '', ratio: 1.67, // sky blue with a white cove and a gold buoy
+    draw: (g, W, H) => { field(g, W, H, SKY); g.fillStyle = WHITE; g.beginPath(); g.arc(W * 0.2, H / 2, H * 0.3, -Math.PI / 2, Math.PI / 2); g.fill(); dot(g, W * 0.3, H / 2, H * 0.08, GOLD); } },
+  { id: 'cyc', club: '', ratio: 1.6, // white with an olive laurel ring and a gold torch dot
+    draw: (g, W, H) => { field(g, W, H, WHITE); ring(g, W * 0.2, H / 2, H * 0.27, H * 0.08, OLIVE); dot(g, W * 0.2, H / 2, H * 0.1, GOLD); } },
+  { id: 'tyc', club: '', ratio: 1.8, // charcoal with a white fin
+    draw: (g, W, H) => { field(g, W, H, '#2b2f36'); poly(g, WHITE, [W * 0.1, H * 0.72], [W * 0.2, H * 0.22], [W * 0.3, H * 0.72]); g.strokeStyle = SKY; g.lineWidth = H * 0.04; g.beginPath(); g.moveTo(W * 0.05, H * 0.77); g.lineTo(W * 0.4, H * 0.77); g.stroke(); } },
+  { id: 'pyc', club: '', // brown with a gold horseshoe, nail holes in it
+    draw: (g, W, H) => { field(g, W, H, BROWN); const x = W * 0.2, y = H * 0.42, r = H * 0.2; line(g, GOLD, H * 0.12, [x - r, y - H * 0.2], [x - r, y]); line(g, GOLD, H * 0.12, [x + r, y - H * 0.2], [x + r, y]); g.strokeStyle = GOLD; g.lineWidth = H * 0.12; g.beginPath(); g.arc(x, y, r, 0, Math.PI); g.stroke(); for (const a of [0.3, 0.5, 0.7]) dot(g, x + Math.cos(Math.PI * a + Math.PI * 0.0) * r * (a === 0.5 ? 1 : 1), y + Math.sin(Math.PI * a) * r, H * 0.022, BROWN); } },
+  { id: 'ssyc', club: '', // pale green with drooping willow fronds
+    draw: (g, W, H) => { field(g, W, H, '#bfe0a8'); for (const dx of [0.1, 0.19, 0.28]) line(g, '#2f6b2a', H * 0.04, [W * dx, H * 0.2], [W * (dx + 0.02), H * 0.45], [W * (dx - 0.01), H * 0.78]); line(g, '#2f6b2a', H * 0.05, [W * 0.03, H * 0.2], [W * 0.34, H * 0.2]); } },
+  { id: 'myc', club: '', // slate violet with a white peak
+    draw: (g, W, H) => { field(g, W, H, '#4a4f86'); poly(g, WHITE, [W * 0.05, H * 0.78], [W * 0.2, H * 0.22], [W * 0.35, H * 0.78]); poly(g, '#4a4f86', [W * 0.15, H * 0.4], [W * 0.2, H * 0.34], [W * 0.25, H * 0.4], [W * 0.2, H * 0.47]); } },
+  { id: 'sryc', club: '', // terracotta with two cream canal stripes
+    draw: (g, W, H) => { field(g, W, H, '#c0623a'); band(g, W, H, CREAM, 0.34, 0.42); band(g, W, H, CREAM, 0.58, 0.66); } },
+  { id: 'ryc', club: '', // brick with cream mortar courses
+    draw: (g, W, H) => { field(g, W, H, BRICK); for (let r = 1; r < 6; r++) band(g, W, H, CREAM, r / 6 - 0.012, r / 6 + 0.012); for (let r = 0; r < 6; r++) for (let c = 0; c < 4; c++) { const x = W * (0.1 + c * 0.14 + (r % 2) * 0.07); g.fillStyle = CREAM; g.fillRect(x, H * (r / 6 + 0.01), W * 0.012, H / 6 - H * 0.02); } } },
+  { id: 'byc', club: '', // purple with a gold mitre
+    draw: (g, W, H) => { field(g, W, H, PURPLE); poly(g, GOLD, [W * 0.08, H * 0.76], [W * 0.14, H * 0.3], [W * 0.2, H * 0.18], [W * 0.26, H * 0.3], [W * 0.32, H * 0.76]); band(g, W, H, PURPLE, 0.52, 0.56); } },
+  { id: 'csc', club: '', // tangerine with a white rising sun
+    draw: (g, W, H) => { field(g, W, H, '#ee6a1f'); g.fillStyle = WHITE; g.beginPath(); g.arc(W * 0.18, H * 0.7, H * 0.26, Math.PI, 0); g.fill(); for (let i = 0; i < 5; i++) { const a = Math.PI + 0.35 + i * 0.6; line(g, WHITE, H * 0.04, [W * 0.18 + Math.cos(a) * H * 0.33, H * 0.7 + Math.sin(a) * H * 0.33], [W * 0.18 + Math.cos(a) * H * 0.46, H * 0.7 + Math.sin(a) * H * 0.46]); } } },
+  { id: 'emyc', club: '', // mud brown with tan tide ripples
+    draw: (g, W, H) => { field(g, W, H, '#5a4632'); for (const y of [0.35, 0.5, 0.65]) line(g, SAND, H * 0.035, [W * 0.04, H * y], [W * 0.1, H * (y - 0.05)], [W * 0.17, H * y], [W * 0.24, H * (y - 0.05)], [W * 0.31, H * y]); } },
+  { id: 'eyc', club: '', // forest green with a gold acorn
+    draw: (g, W, H) => { field(g, W, H, '#1f4d2a'); g.fillStyle = GOLD; g.beginPath(); g.ellipse(W * 0.2, H * 0.55, H * 0.15, H * 0.2, 0, 0, 7); g.fill(); g.fillStyle = BROWN; g.beginPath(); g.ellipse(W * 0.2, H * 0.38, H * 0.19, H * 0.1, 0, Math.PI, 0); g.fill(); band(g, W, H, '#1f4d2a', 0.01, 0.01); } },
+  { id: 'oyc', club: '', // charcoal with two amber estuary stripes
+    draw: (g, W, H) => { field(g, W, H, '#33302d'); band(g, W, H, '#e0a21a', 0.4, 0.47); band(g, W, H, '#e0a21a', 0.53, 0.6); } },
+  { id: 'iyc', club: '', ratio: 2, // turquoise with a sand bar
+    draw: (g, W, H) => { field(g, W, H, '#17b0b8'); g.fillStyle = SAND; g.beginPath(); g.ellipse(W * 0.22, H * 0.6, W * 0.17, H * 0.09, 0, 0, 7); g.fill(); } },
+  { id: 'aeyc', club: '', // pale blue with three white gusts
+    draw: (g, W, H) => { field(g, W, H, '#a9d3ee'); for (const y of [0.34, 0.5, 0.66]) line(g, WHITE, H * 0.045, [W * 0.04, H * y], [W * 0.22, H * y], [W * 0.27, H * (y - 0.07)], [W * 0.22, H * (y - 0.12)]); } },
+  { id: 'bbyc', club: '', // black with a white orca patch and belly
+    draw: (g, W, H) => { field(g, W, H, '#101418'); g.fillStyle = WHITE; g.beginPath(); g.ellipse(W * 0.2, H * 0.36, W * 0.07, H * 0.07, -0.5, 0, 7); g.fill(); poly(g, WHITE, [W * 0.06, H * 0.8], [W * 0.38, H * 0.66], [W * 0.1, H * 0.62]); } },
+  { id: 'vyc', club: '', // violet with a white strait narrowing to the point
+    draw: (g, W, H) => { field(g, W, H, VIOLET); poly(g, WHITE, [0, H * 0.38], [W * 0.5, H * 0.48], [W * 0.5, H * 0.52], [0, H * 0.62]); } },
+  { id: 'bnyc', club: '', // gold with a brown span
+    draw: (g, W, H) => { field(g, W, H, '#d9a21b'); line(g, BROWN, H * 0.06, [W * 0.04, H * 0.6], [W * 0.38, H * 0.6]); g.strokeStyle = BROWN; g.lineWidth = H * 0.05; g.beginPath(); g.arc(W * 0.21, H * 0.6, W * 0.12, Math.PI, 0); g.stroke(); } },
+  { id: 'seqyc', club: '', // green with three white chevrons
+    draw: (g, W, H) => { field(g, W, H, '#17652f'); for (const x of [0.06, 0.15, 0.24]) line(g, WHITE, H * 0.06, [W * x, H * 0.28], [W * (x + 0.07), H / 2], [W * x, H * 0.72]); } },
+  { id: 'cpyc', club: '', // grey with a white paw
+    draw: (g, W, H) => { field(g, W, H, GREY); dot(g, W * 0.17, H * 0.62, H * 0.15, WHITE); for (const [dx, dy] of [[-0.12, 0.43], [-0.04, 0.3], [0.05, 0.3], [0.13, 0.43]] as P[]) dot(g, W * (0.17 + dx * 0.9), H * dy + H * 0.03, H * 0.06, WHITE); } },
+  { id: 'spyc', club: '', // slate with a white ridgeline
+    draw: (g, W, H) => { field(g, W, H, '#4b3a34'); line(g, WHITE, H * 0.05, [W * 0.03, H * 0.72], [W * 0.1, H * 0.38], [W * 0.16, H * 0.6], [W * 0.24, H * 0.3], [W * 0.34, H * 0.72]); } },
+  { id: 'mbyc', club: '', ratio: 2, // steel grey with a yellow rivet row
+    draw: (g, W, H) => { field(g, W, H, STEEL); band(g, W, H, '#f2c200', 0.44, 0.56); for (let i = 0; i < 6; i++) dot(g, W * (0.06 + i * 0.07), H / 2, H * 0.035, '#5a5a5a'); } },
+  { id: 'slyc', club: '', ratio: 1.67, // dark green with two cherries
+    draw: (g, W, H) => { field(g, W, H, '#124d33'); line(g, '#7fc050', H * 0.03, [W * 0.1, H * 0.52], [W * 0.17, H * 0.26], [W * 0.24, H * 0.52]); dot(g, W * 0.1, H * 0.6, H * 0.12, CRIMSON); dot(g, W * 0.24, H * 0.6, H * 0.12, CRIMSON); } }
 ];
 
 /** A burgee as a texture: the pennant on a transparent canvas. Its aspect is the burgee's own (fly over hoist). */

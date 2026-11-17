@@ -31,33 +31,33 @@ export const CLUB_TABLE: ClubInfo[] = [
   C('ggyc', 'Dorado Yacht Club', 'DYC', 'ggyc'),
   C('sbyc', 'China Basin Yacht Club', 'CBYC', 'sbyc'),
   C('bvbc', 'Dry Dock Boat Club', 'DDBC', 'bvbc'),
-  C('mhpyc', 'Monarch Point Yacht Club', 'MPYC', null),
+  C('mhpyc', 'Monarch Point Yacht Club', 'MPYC', 'mhpyc'),
   C('tiyc', 'Clipper Cove Yacht Club', 'CCYC', 'tiyc'),
   // Tier 1 · Marin
   C('sfyc', 'Belvedere Cove Yacht Club', 'BCYC', 'sfyc'),
   C('cyc', 'Olympian Yacht Club', 'OlYC', 'cyc', 1, { harbor: 'corinthian' }),
   C('tyc', 'Shark Point Yacht Club', 'ShPYC', 'tyc'),
-  C('pyc', 'Horseshoe Cove Yacht Club', 'HCYC', null, 1, { harbor: 'horseshoe-bay' }),
+  C('pyc', 'Horseshoe Cove Yacht Club', 'HCYC', 'pyc', 1, { base: [37.83400, -122.47455], harbor: 'horseshoe-bay' }), // base: OSM nodes 1974693051 and 1974693718, clubhouse, about 20 m
   C('ssyc', 'Willow Grove Yacht Club', 'WGYC', 'ssyc'),
-  C('myc', 'Tamalpais Yacht Club', 'TamYC', null),
-  C('sryc', 'Mission Canal Yacht Club', 'MCYC', null),
+  C('myc', 'Tamalpais Yacht Club', 'TamYC', 'myc'),
+  C('sryc', 'Mission Canal Yacht Club', 'MCYC', 'sryc'),
   // Tier 1 · East Bay
   C('ryc', 'Brickyard Racing Club', 'BRC', 'ryc', 1, { harbor: 'richmond-yc' }),
   C('byc', "Bishop's Yacht Club", 'BpYC', 'byc', 1, { harbor: 'berkeley' }),
-  C('csc', "People's Sailing Club", 'PSC', null),
-  C('emyc', 'Mudflat Yacht Club', 'MfYC', null),
+  C('csc', "People's Sailing Club", 'PSC', 'csc', 1, { base: [37.86307, -122.31383] }), // base: OSM way 454025334, building footprint
+  C('emyc', 'Mudflat Yacht Club', 'MfYC', 'emyc'),
   C('eyc', 'Live Oak Yacht Club', 'LOYC', 'eyc', 1, { harbor: 'encinal' }),
   C('oyc', 'Oaktown Yacht Club', 'OtYC', 'oyc', 1, { harbor: 'oakland-yc' }),
   C('iyc', 'Sandbar Yacht Club', 'SdbYC', 'iyc', 1, { harbor: 'alameda-marina' }),
-  C('aeyc', 'Zephyr Yacht Club', 'ZYC', null),
-  C('bbyc', 'Orca Bay Yacht Club', 'OBYC', null),
+  C('aeyc', 'Zephyr Yacht Club', 'ZYC', 'aeyc', 1, { base: [37.75068, -122.23545] }), // base: OSM way 235080253, building matched by the club's address (CA Division of Boating and Waterways)
+  C('bbyc', 'Orca Bay Yacht Club', 'OBYC', 'bbyc', 1, { base: [37.76743, -122.28755] }), // base: OSM building matched by the club's address, about 15 m
   // Tier 1 · North Bay / Carquinez
   C('vyc', 'Mare Island Strait Yacht Club', 'MISYC', 'vyc'),
-  C('bnyc', 'Carquinez Yacht Club', 'CqYC', null),
+  C('bnyc', 'Carquinez Yacht Club', 'CqYC', 'bnyc', 1, { base: [38.04649, -122.15769] }), // base: OSM way 362299099, building footprint
   // Tier 1 · Peninsula / South Bay
   C('seqyc', 'Evergreen Yacht Club', 'EgYC', 'seqyc'),
   C('cpyc', 'Wolf Point Yacht Club', 'WPYC', 'cpyc'),
-  C('spyc', 'Cordillera Point Yacht Club', 'CoPYC', null),
+  C('spyc', 'Cordillera Point Yacht Club', 'CoPYC', 'spyc'),
   // Tier 2 · cruising and social (labels only; not joinable)
   C('mbyc', 'Riveter Bay Yacht Club', 'RBYC', 'mbyc', 2),
   C('slyc', 'Cherry Harbor Yacht Club', 'CHYC', 'slyc', 2),
