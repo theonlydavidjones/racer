@@ -10,7 +10,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tailEnd, tillerTip, type Crew } from './crew';
+import { buildCrew, dockhand, syncCrew, tailEnd, tillerTip, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -846,11 +846,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // forward face to a cam (Josephine under way, looking aft: the lines along the thwart's face to its ends)
   const travLines: THREE.Line[] = [];
   for (const side of [-1, 1]) {
-    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
+    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = travCam(side);
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
     // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
-    const tl = line([end.clone(), end.clone(), cam, cam.clone(), cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl); // (its last two: over the hiker's lap and into the hand, or falling from the cam)
+    const tl = line([end.clone(), end.clone(), cam, ...travTail(cam, undefined, side)], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl); // (its last two: over the hiker's lap and into the hand, or falling from the cam)
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
@@ -1058,8 +1058,6 @@ const VANG_FOOT = horseshoeAt(0).add(new THREE.Vector3(0, 0.05, 0)); // (shackle
  * frame). Estimates from the photos. */
 const VANG_BOOM = 0.9, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
 const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
-/** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
-const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
 const MAIN_CUNNINGHAM_UP = 0.22, JIB_CUNNINGHAM_UP = 0.3;
 
@@ -1721,10 +1719,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // (the windward traveller line's tail up to the hiker holding it, if one is: Crew.travHand; else hanging from its cam)
   { const th = (m.crew as { travHand?: THREE.Vector3 }).travHand;
     for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
-      const e = tailEnd(tmpG.set(pa.getX(2) - side * 0.02, pa.getY(2) - 0.2, pa.getZ(2) - 0.03), th, side), held = e === th;
-      // (held: up from the cam and over the knees, the lap, to the hand: not straight through the thighs between them)
-      if (held) pa.setXYZ(3, (pa.getX(2) + e.x) / 2, Math.max(pa.getY(2), e.y) + 0.12, (pa.getZ(2) + e.z) / 2); else pa.setXYZ(3, pa.getX(2), pa.getY(2), pa.getZ(2));
-      pa.setXYZ(4, e.x, e.y, e.z);
+      travTail(tmpG.set(pa.getX(2), pa.getY(2), pa.getZ(2)), th, side).forEach((q, j) => pa.setXYZ(3 + j, q.x, q.y, q.z));
       pa.needsUpdate = true; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)

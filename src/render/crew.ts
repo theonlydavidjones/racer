@@ -47,6 +47,18 @@ const figure = (p: Person, jacket: number, seed: number): Figure => ({ ...buildB
 export function tailEnd(rest: THREE.Vector3, hand?: THREE.Vector3, side?: number): THREE.Vector3 {
   return hand && (side == null || Math.sign(hand.x) === side) ? hand : rest; // (a side given: only a hand on it, the traveller's own end)
 }
+/** The traveller's control line's cam: on the thwart's forward face, just outboard of the track's end (boatMesh.ts). */
+export const travCam = (s: number) => V(s * (TRAV_END + 0.12), THWART.top - 0.06, THWART.z - THWART.half);
+/**
+ * The traveller line's tail from its cam (boatMesh.ts draws the line through these, after the cam): to the hand of the
+ * hiker holding it on that side (Crew.travHand), else falling from the cam. One place, so a test can check the line as
+ * drawn.
+ */
+export function travTail(cam: THREE.Vector3, hand: THREE.Vector3 | undefined, side: number): THREE.Vector3[] {
+  const e = tailEnd(V(cam.x - side * 0.02, cam.y - 0.2, cam.z - 0.03), hand, side), held = e === hand;
+  // (held: up from the cam and over the knees, the lap, to the hand: not straight through the thighs between them)
+  return [held ? V((cam.x + e.x) / 2, Math.max(cam.y, e.y) + 0.12, (cam.z + e.z) / 2) : cam.clone(), e.clone()];
+}
 export function buildCrew(helm: Person, people: Person[], jackets: number[], seed: number): Crew {
   const group = new THREE.Group();
   const h = figure(helm, jackets[0], seed); group.add(h.root);
