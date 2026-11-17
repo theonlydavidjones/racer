@@ -203,8 +203,11 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'ssyc', shape: 'pennant', ratio: 1.7, // Willow Grove, traced from the owner's reference: stripes of one width leaning 0.56 across for each 1 down, pitch 0.27 of the length, the first teal stripe's right edge at 0.042 of the length along the top
     draw: (g, W, H) => { fill(g, W, H, '#efe6c8'); const pitch = W * 0.27, wid = W * 0.135, lean = H * 0.56, off = -W * 0.093;
       for (let i = -2; i < 5; i++) poly(g, '#0f5b63', [off + i * pitch, 0], [off + i * pitch + wid, 0], [off + i * pitch + wid + lean, H], [off + i * pitch + lean, H]); } },
-  { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
-    draw: (g, W, H) => { fill(g, W, H, '#2a62b8'); poly(g, '#2f7d4a', [W * 0.05, H * 0.7], [W * 0.2, H * 0.28], [W * 0.35, H * 0.7]); poly(g, WHITE, [W * 0.155, H * 0.42], [W * 0.2, H * 0.28], [W * 0.245, H * 0.42]); } },
+  { id: 'myc', shape: 'pennant', ratio: 1.46, // Tamalpais, from the owner's reference (to flag for IP review: the layout is a real club's): a navy hoist field bearing a white T, then a slanting cream band and a red fly, the two slants parallel
+    draw: (g, W, H) => { fill(g, W, H, '#d4504a');
+      poly(g, '#f5f0e2', [W * 0.484, H * 0.242], [W * 0.654, H * 0.327], [W * 0.113, H * 1.2], [-W * 0.11, H * 1.2]); // the cream band, from the top edge down and to the left
+      poly(g, '#1b3558', [-W * 0.1, -H * 0.05], [W * 0.484, H * 0.242], [-W * 0.11, H * 1.2], [-W * 0.1, H * 1.2]); // the navy hoist field, its edge parallel to the band's other edge
+      g.fillStyle = WHITE; g.font = `bold ${Math.round(H * 0.3)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('T', W * 0.14, H * 0.34); } },
   { id: 'sryc', shape: 'pennant', ratio: 1.5, // Mission Canal: one mission bell (the owner's drawing) at the top-left, its axis pointing straight at the corner, cream on mission-tile red, a plain field
     draw: (g, W, H) => { fill(g, W, H, '#8f3b2b'); bell(g, H * 0.2, H * 0.27, H * 0.269, -Math.atan2(0.2, 0.27), '#f1e3c6'); } },
   { id: 'ryc', shape: 'pennant', ratio: 1.5, // DIY: brick red, black and white; one kiln chimney
