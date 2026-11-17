@@ -10,7 +10,7 @@ export interface Burgee {
   /** Fly length over hoist (3:2 unless the burgee is longer). */
   ratio?: number;
   /** Its cut: a triangular pennant (the default), or a swallowtail (a V cut in the fly): rare, at most one burgee in ten (the owner, 17 Nov 2026). */
-  shape?: 'pennant' | 'swallow';
+  shape?: 'pennant' | 'swallow' | 'blunt';
   draw: (g: CanvasRenderingContext2D, W: number, H: number) => void;
 }
 
@@ -23,9 +23,10 @@ export interface Burgee {
 export const BURGEES: Burgee[] = [];
 
 /** A burgee's cut: a pennant, or a swallowtail, which as real ones are tapers: the fly is shorter than the hoist and forked. */
-export function burgeePath(g: CanvasRenderingContext2D, W: number, H: number, shape?: 'pennant' | 'swallow'): void {
+export function burgeePath(g: CanvasRenderingContext2D, W: number, H: number, shape?: 'pennant' | 'swallow' | 'blunt'): void {
   g.beginPath();
   if (shape === 'swallow') { g.moveTo(0, 0); g.lineTo(W, H * 0.17); g.lineTo(W * 0.78, H / 2); g.lineTo(W, H * 0.83); g.lineTo(0, H); }
+  else if (shape === 'blunt') { g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H * 0.62); g.lineTo(W, H * 0.38); } // a pennant cut off square near the point
   else { g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); }
   g.closePath();
 }
