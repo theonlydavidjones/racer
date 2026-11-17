@@ -141,7 +141,7 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): white above, navy below, a gold line along the top and bottom edges, one red shark across the center line at the hoist
     draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#14295c', 0, H * 0.5, W, H * 0.5);
       g.strokeStyle = '#f2b705'; g.lineWidth = H * 0.09; for (const y of [0, H]) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, H / 2); g.stroke(); } // gold along the top and bottom edges
-      shark(g, W * 0.255, H * 0.52 + H * 0.052, H * 0.52, '#c8102e'); } },
+      shark(g, W * 0.255, H * 0.52, H * 0.52, '#c8102e'); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.58, 0, W * 0.42, H); const x = W * 0.25, y = H * 0.42, r = H * 0.15; stroke(g, GOLD, H * 0.1, [x - r, y - H * 0.14], [x - r, y]); stroke(g, GOLD, H * 0.1, [x + r, y - H * 0.14], [x + r, y]); arc(g, GOLD, H * 0.1, x, y, r, 0, Math.PI); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.5, // artsy: cream, teal and willow green; one drooping branch
