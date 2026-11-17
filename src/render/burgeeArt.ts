@@ -79,14 +79,14 @@ function wheel(g: G, cx: number, cy: number, r: number, c: string, ground: strin
   dot(g, c, 0, 0, r * 0.22); dot(g, ground, 0, 0, r * 0.09); g.restore();
 }
 
-/** A cannon on its carriage, muzzle to the right and raised; w is its length. */
+/** A cannon on a truck carriage, simplified from the owner's reference: a tapering barrel with a flared muzzle and two bands, a ball at the breech, a solid carriage on a small and a large wheel; w is its length. */
 function cannon(g: G, x: number, y: number, w: number, c: string, ground: string): void {
   g.save(); g.translate(x, y); g.scale(w, w); g.fillStyle = c;
-  g.save(); g.translate(0.3, 0.3); g.rotate(-0.32); // the barrel: thick at the breech, tapering to the muzzle, a ring at each end
-  g.beginPath(); g.moveTo(-0.22, -0.14); g.lineTo(0.66, -0.1); g.lineTo(0.66, 0.1); g.lineTo(-0.22, 0.14); g.closePath(); g.fill();
-  g.fillRect(0.6, -0.14, 0.11, 0.28); dot(g, c, -0.27, 0, 0.075); g.restore();
-  g.beginPath(); g.moveTo(0.0, 0.34); g.lineTo(0.6, 0.34); g.lineTo(0.68, 0.62); g.lineTo(-0.04, 0.62); g.closePath(); g.fill(); // the carriage
-  dot(g, c, 0.3, 0.62, 0.2); dot(g, ground, 0.3, 0.62, 0.06); g.restore();
+  g.save(); g.translate(0.55, 0.2); g.rotate(-0.2); // the barrel, long, tapering, a flared muzzle and two bands
+  g.beginPath(); g.moveTo(-0.38, -0.11); g.lineTo(0.42, -0.075); g.lineTo(0.42, 0.075); g.lineTo(-0.38, 0.11); g.closePath(); g.fill();
+  g.fillRect(0.36, -0.105, 0.08, 0.21); g.fillRect(-0.03, -0.125, 0.045, 0.25); g.fillRect(0.17, -0.115, 0.045, 0.23); dot(g, c, -0.43, 0, 0.06); g.restore();
+  g.beginPath(); g.moveTo(0.1, 0.3); g.lineTo(0.78, 0.3); g.lineTo(0.78, 0.43); g.lineTo(0.1, 0.43); g.closePath(); g.fill(); // the carriage, low
+  dot(g, c, 0.2, 0.49, 0.09); dot(g, ground, 0.2, 0.49, 0.028); dot(g, c, 0.6, 0.46, 0.17); dot(g, ground, 0.6, 0.46, 0.05); g.restore();
 }
 
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
@@ -169,7 +169,7 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); border(g, W, H, 'pennant', '#c8102e', 0.025);
       shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and one white cannon toward the hoist
-    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); cannon(g, W * 0.06, H * 0.3, W * 0.33, WHITE, '#8fc4ea'); } },
+    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); cannon(g, W * 0.045, H * 0.31, W * 0.4, WHITE, '#8fc4ea'); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.5, // artsy: cream, teal and willow green; one drooping branch
     draw: (g, W, H) => { fill(g, W, H, '#f0e9d0'); rect(g, '#1f8c8a', 0, 0, W * 0.07, H); stroke(g, '#3d7a35', H * 0.07, [W * 0.12, H * 0.3], [W * 0.3, H * 0.3]); for (const x of [0.15, 0.21, 0.27]) stroke(g, '#3d7a35', H * 0.06, [W * x, H * 0.3], [W * x, H * 0.62]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
