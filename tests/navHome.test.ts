@@ -123,6 +123,16 @@ describe('the navigator takes her home to her harbor\'s mouth, and hands her ove
     expect(run.said.some(m => /At the harbor mouth: she's yours/.test(m))).toBe(true);
   }, 120_000);
 
+  it('under sail far from home, with land on the bearing to the mouth: the pilot sails her on round it, not standing by (the third review)', () => {
+    const s = slipById('gashouse-cove:572')!, r = harborRoute(s)!;
+    for (const off of [1500, 2250]) {
+      const t = 80 * Math.PI / 180, o = { x: r.mouth.x + Math.sin(t) * off, y: r.mouth.y + Math.cos(t) * off }, w = world(s, 10, 270);
+      const run = sail(w, o, r.mouth, false, 60);
+      expect(run.said.filter(m => /she's yours/.test(m)), `${off} m out`).toEqual([]);
+      expect(run.pilot, `${off} m out`).toBe('nav');
+    }
+  }, 120_000);
+
   it('the way in starts in the gap between the breakwater ends, in clear sight of the entrance, and every slip that has one keeps its clear water', () => {
     let routed = 0, none = 0; const bad: string[] = [], missing: string[] = [];
     for (const s of SLIPS) {
