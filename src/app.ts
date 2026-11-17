@@ -1418,7 +1418,9 @@ $('bTools').title = 'Tools: what you can show on screen, with their keys';
 function frame(now: number): void {
   requestAnimationFrame(frame);
   const t0 = performance.now();
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  // (never below 0: the first frame's time is when it began, before `last` was taken at the end of a long load, and its
+  // negative step held the readouts back a second or more behind the start page)
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (still) return; // (behind the setup: the last frame stays, and its race waits untouched for the start)
   // the steps due (sim/host.ts: here, or in the worker): racing at the race's speed; with nothing running (the start
   // page, setup, the showroom) she still sails, in the real wind and physics, so her sails, heel and flags agree; in the
@@ -1575,6 +1577,7 @@ const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k ===
   : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
 function showPlace(p: Place): void {
   if (p.k === 'home') { openHome(); return; }
+  setup.home(false); // (off the start page: the races and the showroom are built as set up again)
   for (const id of ['home', 'raceChoose', 'pastView', 'setup', 'drillView', 'seasonView', 'condDlg']) $(id).hidden = true;
   if (p.k !== 'club' && p.k !== 'boat' && fleet.open) fleet.close();
   if (p.k === 'race') { $('raceBack').textContent = nav.backLabel(); paintSeasonCard(); $('raceChoose').hidden = false; }
@@ -1589,13 +1592,14 @@ function openHome(): void { results.settleLog(openHomeNow); }
 function openHomeNow(): void {
   if (boatPanel.open && boatPanel.edited) { boatPanel.leave(openHomeNow); if (boatPanel.edited) return; } // (her changes unsaved: Save or Discard first)
   nav.reset(); // (the start page: the bottom of the back stack)
+  setup.home(true); // (a World built from here on, the showroom's as it closes too, is the start page's quiet cruise)
   courseView.close(); navView.close(); if (w.running) { send({ k: 'running', on: false }); send({ k: 'pause', on: false }); }
-  setup.wake(); // (the start page: the boat sailing behind it again, the setup's race drawn if it hadn't been)
   for (const id of ['motorAsk', 'homeAsk', 'leaveAsk', 'seasonView', 'setup', 'raceChoose', 'condDlg', 'pause', 'results', 'drill', 'replay', 'pastView', 'drillView', 'coachPanel', 'lessonCard', 'lessons']) $(id).hidden = true;
   seasonPick = null;
   if (raceReplay.isOpen) raceReplay.close();
   if (boatPanel.open) boatPanel.hide();
   fleet.close(); showroom(false);
+  setup.toHome(); // (the start page: her sailing behind it, a quiet cruise: app/firstRun.ts homeScene)
   $('home').hidden = false;
 }
 document.addEventListener('click', e => {
@@ -1858,7 +1862,7 @@ for (const [k, a] of Object.entries(ADJ)) {
 }
 
 setup.buildSetupChoices();
-setup.newGame(); setup.paintSeg(); setup.crewRows(); setup.courseCard(); setup.tideBox(); boatSummary(); oppRows();
+setup.home(true); setup.newGame(); setup.paintSeg(); setup.crewRows(); setup.courseCard(); setup.tideBox(); boatSummary(); oppRows();
 requestAnimationFrame(frame);
 
 installDevHandles(ctx); // (src/app/devHandles.ts)

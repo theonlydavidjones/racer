@@ -5,7 +5,9 @@
  *     clicks a card that can't answer yet;
  *  2. the loading mark clears (within 90 s, software graphics allowed for), and then a click on a card answers at
  *     once: Cruise opens its setup;
- *  3. the boat a new player is given is their own: not JOSEPHINE, USA 122 (the owner's).
+ *  3. behind it, a quiet cruise: her alone, no fleet, start line or clock (dev server), and again on coming back to it
+ *     from a race's setup, which still sets up its race;
+ *  4. the boat a new player is given is their own: not JOSEPHINE, USA 122 (the owner's).
  * Fails (exit 1) on any of these, or on a page error. Needs the dev server (default :5173).
  *
  *   node scripts/check/ftue.cjs [<url>] [<out-dir>]   → stills in <out-dir> when given
@@ -45,10 +47,30 @@ const URL = process.argv[2] || 'http://localhost:5173/', OUT = process.argv[3];
   ok(R.busyAtShow, `the start page shows marked as loading (shown at ${Math.round(R.shown)} ms)`);
   ok(st.busy && st.pointer === 'none' && st.opacity < 0.8, `while loading, its cards are drawn dimmed and take no clicks (styled at ${Math.round(st.t)} ms: busy ${st.busy}, pointer-events ${st.pointer}, opacity ${st.opacity})`);
   const ready = await p.waitForFunction(() => window.__ftue.ready, null, { timeout: 90000 }).then(h => h.jsonValue()).catch(() => null);
+  // (the readouts behind it, four frames on: a cruise's, not a race's "Start in 3:00", nor held up by a first frame's
+  // negative time step)
+  const labAtReady = ready == null ? '' : await p.evaluate(() => new Promise(res => { let n = 0; const f = () => (++n >= 4 ? res(document.getElementById('clockLab').textContent) : requestAnimationFrame(f)); requestAnimationFrame(f); }));
   ok(ready != null, `the loading mark clears${ready != null ? ` (at ${(ready / 1000).toFixed(1)} s)` : ' (not within 90 s)'}`);
   await shot('ftue-02-ready');
   if (ready != null) {
     const t = Date.now();
+    // the scene behind the start page: a quiet cruise, her alone (no fleet, start line or clock); the dev server's handle
+    // (__w, the page's World) only, so not on the built page
+    const scene = () => p.evaluate(() => window.__w ? { freeSail: window.__w().freeSail, boats: window.__w().boats.length } : null);
+    const quiet = s => s && s.freeSail && s.boats === 1;
+    const s0 = await scene();
+    if (s0) {
+      ok(quiet(s0), `behind the start page, a quiet cruise: her alone (${JSON.stringify(s0)})`);
+      ok(labAtReady === 'Sailing', `its clock reads as a cruise's within four frames of the page being ready (${labAtReady})`);
+      const go = sel => p.evaluate(sel => { const e = [...document.querySelectorAll(sel)].find(e => e.offsetParent); if (e) e.click(); }, sel);
+      await go('#home [data-home="race"]'); await go('[data-home="create"]'); await p.waitForTimeout(1500);
+      const s1 = await scene();
+      ok(s1 && !s1.freeSail && s1.boats > 1, `Create a race still sets up the race, fleet and all (${JSON.stringify(s1)})`);
+      await go('#setupBack'); await go('#raceBack'); await p.waitForTimeout(1500);
+      const s2 = await scene(), back = await p.evaluate(() => !document.getElementById('home').hidden);
+      ok(back && quiet(s2), `back on the start page, the quiet cruise again (${JSON.stringify(s2)})`);
+      await shot('ftue-02b-home-again');
+    } else console.log('(the scene behind the start page: checked on the dev server only)');
     // (the click dispatched as the browser would: with software graphics a frame takes seconds here, too slow for a
     // mouse click's own checks; on a real GPU the page answers at once)
     await p.evaluate(() => document.querySelector('#home [data-home="cruise"]').click());
