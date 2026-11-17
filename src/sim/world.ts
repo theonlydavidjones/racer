@@ -894,9 +894,10 @@ export class World {
    * islands and hills, and the wakes of boats (their sails), ships and the committee boat. `self`: the boat asking
    * (her own wake doesn't count; her land lee is cached, refreshed every half second).
    */
-  shadowAt(p: Vec, self?: Boat): Shadow {
+  shadowAt(p: Vec, self?: Boat, landK?: number): Shadow {
     const sum = new WindSum(this.wind.from), kt = this.wind.kt, from = this.wind.from;
-    const lee = self?.leeK ?? landLee(p, from);
+    // (the land's lee: hers, worked out with her step; or the caller's, the map's own lattice of it, ui/shadowLayer.ts)
+    const lee = landK ?? self?.leeK ?? landLee(p, from);
     for (const o of this.boats) {
       if (o === self) continue;
       const dx = p.x - o.x, dy = p.y - o.y; if (dx * dx + dy * dy > 120 * 120) continue;
@@ -2532,6 +2533,9 @@ export class World {
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
     this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t), this.user); // (the new day's swell, the waves where she is carried on)
+    // (and the new wind's sea runs its way at once: the field's turn is capped at a few degrees an hour, waveField.ts
+    // turnCap, so left to ease round after a change of conditions the chop would run askew of the wind for a day)
+    this.waves.windDir = this.waves.swellDir = NaN;
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();
