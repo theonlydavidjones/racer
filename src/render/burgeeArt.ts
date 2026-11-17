@@ -45,9 +45,13 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'tiyc', shape: 'pennant', ratio: 1.5, // small and friendly: blue and white, a clipper under sail, a gold hull
     draw: (g, W, H) => { fill(g, W, H, '#1f4f9a'); poly(g, WHITE, [W * 0.08, H * 0.58], [W * 0.08, H * 0.3], [W * 0.19, H * 0.56]); poly(g, WHITE, [W * 0.22, H * 0.56], [W * 0.22, H * 0.24], [W * 0.36, H * 0.54]); poly(g, GOLD, [W * 0.06, H * 0.62], [W * 0.38, H * 0.62], [W * 0.33, H * 0.72], [W * 0.11, H * 0.72]); } },
   // ---- Marin
-  { id: 'sfyc', shape: 'swallow', ratio: 1.67, // the reference classic: red, white and dark blue bands, one dark star
-    draw: (g, W, H) => { rect(g, RED, 0, 0, W, H / 3); rect(g, WHITE, 0, H / 3, W, H / 3); rect(g, NAVY, 0, H * 2 / 3, W, H / 3); const x = W * 0.2, y = H / 2;
-      poly(g, NAVY, [x, y - H * 0.3], [x + H * 0.08, y - H * 0.08], [x + H * 0.3, y], [x + H * 0.08, y + H * 0.08], [x, y + H * 0.3], [x - H * 0.08, y + H * 0.08], [x - H * 0.3, y], [x - H * 0.08, y - H * 0.08]); } },
+  { id: 'sfyc', shape: 'swallow', ratio: 1.67, // the reference classic, the oldest club: strict red, white and dark blue; a white field under a double border, one dark-blue anchor (the first to drop one on this coast)
+    draw: (g, W, H) => { fill(g, W, H, WHITE); border(g, W, H, 'swallow', RED, 0.075); border(g, W, H, 'swallow', NAVY, 0.045);
+      const x = W * 0.27, y = H * 0.52, u = H, S = NAVY;
+      rect(g, S, x - u * 0.025, y - u * 0.2, u * 0.05, u * 0.42); rect(g, S, x - u * 0.12, y - u * 0.13, u * 0.24, u * 0.045); // the shank and the stock
+      g.strokeStyle = S; g.lineWidth = u * 0.04; g.beginPath(); g.arc(x, y - u * 0.26, u * 0.05, 0, 7); g.stroke(); // the ring
+      arc(g, S, u * 0.05, x, y + u * 0.02, u * 0.2, 0.12 * Math.PI, 0.88 * Math.PI); // the arms
+      for (const s of [-1, 1]) poly(g, S, [x + s * u * 0.14, y + u * 0.2 - u * 0.03], [x + s * u * 0.27, y + u * 0.05], [x + s * u * 0.14, y + u * 0.08]); } },
   { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic: dark blue over red, one gold torch
     draw: (g, W, H) => { half(g, W, H, NAVY, RED); poly(g, GOLD, [W * 0.16, H * 0.56], [W * 0.26, H * 0.56], [W * 0.24, H * 0.7], [W * 0.18, H * 0.7]); poly(g, GOLD, [W * 0.21, H * 0.2], [W * 0.27, H * 0.38], [W * 0.21, H * 0.5], [W * 0.15, H * 0.38]); } },
   { id: 'tyc', shape: 'pennant', ratio: 1.8, // mid-century: deep blue over gray water, one white fin
