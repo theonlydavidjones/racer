@@ -11,7 +11,7 @@ import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, c
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec, hypot } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
 import { bodyJob } from '../boat/crewWork';
@@ -43,7 +43,7 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
-import { berthClear, harborAt, harborOf, harborRouteSteps, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type HarborRoute, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, harborRoute, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
@@ -63,13 +63,11 @@ import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
 
-/** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 /** The pilot's hand-over off her harbor's mouth, bound home (navTarget): this many seconds out at her speed under power,
  * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
  * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
 const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
-/** The slice of a step the way home is worked out in, ms (navTarget). */
-const HOME_SLICE_MS = 2;
+/** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
  * start, eased sheets, they take about 10 s; her speed, a heavy boat's in light air, about 50 (World.idle). */
@@ -475,6 +473,7 @@ export class World {
     this.homeSlip = slipById(settings.boat?.slip);
     // (the boats in the other slips solid to her: physics.ts; the slips of the player's own boats empty, as the scene draws them)
     mooredBoats.empty = new Set([this.homeSlip?.id, ...(settings.boats ?? []).map(b => slipById(b.slip)?.id)].filter((id): id is string => !!id));
+    if (this.homeSlip && this.freeSail) harborRoute(this.homeSlip); // (her way home, worked out now, not mid-cruise: navTarget)
     // racing from her slip: the clock starts long enough before the warning signal to sail out to the line
     this.fromSlip = !!this.homeSlip && (this.freeSail ? settings.sailFrom === 'slip' : opts.startAt == null && settings.raceFrom === 'slip');
     this.startAt = this.freeSail ? 0 : opts.startAt ?? settings.seq * 60 + (this.fromSlip ? slipLeadTime(this.homeSlip!, buildCourse(file, { bias: settings.bias, fleet: settings.fleet, windFrom: file.windBase }).center) : 0);
@@ -2466,7 +2465,8 @@ export class World {
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
     this.retire();
     this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
-        this.arrivedT = null;
+    this.arrivedT = null;
+    harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
     this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
     return true;
@@ -2542,11 +2542,10 @@ export class World {
     this.emit({ type: 'toast', msg: `Conditions changed: ${Math.round(this.wind.kt)} kt from ${String(Math.round(this.wind.from) % 360).padStart(3, '0')}°, ${this.cur.label.toLowerCase()}, ${sea}.${laid}`, ms: laid ? 7000 : 4500 });
   }
 
-  /** The way home being worked out (geo/marina.ts harborRouteSteps), a slice each step: the harbor's flood is 75–385 ms
-   * at once, too long for one step; until it's in, the pilot steers for the entrance nearest her slip as the crow flies. */
   /** On Nav home, she's been steered from outside her harbor (navTarget: which words the hand-over has). */
   private homeOut = false;
-  private homeJob: { slip: Slip; g: Generator<void, HarborRoute | null, void>; r?: HarborRoute | null } | null = null;
+  /** When the way ahead to the mouth was last looked along, s of sim time (navTarget: every half second). */
+  private homeLookT = -Infinity;
   /**
    * What the pilot steers for, on Nav: the destination; or, bound for her slip, the middle of her harbor's entrance (the
    * one nearest her slip by water, geo/marina.ts harborRoute), where it goes to standby and hands her over while she's
@@ -2564,15 +2563,26 @@ export class World {
     // its water runs out past the breakwater ends, as at Richmond)
     if (harborAt(b) === H) { yours(this.homeOut ? 'At the harbor mouth' : 'In the harbor'); this.homeOut = false; return null; }
     this.homeOut = true;
-    if (this.homeJob?.slip !== slip) this.homeJob = { slip, g: harborRouteSteps(slip) };
-    const job = this.homeJob;
-    if (job.r === undefined) { const t = performance.now(); for (;;) { const n = job.g.next(); if (n.done) { job.r = n.value; break; } if (performance.now() - t > HOME_SLICE_MS) break; } }
-    let mouth = job.r?.mouth;
+    // (the way in, all at once: worked out when she's given her slip (the constructor) or sent home, so where she's steered
+    // never hangs on how fast the host is; worked out a slice at a time against the clock, the same race sailed twice went
+    // two ways at South Beach and Berkeley, the second review, 17 Nov 2026. Each harbor's flood once, cached)
+    let mouth = harborRoute(slip)?.mouth;
     if (!mouth) { mouth = H.exits[0]; for (const e of H.exits) if (dist(e, slip.p) < dist(mouth, slip.p)) mouth = e; }
     // (handed over HANDOVER_S out at her speed, at least HANDOVER_MIN m; under sail, as she comes in sight of the entrance,
     // since the pilot sails her round the breakwater ends rather than in at the gap)
-    const motoring = !!b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05;
-    if (dist(b, mouth) < (motoring ? Math.max(HANDOVER_MIN, b.v * HANDOVER_S) : HANDOVER_SAIL)) { yours('At the harbor mouth'); this.homeOut = false; return null; }
+    const motoring = !!b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05, ahead = motoring ? Math.max(HANDOVER_MIN, b.v * HANDOVER_S) : HANDOVER_SAIL;
+    if (dist(b, mouth) < ahead) { yours('At the harbor mouth'); this.homeOut = false; return null; }
+    // (and sooner, if there's anything solid in the lane her hull sweeps toward the mouth within that much of her: the
+    // pilot's own look ahead, boat/autopilot.ts, is a line along the shore's outline, and off Corinthian it steered her by
+    // something within a few meters of it: the second review)
+    if (this.t - this.homeLookT >= 0.5) {
+      this.homeLookT = this.t;
+      const u = unit(sub(mouth, b)), side = { x: u.y, y: -u.x };
+      for (let k = 2; k <= ahead; k += 2) for (const o of [-1.6, 0, 1.6]) {
+        const q = { x: b.x + u.x * k + side.x * o, y: b.y + u.y * k + side.y * o };
+        if (hitsHarbor(q) || hitsMooredBoat(q) || onLand(q)) { yours('Something ahead of her'); this.homeOut = false; return null; }
+      }
+    }
     return mouth;
   }
   /** Just sail: tell her when she gets to where she was going. */
