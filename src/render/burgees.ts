@@ -4,6 +4,7 @@
  */
 
 import { CLUB_TABLE } from '../club/clubs';
+import { PARODY_BURGEES } from './burgeeArt';
 
 export interface Burgee {
   id: string; club?: string;
@@ -15,12 +16,17 @@ export interface Burgee {
 }
 
 /**
- * No club flies a burgee for now: the real clubs' designs are trademarks and are gone, and the parody burgees are not
- * approved yet (the owner, 17 Nov 2026; their drawings are in git history, commit 763f240). A boat's club still shows by
- * name; burgeeCanvas() returns null for an id with no design, and every caller draws nothing then. A burgee goes in
- * this list as {id, ratio?, draw}, with the club's id from club/clubs.ts.
+ * The burgees that fly: the owner's 20 approved parody designs (the owner, 17 Nov 2026: "the 20 burgees I did with
+ * Yacht Clubs are ready to go"; the sheet is docs/clubs/approved.png, plus Brickyard). The other clubs' drawings in
+ * burgeeArt.ts stay unflown until the owner approves them; a club with no design shows by name only, as before.
  */
-export const BURGEES: Burgee[] = [];
+export const APPROVED_BURGEE_IDS: readonly string[] = ['stfyc', 'ggyc', 'sbyc', 'bvbc', 'mhpyc', 'tiyc', 'sfyc', 'cyc', 'tyc', 'pyc',
+  'ssyc', 'myc', 'sryc', 'byc', 'csc', 'eyc', 'oyc', 'mbyc', 'slyc', 'ryc'];
+let flown: Burgee[] | null = null;
+/** The flown burgees, looked up when first drawn (burgeeArt.ts imports from this module, so not at load). */
+export function flownBurgees(): Burgee[] {
+  return flown ??= PARODY_BURGEES.filter(b => APPROVED_BURGEE_IDS.includes(b.id));
+}
 
 /** A burgee's cut: a pennant, or a swallowtail, which as real ones are tapers: the fly is shorter than the hoist and forked. */
 export function burgeePath(g: CanvasRenderingContext2D, W: number, H: number, shape?: 'pennant' | 'swallow' | 'blunt'): void {
@@ -33,7 +39,7 @@ export function burgeePath(g: CanvasRenderingContext2D, W: number, H: number, sh
 
 /** A burgee as a texture: the pennant on a transparent canvas. Its aspect is the burgee's own (fly over hoist). */
 export function burgeeCanvas(id: string): HTMLCanvasElement | null {
-  const b = BURGEES.find(x => x.id === id); if (!b) return null;
+  const b = flownBurgees().find(x => x.id === id); if (!b) return null;
   const H = 128, W = Math.round(H * (b.ratio ?? 1.5)), c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
   g.save(); burgeePath(g, W, H, b.shape);
