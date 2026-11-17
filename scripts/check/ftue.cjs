@@ -9,14 +9,18 @@
  * Fails (exit 1) on any of these, or on a page error. Needs the dev server (default :5173).
  *
  *   node scripts/check/ftue.cjs [<url>] [<out-dir>]   → stills in <out-dir> when given
+ *   node scripts/check/ftue.cjs file://$PWD/artifact/folkboat-racing-sim.html   (the built page)
  */
 const { chromium } = require('playwright');
+const path = require('path');
 const URL = process.argv[2] || 'http://localhost:5173/', OUT = process.argv[3];
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } }); // (a fresh context: no saves)
   const p = await ctx.newPage(); p.setDefaultTimeout(120000);
   const errs = [], bad = [];
+  // (the built page takes three.js from jsDelivr: served here from node_modules, as smoke.cjs does)
+  await p.route('https://cdn.jsdelivr.net/npm/three@*/build/**', r => r.fulfill({ path: path.join(__dirname, '../../node_modules/three/build', path.basename(new globalThis.URL(r.request().url()).pathname)), contentType: 'application/javascript', headers: { 'access-control-allow-origin': '*' } }));
   p.on('pageerror', e => errs.push(e.message));
   const ok = (cond, label) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${label}`); if (!cond) bad.push(label); };
   const shot = async n => { if (OUT) await p.screenshot({ path: `${OUT}/${n}.png`, timeout: 120000 }).catch(() => {}); };
