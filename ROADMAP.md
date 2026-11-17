@@ -257,6 +257,9 @@ What's planned, roughly in order. Done work is described in the README.
      - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
      - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
        option.
+     - Known modeling limit: the engine names one boat at fault per incident. Under the RRS both may have broken a rule:
+       a boat that interferes with a boat on another leg (23.2), and that boat failing to keep clear of her from astern
+       (12). Only one is penalized, and a hearing finds only that one.
      - Rule 31 under protests (branch rules-31): a mark touch is any boat's to protest that saw it (60.1,
        60.4(a)(2)). The boats within four lengths saw it: you may hail, and the nearest AI boat hails at once. The toucher's turn is her own choice, as for a foul.
        The hearing decides it as a foul.
