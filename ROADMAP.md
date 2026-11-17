@@ -367,6 +367,13 @@ What's planned, roughly in order. Done work is described in the README.
 8m3. ~~**The bow-line let-go bumps the next boat in a northerly**~~ (done: 94c34591, batch48; Marinas; from their own work, 16 November; their entry and fix land in v201).
    Also (the owner, via the Coordinator, 16 November): AI boats wait for their own crew's "ready", by skill (#434, with Crew Model).
 
+8m4. **Gashouse Cove's entrance sign as it really is** (owner, 16 November, a screenshot and a Street View photo of the
+   entrance; polish; next, not urgent; 1–2 h; Marinas): "text on this sign is crowded. second pic shows what the sign
+   looks like entering the harbor." Today (render/marina.ts noWakeBoard) "IDLE SPEED / NO WAKE" in 48 px letters on a
+   1.2 × 0.9 m board, cut off at its edges, on the red beacon's post. The real one: a square, weathered gray-white board
+   with an orange circle and "5 MPH" in it (the US regulatory "controlled area" mark), on a pipe frame on top of the
+   concrete seawall's end, the red light on its top. Draw that, readable from the fairway, both ways.
+
 8m2. ~~**Josephine can't leave slip 572: walk her out to the fairway, and the moored boats solid**~~ (done, v200: marinas-8m2) (owner, 15 November; bug;
    now; 4–6 h): "i still cannot get out of josephine's gashouse cove slip. ive never had this problem in real life. the
    main issue is that her bow starts turning west, since the wind is pushing her hard. ... she doesn't seem to get
