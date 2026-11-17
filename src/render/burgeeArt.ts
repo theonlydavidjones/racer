@@ -19,6 +19,17 @@ const oval = (g: G, c: string, x: number, y: number, rx: number, ry: number, rot
 const stroke = (g: G, c: string, w: number, ...p: P[]) => { g.strokeStyle = c; g.lineWidth = w; g.lineJoin = 'round'; g.lineCap = 'butt'; g.beginPath(); p.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
 const arc = (g: G, c: string, w: number, x: number, y: number, r: number, a0: number, a1: number) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'butt'; g.beginPath(); g.arc(x, y, r, a0, a1); g.stroke(); };
 
+/** A fish hook with its eye, traced from the owner's reference image (outline and eye hole as unit points, hook height 1, eye at the top right). */
+const HOOK_W = 0.917275;
+const HOOK_OUT: P[] = [[0.881, 0], [0.903, 0], [0.917, 0.022], [0.915, 0.073], [0.895, 0.129], [0.859, 0.187], [0.808, 0.234], [0.745, 0.382], [0.652, 0.567], [0.584, 0.684], [0.474, 0.835], [0.375, 0.934], [0.319, 0.971], [0.263, 0.993], [0.224, 1], [0.17, 1], [0.112, 0.985], [0.068, 0.961], [0.029, 0.92], [0.005, 0.866], [0, 0.779], [0.01, 0.727], [0.049, 0.635], [0.09, 0.557], [0.153, 0.45], [0.221, 0.35], [0.226, 0.345], [0.226, 0.358], [0.18, 0.718], [0.129, 0.635], [0.1, 0.611], [0.054, 0.72], [0.041, 0.779], [0.041, 0.822], [0.051, 0.864], [0.066, 0.891], [0.095, 0.922], [0.122, 0.939], [0.17, 0.954], [0.224, 0.954], [0.302, 0.927], [0.363, 0.883], [0.421, 0.825], [0.484, 0.747], [0.555, 0.642], [0.62, 0.528], [0.732, 0.297], [0.769, 0.209], [0.766, 0.178], [0.774, 0.144], [0.803, 0.078], [0.835, 0.034]];
+const HOOK_EYE: P[] = [[0.881, 0.044], [0.876, 0.073], [0.854, 0.127], [0.83, 0.163], [0.805, 0.187], [0.81, 0.153], [0.83, 0.107], [0.852, 0.073]];
+function hook(g: G, cx: number, cy: number, h: number, c: string, ground: string): void {
+  // The traced line is thin, so the outline is thickened to read from a distance; the eye is then cut back out in the field's color.
+  g.save(); g.translate(cx - HOOK_W * h / 2, cy - h / 2); g.scale(h, h); g.fillStyle = c; g.strokeStyle = c; g.lineWidth = 0.032; g.lineJoin = 'round';
+  g.beginPath(); HOOK_OUT.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = ground; g.beginPath(); HOOK_EYE.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); g.restore();
+}
+
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
@@ -58,9 +69,7 @@ export const PARODY_BURGEES: Burgee[] = [
       border(g, W, H, 'swallow', WHITE, 0.035); } },
   { id: 'ggyc', shape: 'pennant', ratio: 1.67, // scrappy fishermen's club (Puerto d'Oro), from the owner's template: dark blue, a thin white line inside the cut, one hook in the bridge's orange (to flag for IP review: the template is the real club's layout)
     draw: (g, W, H) => { fill(g, W, H, '#1b2285'); border(g, W, H, 'pennant', WHITE, 0.075); border(g, W, H, 'pennant', '#1b2285', 0.052);
-      g.save(); g.translate(W * 0.25, H * 0.55); g.scale(1.1, 1.1); g.strokeStyle = '#c0362c'; g.fillStyle = '#c0362c'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = H * 0.075;
-      const r = H * 0.1; g.beginPath(); g.moveTo(r, -H * 0.2); g.lineTo(r, 0); g.arc(0, 0, r, 0, Math.PI); g.lineTo(-r, -H * 0.07); g.stroke(); // the shank, the bend and the point
-      g.beginPath(); g.moveTo(-r, -H * 0.17); g.lineTo(-r + H * 0.085, -H * 0.06); g.lineTo(-r - H * 0.02, -H * 0.04); g.closePath(); g.fill(); g.restore(); } },
+      hook(g, W * 0.205, H * 0.54, H * 0.42, '#c0362c', '#1b2285'); } },
   { id: 'sbyc', shape: 'pennant', ratio: 1.6, // modern urban: harbor blue and orange, one bridge span
     draw: (g, W, H) => { fill(g, W, H, '#0f5f99'); rect(g, '#f08a1c', W * 0.05, H * 0.62, W * 0.3, H * 0.09); arc(g, '#f08a1c', H * 0.1, W * 0.2, H * 0.62, H * 0.2, Math.PI, 0); } },
   { id: 'bvbc', shape: 'pennant', ratio: 1.5, // working waterfront: dark blue, rust, cream; a keel in its cradle
