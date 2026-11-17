@@ -9,6 +9,8 @@ export interface Burgee {
   id: string; club?: string;
   /** Fly length over hoist (3:2 unless the burgee is longer). */
   ratio?: number;
+  /** Its cut: a triangular pennant (the default), a swallowtail (a V cut in the fly) or a rectangle. */
+  shape?: 'pennant' | 'swallow' | 'rect';
   draw: (g: CanvasRenderingContext2D, W: number, H: number) => void;
 }
 
@@ -25,7 +27,11 @@ export function burgeeCanvas(id: string): HTMLCanvasElement | null {
   const b = BURGEES.find(x => x.id === id); if (!b) return null;
   const H = 128, W = Math.round(H * (b.ratio ?? 1.5)), c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d')!;
-  g.save(); g.beginPath(); g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); g.closePath(); g.clip();
+  g.save(); g.beginPath();
+  if (b.shape === 'rect') g.rect(0, 0, W, H);
+  else if (b.shape === 'swallow') { g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W * 0.84, H / 2); g.lineTo(W, H); g.lineTo(0, H); }
+  else { g.moveTo(0, 0); g.lineTo(0, H); g.lineTo(W, H / 2); }
+  g.closePath(); g.clip();
   b.draw(g, W, H); g.restore();
   return c;
 }
