@@ -960,3 +960,94 @@ for (const o of outOfUse) {
 }
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();
+
+/**
+ * The way in from the harbor mouth to her slip, along the fairways (the navigator's, taking her home: the owner, 15 Nov
+ * 2026, "navigator just cannot take her home to her slip"). `mouth`: the middle of the entrance nearest her slip by water,
+ * where the pilot hands her over (world.ts navTarget); `entry`: the first open water inside it, in clear sight of it; `path`: the turns from there to `approach`, the fairway square off her slip,
+ * where she's brought in by hand (world.ts intoSlip). The water it runs on keeps ROUTE_CLEAR off every dock and every boat
+ * lying in a slip (solid to her: boat/physics.ts), on a 1.5 m grid flooded from the mouths, and it's pulled straight
+ * between the turns. Worked out once a harbor, the path once a slip; null where her slip can't be reached that way.
+ */
+export interface HarborRoute { mouth: Vec; entry: Vec; path: Vec[]; approach: Vec }
+/** How far the navigator's way in keeps off the docks and the moored boats, m: her half-beam (1.1) and as much again to spare (an ESTIMATE). */
+const ROUTE_CLEAR = 2.5;
+/** How far in from an entrance's middle the way in may start, m: the water in clear sight of the gap. */
+const MOUTH_R = 40;
+const harborFloods = new Map<string, { key: (q: Vec) => string; from: Map<string, string | null>; at: Map<string, Vec>; open: (q: Vec) => boolean; mouthOf: Map<string, Vec> }>();
+function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<typeof harborFloods.get>>, void> {
+  let f = harborFloods.get(H.id); if (f) return f;
+  let work = 0; // (a yield every few hundred cells looked at: the flood is 75–385 ms at once, a frame's worth many times over)
+  const G = 1.5, key = (q: Vec) => `${Math.round(q.x / G)},${Math.round(q.y / G)}`;
+  const ring = Array.from({ length: 8 }, (_, k) => [Math.sin(k * Math.PI / 4), Math.cos(k * Math.PI / 4)]);
+  const openMemo = new Map<string, boolean>();
+  const open = (q: Vec) => {
+    const k = key(q); let v = openMemo.get(k);
+    if (v == null) {
+      v = harborAt(q) === H && !hitsHarbor(q) && !hitsMooredBoat(q);
+      for (const r of [ROUTE_CLEAR / 2, ROUTE_CLEAR]) for (const [sx, sy] of ring) if (v) { const p = { x: q.x + sx * r, y: q.y + sy * r }; v = !hitsHarbor(p) && !hitsMooredBoat(p) && inBasin(p); }
+      openMemo.set(k, v);
+    }
+    return v;
+  };
+  const from = new Map<string, string | null>(), at = new Map<string, Vec>(); let fr: Vec[] = [];
+  const mouthOf = new Map<string, Vec>();
+  // (the straight run from an entrance's middle to a cell: nothing solid on it, so the way in starts in the gap between
+  // the breakwater ends, not behind one: the physics review, 17 Nov 2026, found West Harbor's start 86 m from its
+  // entrance with a breakwater between them, and Richmond's clipping the west breakwater's tip)
+  const inSight = (e: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(hypot(q.x - e.x, q.y - e.y) / 0.25)); for (let i = 0; i <= n; i++) { const p = { x: e.x + (q.x - e.x) * i / n, y: e.y + (q.y - e.y) * i / n }; if (hitsHarbor(p) || hitsMooredBoat(p)) return false; } return true; };
+  for (const e of H.exits) {
+    // (the mouth: every open cell within MOUTH_R of the entrance's middle in clear sight of it, so the flood starts on all
+    // the water that opens off the gap; or, with none in sight, the open cell nearest it)
+    // (anywhere in the basin: an entrance's middle may lie between the breakwater ends, outside the basin's own outline)
+    const seen: Vec[] = []; let best: Vec | null = null, bd = Infinity;
+    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
+      if (++work % 256 === 0) yield;
+      const q = { x, y }, dd = hypot(q.x - e.x, q.y - e.y); if (!open(q)) continue;
+      if (dd < bd) { bd = dd; best = q; }
+      if (dd < MOUTH_R && inSight(e, q)) seen.push(q);
+    }
+    for (const q of seen.length ? seen : best ? [best] : []) if (!from.has(key(q))) { from.set(key(q), null); at.set(key(q), q); mouthOf.set(key(q), e); fr.push(q); }
+  }
+  while (fr.length) {
+    const nx: Vec[] = [];
+    for (const p of fr) for (const [dx, dy] of [[G, 0], [-G, 0], [0, G], [0, -G]]) {
+      if (++work % 64 === 0) yield;
+      const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
+      if (from.has(k) || !open(q)) continue;
+      from.set(k, key(p)); at.set(k, q); nx.push(q);
+    }
+    fr = nx;
+  }
+  f = { key, from, at, open, mouthOf }; harborFloods.set(H.id, f); return f;
+}
+const harborRoutes = new Map<string, HarborRoute | null>();
+export function harborRoute(s: Slip): HarborRoute | null {
+  const g = harborRouteSteps(s); let r = g.next(); while (!r.done) r = g.next(); return r.value;
+}
+/** harborRoute a little at a time, for the page (sim/navigator.ts, the passage home): the harbor's flood, the first time,
+ * is 75–385 ms at once, so it yields as it goes; the same answer as harborRoute. */
+export function* harborRouteSteps(s: Slip): Generator<void, HarborRoute | null, void> {
+  if (harborRoutes.has(s.id)) return harborRoutes.get(s.id)!;
+  const H = harborOf(s.marina); if (!H) return null;
+  const F = yield* harborFloodSteps(H), u = dirOf(s.heading), tip = 0.45 * s.finger;
+  // (the approach: in the fairway square off her slip, past her finger's end by her length and a half, or as far as is open)
+  let approach: Vec | null = null;
+  if (s.kind === 'alongside') {
+    // (an end tie: she comes in alongside, so the approach is off her open side, or off the dock's end ahead of her; the
+    // review found all 23 end ties without a way in when it was looked for astern, along the dock)
+    const n = { x: u.y, y: -u.x };
+    for (let off = 4; off <= 16 && !approach; off += 0.5) for (const q of [{ x: s.p.x + n.x * off, y: s.p.y + n.y * off }, { x: s.p.x - n.x * off, y: s.p.y - n.y * off }, { x: s.p.x + u.x * (off + 4), y: s.p.y + u.y * (off + 4) }]) { const k = F.key(q); if (!approach && F.from.has(k)) approach = F.at.get(k)!; }
+  } else for (let back = tip + 1.5 * 2 * BOW; back >= tip + 2; back -= 0.5) { const q = { x: s.p.x - u.x * back, y: s.p.y - u.y * back }, k = F.key(q); if (F.from.has(k)) { approach = F.at.get(k)!; break; } }
+  if (!approach) { harborRoutes.set(s.id, null); return null; }
+  // (back along the flood to the mouth, then pulled straight: from each turn, on to the farthest point in clear sight of it
+  // over the open water)
+  const cells: Vec[] = []; let k: string | null = F.key(approach);
+  while (k) { cells.push(F.at.get(k)!); k = F.from.get(k) ?? null; }
+  cells.reverse();
+  const sight = (p: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(hypot(q.x - p.x, q.y - p.y) / 0.75)); for (let i = 1; i < n; i++) if (!F.open({ x: p.x + (q.x - p.x) * i / n, y: p.y + (q.y - p.y) * i / n })) return false; return true; };
+  const path = [cells[0]]; let i = 0;
+  while (i < cells.length - 1) { let j = cells.length - 1; while (j > i + 1 && !sight(cells[i], cells[j])) j--; path.push(cells[j]); i = j; }
+  const r = { mouth: { ...F.mouthOf.get(F.key(cells[0]))! }, entry: cells[0], path, approach };
+  harborRoutes.set(s.id, r); return r;
+}
