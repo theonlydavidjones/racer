@@ -21,7 +21,7 @@ async function plan(skip: boolean) {
 
 describe('the lee skip leaves the passage plan as it was', () => {
   it('the same track with the skip as without', async () => {
-    const a = await plan(true), b = await plan(false);
+    const a = await plan(true), b = await plan(false).finally(async () => { (await import('../src/environment/shadows')).leeSkip.on = true; });
     expect(a.pl && b.pl, 'both planned').toBeTruthy();
     expect(a.pl!.track.map(x => [x.p.x, x.p.y, x.t])).toEqual(b.pl!.track.map(x => [x.p.x, x.p.y, x.t]));
     expect(a.pl!.route).toEqual(b.pl!.route);

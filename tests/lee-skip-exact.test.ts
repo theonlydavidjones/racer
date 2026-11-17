@@ -12,7 +12,7 @@ describe('the lee ray skips open water exactly', () => {
     let seed = 12345;
     const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 2 ** 32; };
     let n = 0, skipped = 0, sheltered = 0;
-    for (let k = 0; k < 2500; k++) {
+    try { for (let k = 0; k < 2500; k++) {
       const p = LL(37.70 + 0.27 * rnd(), -122.62 + 0.38 * rnd()), from = k % 3 === 0 ? 5 * Math.floor(72 * rnd()) : 360 * rnd();
       for (const gate of [false, true]) {
         leeSkip.on = true; const a = terrainLee(p, from, gate);
@@ -22,8 +22,7 @@ describe('the lee ray skips open water exactly', () => {
       }
       leeSkip.on = true; const a = landLee(p, from); leeSkip.on = false; const b = landLee(p, from);
       expect(Object.is(a, b)).toBe(true);
-    }
-    leeSkip.on = true;
+    } } finally { leeSkip.on = true; } // (left off, later tests in this worker would march every ray: the same, slower)
     // (the check covers both kinds of water: in the open, and in a lee)
     expect(skipped).toBeGreaterThan(500); expect(sheltered).toBeGreaterThan(500);
     expect(n).toBe(5000);
