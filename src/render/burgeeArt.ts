@@ -23,32 +23,18 @@ const arc = (g: G, c: string, w: number, x: number, y: number, r: number, a0: nu
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
 
-/** A mulberry32 stream: the same numbers for the same seed. */
-const rng = (seed: number) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 /**
- * A white oak, grown: segments (a trunk forking to limbs to branches to twigs, each thinner and shorter) and blobs of
- * leaves at the twig ends and the last forks. It is fitted afterwards into the box under the flag's top edge: its middle
- * at x, its roots at 84% of the hoist, about 0.5 hoists wide and 0.6 tall.
+ * A white oak leaf, as a silhouette: four rounded lobes a side, deep sinuses between, a short stem. (x, y) is its middle;
+ * `len` its length from the tip to the foot of the stem; `ang` the lean from upright, clockwise, in radians.
  */
-function oak(g: G, x: number, H: number, seed: number): void {
-  const R = rng(seed), segs: { a: P; b: P; w: number }[] = [], blobs: { p: P; r: number }[] = [];
-  const grow = (px: number, py: number, ang: number, len: number, w: number, d: number): void => {
-    const qx = px + Math.sin(ang) * len, qy = py - Math.cos(ang) * len; segs.push({ a: [px, py], b: [qx, qy], w });
-    if (d >= 5) { for (let i = 0; i < 4; i++) blobs.push({ p: [qx + (R() - 0.5) * 0.06, qy + (R() - 0.5) * 0.05], r: 0.03 + R() * 0.02 }); return; }
-    if (d >= 3) blobs.push({ p: [qx, qy], r: 0.022 + R() * 0.012 });
-    const spread = d === 0 ? 0.5 : 0.26 + R() * 0.24, n = d <= 1 && R() < 0.5 ? 3 : 2, shrink = 0.72 + R() * 0.08;
-    for (let i = 0; i < n; i++) { const off = n === 3 ? (i - 1) * spread : (i === 0 ? -1 : 1) * (spread * (0.7 + R() * 0.6)); grow(qx, qy, ang + off + (R() - 0.5) * 0.2, len * shrink * (n === 3 && i === 1 ? 1.05 : 1), w * 0.64, d + 1); }
-  };
-  grow(0, 0, 0, 0.3, 0.11, 0);
-  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-  for (const s of segs) for (const p of [s.a, s.b]) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
-  for (const b of blobs) { x0 = Math.min(x0, b.p[0] - b.r); x1 = Math.max(x1, b.p[0] + b.r); y0 = Math.min(y0, b.p[1] - b.r); y1 = Math.max(y1, b.p[1] + b.r); }
-  const fitW = 0.5, fitH = 0.64, k = Math.min(fitW / (x1 - x0), fitH / (y1 - y0)), ox = x - (x0 + x1) / 2 * k * H, oy = H * 0.84 - 0 * y0;
-  const T = (p: P): P => [ox + p[0] * k * H, oy + p[1] * k * H];
-  g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = WHITE; g.fillStyle = WHITE;
-  for (const s of segs) { g.lineWidth = Math.max(s.w * k * H, H * 0.012); g.beginPath(); g.moveTo(...T(s.a)); g.lineTo(...T(s.b)); g.stroke(); }
-  for (const b of blobs) { const [bx, by] = T(b.p); g.beginPath(); g.arc(bx, by, b.r * k * H, 0, 7); g.fill(); }
-  const [rx, ry] = T([0, 0]); g.beginPath(); g.moveTo(rx - H * 0.045, ry - H * 0.1); g.quadraticCurveTo(rx - H * 0.05, ry - H * 0.02, rx - H * 0.11, ry + H * 0.005); g.lineTo(rx + H * 0.11, ry + H * 0.005); g.quadraticCurveTo(rx + H * 0.05, ry - H * 0.02, rx + H * 0.045, ry - H * 0.1); g.closePath(); g.fill(); // the trunk's flared foot
+function oakLeaf(g: G, x: number, y: number, len: number, ang: number, c: string): void {
+  const half: P[] = [[0, 0], [0.05, 0], [0.1, 0.04], [0.11, 0.1], [0.09, 0.16], [0.075, 0.2], [0.12, 0.2], [0.2, 0.21], [0.245, 0.27], [0.24, 0.34], [0.17, 0.39], [0.13, 0.42], [0.2, 0.42], [0.3, 0.44], [0.37, 0.5], [0.37, 0.58], [0.3, 0.63], [0.2, 0.66], [0.25, 0.68], [0.31, 0.72], [0.31, 0.79], [0.24, 0.84], [0.12, 0.87], [0.04, 0.91], [0.02, 0.94], [0.02, 1]];
+  const pts: P[] = [...half, ...half.slice(0, -1).reverse().map(([a, b]): P => [-a, b])];
+  g.save(); g.translate(x, y); g.rotate(ang); g.translate(0, -len / 2);
+  g.fillStyle = c; g.strokeStyle = c; g.lineJoin = 'round'; g.lineWidth = len * 0.012;
+  // (a smooth outline: curves through the midpoints of the points, so the lobes are round)
+  const n = pts.length, mid = (i: number): P => [(pts[i % n][0] + pts[(i + 1) % n][0]) / 2 * len, (pts[i % n][1] + pts[(i + 1) % n][1]) / 2 * len];
+  g.beginPath(); g.moveTo(...mid(0)); for (let i = 1; i <= n; i++) { const m = mid(i); g.quadraticCurveTo(pts[i % n][0] * len, pts[i % n][1] * len, m[0], m[1]); } g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 
 export const PARODY_BURGEES: Burgee[] = [
@@ -110,13 +96,12 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#2fa04a'); rect(g, '#f6d21a', 0, H * 0.7, W, H * 0.3); dot(g, '#f6d21a', W * 0.2, H * 0.46, H * 0.2); } },
   { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
     draw: (g, W, H) => { fill(g, W, H, '#8ec7e8'); rect(g, '#6b5338', 0, H * 0.62, W, H * 0.38); rect(g, '#4c7a3a', 0, H * 0.5, W, H * 0.12); } },
-  { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic, 1890 (the owner's template): a dark-blue hoist panel bearing a white oak, then red and white stripes to the point, a gold border, a white hoist band
+  { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic, 1890 (the owner's template): a dark-blue hoist panel bearing one white oak leaf, then red and white stripes to the point, a gold border, a white hoist band
     draw: (g, W, H) => { const X0 = W * 0.215, BORDER = '#f0b323';
       fill(g, W, H, WHITE);
       rect(g, NAVY, 0, 0, W * 0.4, H); // the hoist panel
       for (let k = 0; W * (0.4 + (2 * k + 1) * 0.0625) < W; k++) rect(g, RED, W * (0.4 + (2 * k + 1) * 0.0625), 0, W * 0.0625, H); // the stripes, red and white
-      // the oak, in white, grown: a thick trunk forks into limbs, the limbs into branches, and the twigs end in clusters of leaves, so the crown is lacy with sky through it (seeded, so it is the same tree every time)
-      oak(g, X0, H, 3);
+      oakLeaf(g, X0 + H * 0.0, H * 0.5, H * 0.56, 0.3, WHITE); // one white oak leaf, leaning a little toward the fly, well inside the panel
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.5, // established: navy, white and green; one oak tree
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.18, H * 0.56, W * 0.04, H * 0.2); dot(g, '#2e8b3e', W * 0.2, H * 0.42, H * 0.17); } },
