@@ -36,14 +36,12 @@ function oakLeaf(g: G, x: number, y: number, len: number, ang: number, c: string
   g.beginPath(); OAK_LEAF.forEach(([a, b], i) => i ? g.lineTo(a * len, b * len) : g.moveTo(a * len, b * len)); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 
-/** An acorn, in one color on the field's: a stem, a domed cap of scales, a gap, a round nut with a highlight. (x, y) is its middle, `len` its height, `ang` its lean. */
-function acorn(g: G, x: number, y: number, len: number, ang: number, c: string, field: string): void {
+/** An acorn, in one color: a stem, a domed cap, a gap, a round nut. (x, y) is its middle, `len` its height, `ang` its lean. */
+function acorn(g: G, x: number, y: number, len: number, ang: number, c: string): void {
   g.save(); g.translate(x, y); g.rotate(ang); g.scale(len, len); g.fillStyle = c;
   g.fillRect(-0.03, -0.5, 0.06, 0.14); // the stem
   g.beginPath(); g.moveTo(-0.32, -0.12); g.ellipse(0, -0.12, 0.32, 0.27, 0, Math.PI, 2 * Math.PI); g.quadraticCurveTo(0, -0.04, -0.32, -0.12); g.closePath(); g.fill(); // the cap
-  g.fillStyle = field; for (const [row, n] of [[-0.3, 3], [-0.21, 4], [-0.13, 3]] as [number, number][]) for (let i = 0; i < n; i++) { g.beginPath(); g.arc((i - (n - 1) / 2) * 0.17, row, 0.027, 0, 7); g.fill(); } // its scales
   g.fillStyle = c; g.beginPath(); g.moveTo(-0.27, -0.03); g.bezierCurveTo(-0.34, 0.2, -0.17, 0.42, 0, 0.5); g.bezierCurveTo(0.17, 0.42, 0.34, 0.2, 0.27, -0.03); g.quadraticCurveTo(0, -0.09, -0.27, -0.03); g.closePath(); g.fill(); // the nut
-  g.strokeStyle = field; g.lineWidth = 0.03; g.lineCap = 'round'; g.beginPath(); g.moveTo(-0.19, 0.06); g.quadraticCurveTo(-0.23, 0.22, -0.12, 0.34); g.stroke(); // its highlight
   g.restore();
 }
 
@@ -114,7 +112,7 @@ export const PARODY_BURGEES: Burgee[] = [
       oakLeaf(g, X0, H * 0.515, H * 0.58, 0.3, WHITE); // one white oak leaf, leaning a little toward the fly, well inside the panel
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.667, // Oaktown YC, after the City of Oakland's flag (the owner's): its green for the field, its yellow for one acorn
-    draw: (g, W, H) => { fill(g, W, H, '#005e00'); acorn(g, W * 0.21, H * 0.52, H * 0.6, -0.2, '#f5dc0e', '#005e00'); } },
+    draw: (g, W, H) => { fill(g, W, H, '#005e00'); acorn(g, W * 0.21, H * 0.52, H * 0.6, -0.2, '#f5dc0e'); } },
   { id: 'iyc', shape: 'pennant', ratio: 2, // modern, thrifty: sand, white and teal stripes
     draw: (g, W, H) => { rect(g, '#e6cf99', 0, 0, W, H / 3); rect(g, WHITE, 0, H / 3, W, H / 3); rect(g, '#16a0a6', 0, H * 2 / 3, W, H / 3); oval(g, '#e6cf99', W * 0.16, H / 2, W * 0.1, H * 0.08); } },
   { id: 'aeyc', shape: 'pennant', ratio: 1.6, // mid-century: sky blue and white, one wind swirl
