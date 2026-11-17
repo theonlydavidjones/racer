@@ -25,7 +25,7 @@ const world = (o: THREE.Object3D, y = 0) => o.localToWorld(V(0, y, 0));
 /** The working jib sheet from its winch (the line comes onto the drum from forward, the fairlead), to its tail's end. */
 function jibLine(cr: Crew, side: number): THREE.Vector3[] {
   const wv = jibWinch(side);
-  return [wv.clone().setZ(wv.z - 0.1), wv, ...sheetTail(wv, side, cr.sheetHand)];
+  return [wv.clone().setZ(wv.z - 0.1), wv, ...sheetTail(wv, side, cr.sheetHand, cr.sheetHand2)];
 }
 /** The lines a hiker holds: how each is drawn, from the fitting before it (line[1]: where its tail starts), and its hand. */
 const LINES = [

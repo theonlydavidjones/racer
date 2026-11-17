@@ -514,7 +514,7 @@ function grainUV(g: THREE.BufferGeometry, across = false): THREE.BufferGeometry 
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
-const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
+export const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [], n = pts.length;
@@ -1731,7 +1731,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
       if (i % 2) { const r = MS_R + (i === 1 ? MS_GAP / 2 : -MS_GAP / 2); p.setXYZ(i, Math.sin(a) * r + ux * o, hy, boomZ + Math.cos(a) * r + uz * o); }
       else p.setXYZ(i, lo.x + ux * o, lo.y, lo.z + uz * o);
     }
-    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
+    // (the tail, aft to the helm's fist when they have it, else falling to the helmsman's side of the cockpit)
+    const mh = (m.crew as { mainHand?: THREE.Vector3 }).mainHand;
+    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); if (mh) p.setXYZ(6, mh.x, mh.y, mh.z); else p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; }
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
     const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
@@ -1810,7 +1812,7 @@ function syncLines(m: BoatMesh, b: Boat): void {
     // (the tail: crew.ts sheetTail, over the coaming onto the seat, or across to the hand of the hiker who has the working
     // sheet: Crew.sheetHand)
     const sh = (m.crew as { sheetHand?: THREE.Vector3 }).sheetHand;
-    sheetTail(wv, side, loaded ? sh : undefined).forEach((p, j) => at(19 + j, p.x, p.y, p.z));
+    sheetTail(wv, side, loaded ? sh : undefined, loaded ? (m.crew as { sheetHand2?: THREE.Vector3 }).sheetHand2 : undefined).forEach((p, j) => at(19 + j, p.x, p.y, p.z));
   }
   q.needsUpdate = true;
 }

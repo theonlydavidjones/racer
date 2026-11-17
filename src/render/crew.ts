@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, thwartBottom, uAtZ, benchOut } from './hull';
+import { sheer, CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, thwartBottom, uAtZ, benchOut } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -33,7 +33,7 @@ export interface Figure extends Body {
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
-export interface Crew { /** where the hiker holding the traveller's tail has it (boat frame), for boatMesh.ts to lead it there */ travHand?: THREE.Vector3; /** where the hiker holding the lee jib sheet has its tail (boat frame), for boatMesh.ts to lead it to the hand; none if nobody does */ sheetHand?: THREE.Vector3; group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
+export interface Crew { /** where the helm has the mainsheet's tail (boat frame, the fist), sat steering; none if not */ mainHand?: THREE.Vector3; /** where the hiker holding the traveller's tail has it (boat frame), for boatMesh.ts to lead it there */ travHand?: THREE.Vector3; /** where the hiker holding the lee jib sheet has its tail (boat frame), for boatMesh.ts to lead it to the hand; none if nobody does */ sheetHand?: THREE.Vector3; /** the working sheet's second hand on it, if both are (the fist) */ sheetHand2?: THREE.Vector3; group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
    * +x), for boatMesh.ts to draw the handle where the hand has it */ winch?: { side: 1 | -1; turn: number } }
 type Limb = Body['arm'][number];
@@ -56,7 +56,7 @@ export const jibWinch = (s: number) => winchAt(s);
  * hiker holding the working sheet (Crew.sheetHand), else over the coaming and down onto the seat. One place, so a test
  * can check the line as drawn.
  */
-export function sheetTail(wv: THREE.Vector3, side: number, hand: THREE.Vector3 | undefined): THREE.Vector3[] {
+export function sheetTail(wv: THREE.Vector3, side: number, hand: THREE.Vector3 | undefined, hand2?: THREE.Vector3): THREE.Vector3[] {
   const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z), e = tailEnd(V(side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3), hand);
   if (e !== hand) { // (off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down onto the cockpit seat)
     const over = V(side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
@@ -64,8 +64,9 @@ export function sheetTail(wv: THREE.Vector3, side: number, hand: THREE.Vector3 |
   }
   // (the working sheet in a hiker's hand: off the winch, lying over the coaming's inner edge, and straight across the
   // cockpit to the fist, above the hikers' knees, with only a light tail's slight sag)
-  const edge = sheetEdge(wv, side), len = edge.distanceTo(e);
-  return [edge, ...Array.from({ length: SHEET_N - 1 }, (_, j) => { const t = (j + 1) / (SHEET_N - 1); return edge.clone().lerp(e, t).add(V(0, -TAIL_SAG * len * 4 * t * (1 - t), 0)); })];
+  // (in both hands: through the second fist on its way to the first, the sag before it)
+  const edge = sheetEdge(wv, side), mid = hand2 ?? e, n = hand2 ? SHEET_N - 2 : SHEET_N - 1, len = edge.distanceTo(mid);
+  return [edge, ...Array.from({ length: n }, (_, j) => { const t = (j + 1) / n; return edge.clone().lerp(mid, t).add(V(0, -TAIL_SAG * len * 4 * t * (1 - t), 0)); }), ...(hand2 ? [e.clone()] : [])];
 }
 /** Where the held jib sheet lies over the coaming's inner edge, beside its winch: where it leaves the boat for the hand. */
 export function sheetEdge(wv: THREE.Vector3, side: number): THREE.Vector3 {
@@ -108,6 +109,14 @@ export function fistAt(f: Figure, i: 0 | 1): THREE.Vector3 {
   return par ? par.worldToLocal(at) : at;
 }
 const FIST = 0.065;
+/** How far a point is from the straight run between two others. */
+const onRun = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3) => { const ab = _ab.copy(b).sub(a), t = Math.max(0, Math.min(1, _ap.copy(p).sub(a).dot(ab) / Math.max(1e-9, ab.lengthSq()))); return p.distanceTo(_ap.copy(a).addScaledVector(ab, t)); };
+const _ab = new THREE.Vector3(), _ap = new THREE.Vector3();
+/** The wrist as drawn (boat frame): the forearm's end. */
+function wristAt(f: Figure, i: 0 | 1): THREE.Vector3 {
+  const par = f.root.parent; f.root.updateWorldMatrix(true, true);
+  const at = f.arm[i].mid.localToWorld(V(0, -BONE.fore, 0)); return par ? par.worldToLocal(at) : at;
+}
 export function buildCrew(helm: Person, people: Person[], jackets: number[], seed: number): Crew {
   const group = new THREE.Group();
   const h = figure(helm, jackets[0], seed); group.add(h.root);
@@ -927,10 +936,16 @@ function ready(p: PoseT, k: number, windward: number, jibe: boolean, jibHand: bo
  * its cam on the windward end of the thwart. Each as far as an arm reaches from the chest, or not at all. Returns where
  * the sheet's in the hand, if it is.
  */
+/**
+ * A hand's grip beside a hiker: the toerail just outboard and forward of the hip, the arm down the side to it (fully
+ * hiked, the hand hangs about there: the hiking rail's inboard edge, forward of the thigh, was a reach forward and down
+ * that brought the elbow forward). boatMesh.ts: the toerail 3 cm in from the sheer, 3.5 cm high.
+ */
+const railGrip = (p: PoseT, k: number, s: number, dir: number) => { const z = p.hip.z + dir * 0.2 * k, u = uAtZ(z); return V(s * (halfBeam(u) - 0.03), sheer(u) + 0.035, z); };
 /** Where the hook's reach is measured from: low on the thwart's windward end, by the cam (only a hiker within an arm's
  * reach of it, not at full stretch, tucks the aft foot under the thwart; hikeHold). */
 const HOOK_REACH = (s: number) => V(s * (TRAV_END + 0.12), THWART.top - 0.12, THWART.z - THWART.half - 0.02);
-function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): { sheet?: THREE.Vector3; trav?: THREE.Vector3 } {
+function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean, off?: THREE.Vector3[]): { sheet?: THREE.Vector3; sheet2?: THREE.Vector3; trav?: THREE.Vector3 } {
   const c = chest(p, k), reach = 0.58 * k;
   // (the sheet from the leeward winch across to them: the hand on it out toward the winch, an arm's length)
   // (the fist out toward the lee winch, and up above the knees: the sheet runs straight across the cockpit from the lee
@@ -939,7 +954,7 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
   // (the wrist aimed beyond the fist, straight on from the line coming into it: the forearm in line with the pull, the
   // line into the fist's front, never along the forearm)
   const aim = (f: THREE.Vector3, from: THREE.Vector3) => f.clone().addScaledVector(f.clone().sub(from).normalize(), FIST * k);
-  const sheet = jib ? aim(sf, sheetEdge(lw, -s)) : null;
+  let sheet = jib ? aim(sf, sheetEdge(lw, -s)) : null;
   // (the traveller's tail hanging from its cam on the thwart's windward end, just below it)
   // (the traveller's tail from its cam on the thwart's windward end up to the hand, as the sheet's: boatMesh.ts leads it
   // there, Crew.travHand. Fully hiked out the cam itself is beyond an arm's reach, and the tail's what they hold)
@@ -958,12 +973,30 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
     const j = p.feet[0].z >= p.feet[1].z ? 0 : 1, x = s * (cockpitHalf(uAtZ(THWART.z)) - 0.16);
     p.feet[j] = V(x, Math.max(ground(x, THWART.z, 0) + 0.08, thwartBottom(x) - 0.2), THWART.z - THWART.half + 0.04); p.hook = j; // (low, so the shin from the knee over the coaming passes well under the beam's forward edge)
   }
+  // (and the other hand holds on too, never in the air (the owner: "They can hold on to the rail, they can hold on with
+  // both hands to the line they're holding"): the jib sheet's hand has both on it, the second further along toward the
+  // winch; the traveller's, whose tail the other hand can't reach, holds the hiking rail beside them, forward of the
+  // forward thigh, at its inboard edge. Alone, both hands are on the lines)
+  let sheet2: THREE.Vector3 | undefined;
+  // (the rail, if it's in the arm's reach: not yet, still on the way out across the cockpit to the rail, the hand left where
+  // the pose has it rather than stretched a metre to it)
+  // (and only once they're there, sat out where the pose has them: `off`, from the arm as drawn, given only then)
+  const rail = (i: number) => { const g = railGrip(p, k, s, -1); if (off && g.distanceTo(shoulderAt(p, k, i)) - FIST * k <= 0.55 * k) p.hands[i] = fromShoulder(g, i); };
+  // (a hand's grip, its fist where it's put: the wrist back from it by the fist's offset from the wrist as that arm was
+  // drawn last frame, or at first along the arm from the shoulder)
+  const fromShoulder = (g: THREE.Vector3, i: number) => off?.[i] ? g.clone().sub(off[i]) : g.clone().addScaledVector(g.clone().sub(shoulderAt(p, k, i)).normalize(), -FIST * k);
   if (sheet && tv) { const i = near(tv); p.hands[i] = tv; p.hands[1 - i] = sheet; } // (alone: the traveller's on the side it's on, aft; the sheet in the other)
-  else if (sheet) p.hands[near(sheet)] = sheet;
-  else if (tv) p.hands[near(tv)] = tv;
+  else if (sheet) { const i = near(sheet), ed = sheetEdge(lw, -s), dir = ed.clone().sub(sf).normalize(), sh = shoulderAt(p, k, 1 - i);
+    // (the second hand on the sheet beside the first, where it's nearest that shoulder along it, 8 cm on at least; out of
+    // the arm's reach, fully hiked, it holds the rail instead)
+    const t = Math.max(0.08 * k, sh.clone().sub(sf).dot(dir)), f2 = sf.clone().addScaledVector(dir, t);
+    if (off && f2.distanceTo(sh) - FIST * k <= 0.55 * k) { sheet2 = p.hands[1 - i] = fromShoulder(f2, 1 - i); if (off?.[i]) sheet = sf.clone().sub(off[i]); } // (both fists on the line, where they're put)
+    else rail(1 - i);
+    p.hands[i] = sheet; }
+  else if (tv) { const i = near(tv); p.hands[i] = tv; rail(1 - i); }
   else return {};
   p.elbow = undefined;
-  return { sheet: sheet ?? undefined, trav: tv ?? undefined };
+  return { sheet: sheet ?? undefined, sheet2, trav: tv ?? undefined };
 }
 
 /**
@@ -1448,7 +1481,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   cr.crew.forEach((f, i) => { if (inMid[i] && f.benchSide != null) onBench[i] = true; });
   const tackOn = !!c && (tacking || !!c.roll);
   const fore = cr.crew.reduce((best, _, i) => (ppl?.[i + 1]?.z ?? 9) < (ppl?.[best + 1]?.z ?? 9) ? i : best, 0);
-  let sheetHand: THREE.Vector3 | undefined, travHand: THREE.Vector3 | undefined;
+  let sheetHand: THREE.Vector3 | undefined, sheetHand2: THREE.Vector3 | undefined, travHand: THREE.Vector3 | undefined;
   cr.crew.forEach((f, i) => {
     const a = ppl?.[i + 1];
     let x = a ? a.x : windward * 0.8;
@@ -1497,8 +1530,8 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (hiking, hands on the lines: the forward hand (or a lone one) the lee jib sheet, the middle hand (or a lone one too)
     // the traveller)
     if (a && !role && !busy && !go && pose === 'hike' && lean > 0.3 && !a.ready && !(((a as { outUntil?: number }).outUntil ?? 0) > (c?.clock ?? 0))) {
-      const lone = cr.crew.length < 2, jibH = lone || i === fore, h = hikeHold(want, f.scale, Math.sign(x) || windward, jibH, lone || !jibH);
-      if (h.sheet) sheetHand = h.sheet; if (h.trav) travHand = h.trav;
+      const lone = cr.crew.length < 2, jibH = lone || i === fore, h = hikeHold(want, f.scale, Math.sign(x) || windward, jibH, lone || !jibH, f.cur && f.cur.hip.distanceTo(want.hip) < 0.1 ? [0, 1].map(j => fistAt(f, j as 0 | 1).sub(wristAt(f, j as 0 | 1))) : undefined);
+      if (h.sheet) sheetHand = h.sheet; if (h.sheet2) sheetHand2 = h.sheet2; if (h.trav) travHand = h.trav;
     }
     if (pdl?.f === f) want = paddleWant(f, want, pdl, x, a?.z ?? z, go, windward, i);
     // (on the way along the side deck, and settling into the new place after it)
@@ -1512,7 +1545,12 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const drawnHand = (q?: THREE.Vector3) => q && cr.crew.find(f => f.cur && f.cur.hands.some(h => h.distanceTo(q) < 0.25))?.cur?.hands.reduce((a, h) => h.distanceTo(q) < a.distanceTo(q) ? h : a);
   // (the traveller's tail into the middle of the fist that holds it, as that arm's drawn: not the wrist)
   { const q = drawnHand(travHand), f = q && cr.crew.find(g => g.cur!.hands.includes(q)); cr.travHand = f ? fistAt(f, f.cur!.hands[0] === q ? 0 : 1) : undefined; }
-  { const q = drawnHand(sheetHand), f = q && cr.crew.find(g => g.cur!.hands.includes(q)); cr.sheetHand = f ? fistAt(f, f.cur!.hands[0] === q ? 0 : 1) : undefined; }
+  { const q = drawnHand(sheetHand), f = q && cr.crew.find(g => g.cur!.hands.includes(q)), i = f && f.cur!.hands[0] === q ? 0 : 1; cr.sheetHand = f ? fistAt(f, i) : undefined;
+    // (and the second hand on it, when it's there: near where it was put on the sheet, the other hand of the same figure)
+    // (through it only once it's there, on the sheet: within 3 cm of the sheet's straight run from the lee coaming to the
+    // first hand. On its way to it, the hand isn't holding it yet)
+    const f2 = f && sheetHand2 && f.cur!.hands[1 - i].distanceTo(sheetHand2) < 0.25 ? fistAt(f, (1 - i) as 0 | 1) : undefined;
+    cr.sheetHand2 = f2 && cr.sheetHand && onRun(f2, sheetEdge(winchAt(-Math.sign(cr.sheetHand.x)), -Math.sign(cr.sheetHand.x)), cr.sheetHand) < 0.03 * f!.scale ? f2 : undefined; }
   // (boatMesh.ts turns the handle with the hand: where the hand has got to, a step behind the stroke it's making, so the
   // grip's in it, not a few centimetres ahead)
   const ck = cranked as Cranked | undefined; // (set while posing them, above)
@@ -1534,10 +1572,13 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   apply(h, ease(h, want, dt), upright(h, against(hp?.pose ?? 'helm'), dt), dt);
   h.root.visible = !hideHelm;
   // the extension, from the tiller's end to the helm's hand (and a little past it), unless they've let go
-  const hand = h.cur!.hands[cr.helmSide > 0 ? 0 : 1], ex = cr.extension, held = !away && !hideHelm;
+  // (to the middle of the fist round it, and a little past: not to the wrist, beside it)
+  const hi = cr.helmSide > 0 ? 0 : 1, hand = fistAt(h, hi), ex = cr.extension, held = !away && !hideHelm;
   ex.visible = held;
+  // (the mainsheet's tail in the other hand, sat at the helm: boatMesh.ts leads it from the car's block to the fist)
+  cr.mainHand = held && !h.going && !paddling ? fistAt(h, hi ? 0 : 1) : undefined;
   if (held) {
-    const d = hand.clone().sub(t), len = d.length() + 0.1;
+    const d = hand.clone().sub(t), len = d.length() + 0.05;
     ex.position.copy(t).addScaledVector(d.normalize(), len / 2); ex.scale.set(1, len, 1);
     ex.quaternion.setFromUnitVectors(V(0, 1, 0), d);
   }
