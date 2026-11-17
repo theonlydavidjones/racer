@@ -473,8 +473,10 @@ function releaseTiller(): void {
   if (!tillerHeld) return;
   tillerHeld = false; document.body.classList.remove('tiller-held'); $('tiller').classList.remove('held');
 }
-const overControl = (t: EventTarget | null) => t instanceof Element && !!t.closest('button, a, input, select, #tiller, #msgLog, #map, #trimPanel, .overlay, .layerpop');
-addEventListener('mousemove', e => { lastCursorX = e.clientX; if (tillerHeld && !panning && !overControl(e.target) && w.running && !w.paused) tillerFromCursor(e.clientX); });
+// While the tiller is held, the cursor steers wherever it is, over a panel or not. (It used to ignore moves over the
+// panels at the screen's edges, so a trackpad cursor that went hard over and onto one left the tiller stuck there:
+// the owner, 16 Nov 2026, "the tiller is getting stuck when it's hard to starboard". A click still lets go.)
+addEventListener('mousemove', e => { lastCursorX = e.clientX; if (tillerHeld && !panning && w.running && !w.paused) tillerFromCursor(e.clientX); });
 addEventListener('blur', releaseTiller);
 /** Without a hand on it (tiller held, bar dragged), the tiller eases back to centre. */
 function tillerSpring(dt: number): void {

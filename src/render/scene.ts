@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import { setVisibility } from '../environment/weather';
-import { D2R, V, ZONE } from '../core/math';
+import { D2R, V, ZONE, easeAngle } from '../core/math';
 import type { Vec } from '../core/math';
 import type { SimView } from '../sim/host';
 import type { MarkShape } from '../courses/course';
@@ -1101,7 +1101,9 @@ export class SceneView {
       if (this.lastView !== 1 || !Number.isFinite(this.chaseDir)) this.chaseDir = want;
       // (close behind her: a third of a second behind, the turn looked later than it was, the owner's "delay" between the
       // tiller and the boat; a tenth of a second still takes the frame-to-frame jitter out)
-      else this.chaseDir += (((want - this.chaseDir + 540) % 360) - 180) * Math.min(1, dt * 10);
+      // the shorter way round, and kept within a turn: unwrapped, after two whole turns one way (penalty turns) the
+      // remainder's sign flipped and the camera swung the long way round, a full circle (the owner, 16 Nov 2026)
+      else this.chaseDir = easeAngle(this.chaseDir, want, Math.min(1, dt * 10));
       const hv = V(this.chaseDir), ratio = Math.max(0.05, (9 + look.pitch * 25) / 24); // (the camera's height over its distance)
       const fit = this.chaseFit(this.chaseDir, ratio), dist = look.chase ?? fit.dist;
       this.chaseDist = dist;

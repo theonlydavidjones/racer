@@ -32,16 +32,22 @@ export class NavView {
       return;
     }
     $('navTitle').textContent = 'Working out the passage…';
+    $('navSub').textContent = '';
     $('navBrief').innerHTML = '';
+    // (the chart at once, where she is, while the passage is worked out: it's done between frames and can take a minute
+    // and more; the owner, 16 Nov 2026: "clicking the navigator button opens the navigator modal, which fails to populate
+    // with the map")
+    this.plan = null; this.draw();
     this.stopPlan?.();
-    this.stopPlan = passagePlanLater(w, plan => { // (worked out between frames: the plan takes a few seconds)
+    this.stopPlan = passagePlanLater(w, plan => { // (worked out between frames)
       this.stopPlan = null;
       if (this.world !== w || !this.isOpen) return;
       this.plan = plan;
-      if (!this.plan) return;
-      $('navTitle').textContent = this.plan.title;
-      $('navSub').textContent = this.plan.sub;
-      $('navBrief').innerHTML = briefHtml(this.plan);
+      if (this.plan) {
+        $('navTitle').textContent = this.plan.title;
+        $('navSub').textContent = this.plan.sub;
+        $('navBrief').innerHTML = briefHtml(this.plan);
+      } else $('navTitle').textContent = 'No passage found';
       this.draw();
     });
   }

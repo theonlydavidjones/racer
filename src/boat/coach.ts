@@ -670,7 +670,7 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
   const soft = forestayTension(b.tune) < forestayTension(TUNE_PRESETS[want]);
   const pct = `${(100 * loss).toFixed(1)}%`;
   return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
-    head: soft ? `Her rig is tuned soft for ${airOf(s)}: her sails give up about ${pct}. Backstay on hard.` : `Her rig is tuned tight for ${airOf(s)}: her sails give up about ${pct}. Backstay off, foot a little.`,
+    head: soft ? `Her rig was set for less wind than this: it costs her about ${pct} of her speed upwind. Backstay on hard.` : `Her rig was set for more wind than this: it costs her about ${pct} of her speed upwind. Backstay off, and sail a little lower.`,
     why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5); the backstay is free.`
       : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5).`,
     look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];
