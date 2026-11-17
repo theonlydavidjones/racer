@@ -51,10 +51,10 @@ export const PARODY_BURGEES: Burgee[] = [
       g.strokeStyle = S; g.lineWidth = u * 0.04; g.beginPath(); g.arc(x, y - u * 0.26, u * 0.05, 0, 7); g.stroke(); // the ring
       arc(g, S, u * 0.05, x, y + u * 0.02, u * 0.2, 0.12 * Math.PI, 0.88 * Math.PI); // the arms
       for (const s of [-1, 1]) poly(g, S, [x + s * u * 0.14, y + u * 0.2 - u * 0.03], [x + s * u * 0.27, y + u * 0.05], [x + s * u * 0.14, y + u * 0.08]); } },
-  { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic, the amateur's club (the owner's layout): a red hoist panel with a blunt point, a white middle, a dark-blue tip with a chevron notch; one gold laurel wreath (the Greek games) on the red
+  { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic, the amateur's club (the owner's layout): a red hoist panel coming to a single point, a white middle, a dark-blue tip with a chevron notch; one gold laurel wreath (the Greek games) on the red
     draw: (g, W, H) => { fill(g, W, H, WHITE);
-      poly(g, RED, [0, 0], [W * 0.24, 0], [W * 0.355, H * 0.38], [W * 0.355, H * 0.62], [W * 0.24, H], [0, H]);
-      poly(g, NAVY, [W * 0.62, 0], [W, 0], [W, H], [W * 0.62, H], [W * 0.735, H * 0.5]);
+      poly(g, RED, [0, 0], [W * 0.2, 0], [W * 0.355, H * 0.5], [W * 0.2, H], [0, H]);
+      poly(g, NAVY, [W * 0.544, 0], [W, 0], [W, H], [W * 0.544, H], [W * 0.659, H * 0.5]); // (the white between them is 20% shorter than the first draft's)
       const x = W * 0.185, y = H * 0.5, r = H * 0.15, d = Math.PI / 180;
       for (const s of [-1, 1]) { // two branches from the bottom, each a stem with leaves pairing off it, growing up
         const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.028, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
