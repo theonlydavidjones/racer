@@ -812,7 +812,7 @@ const SLIP_TURN = 2;
  */
 const HAND_LAT = 1.5;
 function sternLineKt(gap: number): number {
-  const lever = 2 * BOW * HAND_LAT / Math.hypot(HAND_LAT, gap + 2 * BOW), hand = 186 * lever * 0.75; // (N·m, a third to spare)
+  const lever = 2 * BOW * HAND_LAT / hypot(HAND_LAT, gap + 2 * BOW), hand = 186 * lever * 0.75; // (N·m, a third to spare)
   return Math.sqrt(hand / (0.5 * 1.225 * 4.8 * BOW)) / 0.5144; // (m/s to kt)
 }
 function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: number | undefined, windKt = 0): PushOff | null {
