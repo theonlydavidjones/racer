@@ -218,7 +218,9 @@ export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
     const first = !m || !sameAim(m, k); // (nothing yet to show for where she's going, in these conditions)
     const pump = () => {
       if (jobs.get(w) !== job) return; // (a newer plan took its place)
-      const t = performance.now(), budget = first ? SLICE_NEW_MS : SLICE_MS;
+      // (the panel's share too while the panel waits on this plan, its own pump idle: on the background's 2 ms a frame, the
+      // panel's plan from Mile Rock came in past its 120 s, 4 runs in 4, once this plan had to be started afresh)
+      const t = performance.now(), budget = first || waiting.has(w) ? SLICE_NEW_MS : SLICE_MS;
       for (;;) {
         const r = job.g.next();
         if (r.done) { noteSlice(performance.now() - t); if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
