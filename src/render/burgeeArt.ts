@@ -18,7 +18,6 @@ const dot = (g: G, c: string, x: number, y: number, r: number) => { g.fillStyle 
 const oval = (g: G, c: string, x: number, y: number, rx: number, ry: number, rot = 0) => { g.fillStyle = c; g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, 7); g.fill(); };
 const stroke = (g: G, c: string, w: number, ...p: P[]) => { g.strokeStyle = c; g.lineWidth = w; g.lineJoin = 'round'; g.lineCap = 'butt'; g.beginPath(); p.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); };
 const arc = (g: G, c: string, w: number, x: number, y: number, r: number, a0: number, a1: number) => { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'butt'; g.beginPath(); g.arc(x, y, r, a0, a1); g.stroke(); };
-const half = (g: G, W: number, H: number, a: string, b: string) => { rect(g, a, 0, 0, W, H / 2); rect(g, b, 0, H / 2, W, H / 2); };
 
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
@@ -52,13 +51,15 @@ export const PARODY_BURGEES: Burgee[] = [
       g.strokeStyle = S; g.lineWidth = u * 0.04; g.beginPath(); g.arc(x, y - u * 0.26, u * 0.05, 0, 7); g.stroke(); // the ring
       arc(g, S, u * 0.05, x, y + u * 0.02, u * 0.2, 0.12 * Math.PI, 0.88 * Math.PI); // the arms
       for (const s of [-1, 1]) poly(g, S, [x + s * u * 0.14, y + u * 0.2 - u * 0.03], [x + s * u * 0.27, y + u * 0.05], [x + s * u * 0.14, y + u * 0.08]); } },
-  { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic, the amateur's club: dark blue over red, a white line between, one gold laurel wreath (the Greek games) on the line
-    draw: (g, W, H) => { half(g, W, H, NAVY, RED); rect(g, WHITE, 0, H * 0.5 - H * 0.018, W, H * 0.036);
-      const x = W * 0.235, y = H * 0.5, r = H * 0.2, d = Math.PI / 180;
+  { id: 'cyc', shape: 'pennant', ratio: 1.6, // classic, the amateur's club (the owner's layout): a red hoist panel with a blunt point, a white middle, a dark-blue tip with a chevron notch; one gold laurel wreath (the Greek games) on the red
+    draw: (g, W, H) => { fill(g, W, H, WHITE);
+      poly(g, RED, [0, 0], [W * 0.24, 0], [W * 0.355, H * 0.38], [W * 0.355, H * 0.62], [W * 0.24, H], [0, H]);
+      poly(g, NAVY, [W * 0.62, 0], [W, 0], [W, H], [W * 0.62, H], [W * 0.735, H * 0.5]);
+      const x = W * 0.185, y = H * 0.5, r = H * 0.15, d = Math.PI / 180;
       for (const s of [-1, 1]) { // two branches from the bottom, each a stem with leaves pairing off it, growing up
-        const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.035, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
+        const a0 = (s > 0 ? 78 : 102) * d, a1 = (s > 0 ? -28 : 208) * d; arc(g, GOLD, H * 0.028, x, y, r, Math.min(a0, a1), Math.max(a0, a1));
         for (let i = 0; i < 5; i++) { const a = (s > 0 ? 70 - i * 24 : 110 + i * 24) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
-          for (const k of [-1, 1]) { const dir = grow + k * 0.75; oval(g, GOLD, px + Math.cos(dir) * H * 0.06, py + Math.sin(dir) * H * 0.06, H * 0.065, H * 0.028, dir); } } } } },
+          for (const k of [-1, 1]) { const dir = grow + k * 0.75; oval(g, GOLD, px + Math.cos(dir) * H * 0.045, py + Math.sin(dir) * H * 0.045, H * 0.049, H * 0.022, dir); } } } } },
   { id: 'tyc', shape: 'pennant', ratio: 1.8, // mid-century: deep blue over gray water, one white fin
     draw: (g, W, H) => { rect(g, '#16386b', 0, 0, W, H * 0.64); rect(g, '#8d99a6', 0, H * 0.64, W, H * 0.36); poly(g, WHITE, [W * 0.09, H * 0.64], [W * 0.17, H * 0.22], [W * 0.27, H * 0.64]); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
