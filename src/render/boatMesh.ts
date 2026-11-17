@@ -10,7 +10,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, sheetTail, syncCrew, tillerTip, travCam, travTail, type Crew } from './crew';
+import { buildCrew, dockhand, SHEET_N, sheetTail, syncCrew, tillerTip, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -702,7 +702,7 @@ const fairlead = (side: number) => { const u = uAtZ(FAIRLEAD_Z), x = side * (hal
  * cabin top's arch), the car, two on the cabin top (it's arched: a straight run would cut through it), the cabin's edge,
  * the fairlead, the winch and two in the tail.
  * The whole line: both halves and the ring between them. */
-const JIB_HALF_PTS = 20, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
+const JIB_HALF_PTS = 18 + SHEET_N, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
 /**
  * The cockpit coaming's height (m) along the boat: at least 200 mm just aft of the cabin, 140 mm at station 4.5 and
  * 80 mm at station 3 (CR 3.22); drawn a little above each.
