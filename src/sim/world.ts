@@ -56,7 +56,7 @@ import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 /** Water a ferry may turn into to keep clear (sim/traffic.ts decide): 100 m off the terrain's land and the drawn shore,
  * 60 m off any pier or wharf (estimates: room for her to turn back, and for the shoaling off a shore). */
 const trafficWaterAt = new Map<number, boolean>();
-const trafficWater = (p: Vec): boolean => {
+export const trafficWater = (p: Vec): boolean => {
   // (kept by 25 m cell, its middle's answer: the same place is asked about every half second while she keeps clear)
   const i = Math.round(p.x / 25), j = Math.round(p.y / 25), k = (i + 1e5) * 2e5 + (j + 1e5);
   let v = trafficWaterAt.get(k);
@@ -1283,7 +1283,7 @@ export class World {
     // the ferries keep out of the boats' way (Rule 18), deciding twice a second; the ships in the channel hold on. (Every
     // boat under way, under sail or motoring: a ferry keeps clear of small craft either way, as good seamanship has it (Rule 2))
     this.traffic.advance(this.trafficT, dt, this.ways);
-    if (this.steps % 30 === 7) this.traffic.decide(this.trafficT, this.ways, this.boats.filter(b => !b.docked), trafficWater);
+    { const k = this.steps % 30; if (k < this.ways.length) this.traffic.decide(this.trafficT, this.ways, this.boats.filter(b => !b.docked), trafficWater, k); } // (each service on its own step)
     this.vessels = this.traffic.vessels(this.trafficT, this.ways);
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour

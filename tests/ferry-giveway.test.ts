@@ -8,7 +8,10 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';
 import { DT, World } from '../src/sim/world';
-import { SERVICES, VESSEL, ACT_S, CLEAR, ROUTES, LATE_S, XTRACK, Traffic, newWays, type Craft } from '../src/sim/traffic';
+import { SERVICES, VESSEL, ACT_S, CLEAR, TURN_DEG_S, ROUTES, LATE_S, XTRACK, Traffic, newWays, type Craft } from '../src/sim/traffic';
+import { trafficWater } from '../src/sim/world';
+import { landDist as terrainLandDist, shoreDist, wharfNearest } from '../src/geo/shore';
+import type { Vec } from '../src/core/math';
 
 const V = 3; // (m/s, about 6 kt)
 
@@ -34,8 +37,7 @@ function crossing(kind: string, side: 1 | -1, seed: number) {
     const way = (w as unknown as { ways?: { tgt: number; slow: number }[] }).ways?.[id];
     if (way && (way.tgt !== 0 || way.slow < 1) && firstAlter !== firstAlter) { // (she turns off her line, or slows)
       // her time to the closest approach as she was going when she began to turn
-      const vx = Math.sin(v.h * Math.PI / 180) * v.v, vy = Math.cos(v.h * Math.PI / 180) * v.v, rx = b.x - v.x, ry = b.y - v.y, ux = b.vx - vx, uy = b.vy - vy;
-      firstAlter = -(rx * ux + ry * uy) / (ux * ux + uy * uy);
+      firstAlter = 200 - (w.t - t0); // (they'd have met at m, 200 s from the start)
     }
   }
   return { nearest, firstAlter, hit, half: ty.len / 2, track };
@@ -49,8 +51,9 @@ describe('the ferries give way to a boat under sail', () => {
       expect(r.hit, 'hit by the ferry').toBe(false);
       expect(r.nearest, 'the nearest she came (m, center to boat)').toBeGreaterThan(CLEAR * 0.8 + r.half);
       expect(r.firstAlter, 'the alteration began (s before the closest approach)').toBeGreaterThan(ACT_S - 10);
-      // (and not before: measured on straight lines as she was going, a few seconds off where her route bends; she decides twice a second)
-      expect(r.firstAlter).toBeLessThan(ACT_S + 5);
+      // (and not before: measured on straight lines as she was going, a few seconds off where her route bends; she decides
+      // twice a second, and her turn builds up over a few)
+      expect(r.firstAlter).toBeLessThan(ACT_S + 8);
     }, 120_000);
   }
 });
@@ -94,22 +97,33 @@ describe('the traffic, the same every time and different each run', () => {
 });
 
 /**
- * The traffic on its own, stepped as the World steps it (advance every 1/60 s, decide every half second), with boats on
- * straight courses: for the harder meetings. `boats(T)`: the boats at the start, the traffic's clock T. Each boat's
- * nearest approach to the vessel's middle, and the vessel's largest jump in one step.
+ * The traffic on its own, stepped as the World steps it (advance every 1/60 s, each give-way vessel deciding every half
+ * second), with boats on straight courses: for the harder meetings. Each boat's nearest approach to the vessel's middle;
+ * the vessel's largest jump in one step (× her speed), her fastest turn over a second (°/s), how far her reported speed
+ * is from how fast she actually moved (worst share), how often her chosen side flips, her least share of speed while
+ * no boat is within a minute of her, and her nearest to land or a pier away from her berths (m, her middle).
  */
-function meeting(id: number, seed: number, T: number, boats: Craft[], secs: number) {
-  const tr = new Traffic(true, seed), ways = newWays(), dt = 1 / 60, nearest = boats.map(() => Infinity);
-  let last = tr.vessels(T, ways)[id], jump = 0, offAtBerth = 0;
+function meeting(id: number, seed: number, T: number, boats: Craft[], secs: number, clearOf: (p: Vec) => boolean = () => true) {
+  const tr = new Traffic(true, seed), ways = newWays(), dt = 1 / 60, nearest = boats.map(() => Infinity), sv = SERVICES[id];
+  const vs = VESSEL[sv.kind].kt * 0.5144, ends = [ROUTES[sv.route][0], ROUTES[sv.route][ROUTES[sv.route].length - 1]];
+  let last = tr.vessels(T, ways)[id], jump = 0, turn = 0, speedErr = 0, flips = 0, side = 0, slowFar = 1, land = Infinity;
+  const hs: number[] = [];
   for (let n = 1; n <= secs * 60; n++) {
     const t = T + n * dt, now = boats.map(b => ({ x: b.x + b.vx * n * dt, y: b.y + b.vy * n * dt, vx: b.vx, vy: b.vy }));
-    tr.advance(t, dt, ways); if (n % 30 === 7) tr.decide(t, ways, now, () => true);
-    const v = tr.vessels(t, ways)[id];
-    jump = Math.max(jump, Math.hypot(v.x - last.x, v.y - last.y)); last = v;
-    if (!v.moving) offAtBerth = Math.max(offAtBerth, Math.abs(ways[id].off));
+    tr.advance(t, dt, ways); if (n % 30 === 7) tr.decide(t, ways, now, clearOf);
+    const v = tr.vessels(t, ways)[id], moved = Math.hypot(v.x - last.x, v.y - last.y);
+    jump = Math.max(jump, moved / (vs * dt));
+    if (v.moving && last.moving && v.v > 1) speedErr = Math.max(speedErr, Math.abs(moved / dt - v.v) / v.v);
+    // (her turning while under way the whole second: leaving her berth she's simply facing the other way, as on main)
+    if (!v.moving) hs.length = 0; else { hs.push(v.h); if (hs.length > 60) { const a = hs.shift()!; turn = Math.max(turn, Math.abs(((v.h - a + 540) % 360) - 180)); } }
+    const sd = Math.sign(ways[id].tgt); if (sd !== 0 && side !== 0 && sd !== side) flips++; if (sd !== 0) side = sd;
+    const gap = Math.min(...now.map(b => Math.hypot(b.x - v.x, b.y - v.y) / Math.max(1, v.v + 3)));
+    if (v.moving && gap > 60) slowFar = Math.min(slowFar, ways[id].slow);
+    if (v.moving && Math.min(...ends.map(e => Math.hypot(v.x - e.x, v.y - e.y))) > 500) land = Math.min(land, terrainLandDist(v), shoreDist(v), wharfNearest(v, 200)?.d ?? Infinity);
+    last = v;
     now.forEach((b, j) => { nearest[j] = Math.min(nearest[j], Math.hypot(v.x - b.x, v.y - b.y)); });
   }
-  return { nearest, jump, offAtBerth };
+  return { nearest, jump, turn, speedErr, flips, slowFar, land };
 }
 /** The first time from T (s, whole seconds) that `ok` holds of the vessel then and `meet` s later. */
 function when(id: number, seed: number, T: number, meet: number, ok: (now: ReturnType<Traffic['vessels']>[number], then: ReturnType<Traffic['vessels']>[number], after: ReturnType<Traffic['vessels']>[number]) => boolean): number {
@@ -151,6 +165,57 @@ describe('the ferries give way in the harder meetings too', () => {
     const T = when(id, 3, T0, 150, (a, b) => a.moving && b.moving && Math.hypot(b.x - bend.x, b.y - bend.y) < 150 && Math.hypot(a.x - r[5].x, a.y - r[5].y) > Math.hypot(b.x - r[5].x, b.y - r[5].y));
     for (const side of [1, -1]) expect(meeting(id, 3, T, [across(id, 3, T, 150, side)], 300).nearest[0], `side ${side}`).toBeGreaterThan(CLEAR * 0.8 + VESSEL.ferry.len / 2);
   });
+  it('the Sausalito ferry, kept off her line by a boat lying on it, never runs into the piers: real water', () => {
+    // (the second review's case: she turns off her line for a boat crossing 4 km out from the Ferry Building, inbound, and
+    // a boat lying stopped on her line 2.3 km out keeps her from going back to it, toward the pier heads)
+    const id = SERVICES.findIndex(s => s.kind === 'ferry'), r = ROUTES.sausalito;
+    let L = 0, stop: Vec = r[0]; for (let i = 1; i < r.length && L < 2300; i++) { const d = Math.hypot(r[i].x - r[i - 1].x, r[i].y - r[i - 1].y); if (L + d >= 2300) { const f = (2300 - L) / d; stop = { x: r[i - 1].x + (r[i].x - r[i - 1].x) * f, y: r[i - 1].y + (r[i].y - r[i - 1].y) * f }; } L += d; }
+    const ferryBldg = r[0];
+    const T = when(id, 3, T0, 150, (a, b) => a.moving && b.moving && Math.hypot(a.x - ferryBldg.x, a.y - ferryBldg.y) > 5000 && Math.hypot(b.x - ferryBldg.x, b.y - ferryBldg.y) < Math.hypot(a.x - ferryBldg.x, a.y - ferryBldg.y));
+    for (const side of [1, -1]) {
+      const m = meeting(id, 3, T, [across(id, 3, T, 150, side), { x: stop.x, y: stop.y, vx: 0, vy: 0 }], 900, trafficWater);
+      expect(m.land, `side ${side}: her nearest to land or a pier away from her berths (m)`).toBeGreaterThan(VESSEL.ferry.beam / 2 + 20);
+      expect(Math.min(...m.nearest), `side ${side}: the nearest boat`).toBeGreaterThan(VESSEL.ferry.len / 2 + 20);
+    }
+  }, 120_000);
+  it('a ferry overtaking a boat on her line slows or passes, and never stops a mile back', () => {
+    for (const kind of ['ferry', 'alcatraz', 'coastguard'] as const) {
+      const id = SERVICES.findIndex(s => s.kind === kind);
+      const T = when(id, 3, T0, 200, (a, b, c) => a.moving && b.moving && c.moving);
+      const v = new Traffic(true, 3).vessels(T)[id], u = { x: Math.sin(v.h * Math.PI / 180), y: Math.cos(v.h * Math.PI / 180) };
+      const m = meeting(id, 3, T, [{ x: v.x + u.x * 600, y: v.y + u.y * 600, vx: u.x * V, vy: u.y * V }], 200, trafficWater);
+      expect(m.slowFar, `${kind}: her least speed while the boat was over a minute off`).toBeGreaterThan(0.25);
+      expect(m.nearest[0], `${kind}: the nearest she came`).toBeGreaterThan(VESSEL[kind].len / 2 + 20);
+    }
+  }, 120_000);
+  it("in a cluster of boats she doesn't swing from side to side, turn faster than she can, or misreport her speed", () => {
+    for (const kind of ['ferry', 'alcatraz', 'tour', 'coastguard'] as const) {
+      const id = SERVICES.findIndex(s => s.kind === kind);
+      const T = when(id, 7, T0, 150, (a, b, c) => a.moving && b.moving && c.moving);
+      const m0 = new Traffic(true, 7).vessels(T + 120)[id], u = { x: Math.sin(m0.h * Math.PI / 180), y: Math.cos(m0.h * Math.PI / 180) };
+      // (three boats crossing where she'll be in two minutes, a fourth lying still just off her line there)
+      const boats = [across(id, 7, T, 120, 1), across(id, 7, T, 140, -1), across(id, 7, T, 160, 1), { x: m0.x + u.y * 80, y: m0.y - u.x * 80, vx: 0, vy: 0 }];
+      const m = meeting(id, 7, T, boats, 400, trafficWater);
+      console.log(`${kind}: side flips ${m.flips}, fastest turn ${m.turn.toFixed(1)}°/s, speed reported off by up to ${(m.speedErr * 100).toFixed(1)}%, nearest ${m.nearest.map(x => x.toFixed(0)).join(', ')} m`);
+      expect(m.flips, kind).toBeLessThanOrEqual(2);
+      // (an alteration turns her at up to TURN_DEG_S, and rounding a corner of her route at up to TURN_DEG_S again: at
+      // most both at once, with her line's own easing in to her berth)
+      expect(m.turn, kind).toBeLessThan(2 * TURN_DEG_S + 4);
+      expect(m.speedErr, kind).toBeLessThan(0.15);
+      for (const d of m.nearest) expect(d, kind).toBeGreaterThan(VESSEL[kind].len / 2 + 10);
+    }
+  }, 180_000);
+  it('a decision with a fleet about her is quick (wall clock: rerun alone once if it fails under load)', () => {
+    const id = SERVICES.findIndex(s => s.kind === 'ferry'), tr = new Traffic(true, 3), ways = newWays();
+    const T = when(id, 3, T0, 120, (a, b) => a.moving && b.moving), m = tr.vessels(T + 120)[id];
+    let seed = 9; const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 2 ** 32; };
+    const fleet: Craft[] = Array.from({ length: 20 }, () => ({ x: m.x + (rnd() - 0.5) * 600, y: m.y + (rnd() - 0.5) * 600, vx: (rnd() - 0.5) * 6, vy: (rnd() - 0.5) * 6 }));
+    for (let k = 0; k < 5; k++) tr.decide(T, ways, fleet, trafficWater, id); // (warm: the water's cells, the compiler)
+    const t0 = performance.now(); for (let k = 0; k < 20; k++) { ways[id].tgt = 0; ways[id].slowTgt = 1; tr.decide(T + k * 0.5, ways, fleet, trafficWater, id); }
+    const ms = (performance.now() - t0) / 20;
+    console.log(`one decision, 20 boats about her: ${ms.toFixed(2)} ms`);
+    expect(ms).toBeLessThan(8); // (one service a step: a frame is 16 ms)
+  }, 60_000);
   it('no vessel jumps: every service for an hour, on her line and 300 m off it, a step (1/60 s) at a time; and on her line alongside', () => {
     for (let id = 0; id < SERVICES.length; id++) {
       const v = VESSEL[SERVICES[id].kind].kt * 0.5144, tr = new Traffic(true, 3), ways = newWays(), dt = 1 / 60;
