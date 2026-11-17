@@ -89,8 +89,15 @@ export const PARODY_BURGEES: Burgee[] = [
   // ---- East Bay
   { id: 'ryc', shape: 'pennant', ratio: 1.5, // DIY: brick red, black and white; one kiln chimney
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
-  { id: 'byc', shape: 'pennant', ratio: 1.6, // with a wink: purple and gold; one bishop's mitre
-    draw: (g, W, H) => { fill(g, W, H, '#5b2a86'); rect(g, GOLD, W * 0.55, 0, W * 0.08, H); poly(g, GOLD, [W * 0.1, H * 0.7], [W * 0.1, H * 0.4], [W * 0.215, H * 0.22], [W * 0.33, H * 0.4], [W * 0.33, H * 0.7]); stroke(g, '#5b2a86', H * 0.06, [W * 0.215, H * 0.32], [W * 0.215, H * 0.7]); } },
+  { id: 'byc', shape: 'pennant', ratio: 1.6, // classic with a wink (1929): purple and gold; one bishop's mitre on the purple, the fly tip gold
+    draw: (g, W, H) => { const PUR = '#55267f', X = W * 0.2;
+      fill(g, W, H, GOLD); poly(g, PUR, [0, 0], [W * 0.36, 0], [W * 0.66, H], [0, H]); // (purple on the hoist side, gold on the fly side, divided on the diagonal: the bishop moves that way)
+      g.fillStyle = GOLD; g.beginPath(); g.moveTo(X - H * 0.15, H * 0.64); g.quadraticCurveTo(X - H * 0.2, H * 0.4, X, H * 0.18); g.quadraticCurveTo(X + H * 0.2, H * 0.4, X + H * 0.15, H * 0.64); g.closePath(); g.fill(); // the mitre
+      rect(g, PUR, X - H * 0.012, H * 0.3, H * 0.024, H * 0.3); // its band down the middle
+      rect(g, PUR, X - H * 0.17, H * 0.575, H * 0.34, H * 0.025); // the line above the base
+      rect(g, GOLD, X - H * 0.16, H * 0.62, H * 0.32, H * 0.04); // the base
+      for (const s of [-1, 1]) poly(g, GOLD, [X + s * H * 0.06, H * 0.66], [X + s * H * 0.11, H * 0.66], [X + s * H * 0.11, H * 0.78], [X + s * H * 0.085, H * 0.74], [X + s * H * 0.06, H * 0.78]); // the two ribbons hanging
+      border(g, W, H, 'pennant', GOLD, 0.04); } },
   { id: 'csc', shape: 'pennant', ratio: 1.5, // modern co-op: bright green and yellow, one rising sun
     draw: (g, W, H) => { fill(g, W, H, '#2fa04a'); rect(g, '#f6d21a', 0, H * 0.7, W, H * 0.3); dot(g, '#f6d21a', W * 0.2, H * 0.46, H * 0.2); } },
   { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
