@@ -79,14 +79,18 @@ function wheel(g: G, cx: number, cy: number, r: number, c: string, ground: strin
   dot(g, c, 0, 0, r * 0.22); dot(g, ground, 0, 0, r * 0.09); g.restore();
 }
 
-/** A cannon on a truck carriage, simplified from the owner's reference: a tapering barrel with a flared muzzle and two bands, a ball at the breech, a solid carriage on a small and a large wheel; w is its length. */
-function cannon(g: G, x: number, y: number, w: number, c: string, ground: string): void {
+/** A cannon, the outline of the owner's reference drawing filled solid (unit points, cannon length 1, about 0.61 high): the body and barrel, and each wheel, are separate pieces. */
+const CANNON: P[][] = [
+  [[0.9417, 0], [0.9641, 0.0045], [0.9731, 0.0179], [1, 0.157], [1, 0.1839], [0.991, 0.1973], [0.9417, 0.1883], [0.8879, 0.1928], [0.8744, 0.2063], [0.8475, 0.2018], [0.6816, 0.2511], [0.6951, 0.3363], [0.7354, 0.3722], [0.7668, 0.4395], [0.7623, 0.5112], [0.7399, 0.5516], [0.704, 0.5874], [0.6547, 0.6099], [0.5874, 0.6099], [0.5336, 0.5874], [0.4933, 0.5471], [0.4664, 0.4664], [0.3587, 0.4843], [0.2556, 0.5202], [0.2287, 0.583], [0.1883, 0.6099], [0.1211, 0.6054], [0.0852, 0.574], [0.0673, 0.5291], [0.0179, 0.5291], [0, 0.5157], [0, 0.4215], [0.0179, 0.3991], [0.0359, 0.3901], [0.1928, 0.3857], [0.2825, 0.3543], [0.2735, 0.3453], [0.2332, 0.3498], [0.2063, 0.3408], [0.1435, 0.2825], [0.1256, 0.296], [0.0987, 0.3004], [0.0717, 0.2735], [0.0762, 0.2511], [0.0897, 0.2377], [0.13, 0.2377], [0.1435, 0.2242], [0.157, 0.1794], [0.1973, 0.139], [0.2332, 0.13], [0.2466, 0.1166], [0.278, 0.1256], [0.3408, 0.1166], [0.3767, 0.0987], [0.3901, 0.1076], [0.4126, 0.1076], [0.5291, 0.0897], [0.5605, 0.0717], [0.5919, 0.0807], [0.7937, 0.0538], [0.8341, 0.0359], [0.8565, 0.0448], [0.9148, 0.0224]],
+  [[0.5919, 0.3543], [0.6457, 0.3543], [0.6771, 0.3677], [0.713, 0.3991], [0.7309, 0.4395], [0.7309, 0.4888], [0.7175, 0.5247], [0.6816, 0.5605], [0.6368, 0.5785], [0.583, 0.574], [0.5426, 0.5516], [0.5202, 0.5247], [0.5067, 0.4888], [0.5067, 0.4395], [0.5247, 0.3991], [0.5471, 0.3767]],
+  [[0.3318, 0.4081], [0.3543, 0.4081], [0.3677, 0.426], [0.3677, 0.4395], [0.3498, 0.4574], [0.3184, 0.4439], [0.3139, 0.4305]],
+  [[0.157, 0.4664], [0.1928, 0.4753], [0.2197, 0.5157], [0.2108, 0.5561], [0.1749, 0.583], [0.1256, 0.574], [0.1031, 0.5426], [0.1076, 0.4978], [0.13, 0.4753]],
+  [[0.157, 0.4978], [0.1749, 0.5022], [0.1883, 0.5247], [0.1704, 0.5516], [0.1525, 0.5516], [0.1345, 0.5381], [0.139, 0.5067]],
+];
+function cannon(g: G, x: number, y: number, w: number, c: string): void {
   g.save(); g.translate(x, y); g.scale(w, w); g.fillStyle = c;
-  g.save(); g.translate(0.55, 0.2); g.rotate(-0.2); // the barrel, long, tapering, a flared muzzle and two bands
-  g.beginPath(); g.moveTo(-0.38, -0.11); g.lineTo(0.42, -0.075); g.lineTo(0.42, 0.075); g.lineTo(-0.38, 0.11); g.closePath(); g.fill();
-  g.fillRect(0.36, -0.105, 0.08, 0.21); g.fillRect(-0.03, -0.125, 0.045, 0.25); g.fillRect(0.17, -0.115, 0.045, 0.23); dot(g, c, -0.43, 0, 0.06); g.restore();
-  g.beginPath(); g.moveTo(0.1, 0.3); g.lineTo(0.78, 0.3); g.lineTo(0.78, 0.43); g.lineTo(0.1, 0.43); g.closePath(); g.fill(); // the carriage, low
-  dot(g, c, 0.2, 0.49, 0.09); dot(g, ground, 0.2, 0.49, 0.028); dot(g, c, 0.6, 0.46, 0.17); dot(g, ground, 0.6, 0.46, 0.05); g.restore();
+  for (const ring of CANNON) { g.beginPath(); ring.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py))); g.closePath(); g.fill(); }
+  g.restore();
 }
 
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
@@ -169,7 +173,7 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); border(g, W, H, 'pennant', '#c8102e', 0.025);
       shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and one white cannon toward the hoist
-    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); cannon(g, W * 0.045, H * 0.31, W * 0.4, WHITE, '#8fc4ea'); } },
+    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); cannon(g, W * 0.05, H * 0.5 - W * 0.4 * 0.305, W * 0.4, WHITE); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.5, // artsy: cream, teal and willow green; one drooping branch
     draw: (g, W, H) => { fill(g, W, H, '#f0e9d0'); rect(g, '#1f8c8a', 0, 0, W * 0.07, H); stroke(g, '#3d7a35', H * 0.07, [W * 0.12, H * 0.3], [W * 0.3, H * 0.3]); for (const x of [0.15, 0.21, 0.27]) stroke(g, '#3d7a35', H * 0.06, [W * x, H * 0.3], [W * x, H * 0.62]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
