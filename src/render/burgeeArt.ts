@@ -59,19 +59,15 @@ function bell(g: G, cx: number, cy: number, h: number, rot: number, c: string): 
   g.restore();
 }
 
-/** A shark, drawn here (not traced from anyone's seal): a great white seen from the side, nose up to the right, length `len`
- *  about the center (cx, cy). One bold white silhouette: blunt snout, high dorsal fin, one pectoral fin, a crescent tail. */
-function shark(g: G, cx: number, cy: number, len: number, c: string, eye: string): void {
-  g.save(); g.translate(cx, cy); g.rotate(-0.3); g.scale(len, len); g.translate(-0.46, 0); g.fillStyle = c;
-  g.beginPath(); g.moveTo(1.0, 0.01);
-  g.bezierCurveTo(0.88, -0.1, 0.68, -0.17, 0.52, -0.17);
-  g.quadraticCurveTo(0.5, -0.3, 0.4, -0.4); g.quadraticCurveTo(0.36, -0.3, 0.33, -0.15);
-  g.bezierCurveTo(0.2, -0.1, 0.11, -0.05, 0.06, -0.03);
-  g.lineTo(-0.08, -0.22); g.quadraticCurveTo(0.0, -0.08, 0.0, 0.0); g.quadraticCurveTo(0.0, 0.08, -0.06, 0.18);
-  g.lineTo(0.08, 0.04); g.bezierCurveTo(0.2, 0.09, 0.3, 0.12, 0.45, 0.16);
-  g.lineTo(0.37, 0.34); g.lineTo(0.58, 0.18);
-  g.bezierCurveTo(0.78, 0.15, 0.93, 0.08, 1.0, 0.01); g.closePath(); g.fill();
-  g.fillStyle = eye; g.beginPath(); g.arc(0.86, -0.045, 0.017, 0, Math.PI * 2); g.fill();
+/** A shark, traced from the owner's reference image (unit points, shark height 1): the body, and the dorsal fin as its own piece; the eye, the gill slits and the mouth are holes, so the field shows through. */
+const SHARK_W = 1.01083;
+const SHARK: P[][][] = [
+  [[[0.6955, 0], [0.7497, 0], [0.7846, 0.0036], [0.8532, 0.0156], [0.9037, 0.0289], [0.9422, 0.0433], [0.9964, 0.0734], [1.0108, 0.0915], [1.0096, 0.1023], [0.9904, 0.1239], [0.9615, 0.1372], [0.9182, 0.1637], [0.846, 0.2214], [0.8051, 0.1974], [0.7858, 0.1925], [0.6871, 0.1901], [0.6691, 0.1937], [0.7918, 0.2539], [0.7918, 0.2563], [0.7738, 0.2708], [0.6318, 0.3381], [0.6005, 0.3634], [0.5644, 0.3995], [0.562, 0.4055], [0.5656, 0.4224], [0.568, 0.4934], [0.5644, 0.5295], [0.5572, 0.5608], [0.5463, 0.5872], [0.5319, 0.6089], [0.5126, 0.6294], [0.4934, 0.6438], [0.4789, 0.651], [0.4585, 0.6558], [0.4561, 0.6414], [0.4537, 0.4681], [0.4477, 0.4489], [0.4392, 0.4344], [0.426, 0.4212], [0.4176, 0.4176], [0.4055, 0.4164], [0.3923, 0.4212], [0.3586, 0.4513], [0.3345, 0.4645], [0.2936, 0.4813], [0.2527, 0.4934], [0.231, 0.5042], [0.2022, 0.5271], [0.16, 0.5716], [0.1288, 0.6161], [0.1143, 0.6534], [0.1131, 0.6943], [0.13, 0.7461], [0.1131, 0.7437], [0.1035, 0.7533], [0.1095, 0.7677], [0.13, 0.7882], [0.1576, 0.8051], [0.1841, 0.8135], [0.2142, 0.8159], [0.2455, 0.8111], [0.278, 0.799], [0.3177, 0.7762], [0.3466, 0.7497], [0.367, 0.7208], [0.3887, 0.6727], [0.3959, 0.6643], [0.4055, 0.6883], [0.4067, 0.7425], [0.3971, 0.7882], [0.3899, 0.8026], [0.3755, 0.8207], [0.3105, 0.8821], [0.3141, 0.9218], [0.3093, 0.9495], [0.2984, 0.9747], [0.2792, 1], [0.2491, 0.9747], [0.2142, 0.9338], [0.1625, 0.8917], [0.0674, 0.8026], [0.0373, 0.7653], [0.0156, 0.7304], [0.0096, 0.7124], [0.0012, 0.6582], [0, 0.58], [0.0132, 0.4922], [0.0373, 0.414], [0.0782, 0.3333], [0.1288, 0.2647], [0.1998, 0.1961], [0.278, 0.1396], [0.3742, 0.0878], [0.4477, 0.0578], [0.4994, 0.0409], [0.5993, 0.0156]], [[0.7629, 0.0963], [0.7665, 0.0963], [0.775, 0.1059], [0.7665, 0.1131], [0.7569, 0.1083], [0.7569, 0.1023]], [[0.58, 0.2094], [0.5848, 0.2094], [0.5981, 0.2178], [0.6306, 0.2491], [0.6546, 0.2852], [0.6546, 0.2888], [0.651, 0.2924], [0.6462, 0.2924], [0.6438, 0.29], [0.6101, 0.2467], [0.5752, 0.2142]], [[0.5511, 0.2118], [0.5692, 0.2238], [0.5981, 0.2491], [0.6306, 0.2936], [0.6318, 0.3008], [0.6294, 0.3032], [0.6245, 0.3032], [0.6173, 0.296], [0.6089, 0.2804], [0.5897, 0.2575], [0.5487, 0.225], [0.5475, 0.2154]], [[0.5187, 0.219], [0.5343, 0.2286], [0.5788, 0.2671], [0.5897, 0.2816], [0.6029, 0.3069], [0.6029, 0.3177], [0.5969, 0.3165], [0.5933, 0.3129], [0.586, 0.2996], [0.5728, 0.2828], [0.5138, 0.2274], [0.5126, 0.2226]], [[0.4765, 0.2214], [0.485, 0.2226], [0.5379, 0.2671], [0.5608, 0.2972], [0.5764, 0.3285], [0.568, 0.3285], [0.5644, 0.3261], [0.5475, 0.2996], [0.5271, 0.2732], [0.4886, 0.2419], [0.4741, 0.2274], [0.4729, 0.2238]]],
+  [[[0.1661, 0.1011], [0.1949, 0.1023], [0.2443, 0.1203], [0.272, 0.1215], [0.272, 0.1239], [0.2154, 0.1637], [0.1468, 0.2238], [0.1408, 0.2238], [0.1252, 0.1961], [0.0903, 0.1613], [0.0686, 0.1516], [0.0421, 0.1468], [0.0493, 0.1396], [0.089, 0.1215]]],
+];
+function shark(g: G, cx: number, cy: number, h: number, c: string): void {
+  g.save(); g.translate(cx - SHARK_W * h / 2, cy - h / 2); g.scale(h, h); g.fillStyle = c;
+  for (const rings of SHARK) { g.beginPath(); for (const ring of rings) { ring.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); } g.fill('evenodd'); }
   g.restore();
 }
 
@@ -199,9 +195,9 @@ export const PARODY_BURGEES: Burgee[] = [
         for (let i = 0; i < 6; i++) { const a = (s > 0 ? 72 - i * 21 : 108 + i * 21) * d, grow = a + s * -Math.PI / 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r, k = 1 - i * 0.07;
           for (const t of [-1, 1]) leaf(px, py, grow + t * 0.8, H * 0.085 * k, H * 0.028 * k); }
         const e = (s > 0 ? -34 : 214) * d; leaf(x + Math.cos(e) * r, y + Math.sin(e) * r, e + s * -Math.PI / 2, H * 0.07, H * 0.022); } } },
-  { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's; the shark is drawn here): navy field, a thin red border, one white shark at the hoist
+  { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): navy field, a thin red border, one white shark at the hoist
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); border(g, W, H, 'pennant', '#c8102e', 0.025);
-      shark(g, W * 0.3, H * 0.5, H * 0.54, WHITE, '#14295c'); } },
+      shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and two white crossed cannon barrels toward the hoist
     draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); crossedGuns(g, W * 0.2, H * 0.5, H * 0.5, WHITE, '#8fc4ea'); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.7, // Willow Grove, traced from the owner's reference: stripes of one width leaning 0.56 across for each 1 down, pitch 0.27 of the length, the first teal stripe's right edge at 0.042 of the length along the top
