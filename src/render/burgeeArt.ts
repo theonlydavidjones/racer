@@ -79,6 +79,16 @@ function wheel(g: G, cx: number, cy: number, r: number, c: string, ground: strin
   dot(g, c, 0, 0, r * 0.22); dot(g, ground, 0, 0, r * 0.09); g.restore();
 }
 
+/** A cannon on its carriage, muzzle to the right and raised; w is its length. */
+function cannon(g: G, x: number, y: number, w: number, c: string, ground: string): void {
+  g.save(); g.translate(x, y); g.scale(w, w); g.fillStyle = c;
+  g.save(); g.translate(0.3, 0.3); g.rotate(-0.32); // the barrel: thick at the breech, tapering to the muzzle, a ring at each end
+  g.beginPath(); g.moveTo(-0.22, -0.14); g.lineTo(0.66, -0.1); g.lineTo(0.66, 0.1); g.lineTo(-0.22, 0.14); g.closePath(); g.fill();
+  g.fillRect(0.6, -0.14, 0.11, 0.28); dot(g, c, -0.27, 0, 0.075); g.restore();
+  g.beginPath(); g.moveTo(0.0, 0.34); g.lineTo(0.6, 0.34); g.lineTo(0.68, 0.62); g.lineTo(-0.04, 0.62); g.closePath(); g.fill(); // the carriage
+  dot(g, c, 0.3, 0.62, 0.2); dot(g, ground, 0.3, 0.62, 0.06); g.restore();
+}
+
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
 const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: string, d: number) => { burgeePath(g, W, H, shape); g.strokeStyle = c; g.lineWidth = H * d * 2; g.lineJoin = 'miter'; g.stroke(); };
 
@@ -158,8 +168,8 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'tyc', shape: 'pennant', ratio: 1.6, // Shark Point (to flag for IP review: the layout is the real club's, the shark the Town of Tiburon seal's): navy field, a thin red border, one white shark at the hoist
     draw: (g, W, H) => { fill(g, W, H, '#14295c'); border(g, W, H, 'pennant', '#c8102e', 0.025);
       shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
-  { id: 'pyc', shape: 'pennant', ratio: 1.5, // modern-formal: navy, gold, a red band; one horseshoe, symmetrical
-    draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, RED, W * 0.58, 0, W * 0.42, H); const x = W * 0.25, y = H * 0.42, r = H * 0.15; stroke(g, GOLD, H * 0.1, [x - r, y - H * 0.14], [x - r, y]); stroke(g, GOLD, H * 0.1, [x + r, y - H * 0.14], [x + r, y]); arc(g, GOLD, H * 0.1, x, y, r, 0, Math.PI); } },
+  { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and one white cannon toward the hoist
+    draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); cannon(g, W * 0.06, H * 0.3, W * 0.33, WHITE, '#8fc4ea'); } },
   { id: 'ssyc', shape: 'pennant', ratio: 1.5, // artsy: cream, teal and willow green; one drooping branch
     draw: (g, W, H) => { fill(g, W, H, '#f0e9d0'); rect(g, '#1f8c8a', 0, 0, W * 0.07, H); stroke(g, '#3d7a35', H * 0.07, [W * 0.12, H * 0.3], [W * 0.3, H * 0.3]); for (const x of [0.15, 0.21, 0.27]) stroke(g, '#3d7a35', H * 0.06, [W * x, H * 0.3], [W * x, H * 0.62]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap

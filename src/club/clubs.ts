@@ -37,7 +37,7 @@ export const CLUB_TABLE: ClubInfo[] = [
   C('sfyc', 'Belvedere Cove Yacht Club', 'BCYC', 'sfyc'),
   C('cyc', 'Olympian Yacht Club', 'OlYC', 'cyc', 1, { harbor: 'corinthian' }),
   C('tyc', 'Shark Point Yacht Club', 'ShPYC', 'tyc'),
-  C('pyc', 'Horseshoe Cove Yacht Club', 'HCYC', 'pyc', 1, { base: [37.83400, -122.47455], harbor: 'horseshoe-bay' }), // base: OSM nodes 1974693051 and 1974693718, clubhouse, about 20 m
+  C('pyc', 'Battery Yacht Club', 'BatYC', 'pyc', 1, { base: [37.83400, -122.47455], harbor: 'horseshoe-bay' }), // base: OSM nodes 1974693051 and 1974693718, clubhouse, about 20 m
   C('ssyc', 'Willow Grove Yacht Club', 'WGYC', 'ssyc'),
   C('myc', 'Tamalpais Yacht Club', 'TamYC', 'myc'),
   C('sryc', 'Mission Canal Yacht Club', 'MCYC', 'sryc'),
