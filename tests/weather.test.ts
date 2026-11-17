@@ -112,14 +112,16 @@ describe('the wind between the record\'s samples comes on smoothly, not in a ste
     for (let m = 0; m < 30; m++) { worstMinute = Math.max(worstMinute, turn(t0 + m, t0 + m + 1)); turned += turn(t0 + m, t0 + m + 1); }
     for (let s = 0; s < 1800; s++) worstSecond = Math.max(worstSecond, turn(t0 + s / 60, t0 + (s + 1) / 60));
     expect(turned, 'the wind does come round over the half hour').toBeGreaterThan(5);
-    // (even through its steepest minute a second brings a sixtieth of it; half as much again allowed for a sample's corner.
+    // (even through its steepest minute a second brings a sixtieth of it: the samples sit on whole minutes, so no corner
+    // falls inside one; a twentieth more allowed for rounding.
     // Read to the whole minute, one second brought the whole minute's change: 60 times its share)
-    expect(worstSecond, `the most in one second, where the steepest minute turned ${worstMinute.toFixed(2)}°`).toBeLessThan(1.5 * worstMinute / 60);
+    expect(worstSecond, `the most in one second, where the steepest minute turned ${worstMinute.toFixed(2)}°`).toBeLessThan(1.05 * worstMinute / 60);
   });
   it('the records\' sea-breeze day too (breezeAt, hourly)', () => {
     const day = dayWeather('2031-07-15', 'west'), t0 = Date.parse('2031-07-15T19:00:00Z') / 60000;
     let turned = 0, worst = 0;
     for (let s = 0; s < 7200; s++) { const a = day.at(t0 + s / 60), b = day.at(t0 + (s + 1) / 60), d = Math.abs(((b.from - a.from + 540) % 360) - 180) + Math.abs(b.kt - a.kt); worst = Math.max(worst, d); turned += d; }
-    if (turned > 0.5) expect(worst).toBeLessThan(turned / 1800); // (two hours of seconds: none more than four times its even share)
+    expect(turned, 'the records\' wind does change over the two hours').toBeGreaterThan(0.5);
+    expect(worst).toBeLessThan(turned / 1800); // (two hours of seconds: none more than four times its even share)
   });
 });
