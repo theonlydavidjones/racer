@@ -210,9 +210,9 @@ export const PARODY_BURGEES: Burgee[] = [
       g.fillStyle = WHITE; g.font = `bold ${Math.round(H * 0.3)}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('T', W * 0.14, H * 0.34); } },
   { id: 'sryc', shape: 'pennant', ratio: 1.5, // Mission Canal: one mission bell (the owner's drawing) at the top-left, its axis pointing straight at the corner, cream on mission-tile red, a plain field
     draw: (g, W, H) => { fill(g, W, H, '#8f3b2b'); bell(g, H * 0.2, H * 0.27, H * 0.269, -Math.atan2(0.2, 0.27), '#f1e3c6'); } },
-  { id: 'ryc', shape: 'blunt', ratio: 2.3, // Brickyard (Richmond YC), on the owner's template (IP flag): white hoist with six dark-orange squares stood on a corner, then a dark-blue fly with a white center stripe
-    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#14295c', W * 0.456, 0, W, H); rect(g, WHITE, W * 0.456, H * 0.435, W, H * 0.13);
-      for (const [x, y] of [[0.124, 0.22], [0.236, 0.37], [0.124, 0.5], [0.357, 0.49], [0.236, 0.66], [0.124, 0.77]]) { const r = H * 0.085; poly(g, '#cc5500', [W * x, H * y - r], [W * x + r, H * y], [W * x, H * y + r], [W * x - r, H * y]); } } },
+  { id: 'ryc', shape: 'pennant', ratio: 2.3, // Brickyard (Richmond YC), on the owner's template (IP flag): white hoist with six dark-orange squares stood on a corner, then a solid dark-blue fly to the point
+    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#14295c', W * 0.456, 0, W, H);
+      for (const [x, y] of [[0.124, 0.22], [0.236, 0.36], [0.124, 0.5], [0.357, 0.5], [0.236, 0.64], [0.124, 0.78]]) { const r = H * 0.085; poly(g, '#cc5500', [W * x, H * y - r], [W * x + r, H * y], [W * x, H * y + r], [W * x - r, H * y]); } } },
   { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; no charge (the name does the work)
     draw: (g, W, H) => { fill(g, W, H, '#003262'); rect(g, '#fdb515', W * 0.2, 0, W * 0.2, H); rect(g, '#fdb515', W * 0.6, 0, W * 0.2, H); } },
   { id: 'csc', shape: 'pennant', ratio: 1.667, // People's: a co-op, so deep red and white; one raised fist on a white disc
