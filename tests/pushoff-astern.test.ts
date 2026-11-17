@@ -143,19 +143,23 @@ describe('pushed off astern', () => {
       light: { out: 5, kept: ['west-harbor:507'] }, northWest: { out: 6, kept: [] },
     });
   }, 300_000);
-  it('a fresh breeze on her bow carries her on whatever the crew do: she\'s let go with the way she has, their walk, never dead in the water', () => {
+  it('a fresh breeze on her bow carries her on whatever the crew do: she\'s never shoved off astern into it (and were she, she\'d be let go with the way she has, their walk, never dead in the water)', () => {
     // (the physics review, 15 Nov 2026: gauged to her room, the shove came to nothing from 14 kt on her bow, and she lay
-    // at the finger's end with no steerage for 10–40 s)
-    let n = 0;
-    for (const s of SLIPS) {
-      if (n >= 4) break;
+    // at the finger's end with no steerage for 10–40 s. Since the sourced sternway drag, 17 Nov 2026, an 18 kt breeze on
+    // her bow carries even the gentlest shove 80 m and more, past any clear water astern, so no berth is shoved off astern
+    // into it: walked out or kept fast instead (planPushOff, leastGlide). A tripwire on every tenth berth: should one come
+    // back, it fails here, and it's still held to being let go with her way on)
+    const shoved: string[] = [];
+    for (const s of SLIPS.filter((_, i) => i % 10 === 0)) {
       if (Math.abs(((s.heading - 270 + 540) % 360) - 180) <= 60) continue; // (not the westerly's flagged berths)
+      const p = pushOffPlan(s, s.heading, 18); if (p.kind !== 'astern' || p.noRoom) continue;
+      shoved.push(s.id); if (shoved.length > 4) continue;
       const w = sail(s.id, s.heading, 18), u = w.user; for (let k = 0; k < 30; k++) w.step(DT);
       if (!w.pushOff() || u.handled?.plan.kind !== 'astern') continue;
       for (let k = 0; k < 60 * 60 && u.handled; k++) w.step(DT);
-      expect(u.handled, s.id).toBeFalsy(); expect(u.astern ?? 0, `${s.id}: her way as she's let go`).toBeGreaterThan(0.43); n++;
+      expect(u.handled, s.id).toBeFalsy(); expect(u.astern ?? 0, `${s.id}: her way as she's let go`).toBeGreaterThan(0.43);
     }
-    expect(n).toBeGreaterThanOrEqual(2);
+    expect(shoved).toEqual([]);
   }, 120_000);
   it('kept fast with a motor on the bracket, the one line says to motor out', () => {
     const id = [...NO_ASTERN, ...NO_ASTERN_WEST].find(i => { const w = sail(i, 270, 12); for (let k = 0; k < 30; k++) w.step(DT); return !w.pushOff(); })!;
