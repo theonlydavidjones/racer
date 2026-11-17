@@ -32,7 +32,7 @@ function hook(g: G, cx: number, cy: number, h: number, c: string, rot = 0, lw = 
   g.drawImage(t, 0, 0);
 }
 
-/** A raised fist, traced from the owner's reference image (unit points, fist height 1): the palm and each knuckle are separate pieces, so the creases between them stay open. */
+/** A raised fist, traced from the owner's reference image (unit points, fist height 1): the palm and each finger are separate pieces, so the creases between them stay open. */
 const FIST_W = 0.567839;
 const FIST: P[][] = [
   [[0.196, 0], [0.221, 0], [0.291, 0.04], [0.286, 0.08], [0.246, 0.166], [0.231, 0.176], [0.126, 0.136], [0.126, 0.116], [0.146, 0.075]],
@@ -41,8 +41,9 @@ const FIST: P[][] = [
   [[0.101, 0.161], [0.136, 0.161], [0.181, 0.176], [0.322, 0.231], [0.337, 0.246], [0.332, 0.281], [0.302, 0.312], [0.246, 0.312], [0.196, 0.302], [0.181, 0.302], [0.171, 0.312], [0.181, 0.322], [0.256, 0.332], [0.291, 0.352], [0.327, 0.417], [0.347, 0.508], [0.357, 0.497], [0.357, 0.457], [0.337, 0.377], [0.362, 0.387], [0.387, 0.382], [0.427, 0.412], [0.462, 0.427], [0.487, 0.422], [0.513, 0.407], [0.523, 0.412], [0.492, 0.548], [0.457, 0.608], [0.452, 0.633], [0.452, 0.965], [0.442, 0.99], [0.432, 0.995], [0.407, 1], [0.151, 1], [0.126, 0.99], [0.116, 0.97], [0.121, 0.593], [0, 0.382], [0.005, 0.322], [0.08, 0.176]],
   [[0.513, 0.236], [0.523, 0.236], [0.563, 0.276], [0.568, 0.312], [0.492, 0.397], [0.482, 0.402], [0.442, 0.397], [0.417, 0.377], [0.417, 0.357], [0.492, 0.251]],
 ];
+const FIST_PALM = 3; // the large piece; the other four are the fingers
 /** A loose, wavy length of rope, traced from the owner's reference image (unit points, rope length 1): each strand's turn is its own piece. */
-const ROPE_STRETCH = 2.6; // the strands are drawn fat, so they still read from a distance
+const ROPE_STRETCH = 2.4; // the strands are drawn fat, so they still read from a distance
 const ROPE_H = 0.122007;
 const ROPE: P[][] = [
   [[0.5051, 0], [0.5222, 0], [0.5314, 0.0046], [0.5336, 0.008], [0.5131, 0.0239], [0.5074, 0.0308], [0.4971, 0.0376], [0.4835, 0.0399], [0.4721, 0.0353], [0.4709, 0.0342], [0.4743, 0.0285], [0.4892, 0.0114]],
@@ -73,12 +74,13 @@ function pieces(g: G, rings: P[][], c: string, halo = 0): void {
   g.fillStyle = c; g.strokeStyle = c; g.lineJoin = 'round';
   for (const ring of rings) { g.beginPath(); ring.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill(); if (halo) { g.lineWidth = halo; g.stroke(); } }
 }
-function fist(g: G, cx: number, cy: number, h: number, c: string): void {
-  g.save(); g.translate(cx - FIST_W * h / 2, cy - h / 2); g.scale(h, h); pieces(g, FIST, c); g.restore();
-}
-/** The rope, drawn first so the fist closes over it: it shows on both sides of the fist. */
-function rope(g: G, cx: number, cy: number, len: number, rot: number, c: string): void {
-  g.save(); g.translate(cx, cy); g.rotate(rot); g.translate(-len / 2, -ROPE_H * len * ROPE_STRETCH / 2); g.scale(len, len * ROPE_STRETCH); pieces(g, ROPE, c); g.restore();
+/** A fist gripping a rope: the palm, then the rope laid across it along the finger line, then the fingers closed over the rope (so its upper edge tucks under them). */
+function fistWithRope(g: G, cx: number, cy: number, h: number, c: string, rope: string, ropeLen: number, rot: number): void {
+  g.save(); g.translate(cx - FIST_W * h / 2, cy - h / 2); g.scale(h, h);
+  pieces(g, [FIST[FIST_PALM]], c);
+  g.save(); g.translate(0.33, 0.33); g.rotate(rot); g.translate(-ropeLen / 2, -ROPE_H * ropeLen * ROPE_STRETCH / 2); g.scale(ropeLen, ropeLen * ROPE_STRETCH);
+  pieces(g, ROPE, '#ffffff', 0.012 / ropeLen); pieces(g, ROPE, rope); g.restore();
+  pieces(g, FIST.filter((_, i) => i !== FIST_PALM), c); g.restore();
 }
 
 /** A border just inside the cut (a fimbriation, as classic burgees have): d is its width as a share of the hoist. */
@@ -163,8 +165,8 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#b03a2a'); rect(g, WHITE, W * 0.5, 0, W * 0.14, H); rect(g, BLACK, W * 0.11, H * 0.34, W * 0.1, H * 0.34); poly(g, BLACK, [W * 0.09, H * 0.34], [W * 0.23, H * 0.34], [W * 0.21, H * 0.27], [W * 0.11, H * 0.27]); } },
   { id: 'byc', shape: 'pennant', ratio: 1.667, // Campanile YC (Berkeley, 1929), on the owner's template: five equal stripes to the point, Berkeley blue and California gold; no charge (the name does the work)
     draw: (g, W, H) => { fill(g, W, H, '#003262'); rect(g, '#fdb515', W * 0.2, 0, W * 0.2, H); rect(g, '#fdb515', W * 0.6, 0, W * 0.2, H); } },
-  { id: 'csc', shape: 'pennant', ratio: 1.667, // People's: a co-op, so deep red and white; a raised fist on a white disc, gripping a loose rope (the boat's line) that shows on both sides of it
-    draw: (g, W, H) => { fill(g, W, H, '#a81f2b'); dot(g, WHITE, W * 0.21, H * 0.5, H * 0.26); rope(g, W * 0.21, H * 0.5, H * 0.43, -0.1, '#15181c'); fist(g, W * 0.21, H * 0.5, H * 0.42, '#a81f2b'); } },
+  { id: 'csc', shape: 'pennant', ratio: 1.667, // People's: a co-op, so deep red and white; a raised fist on a white disc, gripping a loose rope (the boat's line) that its fingers close over
+    draw: (g, W, H) => { fill(g, W, H, '#a81f2b'); dot(g, WHITE, W * 0.21, H * 0.5, H * 0.26); fistWithRope(g, W * 0.21, H * 0.5, H * 0.43, '#a81f2b', '#15181c', 0.82, 0.4); } },
   { id: 'emyc', shape: 'pennant', ratio: 1.5, // small and informal: sky, reed green, mud; a tide line
     draw: (g, W, H) => { fill(g, W, H, '#8ec7e8'); rect(g, '#6b5338', 0, H * 0.62, W, H * 0.38); rect(g, '#4c7a3a', 0, H * 0.5, W, H * 0.12); } },
   { id: 'eyc', shape: 'pennant', ratio: 1.6, // classic, 1890 (the owner's template): a dark-blue hoist panel bearing one white oak leaf, then red and white stripes to the point, a gold border, a white hoist band
