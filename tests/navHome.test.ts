@@ -27,25 +27,22 @@ function world(s: Slip, kt = 6, from = 270): World {
   const w = new World(COURSES[0], S, 1, { freeSail: true }); for (let i = 0; i < 30; i++) w.step(DT); w.drainEvents();
   return w;
 }
-/** Starts off her harbor's mouth: `off` m out on open water, with a lane 12 m wide clear of everything solid all the way
- * in (the pilot's own look ahead, autopilot.ts landAlong, sees the shore's outline, not land a couple of meters off the
- * line: a gap of its own, not the hand-over's), at bearings at least 60 degrees apart. */
+/** Starts off her harbor's mouth: `off` m out on open water with a clear line in by the pilot's own look (landAlong), at
+ * bearings at least 60 degrees apart, every such one: not only clear lanes (the second review: off Corinthian a start
+ * whose line in brushed something solid was where she touched). */
 function starts(mouth: P, off: number, n: number): P[] {
   const ok: { q: P; b: number }[] = [];
   for (let b = 0; b < 360; b += 5) {
     const t = b * Math.PI / 180, q = { x: mouth.x + Math.sin(t) * off, y: mouth.y + Math.cos(t) * off };
     if (onLand(q) || harborAt(q) || landDist(q) < 15 || landAlong(q, mouth) !== Infinity || hull({ ...q, h: b + 180 }).some(solid)) continue;
-    const n = Math.ceil(off / 1.5), side = { x: Math.cos(t), y: -Math.sin(t) };
-    let lane = true; for (let i = 0; i < n - 20 / 1.5 && lane; i++) for (const k of [-6, -3, 0, 3, 6]) { const c = { x: q.x + (mouth.x - q.x) * i / n + side.x * k, y: q.y + (mouth.y - q.y) * i / n + side.y * k }; if (solid(c)) { lane = false; break; } }
-    if (!lane) continue;
     if (ok.every(o => Math.abs(((o.b - b + 540) % 360) - 180) >= 60)) ok.push({ q, b });
   }
   return ok.slice(0, n).map(o => o.q);
 }
-function sail(w: World, o: P, to: P, motor: boolean, secs = 300) {
+function sail(w: World, o: P, to: P, motor: boolean, secs = 300, throttle = 0.5) {
   const u = w.user;
   Object.assign(u, { docked: undefined, x: o.x, y: o.y, h: (Math.atan2(to.x - o.x, to.y - o.y) * 180 / Math.PI + 360) % 360, v: 1, astern: 0, sway: 0, turnRate: 0 });
-  if (motor) { u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.motor = { hp: 6, down: true, running: true, gear: 'F', throttle: 0.5 } as never; }
+  if (motor) { u.rig = { main: 0, jib: 0, mainUp: false, jibUp: false }; u.motor = { hp: 6, down: true, running: true, gear: 'F', throttle } as never; }
   engage(u, w.pilot, 'nav'); w.sendHome(); w.drainEvents();
   const hits: string[] = [], said: string[] = []; let t = 0;
   for (; t < secs && w.pilot.mode === 'nav'; t += DT) {
@@ -66,19 +63,39 @@ describe('the navigator takes her home to her harbor\'s mouth, and hands her ove
     for (const s of SAMPLE) {
       const r = harborRoute(s), H = HARBORS.find(h => h.id === s.marina)!;
       const mouth = r?.mouth ?? H.exits[0], w = world(s);
-      for (const o of starts(mouth, 160, 2)) {
+      for (const o of starts(mouth, 160, 3)) for (const throttle of [0.5, 0.12]) {
         runs++;
-        const run = sail(w, o, mouth, true), u = w.user, at = `${s.id} from ${Math.round(o.x)},${Math.round(o.y)}`;
+        const run = sail(w, o, mouth, true, 300, throttle), u = w.user, at = `${s.id} from ${Math.round(o.x)},${Math.round(o.y)} at ${throttle} throttle`;
         if (run.hits.length) bad.push(`${at}: ${run.hits[0]}`);
-        if (run.pilot !== 'off' || !run.said.some(m => /At the harbor mouth: she's yours/.test(m))) { bad.push(`${at}: no hand-over in ${run.t.toFixed(0)} s (${run.said.join(' | ')})`); continue; }
+        // (handed over at the mouth, or sooner with something solid in her lane; or the pilot's own alarm, standing by)
+        if (run.pilot !== 'off' || !run.said.some(m => /(At the harbor mouth|Something ahead of her): she's yours|Pilot alarm/.test(m))) { bad.push(`${at}: no hand-over in ${run.t.toFixed(0)} s (${run.said.join(' | ')})`); continue; }
         // (handed over at the mouth, with 15 s of clear water straight ahead at her speed to throttle back in)
         const a = u.h * Math.PI / 180, ahead = Math.max(20, u.v * 15);
         for (let k = 1; k <= 10; k++) { const q = { x: u.x + Math.sin(a) * ahead * k / 10, y: u.y + Math.cos(a) * ahead * k / 10 }; if (hull({ ...q, h: u.h }).some(solid)) { bad.push(`${at}: handed over ${(ahead * k / 10).toFixed(0)} m from something ahead at ${u.v.toFixed(1)} m/s`); break; } }
       }
     }
-    expect(runs).toBeGreaterThanOrEqual(2 * SAMPLE.length - 4);
+    expect(runs).toBeGreaterThanOrEqual(4 * SAMPLE.length);
     expect(bad).toEqual([]);
   }, 600_000);
+
+  it('off Corinthian from the southwest, slow: where her lane in brushes something solid, she\'s handed over before it, with the water clear ahead (the second review\'s cases)', () => {
+    const s = SLIPS.find(q => q.marina === 'corinthian' && q.kind === 'bow-in')!, r = harborRoute(s)!, bad: string[] = [];
+    for (const b of [200, 210, 220]) for (const throttle of [0.12, 0.25, 0.5]) {
+      const t = b * Math.PI / 180, o = { x: r.mouth.x + Math.sin(t) * 300, y: r.mouth.y + Math.cos(t) * 300 }, w = world(s), u = w.user;
+      const run = sail(w, o, r.mouth, true, 400, throttle), at = `from ${b} at ${throttle}`;
+      if (run.hits.length) bad.push(`${at}: ${run.hits[0]}`);
+      if (run.pilot !== 'off') { bad.push(`${at}: no hand-over`); continue; }
+      const a = u.h * Math.PI / 180, ahead = Math.max(20, u.v * 15);
+      for (let k = 1; k <= 10; k++) { const q = { x: u.x + Math.sin(a) * ahead * k / 10, y: u.y + Math.cos(a) * ahead * k / 10 }; if (hull({ ...q, h: u.h }).some(solid)) { bad.push(`${at}: handed over ${(ahead * k / 10).toFixed(0)} m from something ahead`); break; } }
+    }
+    expect(bad).toEqual([]);
+  }, 300_000);
+
+  it('the same race sailed twice goes the same way: at South Beach, with two entrances, from a fresh world each time', () => {
+    const s = slipById('south-beach:C1')!, r = harborRoute(s)!, [o] = starts(r.mouth, 300, 1), ends: string[] = [];
+    for (let k = 0; k < 2; k++) { const w = world(s); sail(w, o, r.mouth, true, 60); ends.push(`${w.user.x.toFixed(6)},${w.user.y.toFixed(6)},${w.user.h.toFixed(6)}`); }
+    expect(ends[1]).toBe(ends[0]);
+  }, 120_000);
 
   it('already in her harbor, sent home on Nav: the pilot stands by at once and she\'s steered nowhere', () => {
     const s = slipById('gashouse-cove:572')!, w = world(s), r = harborRoute(s)!, u = w.user;
