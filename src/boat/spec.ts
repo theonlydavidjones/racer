@@ -32,6 +32,8 @@ export interface BoatSpec {
   cockpit?: 'teak' | 'fiberglass';
   /** The companionway: open (the hatch slid forward, the doors stowed below), or shut (the hatch slid aft over it, the doors in). */
   companionway?: 'open' | 'closed';
+  /** The racing instrument on the cabin top (render/tacktick.ts): fitted, as on Josephine, or not (absent: fitted). */
+  instrument?: 'fitted' | 'none';
   /** The colour her name is lettered in on the cabin sides ('' or absent: one that stands out). */
   nameColor?: string;
   /** Her national sail letters: her home country, which also gives her ensign (ensignFor). */
@@ -163,6 +165,7 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     navLights: x.navLights === 'tricolour' ? 'tricolour' : 'deck',
     hatch: x.hatch === 'acrylic' || x.hatch === 'teak' ? x.hatch : d.hatch ?? 'teak',
     companionway: x.companionway === 'closed' ? 'closed' : 'open',
+    ...(x.instrument === 'none' ? { instrument: 'none' as const } : {}),
     cockpit: x.cockpit === 'fiberglass' ? 'fiberglass' : 'teak',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
     // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
@@ -233,5 +236,9 @@ export function localDay(plus = 0): string {
   const d = new Date(); d.setDate(d.getDate() + plus);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/** Laying up after a wreck or damage is off for now (the owner, 15 Nov 2026: "silly and punitive in its current state";
+ * they want to come back to it, ROADMAP "Wrecks"). Set it true to bring it back as it was: the lay-up, the Yacht Club's
+ * "laid up" and the refused cast off all follow it. Days already saved in BoatSpec.laidUpUntil are kept but ignored. */
+export const LAY_UP = false;
 /** Laid up for repairs today (BoatSpec.laidUpUntil: after a wreck or damage, docs/WRECK-PROPOSAL.md). */
-export const laidUp = (b: { laidUpUntil?: string }): boolean => !!b.laidUpUntil && b.laidUpUntil >= localDay();
+export const laidUp = (b: { laidUpUntil?: string }): boolean => LAY_UP && !!b.laidUpUntil && b.laidUpUntil >= localDay();

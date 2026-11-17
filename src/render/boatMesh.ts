@@ -1,5 +1,7 @@
 import './three-setup';
-import { ensignStep, flagDrawn, flagExtension, flagRow } from './flagWave';
+import { PADDLE, paddler } from '../boat/paddle';
+import { workPace } from '../boat/crewWork';
+import { ensignStep, flagDrawn, flagExtension, flagHang, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
@@ -20,6 +22,8 @@ import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLant
 import { buildNavLights, markBoat, syncNavLights, type NavLights } from './navLights';
 import { Sail, Telltale, boatTells, sailEdges, type SailDef, type SailObstacle, type SailShape } from './sails';
 import { PART_SMALL } from './fittings';
+import { buildOutboard, syncOutboard, type OutboardMesh } from './outboard';
+import { bracketFitted } from '../boat/outboardMount';
 const HULL_MID_M = 30, HULL_FAR_M = 80; // m: from here on her hull is drawn more coarsely (render/hull.ts hullLevel)
 const INSIDE_R = 0.1; // m: the cabin's inside is drawn while a part this size would cover a pixel (the 0.45 m companionway, four or five)
 
@@ -129,7 +133,7 @@ const JIB_DEF: SailDef = (() => {
 })();
 /** The rig's layout, for the tests (tests/rig.test.ts). */
 export const RIG = { MAST_FRONT_Z, MAST_Z, DECK_AT_MAST, BOOM_TOP, MAST_TOP, FORESTAY_DECK, HOUNDS, JIB_AXIS, MAIN_DEF, JIB_DEF, carPos: (side: number, fore: number, ins: number) => carPos(side, fore, ins) , TRAV_HALF: 0.5, MS_R: COCKPIT_FIT.thwart.z - (MAST_FRONT_Z + MAST_FA)};
-const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+const WINDOW_MAT = new THREE.MeshPhongMaterial({ color: 0xd8e8ee, transparent: true, opacity: 0.22, shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }); // (one pass, not two: three draws a transparent DoubleSide material twice, back faces then front, re-deriving its program each time; a thin window faces the eye one way, so one pass draws the same pixels: Capacity, 15 Nov 2026)
 
 /** Glossy materials that reflect the sky (the scene sets their environment map from the sky as it changes). */
 export const REFLECTIVE: { mat: THREE.MeshPhongMaterial; amount: number }[] = [];
@@ -215,7 +219,7 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   // syncNavLights sets how bright, on the boat-lights clock)
   // (clear glass in an aluminium frame, cut through the cabin side: the cabin's inside, lit by its lantern after dark,
   // is what shows through it)
-  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const winTex = windowTexture(), winMat = new THREE.MeshPhongMaterial({ map: winTex, transparent: true, specular: 0x99aabb, shininess: 90, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, forceSinglePass: true }); // (one pass: see WINDOW_MAT)
   for (const s of [1, -1]) {
     // (a patch over the light and its frame; the picture draws the tapered glass and the frame on it, the same shape both
     // sides: mirrored to port without turning the picture round)
@@ -368,14 +372,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
   turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
   grp.add(rud);
-  // an outboard on its transom bracket, tilted up (port quarter, clear of the rudder, the tiller and the ensign staff)
-  if (b.spec?.perf.outboard === 'bracket') {
-    const ob = new THREE.Group(), grey = new THREE.MeshPhongMaterial({ color: 0x9aa0a6, specular: 0x666666, shininess: 50 }), blk = MAT.dark;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.34), blk); head.position.set(0, 0.13, 0.12); ob.add(head);
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.62), grey); leg.position.set(0, 0.0, -0.2); ob.add(leg); // tilted up: the leg lies forward along the bracket
-    const brk = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.04), grey); brk.position.set(0, -0.05, -0.12); ob.add(brk);
-    ob.position.set(-0.42, sheer(1) - 0.12, L / 2 + 0.12); ob.rotation.x = 0.35; grp.add(ob);
-  }
+  // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
+  // prop turning, from the motor's state (syncBoatMesh)
+  // (and its bracket alone, empty and raised, while it's stowed below from it: Crew Controls' Stow / Ship)
+  // (no bracket at all with no motor aboard: boat/outboardMount.ts bracketFitted; built later if one's shipped mid-sail)
+  if (bracketFitted(b)) { const ob = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); grp.add(ob.group); grp.userData.outboard = ob; }
   // her name on both sides, where the boats carry it: on the cabin side and the coaming, aft of the window and
   // forward of the winch (there's no room for it on the topsides under the low sheer); hand-lettered script
   if (paint.boatName) {
@@ -414,6 +415,8 @@ export interface BoatMesh {
   jibTells: { windward: Telltale[]; leeward: Telltale[] }; leechTells: Telltale[];
   pole: THREE.Mesh; stowedPole: THREE.Group; ribbons: Ribbon[];
   rudder: THREE.Group; prevH: number; prevT: number;
+  /** When her crew and sail cloth were last posed (a far boat's are every third frame: syncBoatMesh `far`). */
+  liveT?: number;
   /** The mast (bent by syncRig: its unbent vertices kept) and the forestay (sagging), with the bend last drawn. */
   rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; bands: THREE.Mesh; bandsBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
@@ -434,6 +437,8 @@ export interface BoatMesh {
   nav: NavLights;
   /** The cabin's lantern, swinging on its chain (cabinInterior.ts). */
   lantern: LanternSwing;
+  /** Her outboard and its bracket (outboard.ts), when she carries it on the bracket. */
+  outboard?: OutboardMesh;
   /** The companionway's sliding hatch and washboards, moved by syncCompanionway. */
   companionway: Companionway;
 }
@@ -1064,6 +1069,8 @@ const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = shee
 const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
 /** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
 const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
+/** A shroud's ends (starboard's; port's mirrored), in the boat group's frame: its chainplate on deck, and where it meets the mast. */
+export const SHROUD = { foot: new THREE.Vector3(CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip: new THREE.Vector3(MAST_ATH / 2, SHROUD_Y, MAST_Z) };
 const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
 /** The mast's height segments (for its bend) and the forestay's points (for its sag). */
 const MAST_SEGS = 24, STAY_PTS = 13, STAY_LEN = HOUNDS.distanceTo(FORESTAY_DECK);
@@ -1333,6 +1340,10 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   { const g = pc.getContext('2d')!; g.fillStyle = '#d8241f'; g.fillRect(0, 0, 48, 32); }
   hoist(pc, new THREE.Vector3(0, 3, 3), 0.2, grp, false);
   const protest = flags[flags.length - 1].mesh; protest.visible = false;
+  // (it reads red whichever side the light's on, as a flag in daylight does: lit through as well as on, from its own red;
+  // and never left out as a small part (FittingCull): scene.ts keeps it big enough to see at a distance, PROTEST_MIN_PX)
+  { const pm = protest.material as THREE.MeshLambertMaterial; pm.emissive.set(0xffffff); pm.emissiveMap = pm.map; pm.emissiveIntensity = 0.45; }
+  protest.frustumCulled = false;
   // the windex on the masthead: an arrow that swings into the apparent wind, between two reference tabs
   const windex = new THREE.Group(); windex.position.set(0, MAST_TOP, MAST_Z); rig.add(windex);
   { const blk = new THREE.MeshLambertMaterial({ color: 0x1b1d20 }), red = new THREE.MeshLambertMaterial({ color: 0xd8342a });
@@ -1362,7 +1373,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   // tilted up toward the helm (render/tacktick.ts). The owner's photos: reference/photos/josephine-mast-cabin-vang-side-
   // starboard.png (the mount circled, the unit stowed) and josephine-vang-to-mast-base.jpg (the unit, from the cockpit)
   let instrument: Instrument | undefined;
-  if (b.isUser) {
+  if (b.isUser && b.spec?.instrument !== 'none') { // (the owner: optional in her setup; key 6 then has nothing to look at)
     instrument = buildInstrument();
     const z = -L / 2 + CABIN.u1 * L - 2 * COMPANIONWAY.len - 0.08 - UNIT.d / 2 - 0.01; // (its after face 1 cm forward of the runners' ends)
     instrument.grp.position.set(0, cabinTopAt(uAtZ(z), 0), z); grp.add(instrument.grp);
@@ -1381,7 +1392,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern, outboard: grp.userData.outboard };
   mergeStatic(grp, out);
   return out;
 }
@@ -1425,21 +1436,28 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
     if (!m.isMesh || (m as THREE.SkinnedMesh).isSkinnedMesh || keep.has(m) || m.name || m.children.length || !m.visible || m.renderOrder !== 0 || Array.isArray(m.material)) continue;
     const mat = m.material as THREE.Material;
     if (mat.transparent || m.morphTargetInfluences || Object.keys(m.userData).length) continue;
-    const g = m.geometry, key = mat.uuid + '|' + ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',') + '|' + (m.frustumCulled ? tierOf(radius(m)) : -1) + '|' + +m.castShadow + +m.receiveShadow; // (its shadows as they were: a merged mesh that took them up where its parts hadn't would want shader programs of its own)
+    // (a plain painted part, its colour its only difference from the others of its kind, goes in with them: its colour
+    // carried by its vertices. Anything else merges only with its own material.)
+    const plain = plainKey(mat), g = m.geometry;
+    const key = (plain ?? mat.uuid) + '|' + (plain ? 'position,normal,color' : ['position', 'normal', 'uv'].filter(a => g.getAttribute(a)).join(',')) + '|' + (m.frustumCulled ? tierOf(radius(m)) : -1) + '|' + +m.castShadow + +m.receiveShadow; // (its shadows as they were: a merged mesh that took them up where its parts hadn't would want shader programs of its own)
     if (!g.getAttribute('position') || !g.getAttribute('normal')) continue;
     (buckets.get(key) ?? buckets.set(key, []).get(key)!).push(m);
   }
   for (const [key, ms] of buckets) {
     if (ms.length < 2) continue;
     const names = key.split('|')[1].split(',');
+    const tint = names.includes('color');
     const geos = ms.map(m => {
       m.updateMatrix();
       const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrix);
+      if (tint) { const c = (m.material as THREE.MeshLambertMaterial).color, n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
       for (const a of Object.keys(g.attributes)) if (!names.includes(a)) g.deleteAttribute(a);
       g.morphAttributes = {}; g.clearGroups(); return g;
     });
     const merged = mergeGeometries(geos, false); if (!merged) continue;
-    const one = new THREE.Mesh(merged, ms[0].material); one.castShadow = ms[0].castShadow; one.receiveShadow = ms[0].receiveShadow;
+    let mat = ms[0].material as THREE.Material;
+    if (tint) { const t = mat.clone() as THREE.MeshLambertMaterial; t.vertexColors = true; t.color.set(0xffffff); mat = t; } // (white: the vertices carry each part's colour)
+    const one = new THREE.Mesh(merged, mat); one.castShadow = ms[0].castShadow; one.receiveShadow = ms[0].receiveShadow;
     if (+key.split('|')[2] >= 0) one.userData.cullR = Math.max(...ms.map(radius)); // (FittingCull: left out as its largest part would be)
     for (const m of ms) { grp.remove(m); m.geometry.dispose(); }
     for (const g of geos) g.dispose();
@@ -1447,8 +1465,26 @@ function mergeStatic(grp: THREE.Group, held: BoatMesh): void {
   }
 }
 
+/**
+ * A plain painted material's kind: everything about it but its colour (Lambert or Phong, no texture, opaque, no shader
+ * changes of its own), so parts that differ only in colour can share one draw; null if it isn't one.
+ */
+function plainKey(mat: THREE.Material): string | null {
+  const m = mat as THREE.MeshPhongMaterial;
+  if (!(m.type === 'MeshLambertMaterial' || m.type === 'MeshPhongMaterial') || m.transparent || m.vertexColors || m.opacity !== 1) return null;
+  if (Object.prototype.hasOwnProperty.call(m, 'onBeforeCompile') || m.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey) return null;
+  for (const k of ['map', 'emissiveMap', 'normalMap', 'bumpMap', 'alphaMap', 'aoMap', 'lightMap', 'specularMap', 'envMap', 'displacementMap'] as const) if ((m as unknown as Record<string, unknown>)[k]) return null;
+  const j = m.toJSON() as unknown as Record<string, unknown>; delete j.uuid; delete j.name; delete j.color; delete j.metadata; delete j.userData;
+  return 'plain:' + JSON.stringify(j);
+}
+
 /** Pose the mesh from the boat state. `t` is wall-clock seconds, for bobbing and flogging. */
-export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: number; pitch: number; roll: number }): void {
+/**
+ * Her mesh as the boat is now. `hold`: leave her crew and sail cloth as they were last frame (a boat far off, beyond
+ * about 150 m, has them posed every third frame: scene.ts; the hull, spars, lines and flags still every frame, and the
+ * crew and cloth then ease over the time since they last were).
+ */
+export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: number; pitch: number; roll: number }, hold = false): void {
   // riding the waves: heave, pitch and roll from the sea surface under her (or a gentle bob in flat water)
   const heave = wave ? wave.heave : Math.sin(t * 1.3 + b.id) * 0.03, pitch = wave ? wave.pitch : Math.sin(t * 0.9 + b.id) * 0.006;
   m.grp.position.copy(P3(b.x, b.y, heave));
@@ -1459,6 +1495,10 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const dt = m.prevT < 0 ? 0 : Math.min(0.1, t - m.prevT); m.prevT = t;
   // the companionway: the hatch and the washboards where her crew have them (Crew Model's b.companionway), else as specced
   syncCompanionway(m.companionway, b);
+  // her outboard: let down or tilted up, the prop turning (the motor's state: boat/motor.ts, b.motor)
+  { const fit = bracketFitted(b);
+    if (fit && !m.outboard) { m.outboard = buildOutboard(b.motor?.hp ?? b.spec?.perf.outboardHp ?? 3.5); m.grp.add(m.outboard.group); } // (a motor shipped from below mid-sail: its bracket fitted)
+    if (m.outboard) { m.outboard.group.visible = fit; if (fit) syncOutboard(m.outboard, b.motor, Math.max(0, dt)); } }
   // the footrest: slid out while the helm sits on the after deck (their feet on it), slid back under the deck when they
   // stand to steer (the owner). b.footrest (0 out … 1 back) is set by whoever poses the helm (crew.ts): out by default,
   // as the helm sits. It slides there by hand, about half a metre a second, not in a jump.
@@ -1489,7 +1529,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
         const k = (i / 3) % (FLAG_SEGS + 1), x = ROW_X[k], y = f.base[i + 1];
         // streaming, it lies out along the wind; hanging, the fly falls away below the hoist, which stays on its staff or
         // halyard (the foot folds in under it rather than hanging the whole flag's length lower)
-        a[i] = x * cs; a[i + 1] = y - x * sn * (1 + y / f.h); a[i + 2] = ROW_Z[k];
+        const [hx, hy] = flagHang(x, y, f.h, f.fly, cs, sn); a[i] = hx; a[i + 1] = hy; a[i + 2] = ROW_Z[k];
       }
       p.needsUpdate = true;
     }
@@ -1504,8 +1544,12 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   m.card.rotation = b.h * D2R;
   if (m.instrument) syncInstrument(m.instrument, t, b.h, b.v / KT);
   // the crew on the windward side, hiking as hard as she needs
-  syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, dt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking);
-  if (b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
+  // (paddling with the boom crutch: who, which side, and how long the crutch takes to fetch, boat/paddle.ts)
+  const live = !hold || m.liveT == null, ldt = m.liveT == null || m.liveT < 0 ? dt : Math.min(0.15, Math.max(0, t - m.liveT));
+  if (live) m.liveT = t;
+  const pd = b.paddle, who = pd ? paddler(b) : 0;
+  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
+  if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
   m.jibPivot.quaternion.setFromAxisAngle(JIB_AXIS, b.jib * D2R);
@@ -1538,7 +1582,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     const jt0 = JIB_DEF.tack.length();
     jibShape.luff = { x: v.x * jibSgnNow, z: v.z, f: tt => { const u = (jt0 + tt * JIB_LUFF) / STAY_LEN; return 4 * u * (1 - u); } };
   }
-  m.main.update(mainShape);
+  if (live) m.main.update(mainShape);
   m.main.mesh.scale.x = Math.sign(b.boom || 1);
   // a backed jib lies to windward, but the wind still presses its belly to leeward, toward the mast
   const jibSgn = (b.jibBacked ?? 0) > 0 ? Math.sign(b.boom || 1) : Math.sign(b.jib || 1);
@@ -1556,8 +1600,7 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
     jm.matrixWorldNeedsUpdate = true;
   }
   // (now its frame is known: the cloth against the mast and shrouds where the wind presses it onto them)
-  jibShape.obstacles = jibObstacles(m.jibPivot.quaternion, m.jib.mesh.matrix, rd.bow, rd.topAft);
-  m.jib.update(jibShape);
+  if (live) { jibShape.obstacles = jibObstacles(m.jibPivot.quaternion, m.jib.mesh.matrix, rd.bow, rd.topAft); m.jib.update(jibShape); }
   // the cloth's front face looks along the mesh's +x, which the mirroring turns to starboard (+1) or port (−1)
   for (const [sail, sgn] of [[m.main, Math.sign(b.boom || 1)], [m.jib, jibSgn]] as const) {
     const mats = sail.mesh.material as THREE.MeshLambertMaterial[], pr = sailPics.get(mats[0]);
@@ -1907,24 +1950,27 @@ const teakCache = new Map<string, THREE.CanvasTexture>();
 /** Laid teak: planks with black caulked seams and grain; weathered silver-grey, or oiled and polished. */
 /**
  * Texture coordinates for laid planks on any surface: on the flat (sole, seat tops) they run fore and aft like the deck's;
- * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks.
+ * on the sides of the well they run fore and aft along the wall; on the end walls, across the boat. 0.07 m planks, sixteen to the texture's tile (teakTexture).
  */
 function plankUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   if (!g.attributes.normal) g.computeVertexNormals();
   const p = g.attributes.position, n = g.attributes.normal, uv: number[] = [];
   for (let i = 0; i < p.count; i++) {
     const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
-    if (ny > 0.7) uv.push(p.getX(i) / 0.28, p.getZ(i) / 2.4);
-    else if (nx >= nz) uv.push(p.getY(i) / 0.28, p.getZ(i) / 2.4);
-    else uv.push(p.getY(i) / 0.28, p.getX(i) / 2.4);
+    if (ny > 0.7) uv.push(p.getX(i) / 1.12, p.getZ(i) / 2.4);
+    else if (nx >= nz) uv.push(p.getY(i) / 1.12, p.getZ(i) / 2.4);
+    else uv.push(p.getY(i) / 1.12, p.getX(i) / 2.4);
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
 function teakTexture(silver: boolean, seams = true): THREE.CanvasTexture {
   const key = `${silver}${seams}`, hit = teakCache.get(key); if (hit) return hit;
-  const W = 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d')!, planks = 4, pw = W / planks;
+  // (a laid deck: sixteen planks across a tile, each with its butt joint at its own place, so the joints scatter as a real
+  // deck's do; a tile of four repeated every 0.28 m across her, and the same plank's joint on every fourth plank lined up
+  // across the deck into dark bands, the owner's "odd black seams". The trim's pieces, without joints, need only four.)
+  const W = seams ? 1024 : 256, H = 512, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!, planks = W / 64, pw = W / planks;
   let seed = silver ? 7 : 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < planks; i++) {
     const base = silver ? [168, 163, 152] : [176, 116, 62], k = 0.9 + rnd() * 0.18;

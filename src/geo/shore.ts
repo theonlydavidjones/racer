@@ -1,7 +1,8 @@
-import { inPoly, segPt, type Vec } from '../core/math';
+import { inPoly, segPt, type Vec, hypot } from '../core/math';
 import { LAT0, LL, LON0 } from './geo';
 import mask from './data/shore-mask.json';
 import marinaCoast from './data/marina-coast.json';
+import pilePiers from './data/pile-piers.json';
 import wharf from './data/wharf.json';
 import eastPiers from './data/east-piers.json';
 import bridgePiers from './data/bridge-piers.json';
@@ -58,7 +59,7 @@ const LB = (() => {
     const a = LAND[i], b = LAND[j];
     for (let k = Math.floor((Math.min(a.y, b.y) - y0) / BAND); k <= Math.floor((Math.max(a.y, b.y) - y0) / BAND); k++) bands[k].push(i);
     // mark the cells this edge passes through (stepping finely along it)
-    const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L / (C / 4)));
+    const L = hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L / (C / 4)));
     for (let t = 0; t <= n; t++) {
       const x = a.x + (b.x - a.x) * t / n, y = a.y + (b.y - a.y) * t / n, ci = Math.floor((x - x0) / C), cj = Math.floor((y - y0) / C);
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
@@ -183,7 +184,7 @@ const PIER_GROUPS: { box: WharfPart['box']; piers: Pier[] }[] = (() => {
 })();
 /** The bridge pier or tower at p, if she's hit one (for the message: what she hit). */
 export const pierAt = (p: Vec): Pier | null => {
-  for (const G of PIER_GROUPS) if (inB(p, G.box)) for (const a of G.piers) if (inB(p, a.box) && inPoly(p, a.pts)) return a;
+  for (let g = 0; g < PIER_GROUPS.length; g++) { const G = PIER_GROUPS[g]; if (inB(p, G.box)) for (let k = 0; k < G.piers.length; k++) { const a = G.piers[k]; if (inB(p, a.box) && inPoly(p, a.pts)) return a; } } // (indexed: every land check asks)
   return null;
 };
 export const hitsPier = (p: Vec): boolean => pierAt(p) !== null;
@@ -228,10 +229,11 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
 
 export function hitsWharf(p: Vec): boolean {
   if (hitsPier(p)) return true;
-  for (const G of GROUPS) {
+  for (let g = 0; g < GROUPS.length; g++) { // (indexed: every land check asks)
+    const G = GROUPS[g];
     if (!inB(p, G.box)) continue;
-    for (const a of G.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return true;
-    for (const l of G.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return true;
+    for (let k = 0; k < G.areas.length; k++) { const a = G.areas[k]; if (inB(p, a.box) && inPoly(p, a.pts)) return true; }
+    for (let k = 0; k < G.lines.length; k++) { const l = G.lines[k]; if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return true; }
   }
   return false;
 }
@@ -268,7 +270,7 @@ export function wharfNearest(p: Vec, max = 60, piers = true): { d: number; n: Ve
   const near = (b: WharfPart['box']) => p.x >= b.x0 - max && p.x <= b.x1 + max && p.y >= b.y0 - max && p.y <= b.y1 + max;
   const seg = (part: WharfPart, closed: boolean, k: number, a: Vec, b: Vec, half: number) => {
     const abx = b.x - a.x, aby = b.y - a.y, L2 = abx * abx + aby * aby || 1, t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / L2));
-    const q = { x: a.x + abx * t, y: a.y + aby * t }, d = Math.hypot(p.x - q.x, p.y - q.y) - half;
+    const q = { x: a.x + abx * t, y: a.y + aby * t }, d = hypot(p.x - q.x, p.y - q.y) - half;
     if (!best || d < best.d) best = { d, q, part, closed, k };
   };
   let inside = false;
@@ -280,7 +282,7 @@ export function wharfNearest(p: Vec, max = 60, piers = true): { d: number; n: Ve
   }
   const b = best as Best | null;
   if (!b || b.d > max) return null;
-  const dx = p.x - b.q.x, dy = p.y - b.q.y, L = Math.hypot(dx, dy) || 1, n = { x: dx / L, y: dy / L };
+  const dx = p.x - b.q.x, dy = p.y - b.q.y, L = hypot(dx, dy) || 1, n = { x: dx / L, y: dy / L };
   return { d: inside ? 0 : Math.max(0, b.d), n, along: alongside(b.part.pts, b.closed, b.k, b.q, n) };
 }
 /** How far to the nearest of the Wharf's piers, breakwaters and docks (not the bridges'): for the current's shore relief. */
@@ -380,7 +382,7 @@ function circleHit(a: Vec, b: Vec, c: Vec, r: number): number {
 function dockHit(a: Vec, b: Vec, pts: Vec[], half: number): number {
   let best = Infinity;
   for (let i = 1; i < pts.length; i++) {
-    const p = pts[i - 1], q = pts[i], L = Math.hypot(q.x - p.x, q.y - p.y); if (L < 1e-4) continue;
+    const p = pts[i - 1], q = pts[i], L = hypot(q.x - p.x, q.y - p.y); if (L < 1e-4) continue;
     const n = { x: -(q.y - p.y) / L * half, y: (q.x - p.x) / L * half };
     const R = [{ x: p.x + n.x, y: p.y + n.y }, { x: q.x + n.x, y: q.y + n.y }, { x: q.x - n.x, y: q.y - n.y }, { x: p.x - n.x, y: p.y - n.y }];
     if (inPoly(a, R)) return 0;
@@ -423,7 +425,7 @@ let harborStamp = 0;
  * if the whole line is water. Exact: nothing, however narrow, slips between samples.
  */
 export function landAlong(a: Vec, b: Vec): number {
-  const L = Math.hypot(b.x - a.x, b.y - a.y);
+  const L = hypot(b.x - a.x, b.y - a.y);
   if (!Number.isFinite(L)) return Infinity;
   if (onLand(a)) return 0;
   if (L === 0) return Infinity;
@@ -503,14 +505,14 @@ export function terrainNearest(p: Vec, max = 30): { d: number; n: Vec } | null {
     const x0 = (M.west + (i - 0.5) * cw - LON0) * MLON, x1 = x0 + cw * MLON, y1 = (M.north - (j - 0.5) * ch - LAT0) * MLAT, y0 = y1 - ch * MLAT;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     if (cx > CF.x0 && cx < CF.x1 && cy > CF.y0 && cy < CF.y1) continue;
-    const q = { x: Math.max(x0, Math.min(x1, p.x)), y: Math.max(y0, Math.min(y1, p.y)) }, d = Math.hypot(p.x - q.x, p.y - q.y);
+    const q = { x: Math.max(x0, Math.min(x1, p.x)), y: Math.max(y0, Math.min(y1, p.y)) }, d = hypot(p.x - q.x, p.y - q.y);
     if (d <= max && (!best || d < best.d)) best = { d, q, c: { x: cx, y: cy } };
   }
   if (!best) return null;
-  const b = best as { d: number; q: Vec; c: Vec }, dx = p.x - b.q.x, dy = p.y - b.q.y, l = Math.hypot(dx, dy);
+  const b = best as { d: number; q: Vec; c: Vec }, dx = p.x - b.q.x, dy = p.y - b.q.y, l = hypot(dx, dy);
   if (l > 1e-9) return { d: b.d, n: { x: dx / l, y: dy / l } };
   // (inside a land cell: out roughly the way the nearest water lies, away from the cell's middle)
-  const ex = p.x - b.c.x, ey = p.y - b.c.y, el = Math.hypot(ex, ey);
+  const ex = p.x - b.c.x, ey = p.y - b.c.y, el = hypot(ex, ey);
   return { d: 0, n: el > 1e-9 ? { x: ex / el, y: ey / el } : { x: 0, y: 1 } };
 }
 
@@ -606,7 +608,7 @@ function nearCfEdge(bb: Box): boolean {
     || overlaps(bb, { x0: CF.x0 - m, x1: CF.x1 + m, y0: CF.y0 - m, y1: CF.y0 + m }) || overlaps(bb, { x0: CF.x0 - m, x1: CF.x1 + m, y0: CF.y1 - m, y1: CF.y1 + m });
 }
 export function landAlongNear(a: Vec, b: Vec): number {
-  const L = Math.hypot(b.x - a.x, b.y - a.y);
+  const L = hypot(b.x - a.x, b.y - a.y);
   if (Number.isFinite(L) && L <= 300 && anyShoreDistNear(a) > L + 30) {
     const bb: Box = { x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y) };
     // (and not where the land onGround finds isn't in anyShoreDist: Lime Point's coastline, which replaces the terrain
@@ -638,6 +640,69 @@ export function anyShoreDistNear(p: Vec): number {
   const a = i - ti * SG_TILE, b = j - tj * SG_TILE, k = b * (SG_TILE + 1) + a, n = SG_TILE + 1;
   return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
 }
+/**
+ * Piers that stand on open piles with a shed on top (Fort Mason's Piers 1–3: geo/data/pile-piers.json, OSM, with the
+ * sheds' heights). The coastline runs round them, so to a boat (onLand) and to the wind they're solid; the tidal current
+ * runs under them (the owner, 13 Nov 2026, at the Gashouse Cove exit), so for the current they aren't shore.
+ */
+export const PILE_PIERS: { name: string; height: number; pts: Vec[] }[] = (pilePiers as unknown as { piers: { name: string; height: number; pts: [number, number][] }[] }).piers.map(q => ({ name: q.name, height: q.height, pts: q.pts.map(([la, lo]) => LL(la, lo)) }));
+/** The box round all the pile piers (for a quick no, everywhere else on the Bay: these are asked for every boat, every step).
+ * offPiles(p, r): p more than r outside it. */
+const PILE_BOX = (() => { const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), ys = PILE_PIERS.flatMap(P => P.pts.map(q => q.y)); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; })();
+export const offPiles = (p: Vec, r: number) => p.x < PILE_BOX.x0 - r || p.x > PILE_BOX.x1 + r || p.y < PILE_BOX.y0 - r || p.y > PILE_BOX.y1 + r;
+/** Inside a pile pier's shed outline, or within `pad` m of it. */
+export function inPilePier(p: Vec, pad = 0): boolean {
+  if (offPiles(p, pad)) return false;
+  for (const P of PILE_PIERS) { if (inPoly(p, P.pts)) return true; if (pad > 0) for (let i = 0; i < P.pts.length; i++) if (segPt(p, P.pts[i], P.pts[(i + 1) % P.pts.length]) < pad) return true; }
+  return false;
+}
+/** How far p is from the nearest pile pier's shed (m, 0 inside one). */
+export function pilePierDist(p: Vec): number {
+  if (offPiles(p, 100)) return Infinity; // (only the first few dozen meters matter: current.ts DECK, PILE_MIX)
+  let m = Infinity;
+  for (const P of PILE_PIERS) { if (inPoly(p, P.pts)) return 0; for (let i = 0; i < P.pts.length; i++) m = Math.min(m, segPt(p, P.pts[i], P.pts[(i + 1) % P.pts.length])); }
+  return m;
+}
+/** The coastline's run round each pile pier: its deck's edge, within 15 m of the shed's walls. */
+export const PILE_FACE = 15;
+const FLOW = (() => {
+  const xs = PILE_PIERS.flatMap(P => P.pts.map(q => q.x)), ys = PILE_PIERS.flatMap(P => P.pts.map(q => q.y));
+  const box = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  // (only the shore within 350 m matters to the current's relief: the segments up to 750 m from the piers, for points up
+  // to 380 m from them; further off, the faces are beyond 350 m and the shore distance is anyShoreDist's own)
+  const segs: [Vec, Vec][] = [];
+  for (let k = 1; k < SHORE.length; k++) {
+    const a = SHORE[k - 1], b = SHORE[k], m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    if (Math.max(a.x, b.x) < box.x0 - 750 || Math.min(a.x, b.x) > box.x1 + 750 || Math.max(a.y, b.y) < box.y0 - 750 || Math.min(a.y, b.y) > box.y1 + 750) continue;
+    if (inPilePier(m, PILE_FACE)) continue;
+    segs.push([a, b]);
+  }
+  return { box, segs };
+})();
+/**
+ * The distance to the nearest shore for the current: anyShoreDist, but where the coastline runs round a pile pier its
+ * outline isn't shore (the water runs under). Under and beside Fort Mason's piers it's the distance to the real bank.
+ */
+export function flowShoreDist(p: Vec): number {
+  const B = FLOW.box;
+  if (p.x < B.x0 - 380 || p.x > B.x1 + 380 || p.y < B.y0 - 380 || p.y > B.y1 + 380) return anyShoreDist(p);
+  let m = landDist(p);
+  for (const [a, b] of FLOW.segs) { const d = segPt(p, a, b); if (d < m) m = d; }
+  return m;
+}
+/** flowShoreDist off its own 10 m lattice (as anyShoreDistNear), for a boat's current every step. */
+export function flowShoreDistNear(p: Vec): number {
+  const B = FLOW.box;
+  if (p.x < B.x0 - 380 || p.x > B.x1 + 380 || p.y < B.y0 - 380 || p.y > B.y1 + 380) return anyShoreDistNear(p);
+  if (!shoreGridOn || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return flowShoreDist(p);
+  const fx = p.x / SG_STEP, fy = p.y / SG_STEP, i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+  const ti = Math.floor(i / SG_TILE), tj = Math.floor(j / SG_TILE), key = ti * 65536 + tj;
+  let t = flowTiles.get(key);
+  if (!t) { const n = SG_TILE + 1; t = new Float64Array(n * n); for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) t[b * n + a] = flowShoreDist({ x: (ti * SG_TILE + a) * SG_STEP, y: (tj * SG_TILE + b) * SG_STEP }); flowTiles.set(key, t); }
+  const a = i - ti * SG_TILE, b = j - tj * SG_TILE, k = b * (SG_TILE + 1) + a, n = SG_TILE + 1;
+  return (t[k] * (1 - u) + t[k + 1] * u) * (1 - v) + (t[k + n] * (1 - u) + t[k + n + 1] * u) * v;
+}
+const flowTiles = new Map<number, Float64Array>();
 const SG_STEP = 10, SG_TILE = 32, sgTiles = new Map<number, Float64Array>();
 let shoreGridOn = true;
 /** Read the shore distance off the lattice (the default) or work it out exactly every time (for the tests). */
@@ -667,11 +732,11 @@ function boxSegDist(bx0: number, by0: number, bx1: number, by1: number, a: Vec, 
   };
   clip(-dx, a.x - bx0); if (inside) clip(dx, bx1 - a.x); if (inside) clip(-dy, a.y - by0); if (inside) clip(dy, by1 - a.y);
   if (inside && t0 <= t1) return 0;
-  const toBox = (x: number, y: number) => Math.hypot(Math.max(bx0 - x, 0, x - bx1), Math.max(by0 - y, 0, y - by1));
+  const toBox = (x: number, y: number) => hypot(Math.max(bx0 - x, 0, x - bx1), Math.max(by0 - y, 0, y - by1));
   // the corners to the segment
   const L2 = dx * dx + dy * dy || 1, corner = (x: number, y: number) => {
     const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / L2));
-    return Math.hypot(x - a.x - dx * t, y - a.y - dy * t);
+    return hypot(x - a.x - dx * t, y - a.y - dy * t);
   };
   return Math.min(toBox(a.x, a.y), toBox(b.x, b.y), corner(bx0, by0), corner(bx1, by0), corner(bx0, by1), corner(bx1, by1));
 }

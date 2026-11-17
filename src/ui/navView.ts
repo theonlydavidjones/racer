@@ -1,6 +1,6 @@
 import type { Vec } from '../core/math';
 import { onLand } from '../geo/shore';
-import { passagePlan, type PassagePlan } from '../sim/navigator';
+import { passagePlanLater, type PassagePlan } from '../sim/navigator';
 import { ROUTES } from '../sim/traffic';
 import type { SimView } from '../sim/host';
 import { briefHtml } from './briefView';
@@ -32,18 +32,27 @@ export class NavView {
       return;
     }
     $('navTitle').textContent = 'Working out the passage…';
+    $('navSub').textContent = '';
     $('navBrief').innerHTML = '';
-    setTimeout(() => { // let the panel paint first: the plan takes a moment
+    // (the chart at once, where she is, while the passage is worked out: it's done between frames and can take a minute
+    // and more; the owner, 16 Nov 2026: "clicking the navigator button opens the navigator modal, which fails to populate
+    // with the map")
+    this.plan = null; this.draw();
+    this.stopPlan?.();
+    this.stopPlan = passagePlanLater(w, plan => { // (worked out between frames)
+      this.stopPlan = null;
       if (this.world !== w || !this.isOpen) return;
-      this.plan = passagePlan(w);
-      if (!this.plan) return;
-      $('navTitle').textContent = this.plan.title;
-      $('navSub').textContent = this.plan.sub;
-      $('navBrief').innerHTML = briefHtml(this.plan);
+      this.plan = plan;
+      if (this.plan) {
+        $('navTitle').textContent = this.plan.title;
+        $('navSub').textContent = this.plan.sub;
+        $('navBrief').innerHTML = briefHtml(this.plan);
+      } else $('navTitle').textContent = 'No passage found';
       this.draw();
-    }, 30);
+    });
   }
-  close(): void { $('navView').hidden = true; this.world = null; }
+  private stopPlan: (() => void) | null = null;
+  close(): void { this.stopPlan?.(); this.stopPlan = null; $('navView').hidden = true; this.world = null; }
   toggle(w: SimView): void { if (this.isOpen) this.close(); else this.open(w); }
 
   private draw(): void {

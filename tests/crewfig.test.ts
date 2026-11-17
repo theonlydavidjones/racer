@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { testBoat, sail, startTack, courseHeading } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
-import { DEFAULT_CREW, newCrew, type CrewPlace } from '../src/boat/crewPhys';
-import { buildCrew, ground, syncCrew, type Crew, type Figure } from '../src/render/crew';
+import { DEFAULT_CREW, newCrew, slotOf, type CrewPlace } from '../src/boat/crewPhys';
+import { buildCrew, ground, syncCrew, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
+import { PADDLE, paddler } from '../src/boat/paddle';
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
 import { COURSES } from '../src/courses/registry';
@@ -36,6 +37,7 @@ function through(cr: Crew, label: string, bad: string[]): void {
     for (const { name, p } of bones(f, 0.05)) {
       if (Math.abs(p.z) > L / 2 - 0.05 || Math.abs(p.x) > halfBeam(uAtZ(p.z)) - 0.02) continue; // (outboard: hiking out over the side)
       const g = ground(p.x, p.z);
+      if (underDeck(p.x, p.y, p.z)) continue; // (in under the side deck, reaching the winch's handle: open to the cockpit)
       if (p.y < g - 0.025) bad.push(`${label}: ${who} ${name} ${(g - p.y).toFixed(2)} m into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`);
     }
   }
@@ -57,22 +59,35 @@ function elbows(cr: Crew, label: string, bad: string[]): void {
     f.arm.forEach((a, i) => {
       const sh = w(a.root), el = w(a.mid), wr = w(a.mid, 0, -BONE.fore), line = wr.clone().sub(sh), t = el.clone().sub(sh).dot(line) / line.lengthSq();
       const off = el.clone().sub(sh.clone().addScaledVector(line, t)), ahead = off.dot(fw) / fw.length();
-      if (ahead > 0.06) bad.push(`${label}: ${who} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
+      // (an elbow hanging down below a reach down and out, in under the side deck to the winch's handle, is down, not
+      // forward: its offset from the sloping line is more down than ahead)
+      if (ahead > 0.06 && -off.y < ahead) bad.push(`${label}: ${who} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
     });
   }
 }
 
-function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean }, label: string): string[] {
+function run(o: { kt: number; twa?: number; place?: CrewPlace; tack?: boolean; secs?: number; n?: number; pole?: boolean; sea?: number; paddle?: 'P' | 'S'; called?: boolean; struck?: boolean }, label: string): string[] {
   const twa = o.twa ?? beatAngle(o.kt), b = testBoat({ heading: 360 - twa, kt: 4, windKt: o.kt });
   const spec = { helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) };
   b.crew = newCrew(spec, 'S'); if (o.place) b.crew.place = o.place;
   const cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
-  let hold = true;
+  let hold = true, tt = 0;
   sail(b, 20, () => { b.h = courseHeading(b, 360 - twa); }); // (her course at that angle)
-  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
+  const frames = (secs: number) => { for (let i = 0; i < secs * 30; i++) { sail(b, 1 / 30, () => { if (hold && b.turnTarget == null) b.h = courseHeading(b, 360 - twa); }); tt += 1 / 30; syncCrew(cr, b.tack === 'S' ? 1 : -1, b.crew, 1 / 30, false, undefined, b.heel, b.tacking, o.sea ? o.sea * Math.sin(2 * Math.PI * tt / 2.6) : undefined, pd, Math.abs(b.rel) > 110); through(cr, `${label} ${i}`, bad); elbows(cr, `${label} ${i}`, bad); } };
+  // (paddling: as world.ts paddle() and paddleJob set it, the paddler's job the side deck on the side called)
+  let pd: PaddleDraw | null = null;
+  if (o.paddle) { const who = paddler(b), windward = (b.tack === 'S') === (o.paddle === 'S') ? 1 : -1; b.paddle = { side: o.paddle, t0: 0, auto: false };
+    b.crew.people[who].job = { line: 'paddle', reach: 0, work: 1, station: { arm: windward * 0.95, z: 1.35, pose: 'car' }, side: b.tack };
+    pd = { side: o.paddle, back: false, fetch: PADDLE.fetchS, who, key: 0 }; }
   frames(3);
+  // (the turn called and the crew ready for it, a few seconds before she goes: the helper's clock starts again each frame,
+  // so a call at 0 is always just made)
+  if (o.called) { b.callT = 0; frames(4); }
+  // (struck by the boom: out of it, slumped where they are, for the rest of the run)
+  if (o.struck) { for (const a of b.crew.people.slice(1)) (a as { outUntil?: number }).outUntil = Infinity; frames(6); }
   if (o.tack) { hold = false; startTack(b); frames(o.secs ?? 14); }
   else if (o.pole) { b.poleWant = true; frames(o.secs ?? 30); } // (the pole goes out, and they go forward)
+  else if (o.paddle) frames(o.secs ?? 20);
   return bad;
 }
 
@@ -81,12 +96,32 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     ['light air, to leeward', { kt: 4 }], ['Mid: on the cockpit sole', { kt: 8, place: { across: 'mid', fore: null } }],
     ['Lee, placed', { kt: 8, place: { across: 'lee', fore: null } }], ['Up, a breeze', { kt: 12 }], ['hiking', { kt: 20 }],
     ['forward, light air', { kt: 6, place: { across: null, fore: 'fwd' } }], ['aft', { kt: 12, place: { across: null, fore: 'aft' } }],
-    ['a tack in light air', { kt: 5, tack: true }], ['a tack in a breeze', { kt: 14, tack: true }], ['a tack hiking', { kt: 20, tack: true }],
+    ['a tack in light air', { kt: 5, tack: true }], ['a tack in a breeze', { kt: 14, tack: true }], 
     ['downwind, light', { kt: 6, twa: 160 }], ['downwind, breeze', { kt: 16, twa: 165 }], ['a gybe', { kt: 12, twa: 160, tack: true }],
     ['pole out on a light-air run: up on the foredeck, and the trip there', { kt: 7, twa: 172, pole: true, secs: 40 }],
+    // (and in a seaway, lower and on all fours: her pitching 0.03 rad either way every 2.6 s, its rate's root mean square
+    // 0.05 rad/s, as in the Bay's westerly at about 20 kt (crew.ts rough). The wind's the light air's, for the pole)
+    ['pole out in a seaway: forward low, both hands down', { kt: 7, twa: 172, pole: true, secs: 45, sea: 0.03 }],
+    // (on until one of them's sat on the bow, the legs hanging down over it either side of the stem: the owner's "hang his
+    // legs over the front")
+    ['pole out, on to the bow and sat there', { kt: 7, twa: 172, pole: true, secs: 62 }],
+    // (paddling with the boom crutch, on each side: fetched up from the companionway, carried out to the side deck, and
+    // stroked over the side, ROADMAP 8c)
+    ['paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22 }], ['paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22 }],
+    // (and alone: the helm paddles, off the tiller)
+    ['alone, paddling to starboard', { kt: 2, twa: 90, paddle: 'S', secs: 22, n: 0 }], ['alone, paddling to port', { kt: 2, twa: 90, paddle: 'P', secs: 22, n: 0 }],
+    // (ready for the turn coming: the call heard, a look up and a hand to the sheet, then the turn itself; a jibe, heads down)
+    ['a called tack, sat', { kt: 8, tack: true, called: true }], ['a called tack, hiking', { kt: 18, tack: true, called: true }],
+    ['a called jibe', { kt: 12, twa: 160, tack: true, called: true }], ['three aboard, a called tack', { kt: 12, tack: true, called: true, n: 3 }],
+    // (struck by the boom: slumped where they sit, a hand to the head)
+    ['struck, sat', { kt: 8, struck: true }], ['struck, hiking', { kt: 18, struck: true }], ['struck, downwind', { kt: 12, twa: 160, struck: true }],
     ['two aboard, a tack', { kt: 12, tack: true, n: 1 }], ['alone, a tack', { kt: 10, tack: true, n: 0 }], ['alone, light air', { kt: 4, n: 0 }],
   ];
-  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
+  for (const [name, o] of cases) it(name, () => { const bad = run(o, name); expect(bad.slice(0, 8)).toEqual([]); }, 180_000);
+  // (a tack hiking, through the Bay's breeze: its timing shifts with the wind, and where a figure is at each moment with
+  // it. The shin into the boat at 21 kt on main, at 20 on a branch whose tack ran a little differently; at 18.25 kt the
+  // thigh into the coaming's top, shuffling along the new side deck sat on it after the tack)
+  for (const kt of [16, 17, 18, 18.25, 19, 20, 21, 22, 23, 24]) it(`a tack hiking, ${kt} kt`, () => { const bad = run({ kt, tack: true }, `a tack hiking ${kt}`); expect(bad.slice(0, 8)).toEqual([]); }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
   // (the forward hand at the cabin top's lines, held there, on both tacks: kneeling at the cockpit's forward end, and from
   // the side deck for the lines worked from either side; where the owner saw the arms bent backwards)
   for (const tack of ['S', 'P'] as const) for (const arm of [0.3, 0.65]) it(`at the cabin top's lines, ${tack === 'S' ? 'starboard' : 'port'} tack, ${arm > 0.55 ? 'from the side deck' : 'kneeling'}`, () => {
@@ -104,6 +139,35 @@ describe('The crew never pass through the boat (render/crew.ts)', () => {
     }
     expect(bad.slice(0, 8)).toEqual([]);
   }, 180_000); // (every 2 cm of every bone of every figure: some seconds a case)
+  // (grinding the jib in at the winch, on both tacks, from the light-air station to leeward and the breeze's to windward:
+  // sat on the bench beside it, a hand on the handle's grip under the side deck (Josephine's winches are turned from
+  // below it, the owner), short pulls, the handle drawn where the hand has it)
+  for (const tack of ['S', 'P'] as const) for (const arm of [0.45, -0.75]) it(`at the winch, ${tack === 'S' ? 'starboard' : 'port'} tack, ${arm > 0 ? 'to windward' : 'to leeward'}`, () => {
+    const twa = beatAngle(12), b = testBoat({ heading: tack === 'S' ? 360 - twa : twa, kt: 4, windKt: 12 }); b.tack = tack;
+    b.crew = newCrew(DEFAULT_CREW, tack);
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
+    sail(b, 10);
+    const w = tack === 'S' ? 1 : -1, aft = slotOf(0, 2) === 1 ? 0 : 1; let worst = 0, lo = 9, hi = -9;
+    for (let i = 0; i < 8 * 30; i++) {
+      sail(b, 1 / 30);
+      // (first sat out on the side deck, hands up on the knees, as from wherever they were: then to the winch, the hand
+      // brought in under the deck from above it, not stopped on the deck's top)
+      // (the crew member whose station is aft by the winch, crewPhys.ts slotOf: the main trimmer since the swap)
+      const f = b.crew.people[1 + aft], at = i >= 60; f.pose = at ? 'winch' : 'hike'; f.x = (at ? arm : 0.95) * w; f.z = 1.88; f.goal = { x: f.x, z: f.z }; f.lean = at ? 0 : 0.6;
+      syncCrew(cr, w, b.crew, 1 / 30, false, undefined, b.heel, b.tacking);
+      if (i > 150) {
+        through(cr, `winch ${i}`, bad); elbows(cr, `winch ${i}`, bad);
+        expect(cr.winch, 'someone at the winch').toBeTruthy();
+        const fg = cr.crew[aft]; fg.root.updateMatrixWorld(true); const gp = winchGrip(cr.winch!.side, cr.winch!.turn);
+        worst = Math.max(worst, Math.min(...fg.arm.map(a => a.mid.localToWorld(new THREE.Vector3(0, -BONE.fore, 0)).distanceTo(gp))));
+        lo = Math.min(lo, cr.winch!.turn); hi = Math.max(hi, cr.winch!.turn);
+      }
+    }
+    expect(bad.slice(0, 8)).toEqual([]);
+    expect(worst, 'the hand on the grip (its lower half), m').toBeLessThan(0.04);
+    expect(hi - lo, 'short pulls, rad').toBeGreaterThan(0.45);
+    expect(Math.max(Math.abs(lo), Math.abs(hi)), 'short pulls, not round').toBeLessThan(0.4);
+  }, 180_000);
 });
 
 /** The fastest any point of anyone moved in one frame (m/s), and how much they moved at all, over `frames`. */
@@ -184,8 +248,11 @@ describe('Everyone sits on something (render/crew.ts)', () => {
         f.root.updateMatrixWorld(true);
         const hip = f.root.getWorldPosition(new THREE.Vector3()), e = halfBeam(uAtZ(hip.z));
         // (stepping from one seat to another, over the coaming, the pelvis is up for a moment: settled ones only)
-        const was = (f as Figure & { _was?: THREE.Vector3 })._was; (f as Figure & { _was?: THREE.Vector3 })._was = hip.clone();
-        if (!was || was.distanceTo(hip) > 0.01) return;
+        // (settled: the pelvis within a centimetre of where it was a third of a second ago. Within a centimetre of the frame
+        // before, a hip still coming down onto the side deck at 0.3 m/s, stepped up over the coaming's cap from the bench to
+        // hike, counted as sat 16 cm over its seat)
+        const hist = ((f as Figure & { _was?: THREE.Vector3[] })._was ??= []); hist.push(hip.clone()); if (hist.length > 11) hist.shift();
+        if (hist.length < 11 || hist.some(q => q.distanceTo(hip) > 0.01)) return;
         // (the pelvis sits about 9 cm, scaled, above what's under it; a hiker's is over the deck's edge)
         const under = ground(Math.sign(hip.x) * Math.min(Math.abs(hip.x), e - 0.01), hip.z) + 0.09 * f.scale;
         const g = Math.abs(hip.y - under);
@@ -223,10 +290,43 @@ describe('Two crew keep to themselves (render/crew.ts)', () => {
  * - no elbow forward of the line from the shoulder to the wrist (as elbows()), once they're in a pose and still in it
  *   half a second on, not walking: an elbow swinging round as the hands go from one place to the next (up on the cabin
  *   top's lines to the knees) passes forward for a tenth of a second, which isn't this (a follow-up);
- * - no hand more than 0.2 m behind its shoulder, in the torso's own frame. The main hand tacking the main had their hands
+ * - no hand more than 0.2 m behind its shoulder along the way they face (level), with the elbow bent. The main hand tacking the main had their hands
  *   on the mainsheet at the thwart behind them while facing forward, 0.31 m behind the shoulder: reached through the
  *   elbow. A hiker's hand on the rail beside the hip, leaning out, is up to 0.16.
  */
+/**
+ * Nobody stands on the deck with no seat under them while she's sailing (the owner, 16 Nov, a screenshot: "bro just out
+ * here standing on the rail"). A crew figure, not walking: its hips high over the deck (more than 0.45 m above what's
+ * under them) with both feet out on the side deck. Seated on the cabin top's edge, what's under the hips is the cabin top;
+ * stood on the side deck, it's the deck. (Walking, the feet stepping, is moving.) Sailing in a breeze, close-hauled, reaching and running, one and two crew: the
+ * cabin-top lines' work done from the side deck, the crew member was sat down where the physics had them, beside the
+ * cabin, half a meter forward, not walked there, and stood at the rail on the way.
+ */
+describe('Nobody stands on the rail (render/crew.ts)', () => {
+  for (const [n, kt, twa] of [[1, 24, -110], [1, 20, -110], [1, 20, 150], [2, 20, 150], [2, 24, -110], [2, 16, 45], [1, 12, 90]] as const)
+    it(`${n} crew, ${kt} kt, ${twa}° off the wind`, () => {
+      const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0, crew: { ...DEFAULT_SETTINGS.crew, n } } as Settings;
+      const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user, p = LL(37.835, -122.40); u.x = p.x; u.y = p.y;
+      w.step(DT); u.h = n360(u.ww.from + twa); u.v = 2.5; engage(u, w.pilot, 'auto');
+      const cr = buildCrew(u.crew!.spec.helm, u.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), bad: string[] = [];
+      const end = w.t + 40, movedT = cr.crew.map(() => -9);
+      while (w.t < end) {
+        w.step(DT); syncCrew(cr, u.rel >= 0 ? 1 : -1, u.crew, DT, false, undefined, u.heel, u.tacking);
+        if (u.v < 0.5) continue;
+        cr.crew.forEach((f, i) => {
+          // (judged once he's settled: half a second after a walk, a route or the physics' move, as the arms are; the bound the
+          // same whenever it looks. Main's case stands there with no move at all)
+          const c = f.cur, a = u.crew!.people[i + 1]; if (f.going || f.route || f.walking) movedT[i] = w.t;
+          if (!c || !f.root.visible || w.t - movedT[i] < 0.5 || a.pose === 'mast' || a.pose === 'bow' || a.pose === 'fore') return;
+          const outside = (q: THREE.Vector3) => Math.abs(q.x) > halfBeam(uAtZ(q.z)) - 0.35 && Math.abs(q.x) < halfBeam(uAtZ(q.z)) + 0.05;
+          const high = c.hip.y - ground(c.hip.x, c.hip.z);
+          if (high > 0.45 && outside(c.feet[0]) && outside(c.feet[1])) bad.push(`t ${w.t.toFixed(1)}: crew${i + 1} (${a.pose}) stood ${high.toFixed(2)} m over the deck at (${c.hip.x.toFixed(2)}, ${c.hip.z.toFixed(2)})`);
+        });
+      }
+      expect(bad.slice(0, 5)).toEqual([]);
+    }, 120_000);
+});
+
 describe('No backwards arms anywhere (render/crew.ts)', () => {
   function watch(label: string, w: World, b: World['boats'][number], secs: number, bad: string[]): void {
     const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1); new THREE.Group().add(cr.group);
@@ -239,11 +339,15 @@ describe('No backwards arms anywhere (render/crew.ts)', () => {
         const pose = b.crew!.people[k].pose; if (pose !== held[k].pose || fig.going || fig.route) { held[k] = { pose, t: w.t }; }
         const settled = w.t - held[k].t > 0.5;
         const wv = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), fw = fig.root.localToWorld(new THREE.Vector3(0, 0, -1)).sub(wv(fig.root)).setY(0);
-        const tq = fig.torso.getWorldQuaternion(new THREE.Quaternion()).invert();
         fig.arm.forEach((a, i) => {
           const sh = wv(a.root), el = wv(a.mid), wr = wv(a.mid, -BONE.fore);
-          const rel = wr.clone().sub(sh).applyQuaternion(tq);
-          if (rel.z > 0.2) bad.push(`${at}: ${who} ${pose} arm${i} hand ${rel.z.toFixed(2)} m behind its shoulder`);
+          // (behind along the way they face, level: a hiker leaning back with the sheet in front of them has the hand behind
+          // the leaning torso's own front, which isn't this)
+          // (and bent at the elbow: an arm reaching straight back, the helm passing the tiller extension behind them as they
+          // cross, is a shoulder's reach, not a forearm folded back)
+          const back = -wr.clone().sub(sh).dot(fw) / fw.length(), bent = wr.distanceTo(sh) < 0.9 * (BONE.upper + BONE.fore) * fig.scale;
+          // (the crew: the helm crossing passes the stick behind them on purpose, helmCrossing)
+          if (k > 0 && back > 0.2 && bent) bad.push(`${at}: ${who} ${pose} arm${i} hand ${back.toFixed(2)} m behind its shoulder`);
           const line = wr.clone().sub(sh), t = el.clone().sub(sh).dot(line) / line.lengthSq(), off = el.clone().sub(sh.clone().addScaledVector(line, t)), ahead = off.dot(fw) / fw.length();
           if (settled && ahead > 0.06 && -off.y < ahead) bad.push(`${at}: ${who} ${pose} arm${i} elbow ${ahead.toFixed(2)} m forward of its shoulder-to-wrist line`);
         });

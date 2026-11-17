@@ -23,7 +23,8 @@ export interface ConductCtx {
  * unmeasured. One a start gives 0.25%, so she takes it 997 times in 1000: an upper bound on declines, the true one lower.
  * (So a protest against an AI boat will seldom change a result until the skipper's perception, Skipper Model, lands.) (Most real
  * refusals are honest disagreement, not cheating, rule 2: the skipper's perception will model that.) The fallback
- * stands by her choice after the race. `rnd` is her draw, 0–1.
+ * stands by her choice after the race. `rnd` is her draw, 0–1. (Mark touches, rule 31, draw at the same odds: their
+ * rate per start isn't in the census, so the AI's DSQs per start run above it by that much, unmeasured.)
  */
 export const TAKES_PENALTY = 0.997;
 export function takesPenalty(ctx: ConductCtx, rnd: number): boolean {

@@ -28,7 +28,7 @@ const out = process.argv[2] || '.';
   // (the race sails in its worker, the page reading its mirror: sim/host.ts WorkerHost)
   const mode = await p.evaluate(() => document.documentElement.dataset.sim); console.log('the race sails in:', mode); if (mode !== 'worker') errs.push(`the race isn't in its worker (${mode})`);
   const faultsNow = () => p.evaluate(() => document.documentElement.dataset.syncFaults);
-  await step('speed', async () => { await click('#bFast'); await click('#bFast'); });
+  await step('speed', async () => { await click('#bTools'); await click('#toolsTray [data-speed="4"]'); await click('#toolsTray [data-speed="1"]'); await click('#bTools'); }); // (time's speed: in Tools)
   await step('steer', async () => { await key('a', 600); await key('d', 600); });
   await step('sheets', async () => { for (const k of ['z', 'x', ',', '.', 's', ';', "'", ']', ';']) await key(k, 300); });
   await step('tiller', async () => { await key('t'); await p.mouse.move(800, 400); await p.waitForTimeout(300); await p.mouse.move(500, 400); await key('t'); });
@@ -58,8 +58,8 @@ const out = process.argv[2] || '.';
   await p.goto('http://localhost:5173/?simguard'); await p.waitForTimeout(4000);
   await p.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await p.waitForTimeout(1500);
   await click('#bGo'); await p.waitForTimeout(3000);
-  await step('motor', async () => { await click('#bMotor'); await click('[data-mo="tilt"]'); await click('[data-mo="start"]'); await p.waitForTimeout(3000); await click('[data-mg="F"]');
-    await p.evaluate(() => { const t = document.getElementById('moThrottle'); t.value = '40'; t.dispatchEvent(new Event('input')); }); await click('[data-mo="castoff"]'); await p.waitForTimeout(2000); });
+  await step('motor', async () => { const mo = k => click(`.sb-motor [data-mo="${k}"]`); await mo('tilt'); await p.waitForTimeout(1500); await mo('start'); await p.waitForTimeout(3000); await mo('F');
+    for (let i = 0; i < 4; i++) await mo('more'); await mo('castoff'); await p.waitForTimeout(2000); });
   await step('pushoff', async () => { await click('#bPushOff'); await p.waitForTimeout(3000); });
   await step('halyards', async () => { await p.evaluate(() => { for (const el of document.querySelectorAll('.sb-hoist')) el.click(); }); await p.waitForTimeout(2000); });
   await step('lights/ensign', async () => { await key('5'); await click('#bEnsign'); });

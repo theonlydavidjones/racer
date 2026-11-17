@@ -1,6 +1,6 @@
 import { byHand } from '../boat/physics';
 import { poleMustCome } from '../ai/ai';
-import { D2R, V, clamp, cross, dist, dot, sub, unit, wrap } from '../core/math';
+import { D2R, V, clamp, cross, dist, dot, sub, unit, wrap, hypot } from '../core/math';
 import type { Boat } from '../boat/boat';
 import { beatAngle, polar, runAngle } from '../boat/polar';
 import { heelFactor } from '../boat/balance';
@@ -198,7 +198,7 @@ export class RaceLog {
     if (dirtyK < 0.97) {
       this.dirty.t += dt; this.dirty.lost += dt * (1 - dirtyK ** 0.7);
       let best: Boat | null = null, bd = 150; const up = V(ww.from);
-      for (const o of w.boats) if (o !== u) { const r = sub(o, u), d = Math.hypot(r.x, r.y); if (d < bd && dot(r, up) > 0) { bd = d; best = o; } }
+      for (const o of w.boats) if (o !== u) { const r = sub(o, u), d = hypot(r.x, r.y); if (d < bd && dot(r, up) > 0) { bd = d; best = o; } }
       const who = best ? best.name : SHIP;
       this.dirty.by.set(who, (this.dirty.by.get(who) ?? 0) + dt);
       dirtyWho = who;

@@ -6,6 +6,7 @@ body{margin:0}
 /* Layout: full-bleed 3D water; instrument pods docked to the edges like a racing compass and a tactician's display */
 :root{
   --ink:#0a1520;
+  --target:#3ad1c1; /* where a line should go: the trim coach's and the lessons' target (shared with Learn to sail) */
   --pod:rgba(9,22,33,.84);
   --pod-solid:#0f2130;
   --rule:rgba(150,196,218,.2);
@@ -51,7 +52,7 @@ body{
 .val{font:700 23px/1.05 var(--f-inst);font-variant-numeric:tabular-nums;letter-spacing:.02em;color:#e9f1f3;text-align:right}
 .sub{font:600 9px/1.2 var(--f-inst);letter-spacing:.08em;color:#8ea2ac;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
 .pod.clock .val{color:var(--accent)}
-.sub.lift{color:var(--row)} .sub.head{color:var(--giveway)}
+.sub.lift{color:var(--row)} .sub.head{color:var(--giveway)} .sub .code{color:var(--giveway)}
 
 #dial{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);left:max(16px,env(safe-area-inset-left,0px));
   width:96px;height:96px;background:var(--pod);border:1px solid var(--rule);border-radius:50%;pointer-events:none}

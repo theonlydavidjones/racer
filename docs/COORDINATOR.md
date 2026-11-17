@@ -42,11 +42,49 @@ The Coordinator session merges the parallel sessions' PRs into main, builds and 
 ## Owner preferences
 CLAUDE.md has the standing rules (science is prime, ask before big design changes, desktop only, don't relabel). Refer to sessions by name. Plain, short updates.
 
-## Overnight plan (owner, 13 Nov 2026, late)
-1. Crew fidgeting (top): Crew Figures leads with Crew Model and Crew Art; crewsettle extended to cruising and all points of sail; no crew-animation merges until calm; live clips to the owner in the morning. crew-anim (owner-approved look) lands on top after.
-2. Skipper Model: clear air downwind (the real Nov 1 race), then the avoidance-redesign design note.
-3. Rules: findings 4–6; the jibe-as-tack bug with Deep Physics.
-4. Deep Physics: #165 after #196, stand-off spacing, then car-lead, 105–115°, z0.
-5. Owner feedback: two mid-air lines at the mast (Rigging); slower streaks, none on the inset, separate wind/current choice (Charts); race-setup buttons' feedback (UI).
-6. New tonight: start-line drill (Debrief), tack and jibe drill (Crew Controls), constants audit (Bay East), ghost races (Marinas).
-Morning for the owner: the second probe (https://claude.ai/artifact/MrGSH6p7nzwa2M2RV9kWpJ), the crew clips, the band's ▾, the vang.
+## Overnight plan (15 Nov 2026)
+**v197 (batch 42), cut at 10:00 UTC** with whatever has passed its gates; the rest rolls to v198. Already in: rule 31, the
+navigator in the big chart (#383), the trim coach (light/medium/heavy air, IDEAL; last copy fixes in), the confetti fix,
+the protest flag, #367–#381, #335–#366, the debrief telltale tip. In if they clear tonight: the push-off, the crew chain
+(#347 → #348 → seat-swap → #377 bow walk), the Bay East planner, tiller lash, chart expand (top-right), instrument riser.
+NOW items, who has them:
+- Start drill (cue card, no fleet, results table and copy, restart key): Debrief, one PR, stills to the owner.
+- Gashouse push-off: Deep Physics + Marinas, in review. The cove's sudden wind/current edge (8n.5): Bay East, v198.
+- Backwards arms: Crew Figures confirms every pose from both sides as part of #377; then the paddling animation.
+- Aquatic Park seawall (navigator): #337, in v197. Chart layers: Charts, layer-toggle speed PR. Navigator in the big chart: #383.
+- Confetti on the sails: fixed (rope shadows), in v197. Lashing under 13°: Crew Art. Jib cars / boom in the slip: small fixes
+  with Rigging after its depower PR. Chart subtitle: Charts after the layers.
+- Tools tray (compact, "Tools", Hail stays top level, no F-keys): UI & Experience, stills first.
+- Paddle: fatigue by fitness (Crew Model, after the crew chain); ‹ PADDLE › arrows (Crew Controls).
+- Fort Mason Center lettering (8n.6): waits on the owner's photo or the photo sites.
+Morning for the owner: v197 live, stills for the Tools tray, the start-drill screen, the chart expand.
+
+## Lighter models (owner, 15 Nov 2026: "switch to lighter models for sessions that can still be effective with them")
+When one of these finishes its current item, archive it and start its successor on claude-sonnet-5-5 with a handoff
+prompt (its branch, its queue, the rules): Crew Art, Boat Detail, Crew Controls, Marinas, Debrief, Charts, Rigging,
+UI & Experience, Roadmap. Kept on the strongest model: Deep Physics, Bay East, Rules, Skipper Model, Crew Model,
+Crew Figures (rigging the figures), Capacity, the Coordinator. The physics-reviewer agent stays on the strongest.
+
+### Handoffs (retired sessions)
+- **Boat Detail** (retired 15 Nov 18:35): #423 Fort Mason for v199. Unopened: claude/outboard-detail (10f8b9a4, the
+  cowl and kill cord polish), which needs main merged, the checks and perf-ab. landscape.ts estimates are labeled
+  (SHED_H 15.5 m, roof, monitors, arches); the shed widths come from NHL 85002433 via search snippets, to verify when
+  npgallery, loc.gov or overpass are reachable. Pier numbering: the NHL numbers Piers 1–3 west to east, opposite to OSM's
+  names in geo/fortMason.ts; a researcher should settle which is official before anything is renamed. Watch #416
+  (single-pass sail windows) for sort artifacts at grazing angles. Waiting on the owner: the jib car tape measurements;
+  ROADMAP 9a (the bow profile, "too full and round") when they say. The coach simguard write is fixed by #418.
+- **Crew Art** (retired 15 Nov 14:25): #418 coach no-write fix (pure `rigOf()` for the coach; physics keeps `mainRig()`;
+  fingerprints identical, perf-pair 0.9914) for v198, with #409, #410, #412. Unstarted, no PR: branch crew-summer
+  (cf066789), the crew dressed for rain and season, after the crew-figure order lands. Stills branch stills/flags-tile
+  can be deleted. Tips: headless Chromium runs 1–2 frames/s, so wait on state, not time; perf.test needs --silent=false
+  to print its ratio. Bay East wants to hear first if rain ever damps the sea or the wind.
+- **UI & Experience** (retired 15 Nov 10:15): #393 trim coach + keys, #400 map expand, #405 Tools tray, all in batch 42.
+  Branches ui/trim-coach, ui/map-expand, ui/tools-tray, design/features-tray (mock). Keys: no F-keys (tests/keys.test.ts);
+  Shift T Trim Notes, F frame readout, Z/X traveler, P points of sail, R drill restart, J jibe-ho; keydown via keyOf(e).
+  Follow-ups: a Points of sail tile in the Tools tray; Capacity's perf-readout words in it; ROADMAP "the trim coach's
+  promise in light air". Coach simguard write (coach.ts `{ ...b, tune: undefined, rigMain: undefined }`): since #393 the
+  coach runs in the worker; if it fires, look at the guarded proxy's spread and rigTune.ts/condition.ts writes.
+- **Crew Controls** (retired 15 Nov 09:20): #401 rounding prep is a draft on rounding-prep bde1024f, held on the crew
+  chain's +6.7% (prep alone 0.9904 vs 6009bb9c); once the chain lands, merge main, run npm test + perf-pair --ai.
+  #389, #376, #390 in batch 42 (stills on claude/setup-seats-shots). Not started: TACK_SETTLE exemption for the prep
+  when drive-blend lands (`&& !prep`); letting a held backed jib sheet fly (Deep Physics' made-fast sheet, branch turning).

@@ -1,4 +1,4 @@
-import { D2R, KT, LOA, V, brg, clamp, dot, sub, wrap } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, dot, sub, wrap, hypot } from '../core/math';
 import { windOnWater } from '../environment/current';
 import { polar } from '../boat/polar';
 import type { SimView } from './host';
@@ -35,7 +35,7 @@ export function finalApproach(w: SimView): Approach | null {
   while (i > 0 && d(i) - d(i - 1) > 0.33) i--;
   if (k - i < 5) return null; // (no run to speak of: sitting on the line, or reaching along it)
   let path = 0;
-  for (let j = i + 1; j <= k; j++) { const a = F[j - 1].b[u], b = F[j].b[u]; if (a && b) path += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  for (let j = i + 1; j <= k; j++) { const a = F[j - 1].b[u], b = F[j].b[u]; if (a && b) path += hypot(b[0] - a[0], b[1] - a[1]); }
   const dur = F[k].t - F[i].t;
   return { t0: F[i].t, fromM: -d(i), dur, meanV: path / Math.max(1, dur), toward: path > 0 ? (d(k) - d(i)) / path : 1 };
 }
@@ -128,7 +128,7 @@ export function startDebrief(w: SimView): StartDebrief {
   }
   const favoredThird = k > 0 ? me.frac < 1 / 3 : me.frac > 2 / 3;
   if (kind !== 'reach' && bias >= 5 && !favoredThird && grade !== 'ocs') tips.push(`Starting nearer the ${favEnd} end would have put you about ${Math.round(gain * (k > 0 ? me.frac : 1 - me.frac))} m farther up the course.`);
-  if (me.penalty) tips.push('You were doing penalty turns at the gun. Keep clear before the start too: the rules apply from the preparatory signal.');
+  if (me.penalty) tips.push('You owed penalty turns at the gun. Keep clear before the start too: the rules apply from the preparatory signal.');
 
   // time on distance: your run in, against what full speed on the same line would have taken. Full speed for the
   // angle you came in at (the polar at your mean wind angle on the run: on a close reach that's faster than

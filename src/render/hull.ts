@@ -356,7 +356,7 @@ export const HOLLOW = { z1: L / 2 - 0.41 };
 /** `y`: the plank's underside (its top, 25 mm up, level with the seats, COCKPIT_FIT.seat). */
 export const FOOTREST = { y: COCKPIT.sole + 0.30 - 0.025, len: 0.61, out: 0.35, rail: 0.022 };
 /** The hull's lining's half-breadth at the footrest's rails, at z (the lining stands 30 mm in from hullInnerHalf). */
-export const footrestWall = (z: number) => hullInnerHalf(uAtZ(z), FOOTREST.y) - 0.03;
+export const footrestWall = (z: number) => innerAt(1, uAtZ(z), FOOTREST.y) - 0.03;
 /** The plank's half-width at z, slid back: cut to the hull there, as far out as the rails' middle. */
 export const footrestEdge = (z: number) => footrestWall(z) - FOOTREST.rail / 2 - 0.004;
 export const COCKPIT_FIT = {
@@ -375,7 +375,7 @@ export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.
 export const JIB_WINCH_Z = 1.64;
 export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
 /** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
-export const benchOut = (u: number) => Math.min(hullInnerHalf(u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
+export const benchOut = (u: number) => Math.min(innerAt(0, u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
 /**
  * The companionway in the after end of the cabin, drawn open (as she's sailed): the sliding hatch 550 mm wide and
  * 460 mm long, from the after bulkhead forward (the construction plan's deck plan, "sliding hatch"), slid forward over
@@ -415,8 +415,9 @@ function deckGeometryBuild(): THREE.BufferGeometry {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  // texture coordinates for laid decks: planks run fore and aft (u across the boat, a plank to 0.07 m; v along it)
-  const uv: number[] = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] / 0.28, pos[i + 2] / 2.4);
+  // texture coordinates for laid decks: planks run fore and aft (u across the boat, a plank to 0.07 m, sixteen to a tile:
+  // boatMesh teakTexture; v along it)
+  const uv: number[] = []; for (let i = 0; i < pos.length; i += 3) uv.push(pos[i] / 1.12, pos[i + 2] / 2.4);
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx); g.computeVertexNormals();
   return g;
@@ -733,6 +734,21 @@ export function hullInnerHalf(u: number, y: number): number {
   let lo = 0, hi = 0.8;
   for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (sectionPoint(u, m).y > y) lo = m; else hi = m; }
   return sectionPoint(u, (lo + hi) / 2).x;
+}
+/**
+ * hullInnerHalf at one height all along her, tabulated once and read by linear interpolation: the crew's figures ask it
+ * of the bench's and the footrest's edges hundreds of times a frame, and each call bisects her section 30 times (the
+ * owner's Mac, about 0.5 ms a frame: Capacity's profile, 15 Nov 2026). The table every 4 mm over her after half, where
+ * the cockpit is (forward, near the stem, her sections step, and the bisection's kept); within 0.1 mm of the bisection
+ * (tests/hullHalfTable.test.ts). `row` names the height, one table each.
+ */
+const IN_U0 = 0.5, IN_N = 1000, inRows: Float64Array[] = [], inYs: number[] = [];
+export function innerAt(row: number, u: number, y: number): number {
+  if (!(u >= IN_U0 && u < 1)) return hullInnerHalf(u, y);
+  let t = inRows[row];
+  if (!t || inYs[row] !== y) { t = inRows[row] = new Float64Array(IN_N + 1); inYs[row] = y; for (let i = 0; i <= IN_N; i++) t[i] = hullInnerHalf(IN_U0 + (1 - IN_U0) * i / IN_N, y); }
+  const f = (u - IN_U0) / (1 - IN_U0) * IN_N, i = Math.min(IN_N - 1, Math.floor(f)), w = f - i;
+  return t[i] + (t[i + 1] - t[i]) * w;
 }
 /** p (girth position) at station u for a height y on the topsides (between the sheer and the turn of the bilge). */
 function pAtY(u: number, y: number): number {

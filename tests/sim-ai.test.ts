@@ -3,14 +3,23 @@ import train from '../src/courses/data/training-windward-return.json';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { beatAngle, runAngle } from '../src/boat/polar';
-import { crabFor } from '../src/ai/ai';
-import { V, n360, wrap } from '../src/core/math';
+import { aimPoint, crabFor } from '../src/ai/ai';
+import { V, brg, n360, wrap } from '../src/core/math';
 import type { CourseFile } from '../src/courses/course';
 
 /** The AI fleet sailing the training course (windward–return, 620 m legs), the user's boat left at the line. */
 function race(kt: number, current = 'slack', seed = 77) {
   return new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, current, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 5, opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5'] } as never, seed);
 }
+
+/**
+ * What she should sail on a run, by where her mark is: her best running angle (polar.ts runAngle, for the wind she has)
+ * when the mark is that deep or deeper, and straight at it when it's shallower. Above runAngle the polar is convex (the
+ * VMG to a point off the wind is best on the straight line to it), so sailing deeper than the mark and gybing back only
+ * adds distance; below it, steering straight at a mark dead downwind is slower than running at the angle and gybing.
+ * `twa` hers, `aimTwa` her mark's (deg off the wind), `kt` her wind: her angle less the one she should sail, deg.
+ */
+const runError = (twa: number, aimTwa: number, kt: number): number => twa - Math.min(aimTwa, runAngle(kt));
 
 describe('the AI sails the boat as a sailor does', () => {
   it('a tack she decides on she carries out (no stalling head to wind, no wheeling round mid-tack), and she runs at her best angle', () => {
@@ -32,16 +41,28 @@ describe('the AI sails the boat as a sailor does', () => {
         // head to wind (within 10°) for more than 6 s
         const h2w = b.twa < 10 ? (stuck.get(b.id) ?? 0) + DT : 0; stuck.set(b.id, h2w);
         if (h2w > 6 && h2w - DT <= 6) stalls.push(`${b.name} t${w.t.toFixed(0)}`);
-        // on the run (leg 1, the mark well downwind), her mean angle: all of it, so a boat held on the wrong gybe, or
-        // reaching in from 30° past the layline, shows (physics review)
-        if (b.leg === 1 && b.twa > 120) { const r = run.get(b.id) ?? { s: 0, n: 0 }; r.s += b.twa; r.n++; run.set(b.id, r); }
+        // on the run (leg 1), her mean angle against what she should sail by where her mark is (runError): all of it,
+        // so a boat held on the wrong gybe, reaching in from 30° past the layline, or steering straight at a mark dead
+        // downwind, shows (physics review). (Not against runAngle alone: a boat whose mark lies 8° above it sails
+        // straight at it, rightly, and read 6.5° high against runAngle: the crew chain's batch, 15 Nov 2026)
+        if (b.leg === 1 && b.twa > 120) {
+          const P = b.ai!.detour ?? aimPoint(w, b), aimTwa = Math.abs(wrap(b.ww.from - brg(P.x - b.x, P.y - b.y)));
+          const r = run.get(b.id) ?? { s: 0, n: 0 }; r.s += runError(b.twa, aimTwa, b.ww.kt); r.n++; run.set(b.id, r);
+        }
       }
     }
     expect(late).toEqual([]);
     expect(stalls).toEqual([]);
     // (every boat: one that never ran at all is a fault too)
-    for (const b of ai) { const r = run.get(b.id) ?? { s: 0, n: 0 }; expect(r.n, b.name).toBeGreaterThan(3000); expect(Math.abs(r.s / r.n - runAngle(12)), b.name).toBeLessThan(6); }
+    for (const b of ai) { const r = run.get(b.id) ?? { s: 0, n: 0 }; expect(r.n, b.name).toBeGreaterThan(3000); expect(Math.abs(r.s / r.n), b.name).toBeLessThan(6); }
   }, 180_000);
+  it('her run judged by where her mark is: straight at one above her best angle is right; straight at one dead downwind is not', () => {
+    const kt = 12, ra = runAngle(kt);
+    expect(Math.abs(runError(160, 160, kt)), 'the mark 8° above her best angle: straight at it').toBeLessThan(1);
+    expect(Math.abs(runError(ra, 178, kt)), 'the mark dead downwind: running at her angle').toBeLessThan(1);
+    expect(runError(178, 178, kt), 'the mark dead downwind and she steers straight at it, held in reach mode').toBeGreaterThan(6);
+    expect(runError(150, 160, kt), 'reaching 10° above a mark she could lay').toBeLessThan(-6);
+  });
   it('she keeps clear of the committee boat and the pin: no touches of a starting mark before she has started (two minutes after the gun)', () => {
     for (const kt of [8, 12]) {
       const w = race(kt), touches = new Set<string>();

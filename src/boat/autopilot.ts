@@ -2,7 +2,7 @@ import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
 import { thrust } from './motor';
 import { beatFor, targetFor } from './seaway';
-import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec } from '../core/math';
+import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { landAlong } from '../geo/shore';
 import { detour } from '../ai/ai';
 
@@ -164,13 +164,16 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
     const motoring = !!b.motor && thrust(b.motor, b.v) > 40; // (driving her ahead, more than at tick-over)
     // (the direct line probed ahead to 150 m to take it, 100 m to keep it, so it doesn't flip between the two at the edge of
     // the probe; and only as far as the destination: her slip's docks behind it don't count)
-    const dd = dest ? Math.hypot(dest.x - b.x, dest.y - b.y) : 0, direct = dest ? n360(brg(dest.x - b.x, dest.y - b.y)) : b.h, u = V(direct);
+    const dd = dest ? hypot(dest.x - b.x, dest.y - b.y) : 0, direct = dest ? n360(brg(dest.x - b.x, dest.y - b.y)) : b.h, u = V(direct);
     const reach = Math.min(p.direct ? 100 : 150, Math.max(0, dd - 12));
     const clear = !!dest && landAlong(b, { x: b.x + u.x * reach, y: b.y + u.y * reach }) === Infinity;
     p.direct = motoring && clear;
     want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
   }
   const err = wrap(want - b.h), rate = wrap(b.h - p.lastH) / Math.max(dt, 1e-6); p.lastH = b.h;
+  // (turning her onto a new course is a turn called: if her stern passes the wind in it, her crew jibe the main, as for a
+  // called jibe; held steady by the lee, they leave it, as with a helmsman: physics.ts gybeMeant)
+  if (Math.abs(err) > 5) b.turnCalledT = t;
   const mr = Math.max(1, maxTurnRate(b.v));
   // the turn it asks for, and the helm that should give it, plus what AutoTrim has learned she needs to go straight
   const ask = clamp(err * GAIN, -mr, mr), helm = clamp(ask / mr + p.trim, -1, 1);

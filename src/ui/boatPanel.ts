@@ -142,6 +142,7 @@ export class BoatPanel {
       case 'navLights': this.set(b => { b.navLights = v === 'tricolour' ? 'tricolour' : 'deck'; }); return;
       case 'hatch': this.set(b => { b.hatch = v === 'acrylic' ? 'acrylic' : 'teak'; }); return;
       case 'cockpit': this.set(b => { b.cockpit = v === 'fiberglass' ? 'fiberglass' : 'teak'; }); return;
+      case 'instrument': this.set(b => { if (v === 'none') b.instrument = 'none'; else delete b.instrument; }); return;
       case 'companionway': this.set(b => { b.companionway = v === 'closed' ? 'closed' : 'open'; }); return;
       case 'nameColor': this.set(b => { if (/^#[0-9a-f]{6}$/i.test(v)) b.nameColor = v; else delete b.nameColor; }); return;
       case 'sailColor': this.set(b => { b.sails.color = v as 'white' | 'black'; }); return;
@@ -285,6 +286,7 @@ export class BoatPanel {
         kv('Forehatch', seg('hatch', [['teak', 'Teak'], ['acrylic', 'Acrylic']], b.hatch ?? 'acrylic')),
         kv('Cockpit', seg('cockpit', [['teak', 'Teak'], ['fiberglass', 'Fiberglass']], b.cockpit ?? 'teak')),
         kv('Companionway', seg('companionway', [['open', 'Open'], ['closed', 'Closed']], b.companionway ?? 'open')),
+        kv('Instrument', seg('instrument', [['fitted', 'Fitted'], ['none', 'None']], b.instrument ?? 'fitted')),
         kv('Whisker pole', seg('poleSide', [['port', 'Port deck'], ['starboard', 'Starboard deck']], b.poleSide ?? 'port')),
         kv('Navigation lights', seg('navLights', [['deck', 'Bow and stern'], ['tricolour', 'Masthead']], b.navLights ?? 'deck')),
         kv('Outboard', seg('outboard', [['none', 'Ashore'], ['stowed', 'Stowed'], ['bracket', 'Bracket']], b.perf.outboard)),

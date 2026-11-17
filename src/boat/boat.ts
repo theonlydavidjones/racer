@@ -37,6 +37,9 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** Stopped or going astern: sheets in, and off the wind if she's in irons, until she has way on again (ai.ts). */
+  keptEased?: boolean; // (irons: her sails kept eased for a boat close by she must keep clear of, ai.ts, with a band)
+  gather?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
   /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
@@ -65,7 +68,7 @@ export interface AiState {
   /** A tack she's decided on and is carrying out: the tack she's going onto, and when she decided (held until she's round). */
   goTack?: { to: 'S' | 'P'; at: number; mode: 'beat' | 'run' | 'reach'; leg: number } | null;
   /** A mark she's keeping clear of, and the side she's passing it on (+1: it to starboard), so she doesn't swap sides each second. */
-  passing?: { key: string; side: number } | null;
+  passing?: { key: string; side: number; away?: 'S' | 'P' } | null; // (away: turning away from it through the wind, begun on this tack, held until she's through)
   /** Running for a mark deeper than her best downwind angle (held with some hysteresis). */
   running?: boolean;
   /** Her aim point (the mark, a detour round the land, or the line) upwind of her: within 44° of the wind, let go past
@@ -103,6 +106,12 @@ export interface Boat {
   astern?: number;
   /** her outboard, when she has one on the transom bracket (boat/motor.ts) */
   motor?: import('./motor').MotorState;
+  /** The crew paddling her with the boom crutch (boat/paddle.ts): the side, since when, and whether they called it. */
+  paddle?: import('./paddle').PaddleState | null;
+  /** You stopped the crew's own paddling: they leave it to you until the jam has passed (world.ts crewPaddleCall). */
+  paddleOff?: boolean;
+  /** Race time of her last contact with land, a pier, a mark or a boat (for rule 42.3(h): getting clear after it). */
+  lastHitT?: number;
   /**
    * Being pushed off: a crew member on the finger walks her back by the shrouds, then jumps aboard as her bow comes
    * level with the end of it. `side` is where the finger is (+1 starboard, −1 port) and `lat` how far out (m);
@@ -138,6 +147,9 @@ export interface Boat {
   penaltyTotal: number; // 360 or 720
   penaltyTurned: number; // signed degrees turned since the penalty started
   penaltyDir: number; // the direction she is turning her penalty (+1 starboard, −1 port, 0 not yet)
+  /** Her turns' tacks and jibes (physics.ts penaltyManeuver): how many counted, the last (1 a tack, 2 a jibe, 0 none),
+   * how far into her turns it was (degrees), and whether her penalty ends as the tack she's in completes. */
+  penaltyMoves: number; penaltyLastMove: 0 | 1 | 2; penaltyAt: number; penaltyEndOnTack: boolean;
   started: boolean;
   ocs: boolean;
   returning?: boolean; // Rule 21.1: after her start signal, not started, sailing back toward the pre-start side to start; kept by the World
@@ -181,6 +193,49 @@ export interface Boat {
   yawRate?: number;
   /** Her turn rate answering the helm, deg/s (yawRate is it with the sea's knocks): it lags the helm (physics.ts yawLag). */
   turnRate?: number;
+  /** The tack she's gybing to, while her boom is on its way across: by the lee her tack is her mainsail's side (RRS
+   * Definitions), so it changes when the boom has crossed (physics.ts tackStep). */
+  gybeTo?: 'S' | 'P';
+  /** When a called turn (turnTarget) was last under way, s: a jibe it ends on is one her crew make. */
+  turnCalledT?: number;
+  /** When the helm last called a turn ("Ready about", "Ready to jibe"), s: her crew warned of it get ready, and work it
+   * at once on the order (crewPhys.ts PREPARED). Uncalled, they react as they see it (boat/calls.ts). */
+  callT?: number;
+  /** Your call, held until the crew answer ready (world.ts callTurn): when it was made, whether one has said "Not
+   * ready" (busy at a job), and her tack then. The turn starts once they're ready, or at once if you call it again; you
+   * steering her yourself meanwhile, or CALL_WAIT_MAX s gone, and it's dropped (still a call: the crew were warned). */
+  callWait?: { t0: number; notReady: boolean; tack: 'S' | 'P' } | null;
+  /** Her crew warned of the turn coming (a call within CALL_KEEP s: tackStep), and how long it has visibly been coming
+   * (s: the helm turning her up to tack, or down through a run to jibe), which the experienced read without a call. */
+  callOn?: boolean;
+  comingFor?: number;
+  /** When she went by the lee with a jibe wanted, and how much of the turn her crew had seen then (physics.ts gybeMeant). */
+  byLeeSince?: number;
+  byLeeCue?: number;
+  /** When her skipper last decided a turn, called or not (boat/calls.ts decideTurn: once a turn). */
+  decidedT?: number;
+  /** Turns her skipper has decided (the AI's call or not is worked from this: boat/calls.ts). */
+  turnsDecided?: number;
+  /** The windward jib sheet, made fast through the tack, held so many more seconds before the crew let it fly (s): an
+   * unwarned crew a reaction's worth, the jib backing meanwhile (physics.ts tackStep, trimSails); −1 while it's let fly and
+   * running out, 0 otherwise. */
+  jibHold?: number;
+  /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
+  byLee?: boolean;
+  /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
+   * wind means the jibe; a tap doesn't (physics.ts gybeMeant). */
+  steerSince?: number;
+  steerWas?: number;
+  /** Her boom free of its sheet's hold and swinging across, deg/s (+ toward starboard): the wind got behind the main
+   * (physics.ts boomStep). Undefined while the sheet has it. */
+  boomFree?: number;
+  /** When the wind took it, s; and when it was first seen swinging (faster than BOOM_SEEN deg/s: boat/calls.ts). */
+  boomFreeT?: number;
+  boomSeenT?: number;
+  /** The side it was on when the wind took it (+1 starboard, −1 port). */
+  boomFrom?: number;
+  /** When her boom last crashed across in a jibe the wind made (s): for the debrief and the tests. */
+  crashT?: number;
   /** You've hauled the windward jib sheet in since taking it (easing it right off again then hands it back to the crew). */
   wHauled?: boolean;
   /** Moving by the forces on her (the jib aback) rather than by the polar; it takes a little backing to start and none to end. */
@@ -198,6 +253,8 @@ export interface Boat {
   crewPlan?: CrewSettings | null; crewPlanT?: number;
   /** What moving each line to the plan is worth (share of drive; 1: the depowering steps need it): controls.ts planWorth. */
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
+  /** The cabin-top lines worth a trip together though each is under it alone (controls.ts worthTogether), with crewWorth. */
+  crewTogether?: ReadonlySet<string>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
   /**
@@ -262,7 +319,7 @@ export interface Boat {
   /** Rule 30.1 (I flag): she was over in the last minute and must return around an end of the line. */
   roundEnd?: boolean;
   /** Rule 30.2–30.4: scoring penalty or disqualification for being in the triangle in the last minute. */
-  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: the umpire's, for finishing with her penalty not taken)
+  scoring?: 'ZFP' | 'UFD' | 'BFD' | 'DSQ' | null; // (DSQ: disqualified: rule 42 (scored as entries + 1, A5.2), or the umpire's, for finishing with her penalty not taken)
   /** The sea where she is (refreshed twice a second). */
   sea: SeaHere;
   ai: AiState | null;

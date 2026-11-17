@@ -1,5 +1,5 @@
 import { CANCEL_KT } from './signals';
-import { D2R, KT, LOA, V, brg, clamp, cross, dot, markReach, sub, unit, wrap, type Vec } from '../core/math';
+import { D2R, KT, LOA, V, brg, clamp, cross, dot, markReach, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { beatAngle, polar } from '../boat/polar';
 import { beatInChop, speedInChop } from '../boat/seaway';
 import { crewSolve, targetShape, CAR_FORE_PINS } from '../boat/controls';
@@ -180,7 +180,7 @@ function daySection(w: SimView, o: Outlook, finishT: number): BriefSection {
     // the relief along the shore: the current at the club end of the line against out in the stream
     const shoreP = C.committeeKind === 'shore' ? C.committee : C.pinKind === 'shore' ? C.pin : C.center;
     const far = shoreP === C.committee ? C.pin : C.committee, dirOut = unit(sub(far, shoreP)), out = { x: shoreP.x + dirOut.x * 900, y: shoreP.y + dirOut.y * 900 };
-    const cs = Math.hypot(o.current(shoreP, gun).x, o.current(shoreP, gun).y) / KT, co = Math.hypot(o.current(out, gun).x, o.current(out, gun).y) / KT;
+    const cs = hypot(o.current(shoreP, gun).x, o.current(shoreP, gun).y) / KT, co = hypot(o.current(out, gun).x, o.current(out, gun).y) / KT;
     if (co > 0.4 && co - cs > 0.2) items.push({ head: 'Relief along the shore', src: 'model', text: `Near the shore the current is weaker (${kt1(cs)} kt at ${C.committeeKind === 'shore' ? C.committeeLabel : 'the line'} against ${kt1(co)} kt 900 m out), because the water drags on the bottom and the shore. Sailing against the tide, the shore is relief; with it, the stream is a free ride. Racers on the Cityfront close-reach or short-tack along the beach to cheat a foul tide. (The sim's relief is a model fitted to the NOAA stations; real eddies near the shore are messier.)` });
   }
   // wind against tide: steep chop
@@ -193,7 +193,7 @@ function daySection(w: SimView, o: Outlook, finishT: number): BriefSection {
 function startSection(w: SimView, o: Outlook, legs: LegPlan[]): BriefSection {
   // the wind on the water (air minus tide), which is what you see heading to wind on the line, and what the boats sail in
   const C = w.C, gun = o.t0, wd = o.windOnWater(C.center, gun), up = V(wd.from), items: BriefItem[] = [];
-  const line = sub(C.committee, C.pin), len = Math.hypot(line.x, line.y), gain = dot(line, up); // + committee end upwind
+  const line = sub(C.committee, C.pin), len = hypot(line.x, line.y), gain = dot(line, up); // + committee end upwind
   const fav = gain > 0 ? C.committeeLabel : C.pinLabel, m = Math.abs(gain), bias = Math.asin(clamp(m / len, -1, 1)) / D2R;
   const first = legs[0];
   if (first.kind === 'beat') {
@@ -202,8 +202,8 @@ function startSection(w: SimView, o: Outlook, legs: LegPlan[]): BriefSection {
   // the current at the line
   const c = o.current(C.center, gun - 1), toward = dot(c, C.N), perMin = toward * 60;
   if (Math.abs(toward) > 0.1) items.push({ head: 'The current at the line', src: 'model', text: toward > 0 ? `The current is carrying you over the line at ${Math.round(perMin)} m a minute (${(perMin / LOA).toFixed(1)} boat lengths). In the last minute hold back further than feels right, approach from below rather than sitting on the line, and watch the transit: being over early with the tide under you is the classic Cityfront mistake. (A boat over the line at the signal hasn't started: she must come back to the pre-start side and start, by the definition of Start and rule 28.1; the committee signals it with the X flag, rule 29.1.)` : `The current is carrying you back from the line at ${Math.round(-perMin)} m a minute (${(-perMin / LOA).toFixed(1)} boat lengths): you'll be late if you time it as in still water. Set up closer, and keep moving; a boat stopped on the line drifts back.` });
-  const cp = o.current(C.pin, gun), cc = o.current(C.committee, gun), dcp = (Math.hypot(cp.x, cp.y) - Math.hypot(cc.x, cc.y)) / KT;
-  if (Math.abs(dcp) > 0.25) items.push({ head: 'Different at each end', src: 'model', text: `It runs ${kt1(Math.hypot(cp.x, cp.y) / KT)} kt at the ${C.pinLabel} end and ${kt1(Math.hypot(cc.x, cc.y) / KT)} kt at the ${C.committeeLabel} end. Time your run from the end you're starting at.` });
+  const cp = o.current(C.pin, gun), cc = o.current(C.committee, gun), dcp = (hypot(cp.x, cp.y) - hypot(cc.x, cc.y)) / KT;
+  if (Math.abs(dcp) > 0.25) items.push({ head: 'Different at each end', src: 'model', text: `It runs ${kt1(hypot(cp.x, cp.y) / KT)} kt at the ${C.pinLabel} end and ${kt1(hypot(cc.x, cc.y) / KT)} kt at the ${C.committeeLabel} end. Time your run from the end you're starting at.` });
   // which end leads to the favoured side of the first beat
   if (first.kind === 'beat' && first.best !== 'middle' && first.certainty !== 'open') {
     const leftN = { x: -up.y, y: up.x }, leftEnd = dot(sub(C.pin, C.committee), leftN) > 0 ? C.pinLabel : C.committeeLabel, rightEnd = leftEnd === C.pinLabel ? C.committeeLabel : C.pinLabel;
@@ -222,7 +222,7 @@ function legItems(o: Outlook, L: LegPlan): BriefItem[] {
   if (L.kind === 'reach') {
     const wd = o.wind(L.from, L.t0), c = o.current(L.from, L.t0), u = unit(sub(L.to, L.from)), v = polar(wd.kt, Math.abs(wrap(brg(u.x, u.y) - wd.from)));
     const across = cross(u, c) / KT, crab = Math.asin(clamp(cross(u, c) / Math.max(0.3, v), -0.95, 0.95)) / D2R, twa = Math.abs(wrap(brg(u.x, u.y) - wd.from));
-    const kind = twa < 75 ? 'a close reach: sheets well in, ease in the puffs and keep her flat' : twa < 115 ? 'a beam reach: ease to the telltales; the vang holds the leech as the sheet comes out' : twa < 150 ? 'a broad reach: sails well out, vang on, crew back a little in a breeze' : 'nearly a run: wing on wing with the whisker pole is fastest this deep';
+    const kind = twa < 75 ? 'a close reach: sheets well in, ease in the puffs and keep her flat' : twa < 115 ? 'a beam reach: ease until the jib\'s windward luff telltales just lift, then trim a touch; the vang holds the leech as the sheet comes out' : twa < 150 ? 'a broad reach: sails well out, vang on, crew back a little in a breeze' : 'nearly a run: wing on wing with the whisker pole is fastest this deep';
     let txt = `${when}. ${kind[0].toUpperCase()}${kind.slice(1)}.`;
     if (Math.abs(crab) > 30) txt += ` The current across the leg (${kt1(Math.abs(across))} kt, setting you to the ${across > 0 ? 'left' : 'right'}) is nearly as fast as she'll sail here: you can't hold a straight line. Get up-current early, while you have speed, and let it carry you down to the mark at the end.`;
     else if (Math.abs(across) > 0.2) txt += ` The current sets you ${across > 0 ? 'to the left' : 'to the right'} of the line to the mark at ${kt1(Math.abs(across))} kt: steer about ${Math.round(Math.abs(crab))}° ${crab > 0 ? 'right' : 'left'} of the mark (up-current) from the start of the leg and keep the mark steady against the shore behind it. Aim straight at it and the current sweeps you down-current in a curve, and the end of the leg is a slow climb back against it.`;
@@ -319,7 +319,7 @@ function trimSection(w: SimView, o: Outlook, legs: LegPlan[], finishT: number): 
     const sea = o.sea(w.C.center, (ph.a + ph.b) / 2), tws = mean;
     // close-hauled: the angle, speed and the apparent wind the crew trims to
     const flat = beatAngle(tws), chopB = sea.hsW < 0.02 ? flat : beatInChop(tws, sea.hsW, sea.tpW), vb = speedInChop(tws, chopB, sea.hsW, sea.tpW);
-    const awx = tws * Math.sin(chopB * D2R), awy = tws * Math.cos(chopB * D2R) + vb / KT, awa = Math.atan2(awx, awy) / D2R, aws = Math.hypot(awx, awy);
+    const awx = tws * Math.sin(chopB * D2R), awy = tws * Math.cos(chopB * D2R) + vb / KT, awa = Math.atan2(awx, awy) / D2R, aws = hypot(awx, awy);
     const dep = clamp((tws - 14) / 10, 0, 1); // where the crew starts from, as the boat does (boat/physics.ts)
     const s = crewSolve(tws, awa, 'S', optimalSheet('main', awa), optimalSheet('jib', awa), undefined, mainRig({ tune: u.tune, rigMain: u.rigMain, cond: cond ?? undefined }), cond?.jib, aws, dep);
     const tm = targetShape('main', tws, awa, dep);

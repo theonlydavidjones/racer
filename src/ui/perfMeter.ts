@@ -1,29 +1,60 @@
 import type * as THREE from 'three';
 
 /**
- * The frame-time readout (F9, or the key set in Keys; a developer's tool): frames per second and the slowest frame lately, the
+ * The frame-time readout (Shift+F, or the key set in Keys; a developer's tool): frames per second and the slowest frame lately, the
  * JavaScript time per frame by part (the sim's steps, the 3D scene, the rest: labels, HUD, maps), and what the GPU is
  * given (draw calls, triangles, shader programs, geometries and textures held) and the JS heap. For checking the
  * performance budget (ROADMAP, "Performance review") on a real machine. Stutter shows as the 95th-percentile frame and
  * the long frames (over 33 ms: a frame that missed two 60 Hz refreshes) over the last 10 s, which an average hides.
+ *
+ * Its last line has two switches for splitting the GPU's time on a real machine (the Coordinator, 15 Nov 2026): the sun's
+ * shadows off, and every boat's sails hidden (the readout's own words, clicked: no key, no button on the game surface).
  */
+/** A switch on the readout's last line: its word, whether it's on, and what clicking it does. */
+export interface PerfSwitch { label: string; on(): boolean; set(on: boolean): void }
 /** How far back the stutter figures look, ms; and what counts as a long frame, ms. */
 const WINDOW = 10000, LONG = 33;
 export class PerfMeter {
   private el: HTMLDivElement | null = null;
+  private txt: HTMLDivElement | null = null;
+  constructor(private readonly switches: PerfSwitch[] = []) {}
   /** The frames' intervals over the last WINDOW ms: when each ended, and how long it took (a ring, oldest first). */
   private span: { t: number; f: number }[] = [];
   private last = 0; private n = 0; private sum = { frame: 0, js: 0, sim: 0, scene: 0 }; private worst = 0; private shown = 0;
+  /**
+   * The browser's own work after our JS each frame: a message posted as the frame's callback ends runs as the next task,
+   * after the event loop's rendering step (style, layout, paint of the page's own labels and HUD, and handing the frame
+   * to the compositor), so the gap is that work, which the JS figures don't see. What's left of the frame is the wait:
+   * for the display's next refresh, or the GPU. Which one sets the pace is then on the readout itself. (The HTML event
+   * loop's order, and Chrome's; WebKit's isn't documented: if Safari ran the message before its rendering, the browser
+   * figure would read near 0 and its work would show in the wait.)
+   */
+  private ch: MessageChannel | null = null; private sent = 0; private after = { ms: 0, n: 0 };
   get on(): boolean { return !!this.el; }
   toggle(): void {
-    if (this.el) { this.el.remove(); this.el = null; return; }
+    if (this.el) { this.el.remove(); this.el = this.txt = null; this.ch?.port1.close(); this.ch = null; this.sent = 0; return; }
     const el = this.el = document.createElement('div');
     el.style.cssText = 'position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:99;background:rgba(0,0,0,.72);color:#cfe;font:11px/1.35 ui-monospace,monospace;padding:6px 8px;border-radius:4px;pointer-events:none;white-space:pre';
+    this.txt = el.appendChild(document.createElement('div'));
+    if (this.switches.length) {
+      // (the switches: each word clickable, struck through while its part of the frame is off)
+      const row = el.appendChild(document.createElement('div')); row.textContent = 'test: ';
+      for (const w of this.switches) {
+        const a = row.appendChild(document.createElement('span'));
+        const show = () => { a.textContent = w.label; a.style.textDecoration = w.on() ? 'none' : 'line-through'; a.style.color = w.on() ? '#cfe' : '#fc8'; };
+        a.style.cssText = 'pointer-events:auto;cursor:pointer;text-decoration-thickness:2px;margin-right:10px';
+        a.title = `${w.label}: on or off for this reading`;
+        a.addEventListener('click', e => { e.stopPropagation(); w.set(!w.on()); show(); });
+        show();
+      }
+    }
     document.body.appendChild(el); this.n = 0; this.last = 0; this.span = [];
   }
   /** Once a frame: `now` the frame's timestamp, and the JS times (ms) of the whole frame, the sim's steps and the scene. */
   frame(now: number, js: number, sim: number, scene: number, r: THREE.WebGLRenderer): void {
-    if (!this.el) return;
+    if (!this.el || !this.txt) return;
+    if (!this.ch) { this.ch = new MessageChannel(); this.ch.port1.onmessage = () => { if (this.sent) { this.after.ms += performance.now() - this.sent; this.after.n++; this.sent = 0; } }; }
+    this.sent = performance.now(); this.ch.port2.postMessage(0);
     if (this.last) { const f = now - this.last; this.sum.frame += f; this.worst = Math.max(this.worst, f); this.span.push({ t: now, f }); }
     while (this.span.length && now - this.span[0].t > WINDOW) this.span.shift();
     this.last = now; this.n++; this.sum.js += js; this.sim(sim, scene);
@@ -31,13 +62,19 @@ export class PerfMeter {
     const k = this.n, fr = this.sum.frame / (k - 1), i = r.info, mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     // the stutter over the last 10 s: the 95th-percentile frame, and how many frames ran long
     const fs = this.span.map(x => x.f).sort((a, b) => a - b), p95 = fs.length ? fs[Math.min(fs.length - 1, Math.floor(fs.length * 0.95))] : 0, long = fs.filter(f => f > LONG).length;
+    // the frames' rhythm: at a 60 Hz pace a frame that misses its refresh lands at 25 ms on a 120 Hz screen (33 at 60 Hz),
+    // so the shares near 16.7 and near 25 show a pacing step where the average only shows 21 ms (Safari paces pages at
+    // about 60 fps even at 120 Hz: its "Prefer Page Rendering Updates near 60fps" feature flag)
+    const near = (lo: number, hi: number) => fs.length ? Math.round(100 * fs.filter(f => f >= lo && f < hi).length / fs.length) : 0;
     const secs = this.span.length ? Math.min(WINDOW, now - this.span[0].t + this.span[0].f) / 1000 : 0;
-    this.el.textContent = `${(1000 / fr).toFixed(0)} fps  ${fr.toFixed(1)} ms/frame  worst ${this.worst.toFixed(0)} ms\n`
+    this.txt.textContent = `${(1000 / fr).toFixed(0)} fps  ${fr.toFixed(1)} ms/frame  worst ${this.worst.toFixed(0)} ms\n`
       + `last ${secs.toFixed(0)} s: 95% of frames under ${p95.toFixed(1)} ms  ${long} long (> ${LONG} ms) of ${fs.length}\n`
+      + `frames ≤ 12 ms ${near(0, 12)}%, 12–20 ms ${near(12, 20)}%, 20–30 ms ${near(20, 30)}%, over 30 ms ${near(30, Infinity)}%\n`
       + `JS ${(this.sum.js / k).toFixed(1)} ms: sim ${(this.sum.sim / k).toFixed(1)}, scene ${(this.sum.scene / k).toFixed(1)}, rest ${((this.sum.js - this.sum.sim - this.sum.scene) / k).toFixed(1)}\n`
+      + (this.after.n ? `then the browser ${(this.after.ms / this.after.n).toFixed(1)} ms (style, layout, paint), waiting ${Math.max(0, fr - this.sum.js / k - this.after.ms / this.after.n).toFixed(1)} ms\n` : '')
       + `${i.render.calls} draw calls  ${(i.render.triangles / 1e6).toFixed(2)} M triangles  ${i.programs?.length ?? 0} programs\n`
       + `GPU: ${i.memory.geometries} geometries  ${i.memory.textures} textures${mem ? `  heap ${(mem.usedJSHeapSize / 1e6).toFixed(0)} MB` : ''}`;
-    this.shown = now; this.n = 0; this.last = now; this.worst = 0; this.sum = { frame: 0, js: 0, sim: 0, scene: 0 };
+    this.shown = now; this.n = 0; this.last = now; this.worst = 0; this.sum = { frame: 0, js: 0, sim: 0, scene: 0 }; this.after = { ms: 0, n: 0 };
   }
   private sim(sim: number, scene: number): void { this.sum.sim += sim; this.sum.scene += scene; }
 }
