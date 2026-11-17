@@ -504,6 +504,17 @@ function keepEased(b: Boat, near: { o: Boat; r: { kc: Boat | null } }[]): boolea
   return near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
 }
 
+/** At a crowded mark (aiThink): within MARK_CROWD_M of the mark she's coming to or the one she's just rounded, and two
+ * boats or more within 30 m of her. A judgement, as the start's minute is. */
+const MARK_CROWD_M = 40;
+function crowdedMark(w: World, b: Boat, near: { dx: number; dy: number }[]): boolean {
+  if (!b.started || b.finished || near.length < 2) return false;
+  let n = 0; for (const { dx, dy } of near) if (dx * dx + dy * dy < 900) n++;
+  if (n < 2) return false;
+  const ms = w.C.marks, at = (i: number) => i >= 0 && i < ms.length && dist(b, ms[i].p) < MARK_CROWD_M;
+  return at(b.leg) || at(b.leg - 1);
+}
+
 /** One decision step for an AI boat: sets b.desired and b.luff. */
 export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
@@ -823,7 +834,6 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // collision avoidance under the rules
   // (around the start, in the pre-start and the first minute after the gun, when the fleet is bunched up, she also
   // looks at each heading's room to other boats: out on the course the simple moves below are enough, and cheaper)
-  const startArea = w.t < 60;
   const near: { o: Boat; dx: number; dy: number; r: ReturnType<World['rights']>; cp: { t: number; d: number } }[] = [];
   for (const o of w.boats) {
     if (o === b) continue;
@@ -831,6 +841,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (dx * dx + dy * dy > 3600) continue;
     near.push({ o, dx, dy, r: w.rights(b, o), cp: cpa(b, o) });
   }
+  // (and at a crowded mark, the same: inside about five lengths of the mark she's coming to or has just rounded, with
+  // two boats or more within four lengths of her. Seven boats reaching a mark two minutes after the gun, leaving it on
+  // the run through the ones still coming in, took two penalties a rounding, on the simple moves alone (the owner's
+  // race, 16 Nov 2026))
+  const startArea = w.t < 60 || crowdedMark(w, b, near);
   // Way on, first. A boat going astern can't steer as she means to and can't tack: she gets way on again before anything
   // else her plan wants (US Sailing, "Getting in and out of irons": fall off, then "pull in the sheets ... to stop the
   // luffing"). The rules still change her course after this.
