@@ -59,7 +59,7 @@ describe('nothing moves past a still boat faster than its own waves (the owner\'
     for (let i = 0; i < 600; i++) w.step(DT);
     w.applyConditions({ ...w.settings, windKind: 'north' } as Settings);
     for (let i = 0; i < 60; i++) w.step(DT);
-    const base = (w as unknown as { windModel: { base: number } }).windModel.base, off = Math.abs(((w.waves.windDir - (base + 180) + 540) % 360) - 180);
+    const base = (w as unknown as { windModel: { base: number } }).windModel.base, off = Math.abs(((w.waves.chopFrom - base + 540) % 360) - 180); // (where its living waves come from, not only where the wind sends new ones)
     expect(off, `the chop runs ${off.toFixed(1)}° off the new wind a second after the change`).toBeLessThan(2);
   }, 60_000);
   it('sailing free from the Gate (the swell turned by the bar as she sails; this rushed in v176)', () => {

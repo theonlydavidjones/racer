@@ -485,7 +485,7 @@ export class World {
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs, total: undefined } : sw, settings.chop ?? 1);
       this.sea.duration = this.seaDurationAt(this.clockUtc);
       this.waves = new WaveField(this.sea.swell?.tp ?? 12);
-      this.sea.chopFrom = () => this.waves.chopFrom; // (the wave drag meets the sea that's drawn)
+      this.sea.field = this.waves; // (the wave drag meets the sea that's drawn)
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -542,8 +542,8 @@ export class World {
     // (and the harbor mouths' gyres spun up through the tide's last 13 hours now, not in the race's first step: mouthFlows)
     this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
+    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user, this.windModel.kt); // (the waves already running at the first frame, and before the boats' seas, which take the chop's direction from them)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
-    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user, this.windModel.kt); // (the waves already running at the first frame)
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
@@ -1312,7 +1312,7 @@ export class World {
       if (b.mooring) this.mooringStep(b, dt); // (coming in: the hand at the shrouds, waiting to step)
     }
     if (this.caseRun) this.pinCase(dt);
-    // the waves: the field eased to its reference sea (waveRef) and turning with the course's mean wind about your boat,
+    // the waves: the field eased to its reference sea (waveRef), the chop changing over to the course's mean wind,
     // and every boat's heave and pitch on it (boat/seaway.ts waveMotion)
     if (this.steps % 30 === 1) this.waveRefSea = null;
     this.waves.update(this.waveRef(), this.windModel.base, dt, this.user, this.windModel.kt);
@@ -2513,16 +2513,17 @@ export class World {
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
-    this.sea = n.sea; this.sea.chopFrom = () => this.waves.chopFrom; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
+    this.sea = n.sea; this.sea.field = this.waves; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
-    // (and the new wind's sea runs its way at once: the field's turn is capped at a few degrees an hour, waveField.ts
-    // turnCap, so left to ease round after a change of conditions the chop would run askew of the wind for a day)
+    // (and the new wind's sea runs its way at once: left to change over wave by wave after a change of conditions the
+    // chop would run askew of the wind for an hour, and the swell, whose turn is capped, far longer: waveField.ts)
     this.waves.windDir = this.waves.swellDir = NaN;
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();
     if (this.tide) this.updateTide();
     this.mouthFlows(); // (read at once, here as in the race's step, so the race and its mirror hold the same)
+    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user, this.windModel.kt); // (set to the new wind before the boats' seas read its direction)
     // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
     // as it would on the water, until the new mean settles in)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
