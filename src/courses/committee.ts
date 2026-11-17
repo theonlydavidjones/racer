@@ -141,7 +141,7 @@ const hash = (s: string) => { let h = 2166136261; for (const ch of s) h = Math.i
  * (the same day always gives the same course).
  */
 export function chooseCourse(courses: CourseFile[], S: Settings): CommitteeChoice | null {
-  const pool = courses.filter(c => c.group?.startsWith('Seaweed Soup'));
+  const pool = courses.filter(c => c.group?.startsWith('Kelp Chowder'));
   if (!pool.length) return null;
   const day = raceDay(S, pool[0].windBase), target = TARGET_MIN[(S.raceLength ?? 'medium') as RaceLength] ?? 60;
   const score = (e: CourseEstimate) => Math.abs(Math.log(e.minutes / target)) + (e.upwindStart ? 0 : 0.35) + (e.slowestKt < 1 ? 1 : 0);

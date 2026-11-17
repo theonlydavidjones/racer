@@ -24,6 +24,7 @@ import { currentSeason, seasonById, seasonResults, seasons, standings, type Seas
 import { seasonHtml } from './ui/season';
 import { nextRace, paintSeasonView, seasonCardHtml } from './ui/seasonView';
 import { burgeeCanvas } from './render/burgees';
+import { raceDisplayName } from './club/raceNames';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
 import { placeAmong, realFleetIds, realRace, realRaces, sailKey } from './sim/realRaces';
 import type { Boat, LineKey } from './boat/boat';
@@ -1634,7 +1635,7 @@ function realRaceRows(): void {
     const day = new Date(r.date + 'T12:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     const fin = r.boats.filter(b => b.elapsedS != null && b.code == null).sort((a, b) => a.elapsedS! - b.elapsedS!);
     const won = fin[0];
-    return `<div class="pastrow"><div><b>${esc(r.event.replace(/^GGYC Manuel Fagundes /, ''))} · race ${r.raceNo} · course ${r.courseNo} (${r.distanceNm} nm)</b>`
+    return `<div class="pastrow"><div><b>${esc(raceDisplayName(r.event))} · race ${r.raceNo} · course ${r.courseNo} (${r.distanceNm} nm)</b>`
       + `<small>${day}, start ${r.start} · ${fin.length} finished · ${esc(titleCase(won.boat))} ${esc(won.key)} won in ${mmss(won.elapsedS!)}${r.courseFrom ? ` · <span title="${esc('The course from ' + r.courseFrom)}">course from a sailor in the race (a last-minute change)</span>` : ''}${r.uncertain ? ` · <span class="warn" title="${esc(r.uncertain)}">course uncertain</span>` : ''}${r.doubt ? ` · <span class="warn" title="${esc(r.doubt)}">the published distance disagrees with the course sheet</span>` : ''}</small></div>`
       + `<button type="button" class="ghost sm" data-real="${esc(r.id)}">Sail it</button></div>`;
   }).join('') : '';

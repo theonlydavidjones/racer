@@ -14,7 +14,7 @@ const REAL_NAMES = [
   'Coyote Point', 'Sierra Point Yacht', 'Alameda Yacht', 'Metropolitan Yacht', 'Marina Bay Yacht', 'Point San Pablo Yacht Club',
   'Oyster Point Yacht', 'Peninsula Yacht', 'South Bay Yacht', 'San Leandro Yacht', 'Loch Lomond Yacht', 'Bel Marin Keys',
   'Petaluma Yacht', 'Napa Valley Yacht', 'Glen Cove Yacht', 'Martinez Yacht', 'Pittsburg Yacht', 'Sausalito Cruising',
-  'Seattle Yacht', 'St. Francis outer', 'St Francis outer'
+  'Seattle Yacht', 'Seaweed Soup', 'Manuel Fagundes', 'Resin Regatta', 'Resin Invitational', 'Classic Boat Invitational', 'Big Boat Series', 'St. Francis outer', 'St Francis outer'
 ];
 const REAL_ABBR = ['StFYC', 'GGYC', 'SBYC', 'BVBC', 'MHPYC', 'TIYC', 'SFYC', 'CYC', 'TYC', 'PYC', 'SYC', 'RYC', 'BYC', 'CSC', 'EYC',
   'OYC', 'IYC', 'AYC', 'BBYC', 'VYC', 'SeqYC', 'CPYC', 'SPYC', 'MBYC', 'SLYC', 'SSYC', 'St. Francis YC', 'Golden Gate YC',
@@ -24,8 +24,7 @@ const ABBR_RE = new RegExp(`\\b(${REAL_ABBR.map(a => a.replace(/[.]/g, '\\.')).j
 const TS = import.meta.glob('../src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const JSONS = import.meta.glob(['../src/**/*.json', '!**/sf-folkboat-results.json', '!**/real-club-codes.json'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const DOCS = import.meta.glob(['../index.html', '../README.md'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-// (the one place the real event title is matched, to cut it from the heading; the owner decides the race names later)
-const ALLOWED = ["r.event.replace(/^GGYC Manuel Fagundes /"];
+const ALLOWED: string[] = [];
 /** Source with comments removed (what's left is code and strings, which the player can see). */
 function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
@@ -49,7 +48,7 @@ describe('no real yacht club name reaches the player', () => {
   it('the shown fields of the data files (label, title, name, short)', () => {
     const bad: string[] = [];
     const visit = (v: unknown, f: string, key = ''): void => {
-      if (typeof v === 'string') { if (/^(label|title|name|short)$/.test(key) && hits(v).length) bad.push(`${f}: ${key}=${v.slice(0, 80)}`); }
+      if (typeof v === 'string') { if (/^(label|title|name|short|group)$/.test(key) && hits(v).length) bad.push(`${f}: ${key}=${v.slice(0, 80)}`); }
       else if (Array.isArray(v)) v.forEach(x => visit(x, f, key));
       else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) visit(x, f, k);
     };

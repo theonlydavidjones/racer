@@ -64,11 +64,11 @@ type Raw = { id: string; name: string; url: string; races: { raceNo: number; dat
  * five races completed", above; the 2025–26 results have five).
  */
 const EVENTS: { event: string; id: string; title: string; dates?: string[] }[] = [
-  { event: 'GGYC_T008047221', id: 'ggyc-seaweed-2025-26', title: 'Seaweed Soup 2025–26' },
+  { event: 'GGYC_T008047221', id: 'ggyc-seaweed-2025-26', title: 'Kelp Chowder 2025–26' },
   // the race days as announced, before their results: Latitude 38's racing calendar, "GOLDEN GATE YC — Seaweed Soup:
   // 11/7, 12/5, 1/2, 2/6, 3/6" (https://www.latitude38.com/calendar/, read 14 Nov 2026), the first Saturday of each month
   // as the series has run. The start times aren't announced: a race's own comes with its results.
-  { event: 'GGYC_T00227699', id: 'ggyc-seaweed-2026-27', title: 'Seaweed Soup 2026–27', dates: ['2026-11-07', '2026-12-05', '2027-01-02', '2027-02-06', '2027-03-06'] }
+  { event: 'GGYC_T00227699', id: 'ggyc-seaweed-2026-27', title: 'Kelp Chowder 2026–27', dates: ['2026-11-07', '2026-12-05', '2027-01-02', '2027-02-06', '2027-03-06'] }
 ];
 const SCHEDULED = 5;
 

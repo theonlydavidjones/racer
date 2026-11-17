@@ -122,7 +122,7 @@ function buildSetupChoices(): void {
   const label = (c: typeof COURSES[number]) => {
     if (!c.group) return c.title;
     const route = c.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
-    return `${c.title.replace('Seaweed Soup · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
+    return `${c.title.replace('Kelp Chowder · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
   };
   const sel = $('courseSel') as HTMLSelectElement;
   groups.delete('Practice');
@@ -388,7 +388,7 @@ function drawHeads(): void {
   let burgee = burgeeUrls.get(host);
   if (burgee == null && !practice) { try { burgee = burgeeCanvas(host)?.toDataURL() ?? ''; } catch { burgee = ''; } burgeeUrls.set(host, burgee); }
   const C = w.C, nm = courseFileNow?.distanceNm;
-  const title = C.title.replace(/^Seaweed Soup · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
+  const title = C.title.replace(/^Kelp Chowder · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
   set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Dorado Yacht Club">` : '',
     `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailing instructions|Practice): /, ''))}</span></span>`);
   // the fleet: a tile each, and + to add one
