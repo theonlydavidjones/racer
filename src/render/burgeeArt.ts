@@ -86,14 +86,16 @@ export const PARODY_BURGEES: Burgee[] = [
       fill(g, W, H, WHITE);
       rect(g, NAVY, 0, 0, W * 0.4, H); // the hoist panel
       for (let k = 0; W * (0.4 + (2 * k + 1) * 0.0625) < W; k++) rect(g, RED, W * (0.4 + (2 * k + 1) * 0.0625), 0, W * 0.0625, H); // the stripes, red and white
-      // the oak, in white: a broad spreading crown (a lobed cloud), a short thick trunk, limbs reaching out, roots
+      // the oak, in white: a wide, lumpy, lopsided crown on a short thick trunk, the underside broken by gaps where the limbs show (x in hoists from the tree's middle, y from the top; x is squeezed to fit the panel)
       type T3 = [number, number, number];
-      const crown: T3[] = [[0, -0.08, 0.1], [-0.12, -0.04, 0.09], [0.12, -0.04, 0.09], [-0.2, 0.03, 0.07], [0.2, 0.03, 0.07], [-0.07, 0.03, 0.1], [0.07, 0.03, 0.1], [-0.14, 0.08, 0.07], [0.14, 0.08, 0.07], [0, 0.09, 0.07]];
-      const k = 0.9, cy = H * 0.45, X = X0 - 0.0 * u;
-      for (const [dx, dy, r] of crown) dot(g, WHITE, X + dx * k * u, cy + dy * k * u, r * k * u);
-      for (const s of [-1, 1]) stroke(g, WHITE, u * 0.05, [X + s * 0.03 * u, H * 0.7], [X + s * 0.1 * u, H * 0.62], [X + s * 0.15 * u, H * 0.54]); // the limbs, rising into the crown
-      poly(g, WHITE, [X - 0.045 * u, H * 0.56], [X + 0.045 * u, H * 0.56], [X + 0.055 * u, H * 0.72], [X + 0.12 * u, H * 0.83], [X - 0.12 * u, H * 0.83], [X - 0.055 * u, H * 0.72]); // the trunk, flaring to its roots
-      for (const [dx, dy, r] of crown) { g.strokeStyle = NAVY; g.lineWidth = u * 0.012; g.beginPath(); g.arc(X + dx * k * u, cy + dy * k * u, r * k * u * 0.62, 0.35 * Math.PI, 0.9 * Math.PI); g.stroke(); } // the clusters of leaves, as lines
+      const kx = 0.7, mx = (a: number) => X0 + a * kx * u;
+      const crown: T3[] = [[-0.24, 0.5, 0.07], [-0.16, 0.54, 0.075], [-0.07, 0.56, 0.07], [0.03, 0.57, 0.075], [0.12, 0.56, 0.07], [0.2, 0.54, 0.07], [0.27, 0.5, 0.06],
+        [-0.27, 0.42, 0.07], [-0.19, 0.4, 0.085], [-0.09, 0.38, 0.09], [0.02, 0.37, 0.09], [0.12, 0.38, 0.085], [0.21, 0.4, 0.08], [0.28, 0.44, 0.055],
+        [-0.14, 0.3, 0.075], [-0.02, 0.29, 0.075], [0.09, 0.31, 0.07]];
+      for (const [a, b, r] of crown) dot(g, WHITE, mx(a), b * u, r * kx * u * 1.15 + 0 * r);
+      for (const [a, b] of [[-0.11, 0.55], [0.09, 0.56]] as P[]) oval(g, NAVY, mx(a), b * u, 0.045 * u, 0.06 * u); // the gaps under the crown
+      for (const l of [[[-0.02, 0.66], [-0.1, 0.56], [-0.17, 0.47]], [[0.02, 0.66], [0.09, 0.57], [0.16, 0.48]]] as P[][]) stroke(g, WHITE, u * 0.05, ...l.map(([a, b]): P => [mx(a), b * u])); // the limbs showing through
+      poly(g, WHITE, [mx(-0.085), 0.62 * u], [mx(0.085), 0.62 * u], [mx(0.1), 0.72 * u], [mx(0.2), H * 0.84], [mx(-0.2), H * 0.84], [mx(-0.1), 0.72 * u]); // the trunk, flaring to its roots
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.5, // established: navy, white and green; one oak tree
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.18, H * 0.56, W * 0.04, H * 0.2); dot(g, '#2e8b3e', W * 0.2, H * 0.42, H * 0.17); } },
