@@ -160,8 +160,9 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'spyc', shape: 'pennant', ratio: 1.6, // modern, minimal: mountain gray and blue; one white ridge
     draw: (g, W, H) => { fill(g, W, H, '#6e7a85'); rect(g, '#2f6fb5', 0, 0, W, H * 0.38); poly(g, WHITE, [W * 0.06, H * 0.7], [W * 0.15, H * 0.4], [W * 0.22, H * 0.56], [W * 0.31, H * 0.34], [W * 0.42, H * 0.7]); } },
   // ---- Tier 2 (no guidance in the file)
-  { id: 'mbyc', shape: 'pennant', ratio: 2, // steel gray with a safety-yellow band
-    draw: (g, W, H) => { fill(g, W, H, '#8a96a6'); rect(g, '#f2c200', 0, H * 0.4, W, H * 0.2); } },
+  { id: 'mbyc', shape: 'pennant', ratio: 1.6, // Riveter Bay: dark steel gray, a thin safety-orange line inside the cut, one row of big domed rivets that shrink toward the point
+    draw: (g, W, H) => { fill(g, W, H, '#3d444c'); border(g, W, H, 'pennant', '#f26b1d', 0.04);
+      [[0.19, 0.135], [0.38, 0.11], [0.55, 0.085], [0.68, 0.06]].forEach(([x, r]) => { dot(g, '#8f979f', W * x, H * 0.5, H * r); dot(g, '#cfd5da', W * x - H * r * 0.1, H * 0.5 - H * r * 0.1, H * r * 0.66); }); } },
   { id: 'slyc', shape: 'pennant', ratio: 1.67, // dark green with two cherries
     draw: (g, W, H) => { fill(g, W, H, '#124d33'); stroke(g, '#7fc050', H * 0.06, [W * 0.1, H * 0.58], [W * 0.17, H * 0.28], [W * 0.24, H * 0.58]); dot(g, '#c3122f', W * 0.1, H * 0.6, H * 0.13); dot(g, '#c3122f', W * 0.24, H * 0.6, H * 0.13); } }
 ];
