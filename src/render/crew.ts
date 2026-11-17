@@ -64,8 +64,12 @@ export function sheetTail(wv: THREE.Vector3, side: number, hand: THREE.Vector3 |
   }
   // (the working sheet in a hiker's hand: off the winch, lying over the coaming's inner edge, and straight across the
   // cockpit to the fist, above the hikers' knees, with only a light tail's slight sag)
-  const edge = V(side * (ci - 0.004), coam + 0.008, wv.z + 0.04), len = edge.distanceTo(e);
+  const edge = sheetEdge(wv, side), len = edge.distanceTo(e);
   return [edge, ...Array.from({ length: SHEET_N - 1 }, (_, j) => { const t = (j + 1) / (SHEET_N - 1); return edge.clone().lerp(e, t).add(V(0, -TAIL_SAG * len * 4 * t * (1 - t), 0)); })];
+}
+/** Where the held jib sheet lies over the coaming's inner edge, beside its winch: where it leaves the boat for the hand. */
+export function sheetEdge(wv: THREE.Vector3, side: number): THREE.Vector3 {
+  const u = uAtZ(wv.z), ci = cockpitHalf(u); return V(side * (ci - 0.004), deckY(u, ci + COAMING_T) + COAMING_H(wv.z) + 0.008, wv.z + 0.04);
 }
 /** The jib sheet tail's points after the winch (boatMesh.ts JIB_HALF_PTS: the winch is the 18th from the clew). */
 export const SHEET_N = 6;
@@ -83,9 +87,12 @@ export function travTail(cam: THREE.Vector3, hand: THREE.Vector3 | undefined, si
   // edge and across the top to the coaming, over the coaming's top, and across the side deck to the fist beside the hip,
   // with only a light line's slight sag there. It lies on the boat at each edge it turns on, as a line does; straight
   // from the cam to the coaming it went through the thwart's top and the coaming's face)
-  const r = 0.008, s = side, top = V(cam.x, THWART.top + r, cam.z + 0.003), z = THWART.z, ci = cockpitHalf(uAtZ(z)), ct = ground(s * (ci + COAMING_T / 2), z) + r;
-  const inner = V(s * (ci - 0.004), ct, z), outer = V(s * (ci + COAMING_T + 0.004), ct, z), len = outer.distanceTo(e);
+  const r = 0.008, s = side, top = V(cam.x, THWART.top + r, cam.z + 0.003), outer = travOuter(s), inner = outer.clone().setX(s * (cockpitHalf(uAtZ(outer.z)) - 0.004)), len = outer.distanceTo(e);
   return [top, inner, outer, ...Array.from({ length: TAIL_N - 3 }, (_, j) => { const t = (j + 1) / (TAIL_N - 3); return outer.clone().lerp(e, t).add(V(0, -TAIL_SAG * len * 4 * t * (1 - t), 0)); })];
+}
+/** Where the held traveller tail leaves the boat for the hand: over the coaming's outer top edge at the thwart's end. */
+export function travOuter(s: number): THREE.Vector3 {
+  const z = THWART.z, ci = cockpitHalf(uAtZ(z)); return V(s * (ci + COAMING_T + 0.004), ground(s * (ci + COAMING_T / 2), z) + 0.008, z);
 }
 /** The traveller tail's points after the cam, and its sag held (m a metre of it): a light line, nearly taut. */
 const TAIL_N = 8, TAIL_SAG = 0.015;
@@ -879,9 +886,17 @@ function helmCrossing(h: Figure, x: number, z: number, dir: number, tip: THREE.V
 
 /** Where a figure's shoulders are about, in a pose (the chest's middle, between them). */
 const chest = (p: PoseT, k: number) => p.hip.clone().addScaledVector(fwd(p.yaw), -Math.sin(p.pitch) * BONE.shoulderY * k).add(V(0, Math.cos(p.pitch) * BONE.shoulderY * k, 0));
-/** The hand of a pose nearer `to`, moved there, or as far toward it as an arm reaches from the chest; none if it's behind them. */
+/** Where a pose's shoulder (0 left, 1 right) is about. */
+const shoulderAt = (p: PoseT, k: number, i: number) => chest(p, k).addScaledVector(right(p.yaw), (i ? 1 : -1) * BONE.shoulderX * k);
+/**
+ * The hand on `to`'s side of the body: the arm whose shoulder is nearer it. (The hand that happened to be nearer reached
+ * across the chest, through the torso: the owner's "his right arm seems to extend through his torso to grab the
+ * traveler line".)
+ */
+const sideHand = (p: PoseT, k: number, to: THREE.Vector3) => shoulderAt(p, k, 0).distanceToSquared(to) <= shoulderAt(p, k, 1).distanceToSquared(to) ? 0 : 1;
+/** The hand of a pose on `to`'s side, moved there, or as far toward it as an arm reaches from the chest; none if it's behind them. */
 function reachTo(p: PoseT, to: THREE.Vector3, k: number): void {
-  const i = p.hands[0].distanceToSquared(to) <= p.hands[1].distanceToSquared(to) ? 0 : 1, c = chest(p, k), max = 0.55 * k;
+  const i = sideHand(p, k, to), c = chest(p, k), max = 0.55 * k;
   const d = to.clone().sub(c);
   // (only to something in front of them: the mainsheet behind someone sat facing forward, aft of the thwart, had the hand
   // go back past the shoulder, the arm bent backwards. They leave it, and only look up)
@@ -921,7 +936,10 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
   // (the fist out toward the lee winch, and up above the knees: the sheet runs straight across the cockpit from the lee
   // coaming to it, clear of the hikers' legs. The wrist's aimed short of the fist by the hand's own length)
   const lw = winchAt(-s), sf = c.clone().add(lw.clone().add(V(0, 0.15, 0)).sub(c).setLength(reach * 0.8)); sf.y = Math.max(sf.y, p.hip.y + 0.34 * k);
-  const sheet = jib ? sf.clone().addScaledVector(sf.clone().sub(c).normalize(), -FIST * k) : null;
+  // (the wrist aimed beyond the fist, straight on from the line coming into it: the forearm in line with the pull, the
+  // line into the fist's front, never along the forearm)
+  const aim = (f: THREE.Vector3, from: THREE.Vector3) => f.clone().addScaledVector(f.clone().sub(from).normalize(), FIST * k);
+  const sheet = jib ? aim(sf, sheetEdge(lw, -s)) : null;
   // (the traveller's tail hanging from its cam on the thwart's windward end, just below it)
   // (the traveller's tail from its cam on the thwart's windward end up to the hand, as the sheet's: boatMesh.ts leads it
   // there, Crew.travHand. Fully hiked out the cam itself is beyond an arm's reach, and the tail's what they hold)
@@ -930,8 +948,8 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
   // forearm, ending short of the hand, the owner's "not gripping the line". The wrist's aimed short of the fist by the
   // hand's own length, along the arm from the shoulder)
   const fist = V(p.hip.x - s * 0.03 * k, p.hip.y + 0.01 * k, p.hip.z + 0.22 * k);
-  const tv = trav ? fist.clone().addScaledVector(fist.clone().sub(c).normalize(), -FIST * k) : null;
-  const near = (q: THREE.Vector3) => p.hands[0].distanceToSquared(q) <= p.hands[1].distanceToSquared(q) ? 0 : 1;
+  const tv = trav ? aim(fist, travOuter(s)) : null;
+  const near = (q: THREE.Vector3) => sideHand(p, k, q); // (each line in the hand on its own side of the body)
   // (the middle hand, at the traveller beside the thwart: the aft leg tucked under the thwart for a purchase, the foot in
   // under it near its end (the owner: "often tucking their aft leg under the thwart for stability"))
   // (only within an arm's reach of the cam, a hiker not right out at full stretch: fully out, the aft leg's beside the
@@ -940,7 +958,7 @@ function hikeHold(p: PoseT, k: number, s: number, jib: boolean, trav: boolean): 
     const j = p.feet[0].z >= p.feet[1].z ? 0 : 1, x = s * (cockpitHalf(uAtZ(THWART.z)) - 0.16);
     p.feet[j] = V(x, Math.max(ground(x, THWART.z, 0) + 0.08, thwartBottom(x) - 0.2), THWART.z - THWART.half + 0.04); p.hook = j; // (low, so the shin from the knee over the coaming passes well under the beam's forward edge)
   }
-  if (sheet && tv) { const i = near(sheet); p.hands[i] = sheet; p.hands[1 - i] = tv; }
+  if (sheet && tv) { const i = near(tv); p.hands[i] = tv; p.hands[1 - i] = sheet; } // (alone: the traveller's on the side it's on, aft; the sheet in the other)
   else if (sheet) p.hands[near(sheet)] = sheet;
   else if (tv) p.hands[near(tv)] = tv;
   else return {};
