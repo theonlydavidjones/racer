@@ -2572,10 +2572,11 @@ export class World {
     // since the pilot sails her round the breakwater ends rather than in at the gap)
     const motoring = !!b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05, ahead = motoring ? Math.max(HANDOVER_MIN, b.v * HANDOVER_S) : HANDOVER_SAIL;
     if (dist(b, mouth) < ahead) { yours('At the harbor mouth'); this.homeOut = false; return null; }
-    // (and sooner, if there's anything solid in the lane her hull sweeps toward the mouth within that much of her: the
-    // pilot's own look ahead, boat/autopilot.ts, is a line along the shore's outline, and off Corinthian it steered her by
-    // something within a few meters of it: the second review)
-    if (this.t - this.homeLookT >= 0.5) {
+    // (and sooner, under power, if there's anything solid in the lane her hull sweeps toward the mouth within that much of
+    // her: motoring, the pilot steers that straight line, its own look ahead (boat/autopilot.ts) a line along the shore's
+    // outline, and off Corinthian it steered her by something within a few meters of it: the second review. Under sail it
+    // tacks and bears away round the land as it goes, not along the bearing, so there the lane says nothing: the third)
+    if (motoring && this.t - this.homeLookT >= 0.5) {
       this.homeLookT = this.t;
       const u = unit(sub(mouth, b)), side = { x: u.y, y: -u.x };
       for (let k = 2; k <= ahead; k += 2) for (const o of [-1.6, 0, 1.6]) {
