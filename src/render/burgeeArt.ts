@@ -130,8 +130,15 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#f2c200'); wheel(g, W * 0.27, H * 0.5, H * 0.29, '#14295c', '#f2c200'); } },
   { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // Monarch Point: three equal bands, one for each club that merged in 1974: monarch orange, sunflower yellow, harbor teal
     draw: (g, W, H) => { rect(g, '#e8590c', 0, 0, W, H / 3); rect(g, '#f6c026', 0, H / 3, W, H / 3); rect(g, '#0f5d6b', 0, H * 2 / 3, W, H / 3); } },
-  { id: 'tiyc', shape: 'pennant', ratio: 1.5, // small and friendly: blue and white, a clipper under sail, a gold hull
-    draw: (g, W, H) => { fill(g, W, H, '#1f4f9a'); poly(g, WHITE, [W * 0.08, H * 0.58], [W * 0.08, H * 0.3], [W * 0.19, H * 0.56]); poly(g, WHITE, [W * 0.22, H * 0.56], [W * 0.22, H * 0.24], [W * 0.36, H * 0.54]); poly(g, GOLD, [W * 0.06, H * 0.62], [W * 0.38, H * 0.62], [W * 0.33, H * 0.72], [W * 0.11, H * 0.72]); } },
+  { id: 'tiyc', shape: 'pennant', ratio: 1.6, // Clipper Cove, from the owner's reference (to flag for IP review: the layout is a real club's): a red hoist panel bearing one gold clipper under sail, then navy and white stripes to the point
+    draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#d8312b', 0, 0, W * 0.41, H);
+      for (let i = 0; i < 9; i += 2) rect(g, '#14196b', W * (0.41 + i * 0.07), 0, W * 0.07, H);
+      const gold = '#f4c542', x0 = W * 0.04, y0 = H * 0.26, w = W * 0.32, h = H * 0.5, T = ([x, y]: P): P => [x0 + x * w, y0 + y * h];
+      const go = (pts: number[][]) => poly(g, gold, ...(pts as P[]).map(T));
+      go([[0.02, 0.74], [0.98, 0.74], [0.86, 0.92], [0.14, 0.92]]); // the hull
+      go([[0.96, 0.74], [1.1, 0.66], [1.1, 0.71], [0.98, 0.79]]); // the bowsprit, bow to the fly
+      for (const m of [0.16, 0.42, 0.68]) go([[m - 0.1, 0.12], [m + 0.1, 0.12], [m + 0.115, 0.66], [m - 0.115, 0.66]]); // three square sails, a gap between each
+      go([[0.85, 0.66], [0.85, 0.22], [1.07, 0.66]]); } },
   // ---- Marin
   { id: 'sfyc', shape: 'swallow', ratio: 1.67, // the reference classic, the oldest club: strict red, white and dark blue; a white field under a double border, one dark-blue anchor (the first to drop one on this coast)
     draw: (g, W, H) => { fill(g, W, H, WHITE); border(g, W, H, 'swallow', RED, 0.075); border(g, W, H, 'swallow', NAVY, 0.045);
