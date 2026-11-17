@@ -29,6 +29,10 @@ const NEW_HELD = 10, HELD_DEG = 3;
  * held one, which the backlash is for (on the tiller pilot in a light, shifty breeze her apparent angle wandered 39-76° on a
  * beam reach, and each shift read the guide afresh: the vang eased and set again 25 s apart; an estimate). */
 const NEW_HEADING = 10;
+/** The longest (s) the guide's angle is held through swings (an estimate): a slow penalty circle took 44 s in 6 kt,
+ * crewstation's seed 14, so a two-turns penalty and its NEW_HELD after about 98 s. At 60 s the hold let go part way
+ * through the light air's slow turns, and seed 15's trips went over the backstop. */
+const HOLD_MAX = 120;
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
@@ -1351,7 +1355,7 @@ const clamp_ = clamp, wrap_ = wrap, n360_ = n360, courseHeld_ = courseHeld, NEW_
  * and the paddle's work moved out of aiThink the same way).
  */
 function crewSettle(b: Boat, dt: number): void {
-  const s = b.settle ??= new Float64Array(9); // (the World's boats have it from birth: world.ts makeBoat)
+  const s = b.settle ??= new Float64Array(10); // (the World's boats have it from birth: world.ts makeBoat)
   // (the angle the guide's settings are read at: hers, but past a backlash: controls.ts GUIDE_BACKLASH_)
   // (and once she holds a course it comes to hers, over a gust-lull cycle, LINE_GAP_: the backlash stops a wandering
   // course flipping their settings, but doesn't keep a reach on the beat's settings for the leg, the Deep Physics review)
@@ -1364,8 +1368,16 @@ function crewSettle(b: Boat, dt: number): void {
     // and the vang came off in two trips, crewstation's 6 kt seed 14; a new course is read at once when it's held, below)
     // (held only against loosening: coming up through the swing, the beat's settings, the vang's ceiling under 18 kt, come
     // in as she comes up, as before; frozen, they came 10 s after a rounding, the physics review)
+    // (for a swing begun in light air only, where the wider backlash is, GUIDE_LIGHT_: the angle coming back through it
+    // after a swing is what took a minute there. In a breeze the beat's settings held through each bear-away of a boat
+    // lying to off the harbor in 26 kt, and her tacks there nearly doubled, tests/abandon-home.test.ts's northerly. Judged
+    // as the swing begins: let go part way as a building breeze crossed 10 kt, the outhaul's ease for a run fell between
+    // the crew's waits and its worth, tests/crew.test.ts. And for HOLD_MAX at most: a helm swinging without end doesn't
+    // hold it for good, the physics review)
+    const held = s[SETTLE.held];
+    s[SETTLE.held] = s[SETTLE.since] >= NEW_HELD ? 0 : held === 0 && s[SETTLE.guideKt] >= GUIDE_LIGHT_KT_ + 5 ? HOLD_MAX + 1 : held + dt;
     if (!b.crewReady) s[SETTLE.guideAwa] = a;
-    else if (s[SETTLE.since] >= NEW_HELD) {
+    else if (s[SETTLE.since] >= NEW_HELD || s[SETTLE.held] > HOLD_MAX) {
       s[SETTLE.guideAwa] = clamp_(s[SETTLE.guideAwa], a - bl, a + bl);
       const off = a - s[SETTLE.guideAwa]; if (Math.abs(off) > GUIDE_DEAD_) s[SETTLE.guideAwa] += (off - Math.sign(off) * GUIDE_DEAD_) * Math.min(1, dt / LINE_GAP_);
     } else s[SETTLE.guideAwa] = Math.min(s[SETTLE.guideAwa], a + bl); }

@@ -222,7 +222,7 @@ export interface Boat {
   jibHold?: number;
   /** What the crew's trim reads its guide by and waits on (physics.ts crewSettle), by SETTLE's places: the apparent
    * angle (deg, 0..180) and the wind (kt) the tuning guide's settings are read at; her true wind over a few seconds (kt);
-   * her heading smoothed over a few seconds and over LINE_TAU, and her true wind angle (unsigned) and heading the guide was last read at (deg); and the
+   * her heading smoothed over a few seconds and over LINE_TAU, and her true wind angle (unsigned) and heading the guide was last read at (deg); how long the guide's angle has been held through swings (s); and the
    * seconds till she's settled enough for her crew to go to the cabin top's lines, and since she last swung. In one Float64Array: read and written each
    * step for each boat, as fields of their own each was a pointer to its own number elsewhere in memory,
    * scattered reads a boat a step, and crewSettle took 18 µs a step in the race against 10 (Capacity, 16 Nov 2026). */
@@ -387,4 +387,4 @@ export const FLEET: FleetEntry[] = [
 ];
 
 /** Places in Boat.settle (physics.ts crewSettle). */
-export const SETTLE = { guideAwa: 0, guideKt: 1, twsFast: 2, hSwing: 3, twaGuide: 4, left: 5, since: 6, hHeld: 7, hGuide: 8 } as const;
+export const SETTLE = { guideAwa: 0, guideKt: 1, twsFast: 2, hSwing: 3, twaGuide: 4, left: 5, since: 6, hHeld: 7, hGuide: 8, held: 9 } as const;
