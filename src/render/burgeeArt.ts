@@ -91,8 +91,8 @@ export const PARODY_BURGEES: Burgee[] = [
     draw: (g, W, H) => { fill(g, W, H, '#0f5f99'); rect(g, '#f08a1c', W * 0.05, H * 0.62, W * 0.3, H * 0.09); arc(g, '#f08a1c', H * 0.1, W * 0.2, H * 0.62, H * 0.2, Math.PI, 0); } },
   { id: 'bvbc', shape: 'pennant', ratio: 1.5, // working waterfront: dark blue, rust, cream; a keel in its cradle
     draw: (g, W, H) => { fill(g, W, H, '#27415f'); rect(g, '#a4502d', 0, H * 0.7, W, H * 0.3); poly(g, '#efe3c6', [W * 0.08, H * 0.3], [W * 0.3, H * 0.3], [W * 0.24, H * 0.64], [W * 0.14, H * 0.64]); } },
-  { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // modern: orange and black, one butterfly
-    draw: (g, W, H) => { fill(g, W, H, '#f08a1c'); poly(g, BLACK, [W * 0.55, H * 0.28], [W, H / 2], [W * 0.55, H * 0.72]); for (const s of [-1, 1]) { oval(g, BLACK, W * 0.15, H * 0.5 + s * H * 0.13, W * 0.09, H * 0.1, s * 0.55); oval(g, BLACK, W * 0.27, H * 0.5 + s * H * 0.09, W * 0.05, H * 0.06, -s * 0.3); } } },
+  { id: 'mhpyc', shape: 'pennant', ratio: 1.6, // Monarch Point: three equal bands, one for each club that merged in 1974: monarch orange, sunflower yellow, harbor teal
+    draw: (g, W, H) => { rect(g, '#e8590c', 0, 0, W, H / 3); rect(g, '#f6c026', 0, H / 3, W, H / 3); rect(g, '#0f5d6b', 0, H * 2 / 3, W, H / 3); } },
   { id: 'tiyc', shape: 'pennant', ratio: 1.5, // small and friendly: blue and white, a clipper under sail, a gold hull
     draw: (g, W, H) => { fill(g, W, H, '#1f4f9a'); poly(g, WHITE, [W * 0.08, H * 0.58], [W * 0.08, H * 0.3], [W * 0.19, H * 0.56]); poly(g, WHITE, [W * 0.22, H * 0.56], [W * 0.22, H * 0.24], [W * 0.36, H * 0.54]); poly(g, GOLD, [W * 0.06, H * 0.62], [W * 0.38, H * 0.62], [W * 0.33, H * 0.72], [W * 0.11, H * 0.72]); } },
   // ---- Marin
