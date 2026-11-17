@@ -505,7 +505,8 @@ function keepEased(b: Boat, near: { o: Boat; r: { kc: Boat | null } }[]): boolea
 }
 
 /** At a crowded mark (aiThink): within MARK_CROWD_M of the mark she's coming to or the one she's just rounded, and two
- * boats or more within 30 m of her. A judgement, as the start's minute is. */
+ * boats or more within 30 m of her. All three numbers (40 m, about five lengths; 30 m, about four; two boats) are
+ * estimates, unsourced, as the start's minute is: chosen to take in a pack at the mark and not a boat or two passing. */
 const MARK_CROWD_M = 40;
 function crowdedMark(w: World, b: Boat, near: { dx: number; dy: number }[]): boolean {
   if (!b.started || b.finished || near.length < 2) return false;
