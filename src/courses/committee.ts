@@ -64,7 +64,7 @@ export function raceDay(S: Settings, windBase = 275): RaceDay {
 
 export type LegKind = 'beat' | 'reach' | 'run';
 export interface LegEstimate { to: string; kind: LegKind; minutes: number; sogKt: number }
-export interface CourseEstimate { file: CourseFile; no: number; minutes: number; legs: LegEstimate[]; slowestKt: number; upwindStart: boolean }
+export interface CourseEstimate { file: CourseFile; no: number; minutes: number; legs: LegEstimate[]; slowestKt: number; upwindStart: boolean; firstTwa: number }
 
 /** Seconds lost in each tack or gybe, and at each mark. */
 // (8 s a tack or gybe, unsourced: calibrated together with FLEET_FACTOR against fleet runs, so it stays until the two
@@ -126,25 +126,44 @@ export function estimateCourse(file: CourseFile, day: RaceDay, fleet = 3): Cours
     t += s + (i < pts.length - 1 && C.marks[i - 1].type === 'round' ? ROUNDING_S : 0);
   }
   const w0 = day.wind(C.center, 0), first = sub(C.marks[0].p, C.center);
-  const upwindStart = Math.abs(wrap(brg(first.x, first.y) - w0.from)) < 55; // a beat, as course.ts counts one
+  const firstTwa = Math.abs(wrap(brg(first.x, first.y) - w0.from)), upwindStart = firstTwa < BEAT_TWA; // a beat, as course.ts counts one
   const islands = C.marks.filter(m => m.reach).length;
-  return { file, no: Number(file.id.replace(/\D/g, '')) || 0, minutes: (t * FLEET_FACTOR + islands * ISLAND_ROUNDING_S) / 60, legs, slowestKt: slowest, upwindStart };
+  return { file, no: Number(file.id.replace(/\D/g, '')) || 0, minutes: (t * FLEET_FACTOR + islands * ISLAND_ROUNDING_S) / 60, legs, slowestKt: slowest, upwindStart, firstTwa };
 }
+
+/** A first leg this close to the wind (true wind angle, degrees) or closer is a beat, as course.ts counts one. */
+const BEAT_TWA = 55;
+/**
+ * The first leg: as near a beat as the courses allow, and long enough to spread the fleet. World Sailing's Race
+ * Management Manual (J.2.2, Course selection): "On a beat a fleet tends to spread out - the leading boats have clear air
+ * and less interference from other boats. On a run the leading boats may be blanketed and the fleet closes up. Because
+ * of this and because an upwind start is the fairest, a race should start with a beat or have a beating leg as soon as
+ * possible after the start"; and (J.3.1) "sufficient distance between the start line and mark 1 to allow the fleet to
+ * spread out before reaching mark 1". On the Bay's fixed marks the line can't move and in a southerly no course starts
+ * with a beat, so the committee takes the one nearest it: the score grows with the first leg's angle off a beat, up to
+ * FIRST_OFF_BEAT for a dead run. And a first leg shorter than SPREAD_MIN minutes costs up to FIRST_SHORT (a mark two
+ * minutes off the line has the whole fleet there inside 30 s). The weights and the five minutes are the sim's
+ * estimates, set so either outweighs a few minutes off the target time; the manuals give no numbers.
+ */
+const FIRST_OFF_BEAT = 0.6, FIRST_SHORT = 0.3, SPREAD_MIN = 5;
+export const firstLegScore = (e: CourseEstimate): number =>
+  FIRST_OFF_BEAT * Math.max(0, e.firstTwa - BEAT_TWA) / (180 - BEAT_TWA) + FIRST_SHORT * Math.max(0, 1 - (e.legs[0]?.minutes ?? SPREAD_MIN) / SPREAD_MIN);
 
 export interface CommitteeChoice { est: CourseEstimate; target: number; why: string; considered: number }
 
 const hash = (s: string) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
 
 /**
- * The committee's pick from the Seaweed Soup courses: the course that best fits the target time, starting to
- * windward, with no leg the fleet can barely sail. Among courses within a few percent of the best, the day decides
+ * The committee's pick from the Seaweed Soup courses: the course that best fits the target time, its first leg a beat
+ * or as near one as the courses allow and long enough to spread the fleet (firstLegScore), with no leg the fleet can
+ * barely sail. Among courses within a few percent of the best, the day decides
  * (the same day always gives the same course).
  */
 export function chooseCourse(courses: CourseFile[], S: Settings): CommitteeChoice | null {
   const pool = courses.filter(c => c.group?.startsWith('Seaweed Soup'));
   if (!pool.length) return null;
   const day = raceDay(S, pool[0].windBase), target = TARGET_MIN[(S.raceLength ?? 'medium') as RaceLength] ?? 60;
-  const score = (e: CourseEstimate) => Math.abs(Math.log(e.minutes / target)) + (e.upwindStart ? 0 : 0.35) + (e.slowestKt < 1 ? 1 : 0);
+  const score = (e: CourseEstimate) => Math.abs(Math.log(e.minutes / target)) + firstLegScore(e) + (e.slowestKt < 1 ? 1 : 0);
   const ranked = pool.map(f => estimateCourse(f, day, S.fleet)).map(e => ({ e, s: score(e) })).sort((a, b) => a.s - b.s);
   const near = ranked.filter(r => r.s <= ranked[0].s + 0.05);
   const pick = near[hash(`${S.tideDate}|${S.tideTime}|${S.windKt}|${S.current}|${S.raceLength}`) % near.length].e;
