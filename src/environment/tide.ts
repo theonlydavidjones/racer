@@ -460,25 +460,26 @@ export class CurrentField {
    * same number worked out once, as atShore works it out (tests/current-kept.test.ts holds them equal to the bit). Not
    * for a boat's own current, which is never at the same spot twice: atShore itself is left as it was for the step.
    */
-  atShoreKept(p: Vec): Vec {
-    let row = this.kept.get(p.x), m = row?.get(p.y);
-    if (m === undefined) {
+  atShoreKept(p: Vec, cell: number): Vec {
+    // (two maps of numbers by the point's own cell number, no object per point: kept as objects, ~100,000 of them in a
+    // plan, they're the likely cause of the plan's slices running past their budget now and then, the collector's work)
+    let k = this.keptK.get(cell), bi: number;
+    if (k === undefined) {
       let dn = Infinity;
-      { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } }
+      { const list = this.near(p); for (let n = 0; n < list.length; n++) { const i = list[n], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } }
       dn = Math.sqrt(dn);
       const B = bayAt(p);
       let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
-      for (const k of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
-      m = { k: 1 - (1 - shoreRelief(p, false)) * Math.min(1, dn / 600) * (1 - bay), B };
-      if (this.keptN >= 200000) { this.kept.clear(); this.keptN = 0; row = undefined; }
-      if (!row) { row = new Map(); this.kept.set(p.x, row); }
-      row.set(p.y, m); this.keptN++;
-    }
-    const c = this.at(p, m.B);
-    return { x: c.x * m.k, y: c.y * m.k };
+      for (const m of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - m.mouth.x, p.y - m.mouth.y) / B!.hand);
+      k = 1 - (1 - shoreRelief(p, false)) * Math.min(1, dn / 600) * (1 - bay); bi = B ? BAYS.indexOf(B) : -1;
+      if (this.keptK.size >= 200000) { this.keptK.clear(); this.keptB.clear(); }
+      this.keptK.set(cell, k); this.keptB.set(cell, bi);
+    } else bi = this.keptB.get(cell)!;
+    const c = this.at(p, bi < 0 ? null : BAYS[bi]);
+    return { x: c.x * k, y: c.y * k };
   }
-  private kept = new Map<number, Map<number, { k: number; B: Bay | null }>>();
-  private keptN = 0;
+  private keptK = new Map<number, number>();
+  private keptB = new Map<number, number>();
 }
 
 /* ---------- local time in San Francisco ---------- */

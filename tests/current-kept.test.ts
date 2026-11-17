@@ -17,7 +17,7 @@ describe("the planner's kept shore share", () => {
     for (let m = 0; m < 1440; m += 37.5) {
       kept.setTime(t0 + m); fresh.setTime(t0 + m);
       for (const p of pts) {
-        const a = kept.atShoreKept(p), b = fresh.atShore(p);
+        const a = kept.atShoreKept(p, (p.x / 100 + 100000) * 200000 + (p.y / 100 + 100000)), b = fresh.atShore(p);
         expect(Object.is(a.x, b.x) && Object.is(a.y, b.y), `at (${p.x}, ${p.y}), minute ${m}: ${a.x}, ${a.y} kept; ${b.x}, ${b.y} afresh`).toBe(true);
         n++;
       }
