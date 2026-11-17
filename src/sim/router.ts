@@ -169,7 +169,7 @@ export function routeLeg(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, ma
   while (!r.done) r = g.next();
   return r.value;
 }
-/** routeLeg a little at a time: it yields every 4 points of a front and after each front, so a plan can be worked out a slice a frame
+/** routeLeg a little at a time: it yields at every point of a front, every few of a point's headings, and after each front, so a plan can be worked out a slice a frame
  * (sim/navigator.ts passageLive) instead of holding a frame up for a second or two. */
 /** `limit`: an arrival (minute since epoch UTC) another plan already makes. A point that couldn't get there sooner even
  * at OPTIMISTIC over the ground is dropped, and the search ends there: it can't lose a quicker route. */
