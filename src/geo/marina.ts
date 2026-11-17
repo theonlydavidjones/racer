@@ -403,7 +403,7 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false, grow =
  * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first). `setBack`: the wind's
  *   blowing her back onto the dock (ONTO_DOCK and more across her): her bow's pushed well off, so she goes out at an angle.
  */
-export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number }; /** the point she's turned about, m ahead of her middle: her bow on the bow line (absent), or her middle, walked out into the fairway (0) */ pivot?: number } | { kind: 'astern'; back: number; coast: number; /** the way she's steered stern first: +1 her bow to starboard (the tiller pushed to starboard), −1 to port, 0 straight back */ helm: 1 | -1 | 0 } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
+export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number }; /** the point she's turned about, m ahead of her middle: her bow on the bow line (absent), or her middle, walked out into the fairway (0) */ pivot?: number } | { kind: 'astern'; back: number; coast: number; /** the way she's steered stern first: +1 her bow to starboard (the tiller pushed to starboard), −1 to port, 0 straight back */ helm: 1 | -1 | 0; /** where her coast ends, no clear water to sail off in (clearRun, 8m3): kept fast, not shoved off */ noRoom?: boolean } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
 /**
  * A breeze this strong (kt) blowing her onto the dock she's lying alongside and she's pushed off at an angle, not
  * straight out: the same 4 kt as WIND_SWINGS, where the wind on her bare rig starts to have the say over the crew's hands.
@@ -531,6 +531,29 @@ function runAhead(c: Vec, h: number, s: Slip): number {
   const v = dirOf(h); let d = 0;
   while (d < 14 && berthClear({ x: c.x + v.x * (d + 2), y: c.y + v.y * (d + 2) }, h, s)) d += 2;
   return d;
+}
+/**
+ * The clear water she needs once she's let go with no way to speak of (8m3, 15 Nov 2026): her hull, half a meter bigger all
+ * round (LET_GO_MARGIN), sailed straight on until her middle's LET_GO_RUN m on, sagging to leeward
+ * as she goes (LET_GO_SAG m in 12 kt, in proportion to the wind), touching nothing. In light air there's next to no
+ * sag, but she still runs straight on: let go with a moored boat's stern just off her bow, she hits it. Gauged by a sweep
+ * of the sim itself (every berth swung on her bow line in 12 and 15 kt from 270, 225 and 000: 1,604 cases): let go with
+ * less, she hit the boat in the next slip within 15 m in 1,124, mostly the stern of the next boat just off her bow. The
+ * sag is the sim's own, at the wind her slip has (which the plan is made for): 1.1–1.5 m over her first 15 m in 9–10 kt,
+ * about 1.2 in 12, 1.8–2.0 in 15, with the jib going up (ESTIMATES, from the sim, not from life).
+ * Two limits (Deep Physics' review, 16 Nov 2026): the sag is gauged at the wind her slip has, so where she sails out past
+ * the lee's edge a few meters on into a fresher breeze, that isn't in it; and it was gauged in 12 and 15 kt from 270, 225
+ * and 000 (and holds in 20 from 270), not in every wind (tests/pushoff-sweep.test.ts says where it doesn't yet).
+ */
+const LET_GO_MARGIN = 0.5, LET_GO_RUN = 15, LET_GO_SAG = 1.75;
+function clearRun(c: Vec, h: number, s: Slip, windFrom: number | undefined, windKt = 12): boolean {
+  const v = dirOf(h), n = { x: v.y, y: -v.x }, w = windFrom == null ? { x: 0, y: 0 } : dirOf(windFrom + 180), lee = n.x * w.x + n.y * w.y >= 0 ? 1 : -1;
+  const sag = windFrom == null ? 0 : LET_GO_SAG * windKt / 12;
+  for (let d = 1; d <= LET_GO_RUN; d++) { // (her whole hull at each: her bow 3.8 m beyond)
+    const sd = lee * sag * Math.min(1, d / LET_GO_RUN);
+    if (!berthClear({ x: c.x + v.x * d + n.x * sd, y: c.y + v.y * d + n.y * sd }, h, s, true, LET_GO_MARGIN)) return false;
+  }
+  return true;
 }
 /** Turning her about a point on her centreline `pivot` m ahead of her middle (her bow: 3.8; her stern: −3.8), from (c0, h0) by `a` deg. */
 const about = (c0: Vec, h0: number, pivot: number, a: number) => {
@@ -661,7 +684,11 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
         const c1 = about(at(back), s.heading, BOW, turn), end = hold ? about(c1.c, c1.h, holdPivot(hold.off), hold.off) : c1, h = (end.h + 720) % 360;
         const v = dirOf(h), run = runAhead(end.c, h, s);
         const gain = togo({ x: end.c.x - v.x * 12, y: end.c.y - v.y * 12 }) - togo({ x: end.c.x + v.x * 12, y: end.c.y + v.y * 12 }); // (how much nearer the way out, along the water, she's pointed)
-        if (run >= (hold ? 8 : 12)) ways.push({ back, turn, h, gain: Number.isFinite(gain) ? gain : 0, run, hold });
+        // (let go with no sail up and only the crew's push for way, 8m3: 60 degrees and more off the wind, as the walk-outs are,
+        // where a sail fills as it goes up; and the clear water to gather way in, clearRun. Held head to wind for the main,
+        // she's pushed off with her main drawing: letGoClear's own room)
+        const letGo = hold || windFrom == null || ((windKt < WIND_SWINGS || Math.abs(wrap180(windFrom - h)) >= 60) && clearRun(end.c, h, s, windFrom, windKt));
+        if (run >= (hold ? 8 : 12) && letGo) ways.push({ back, turn, h, gain: Number.isFinite(gain) ? gain : 0, run, hold });
         if (swings) break; // (one way round, by the wind)
       }
       if (ways.some(w => w.gain > 15 && fine(w))) break; // (pointed well toward the way out: no need to hold her any further off)
@@ -675,13 +702,22 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // water than her shove carries her (FAIRWAY_SHORT)
   // (not with the wind already ahead of her in her slip: then she's held head to wind for the main, or shoved off astern)
   const fairway = () => headUp(s.heading, windFrom) ? null : fairwayWay(s, reach, togo, windFrom, windKt);
-  if (best && !best.hold && best.gain < 0) { const f = fairway(); if (f) return f; } // (held head to wind for the main, she's pointed by the wind, not the way out)
+  // (or where there's no swing to be had at all, 8m3: none that lets her go with clear water to sail off in)
+  if (!best || (!best.hold && best.gain < 0)) { const f = fairway(); if (f) return f; } // (held head to wind for the main, she's pointed by the wind, not the way out)
   if (best) return { kind: 'swing', back: best.back, turn: best.turn, h: best.h, ...(best.hold ? { hold: best.hold } : {}), ...(headUp(best.h, windFrom) ? { headToWind: true } : {}) };
   // no room to swing her (or the wind would swing her into something): walked back until her bow's at the finger's end,
   // then shoved off astern into the fairway at a walk and more (world.ts ASTERN_SHOVE), and steered stern first: her
   // stern swung round toward the way out with the helm hard over, or straight back where that's the clear way
   const a = asternWay(s, reach, windFrom, windKt);
   if (a.kind === 'astern' && a.coast < FAIRWAY_SHORT) { const f = fairway(); if (f) return f; }
+  // (shoved off astern and let go where her coast ends, she's held to the same clear water as any let-go, 8m3: the
+  // coordinator's ruling, 16 Nov 2026. Where it isn't there, her crew keep her fast rather than shove her into the boats)
+  // (and in a breeze, 60 degrees and more off the wind as any let-go: left nearer head to wind, the jib can't fill and the
+  // breeze on her bow carries her on astern past her coast, into whatever's behind her)
+  if (a.kind === 'astern' && windFrom != null) {
+    const e = pushOffPoses(s, a).at(-1)!, headUpThere = windKt >= WIND_SWINGS && Math.abs(wrap180(windFrom - e.h)) < 60;
+    if (headUpThere || !clearRun(e.c, e.h, s, windFrom, windKt)) return { ...a, noRoom: true };
+  }
   return a;
 }
 /** Clear water astern shorter than this, m, and she's walked out to the fairway and turned there instead, where that fits:
@@ -721,7 +757,7 @@ function fairwayWay(s: Slip, reach: number, togo: (q: Vec) => number, windFrom: 
     const end = about(c, s.heading, 0, turn), h = (end.h + 720) % 360;
     // (60 degrees and more off the wind, where a sail fills as it goes up: nearer it, let go with no sail up she'd carry her
     // way toward the wind and stop in irons)
-    if (gainOf(turn) > 0 && (windFrom == null || Math.abs(wrap180(windFrom - h)) >= 60) && runAhead(end.c, h, s) >= 10) return { kind: 'swing', back, turn, h, pivot: 0 };
+    if (gainOf(turn) > 0 && (windFrom == null || Math.abs(wrap180(windFrom - h)) >= 60) && runAhead(end.c, h, s) >= 10 && (windFrom == null || clearRun(end.c, h, s, windFrom, windKt))) return { kind: 'swing', back, turn, h, pivot: 0 };
   }
   return null;
 }

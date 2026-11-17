@@ -27,7 +27,7 @@ cruiser, or it can cross the Pacific single-handed.
 Sailors say two things: if you can sail the Bay, you can sail anywhere; and if you can sail a Folkboat, you can sail
 anything. That's what this game amounts to. Our mission is to bring those two truths to anyone who wants them.
 
-Working title (the owner, 16 Nov 2026): **Mainsail**. The owner's plans are bigger than Folkboats and San Francisco Bay:
+Working title (the owner, 16 Nov 2026): **Mainsail**, not confirmed: the owner is still deciding on a name, so don't put it on the player's screens yet. The owner's plans are bigger than Folkboats and San Francisco Bay:
 this game is about sailing. So the name must be able to hold more boats and more waters later, and the build should stay
 extensible (don't hard-wire the Folkboat or the Bay where a boat or a body of water could be a parameter). But the
 mission above stands for the MVP and does not change: the Bay and the Folkboat. Don't put the Bay or the Folkboat in the
