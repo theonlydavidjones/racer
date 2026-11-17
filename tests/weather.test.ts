@@ -99,3 +99,29 @@ describe("a past day's record covers its hours, and no more", () => {
     expect(dayWeather('2025-07-05', 'west').covers(sfLocalToUtcMin('2025-07-05', '06:00'))).toBe(true);
   });
 });
+
+describe('the wind between the record\'s samples comes on smoothly, not in a step a minute', () => {
+  // (NOAA CO-OPS 9414290, Fort Point: a 2-minute mean every 6 minutes. Between two samples the wind is read to the
+  // second; read to the whole minute it came on in steps of 0.6 to 2.4° a minute on an observed day, which the wave
+  // field then swung after: the "rushing water" of 16 Nov 2026)
+  it('an observed day (14 Nov 2026): no second brings more than its share of its minute\'s change', () => {
+    const day = dayWeather('2026-11-14'), t0 = Date.parse('2026-11-14T20:00:00Z') / 60000; // 12:00 local
+    expect(day.source).toBe('observed');
+    const turn = (a: number, b: number) => Math.abs(((day.at(b).from - day.at(a).from + 540) % 360) - 180);
+    let turned = 0, worstSecond = 0, worstMinute = 0;
+    for (let m = 0; m < 30; m++) { worstMinute = Math.max(worstMinute, turn(t0 + m, t0 + m + 1)); turned += turn(t0 + m, t0 + m + 1); }
+    for (let s = 0; s < 1800; s++) worstSecond = Math.max(worstSecond, turn(t0 + s / 60, t0 + (s + 1) / 60));
+    expect(turned, 'the wind does come round over the half hour').toBeGreaterThan(5);
+    // (even through its steepest minute a second brings a sixtieth of it: the samples sit on whole minutes, so no corner
+    // falls inside one; a twentieth more allowed for rounding.
+    // Read to the whole minute, one second brought the whole minute's change: 60 times its share)
+    expect(worstSecond, `the most in one second, where the steepest minute turned ${worstMinute.toFixed(2)}°`).toBeLessThan(1.05 * worstMinute / 60);
+  });
+  it('the records\' sea-breeze day too (breezeAt, hourly)', () => {
+    const day = dayWeather('2031-07-15', 'west'), t0 = Date.parse('2031-07-15T19:00:00Z') / 60000;
+    let turned = 0, worst = 0;
+    for (let s = 0; s < 7200; s++) { const a = day.at(t0 + s / 60), b = day.at(t0 + (s + 1) / 60), d = Math.abs(((b.from - a.from + 540) % 360) - 180) + Math.abs(b.kt - a.kt); worst = Math.max(worst, d); turned += d; }
+    expect(turned, 'the records\' wind does change over the two hours').toBeGreaterThan(0.5);
+    expect(worst).toBeLessThan(turned / 1800); // (two hours of seconds: none more than four times its even share)
+  });
+});
