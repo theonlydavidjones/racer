@@ -200,14 +200,9 @@ export const PARODY_BURGEES: Burgee[] = [
       shark(g, W * 0.255, H * 0.53, H * 0.5, WHITE); } },
   { id: 'pyc', shape: 'pennant', ratio: 1.6, // Battery Yacht Club (the Army's old coast-defense post): a light-blue field and two white crossed cannon barrels toward the hoist
     draw: (g, W, H) => { fill(g, W, H, '#8fc4ea'); crossedGuns(g, W * 0.2, H * 0.5, H * 0.5, WHITE, '#8fc4ea'); } },
-  { id: 'ssyc', shape: 'pennant', ratio: 1.6, // Willow Grove (Sausalito, 'little willow grove'): one weeping willow, a round crown with long drooping lobes either side of the trunk, cream on deep teal
-    draw: (g, W, H) => { fill(g, W, H, '#0f5b63');
-      const S = H * 0.6, x0 = W * 0.22 - S / 2, y0 = H * 0.5 - S / 2, X = (u: number) => x0 + u * S, Y = (v: number) => y0 + v * S;
-      g.fillStyle = '#efe6c8'; g.fillRect(X(0.455), Y(0.3), S * 0.09, S * 0.7); // the trunk
-      g.beginPath(); g.moveTo(X(0.005), Y(0.34)); g.bezierCurveTo(X(0.005), Y(-0.07), X(0.995), Y(-0.07), X(0.995), Y(0.34)); g.closePath(); g.fill(); // the crown
-      // the curtain: long drooping pointed lobes either side of the trunk, curving slightly outward
-      [[0.1, 0.96, -0.03], [0.24, 1.0, -0.02], [0.37, 0.82, 0], [0.63, 0.82, 0], [0.76, 1.0, 0.02], [0.9, 0.96, 0.03]].forEach(([u, tip, bend]) => {
-        g.beginPath(); g.moveTo(X(u - 0.095), Y(0.3)); g.quadraticCurveTo(X(u - 0.095), Y(tip * 0.75), X(u + bend), Y(tip)); g.quadraticCurveTo(X(u + 0.095), Y(tip * 0.75), X(u + 0.095), Y(0.3)); g.closePath(); g.fill(); }); } },
+  { id: 'ssyc', shape: 'pennant', ratio: 1.7, // Willow Grove, from the owner's reference: bold diagonal stripes in teal and cream, a teal stripe starting at the top corner
+    draw: (g, W, H) => { fill(g, W, H, '#efe6c8'); const pitch = W * 0.27, wid = W * 0.135, lean = H * 0.545;
+      for (let i = -2; i < 5; i++) poly(g, '#0f5b63', [i * pitch, 0], [i * pitch + wid, 0], [i * pitch + wid + lean, H], [i * pitch + lean, H]); } },
   { id: 'myc', shape: 'pennant', ratio: 1.5, // established: blue, mountain green, a white cap
     draw: (g, W, H) => { fill(g, W, H, '#2a62b8'); poly(g, '#2f7d4a', [W * 0.05, H * 0.7], [W * 0.2, H * 0.28], [W * 0.35, H * 0.7]); poly(g, WHITE, [W * 0.155, H * 0.42], [W * 0.2, H * 0.28], [W * 0.245, H * 0.42]); } },
   { id: 'sryc', shape: 'pennant', ratio: 1.5, // Mission Canal: one mission bell (the owner's drawing) at the top-left, its axis pointing straight at the corner, cream on mission-tile red, a plain field
