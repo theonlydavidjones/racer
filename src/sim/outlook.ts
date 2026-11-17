@@ -93,7 +93,7 @@ export function outlookFor(w: SimView, exact = false): Outlook {
     let v = currents.get(k);
     if (!v) {
       if (m / 2 !== fieldT) { fieldT = m / 2; field.setTime(fieldT); }
-      v = field.atShore({ x: i * 100, y: j * 100 });
+      v = field.atShoreKept({ x: i * 100, y: j * 100 }); // (the shore's share kept for each point: the same current)
       if (currents.size > 200000) currents.clear();
       currents.set(k, v);
     }

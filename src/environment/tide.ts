@@ -444,6 +444,31 @@ export class CurrentField {
    */
   /** (`lattice`: the shore's distance off its 10 m lattice, for a boat's own current every step: environment/current.ts shoreRelief) */
   atShore(p: Vec, lattice = false): Vec {
+    const k = this.shoreShare(p, lattice), c = this.at(p, this.shareBay); // (the bay found once)
+    return { x: c.x * k, y: c.y * k };
+  }
+  /**
+   * atShore for a point asked about again and again as the tide turns (the passage planner's 100 m grid, afresh each half
+   * minute of its clock): the shore's share doesn't change with the tide, so it's kept by p's exact coordinates, the
+   * same number worked out once. (Not for a boat's own current, which is never at the same spot twice.)
+   */
+  atShoreKept(p: Vec): Vec {
+    let row = this.kept.get(p.x), m = row?.get(p.y);
+    if (m === undefined) {
+      m = { k: this.shoreShare(p, false), B: this.shareBay };
+      if (this.keptN >= 200000) { this.kept.clear(); this.keptN = 0; row = undefined; }
+      if (!row) { row = new Map(); this.kept.set(p.x, row); }
+      row.set(p.y, m); this.keptN++;
+    }
+    const c = this.at(p, m.B);
+    return { x: c.x * m.k, y: c.y * m.k };
+  }
+  private kept = new Map<number, Map<number, { k: number; B: Bay | null }>>();
+  private keptN = 0;
+  /** shoreShare's bay for p (found there once). */
+  private shareBay: Bay | null = null;
+  /** How much of the stream the shore lets by at p (atShore's factor; the tide doesn't change it); its bay in shareBay. */
+  private shoreShare(p: Vec, lattice: boolean): number {
     let dn = Infinity;
     { const list = this.near(p); for (let k = 0; k < list.length; k++) { const i = list[k], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } } // (the nearest in sight is always among them)
     dn = Math.sqrt(dn);
@@ -451,8 +476,8 @@ export class CurrentField {
     const B = bayAt(p);
     let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
     for (const k of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - k.mouth.x, p.y - k.mouth.y) / B!.hand);
-    const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
-    return { x: c.x * k, y: c.y * k };
+    this.shareBay = B;
+    return 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay);
   }
 }
 
