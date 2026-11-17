@@ -582,6 +582,14 @@ What's planned, roughly in order. Done work is described in the README.
      stability. if only one crew, they would hold the jib sheet and the traveller." The hands go on the lee jib sheet's
      tail and the traveller or mainsheet; the middle hand's aft foot hooked under the thwart. Checked from both sides on
      both tacks.
+   - Arms through bodies in a tack (Crew Figures, 17 November; from the owner's "his right arm seems to extend through his
+     torso"; bug; next; most of a day): tests/crewarms.test.ts holds the steady poses (sitting out, the lines in hand);
+     through a tack in 15 and 18 kt, getting ready, crossing and hiking again on the new side, the hikers' arms pass
+     through their own torsos by up to 12 cm in many frames, the lone hand's getting up off the cabin top to the rail too.
+     Hands go straight from place to place, through the chest and thighs, and the tack's poses don't keep each hand on its
+     side; a hand put to rest on the lap sinks 3–4 cm into the thigh (lifting it pushed elbows forward: crewfig's arm checks).
+     A test of its own first, failing on main (every frame of a tack and of the moves, both tacks, one and two crew),
+     then hands that go round the torso and poses with each hand on its own side. Checked from both sides on both tacks.
    - Open question (Coordinator, 14 November; from the physics review of claude/crew-mast-sheets): in about 16 kt and
      up the crew won't leave the rail to set the lazy jib car (crewWork.ts carJob: not while she needs their weight), so
      after a change of breeze she sails the next tack on the old car. Arguably right: a good crew stays hiked and sets
