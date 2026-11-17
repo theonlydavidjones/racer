@@ -133,12 +133,21 @@ export const PARODY_BURGEES: Burgee[] = [
   { id: 'tiyc', shape: 'pennant', ratio: 1.6, // Clipper Cove, from the owner's reference (to flag for IP review: the layout is a real club's): a red hoist panel bearing one gold clipper under sail, then navy and white stripes to the point
     draw: (g, W, H) => { fill(g, W, H, WHITE); rect(g, '#d8312b', 0, 0, W * 0.41, H);
       for (let i = 0; i < 9; i += 2) rect(g, '#14196b', W * (0.41 + i * 0.07), 0, W * 0.07, H);
-      const gold = '#f4c542', x0 = W * 0.04, y0 = H * 0.26, w = W * 0.32, h = H * 0.5, T = ([x, y]: P): P => [x0 + x * w, y0 + y * h];
-      const go = (pts: number[][]) => poly(g, gold, ...(pts as P[]).map(T));
-      go([[0.02, 0.74], [0.98, 0.74], [0.86, 0.92], [0.14, 0.92]]); // the hull
-      go([[0.96, 0.74], [1.1, 0.66], [1.1, 0.71], [0.98, 0.79]]); // the bowsprit, bow to the fly
-      for (const m of [0.16, 0.42, 0.68]) go([[m - 0.1, 0.12], [m + 0.1, 0.12], [m + 0.115, 0.66], [m - 0.115, 0.66]]); // three square sails, a gap between each
-      go([[0.85, 0.66], [0.85, 0.22], [1.07, 0.66]]); } },
+      const gold = '#f4c542', x0 = W * 0.05, y0 = H * 0.25, w = W * 0.28, h = H * 0.54;
+      const X = (x: number) => x0 + x * w, Y = (y: number) => y0 + y * h;
+      g.fillStyle = gold; g.strokeStyle = gold; g.lineCap = 'butt';
+      // the hull: a long, low, sweeping sheer, the stern a little raised, the bow raked
+      g.beginPath(); g.moveTo(X(0.0), Y(0.7)); g.quadraticCurveTo(X(0.5), Y(0.84), X(1.04), Y(0.66)); g.lineTo(X(0.9), Y(0.93)); g.quadraticCurveTo(X(0.5), Y(1.0), X(0.1), Y(0.94)); g.closePath(); g.fill();
+      g.lineWidth = h * 0.045; g.beginPath(); g.moveTo(X(1.0), Y(0.68)); g.lineTo(X(1.17), Y(0.56)); g.stroke(); // the bowsprit
+      // three masts, each carrying two billowed square sails with a gap between
+      for (const m of [0.2, 0.46, 0.72]) {
+        g.lineWidth = h * 0.03; g.beginPath(); g.moveTo(X(m), Y(0.74)); g.lineTo(X(m - 0.015), Y(0.04)); g.stroke();
+        for (const [t, b, hw] of [[0.07, 0.3, 0.075], [0.36, 0.69, 0.11]]) {
+          g.beginPath(); g.moveTo(X(m - hw), Y(t)); g.lineTo(X(m + hw), Y(t)); g.lineTo(X(m + hw * 1.06), Y(b));
+          g.quadraticCurveTo(X(m), Y(b + 0.05), X(m - hw * 1.06), Y(b)); g.closePath(); g.fill();
+        }
+      }
+      g.beginPath(); g.moveTo(X(0.84), Y(0.68)); g.lineTo(X(0.84), Y(0.26)); g.lineTo(X(1.12), Y(0.62)); g.closePath(); g.fill(); } },
   // ---- Marin
   { id: 'sfyc', shape: 'swallow', ratio: 1.67, // the reference classic, the oldest club: strict red, white and dark blue; a white field under a double border, one dark-blue anchor (the first to drop one on this coast)
     draw: (g, W, H) => { fill(g, W, H, WHITE); border(g, W, H, 'swallow', RED, 0.075); border(g, W, H, 'swallow', NAVY, 0.045);
