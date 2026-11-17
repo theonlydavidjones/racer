@@ -2527,6 +2527,7 @@ export class World {
   /** The showroom's clock moved (the time she's shown at): the same day and place, lit for the new hour (ROADMAP 8v). */
   setClock(tideTime: string): void {
     this.settings.tideTime = tideTime; this.gunUtc = sfLocalToUtcMin(this.raceDate, tideTime || '12:00');
+    this.ways = newWays(); // (the traffic's clock has jumped: each vessel starts on her schedule, on her line)
     for (const b of this.boats) if (b.ensign) b.ensignNight = !ensignDue(this.clockUtc, inBasin(b), false); // (her ensign, struck at sunset)
   }
   applyConditions(next: Settings): void {

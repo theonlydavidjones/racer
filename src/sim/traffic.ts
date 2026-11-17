@@ -86,6 +86,9 @@ const SLOW = 0.3, ROOM_IN = 50, ROOM_K = 0.25;
  * meet within STOP_S seconds; farther off, slowing gives the boat time to go by.
  */
 export const TURN_DEG_S = 3, SPEED_RATE = 0.08, STOP_S = 60;
+/** A new choice must clear every boat by this much more than it needs (m): her plan is a forecast, and she keeps a
+ * choice while it still clears at all (so she doesn't swap on a few meters). An estimate. */
+const MARGIN = 25;
 /**
  * The run-to-run variation (the owner, 17 Nov 2026: a ferry doesn't keep an exact course on a perfect schedule):
  * - a departure up to half the service's dwell late: 97% of SF Bay Ferry trips arrive within 5 minutes of schedule (WETA's
@@ -101,12 +104,13 @@ export const LATE_S = 85, XTRACK = 40;
  * Each service's give-way state: World state, stepped with the race (so the same race gives the same give-way in the
  * page's mirror, a replay and a ghost). `off`: how far she is to starboard of her line (m), `tgt` where she's going, `rate`
  * how fast she's getting there (m/s); `lag`: the seconds behind her schedule that slowing and turning off her line have
- * cost her; `slow`: her speed's share now, and `slowTgt` what she's easing it to. `hist`: her `off`, `lag`, `slow` and `rate` every HIST_S of the traffic's clock for the
+ * cost her; `slow`: her speed's share now, and `slowTgt` what she's easing it to; `h`: her heading, the way she last
+ * moved (NaN alongside). `hist`: her `off`, `lag`, `slow` and `h` every HIST_S of the traffic's clock for the
  * last 4 minutes (her wake's arms are where she was, not where she is); `histT`, the last of those slots.
  */
-export interface Way { off: number; tgt: number; rate: number; lag: number; slow: number; slowTgt: number; hist: number[]; histT: number }
-export const newWays = (): Way[] => SERVICES.map(() => ({ off: 0, tgt: 0, rate: 0, lag: 0, slow: 1, slowTgt: 1, hist: [], histT: NaN }));
-const HIST_N = 4; // (off, lag, slow, rate in each slot)
+export interface Way { off: number; tgt: number; rate: number; lag: number; slow: number; slowTgt: number; h: number; hist: number[]; histT: number }
+export const newWays = (): Way[] => SERVICES.map(() => ({ off: 0, tgt: 0, rate: 0, lag: 0, slow: 1, slowTgt: 1, h: NaN, hist: [], histT: NaN }));
+const HIST_N = 4; // (off, lag, slow, h in each slot)
 const HIST = 60, HIST_S = 4;
 
 /** A route's geometry: its points, the distance along it to each, and each leg's direction. */
@@ -206,8 +210,9 @@ const softMin = (a: number, b: number, e = ROOM_EASE) => { const h = Math.max(e 
 function placeAt(P: Path, s: number, dir: number, off: number): Vec {
   return pathAt(P, s, held(off, room(P, s)) * dir);
 }
-/** Her offset `off` held within ±lim, the corner where the limit takes over rounded (a hard one turned her 14° at once). */
-const held = (off: number, lim: number) => Math.sign(off) * Math.max(0, softMin(Math.abs(off), lim, 30));
+/** Her offset `off` held within ±lim, smoothly: near `off` itself well inside the limit, closing on the limit beyond it,
+ * with no corner where it takes over (a hard one turned her 14° at once) and no flat spot near her line. */
+const held = (off: number, lim: number) => lim <= 1e-6 ? 0 : off / Math.pow(1 + (Math.abs(off) / lim) ** 4, 0.25);
 
 /** How far she goes for each meter along her line (≥ about 1): more on the outside of a bend, or easing off her line. */
 function stretch(P: Path, s: number, dir: number, off: number): number {
@@ -219,23 +224,24 @@ function stretch(P: Path, s: number, dir: number, off: number): number {
 const madeGood = (v: number, slow: number, rate: number) => Math.sqrt(Math.max(0, (v * slow) ** 2 - rate * rate));
 /** The vessel itself, from her schedule and her give-way state (`hist`: her state then, for her wake). Her heading and
  * speed are the way she's actually moving: along her line, and across it as she alters. */
-function vesselOf(sv: Service, id: number, t: number, seed: number, w?: Way, then?: { off: number; lag: number; slow: number; rate: number }): Vessel {
+function vesselOf(sv: Service, id: number, t: number, seed: number, w?: Way, then?: { off: number; lag: number; slow: number; h: number }): Vessel {
   const P = PATH[sv.route], st = then ?? w, o = at(sv, id, t - (st?.lag ?? 0), seed);
   const off = o.off + (st?.off ?? 0), p = placeAt(P, o.s, o.dir, off);
   if (!o.moving) { const q = placeAt(P, o.s - o.dir, o.dir, off); return { id, kind: sv.kind, x: p.x, y: p.y, h: brg(p.x - q.x, p.y - q.y), v: 0, moving: false }; }
   // (her speed over the ground, slowed and less what she gives to crossing her line, made good along her line: a meter
   // of it is `stretch` m of her own way round a bend or out to an offset, so her line goes by that much slower)
-  const rate = st?.rate ?? 0, along = madeGood(o.v, st?.slow ?? 1, rate) / stretch(P, o.s, o.dir, off);
+  const rate = then ? 0 : w?.rate ?? 0, along = madeGood(o.v, st?.slow ?? 1, rate) / stretch(P, o.s, o.dir, off), known = st?.h;
   if (along < 1e-3) { // (stopped out on the water: heading along her own way there)
     const end = o.s + o.dir < 0 || o.s + o.dir > P.total, q = placeAt(P, end ? o.s - o.dir : o.s + o.dir, o.dir, off);
-    return { id, kind: sv.kind, x: p.x, y: p.y, h: end ? brg(p.x - q.x, p.y - q.y) : brg(q.x - p.x, q.y - p.y), v: 0, moving: true };
+    return { id, kind: sv.kind, x: p.x, y: p.y, h: known != null && known === known ? known : end ? brg(p.x - q.x, p.y - q.y) : brg(q.x - p.x, q.y - p.y), v: 0, moving: true };
   }
   // (her heading: along her own way at her offset (at her route's end, the meter before), turned by her crossing it at
   // `rate`; that turn fading as she nearly stops, where crossing and going ahead fall away together)
   const end = o.s + o.dir < 0 || o.s + o.dir > P.total;
   const q = end ? placeAt(P, o.s - o.dir, o.dir, off) : placeAt(P, o.s + o.dir, o.dir, off), sp = o.v * (st?.slow ?? 1);
   const way = end ? brg(p.x - q.x, p.y - q.y) : brg(q.x - p.x, q.y - p.y), crab = Math.atan2(rate, madeGood(o.v, st?.slow ?? 1, rate)) / D2R * Math.min(1, sp / 2);
-  return { id, kind: sv.kind, x: p.x, y: p.y, h: (way + crab + 360) % 360, v: sp, moving: true }; // (advance keeps her moving at just this speed)
+  // (where advance has stepped her, the way she actually moved last: that's her heading)
+  return { id, kind: sv.kind, x: p.x, y: p.y, h: known != null && known === known ? known : (way + crab + 360) % 360, v: sp, moving: true }; // (advance keeps her moving at just this speed)
 }
 
 /** Closest approach of two straight tracks over the next `horizon` s: when (s) and how near (m). */
@@ -275,10 +281,13 @@ export class Traffic {
       const K = 2, N = Math.round((ACT_S + 60) / K); // (looked at every K s, out to a minute past ACT_S)
       // her way ahead holding offset g at speed share sf: getting to g at the alteration's rate, making v·sf·cos along
       // her line meanwhile; past her route's end, at her berth. Each point and how far off her line she is there
+      // (her turn builds up at TURN_DEG_S: across her line she gets ½·acc·k² until she's crossing it at full rate)
       const plan = (g: number, sf: number) => {
-        const pts: Vec[] = [], lats: number[] = [], lat = Math.max(1e-6, v * sf * sinA), T = Math.abs(g - w.off) / lat;
+        const pts: Vec[] = [], lats: number[] = [], lat = Math.max(1e-6, v * sf * sinA), acc = Math.max(1e-6, v * sf * TURN_DEG_S * D2R), tr = lat / acc;
+        const d = Math.abs(g - w.off), across = (k: number) => Math.min(d, k < tr ? 0.5 * acc * k * k : 0.5 * acc * tr * tr + lat * (k - tr));
+        const T = d <= 0.5 * acc * tr * tr ? Math.sqrt(2 * d / acc) : tr + (d - 0.5 * acc * tr * tr) / lat;
         for (let n = 0; n <= N; n++) {
-          const k = n * K, side = w.off + Math.sign(g - w.off) * Math.min(Math.abs(g - w.off), lat * k);
+          const k = n * K, side = w.off + Math.sign(g - w.off) * across(k);
           const s = o.s + o.dir * (v * sf * k - v * sf * (1 - Math.cos(ALTER_DEG * D2R)) * Math.min(k, T)), lim = room(P, s);
           pts.push(placeAt(P, s, o.dir, o.off + side)); lats.push(held(o.off + side, lim));
         }
@@ -317,44 +326,49 @@ export class Traffic {
       // (water to turn into: looked for only where she'd be off her line by more than a crossing's own spread; her line
       // itself, and her way in to her berth, are her route's water)
       const water = (p: { pts: Vec[]; lats: number[] }) => {
-        for (let n = 0; n <= Math.min(N, ACT_S / K); n += 5) if (Math.abs(p.lats[n]) > XTRACK && !clearOf(p.pts[n])) return false;
+        for (let n = 0; n <= Math.min(N, ACT_S / K); n += 2) if (Math.abs(p.lats[n]) > XTRACK && !clearOf(p.pts[n])) return false;
         return true;
       };
+      // the choices: every offset at her full speed (with MARGIN to spare: her plan is a forecast); failing those, the
+      // roomiest few slowed. Turning is preferred to slowing, astern of a boat to across her bow, and starboard
+      const choose = (slowed: boolean) => {
+        let best: { g: number; sf: number } | null = null, bestCost = Infinity;
+        const tried: { g: number; sf: number; worst: number; when: number }[] = [];
+        const consider = (g: number, sf: number) => {
+          const p = plan(g, sf); if (!water(p)) return;
+          const m = meet(p); tried.push({ g, sf, worst: m.worst, when: m.when });
+          if (m.worst < MARGIN) return;
+          const cost = Math.abs(g - w.off) + (m.ahead ? 150 : 0) + (g < w.off ? 20 : 0) + (1 - sf) * 300;
+          if (cost < bestCost) { best = { g, sf }; bestCost = cost; }
+        };
+        for (let g = -MAX_OFF; g <= MAX_OFF; g += 25) consider(g, 1);
+        if (!best && slowed) {
+          const roomiest = [...tried].sort((x, y) => y.worst - x.worst).slice(0, 3).map(c => c.g);
+          for (const g of new Set([...roomiest, w.tgt, 0])) for (const sf of [0.6, SLOW]) consider(g, sf);
+        }
+        return { best: best as { g: number; sf: number } | null, tried };
+      };
       const now = meet(cur, true);
-      if (!now.close && now.worst >= 0 && water(cur)) { // nothing to clear where she's going: back to her line, once that's clear too
+      if (!now.close && now.worst >= 0 && water(cur)) { // nothing to clear where she's going (her choice holds while it clears)
         if (w.tgt !== 0 || w.slowTgt !== 1) {
-          // (of every boat about, those she's past as well: going back across her line she mustn't close one astern of her beam)
+          // back to her line once that's clear too (of every boat about, those she's past as well: going back across her
+          // line she mustn't close one astern of her beam); slowed, back up to speed as soon as any offset allows it
           const line = plan(0, 1), back = meet(line, false, range);
-          if (!back.close && back.worst >= 0 && water(line)) { w.tgt = 0; w.slowTgt = 1; }
-          else if (w.slowTgt !== 1) { const go = plan(w.tgt, 1), m = meet(go, false, range); if (!m.close && m.worst >= 0) w.slowTgt = 1; }
+          if (!back.close && back.worst >= MARGIN && water(line)) { w.tgt = 0; w.slowTgt = 1; }
+          else if (w.slowTgt !== 1) { const c = choose(false); if (c.best) { w.tgt = c.best.g; w.slowTgt = 1; } }
         }
         return;
       }
-      // the choices: every offset at her full speed; failing those, the roomiest few slowed
-      let best: { g: number; sf: number } | null = null, bestCost = Infinity;
-      const tried: { g: number; sf: number; worst: number; when: number }[] = [];
-      const consider = (g: number, sf: number) => {
-        const p = plan(g, sf); if (!water(p)) return;
-        const m = meet(p); tried.push({ g, sf, worst: m.worst, when: m.when });
-        if (m.worst < 0) return;
-        const cost = Math.abs(g - w.off) + (m.ahead ? 150 : 0) + (g < w.off ? 20 : 0) + (1 - sf) * 300; // (astern of her, starboard, and turning before slowing)
-        if (cost < bestCost) { best = { g, sf }; bestCost = cost; }
-      };
-      for (let g = -MAX_OFF; g <= MAX_OFF; g += 25) consider(g, 1);
-      if (!best) {
-        const roomiest = [...tried].sort((a, b) => b.worst - a.worst).slice(0, 3).map(c => c.g);
-        for (const g of new Set([...roomiest, w.tgt, 0])) for (const sf of [0.6, SLOW]) consider(g, sf);
-      }
-      const chosen = best as { g: number; sf: number } | null;
-      if (chosen) { w.tgt = chosen.g; w.slowTgt = chosen.sf; return; }
-      // nowhere clears: the most room, held unless another is better by 20 m (no swinging between near-equal sides);
-      // slowed, and stopped only for a boat she'd meet within STOP_S
-      if (!tried.length) { w.tgt = 0; w.slowTgt = SLOW; return; } // (no water to turn into: on her line, slowed)
-      const keep = tried.find(c => c.g === w.tgt && c.sf === Math.min(w.slowTgt, 1)) ?? tried.find(c => c.g === w.tgt);
-      let pick = tried.reduce((a, c) => c.worst > a.worst ? c : a);
+      const c = choose(true);
+      if (c.best) { w.tgt = c.best.g; w.slowTgt = c.best.sf; return; }
+      // nowhere clears: the most room, at the speed it was judged at, held unless another is better by 20 m (no
+      // swinging between near-equal sides); stopped only for a boat she'd otherwise meet within STOP_S
+      if (!c.tried.length) { w.tgt = 0; w.slowTgt = SLOW; return; } // (no water to turn into: on her line, slowed)
+      const keep = c.tried.find(x => x.g === w.tgt && x.sf === w.slowTgt);
+      let pick = c.tried.reduce((x, y) => y.worst > x.worst ? y : x);
       if (keep && keep.worst >= pick.worst - 20) pick = keep;
       w.tgt = pick.g;
-      w.slowTgt = pick.when <= STOP_S && pick.worst < -sep / 2 ? 0 : Math.min(pick.sf, SLOW);
+      w.slowTgt = pick.when <= STOP_S && pick.worst < -sep / 2 ? 0 : pick.sf;
     });
   }
 
@@ -370,14 +384,21 @@ export class Traffic {
         w.slow += Math.sign(w.slowTgt - w.slow) * Math.min(Math.abs(w.slowTgt - w.slow), SPEED_RATE * dt);
         // (across her line at up to v·sin(ALTER_DEG); the rate of that changing as fast as her turning allows, and easing
         // off in time to arrive at her offset; stopped, she holds where she is)
-        const sp = o.v * w.slow, top = sp * Math.sin(ALTER_DEG * D2R), acc = Math.max(1e-6, sp * TURN_DEG_S * D2R), d = w.tgt - w.off;
+        // (where she's going held to 1.5 × her room there, where `held` has all but closed on it: she eases in to that,
+        // as to any offset, rather than meeting it all at once)
+        const P = PATH[sv.route], lim = 1.5 * room(P, o.s), aim = Math.max(-lim, Math.min(lim, o.off + w.tgt)) - o.off;
+        const sp = o.v * w.slow, top = sp * Math.sin(ALTER_DEG * D2R), acc = Math.max(1e-6, sp * TURN_DEG_S * D2R), d = aim - w.off;
         // (taking all way off, she stops crossing her line first: her bow comes back to her way as she stops)
         const want = w.slowTgt === 0 ? 0 : Math.sign(d) * Math.min(top, Math.sqrt(2 * acc * Math.abs(d)));
         w.rate += Math.sign(want - w.rate) * Math.min(Math.abs(want - w.rate), acc * dt);
         w.rate = Math.max(-top, Math.min(top, w.rate));
-        const P = PATH[sv.route], sPrev = Math.max(0, Math.min(P.total, o.s - o.dir * o.v * dt)), p0 = placeAt(P, sPrev, o.dir, o.off + w.off);
+        const sPrev = Math.max(0, Math.min(P.total, o.s - o.dir * o.v * dt)), p0 = placeAt(P, sPrev, o.dir, o.off + w.off);
         w.off += w.rate * dt;
-        if (Math.abs(w.tgt - w.off) < 0.05 && Math.abs(w.rate) < acc * dt) { w.off = w.tgt; w.rate = 0; }
+        if (Math.abs(aim - w.off) < 1e-3 && Math.abs(w.rate) < acc * dt) { w.off = aim; w.rate = 0; } // (a millimeter: a step is only some 15 cm, and a bigger snap turned her heading 15° at once)
+        // (and never past twice her room, should her room close faster than she can ease in: her offset can't run on past
+        // what she can actually be at)
+        const tot = o.off + w.off;
+        if (Math.abs(tot) > 2 * lim / 1.5) { w.off = Math.sign(tot) * 2 * lim / 1.5 - o.off; w.rate = 0; }
         // how far along her line she gets this step: as far as makes her own way, over the ground, her speed × dt (she
         // goes the long way round the outside of a bend, and across her line as she alters): the rest is lag. (Her way's
         // length grows as the root of its two parts' squares: across, fixed by her offset; along, by how far she goes)
@@ -392,12 +413,17 @@ export class Traffic {
           if (d2 > 1e-9) frac *= Math.sqrt(g) / d2;
         }
         w.lag += dt * (1 - Math.min(frac, 10));
+        // (her heading: the way she actually moved this step)
+        const p3 = placeAt(P, sPrev + o.dir * o.v * dt * Math.min(frac, 10), o.dir, o.off + w.off);
+        if (Math.hypot(p3.x - p0.x, p3.y - p0.y) > 1e-4) w.h = brg(p3.x - p0.x, p3.y - p0.y);
       } else { // (alongside, on her line, making up lost time, or waiting out what she gained on the inside of a bend)
-        w.off = w.tgt = w.rate = 0; w.slow = w.slowTgt = 1;
-        w.lag = w.lag > 0 ? Math.max(0, w.lag - dt) : Math.min(0, w.lag + dt);
+        w.off = w.tgt = w.rate = 0; w.slow = w.slowTgt = 1; w.h = NaN;
+        // (her clock held only while that keeps her alongside: held at the step she came in, she'd read as still under way)
+        const lag = w.lag > 0 ? Math.max(0, w.lag - dt) : Math.min(0, w.lag + dt);
+        if (!at(sv, id, t - lag, this.seed).moving) w.lag = lag;
       }
       const slot = Math.floor(t / HIST_S);
-      if (slot !== w.histT) { w.histT = slot; w.hist.push(w.off, w.lag, w.slow, w.rate); if (w.hist.length > HIST_N * HIST) w.hist.splice(0, HIST_N); }
+      if (slot !== w.histT) { w.histT = slot; w.hist.push(w.off, w.lag, w.slow, w.h); if (w.hist.length > HIST_N * HIST) w.hist.splice(0, HIST_N); }
     });
   }
 
@@ -416,7 +442,7 @@ export class Traffic {
       for (let age = 4; age < 240; age += 4) {
         // (her state in the slot that time fell in: the newest slot is the one t is in)
         const back = Math.floor(t / HIST_S) - Math.floor((t - age) / HIST_S), k = w && GIVES_WAY[sv.kind] ? w.hist.length / HIST_N - 1 - back : -1, H = w?.hist;
-        const then = k >= 0 ? { off: H![HIST_N * k], lag: H![HIST_N * k + 1], slow: H![HIST_N * k + 2], rate: H![HIST_N * k + 3] } : w && GIVES_WAY[sv.kind] ? { off: w.off, lag: w.lag, slow: w.slow, rate: w.rate } : undefined;
+        const then = k >= 0 ? { off: H![HIST_N * k], lag: H![HIST_N * k + 1], slow: H![HIST_N * k + 2], h: H![HIST_N * k + 3] } : w && GIVES_WAY[sv.kind] ? { off: w.off, lag: w.lag, slow: w.slow, h: w.h } : undefined;
         const q = vesselOf(sv, i, t - age, this.seed, undefined, then);
         if (!q.moving) continue;
         const u = { x: Math.sin(q.h * D2R), y: Math.cos(q.h * D2R) }, n = { x: u.y, y: -u.x };
