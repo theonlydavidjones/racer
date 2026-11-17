@@ -109,7 +109,13 @@ function crossedGuns(g: G, cx: number, cy: number, h: number, c: string, ground:
   for (const ring of GUNS) { g.beginPath(); ring.forEach(([px, py], i) => (i ? g.lineTo(px, py) : g.moveTo(px, py))); g.closePath(); g.fill(); }
   // Where the barrels cross, the one in front (rising to the right) gets a gap down both long sides, so its white never runs into the white of the barrel behind it.
   g.strokeStyle = ground; g.lineWidth = 0.02; g.lineCap = 'butt';
-  for (const [a, b] of [[[0.679, 0.466], [0.458, 0.697]], [[0.526, 0.32], [0.305, 0.551]]]) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  for (const [a, b] of [[[0.693, 0.451], [0.486, 0.668]], [[0.54, 0.305], [0.332, 0.522]]]) { g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+  // The four sharp corners where an arm of the barrel behind meets the sides of the front one are rounded a little.
+  g.fillStyle = ground; const r = 0.03;
+  for (const [x, y, ax, ay, bx, by] of [[0.6465, 0.5, 0.6905, 0.7234, -0.7234, 0.6905], [0.5, 0.6535, 0.6905, 0.7234, 0.7234, -0.6905], [0.5, 0.3465, -0.6905, -0.7234, -0.7234, 0.6905], [0.3535, 0.5, -0.6905, -0.7234, 0.7234, -0.6905]]) {
+    const a0 = Math.atan2(-by, -bx); let d = Math.atan2(-ay, -ax) - a0; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + ax * r, y + ay * r); g.arc(x + (ax + bx) * r, y + (ay + by) * r, r, a0 + 0, a0 + d, d < 0); g.lineTo(x + bx * r, y + by * r); g.closePath(); g.fill();
+  }
   g.restore();
 }
 
