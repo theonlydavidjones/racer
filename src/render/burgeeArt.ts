@@ -24,17 +24,16 @@ const border = (g: G, W: number, H: number, shape: 'pennant' | 'swallow', c: str
 
 
 /**
- * A white oak leaf, as a silhouette: four rounded lobes a side, deep sinuses between, a short stem. (x, y) is its middle;
- * `len` its length from the tip to the foot of the stem; `ang` the lean from upright, clockwise, in radians.
+ * An oak leaf's silhouette, as one outline (about 70 points: its lobes, notches and long thin stem), traced from the
+ * owner's reference picture, x across from the leaf's middle and y down from its tip, both in units of the whole leaf's
+ * length (stem included).
  */
+const OAK_LEAF: P[] = [[-0.004, 0.0], [0.018, 0.007], [0.047, 0.036], [0.047, 0.073], [0.055, 0.08], [0.069, 0.073], [0.091, 0.08], [0.091, 0.131], [0.084, 0.139], [0.091, 0.168], [0.164, 0.139], [0.193, 0.168], [0.193, 0.241], [0.142, 0.336], [0.142, 0.35], [0.164, 0.372], [0.179, 0.372], [0.281, 0.321], [0.347, 0.321], [0.361, 0.336], [0.354, 0.409], [0.318, 0.474], [0.274, 0.518], [0.281, 0.54], [0.318, 0.547], [0.354, 0.577], [0.347, 0.599], [0.303, 0.642], [0.179, 0.693], [0.223, 0.737], [0.201, 0.766], [0.128, 0.796], [0.069, 0.796], [0.018, 0.839], [0.011, 0.854], [0.011, 1.0], [0.004, 1.0], [-0.011, 1.0], [-0.011, 0.854], [-0.018, 0.839], [-0.069, 0.796], [-0.128, 0.796], [-0.201, 0.766], [-0.223, 0.745], [-0.223, 0.73], [-0.193, 0.715], [-0.179, 0.693], [-0.303, 0.642], [-0.347, 0.599], [-0.354, 0.577], [-0.332, 0.555], [-0.281, 0.54], [-0.274, 0.518], [-0.332, 0.453], [-0.361, 0.387], [-0.361, 0.336], [-0.339, 0.321], [-0.281, 0.321], [-0.172, 0.372], [-0.142, 0.35], [-0.142, 0.336], [-0.172, 0.299], [-0.193, 0.241], [-0.193, 0.168], [-0.172, 0.139], [-0.091, 0.168], [-0.084, 0.161], [-0.091, 0.08], [-0.084, 0.073], [-0.055, 0.08], [-0.047, 0.073], [-0.047, 0.036]];
+/** The leaf drawn with its middle at (x, y), `len` long from tip to stem's end, leaning `ang` radians clockwise from upright. */
 function oakLeaf(g: G, x: number, y: number, len: number, ang: number, c: string): void {
-  const half: P[] = [[0, 0], [0.05, 0], [0.1, 0.04], [0.11, 0.1], [0.09, 0.16], [0.075, 0.2], [0.12, 0.2], [0.2, 0.21], [0.245, 0.27], [0.24, 0.34], [0.17, 0.39], [0.13, 0.42], [0.2, 0.42], [0.3, 0.44], [0.37, 0.5], [0.37, 0.58], [0.3, 0.63], [0.2, 0.66], [0.25, 0.68], [0.31, 0.72], [0.31, 0.79], [0.24, 0.84], [0.12, 0.87], [0.04, 0.91], [0.02, 0.94], [0.02, 1]];
-  const pts: P[] = [...half, ...half.slice(0, -1).reverse().map(([a, b]): P => [-a, b])];
   g.save(); g.translate(x, y); g.rotate(ang); g.translate(0, -len / 2);
-  g.fillStyle = c; g.strokeStyle = c; g.lineJoin = 'round'; g.lineWidth = len * 0.012;
-  // (a smooth outline: curves through the midpoints of the points, so the lobes are round)
-  const n = pts.length, mid = (i: number): P => [(pts[i % n][0] + pts[(i + 1) % n][0]) / 2 * len, (pts[i % n][1] + pts[(i + 1) % n][1]) / 2 * len];
-  g.beginPath(); g.moveTo(...mid(0)); for (let i = 1; i <= n; i++) { const m = mid(i); g.quadraticCurveTo(pts[i % n][0] * len, pts[i % n][1] * len, m[0], m[1]); } g.closePath(); g.fill(); g.stroke(); g.restore();
+  g.fillStyle = c; g.strokeStyle = c; g.lineJoin = 'round'; g.lineWidth = len * 0.01;
+  g.beginPath(); OAK_LEAF.forEach(([a, b], i) => i ? g.lineTo(a * len, b * len) : g.moveTo(a * len, b * len)); g.closePath(); g.fill(); g.stroke(); g.restore();
 }
 
 export const PARODY_BURGEES: Burgee[] = [
@@ -101,7 +100,7 @@ export const PARODY_BURGEES: Burgee[] = [
       fill(g, W, H, WHITE);
       rect(g, NAVY, 0, 0, W * 0.4, H); // the hoist panel
       for (let k = 0; W * (0.4 + (2 * k + 1) * 0.0625) < W; k++) rect(g, RED, W * (0.4 + (2 * k + 1) * 0.0625), 0, W * 0.0625, H); // the stripes, red and white
-      oakLeaf(g, X0 + H * 0.0, H * 0.5, H * 0.56, 0.3, WHITE); // one white oak leaf, leaning a little toward the fly, well inside the panel
+      oakLeaf(g, X0, H * 0.515, H * 0.58, 0.3, WHITE); // one white oak leaf, leaning a little toward the fly, well inside the panel
       border(g, W, H, 'pennant', BORDER, 0.045); rect(g, WHITE, 0, 0, W * 0.04, H); } },
   { id: 'oyc', shape: 'pennant', ratio: 1.5, // established: navy, white and green; one oak tree
     draw: (g, W, H) => { fill(g, W, H, NAVY); rect(g, WHITE, W * 0.18, H * 0.56, W * 0.04, H * 0.2); dot(g, '#2e8b3e', W * 0.2, H * 0.42, H * 0.17); } },
