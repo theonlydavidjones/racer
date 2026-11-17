@@ -17,7 +17,7 @@ class El {
   get textContent() { return this.txt + this.children.map(c => c.textContent).join(''); }
   set textContent(v: string) { this.txt = v; this.children = []; }
   set innerHTML(_: string) { this.children = []; this.txt = ''; }
-  get lastChild() { return this.children.at(-1) ?? null; }
+  get lastChild(): El | null { return this.children.at(-1) ?? null; }
   appendChild(c: El) { this.children.push(c); return c; }
   removeAttribute(a: string) { if (a === 'title') this.title = ''; }
 }
@@ -29,7 +29,7 @@ describe('the destination tag follows the destination', () => {
   it('moves and renames with each new destination, shows a pin for a spot, and goes when there is none', () => {
     const root = new El();
     const a = place('crissy')!, start = destMark(a)!;
-    const w = { freeSail: true, rounding: null, dest: start, boats: [], user: { leg: 0, x: a.p.x - 400, y: a.p.y - 400, mooring: null }, t: 0 } as unknown as SimView;
+    const w = { freeSail: true, rounding: null, dest: start, boats: [], user: { leg: 0, x: a.p.x - 400, y: a.p.y - 400, mooring: null }, t: 0 } as unknown as { -readonly [K in keyof SimView]: SimView[K] };
     const L = new Labels(root as unknown as HTMLElement); L.build(w);
     const cam = new THREE.PerspectiveCamera(60, 1400 / 860, 1, 50000);
     const look = (p: { x: number; y: number }) => { cam.position.set(p.x - 300, 40, -(p.y - 300)); cam.lookAt(p.x, 0, -p.y); cam.updateMatrixWorld(); cam.updateProjectionMatrix(); };
