@@ -27,7 +27,7 @@ const C = (id: string, name: string, short: string, burgee: string | null, tier:
 
 export const CLUB_TABLE: ClubInfo[] = [
   // Tier 1 · San Francisco city front
-  C('stfyc', 'St. Bartholomew Yacht Club', 'StBYC', 'stfyc'), // always in full; never "St. Bart's" (the owner)
+  C('stfyc', 'St. Felix Yacht Club', 'StFelYC', 'stfyc'), // (was St. Bartholomew; renamed by the owner, 17 Nov 2026) always in full; never "St. Fel"
   C('ggyc', 'Dorado Yacht Club', 'DYC', 'ggyc'),
   C('sbyc', 'China Basin Yacht Club', 'CBYC', 'sbyc'),
   C('bvbc', 'Dry Dock Boat Club', 'DDBC', 'bvbc'),

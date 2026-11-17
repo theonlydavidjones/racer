@@ -30,7 +30,7 @@ export const PLACES: Place[] = [
   P('baybridge', 'Bay Bridge, west span', 37.8000, -122.3800),
   P('clipper', 'Clipper Cove, Treasure Island', 37.8150, -122.3700),
   P('ti-north', 'North of Treasure Island', 37.8350, -122.3750),
-  P('m-A', 'A · St. Bartholomew outer buoy', 37.810767, -122.446817, { shape: 'sphere' }),
+  P('m-A', 'A · St. Felix outer buoy', 37.810767, -122.446817, { shape: 'sphere' }),
   P('m-X', 'X · off Dorado YC', 37.811667, -122.443333, { shape: 'cylinder' }),
   P('m-6', '6 · Fort Mason "M"', 37.811667, -122.43, { shape: 'cylinder' }),
   P('m-16', '16 · Blackaller', 37.81, -122.465, { shape: 'column', look: 'Y' }),

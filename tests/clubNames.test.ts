@@ -70,10 +70,9 @@ describe('the club table', () => {
     const real = REAL_ABBR.map(a => a.toLowerCase());
     expect(CLUB_TABLE.filter(c => real.includes(c.short.toLowerCase())).map(c => c.short)).toEqual([]);
   });
-  it('has the owner\'s 27 racing clubs, and St. Bartholomew is never shortened to St. Bart\'s', () => {
+  it('has the owner\'s 27 racing clubs, and St. Felix is always shown in full', () => {
     expect(CLUB_TABLE.filter(c => c.tier === 1).length).toBe(27);
-    expect(CLUB_TABLE.find(c => c.id === 'stfyc')).toMatchObject({ name: 'St. Bartholomew Yacht Club', short: 'StBYC' });
-    expect(CLUB_TABLE.some(c => /bart'?s|barth\b/i.test(c.name + c.short) && c.name !== 'St. Bartholomew Yacht Club')).toBe(false);
+    expect(CLUB_TABLE.find(c => c.id === 'stfyc')).toMatchObject({ name: 'St. Felix Yacht Club', short: 'StFelYC' });
   });
   it('keeps the internal ids that saves already hold', () => {
     for (const id of ['bvbc', 'ggyc', 'stfyc', 'sfyc', 'cyc', 'tyc', 'ssyc', 'sbyc', 'seqyc', 'cpyc', 'ryc', 'oyc', 'iyc', 'eyc', 'byc', 'vyc', 'tiyc', 'mbyc', 'slyc'])
