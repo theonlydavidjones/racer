@@ -28,13 +28,20 @@ export const VESSEL: Record<VesselKind, VesselType> = {
 const route = (pts: [number, number][]) => pts.map(([la, lo]) => LL(la, lo));
 // Approximate tracks (lat, lon). Ships keep to the deep water north of the race area, inside Alcatraz.
 export const ROUTES: Record<string, Vec[]> = {
-  channel: route([[37.8060, -122.5350], [37.8160, -122.4790], [37.8240, -122.4500], [37.8330, -122.4200], [37.8240, -122.3900], [37.8060, -122.3500]]),
+  // (on to Oakland under the Bay Bridge's west span and along the south side of Yerba Buena Island to the Oakland Bar
+  // Channel (US Coast Pilot 7, ch. 7): the line drawn across Treasure Island and Yerba Buena before ran over both. The
+  // line itself is an estimate, every part of it at least 100 m off the land (tests/traffic-routes.test.ts))
+  channel: route([[37.8060, -122.5350], [37.8160, -122.4790], [37.8240, -122.4500], [37.8330, -122.4200], [37.8150, -122.3950], [37.7990, -122.3790], [37.8000, -122.3640], [37.8060, -122.3500]]),
   // (out clear of the pier heads: Piers 35 to 27 reach out to 37.810; geo/shore.ts)
   sausalito: route([[37.7960, -122.3910], [37.8050, -122.3930], [37.8110, -122.4040], [37.8190, -122.4330], [37.8400, -122.4640], [37.8560, -122.4770]]),
   alcatraz: route([[37.8085, -122.4030], // (off the head of Pier 33, the Alcatraz landing)
      [37.8180, -122.4130], [37.8262, -122.4212]]),
-  // (from the berth on the west side of Pier 41, where OpenStreetMap's ferry routes end, out round Pier 45 and the Wharf's breakwater)
-  tour: route([[37.8102, -122.4135], [37.8128, -122.4140], [37.8128, -122.4300], [37.8145, -122.4560], [37.8195, -122.4760], [37.8280, -122.4790], [37.8300, -122.4500], [37.8300, -122.4250], [37.8200, -122.4120], [37.8102, -122.4135]]),
+  // (from the berth on the west side of Pier 41, where OpenStreetMap's ferry routes end, out round Pier 45 and the Wharf's
+  // breakwater; under the Golden Gate Bridge mid-span and back under it just outside, past Fort Point, as the operators'
+  // cruise is described (a tourism guide; their route maps weren't reachable from here); home round the east end of
+  // Alcatraz. The line before ran over Lime Point and across Alcatraz. The turn and the line are estimates, every part of
+  // it at least 100 m off the land with a crossing's spread (tests/traffic-routes.test.ts))
+  tour: route([[37.8102, -122.4135], [37.8128, -122.4140], [37.8128, -122.4300], [37.8145, -122.4560], [37.8165, -122.4750], [37.8180, -122.4850], [37.8215, -122.4810], [37.8240, -122.4650], [37.8300, -122.4500], [37.8310, -122.4250], [37.8280, -122.4150], [37.8200, -122.4110], [37.8102, -122.4135]]),
   coastguard: route([[37.8325, -122.4740], [37.8200, -122.4600], [37.8150, -122.4400], [37.8260, -122.4350], [37.8325, -122.4740]])
 };
 
@@ -197,7 +204,7 @@ function at(sv: Service, id: number, t: number, seed: number): OnRoute {
  */
 function room(P: Path, s: number): number {
   // (their corners eased over ROOM_EASE m, so easing out to an offset she never turns all at once)
-  let lim = ramp(Math.min(s, P.total - s) - ROOM_IN) * ROOM_K;
+  let lim = ramp(softMin(s, P.total - s) - ROOM_IN) * ROOM_K; // (soft at mid-route too: a short route's middle had a corner)
   for (let j = 1; j < P.L.length - 1; j++) {
     const c = P.c[j]; if (c.k === Infinity) continue;
     // (round a corner whose arms can't grow to her offset: no farther off than its tightest radius allows, with the room
@@ -287,7 +294,6 @@ export class Traffic {
       // her way ahead holding offset g at speed share sf: getting to g at the alteration's rate, making v·sf·cos along
       // her line meanwhile; past her route's end, at her berth. Each point and how far off her line she is there
       // (her turn builds up at TURN_DEG_S: across her line she gets ½·acc·k² until she's crossing it at full rate)
-      let sPrevPlan = o.s;
       const plan = (g: number, sf: number) => {
         const pts: Vec[] = [], lats: number[] = [], lat = Math.max(1e-6, v * sf * sinA), acc = Math.max(1e-6, v * sf * TURN_DEG_S * D2R), tr = lat / acc;
         const d = Math.abs(g - w.off), across = (k: number) => Math.min(d, k < tr ? 0.5 * acc * k * k : 0.5 * acc * tr * tr + lat * (k - tr));
@@ -295,17 +301,18 @@ export class Traffic {
         // (along her line by what she makes good over the ground: v·sf a second, less what goes to crossing her line,
         // and her line going by faster on the inside of a bend, slower on the outside: each step scaled by how far the
         // last one actually took her, as advance does)
-        let s = o.s, ratio = 1 / stretch(P, o.s, o.dir, o.off + w.off);
+        // (her way's own length for a meter of her line at her offset there, as advance has it: the cos(ALTER_DEG) already
+        // takes off what goes to crossing it, so this is her way along it alone)
+        // (the stretch changes slowly along her way: looked at every fifth point, 10 s of it)
+        let s = o.s, st = 1;
         for (let n = 0; n <= N; n++) {
           const k = n * K, side = w.off + Math.sign(g - w.off) * across(k);
           if (n > 0) {
+            if ((n - 1) % 5 === 0) st = stretch(P, s, o.dir, o.off + side);
             const ground = v * sf * K * (k - K < T ? Math.cos(ALTER_DEG * D2R) : 1);
-            s = Math.max(0, Math.min(P.total, s + o.dir * ground * ratio));
+            s = Math.max(0, Math.min(P.total, s + o.dir * ground / st));
           }
-          const p = placeAt(P, s, o.dir, o.off + side);
-          if (n > 0) { const moved = hypot(p.x - pts[n - 1].x, p.y - pts[n - 1].y), step = Math.abs(s - (n > 1 ? sPrevPlan : o.s)); if (moved > 1e-6 && step > 1e-6) ratio = step / moved; }
-          sPrevPlan = s;
-          pts.push(p); lats.push(held(o.off + side, room(P, s)));
+          pts.push(placeAt(P, s, o.dir, o.off + side)); lats.push(held(o.off + side, room(P, s)));
         }
         return { pts, lats, T };
       };
