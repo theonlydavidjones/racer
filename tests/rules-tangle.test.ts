@@ -12,7 +12,7 @@ import { LOA, V } from '../src/core/math';
 // incident if they haven't parted, or she's had no steerage way since; a new breach if she has, so could have kept
 // clear. Built by hand, so it doesn't hang on how one race sails (Crew Model's crew-stations race, 14 Nov 2026: the hulls
 // overlapped at a touch (g0 = 0), a metre's drift read as parting, and a second touch 12 s on counted anew).
-function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean; every?: number; n?: number; thenB?: boolean; thenWay?: boolean }) {
+function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean; every?: number; n?: number; thenB?: boolean; thenWay?: boolean; drift?: boolean; aIdle?: boolean; bTouches?: boolean }) {
   const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', fleet: 2, current: 'slack' } as Settings, 7);
   w.t = 60; w.exactPairs = true;
   const A = o.user ? w.user : w.boats[1], B = w.boats[2];
@@ -31,9 +31,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   const run = (s: number) => {
     for (let i = 0; i < Math.round(s / DT); i++) {
       // (held: her heading and her turn both, or what she'd turn by is still there for the other boat to see coming)
+      if (o.drift) { const d = V(hB); B0.x += d.x * vB * DT; B0.y += d.y * vB * DT; } // (both making way over the ground, side by side)
       Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB, turnRate: 0, yawRate: 0 });
       if (bTurning) { B.penaltyDir = 1; B.penaltyTurned = 90; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
-      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1, penaltyTurned: 90, turnRate: 0, yawRate: 0 }); // (her turns begun: 90° into them, physics.ts countPenalty)
+      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: o.aIdle ? 0 : 1, penaltyTurned: o.aIdle ? 0 : 90, turnRate: 0, yawRate: 0 }); // (her turns begun: 90° into them, physics.ts countPenalty)
       if (o.retired) { A.retired = true; A.penalty = A.penaltyTotal = 0; A.penaltyDir = 0; } // (not racing: her contacts carry no penalty)
       else { A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty); }
       w.step(DT); w.paused = false;
@@ -54,6 +55,9 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   if (o.every) {
     for (let k = 1; k < (o.n ?? 4); k++) { off = o.apart; run(o.every - 1); off = 2; run(1); }
     // (then A gets way on, past a helmsman's reaction, and touches again: she could have kept clear)
+    // (then B, taking a penalty now, touches the pinned A (her own breach, 21.2), and A touches again 70 s on: past JAM_MAX
+    // from B's touch, so only the pin can make it the first incident's)
+    if (o.bTouches) { off = o.apart; run(o.every - 1); bTurning = true; off = 2; run(1); bTurning = false; Object.assign(B, { penalty: 0, penaltyTotal: 0, penaltyDir: 0, penaltyTurned: 0 }); off = o.apart; run(69); off = 2; run(1); return got.length * 10 + byB.length; }
     if (o.thenWay) { o.vA = 1.5; off = o.apart; run(5); o.vA = 0.08; run(3); off = 2; run(1); }
     return got.length;
   }
@@ -103,6 +107,12 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
   }, 120000);
   it('but once she has had way on since, stopping again, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 6, thenWay: true })).toBe(2);
+  }, 120000);
+  it('the other boat\'s own breach against her while she\'s pinned (a third minute in) is its own incident, and her next touch, a minute and more on, is still the first\'s', () => {
+    expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 9, aIdle: true, bTouches: true })).toBe(11); // (hers 1, B's 1)
+  }, 120000);
+  it('two boats drifting together at 0.45 m/s (light air, side by side, making way over the ground: not held), touching every 20 s for ten minutes: capped as a jam, not one incident', () => {
+    expect(tangle({ vA: 0.45, apart: NEAR, every: 20, n: 30, drift: true })).toBeGreaterThan(4);
   }, 120000);
   it('a boat with steerage way creeping into another, touching every 20 s for ten minutes, isn\'t pinned: she could keep clear, a new incident each time the tangle runs out', () => {
     expect(tangle({ vA: 0.6, apart: NEAR, every: 20, n: 30 })).toBeGreaterThan(4);

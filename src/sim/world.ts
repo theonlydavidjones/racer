@@ -114,13 +114,18 @@ const PRESSED_SLACK = 0.3;
 /** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modeling
  * cap), unless the boat at fault is pinned (PIN_SLACK). */
 const JAM_MAX = 2 * TANGLE_MAX;
-/** Pinned: the boat at fault never at steerage way (STEERAGE, the sim's one line for "could steer clear"), not for a
- * moment, through the water ahead or astern, since her last contact with the other boat, and the hulls never more than
- * PIN_SLACK past touching, m (the contact's own push apart is 1.6 m). Then her next touch is the same incident however
- * long after: she could do nothing in between (US Appeal 65). A modeling choice, from Deep Physics' seed 16 (sea-born,
- * 17 Nov 2026): a boat held in the corner of the Marina jetty at 0.00-0.34 m/s, touched again 61-76 s on with the
- * hulls never 1.9 m past touching, was given a new two-turn penalty each time. */
-const PIN_SLACK = 2.5;
+/** Pinned: the boat at fault held against the other with no way of her own since her last contact with her: then her next
+ * touch is the same incident however long after, since she could do nothing in between (US Appeal 65). Three signs, all
+ * needed: never at steerage way through the water, not for a moment (STEERAGE, the sim's one line for "could steer
+ * clear"); the hulls never more than PIN_SLACK past touching, m (the contact's own push apart is 1.6 m, CONTACT_PUSH);
+ * and held over the ground (PIN_DRIFT: under that, averaged, since the last contact; two boats drifting together at a
+ * few tenths of a knot, or carried by the tide, aren't held, and could luff clear in a minute at the 3°/s or so they
+ * have: those stay capped at JAM_MAX). Modeling choices, from Deep Physics' seed 16 (sea-born, 17 Nov 2026): a boat in
+ * the corner of the Marina jetty at 0.00-0.37 m/s through the water, making 0.07-0.08 m/s good, touched again 50-76 s
+ * on with the hulls never 1.9 m past touching, was given a new two-turn penalty each time. PIN_SLACK's margin past the
+ * push (0.9 m) is fitted to that one race. */
+const CONTACT_PUSH = 2 * 0.8, PIN_DRIFT = 0.15, PIN_DRIFT_MIN_S = 10;
+const PIN_SLACK = CONTACT_PUSH + 0.9;
 
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
@@ -403,7 +408,7 @@ export class World {
    * chooses later, or the other boat's own breach, is judged afresh. Pinned (`fmax`, `near`: see PIN_SLACK), the boat at fault
    * held against the other with no way of her own: one incident however long it lasts (Rule 44.1, "an incident"; US
    * Appeal 65, "the inevitable result of the first"). */
-  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean; fmax: number; near: boolean }>();
+  private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean; fmax: number; near: boolean; x0: number; y0: number }>();
   private lastTouch = new Map<number, { t: number; near: number[]; loaded?: boolean }>(); // (the boats within ENGAGED of her as she touched; whether her turn for it was loaded, or she declined it)
   /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
    * still going on (`on`: touching, still making her swerve, or close and closing, as a squeeze onto a mark goes on
@@ -1607,6 +1612,12 @@ export class World {
     return true;
   }
 
+  /** Held (see PIN_DRIFT): the boat at fault in a tangle has made under PIN_DRIFT good over the ground since its last contact. */
+  private heldSince(tg: { fouler: number; t: number; x0: number; y0: number }): boolean {
+    const fb = this.boats.find(b => b.id === tg.fouler);
+    return !!fb && hypot(fb.x - tg.x0, fb.y - tg.y0) < PIN_DRIFT * Math.max(this.t - tg.t, PIN_DRIFT_MIN_S);
+  }
+
   private checkPairs(): void {
     this.kcMemo = { t: this.t, m: new Map() }; // after the boats have moved this step
     const bs = this.boats, ctx = this.rulesCtx(), found: { A: Boat; B: Boat; incident: Incident<Boat> }[] = [];
@@ -1672,7 +1683,7 @@ export class World {
       if (incident.kind === 'contact') {
         A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
         const dx = B.x - A.x, dy = B.y - A.y, l = hypot(dx, dy) || 1;
-        A.x -= dx / l * 0.8; A.y -= dy / l * 0.8; B.x += dx / l * 0.8; B.y += dy / l * 0.8;
+        A.x -= dx / l * CONTACT_PUSH / 2; A.y -= dy / l * CONTACT_PUSH / 2; B.x += dx / l * CONTACT_PUSH / 2; B.y += dy / l * CONTACT_PUSH / 2;
       }
       // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
       // from that foul (not a length clear of each other since), is that same incident: no second foul. (The AI gets clear
@@ -1691,18 +1702,21 @@ export class World {
       // choose anything)
       // (pressed together, one collision going on: however long it lasts, no cap)
       const pressed = !!prior && prior.contact && !prior.opened && this.t - prior.t <= INCIDENT_COOLDOWN + 1;
-      const pinned = !!prior && prior.pen && prior.fouler === f.id && prior.near && prior.fmax < STEERAGE;
+      // (pinned: see PIN_SLACK. A live pin isn't replaced by the other boat's touch either: her breach is her own incident,
+      // and the pinned boat's next touch is still the first's)
+      const pinLive = (tg: typeof prior) => !!tg && tg.pen && !tg.clear && tg.near && tg.fmax < STEERAGE && this.heldSince(tg);
+      const pinned = !!prior && prior.fouler === f.id && pinLive(prior);
       const inWindow = !!prior && (pressed || pinned || (jammed ? this.t - prior.t < TANGLE_MAX && this.t - prior.t0 < JAM_MAX : this.t - prior.t0 < TANGLE_MAX));
       if (incident.kind !== 'hail' && prior && !prior.clear && inWindow && (prior.pen
         ? (!f.penaltyDir || jammed || (prior.fouler === f.id && !prior.steered) || !prior.parted) && (prior.fouler === f.id || jammed || !prior.parted)
         : pressed && prior.fouler === f.id)) {
-        prior.t = this.t; prior.parted = false; prior.steered = false; prior.wayT = null; prior.opened = false; prior.contact = incident.kind === 'contact'; prior.g0 = hullGap(A, B); prior.fmax = 0; prior.near = true; // (the tangle goes on)
+        prior.t = this.t; prior.parted = false; prior.steered = false; prior.wayT = null; prior.opened = false; prior.contact = incident.kind === 'contact'; prior.g0 = hullGap(A, B); prior.fmax = 0; prior.near = true; { const fb = prior.fouler === A.id ? A : B; prior.x0 = fb.x; prior.y0 = fb.y; } // (the tangle goes on)
         if (A.isUser || B.isUser) this.emit({ type: 'toast', ms: 4000, msg: `${f.isUser ? 'You' : f.name} and ${f.isUser ? victim.name : victim.isUser ? 'you' : victim.name} ${prior.pen ? 'are still tangled from the same incident: the penalty already owed covers it (Rule 44.1). Get clear, then take the turns (Rule 44.2).' : 'are still pressed together: the same incident.'}` });
         continue;
       }
       // (a tangle with no penalty doesn't take the place of one with a penalty still running: her next touch is that one's)
       const pen = incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1';
-      if (incident.kind !== 'hail' && !(prior && prior.pen && !pen && !prior.clear && this.t - prior.t0 < TANGLE_MAX)) this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B), steered: false, wayT: null, pen, contact: incident.kind === 'contact', opened: false, fmax: 0, near: true });
+      if (incident.kind !== 'hail' && !(prior && prior.pen && !pen && !prior.clear && this.t - prior.t0 < TANGLE_MAX) && !(prior && prior.fouler !== f.id && pinLive(prior))) this.tangles.set(pk, { t0: this.t, t: this.t, clear: false, fouler: f.id, parted: false, g0: hullGap(A, B), steered: false, wayT: null, pen, contact: incident.kind === 'contact', opened: false, fmax: 0, near: true, x0: f.x, y0: f.y });
       // (only a foul that carries a penalty: a mark touch in the same incident is then covered by it, rule 44.1(a))
       if (incident.exoneratedBy == null && !incident.notRacing && incident.part !== '23.1') { this.lastFoul.set(f.id, { t: this.t, x: f.x, y: f.y, vs: victim.id }); this.lastFoulVs.set(f.id, { vs: victim.id, t: this.t, clear: false }); }
       this.onIncident?.(A, B, incident);
