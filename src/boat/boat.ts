@@ -37,6 +37,9 @@ export interface AiState {
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
+  /** Stopped or going astern: sheets in, and off the wind if she's in irons, until she has way on again (ai.ts). */
+  keptEased?: boolean; // (irons: her sails kept eased for a boat close by she must keep clear of, ai.ts, with a band)
+  gather?: boolean;
   /** About to touch another boat, avoiding her (Rule 14): that comes before finishing a tack (physics.ts midTack). */
   urgent?: boolean;
   /** Racing called off for the day: her way home round the land (ai.ts homeCourse), the leg she's on, her spot off the
@@ -219,9 +222,9 @@ export interface Boat {
   jibHold?: number;
   /** What the crew's trim reads its guide by and waits on (physics.ts crewSettle), by SETTLE's places: the apparent
    * angle (deg, 0..180) and the wind (kt) the tuning guide's settings are read at; her true wind over a few seconds (kt);
-   * her heading smoothed over a few seconds and over LINE_TAU, and the heading the guide was last read at (deg); and the
-   * seconds till she's settled enough for her crew to go to the cabin top's lines. In one Float64Array: read and written each
-   * step for each boat, as seven fields of their own each was a pointer to its own number elsewhere in memory, seven
+   * her heading smoothed over a few seconds and over LINE_TAU, and her true wind angle (unsigned) and heading the guide was last read at (deg); how long the guide's angle has been held through swings (s); and the
+   * seconds till she's settled enough for her crew to go to the cabin top's lines, and since she last swung. In one Float64Array: read and written each
+   * step for each boat, as fields of their own each was a pointer to its own number elsewhere in memory,
    * scattered reads a boat a step, and crewSettle took 18 µs a step in the race against 10 (Capacity, 16 Nov 2026). */
   settle?: Float64Array;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
@@ -384,4 +387,4 @@ export const FLEET: FleetEntry[] = [
 ];
 
 /** Places in Boat.settle (physics.ts crewSettle). */
-export const SETTLE = { guideAwa: 0, guideKt: 1, twsFast: 2, hSwing: 3, hHeld: 4, hGuide: 5, left: 6 } as const;
+export const SETTLE = { guideAwa: 0, guideKt: 1, twsFast: 2, hSwing: 3, twaGuide: 4, left: 5, since: 6, hHeld: 7, hGuide: 8, held: 9 } as const;
