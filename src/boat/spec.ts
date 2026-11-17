@@ -102,6 +102,23 @@ export const DEFAULT_BOAT: BoatSpec = {
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 
+/**
+ * A new player's boat (docs/FTUE-PLAN.md; the owner, 17 Nov 2026): her own, not the owner's Josephine (DEFAULT_BOAT stays
+ * his, and every save made before this keeps her). A plain glassfibre Folkboat as she'd come: cream topsides, a navy boot
+ * stripe, a light deck and a teak forehatch. USA 200 is clear of the real San Francisco fleet's numbers (56 to 125 in
+ * boat/data/sf-folkboat-results.json), the club's stock boats' and the generic boats' (30 to about 150, boat/generic.ts).
+ * No club: one is joined, not given (and no real club's name). She's set up in the first run, or kept as she is.
+ */
+export const NEW_BOAT: BoatSpec = {
+  id: 'my-folkboat', name: 'KESTREL',
+  hull: { material: 'fiberglass', upper: '#efe6cf', lower: '#1f2a44', stripe: '#1f2c4f' },
+  deck: '#e8e3d6',
+  hatch: 'teak',
+  sails: { country: 'USA', number: '200', color: 'white' },
+  club: '', skipper: 'you',
+  perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
+};
+
 /** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. */
 export const HULL_COLORS: [string, string][] = [
   ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'],
@@ -186,7 +203,7 @@ export const sailNo = (s: BoatSpec) => `${s.sails.country ? s.sails.country + ' 
 
 const newId = () => 'b' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 /** A new boat for your list: the standard Folkboat, under a new name. */
-export function newBoat(name: string, from: BoatSpec = DEFAULT_BOAT): BoatSpec {
+export function newBoat(name: string, from: BoatSpec = NEW_BOAT): BoatSpec {
   return fixSpec({ ...structuredClone(from), id: newId(), name: name.toUpperCase().slice(0, 18) });
 }
 

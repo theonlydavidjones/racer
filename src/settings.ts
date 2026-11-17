@@ -1,5 +1,5 @@
 import type { LessonId } from './sim/lessons';
-import { DEFAULT_BOAT, fixSpec, type BoatSpec } from './boat/spec';
+import { DEFAULT_BOAT, NEW_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
 export interface Settings {
@@ -103,10 +103,12 @@ export const drillFleet = <T extends Pick<Settings, 'opponents' | 'fleet' | 'dri
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULT_SETTINGS };
-  try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) Object.assign(s, saved); } catch { /* private mode etc. */ }
+  let fresh = true; // (no save at all: a new player, who gets a boat of their own, NEW_BOAT, not the owner's Josephine)
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) { Object.assign(s, saved); fresh = false; } } catch { /* private mode etc. */ }
+  if (fresh) { s.boats = [NEW_BOAT]; s.boat = NEW_BOAT; s.boatId = NEW_BOAT.id; }
   s.crew = structuredClone(s.crew ?? DEFAULT_SETTINGS.crew); // a copy: editing your crew mustn't change the defaults
   // your boats: older saves had one boat (and before that, only a burgee)
-  let boats = s.boats !== DEFAULT_SETTINGS.boats && s.boats?.length ? s.boats
+  let boats = (fresh || s.boats !== DEFAULT_SETTINGS.boats) && s.boats?.length ? s.boats
     : [s.boat === DEFAULT_BOAT ? { ...DEFAULT_BOAT, club: s.burgee ?? DEFAULT_BOAT.club } : s.boat];
   // (older saves had no skipper: the boat you were sailing is yours to skipper, the rest have the AI's)
   boats = structuredClone(boats).map(b => fixSpec({ ...b, skipper: b.skipper ?? (b.id === s.boatId ? 'you' : 'ai') }));

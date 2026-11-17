@@ -1,7 +1,6 @@
 import { lineNotes } from './boat/coach';
 import type { CoachStep } from './sim/coachRun';
 import { trimNotesHtml } from './ui/trimNotes';
-import './styles.css';
 import { COURSES } from './courses/registry';
 import { RC_COURSE, chooseCourse, type CommitteeChoice } from './courses/committee';
 import { ghostGap, ghostsFor, loadGhost, setupKey, type Ghost } from './replay/ghost';
@@ -64,6 +63,7 @@ import { Nav, type Place } from './ui/nav';
 import { morph } from './ui/morph';
 import { emptyTile, splitNo, tile } from './ui/tiles';
 import { installDevHandles } from './app/devHandles';
+import { startPageReady } from './app/firstRun';
 import { mountBoatLesson } from './app/boatLesson';
 import { mountDrills } from './app/drills';
 import { DrillCoach } from './app/drillCoach';
@@ -1862,3 +1862,4 @@ setup.newGame(); setup.paintSeg(); setup.crewRows(); setup.courseCard(); setup.t
 requestAnimationFrame(frame);
 
 installDevHandles(ctx); // (src/app/devHandles.ts)
+startPageReady(); // (the start page's cards light up: src/app/firstRun.ts)
