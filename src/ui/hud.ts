@@ -3,7 +3,7 @@ import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
-import { PLACES } from '../sim/places';
+import { PLACES, isSpot } from '../sim/places';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
 import { currentWords } from '../sim/outlook';
@@ -570,7 +570,7 @@ export class Hud {
         const eta = vmc > 0.1 ? rng / vmc : Infinity, [n, un] = this.range(rng);
         const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 55);
         this.card('', 'Navigator', n, un, `<circle cx="75" cy="36" r="4" fill="#3fd197"/><path d="M75 36 L${mx} 12" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
-          + `<path d="M${mx} 2 v14 M${mx} 2 l9 4 l-9 4" fill="#ffb627" stroke="#ffb627" stroke-width="1.5"/>${T(clamp(mx, 40, 110), 46, d.name.toUpperCase().slice(0, 22), '#ffb627')}`);
+          + `<path d="M${mx} 2 v14 M${mx} 2 l9 4 l-9 4" fill="#ffb627" stroke="#ffb627" stroke-width="1.5"/>${isSpot(d.name) ? '' : T(clamp(mx, 40, 110), 46, d.name.toUpperCase().slice(0, 22), '#ffb627')}`); // (a spot on open water: the flag alone, its position not spelled out: the owner, 17 Nov 2026)
         el.innerHTML = `${String(Math.round(b)).padStart(3, '0')}° · ` + (vmc > 0.05 ? `making ${(vmc / KT).toFixed(1)} kt toward it${isFinite(eta) ? ` · ${eta < 60 ? 'under a minute' : eta < 3600 ? Math.round(eta / 60) + ' min' : (eta / 3600).toFixed(1) + ' h'}` : ''}` : 'sailing away from it')
           + `<br><small>${speed}</small>`;
         return;

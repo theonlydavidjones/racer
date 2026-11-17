@@ -17,7 +17,7 @@ class El {
   get textContent() { return this.txt + this.children.map(c => c.textContent).join(''); }
   set textContent(v: string) { this.txt = v; this.children = []; }
   set innerHTML(_: string) { this.children = []; this.txt = ''; }
-  get lastChild() { return this.children.at(-1) ?? null; }
+  get lastChild(): El | null { return this.children.at(-1) ?? null; }
   appendChild(c: El) { this.children.push(c); return c; }
   removeAttribute(a: string) { if (a === 'title') this.title = ''; }
 }
@@ -39,14 +39,14 @@ describe('the destination tag follows the destination', () => {
     look(a.p); L.update(w, cam, 0);
     expect(tag().textContent).toBe(a.name); expect(tag().hidden).toBe(false);
     // a named place picked on the chart
-    const b = place('alcatraz')!; w.dest = destMark(b)!; look(b.p); L.update(w, cam, 0);
+    const b = place('alcatraz')!; (w as { dest: unknown }).dest = destMark(b)!; look(b.p); L.update(w, cam, 0);
     expect(tag().textContent).toBe(b.name); expect(tag().className).not.toContain('pin');
     const [x, y] = where(), [ex, ey] = at(b.p); expect(Math.hypot(x - ex, y - ey)).toBeLessThan(2);
     // a spot on open water: a pin, its position only on hover
-    const q = { x: b.p.x + 900, y: b.p.y - 600 }; w.dest = destMark({ id: 'pick', name: latLon(q), group: 'Spots', p: q } as never)!; look(q); L.update(w, cam, 0);
+    const q = { x: b.p.x + 900, y: b.p.y - 600 }; (w as { dest: unknown }).dest = destMark({ id: 'pick', name: latLon(q), group: 'Spots', p: q } as never)!; look(q); L.update(w, cam, 0);
     expect(tag().className).toContain('pin'); expect(tag().textContent).toBe(''); expect(tag().title).toBe(latLon(q));
     const [x2, y2] = where(), [ex2, ey2] = at(q); expect(Math.hypot(x2 - ex2, y2 - ey2)).toBeLessThan(2);
     // none: the tag goes
-    w.dest = null; L.update(w, cam, 0); expect(tag().hidden).toBe(true);
+    (w as { dest: unknown }).dest = null; L.update(w, cam, 0); expect(tag().hidden).toBe(true);
   });
 });
