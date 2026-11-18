@@ -448,6 +448,14 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q4. **Now — the backstay's chainplates where the tiller would hit them** (owner, 18 November, with a screenshot;
+   accuracy; now; 1 h): "backstay attachments are too far forward. the tiller would run right into them. they should sit
+   about one inch forward of the aft edge of the deck, about six inches from the tiller on either side." In
+   src/render/boatMesh.ts the plates are BS_CHAINPLATE_X = 0.3 m out, forward of the deck's edge. Move them to 2.5 cm
+   forward of the after deck's aft edge, and about 15 cm clear of the tiller each side (≈0.17 m out with its width).
+   The bridle's legs follow. The ensign staff's place was measured as "equidistant from the toe rail and the starboard
+   chain plate", so keep it at the owner's 0.46 m and check the two stay clear. Add a test that the tiller's swing,
+   hard over at 46.5°, stays clear of both plates. Check it from both quarters.
 8q3. **Now — bug: no Hoist tabs on a cruise started mid-water with the sails down** (owner, 18 November; bug; now; 1–2 h):
    "while cruising, I started a cruise mid-water with sails down. I don't see hoist buttons. I should always see those if
    sails are down." The tabs come from app.ts `hoistTab()` and are drawn by sailBand.ts (`.sb-hoist`, ~L553). It hides
