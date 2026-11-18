@@ -490,6 +490,9 @@ export const CAR = {
 };
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
+/** Made fast or on her lines: only your own call for a lazy car is worked (physics.ts crewTiedUp); the crew's own plan for
+ * it waits till she's sailing, for the course she'll be on. */
+export function carCall(b: Boat, dt: number): void { if (b.carCmd && b.crew) carJob(b, dt); }
 function carJob(b: Boat, dt: number): void {
   const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, c.layout ?? 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;

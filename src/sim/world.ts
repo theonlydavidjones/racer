@@ -7,14 +7,14 @@ import { addHarborLee } from '../environment/harborLee';
 import { LESSON_WIND, LessonTracker, type MobEnv } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
-import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
+import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, crewRig, crewTiedUp, moveBoat, settleTrim, tackTarget, tiedTack, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
 import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
-import { bodyJob } from '../boat/crewWork';
+import { bodyJob, ownerOf } from '../boat/crewWork';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
 import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor, tideHeightAt } from '../environment/tide';
@@ -1982,7 +1982,17 @@ export class World {
     }
     // a line ashore: the dock lines' physics (boat/dockLines.ts), the wind on her bare rig, the current
     const out = lineStep(b, m.lines, b.ww, b.cur, dt, q => hitsHarbor(q) || hitsMooredBoat(q));
-    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = tiedTack(b.rel, b.tack);
+    // (a line ashore: the crew's work is the dock's, as in her berth: the sails struck or hoisted (crewRig), the jobs of sailing
+    // ended (crewTiedUp) and the crew sat in the cockpit (crewAtDock). With none of it run here, a job open as the hand stepped
+    // ashore froze with them at it, and a strike called once the bow line was on waited till she lay in her berth, for good
+    // if she was pressed off it and never made fast. The hand handling the lines ashore, crew[0] (alone, the helm), is away
+    // while they go on, up to 'fast': what's theirs waits till then, the halyards too)
+    const handling = m.phase === 'ashore' || m.phase === 'stern' || m.phase === 'springs', ashore = handling ? (m.solo ? 0 : 1) : null;
+    const owner = b.crew ? ownerOf('hoist', b.crew.spec.crew.length, b.crew.spec, b.crew.layout ?? 'cockpit') : -1;
+    if (ashore == null || ashore !== owner) crewRig(b, dt, this.emit);
+    crewTiedUp(b, dt, this.emit, ashore);
+    crewAtDock(b, dt);
     const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true;
     b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
@@ -2398,7 +2408,7 @@ export class World {
         b.x += (s.p.x - b.x) * k; b.y += (s.p.y - b.y) * k; b.h = n360(b.h + wrap(h - b.h) * k); } }
     // (her tack by the wind's side, held dead downwind (or head to wind in her slip) as moveBoat holds it: a wind
     // wandering either side of her stern or bow lying in a slip doesn't send the helm across the cockpit each time)
-    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); if (b.twa < 176 && b.twa > 4) b.tack = b.rel >= 0 ? 'S' : 'P';
+    b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = tiedTack(b.rel, b.tack);
     const aw = apparent(b.ww.from, b.ww.kt, b.h, 0); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws; // (her flags, windex and ribbons: the wind as it is where she lies)
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true; // sails up at the dock weathervane, let fly
     // (the boom out to the shroud; the main down: its boom sheeted in amidships, clear of the dock and the boats either side)
@@ -2408,6 +2418,7 @@ export class World {
     // centerline (when starting) or brought to centerline (when finishing a sail and docking)")
     if (!up) { b.ctl.mainsheet += (0 - b.ctl.mainsheet) * k; b.ctl.traveller += (0 - b.ctl.traveller) * k; if (b.ctlTarget) { delete b.ctlTarget.mainsheet; delete b.ctlTarget.traveller; } }
     crewRig(b, dt, this.emit);
+    crewTiedUp(b, dt, this.emit); // (the pole stowed, your car call worked, the rest of sailing's jobs ended: physics.ts)
     crewAtDock(b, dt); // (the crew sit centred at the dock and through the push-off, not hiked or to leeward)
   }
 
