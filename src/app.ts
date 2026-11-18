@@ -46,6 +46,7 @@ import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
 import { ToolsTray, type Tool } from './ui/toolsTray';
+import { weatherHelmChip } from './ui/weatherHelm';
 import { degAndPoint, turnWords } from './core/compass';
 import { WIND_KIND_LABEL, type WindKind } from './environment/wind';
 import { sunPosition } from './environment/sun';
@@ -433,6 +434,21 @@ function showTiller(): void {
   setAttr($('tiller'), 'aria-valuenow', String(Math.round(t / HELM_MAX * 100)));
   setText($('tillerLab'), w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
     : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`);
+}
+// Weather helm at the foot of the tiller guide's dashed line (ui/weatherHelm.ts): shown with the guide, while you hold the
+// tiller; Tools (or its key) turns it off.
+const WH_TAU = 3;
+let whAvg: number | null = null, whT = 0;
+function showWeatherHelm(): void {
+  const el = $('tgWh'), on = S.weatherHelm !== false && tillerHeld && w.running && !w.paused;
+  if (!on) { whAvg = null; if (!el.hidden) el.hidden = true; return; }
+  // (the rudder she's held on with, deg to windward; its average over about the last five seconds of the race's own
+  // time, so it keeps pace at any speed of time and on a slow frame)
+  const now = w.user.weatherHeld ?? 0, dts = Math.max(0, Math.min(5, w.t - whT)); whT = w.t;
+  whAvg = whAvg == null ? now : whAvg + (now - whAvg) * (1 - Math.exp(-dts / WH_TAU));
+  const c = weatherHelmChip(whAvg), cls = c.tone ? `tg-wh ${c.tone}` : 'tg-wh';
+  if (el.className !== cls) el.className = cls;
+  setText(el, c.text); if (el.hidden) el.hidden = false;
 }
 // Tiller bar: drag the handle left/right. Let go and it springs back to centre.
 let barDrag = false;
@@ -1264,6 +1280,7 @@ function runAction(a: Action): void {
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
     case 'windLadder': windShow(!S.windLadder); break;
+    case 'weatherHelm': S.weatherHelm = S.weatherHelm === false; saveSettings(S); toast(`Weather helm at the tiller guide ${S.weatherHelm ? 'on' : 'off'}.`, 1600); break;
     case 'restartStart': if (S.mode === 'drill') results.restartDrill(); break;
     case 'pointsRose': roseShow(!roseOn()); break;
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
@@ -1416,6 +1433,7 @@ const toggleCourse = () => { if (w.cruising) navToggle(); else courseView.toggle
 const toolKey = (a: Action) => keymap.label(a);
 const TOOLS: Tool[] = [
   { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
+  { id: 'weatherHelm', label: 'Weather helm', icon: 'helm', key: () => toolKey('weatherHelm'), on: () => S.weatherHelm !== false, act: () => runAction('weatherHelm') },
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
   { id: 'course', label: 'Course chart', icon: 'chart', key: () => toolKey('course'), on: () => courseView.isOpen || navView.isOpen || (w.cruising && chart.isOpen), act: toggleCourse },
@@ -1449,7 +1467,7 @@ function frame(now: number): void {
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(); windTick(); if (tools.open) tools.refresh(); drills.drillTick(); drills.roundTick();
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showWeatherHelm(); showLines(); coachTick(); windTick(); if (tools.open) tools.refresh(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   boatLesson.tick();
   // (the full chart covers the whole screen, opaque: the 3D scene behind it isn't drawn, nor its labels. The race sails

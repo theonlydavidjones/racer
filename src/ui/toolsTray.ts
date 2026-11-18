@@ -27,6 +27,7 @@ export const TOOL_ICONS = {
   paddle: '<path d="M4 16 13 7"/><path d="M12 4l4 4-3 3-4-4Z"/>',
   log: '<path d="M6 5h10M6 10h10M6 15h10"/><path d="M3 5h.5M3 10h.5M3 15h.5"/>',
   perf: '<path d="M4 16V9M8 16V5M12 16v-8M16 16v-5"/>',
+  helm: '<path d="M10 17V6"/><path d="M10 6l4-3"/><path d="M4 15a8 8 0 0 1 12 0"/>',
   speed: '<path d="M3 5l6 5-6 5Z"/><path d="M10 5l6 5-6 5Z"/>',
   tools: '<rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/>',
 };
