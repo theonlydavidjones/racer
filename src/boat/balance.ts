@@ -95,8 +95,76 @@ const CHORD = { main: 2.4, jib: 2.0 };
  * third of the geometric one. Not changed by the constants audit: a finding for the physics (docs/CONSTANTS.md).
  */
 export const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
-/** Full helm (deg of rudder) for the sim's fastest turn. */
+/** Full helm (deg of rudder): the unit the helm is counted in (b.tiller, b.steer, b.helm: 1 is this much), and the most
+ * her AI helmsman and the tiller pilot use. */
 export const FULL_RUDDER = 30;
+/**
+ * The tiller's swing, deg each side: to where it comes down onto the after deck, the same both sides (the owner's
+ * ruling, 18 Nov 2026: "the tiller swings on a slight arc, up off the deck at center and down onto the deck at the
+ * extremes"; his first account, 15 Nov, was "the entire radius ... maybe 150 degrees", and it was 75 here until then).
+ * Not a free number: it's where the drawn tiller's arc about the raked rudder line meets the deck (render/hull.ts
+ * tillerClearance: 46.5 degrees, from TILLER.len 1.2 m, its 4 degrees above level at rest, and the class hull's rudder
+ * rake; Crew Figures, 18 Nov 2026), and tests/tillerpath.test.ts holds the two together within half a degree. The rest
+ * angle is measured from the owner's photos (two of Josephine's tiller, 18 Nov 2026, scaled from the tiller's own
+ * thickness): its end 15 cm over the deck at the after coaming, give or take 4, so 4 degrees give or take 2, and the
+ * stop anywhere from 41 to 49 degrees: past the stall throughout. The hinge's rake and the pin's height are ESTIMATES
+ * still; the tiller's end measured from the centerline with it down on the deck would make the stop a measurement. The tiller is fast to the rudder's head, so this is the blade's angle too. And the angle the blade stalls at: up to it the turn grows with the angle; past it the water breaks away
+ * from the blade's back, its side force falls off and it mostly brakes. 40 degrees is an ESTIMATE: a free-standing blade
+ * of this shape stalls at 20 to 25 (Molland & Turnock, Marine Rudders and Control Surfaces), but hers is hung on the
+ * keel's after edge and works as its flap, which holds on to about twice that; no measurement for a Folkboat was found
+ * (the researcher, 15 Nov 2026), so the owner's boat is the reference: he wants about half as much tiller again as 30.
+ * A practitioner's account, the best evidence short of a logged sea trial (a seasoned skipper who tried the sim, relayed
+ * by the owner, 15 Nov 2026): "it was immediately apparent that the tiller was wrong. sixty degrees turning radius is
+ * 'crazy'" (the tiller's whole swing was 60 degrees, 30 each side).
+ */
+export const HARD_OVER = 46.5, RUDDER_STALL = 40;
+/** Hard over, and the stall, in the helm's units (FULL_RUDDER each). */
+export const HELM_MAX = HARD_OVER / FULL_RUDDER, HELM_STALL = RUDDER_STALL / FULL_RUDDER;
+/** A stalled flat plate's normal force coefficient at `a` rad to the flow (Kirchhoff's free-streamline result, as in
+ * Hoerner, Fluid-Dynamic Drag, ch. 3: 2π·sin a / (4 + π·sin a); 0.88 square on). */
+const plateCn = (a: number) => 2 * Math.PI * Math.sin(a) / (4 + Math.PI * Math.sin(a));
+const STALL_SIDE = plateCn(RUDDER_STALL * D2R) * Math.cos(RUDDER_STALL * D2R), STALL_DRAG = plateCn(RUDDER_STALL * D2R) * Math.sin(RUDDER_STALL * D2R);
+/** The most turn the rudder gives, at the stall, as a multiple of full helm's: see rudderTurn. */
+const TURN_PEAK = 1 + (HELM_STALL - 1) / 2;
+/**
+ * The turn the rudder gives at `helm` (its units, 0 and up), as a multiple of full helm's (FULL_RUDDER's). In step with
+ * the angle up to full helm, as it has always been here. From there to the stall it rounds off, as a flap's lift does
+ * well before it stalls (a parabola from full helm's slope to none at the stall): a sixth more turn at 40 degrees than
+ * at 30, a 7.7 m radius for 9. Past the stall it falls as a stalled plate's side force does, its normal force's part
+ * across the flow (0.97 of the most at the deck's stop, 46.5 degrees: hard over she turns nearly as fast as at the stall,
+ * and brakes a little, 133 N at 4.7 kt). The shape past full helm is an ESTIMATE (the physics review, 15 Nov 2026: growth in step with the
+ * angle all the way to 40 degrees would ask a lift coefficient over 2 of the blade).
+ */
+export function rudderTurn(helm: number): number {
+  if (helm <= 1) return helm;
+  if (helm <= HELM_STALL) return 1 + (helm - 1) - (helm - 1) ** 2 / (2 * (HELM_STALL - 1));
+  const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
+  return TURN_PEAK * plateCn(a) * Math.cos(a) / STALL_SIDE;
+}
+/** The most turn the rudder gives, at the stall, as a multiple of full helm's (rudderTurn at HELM_STALL). */
+export const STALL_TURN = TURN_PEAK;
+/**
+ * The helm (its units) that gives `turn` (a multiple of full helm's turn, as rudderTurn), up to the stall: rudderTurn
+ * turned round on its rising side. Past what the stall gives, the stall: a helmsman steering for her quickest turn holds
+ * the blade there, not past it, where it brakes and turns her less (her AI helmsman, physics.ts).
+ */
+export function helmFor(turn: number): number {
+  if (turn <= 1) return Math.max(0, turn);
+  const k = HELM_STALL - 1, r = Math.min(turn, TURN_PEAK);
+  return 1 + k * (1 - Math.sqrt(Math.max(0, 1 - 2 * (r - 1) / k)));
+}
+/**
+ * The stalled rudder's braking, N, at `helm` (its units) and v m/s (ahead: sternway isn't braked by it here): a flat
+ * plate's drag at that angle, ½ρv²·A·Cn·sin a, less a share for what the turn's own bleed of speed already has
+ * (physics.ts turnBleed, which goes by how fast she's turning: the plate's drag at the stall, in the measure of the turn
+ * she still gets). Nothing at the stall, about 800 N hard over at 4.7 kt: with the turn's bleed, some 10 to 15% under
+ * the plate's drag alone there (the physics review's sum), an ESTIMATE. With nothing else, a knot off her in under 2 s.
+ */
+export function rudderBrake(helm: number, v: number): number {
+  if (helm <= HELM_STALL) return 0;
+  const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
+  return 0.5 * RHO_W * v * v * RUDDER.area * (plateCn(a) * Math.sin(a) - STALL_DRAG * rudderTurn(helm) / TURN_PEAK);
+}
 /**
  * Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. Sailing texts put it at about 3–5°
  * (Dellenbaugh, Steering; Sailing World), and Keuning's downwash measurements give the least drag at about 3° (as

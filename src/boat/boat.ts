@@ -220,6 +220,13 @@ export interface Boat {
    * unwarned crew a reaction's worth, the jib backing meanwhile (physics.ts tackStep, trimSails); −1 while it's let fly and
    * running out, 0 otherwise. */
   jibHold?: number;
+  /** What the crew's trim reads its guide by and waits on (physics.ts crewSettle), by SETTLE's places: the apparent
+   * angle (deg, 0..180) and the wind (kt) the tuning guide's settings are read at; her true wind over a few seconds (kt);
+   * her heading smoothed over a few seconds and over LINE_TAU, and her true wind angle (unsigned) and heading the guide was last read at (deg); how long the guide's angle has been held through swings (s); and the
+   * seconds till she's settled enough for her crew to go to the cabin top's lines, and since she last swung. In one Float64Array: read and written each
+   * step for each boat, as fields of their own each was a pointer to its own number elsewhere in memory,
+   * scattered reads a boat a step, and crewSettle took 18 µs a step in the race against 10 (Capacity, 16 Nov 2026). */
+  settle?: Float64Array;
   /** The wind has come round her stern onto her main's own side and her tack hasn't changed yet (physics.ts tackStep). */
   byLee?: boolean;
   /** Since when a steering key has been held down (s), and which (b.steer as it was): a key held as her stern passes the
@@ -378,3 +385,6 @@ export const FLEET: FleetEntry[] = [
   { name: 'Black', hull: '#26272b', sail: '#efe9dc', tag: '#c9cdd4', no: 'US 120', build: WOOD, paint: { deck: '#cdbb94', boot: '#d4b05a', bottom: '#2a2d33' } },
   { name: 'Varnish', hull: '#9a6a36', sail: '#f3ecdc', tag: '#e2b071', no: 'US 63', build: WOOD, paint: { deck: '#cdbb94', boot: '#f2eee4', bottom: '#5a1f1a' } }
 ];
+
+/** Places in Boat.settle (physics.ts crewSettle). */
+export const SETTLE = { guideAwa: 0, guideKt: 1, twsFast: 2, hSwing: 3, twaGuide: 4, left: 5, since: 6, hHeld: 7, hGuide: 8, held: 9 } as const;

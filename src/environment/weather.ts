@@ -54,7 +54,10 @@ export const REAL_UPDATED = R.updated;
 
 /** San Francisco local minutes after midnight for a UTC minute. */
 const localFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: 'numeric', minute: 'numeric' });
-const localMin = (tMin: number) => { const p = Object.fromEntries(localFmt.formatToParts(new Date(tMin * 60000)).map(x => [x.type, x.value])); return (+p.hour % 24) * 60 + +p.minute; };
+// (the clock's hour and minute, and the part of a minute since: read to the whole minute, the wind between the record's
+// samples came on in a step a minute, 0.6 to 2.4° at a time on an observed day, where the record itself (NOAA CO-OPS
+// 9414290, Fort Point: a 2-minute mean every 6 minutes) says nothing of a minute's edge; the zone's offset is whole minutes)
+const localMin = (tMin: number) => { const p = Object.fromEntries(localFmt.formatToParts(new Date(tMin * 60000)).map(x => [x.type, x.value])); return (+p.hour % 24) * 60 + +p.minute + (tMin - Math.floor(tMin)); };
 
 /** A day's samples: [local minute, kt, from, gust kt] (open-water kt). */
 type Sample = [number, number, number, number];

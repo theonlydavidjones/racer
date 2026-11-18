@@ -49,9 +49,14 @@ const budget = +(process.argv.find(a => a.startsWith('--budget='))?.slice(9) ?? 
   };
   const res = [];
   res.push(await timed('open', `document.querySelector('[data-f="edit"]').click()`)); await page.waitForTimeout(2000);
+  // (the editor's groups fold, one open at a time, 8i: Deck and cabin opened, timed as a click of its own, for the hatch and
+  // the cockpit; then Hull and its Topsides picker for the paint)
+  res.push(await timed('group', `document.querySelector('#boatPanel [data-act="grp"][data-v="deck"]').click()`)); await page.waitForTimeout(800);
   res.push(await timed('hatch', `(() => { const b = [...document.querySelectorAll('#boatPanel [data-act="hatch"]')].find(x => x.getAttribute('aria-pressed') !== 'true'); b.click(); })()`));
-  res.push(await timed('paint', `(() => { const b = [...document.querySelectorAll('#boatPanel [data-act="upper"]')].find(x => x.getAttribute('aria-pressed') !== 'true'); b.click(); })()`));
   res.push(await timed('cockpit', `(() => { const b = [...document.querySelectorAll('#boatPanel [data-act="cockpit"]')].find(x => x.getAttribute('aria-pressed') !== 'true'); b?.click(); })()`));
+  await click('#boatPanel [data-act="grp"][data-v="hull"]'); await page.waitForTimeout(800);
+  await click('#boatPanel [data-act="pick"][data-v="upper"]'); await page.waitForTimeout(800);
+  res.push(await timed('paint', `(() => { const b = [...document.querySelectorAll('#boatPanel .be-picker[data-key="upper"] [data-cp="preset"]')].find(x => !x.classList.contains('on')); b.click(); })()`));
   res.push(await timed('time', `(() => { const e = document.getElementById('showTime'); e.value = String((+e.value + 180) % 1440); e.dispatchEvent(new Event('change', { bubbles: true })); })()`));
   const over = res.filter(r => r.sync > budget);
   for (const r of over) console.log(`FAIL: ${r.name} took ${r.sync.toFixed(0)} ms of the page's work (budget ${budget} ms)`);

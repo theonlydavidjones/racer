@@ -490,6 +490,10 @@ export class SeaField {
   private cache = new Map<string, number>();
   /** `swell` outside the Gate; null for flat water (no waves at all). `chop`: the wind sea × this (the conditions adjuster). */
   constructor(readonly swell: Swell | null, readonly chop = 1) {}
+  /** Where the chop on the water comes from (deg), when a wave field is drawing it (the World's wave field, held here: waveField.ts chopFrom; a plain reference, so the page's mirror holds its own):
+   *  the boat's wave drag meets the sea that's drawn, through a shift too, while the old sea fades and the new one grows.
+   *  Without one, the wind's own direction. */
+  field: { chopFrom: number } | null = null;
 
   get flat(): boolean { return !this.swell; }
 
@@ -628,7 +632,7 @@ export class SeaField {
     // summarized). (It was scaled by the chop's steepness too, unsourced, which halved it in a breeze.)
     const steep = hsW / Math.max(1, wc.L);
     const white = clamp(3.84e-6 * Math.pow(U, 3.41) * (wc.blocked ? 2 : 1), 0, 0.1);
-    return { hsW, tpW: w.tp, fromW: ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
+    return { hsW, tpW: w.tp, fromW: this.field ? this.field.chopFrom : ww.from, hsS, tpS: s.tp, fromS: (reach.toward + 180) % 360, steep, white, fetch: F };
   }
 }
 

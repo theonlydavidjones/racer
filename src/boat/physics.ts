@@ -4,7 +4,7 @@ import { KT, V, clamp, wrap, n360, D2R, type Vec, hypot } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
-import { bow, stern, type Boat, type LineKey, type Tack } from './boat';
+import { SETTLE, bow, stern, type Boat, type LineKey, type Tack } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce, motorYaw } from './motor';
@@ -13,14 +13,37 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
+import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, STALL_TURN, helmFor, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
+import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
+/** Swinging: her heading this far (deg) past where it has been over SWING_TAU (s), a turn kept up at over about
+ * SWING_DEG / SWING_TAU, 3.2°/s; and settled this long after it (s) before her crew go to the cabin top for a small gain
+ * (estimates: past a helm's correction, a key's tap at 5°/s for a fraction of a second; a turn's settling, crewPhys.ts
+ * HOLD.settle's 4 s and her speed and heel coming back). */
+const SWING_DEG = 8, SWING_TAU = 2.5, SETTLE_S = 5;
+/** A new course: her true wind angle NEW_COURSE (crewWork.ts) from where the guide was last read, on either tack, held NEW_HELD s without a swing (an
+ * estimate: past a turn's own settling, SETTLE_S, and a helm's first corrections on the new course). */
+const NEW_HELD = 10, HELD_DEG = 3;
+/** ... and her heading this far (deg) from where it was then: a new course she's steered, not the wind shifting under a
+ * held one, which the backlash is for (on the tiller pilot in a light, shifty breeze her apparent angle wandered 39-76° on a
+ * beam reach, and each shift read the guide afresh: the vang eased and set again 25 s apart; an estimate). */
+const NEW_HEADING = 10;
+/** The longest (s) the guide's angle is held through swings (an estimate): a slow penalty circle took 44 s in 6 kt,
+ * crewstation's seed 14, so a two-turns penalty and its NEW_HELD after about 98 s. At 60 s the hold let go part way
+ * through the light air's slow turns, and seed 15's trips went over the backstop. */
+const HOLD_MAX = 120;
+/** How many of the car's athwartships holes (half a degree of lead each, controls.ts leadAt) the lazy car's lead must be
+ * outboard of the hole for her guide's angle before the crew's own plan brings it in (an estimate): three. Kept, the jib
+ * on it sits at most about 1.3° wide of its angle (two holes and the quarter degree carInFor leaves in hand), inside its
+ * luffing margin (trim.ts sailTrim, 2°). The track's five holes span only 2° of lead, the apparent wind from about 28° to
+ * 30.5° on a beat, inside her guide's own dead band (GUIDE_DEAD): in 12 kt her guide wandered 29.6° to 31.9° on
+ * crewstation's seed 2, across holes 2 to 4. A trip forward to the car is a body off the rail for most of a minute. */
+const CAR_HOLES = 3;
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, carInFor, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, GUIDE_BACKLASH, GUIDE_LIGHT, GUIDE_LIGHT_KT, GUIDE_DEAD, GUIDE_FAST, GUIDE_KT, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -38,15 +61,53 @@ export const SLOW_TACK = 1.3;
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
 
-/** Slowing while she goes astern: dv/dt = −(c0 + c1·v), m/s². */
-export const ASTERN_DRAG = { c0: 0.005, c1: 0.035 };
-/** How far she coasts astern from `v0` m/s (to a stop) with that drag, m. */
-export const asternCoast = (v0: number) => (v0 - (ASTERN_DRAG.c0 / ASTERN_DRAG.c1) * Math.log(1 + ASTERN_DRAG.c1 * v0 / ASTERN_DRAG.c0)) / ASTERN_DRAG.c1;
+/**
+ * The water's drag on her going astern, over her resistance going ahead at the same speed (dynamics.ts hullResistance:
+ * the ITTC friction line and the residuary, as sailing). AN ESTIMATE: no measurement of a small keelboat's resistance
+ * stern first was found, nor a timed coast-down (researched 14 Nov 2026: ships' astern trials weren't reachable, and
+ * there's nothing for yachts). Stern first she leads with her afterbody and her rudder, which are shaped to leave the
+ * water, not to meet it: more drag than ahead, by the factor a streamlined section shows turned end for end, about two
+ * (NACA TN 3361, Critzos, Heyson & Boswinkle 1955: the NACA 0012's drag at 180° about twice its drag at 0°; a wing
+ * section in two dimensions, not a hull, so still an estimate).
+ * It replaces dv/dt = −(0.005 + 0.035·v), which had no source and was 6 to 20 times her hull's own resistance at a
+ * walk (48 N against 8 N at 0.4 m/s), with a constant part a hull's drag doesn't have. So she carries her way as a
+ * two-tonne keelboat does: shoved off at 0.5 m/s she has lost it (WAY_LOST) after 37 m and four minutes, not 8 m and
+ * half a minute. The owner's own observation agrees (16 Nov 2026): shoved off astern at a walking pace in still air a
+ * Folkboat "glides a fair bit. Closer to five [boat lengths] than one, for sure", by the wind and the push: five of her
+ * lengths is 38 m.
+ * Under a tenth of a knot hullResistance is nearly in proportion to her speed (its residuary table runs straight from
+ * nothing to its first row), so her last way dies off slowly, halving about every two minutes, over eight
+ * meters more: in still water a hull does creep on like that, and any wind or stream soon outweighs it.
+ */
+export const ASTERN = 2;
+/** Going astern faster than this, m/s, a held tiller steers her by the water past her rudder, however little; it is
+ * sculling only once she has lost her way (asternCoast's WAY_LOST). Higher, and a helm held over near head to wind
+ * turned her one way above it and sculled her the other below it: at 0.2 m/s, 0.9 deg/s one way against 4 the other. */
+export const STEERS_ASTERN = 0.05;
+/** How fast the water slows her sternway (m/s²) at `v` m/s astern (at her design displacement: her crew's weight isn't in it yet). */
+export const asternDrag = (v: number): number => ASTERN * hullResistance(v) / HANDLING.mass;
+/** Below this (m/s) she has lost her way, for a coast's length: the water's drag alone takes minutes more to stop her. */
+const WAY_LOST = 0.05;
+/**
+ * How far she coasts astern from `v0` m/s until she has lost her way (m), on the water's drag alone: the distance run
+ * while slowing from v0 to WAY_LOST, ∫ m·u/(ASTERN·R(u)) du (tabled once, every 5 mm/s up to 2 m/s).
+ */
+let coastTable: Float64Array | null = null;
+const COAST_STEP = 0.005, COAST_N = 401;
+export function asternCoast(v0: number): number {
+  if (!coastTable) {
+    coastTable = new Float64Array(COAST_N);
+    for (let i = 1; i < COAST_N; i++) { const u = (i - 0.5) * COAST_STEP; coastTable[i] = coastTable[i - 1] + (u > WAY_LOST ? u / asternDrag(u) * COAST_STEP : 0); }
+  }
+  const x = Math.min(COAST_N - 1, Math.max(0, v0 / COAST_STEP)), i = Math.min(COAST_N - 2, Math.floor(x));
+  return coastTable[i] + (coastTable[i + 1] - coastTable[i]) * (x - i);
+}
+
 /**
  * Her glide stern first under bare poles from `v0` m/s in the wind there is, her heading held: for planning a push-off.
  * The step's own working, a step at a time: the wind on her bare hull and rig from forward of the beam pushes her astern
  * (dynamics.ts airDrag, on the wind she feels: going astern she runs with a wind on her bow), a wind abaft the beam
- * drifts her ahead (the bare-poles drift, a tenth of the wind), and the water slows her sternway (ASTERN_DRAG). So a
+ * drifts her ahead (the bare-poles drift, a tenth of the wind), and the water slows her sternway (asternDrag). So a
  * wind on her stern shortens the glide and a wind on her bow carries her on, perhaps without stopping. Returns how far
  * she goes astern in `secs` (m), how long from the start she keeps `steerage` m/s of sternway (s: until it first falls
  * under it; way the wind gives her back later doesn't count, she has lain there unsteerable meanwhile), and whether
@@ -63,16 +124,12 @@ export function asternGlide(v0: number, heading: number, windFrom: number, windK
     if (windAt) { const w = windAt(dist, t); windFrom = w.from; windKt = w.kt; drift = driftIn(windFrom, windKt); }
     const ap = sailWind(windFrom, windKt, heading, -ast);
     ast -= surgeAccel(0, drift, airDrag(ap.aws, ap.awa, 1, 0)) * dt; // (what would be headway comes off her sternway: one motion)
-    if (ast > 0) ast = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
+    if (ast > 0) { const left = ast - asternDrag(ast) * dt; ast = left > 1e-6 ? left : 0; } // (as travel slows her)
     if (ast > 0) dist += ast * dt;
     if (steers && ast > steerage) steerable += dt; else steers = false;
   }
   return { dist, steerable, going: ast > 0 };
 }
-/** Going astern faster than this, m/s, a held tiller steers her by the water past her rudder, however little; it is
- * sculling only once she has lost her way (under it). Higher, and a helm held over near head to wind
- * turned her one way above it and sculled her the other below it: at 0.2 m/s, 0.9 deg/s one way against 4 the other. */
-export const STEERS_ASTERN = 0.05;
 
 /** Crew timings for the whisker pole, s. */
 export const POLE = { set: 8, stow: 5, gybe: 8 };
@@ -254,6 +311,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // (and the AI) eases the helm before the heading he wants, by what she'll still turn once it's amidships
   const tau = yawLag(b.v + astern), r0 = b.turnRate ?? 0;
   let bladeFlip = astern > b.v && !b.isUser; // (going stern first and steering by the flow: the blade's the other way to the turn)
+  let handHelm: number | undefined; // (the helm as your hand holds it, past full helm too: for the blade's drawing and its braking)
+  let flowMost = flow; // (the most the flow past her rudder is turning her this step: more than that is sculling)
   if (b.isUser) {
     if (b.turnTarget != null && b.steer === 0) {
       const err = wrap(b.turnTarget - b.h);
@@ -261,7 +320,12 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) { rate = 0; b.turnTarget = null; b.turnCalledT = t; } // (called, and reached: gybeMeant)
     } else {
       // tiller to starboard turns the bow to port; keys add a push of their own
-      const helm = clamp(b.steer - b.tiller, -1, 1);
+      // (the tiller in your hand swings to hard over, HELM_MAX: the turn grows with it to the rudder's stall and falls
+      // off past it, where the blade brakes more than it turns (balance.ts rudderTurn). A steering key asks her
+      // helmsman for her quickest turn: the helm at the stall, no farther)
+      // (a key held with the tiller already over the same way doesn't push it past the stall: the hand alone does that)
+      const hand = -b.tiller, key = b.steer * HELM_STALL;
+      const helm = clamp(key !== 0 && Math.sign(hand) === Math.sign(key) ? Math.sign(key) * Math.max(Math.abs(hand), Math.abs(key)) : hand + key, -HELM_MAX, HELM_MAX);
       if (helm !== 0) b.turnTarget = null;
       // going astern the rudder works backwards: the bow goes the way you push the tiller. Sculled (where that turns her
       // faster than the flow does), she turns the way the tiller's pumped, as with way on, whichever way she's drifting
@@ -271,11 +335,15 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // (that's the tiller in your hand, which is where you put it. A steering key asks for the turn: her helmsman
       // works the helm for it, sculling her round where the rule allows, as before, sternway or none)
       const sculls = b.steer !== 0 || !(sternFirst && astern > STEERS_ASTERN);
-      const byFlow = dirFlow * Math.abs(helm) * flow, sculled = sculls && d && scullOK(d) ? d * Math.abs(helm) * HANDLING.minTurnRate : 0;
+      // (never past her hard-over rate, HANDLING.maxTurnRate, however fast she's going)
+      const byFlow = dirFlow * Math.min(rudderTurn(Math.abs(helm)) * flow, Math.max(flow, HANDLING.maxTurnRate)), sculled = sculls && d && scullOK(d) ? d * Math.min(1, Math.abs(helm)) * HANDLING.minTurnRate : 0;
       rate = Math.abs(sculled) > Math.abs(byFlow) ? sculled : byFlow;
       if (sternFirst && rate === byFlow) bladeFlip = true;
+      // (the blade where your hand has it, the way she's turning: drawn there, at rest too)
+      handHelm = (Math.sign(rate) || dirFlow) * Math.abs(helm);
+      flowMost = Math.max(flow, Math.abs(byFlow)); // (past full helm the flow turns her faster than `flow`: that isn't sculling)
     }
-    rudder = clamp(rate / Math.max(1e-6, maxRate), -1, 1);
+    rudder = handHelm ?? clamp(rate / Math.max(1e-6, maxRate), -1, 1);
     if (b.turnTarget == null) rate += balRate + motRate; // let go of the tiller and she rounds up (or bears away), or the motor swings her
   } else if (b.penalty > 0 && !b.ai?.clearing) {
     // penalty turns: the crew backs the sails to spin the boat even when slow
@@ -306,14 +374,27 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     }
     // (where her heading's going with the helm amidships; checking a swing is the rudder's work, not sculling's: rule
     // 42.3(d) allows sculling only to turn toward close-hauled)
-    const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? rateFor(Math.sign(lead)) : flow;
+    // Her helm goes to full helm, 30°, as it always has, for her tacks, gybes and her own steering. Only about to touch
+    // another boat (rule 14, ai.ts urgent) does she put it to the rudder's stall, 40°, her quickest turn (balance.ts
+    // STALL_TURN, a sixth more than full helm's), as your steering key does; never past it, where the blade brakes and
+    // turns her less: no helmsman steering for a turn shoves it hard over. Short of that she holds the helm the turn wants
+    // (balance.ts helmFor), the drawn tiller with it. (Full helm for her tacks is a choice made by the fleet's fouls, not
+    // by the physics: at the stall in every tack and turn the fleet fouled more round the start, 31 penalties in
+    // fouls-start's sixteen starts against 25, 20 against 14 in 22 kt. Real helmsmen tack on a moderate helm, more only
+    // slowing her through the turn, but this model charges nothing for the rudder's angle short of the stall (rudderBrake
+    // starts there; turnBleed goes by the turn), so your key, which asks for the stall, tacks her a sixth quicker than
+    // her AI: the physics review. The rudder's induced drag below the stall is the missing piece.)
+    const most = ai?.urgent ? HELM_STALL : 1, quick = ai?.urgent ? Math.min(STALL_TURN * flow, Math.max(flow, HANDLING.maxTurnRate)) : flow;
+    const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? Math.max(quick, rateFor(Math.sign(lead))) : quick;
     rate = clamp(lead * 1.6, -lim, lim);
-    rudder = clamp((rate - balRate - motRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
+    const need = (rate - balRate - motRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
+    rudder = Math.sign(need) * Math.min(most, helmFor(Math.abs(need)));
+    flowMost = Math.max(flow, quick); // (at the stall the flow turns her faster than `flow`: that isn't sculling, as yours)
   }
   // (sculling in use: she's turning faster than the flow alone would turn her; latched to that way until close-hauled)
-  if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flow + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
-  if (bladeFlip && Math.abs(rate) > flow + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
-  b.helm = clamp(bladeFlip ? -rudder : rudder, -1, 1); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
+  if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flowMost + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
+  if (bladeFlip && Math.abs(rate) > flowMost + 1e-6) bladeFlip = false; // (sculled: the tiller's pumped the way she turns)
+  b.helm = clamp(bladeFlip ? -rudder : rudder, -HELM_MAX, HELM_MAX); // how hard the helm is over (for drawing the rudder and tiller: the blade where it is)
   b.weatherHeld = -helmSide * b.helm * FULL_RUDDER; // deg of weather helm actually held on the rudder
   // (paddling on one side swings her too, against the same inertia and the water's resistance to her turning: paddle.ts)
   rate += paddleYawRate(b, t);
@@ -440,8 +521,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   const flog = b.luff ? flogAmount(twa, beat, NO_GO, true) : Math.max(sailFlog(b, plan, apF.awa), pinchFlog(Math.min(180, twa + b.leeway), beat)); // (her course's angle, as the polar's beat is)
   const a = surgeAccel(b.v, target, airDrag(ap.aws, ap.awa, flog, (SAIL_AREA.main * hm + SAIL_AREA.jib * hj) / (SAIL_AREA.main + SAIL_AREA.jib)) + seaDrag(b.sea, b.h, b.v) + helmDrag + (cond ? foulingDrag(cond, b.v) : 0) - sweep - motorForce(b) - paddleForce(b, t), disp, b.luff || (b.rig && (b.rig.main < 1 || b.rig.jib < 1)) ? undefined : driveCurveFor(ww.kt, Math.min(180, twa + (b.leeway ?? 0)), target)); // (the sails' push at her speed, from the sail model: driveCurve.ts; eased or struck, none)
   // stopped, the wind still on her bare rig drives her astern: what the surge
-  // equation would take below zero becomes sternway, which the water's drag then slows (ASTERN_DRAG, in travel). Head to
-  // wind in 15 kt on bare poles that comes to about 0.6 m/s (rig windage 2.0 m² against ASTERN_DRAG on her mass)
+  // equation would take below zero becomes sternway, which the water's drag then slows (asternDrag, in travel). Head to
+  // wind in 15 kt on bare poles that comes to about 1 m/s (rig windage 2.0 m² against her hull's drag stern first)
   // (with her sails up and flogging, in irons, the same: their windage on top of the rig's, so she gathers sternway
   // faster, and the rudder then works backwards; the way out is to bear away, the tiller pushed the way she's to go)
   const v1 = b.v + a * dt;
@@ -452,6 +533,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
   // which is how a roll tack starts her turning with less rudder), so the same turn costs less or more by her balance
   b.v = Math.max(0, b.v * (1 - turnBleed(rate, b.v, b.h, ww.from, b.helmNeed) * dt));
+  // (the rudder held past its stall brakes her: balance.ts rudderBrake. Only your own hand puts it there)
+  if (handHelm !== undefined && Math.abs(handHelm) > HELM_STALL) b.v = Math.max(0, b.v - rudderBrake(Math.abs(handHelm), b.v) / HANDLING.mass * dt);
   // leeway, as a motion: her sails' side force across the water and the wind on her topsides and rig (HOVE.windSide) set
   // her bodily to leeward; her keel's lift with way on (slender wing: ½ρ·A·(πAR/2)·u·v = ½ρ·πT²·u·v) and her hull and keel
   // broadside to the water (cross-flow drag, HOVE.crossCd: Hoerner) hold her. At speed the lift does it: a few degrees
@@ -509,8 +592,18 @@ export const HOVE = {
   dragAft: 0.3,
   /** Sway and yaw: added mass of water as a fraction of the boat's (a deep keel side-on drags a lot with it: ~0.9; in yaw ~0.4, estimates). */
   swayAdded: 0.9, yawAdded: 0.4,
-  /** Radius of gyration in yaw, as a fraction of LOA (0.25, the usual figure for a yacht). */
-  gyration: 0.25,
+  /**
+   * Radius of gyration in yaw, as a fraction of LOA. 0.25 is the usual figure for a yacht, but a Folkboat carries over
+   * half her weight in an iron keel under her middle (NFIA Class Rules: ballast 1,000 kg of 1,930), and weight near the
+   * middle hardly resists her turning. Worked from that: the keel's 52%, a casting about 2.5 m long, at a radius of about
+   * 0.7 m; the other 48% (hull, deck, rig, crew) at about 2.0 m, 0.26 of her length; together √(0.52·0.7² + 0.48·2.0²)
+   * = 1.47 m, 0.19 of her 7.68 m. An ESTIMATE (no swing test of a Folkboat was found). It sets how soon her turn
+   * answers the helm (yawLag: 0.36 s at 4.7 kt, 0.85 s at 2 kt; with 0.25 it was 0.6 and 1.4 s, and the owner, of his own
+   * boat, 15 Nov 2026: "no delay in the turn of the boat and the push of the tiller"; and a seasoned skipper's account,
+   * relayed by him the same day: "the boat is promptly responsive to tiller turning IRL (unless she has no momentum
+   * obviously)": a practitioner's word, the best evidence short of a logged sea trial).
+   */
+  gyration: 0.19,
   /** Side-on windage of hull, cabin and rig (CdA, m²; freeboard about 0.65 m over 7.6 m, the cabin and mast) and how far ahead of the keel's centre it acts (the mast is forward), m. */
   windSide: 5.5, windLever: 0.3,
   /** How much of the sideways flow reaches the rudder: the long keel ahead of it straightens half of it (estimate). */
@@ -538,11 +631,11 @@ export function turnBleed(rate: number, v: number, h: number, windFrom: number, 
 /**
  * How long (s) her turn takes to answer the helm at speed u (m/s) through the water: the time constant of a first-order
  * (Nomoto) yaw response, her yaw inertia over the water's yaw damping, from her own hove-to model (HOVE, heaveTo): the
- * moment of inertia, with the water's added mass, I = m·(0.25·LOA)²·1.4, against the damping the hull's strips and the
+ * moment of inertia, with the water's added mass, I = m·(HOVE.gyration·LOA)²·1.4, against the damping the hull's strips and the
  * rudder give as she turns, both growing with her speed (the keel's lift ½ρ·A·(πAR/2)·u·L²/12 and the rudder's
- * ½ρ·u·A_R·slope·flow·arm²). 0.6 s at 4.7 kt, 1.4 s at 2 kt, 2.8 s at 1 kt. (No measured value for a yacht was found.
+ * ½ρ·u·A_R·slope·flow·arm²). 0.36 s at 4.7 kt, 0.85 s at 2 kt, 1.7 s at 1 kt (with HOVE.gyration 0.19). (No measured value for a yacht was found.
  * The broadside cross-flow drag damps her turn too, which this linear figure leaves out: about 20% quicker at 4.7 kt
- * turning hard. At a standstill it's all there is: sculled at 4°/s it gives 7–8 s, near the 5.8 s the speed's floor,
+ * turning hard. At a standstill it's all there is: sculled at 4°/s it gives 7–8 s (4–5 with the lighter inertia), near the 3.4 s the speed's floor,
  * 0.25 m/s, gives.)
  */
 let yawK = 0, yawPerU = 0;
@@ -605,12 +698,15 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   const ww = b.ww, toWind = wrap(ww.from - b.h) >= 0 ? 1 : -1, D = D2R;
   const RHO = 1025, RHO_A = 1.225;
   // the helm: lashed, or wherever you hold it, or hard over through a tack or gybe you've called for (+ turns her to starboard)
-  let helm = clamp(b.steer - b.tiller, -1, 1);
+  // (past full helm the blade's side force is no more than at full helm here, and past the stall it falls off as it does
+  // sailing: balance.ts rudderTurn, an estimate. Drawn where it's held)
+  const held = clamp(b.steer - b.tiller, -HELM_MAX, HELM_MAX);
+  let helm = Math.sign(held) * Math.min(1, rudderTurn(Math.abs(held)));
   if (b.turnTarget != null && b.steer === 0) {
     const err = wrap(b.turnTarget - b.h);
     if (Math.abs(err) < 3 || (Math.sign(err) !== b.turnDir && Math.abs(err) < 20)) b.turnTarget = null; else helm = b.turnDir;
   }
-  b.helm = helm;
+  b.helm = Math.abs(held) > 1 && Math.sign(held) === Math.sign(helm) ? held : helm;
   const deltaTw = helm * toWind * FULL_RUDDER * D; // rudder angle, rad, + turning her toward the wind
   // tack and sails, as when sailing
   const rel = wrap(ww.from - b.h), twa = Math.abs(rel); b.rel = rel; b.twa = twa;
@@ -671,7 +767,7 @@ function heaveTo(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: n
   // the equations of motion: surge, sway, yaw
   const sails = { main, jib };
   // (the seaway's added resistance as when sailing; the turning drag the polar model adds is here in the strips' damping)
-  // (going astern, the water's drag on her is travel's, ASTERN_DRAG, as when she's driven astern sailing)
+  // (going astern, the water's drag on her is travel's, asternDrag, as when she's driven astern sailing)
   const X = main.drive + jib.drive + windX - hullResistance(Math.max(0, u0)) + inducedX + rudX - (u0 > 0 ? seaDrag(b.sea, b.h, u0) + (cond ? foulingDrag(cond, u0) : 0) : 0)
     + paddleForce(b, t); // (paddled with the crutch: its push, and below its moment, which the strips resist: paddle.ts)
   const Y = main.heel + jib.heel + windY + hullY + rudY;
@@ -726,7 +822,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
     shows = (twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind);
   }
   b.comingFor = shows ? Math.min(CUE_MAX, (b.comingFor ?? 0) + dt) : Math.max(0, (b.comingFor ?? 0) - dt);
-  placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, held: courseHeld_(b), steadyFor: b.settle ? b.settle[SETTLE.since] : undefined, courseTwa: b.settle && b.crewReady ? b.settle[SETTLE.twaGuide] : undefined, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -1020,12 +1116,13 @@ const motorDrives = (b: Boat) => !!b.motor?.running && b.motor.down && b.motor.g
 function travel(b: Boat, dt: number, t: number, emit: Emit, groundToast: { t: number }): void {
   const u = V(b.h), ww = b.ww;
   // sternway (pushed off astern): she coasts back, slowing on the water's drag, which is slight at a walking pace (a
-  // two-tonne boat glides a long way: from a shove, three or four lengths in most of a minute)
+  // two-tonne boat glides a long way: from a shove of 0.5 m/s, five lengths in four minutes)
   const ast = b.astern ?? 0;
-  // (the coast's law at a walk; faster, her hull's resistance going through the water, the same as ahead, which rises with
-  // the square of the speed and more; the drag's constant part stops her in a finite time, and the wind's push astern
-  // builds a little a step)
-  if (ast > 0) b.astern = Math.max(0, ast - Math.max(ASTERN_DRAG.c0 + ASTERN_DRAG.c1 * ast, hullResistance(ast) / HANDLING.mass) * dt);
+  // (her hull's resistance going through the water, and twice it stern first: ASTERN, an estimate. It falls away with
+  // her speed, so her last way dies slowly; under a micron a second she's taken as stopped. Not higher: head to wind in
+  // 3 to 6 kt the wind's push adds less than a tenth of a millimeter a second each step, and at that cutoff she never
+  // began to go astern, then made a third of a meter a second from 7.5 kt: the physics review, 17 Nov 2026)
+  if (ast > 0) { const left = ast - asternDrag(ast) * dt; b.astern = left > 1e-6 ? left : 0; }
   // sideways too, while she's slipping (hove to)
   const sw = b.sway ?? 0, stb = V(b.h + 90);
   b.vx = u.x * (b.v - ast) + stb.x * sw + b.cur.x; b.vy = u.y * (b.v - ast) + stb.y * sw + b.cur.y;
@@ -1325,6 +1422,86 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
   else if (!leeMine) emit({ type: 'toast', msg: 'The jib sheets changed sides: the one you held is now the leeward sheet, and yours to trim (tap its Auto to give it to the crew).', ms: 5000 });
 }
 
+/** (crewSettle's imports, read once at load: loaded through a module runner, as perf-pair and perf.test load the sim,
+ * each use of an imported name is a lookup in the module's namespace and a call to its getter, about 20 a call here:
+ * Capacity, 16 Nov 2026) */
+const GUIDE_BACKLASH_ = GUIDE_BACKLASH, GUIDE_LIGHT_ = GUIDE_LIGHT, GUIDE_LIGHT_KT_ = GUIDE_LIGHT_KT, GUIDE_DEAD_ = GUIDE_DEAD, GUIDE_FAST_ = GUIDE_FAST, GUIDE_KT_ = GUIDE_KT, LINE_GAP_ = LINE_GAP, LINE_TAU_ = LINE_TAU;
+const clamp_ = clamp, wrap_ = wrap, n360_ = n360, courseHeld_ = courseHeld, NEW_COURSE_ = NEW_COURSE, carInFor_ = carInFor, optimalSheet_ = optimalSheet;
+
+/**
+ * What the crew's trim reads its guide by and waits on, each step (trimSails): the apparent angle and the wind the
+ * tuning guide's settings are read at (Boat.settle: SETTLE.guideAwa, guideKt), and whether she's swinging or settled (settleLeft). Kept
+ * out of trimSails, a function of its own: the step ran 2.6-3.8% slower with it inside for the same work, and trimSails
+ * is large enough that what it grows by can cost its own callees their inlining (Capacity, 16 Nov 2026; the irons'
+ * and the paddle's work moved out of aiThink the same way).
+ */
+function crewSettle(b: Boat, dt: number): void {
+  const s = b.settle ??= new Float64Array(10); // (the World's boats have it from birth: world.ts makeBoat)
+  // (the angle the guide's settings are read at: hers, but past a backlash: controls.ts GUIDE_BACKLASH_)
+  // (and once she holds a course it comes to hers, over a gust-lull cycle, LINE_GAP_: the backlash stops a wandering
+  // course flipping their settings, but doesn't keep a reach on the beat's settings for the leg, the Deep Physics review)
+  // (past a few degrees of it: a couple of degrees' drift inside the guide's 40-60° blend slid the vang's ceiling under
+  // its setting and sent them up to ease it)
+  // (wider in light air, controls.ts GUIDE_LIGHT_, read for the guide's wind as it was last read)
+  { const a = Math.abs(b.awaSlow), bl = GUIDE_BACKLASH_ + GUIDE_LIGHT_ * clamp_((GUIDE_LIGHT_KT_ + 5 - s[SETTLE.guideKt]) / 5, 0, 1);
+    // (not while she's swinging, or till she's held a course NEW_HELD after: the angles she turns through aren't a course.
+    // Dragged round by a slow penalty circle on the beat, it came back through the backlash and the blend over a minute,
+    // and the vang came off in two trips, crewstation's 6 kt seed 14; a new course is read at once when it's held, below)
+    // (held only against loosening: coming up through the swing, the beat's settings, the vang's ceiling under 18 kt, come
+    // in as she comes up, as before; frozen, they came 10 s after a rounding, the physics review)
+    // (for a swing begun in light air only, where the wider backlash is, GUIDE_LIGHT_: the angle coming back through it
+    // after a swing is what took a minute there. In a breeze the beat's settings held through each bear-away of a boat
+    // lying to off the harbor in 26 kt, and her tacks there nearly doubled, tests/abandon-home.test.ts's northerly. Judged
+    // as the swing begins: let go part way as a building breeze crossed 10 kt, the outhaul's ease for a run fell between
+    // the crew's waits and its worth, tests/crew.test.ts. And for HOLD_MAX at most: a helm swinging without end doesn't
+    // hold it for good, the physics review)
+    const held = s[SETTLE.held];
+    s[SETTLE.held] = s[SETTLE.since] >= NEW_HELD ? 0 : held === 0 && s[SETTLE.guideKt] >= GUIDE_LIGHT_KT_ + 5 ? HOLD_MAX + 1 : held + dt;
+    if (!b.crewReady) s[SETTLE.guideAwa] = a;
+    else if (s[SETTLE.since] >= NEW_HELD || s[SETTLE.held] > HOLD_MAX) {
+      s[SETTLE.guideAwa] = clamp_(s[SETTLE.guideAwa], a - bl, a + bl);
+      const off = a - s[SETTLE.guideAwa]; if (Math.abs(off) > GUIDE_DEAD_) s[SETTLE.guideAwa] += (off - Math.sign(off) * GUIDE_DEAD_) * Math.min(1, dt / LINE_GAP_);
+    } else s[SETTLE.guideAwa] = Math.min(s[SETTLE.guideAwa], a + bl); }
+  // (and the wind it's read for: the breeze she's sailing in, not each puff. Read again only once it's GUIDE_KT_ from where
+  // it was read: up to her wind over a few seconds as it builds, down to her wind over 20 s as it falls. In 4-6 kt, a
+  // breeze wandering across the guide's 5 kt step sent them to the outhaul and back, three times in a beat)
+  { const kt = b.ww.kt;
+    s[SETTLE.twsFast] = !b.crewReady ? kt : s[SETTLE.twsFast] + (kt - s[SETTLE.twsFast]) * Math.min(1, dt / GUIDE_FAST_);
+    const slow = b.twsSlow ?? kt;
+    if (!b.crewReady) s[SETTLE.guideKt] = kt;
+    // (up when her few seconds' wind is a knot past it, or past it and well over her 20 s wind: a build under way, read
+    // right up to it, not a knot short; down when both her winds are a knot under it, or under it with her 20 s wind well
+    // over her few seconds': a lull settled in. Each only past both, so a build doesn't flip it from one to the other
+    // each step, the physics review: 2022 times in 38 s after a step to 12 kt)
+    else { const hi = Math.max(slow, s[SETTLE.twsFast]);
+      if (s[SETTLE.twsFast] > s[SETTLE.guideKt] + GUIDE_KT_ || (s[SETTLE.twsFast] > s[SETTLE.guideKt] && s[SETTLE.twsFast] - slow > GUIDE_KT_ / 2)) s[SETTLE.guideKt] = s[SETTLE.twsFast];
+      else if (hi < s[SETTLE.guideKt] - GUIDE_KT_ || (hi < s[SETTLE.guideKt] && slow - s[SETTLE.twsFast] > GUIDE_KT_ / 2)) s[SETTLE.guideKt] = hi; } }
+  // (swinging, her heading running away from where it was a few seconds ago, SWING_DEG past her heading over SWING_TAU:
+  // a turn kept up at over about 3°/s, not a helm's correction; then they're on the sheets, and the cabin-top lines that
+  // only gain a little wait till she's settled, SETTLE_S after (crewWork.ts): a crew resets them for the course she's on,
+  // not the angles she passes through. A failed tack in a drifter falling off and round through a jibe swept her 14 to
+  // 100° apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
+  s[SETTLE.hSwing] = !b.crewReady ? b.h : n360_(s[SETTLE.hSwing] + wrap_(b.h - s[SETTLE.hSwing]) * Math.min(1, dt / SWING_TAU));
+  const swung = Math.abs(wrap_(b.h - s[SETTLE.hSwing])) > SWING_DEG;
+  s[SETTLE.left] = swung ? SETTLE_S : Math.max(0, s[SETTLE.left] - dt);
+  s[SETTLE.since] = swung || !b.crewReady ? 0 : s[SETTLE.since] + dt;
+  // (on a new course, her true wind angle NEW_COURSE (crewWork.ts) from where they last read the guide, either tack, as
+  // the guide is read, and not turning this moment, the
+  // guide's settings are read at her angle now, not past the backlash, which is for a course wandering, not a new one:
+  // bearing away onto a reach, held 10° short, the vang went on in two trips. New: after a turn, once she's held it
+  // NEW_HELD without a swing (her heading's own mean over 20 s took a minute to come to it after a 90° bear-away); after
+  // a change too slow to be a swing, once her heading has come to its own mean over LINE_TAU, which a course wandering
+  // either side of its mean doesn't do at its ends)
+  s[SETTLE.hHeld] = !b.crewReady ? b.h : n360_(s[SETTLE.hHeld] + wrap_(b.h - s[SETTLE.hHeld]) * Math.min(1, dt / LINE_TAU_));
+  const twa = Math.abs(b.twa ?? 0);
+  if (!b.crewReady) { s[SETTLE.twaGuide] = twa; s[SETTLE.hGuide] = b.h; }
+  else if (Math.abs(twa - s[SETTLE.twaGuide]) > NEW_COURSE_ && Math.abs(wrap_(b.h - s[SETTLE.hGuide])) > NEW_HEADING && Math.abs(wrap_(b.h - s[SETTLE.hSwing])) < 1
+    && ((s[SETTLE.since] >= NEW_HELD && s[SETTLE.since] < LINE_GAP_) || Math.abs(wrap_(b.h - s[SETTLE.hHeld])) < HELD_DEG)) { s[SETTLE.twaGuide] = twa; s[SETTLE.hGuide] = b.h; s[SETTLE.guideAwa] = Math.abs(b.awaSlow); }
+  // (and back on the course it was read for after a swing, held NEW_HELD: read at her angle now, as it was held through
+  // the swing, above)
+  else if (s[SETTLE.since] >= NEW_HELD && s[SETTLE.since] - dt < NEW_HELD && Math.abs(twa - s[SETTLE.twaGuide]) <= NEW_COURSE_) s[SETTLE.guideAwa] = Math.abs(b.awaSlow);
+}
+
 /**
  * Work the sheets and every other control. The crew trims each sail toward its best sheet angle at a human
  * pace, reacting to the apparent wind with a short lag (so a quick luff or bear-away shows on the telltales
@@ -1389,6 +1566,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // unless the change calls for moving them)
   const mineNow = b.isUser ? linesByHand(b).join() : '';
   if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; }
+  crewSettle(b, dt);
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
@@ -1404,16 +1582,33 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // (held there, but inside the band for the wind and their depowering floor, controls.ts depowerLimits, which doesn't
     // depend on your sheet: the car still goes down as the breeze builds, up in a drifter, and from the start when you
     // trim the sheets from the off)
-    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, tws); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
+    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, b.settle![SETTLE.guideKt], b.settle![SETTLE.guideAwa]); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
-    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)));
+    // (the lazy car is set for the course she holds, at the guide's angle (crewSettle), not for the jib's angle in the wind
+    // of the last few seconds: read that way, on a beat in the Bay's gusty westerly the plan hunted across all five
+    // athwartships holes every few seconds, the crew's wait for a change that had lasted ran on through the hunting, and the
+    // bow hand went forward to move it for nothing, crewstation's 12 kt seed 2. Set up before she sails at the hole for the
+    // wind she has; then moved in only when its lead is CAR_HOLES wider than her guide's angle wants, the jib held off its
+    // angle, and only once she's held her course NEW_HELD (out of a tack the guide's angle lags 5-10° low as she gathers
+    // way). Not out again for their own wish: off a lead inboard of its angle the jib still reaches it, the sheet eased, at
+    // a degree of twist more at most, a few hundredths of a percent of her drive (the physics review), not a trip forward.
+    // That's this model's truth, not a sailing one: on a real boat a lead left inboard as the breeze builds closes the
+    // slot, backwinds the main and heels her, and crews take it out; none of that is priced here, only the twist. If the
+    // slot is ever modeled, the move out comes back. With your own jib sheet, the hole for your sheet's angle, the same way)
+    const yourJib = b.isUser && byHand(b, 'jibsheet');
+    const carIdeal = carInFor_((yourJib ? jAng : optimalSheet_('jib', b.settle![SETTLE.guideAwa])) - 0.25);
+    const carLz = c.car[b.tack].ins;
+    const carIn = b.crewReady && (b.settle![SETTLE.since] < NEW_HELD || carLz - carIdeal < CAR_HOLES) ? carLz : carIdeal;
+    if (fixed.carIn == null) fixed.carIn = carIn;
+    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]); b.crewPlanT = 1;
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)), b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]);
     b.crewTogether = worthTogether(b.crewWorth); // (worked out with the worth, once a second: not looked up each step)
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
-      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
+      // (the car's mark by the crew's own rule, above: not one hopping across the holes with each puff)
+      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, { carIn }, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]) : b.crewPlan;
       b.crewIdeal = { ...free, mainsheet: mainsheetFor(wantMain, free.traveller), jibsheet: jibsheetFor(wantJib, c, b.tack) };
     }
   }

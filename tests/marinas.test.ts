@@ -151,7 +151,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
     const rel = (from: number, h: number) => ((from - h + 540) % 360) - 180;
     let n = 0, held = 0;
     for (const s of SLIPS.filter((_, i) => i % 3 === 0)) for (const from of [270, 225, 0]) {
-      const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing' || p.pivot === 0) continue; // (walked out to the fairway and turned there by hand toward the way out, 8m2: not the wind's swing)
+      const p = pushOffPlan(s, from, 15); if (p.kind !== 'swing' || p.walk) continue; // (walked out to the fairway and turned there by hand toward the way out, 8m2: not the wind's swing)
       if (15 * Math.abs(Math.sin(rel(from, s.heading) * Math.PI / 180)) < WIND_SWINGS) continue;
       n++;
       expect(Math.sign(p.turn)).toBe(Math.sign(rel(from, s.heading))); // (the bow comes round toward the wind: the stern goes downwind)
@@ -189,7 +189,7 @@ describe('the other marinas: Gashouse Cove, South Beach, the Corinthian, Horsesh
   it('the wind straight out of her slip: she\'s already head to wind, so she\'s walked out and held for the main, not turned across it', () => {
     let n = 0;
     for (const s of SLIPS.filter(x => x.kind === 'bow-in').filter((_, i) => i % 4 === 0)) {
-      const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing') continue;
+      const p = pushOffPlan(s, s.heading, 15); if (p.kind !== 'swing' || p.walk) continue; // (walked out on her lines where she couldn't be held for the main, 8m3: the walk-out's own tests')
       n++; expect(p.hold).toBeTruthy(); expect(Math.abs(p.turn)).toBeLessThan(15);
     }
     expect(n).toBeGreaterThan(8); // (was 20: since she must have 20 m clear along her path as she gathers way, main alone and hands off (pushoff-letgo.test.ts), many narrow berths shove her off astern instead)

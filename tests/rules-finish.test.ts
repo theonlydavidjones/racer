@@ -131,6 +131,8 @@ function sail(w: World, b: B, p: Vec, tack: 'S' | 'P', v = 2.4) {
   if (b.ai) { b.ai.turnCommit = 0; b.ai.commitFor = 0; } // (no turn the AI committed to where she was before)
   return h;
 }
+/** The tack a boat is on `after` s past her tack at `at`, from a log of it: a tack given up at once shows, a later tack back for the mark doesn't. */
+const tackAfter = (log: { t: number; tack: string }[], at: number, after = 5) => log.find(x => x.t >= at + after)?.tack;
 const off = (p: Vec, u: Vec, k: number) => ({ x: p.x + u.x * k, y: p.y + u.y * k });
 
 describe('in the world', () => {
@@ -146,13 +148,17 @@ describe('in the world', () => {
     expect(w.pairRecord(M, W)?.hail).toMatchObject({ by: M.id, kind: 'room', relayed: true });
     expect(w.pairRecord(L, M)?.hail?.passedOn?.to).toBe(W.id);
     // (each boat's first tack after the hail: free of it, W may well tack back for the mark later)
-    let wT = NaN, mT = NaN;
-    for (let t = 0; t < 20; t += DT) { w.step(DT); if (isNaN(wT) && W.lastTackT > t0) wT = W.lastTackT; if (isNaN(mT) && M.lastTackT > t0) mT = M.lastTackT; }
+    // (whether she stayed tacked is read 5 s after her tack, not at the end of the 20 s: the boats tack back for the mark
+    // some 10 s later, which is not an aborted tack; the Coordinator's OK, 16 Nov 2026)
+    let wT = NaN, mT = NaN; const mLog: { t: number; tack: string }[] = [];
+    for (let t = 0; t < 20; t += DT) { w.step(DT); if (isNaN(wT) && W.lastTackT > t0) wT = W.lastTackT; if (isNaN(mT) && M.lastTackT > t0) mT = M.lastTackT; mLog.push({ t: w.t, tack: M.tack }); }
     expect(wT).toBeGreaterThan(t0);
     expect(mT).toBeGreaterThan(t0);
     expect(mT).toBeGreaterThanOrEqual(wT); // M waited for W
     expect(mT - wT).toBeLessThan(6); // and then tacked as soon as she could (20.2(c))
-    expect(M.tack, 'and stayed tacked').toBe('P');
+    expect(tackAfter(mLog, mT), 'and stayed tacked').toBe('P');
+    // (the check itself: a tack given up after 2 s, back on starboard, is not "stayed tacked")
+    expect(tackAfter([0, 1, 2, 3, 4, 5, 6].map(t => ({ t, tack: t < 2 ? 'P' : 'S' })), 0)).toBe('S');
   });
 
   it('20.3: you, hailed with a boat to windward, press Hail and pass it on', () => {

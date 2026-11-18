@@ -45,12 +45,33 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   so the VMG curve has two near-equal peaks and beatInChop's answer swings 5–7° on a 0.25 kt puff (the speed made good
   between them under 0.2%). The AI's target angle and the laylines move with it. Blend the drive curve across its
   neighboring bins, as driveCalibration already does across the wind.
+- **AI steering in a dying breeze** (Skipper Model, after their irons PR; the Coordinator, 16 November; found by Crew
+  Model's crewstation work): in races whose 6 kt westerly dies to 1–4 kt, the AI's tacks stall at about 2.3 kn and fall
+  off the long way round through a jibe, and its desired heading flips 190↔284 every 10–20 s, or zig-zags 55°↔105–160°
+  true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
+  tests/crewstation.test.ts's 2.0 backstop failed on 6 kt seeds 4, 11 and 15; since the AI's pole call waits for the run to
+  hold and the guide's angle holds through a swing (claude/crew-habits), all 24 seeds pass it and nothing is held. The
+  steering itself is still to fix.
+- **The outhaul in a breeze wandering across the guide's steps** (Crew Model; the physics review of the crew habits,
+  16 November): two cases left after the guide's steps were read as its ranges (controls.ts guideLimits):
+  - a light-air beat whose breeze swings across both 4 and 5 kt (3.5 to 5.7 kt read) still has them at the outhaul
+    every 70-90 s, 0.05 to 0.45 and back: what the guide says for those winds, but more than a crew would do;
+  - in 11.5 ± 1.2 kt the outhaul creeps off the mark in six trips, a trip each 95 s, for one ease.
+  Both want the trip judged against what it's worth and the wait since the last, not forced by the band.
 - **The sea turning with the wind, truly** (for Deep Physics, next after the boom's place on a beat; the Coordinator,
   16 November; Capacity to check the frame's cost): the wave field is plane waves turned about your boat, so any turn
   sweeps the pattern sideways at a distance; its turn is now capped at about 4° an hour (environment/waveField.ts
   turnCap), a stopgap that stops the "rushing water" on days sailed from the observed record but leaves the chop
   lagging a big shift for hours. Real short chop comes round in ten minutes or so, the old waves dying as new ones
   grow from the new direction: model that, two seas cross-faded, and take the cap out.
+- ~~**The sea turning with the wind, truly**~~ (done on branch sea-born, Deep Physics, 17 November; awaiting the batch):
+  no wave of the chop turns now. Its components change direction in pairs, one dying into its neighbor and born again
+  for the new wind, the pair's energy kept, so the old sea fades as the new one grows across it and nothing sweeps at
+  any distance (environment/waveField.ts update); the cap on the chop's turn is gone, and the boat's wave drag reads
+  the chop's direction from the same components. The time is the wind's input to waves as measured (Snyder et al.
+  1981, Komen et al. 1984): in 10 kt the 1 s waves in about 8 minutes, the main chop in about an hour. (The earlier
+  line here, and #450, said real chop "comes round in ten minutes or so": that was unsourced, and true only of the
+  shortest waves in a breeze.)
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
@@ -86,6 +107,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
   Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
   120/60/30 m it allows, or a cost for less, so only the narrow reach is sailed close.
+- **Prepare for the rounding** (Crew Model; the Coordinator, 16 November): with a mark close ahead, the crew get ready for
+  the rounding (the pole, the vang, the jib car for the next leg) and make no small-gain cabin-top trips for this leg:
+  within about 30 s of a mark (an ESTIMATE, to be sourced if possible). Found on the shelved back-up-to-speed branch
+  (claude/back-to-speed, 60e0dbb4): waiting for her speed after a tack moved a jib-halyard trim to five seconds before
+  the windward mark, undone after the bear-away (12 kt seed 6: three extra trips). Back-up-to-speed returns on top of
+  this and the AI's light-air steering.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
@@ -99,6 +126,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
   yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
   sternway; ~~the end tie's push-off doesn't allow for the wind setting her back onto the dock~~ (done: her bow's pushed off to close-hauled, away from the dock; a boat set sideways now stops against a dock or the shore instead of passing through).
+- **Her bare hull's windage at its own height, and the bare-poles drift ahead** (physics review of the sternway drag,
+  17 Nov 2026; for Deep Physics, later): the wind on her bare hull and rig (windageCdA 2.0, ORC) is all taken at the
+  sails' height (4.29 m), but about 1.17 m² of it is hull near 0.6 m, where the log profile gives 0.63 of the wind
+  against 0.889: weighted by height the push falls about 30% and her terminal sternway about 15%. And a wind abaft the
+  beam drifts her ahead at a tenth of the wind (1.03 m/s in 20 kt), unsourced, where a force balance on the same
+  windage gives about 1.4 m/s; stern first she now makes 1.07 m/s against twice the drag.
 - ~~**The sea inside the marinas**~~ (done, bay-east-7: the swell diffracts through each entrance by the exact gap solution, scripts/make-gap-diffraction.py, the Penney & Price problem the Shore Protection Manual draws for B/L 0.5–5; the fetch is traced finely just outside a marina as well as inside, every 2° by one, and blended between its 10 m nodes;
   swell running past an entrance bends round its breakwater head by Sommerfeld's half-plane solution; over a swell's
   spread of directions, Mitsuyasu/Goda s 75. Left out, from review: the basin's own walls reflecting the waves (Gashouse
@@ -115,6 +148,32 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   (fetch 194 m against 108 m), from the open-water ray's 50 m minimum fetch (2–4 h).
 
 What's planned, roughly in order. Done work is described in the README.
+
+**v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
+
+**v205 (18 Nov):** fewer first-mark pile-ups (#453), the committee's beat-start course (#452), hands on the lines when
+hiking, crew stations (#446) and habits (#455), Sail Home paced, the destination pin, the 8 m slip walk-out, the rounding
+note (#447), the coach's heeled speed (#449), the wind to the second (#451). Still open: shallow waves (#454, pulled: it
+broke the first-mark test), the navigator's harbor-mouth pilot home, the navigator as a layer.
+
+**Every owner request is also kept in Owner's Requests** (https://claude.ai/artifact/9LqaHyCJvUStsifA29UAj3; the owner,
+17 November: "I feel like features I've requested are being lost"): one row per request, ranked now · next · later ·
+done, in the artifact's own database, so it survives compaction. Each new request goes there as well as here, and moves
+to done there when it ships.
+**Every finished feature is kept in Finished Features** (https://claude.ai/artifact/RzR3C42c24ZiGNCWsrPn7Q; the owner,
+17 November, for documentation later): one row per feature, by area, with what it does, its key, the version and its
+sources. Each shipped item is added there when it's published.
+
+- **Motor sailing: her speed with the sails up and the motor on** (owner, 17 November; accuracy; later, "low priority";
+  1–3 h; Deep Physics): "motoring speed should account for sails being up. sails should impact physics when motor
+  sailing, if they don't already." Found (Roadmap, 17 Nov): physics.ts already adds the outboard's thrust (motor.ts
+  motorForce) to the sails' drive and drag in the one surge equation, so the sails do count. To check and test: motor
+  alone against motor and sails on a reach and close-hauled (faster, toward hull speed), head to wind (the flogging
+  sails slow her), and the apparent wind the sails see while she motors (her motored speed in it); then the physics
+  review.
+- **Mounting the outboard takes far too long: 5 seconds at most** (owner, 17 November; polish; later, "low priority";
+  1–2 h; Marinas): "mounting the motor takes way, way too long. 5 seconds max." The crew's lowering and mounting of the
+  outboard on its bracket, from the call to running, in 5 s or less.
 
 ## Priorities (owner's ranking, November 2026)
 
@@ -195,7 +254,11 @@ What's planned, roughly in order. Done work is described in the README.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   **Now, first in the pass: the helm's travel and response** (owner, 15 November; accuracy; now; 3–5 h): "the turning
+   ~~**Now, first in the pass: the helm's travel and response**~~ (done, Deep Physics: the tiller to 75° each side, the
+   turn rounding off to the rudder's stall at 40° (a 7.7 m circle for 9) and braking past it; her yaw inertia from her
+   ballast keel, so the turn answers in 0.36 s at 4.7 kt, not 0.6; the chase camera close behind her; tests/helm-travel.
+   Left: the AI, a called tack and the tiller pilot still use 30° at most, so a hand on the tiller out-turns them by a
+   sixth; and the mouse's travel is linear to 75° at the window's edge, for the owner to try) (owner, 15 November; accuracy): "the turning
    radius is too slow and not wide enough when I'm tacking ... short tacks in the marina. I need to be able to push the
    tiller about 50% wider, and I would expect the tiller to be much more reactive ... There should be no delay in the
    turn of the boat and the push of the tiller ... exactly in line." The owner's answers:
@@ -238,6 +301,9 @@ What's planned, roughly in order. Done work is described in the README.
      - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
      - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
        option.
+     - Known modeling limit: the engine names one boat at fault per incident. Under the RRS both may have broken a rule:
+       a boat that interferes with a boat on another leg (23.2), and that boat failing to keep clear of her from astern
+       (12). Only one is penalized, and a hearing finds only that one.
      - Rule 31 under protests (branch rules-31): a mark touch is any boat's to protest that saw it (60.1,
        60.4(a)(2)). The boats within four lengths saw it: you may hail, and the nearest AI boat hails at once. The toucher's turn is her own choice, as for a foul.
        The hearing decides it as a foul.
@@ -313,6 +379,18 @@ What's planned, roughly in order. Done work is described in the README.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **A gentler way out than the walk-pace shove (Marinas; from the sourced sternway drag, 17 Nov 2026):** the gentlest
+     shove the crew give is their walk, 0.45 m/s, which now glides her 23 m in still air, so six South Beach berths
+     (D2, E1, E2, F1, F2, G1; 9–12 m of clear water astern) are kept fast in a dead calm. A real crew hands her out
+     slower, checks her on a line, or paddles. (The plan is judged to her way lost, 240 s, since 18 Nov 2026: at 90 s
+     she crept on some 14 m, and five light-air shoves crept into a dock, the breakwater or the next boat.)
+   - **Her crew take charge at the coast's end in a breeze forward of her beam (Marinas; the creep sweep, 18 Nov 2026):**
+     shoved off stern first with a breeze on her bow, a bare-poled boat never loses her way (0.76 m/s in 15 kt on the
+     sourced drag), so on the way-lost horizon 73 berths that were shoved are kept fast, nearly all in a 12 or 20 kt
+     easterly (West Harbor 373–407 odd and 637–649, Gashouse Cove 516/518/520, Corinthian A5–A14 and B30–B35, South
+     Beach A77/A79/A81, Horseshoe Bay A12, A15, C21, Corinthian B3). A real crew finds that the easy way out: the jib up
+     or the main, and she's sailed off where her coast ends. The push-off ends passively, and steered and left alone 87
+     such shoves touched. Let the crew sail her out, with its own every-berth sweep, and those berths come back.
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
      from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. The lee's edge is allowed for in the shove (done,
      Deep Physics: gauged to the wind along her line out and to leeward of it, World.windAstern; Corinthian B16 in a 20 kt
@@ -421,10 +499,19 @@ What's planned, roughly in order. Done work is described in the README.
      12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
      held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
    - **Still to do (Deep Physics' review, 16 Nov 2026):**
-     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
-       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
-       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
-       or motored out. The sweep test fails if the count rises.
+     - **~~The berths kept fast: the stern-line walk-out's target~~** (done, 16 Nov 2026, the coordinator's calls). Where
+       the shove would leave her kept fast, she's walked out by hand instead, even from a slip the wind blows straight out
+       of, and turned the way a crew does it (the physics review): about her bow at the finger's end by a hand on the dock
+       with a stern line, who then steps aboard (in about 8 kt and less, either way round: the line to her stern runs
+       nearly through her bow, a lever of 1.1–1.4 m, and turned with the wind she still has to be checked before she lies
+       head to wind), or, where that won't do, out in the fairway about her middle on a slip line round the finger's cleat,
+       all hands aboard, hauled in as she comes round (set no more than 2 m to leeward while the crew's haul, 271 N on her
+       less the cleat's friction, beats the wind's push with a third to spare, to about 16 kt; set more and more beyond, to
+       her bare-rig drift where the push beats the haul outright, about 18.7 kt). Every let-go 60 degrees and more off the
+       real wind. Sample of every 25th bow-in berth in seven winds: kept fast 90 of 434 to 31 (8 by a hand on the dock,
+       383 on a slip line), none touching. The 1,604 once swung on the bow line: 1,254 on a slip line, 106 kept fast (31 before the review), none
+       touching. In 20 kt from the north no berth is shoved off astern any more: walked out or
+       kept fast. In 12 kt from 090, the easterly, rare on the Bay, the sample still keeps most fast: not in the sweep test.
      - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
        astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
        the test.
@@ -545,12 +632,20 @@ What's planned, roughly in order. Done work is described in the README.
      the rail"; bug; now; 1–3 h): a crew figure stands straight-legged on the side deck at the rail, leaning outboard,
      with no seat under him. Find the state that poses it (a move or a hike pose before he sits), and a test in
      tests/crewfig.test.ts that no hand is standing on the deck while she's sailing and he isn't moving.
-   - Hands on what they'd really hold, hiking on a beat (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
+   - ~~Hands on what they'd really hold, hiking on a beat~~ (done, v205: hike-hands) (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
      out, crew seem to be holding on to thin air. IRL, when beating, forward crew would be holding the lee jib sheet, and
      middle crew would be holding the traveller and/or mainsheet, often tucking their aft leg under the thwart for
      stability. if only one crew, they would hold the jib sheet and the traveller." The hands go on the lee jib sheet's
      tail and the traveller or mainsheet; the middle hand's aft foot hooked under the thwart. Checked from both sides on
      both tacks.
+   - Arms through bodies in a tack (Crew Figures, 17 November; from the owner's "his right arm seems to extend through his
+     torso"; bug; next; most of a day): tests/crewarms.test.ts holds the steady poses (sitting out, the lines in hand);
+     through a tack in 15 and 18 kt, getting ready, crossing and hiking again on the new side, the hikers' arms pass
+     through their own torsos by up to 12 cm in many frames, the lone hand's getting up off the cabin top to the rail too.
+     Hands go straight from place to place, through the chest and thighs, and the tack's poses don't keep each hand on its
+     side; a hand put to rest on the lap sinks 3–4 cm into the thigh (lifting it pushed elbows forward: crewfig's arm checks).
+     A test of its own first, failing on main (every frame of a tack and of the moves, both tacks, one and two crew),
+     then hands that go round the torso and poses with each hand on its own side. Checked from both sides on both tacks.
    - Open question (Coordinator, 14 November; from the physics review of claude/crew-mast-sheets): in about 16 kt and
      up the crew won't leave the rail to set the lazy jib car (crewWork.ts carJob: not while she needs their weight), so
      after a change of breeze she sails the next tack on the old car. Arguably right: a good crew stays hiked and sets
@@ -814,7 +909,7 @@ What's planned, roughly in order. Done work is described in the README.
        src/geo/marina.ts), finishing with the docking hand-over;
      - (3) moored boats solid, the same fix as slip 572 (8m2);
      - (4) a test that the navigator brings her home from the Bay to slip 572 with no contact.
-   - **Bug: "Sail Home" from Mile Rock still plotting after ten minutes** (owner, 16 November; bug; now; 2–4 h): "I was
+   - ~~**Bug: "Sail Home" from Mile Rock still plotting after ten minutes**~~ (done, v205: nav-pace) (owner, 16 November; bug; now; 2–4 h): "I was
      sailing outside of the gate, with a destination near the old mile rock lighthouse. when I got near to the
      lighthouse, I went into the nav view and clicked Sail Home. It appears that my destination has updated, but we're a
      full ten minutes in and the course is still plotting in the nav map. I need that to move more quickly." Lead: since
@@ -823,6 +918,7 @@ What's planned, roughly in order. Done work is described in the README.
      each time, never finishing. Finish (or carry on) the search under way rather than restart it, and give a new
      destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
      at 6 kt (tests/insetRoute).
+   - ~~**A clicked destination shown as a pin, not coordinates, and moved when the destination changes**~~ (done, v205: nav-dest-pin) (owner, 16
    - **The passage plan's cold first fill: exact speedups left** (17 November; perf; later; each 1–3 h). From Mile Rock to
      Gashouse Cove the first plan now takes 63 s of work, not 87 s. Two changes did that, both exact (the same track point
      for point; branch cold-current): the lee rays skip open water, and the current grid keeps the shore's share per

@@ -9,7 +9,7 @@ import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from
 import { FINE, routeLegSteps, trackClear, type Grain } from './router';
 import { groundLaylines, landDist, routeAroundSteps, sailLegSteps, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
-import { harborAt } from '../geo/marina';
+import { harborAt, harborRouteSteps, slipAt } from '../geo/marina';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
 /**
@@ -70,7 +70,8 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
   // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
   // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried.
   // An estimate: docs/CONSTANTS.md)
-  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity);
+  // (a front that has lost the way given up here, router.ts GIVE_UP, only when the stretches follow to try again)
+  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity, route.length > 2);
   if (direct.ok && (!rules.ok || direct.minutes <= rules.minutes)) return { ok: true, minutes: direct.minutes, track: direct.path, legs: [direct] };
   if (rules.ok && (!direct.ok || rules.minutes < direct.minutes)) return rules;
   if (route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };
@@ -146,6 +147,14 @@ const fresh = (m: { key: string; refs: unknown[] } | undefined, k: { key: string
 /** A place inside a marina's basin, for the passage: the marina's entrance nearest it (the middle of the way in). The
  * way between the entrance and her slip, round the docks and along the fairways, is the marina's own (ROADMAP 8m2,
  * Marinas), not the passage's. */
+/** Where a passage to a destination ends: bound for a slip, the middle of its harbor's entrance nearest it by water, where the
+ * pilot hands her over (geo/marina.ts harborRoute, world.ts navTarget: one mouth for the plan and the pilot); else as
+ * outOfBasin. The harbor's flood the first time, a little at a time. */
+function* destOut(p: Vec): Generator<void, Vec, void> {
+  const s = slipAt(p);
+  if (s) { const r = yield* harborRouteSteps(s); if (r) return { ...r.mouth }; }
+  return outOfBasin(p);
+}
 function outOfBasin(p: Vec): Vec {
   const H = harborAt(p); if (!H || !H.exits.length) return p;
   let e = H.exits[0]; for (const x of H.exits) if (dist(x, p) < dist(e, p)) e = x;
@@ -162,7 +171,7 @@ function sharedOutlook(w: SimView) {
 }
 function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> {
   const dest = w.dest; if (!dest) return null;
-  const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
+  const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = yield* destOut(dest.p);
   const o = sharedOutlook(w);
   yield;
   const route = yield* routeAroundSteps(from, to);
@@ -271,7 +280,7 @@ export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => vo
 function* passagePlanSteps(w: SimView, live = true): Generator<void, PassagePlan | null, void> {
   const dest = w.dest; if (!dest) return null;
   const o = sharedOutlook(w), u = w.user, t0 = w.clockUtc;
-  const from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
+  const from = outOfBasin({ x: u.x, y: u.y }), to = yield* destOut(dest.p);
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
   // (the same passage the chart and the setup show: passageNow)
   // (the passage leaving now: the live plan's, the one the inset and the HUD draw, if it's recent; else that plan, started
