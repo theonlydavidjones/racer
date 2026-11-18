@@ -391,9 +391,11 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // helm the other four to eight times a minute under a knot in light air. Under STEERAGE she asks only for the turn
     // rate the helm she'd hold at steerage way gives her now, so a small error takes a little helm, a big turn full
     // helm, and the tiller drawn is the turn she makes. (That a helmsman steers so is an ESTIMATE, as STEERAGE is.) About
-    // to touch a boat (rule 14, ai.ts urgent), her quickest turn, whatever her speed)
+    // to touch a boat (rule 14, ai.ts urgent), her quickest turn, whatever her speed. Sculling toward close-hauled (rule
+    // 42.3(d)) isn't scaled by the flow either: a pumped tiller makes its own, so stopped head to wind in a tack she
+    // sculls round as before)
     const steerFlow = STEERAGE_FLOW * (aheadK + HANDLING.asternRudder * (1 - aheadK)); // (astern, the blade works less well: as flow)
-    const gain = ai?.urgent ? 1 : Math.min(1, maxRate / steerFlow);
+    const gain = ai?.urgent ? 1 : Math.min(1, lim / steerFlow); // (lim: the flow's turn, or sculling's where 42.3(d) allows it)
     rate = clamp(lead * 1.6 * gain, -lim, lim);
     const need = (rate - balRate - motRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
     rudder = Math.sign(need) * Math.min(most, helmFor(Math.abs(need)));
