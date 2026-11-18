@@ -27,16 +27,18 @@ cruiser, or it can cross the Pacific single-handed.
 Sailors say two things: if you can sail the Bay, you can sail anywhere; and if you can sail a Folkboat, you can sail
 anything. That's what this game amounts to. Our mission is to bring those two truths to anyone who wants them.
 
-Working title (the owner, 16 Nov 2026): **Mainsail**, not confirmed: the owner is still deciding on a name, so don't put it on the player's screens yet. The owner's plans are bigger than Folkboats and San Francisco Bay:
-this game is about sailing. So the name must be able to hold more boats and more waters later, and the build should stay
-extensible (don't hard-wire the Folkboat or the Bay where a boat or a body of water could be a parameter). But the
-mission above stands for the MVP and does not change: the Bay and the Folkboat. Don't put the Bay or the Folkboat in the
-game's name.
+Working titles (the owner, 18 Nov 2026): **Folkboater** or **Bay Racer**, not decided: don't put either on the
+player's screens yet. They replace the earlier "Mainsail" (16 Nov), and with it the earlier plan for a name and a build
+wider than Folkboats and the Bay: the focus below is the scope.
 
 Community (the owner, 13 Nov 2026): the mission is also about community. You can't race in real life without belonging
 to a club, and no single person can know or do everything required to sail and maintain a boat. The marinas, the trading
 and training of crew, the flying of burgees, the traditions, the legacies and the trophies all belong to that community
 element. Eventually: a live multiplayer mode.
+
+Focus (the owner, 17 Nov 2026): the game is the Nordic Folkboat on San Francisco Bay, and nothing wider. No other
+classes of boat and no other waters: depth in this one boat and this one place is what sets it apart from general
+sailing sims. Work that widens the scope beyond them is out unless the owner asks for it.
 
 Priority (the owner, 13 Nov 2026): physics and racing first. "Physics is the key to the true-to-life element of the
 simulator. If it's not real and accurate, then it's not a simulator." The Bay's beauty and a robust open-Bay cruising mode

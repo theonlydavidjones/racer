@@ -1,11 +1,11 @@
 import { setOntoPier } from '../geo/fortMason';
-import { bow, stern, type Boat, type LineKey } from './boat';
+import { SETTLE, bow, stern, type Boat, type LineKey } from './boat';
 import { heelFactor, heelWithCrew, helmNeeded, rudderDrag, sailForces } from './balance';
 import { CAR_FORE_PINS, boomAngle, crewSolve, depowerLimits, planWorth, jibClew, jibShape, mainShape, mainsheetFor, shapeEfficiency, targetShape, type Controls, type CrewSettings, type Shape } from './controls';
 import { crewBestHeel, crewMass, crewMoment, crewSkill, displacement, specAttr } from './crewPhys';
 import { crewHeading } from './crewWork';
 import { condition, rigOf } from './condition';
-import { airDrag, driveSpeedRatio, hullResistance } from './dynamics';
+import { airDrag, driveSpeedRatio, hullResistance, speedForDrive } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
 import { byHand, crewEaseBoom, crewMainAngle, leeDrift, pinchFlog, sailFrame, sailPlan, sailPush, sailWind } from './physics';
@@ -211,7 +211,13 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, d
   const lwFor = (F: number, h: number) => b.twa < 150 ? clamp(F * Math.cos(h * D2R) / (0.5 * 1025 * Math.PI * DRAFT ** 2 * Math.max(0.8, polar(tws, crs0, plan)) ** 2) / D2R, 0, 12) : 0;
   const lw = lw0 + lwFor(sf.main.heel + sf.jib.heel, heelC) - lwFor(b.forces?.heel ?? sf.main.heel + sf.jib.heel, b.heelMag ?? 0);
   const crs = Math.min(180, b.twa + Math.max(0, lw)), vt0 = Math.max(0.5, polar(tws, crs0, plan));
-  const vT = f * driveSpeed(b, K) * Math.max(0.5, polar(tws, crs, plan));
+  // (the drive's share turned into speed from the heeled hull's own speed, as the step does it (physics.ts: vB, then
+  // speedForDrive there). Weighed from the upright polar speed it came out differently, because near hull speed the
+  // resistance's slope changes within a few cm/s (its table's corners: dynamics.ts RESIDUARY). Close-hauled in 20 kt
+  // with a line set wrong the coach's estimate of her as she is sat 0.08 to 0.10% off her settled speed; now 0.03%, its
+  // standing offset in every wind. Measured on main, 16 Nov 2026; tests/coach-self)
+  const vB = f * Math.max(0.5, polar(tws, crs, plan));
+  const vT = speedForDrive(vB, K, driveCurveFor(tws, crs, vB));
   // the sails flogging, as the boat counts it (physics.ts sailFlog, pinchFlog; dynamics.ts airDrag): a main eased till it
   // luffs, or a course pinched below the beat, costs her windage the drive no longer pays for. A force, so where it
   // leaves her is where the drive at her speed meets the hull's resistance and it, as the surge settles (dynamics.ts
@@ -257,11 +263,11 @@ export function withCrew(b: Boat, k: LineKey, v: number): Controls {
     const fixed: Partial<CrewSettings> = {};
     for (const x of FIXABLE) if (x === k || byHand(b, x)) fixed[x] = c[x];
     const tws = b.ww.kt, cond = b.spec ? (b.cond ?? condition(b.spec)) : null; // (nothing kept on b: the page's copy is read-only)
-    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed);
+    const plan = crewSolve(tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), b.crewPlan ?? undefined, rigOf(b), cond?.jib, b.aws / KT, b.depower, fixed, b.settle?.[SETTLE.guideAwa] ?? b.awaSlow, b.settle?.[SETTLE.guideKt] ?? b.ww.kt);
     // (and only if it's worth the trip to them, as they judge it: physics.ts trimSails, controls.ts planWorth; a skilled
     // crew moves the car for ~0.1% of drive, a novice for ~0.4%)
     // (every line of theirs, as trimSails applies the plan: the outhaul off, they may take the backstay up as well)
-    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
+    const worth = planWorth(c, plan, tws, b.awaSlow, b.tack, want, optimalSheet('jib', b.awaSlow), rigOf(b), cond?.jib, b.aws / KT, b.depower, undefined, undefined, b.settle?.[SETTLE.guideAwa] ?? b.awaSlow, b.settle?.[SETTLE.guideKt] ?? b.ww.kt), minGain = 0.001 + 0.003 * (1 - crewSkill(b.crew));
     for (const x of ['traveller', ...FIXABLE] as const) if (fixed[x as keyof CrewSettings] == null && (worth[x] ?? 1) >= minGain) c[x] = plan[x];
     c.mainsheet = mainsheetFor(want, c.traveller);
   }
@@ -277,7 +283,7 @@ function bestFor(b: Boat, k: Exclude<LineKey, 'car' | 'jibsheetW'>): { to: numbe
   // Without them the coach found "vang on, hard" upwind in 6–8 kt with the main eased, which the guide forbids: "Never
   // use the kickingstrap upwind in less than 18 knots"; the cure there is the sheet. The guide's minimums aren't
   // applied: whether its outhaul-to-the-mark beats the speed search in a breeze is the open depowering question)
-  const lim = depowerLimits(b.depower ?? 0, b.awa, b.ww.kt), [lo, hi0] = RANGE[k] ?? [0, 1];
+  const lim = depowerLimits(b.depower ?? 0, b.awa, b.settle?.[SETTLE.guideKt] ?? b.ww.kt, b.settle?.[SETTLE.guideAwa] ?? b.awa), [lo, hi0] = RANGE[k] ?? [0, 1];
   const hi = Math.max(lo, Math.min(hi0, lim.max[k as keyof CrewSettings] ?? hi0)), base = speedFactor(b, withCrew(b, k, b.ctl[k]), !crewMoving(b, k));
   // (with both sails flogging the drive is nil: a floor, so the line that brings one back still counts)
   let to = b.ctl[k], best = Math.max(base, 0);

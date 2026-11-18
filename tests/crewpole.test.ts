@@ -17,18 +17,26 @@ import { testBoat } from './helpers/testBoat';
 const world = (t = 60) => ({ t, nextMark: () => null }) as unknown as World;
 
 describe('The crew calls the whisker pole', () => {
-  it('out running deep, in on a reach, with a gap between so they do not set and stow it over and over', () => {
-    const b = testBoat({ heading: 0, kt: 4 });
-    b.twa = 165; crewPoleCall(world(), b); expect(b.poleWant).toBe(true);
-    b.twa = 153; crewPoleCall(world(), b); expect(b.poleWant).toBe(true); // (inside the gap: stays as it was)
-    b.twa = 148; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
-    b.twa = 155; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
-    b.twa = 160; crewPoleCall(world(), b); expect(b.poleWant).toBe(true);
+  it('out running deep once the run has held, in on a reach, with a gap between so they do not set and stow it over and over', () => {
+    // (called once she's been past 157° POLE_SET s, stowed once below 150° POLE_STOW s, or at once below 145°: ai.ts)
+    const b = testBoat({ heading: 0, kt: 4 }), at = (t: number, twa: number) => { b.twa = twa; crewPoleCall(world(t), b); return b.poleWant; };
+    expect(at(60, 165)).toBe(false); expect(at(67, 165)).toBe(false); expect(at(68.1, 165)).toBe(true);
+    expect(at(70, 153)).toBe(true); // (inside the gap: stays as it was)
+    expect(at(71, 148)).toBe(true); expect(at(74.9, 148)).toBe(true); expect(at(75.1, 148)).toBe(false); // (a luff of a few seconds: kept)
+    expect(at(76, 155)).toBe(false);
+    expect(at(77, 160)).toBe(false); expect(at(85.1, 160)).toBe(true);
+    expect(at(86, 140)).toBe(false); // (where the poled-out jib does nothing: in at once)
   });
   it('in for penalty turns: no crew spins circles with the pole out', () => {
     const b = testBoat({ heading: 0, kt: 4 });
-    b.twa = 170; crewPoleCall(world(), b); expect(b.poleWant).toBe(true);
-    b.penalty = 720; crewPoleCall(world(), b); expect(b.poleWant).toBe(false);
+    b.twa = 170; crewPoleCall(world(60), b); crewPoleCall(world(70), b); expect(b.poleWant).toBe(true);
+    b.penalty = 720; crewPoleCall(world(71), b); expect(b.poleWant).toBe(false);
+  });
+  it('a boat restored mid-race on a run (no timer kept): waits the hold, never sets it at once', () => {
+    // (the timers aren't saved with the race: a restored or new boat starts them on its first call)
+    const b = testBoat({ heading: 0, kt: 4 }); b.twa = 170;
+    crewPoleCall(world(500), b); expect(b.poleWant).toBe(false);
+    crewPoleCall(world(508.5), b); expect(b.poleWant).toBe(true);
   });
   it('never before the start, nor with the jib down', () => {
     const b = testBoat({ heading: 0, kt: 4 });

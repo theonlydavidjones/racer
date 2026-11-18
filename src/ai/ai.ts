@@ -1,6 +1,6 @@
 import type { PrepFlag } from '../sim/signals';
 import { aiCrewReady, decideTurn } from '../boat/calls';
-import { bow, stern, type Boat } from '../boat/boat';
+import { SETTLE, bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
@@ -504,6 +504,19 @@ function keepEased(b: Boat, near: { o: Boat; r: { kc: Boat | null } }[]): boolea
   return near.some(({ o, r }) => !o.finished && r.kc === b && hullGap(b, o) < lim);
 }
 
+/** At a crowded mark (aiThink): within MARK_CROWD_M of the mark she's coming to or the one she's just rounded, and two
+ * boats or more within 30 m of her. All three numbers (40 m, about five lengths; 30 m, about four; two boats) are
+ * estimates, unsourced, as the start's minute is: chosen to take in a pack at the mark and not a boat or two passing. */
+const MARK_CROWD_M = 40;
+function crowdedMark(w: World, b: Boat, near: { o: Boat; dx: number; dy: number }[]): boolean {
+  if (!b.started || b.finished || near.length < 2) return false;
+  let n = 0; for (const { o, dx, dy } of near) if (!o.finished && !o.retired && dx * dx + dy * dy < 900) n++;
+  if (n < 2) return false;
+  // (to the mark's own edge: an island's shore, not its middle, a long way inside it)
+  const ms = w.C.marks, at = (i: number) => i >= 0 && i < ms.length && markDist(b, ms[i]) < MARK_CROWD_M;
+  return at(b.leg) || at(b.leg - 1);
+}
+
 /** One decision step for an AI boat: sets b.desired and b.luff. */
 export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
@@ -532,11 +545,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
     b.desired = near && ai.clearing ? sailable(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
     if (!ai.clearing) decideTurn(b, w.t, true); // (spinning her turns: a skipper always calls those, boat/calls.ts)
-    b.luff = false; return;
+    b.luff = false; crewPoleCall(w, b); return; // (the pole in for the turns: the physics review)
   }
   ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
   const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
-  if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; return; }
+  if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; crewPoleCall(w, b); return; }
   const tl = -w.t; // time to the start signal
   const refresh = (w.steps + b.id) % (2 * AI_EVERY) === 0; // heavy predictions 10× a second (every other think outside close quarters, as before the speed pass)
   // her compass: about a minute's mean of the wind where she is, against which a shift is a lift or a header (she can only
@@ -821,9 +834,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   if (bh && !boatHailOn) boatHails.delete(b);
   if (boatHailOn) holdForHail = true;
   // collision avoidance under the rules
-  // (around the start, in the pre-start and the first minute after the gun, when the fleet is bunched up, she also
-  // looks at each heading's room to other boats: out on the course the simple moves below are enough, and cheaper)
-  const startArea = w.t < 60;
+  // (where the fleet's bunched up, she also looks at each heading's room to the boats about her (crowded): round the
+  // start, in the pre-start and the first minute after the gun; and at a crowded mark, inside about five lengths of the
+  // mark she's coming to or has just rounded, with two boats or more within four lengths of her (crowdedMark). Seven
+  // boats reaching a mark two minutes after the gun, leaving it on the run through the ones still coming in, took two
+  // penalties a rounding on the simple moves alone (the owner's race, 16 Nov 2026). Out on the course the simple moves
+  // below are enough, and cheaper; asked only where it's used, by a boat keeping clear)
   const near: { o: Boat; dx: number; dy: number; r: ReturnType<World['rights']>; cp: { t: number; d: number } }[] = [];
   for (const o of w.boats) {
     if (o === b) continue;
@@ -831,6 +847,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (dx * dx + dy * dy > 3600) continue;
     near.push({ o, dx, dy, r: w.rights(b, o), cp: cpa(b, o) });
   }
+  const crowded = () => w.t < 60 || crowdedMark(w, b, near);
   // Way on, first. A boat going astern can't steer as she means to and can't tack: she gets way on again before anything
   // else her plan wants (US Sailing, "Getting in and out of irons": fall off, then "pull in the sheets ... to stop the
   // luffing"). The rules still change her course after this.
@@ -912,12 +929,12 @@ export function aiThink(w: World, b: Boat, dt: number): void {
         const up = b.tack === 'P' ? -1 : 1, cap = n360(course + up * 35), h = n360(b.h + up * 20);
         desired = sailable(b, wrap(h - cap) * up > 0 ? cap : h); luff = !running;
       }
-      else if (running) { desired = startArea ? clearestHeading(w, b, b.h) : away; luff = false; } // easing barely slows her on a run: steer round instead
+      else if (running) { desired = crowded() ? clearestHeading(w, b, b.h) : away; luff = false; } // easing barely slows her on a run: steer round instead
       else { luff = true; desired = away; }
       if (o.id !== ai.hailTack?.with) avoiding = true; // (the boat of the hail: rule 20.2 has their room in hand)
       // and if that still leaves her too close (she keeps clear of every boat she must, not just this one), the
       // heading that opens the most room, nearest what she wanted
-      if (startArea && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
+      if (crowded() && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
       desired = sailable(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
@@ -1004,9 +1021,30 @@ export function aiThink(w: World, b: Boat, dt: number): void {
 export function crewPoleCall(w: World, b: Boat): void {
   const nm = w.nextMark(b), nearMark = !!nm && nm.type === 'round' && markDist(b, nm) < 45;
   const twa = b.twa, jibDown = !!b.rig && (b.rig.jib < 1 || !b.rig.jibUp); // (the pole goes out on the jib)
-  if (w.t < 0 || nearMark || twa < 150 || jibDown || b.docked || b.penalty > 0 || inBasin(b)) b.poleWant = false;
-  else if (twa > 157) b.poleWant = true;
+  // (and called once the run's settled, not the moment her course crosses 157°: swinging through the run, it was set as
+  // she passed it and stowed seconds later, four trips forward and back each time, crewstation's 6 kt seed 21. Set once
+  // she's been past 157° POLE_SET s and not swinging (Boat.settle's since); stowed once she's been below 150° POLE_STOW s,
+  // so a brief luff doesn't take it in, or at once below 145°, where the poled-out jib does nothing (polar.ts jibEfficiency).
+  // The times are estimates: the skipper's call as the run settles, and a luff of a few seconds to keep clear. Not
+  // crewWork.ts courseHeld: her heading's 20 s mean takes about 25 s to come to it after a bear-away round the windward
+  // mark, every run's pole that late; the 8 s past 157° unbroken and no swing keep a course swinging through it from
+  // calling it, the Coordinator, 16 Nov 2026. The timers aren't saved with the race: a restored boat starts them afresh)
+  // (the hold kept while she stays past the 154.5° crossover, polar.ts, so a light, shifty run hovering about 157° isn't
+  // restarted by each dip; and her heading still within POLE_TURN of where it began, so a circle too slow to be a swing,
+  // under about 3°/s, doesn't pass it either: the physics review)
+  const p = poleT.get(b) ?? { hi: NaN, lo: NaN, h: 0 }; poleT.set(b, p);
+  if (p.hi === p.hi ? twa < 154.5 : twa > 157) { p.hi = twa > 157 ? w.t : NaN; p.h = b.h; }
+  // (and the heading's mark moved on while she's swinging or just steadied: after a bear-away deep onto the run, or a
+  // gybe in the hold, it's her new course's, and the pole goes out once she's held it; a circle too slow to be a swing
+  // keeps the mark where she crossed 157°. Fixed there, a gybe or a bear-away to 172° kept it in for the leg, the review)
+  if ((b.settle?.[SINCE] ?? 1e9) < POLE_SET) p.h = b.h;
+  p.lo = twa < 150 ? (p.lo === p.lo ? p.lo : w.t) : NaN;
+  if (w.t < 0 || nearMark || jibDown || b.docked || b.penalty > 0 || inBasin(b) || twa < 145 || w.t - p.lo >= POLE_STOW) b.poleWant = false;
+  else if (w.t - p.hi >= POLE_SET && (b.settle?.[SINCE] ?? 1e9) >= POLE_SET && Math.abs(wrap(b.h - p.h)) < POLE_TURN) b.poleWant = true;
 }
+const POLE_SET = 8, POLE_STOW = 4, POLE_TURN = 15, SINCE = SETTLE.since; // (read once at load: docs/CAPACITY.md)
+/** When each AI boat's angle last went past 157° (and her heading then) and below 150° (crewPoleCall; NaN while it isn't). */
+const poleT = new WeakMap<Boat, { hi: number; lo: number; h: number }>();
 /**
  * Your boat's pole goes out only on your call (the O key, the band's Pole tab); your crew stows it only when it must come
  * in, and says why: she's come up to where the poled-out jib does nothing at all (145 true and higher: polar.ts

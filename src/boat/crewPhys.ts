@@ -167,7 +167,7 @@ export interface CrewState {
   fore01?: number; foreT?: number;
   /** Downwind, whether the bow-down trim with the bow hand at the mast pays (re-thought with the fore-and-aft place), and
    * whether, with the pole out, both crew right forward on the foredeck pays more: `layout`, and seconds since it changed. */
-  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; twsAvg?: number; twaAvg?: number; poleWas?: boolean;
+  layout?: 'cockpit' | 'mast' | 'foredeck'; layoutT?: number; twsAvg?: number; twaAvg?: number; /** the course's angle the mean last snapped for (placeCrew, CrewCall.courseTwa) */ courseSeen?: number; poleWas?: boolean;
   /** With the pole out: whether best practice has them forward, how long it's said so (s), and what they're doing about
    * it, in the status line's terms (ui/crewWords.ts). */
   poleFwd?: boolean; poleFwdT?: number; poleWhy?: 'fwd' | 'part' | 'soon' | 'soonMast' | 'stay' | 'aft' | 'late' | 'wrong';
@@ -178,7 +178,7 @@ export interface CrewState {
   /** Where each has settled (HOLD: they stay there until a change is worth a move), the crew's clock (s), and what you'd set. */
   held?: (Held | null)[]; clock?: number; holdT?: number; settleT?: number; placeKey?: string;
   /** Seconds until they look round for the next job (crewWork.ts), and where they've wanted each cabin-top line lately. */
-  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** her true wind angle over the last 20 s (crewWork.ts, LINE_TAU) */ twa20?: number; /** and their wish for it over a gust-lull cycle then (crewWork.ts LINE_MOVED) */ lineRef?: Record<string, number>; /** the wind and angle when each jib car was last set (crewWork.ts CAR_WIND) */ carSet?: Partial<Record<'S' | 'P', { tws: number; twa: number }>>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
+  jobT?: number; lineWant?: Record<string, number>; lineT?: number; lineSet?: Record<string, number>; /** the cabin-top wishes over a gust-lull cycle (crewWork.ts) */ lineSlow?: Record<string, number>; /** her true wind angle when each cabin-top line was last set */ lineTwa?: Record<string, number>; /** her true wind angle over the last 20 s (crewWork.ts, LINE_TAU) */ twa20?: number; /** and their wish for it over a gust-lull cycle then (crewWork.ts LINE_MOVED) */ lineRef?: Record<string, number>; /** the wind and angle when each jib car was last set (crewWork.ts CAR_WIND) */ carSet?: Partial<Record<'S' | 'P', { tws: number; twa: number }>>; /** when (c.clock) a cabin-top trip last began (crewWork.ts LINE_TRIP) */ pianoT?: number; /** and who made it */ pianoWho?: number; /** when (c.clock) the crew last moved fore and aft (chooseFore) */ foreSetT?: number; /** and her true wind angle then */ foreTwa?: number; /** two crew: since when (c.clock) the other station has been the better (chooseFore) */ foreWantT?: number; /** two crew forward of the winch: the side the front hand sits on the cabin top's edge (+1 to windward), and the tack it was chosen on */ fwdSide?: number; fwdTack?: 'S' | 'P';
   /** (Everyone aboard, their weights and the total: worked out once.) */
   ppl?: Person[]; W?: number[]; total?: number; sitA?: number;
   /** They've sailed a step (before that, they're put on the side the wind is on, not sent across). */
@@ -345,7 +345,7 @@ export function newCrew(spec: CrewSpec, tack: 'S' | 'P'): CrewState {
   // (every field she'll have, declared now, undefined till it's given: each crew gains them as she sails, in its own
   // order, and the fleet's crews ended up on different hidden classes, every read of one slower: docs/CAPACITY.md)
   const c: CrewState = { spec, people, wind: w, arm: 0.6, fore: 0.4, mode: 'windward', hike: 0, side: tack, trim: 0, trimMoment: 0,
-    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined, sc: scratchFor(people.length) };
+    place: undefined, roll: undefined, allOut: undefined, fore01: undefined, foreT: undefined, layout: undefined, layoutT: undefined, twsAvg: undefined, twaAvg: undefined, courseSeen: undefined, poleWas: undefined, poleFwd: undefined, poleFwdT: undefined, poleWhy: undefined, foredeck: undefined, tgt: undefined, decideT: undefined, held: undefined, clock: undefined, holdT: undefined, settleT: undefined, placeKey: undefined, jobT: undefined, lineWant: undefined, lineT: undefined, lineSet: undefined, lineSlow: undefined, lineTwa: undefined, twa20: undefined, lineRef: undefined, carSet: undefined, pianoT: undefined, pianoWho: undefined, foreSetT: undefined, foreTwa: undefined, foreWantT: undefined, fwdSide: undefined, fwdTack: undefined, ppl: undefined, W: undefined, total: undefined, sitA: undefined, sailing: undefined, sc: scratchFor(people.length) };
   summarise(c, w);
   return c;
 }
@@ -388,6 +388,14 @@ export interface CrewCall {
   coming?: number;
   /** Her stiffness here (N·m of righting moment per degree of heel), to size the crew's dead band (HOLD). */
   rmPerDeg?: number;
+  /** She's holding a course, not swinging through one (crewWork.ts courseHeld): false, they don't move to the mast for
+   * a run she's only passing through (unset: held). */
+  held?: boolean;
+  /** Seconds since she last swung (physics.ts crewSettle, Boat.settle's since; unset: long). */
+  steadyFor?: number;
+  /** Her true wind angle (unsigned) when she last came to a new course she steered (physics.ts crewSettle, Boat.settle's
+   * twaGuide: her heading moved, not the wind shifting under a held one; unset: this moment's). */
+  courseTwa?: number;
 }
 
 /**
@@ -533,13 +541,37 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     // (and the angle she's been sailing over the same minute: through a gybe the angle passes 180, where the jib's
     // blanketed and the polar's slowest, and a helm wanders a few degrees; neither is the course she's on (physics review))
     c.twaAvg = c.twaAvg == null ? k.twa : c.twaAvg + (k.twa - c.twaAvg) * Math.min(1, Math.max(dt, 0.05) / 60);
+    // (but a new course held, NEW_ANGLE off that mean and steady STEADY_NEW s without a swing, is the course she's on now:
+    // after a bear-away onto a run the minute's mean sat on the reach a minute or two, and the bow hand with it in the
+    // cockpit, the physics review. Not a luff of a few seconds to keep clear: she swings back before it counts. And a course
+    // she's steered, not a shift under a held heading: on a light, shifty beam reach the mean jumped to each shift past
+    // 120° and the bow hand went to the mast, crewcruise's 6 kt seeds 2 and 6)
+    // (and only while her angle is on that course still: a shift that has come to stay under a held heading, or a slow
+    // bear-away with no swing, isn't thrown back to a course she's left; the minute's mean follows it, the physics review)
+    // (once for each course read: held there again and again, a shift wandering either side of the snap's edge threw the
+    // mean back to the course each time it dipped, and the bow hand went forward and back, the physics review)
+    const course = k.courseTwa ?? k.twa;
+    if ((k.steadyFor ?? 1e9) >= STEADY_NEW && course !== c.courseSeen) {
+      c.courseSeen = course;
+      if (Math.abs(course - c.twaAvg) > NEW_ANGLE && Math.abs(k.twa - course) <= NEW_ANGLE) c.twaAvg = course;
+    }
     // (without the pole only a good crew thinks of the mast; with it out everyone decides, as well as their skill lets them)
-    const canGo = n > 0 && downwind && !pl?.fore && (skill > 0.5 || (k.pole && n >= 2));
+    // (with the pole set they stay with it, though she comes up past a run for a few seconds to keep clear: sent aft as she
+    // passed 120° and forward again as she bore away, Deep Physics' trace, 12 kt seed 1; struck, the pole's no reason)
+    // (and downwind is the course she's on, over the minute, not this moment's angle: on a beam reach in a light, shifty
+    // breeze her angle passed 120° now and then, and the bow hand went to the mast and back 5-10 s later, crewcruise's 6 kt
+    // beam reach, seeds 2 and 6. Back aft at once still as she comes up past RUN_STAY: a luff onto a reach, or the beat)
+    const onRun = (c.twaAvg ?? k.twa) > 120 && k.twa > RUN_STAY;
+    const canGo = n > 0 && (onRun || k.pole) && !pl?.fore && (skill > 0.5 || (k.pole && n >= 2));
     if (!k.pole || !canGo) c.poleWhy = undefined;
     if (pl?.fore === 'deck' && n > 0) {
       // sent forward by you (the owner: "send the crew forward"): two right up on the foredeck, one to the mast
       const l = n >= 2 ? 'foredeck' : 'mast'; if (c.layout !== l) c.layoutT = 0;
       c.layout = l; c.foredeck = n >= 2; c.poleWhy = undefined;
+    } else if (k.held === false && !k.pole && (c.layout ?? 'cockpit') === 'cockpit') {
+      // (swinging through a point of sail, not on it, nobody goes forward for it: in a slow penalty circle the bow hand
+      // went forward for each pass through the run and back for each through the beat, Deep Physics' trace, 6 kt seed 24.
+      // Back aft they still go at once: held at the mast, they rounded the leeward mark and tacked up the beat there)
     } else if (c.foreT === 1 && canGo) c.layout = chooseLayout(c, k, foreF, skill);
     else if (!canGo) { c.layout = 'cockpit'; c.foredeck = false; }
     const atMast = c.layout === 'mast' || c.layout === 'foredeck', forward = c.layout === 'foredeck';
@@ -651,14 +683,18 @@ export function placeCrew(c: CrewState, k: CrewCall, dt: number): void {
     const he = i === 0 ? deckHalf(Z.helm) : crewEdge(c, i);
     a.lean = clamp((arm - sitArm(p, he)) / Math.max(0.05, hikeArm(p, 1, he) - sitArm(p, he)), 0, 1);
     // (sitting, hiking or to leeward: by where they actually are, so the figure matches the weight)
-    const free = t.pose === 'sit' || t.pose === 'hike' || t.pose === 'lee';
+    // (and while they've yet to react to a new place, as they were: not drawn at the mast, sat in the cockpit, for the
+    // second before they get up to go there; then up and across, and at the mast as they come to it, one trip, not the mast's
+    // pose, a crossing and the mast's again, crewcruise's 6 kt beam reach, seed 2)
+    const tPose: Pose = a.react > 0 && !a.job ? a.pose : t.pose;
+    const free = tPose === 'sit' || tPose === 'hike' || tPose === 'lee';
     // (with a dead band: someone sat on the edge of hiking, their weight going out and in a little with each puff, is
     // still sitting there, not drawn flicking from sitting to hiking and back several times a second)
     const was = a.pose, hikeAt = was === 'hike' ? 0.02 : 0.08, leeAt = was === 'lee' ? -0.02 : -0.08;
-    const settled: Pose = free ? (arm < leeAt ? 'lee' : a.lean > hikeAt ? 'hike' : 'sit') : t.pose;
+    const settled: Pose = free ? (arm < leeAt ? 'lee' : a.lean > hikeAt ? 'hike' : 'sit') : tPose;
     // (moving out to the rail or in from it on their own side, to a seat, is still sitting or hiking: not 'cross', the
     // crouch across under the boom, which had them bob up for a moment with every puff)
-    const outOrIn = !crossing && (free || t.pose === 'helm') && Math.abs(goal.z - a.z) <= 0.5; // (the helm too: out to the rail and in again)
+    const outOrIn = !crossing && (free || tPose === 'helm') && Math.abs(goal.z - a.z) <= 0.5; // (the helm too: out to the rail and in again)
     a.pose = !outOrIn && (Math.abs(goal.x - a.x) > 0.35 || Math.abs(goal.z - a.z) > 0.5) ? (crossing || Math.abs(goal.z - a.z) <= 0.5 ? 'cross' : t.pose) : settled;
     // fatigue: builds as the square of the effort against their endurance; recovers off the rail
     const e = downwind ? 0 : a.lean;
@@ -848,8 +884,10 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
     // to cockpit"): with this hull's resistance, from about 11 kt of true wind on a run (an estimate: hullTrim.ts's wave
     // term; the Year Book's "moderate" runs to about 16 kt, so this may be a knot or two early).
     // Judged at her wing-on-wing polar speed (polar.ts: knots in, m/s out) in the wind over the last minute, not each puff,
+    // and at the angle she's been sailing over it, not a luff of a few seconds to keep clear (twaAvg: re-stationed foredeck,
+    // cockpit, foredeck for a 12 s luff on a run, Deep Physics' trace, 12 kt seed 1),
     // with a dead band (forward while it costs under 0.3%, back once it costs over 0.8%: about half a knot of wind)
-    const vt = Math.max(0.5, polar(c.twsAvg ?? k.tws, k.twa, 'wing'));
+    const vt = Math.max(0.5, polar(c.twsAvg ?? k.tws, c.twaAvg ?? k.twa, 'wing'));
     const cost = dragAt(vt, j => j === n - 1 ? Z.bow : j === n - 2 ? Z.foredeck : cockpitZ(j, n - 2)) - dragAt(vt, j => cockpitZ(j, n));
     if (justOut) { c.layoutT = 1e9; c.poleFwd = undefined; }
     const fwdNow = now !== 'cockpit', call = (x: number) => fwdNow ? x <= 0.008 : x < 0.003, best = call(cost);
@@ -896,6 +934,11 @@ function chooseLayout(c: CrewState, k: CrewCall, foreF: number, skill: number): 
 }
 
 /** How far forward (0 aft … 1 forward of the cockpit) the crew sit: where the trim has the least resistance, for a crew good at trim. */
+/** A new course for the layout's mean angle: this far off it (deg), steady this long (s) without a swing (estimates: past a
+ * keep-clear luff's few seconds, and as the guide's read is, crewWork.ts NEW_COURSE). */
+const NEW_ANGLE = 15, STEADY_NEW = 20;
+/** Off a run, the true wind angle (deg) below which the bow hand leaves the mast at once (an estimate: a beam reach's). */
+const RUN_STAY = 100;
 /** Two crew move forward of the winch, or back to their stations, once it's been worth it this long (s): an estimate. */
 const TWO_DWELL = 120;
 function chooseFore(c: CrewState, k: CrewCall, skill: number): number {

@@ -121,6 +121,8 @@ export function latLon(q: Vec): string {
   const { lat, lon } = toLL(q), dm = (v: number) => `${Math.floor(Math.abs(v))}°${((Math.abs(v) % 1) * 60).toFixed(2)}′`;
   return `${dm(lat)}N ${dm(lon)}W`;
 }
+/** A spot picked on open water, with no name but its position (latLon's form): the 3D view marks it with a plain pin. */
+export const isSpot = (name: string): boolean => /^\d+°[\d.]+′N \d+°[\d.]+′W$/.test(name);
 
 /** A place as the thing you're sailing to: the dials (compass bearing, laylines, range) treat it like a mark. */
 export function destMark(pl: Place | null): CourseMark | null {
