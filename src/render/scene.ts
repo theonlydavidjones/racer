@@ -886,7 +886,7 @@ export class SceneView {
     this.sun.target.position.set(f.x, 0, -f.y); this.sun.position.copy(this.sun.target.position).addScaledVector(dir.y > 0.05 ? dir : new THREE.Vector3(0, 1, 0), 500);
     // (the sun casts its shadows always, so no lit surface's shader changes as it sets; below the horizon its shadows are
     // faded out and the shadow map no longer drawn: one set of programs, not one for day and one for night)
-    { const lit = up > 0.05; this.sun.shadow.intensity = lit ? 1 : 0; this.renderer.shadowMap.autoUpdate = lit; if (lit && !this.sunLit) this.renderer.shadowMap.needsUpdate = true; this.sunLit = lit; }
+    { const lit = up > 0.05; this.sun.shadow.intensity = lit ? 1 : 0; this.renderer.shadowMap.autoUpdate = lit; if ((lit && !this.sunLit) || !this.sun.shadow.map) this.renderer.shadowMap.needsUpdate = true; this.sunLit = lit; }
     // twilight sky colours: civil twilight (sun 0–6° down) still glows; darker through nautical twilight
     const tw = 1 - ss(-12, -1, el), glow = ss(-10, -2, el);
     sm.uniforms.uTwi.value = 1 - ss(-1, 4, el);

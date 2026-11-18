@@ -75,6 +75,7 @@ npm run dev & node scripts/check/sail-views.cjs <out-dir>   # the boat from both
 npm run dev & node scripts/check/rushing-edge.cjs <out-dir> # ~3 min: a still boat at the map's west edge, the mean wind turned: the ripples stay put
 npm run dev & node scripts/check/setup-map.cjs <url> [<out-dir>]  # ~1 min: the cruise setup's chart and the big plan chart draw the chart
 npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in the page (the statement, a tow, her logbook, laid up, carry on)
+npm run dev & node scripts/check/night-start.cjs            # ~1 min: a sail started at sunset and at night: water and boat drawn (no GL errors)
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
 node scripts/check/perf-pair.mjs --ai         # ~11 min: an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), the mean
