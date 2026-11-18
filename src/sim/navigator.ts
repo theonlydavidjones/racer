@@ -205,10 +205,13 @@ const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<v
  * choice inside Capacity's frame budget); SLICE_NEW_MS while there's no plan at all for where she's going (a destination
  * just chosen: the player's waiting on it), or the passage panel's plan, asked for and waited on. */
 const SLICE_MS = 2, SLICE_NEW_MS = 6, TICK_MS = 16;
-/** For the tests (tests/sailHome-mileRock.test.ts), kept only while `on`: each slice's length (ms), that none runs over
- * its budget, and how many live plans were started (one for a passage sailed, not one each 150 m). */
-export const liveLog = { on: false, slices: [] as number[], starts: 0 };
-const noteSlice = (ms: number) => { if (liveLog.on) liveLog.slices.push(ms); };
+/** For the tests (tests/sailHome-mileRock.test.ts), kept only while `on`: each slice's length (ms, on `clock`), the live
+ * plan's and the panel's, that none runs over its budget, and how many live plans were started (one for a passage
+ * sailed, not one each 150 m). The test sets `clock` to the process's CPU time: it doesn't run while the process waits
+ * for a core, so a loaded host doesn't read as a long slice (the slices' own budgets stay on the wall clock). */
+export const liveLog = { on: false, slices: [] as number[], panel: [] as number[], starts: 0, clock: () => performance.now() };
+const clock0 = () => liveLog.on ? liveLog.clock() : 0;
+const noteSlice = (c0: number, to = liveLog.slices) => { if (liveLog.on) to.push(liveLog.clock() - c0); };
 /** The destination's part of a plan's key (where she's going, not where she is or when). */
 const destOf = (key: string) => key.slice(0, key.indexOf('|'));
 export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
@@ -228,13 +231,13 @@ export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
       if (jobs.get(w) !== job) return; // (a newer plan took its place)
       // (the panel's share too while the panel waits on this plan, its own pump idle: on the background's 2 ms a frame, the
       // panel's plan from Mile Rock came in past its 120 s, 4 runs in 4, once this plan had to be started afresh)
-      const t = performance.now(), budget = first || waiting.has(w) ? SLICE_NEW_MS : SLICE_MS;
+      const t = performance.now(), c0 = clock0(), budget = first || waiting.has(w) ? SLICE_NEW_MS : SLICE_MS;
       for (;;) {
         const r = job.g.next();
-        if (r.done) { noteSlice(performance.now() - t); if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
+        if (r.done) { noteSlice(c0); if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
         if (performance.now() - t > budget) break;
       }
-      noteSlice(performance.now() - t);
+      noteSlice(c0);
       setTimeout(pump, TICK_MS);
     };
     setTimeout(pump, 0);
@@ -268,8 +271,9 @@ export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => vo
   const pump = () => {
     if (stopped) return;
     if (waiting.has(w) && jobs.get(w)) { setTimeout(pump, TICK_MS); return; } // (the live plan's own pump is at it)
-    const t = performance.now();
-    for (;;) { const r = g.next(); if (r.done) { done(r.value); return; } if (performance.now() - t > SLICE_NEW_MS) break; } // (the panel's: asked for and waited on)
+    const t = performance.now(), c0 = clock0();
+    for (;;) { const r = g.next(); if (r.done) { noteSlice(c0, liveLog.panel); done(r.value); return; } if (performance.now() - t > SLICE_NEW_MS) break; } // (the panel's: asked for and waited on)
+    noteSlice(c0, liveLog.panel);
     setTimeout(pump, TICK_MS);
   };
   setTimeout(pump, 0);
