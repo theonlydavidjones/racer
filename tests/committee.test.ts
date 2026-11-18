@@ -95,7 +95,7 @@ describe('a start to leeward (the courses starting east)', () => {
 });
 
 describe('The first leg (World Sailing Race Management Manual J.2.2: "a race should start with a beat or have a beating leg as soon as possible after the start")', () => {
-  const pool = COURSES.filter(c => c.group?.startsWith('Seaweed Soup'));
+  const pool = COURSES.filter(c => c.group?.startsWith('Kelp Chowder')); // (the series' in-game name since Clubs' rename, 17 Nov 2026: real race names aren't shown)
   /** Worked out here from the courses themselves: those that fit the time, and each one's first leg off the wind. */
   const committee = (S: Settings) => {
     const day = raceDay(S, pool[0].windBase), target = TARGET_MIN[S.raceLength as 'short'];
