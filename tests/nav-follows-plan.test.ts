@@ -67,3 +67,19 @@ describe('Nav follows the plotted course', () => {
     expect(Object.is(a.end.x, b.end.x) && Object.is(a.end.y, b.end.y) && a.min === b.min, 'the same passage, to the bit, with the plan sent or not').toBe(true);
   }, 600_000);
 });
+
+describe('racing: the pilot never takes a page plan', () => {
+  it('a race sailed with a plan and Nav sent is the same to the bit as one without (RRS 52: no pilot racing)', () => {
+    const S = { ...DEFAULT_SETTINGS, mode: 'race', current: 'real', tideDate: '2026-11-14', fleet: 3 } as Settings;
+    const run = (send: boolean) => {
+      const w = new World(COURSES[0], S, 4); const u = w.user, d = { x: u.x + 2000, y: u.y + 1500 };
+      for (let i = 0; i < 60 * 240; i++) {
+        if (send && i % 600 === 0) { applyCommand(w, { k: 'pilot', op: 'engage', mode: 'nav' }); applyCommand(w, { k: 'navPlan', to: d, pts: [{ x: u.x, y: u.y }, { x: u.x + 500, y: u.y - 300 }, d] } as never); }
+        w.step(DT);
+      }
+      return w.boats.flatMap(b => [b.x, b.y, b.h, b.v]);
+    };
+    const a = run(true), b = run(false);
+    expect(a.every((v, i) => Object.is(v, b[i]))).toBe(true);
+  }, 300_000);
+});
