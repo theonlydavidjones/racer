@@ -30,8 +30,8 @@ export const PLACES: Place[] = [
   P('baybridge', 'Bay Bridge, west span', 37.8000, -122.3800),
   P('clipper', 'Clipper Cove, Treasure Island', 37.8150, -122.3700),
   P('ti-north', 'North of Treasure Island', 37.8350, -122.3750),
-  P('m-A', 'A · St Francis outer buoy', 37.810767, -122.446817, { shape: 'sphere' }),
-  P('m-X', 'X · off Golden Gate YC', 37.811667, -122.443333, { shape: 'cylinder' }),
+  P('m-A', 'A · St. Felix outer buoy', 37.810767, -122.446817, { shape: 'sphere' }),
+  P('m-X', 'X · off Dorado YC', 37.811667, -122.443333, { shape: 'cylinder' }),
   P('m-6', '6 · Fort Mason "M"', 37.811667, -122.43, { shape: 'cylinder' }),
   P('m-16', '16 · Blackaller', 37.81, -122.465, { shape: 'column', look: 'Y' }),
   P('m-15', '15 · Hank Easom (Yellow Bluff)', 37.84, -122.468333, { shape: 'column', look: 'Y' }),
@@ -67,7 +67,7 @@ export const PLACES: Place[] = [
   // breakwater" (BYC's 2026–27 Friday Night / Chowder courses, Attachment 1: 37°52.07′ N 122°19.56′ W, "for guidance
   // only"). Its sheet also gives D (the Berkeley Marina light "3", the sim's DOC, within 6 m), and X and F about 220 m
   // from the YRA's XOC and FOC: derived from D on a nominal circle, so the YRA's own positions are kept.
-  P('m-BYC', 'BYC · Berkeley YC start mark', 37.86783, -122.32600, { shape: 'column', look: 'Y' }),
+  P('m-BYC', 'CamYC · Campanile YC start mark', 37.86783, -122.32600, { shape: 'column', look: 'Y' }),
   P('m-XOC', 'XOC · Berkeley Circle "Bobbi Tosse"', 37.873333, -122.358333, { shape: 'cylinder' }),
   P('m-FOC', 'FOC · Berkeley Circle', 37.865, -122.376667, { shape: 'cylinder' }),
   P('m-DOC', 'DOC · Berkeley Marina G "3"', 37.85767, -122.34943, { shape: 'beacon', look: 'G' }),
@@ -75,8 +75,8 @@ export const PLACES: Place[] = [
   P('m-19', '19 · North Channel R "8"', 37.87967, -122.41497, { shape: 'lighted', look: 'R' }),
   P('m-NC10', 'North Channel R "10"', 37.90074, -122.43620, { shape: 'lighted', look: 'R' }),
   P('m-NC12', 'North Channel R "12"', 37.91359, -122.44514, { shape: 'lighted', look: 'R' }),
-  P('m-RYCA', 'RYC A · Richmond YC', 37.89745, -122.389783, { shape: 'cylinder' }),
-  P('m-BK', 'BK · "Bob Klein" (Richmond YC)', 37.886117, -122.402367, { shape: 'sphere' }),
+  P('m-RYCA', 'BRC A · Brickyard RC', 37.89745, -122.389783, { shape: 'cylinder' }),
+  P('m-BK', 'BK · "Bob Klein" (Brickyard RC)', 37.886117, -122.402367, { shape: 'sphere' }),
   P('m-28', '28 · Southampton Shoal R "2"', 37.89057, -122.41764, { shape: 'lighted', look: 'R' }),
   P('m-29', '29 · Southampton Shoal R "4"', 37.90390, -122.42014, { shape: 'lighted', look: 'R' }),
   P('m-SS6', 'Southampton Shoal R "6"', 37.91624, -122.42233, { shape: 'lighted', look: 'R' }),
@@ -95,14 +95,14 @@ export const PLACES: Place[] = [
   P('m-36', '36 · Alameda NAS Channel light R "4"', 37.77336, -122.33015, { shape: 'beacon', look: 'R' }),
   P('m-SC', 'SC · Preferred Channel "SC"', 37.77556, -122.36583, { shape: 'lighted', look: 'GRG' }),
   // the Estuary's racing marks: Oakland YC's red balls and Island YC's red and orange ones
-  P('m-OYCDR', 'OYC DR · "Debby Ratto" (Jack London Sq)', 37.792363, -122.277332, { shape: 'sphere', look: 'R' }),
-  P('m-OYC2', 'OYC 2', 37.789632, -122.270968, { shape: 'sphere', look: 'R' }),
-  P('m-OYC6', 'OYC 6', 37.786055, -122.265329, { shape: 'sphere', look: 'R' }),
-  P('m-OYCX', 'OYC X', 37.785304, -122.263493, { shape: 'sphere', look: 'R' }),
-  P('m-OYC5', 'OYC 5 · Encinal Basin', 37.781967, -122.260063, { shape: 'sphere', look: 'R' }),
-  P('m-IYC1', 'Island YC 1', 37.793289, -122.278976, { shape: 'sphere', look: 'O' }),
-  P('m-IYC2', 'Island YC 2', 37.787647, -122.266652, { shape: 'sphere', look: 'O' }),
-  P('m-IYC3', 'Island YC 3', 37.783585, -122.257527, { shape: 'sphere', look: 'O' })
+  P('m-OYCDR', 'OtYC DR · "Debby Ratto" (Jack London Sq)', 37.792363, -122.277332, { shape: 'sphere', look: 'R' }),
+  P('m-OYC2', 'OtYC 2', 37.789632, -122.270968, { shape: 'sphere', look: 'R' }),
+  P('m-OYC6', 'OtYC 6', 37.786055, -122.265329, { shape: 'sphere', look: 'R' }),
+  P('m-OYCX', 'OtYC X', 37.785304, -122.263493, { shape: 'sphere', look: 'R' }),
+  P('m-OYC5', 'OtYC 5 · Encinal Basin', 37.781967, -122.260063, { shape: 'sphere', look: 'R' }),
+  P('m-IYC1', 'Sandbar YC 1', 37.793289, -122.278976, { shape: 'sphere', look: 'O' }),
+  P('m-IYC2', 'Sandbar YC 2', 37.787647, -122.266652, { shape: 'sphere', look: 'O' }),
+  P('m-IYC3', 'Sandbar YC 3', 37.783585, -122.257527, { shape: 'sphere', look: 'O' })
 ];
 
 /**

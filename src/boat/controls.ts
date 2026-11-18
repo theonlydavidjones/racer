@@ -465,6 +465,8 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
  * The sails as a crew sets them at depowering step `depower` (crewSolve, within the step's floors on each line: a step
  * flattens her more than its target shape alone), for the main and jib at these sheet angles, standard rig and new
  * sails. For physics.ts powerFactor's search over the steps. (Cached by half a knot, a degree and a sixteenth of a step.)
+ * (Its car at the hole for this jib angle, crewSolve's own: the crew's lazy car is left where it is for a hole or two,
+ * physics.ts CAR_HOLES, a degree of jib twist at most, a few hundredths of a percent of drive: the physics review.)
  */
 const crewShapeCache = new Map<number, { main: Shape; jib: Shape }>();
 export function crewShapes(tws: number, awa: number, depower: number, mainAngle: number, jibAng: number): { main: Shape; jib: Shape } {

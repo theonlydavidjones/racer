@@ -11,7 +11,7 @@ import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, c
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
-import { D2R, HALF, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec, hypot } from '../core/math';
+import { D2R, HALF, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
 import { bodyJob } from '../boat/crewWork';
@@ -43,7 +43,7 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
-import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, harborRoute, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, keptFastWhy, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
@@ -63,6 +63,10 @@ import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
 
+/** The pilot's hand-over off her harbor's mouth, bound home (navTarget): this many seconds out at her speed under power,
+ * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
+ * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
+const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -221,16 +225,18 @@ export const SHOVE_N = 27 * 9.80665;
 export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.mass);
 /** How long she's to have steerage way stern first once she's shoved, s (over 0.3 m/s: about 1.3 deg/s with the helm hard
  * over): the bar's 10 s, and three more for the sim's scatter about asternGlide (0.4 s held straight, Deep Physics' check;
- * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.555 m/s; a breeze on her
+ * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.362 m/s on the sourced drag
+ * (0.555 on the old: Deep Physics, 17 Nov 2026), and the gentlest such shove glides her 30 m to her way's end (ASTERN_GLIDE_S); a breeze on her
  * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
 /** How far along her line astern the crew read the breeze before the shove, how far to leeward of it, and how often, m
- * (windAstern): past her longest glide in a breeze (ASTERN_LOOK_MAX, 24 m, and what a bow wind adds) and the furthest
+ * (windAstern): past the furthest the planner looks (ASTERN_LOOK_MAX, 32 m) and the furthest
  * the wind sets her across it meanwhile, at the scale a harbor's lee changes over (Corinthian's: 0.32 to 0.55 of the open
  * wind in 20 m). And her set to leeward, m/s per knot of the breeze on her beam, lying stern first with no sail up: the
- * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. */
+ * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. Her glides now run on past it (50 to 85 m with a
+ * breeze on her bow, on the sourced drag): beyond ASTERN_WIND_FAR she's taken to meet the last reading. */
 const ASTERN_WIND_FAR = 40, ASTERN_SET_FAR = 16, ASTERN_WIND_STEP = 4, SET_PER_KT = 0.019;
-useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE); // (the planner's look along her glide)
+useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE, WALK, STEER_FOR); // (the planner's look along her glide, and the gentlest shove's)
 /**
  * The water's resistance to her swinging about her bow, N·m per (rad/s)²: her keel and hull broadside to the water,
  * ½·ρ·Cd·∫r³dA along her length (the lateral area spread evenly over it: A·L³/4). About 1×10⁵: at 3°/s about 300 N·m.
@@ -530,6 +536,7 @@ export class World {
       this.sea = new SeaField(settings.sea === 'flat' ? null : settings.swellHs != null ? { ...sw, hs: settings.swellHs, total: undefined } : sw, settings.chop ?? 1);
       this.sea.duration = this.seaDurationAt(this.clockUtc);
       this.waves = new WaveField(this.sea.swell?.tp ?? 12);
+      this.sea.field = this.waves; // (the wave drag meets the sea that's drawn)
     }
     if (settings.current === 'real') {
       this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
@@ -586,8 +593,8 @@ export class World {
     // (and the harbor mouths' gyres spun up through the tide's last 13 hours now, not in the race's first step: mouthFlows)
     this.mouthFlows();
     // the sea she's in from the first frame (step() works it out twice a second after that)
+    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user, this.windModel.kt); // (the waves already running at the first frame, and before the boats' seas, which take the chop's direction from them)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
-    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user); // (the waves already running at the first frame)
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
@@ -1104,7 +1111,7 @@ export class World {
     }
     // clear: the stream no longer setting her onto anything, with way on (either way) or wind to sail by
     // (way on: half a knot ahead; or, backed off what was ahead, sternway, which back-paddling makes slowly, about
-    // 0.2 m/s at most against her drag going astern, physics.ts ASTERN_DRAG: paddle.test)
+    // 0.2 m/s at most against her drag going astern, physics.ts asternDrag: paddle.test)
     if (!set && !going && !irons && (ahead > 0.5 || ahead < -0.1 || b.ww.kt >= 4) && this.t - p.t0 > 10) this.paddle(null, false, true);
     // (tired, they rest and paddle on, or swap, as long as the jam lasts: paddle.ts paddleStep. Resting once she's clear of
     // it, they put the crutch away rather than paddle again to make way)
@@ -1346,7 +1353,7 @@ export class World {
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
-        pilotStep(b, this.pilot, this.arrivedT == null ? this.dest?.p ?? null : null, this.t, dt);
+        pilotStep(b, this.pilot, this.arrivedT == null ? (this.pilot.mode === 'nav' ? this.navTarget(b) : this.dest?.p ?? null) : null, this.t, dt); // (the way in worked out only on Nav: its harbor's flood is a third of a second, once)
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
@@ -1356,10 +1363,10 @@ export class World {
       if (b.mooring) this.mooringStep(b, dt); // (coming in: the hand at the shrouds, waiting to step)
     }
     if (this.caseRun) this.pinCase(dt);
-    // the waves: the field eased to its reference sea (waveRef) and turning with the course's mean wind about your boat,
+    // the waves: the field eased to its reference sea (waveRef), the chop changing over to the course's mean wind,
     // and every boat's heave and pitch on it (boat/seaway.ts waveMotion)
     if (this.steps % 30 === 1) this.waveRefSea = null;
-    this.waves.update(this.waveRef(), this.windModel.base, dt, this.user);
+    this.waves.update(this.waveRef(), this.windModel.base, dt, this.user, this.windModel.kt);
     { const tw = waveTime(this.t); for (const b of this.boats) waveMotion(b, this.waves, tw, dt); }
     this.drill?.step(this.user, this.t, dt, this.user.sea?.hsW ?? 0); // (the tack and gybe drill: the page shows its scores)
     this.lesson?.update(this.user, this.t, dt, this.user.sea?.hsW ?? 0, this.mobEnv); // (a lesson: its check, on the boat as she sails)
@@ -2190,6 +2197,27 @@ export class World {
     if (a === 'ready') { u.callWait = null; u.callT = this.t; this.putOver(u); return; }
     if (a === 'busy' && !w.notReady && this.t - w.t0 > 0.6) { w.notReady = true; this.emit({ type: 'toast', ms: 4000, msg: '"Not ready!" Call again to go.' }); }
   }
+  /** Kept fast at her berth, and why, in one line (the owner, 18 Nov 2026: in a strong southerly on her stern it said "no
+   * room", where it was the wind): too much wind, and where it is on her; or no room to get her out and sail off. */
+  private keptFast(u: Boat, why: 'wind' | 'room', windFrom: number): void {
+    const rel = wrap(windFrom - u.h), on = Math.abs(rel) < 45 ? 'bow' : Math.abs(rel) > 135 ? 'stern' : rel > 0 ? 'starboard side' : 'port side';
+    // (forward of her beam it isn't too much to push against: shoved off stern first with it, she'd never lose her way.
+    // The Coordinator's line, 18 Nov 2026; broad on her bow it names the side, as most of those berths have it)
+    const fwd = Math.abs(rel) < 90, bow = Math.abs(rel) < 30 ? 'bow' : rel > 0 ? 'starboard bow' : 'port bow';
+    const msg = why === 'wind' && fwd
+      ? `The breeze on her ${bow} would carry her into the boats astern: ${u.motor ? 'motor out, or wait for it to ease.' : 'she stays fast until it eases.'}`
+      : why === 'wind'
+      ? `Too much wind on her ${on} to push her off: ${u.motor ? 'motor out, or wait for it to ease.' : 'she stays fast until it eases.'}`
+      : `No room to push her off from this berth in this wind: ${u.motor ? 'motor out, or wait for the wind to change.' : 'she stays fast until it changes.'}`;
+    this.emit({ type: 'toast', ms: 6000, msg });
+  }
+  /** How far the gentlest shove her crew give carries her stern first, m, to where her way's gone, in the breeze she meets
+   * along her line out (windAstern): their walk, or more where that wouldn't steer her STEER_FOR s, as handStep gauges it. */
+  private leastGlideOut(b: Boat, h: number, ww: { from: number; kt: number }, calm = false): number {
+    const along = calm ? undefined : this.windAstern(b, h), g = (v: number) => asternGlide(v, h, ww.from, calm ? 0 : ww.kt, ASTERN_GLIDE_S, undefined, along);
+    let flo = 0, fhi = ASTERN_SHOVE; for (let k = 0; k < 20; k++) { const m = (flo + fhi) / 2; if (g(m).steerable < STEER_FOR) flo = m; else fhi = m; }
+    return g(Math.max(WALK, fhi)).dist;
+  }
   pushOff(): boolean {
     const u = this.user, H = u.handled;
     // held head to wind on the bow line: let her go now, her bow pushed off
@@ -2200,7 +2228,12 @@ export class World {
     const wind = this.windHere(u, u, false), plan = slip ? pushOffPlan(slip, wind.from, wind.kt) : null;
     // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast, geo/marina.ts NO_ASTERN, NO_ASTERN_WEST;
     // or where her coast would end with no clear water to sail off in, 8m3)
-    if (slip && plan?.kind === 'astern' && (plan.noRoom || noAsternPushOff(slip, wind.from, wind.kt))) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in this wind: motor out, or wait for the wind to change.' : 'No room to push her off from this berth in this wind: she stays fast until it changes.' }); return false; }
+    // (and kept fast where even the gentlest shove would glide her past her clear water in the breeze along her line out:
+    // the planner judges it in her slip's wind, and let go in a harbor's lee she glides out of it into more. Horseshoe Bay
+    // A6 in a 12 kt easterly, 18 Nov 2026: planned in the lee, she glided 138 m and was still going after 10 minutes, into
+    // the boats: the creep sweep)
+    if (slip && plan?.kind === 'astern' && !plan.noRoom && this.leastGlideOut(u, plan.h, wind) > plan.coast + COAST_SHORT) { this.keptFast(u, this.leastGlideOut(u, plan.h, wind, true) > plan.coast + COAST_SHORT ? 'room' : 'wind', wind.from); return false; } // (the wind, where her glide in a calm would fit)
+    if (slip && plan?.kind === 'astern' && (plan.noRoom || noAsternPushOff(slip, wind.from, wind.kt))) { this.keptFast(u, keptFastWhy(slip, plan), wind.from); return false; }
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip || !plan) { u.v = SHOVE; return true; }
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };
@@ -2386,7 +2419,7 @@ export class World {
     if (!waves) return;
     // (the waves run on, and she rides them, as on the water: the setup's and the showroom's sea isn't glassy)
     if (this.steps % 30 === 1) this.waveRefSea = null;
-    this.waves.update(this.waveRef(), this.windModel.base, dt, u); waveMotion(u, this.waves, waveTime(this.t), dt);
+    this.waves.update(this.waveRef(), this.windModel.base, dt, u, this.windModel.kt); waveMotion(u, this.waves, waveTime(this.t), dt);
   }
 
   /**
@@ -2512,7 +2545,7 @@ export class World {
   /**
    * Stow it, or ship it again (the owner: Folkboat outboards sit on a sliding bracket on the after deck, slid up and away,
    * and off it to stow): the crew slide it off the bracket into the lazarette, or back on, taking MOTOR_STOW_S or
-   * MOTOR_SHIP_S (estimates) at their pace. Only stopped and tilted up; racing, it stays below (the class rules don't allow
+   * MOTOR_SHIP_S (stowing at their pace; shipping in the owner's 5 s from the call to running). Only stopped and tilted up; racing, it stays below (the class rules don't allow
    * racing with it mounted aft). The weight moves with it, and stowed there's no leg in the water (condition.ts, motor.ts).
    */
   motorStow(): void {
@@ -2523,7 +2556,7 @@ export class World {
       if (m.down) { say('Tilt it up first, then it can come off the bracket.'); return; }
     } else if (this.racingNow) { say('Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
     // (whoever goes aft to the bracket: the forward hand, or sailing alone, you; their weight goes aft with them)
-    const to = m.stowed ? 'bracket' : 'stowed', pace = Math.max(0.3, bodyJob(u, 'outboard', true)), of = (to === 'stowed' ? MOTOR_STOW_S : MOTOR_SHIP_S) / pace;
+    const to = m.stowed ? 'bracket' : 'stowed', pace = Math.max(0.3, bodyJob(u, 'outboard', true)), of = to === 'stowed' ? MOTOR_STOW_S / pace : MOTOR_SHIP_S; // (shipped in the owner's time, whoever's aft: MOTOR_SHIP_S)
     m.shifting = { to, left: of, of }; m.down = false; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; m.swivel = false;
     say(to === 'stowed' ? 'Unclamping the outboard to stow it below.' : 'Getting the outboard out of the lazarette to ship it.');
   }
@@ -2574,6 +2607,7 @@ export class World {
     this.retire();
     this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
     this.arrivedT = null;
+    harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
     this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
     return true;
@@ -2625,16 +2659,17 @@ export class World {
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
-    this.sea = n.sea; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
+    this.sea = n.sea; this.sea.field = this.waves; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
     this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
-    // (and the new wind's sea runs its way at once: the field's turn is capped at a few degrees an hour, waveField.ts
-    // turnCap, so left to ease round after a change of conditions the chop would run askew of the wind for a day)
+    // (and the new wind's sea runs its way at once: left to change over wave by wave after a change of conditions the
+    // chop would run askew of the wind for an hour, and the swell, whose turn is capped, far longer: waveField.ts)
     this.waves.windDir = this.waves.swellDir = NaN;
     if ((s.traffic !== 0) !== (this.traffic.on)) this.traffic = n.traffic; // (ships on or off; otherwise they sail on)
     this.windModel = n.windModel; this.puffs = n.puffs; this.shifts = n.shifts; this.gusts = n.gusts; this.shiftRef = { turn: 0, k: 1 };
     this.updateBreeze(); this.courseWind(); this.buildField();
     if (this.tide) this.updateTide();
     this.mouthFlows(); // (read at once, here as in the race's step, so the race and its mirror hold the same)
+    this.waves.update(this.waveRef(), this.windModel.base, 0, this.user, this.windModel.kt); // (set to the new wind before the boats' seas read its direction)
     // (the boats' and the world's memory of the mean wind keep their old averages: a change this sudden reads as a big shift,
     // as it would on the water, until the new mean settles in)
     for (const b of this.boats) { b.cur = this.currentAt(b, true); b.leeK = landLee(b, this.wind.from); b.ww = windOnWater(this.windHere(b, b), b.cur); b.sea = this.sea.at(b, windOnWater(this.seaWind(b, b.leeK), b.cur), b.cur, q => this.openStreamAt(q)); }
@@ -2649,6 +2684,52 @@ export class World {
     this.emit({ type: 'toast', msg: `Conditions changed: ${Math.round(this.wind.kt)} kt from ${String(Math.round(this.wind.from) % 360).padStart(3, '0')}°, ${this.cur.label.toLowerCase()}, ${sea}.${laid}`, ms: laid ? 7000 : 4500 });
   }
 
+  /** On Nav home, she's been steered from outside her harbor (navTarget: which words the hand-over has). */
+  private homeOut = false;
+  /** When the way ahead to the mouth was last looked along, s of sim time (navTarget: every half second). */
+  private homeLookT = -Infinity;
+  /**
+   * What the pilot steers for, on Nav: the destination; or, bound for her slip, the middle of her harbor's entrance (the
+   * one nearest her slip by water, geo/marina.ts harborRoute), where it goes to standby and hands her over while she's
+   * still outside, with time to slow her and take her in along the fairways by hand. The owner's ruling (17 Nov 2026,
+   * after the physics review): a tiller pilot can't work the throttle, and nobody threads a marina's fairways on one;
+   * steered in on it, she hit docks on the turns (her 9 m turn doesn't fit a fairway's corner at motoring speed), gave up
+   * mid-harbor, and was handed over seconds from the dock. Already inside her harbor, it hands her over at once.
+   */
+  private navTarget(b: Boat): Vec | null {
+    const d = this.dest; if (!d) return null;
+    const slip = d.key === 'slip' ? this.homeSlip : null, H = slip ? harborOf(slip.marina) : null;
+    if (!slip || !H || !H.exits.length) return d.p;
+    const yours = (where: string) => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours.`, ms: 5000 }); } };
+    // (inside her harbor's water: handed over at once, sent home from there; or as she crosses into it on her way, where
+    // its water runs out past the breakwater ends, as at Richmond)
+    if (harborAt(b) === H) { yours(this.homeOut ? 'At the harbor mouth' : 'In the harbor'); this.homeOut = false; return null; }
+    this.homeOut = true;
+    // (the way in, all at once: worked out when she's sent home, or here the first time the pilot asks (a cruise begun
+    // bound for her slip), so where she's steered never hangs on how fast the host is. Not when the World's made: a
+    // harbor's flood held in memory alongside the page's own planning, in one process, doubled the Sail Home test's plan
+    // from Mile Rock (17 Nov 2026); worked out a slice at a time against the clock, the same race sailed twice went
+    // two ways at South Beach and Berkeley, the second review, 17 Nov 2026. Each harbor's flood once, cached)
+    let mouth = harborRoute(slip)?.mouth;
+    if (!mouth) { mouth = H.exits[0]; for (const e of H.exits) if (dist(e, slip.p) < dist(mouth, slip.p)) mouth = e; }
+    // (handed over HANDOVER_S out at her speed, at least HANDOVER_MIN m; under sail, as she comes in sight of the entrance,
+    // since the pilot sails her round the breakwater ends rather than in at the gap)
+    const motoring = !!b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05, ahead = motoring ? Math.max(HANDOVER_MIN, b.v * HANDOVER_S) : HANDOVER_SAIL;
+    if (dist(b, mouth) < ahead) { yours('At the harbor mouth'); this.homeOut = false; return null; }
+    // (and sooner, under power, if there's anything solid in the lane her hull sweeps toward the mouth within that much of
+    // her: motoring, the pilot steers that straight line, its own look ahead (boat/autopilot.ts) a line along the shore's
+    // outline, and off Corinthian it steered her by something within a few meters of it: the second review. Under sail it
+    // tacks and bears away round the land as it goes, not along the bearing, so there the lane says nothing: the third)
+    if (motoring && this.t - this.homeLookT >= 0.5) {
+      this.homeLookT = this.t;
+      const u = unit(sub(mouth, b)), side = { x: u.y, y: -u.x };
+      for (let k = 2; k <= ahead; k += 2) for (const o of [-1.6, 0, 1.6]) {
+        const q = { x: b.x + u.x * k + side.x * o, y: b.y + u.y * k + side.y * o };
+        if (hitsHarbor(q) || hitsMooredBoat(q) || onLand(q)) { yours('Something ahead of her'); this.homeOut = false; return null; }
+      }
+    }
+    return mouth;
+  }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
     const d = this.dest, u = this.user;

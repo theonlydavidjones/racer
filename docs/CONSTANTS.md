@@ -126,7 +126,8 @@ physics, ranked like the ten above:
 | RUDDER.slope | 3.0 | 91 | estimate |  |
 | RUDDER.arm | 2.6 | 91 | unsourced |  |
 | RUDDER.aspect | 1.4 | 91 | unsourced |  |
-| FULL_RUDDER | 30 | 93 | unsourced |  |
+| FULL_RUDDER | 30 | 93 | unsourced | the helm's unit, and the most the AI and the tiller pilot use |
+| HARD_OVER, RUDDER_STALL (balance.ts) | 46.5°, 40° | | derived / estimate | the tiller's swing each side, to where its arc meets the after deck (the owner's ruling, 18 Nov 2026; from render/hull.ts TILLER, len 1.2 m and 4° above level at rest, both estimates from the owner's photos, and the hull's rudder rake; tests/tillerpath holds it; 75° before); the stall for a keel-hung blade working as the keel's flap. No Folkboat measurement found. rudderTurn's rounding from 30° to the stall (a sixth more turn at 40°) and the stalled plate past it (Kirchhoff; Hoerner), and rudderBrake, are estimates on these |
 | IDEAL_HELM | 2.5 | 95 | unsourced |  |
 | MAIN_C.kpp | 0.01379 | 127 | sourced |  |
 | JIB_C.kpp | 0.016 | 135 | sourced |  |
@@ -330,8 +331,7 @@ physics, ranked like the ten above:
 | PENALTY_TURN_RATE | 10 | 22 | unsourced |  |
 | SLOW_TACK | 1.3 | 24 | unsourced |  |
 | CREW_LAG | 0.8 | 27 | unsourced |  |
-| ASTERN_DRAG.c0 | 0.005 | 30 | unsourced |  |
-| ASTERN_DRAG.c1 | 0.035 | 30 | unsourced |  |
+| ASTERN | 2 | | estimate | her drag stern first over her hull's resistance ahead at the same speed (NACA TN 3361: a 0012 section's drag at 180° about twice that at 0°; a section, not a hull); replaces the unsourced ASTERN_DRAG law |
 | STEERS_ASTERN | 0.05 m/s | | estimate | above it a held tiller steers by the flow going astern; below, it sculls |
 | HANDLING.asternRudder | 0.7 | | estimate | the rudder's lift going astern over ahead (Molland & Turnock, second hand: 75–85%, earlier stall) |
 | POLE.set | 8 | 35 | unsourced |  |
@@ -347,7 +347,7 @@ physics, ranked like the ten above:
 | HOVE.dragAft | 0.3 | 387 | estimate |  |
 | HOVE.swayAdded | 0.9 | 389 | estimate |  |
 | HOVE.yawAdded | 0.4 | 389 | estimate |  |
-| HOVE.gyration | 0.25 | 391 | estimate |  |
+| HOVE.gyration | 0.19 | 391 | estimate | worked from her ballast keel (52% of her weight at about 0.7 m, the rest at about 2.0 m); was 0.25, "the usual figure for a yacht". Sets yawLag: 0.36 s at 4.7 kt |
 | HOVE.windSide | 5.5 | 393 | estimate |  |
 | HOVE.windLever | 0.3 | 393 | estimate |  |
 | HOVE.rudderFlow | 0.5 | 395 | estimate |  |
@@ -704,8 +704,8 @@ physics, ranked like the ten above:
 | ASTERN_SHOVE | 0.64 m/s | | estimate | WALK plus SHOVE_N over 1 m of reach (the reach is the estimate) |
 | STEER_FOR | 13 s | | estimate | the steerage (over 0.3 m/s) the shove must give in the wind there is: the bar's 10 s and the scatter on an arc |
 | ASTERN_WIND_FAR, ASTERN_SET_FAR, ASTERN_WIND_STEP, SET_PER_KT (sim/world.ts) | 40 m, 16 m, 4 m, 0.019 m/s per kt | | estimate | the wind the shove is gauged by, read along her line astern and to leeward of it once as she's let go; her set across her line lying stern first under bare poles, per knot on her beam (the sim's own: 0.15 m/s in 10.5 kt 49° off her bow) |
-| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 9 m | | derived / estimate | her still-air glide from the full shove (11.4 m); the clear water for which the way nearest the exit is taken |
-| ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 90 s, 1 m, 24 m | | estimate | the glide's one horizon; stopping short of the clear water's end; the furthest the planner looks |
+| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 45 m, 30 m | | derived / estimate | her still-air glide from the full shove to her way lost (44.5 m on the sourced sternway drag); what the gentlest steering shove glides to her way's end (30.4 m), the clear water for which the way nearest the exit is taken |
+| ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 240 s, 1 m, 46 m | | derived / estimate | the glide's one horizon, to where her way's gone from the full shove in still air (under 0.05 m/s; at 90 s she crept on 14 m more: the creep sweep, 18 Nov 2026); stopping short of the clear water's end; the furthest the planner looks |
 | DRIFT_PER_KT, DRIFT_PACE, DRIFT_FOR (geo/marina.ts) | 0.017 m/s per kt, 0.2 m/s, 60 s | | estimate | bare-poles drift to leeward allowed for along her run, measured in this sim |
 | ASTERN_WEST_KT, ASTERN_WEST_BAND (geo/marina.ts) | 6 kt, 45° | | estimate | NO_ASTERN_WEST's westerly: sailed at 4, 8 and 12 kt from 270, and at 12 kt from 225 and 315, only |
 | CREW_TURN | 2 | 111 | unsourced |  |

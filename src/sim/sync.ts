@@ -36,7 +36,7 @@ export const CHECK_EVERY = 20;
 export function checkOf(w: World): number[] {
   const out: number[] = [w.t, w.steps, w.wind.from, w.wind.kt];
   for (const b of w.boats) out.push(b.x, b.y, b.h, b.v, b.heel, b.heave ?? 0, b.pitch ?? 0);
-  out.push(w.waves.phase[0], w.waves.amp[5]);
+  out.push(w.waves.phase[0], w.waves.amp[5], w.waves.dir[0], w.waves.share[2], w.waves.chopFrom);
   const p = w.C.center, c = w.currentAt(p), f = w.fieldAt(p), h = w.windHere(p);
   out.push(c.x, c.y, f.k, f.turn, f.extra, h.from, h.kt);
   return out;

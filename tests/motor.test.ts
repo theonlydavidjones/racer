@@ -212,6 +212,27 @@ describe('Stowing it below and shipping it again (the owner: off the sliding bra
     expect(m.stowed).toBe(false); expect(m.down).toBe(false);
     w.motorTilt(); expect(m.down).toBe(true);
   }, 60_000);
+  it('shipped and running in 5 s from the call (the owner, 17 Nov 2026: "mounting the motor takes way, way too long. 5 seconds max."), whoever\'s aft', () => {
+    const w = withMotor('sail'), m = w.user.motor!;
+    Object.assign(m, { stowed: true, down: false, running: false, warm: true }); // (below, warm: its first pull catches 19 times in 20)
+    applyCommand(w, { k: 'motor', op: 'stow' }); expect(m.shifting?.to).toBe('bracket');
+    expect(m.shifting!.of).toBe(MOTOR_SHIP_S); // (the owner's time whoever's aft: not slowed by a crewmate's pace)
+    let t = 0; for (; t < 10 && m.shifting; t += DT) w.step(DT);
+    w.motorTilt(); expect(w.motorStart()).toBe('ok');
+    for (; t < 10 && !m.running; t += DT) w.step(DT);
+    expect(m.running).toBe(true); expect(t, 'from the call to running (s)').toBeLessThanOrEqual(5);
+  });
+  it('and the worst case in 5 s too: cold, its first pull doesn\'t catch and the next does (the Coordinator, 17 Nov 2026)', () => {
+    const w = withMotor('sail'), m = w.user.motor!;
+    Object.assign(m, { stowed: true, down: false, running: false, warm: false });
+    applyCommand(w, { k: 'motor', op: 'stow' });
+    let t = 0; for (; t < 10 && m.shifting; t += DT) w.step(DT);
+    w.motorTilt(); expect(w.motorStart()).toBe('ok');
+    m.pulling!.catches = false; let second = false;
+    for (; t < 10 && !m.running; t += DT) { w.step(DT); if (!second && m.pulling && m.pulling.left > 1.4) { m.pulling.catches = true; second = true; } }
+    expect(second, 'a second pull').toBe(true);
+    expect(m.running).toBe(true); expect(t, 'from the call to running, two pulls (s)').toBeLessThanOrEqual(5);
+  });
   it('its weight goes with it: stowed, the same weight aboard but further forward and off the height of the bracket; shipped again, as before', () => {
     const w = withMotor('sail'), u = w.user, m = u.motor!, c = u.cond!;
     // (her condition is written as it stands, the same object: its numbers taken at each stage)
