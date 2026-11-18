@@ -13,7 +13,7 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
+import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, STALL_TURN, helmFor, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
@@ -340,9 +340,18 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     }
     // (where her heading's going with the helm amidships; checking a swing is the rudder's work, not sculling's: rule
     // 42.3(d) allows sculling only to turn toward close-hauled)
-    const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? rateFor(Math.sign(lead)) : flow;
+    // Her helm goes to full helm, 30°, as it always has, for her tacks, gybes and her own steering. Only about to touch
+    // another boat (rule 14, ai.ts urgent) does she put it to the rudder's stall, 40°, her quickest turn (balance.ts
+    // STALL_TURN, a sixth more than full helm's), as your steering key does; never past it, where the blade brakes and
+    // turns her less: no helmsman steering for a turn shoves it hard over. (Turning at the stall in every tack and turn,
+    // the fleet fouled more round the start: 31 penalties in fouls-start's sixteen starts against 25, 20 against 14 in
+    // 22 kt. Real helmsmen tack on a moderate helm: more of it only slows her through the turn.) Short of that she holds
+    // the helm the turn wants (balance.ts helmFor), the drawn tiller with it.
+    const most = ai?.urgent ? HELM_STALL : 1, quick = ai?.urgent ? Math.min(STALL_TURN * flow, Math.max(flow, HANDLING.maxTurnRate)) : flow;
+    const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? Math.max(quick, rateFor(Math.sign(lead))) : quick;
     rate = clamp(lead * 1.6, -lim, lim);
-    rudder = clamp((rate - balRate - motRate) / Math.max(1e-6, maxRate), -1, 1); // the AI holds whatever helm the boat needs
+    const need = (rate - balRate - motRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
+    rudder = Math.sign(need) * Math.min(most, helmFor(Math.abs(need)));
   }
   // (sculling in use: she's turning faster than the flow alone would turn her; latched to that way until close-hauled)
   if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flowMost + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
