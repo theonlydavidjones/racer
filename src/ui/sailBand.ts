@@ -175,8 +175,8 @@ const jcar = (side: Side) => {
  * closed upper leech; loose: the top bends open; loose in light air and strong winds, 2-3 turns in medium) and rigTune.ts
  * JUMPER (-0.6 deg of twist a turn); the vang, the guide's "never use the kickingstrap upwind in less than 18 knots"
  * (controls.ts guideLimits); the outhaul and Cunningham, the guide's 5 and 12 kt ranges; the rest, lines.ts LINE_ENDS and
- * LINE_WHAT (the model's own effects). The jib car's in-out lead is left out: no Folkboat source says what it does in chop
- * or flat water. The band's clicks and scrolls are in the Keys screen's "How to sail her".
+ * LINE_WHAT (the model's own effects). The jib car's in-out lead says only what the sim does (a wider lead, the clew outboard, a fuller
+ * lower jib; controls.ts leadAt, 11.6 to 13.7 deg); "chop" is left out, no Folkboat source says it (the owner picked this line, r252). The band's clicks and scrolls are in the Keys screen's "How to sail her".
  */
 export const BAND_TIPS = {
   jumpers: "More turns close the main's top leech: medium air. Loose in light air and a breeze.",
@@ -190,7 +190,7 @@ export const BAND_TIPS = {
   jibCunningham: "On as the wind builds, to hold the jib's draft forward.",
   jibHalyard: "Set before the start: tight keeps the jib's draft forward for a breeze.",
   jib: 'In to point; eased for speed and reaching.',
-  car: 'Forward closes the leech for power; aft opens it to depower.',
+  car: 'Forward for power, aft to depower. In to point; out for a wider, fuller slot.',
   windex: 'Arrow: the apparent wind. Red wedge: too close, the sails luff.',
   pole: 'Holds the jib out for wing-on-wing, past about 150° true.',
   hoistMain: 'Hauls the main up; head to wind makes it easy.',
