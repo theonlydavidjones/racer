@@ -2460,7 +2460,7 @@ export class World {
   /**
    * Stow it, or ship it again (the owner: Folkboat outboards sit on a sliding bracket on the after deck, slid up and away,
    * and off it to stow): the crew slide it off the bracket into the lazarette, or back on, taking MOTOR_STOW_S or
-   * MOTOR_SHIP_S (estimates) at their pace. Only stopped and tilted up; racing, it stays below (the class rules don't allow
+   * MOTOR_SHIP_S (stowing at their pace; shipping in the owner's 5 s from the call to running). Only stopped and tilted up; racing, it stays below (the class rules don't allow
    * racing with it mounted aft). The weight moves with it, and stowed there's no leg in the water (condition.ts, motor.ts).
    */
   motorStow(): void {
@@ -2471,7 +2471,7 @@ export class World {
       if (m.down) { say('Tilt it up first, then it can come off the bracket.'); return; }
     } else if (this.racingNow) { say('Not while racing: the class rules don\'t allow racing with the outboard on its bracket.'); return; }
     // (whoever goes aft to the bracket: the forward hand, or sailing alone, you; their weight goes aft with them)
-    const to = m.stowed ? 'bracket' : 'stowed', pace = Math.max(0.3, bodyJob(u, 'outboard', true)), of = (to === 'stowed' ? MOTOR_STOW_S : MOTOR_SHIP_S) / pace;
+    const to = m.stowed ? 'bracket' : 'stowed', pace = Math.max(0.3, bodyJob(u, 'outboard', true)), of = to === 'stowed' ? MOTOR_STOW_S / pace : MOTOR_SHIP_S; // (shipped in the owner's time, whoever's aft: MOTOR_SHIP_S)
     m.shifting = { to, left: of, of }; m.down = false; m.running = false; m.pulling = undefined; m.gear = 'N'; m.throttle = 0; m.swivel = false;
     say(to === 'stowed' ? 'Unclamping the outboard to stow it below.' : 'Getting the outboard out of the lazarette to ship it.');
   }
