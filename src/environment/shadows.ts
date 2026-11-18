@@ -183,6 +183,39 @@ const CF_FADE = 250;
 export function prepareLee(pts: Vec[], half: number): void {
   for (const c of pts) for (let y = c.y - half; y <= c.y + half; y += GL * GT) for (let x = c.x - half; x <= c.x + half; x += GL * GT) groundHeightSmooth({ x, y });
 }
+/** The distances along a lee ray that terrainLeeRaw samples (m): every 50 m to 1 km, then every 100 m to 6 km. */
+const LEE_D: number[] = (() => { const r: number[] = []; for (let d = 50; d <= 6000; d += d < 1000 ? 50 : 100) r.push(d); return r; })();
+/**
+ * Where ground over 8 m might be (groundHeightSmooth there could pass the level a stretch of land starts at), on a 50 m
+ * bitmap: false only where it can't be. A lattice point's height is a mean of the 200 m blocks round it, none higher
+ * than the highest, so it's under 8 m unless a block over 8 m is within a block's spacing of it; and a point's height
+ * is read from lattice points within 50 m. So each block over 8 m marks its spacing + 50 m (+2 m for rounding) round it.
+ */
+const RISE_R = 50;
+const RISE = (() => {
+  const S0 = HM.samples[0] - 1, S1 = HM.samples[1] - 1;
+  const cx = (i: number) => (HM.west + ((i + 0.5) * HM.block - 0.5) / S0 * (HM.east - HM.west) - LON0) * MLON;
+  const cy = (j: number) => (HM.north - ((j + 0.5) * HM.block - 0.5) / S1 * (HM.north - HM.south) - LAT0) * MLAT;
+  const mx = HM.block / S0 * (HM.east - HM.west) * MLON + 50 + 2, my = HM.block / S1 * (HM.north - HM.south) * MLAT + 50 + 2; // (50: the lattice's spacing, GL)
+  const x0 = Math.min(cx(0), cx(HM.nx - 1)) - mx - RISE_R, y0 = Math.min(cy(0), cy(HM.ny - 1)) - my - RISE_R;
+  const nx = Math.ceil((Math.max(cx(0), cx(HM.nx - 1)) + mx + RISE_R - x0) / RISE_R) + 1, ny = Math.ceil((Math.max(cy(0), cy(HM.ny - 1)) + my + RISE_R - y0) / RISE_R) + 1;
+  const bits = new Uint8Array(nx * ny);
+  for (let j = 0; j < HM.ny; j++) for (let i = 0; i < HM.nx; i++) {
+    if (HGRID[j * HM.nx + i] * HM.step <= 8) continue;
+    const x = cx(i), y = cy(j);
+    const a0 = Math.max(0, Math.floor((x - mx - x0) / RISE_R)), a1 = Math.min(nx - 1, Math.floor((x + mx - x0) / RISE_R));
+    const b0 = Math.max(0, Math.floor((y - my - y0) / RISE_R)), b1 = Math.min(ny - 1, Math.floor((y + my - y0) / RISE_R));
+    for (let b = b0; b <= b1; b++) bits.fill(1, b * nx + a0, b * nx + a1 + 1);
+  }
+  return { bits, x0, y0, nx, ny };
+})();
+/** For the tests: off, every ray is marched from its start (the same lee, slower). */
+export const leeSkip = { on: true };
+function mayRise(x: number, y: number): boolean {
+  if (!leeSkip.on) return true;
+  const a = Math.floor((x - RISE.x0) / RISE_R), b = Math.floor((y - RISE.y0) / RISE_R);
+  return a >= 0 && b >= 0 && a < RISE.nx && b < RISE.ny ? RISE.bits[b * RISE.nx + a] === 1 : false;
+}
 /** A dip between two stretches of land narrower than this (m) doesn't part them for the lee (terrainLeeRaw). */
 const DIP_GAP = 200;
 /** The mask's share of land (0..1, read bilinearly) from which the ground counts: its cells' own edge. */
@@ -284,16 +317,28 @@ function terrainLeeRaw(p: Vec, from: number, skipGate = false): number {
     let rise = 0; // (the stretch's ground as it rises, scored from where it stands: the most of shape(d, height so far))
     const close = () => { worst = Math.max(worst, side * Math.max(lee(enter, top), cavOf(top) * rise, ca >= 0 ? wa * lee(ca, top) : 0, cb >= 0 ? wb * lee(cb, top) : 0)); };
     const at = (L: number, d: number, h: number) => prevH === h ? prevD : prevD + (d - prevD) * (L - prevH) / (h - prevH); // (where the height passes L, between the samples)
-    let step = 50;
-    for (let d = 50; d <= 6000; d += step) {
-      step = d < 1000 ? 50 : 100;
-      // the ground the air comes over, averaged across the wind over a width that grows with the distance run (a lee's
-      // edge spreads as it goes: wakes mix at roughly 1 in 5 to 1 in 10 of the distance; the spread here, d/8 either
-      // side weighted ¼ ½ ¼, is an estimate, no figure measured for these shores). Close in it's under the coast's own
-      // 50 m cells and changes nothing; far off a narrow gap opens gradually, averaged with the land beside it
+    // the ground the air comes over, averaged across the wind over a width that grows with the distance run (a lee's
+    // edge spreads as it goes: wakes mix at roughly 1 in 5 to 1 in 10 of the distance; the spread here, d/8 either
+    // side weighted ¼ ½ ¼, is an estimate, no figure measured for these shores). Close in it's under the coast's own
+    // 50 m cells and changes nothing; far off a narrow gap opens gradually, averaged with the land beside it
+    const g = (r: Vec) => skipGate && r.x < GATE_X ? 0 : groundHeightSmooth(r);
+    const hAt = (d: number) => {
       const q = { x: p.x + u.x * d, y: p.y + u.y * d }, a = d / 8, nx = u.y * a, ny = -u.x * a;
-      const g = (r: Vec) => skipGate && r.x < GATE_X ? 0 : groundHeightSmooth(r);
-      const h = 0.5 * g(q) + 0.25 * (g({ x: q.x + nx, y: q.y + ny }) + g({ x: q.x - nx, y: q.y - ny }));
+      return 0.5 * g(q) + 0.25 * (g({ x: q.x + nx, y: q.y + ny }) + g({ x: q.x - nx, y: q.y - ny }));
+    };
+    // Over open water the ray changes nothing (no stretch starts below 8 m): it starts at the last sample before ground
+    // that might be over 8 m (mayRise), with that sample's height as it was. The same lee, to the bit; a ray with no
+    // such ground at all shelters nothing. (Most of the water the passage planner looks at: 89% of its 25 m points
+    // from Mile Rock in a westerly have no land upwind.)
+    let k0 = 0;
+    for (; k0 < LEE_D.length; k0++) {
+      const d = LEE_D[k0], qx = p.x + u.x * d, qy = p.y + u.y * d, a = d / 8, nx = u.y * a, ny = -u.x * a;
+      if (mayRise(qx, qy) || mayRise(qx + nx, qy + ny) || mayRise(qx - nx, qy - ny)) break;
+    }
+    if (k0 === LEE_D.length) continue;
+    if (k0 > 0) { prevD = LEE_D[k0 - 1]; prevH = hAt(prevD); }
+    for (let k = k0; k < LEE_D.length; k++) {
+      const d = LEE_D[k], h = hAt(d);
       if (enter >= 0) {
         const L = Math.max(8, 0.5 * top);
         // the ground as it rises, its reach scored from where it stands by the height reached so far (Deep Physics): 20 m

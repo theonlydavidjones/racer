@@ -20,7 +20,7 @@ describe('pushed off astern', () => {
     for (const id of NO_WAY_OUT) { const s = slipById(id); expect(s, id).toBeTruthy(); expect(SLIPS).toContain(s); expect(s!.marina).toBe(id.split(':')[0]); }
   });
   it('in still air the full shove steers her 13 s and more, and glides her past ASTERN_ENOUGH', () => { const g = asternGlide(ASTERN_SHOVE, 0, 0, 0, ASTERN_GLIDE_S); expect(g.steerable).toBeGreaterThanOrEqual(13); expect(g.dist).toBeGreaterThan(ASTERN_ENOUGH); });
-  it('the shove: her walk-back pace and a last push, about 0.64 m/s, which glides her about as far as the planner looks', () => {
+  it('the shove: her walk-back pace and a last push, about 0.64 m/s, which glides her ASTERN_RUN, more than the planner ever looks (ASTERN_LOOK_MAX)', () => {
     expect(ASTERN_SHOVE).toBeGreaterThan(0.55); expect(ASTERN_SHOVE).toBeLessThan(0.7);
     expect(asternCoast(ASTERN_SHOVE)).toBeGreaterThan(ASTERN_RUN - 3); expect(asternCoast(ASTERN_SHOVE)).toBeLessThanOrEqual(ASTERN_RUN);
   });
@@ -30,7 +30,11 @@ describe('pushed off astern', () => {
     for (const H of HARBORS) {
       const all = slipsIn(H.id).filter(s => s.kind === 'bow-in'); if (!all.length) continue;
       const k = Math.min(20, all.length); // (each berth once: no repeats in a small harbor; and the twelve kept from a shove astern, every run)
-      const pick = [...new Set([...Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]), ...all.filter(s => NO_ASTERN.includes(s.id) || NO_ASTERN_WEST.includes(s.id))])];
+      // (and every berth planned a shove astern in this wind, up to three a harbor: on the sourced drag, 17 Nov 2026, even the
+      // gentlest shove glides her 23.0 m in still air, and few berths have that much clear water astern; none of the spread
+      // sample did)
+      const shoved = all.filter(s => { const p = pushOffPlan(s, 270, kt); return p.kind === 'astern' && !p.noRoom; }).slice(0, 3);
+      const pick = [...new Set([...Array.from({ length: k }, (_, i) => all[Math.floor(i * all.length / k)]), ...all.filter(s => NO_ASTERN.includes(s.id) || NO_ASTERN_WEST.includes(s.id)), ...shoved])];
       for (const s of pick) {
         const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
         const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: Math.max(kt, 0.01), windDir: 270, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
@@ -106,7 +110,7 @@ describe('pushed off astern', () => {
         const out = Math.hypot(u.x - sl.p.x, u.y - sl.p.y);
         if (bumps.length || way <= 0.3 || out <= 12) clean = `${id} from ${from} at ${kt} kt: ${bumps[0] ?? ''} least way ${way.toFixed(2)} m/s, ${out.toFixed(0)} m out`;
       }
-      return { astern, walked, went, noRoom: plan.kind === 'astern' && !!plan.noRoom, docked: !!u.docked, told: msgs.some(m => /^No room to push her off from this berth in this wind/.test(m)), clean };
+      return { astern, walked, went, noRoom: plan.kind === 'astern' && !!plan.noRoom, docked: !!u.docked, told: msgs.some(m => /^(No room to push her off from this berth in this wind|Too much wind on her (bow|stern|port side|starboard side) to push her off|The breeze on her (bow|port bow|starboard bow) would carry her into the boats astern)/.test(m)), clean };
     };
     // (each run, the berths kept fast and told, by name, and how many get out, exactly as today, 16 Nov 2026: a change to
     // the planner that moves a berth between them has to say why. Kept fast: planned astern and flagged, NO_ASTERN and
@@ -139,20 +143,61 @@ describe('pushed off astern', () => {
       light: { out: 5, kept: ['west-harbor:507'] }, northWest: { out: 6, kept: [] },
     });
   }, 300_000);
-  it('a fresh breeze on her bow carries her on whatever the crew do: she\'s let go with the way she has, their walk, never dead in the water', () => {
+  it('a fresh breeze on her bow carries her on whatever the crew do: she\'s never shoved off astern into it (and were she, she\'d be let go with the way she has, their walk, never dead in the water)', () => {
     // (the physics review, 15 Nov 2026: gauged to her room, the shove came to nothing from 14 kt on her bow, and she lay
-    // at the finger's end with no steerage for 10–40 s)
-    let n = 0;
-    for (const s of SLIPS) {
-      if (n >= 4) break;
+    // at the finger's end with no steerage for 10–40 s. Since the sourced sternway drag, 17 Nov 2026, an 18 kt breeze on
+    // her bow carries even the gentlest shove 75 m (79 from the full shove), past any clear water astern, so no berth is shoved off astern
+    // into it: walked out or kept fast instead (planPushOff, leastGlide). A tripwire on every tenth berth: should one come
+    // back, it fails here, and it's still held to being let go with her way on. Each berth's plan in the wind the World has
+    // at her slip, as it plans her push-off (a harbor's lee lightens and turns it: the physics review), read from one World
+    // a wind direction)
+    const shoved: string[] = [], worlds = new Map<number, World>();
+    const windAt = (s: (typeof SLIPS)[number]) => {
+      const from = Math.round(s.heading / 10) * 10 % 360; let w = worlds.get(from);
+      if (!w) { w = sail(s.id, from, 18); w.step(DT); worlds.set(from, w); }
+      return (w as unknown as { windHere: (p: unknown, b: unknown, g: boolean) => { from: number; kt: number } }).windHere(s.p, undefined, false);
+    };
+    for (const s of SLIPS.filter((_, i) => i % 10 === 0)) {
       if (Math.abs(((s.heading - 270 + 540) % 360) - 180) <= 60) continue; // (not the westerly's flagged berths)
+      const ww = windAt(s), p = pushOffPlan(s, ww.from, ww.kt); if (p.kind !== 'astern' || p.noRoom) continue;
+      shoved.push(s.id); if (shoved.length > 4) continue;
       const w = sail(s.id, s.heading, 18), u = w.user; for (let k = 0; k < 30; k++) w.step(DT);
       if (!w.pushOff() || u.handled?.plan.kind !== 'astern') continue;
       for (let k = 0; k < 60 * 60 && u.handled; k++) w.step(DT);
-      expect(u.handled, s.id).toBeFalsy(); expect(u.astern ?? 0, `${s.id}: her way as she's let go`).toBeGreaterThan(0.43); n++;
+      expect(u.handled, s.id).toBeFalsy(); expect(u.astern ?? 0, `${s.id}: her way as she's let go`).toBeGreaterThan(0.43);
     }
-    expect(n).toBeGreaterThanOrEqual(2);
+    // (one, 18 Nov 2026: Horseshoe Bay A20, in its harbor's lee, let go with her way on as asked; the creep sweep has it clear
+    // to where her way's gone. Any other that comes back fails here)
+    expect(shoved).toEqual(['horseshoe-bay:A20']);
   }, 120_000);
+  it('kept fast for the wind, it says the wind and where it is on her; for the room, the room (the owner, 18 Nov 2026: Josephine in a strong southerly)', () => {
+    // (Josephine's slip, Gashouse Cove 572, bow to 351, in 30 kt from the south (25 in her slip): too much for her crew to
+    // turn her on a line, and shoved off astern into it she'd stop 5 m out pointing back into the slip: kept fast for the
+    // wind on her stern, which the line used to call "no room")
+    const said = (id: string, from: number, kt: number, motor: boolean) => {
+      const w = sail(id, from, kt), u = w.user; for (let k = 0; k < 30; k++) w.step(DT); w.drainEvents();
+      u.motor = motor ? { hp: 3.5, down: false, running: false, gear: 'N', throttle: 0 } : undefined;
+      const went = w.pushOff(), plan = pushOffPlan(slipById(id)!, ...(() => { const ww = (w as unknown as { windHere: (a: unknown, b: unknown, c: boolean) => { from: number; kt: number } }).windHere(u, u, false); return [ww.from, ww.kt] as const; })());
+      return { went, plan, msgs: w.drainEvents().filter(e => e.type === 'toast').map(e => (e as { msg: string }).msg) };
+    };
+    const jo = said('gashouse-cove:572', 180, 30, false);
+    expect(jo.went).toBe(false);
+    expect(jo.plan.kind === 'astern' && jo.plan.noRoom && jo.plan.why).toBe('wind');
+    expect(jo.msgs).toEqual(['Too much wind on her stern to push her off: she stays fast until it eases.']);
+    expect(said('gashouse-cove:572', 180, 30, true).msgs).toEqual(['Too much wind on her stern to push her off: motor out, or wait for it to ease.']);
+    // (a breeze on her bow isn't too much to push against: shoved off stern first with it she'd never lose her way, and
+    // the line says where it would take her. Horseshoe Bay A12 and South Beach A77 in a 12 kt easterly, two of the 73 the
+    // way-lost horizon keeps fast, the second with it broad on her port bow: the Coordinator's line, 18 Nov 2026)
+    const bow = said('horseshoe-bay:A12', 90, 12, false);
+    expect(bow.went).toBe(false); expect(bow.msgs).toEqual(['The breeze on her starboard bow would carry her into the boats astern: she stays fast until it eases.']);
+    expect(said('horseshoe-bay:A12', 90, 12, true).msgs).toEqual(['The breeze on her starboard bow would carry her into the boats astern: motor out, or wait for it to ease.']);
+    expect(said('south-beach:A77', 90, 12, false).msgs).toEqual(['The breeze on her port bow would carry her into the boats astern: she stays fast until it eases.']);
+    // (and nearly dead ahead, within 30 degrees, plainly on her bow: West Harbor 203 in 12 kt from 278, the Coordinator, 18 Nov 2026)
+    expect(said('west-harbor:203', 278, 12, false).msgs).toEqual(['The breeze on her bow would carry her into the boats astern: she stays fast until it eases.']);
+    // (and a berth kept fast for the room: short of the clearance or the steerage in any wind, a calm too, NO_ASTERN)
+    const room = said(NO_ASTERN[0], 270, 12, false);
+    expect(room.went).toBe(false); expect(room.msgs).toEqual(['No room to push her off from this berth in this wind: she stays fast until it changes.']);
+  });
   it('kept fast with a motor on the bracket, the one line says to motor out', () => {
     const id = [...NO_ASTERN, ...NO_ASTERN_WEST].find(i => { const w = sail(i, 270, 12); for (let k = 0; k < 30; k++) w.step(DT); return !w.pushOff(); })!;
     expect(id, 'a berth she is kept fast in').toBeTruthy();
@@ -196,7 +241,11 @@ describe('pushed off astern', () => {
     // lighter edge, and in the World's own wind at her slip she's walked out or kept fast instead. So the property can't be
     // tested there: none, exactly, a tripwire. The 12 kt northerly tests it in that wind. Should a 20 kt northerly shove
     // come back, this fails, and asks for it to be held to the glide as the rest are)
-    if (from === 0 && kt === 20) expect(n).toBe(0); else expect(n).toBeGreaterThanOrEqual(1);
+    // (in a 20 kt northerly or easterly, no berth has a shove she's let go from, 18 Nov 2026: on the sourced sternway drag
+    // her glide's gauged to where her way's gone (ASTERN_GLIDE_S, 240 s), and a breeze forward of her beam carries even
+    // the gentlest shove past any clear water astern, so she's walked out or kept fast. A tripwire, as before: should one
+    // come back, this fails, and asks for it to be held to the glide as the 12 kt northerly's are)
+    if (kt === 20) expect(n).toBe(0); else expect(n).toBeGreaterThanOrEqual(1);
     expect(bad).toEqual([]);
   }, 600_000);
   it('a shove that collides fails the glide check, never skipped: her heading swung round, she runs back into her slip, and it says so', () => {

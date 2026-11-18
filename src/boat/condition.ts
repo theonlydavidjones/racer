@@ -165,4 +165,6 @@ export function conditionItems(s: BoatSpec, month = 9): { label: string; spec: B
   return items;
 }
 const AGE = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
-const TUNE_LABEL = { light: 'North Sails light', medium: 'North Sails medium', strong: 'North Sails strong', heikkila: 'Heikkilä', custom: 'your own' } as const;
+// (by the wind each is for, without the sailmakers' names (the owner, 18 Nov 2026): North Sails' guide's three, and
+// Heikkilä Sailmaker's raked tune; boat/rigTune.ts)
+const TUNE_LABEL = { light: 'light air', medium: 'medium', strong: 'strong wind', heikkila: 'raked', custom: 'your own' } as const;

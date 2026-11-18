@@ -41,19 +41,19 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'west-harbor', name: 'West Harbor, San Francisco Marina', short: 'West Harbor', data: westHarbor as unknown as HarborData },
   { id: 'gashouse-cove', name: 'Gashouse Cove, San Francisco Marina East Harbor', short: 'Gashouse Cove', data: gashouseCove as unknown as HarborData },
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
-  { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
+  { id: 'corinthian', name: 'Olympian Yacht Club, Tiburon', short: 'Olympian YC', data: corinthian as unknown as HarborData },
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
   // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
   // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
   // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
-  { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
-  { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
-  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
-  { id: 'oakland-yc', name: 'Oakland Yacht Club, Alameda', short: 'Oakland YC', data: oaklandYc as unknown as HarborData },
+  { id: 'berkeley', name: 'Berkeley Marina (Campanile Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
+  { id: 'richmond-yc', name: 'Brickyard Racing Club, Brickyard Cove', short: 'Brickyard RC', data: richmondYc as unknown as HarborData },
+  { id: 'encinal', name: 'Live Oak Yacht Club, Alameda', short: 'Live Oak YC', data: encinal as unknown as HarborData },
+  { id: 'oakland-yc', name: 'Oaktown Yacht Club, Alameda', short: 'Oaktown YC', data: oaklandYc as unknown as HarborData },
   { id: 'marina-village', name: 'Marina Village Yacht Harbor, Alameda', short: 'Marina Village', data: marinaVillage as unknown as HarborData },
   { id: 'fortmann', name: 'Fortmann Marina, Alameda', short: 'Fortmann Marina', data: fortmann as unknown as HarborData },
   { id: 'grand-marina', name: 'Grand Marina, Alameda', short: 'Grand Marina', data: grandMarina as unknown as HarborData },
-  { id: 'alameda-marina', name: 'Alameda Marina (Island Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
+  { id: 'alameda-marina', name: 'Alameda Marina (Sandbar Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 
@@ -403,7 +403,7 @@ export function berthClear(c: Vec, h: number, except: Slip, fine = false, grow =
  * `headToWind`: she'll be pointing within 45 degrees of the wind when let go (get the main up first). `setBack`: the wind's
  *   blowing her back onto the dock (ONTO_DOCK and more across her): her bow's pushed well off, so she goes out at an angle.
  */
-export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number }; /** the point she's turned about, m ahead of her middle: her bow (absent, 3.8), or her middle (0), turned in the fairway on a slip line */ pivot?: number; /** walked out by hand and turned toward the way out, the crew's way, not the wind's (fairwayWay): about her bow at the finger's end by a hand on the dock with a stern line, or in the fairway on a slip line (`slip`) */ walk?: true; /** turned in the fairway on a slip line, all hands aboard: how far she's set to leeward over the turn, m (east, north), held by the line */ slip?: Vec } | { kind: 'astern'; back: number; coast: number; /** the way she's steered stern first: +1 her bow to starboard (the tiller pushed to starboard), −1 to port, 0 straight back */ helm: 1 | -1 | 0; /** where her coast ends, no clear water to sail off in (clearRun, 8m3): kept fast, not shoved off */ noRoom?: boolean } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
+export type PushOff = ({ kind: 'swing'; back: number; turn: number; hold?: { off: number }; /** the point she's turned about, m ahead of her middle: her bow (absent, 3.8), or her middle (0), turned in the fairway on a slip line */ pivot?: number; /** walked out by hand and turned toward the way out, the crew's way, not the wind's (fairwayWay): about her bow at the finger's end by a hand on the dock with a stern line, or in the fairway on a slip line (`slip`) */ walk?: true; /** turned in the fairway on a slip line, all hands aboard: how far she's set to leeward over the turn, m (east, north), held by the line */ slip?: Vec } | { kind: 'astern'; back: number; coast: number; /** the way she's steered stern first: +1 her bow to starboard (the tiller pushed to starboard), −1 to port, 0 straight back */ helm: 1 | -1 | 0; /** where her coast ends, no clear water to sail off in (clearRun, 8m3): kept fast, not shoved off */ noRoom?: boolean; /** why she's kept fast: the wind (it would carry her on past her clear water, or leave her pointing back into her slip or head to wind), or the room (no clear water to sail off in) */ why?: 'wind' | 'room' } | { kind: 'off'; out: Vec }) & { h: number; headToWind?: boolean; /** the wind's setting her back onto the dock she's pushed off */ setBack?: boolean };
 /**
  * A breeze this strong (kt) blowing her onto the dock she's lying alongside and she's pushed off at an angle, not
  * straight out: the same 4 kt as WIND_SWINGS, where the wind on her bare rig starts to have the say over the crew's hands.
@@ -451,28 +451,58 @@ function letGoClear(c0: Vec, h0: number, off: number, s: Slip, f = 0): boolean {
 }
 /**
  * Her glide stern first in still air from the crew's full shove (world.ts ASTERN_SHOVE, about 0.64 m/s), to where she's lost
- * her way, m: about 11.4 m on physics.ts's sternway drag (asternCoast; tests/pushoff-astern.test.ts holds the two together).
- * What the planner looks along when it's given no glide (geo/ alone, in a test); the World gives it the glide in the wind.
+ * her way, m: about 44.5 m on physics.ts's sourced sternway drag (asternCoast, twice her resistance ahead, Deep Physics,
+ * 17 Nov 2026; 11.4 m on the old law; tests/pushoff-astern.test.ts holds the two together). What the planner looks along
+ * when it's given no glide (geo/ alone, in a test); the World gives it the glide in the wind.
  */
-export const ASTERN_RUN = 12;
+export const ASTERN_RUN = 45;
 /** Her glide stern first under bare poles in the wind there is (physics.ts asternGlide), given to the planner by the World
  * (geo/ can't import the physics: it's imported by it), with the crew's full shove (world.ts ASTERN_SHOVE). */
 export type AsternGlide = (v0: number, heading: number, windFrom: number, windKt: number, secs?: number) => { dist: number; steerable: number; going: boolean };
-let glide: { f: AsternGlide; shove: number } | null = null;
-export const useAsternGlide = (f: AsternGlide, shove: number): void => { glide = { f, shove }; astern.clear(); plans.clear(); };
+let glide: { f: AsternGlide; shove: number; least: number; steerFor: number } | null = null;
+/** `least`: the gentlest shove her crew give (their walk back, world.ts WALK); `steerFor`: the steerage she's to have, s
+ * (world.ts STEER_FOR), which may ask more of it. */
+export const useAsternGlide = (f: AsternGlide, shove: number, least = 0, steerFor = 0): void => { glide = { f, shove, least, steerFor }; astern.clear(); plans.clear(); floors.clear(); };
+/**
+ * How far the gentlest shove she's given carries her, stern first in the wind there is, m: her crew's walk, or more where
+ * that wouldn't steer her STEER_FOR s, as the World gauges it (world.ts). Shoved into less clear water than this, she runs
+ * on past it whatever they do: 35 m in still air to where her way's gone (ASTERN_GLIDE_S) on the sourced drag (17 Nov
+ * 2026), more with a breeze on her bow. Without
+ * the World's glide (geo/ alone), ASTERN_ENOUGH.
+ * As it acts (the physics review, 17 Nov 2026): the clear water she's planned is never more than ASTERN_LOOK_MAX, and with a
+ * breeze forward of her beam this glide is longer than that from a few knots on her bow: there no berth is shoved off
+ * astern, however much water is astern of her (Gashouse Cove 398 and 408, West Harbor 661 among the few that were). And it's her glide with her heading
+ * held, which a plan with the helm over (her stern turned down the fairway in about 20 m) shortens a little: on the safe side.
+ */
+const floors = new Map<string, number>();
+function leastGlide(heading: number, windFrom: number | undefined, windKt: number): number {
+  if (!glide) return ASTERN_ENOUGH;
+  const G = glide, wf = windFrom ?? 0, wk = windFrom == null ? 0 : windKt, k = `${Math.round(heading)}:${Math.round(wf)}:${Math.round(wk * 2) / 2}`;
+  let d = floors.get(k);
+  if (d == null) {
+    let lo = 0, hi = G.shove; for (let i = 0; i < 20; i++) { const m = (lo + hi) / 2; if (G.f(m, heading, wf, wk, ASTERN_GLIDE_S).steerable < G.steerFor) lo = m; else hi = m; }
+    d = G.f(Math.max(G.least, hi), heading, wf, wk, ASTERN_GLIDE_S).dist; floors.set(k, d);
+  }
+  return d;
+}
 /** The glide's horizon, s, for the planner's look and for the World's gauging of the shove alike (one horizon, so the full
- * shove is what she's given where the water's clear): long enough that she has lost her way, short of a breeze on her bow. */
-export const ASTERN_GLIDE_S = 90;
+ * shove is what she's given where the water's clear): to where her way's gone, under 0.05 m/s, from the full shove in still
+ * air on the sourced drag (240 s, 44.5 m: asternCoast; the walk's, 221 s and 35 m). At 90 s, as it was, she still had
+ * 0.2 m/s and crept on 14 m more, and in light air four berths' shoves crept on into a dock, the breakwater or the boat
+ * next door (Horseshoe Bay A5 and A9, West Harbor 677 and 679: the creep sweep, 17 Nov 2026, the Coordinator's condition). */
+export const ASTERN_GLIDE_S = 240;
 /** The World gauges her glide to stop this far short of the end of the clear water, m (an ESTIMATE: her drift and the
  * helm's scatter about the plan take her a little further; the every-berth sweep, 14 Nov 2026). The planner looks that much
  * further than her glide, so with the water clear the full shove is hers. */
 export const COAST_SHORT = 1;
-/** The furthest the planner looks, m (an ESTIMATE): with a breeze on her bow she glides on and on (20 m in 30 s in 20 kt), and
- * is steered down the fairway or sailed off well before. */
-const ASTERN_LOOK_MAX = 24;
-/** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one (an
- * ESTIMATE: about what the gentlest shove that steers her STEER_FOR s in still air, 0.555 m/s, carries her: 9.4 m). */
-export const ASTERN_ENOUGH = 9;
+/** The furthest the planner looks, m: her whole glide from the full shove in still air over ASTERN_GLIDE_S (44.5 m on the
+ * sourced drag, 17 Nov 2026), and a meter and a half to spare. With a breeze on her bow she glides on and on, so there she
+ * isn't shoved off astern at all (leastGlide). */
+const ASTERN_LOOK_MAX = 46;
+/** Clear water for this much of her glide, m, and the way that's nearest the way out is taken over a longer one: what the
+ * gentlest shove that steers her STEER_FOR s in still air carries her over ASTERN_GLIDE_S (0.362 m/s, 30.4 m to her way's
+ * end on the sourced drag, 17 Nov 2026; 0.555 m/s and 9.4 m on the old). */
+export const ASTERN_ENOUGH = 30;
 /** The most she's turned stern first before she's straightened up, deg: her stern pointing down the fairway. */
 const ASTERN_TURN = 90;
 /**
@@ -734,8 +764,12 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
   // no room to swing her (or the wind would swing her into something): walked back until her bow's at the finger's end,
   // then shoved off astern into the fairway at a walk and more (world.ts ASTERN_SHOVE), and steered stern first: her
   // stern swung round toward the way out with the helm hard over, or straight back where that's the clear way
-  const a = asternWay(s, reach, windFrom, windKt);
+  let a = asternWay(s, reach, windFrom, windKt);
   if (a.kind === 'astern' && a.coast < FAIRWAY_SHORT) { const f = fairway(); if (f) return f; }
+  // (nor shoved into less clear water than the gentlest shove carries her in this wind: she'd run on past it into whatever's
+  // there, unsteerable at a crawl. West Harbor 231 in a 20 kt northerly on the sourced drag, 17 Nov 2026: 20.8 m into a
+  // moored boat. Walked out instead where that fits, else kept fast)
+  if (a.kind === 'astern' && !a.noRoom && a.coast < leastGlide(s.heading, windFrom, windKt) + COAST_SHORT) { const f = fairwayWay(s, reach, togo, windFrom, windKt); if (f) return f; a = { ...a, noRoom: true, why: a.coast < leastGlide(s.heading, undefined, 0) + COAST_SHORT ? 'room' : 'wind' }; } // (the wind, where her glide in a calm would fit)
   // (shoved off astern and let go where her coast ends, she's held to the same clear water as any let-go, 8m3: the
   // coordinator's ruling, 16 Nov 2026. Where it isn't there, her crew keep her fast rather than shove her into the boats)
   // (and in a breeze, 60 degrees and more off the wind as any let-go: left nearer head to wind, the jib can't fill and the
@@ -751,13 +785,14 @@ function planPushOff(s: Slip, windFrom: number | undefined, windKt: number): Pus
     // (nor let go still pointing back into her own slip: shoved only a little way out, she'd sail straight back in among
     // the boats either side. South Beach B87 in 15 kt from the north, 16 Nov 2026: 3.5 m out, 16 degrees off her slip's line)
     const backIn = windKt >= WIND_SWINGS && Math.abs(wrap180(e.h - s.heading)) < 90; // (in a breeze: in light air there's time to steer her off)
-    if (headUpThere || backIn || !clearRun(e.c, e.h, s, windFrom, windKt)) { const f = walkOut(); if (f) return f; return { ...a, noRoom: true }; }
+    if (headUpThere || backIn || !clearRun(e.c, e.h, s, windFrom, windKt)) { const f = walkOut(); if (f) return f; return { ...a, noRoom: true, why: headUpThere || backIn ? 'wind' : 'room' }; }
   }
   return a;
 }
 /** Clear water astern shorter than this, m, and she's walked out to the fairway and turned there instead, where that fits:
- * the shove carries her about 11 m in still air (ASTERN_RUN), and in less she runs on past it (an ESTIMATE). */
-const FAIRWAY_SHORT = 10;
+ * even the gentlest shove that steers her carries her 30 m to her way's end in still air on the sourced drag (ASTERN_ENOUGH; 9.4 m on the
+ * old, when this was 10), and in less she runs on past the clear water, unsteerable at a crawl. */
+const FAIRWAY_SHORT = ASTERN_ENOUGH;
 
 /**
  * Her drift to leeward with no sail up, m/s per knot of wind: about 0.2 m/s in 12 kt, beam on (the sim's own, measured by
@@ -875,8 +910,8 @@ function asternWay(s: Slip, reach: number, windFrom: number | undefined, windKt:
   // (clear all the way across the band from straight back to the helm hard over: she turns less than the full circle as her
   // yaw lags and her way falls off, and a helmsman's hand isn't exact; and a hand's breadth to spare all round, sampled finely)
   // (each way's poses every 0.5 m, worked out once; each pose checked once, quickly first)
-  // (as far as her glide from the full shove carries her in the wind there is, and COAST_SHORT more: 12.4 m in still air)
-  const look = glide ? Math.min(ASTERN_LOOK_MAX, Math.max(4, glide.f(glide.shove, s.heading, windFrom ?? 0, windFrom == null ? 0 : windKt, ASTERN_GLIDE_S).dist + COAST_SHORT)) : ASTERN_RUN;
+  // (as far as her glide from the full shove carries her in the wind there is, and COAST_SHORT more: 45.5 m in still air)
+  const look = glide ? Math.min(ASTERN_LOOK_MAX, Math.max(4, glide.f(glide.shove, s.heading, windFrom ?? 0, windFrom == null ? 0 : windKt, ASTERN_GLIDE_S).dist + COAST_SHORT)) : Math.min(ASTERN_LOOK_MAX, ASTERN_RUN);
   const STEP = 0.5, N = Math.round(look / STEP), arcs = new Map<number, { c: Vec; h: number }[]>(), okAt = new Map<string, boolean>();
   const arc = (hf: number) => { let a = arcs.get(hf); if (!a) { a = []; for (let k = 0; k <= N; k++) a.push(asternArc(c0, s.heading, hf, k * STEP)); arcs.set(hf, a); } return a; };
   // (the wind sets her to leeward as she goes: each pose checked where she'd have drifted to as well, by the time she's
@@ -942,6 +977,13 @@ for (let i = SLIPS.length - 1; i >= 0; i--) {
 export const NO_ASTERN = ['south-beach:G88', 'richmond-yc:E31', 'richmond-yc:E35', 'richmond-yc:F2', 'south-beach:F15', 'horseshoe-bay:C22'];
 export const NO_ASTERN_WEST = ['west-harbor:507', 'gashouse-cove:124', 'gashouse-cove:212', 'south-beach:F25', 'south-beach:F49', 'south-beach:G89'];
 const ASTERN_WEST_KT = 6, ASTERN_WEST_BAND = 45;
+/** Why a berth's kept fast from a shove astern, for the crew's one line (world.ts pushOff): NO_ASTERN's are short of the room
+ * in any wind, a calm too; NO_ASTERN_WEST's are carried into the boats by a westerly; a plan's own (`why`) as it says. */
+export function keptFastWhy(s: Slip, p: PushOff): 'wind' | 'room' {
+  if (NO_ASTERN.includes(s.id)) return 'room';
+  if (NO_ASTERN_WEST.includes(s.id)) return 'wind';
+  return p.kind === 'astern' && p.why ? p.why : 'room';
+}
 /** No shove off astern from this berth in this wind (NO_ASTERN, any; NO_ASTERN_WEST, a westerly of ASTERN_WEST_KT and more). */
 export const noAsternPushOff = (s: Slip, windFrom: number | undefined, windKt = 0): boolean =>
   NO_ASTERN.includes(s.id) || (NO_ASTERN_WEST.includes(s.id) && windFrom != null && windKt >= ASTERN_WEST_KT && Math.abs(wrap180(windFrom - 270)) <= ASTERN_WEST_BAND);
@@ -960,3 +1002,99 @@ for (const o of outOfUse) {
 }
 BY_ID.clear(); for (const s of SLIPS) BY_ID.set(s.id, s);
 byHarbor.clear();
+
+/**
+ * The way in from the harbor mouth to her slip, along the fairways (the navigator's, taking her home: the owner, 15 Nov
+ * 2026, "navigator just cannot take her home to her slip"). `mouth`: the middle of the entrance nearest her slip by water,
+ * where the pilot hands her over (world.ts navTarget); `entry`: the first open water inside it, in clear sight of it; `path`: the turns from there to `approach`, the fairway square off her slip,
+ * where she's brought in by hand (world.ts intoSlip). The water it runs on keeps ROUTE_CLEAR off every dock and every boat
+ * lying in a slip (solid to her: boat/physics.ts), on a 1.5 m grid flooded from the mouths, and it's pulled straight
+ * between the turns. Worked out once a harbor, the path once a slip; null where her slip can't be reached that way.
+ */
+export interface HarborRoute { mouth: Vec; entry: Vec; path: Vec[]; approach: Vec }
+/** How far the navigator's way in keeps off the docks and the moored boats, m: her half-beam (1.1) and as much again to spare (an ESTIMATE). */
+const ROUTE_CLEAR = 2.5;
+/** How far in from an entrance's middle the way in may start, m: the water in clear sight of the gap. */
+const MOUTH_R = 40;
+const harborFloods = new Map<string, { key: (q: Vec) => string; from: Map<string, string | null>; at: Map<string, Vec>; open: (q: Vec) => boolean; mouthOf: Map<string, Vec> }>();
+function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<typeof harborFloods.get>>, void> {
+  let f = harborFloods.get(H.id); if (f) return f;
+  let work = 0; // (a yield every few hundred cells looked at: the flood is 75–385 ms at once, a frame's worth many times over)
+  const G = 1.5, key = (q: Vec) => `${Math.round(q.x / G)},${Math.round(q.y / G)}`;
+  const ring = Array.from({ length: 8 }, (_, k) => [Math.sin(k * Math.PI / 4), Math.cos(k * Math.PI / 4)]);
+  const openMemo = new Map<string, boolean>();
+  const open = (q: Vec) => {
+    const k = key(q); let v = openMemo.get(k);
+    if (v == null) {
+      v = harborAt(q) === H && !hitsHarbor(q) && !hitsMooredBoat(q);
+      for (const r of [ROUTE_CLEAR / 2, ROUTE_CLEAR]) for (const [sx, sy] of ring) if (v) { const p = { x: q.x + sx * r, y: q.y + sy * r }; v = !hitsHarbor(p) && !hitsMooredBoat(p) && inBasin(p); }
+      openMemo.set(k, v);
+    }
+    return v;
+  };
+  const from = new Map<string, string | null>(), at = new Map<string, Vec>(); let fr: Vec[] = [];
+  const mouthOf = new Map<string, Vec>();
+  // (the straight run from an entrance's middle to a cell: nothing solid on it, so the way in starts in the gap between
+  // the breakwater ends, not behind one: the physics review, 17 Nov 2026, found West Harbor's start 86 m from its
+  // entrance with a breakwater between them, and Richmond's clipping the west breakwater's tip)
+  const inSight = (e: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(hypot(q.x - e.x, q.y - e.y) / 0.25)); for (let i = 0; i <= n; i++) { const p = { x: e.x + (q.x - e.x) * i / n, y: e.y + (q.y - e.y) * i / n }; if (hitsHarbor(p) || hitsMooredBoat(p)) return false; } return true; };
+  for (const e of H.exits) {
+    // (the mouth: every open cell within MOUTH_R of the entrance's middle in clear sight of it, so the flood starts on all
+    // the water that opens off the gap; or, with none in sight, the open cell nearest it)
+    // (anywhere in the basin: an entrance's middle may lie between the breakwater ends, outside the basin's own outline)
+    const seen: Vec[] = []; let best: Vec | null = null, bd = Infinity;
+    for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
+      if (++work % 256 === 0) yield;
+      const q = { x, y }, dd = hypot(q.x - e.x, q.y - e.y); if (!open(q)) continue;
+      if (dd < bd) { bd = dd; best = q; }
+      if (dd < MOUTH_R && inSight(e, q)) seen.push(q);
+    }
+    for (const q of seen.length ? seen : best ? [best] : []) if (!from.has(key(q))) { from.set(key(q), null); at.set(key(q), q); mouthOf.set(key(q), e); fr.push(q); }
+  }
+  while (fr.length) {
+    const nx: Vec[] = [];
+    for (const p of fr) for (const [dx, dy] of [[G, 0], [-G, 0], [0, G], [0, -G]]) {
+      if (++work % 64 === 0) yield;
+      const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
+      if (from.has(k) || !open(q)) continue;
+      from.set(k, key(p)); at.set(k, q); nx.push(q);
+    }
+    fr = nx;
+  }
+  f = { key, from, at, open, mouthOf }; harborFloods.set(H.id, f); return f;
+}
+const harborRoutes = new Map<string, HarborRoute | null>();
+/** The way in to her slip if it's been worked out already (undefined if not yet; null if there's none): for drawing it
+ * without working it out in a frame (ui/hud.ts). */
+export const harborRouteCached = (s: Slip): HarborRoute | null | undefined => harborRoutes.get(s.id);
+/** The slip a destination is, if it's one (a destination's place is its slip's own). */
+export const slipAt = (p: Vec): Slip | undefined => SLIPS.find(s => s.p.x === p.x && s.p.y === p.y);
+export function harborRoute(s: Slip): HarborRoute | null {
+  const g = harborRouteSteps(s); let r = g.next(); while (!r.done) r = g.next(); return r.value;
+}
+/** harborRoute a little at a time, for the page (sim/navigator.ts, the passage home): the harbor's flood, the first time,
+ * is 75–385 ms at once, so it yields as it goes; the same answer as harborRoute. */
+export function* harborRouteSteps(s: Slip): Generator<void, HarborRoute | null, void> {
+  if (harborRoutes.has(s.id)) return harborRoutes.get(s.id)!;
+  const H = harborOf(s.marina); if (!H) return null;
+  const F = yield* harborFloodSteps(H), u = dirOf(s.heading), tip = 0.45 * s.finger;
+  // (the approach: in the fairway square off her slip, past her finger's end by her length and a half, or as far as is open)
+  let approach: Vec | null = null;
+  if (s.kind === 'alongside') {
+    // (an end tie: she comes in alongside, so the approach is off her open side, or off the dock's end ahead of her; the
+    // review found all 23 end ties without a way in when it was looked for astern, along the dock)
+    const n = { x: u.y, y: -u.x };
+    for (let off = 4; off <= 16 && !approach; off += 0.5) for (const q of [{ x: s.p.x + n.x * off, y: s.p.y + n.y * off }, { x: s.p.x - n.x * off, y: s.p.y - n.y * off }, { x: s.p.x + u.x * (off + 4), y: s.p.y + u.y * (off + 4) }]) { const k = F.key(q); if (!approach && F.from.has(k)) approach = F.at.get(k)!; }
+  } else for (let back = tip + 1.5 * 2 * BOW; back >= tip + 2; back -= 0.5) { const q = { x: s.p.x - u.x * back, y: s.p.y - u.y * back }, k = F.key(q); if (F.from.has(k)) { approach = F.at.get(k)!; break; } }
+  if (!approach) { harborRoutes.set(s.id, null); return null; }
+  // (back along the flood to the mouth, then pulled straight: from each turn, on to the farthest point in clear sight of it
+  // over the open water)
+  const cells: Vec[] = []; let k: string | null = F.key(approach);
+  while (k) { cells.push(F.at.get(k)!); k = F.from.get(k) ?? null; }
+  cells.reverse();
+  const sight = (p: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(hypot(q.x - p.x, q.y - p.y) / 0.75)); for (let i = 1; i < n; i++) if (!F.open({ x: p.x + (q.x - p.x) * i / n, y: p.y + (q.y - p.y) * i / n })) return false; return true; };
+  const path = [cells[0]]; let i = 0;
+  while (i < cells.length - 1) { let j = cells.length - 1; while (j > i + 1 && !sight(cells[i], cells[j])) j--; path.push(cells[j]); i = j; }
+  const r = { mouth: { ...F.mouthOf.get(F.key(cells[0]))! }, entry: cells[0], path, approach };
+  harborRoutes.set(s.id, r); return r;
+}

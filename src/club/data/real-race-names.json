@@ -1,0 +1,13 @@
+{
+  "_note": "Provenance only: how the published results' real, branded race names read in the game (the owner's parodies, 17 Nov 2026). Applied in order to a name from the results data, at display time; real names are allowed in this file. Host prefixes are dropped: the page names the host club.",
+  "replace": [
+    ["^(\\d{4} )?GGYC Manuel Fagundes Seaweed Soup", "Kelp Chowder"],
+    ["^(\\d{4} )?GGYC Seaweed Soup", "Kelp Chowder"],
+    ["Seaweed Soup", "Kelp Chowder"],
+    ["Resin (Invitational )?Regatta", "Epoxy Epic"],
+    ["SYC (\\d{4} )?(Spring )?Classic Boat Invitational( Regatta)?", "$2Heritage Invitational"],
+    ["Spring Classic Boat Invitational", "Spring Heritage Invitational"],
+    ["Classic Boat Invitational( Regatta)?", "Heritage Invitational"],
+    [" \\(Bear/Bird/Folkboat/SFBIOD/Knarr\\)", ""]
+  ]
+}

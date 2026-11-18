@@ -454,6 +454,32 @@ export class CurrentField {
     const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
     return { x: c.x * k, y: c.y * k };
   }
+  /**
+   * atShore for a point asked about again and again as the tide turns (the passage planner's 100 m grid, afresh each half
+   * minute of its clock): the shore's share doesn't change with the tide, so it's kept by p's exact coordinates, the
+   * same number worked out once, as atShore works it out (tests/current-kept.test.ts holds them equal to the bit). Not
+   * for a boat's own current, which is never at the same spot twice: atShore itself is left as it was for the step.
+   */
+  atShoreKept(p: Vec, cell: number): Vec {
+    // (two maps of numbers by the point's own cell number, no object per point: kept as objects, ~100,000 of them in a
+    // plan, they're the likely cause of the plan's slices running past their budget now and then, the collector's work)
+    let k = this.keptK.get(cell), bi: number;
+    if (k === undefined) {
+      let dn = Infinity;
+      { const list = this.near(p); for (let n = 0; n < list.length; n++) { const i = list[n], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } }
+      dn = Math.sqrt(dn);
+      const B = bayAt(p);
+      let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
+      for (const m of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - m.mouth.x, p.y - m.mouth.y) / B!.hand);
+      k = 1 - (1 - shoreRelief(p, false)) * Math.min(1, dn / 600) * (1 - bay); bi = B ? BAYS.indexOf(B) : -1;
+      if (this.keptK.size >= 200000) { this.keptK.clear(); this.keptB.clear(); }
+      this.keptK.set(cell, k); this.keptB.set(cell, bi);
+    } else bi = this.keptB.get(cell)!;
+    const c = this.at(p, bi < 0 ? null : BAYS[bi]);
+    return { x: c.x * k, y: c.y * k };
+  }
+  private keptK = new Map<number, number>();
+  private keptB = new Map<number, number>();
 }
 
 /* ---------- local time in San Francisco ---------- */

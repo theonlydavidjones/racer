@@ -112,8 +112,11 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-a svg{width:12px;height:12px;display:block;margin:0 auto;fill:currentColor}
 .sb-a:hover,.sb-a:active{color:var(--text)!important}
 .sb-well{position:relative;width:12px;height:46px;background:#0a141c;border:1px solid #22384a;border-radius:3px;overflow:hidden}
-.sb-rope{position:absolute;left:1px;right:1px;top:0;height:0;border-radius:2px;
-  background:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px)}
+/* (a rope's colorway: its color in the braid's twill, a fleck's specks and a tracer's dashes over it, spec.ts ROPES) */
+.sb-rope,.sb-boom{--braid:repeating-linear-gradient(135deg,var(--rope) 0 4px,color-mix(in srgb,var(--rope) 70%,#000) 4px 5px);
+  --marks:radial-gradient(circle,var(--fleck,transparent) 0 1.1px,transparent 1.4px) 0 0/5px 7px,
+    repeating-linear-gradient(135deg,transparent 0 7px,var(--tracer,transparent) 7px 9px,transparent 9px 14px)}
+.sb-rope{position:absolute;left:1px;right:1px;top:0;height:0;border-radius:2px;background:var(--marks),var(--braid)}
 .mine .sb-rope{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-mark{position:absolute;left:-1px;right:-1px;height:2px;background:#fff;opacity:.9;pointer-events:none}
 /* the rope's inches (the owner's "middle way"): faint hairlines in the well, over the rope, under the marks */
@@ -140,7 +143,7 @@ button.sb-tab:hover{color:var(--text)!important}
 .sb-rail{position:relative;height:10px;background:#0a141c;border:1px solid #22384a;border-radius:5px}
 .sb-mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:#3b5163}
 .sb-boom{position:absolute;top:1px;bottom:1px;width:26px;margin-left:-13px;border-radius:3px;
-  background:repeating-linear-gradient(135deg,var(--rope,#3d8bff) 0 4px,color-mix(in srgb,var(--rope,#3d8bff) 70%,#000) 4px 5px)}
+  background:var(--marks),var(--braid)}
 .sb-car{position:absolute;top:-3px;bottom:-3px;width:18px;margin-left:-9px;border-radius:3px;background:#c7d3db;box-shadow:0 1px 2px rgba(0,0,0,.5)}
 .sb-trk.mine .sb-boom,.sb-trk.mine .sb-car{box-shadow:0 0 0 1.5px var(--accent)}
 .sb-trk .sb-mark{top:-3px;bottom:-3px;width:0;height:auto;border-left:2px dashed #fff;background:none}

@@ -144,6 +144,18 @@ export function rudderTurn(helm: number): number {
 /** ORC's effective draft, m (VPP Documentation 2025, eq. 4.20: MHSD, 0.92 of the deepest station's reduced draft; her
  * full draft stands in for it, as netDrive has it). */
 export const EFF_DRAFT = 0.92 * orc.boat.draft;
+/** The most turn the rudder gives, at the stall, as a multiple of full helm's (rudderTurn at HELM_STALL). */
+export const STALL_TURN = TURN_PEAK;
+/**
+ * The helm (its units) that gives `turn` (a multiple of full helm's turn, as rudderTurn), up to the stall: rudderTurn
+ * turned round on its rising side. Past what the stall gives, the stall: a helmsman steering for her quickest turn holds
+ * the blade there, not past it, where it brakes and turns her less (her AI helmsman, physics.ts).
+ */
+export function helmFor(turn: number): number {
+  if (turn <= 1) return Math.max(0, turn);
+  const k = HELM_STALL - 1, r = Math.min(turn, TURN_PEAK);
+  return 1 + k * (1 - Math.sqrt(Math.max(0, 1 - 2 * (r - 1) / k)));
+}
 /**
  * The hull and keel's induced drag, N, for a side force `fh` N at v m/s: ORC VPP Documentation 2025, eq. 6.37,
  * DI = FH² / (π·½ρV²·Te²), as netDrive charges the sails' side force. Here for the force that turns her (physics.ts

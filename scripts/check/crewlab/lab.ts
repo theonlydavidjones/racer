@@ -53,16 +53,15 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; ensign?: Boat['ensign'] }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; ensign?: Boat['ensign']; spec?: Partial<BoatSpec> }) {
     (lab as any).seaA = o.sea ?? 0; // (pitching in a seaway: that many radians either way every 2.6 s, crew.ts rough)
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
     b.crew = newCrew({ helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) }, tack);
     if (o.place) b.crew.place = o.place;
     if (o.pole) b.poleWant = true;
-    if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: the tiller's sweep past it)
     if (o.spec) b.spec = { ...structuredClone(DEFAULT_BOAT), ...o.spec }; // (her looks: the boat editor's choices, e.g. her lines' colorways)
-    if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: 'us', …)
+    if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: the tiller's sweep past it)
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
     m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)

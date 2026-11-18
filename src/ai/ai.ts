@@ -665,10 +665,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
       if (ai.detour) P = ai.detour;
-    } else if (b.started && !ai.detour && refresh && landAlong(b, P) < 500 && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
+    } else if (b.started && refresh && (ai.detour ? landAlong(b, ai.detour) < Infinity && landAlong(b, P) < Infinity : landAlong(b, P) < 500) && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
       // beating toward a point with land close ahead on the straight line to it (a jetty, a point, the harbor's mouth
       // she's in): tacking off the shore would only take her back and forth into the corner it makes, so she lays the
       // end of it first, as a sailor does: the first turn of the way round by water (the navigator's route)
+      // (and again if the turn she was laying is no longer in sight: set or sailed round to the other side of the
+      // jetty from it, she'd steer for it through the stones. Seaweed Soup course 2's last beat, seed 16: a boat inside
+      // the Marina's jetty held a turn outside it and struck the jetty for forty minutes)
       ai.detour = escape(b, P);
       if (ai.detour) P = ai.detour;
     } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)
@@ -913,6 +916,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
     const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
     if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+      // (about to touch, as the Rule 14 branch below reckons it: rule 14 binds her too, and the keep-clear boat is the one
+      // whose helm goes over hardest at the last moment, to the rudder's stall: physics.ts, the physics review)
+      if (cp.t < lagT + 1 && cp.d < 4.5 + 0.5 * lagM) ai.urgent = true;
       // Already opening, with room between the hulls: she is keeping clear (Definitions, Keep Clear: the other boat can
       // sail her course with no need to act), so she sails on at full speed: on her course if that keeps the room, on
       // her heading if her course would close it again. (Easing and heading up on regardless, a windward boat slowed
