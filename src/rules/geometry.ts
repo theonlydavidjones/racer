@@ -28,10 +28,10 @@ export function hullGap(A: Hull, B: Hull): number {
   return Math.min(segPt(p1, q1, q2), segPt(p2, q1, q2), segPt(q1, p1, p2), segPt(q2, p1, p2));
 }
 
-/** Closest point of approach over the next 12 s: time (s) and distance between centres (m). */
-export function cpa(A: Moving, B: Moving): { t: number; d: number } {
+/** Closest point of approach over the next 12 s (or `horizon` s): time (s) and distance between centres (m). */
+export function cpa(A: Moving, B: Moving, horizon = 12): { t: number; d: number } {
   const rx = B.x - A.x, ry = B.y - A.y, ux = B.vx - A.vx, uy = B.vy - A.vy, uu = ux * ux + uy * uy;
-  const t = clamp(uu > 1e-4 ? -(rx * ux + ry * uy) / uu : 0, 0, 12);
+  const t = clamp(uu > 1e-4 ? -(rx * ux + ry * uy) / uu : 0, 0, horizon);
   return { t, d: hypot(rx + ux * t, ry + uy * t) };
 }
 

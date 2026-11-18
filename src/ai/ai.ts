@@ -2,7 +2,7 @@ import type { PrepFlag } from '../sim/signals';
 import { aiCrewReady, decideTurn } from '../boat/calls';
 import { SETTLE, bow, stern, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
-import { coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
+import { HANDLING, coastDistance, maxTurnRate, timeToCover } from '../boat/dynamics';
 import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
@@ -146,6 +146,27 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
     m = Math.min(m, cpa(me, o).d);
   }
   return m;
+}
+/**
+ * The time she needs to get clear of a boat she must keep clear of, at her speed (s): bear away (CLEAR_BEAR) at the
+ * turn rate the flow past her rudder gives (dynamics.ts turnRadius: v / R), then sail far enough on the new heading to
+ * move her track a length aside. Both go as 1 / v: about 19 s at 1 m/s, 39 s at half that (looked at no further than KEEP_LOOK_MAX). Above about 1.6 m/s it's
+ * inside the 12 s she always looks ahead. (Looking only 12 s ahead, of main's keep-clear fouls in sixty starts the
+ * port boats making 0.5-2 m/s saw the starboard boat 5-8 s off and bore away too late to open the gap past 2-4 m.)
+ */
+const CLEAR_BEAR = 32, CLEAR_K = (CLEAR_BEAR * Math.PI / 180) * HANDLING.turnRadius + LOA / Math.sin(CLEAR_BEAR * Math.PI / 180);
+/** The longest she looks ahead for a boat to keep clear of, s (an ESTIMATE: past it, the boats' courses change too much to read). */
+const KEEP_LOOK_MAX = 30;
+/**
+ * She must keep clear of o and they're closing: their closest approach, inside `room` m, comes within `look` s, or, slow,
+ * within the time she needs to get clear (CLEAR_K). `cp` is cpa(b, o) over 12 s; looked at again further ahead only
+ * where that ran out at 12 s with her slow.
+ */
+function closingIn(b: Boat, o: Boat, cp: { t: number; d: number }, look: number, room: number): boolean {
+  if (cp.t < look) return cp.d < room;
+  if (b.v * look >= CLEAR_K || cp.t < 12) return false;
+  const far = Math.min(KEEP_LOOK_MAX, CLEAR_K / Math.max(0.1, b.v)), c = cpa(b, o, far);
+  return c.t < far && c.d < room;
 }
 /** Of the sailable headings near `want`, the one that keeps her furthest from other boats (the nearest to `want` among near-equals). */
 function clearestHeading(w: World, b: Boat, want: number): number {
@@ -915,7 +936,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // by side at a few cm a second, the closest approach lies beyond the 12 s she looks ahead, and she'd drift on into
     // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
     const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
-    if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+    if (r.kc === b && (closingIn(b, o, cp, ai.kn.keepClearS, ai.kn.keepClearM + lagM) || inside)) {
       // (about to touch, as the Rule 14 branch below reckons it: rule 14 binds her too, and the keep-clear boat is the one
       // whose helm goes over hardest at the last moment, to the rudder's stall: physics.ts, the physics review)
       if (cp.t < lagT + 1 && cp.d < 4.5 + 0.5 * lagM) ai.urgent = true;
