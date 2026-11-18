@@ -62,6 +62,8 @@ export interface AiState {
   leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
+  /** The side of her bearing the detour goes round (+1 right, −1 left, 0 none), kept for the next one round the same land. */
+  detourSide?: number;
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
