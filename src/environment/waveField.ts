@@ -105,6 +105,14 @@ const REAIM_OFF = 12;
  * dying is given the growing's time, an ESTIMATE: no measurement of short chop's decay after a shift was found (the
  * measured turning of a whole sea's mean direction, Hasselmann et al. 1980, is of the same order: an hour or more).
  */
+/** A wave's group speed (m/s) in water `h` deep (m; Infinity: deep), for its frequency w and wavenumber k there: n·ω/k,
+ * n = ½(1 + 2kh / sinh 2kh) (linear theory: the Shore Protection Manual, and any text). In deep water n is ½, the speed
+ * half the wave's own, exactly as before the depth; in the shallows it rises toward 1. Past kh ≈ 10 the term is under
+ * 1e-7 of n, and sinh would overflow past ~350: deep. */
+export function groupSpeedAt(w: number, k: number, h: number): number {
+  const kh = k * h, n = kh > 10 ? 0.5 : 0.5 * (1 + 2 * kh / Math.sinh(2 * kh));
+  return n * w / k;
+}
 const RHO_RATIO = 1.2 / 1025, CD10 = 1.2e-3, KT_MS = 0.5144;
 function lifeTime(k: number, w: number, kt: number): number {
   const c = w / k, us = Math.sqrt(CD10) * Math.max(2, kt) * KT_MS, g = 0.25 * RHO_RATIO * (28 * us / c - 1) * w;
@@ -260,7 +268,7 @@ export class WaveField {
       if (this.stage[p] === 0 && Math.max(off(i), off(j)) > REAIM_OFF) this.stage[p] = 1; // (either of them: the second is born a stage after the first, for the wind as it was then)
       const st = this.stage[p], to = st === 1 ? 0 : st === 2 ? 1 : home;
       // (the pair's time: its shorter wave's, the quicker to answer, and never longer than the waves take to cross the fetch)
-      const step = dt / Math.min(lifeTime(this.k[i], this.w[i], windKt), Math.max(60, (s.fetch || 0) / (0.5 * this.w[j] / this.k[j])));
+      const step = dt / Math.min(lifeTime(this.k[i], this.w[i], windKt), Math.max(60, (s.fetch || 0) / groupSpeedAt(this.w[j], this.k[j], this.depth)));
       let x = this.share[p]; x += Math.max(-step, Math.min(step, to - x)); this.share[p] = x;
       this.amp[i] = Math.sqrt(e * x); this.amp[j] = Math.sqrt(e * (1 - x));
       // (flat: born again for the wind as it is now. Its phase stays: at no height there's no jump)
