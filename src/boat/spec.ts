@@ -134,10 +134,9 @@ export const DEFAULT_BOAT: BoatSpec = {
   perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 
-/** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. (Bone: a new player's boat's
- * light deck, NEW_BOAT, named; the owner, 18 Nov 2026.) */
+/** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. */
 export const HULL_COLORS: [string, string][] = [
-  ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Bone', '#e8e3d6'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'],
+  ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Bone', '#e8e3d6'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'], // (Bone: a new player's boat's light deck, named: the owner, 18 Nov 2026)
   ['Light gray', '#c9ccd0'], ['Pewter', '#8d9399'], ['Charcoal', '#3b3e44'], ['Black', '#1c1d20'],
   ['Navy', '#1f2c4f'], ['Midnight', '#24324f'], ['Flag blue', '#24407a'], ['Royal blue', '#2c56a8'], ['Sky blue', '#7fb0d8'], ['Teal', '#1f7a7a'], ['Seafoam', '#a8d5c2'],
   ['Hunter green', '#2a4a33'], ['Racing green', '#1f5a3a'], ['Sage', '#8e9f7c'],
