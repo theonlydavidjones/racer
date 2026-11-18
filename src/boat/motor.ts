@@ -87,10 +87,11 @@ export interface MotorState {
  * bracket and over the after deck, laid in the lazarette on its proper side (a four-stroke laid down must lie as its
  * maker says), the hatch shut: about 45 s for a crew who've done it before, longer for a slower crewmate (workPace).
  * Shipping it is the owner's: "mounting the motor takes way, way too long. 5 seconds max." (17 Nov 2026; it was a minute):
- * from the call to running, out and onto the bracket in MOTOR_SHIP_S, tilted down, and a pull-start's 1.5 s, whoever's
- * aft (a pull that doesn't catch, one cold start in four, is another 1.5 s: world.ts motorStart).
+ * from the call to running, out and onto the bracket in MOTOR_SHIP_S, tilted down, and pull-started, whoever's aft, the
+ * worst case too: a cold pull that doesn't catch (one start in four, world.ts motorStart) and the next that does, 1.5 s
+ * each (the Coordinator, 17 Nov 2026).
  */
-export const MOTOR_STOW_S = 45, MOTOR_SHIP_S = 3.4; // (3.4 and a pull's 1.5: 4.9 s, inside the owner's 5 at the sim's step)
+export const MOTOR_STOW_S = 45, MOTOR_SHIP_S = 1.9; // (1.9 and two pulls' 3: 4.9 s, inside the owner's 5 at the sim's step)
 
 /** The prop's static thrust at full power (N), from momentum theory and the figure of merit. */
 export function staticThrust(o: Outboard): number {
