@@ -793,6 +793,10 @@ sources. Each shipped item is added there when it's published.
      says Expand ▾.
    - Lines: "N more / Change to see" becomes "N more"; its header keeps Change, since there you do change them.
    - Check every group's folded line for the same pattern.
+   - Bug: a boat's page reads "Bottom: , just cleaned" (owner, 18 November: "copy error on this ', just cleaned'
+     string"). In src/ui/fleet.ts, colour() returns '' when her color isn't a named one (any color is kept since
+     #354's picker), and the row joins it with ", " anyway. The fix: name the nearest swatch, or say "Custom", and join
+     only the parts that exist. Topsides uses the same colour() and needs the same fix.
    - The rope picker (owner, 18 November, with a screenshot): "copy strings here should right-align close to their
      swatches." Each colorway's name sits right-aligned, just left of its swatch, not at the far left of its cell.
 8k. **Drop and raise the anchor** (in PR #339; rule 22 in PR #335) (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
