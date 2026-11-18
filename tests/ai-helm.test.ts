@@ -3,6 +3,7 @@ import train from '../src/courses/data/training-windward-return.json';
 import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { HELM_STALL, helmFor, rudderTurn } from '../src/boat/balance';
+import { moveBoat } from '../src/boat/physics';
 import type { CourseFile } from '../src/courses/course';
 
 // The AI's tiller has the same swing as yours (#437: 75° each side, the blade stalling at 40°). Her helmsman tacks and
@@ -26,7 +27,21 @@ describe('the AI helmsman and the tiller', () => {
     }
     expect(most).toBeLessThanOrEqual(HELM_STALL + 1e-9); // (never slammed hard over)
     expect(pastFullCalm).toBe(0); // (her tacks and her own steering: full helm at most)
-    expect(pastFull).toBeGreaterThan(0); // (and about to touch, she does use it: on main she never had it)
     expect(pastFull / steps).toBeLessThan(0.01);
   }, 120000);
+  it('about to touch, a big turn: the helm to the stall, not past it; otherwise full helm', () => {
+    const helmAt = (urgent: boolean) => {
+      const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 1, opponents: ['stock:1'] } as never, 1);
+      while (w.t < 90) w.step(DT);
+      const b = w.boats.find(o => !o.isUser)!;
+      expect(b.v).toBeGreaterThan(1.5); // (way on: the rudder has water past it)
+      b.desired = b.h + (b.tack === 'S' ? -60 : 60); b.ai!.turnCommit = 0; b.ai!.urgent = urgent; b.turnRate = 0;
+      moveBoat(b, DT, w.t, () => {}, { t: 0 });
+      return Math.abs(b.helm);
+    };
+    const calm = helmAt(false), urgent = helmAt(true);
+    expect(calm).toBeCloseTo(1, 6); // (full helm, as on main)
+    expect(urgent).toBeGreaterThan(1.2); // (to the stall, about: on main she never had it)
+    expect(urgent).toBeLessThanOrEqual(HELM_STALL + 1e-9);
+  });
 });
