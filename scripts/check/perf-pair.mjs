@@ -9,6 +9,9 @@
  *   node scripts/check/perf-pair.mjs                 the PR gate: against origin/main (fetched), fails above 1.015
  *   node scripts/check/perf-pair.mjs --budget        the owner's budget: against v168 (425a5eb), fails above 1.019
  *   node scripts/check/perf-pair.mjs --ai            an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), once each
+ *   node scripts/check/perf-pair.mjs --budget --ai   the owner's budget for a change to how boats sail or are judged (the
+ *                                                    physics, src/ai, src/rules): those ten races against v168, their mean
+ *                                                    within 1.019 (the owner, 18 Nov 2026; perf.test does it with PERF_BUDGET_AI=1)
  *   options: --against <ref>  --max <ratio>  --races <n per order, default 3: the mean of six ratios, about ±0.65%>
  *            --seeds <a,b,...> [--winds <kt,kt>, default 22]: those races once each, alternating the load order
  *
@@ -24,6 +27,10 @@ import path from 'node:path';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url)).replace(/\/$/, '');
 /** The commit the owner's budget was set on (tests/perf.test.ts; docs/CAPACITY.md §1.1a): 43.1 in thread units is v168 × 1.019. */
 export const BUDGET_REF = '425a5eb61e5e95dd2da659a92e424b6da6602ee3', BUDGET_MAX = 1.019, GATE_MAX = 1.015;
+
+/** The AI and rules gate's races (--ai): seeds 1–5 at 12 and 22 kt, once each; the budget's for a change to how boats
+ * sail or are judged too (--budget --ai, perf.test with PERF_BUDGET_AI=1: the owner, 18 Nov 2026). */
+export const AI_RACES = ['12', '22'].flatMap(kt => [1, 2, 3, 4, 5].map(seed => ({ seed, kt: +kt })));
 
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
@@ -108,8 +115,8 @@ if (args[0] === '--child') {
   const budget = args.includes('--budget');
   const ref = opt('--against') ?? (budget ? BUDGET_REF : 'origin/main'), max = +(opt('--max') ?? (budget ? BUDGET_MAX : GATE_MAX));
   // (--seeds: every seed at every wind of --winds, once each; --ai: the AI and rules gate's set, seeds 1–5 at 12 and 22 kt)
-  const seeds = args.includes('--ai') ? '1,2,3,4,5' : opt('--seeds'), winds = opt('--winds') ?? (args.includes('--ai') ? '12,22' : '22');
-  const races = seeds ? winds.split(',').flatMap(kt => seeds.split(',').map(seed => ({ seed: +seed, kt: +kt }))) : +(opt('--races') ?? 3);
+  const seeds = opt('--seeds'), winds = opt('--winds') ?? '22';
+  const races = args.includes('--ai') ? AI_RACES : seeds ? winds.split(',').flatMap(kt => seeds.split(',').map(seed => ({ seed: +seed, kt: +kt }))) : +(opt('--races') ?? 3);
   const t0 = Date.now(), m = measure(ref, races);
   for (const r of m.runs) console.log(`  ${r.hereFirst ? 'this tree loaded first ' : `${ref} loaded first`}${typeof races === 'number' ? '' : `, seed ${r.race.seed} ${r.race.kt} kt`}: this tree ${r.here.toFixed(0)} µs a step, ${ref} ${r.there.toFixed(0)}: ${(r.here / r.there).toFixed(4)}`);
   console.log(`perf-pair: this tree / ${ref} (${m.sha.slice(0, 8)}) = ${m.ratio.toFixed(4)}, limit ${max} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
