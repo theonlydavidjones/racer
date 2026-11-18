@@ -128,6 +128,29 @@ describe('Up at the cabin top, they see to what\'s coming due there in the same 
     expect(cun, 'up for the Cunningham').toBeDefined(); expect(out, 'the outhaul trimmed').toBeDefined();
     expect(out!.t - cun!.t, 'the outhaul in the same trip, seconds after the Cunningham').toBeLessThan(15);
   });
+  it('from one cabin-top line to the next, a step along: one visit, not up to the seat and back for it', () => {
+    // (crewcruise's close-hauled 6 kt, seed 1, on the turn's sourced cost: the Cunningham set at 329.6 s, the jib
+    // Cunningham due a step along. It waited one look for the downhaul at her own place, which the check called due and
+    // the pick then didn't take, so she sat for a step and went back up for it: two trips for one visit)
+    const PIANO_LINES = new Set(['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard']);
+    const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 6, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
+    const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user, p = LL(37.835, -122.40); u.x = p.x; u.y = p.y;
+    w.step(DT); u.h = n360(u.ww.from + 45); u.v = 2.5; engage(u, w.pilot, 'auto');
+    const had = u.crew!.people.map(() => null as string | null), ended = u.crew!.people.map(() => -1e9), gaps: string[] = [];
+    let chained = 0;
+    while (w.t < 360) {
+      w.step(DT);
+      u.crew!.people.forEach((a, i) => {
+        const j = a.job?.line ?? null, was = had[i];
+        if (was && PIANO_LINES.has(was) && !j) ended[i] = w.t;
+        if (j && PIANO_LINES.has(j) && !was && w.t - ended[i]! < 1) gaps.push(`${w.t.toFixed(2)} s: crew ${i} back up for the ${j}`);
+        if (j && was && j !== was && PIANO_LINES.has(j) && PIANO_LINES.has(was)) chained++;
+        had[i] = j;
+      });
+    }
+    expect(gaps, 'a cabin-top job begun within a second of another ending, after a step without one').toEqual([]);
+    expect(chained, 'one line straight on to the next at the cabin top').toBeGreaterThan(0);
+  });
 });
 
 

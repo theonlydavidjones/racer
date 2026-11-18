@@ -287,6 +287,8 @@ export function crewHeading(b: Boat, k: Ctl): number | undefined {
 type Work = { pace: number; to: number };
 type Works = { out: Partial<Record<Ctl, Work>>; cell: Partial<Record<Ctl, Work>> };
 const WORK = new WeakMap<Boat, Works>();
+/** (crewJobs: the lines put off this look for one at the hand's own place, looked at again if that one isn't taken; reused) */
+const PUT_OFF: Ctl[] = [];
 const put = (wk: Works, k: Ctl, pace: number, to: number) => { const e = wk.cell[k] ??= { pace, to }; e.pace = pace; e.to = to; wk.out[k] = e; };
 
 /** Time (s) for a person to get to a station: react, then move there (about 0.9 m/s about the boat for a club crew; slower crawling forward on deck). */
@@ -318,6 +320,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   const main = mainHand(n, c.spec, fwdL !== 'cockpit' || ahead);
   // finish or drop jobs on lines that are done, or that you've taken. A control line is set to where the crew wanted it
   // when they started (an adjustment, not a chase); the sheets follow the wind as it changes
+  let pianoDone = false;
   for (let i = 0; i < c.people.length; i++) {
     const a = c.people[i], j = a.job; if (!j) continue;
     // (a sheet that's no longer theirs, as the crew go forward and the helm takes the main: let go. A sheet follows the
@@ -335,6 +338,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         // (and what it was set for: the angle and the wish when they chose where to set it, at the start; stamped at the
         // end, a line set through a bear-away was judged against the run's angle and left at the reach's setting)
         if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; c.pianoWho = i; (c.lineTwa ??= {})[j.line] = j.refTwa ?? b.twa ?? 0; (c.lineRef ??= {})[j.line] = j.to ?? b.ctl[j.line as Ctl]; }
+        if (PIANO.has(j.line)) pianoDone = true;
         a.job = null;
       }
     }
@@ -343,7 +347,9 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // each free person takes the most urgent of their lines that's off by more than they'd bother with (looked at 20
   // times a second: quicker than anyone reacts)
   c.jobT = (c.jobT ?? 0) - dt; c.lineT = (c.lineT ?? 0) + dt;
-  const look = c.jobT <= 0; if (look) c.jobT = 0.05;
+  // (and at once when a cabin-top line is done: what's due a step along is seen to as the one in hand is finished, not a
+  // look later, sat for the step between, a second trip: crewcruise's close-hauled 6 kt)
+  const look = c.jobT <= 0 || pianoDone; if (look) c.jobT = 0.05;
   // (where they've wanted each cabin-top line lately: the wish smoothed over LINE_TAU, kept up whoever is busy)
   const lw = c.lineWant ??= {};
   // (and over a whole gust-lull cycle, LINE_GAP: what counts as a change that has come to stay, urgent, a new point of
@@ -364,7 +370,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
   // it: a real change. Against where it was set, not the wish then: a line set right through for a puff, the wish went
   // back to where it was and the line was left at the puff's setting for good (the physics review). A line not yet
   // set is not a new point of sail: as she starts, its first trip waits like any other): newAngleOf, realChangeOf
-  if (look) for (const k of PRIORITY) {
+  // (a line put off for one at their own place that the loose check below calls due: if the pick then doesn't take that
+  // one, a second look at what was put off, the same moment. Put off and nothing taken, they stood up from the piano for a
+  // step and went back up for it, two trips for one visit: crewcruise's close-hauled 6 kt, the Cunningham then the jib
+  // Cunningham a step along, the downhaul at her place called due and not taken)
+  PUT_OFF.length = 0;
+  if (look) for (let pass = 0; pass < 2 && (pass === 0 || PUT_OFF.length > 0); pass++) for (const k of pass === 0 ? PRIORITY : PUT_OFF) {
     if (!(k in want)) continue;
     const who = workerOf(c, n, fwdL, ahead, main, k), a = c.people[who]; if (!a) continue;
     const skill = attrOf(ppl[who], 'trim'), e = Math.abs((want[k] ?? b.ctl[k]) - b.ctl[k]);
@@ -392,12 +403,12 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the
       // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed; and only
       // for a line here they'd see to now: off, and for a real change)
-      if (there && !a.job && !hereAt(k, who, windward, a.z)) {
+      if (pass === 0 && there && !a.job && !hereAt(k, who, windward, a.z)) {
         let other = false;
         for (const l of PIANO_LIST) {
           if (l !== k && hereAt(l, who, windward, a.z) && l in want && workerOf(c, n, fwdL, ahead, main, l) === who && Math.abs((lw[l] ?? want[l]!) - b.ctl[l]) >= startThreshold(l, skill, want[l]) && realChangeOf(c, twa, ls, l, skill)) { other = true; break; }
         }
-        if (other) continue;
+        if (other) { PUT_OFF.push(k); continue; }
       }
       // (the waits are for the walk: a line they reach from where they sit, placed by you, they work when it's off)
       // (and none of it for a line knocked off, or wanted well away from where it is, now and lately both: a new point of
