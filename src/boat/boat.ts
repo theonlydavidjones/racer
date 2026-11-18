@@ -34,8 +34,8 @@ export interface AiState {
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
-  /** The offset (deg) from her course ai.ts clearestHeading last chose, held while it's about as good as any. */
-  clearK?: number;
+  /** The heading ai.ts clearestHeading chose (deg), and when (s, World.t): held on her next thinks while it's about as good as any. */
+  clearH?: number; clearT?: number;
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
    * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
   tackNow?: boolean;
