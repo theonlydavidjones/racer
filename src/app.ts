@@ -1026,6 +1026,7 @@ $('bHome').onclick = goHome;
 // Home is part of the navigator (the owner, 13 Nov: "Home really belongs inside the nav experience"): its Sail home
 $('bNavHome').onclick = () => { if (homeWhyNot()) return; navView.close(); goHome(); }; // (dimmed: its hover says why)
 $('bCvHome').onclick = () => { if (homeWhyNot()) return; courseView.close(); goHome(); };
+$('bChartHome').onclick = () => { if (homeWhyNot()) return; chart.close(); goHome(); }; // (on the chart M opens, there while the passage is still being worked out: the playtest, 18 Nov 2026)
 $('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); homeNow(); };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
 /** Why she can't be sent home just now, in a few words for the button's hover (null: she can). Racing she can: it asks
@@ -1047,9 +1048,9 @@ function homeWhyNot(): string | null {
  * owner, 18 Nov 2026: "can't find Sail home": it vanished whenever it couldn't be used). */
 function homeButton(): void {
   // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden. And in the Course panel,
-  // which M opens racing and in a lesson, where the navigator doesn't)
+  // which M opens racing and in a lesson, where the navigator doesn't; and on the chart itself, which M opens under way)
   const racing = !w.freeSail && !w.user.finished && !w.user.retired, why = homeWhyNot(), t = why ? `${why}.` : racing ? 'Retire from the race and sail her home (it asks first)' : 'Send her back to her home slip';
-  for (const el of [$('bNavHome'), $('bCvHome')]) {
+  for (const el of [$('bNavHome'), $('bCvHome'), $('bChartHome')]) {
     if (el.hidden) el.hidden = false;
     el.classList.toggle('dim', !!why); el.setAttribute('aria-disabled', why ? 'true' : 'false');
     if (el.title !== t) el.title = t;

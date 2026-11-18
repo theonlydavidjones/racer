@@ -65,8 +65,8 @@ import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, st
 import { RaceLog } from './debrief';
 
 /** The pilot's hand-over off her harbor's mouth, bound home (navTarget): this many seconds out at her speed under power,
- * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
- * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
+ * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, within HANDOVER_SAIL m
+ * of it, pointed at it (SAIL_POINT). ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
 const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
 /** The navigator's plan at the helm, for each World (planTarget): kept off the World itself, so its shape is as it was
  * (the step's cost, perf-pair, is judged on it) and the page's mirror never walks it (sim/sync.ts). */
@@ -83,6 +83,18 @@ const OFF_HELD_S = 5;
 /** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
  * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
 let onPlan = false;
+/** Under sail, bound home (navTarget): in sight of the gap (HANDOVER_SAIL), she's handed over pointed at it, her bow
+ * within SAIL_POINT degrees and steady, with SAIL_LANE m of clear water either side of the way to it (twice that to
+ * leeward, for her leeway); otherwise at once, there, with the turn in words (the turn onto that clear lane, a tack
+ * with the gap to windward, or "open it up" with a pier end or breakwater in the way). The playtest, 18 Nov 2026: let go 150 m out heading 208° with the gap at 148°, on the breakwater 40 s
+ * later; the physics review: steered closer in under sail, the pilot put her on the Fort Mason piers. ESTIMATES: 30° is
+ * a small turn to line up by hand; 4 m, about two beams. */
+const SAIL_POINT = 30, SAIL_LANE = 4;
+/** Her sea room under sail coming in (sailHomeTo): within SAIL_NEAR m beyond HANDOVER_SAIL of the gap, she's let go as
+ * soon as there's something solid within SAIL_ROOM_S seconds at her speed on her own heading (at least SAIL_ROOM_MIN m),
+ * with room to turn away; SAIL_HALF_GAP m, the least half-width of an entrance she's taken to be able to lay (the Gashouse
+ * gap is 34 m: the second review). ESTIMATES: 20 s at 5 kt is 50 m, her turn and a tack's worth. */
+const SAIL_NEAR = 100, SAIL_ROOM_S = 20, SAIL_ROOM_MIN = 40, SAIL_HALF_GAP = 8;
 /** How far off her own slip the crew can get her lines ready, m (freeBerthsNear): its fairway and the turn into it. */
 const HOME_REACH = 50;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
@@ -2809,7 +2821,7 @@ export class World {
     const d = this.dest; if (!d) return null;
     const slip = d.key === 'slip' ? this.homeSlip : null, H = slip ? harborOf(slip.marina) : null;
     if (!slip || !H || !H.exits.length) return this.planTarget(b, d.p);
-    const yours = (where: string) => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours. ${ramHolds(this.pilot.ram)}`, ms: 6000 }); } };
+    const yours = (where: string, more = '') => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours.${more} ${ramHolds(this.pilot.ram)}`, ms: 6000 }); } };
     // (inside her harbor's water: handed over at once, sent home from there; or as she crosses into it on her way, where
     // its water runs out past the breakwater ends, as at Richmond)
     if (harborAt(b) === H) { yours(this.homeOut ? 'At the harbor mouth' : 'In the harbor'); this.homeOut = false; return null; }
@@ -2823,13 +2835,15 @@ export class World {
     if (!mouth) { mouth = H.exits[0]; for (const e of H.exits) if (dist(e, slip.p) < dist(mouth, slip.p)) mouth = e; }
     // (handed over HANDOVER_S out at her speed, at least HANDOVER_MIN m; under sail, as she comes in sight of the entrance,
     // since the pilot sails her round the breakwater ends rather than in at the gap)
-    const motoring = !!b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05, ahead = motoring ? Math.max(HANDOVER_MIN, b.v * HANDOVER_S) : HANDOVER_SAIL;
-    if (dist(b, mouth) < ahead) { yours('At the harbor mouth'); this.homeOut = false; return null; }
+    const motoring = !!b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05;
+    if (!motoring) return this.sailHomeTo(b, mouth, yours);
+    if (dist(b, mouth) < Math.max(HANDOVER_MIN, b.v * HANDOVER_S)) { yours('At the harbor mouth'); this.homeOut = false; return null; }
     // (and sooner, under power, if there's anything solid in the lane her hull sweeps toward the mouth within that much of
     // her: motoring, the pilot steers that straight line, its own look ahead (boat/autopilot.ts) a line along the shore's
     // outline, and off Corinthian it steered her by something within a few meters of it: the second review. Under sail it
     // tacks and bears away round the land as it goes, not along the bearing, so there the lane says nothing: the third)
-    if (motoring && this.t - this.homeLookT >= 0.5) {
+    const ahead = Math.max(HANDOVER_MIN, b.v * HANDOVER_S);
+    if (this.t - this.homeLookT >= 0.5) {
       this.homeLookT = this.t;
       const u = unit(sub(mouth, b)), side = { x: u.y, y: -u.x };
       for (let k = 2; k <= ahead; k += 2) for (const o of [-1.6, 0, 1.6]) {
@@ -2914,6 +2928,56 @@ export class World {
     const u = this.user, was = this.carWas, now = u.carCmd ?? null;
     if (was && !now) { const car = u.ctl.car[was.side ?? u.tack]; if (car.fore !== was.fore || car.ins !== was.ins) this.emit({ type: 'toast', msg: 'Jib car call dropped: that car is loaded now.', ms: 3000 }); }
     this.carWas = now;
+  }
+  /** Under sail, bound home: the last look along her lane to the gap (sailHomeTo). */
+  private homeLane: { t: number; clear: boolean; room: boolean } = { t: -Infinity, clear: false, room: true };
+  /**
+   * Under sail, bound home (navTarget): out of sight of the gap, steered for it (the pilot's own way round the land); in
+   * sight, handed over pointed at it along a clear lane, or at once with the turn in words: one short line, e.g. "At the
+   * harbor mouth: she's yours. The gap's at 148°, bear away to port."
+   */
+  private sailHomeTo(b: Boat, mouth: Vec, yours: (where: string, more?: string) => void): Vec | null {
+    const d = dist(b, mouth);
+    if (d >= HANDOVER_SAIL + SAIL_NEAR) return this.planTarget(b, mouth);
+    const gap = brg(mouth.x - b.x, mouth.y - b.y), off = wrap(gap - b.h), wf = b.ww.from;
+    // (to windward: inside her close-hauled course by more than the gap's half-width from here allows: the second review,
+    // close-hauled and fetching it, she was told to tack)
+    const toWindward = Math.abs(wrap(gap - wf)) < beatAngle(b.ww.kt) - Math.atan2(SAIL_HALF_GAP, d) / D2R;
+    // (looked along every half second: the lane to the gap, her hull's width and SAIL_LANE m either side, twice that to
+    // leeward, sampled every 2 m, and nothing of the land across it; and her sea room, the water ahead on her own heading)
+    if (this.t - this.homeLane.t >= 0.5) {
+      const u = unit(sub(mouth, b)), sd = { x: u.y, y: -u.x }, lee = wrap(wf + 180 - gap) > 0 ? 1 : -1; // (lee: +1 the lane's starboard side)
+      const hit = (q: Vec) => onLand(q) || hitsHarbor(q) || hitsMooredBoat(q);
+      let clear = landAlong(b, mouth) === Infinity;
+      for (let k = 2; k < d && clear; k += 2) for (const o of [-1, -0.5, 0, 0.5, 1]) {
+        const w = 1.1 + SAIL_LANE * (Math.sign(o) === lee ? 2 : 1);
+        if (hit({ x: b.x + u.x * k + sd.x * o * w, y: b.y + u.y * k + sd.y * o * w })) { clear = false; break; }
+      }
+      const f = V(b.h), fs = { x: f.y, y: -f.x }, reach = Math.max(SAIL_ROOM_MIN, b.v * SAIL_ROOM_S);
+      let room = true;
+      for (let k = 2; k <= reach && room; k += 2) for (const o of [-1.1, 0, 1.1]) if (hit({ x: b.x + f.x * k + fs.x * o, y: b.y + f.y * k + fs.y * o })) { room = false; break; }
+      this.homeLane = { t: this.t, clear, room };
+    }
+    const { clear, room } = this.homeLane;
+    // (and in sight of the gap; or sooner, coming in, as soon as there's something solid ahead of her with less than her
+    // sea room: off Gashouse from the northeast, the pilot's way round took her into the slot by the Fort Mason piers)
+    if (room && (d >= HANDOVER_SAIL || ((b.tacking || this.pilot.goTack) && d > HANDOVER_SAIL - 30))) return this.planTarget(b, mouth); // (a tack begun is finished first)
+    if (clear && !toWindward && Math.abs(off) <= SAIL_POINT && Math.abs(b.turnRate ?? 0) < 3) { this.handOverSail(gap, 'ahead', yours); return null; }
+    // (not on it: let go here, in sight of it and well off, with the turn in words; not steered in closer, where the
+    // pilot's own way round the land near the gap (boat/autopilot.ts navHeading) took her among the piers: the review)
+    this.handOverSail(gap, !clear ? 'open it up before you turn in' : toWindward ? 'to windward: tack in' : this.turnWords(b.h, gap, wf), yours);
+    return null;
+  }
+  private handOverSail(gap: number, how: string, yours: (where: string, more?: string) => void): void {
+    yours('At the harbor mouth', ` The gap's at ${String(Math.round(gap) % 360).padStart(3, '0')}°, ${how}.`);
+    this.homeOut = false; this.homeLane.t = -Infinity;
+  }
+  /** The turn from heading h to the gap's bearing, in a sailor's words, with the wind from wf: on the same side of the wind,
+   * head up (toward it) or bear away, to port or starboard; across it, a tack (the short way through its eye) or a jibe. */
+  private turnWords(h: number, gap: number, wf: number): string {
+    const hs = wrap(h - wf), gs = wrap(gap - wf), side = wrap(gap - h) < 0 ? 'port' : 'starboard';
+    if (Math.sign(hs) === Math.sign(gs)) return `${Math.abs(gs) < Math.abs(hs) ? 'head up' : 'bear away'} to ${side}`;
+    return Math.abs(hs) + Math.abs(gs) < 180 ? 'tack onto it' : 'jibe onto it';
   }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {

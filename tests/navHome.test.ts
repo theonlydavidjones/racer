@@ -21,6 +21,8 @@ function hull(u: { x: number; y: number; h: number }): P[] {
   return out;
 }
 const solid = (q: P) => hitsHarbor(q) || hitsMooredBoat(q) || onLand(q);
+/** The sim's own word of a touch (piles stop her before a hull sample's inside them: the review, 18 Nov 2026). */
+const BUMP = /Damage|Collision|hit the piles|Set onto|aground/i;
 function world(s: Slip, kt = 6, from = 270): World {
   const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
   const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, windDir: from, mode: 'sail', sailFrom: 'cityfront', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings;
@@ -47,7 +49,7 @@ function sail(w: World, o: P, to: P, motor: boolean, secs = 300, throttle = 0.5)
   const hits: string[] = [], said: string[] = []; let t = 0;
   for (; t < secs && w.pilot.mode === 'nav'; t += DT) {
     w.step(DT);
-    for (const e of w.drainEvents()) if (e.type === 'toast') said.push(e.msg);
+    for (const e of w.drainEvents()) if (e.type === 'toast') { said.push(e.msg); if (!hits.length && BUMP.test(e.msg)) hits.push(`"${e.msg}" at ${t.toFixed(1)} s`); }
     if (!hits.length && hull(u).some(solid)) hits.push(`her hull on something at ${t.toFixed(1)} s, ${Math.round(u.x)},${Math.round(u.y)}`);
   }
   return { hits, said, t, pilot: w.pilot.mode };
@@ -122,6 +124,54 @@ describe('the navigator takes her home to her harbor\'s mouth, and hands her ove
     expect(run.pilot).toBe('off'); expect(run.hits).toEqual([]);
     expect(run.said.some(m => /At the harbor mouth: she's yours/.test(m))).toBe(true);
   }, 120_000);
+
+  it('under sail, in sight of the gap: handed over pointed at it along clear water, and then sailed in touching nothing; or there and then, with the turn in words (the playtest, 18 Nov 2026)', () => {
+    // (the playtest, v208: let go 122 m off the Gashouse mouth at 5 kt heading 208°, the gap at 148°; on the breakwater
+    // 40 s later. The physics review's cases: off Gashouse from the north and northeast, past the Fort Mason piers, in a
+    // westerly, a northerly and a southerly; South Beach's south mouth; West Harbor)
+    const at400 = (m: P, b: number): P => ({ x: m.x + Math.sin(b * Math.PI / 180) * 400, y: m.y + Math.cos(b * Math.PI / 180) * 400 });
+    const CASES: [Slip, number[]][] = [
+      [slipById('gashouse-cove:572')!, [328, 0, 20, 25, 30, 45]], [slipById('gashouse-cove:332')!, [25]],
+      [slipById('south-beach:G2') ?? SLIPS.find(q => q.marina === 'south-beach')!, [60, 180]],
+      [SLIPS.find(q => q.marina === 'west-harbor')!, []], [slipById('horseshoe-bay:A30')!, []],
+    ];
+    const bad: string[] = []; let runs = 0, pointed = 0;
+    for (const [s, bearings] of CASES) {
+      const r = harborRoute(s)!, m = r.mouth;
+      const os = [...bearings.map(b => at400(m, b)), ...starts(m, 400, 2)].filter(q => !onLand(q) && !harborAt(q) && landDist(q) >= 15);
+      for (const [kt, wind] of [[8, 270], [12, 270], [10, 20], [10, 200]] as const) for (const o of os) {
+        const w = world(s, kt, wind), u = w.user, run = sail(w, o, m, false, 900), at = `${s.id} ${kt} kt from ${wind}, start ${Math.round(o.x)},${Math.round(o.y)}`;
+        runs++;
+        if (run.hits.length) { bad.push(`${at}: under the pilot, ${run.hits[0]}`); continue; }
+        const said = run.said.find(q => /At the harbor mouth: she's yours/.test(q)), d0 = Math.hypot(u.x - m.x, u.y - m.y);
+        if (!said) { bad.push(`${at}: no hand-over at the mouth in ${run.t.toFixed(0)} s, ${d0.toFixed(0)} m off (${run.said.join(' | ')})`); continue; }
+        const gap = (Math.atan2(m.x - u.x, m.y - u.y) * 180 / Math.PI + 360) % 360, off = ((gap - u.h + 540) % 360) - 180;
+        // (every hand-over with sea room: 15 s of clear water at her speed on her heading, as under power)
+        const a = u.h * Math.PI / 180, room = Math.max(20, u.v * 15);
+        for (let k = 1; k <= 10; k++) { const q = { x: u.x + Math.sin(a) * room * k / 10, y: u.y + Math.cos(a) * room * k / 10 }; if (hull({ ...q, h: u.h }).some(solid)) { bad.push(`${at}: "${said}", let go ${(room * k / 10).toFixed(0)} m from something ahead at ${u.v.toFixed(1)} m/s`); break; } }
+        if (!/The gap's at \d{3}°, /.test(said)) { bad.push(`${at}: no bearing in "${said}"`); continue; }
+        if (!/, ahead\./.test(said)) {
+          // (not pointed at it: let go there and then, not steered on in closer, with the turn to her side)
+          const turn = /(head up|bear away) to (port|starboard)/.exec(said);
+          if (turn && turn[2] !== (off < 0 ? 'port' : 'starboard')) bad.push(`${at}: "${said}", heading ${u.h.toFixed(0)}° with the gap at ${gap.toFixed(0)}°`);
+          if (!turn) continue; // (a tack or a jibe onto it, or opening it up first: a sailor's own call from there)
+        } else { pointed++; if (Math.abs(off) > 30) { bad.push(`${at}: "ahead", heading ${u.h.toFixed(0)}° with the gap at ${gap.toFixed(0)}°`); continue; } }
+        // (then a sailor takes her: her course held 5 s, the time to read it and take the tiller, then the turn it said and
+        // steered for the gap by eye, re-aimed each second: she gets within 25 m of it with her hull touching nothing)
+        engage(u, w.pilot, 'auto'); let near = false, t = 0, hit = '';
+        for (; t < 150 && !near && !hit; t += DT) {
+          if (t >= 5 && Math.abs(t % 1) < DT) w.pilot.course = (Math.atan2(m.x - u.x, m.y - u.y) * 180 / Math.PI + 360) % 360;
+          w.step(DT); const bump = w.drainEvents().find(e => e.type === 'toast' && BUMP.test((e as { msg: string }).msg));
+          if (bump) hit = `"${(bump as { msg: string }).msg}" ${t.toFixed(0)} s on`;
+          else if (hull(u).some(solid)) hit = `${t.toFixed(0)} s on, ${Math.round(Math.hypot(u.x - m.x, u.y - m.y))} m from the gap`;
+          near = Math.hypot(u.x - m.x, u.y - m.y) < 25;
+        }
+        if (hit || !near) bad.push(`${at}: "${said}" ${d0.toFixed(0)} m off, sailed for the gap: ${hit ? `hit something ${hit}` : `not there in ${t.toFixed(0)} s`}`);
+      }
+    }
+    expect(runs).toBeGreaterThanOrEqual(30); expect(pointed, 'handed over pointed at it, some of the time').toBeGreaterThan(3);
+    expect(bad).toEqual([]);
+  }, 1_800_000);
 
   it('under sail far from home, with land on the bearing to the mouth: the pilot sails her on round it, not standing by (the third review)', () => {
     const s = slipById('gashouse-cove:572')!, r = harborRoute(s)!;
