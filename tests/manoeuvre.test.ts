@@ -25,8 +25,9 @@ describe("the passage planner's time for a tack or a gybe (routing.ts manoeuvreS
     }
   }, 180_000);
   it('runs smoothly between the winds measured, and holds beyond them', () => {
-    expect(manoeuvreS('tack', 10)).toBeCloseTo((5.2 + 3.1) / 2, 6);
-    expect(manoeuvreS('tack', 2)).toBe(21.3); expect(manoeuvreS('tack', 30)).toBe(4.8);
+    // (the table's own figures, re-measured 18 Nov 2026 on the turn's sourced cost: routing.ts MANOEUVRE_LOSS)
+    expect(manoeuvreS('tack', 10)).toBeCloseTo((6.3 + 3.8) / 2, 6);
+    expect(manoeuvreS('tack', 2)).toBe(24.6); expect(manoeuvreS('tack', 30)).toBe(5.3);
     expect(manoeuvreS('gybe', 14)).toBeLessThan(manoeuvreS('tack', 14));
   });
   it('costs a tack more in chop (the sim\'s own sea: about 40% a metre), a gybe the same', () => {

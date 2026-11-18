@@ -3,7 +3,8 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { COURSES } from '../src/courses/registry';
 import { D2R, KT, V, wrap } from '../src/core/math';
-import { HULL } from '../src/boat/dynamics';
+import { HANDLING, flowTurnRate } from '../src/boat/dynamics';
+import { turnBleed } from '../src/boat/physics';
 import { HELM_MAX, HELM_STALL, inducedDrag, rudderSepDrag, rudderTurn } from '../src/boat/balance';
 import { yawLag } from '../src/boat/physics';
 import { sail, testBoat } from './helpers/testBoat';
@@ -50,12 +51,23 @@ describe('the helm\'s travel: the tiller to the deck at 46.5 degrees, the rudder
     expect(rudderSepDrag(10, 2.4)).toBe(0); expect(rudderSepDrag(15, 2.4)).toBe(0);
     expect(rudderSepDrag(40, 2.4)).toBeGreaterThan(400); expect(rudderSepDrag(40, 2.4)).toBeLessThan(668);
     for (let a = 15; a < 90; a += 1) expect(rudderSepDrag(a + 1, 2.4), `${a} degrees`).toBeGreaterThan(rudderSepDrag(a, 2.4));
-    // (and the hull and keel's induced drag for the side force of a turn at full helm at 4.7 kt, 16.4 degrees a second:
-    // 252 N by ORC's eq. 6.37, in 189 to 315. With the blade's 48 N at the 21 degrees it meets the water at there, 300 N,
-    // where the uncited 0.15·v·ω it replaces gave 260 N)
-    const fh = HULL.displacement * 2.4 * 16.44 * Math.PI / 180;
-    expect(inducedDrag(fh, 2.4)).toBeGreaterThan(189); expect(inducedDrag(fh, 2.4)).toBeLessThan(315);
-    expect(rudderSepDrag(21.1, 2.4)).toBeGreaterThan(36); expect(rudderSepDrag(21.1, 2.4)).toBeLessThan(60);
+    // (and the hull and keel's induced drag for the side force of a turn at full helm at 4.7 kt, her own 15.3 degrees a
+    // second there: 254 N by ORC's eq. 6.37, in 190 to 318. With the blade's 56 N at the 21.7 degrees it meets the water
+    // at, 309 N, where the uncited 0.15·v·ω it replaces gave 241 N)
+    const full = flowTurnRate(2.4), M = HANDLING.mass, fh = M * 2.4 * full * Math.PI / 180;
+    expect(inducedDrag(fh, 2.4)).toBeGreaterThan(190); expect(inducedDrag(fh, 2.4)).toBeLessThan(318);
+    expect(rudderSepDrag(21.7, 2.4)).toBeGreaterThan(42); expect(rudderSepDrag(21.7, 2.4)).toBeLessThan(70);
+    // (turnBleed itself, the two together over her mass and speed: 309 N at full helm in that steady turn, in 232 to 386;
+    // and what the physics review found, 18 Nov 2026: the blade put over against her swing meets the water at more, not
+    // less, 48 degrees for 40 of helm, and brakes hard, where with the helm amidships there's only the keel's share)
+    const N = (helm?: number, rate = full) => turnBleed(rate, 2.4, 0, 90, 0, helm) * 2.4 * M;
+    expect(N(1)).toBeGreaterThan(232); expect(N(1)).toBeLessThan(386);
+    expect(N(-HELM_STALL)).toBeGreaterThan(N(HELM_STALL, full) + 300); expect(N(0)).toBeCloseTo(inducedDrag(fh, 2.4), 6);
+    expect(N(1, -full)).toBeCloseTo(N(-1, full), 6); // (either way round: the helm against the turn)
+    // (the helm left out, as arcs.ts asks it: the helm that rate takes, the same in a steady turn; and a slow turn's cost
+    // by the square of its rate, a quarter of the keel's share for half the rate)
+    expect(N(undefined)).toBeCloseTo(N(1), 6); expect(N(0.5, full / 2)).toBeCloseTo(inducedDrag(fh, 2.4) / 4, 6);
+    expect(turnBleed(full, 0, 0, 90, 0, 1)).toBe(0); // (stopped: nothing to bleed)
   });
   it('her turning circle from a beam reach in 10 kt: 9 m at 30 degrees of helm as before, under 8 m at the stall, and a little wider and slower hard over', () => {
     const full = circle(10, 1), stall = circle(10, HELM_STALL), hard = circle(10, HELM_MAX);
@@ -73,16 +85,16 @@ describe('the helm\'s travel: the tiller to the deck at 46.5 degrees, the rudder
     expect(yawLag(4.7 * KT)).toBeLessThan(0.4); expect(yawLag(2 * KT)).toBeLessThan(0.9);
     expect(yawLag(1 * KT)).toBeGreaterThan(2 * yawLag(2 * KT) - 1e-9); // (and still by her speed: at a crawl she answers slowly)
   }, 60_000);
-  it('a tack with the helm at the stall: inside 8.7 s and 8.6 m of carry in 6, 8 and 14 kt, half a second quicker and a meter shorter than at 30 degrees, and a quarter of a knot slower out of it; hard over, half a second slower', () => {
+  it('a tack with the helm at the stall: inside 8.9 s and 8.6 m of carry in 6, 8 and 14 kt, half a second quicker and a meter shorter than at 30 degrees, and a quarter of a knot slower out of it; hard over, half a second slower', () => {
     for (const kt of [6, 8, 14]) {
       const full = tack(kt, 1), stall = tack(kt, HELM_STALL);
-      // (the turn's bleed from its sources, 18 Nov 2026 (physics.ts turnBleed): the stall's tack takes 8.23, 7.53 and 6.67 s
-      // (7.60, 6.87 and 5.97 before, asked under 8: the same twentieth over the slowest), and is 0.72, 0.70 and 0.51 s
+      // (the turn's bleed from its sources, 18 Nov 2026 (physics.ts turnBleed): the stall's tack takes 8.45, 7.72 and 6.70 s
+      // (7.60, 6.87 and 5.97 before, asked under 8: the same twentieth over the slowest), and is 0.62, 0.58 and 0.68 s
       // quicker than full helm's (1.32, 1.28 and 1.33 before, asked over 1: the same fifth under the least). Her carry
-      // hasn't moved. And it's paid for now: she comes out 0.29, 0.33 and 0.43 kt slower than from full helm's, where
+      // hasn't moved. And it's paid for now: she comes out 0.30, 0.31 and 0.49 kt slower than from full helm's, where
       // before she lost nothing by it)
-      expect(stall.t, `${kt} kt`).toBeLessThan(8.7); expect(stall.adv, `${kt} kt`).toBeLessThan(8.6);
-      expect(full.t - stall.t, `${kt} kt`).toBeGreaterThan(0.4); expect(full.adv - stall.adv, `${kt} kt`).toBeGreaterThan(1);
+      expect(stall.t, `${kt} kt`).toBeLessThan(8.9); expect(stall.adv, `${kt} kt`).toBeLessThan(8.6);
+      expect(full.t - stall.t, `${kt} kt`).toBeGreaterThan(0.45); expect(full.adv - stall.adv, `${kt} kt`).toBeGreaterThan(1);
       expect((full.v - stall.v) / KT, `${kt} kt`).toBeGreaterThan(0.2);
     }
     // (uncalled, the tack at the stall in 14 kt is a fifth of a second slower: the crew late on the jib)
@@ -91,9 +103,9 @@ describe('the helm\'s travel: the tiller to the deck at 46.5 degrees, the rudder
     // (hard over at the deck's stop, 18 Nov 2026: 7.50 s against 6.87 and 2.54 kt out of it against 2.80. At 75: 19.98 s,
     // asked over twice the stall's, and 0.98 kt, asked under 0.6 of it: the old properties belonged to a tiller 35 degrees past
     // the stall, and the stop is 6.5 past it now)
-    // (on the sourced bleed, the same day: 8.33 s against 7.53 and 2.08 kt against 2.38; the 8 s it was asked under becomes
-    // 8.9, the same fifteenth over)
-    expect(hard.t).toBeGreaterThan(stall.t + 0.3); expect(hard.t).toBeLessThan(8.9); expect(hard.v).toBeLessThan(0.95 * stall.v);
+    // (on the sourced bleed, the same day: 8.67 s against 7.72 and 2.01 kt against 2.31; the 8 s it was asked under becomes
+    // 9.3, the same fifteenth over)
+    expect(hard.t).toBeGreaterThan(stall.t + 0.3); expect(hard.t).toBeLessThan(9.3); expect(hard.v).toBeLessThan(0.95 * stall.v);
   }, 120_000);
   it('the physics review\'s cases: a turn by the flow past full helm isn\'t sculling; a key with the tiller over the same way stops at the stall; going astern the blade is drawn where it\'s held', () => {
     // (a key's turn with way on, the helm at the stall, turns her faster than full helm's flow: no sculling latched, so

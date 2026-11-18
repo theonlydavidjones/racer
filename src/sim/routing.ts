@@ -80,7 +80,7 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
 /**
  * Seconds a tack or a gybe costs, by the true wind (kt): the distance made good the sim's own Folkboat loses in one
  * (boat/physics.ts, measured against a twin sailing on until she's back to speed: tests/manoeuvre.test.ts keeps this
- * table in step with it), over her VMG. A tack loses 0.8-2.1 boat lengths: most in light air, where she's slowest to get
+ * table in step with it), over her VMG. A tack loses about 1 to 2.5 boat lengths (0.8-2.1 before 18 Nov 2026): most in light air, where she's slowest to get
  * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
  * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
  * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
@@ -92,10 +92,14 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
  * with it off); in 20 kt 2.82 (3.11), within the table's 2.9; light air unchanged.
  * Measured again, every wind, 15 Nov 2026, with her turn answering the helm sooner (physics.ts HOVE.gyration 0.19): light-air
  * tacks a second or two cheaper, the 25 kt tack 4.8 s.
+ * And again, every wind, 18 Nov 2026, with what a turn costs her taken from its sources (physics.ts turnBleed: her keel's
+ * induced drag for the force that turns her, and her rudder's own): a tack on full helm costs a tenth to a fifth more,
+ * 3.3 to 3.8 s in 12 kt and 21.3 to 24.6 s in 3 kt (it was tack 21.3, 13.7, 8.1, 5.2, 3.1, 3.0, 3.0, 4.8 and gybe 4.1,
+ * 3.6, 2.4, 1.7, 1.1, 0.7, 0.6, 0.5); a gybe, the small turn it is, a tenth more in light air.
  */
 export const MANOEUVRE_LOSS: Record<'tack' | 'gybe', [number, number][]> = {
-  tack: [[3, 21.3], [4, 13.7], [6, 8.1], [8, 5.2], [12, 3.1], [16, 3.0], [20, 3.0], [25, 4.8]],
-  gybe: [[3, 4.1], [4, 3.6], [6, 2.4], [8, 1.7], [12, 1.1], [16, 0.7], [20, 0.6], [25, 0.5]]
+  tack: [[3, 24.6], [4, 16.2], [6, 9.3], [8, 6.3], [12, 3.8], [16, 3.7], [20, 3.3], [25, 5.3]],
+  gybe: [[3, 4.7], [4, 4.0], [6, 2.7], [8, 1.9], [12, 1.2], [16, 0.8], [20, 0.6], [25, 0.5]]
 };
 /**
  * The cost (s) of a tack or a gybe in `tws` kt, and `hs` m of chop: in a wind sea a tack costs about 40% more a metre of

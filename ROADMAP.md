@@ -363,6 +363,11 @@ sources. Each shipped item is added there when it's published.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **The turn's side force and the sails', together (Deep Physics; the physics review of turnBleed, 18 Nov 2026):** her
+     keel carries both, so its induced drag goes as their sum squared; they're charged apart now (netDrive for the sails',
+     turnBleed for the turn's). Luffing with her sails drawing costs more than charged, bearing away less, and through a
+     tack the two partly cancel. Needs the sails' side force in turnBleed and in arcs.ts's prediction. Also there: the
+     drift angle at her center left out of the blade's flow angle, and arcs.ts reading the blade from her lagged turn.
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
      from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. The lee's edge is allowed for in the shove (done,
      Deep Physics: gauged to the wind along her line out and to leeward of it, World.windAstern; Corinthian B16 in a 20 kt

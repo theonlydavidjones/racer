@@ -37,7 +37,7 @@ that would act on a finding.
 | # | Constants | What they do | What would settle it | Owner |
 |---|---|---|---|---|
 | 1 | trim.ts SAILS.aoa (main 22°, jib 18°), LUFF_START 2, LUFF_SPAN 10, STALL_START 4 | The best angle of attack and how fast trim error costs drive: every boat's speed, every trim lesson | Sail aerodynamics (wind-tunnel or VPP data for a main and jib: angle of best drive, the width of the "groove") | Deep Physics |
-| 2 | dynamics.ts HANDLING.turnRadius 9 m, maxTurnRate 22°/s (turnDrag 0.15 no longer bleeds her speed in a turn, 18 Nov 2026: physics.ts turnBleed, ORC eq. 6.37 and NACA Report 938) | How fast she turns and what a tack or a jibe costs in speed. routing.ts MANOEUVRE_LOSS is measured from the sim's own boat, so it inherits these | Tack-loss measurements for long-keel boats (GPS tracks of Folkboats tacking; published tack-loss studies) | Deep Physics |
+| 2 | dynamics.ts HANDLING.turnRadius 9 m, maxTurnRate 22°/s (turnDrag 0.15 is gone, 18 Nov 2026: what a turn costs is physics.ts turnBleed, ORC eq. 6.37 and NACA Report 938, with SEP_FROM 15° sourced and the ramp to the stall an estimate) | How fast she turns and what a tack or a jibe costs in speed. routing.ts MANOEUVRE_LOSS is measured from the sim's own boat, so it inherits these | Tack-loss measurements for long-keel boats (GPS tracks of Folkboats tacking; published tack-loss studies) | Deep Physics |
 | 3 | dynamics.ts HANDLING.formFactor 1.15, windageCdA 2.0 m², flogCdA 3 m² | Hull resistance beyond friction, and the rig's windage: speed at every angle, and upwind most | Form factors for full-bodied keelboats (ITTC/Delft series); windage of a rig and hull (Marchaj, ORC VPP windage terms) | Deep Physics |
 | 4 | balance.ts CREW.kg 240, CREW.reach 1.05 m (estimate) | The crew's righting moment hiking: heel, and so speed, in every breeze | Sailor weights for the SF fleet (the owner); hiking reach from the deck plan and anthropometry | Crew Model |
 | 5 | polar.ts NO_GO 25° | Below this true wind angle, no drive at all: pinching and luffing behavior | Folkboat polars (ORC certificates' beat angles) and sail-model stall | Deep Physics |
@@ -273,7 +273,6 @@ physics, ranked like the ten above:
 | HANDLING.turnRadius | 9 | 34 | unsourced |  |
 | HANDLING.minTurnRate | 4 | 36 | unsourced |  |
 | HANDLING.maxTurnRate | 22 | 38 | unsourced |  |
-| HANDLING.turnDrag | 0.15 | 40 | unsourced |  |
 | HANDLING.luffFactor | 0.12 | 42 | unsourced |  |
 | HANDLING.luffFlog | 1 | 44 | unsourced |  |
 | RES_STEP | 0.001 | 76 | numerical |  |

@@ -55,9 +55,6 @@ export const HANDLING = {
   minTurnRate: 4,
   /** Hard limit on turn rate, deg/s. */
   maxTurnRate: 22,
-  /** Speed lost to the rudder and hull yawing: dv/dt = −k·v·|ω| (ω in rad/s). An uncited estimate (with turnRadius it
-   * sets how long penalty turns take: physics.ts PENALTY_TURN_RATE). */
-  turnDrag: 0.15,
   /** Drive while luffing (sails eased until they lift), as a fraction of normal target speed. */
   luffFactor: 0.12,
   /** How much the sails flog while luffing (fully eased: they flog, and the boat coasts to a stop). */

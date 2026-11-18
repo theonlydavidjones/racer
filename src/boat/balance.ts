@@ -165,8 +165,8 @@ export const SEP_FROM = 15;
  * The rudder's separation drag, N, with the water meeting the blade at `alphaDeg` and v m/s: a flat plate's drag at
  * that angle (plateCn·sin a, as past the stall) for the share of the blade the flow has left: none to SEP_FROM, all of
  * it at RUDDER_STALL and past. The share between them, in step with the angle, is an ESTIMATE (the report gives the two
- * ends, not the curve). At 4.7 kt: nothing at 15°, 48 N at 21° (what the blade meets in a steady turn on 30° of helm,
- * her stern's swing taking 9 off it), 210 N at 30°, 535 N at 40°.
+ * ends, not the curve). At 4.7 kt: nothing at 15°, 56 N at 21.7° (what the blade meets in a steady turn on 30° of helm,
+ * her stern's swing taking 8 off it), 210 N at 30°, 535 N at 40°.
  */
 export function rudderSepDrag(alphaDeg: number, v: number): number {
   const a = Math.min(Math.abs(alphaDeg), 90), share = clamp((a - SEP_FROM) / (RUDDER_STALL - SEP_FROM), 0, 1);
