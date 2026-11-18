@@ -4,6 +4,7 @@ import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
 import { DT, World } from '../src/sim/world';
+import { Z } from '../src/boat/crewPhys';
 
 // At the dock and leaving it under bare poles the crew sit centred, not hiked or to leeward (the owner, 13 Nov 2026):
 // physics.ts crewAtDock, and an upright heel aimed for with the sails struck. Their weight moves only her heel.
@@ -49,4 +50,25 @@ describe('the crew at the dock', () => {
     for (let i = 0; i < 60 * 60 && (u.handled || n < 20 * 60); i++) { w.step(DT); if (!u.handled) n++; for (const p of u.crew!.people.slice(1)) { if (p.job?.station) continue; far = Math.max(far, Math.abs(p.x)); lean = Math.max(lean, p.lean); } }
     expect(far, 'arm from the middle, m').toBeLessThan(0.45); expect(lean).toBeLessThan(0.05);
   }, 60_000);
+});
+
+describe('in her slip, the jobs of sailing end (physics.ts crewAtDock)', () => {
+  it('a job under way as she comes into her slip ends there: nobody left at the jib car while she lies made fast', () => {
+    // (the crew soak, v208, 18 Nov 2026: home in 22 kt, the bow hand set off for the lazy jib car as she came into her
+    // slip, and was still at it a minute later and for good, at the car on the foredeck, the job frozen: at the dock
+    // only the hoist is worked, crewRig, and the place the crew sit, crewAtDock)
+    const w = atSlip(12), u = w.user, slip = SLIPS[0];
+    for (let i = 0; i < 60; i++) w.step(DT);
+    const a = u.crew!.people[u.crew!.people.length - 1]!;
+    a.job = { line: 'car', reach: 4, work: 6, station: { arm: 0.8, z: Z.car, pose: 'car' }, side: u.tack, target: { fore: 0, ins: 0 } };
+    // (out of her slip, as from a sail, and sent home; then in bow first, slow)
+    Object.assign(u, { docked: undefined, x: slip.p.x + 20, y: slip.p.y, v: 0 }); w.step(DT); w.sendHome();
+    Object.assign(u, { x: slip.p.x, y: slip.p.y, h: slip.heading + 10, v: 0.2, astern: 0 });
+    w.step(DT);
+    expect(u.docked, 'made fast in her slip').toBeTruthy();
+    for (let i = 0; i < 30 * 60; i++) w.step(DT);
+    expect(u.crew!.people.map(p => p.job?.line ?? null), 'jobs, made fast').toEqual(u.crew!.people.map(() => null));
+    expect(u.crew!.people.every(p => p.pose !== 'car'), 'nobody posed at the car').toBe(true);
+    expect(Math.min(...u.crew!.people.map(p => p.z)), 'everyone back in the cockpit').toBeGreaterThan(Z.cockpitFwd - 0.05);
+  });
 });

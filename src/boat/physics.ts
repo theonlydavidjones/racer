@@ -158,6 +158,10 @@ export const sailUp = (b: Boat, k: 'main' | 'jib'): number => (b.rig ? hoistedSh
  */
 export function crewAtDock(b: Boat, dt: number): void {
   const cs = b.crew; if (!cs) return;
+  // (made fast, the jobs of sailing end: at the dock only the hoist and the outboard are worked (crewRig, the motor), so a
+  // job under way as she came in, the lazy jib car or a sheet, was never finished, and its hand stood at it for good, at
+  // the car on the foredeck: the crew soak, v208. The paddle's job is the paddle's own, ended by world.ts paddleWork)
+  for (const a of cs.people) if (a.job && a.job.line !== 'hoist' && a.job.line !== 'outboard' && a.job.line !== 'paddle') a.job = null;
   const yours = cs.place;
   // (placed by you, they're where you put them, at the dock as under way; and fore and aft in the cockpit unless you've
   // put them elsewhere: no bow hand off to the mast for the trim of a boat that isn't sailing)
