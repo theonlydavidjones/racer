@@ -90,14 +90,9 @@ export const TRIPS_MEAN = 1.4, TRIPS_CAP = 2.0;
  * 11, 14, 20 and 21; 14, 20 and 21 pass the backstop since the crew habits, and are judged on it again, and 15 joined
  * (the Coordinator's ruling: the list grows no further than it was).
  */
-export const CAP_HELD: Record<number, readonly number[]> = { 6: [4] };
-// (empty from 16 Nov 2026, once the AI's pole call waited for the run to hold, ai.ts crewPoleCall, and the guide's angle
-// held through a swing: 4, 11 and 15 all came under the backstop, the `it.fails` case went red as it should.)
-// 6 kt seed 4 held again (the Coordinator's ruling, 18 Nov 2026), from the turn's drag by sources (physics.ts turnBleed):
-// her second boat tacks into the other at 52.6 s (rule 13), falls to 0.7 kt, and the two lie 7-8 m apart under a knot,
-// in contact every 6.0 s, while she circles, the helm hard over each way, 10 tacks and gybes in 4 minutes. Her crew trim
-// for each real swing of course (the vang, the pole, the light air's stations: 2.25 trips a minute, none for no job). The
-// cause is the keep-clear in a tack (Skipper Model) and the repeated contact (Rules), not the crew; it goes when they're fixed.
+export const CAP_HELD: Record<number, readonly number[]> = {};
+// (empty since the AI's pole call waits for the run to hold, ai.ts crewPoleCall, and the guide's angle holds through a
+// swing: 4, 11 and 15 are all under the backstop and judged on it, the `it.fails` case went red as it should, 16 Nov 2026)
 
 /**
  * Changes of seat and walking along the boat at a seat, a minute: each crew member's mean over the races under
@@ -191,9 +186,9 @@ describe('The crew keep their stations (crewPhys.ts stationZ, chooseFore)', () =
     expect(tripsVerdict([m, ...Array.from({ length: 23 }, (_, j) => movesOf(kt, j + 2))], { skipCap: CAP_HELD[kt] })).toEqual([]);
   }, 1_200_000);
   // (the races held off the backstop: over it now, from the AI's steering in a dying breeze; red when that's fixed)
-  // (a race held off the backstop needs the Coordinator's ruling, and this line changed with it: 6 kt seed 4, 18 Nov 2026)
-  it('no race is held off the backstop but 6 kt seed 4 (CAP_HELD: the contact after a rule 13 tack)', () => expect(CAP_HELD).toEqual({ 6: [4] }));
-  for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: repeated contact after a rule 13 tack, CAP_HELD)`, () => {
+  // (and none held now: a race held off the backstop again needs the Coordinator's ruling, and this line changed with it)
+  it('no race is held off the backstop (CAP_HELD empty)', () => expect(Object.values(CAP_HELD).flat()).toEqual([]));
+  for (const [kt, seeds] of Object.entries(CAP_HELD)) it.fails(`in ${kt} kt, seeds ${seeds.join(', ')}: no race over the backstop (held: the AI's course in light air, ROADMAP, "AI steering in a dying breeze")`, () => {
     expect(tripsVerdict(seeds.map(s => movesOf(+kt, s)), { capOnly: true, seeds })).toEqual([]);
   }, 600_000);
 });
