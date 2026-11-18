@@ -241,13 +241,13 @@ describe('in the world', () => {
     const fouls: string[] = [];
     w.onIncident = (a, b, inc) => { if (inc.fouler === W && (a === A || b === A)) fouls.push(`W vs A at ${w.t.toFixed(1)} s`); };
     let ws = Infinity, wa = Infinity, as = Infinity, turnsNear = Infinity;
-    for (let t = 0; t < 40; t += DT) {
+    for (let t = 0; t < 150; t += DT) { // (long enough to see any penalty she owes taken)
       const dir0 = W.penaltyDir;
       u.h = hP; u.desired = hP; w.step(DT);
       ws = Math.min(ws, hullGap(W, S)); wa = Math.min(wa, hullGap(W, A)); as = Math.min(as, hullGap(A, S));
       if (!dir0 && W.penaltyDir) turnsNear = Math.min(...[A, S, u].map(o => hullGap(W, o))); // (where her turns began)
     }
-    return { ws, wa, as, fouls, turnsNear };
+    return { ws, wa, as, fouls, turnsNear, owing: W.penalty };
   };
   for (const gap of [22, 26, 30]) it(`the chain stalled, ${gap} m off: the hailing boat and the boat she hailed both keep clear of the starboard boat and of each other, no foul between them, no penalty turns begun close by (rules 10, 11, 13, 20.3, 44.2)`, () => {
     const r = stalled(gap);
@@ -256,7 +256,8 @@ describe('in the world', () => {
     expect(r.as, 'A against S').toBeGreaterThan(CONTACT_GAP);
     expect(r.fouls, 'W fouling A').toEqual([]);
     expect(r.turnsNear, 'the nearest boat as W\'s penalty turns began').toBeGreaterThan(LOA);
-  });
+    expect(r.owing, 'W\'s penalty, taken (rule 44.2: as soon as possible after getting well clear)').toBe(0);
+  }, 60000);
   // (Expected to fail, 18 Nov 2026: at 26 and 30 m W still touches S (as on main). She holds close-hauled for the hail she passed
   // on until the relay fails (HAIL_RESPONSE, 5 s), about 3 s from the meeting, and her duck from there is too late.
   // Ending that hold earlier, or easing in it, moved the touch to the other gaps (S's moves answer hers). The cure is in
@@ -264,7 +265,7 @@ describe('in the world', () => {
   // test above is made, so it's the owner's AI design to settle. Goes red when it's fixed)
   for (const gap of [26, 30]) it.fails(`the chain stalled, ${gap} m off: the boat she hailed keeps clear of the starboard boat (her duck too late: the hail's lead time)`, () => {
     expect(stalled(gap).ws, 'W against S').toBeGreaterThan(CONTACT_GAP);
-  });
+  }, 60000);
 
 });
 

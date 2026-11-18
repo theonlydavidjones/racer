@@ -165,17 +165,23 @@ export function crabFor(brgT: number, v: number, cur: Vec): number {
   return n360(brgT - Math.asin(k) / (Math.PI / 180));
 }
 
-/** Close-hauled course on the current tack, or the requested heading if it is sailable. */
-/** Steering away from a boat, on her own side of the wind: a heading across it is a tack, and a tack is no way to get
- * out of another boat's way close by (rule 13 has her keep clear all through it, and it takes her bow, then her stern,
- * across the other boat's water). Across the wind, she's close-hauled on the tack she's on instead. Not dead downwind,
- * where a degree either way is the same move. */
-function awayOnSide(b: Boat, h: number): number {
-  const from = b.ww.from, rel = wrap(from - h), mine = wrap(from - b.h);
-  if (Math.abs(rel) > 175 || Math.abs(mine) > 175 || (rel >= 0) === (mine >= 0)) return sailable(b, h);
-  const ch = beatFor(b) + 1;
-  return b.tack === 'S' ? n360(from - ch) : n360(from + ch);
+/** Whether turning from her heading to `h` the short way takes her through head to wind: a tack (as physics.ts's own
+ * throughWind reckons it). A bear-away onto the other gybe isn't one. */
+function tacksTo(b: Boat, h: number): boolean {
+  const toWind = wrap(b.ww.from - b.h), err = wrap(h - b.h);
+  return Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
 }
+/** Steering away from a boat without tacking: a tack is no way to get out of another boat's way close by (rule 13 has
+ * her keep clear from head to wind, and it takes her bow, then her stern, across the other boat's water). Where away
+ * is through the wind she turns that way only as far as she can on her own tack: for rule 14, a luff toward head to
+ * wind, short of it (`luffUp`), still the right-of-way boat (rule 13 begins only past head to wind); getting clear for
+ * her penalty, close-hauled. Off the wind, a bear-away or a gybe, as before. */
+function awayOnSide(b: Boat, h: number, luffUp = false): number {
+  if (!tacksTo(b, h)) return sailable(b, h);
+  const from = b.ww.from, off = luffUp ? 5 : beatFor(b) + 1;
+  return b.tack === 'S' ? n360(from - off) : n360(from + off);
+}
+/** Close-hauled course on the current tack, or the requested heading if it is sailable. */
 export function sailable(b: Boat, desired: number): number {
   const from = b.ww.from, rel = wrap(from - desired), ch = beatFor(b) + 1;
   if (Math.abs(rel) >= ch) return n360(desired);
@@ -554,20 +560,21 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // physics.ts), and then sails off to get clear for her turns. Steering straight away from the nearest boat
   // regardless, a port boat called for a starboard boat's swerve as she ducked her went up through the wind and into
   // her (rules-finish, the unanswered hail). Held 2 s past the last moment it applied, so it doesn't flicker at the edge
-  // of her look-ahead; and 30 s at most, so a boat standing close can't keep her from her penalty.
+  // of her look-ahead; and 30 s at most, counted from the first time for this penalty, so a boat standing close can't keep
+  // her from it.
   // (only where getting clear would take her through the wind: straight away from the nearest boat is the penalty
   // branch's way, and off the wind, a hard bear-away from a boat she's ducking, it's a good one. Through the wind, with a
   // boat she must keep clear of close by, it's a tack into her: rule 13 has her keep clear through it)
-  const pNear = b.penalty > 0 && !b.penaltyDir ? w.boats.reduce<Boat | null>((m, o) => o !== b && dist(o, b) < PENALTY_CLEAR && (!m || dist(o, b) < dist(m, b)) ? o : m, null) : null;
-  const awayH = pNear ? brg(b.x - pNear.x, b.y - pNear.y) : 0;
-  const acrossWind = !!pNear && (wrap(ww.from - awayH) >= 0) !== (wrap(ww.from - b.h) >= 0) && Math.abs(wrap(ww.from - awayH)) < 175;
+  // (not on the leg to the finish: there she'd race on for the line in this state and finish owing her turns, rule 44.2)
+  const pNear = b.penalty > 0 && !b.penaltyDir && b.leg < w.C.marks.length ? w.boats.reduce<Boat | null>((m, o) => o !== b && !o.finished && !o.retired && dist(o, b) < PENALTY_CLEAR && (!m || dist(o, b) < dist(m, b)) ? o : m, null) : null;
+  const acrossWind = !!pNear && tacksTo(b, brg(b.x - pNear.x, b.y - pNear.y));
   const keepFirst = acrossWind && w.boats.some(o => {
     if (o === b || o.finished || o.retired || w.rights(b, o).kc !== b) return false;
     const c = cpa(b, o); return c.t < ai.kn.keepClearS && c.d < ai.kn.keepClearM;
   });
   if (keepFirst) { ai.keepFirstT = w.t; ai.keepFirstSince ??= w.t; }
   const firstClear = b.penalty > 0 && !b.penaltyDir && ai.keepFirstT != null && w.t - ai.keepFirstT < 2 && w.t - (ai.keepFirstSince ?? w.t) < 30;
-  if (!firstClear && !keepFirst) ai.keepFirstSince = undefined;
+  if (!(b.penalty > 0)) ai.keepFirstSince = undefined; // (30 s from the first of it, for this penalty: not re-armed each time it lapses)
   if (b.penalty > 0 && !firstClear) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
@@ -926,7 +933,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     desired = ok;
   }
   // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
-  let avoiding = false;
+  let avoiding = false, luffToWind: number | null = null; // (rule 14's luff toward head to wind, above close-hauled)
   const course = desired; // (where she'd steer with no boat to keep clear of)
   // (her turn answers the helm over a moment, physics.ts yawLag, in which she covers the same ground at any speed, the
   // time growing as the speed falls: v·τ = 1.46 m. She starts her keep-clear moves that much further off; and her Rule
@@ -983,7 +990,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (crowded() && clearanceOn(w, b, desired) < 9) desired = clearestHeading(w, b, desired);
     } else if (r.kc === o && cp.t < 2.4 + lagT && cp.d < 4.5 + 0.5 * lagM) {
       // Rule 14: even a right-of-way boat must avoid contact if she reasonably can
-      desired = awayOnSide(b, brg(-dx, -dy)); luff = true; if (o.id !== ai.hailTack?.with) avoiding = true;
+      desired = awayOnSide(b, brg(-dx, -dy), true); luff = true; luffToWind = tacksTo(b, brg(-dx, -dy)) ? desired : null; if (o.id !== ai.hailTack?.with) avoiding = true;
       if (cp.t < lagT + 1) ai.urgent = true; // (about to touch: before even finishing a tack, physics.ts midTack)
       // the other boat made her swerve: that's a foul (a keep-clear boat that makes the right-of-way boat change course to
       // avoid her hasn't kept clear: the definition of Keep Clear, (a), "the right-of-way boat can sail her course with no
@@ -1024,6 +1031,8 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired, avoiding));
+  // (sailable holds her to close-hauled; rule 14's luff goes on above it, toward head to wind, short of it)
+  if (luffToWind != null && !tackNow) desired = luffToWind;
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
   // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
