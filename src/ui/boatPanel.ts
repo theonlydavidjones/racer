@@ -1,12 +1,13 @@
 import type { Settings } from '../settings';
 import { BOTTOM_COLORS, BRIGHT_FINISH, DEFAULT_ROPES, HULL_COLORS, ROPES, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, lineRope, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
 import { saveSettings } from '../settings';
+import { berthRows } from './berthName';
 import { ROPE_SHADE, hexToHsv, hsvToHex, isHex, pickerHtml, ropeSvg, ropesHtml } from './colorPicker';
 import { CLUBS } from '../render/burgees';
 import { conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
 import { TUNE_DEFAULT, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
-import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
+import { dockName, MARINAS, slipById, slipsIn } from '../geo/marina';
 import { morph } from './morph';
 
 /**
@@ -251,6 +252,7 @@ export class BoatPanel {
     const slip = slipById(b.slip);
     // the groups: folded to a short summary; Change opens one (and folds the others)
     // (each group's own verb: a read-only one says View / Hide, an editable one Change / Done)
+    const berth = berthRows(b.marina);
     const grp = (id: string, label: string, sum: string[], open: () => string, verb: [string, string] = ['Change ▾', 'Done ▴']) => {
       const on = this.grpOpen === id;
       return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i>${on ? verb[1] : verb[0]}</i></header><div class="be-in">${on ? open() : sum.join('')}</div></section>`;
@@ -305,9 +307,9 @@ export class BoatPanel {
       ].join(''))}
       ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change', true))], () =>
         LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual ropes</button>') : ''))}
-      ${grp('berth', 'Home berth', [kv('Marina', val(esc(b.marina ? MARINAS.find(m => m.id === b.marina)?.name ?? '' : 'None'))), ...(b.marina ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
+      ${grp('berth', 'Home berth', [kv('Marina', val(esc(berth.marina))), ...(berth.slipRow ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
         kv('Marina', `<select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`),
-        b.marina ? kv(`Slip in ${esc(harborOf(b.marina)?.short ?? '')}`, `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
+        berth.slipRow ? kv(esc(berth.slipRow), `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
       ].join(''))}
       ${grp('speed', 'Speed', [], () => '<div class="bpreport" id="bpReport"></div>', ['View ▾', 'Hide ▴'])}
       </div>`);
