@@ -123,7 +123,7 @@ export const HELM_MAX = HARD_OVER / FULL_RUDDER, HELM_STALL = RUDDER_STALL / FUL
 /** A stalled flat plate's normal force coefficient at `a` rad to the flow (Kirchhoff's free-streamline result, as in
  * Hoerner, Fluid-Dynamic Drag, ch. 3: 2π·sin a / (4 + π·sin a); 0.88 square on). */
 const plateCn = (a: number) => 2 * Math.PI * Math.sin(a) / (4 + Math.PI * Math.sin(a));
-const STALL_SIDE = plateCn(RUDDER_STALL * D2R) * Math.cos(RUDDER_STALL * D2R), STALL_DRAG = plateCn(RUDDER_STALL * D2R) * Math.sin(RUDDER_STALL * D2R);
+const STALL_SIDE = plateCn(RUDDER_STALL * D2R) * Math.cos(RUDDER_STALL * D2R);
 /** The most turn the rudder gives, at the stall, as a multiple of full helm's: see rudderTurn. */
 const TURN_PEAK = 1 + (HELM_STALL - 1) / 2;
 /**
@@ -132,7 +132,7 @@ const TURN_PEAK = 1 + (HELM_STALL - 1) / 2;
  * well before it stalls (a parabola from full helm's slope to none at the stall): a sixth more turn at 40 degrees than
  * at 30, a 7.7 m radius for 9. Past the stall it falls as a stalled plate's side force does, its normal force's part
  * across the flow (0.97 of the most at the deck's stop, 46.5 degrees: hard over she turns nearly as fast as at the stall,
- * and brakes a little, 133 N at 4.7 kt). The shape past full helm is an ESTIMATE (the physics review, 15 Nov 2026: growth in step with the
+ * and the blade's drag is all a plate's, rudderSepDrag). The shape past full helm is an ESTIMATE (the physics review, 15 Nov 2026: growth in step with the
  * angle all the way to 40 degrees would ask a lift coefficient over 2 of the blade).
  */
 export function rudderTurn(helm: number): number {
@@ -141,17 +141,36 @@ export function rudderTurn(helm: number): number {
   const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
   return TURN_PEAK * plateCn(a) * Math.cos(a) / STALL_SIDE;
 }
+/** ORC's effective draft, m (VPP Documentation 2025, eq. 4.20: MHSD, 0.92 of the deepest station's reduced draft; her
+ * full draft stands in for it, as netDrive has it). */
+export const EFF_DRAFT = 0.92 * orc.boat.draft;
 /**
- * The stalled rudder's braking, N, at `helm` (its units) and v m/s (ahead: sternway isn't braked by it here): a flat
- * plate's drag at that angle, ½ρv²·A·Cn·sin a, less a share for what the turn's own bleed of speed already has
- * (physics.ts turnBleed, which goes by how fast she's turning: the plate's drag at the stall, in the measure of the turn
- * she still gets). Nothing at the stall, about 800 N hard over at 4.7 kt: with the turn's bleed, some 10 to 15% under
- * the plate's drag alone there (the physics review's sum), an ESTIMATE. With nothing else, a knot off her in under 2 s.
+ * The hull and keel's induced drag, N, for a side force `fh` N at v m/s: ORC VPP Documentation 2025, eq. 6.37,
+ * DI = FH² / (π·½ρV²·Te²), as netDrive charges the sails' side force. Here for the force that turns her (physics.ts
+ * turnBleed): to follow a curve at v m/s, turning w rad/s, the water must push her mass·v·w toward its center, and her
+ * keel and rudder between them make that push at this cost, whichever carries it.
  */
-export function rudderBrake(helm: number, v: number): number {
-  if (helm <= HELM_STALL) return 0;
-  const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
-  return 0.5 * RHO_W * v * v * RUDDER.area * (plateCn(a) * Math.sin(a) - STALL_DRAG * rudderTurn(helm) / TURN_PEAK);
+export function inducedDrag(fh: number, v: number): number {
+  return fh * fh / (Math.PI * 0.5 * RHO_W * Math.max(0.5, v) ** 2 * EFF_DRAFT * EFF_DRAFT);
+}
+/** The flow angle at the blade, deg, where the water starts to break away from its back, and where it has broken away
+ * all along it. Her rudder is a flap on the keel's after edge, and for a plain flap "above a deflection of about 15° the
+ * flow begins to separate at the flap hinge", while "above a flap deflection of about 40° the load distributions for
+ * plain and split flaps were identical", a split flap's being fully separated (Cahill, Summary of Section Data on
+ * Trailing-Edge High-Lift Devices, NACA Report 938, 1949, pp. 4–6: "a large part of the drag of airfoils equipped with
+ * deflected plain flaps is caused by the fact that the flow over the flap separates at relatively low deflections (of
+ * the order of 15° or 20°)"). 40 is RUDDER_STALL, by the same evidence. */
+export const SEP_FROM = 15;
+/**
+ * The rudder's separation drag, N, with the water meeting the blade at `alphaDeg` and v m/s: a flat plate's drag at
+ * that angle (plateCn·sin a, as past the stall) for the share of the blade the flow has left: none to SEP_FROM, all of
+ * it at RUDDER_STALL and past. The share between them, in step with the angle, is an ESTIMATE (the report gives the two
+ * ends, not the curve). At 4.7 kt: nothing at 15°, 48 N at 21° (what the blade meets in a steady turn on 30° of helm,
+ * her stern's swing taking 9 off it), 210 N at 30°, 535 N at 40°.
+ */
+export function rudderSepDrag(alphaDeg: number, v: number): number {
+  const a = Math.min(Math.abs(alphaDeg), 90), share = clamp((a - SEP_FROM) / (RUDDER_STALL - SEP_FROM), 0, 1);
+  return 0.5 * RHO_W * v * v * RUDDER.area * plateCn(a * D2R) * Math.sin(a * D2R) * share;
 }
 /**
  * Ideal weather helm, deg: the rudder's small lift to windward pays for its drag. Sailing texts put it at about 3–5°
@@ -360,7 +379,7 @@ export function diFactor(heelDeg: number, drive: number, side: number): number {
 }
 export function netDrive(f: { main: SailForce; jib: SailForce }, heelDeg: number, v: number): number {
   const q = 0.5 * RHO_W * Math.max(0.5, v) ** 2, side = f.main.heel + f.jib.heel, drive = f.main.drive + f.jib.drive;
-  const fh = side, te = 0.92 * orc.boat.draft;
+  const fh = side, te = EFF_DRAFT;
   return drive - diFactor(heelDeg, drive, Math.abs(side)) * fh * fh / (Math.PI * q * te * te);
 }
 

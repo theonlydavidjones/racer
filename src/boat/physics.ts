@@ -13,7 +13,7 @@ import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
-import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
+import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, inducedDrag, rudderDrag, rudderSepDrag, rudderTurn, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
@@ -485,9 +485,8 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
   // turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what the sails' own turning
   // moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward the wind by herself,
   // which is how a roll tack starts her turning with less rudder), so the same turn costs less or more by her balance
-  b.v = Math.max(0, b.v * (1 - turnBleed(rate, b.v, b.h, ww.from, b.helmNeed) * dt));
-  // (the rudder held past its stall brakes her: balance.ts rudderBrake. Only your own hand puts it there)
-  if (handHelm !== undefined && Math.abs(handHelm) > HELM_STALL) b.v = Math.max(0, b.v - rudderBrake(Math.abs(handHelm), b.v) / HANDLING.mass * dt);
+  // (the blade where it is, b.helm: past its stall, where only your own hand puts it, all of it brakes)
+  b.v = Math.max(0, b.v * (1 - turnBleed(rate, b.v, b.h, ww.from, b.helmNeed, b.helm) * dt));
   // leeway, as a motion: her sails' side force across the water and the wind on her topsides and rig (HOVE.windSide) set
   // her bodily to leeward; her keel's lift with way on (slender wing: ½ρ·A·(πAR/2)·u·v = ½ρ·πT²·u·v) and her hull and keel
   // broadside to the water (cross-flow drag, HOVE.crossCd: Hoerner) hold her. At speed the lift does it: a few degrees
@@ -567,18 +566,38 @@ export const HOVE = {
 
 /**
  * The fraction of her speed a turn bleeds away per second (physics.ts's own step, and src/boat/arcs.ts's prediction):
- * dv/dt = −turnBleed·v. Turning bleeds speed through the rudder's drag: for the rudder angle the turn needs, less what
- * the sails' own turning moment does for it (her helm: heeled to leeward she carries weather helm and comes up toward
- * the wind by herself, which is how a roll tack starts her turning with less rudder), so the same turn costs less or
- * more by her balance. `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg.
+ * dv/dt = −turnBleed·v. Two drags, both from sources (18 Nov 2026; before, dv/dt = −0.15·v·|ω|, HANDLING.turnDrag, an
+ * uncited estimate that charged the same share of her speed for each degree turned however hard the helm was over):
+ * - her hull and keel's induced drag for the side force that turns her, her mass·v·ω toward the curve's center
+ *   (balance.ts inducedDrag: ORC's eq. 6.37, as her sails' side force is charged). It grows as the square of the turn
+ *   rate, so a slow turn keeps her way and a hard one spends it: 16 N at 4°/s, 252 N at 16°/s (full helm), at 4.7 kt;
+ * - her rudder's separation drag at the angle the water meets the blade (balance.ts rudderSepDrag: NACA Report 938's
+ *   plain flap), which is the blade's angle less what her swinging stern takes off it (ω·RUDDER.arm/v, the share of it
+ *   HOVE.rudderFlow lets past the keel): 48 N on 30° of helm in a steady turn at 4.7 kt, 200 N on 40°.
+ * Together, at full helm at 4.7 kt, 300 N, where the old estimate gave 260 N: within a sixth of it, with nothing fitted.
+ * On 40°, 543 N for a sixth more turn (the old, 303 N), so the stall's quicker tack is paid for; on 15°, 63 N for half
+ * the turn (the old, 130 N). For each 90° turned, of her speed: 6% on 7.5°, 11% on 15°, 27% on 30°, 42% on 40° (the old,
+ * 21% on any).
+ * `rate` deg/s (+ to starboard), `h` her heading, `windFrom` the wind she has, `helmNeed` deg. `helm`: how far over the
+ * blade is (FULL_RUDDER each, either sign), where the caller knows; left out, it's the helm that turn rate takes, less
+ * what the sails' own turning moment does for it (her weather helm brings her up toward the wind by herself, which is
+ * how a roll tack starts her turning with less rudder).
  */
-export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0): number {
-  let bleed = 1;
-  if (Math.abs(rate) > 0.5) {
-    const toWind = rate * Math.sign(wrap(windFrom - h) || 1), turn = FULL_RUDDER * toWind / Math.max(1, maxTurnRate(v));
-    bleed = clamp(Math.abs(turn - clamp(helmNeed, -12, 12)) / Math.max(2, Math.abs(turn)), 0.3, 2);
+export function turnBleed(rate: number, v: number, h: number, windFrom: number, helmNeed = 0, helm?: number): number {
+  if (v <= 1e-3) return 0;
+  const w = Math.abs(rate) * D2R;
+  let deg: number;
+  if (helm !== undefined) deg = Math.abs(helm) * FULL_RUDDER;
+  else {
+    // (the helm this rate takes of her rudder: rudderTurn turned about, to the stall; and her balance's share of it)
+    const r = Math.abs(rate) / Math.max(1, maxTurnRate(v)), S = HELM_STALL - 1;
+    const hm = r <= 1 ? r : 1 + S * (1 - Math.sqrt(Math.max(0, 1 - 2 * (r - 1) / S)));
+    const toWind = Math.sign(rate) * Math.sign(wrap(windFrom - h) || 1);
+    deg = Math.abs(hm * FULL_RUDDER * toWind - clamp(helmNeed, -12, 12));
+    if (Math.abs(rate) <= 0.5) deg = 0; // (sailing straight: the helm she carries is rudderDrag's, in the step)
   }
-  return HANDLING.turnDrag * bleed * Math.abs(rate) * D2R;
+  const alpha = Math.max(0, deg - HOVE.rudderFlow * w * RUDDER.arm / Math.max(0.5, v) / D2R);
+  return (inducedDrag(HULL.displacement * v * w, v) + rudderSepDrag(alpha, v)) / (HANDLING.mass * v);
 }
 
 /**
