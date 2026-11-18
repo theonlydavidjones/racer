@@ -86,6 +86,15 @@ function windSpectrum(tp: number): void {
   specTot = tot || 1; specTp = tp;
 }
 
+/** A wave's group speed (m/s) in water `h` deep (m; Infinity: deep), for its frequency w and wavenumber k there: n·ω/k,
+ * n = ½(1 + 2kh / sinh 2kh) (linear theory: the Shore Protection Manual, and any text). In deep water n is ½, the speed
+ * half the wave's own (to the bit as before the depth, where the depth is infinite: offshore and off the chart; at a
+ * course's 5-60 m the longest components feel it, by a few parts in 1e5 to a per cent); in the shallows it rises toward 1. Past kh ≈ 10 the term is under
+ * 1e-7 of n, and sinh would overflow past ~350: deep. */
+export function groupSpeedAt(w: number, k: number, h: number): number {
+  const kh = k * h, n = kh > 10 ? 0.5 : 0.5 * (1 + 2 * kh / Math.sinh(2 * kh));
+  return n * w / k;
+}
 /** How far (deg) the wind may go from the direction a pair was born for before the pair changes over: past a gust's
  * wobble and the minute's easing. AN ESTIMATE, the model's own. */
 const REAIM_OFF = 12;
@@ -105,14 +114,6 @@ const REAIM_OFF = 12;
  * dying is given the growing's time, an ESTIMATE: no measurement of short chop's decay after a shift was found (the
  * measured turning of a whole sea's mean direction, Hasselmann et al. 1980, is of the same order: an hour or more).
  */
-/** A wave's group speed (m/s) in water `h` deep (m; Infinity: deep), for its frequency w and wavenumber k there: n·ω/k,
- * n = ½(1 + 2kh / sinh 2kh) (linear theory: the Shore Protection Manual, and any text). In deep water n is ½, the speed
- * half the wave's own, exactly as before the depth; in the shallows it rises toward 1. Past kh ≈ 10 the term is under
- * 1e-7 of n, and sinh would overflow past ~350: deep. */
-export function groupSpeedAt(w: number, k: number, h: number): number {
-  const kh = k * h, n = kh > 10 ? 0.5 : 0.5 * (1 + 2 * kh / Math.sinh(2 * kh));
-  return n * w / k;
-}
 const RHO_RATIO = 1.2 / 1025, CD10 = 1.2e-3, KT_MS = 0.5144;
 function lifeTime(k: number, w: number, kt: number): number {
   const c = w / k, us = Math.sqrt(CD10) * Math.max(2, kt) * KT_MS, g = 0.25 * RHO_RATIO * (28 * us / c - 1) * w;
@@ -186,6 +187,10 @@ export class WaveField {
     }
   }
 
+  /** The water's depth at the reference place (m, the chart's below MLLW and the tide's height; null off the chart:
+   * deep). The field eases to it (update), so a boat sailing on into shoaler water sees the waves shorten, not jump. */
+  setDepth(d: number | null): void { this.depthTo = d == null || Number.isNaN(d) ? Infinity : Math.max(0.3, d); } // (never under 0.3 m: a guard for the arithmetic, not a depth she sails in)
+
   /**
    * Ease the heights toward the sea `s` (the reference sea), the chop for the wind from `windFrom` (the course's mean
    * wind) at `windKt`, the swell turning about `about` (your boat).
@@ -194,10 +199,6 @@ export class WaveField {
    * the water by at many times the waves' own speed: the owner's "the water surface starts rushing by"). So as the
    * swell's d turns, φ takes up the change at `about`, and its pattern turns about there. The chop's d never turns.
    */
-  /** The water's depth at the reference place (m, the chart's below MLLW and the tide's height; null off the chart:
-   * deep). The field eases to it (update), so a boat sailing on into shoaler water sees the waves shorten, not jump. */
-  setDepth(d: number | null): void { this.depthTo = d == null || Number.isNaN(d) ? Infinity : Math.max(0.3, d); } // (never under 0.3 m: a guard for the arithmetic, not a depth she sails in)
-
   update(s: SeaHere, windFrom: number, dt: number, about: Vec, windKt = 10): void {
     const turn = (i: number, dir: number) => {
       if (dir === this.dir[i]) return;

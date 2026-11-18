@@ -84,4 +84,24 @@ describe("the drawn wave groups as the depth changes", () => {
     }
     expect(worst).toBeLessThan(1.6); // (its own group speed, the old one and the new within that)
   });
+
+  // (a wind shift in shallow water, through main's chop change-over (each pair dying and reborn for the new wind):
+  // Deep Physics' review of the merge, 18 Nov 2026, probed it; this keeps it. The chop's height holds, its direction
+  // turns toward the new wind in the shallows as in deep water, and the surface where she is doesn't jump more for the
+  // depth)
+  it('a 30-degree wind shift at 1.5 m: the chop holds its height and turns, as in deep water, without jumps', () => {
+    const s = { ...FLAT_SEA, hsW: 0.6, tpW: 3, hsS: 0.4, tpS: 14, fetch: 8000 }, about = { x: 500, y: 200 }, out: Record<string, { hs: number; from: number; jump: number }> = {};
+    for (const depth of [Infinity, 1.5]) {
+      const g = new WaveField(14); g.setDepth(depth); g.update(s, 270, 0, about, 15);
+      let t = 0, prev = g.height(about, 0, 1, 1), jump = 0;
+      for (let n = 0; n < 20 * 60 * 10; n++) { g.update(s, 300, 0.1, about, 15); t += 0.1; const h = g.height(about, t, 1, 1); jump = Math.max(jump, Math.abs(h - prev)); prev = h; }
+      let e = 0; for (let i = 0; i < N_WIND; i++) e += g.amp[i] ** 2 / 2;
+      out[String(depth)] = { hs: 4 * Math.sqrt(e), from: g.chopFrom, jump };
+    }
+    const deep = out.Infinity, shoal = out['1.5'];
+    expect(shoal.hs).toBeCloseTo(deep.hs, 2); expect(shoal.hs).toBeCloseTo(0.6, 2);
+    expect(shoal.from - 270, 'turned toward the new wind').toBeGreaterThan(3); expect(shoal.from).toBeLessThan(300.5);
+    expect(shoal.jump, 'the surface in a tenth of a second (m)').toBeLessThan(2 * deep.jump + 0.01);
+  });
 });
+

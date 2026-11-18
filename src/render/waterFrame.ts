@@ -1,5 +1,5 @@
 import type { Vec } from '../core/math';
-import { N_WAVES, type WaveField } from '../environment/waveField';
+import { N_WAVES, groupSpeedAt, type WaveField } from '../environment/waveField';
 
 /**
  * The drawn water's patterns turn about where you are, not about the Bay's origin (the owner's "rushing water", its
@@ -77,7 +77,7 @@ export class EnvelopeFrame {
       // (the groups run at the group speed, c·n: n = ½ in deep water, toward 1 in shallow, n = ½(1 + 2kd / sinh 2kd),
       // linear theory, Dean & Dalrymple ch. 3. When the depth changes it, the groups where they are carry on: the change
       // times the wave time, thousands of seconds, would otherwise slide them across the water)
-      const k = f.k[i], kd = k * f.depth, n = kd < 20 ? 0.5 * (1 + 2 * kd / Math.sinh(2 * kd)) : 0.5, cg = k > 0 ? n * f.w[i] / k : 0;
+      const k = f.k[i], cg = k > 0 ? groupSpeedAt(f.w[i], k, f.depth) : 0; // (the field's own: environment/waveField.ts)
       if (this.primed && cg !== this.cg[i]) this.ua[i] += (cg - this.cg[i]) * t;
       this.cg[i] = cg;
       e[i * 2] = o.x * s + o.y * c - cg * t + this.ua[i];
