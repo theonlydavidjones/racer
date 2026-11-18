@@ -60,7 +60,10 @@ describe('The tack and gybe drill: each manoeuvre scored against a twin that sai
   });
   it('a half-hearted tack (half helm) is slow through the eye, loses more and is told so', () => {
     const half = drill('tack', 10, { tiller: -0.4 })!;
-    expect(half.lostM).toBeGreaterThan(2 * half.goodM);
+    // (sim-measured, 18 Nov 2026, on the turn's sourced cost (physics.ts turnBleed): 11.4 m against a good crew's 6.65,
+    // 1.72 of it. It was 15.3 against 5.30, 2.89, asked over 2: a gentle turn bleeds less of her way now and full helm's
+    // more. The same headroom on the new measurement: 1.2)
+    expect(half.lostM).toBeGreaterThan(1.2 * half.goodM);
     expect(half.coach).toMatch(/Too slow through the eye/);
   });
   it('the tide does not score her: the same tack in a 1.5 kt current loses about the same', () => {

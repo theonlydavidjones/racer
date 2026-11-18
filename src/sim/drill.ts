@@ -238,10 +238,14 @@ export class DrillTracker {
  * search of coaching texts found none,
  * only words ("too fast a turn and you throw off speed; too slow and you lose momentum": US Sailing, "Tacking Tips
  * Part I – The Turn").
+ * Measured again, every wind, 18 Nov 2026, with what a turn costs her taken from its sources (physics.ts turnBleed): the
+ * sim crew's tack on full helm loses a fifth more than it did (4.6 to 5.8 m in 12 kt, 7.3 to 8.9 in 6; it was 8.1, 8.8,
+ * 7.3, 6.0, 4.6, 5.1, 5.5, 8.7 m by the wind), her speed dipping to 0.63 of what she had, not 0.67, and a second or two
+ * longer back to speed; a gybe a tenth more in light air (1.9, 2.3, 2.5, 2.4, 2.2 m before, to 12 kt).
  */
 export const SIM_CREW: Record<DrillKind, [number, number, number, number, number, number][]> = {
-  tack: [[3, 8.0, 5.0, 0.65, 75, 8.1], [4, 5.9, 6.6, 0.64, 58, 8.8], [6, 4.2, 9.0, 0.67, 35, 7.3], [8, 3.6, 10.4, 0.67, 24, 6.0], [12, 3.1, 11.9, 0.67, 15, 4.6], [16, 2.9, 12.5, 0.63, 14, 5.1], [20, 2.9, 12.4, 0.59, 14, 5.5], [25, 3.1, 11.5, 0.47, 16, 8.7]],
-  gybe: [[3, 0, 4.1, 0.89, 54, 1.9], [4, 0, 5.2, 0.89, 46, 2.3], [6, 0, 7.3, 0.89, 33, 2.5], [8, 0, 8.7, 0.91, 25, 2.4], [12, 0, 10.1, 0.92, 18, 2.2], [16, 0, 9.2, 0.94, 12, 1.6], [20, 0, 9.8, 0.95, 10, 1.4], [25, 0, 10.2, 0.95, 10, 1.4]]
+  tack: [[3, 8.3, 4.9, 0.61, 75, 9.4], [4, 6.1, 6.4, 0.60, 64, 11.0], [6, 4.3, 8.7, 0.64, 38, 8.9], [8, 3.7, 10.1, 0.63, 26, 7.5], [12, 3.1, 11.6, 0.63, 17, 5.8], [16, 3.0, 12.1, 0.59, 15, 6.4], [20, 3.0, 11.9, 0.55, 14, 6.4], [25, 3.2, 11.0, 0.43, 17, 10.1]],
+  gybe: [[3, 0, 4.1, 0.87, 56, 2.2], [4, 0, 5.2, 0.88, 48, 2.6], [6, 0, 7.2, 0.88, 34, 2.8], [8, 0, 8.7, 0.90, 26, 2.7], [12, 0, 10.1, 0.92, 18, 2.3], [16, 0, 9.2, 0.94, 12, 1.6], [20, 0, 9.7, 0.95, 10, 1.4], [25, 0, 10.2, 0.95, 10, 1.4]]
 };
 /** The sim crew's figures at `tws`, between the winds measured. */
 export function simCrew(kind: DrillKind, tws: number): { dead: number; rate: number; minSpeed: number; back: number; lostM: number } {
@@ -255,8 +259,8 @@ export function simCrew(kind: DrillKind, tws: number): { dead: number; rate: num
 export const finishLow = (tws: number) => (tws < 8 ? 5 : tws <= 15 ? 3 : 0);
 
 /** One plain line: the biggest thing to change, against the sim crew's own (SIM_CREW), or that it was good. (The sim's
- * rudder doesn't yet brake as a real one does at full helm, so a hard spin costs little more than a good tack: the
- * 'turned too fast' line rarely fires. With Deep Physics. And no 'let the jib go too early': the sim crew itself lets it go
+ * rudder brakes as a real one does from 18 Nov 2026, physics.ts turnBleed: a hard spin at the stall costs twice a turn
+ * on full helm for each degree, so the 'turned too fast' line has something to fire on. And no 'let the jib go too early': the sim crew itself lets it go
  * at head to wind, before it backs, so there's no honest signal for it yet.) */
 export function coachLine(s: ManoeuvreScore, jibMine = false): string {
   const g = simCrew(s.kind, s.tws), lost = s.lostM - s.goodM;
