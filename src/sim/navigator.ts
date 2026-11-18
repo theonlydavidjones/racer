@@ -291,9 +291,16 @@ function* passagePlanSteps(w: SimView, live = true): Generator<void, PassagePlan
   // or joined and waited on. Worked out here a second time, it was ~45 s more of the page's thread from Mile Rock)
   const k = nowKey(w)!, m = nowMemo.get(w);
   let pn = fresh(m, k) ? m!.v : live ? liveFor(w) : (yield* passageNowSteps(w));
+  // (the plan it waits on is the one being worked out when it began waiting, or the one that starts at once: once that's
+  // in, it's taken, though she's sailed on. Waiting on whatever was running, it waited again on the next live plan, begun
+  // each 150 m as she sails (passageLive), whenever the first took her more than that: the panel's plan from Mile Rock in
+  // 16 s of the page's thread with one, 42 s with two, on the same quiet host; Marinas, 18 Nov 2026)
+  let on: unknown;
   while (!pn && live) {
-    passageLive(w); waiting.add(w); yield; waiting.delete(w);
-    if (!jobs.get(w)) { pn = liveFor(w) ?? nowMemo.get(w)?.v ?? null; if (!pn) { pn = (yield* passageNowSteps(w)); break; } }
+    passageLive(w); const j = jobs.get(w); if (on === undefined) on = j ?? null;
+    if (j && j === on) { waiting.add(w); yield; waiting.delete(w); continue; }
+    pn = liveFor(w) ?? nowMemo.get(w)?.v ?? null; if (!pn) pn = (yield* passageNowSteps(w));
+    break;
   }
   if (!pn) return null;
   const route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
