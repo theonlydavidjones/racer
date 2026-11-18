@@ -182,6 +182,16 @@ sources. Each shipped item is added there when it's published.
 
 ## Priorities (owner's ranking, November 2026)
 
+**The sprint: stability, performance, playability** (owner's ruling, 18 November 2026, via the Coordinator):
+1. In-flight work finishes and ships: what's already built or approved (the sail band's tips, the jumpers and the
+   Hoist tabs, Sail home and tie-up, the tiller-angle needle, Mile Rock and the rest of v208).
+2. After that, no new features until the sprint ends.
+3. The sprint's order: the owner's bugs first, then lag and frame time, then playability end to end (slip out,
+   hoist, sail, home, tie up, and a race).
+4. Each bug gets a test that reproduces it before it's fixed.
+5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
+6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
    shelves and fiddles, floorboards, knees, a hanging locker, the forepeak opening to the rule, the keel-stepped mast).
@@ -273,11 +283,11 @@ sources. Each shipped item is added there when it's published.
    - Speed: the pair passed at 0.972. Changes to how boats sail or are judged are now budgeted on the ten-race mean (the
      owner, 18 Nov; Capacity's PR #465).
    - Optional, for the owner: measure hard-over at Josephine.
-   - Open: **turn drag** (Deep Physics, turn-drag). It replaces the uncited 0.15 with ORC VPP 6.37 induced drag and the
+   - Open, parked for the sprint: **turn drag** (Deep Physics, turn-drag). It replaces the uncited 0.15 with ORC VPP 6.37 induced drag and the
      blade's separation from 15° (NACA Report 938; the 15–40° ramp is an estimate), so a tack loses 0.8–2.1 lengths. The
      physics review is done; the full suite and the ten-race budget are left. A known limit: the keel's side forces are
      charged separately, not as their sum squared.
-   - Open: **the slow-boat AI** (Skipper Model). It centers the helm under 1 kt instead of hunting, then looks ahead to
+   - Open, parked for the sprint: **the slow-boat AI** (Skipper Model). It centers the helm under 1 kt instead of hunting, then looks ahead to
      keep clear by its speed (every fouler was under 2.7 m/s). Judged with fouls-pair (#461).
    - Open: weather helm against the AI's turn (not started), and the #460 rules contact fix (held from v208 for the
      duck test, with Rules).
@@ -448,6 +458,14 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q4. **Now — the backstay's chainplates where the tiller would hit them** (owner, 18 November, with a screenshot;
+   accuracy; now; 1 h): "backstay attachments are too far forward. the tiller would run right into them. they should sit
+   about one inch forward of the aft edge of the deck, about six inches from the tiller on either side." In
+   src/render/boatMesh.ts the plates are BS_CHAINPLATE_X = 0.3 m out, forward of the deck's edge. Move them to 2.5 cm
+   forward of the after deck's aft edge, and about 15 cm clear of the tiller each side (≈0.17 m out with its width).
+   The bridle's legs follow. The ensign staff's place was measured as "equidistant from the toe rail and the starboard
+   chain plate", so keep it at the owner's 0.46 m and check the two stay clear. Add a test that the tiller's swing,
+   hard over at 46.5°, stays clear of both plates. Check it from both quarters.
 8q3. **Now — bug: no Hoist tabs on a cruise started mid-water with the sails down** (owner, 18 November; bug; now; 1–2 h):
    "while cruising, I started a cruise mid-water with sails down. I don't see hoist buttons. I should always see those if
    sails are down." The tabs come from app.ts `hoistTab()` and are drawn by sailBand.ts (`.sb-hoist`, ~L553). It hides
