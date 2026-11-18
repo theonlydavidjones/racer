@@ -8,6 +8,9 @@
 //   alone, it couldn't get there).
 // - Waiting, holding on: from Coyote Point to the Gate at 07:30 in 14 kt, the front lay 500-700 m from the Gate for 70
 //   minutes against the flood and got through at 168.2 (given up on the stall and a dead way alone, it couldn't either).
+// - And the give-up is the passage's direct try's alone (it then goes stretch by stretch): asked of the router in general,
+//   it cut a long wait on the foul tide in Raccoon Strait (Belvedere Point to Ayala Cove against the ebb in 5 kt, 25 Nov
+//   15:00), given up at 218 min where it arrives at 327.5 (Deep Physics' second review). Not asked, the router gets there.
 import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
@@ -16,7 +19,7 @@ import { SLIPS, harborAt } from '../src/geo/marina';
 import { LL } from '../src/geo/geo';
 import { dist } from '../src/core/math';
 import { outlookFor } from '../src/sim/outlook';
-import { routeLegSteps } from '../src/sim/router';
+import { routeLeg, routeLegSteps } from '../src/sim/router';
 import { passageNow } from '../src/sim/navigator';
 
 const sail = (o: Partial<Settings>) => ({ ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: '', current: 'real', traffic: 0, fleet: 0, opponents: [], windKind: 'west', ...o } as Settings);
@@ -30,7 +33,7 @@ describe('a front that has lost the way is given up; one that is waiting is kept
     const V = 6 * 1852 / 3600, h = 75 * Math.PI / 180, E = 117, W = w as unknown as { t: number };
     const a = { x: p.x + Math.sin(h) * V * E, y: p.y + Math.cos(h) * V * E }; W.t += E;
     const H = harborAt(slip)!; let b = H.exits[0]; for (const x of H.exits) if (dist(x, slip) < dist(b, slip)) b = x;
-    const g = routeLegSteps(outlookFor(w as never), a, { ...b }, w.clockUtc + 60, 30, 360); let r = g.next();
+    const g = routeLegSteps(outlookFor(w as never), a, { ...b }, w.clockUtc + 60, 30, 360, undefined, Infinity, true); let r = g.next();
     while (!r.done) r = g.next();
     expect(r.value.ok).toBe(false);
     expect(r.value.minutes, 'the front searched on to its 360 minutes').toBeLessThan(150);
@@ -51,5 +54,12 @@ describe('a front that has lost the way is given up; one that is waiting is kept
     const w = new World(COURSES[0], sail({ windKt: 14, sailFrom: 'm-CM2', sailTo: 'gate', tideDate: '2026-11-14', tideTime: '07:30' }), 7, { freeSail: true });
     const pn = passageNow(w as never)!;
     expect(pn.ok).toBe(true); expect(pn.minutes).toBeCloseTo(168.154, 2);
+  }, 300_000);
+
+  it('Raccoon Strait eastbound against the ebb in 5 kt: the router, not asked to give up, waits it out and gets there at 327.5 minutes', () => {
+    const w = new World(COURSES[0], sail({ tideDate: '2026-11-25', tideTime: '12:00', windKt: 5 }), 1, { freeSail: true });
+    w.step(DT);
+    const r = routeLeg(outlookFor(w as never), LL(37.8655, -122.456), LL(37.871, -122.435), w.clockUtc + 180, 30, 360); // (leaving 15:00)
+    expect(r.ok).toBe(true); expect(r.minutes).toBeCloseTo(327.525, 2);
   }, 300_000);
 });
