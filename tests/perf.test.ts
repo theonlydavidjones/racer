@@ -13,6 +13,7 @@ import { DT, World } from '../src/sim/world';
 import { SyncMirror, SyncSource } from '../src/sim/sync';
 // @ts-expect-error (a plain .mjs script, no types)
 import { BUDGET_MAX, BUDGET_REF, measure } from '../scripts/check/perf-pair.mjs';
+import { HUNG, PLAN_S, SLICE_MAX, pct, sailHomeFromMileRock } from './helpers/mileRock';
 
 /** A fixed workload like the sim's (trig, square roots, small arrays). */
 /**
@@ -76,4 +77,15 @@ describe('performance budget: the sim', () => {
     expect(page).toBeLessThan(PAGE_BUDGET);
     expect(worker).toBeLessThan(WORKER_BUDGET);
   }, 180_000);
+
+  // The page's thread held no longer than SLICE_MAX at the 99.9th percentile by the live plan's slices, Sail Home from
+  // Mile Rock (sailHome-mileRock.test.ts's notes): a wall-clock bar, so it's here, with this file's rerun-alone rule.
+  it('Sail Home from Mile Rock: the live plan\'s slices within SLICE_MAX (99.9th percentile, ms on the wall)', async () => {
+    const r = await sailHomeFromMileRock({ panel: false, hungPlanS: HUNG * PLAN_S, hungPanelS: 0 });
+    console.log(`Mile Rock's slices: 99.9th percentile ${pct(r.slices, 99.9).toFixed(1)} ms, the longest ${pct(r.slices, 100).toFixed(1)} (the plan in ${r.planS.toFixed(0)} s)`);
+    expect(r.plan, 'the plan came in').not.toBeNull();
+    // (a percentile, not the longest: on a shared host a collection or the machine's other work can land in one slice)
+    expect(pct(r.slices, 99.9), 'the slices, 99.9th percentile (ms)').toBeLessThan(SLICE_MAX);
+  }, 1_000_000);
 });
+
