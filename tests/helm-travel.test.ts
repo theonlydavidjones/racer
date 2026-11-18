@@ -101,8 +101,10 @@ describe('the helm\'s travel: the tiller to the deck at 46.5 degrees, the rudder
     // tack at the stall is 0.63 s slower uncalled, 7.65 s against 7.02. It was read in 14 kt, 0.25 s slower there (6.22
     // against 5.97), asked over 0.1; on the turn's sourced cost, 18 Nov 2026, her stall tack in 14 kt takes 6.70 s, slow
     // enough that they've seen it coming, called or not, and the two are the same. So it's read where it still shows: the
-    // same check, the same 0.1 s, in 20 kt)
+    // same check, the same 0.1 s, in 20 kt; and in 14 kt, where it changed, the uncalled tack is still no quicker than
+    // the called one: the Coordinator's ruling, 18 Nov 2026)
     expect(tack(20, HELM_STALL, false).t).toBeGreaterThan(tack(20, HELM_STALL).t + 0.1);
+    expect(tack(14, HELM_STALL, false).t).toBeGreaterThanOrEqual(tack(14, HELM_STALL).t);
     const hard = tack(8, HELM_MAX), stall = tack(8, HELM_STALL);
     // (hard over at the deck's stop, 18 Nov 2026: 7.50 s against 6.87 and 2.54 kt out of it against 2.80. At 75: 19.98 s,
     // asked over twice the stall's, and 0.98 kt, asked under 0.6 of it: the old properties belonged to a tiller 35 degrees past
