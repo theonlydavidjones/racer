@@ -195,7 +195,17 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   // sailLeg): that arrival is kept as the time to beat, and the front searches on until it beats it or passes it. Taken
   // as the end at once, a light-air case (Horseshoe Bay to Yellow Bluff, 25 Nov 15:30, 6 kt) took the rules' 221 min
   // where the front, searching on, got there in 131. STALL is an estimate: docs/CONSTANTS.md)
-  const STALL = 10; let nearD = dist(a, b), nearStep = 0, bound: { k: number; r: SailResult; t: number } | null = null;
+  // (and a front that has lost the way, given up: no nearer the mark for GIVE_UP minutes, no rescue's time to beat, and
+  // fallen back by more than half the ground it had made. The passage then tries the way round the land stretch by
+  // stretch, as it does when this try fails. A front that is waiting, not lost, holds its ground and is kept: from Coyote
+  // Point to the Gate at 07:30 in 14 kt it lay within 500-700 m of the Gate for 70 minutes against the flood and got
+  // through at 168 (given up there, the passage had no way at all). The lost one: from Mile Rock, some departures' fronts
+  // came within 1.5 km of Gashouse Cove, lost the way in, fell back 3.5 km across the Bay and searched it to maxMin, 360
+  // minutes, every rescue ashore or blocked: ~25 s of the page's thread for an answer the stretches gave in ~4, the same
+  // to the minute (the passage panel's plan missed its 120 s three runs in four). GIVE_UP and the half are estimates:
+  // docs/CONSTANTS.md)
+  const STALL = 10, GIVE_UP = 3 * STALL;
+  let nearD = dist(a, b), nearStep = 0, gainStep = 0, bound: { k: number; r: SailResult; t: number } | null = null;
   const beatBy = () => Math.min(limit, bound ? bound.t : Infinity);
   for (let step = 0; step * STEP_MIN < maxMin && best < 0 && t0 + step * STEP_MIN < beatBy(); step++) {
     const sectors = new Map<number, Node>(); // sector → the point kept there (only those are stored: the rest are many)
@@ -255,7 +265,8 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
     if (!front.length) return yield* (bound ? finish(bound.k, true, undefined, bound.r) : finish(0, false, 'land'));
     let k = front[0]; for (const i of front) if (dist(nodes[i].p, b) < dist(nodes[k].p, b)) k = i;
     const dk = dist(nodes[k].p, b);
-    if (dk < nearD - 10) { nearD = dk; nearStep = step; }
+    if (dk < nearD - 10) { nearD = dk; nearStep = gainStep = step; }
+    else if (!bound && (step - gainStep) * STEP_MIN >= GIVE_UP && dk - nearD > 0.5 * (dist(a, b) - nearD)) return yield* finish(k, false, 'time');
     else if ((step - nearStep) * STEP_MIN >= STALL) {
       const n = nodes[k], r = yield* sailLegSteps(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
       if (r.ok && (!bound || n.t + r.minutes < bound.t) && trackClear(r.path, b, arrive)) bound = { k, r, t: n.t + r.minutes }; // (the rules sample every 10 s: a pier can slip between)
