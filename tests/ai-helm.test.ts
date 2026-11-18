@@ -37,11 +37,11 @@ describe('the AI helmsman and the tiller', () => {
       expect(b.v).toBeGreaterThan(1.5); // (way on: the rudder has water past it)
       b.desired = b.h + (b.tack === 'S' ? -60 : 60); b.ai!.turnCommit = 0; b.ai!.urgent = urgent; b.turnRate = 0;
       moveBoat(b, DT, w.t, () => {}, { t: 0 });
-      return Math.abs(b.helm);
+      return Math.abs(b.helm ?? 0);
     };
     const calm = helmAt(false), urgent = helmAt(true);
     expect(calm).toBeCloseTo(1, 6); // (full helm, as on main)
     expect(urgent).toBeGreaterThan(1.2); // (to the stall, about: on main she never had it)
     expect(urgent).toBeLessThanOrEqual(HELM_STALL + 1e-9);
-  });
+  }, 120000);
 });

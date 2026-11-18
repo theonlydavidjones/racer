@@ -903,6 +903,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
     const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
     if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+      // (about to touch, as the Rule 14 branch below reckons it: rule 14 binds her too, and the keep-clear boat is the one
+      // whose helm goes over hardest at the last moment, to the rudder's stall: physics.ts, the physics review)
+      if (cp.t < lagT + 1 && cp.d < 4.5 + 0.5 * lagM) ai.urgent = true;
       // Already opening, with room between the hulls: she is keeping clear (Definitions, Keep Clear: the other boat can
       // sail her course with no need to act), so she sails on at full speed: on her course if that keeps the room, on
       // her heading if her course would close it again. (Easing and heading up on regardless, a windward boat slowed
