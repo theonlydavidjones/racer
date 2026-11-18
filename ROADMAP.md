@@ -1216,11 +1216,17 @@ sources. Each shipped item is added there when it's published.
      small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
      far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
      November the owner said "no tiller strip"; this is a needle, not the old strip).
-   - **An audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
+   - **Now — an audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
      the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
      these.
+     - **First: the sail band's and coach's tips** (owner, 18 November, with a screenshot of Jumpers' tip, 11 lines; now;
+       3–5 h): "we need to work on these gargantuan copy blocks. no one will read this." Each tip (src/ui/sailBand.ts,
+       e.g. `jt`) becomes one line of about 12 words: what it does, and the cue to act (Jumpers: "More turns stiffen the
+       masthead. Tall tick: North's 2.5."). The click and scroll use goes to Keys. The sources and the physics go into the
+       code's comments, or into one "Why" link per control if the owner wants them kept. All the band's new lines go to
+       the owner as one table before they replace the old ones. A test: no band tip over about 90 characters.
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
