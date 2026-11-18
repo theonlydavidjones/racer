@@ -262,7 +262,8 @@ sources. Each shipped item is added there when it's published.
    ~~**Now, first in the pass: the helm's travel and response**~~ (done, v206: #437, Crew Figures + Deep Physics; ai-helm,
    Skipper Model). Where it stands:
    - The after deck stops the tiller, the same both sides (the owner chose option (a)): HARD_OVER 46.5°, fitted to three
-     of the owner's photos (41–49°) and labeled as fitted. Drawn with an 8 cm pin and 6° rest, so the stop is 46.8°.
+     of the owner's photos (41–49°) and labeled as fitted. Drawn with a 12 cm pin and 4° rest (Deep Physics suggests
+     8 cm and 6°, a 46.8° stop; held by Crew Figures, not shipped).
    - The ensign staff is at the owner's spot on the starboard quarter, 0.46 m out and 2 in forward of the deck's aft
      edge, clear of the tiller. The aft cleat is on the centerline.
    - The rudder stalls at 40°. Her gyration is 0.25 → 0.19, so the turn answers in 0.36 s at 4.7 kt, not 0.6.
