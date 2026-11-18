@@ -703,11 +703,33 @@ export const RUDDER_RAKE = Math.atan2(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HE
  * would come down onto the deck, so past about 45° it rides up on the pin over the coaming and the rail (tillerLift), to
  * about 20° at 75°. ESTIMATES: its length, rest angle and the pin's height (the rudder head's top, 12 cm above the
  * transom), measured against the photos, not a drawing (tests/tillerClear.test.ts).
+ *
+ * The pin re-placed, 18 Nov 2026 (the owner's r248: at his measured backstay chainplates, 0.17 m out, the tiller's root
+ * ran into the bridle's legs in the last 4° to hard over). ESTIMATES, from photos, none of them a drawing:
+ * - Height: 9 cm above the transom's top at the sheer (was 12). The side view of another Folkboat's stern underway
+ *   (reference/photos/folkboat-stern-tiller-side-underway.jpg, scaled from the 0.60 m freeboard at the transom) gives
+ *   5 ± 3 cm, CircleSea's (circlesea-helm-on-aft-rail-side.jpg, the same scale) about 5 ± 3: 9 is a centimeter over
+ *   both. Lower, the tiller can't be 5 cm off the deck amidships (tests/tillerpath.test.ts) and still meet the deck at
+ *   HARD_OVER: the deck's crown is 3 cm over the sheer at the transom, and the root 2.8 cm in radius.
+ * - Aft: 18 cm aft of the transom's top (was 21), CircleSea's photo 11 ± 6 (the tiller's end over the rudder head's
+ *   after corner, the pin a little forward of it).
+ * - Rest: 5.75° above level (was 4), the angle that keeps the arc meeting the deck at HARD_OVER, 46.5° (balance.ts):
+ *   its end then 17 cm over the deck at the after coaming (Josephine's photos 15 ± 4; 16.7 before). The stop is where
+ *   it was, so no physics number moves.
+ * The tiller is then 5.25 cm off the deck amidships (asked over 5) and its axis 5.08 cm from the bridle's legs and
+ * plates (2.7 before; tests/backstayplates asks 4.8): the only pins that keep both are within a few millimeters of
+ * this one, so a measurement of Josephine's pin at the boat is what would settle it.
  */
-export const TILLER = { rest: 4, len: 1.2 };
+export const TILLER = { rest: 5.75, len: 1.2 };
+/** The tiller's pin, boat frame, from the transom's top at the sheer (m): up, and aft (ESTIMATES: above). */
+export const TILLER_PIN = { up: 0.09, aft: 0.18 };
 /** In the rudder's frame (rudderGeometry's: y up the hinge from the heel, z aft): the pin, and the tiller's way from it at
  * rest (`deg` above level in the boat's frame, amidships). */
-export function tillerPivot(): THREE.Vector3 { const toWL = -HEEL.y / Math.cos(RUDDER_RAKE); return new THREE.Vector3(0, toWL - 1.528 + 2.62, 0.06); }
+export function tillerPivot(): THREE.Vector3 {
+  // (the boat frame's point turned into the rudder's: up the hinge from the heel, and square aft of it)
+  const r = RUDDER_RAKE, y = TRANSOM_TOP.y + TILLER_PIN.up - HEEL.y, z = TRANSOM_TOP.z + TILLER_PIN.aft - HEEL.z;
+  return new THREE.Vector3(0, y * Math.cos(r) + z * Math.sin(r), -y * Math.sin(r) + z * Math.cos(r));
+}
 export function tillerRestDir(): THREE.Vector3 {
   const r = RUDDER_RAKE, up = TILLER.rest * Math.PI / 180, wy = Math.sin(up), wz = -Math.cos(up);
   return new THREE.Vector3(0, wy * Math.cos(r) + wz * Math.sin(r), -wy * Math.sin(r) + wz * Math.cos(r)).normalize();
