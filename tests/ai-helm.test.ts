@@ -6,7 +6,7 @@ import { HELM_STALL, helmFor, rudderTurn } from '../src/boat/balance';
 import { moveBoat } from '../src/boat/physics';
 import type { CourseFile } from '../src/courses/course';
 
-// The AI's tiller has the same swing as yours (#437: 75° each side, the blade stalling at 40°). Her helmsman tacks and
+// The AI's tiller has the same swing as yours (#437: balance.ts HARD_OVER each side, the blade stalling at RUDDER_STALL). Her helmsman tacks and
 // steers on up to full helm, 30°, as before; about to touch another boat (rule 14, ai.ts urgent) he puts it to the
 // stall, her quickest turn; never past it, where the blade brakes and turns her less.
 describe('the AI helmsman and the tiller', () => {
