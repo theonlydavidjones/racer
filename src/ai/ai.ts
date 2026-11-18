@@ -148,12 +148,34 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
   return m;
 }
 /** Of the sailable headings near `want`, the one that keeps her furthest from other boats (the nearest to `want` among near-equals). */
+// (only headings on her own tack: one across the wind is a tack or a gybe, not a way round a boat, and slow she'd
+// commit to it as a gybe the long way round; a tack away she may, with way on for it (below). Her tack is her boom's side, as physics.ts tackStep keeps it: within 4° of
+// dead downwind, either side, she's still on it. And the heading she chose on an earlier think, still near her want,
+// holds while it leaves within half a metre (or a tenth) of the most room, and 9 m or more: two about as good, she swapped
+// between them every second or two, the helm slammed across each time, tacking for one and back for the other: Red, 6
+// kt, seed 4, the start's crowd, beside Blue tacking. An absolute heading, from an earlier think, not an offset: an
+// offset re-applied to another call's want added the two turns together: the physics review)
+const CLEAR_HOLD_S = 0.5;
 function clearestHeading(w: World, b: Boat, want: number): number {
-  let best = want, bestS = -Infinity;
+  const from = b.ww.from, tackOf = (h: number) => { const r = wrap(from - h); return Math.abs(r) > 176 ? b.tack : r >= 0 ? 'S' : 'P'; }; // (starboard: the wind on her right, rel >= 0, as physics.ts tackStep)
+  const ai = b.ai, held = ai && ai.clearT != null && ai.clearH != null && ai.clearT < w.t && w.t - ai.clearT <= CLEAR_HOLD_S && Math.abs(wrap(ai.clearH - want)) <= 90 ? ai.clearH : null;
+  // (a tack away, though, with way on for it: from SLOW_TACK + 0.2 m/s, and once chosen, whatever her speed, until she's
+  // through the wind; a hard threshold would offer it at 1.31 m/s and take it back at 1.29 as she luffed into the tack:
+  // the physics review)
+  const tackAway = (h: number) => Math.abs(wrap(from - h)) < 90, heldAway = held != null && tackOf(held) !== b.tack && tackAway(held);
+  const mayTack = heldAway || b.v >= SLOW_TACK + 0.2;
+  let best = want, bestS = -Infinity, bestC = 0;
   for (const k of [0, 20, -20, 40, -40, 60, -60, 90, -90]) {
-    const h = sailable(b, want + k), sc = Math.min(15, clearanceOn(w, b, h)) - Math.abs(k) * 0.02;
-    if (sc > bestS) { bestS = sc; best = h; }
+    const h = sailable(b, want + k);
+    if (k && tackOf(h) !== b.tack && !(mayTack && tackAway(h))) continue;
+    const c = Math.min(15, clearanceOn(w, b, h)), sc = c - Math.abs(k) * 0.02;
+    if (sc > bestS) { bestS = sc; best = h; bestC = c; }
   }
+  if (held != null && (tackOf(held) === b.tack || heldAway)) {
+    const c = Math.min(15, clearanceOn(w, b, held));
+    if (c >= 9 && c >= bestC - Math.min(0.5, 0.1 * bestC)) best = held;
+  }
+  if (ai && ai.clearT !== w.t) { ai.clearH = best; ai.clearT = w.t; }
   return best;
 }
 
