@@ -458,6 +458,16 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q5. **Now — bug: on Nav, she steers the rhumb line, not the plotted course** (owner, 18 November; bug; now, a sprint
+   bug; 4–8 h; owner of the navigator and pilot): "when in autonav, the boat doesn't seem to be following the plotted
+   course. it just follows the rhum line to the destination. this is bad, especially if the plotted route is avoiding a
+   strong tide or wind shadows." The pilot steers for one point: world.ts `navTarget()` returns `dest.p` (or her
+   harbor's mouth), and `pilotStep` steers there with its own look ahead (boat/autopilot.ts), so the plan's legs
+   (navigator.ts, hud.ts `navRoute`) never reach the helm. The fix: the pilot's target is the plan's next leg point (the
+   one the route reaches by tide and shadow), advanced as she gets within a few boat lengths of it. A leg she can't
+   reach is the pilot's cue to re-plan, not to cut across. Keep it working with the way in (the hand-over at the mouth).
+   First a test that reproduces it: a route that bends round a foul-tide patch or a wind shadow, then the pilot's track
+   stays within a tolerance of the plotted legs (and fails on main).
 8q4. **Now — the backstay's chainplates where the tiller would hit them** (owner, 18 November, with a screenshot;
    accuracy; now; 1 h): "backstay attachments are too far forward. the tiller would run right into them. they should sit
    about one inch forward of the aft edge of the deck, about six inches from the tiller on either side." In
