@@ -138,6 +138,12 @@ export function jibClew(c: Controls, tack: Tack): number {
   const lee = jibAngle(c, tack), wlead = carLead(c.car[tack].ins); // the windward car is on the tack's own side
   return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
 }
+/** jibClew with the leeward sheet let fly (jibsheet 1), the rest as `c` has them: jibClew({ ...c, jibsheet: 1 }, tack),
+ * the same sums, without copying the controls (trimSails asks up to three times a step for every boat). */
+export function jibClewFree(c: Controls, tack: Tack): number {
+  const lee = Math.min(68, carLead(c.car[tack === 'S' ? 'P' : 'S'].ins) + 70 * Math.pow(1, 1.4)), wlead = carLead(c.car[tack].ins);
+  return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
+}
 /** Windward-sheet setting that holds the clew `angle` deg to windward (inverse of jibClew's windward stop). */
 export function jibsheetWFor(angle: number, c: Controls, tack: Tack): number {
   const wlead = carLead(c.car[tack].ins);
