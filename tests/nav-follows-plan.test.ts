@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { engage } from '../src/boat/autopilot';
 import { applyCommand } from '../src/sim/commands';
-import { helmPoints, passageNow } from '../src/sim/navigator';
+import { HelmFeed, helmPoints, passageNow } from '../src/sim/navigator';
 import { segPt, type Vec } from '../src/core/math';
 
 const OFF_M = 80;
@@ -82,4 +82,26 @@ describe('racing: the pilot never takes a page plan', () => {
     const a = run(true), b = run(false);
     expect(a.every((v, i) => Object.is(v, b[i]))).toBe(true);
   }, 300_000);
+});
+
+describe('the helm asks for a plan on events, not on a timer (HelmFeed)', () => {
+  it('Cityfront to north of Treasure Island: a handful of plans for the passage, where a plan each 150 m or 2 min was dozens, and she keeps to them', () => {
+    const S = { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: 'ti-north', current: 'real', tideDate: '2026-11-14', tideTime: '13:00', traffic: 0, fleet: 0, opponents: [], windKind: 'west', windKt: 14 } as Settings;
+    const w = new World(COURSES[0], S, 1, { freeSail: true }); for (let i = 0; i < 30; i++) w.step(DT); w.drainEvents();
+    (w as unknown as { running: boolean }).running = true;
+    const feed = new HelmFeed(v => passageNow(v as never)); let cur: Vec[] = [], worst = 0, timer = 0, key = '';
+    engage(w.user, w.pilot, 'nav'); const t0 = w.t;
+    while (w.t - t0 < 60 * 60 && (w as unknown as { arrivedT: number | null }).arrivedT == null) {
+      if (w.steps % 60 === 0) { // (a frame a second of her clock)
+        const c = feed.tick(w as never); if (c) { applyCommand(w, c as never); cur = [{ x: w.user.x, y: w.user.y }, ...c.pts]; }
+        const k = `${Math.round(w.user.x / 150)},${Math.round(w.user.y / 150)}|${Math.floor(w.clockUtc / 2)}`; if (k !== key) { key = k; timer++; } // (the old cadence)
+        if (cur.length > 1) worst = Math.max(worst, off(w.user, cur));
+      }
+      w.step(DT);
+    }
+    console.log(`HelmFeed: ${feed.taken} plans taken for the passage (${((w.t - t0) / 60).toFixed(1)} min); the old cadence started ${timer}; at most ${worst.toFixed(0)} m off the plan she had`);
+    expect((w as unknown as { arrivedT: number | null }).arrivedT != null).toBe(true);
+    expect(feed.taken, 'plans for the passage').toBeLessThan(timer / 3);
+    expect(worst).toBeLessThan(OFF_M);
+  }, 600_000);
 });

@@ -637,7 +637,7 @@ physics, ranked like the ten above:
 | LIVE_M, LIVE_MIN | 150 m, 2 min | 143 | numerical | how often the page's live plan is worked out again |
 | SLICE_MS, TICK_MS | 2 ms per 16 ms | 187 | design | the background plan's share of the page's thread (an eighth of a 60 fps frame; Capacity's budget) |
 | HELM_TOL | 8 m | 152 | estimate | the plotted track thinned to its corners for the helm (about one boat length; inside NAV_MADE). Settled by: the pilot's track against the plan at a few tolerances (tests/nav-follows-plan) |
-| HELM_NEAR, HELM_OFF, HELM_WIND, HELM_KT, HELM_TIDE, HELM_EVERY (app.ts) | 400 m, 100 m, 10°, 3 kt, 0.3 kt, 5 min | 958 | estimate | when Nav's plan is worked out afresh (navPlanTick: on events, not a timer). Settled by: the page's profile on a Nav passage against how far she strays from a plan grown stale |
+| HELM_OFF, HELM_WIND, HELM_KT, HELM_TIDE, HELM_EVERY (HelmFeed) | 100 m, 10°, 3 kt, 0.3 kt, 5 min | 193 | estimate | when Nav's plan is worked out afresh (on events, not a timer; tests/nav-follows-plan: 12 plans on a 42 min passage, the old cadence 77). Settled by: the page's profile on a Nav passage against how far she strays from a plan grown stale |
 
 ### src/sim/outlook.ts (router, 15 Nov 2026)
 
