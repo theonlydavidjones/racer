@@ -559,7 +559,7 @@ export class SeaField {
    * The sea at `p`, for the wind over the water there (`ww`, i.e. relative to the current) and the current
    * (`cur`, m/s). `currentAt` gives the current elsewhere (to see what the waves have come through).
    */
-  at(p: Vec, ww: Wind, cur: Vec, currentAt: (q: Vec) => Vec, duration = this.duration): SeaHere {
+  at(p: Vec, ww: Wind, cur: Vec, currentAt: (q: Vec) => Vec, duration = this.duration, windSeaOnly = false): SeaHere {
     if (!this.swell) return FLAT_SEA;
     // the wind sea, made by the wind over the water across the fetch
     const U = ww.kt * KT, to = V(ww.from + 180), Uc = dot(cur, to);
@@ -580,6 +580,9 @@ export class SeaField {
     hsW = Math.min(hsW, 0.1 * wc.L); // steeper than this, it breaks
     // the swell, from the ocean (no current) into whatever current is running here
     // (in a marina: what comes in through its entrances, spreading from them; its walls stop the rest)
+    // (`windSeaOnly`: the chop alone, its height and period, for the passage planner, which reads only that: the swell's
+    // reach, its shadows behind the islands and points, is no part of it and costs up to 100 ms a point, uncached)
+    if (windSeaOnly) return { hsW, tpW: w.tp, fromW: ww.from, hsS: 0, tpS: this.swell.tp, fromS: 0, steep: hsW / Math.max(1, wc.L), white: 0, fetch: F };
     const s = this.swell, reach = inBasin(p) ? harborSwell(p, s.tp, s.from) : swellReach(p, true, s.from);
     const sc = onCurrent(s.hs * reach.k, s.tp, dot(cur, V(reach.toward)));
     const hsS = Math.min(sc.H, 0.1 * sc.L);
