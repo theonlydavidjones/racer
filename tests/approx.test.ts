@@ -33,17 +33,24 @@ describe('the shore distance off a 10 m lattice', () => {
     expect(worstK).toBeLessThan(0.013); // (0.75 / 350 per metre: 6 m is 1.3% of the current)
   }, 180_000);
 
-  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over eight races', async () => {
+  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over 24 races', async () => {
     // A race isn't chaotic to a nudge (a boat moved a micrometre sails the same race), but a small change to the forces
     // moves the AI's decisions (a tack a step sooner, a contact, a penalty's turns) and the race goes its own way from
     // there, by as much as its own luck: one race's fleet speed moved 1–17% for the current 0.1% stronger or weaker (far
     // inside NOAA's own uncertainty), depending on the race. So the lattice is measured against that, in the same races:
-    // over eight (two courses, four starts each), the mean change in the fleet's mean speed the lattice makes, against
+    // over 24 (two courses, twelve starts each), the mean change in the fleet's mean speed the lattice makes, against
     // the mean the current's ±0.1% makes, within half as much again and half a point. (A lattice that's subtly wrong is
     // the test above's to catch, point by point; this is that it doesn't sail a different kind of race.)
     const dev: number[] = [], nudge: number[] = [];
     // (the 32 races sailed side by side on the pool's threads; then, seed by seed as before)
-    const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const;
+    // (24 fixed seeds since 18 Nov 2026, 3–14 and 19–30 with the courses as the AI's case below has them, fixed from now
+    // on: a failure is read against this same set, never one chosen again. It was eight, 3–10. Why: over eight the mean
+    // has a standard error of about 1.3 points, and with what a turn costs her taken from its sources (physics.ts
+    // turnBleed) the eight drew two wild races, 13.5% and 11.9%: 4.96% against a bound of 4.71%. The lattice itself was
+    // unchanged and passes point by point (above); over these 24 it gave 3.79% against 4.69%, over the AI case's 48 3.71%
+    // against 4.66% (and before that change, 2.61% against 4.51%): Capacity's measurement. The same formula and the same
+    // bound on more seeds, not a looser bound: the Coordinator's ruling, as for the AI's case on 15 Nov 2026)
+    const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [0, 11], [0, 12], [0, 13], [0, 14], [1, 7], [1, 8], [1, 9], [1, 10], ...Array.from({ length: 12 }, (_, k) => [k % 2, 19 + k] as const)] as const;
     const jobs = SEEDS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: false, skip: false, seed }], [i, { grid: true, skip: false, seed }],
       [i, { grid: false, skip: false, seed, curK: 1.001 }], [i, { grid: false, skip: false, seed, curK: 0.999 }]]);
     const R = await sail('approxRace', jobs);
@@ -54,7 +61,7 @@ describe('the shore distance off a 10 m lattice', () => {
     });
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(mean(dev), `the lattice ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
-  }, 1_800_000);
+  }, 3_600_000);
 });
 
 describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
