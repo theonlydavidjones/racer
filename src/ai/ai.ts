@@ -538,7 +538,15 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   let desired = b.h, luff = false, beating = false;
   let aim: Vec | null = null; // (the point she's steering for, racing)
   ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
-  if (b.penalty > 0) {
+  // (owing a penalty but not yet turning, she's a boat like any other to the boats about her: one she must keep clear of
+  // close by, she keeps clear of first, by the keep-clear moves below, and only then sails off to get clear for her turns.
+  // Steering straight away from the nearest boat regardless, a port boat called for a starboard boat's swerve as she
+  // ducked her went up through the wind and into her: rule 10, and rule 44.2's "after getting well clear")
+  const owes = b.penalty > 0 && !b.penaltyDir && w.boats.some(o => {
+    if (o === b || o.finished || o.retired || w.rights(b, o).kc !== b) return false;
+    const c = cpa(b, o); return c.t < ai.kn.keepClearS && c.d < ai.kn.keepClearM;
+  });
+  if (b.penalty > 0 && !owes) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
     let near: Vec | null = null, nd = PENALTY_CLEAR;
@@ -991,7 +999,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ht = ai.hailTack;
   if (ht && ((b.tack === ht.to && !b.tacking) || w.t - ht.at > 30)) ai.hailTack = null;
   else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
-  if (holdForHail) desired = b.tack === 'S' ? csS : csP;
+  // (holding her course for a hail passed on (rule 20.3) is holding it against the boats she's hailing about: not against
+  // one she must keep clear of besides, a starboard boat crossing, whom the keep-clear moves above answer first. Held on
+  // regardless, the windward of two port boats sailed close-hauled at a starboard boat until 10 m off, then ducked late
+  // and touched her: rules-finish, the unanswered hail at 22 m)
+  if (holdForHail && !avoiding) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired, avoiding));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above

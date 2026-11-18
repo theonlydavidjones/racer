@@ -225,6 +225,24 @@ describe('in the world', () => {
       expect(minGap, `starting ${gap} m off`).toBeGreaterThan(CONTACT_GAP);
     }
   });
+  it('and the windward boat, called for making the starboard boat swerve, still keeps clear of her while she gets clear to take her penalty (rule 10; 44.2)', () => {
+    // (18 Nov 2026, Skipper Model's report: at 26 m, W, ducking S late, was called at 127.85 s for S's swerve; owing a
+    // penalty, her AI steered straight away from the nearest boat, S 4 m off, which took her up through the wind and into
+    // her at 128.95 s. Until she starts her turns she's a port boat like any other: she keeps clear of S first)
+    for (const gap of [22, 26, 30]) {
+      const w = race(), [u, A, W, S] = w.boats, wv = V(w.wind.from);
+      const leg = w.C.marks.findIndex(m => m.type === 'round' && !onLand(off(m.p, wv, -500)) && !onLand(off(m.p, wv, -480)));
+      const P = off(w.C.marks[leg].p, wv, -500);
+      for (const b of w.boats) b.leg = leg;
+      w.t = 120;
+      const hP = sail(w, A, P, 'P'); sail(w, W, off(P, wv, 8), 'P'); sail(w, u, off(P, wv, 30), 'P');
+      const beat = beatAngle(w.wind.kt), hS = n360(w.wind.from - beat), X = off(P, V(hP), gap);
+      sail(w, S, off(X, V(hS), -gap), 'S');
+      let minGap = Infinity;
+      for (let t = 0; t < 20; t += DT) { u.h = hP; u.desired = hP; w.step(DT); minGap = Math.min(minGap, hullGap(W, S)); }
+      expect(minGap, `starting ${gap} m off: W against S`).toBeGreaterThan(CONTACT_GAP);
+    }
+  });
 
 });
 
