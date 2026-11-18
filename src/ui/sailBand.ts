@@ -200,6 +200,14 @@ export const BAND_TIPS = {
   autoTrim: 'The crew trims every line; touch one to take it.',
   handBack: 'Your lines go back to the crew; the pole stays yours.'
 } as const;
+/** The control's name, bold in the Coach card ahead of its tip (app.ts help() bolds what comes before the first colon). */
+const BAND_NAME: Record<keyof typeof BAND_TIPS, string> = {
+  jumpers: 'Jumpers', mainsheet: 'Mainsheet', traveller: 'Traveler', backstay: 'Backstay', vang: 'Vang', outhaul: 'Outhaul',
+  cunningham: 'Cunningham', downhaul: 'Main halyard', jibCunningham: 'Jib Cunningham', jibHalyard: 'Jib halyard', jib: 'Jib sheet',
+  car: 'Jib car', windex: 'Windex', pole: 'Whisker pole', hoistMain: 'Main hoist', hoistJib: 'Jib hoist', paddle: 'Paddle',
+  motor: 'Motor', autoTrim: 'Auto-Trim', handBack: 'Hand Back'
+};
+const bandHelp = (k: keyof typeof BAND_TIPS) => `${BAND_NAME[k]}: ${BAND_TIPS[k]}`;
 
 /** The jumpers (CR 7.40: adjustable above deck while racing), when her Rig tune says so: a small dial at each end of
  * the band, as her two jumpers are, one each side, set alike (the crew turns both). A turnbuckle's turns, 0 to 5 in half
@@ -258,9 +266,9 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="${BAND_TIPS.hoistMain}"></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="${BAND_TIPS.hoistJib}"></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="${BAND_TIPS.paddle}"><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="${BAND_TIPS.motor}"><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="${bandHelp('hoistMain')}"></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="${bandHelp('hoistJib')}"></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="${bandHelp('paddle')}"><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="${bandHelp('motor')}"><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
 <span class="sb-tillerslot"></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="${BAND_TIPS.pole}"></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="${bandHelp('pole')}"></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
@@ -283,9 +291,9 @@ export class SailBand {
     // what each control does and why, one line each, in the Coach card for the control under the mouse or the one last
     // touched (the owner: hover titles popped up over the controls you were reaching for; 18 Nov: "no one will read
     // this", so BAND_TIPS holds one line of what to do and why; the clicks and scrolls are in Keys' "How to sail her")
-    el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { d.dataset.help = BAND_TIPS[d.dataset.line as keyof typeof BAND_TIPS]; });
+    el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { d.dataset.help = bandHelp(d.dataset.line as keyof typeof BAND_TIPS); });
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
-      d.dataset.help = BAND_TIPS.jumpers; // (in the Coach card, as every control's help: no hover titles)
+      d.dataset.help = bandHelp('jumpers'); // (in the Coach card, as every control's help: no hover titles)
       d.addEventListener('wheel', e => { if (!this.ok()) return; e.preventDefault(); this.turnJumpers(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
     });
   }
@@ -570,7 +578,7 @@ export class SailBand {
     // her point of sail under the vane (the owner: the windex names it: Close-hauled, Beam reach, Broad reach, Run)
     const pos = pointOfSailWord(u); put(wx.querySelector('.sb-pos')!, pos);
     attr(wx, 'aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
-    if (wx.dataset.help !== BAND_TIPS.windex) wx.dataset.help = BAND_TIPS.windex;
+    if (wx.dataset.help !== bandHelp('windex')) wx.dataset.help = bandHelp('windex');
     // hoisting and dropping the sails at the mast: a tab for a sail that's down, on its way, or (in a harbor) to drop
     this.el.querySelectorAll<HTMLElement>('.sb-hoist').forEach(tab => {
       const txt = this.host.hoistTab(tab.dataset.sail as 'main' | 'jib');
@@ -581,7 +589,7 @@ export class SailBand {
     const all = this.el.querySelector<HTMLElement>('.sb-all')!, word = trimTab(u);
     if (all.textContent !== word) {
       all.textContent = word; all.classList.toggle('mine', word === 'Hand Back');
-      all.dataset.help = word === 'Hand Back' ? BAND_TIPS.handBack : BAND_TIPS.autoTrim;
+      all.dataset.help = word === 'Hand Back' ? bandHelp('handBack') : bandHelp('autoTrim');
     }
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
