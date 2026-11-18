@@ -1461,7 +1461,11 @@ export class World {
           const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
           const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = hypot(dx, dy) || 1;
           b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          b.v *= m.q ? 0.9 : 0.97; b.lastHitT = this.t;
+          // (her way lost only as she sails into it: the share of her heading toward it. Lying along it, the wind pressing her
+          // sideways onto it, she slides off it as a boat does a buoy; taxed whatever her heading, she lay on mark A at 0.1
+          // m/s for five minutes in 22 kt: the stability soak, 18 Nov 2026, tests/mark-pinned.test.ts)
+          const into = Math.max(0, -(dx * -ax + dy * -ay) / (l * (hypot(ax, ay) || 1)));
+          b.v *= 1 - (m.q ? 0.1 : 0.03) * into; b.lastHitT = this.t;
         }
       }
       // the same touch until she's got clearly away from that mark

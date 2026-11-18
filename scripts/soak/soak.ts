@@ -42,13 +42,17 @@ function watch(w: World, label: string, minutes: number, each?: (w: World) => vo
       for (const [nm, o] of [['ww', b.ww], ['cur', (b as any).cur]] as const) if (o) for (const f in o) { const v = (o as any)[f]; if (typeof v === 'number' && !Number.isFinite(v)) say('nonfinite', b, `${nm}.${f} = ${v}`, `nf:${b.id}:${nm}.${f}`); }
       scan(b, b.isUser ? 'user' : 'ai', 2);
       let T = tr.get(b.id); if (!T) tr.set(b.id, T = { at: [], hs: [], h: b.h, land: 0 });
-      const live = racing ? !b.isUser && b.started && !b.finished && !b.retired : b.isUser && w.pilot.mode !== 'off';
+      // (wrecked, she's done; called off, the fleet lies to off the harbor, circling on purpose: ai.ts standOffPlaces)
+      if (b.wrecked) say('wrecked', b, `${b.wrecked.how}, ${b.wrecked.where}, at ${b.x.toFixed(0)}, ${b.y.toFixed(0)}`);
+      if (w.cancelled) say('called off', null, `${w.cancelled.say.slice(0, 90)} (${w.cancelled.kt.toFixed(1)} kt)`, 'cancelled');
+      const live = !b.wrecked && !w.cancelled && (racing ? !b.isUser && b.started && !b.finished && !b.retired : b.isUser && w.pilot.mode !== 'off');
       // on land: her center on the land's side of the shore, half a second or more
       if (onLand(b)) { T.land += 0.5; if (T.land >= 2) say('on land', b, `at ${b.x.toFixed(0)}, ${b.y.toFixed(0)}, v ${b.v.toFixed(2)}`); } else T.land = 0;
       if (!live) { T.at.length = 0; T.hs.length = 0; T.h = b.h; continue; }
       // stuck: less than 10 m made good in 3 minutes
       T.at.push({ t: w.t, x: b.x, y: b.y }); while (T.at.length && w.t - T.at[0].t > 180) T.at.shift();
-      if (w.t - T.at[0].t >= 179 && Math.hypot(b.x - T.at[0].x, b.y - T.at[0].y) < 10) say('stuck', b, `within 10 m of ${b.x.toFixed(0)}, ${b.y.toFixed(0)} for 3 min; v ${b.v.toFixed(2)}, wind ${b.ww.kt.toFixed(1)} kt, leg ${b.leg}, mode ${b.ai?.mode ?? 'pilot ' + w.pilot.mode}`, `stuck:${b.id}:${Math.floor(w.t / 600)}`);
+      // (all of the three minutes within 10 m of where they began: not just back there, as a short leg out and back is)
+      if (w.t - T.at[0].t >= 179 && T.at.every(q => Math.hypot(q.x - T.at[0].x, q.y - T.at[0].y) < 10)) say('stuck', b, `within 10 m of ${b.x.toFixed(0)}, ${b.y.toFixed(0)} for 3 min; v ${b.v.toFixed(2)}, wind ${b.ww.kt.toFixed(1)} kt, leg ${b.leg}, mode ${b.ai?.mode ?? 'pilot ' + w.pilot.mode}`, `stuck:${b.id}:${Math.floor(w.t / 600)}`);
       // spinning: more than three full turns of heading in a minute
       const d = Math.abs(((b.h - T.h + 540) % 360) - 180); T.h = b.h; T.hs.push({ t: w.t, d }); while (T.hs.length && w.t - T.hs[0].t > 60) T.hs.shift();
       const turned = T.hs.reduce((s, q) => s + q.d, 0);
@@ -69,10 +73,13 @@ MARINAS.forEach((m, i) => jobs.push([`cruise ${m.id}`, () => {
   const slip = SLIPS.find(s => s.marina === m.id)!, kt = WINDS[i % 4], boat = { ...DEFAULT_BOAT, slip: slip.id };
   const S = { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: '', windKind: 'west', windKt: kt, current: 'real', sea: 'real', tideDate: '2026-11-14', traffic: 1, fleet: 0, opponents: [], boats: [boat], boat, boatId: boat.id } as Settings;
   const w = new World(COURSES[0], S, 100 + i, { freeSail: true }), u = w.user;
-  const hr = harborRoute(slip), from = hr?.approach ?? hr?.mouth ?? slip.p;
+  // (from the open-water spot nearest her harbor's mouth: a tiller pilot can't thread a marina's fairways, and Nav from
+  // inside one sails her into the docks: world.ts navTarget. Then on the pilot's Nav to the spot nearest 3 km on from it;
+  // at 25 minutes, sent home (the pilot hands her back off the mouth: world.ts navTarget), and her sails come down)
+  const hr = harborRoute(slip), mouth = hr?.mouth ?? slip.p, d = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+  const from = PLACES.filter(p => !p.buoy).sort((a, b) => d(a.p, mouth) - d(b.p, mouth))[0].p;
   w.step(DT); u.x = from.x; u.y = from.y; w.step(DT);
-  // out to the place nearest 3 km off, on the pilot's Nav; at 25 minutes, home; when the pilot hands her back, sails down
-  const to = PLACES.slice().sort((a, b) => Math.abs(Math.hypot(a.p.x - from.x, a.p.y - from.y) - 3000) - Math.abs(Math.hypot(b.p.x - from.x, b.p.y - from.y) - 3000))[0];
+  const to = PLACES.slice().sort((a, b) => Math.abs(d(a.p, from) - 3000) - Math.abs(d(b.p, from) - 3000))[0];
   applyCommand(w, { k: 'dest', p: to.p, name: to.name }); applyCommand(w, { k: 'pilot', op: 'engage', mode: 'nav' });
   let home = false, down = false; const t0 = w.t;
   watch(w, `cruise ${m.id} ${kt} kt, out to ${to.id}`, MIN || 60, w => {
