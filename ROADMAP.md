@@ -447,6 +447,13 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q3. **Now — bug: no Hoist tabs on a cruise started mid-water with the sails down** (owner, 18 November; bug; now; 1–2 h):
+   "while cruising, I started a cruise mid-water with sails down. I don't see hoist buttons. I should always see those if
+   sails are down." The tabs come from app.ts `hoistTab()` and are drawn by sailBand.ts (`.sb-hoist`, ~L553). It hides
+   them when `!w.running`, or when the rig says up and hoisted outside a basin. Check how a mid-water start with sails
+   down sets `rig` (mainUp/jibUp and the hoist fraction), and whether the band or its tabs are shown at all then. The rule:
+   a sail that's down always has its Hoist tab while she's on the water. Add a test: a mid-water cruise start with the
+   sails down shows Hoist main and Hoist jib.
 8q2. **The crew bring the boom back to the centerline when the main drops** (owner, 18 November; accuracy; later, "not
    urgent"; 1–2 h; Crew Model): "when the main drops, the crew should bring the boom back to centerline." 8q does this
    only in the slip. On the water, once the main is down, the crew sheet in and center the traveler as a called job, and
