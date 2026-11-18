@@ -196,7 +196,8 @@ sources. Each shipped item is added there when it's published.
    data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
    sessions where possible (Blender with Blosm, compressed glTF with levels of detail) to save tokens; (3) one
    integration session to wire them in, checked against frame speed and the page's 16 MB size budget (about 6 MB used
-   today). It takes over the "Alcatraz, properly built out" item (6–10 h) and widens it.
+   today). It takes over the "Alcatraz, properly built out" item (6–10 h) and widens it. The plan, in four phases
+   (Alcatraz, then the city blocks, then the hero landmarks, then night windows): docs/plans/cityfront-alcatraz.md.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
@@ -464,6 +465,10 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q6. **Now — bug: the OpenStreetMap attribution isn't on screen** (the Coordinator, 18 November; legal, an ODbL
+   requirement; now, a sprint bug; 1 h; UI & Copy): wherever the page draws OSM-derived data (the chart, the shore, the
+   buildings), "© OpenStreetMap contributors" shows, on the chart and in the credits. One short line, in an existing
+   element, no new button.
 8q5. **Now — bug: on Nav, she steers the rhumb line, not the plotted course** (owner, 18 November; bug; now, a sprint
    bug; 4–8 h; owner of the navigator and pilot): "when in autonav, the boat doesn't seem to be following the plotted
    course. it just follows the rhum line to the destination. this is bad, especially if the plotted route is avoiding a
