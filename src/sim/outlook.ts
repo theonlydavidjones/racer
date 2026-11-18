@@ -27,6 +27,10 @@ export interface Outlook {
   stations: TideStation[] | null;
   /** The wind's chop at p around minute tMin (height m, period s): cached on a 400 m grid, every 10 minutes. */
   chop(p: Vec, tMin: number): { hs: number; tp: number };
+  /** chop's cell made ready a piece at a time, for a plan worked out between frames: the current there and 1 km upwind,
+   * the wind, the fetch and the sea's duration, each its own step, then the chop itself (cold, all at once, a cell held
+   * the page's thread up to 100 ms from Mile Rock). Nothing if the cell's known. The same chop either way. */
+  chopSteps?(p: Vec, tMin: number): Generator<void, void, void>;
   /** The course-wide wind at a time (no place): for the day's timeline. */
   breeze(tMin: number): { kt: number; from: number; gust: number };
 }
@@ -117,13 +121,26 @@ export function outlookFor(w: SimView, exact = false): Outlook {
   const chop = (p: Vec, t: number) => {
     const k = `${Math.round(p.x / 400)},${Math.round(p.y / 400)},${Math.round(t / 10)}`;
     let v = chops.get(k);
-    if (!v) { const s = sea({ x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, Math.round(t / 10) * 10); v = { hs: s.hsW, tp: s.tpW }; chops.set(k, v); }
+    if (!v) {
+      // (the wind sea alone: the swell's reach isn't the chop's, and costs up to 100 ms a point)
+      const q = { x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, tq = Math.round(t / 10) * 10, c = current(q, tq);
+      const s = w.sea.at(q, windOnWater(wind(q, tq), c), c, r => current(r, tq), w.seaDurationAt(tq), true); v = { hs: s.hsW, tp: s.tpW }; chops.set(k, v);
+    }
     return v;
   };
   return {
     t0: gun, stations: w.tide?.stations ?? null, breeze, wind, current,
     windOnWater: (p, t) => windOnWater(wind(p, t), current(p, t)),
-    sea, chop
+    sea, chop,
+    chopSteps: function* (p: Vec, t: number) {
+      const k = `${Math.round(p.x / 400)},${Math.round(p.y / 400)},${Math.round(t / 10)}`;
+      if (chops.has(k)) return;
+      const q = { x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, tq = Math.round(t / 10) * 10;
+      const c = current(q, tq); yield;
+      const ww = windOnWater(wind(q, tq), c); yield;
+      const to = V(ww.from + 180); current({ x: q.x - to.x * 1000, y: q.y - to.y * 1000 }, tq); yield; w.sea.fetch(q, ww.from); yield; w.seaDurationAt(tq); yield; // (the water the waves came through: sea.at's)
+      chop(p, t);
+    }
   };
 }
 

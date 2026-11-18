@@ -4,6 +4,7 @@ import { passagePlanLater, type PassagePlan } from '../sim/navigator';
 import { ROUTES } from '../sim/traffic';
 import type { SimView } from '../sim/host';
 import { briefHtml } from './briefView';
+import { navRoute, navRoutePending } from './hud';
 import { $ } from './dom';
 import { ARROW_MIN, drawCurrentArrows, drawLand, fitCanvas, makeTf } from './draw2d';
 
@@ -16,6 +17,8 @@ type P = [number, number];
 export class NavView {
   private world: SimView | null = null;
   private plan: PassagePlan | null = null;
+  /** The way round the land to where she's going (hud.ts navRoute, a second or so), drawn until the timed plan's in. */
+  private route: Vec[] | null = null;
   private canvas = $<HTMLCanvasElement>('navcanvas');
 
   get isOpen(): boolean { return !$('navView').hidden; }
@@ -37,7 +40,16 @@ export class NavView {
     // (the chart at once, where she is, while the passage is worked out: it's done between frames and can take a minute
     // and more; the owner, 16 Nov 2026: "clicking the navigator button opens the navigator modal, which fails to populate
     // with the map")
-    this.plan = null; this.draw();
+    this.plan = null; this.route = null; this.draw();
+    // (and the way round the land on it as soon as that's in: from Mile Rock to Gashouse Cove the timed plan is a minute or
+    // two of the page's spare time, the way round the land a second (the owner, ROADMAP 8b: "ten minutes in, the course
+    // is still plotting"))
+    const dest = w.dest, poll = () => {
+      if (this.world !== w || !this.isOpen || this.plan || w.dest !== dest) return;
+      this.route = navRoute(w.user, dest); this.draw();
+      if (navRoutePending()) setTimeout(poll, 100);
+    };
+    setTimeout(poll, 0);
     this.stopPlan?.();
     this.stopPlan = passagePlanLater(w, plan => { // (worked out between frames)
       this.stopPlan = null;
@@ -59,7 +71,8 @@ export class NavView {
     const w = this.world, [ctx, cw, ch] = fitCanvas(this.canvas);
     ctx.fillStyle = '#0c2534'; ctx.fillRect(0, 0, cw, ch);
     if (!w) return;
-    const pl = this.plan, pts: Vec[] = pl ? [...pl.route, ...pl.track.map(q => q.p)] : [{ x: w.user.x - 2500, y: w.user.y - 2000 }, { x: w.user.x + 2500, y: w.user.y + 2000 }];
+    const pl = this.plan, rt = !pl && this.route && this.route.length > 1 ? this.route : null;
+    const pts: Vec[] = pl ? [...pl.route, ...pl.track.map(q => q.p)] : rt ?? [{ x: w.user.x - 2500, y: w.user.y - 2000 }, { x: w.user.x + 2500, y: w.user.y + 2000 }];
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
     const scale = Math.min((cw - 80) / Math.max(600, Math.max(...xs) - Math.min(...xs)), (ch - 80) / Math.max(600, Math.max(...ys) - Math.min(...ys)));
@@ -74,7 +87,13 @@ export class NavView {
       ctx.beginPath(); r.forEach((p, i) => { const s = S(p); if (i) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); }); ctx.stroke();
     }
     ctx.setLineDash([]);
-    if (!pl) { // no passage yet: at least show where she is
+    if (!pl) { // no passage yet: where she is, and the way round the land to where she's going, dashed, once it's in
+      if (rt) {
+        ctx.setLineDash([8, 6]); ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,182,39,.8)';
+        ctx.beginPath(); rt.forEach((p, i) => { const s = S(i ? p : { x: w.user.x, y: w.user.y }); if (i) ctx.lineTo(s[0], s[1]); else ctx.moveTo(s[0], s[1]); }); ctx.stroke(); ctx.setLineDash([]);
+        const b = S(rt[rt.length - 1]);
+        ctx.fillStyle = '#3fd197'; ctx.beginPath(); ctx.arc(b[0], b[1], 7, 0, 2 * Math.PI); ctx.fill(); label(ctx, b, w.dest?.name.replace(/^Off /, '') ?? '', '#3fd197');
+      }
       const a = S({ x: w.user.x, y: w.user.y });
       ctx.fillStyle = '#ffb627'; ctx.beginPath(); ctx.arc(a[0], a[1], 6, 0, 2 * Math.PI); ctx.fill(); label(ctx, a, 'You', '#ffb627');
     }

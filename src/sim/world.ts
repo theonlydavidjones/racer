@@ -709,7 +709,7 @@ export class World {
       cur: { x: 0, y: 0 }, ww: { from: this.wind.from, kt: this.wind.kt }, rel: 0, twa: 90, awa: 90, arel: 90, aws: 0, sheets: { main: 30, jib: 30 }, manualTrim: isUser && !!this.settings.manualTrim, sheetCmd: { main: 0, jib: 0 }, trimAll: isUser && this.settings.manualTrim === 2, ctl: docked ? { ...defaultControls(), mainsheet: 0 } : defaultControls(), ctlCmd: {}, shape: { main: { depth: 0.12, draft: 0.45, twist: 10 }, jib: null, eff: 1 }, trim: { main: { eff: 1, err: 0, flow: 'good', amount: 0 }, jib: { eff: 1, err: 0, flow: 'good', amount: 0 } }, awaSlow: 90, poleWant: false, poleMine: isUser, pole: 'down', poleT: 0, poleTack: 'S',
       heel: 0, boom: 0, jib: 0, sea: FLAT_SEA,
       // (given later, from 0 and then fractions: declared here, see asDoubles)
-      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crewTogether: undefined, gybeTo: undefined, turnCalledT: undefined, callT: undefined, callWait: null, callOn: false, comingFor: 0, byLeeSince: undefined, byLeeCue: undefined, decidedT: undefined, turnsDecided: 0, jibHold: 0, byLee: false, boomFree: undefined, boomFrom: undefined, crashT: undefined, boomFreeT: undefined, boomSeenT: undefined, steerSince: undefined, steerWas: 0, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
+      weatherHeld: undefined, carOff: undefined, lastHitT: undefined, paddle: undefined, crewTogether: undefined, gybeTo: undefined, turnCalledT: undefined, callT: undefined, callWait: null, callOn: false, comingFor: 0, byLeeSince: undefined, byLeeCue: undefined, decidedT: undefined, turnsDecided: 0, jibHold: 0, settle: new Float64Array(10), byLee: false, boomFree: undefined, boomFrom: undefined, crashT: undefined, boomFreeT: undefined, boomSeenT: undefined, steerSince: undefined, steerWas: 0, crew: newCrew(isUser ? userCrew(this.settings) : aiCrew(spec ? '' : F.name, spec?.name ?? F.name), 'S'),
       // flags come down for a race: they fly when you're just sailing. Her club's burgee and her country's ensign
       // (officers' flags will go with skippers, in the Yacht Club)
       ...(spec && (this.freeSail || this.showFlags) ? { burgee: spec.club || undefined, ensign: ensignFor(spec.sails.country), ensignNight: !ensignDue(this.clockUtc, inBasin(p), false) } : {}),
@@ -2218,7 +2218,9 @@ export class World {
     }
     const hoist = plan.headToWind ? ' She\'ll be head to wind: get the main up first (U), or she\'ll soon stop.' : '';
     this.emit({ type: 'toast', ms: 7000, msg: plan.kind === 'swing'
-      ? plan.hold
+      ? plan.walk // (walked out and turned by hand: about her bow by a hand on the dock with a stern line, or in the fairway on a slip line round the cleat, all hands aboard)
+        ? plan.slip ? `Pushing off: your crew walks her out and turns her on a slip line round the cleat. Steer her out.${hoist}` : `Pushing off: a hand on the dock swings her stern round on a line, then steps aboard. Steer her out.${hoist}`
+        : plan.hold
         ? 'Pushing off: your crew walks her back out of the slip and steps aboard at the finger\'s end, a bow line round the cleat there; the wind swings her stern round until she lies head to wind on it. Hoist the main (U), then push off again (G) and they\'ll push her bow off, slip the line and let her go.'
         : `Pushing off: your crew walks her back out of the slip and steps aboard at the finger's end, a bow line round the cleat there holding her bow while her stern swings out across the fairway; then they slip the line and push her off forward with the boathook. Steer her out (she has a little way on).${hoist}`
       : plan.kind === 'astern'
@@ -2275,10 +2277,11 @@ export class World {
           // the bow held at the finger's end, the stern swinging out across the fairway: as fast as the wind on her side
           // swings her against the water's resistance (if it's helping), or the crew walks the bow round
           const rel = wrap(ww.from - n360(H.h0 + H.a)), helps = Math.sign(rel) === Math.sign(P.turn);
-          const rate = Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
+          // (on a slip line, hauled round at the crew's pace, as the plan's set to leeward was gauged: geo/marina.ts SLIP_TURN)
+          const rate = P.slip ? CREW_TURN : Math.min(6, Math.max(CREW_TURN, helps ? windSwing(ww.kt, rel) : 0));
           // (the tiller can't hurry or slow it: the water crosses the rudder broadside)
           H.a = Math.sign(P.turn) * Math.min(Math.abs(P.turn), Math.abs(H.a) + rate * dt);
-          const q = swingAbout(start, H.h0, P.pivot ?? 3.8, H.a); b.x = q.c.x; b.y = q.c.y; b.h = n360(q.h); b.astern = 0; // (about her bow on the bow line, or her middle, walked out into the fairway)
+          const q = swingAbout(start, H.h0, P.pivot ?? 3.8, H.a), f = Math.abs(H.a / P.turn); b.x = q.c.x + (P.slip ? P.slip.x * f : 0); b.y = q.c.y + (P.slip ? P.slip.y * f : 0); b.h = n360(q.h); b.astern = 0; // (on a slip line: set to leeward as she comes round, as the plan has it) // (about her bow on the bow line, or the point beside the finger's end she's walked round about)
         } else if (P.hold && H.held !== false) {
           // head to wind, held on the bow line: waiting for the main to go up and the word to let go; she lies to the wind as
           // it shifts (a boat on a bow line follows it), within 20 degrees of where she came to
