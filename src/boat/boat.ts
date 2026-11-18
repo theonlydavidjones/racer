@@ -25,6 +25,9 @@ export interface AiState {
   /** The numbers her decisions are made by: her skipper's (ai/skipper.ts). */
   kn: SkipperKnobs;
   clearing: boolean; // owes a penalty but is first sailing into clear water
+  /** Owes a penalty not yet begun, with a boat she must keep clear of close by: when that last held, and since when
+   * (ai.ts: she keeps clear of her first, rule 44.2's "after getting well clear") */
+  keepFirstT?: number; keepFirstSince?: number;
   /** The penalty total she last saw: a new penalty while she's turning sends her to clear water again first (44.2). */
   penSeen?: number;
   reclear?: boolean;

@@ -538,15 +538,27 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   let desired = b.h, luff = false, beating = false;
   let aim: Vec | null = null; // (the point she's steering for, racing)
   ai.tackNow = false; ai.urgent = false; // (set below while she answers a hail; or she's about to touch a boat)
-  // (owing a penalty but not yet turning, she's a boat like any other to the boats about her: one she must keep clear of
-  // close by, she keeps clear of first, by the keep-clear moves below, and only then sails off to get clear for her turns.
-  // Steering straight away from the nearest boat regardless, a port boat called for a starboard boat's swerve as she
-  // ducked her went up through the wind and into her: rule 10, and rule 44.2's "after getting well clear")
-  const owes = b.penalty > 0 && !b.penaltyDir && w.boats.some(o => {
+  // Owing a penalty she hasn't begun, she's a boat like any other to the boats about her (rule 44.2: she takes it "after
+  // getting well clear"; until her turns begin, rule 21.2 doesn't apply). With one she must keep clear of close by, she
+  // keeps clear of her first, by the moves below, her sails and helm her own (`clearing`: no spin, no turns counted,
+  // physics.ts), and then sails off to get clear for her turns. Steering straight away from the nearest boat
+  // regardless, a port boat called for a starboard boat's swerve as she ducked her went up through the wind and into
+  // her (rules-finish, the unanswered hail). Held 2 s past the last moment it applied, so it doesn't flicker at the edge
+  // of her look-ahead; and 30 s at most, so a boat standing close can't keep her from her penalty.
+  // (only where getting clear would take her through the wind: straight away from the nearest boat is the penalty
+  // branch's way, and off the wind, a hard bear-away from a boat she's ducking, it's a good one. Through the wind, with a
+  // boat she must keep clear of close by, it's a tack into her: rule 13 has her keep clear through it)
+  const pNear = b.penalty > 0 && !b.penaltyDir ? w.boats.reduce<Boat | null>((m, o) => o !== b && dist(o, b) < PENALTY_CLEAR && (!m || dist(o, b) < dist(m, b)) ? o : m, null) : null;
+  const awayH = pNear ? brg(b.x - pNear.x, b.y - pNear.y) : 0;
+  const acrossWind = !!pNear && (wrap(ww.from - awayH) >= 0) !== (wrap(ww.from - b.h) >= 0) && Math.abs(wrap(ww.from - awayH)) < 175;
+  const keepFirst = acrossWind && w.boats.some(o => {
     if (o === b || o.finished || o.retired || w.rights(b, o).kc !== b) return false;
     const c = cpa(b, o); return c.t < ai.kn.keepClearS && c.d < ai.kn.keepClearM;
   });
-  if (b.penalty > 0 && !owes) {
+  if (keepFirst) { ai.keepFirstT = w.t; ai.keepFirstSince ??= w.t; }
+  const firstClear = b.penalty > 0 && !b.penaltyDir && ai.keepFirstT != null && w.t - ai.keepFirstT < 2 && w.t - (ai.keepFirstSince ?? w.t) < 30;
+  if (!firstClear && !keepFirst) ai.keepFirstSince = undefined;
+  if (b.penalty > 0 && !firstClear) {
     ai.goTack = null; ai.headedT = 0;
     // Take the penalty in clear water: first sail away from nearby boats, then spin.
     let near: Vec | null = null, nd = PENALTY_CLEAR;
@@ -565,7 +577,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (!ai.clearing) decideTurn(b, w.t, true); // (spinning her turns: a skipper always calls those, boat/calls.ts)
     b.luff = false; crewPoleCall(w, b); return; // (the pole in for the turns: the physics review)
   }
-  ai.clearing = false; ai.penSeen = undefined; ai.reclear = false;
+  if (firstClear) ai.clearing = true; else { ai.clearing = false; ai.penSeen = undefined; ai.reclear = false; }
   const home = w.cancelled && !b.finished ? homeCourse(w, b) : null; // (no more racing today: she sails home)
   if (b.finished && !home) { b.desired = n360(ww.from + 90); b.luff = true; crewPoleCall(w, b); return; }
   const tl = -w.t; // time to the start signal
@@ -912,7 +924,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   // she needn't)
   const lagT = Math.min(1.5, yawLag(b.v + (b.astern ?? 0))), lagM = (b.v + (b.astern ?? 0)) * yawLag(b.v + (b.astern ?? 0));
   ai.urgent = false;
+  let mover: Boat | null = null, moverD = desired, moverO: Boat | null = null; // (which boat's move set her heading last)
   for (const { o, dx, dy, r, cp } of near) {
+    if (moverO && desired !== moverD) mover = moverO;
+    moverD = desired; moverO = o;
     // keep clear early: slow, heavy boats need time to respond
     // hailed "Starboard!" by this boat: duck early and generously
     const ducking = r.rule === '10' && r.kc === b && w.t < ai.duckUntil;
@@ -977,6 +992,25 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (hypot(dx, dy) < 10 && (o.isUser || (hullGap(b, o) >= CONTACT_GAP && wouldTouch(b, o, lagT + 1)))) b.forced14 = o.id;
     }
   }
+  // (one move for one boat (`mover`) mustn't take her onto another she must keep clear of: ducking a starboard boat with a leeward
+  // boat close beneath her, the bear-away for the one closed on the other (rule 11 as much as rule 10). Each move is
+  // taken back toward her heading as far as it needs, and she eases instead, slowing to let the first boat by: what a
+  // crew boxed in does. The moves above are each for one boat, the last one's winning)
+  if (moverO && desired !== moverD) mover = moverO;
+  if (avoiding) for (const { o, r } of near) {
+    if (r.kc !== b || o === mover || o.id === ai.hailTack?.with || Math.abs(wrap(desired - b.h)) < 3) continue;
+    // (room enough that the hulls pass clear with a margin, 2 × CONTACT_GAP between the centers' closest approach: not the
+    // 8 m a course is held to above, which a boat ducking just ahead of her on the same line never leaves)
+    const need = Math.min(2 * CONTACT_GAP, clearanceOn(w, b, b.h, o));
+    if (clearanceOn(w, b, desired, o) >= need) continue;
+    const sweep = wrap(desired - b.h), n = Math.ceil(Math.abs(sweep) / 5);
+    let ok = b.h;
+    for (let i = 1; i <= n; i++) { const h = sailable(b, b.h + sweep * i / n); if (clearanceOn(w, b, h, o) < need) break; ok = h; }
+    desired = ok; luff = true;
+  }
+  // (and the boat she must keep clear of near enough that holding on for a hail would put her at her: BOAT_HAIL_MARGIN, as
+  // the hailing boat's own hold ends)
+  const meetSoon = near.some(({ o, r, cp }) => r.kc === b && o.id !== ai.hailTack?.with && cp.t <= BOAT_HAIL_MARGIN && cp.d < ai.kn.keepClearM);
   for (const o of w.boats) {
     const h = o !== b ? w.pairRecord(b, o)?.hail : null;
     if (!h || h.kind !== 'room') continue;
@@ -999,11 +1033,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   const ht = ai.hailTack;
   if (ht && ((b.tack === ht.to && !b.tacking) || w.t - ht.at > 30)) ai.hailTack = null;
   else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
-  // (holding her course for a hail passed on (rule 20.3) is holding it against the boats she's hailing about: not against
-  // one she must keep clear of besides, a starboard boat crossing, whom the keep-clear moves above answer first. Held on
-  // regardless, the windward of two port boats sailed close-hauled at a starboard boat until 10 m off, then ducked late
-  // and touched her: rules-finish, the unanswered hail at 22 m)
-  if (holdForHail && !avoiding) desired = b.tack === 'S' ? csS : csP;
+  // (holding on for a hail, a boat she must keep clear of in her look-ahead: she holds her course for the chain, easing to
+  // let that boat cross ahead (rule 10 binds her as much as the hail does), until the meeting's too near to hold on)
+  if (holdForHail && !meetSoon) { desired = b.tack === 'S' ? csS : csP; if (avoiding) luff = true; }
   ai.tackNow = tackNow && !holdForHail;
   desired = sailable(b, avoidMarks(w, b, desired, avoiding));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
