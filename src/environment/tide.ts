@@ -32,6 +32,8 @@ export interface TideStation {
 }
 
 const STEP = 6; // minutes between harmonic predictions
+/** CurrentField.cover's window (minutes): predicted afresh when less than COVER_AHEAD is left, from COVER_BACK back to COVER_ON on. */
+const COVER_AHEAD = 8 * 60 + 15, COVER_BACK = 4 * 60, COVER_ON = 14 * 60;
 
 /** Times (minutes since epoch) of slack and peak events in a regular series: [t, v, kind]. kind: 0 max flood, 1 slack before ebb, 2 max ebb, 3 slack before flood. */
 export function events(t: number[], v: number[]): [number, number, number][] {
@@ -339,10 +341,23 @@ export class CurrentField {
    * from 4 hours back (the conditions graph and the strategist look back) to 14 hours on.
    */
   cover(tMin: number): void {
-    if (!this.stations.length || (tMin >= this.from && tMin + 8 * 60 + 15 <= this.to)) return;
-    const fresh = new Map(stationsFor(tMin - 4 * 60, tMin + 14 * 60).map(x => [x.id, x]));
+    if (!this.stations.length || (tMin >= this.from && tMin + COVER_AHEAD <= this.to)) return;
+    const fresh = new Map(stationsFor(tMin - COVER_BACK, tMin + COVER_ON).map(x => [x.id, x]));
     for (const st of this.stations) { const n = fresh.get(st.id); if (n) { st.t = n.t; st.v = n.v; } }
     this.span(); this.epoch++;
+  }
+  /**
+   * The field for a race or a sail over [from, to] (minutes, UTC) that starts at `now`. The World asks for its window
+   * and at once calls cover(now), which predicts every station afresh whenever less than 8¼ hours are left ahead. For a
+   * window ending a few hours after the gun, that was always so: every station was predicted twice at load, the first
+   * set thrown away (Capacity's profile, 18 Nov 2026: ~20 ms on the page and again in the worker). When cover would
+   * certainly predict afresh, the stations are predicted once over cover's own window: the same call cover makes, so the
+   * same series to the bit. ("Certainly": some harmonic station's predictions end within one STEP after `to` and start
+   * within one STEP before `from`, so the field's span lies inside [from − STEP, to + STEP].)
+   */
+  static covering(now: number, from: number, to: number): CurrentField {
+    const fresh = now < from - STEP || now + COVER_AHEAD > to + STEP;
+    return new CurrentField(fresh ? stationsFor(now - COVER_BACK, now + COVER_ON) : stationsFor(from, to));
   }
   /** Station i's current (m/s) at the field's time. */
   stationVec(i: number): Vec {
