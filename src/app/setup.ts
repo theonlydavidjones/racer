@@ -11,6 +11,7 @@ import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
+import { homeScene } from './firstRun';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
@@ -69,6 +70,9 @@ function prepare(seed = randomSeed()): void {
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
+  // (on the start page: a quiet cruise behind it, not this race: app/firstRun.ts homeScene)
+  homeBuilt = atHome && !shown;
+  if (homeBuilt) { const h = homeScene(app.S); args.settings = h.settings; args.opts = h.opts; }
   // the one World the page builds for this race (the setup's cards read it), handed to the host as its mirror
   courseFileNow = args.file;
   const facts = new World(args.file, args.settings, args.seed, args.opts);
@@ -99,6 +103,11 @@ function show(): void {
 function setStill(on: boolean): void { app.still = on; document.body.classList.toggle('still', on); }
 /** Leaving the setup without sailing (the start page): its race drawn, and live again. */
 function wake(): void { if (app.unshown) show(); else setStill(false); }
+/** On the start page (from load, and each time it's opened) or away from it: what prepare() builds behind it. */
+let atHome = false, homeBuilt = false;
+function home(on: boolean): void { atHome = on; }
+/** The start page's scene, live: its quiet cruise (built now unless it's the World already there). */
+function toHome(): void { atHome = true; if (homeBuilt) wake(); else newGame(); }
 
 const setupAfter = new Set<() => void>();
 /**
@@ -589,7 +598,7 @@ $('lessonGrid').addEventListener('click', e => { const id = (e.target as HTMLEle
 $('bLessonsX').onclick = () => { $('lessons').hidden = true; };
 /** Start a Learn to sail lesson (its tile, in the Drill section). */
 function beginLesson(id: LessonId): void { if (id === 'boat') { app.boatLesson.open(); return; } app.S.mode = 'lesson'; app.S.lesson = id; app.courseView.close(); app.navView.close(); for (const el of ['home', 'raceChoose', 'setup', 'drillView', 'lessons', 'seasonView']) $(el).hidden = true; beginRace(); }
-return { noRealWind, beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toSetup, wake };
+return { noRealWind, beginLesson, openLessons, beginRace, buildSetupChoices, courseCard, crewRows, home, newGame, openSetup, paintSeg, prepare, setupChanged, setupHeads, tideBox, toHome, toSetup, wake };
 }
 
 /**
