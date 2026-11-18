@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { SyncMirror, SyncSource } from '../src/sim/sync';
 // @ts-expect-error (a plain .mjs script, no types)
-import { BUDGET_MAX, BUDGET_REF, measure } from '../scripts/check/perf-pair.mjs';
+import { AI_RACES, BUDGET_MAX, BUDGET_REF, measure } from '../scripts/check/perf-pair.mjs';
 
 /** A fixed workload like the sim's (trig, square roots, small arrays). */
 /**
@@ -45,8 +45,12 @@ describe('performance budget: the sim', () => {
     // same units (twelve runs), so 43.1 is v168 × 43.1 / 42.31 = v168 × 1.019. (Before: the ratio to a fixed arithmetic
     // workload in the same process, which a shared machine's memory and caches moved by ±5–6% within a day, more than
     // the room the budget leaves. The derivations of 54.7 and 43.1 are in docs/CAPACITY.md §1.1a.)
-    const m = measure(BUDGET_REF, 6);
-    console.log(`full fleet, paired against v168: ${m.runs.map((r: { here: number; there: number }) => `${r.here.toFixed(0)}/${r.there.toFixed(0)} µs`).join(', ')}: ratio ${m.ratio.toFixed(4)} (budget ${BUDGET_MAX})`);
+    // A change to how boats sail or are judged (the physics, src/ai, src/rules) is judged on the ten races' mean instead
+    // (PERF_BUDGET_AI=1, perf-pair's --budget --ai): it changes the race itself, so the one race's ratio says as much
+    // about where that race now goes as about the code (#437 against v168: 1.025 on the one race, its mean over ten 1.006
+    // above main; the owner, 18 Nov 2026). The budget figure is the same.
+    const ai = !!(globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.PERF_BUDGET_AI, m = measure(BUDGET_REF, ai ? AI_RACES : 6);
+    console.log(`full fleet${ai ? ', the ten races (PERF_BUDGET_AI)' : ''}, paired against v168: ${m.runs.map((r: { here: number; there: number }) => `${r.here.toFixed(0)}/${r.there.toFixed(0)} µs`).join(', ')}: ratio ${m.ratio.toFixed(4)} (budget ${BUDGET_MAX})`);
     expect(m.ratio).toBeLessThan(BUDGET_MAX);
   }, 1_800_000); // (twelve races of both trees: about 12 minutes on the shared host)
 
