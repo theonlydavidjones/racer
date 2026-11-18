@@ -556,6 +556,41 @@ export class SeaField {
   }
 
   /**
+   * fetch made ready a ray at a time, for the planner's slices (sim/outlook.ts chopSteps): each cell fetch would read, its
+   * number worked out by fetchAt's sum in fetchAt's order and kept under fetch's key, so fetch then finds them all and
+   * answers the same to the last bit. Cold, a cell held one slice for up to 44 ms from Mile Rock (by Gashouse Cove, the
+   * fine map's 43 rays at each of four nodes), against the page's 20.
+   */
+  *fetchSteps(p: Vec, from: number): Generator<void, void, void> {
+    const fine = fineFetch(p), basin = inBasin(p), g = fine ? 10 : 150, w = Math.round(from / 2) * 2, step = fine ? 2 : 6;
+    const self = this;
+    function* warm(key: string, at: Vec): Generator<void, void, void> {
+      if (self.cache.get(key) !== undefined) return;
+      let num = 0, den = 0;
+      for (let a = -42; a <= 42; a += step) { const c = Math.cos(a * D2R); num += fetchRay(at, w + a, fine) * c * c; den += c; yield; }
+      if (self.cache.get(key) !== undefined) return; // (filled meanwhile, by a fetch between the slices)
+      if (self.cache.size > 60000) self.cache.clear();
+      self.cache.set(key, num / den);
+    }
+    // (the nodes fetch reads: the same tests, in the same order)
+    const node = (i: number, j: number): { key: string; at: Vec } | null => {
+      const c = { x: i * g, y: j * g };
+      return fineFetch(c) !== fine || inBasin(c) !== basin ? null : { key: `${w}:${g}:${i}:${j}`, at: c };
+    };
+    const x = Math.round(p.x), y = Math.round(p.y), here = { key: `${w}:1:${x}:${y}`, at: { x, y } };
+    if (!fine) { const n = node(Math.round(p.x / g), Math.round(p.y / g)); if (n) yield* warm(n.key, n.at); return; } // (no node: fetch works it out at p, uncached)
+    const H = fineHarbor(p)!, i = Math.floor(p.x / g), j = Math.floor(p.y / g);
+    const seen = (ni: number, nj: number) => {
+      const dx = ni * g - p.x, dy = nj * g - p.y, n = Math.ceil(hypot(dx, dy) / 1);
+      for (let k = 0; k <= n; k++) if (walled(H, { x: p.x + dx * k / Math.max(1, n), y: p.y + dy * k / Math.max(1, n) })) return false;
+      return true;
+    };
+    const ns = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]].map(([a, b]) => seen(a, b) ? node(a, b) : null);
+    for (const n of ns) if (n) yield* warm(n.key, n.at);
+    if (ns.some(n => n === null)) yield* warm(here.key, here.at);
+  }
+
+  /**
    * The sea at `p`, for the wind over the water there (`ww`, i.e. relative to the current) and the current
    * (`cur`, m/s). `currentAt` gives the current elsewhere (to see what the waves have come through).
    */
