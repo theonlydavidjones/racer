@@ -968,19 +968,37 @@ function goHome(): void {
 function homeNow(): void { void host.ask({ k: 'sendHome' }).then(ok => { if (ok) { word('bCourse', 'Navigator'); keysHint(); insetViews(); view.refreshCourse(w); } }); }
 $('bHome').onclick = goHome;
 // Home is part of the navigator (the owner, 13 Nov: "Home really belongs inside the nav experience"): its Sail home
-$('bNavHome').onclick = () => { navView.close(); goHome(); };
+$('bNavHome').onclick = () => { if (homeWhyNot()) return; navView.close(); goHome(); }; // (dimmed: its hover says why)
+$('bCvHome').onclick = () => { if (homeWhyNot()) return; courseView.close(); goHome(); };
 $('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); homeNow(); };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
-/** The Home button: while she's out sailing or racing (not in practice, or made fast in her slip). */
+/** Why she can't be sent home just now, in a few words for the button's hover (null: she can). Racing, not from here: it
+ * would retire her, too much for one click (the Coordinator, 18 Nov 2026); the pause menu's Home asks first. */
+function homeWhyNot(): string | null {
+  const u = w.user;
+  if (!w.running) return 'Once she\'s under way';
+  if (S.mode === 'drill') return 'Not in a start practice';
+  if (S.mode === 'lesson') return 'Not in a lesson';
+  if (S.mode === 'manoeuvres' || S.mode === 'roundings') return 'Not in practice';
+  if (!w.freeSail && !u.finished && !u.retired) return 'Retire from the race to sail home';
+  if (w.dest?.key === 'slip' && w.arrivedT != null) return 'She\'s home already';
+  if (u.docked) return 'She\'s made fast: push off first';
+  if (u.handled) return 'Her crew are pushing her off: once she\'s free';
+  if (!w.homeSlip) return 'Give her a home slip in the Yacht Club first';
+  return null;
+}
+/** The Home button, in the navigator: always there, dimmed with the reason on its hover when she can't be sent home (the
+ * owner, 18 Nov 2026: "can't find Sail home": it vanished whenever it couldn't be used). */
 function homeButton(): void {
-  // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden)
-  const el = $('bNavHome'), u = w.user, home = w.dest?.key === 'slip' && w.arrivedT != null;
-  const hide = !w.running || !w.cruising || S.mode === 'drill' || !!u.docked || !!u.handled || home;
-  if (el.hidden !== hide) el.hidden = hide;
+  // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden. And in the Course panel,
+  // which M opens racing and in a lesson, where the navigator doesn't)
+  const why = homeWhyNot(), t = why ? `${why}.` : 'Send her back to her home slip';
+  for (const el of [$('bNavHome'), $('bCvHome')]) {
+    if (el.hidden) el.hidden = false;
+    el.classList.toggle('dim', !!why); el.setAttribute('aria-disabled', why ? 'true' : 'false');
+    if (el.title !== t) el.title = t;
+  }
   if (!$('bHome').hidden) $('bHome').hidden = true;
-  el.classList.toggle('dim', !w.homeSlip);
-  const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Yacht Club first)';
-  if (el.title !== t) el.title = t;
 }
 $('bPilot').onclick = () => { if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); };
 for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pm]')) b.onclick = () => pilotOn(b.dataset.pm as Exclude<PilotMode, 'off'>);
