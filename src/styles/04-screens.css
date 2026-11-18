@@ -209,8 +209,8 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 #chartFx,#mapFx,#planFx{position:fixed;pointer-events:none}
 #chartFx,#planFx{z-index:1}
 /* the cruise planner: the start and the destination on one big chart, over the setup (ui/planChart.ts) */
-/* the data credit ODbL asks for, in the corner of the big charts */
-.ch-credit{position:absolute;right:12px;bottom:6px;z-index:3;font:500 10px/1 var(--f-inst);color:var(--muted);opacity:.8;text-decoration:none}
+/* the data credit ODbL asks for, in the corner of the big charts, above the NOAA strip drawn along their bottom edge (hud.ts) */
+.ch-credit{position:absolute;right:12px;bottom:26px;z-index:3;font:500 10px/1 var(--f-inst);color:var(--muted);opacity:.8;text-decoration:none}
 .ch-credit:hover{opacity:1;text-decoration:underline}
 #plan{position:fixed;inset:0;z-index:58;background:#0b1c28;display:flex;flex-direction:column}
 #planC{flex:1;min-height:0;width:100%;display:block;cursor:crosshair;touch-action:none}
