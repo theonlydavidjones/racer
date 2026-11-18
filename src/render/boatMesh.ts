@@ -1118,6 +1118,9 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
+/** The ensign staff (boat frame): its foot, its length, its rake aft and its truck. */
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, base = new THREE.Vector3(0.38, sheer(1) - 0.04, L / 2 + 0.03);
+  return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
   const alu = b.build.spars === 'aluminium', aluBoom = (b.build.boom ?? b.build.spars) === 'aluminium';
@@ -1327,10 +1330,10 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     // 8 cm forward of the transom, it stood in the tiller's sweep: put hard over to starboard, the tiller swings across
     // the quarter at the deck's height, through the staff's foot. On the transom's face it's aft of all of it (about 10 cm clear
     // at 75°)
-    const ens = flagArtCanvas(b.ensign), staffH = 1.0, rake = 0.22, base = new THREE.Vector3(0.38, sheer(1) - 0.04, L / 2 + 0.03);
+    const ens = flagArtCanvas(b.ensign), { h: staffH, rake, base } = ENSIGN_STAFF;
     const staffG = new THREE.Group(); grp.add(staffG);
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, staffH, 6), MAT.wood);
-    const top = base.clone().add(new THREE.Vector3(0, Math.cos(rake) * staffH, Math.sin(rake) * staffH));
+    const top = ENSIGN_STAFF.top;
     staff.position.copy(base.clone().lerp(top, 0.5)); staff.rotation.x = rake; staffG.add(staff);
     const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); staffG.add(truck);
     if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, staffG, false);
