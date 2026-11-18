@@ -771,7 +771,10 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // with their hands on it behind them, the arms went back through the elbows, the owner's "backwards arms"; and back from
     // it far enough that, bent over in the crouch toward it, their hands are in front of the chest and their knees clear of
     // the thwart)
-    const sheet = V(px * 0.4, 0.9, THWART.z - 0.25); // (the tail hauled in front of the thwart, not over it: an elbow below the hands lay on its top)
+    // (the tail hauled in front of the thwart, not over it: an elbow below the hands lay on its top; and low, at the
+    // knees' height: held up at the chest, 0.9 m, the crouch leant the shoulders right over it, a hand came within 17 cm
+    // of its shoulder, the arm folded up and the elbow stuck out ahead of it, 8 to 17 cm, the sprint's soak and tests/crewelbow)
+    const sheet = V(px * 0.4, 0.72, THWART.z - 0.25);
     return crouch(px, zz, Math.PI, [sheet.clone().add(V(0.07, 0.05, 0)), sheet.clone().add(V(-0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, 0.4)));
   }
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
