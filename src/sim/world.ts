@@ -1,6 +1,6 @@
 import { protestAfter, takesPenalty } from '../ai/conduct';
 import { DrillTracker } from './drill';
-import { groundStep } from '../boat/ground';
+import { GROUND, groundStep } from '../boat/ground';
 import { RoundingTracker } from './roundings';
 import { LESSON_WIND, LessonTracker } from './lessons';
 import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
@@ -14,7 +14,8 @@ import { makeRng, type Rng } from '../core/rng';
 import { OUTBOARDS } from '../boat/motor';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
-import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
+import { CurrentField, nextSaturday, sfClock, sfDate, sfLocalToUtcMin, stationsFor, tideHeightAt } from '../environment/tide';
+import { bottomDepth } from '../environment/bottom';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
 import { waveMotion } from '../boat/seaway';
@@ -2094,6 +2095,41 @@ export class World {
   applyConditions(next: Settings): void {
     const s: Settings = { ...this.settings };
     for (const k of CONDITION_KEYS) (s as unknown as Record<string, unknown>)[k] = (next as unknown as Record<string, unknown>)[k];
+    this.adopt(s);
+    const sea = this.sea.flat ? 'flat water' : 'the sea from the wind' + (this.sea.swell ? ' and the swell' : '');
+    const laid = !this.freeSail && Math.abs(wrap(this.windModel.base - this.C.base)) > 20 ? ' The marks stay where the committee laid them, for the old wind: a real committee would postpone or move the marks (RRS 27.3, 33).' : '';
+    this.emit({ type: 'toast', msg: `Conditions changed: ${Math.round(this.wind.kt)} kt from ${String(Math.round(this.wind.from) % 360).padStart(3, '0')}°, ${this.cur.label.toLowerCase()}, ${sea}.${laid}`, ms: laid ? 7000 : 4500 });
+  }
+  /**
+   * When your boat, aground on the mud, floats again on the tide (ms UTC): the first minute in the next day that the
+   * water over the bottom under her keel (environment/bottom.ts, with tide.ts tideHeightAt) comes to her draft upright
+   * and a few centimeters (the predictions, as a skipper reads the tide table). Null if she isn't aground, or won't float.
+   */
+  floatTime(): number | null {
+    const u = this.user; if (!u?.aground) return null;
+    const z = bottomDepth(u); if (z === null) return null;
+    const now = this.clockUtc * 60e3;
+    for (let m = 1; m <= 24 * 60; m++) { const t = now + m * 60e3; if (z + tideHeightAt(u, t) >= GROUND.draft + 0.05) return t; }
+    return null;
+  }
+  /**
+   * Wait for the tide (cruising, aground; the owner, 14 Nov 2026): the clock goes on to when she floats (floatTime), and
+   * the wind, the stream and the sea are that hour's, as the day has them (as applyConditions takes a new day's). She
+   * lies where she is, as she would. True if it waited.
+   */
+  waitForTide(): boolean {
+    if (!this.cruising) return false;
+    const at = this.floatTime(); if (at === null) return false;
+    // (the start moved on by as much, so the clock, the start plus the time sailed, reads the hour she floats)
+    const gun = Math.ceil(at / 60e3) - this.t / 60, s: Settings = { ...this.settings, tideDate: sfDate(gun), tideTime: sfClock(gun) };
+    this.raceDate = s.tideDate; this.gunUtc = sfLocalToUtcMin(this.raceDate, s.tideTime); // (first: the new conditions are read at the new hour)
+    this.adopt(s);
+    for (const b of this.boats) { b.cur = this.currentAt(b, true); b.ww = windOnWater(this.windHere(b, b), b.cur); if (b.ensign) b.ensignNight = !ensignDue(this.clockUtc, inBasin(b), false); }
+    this.emit({ type: 'toast', msg: `Waited for the tide: she floats at ${sfClock(this.clockUtc)}.`, ms: 4500 });
+    return true;
+  }
+  /** The conditions of settings `s` taken by the sail that's running (applyConditions, waitForTide): a fresh World's. */
+  private adopt(s: Settings): void {
     const n = new World(this.file, { ...s, fleet: 0, opponents: [] }, this.seed, { ...this.opts, startAt: this.startAt });
     this.settings = s;
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
@@ -2113,9 +2149,6 @@ export class World {
       classifyLegs(this.C, this.windModel.base); this.committeeFrom = this.windModel.base;
       this.cbWin = []; this.cbMean = null; // (the committee judges the new wind afresh: two minutes of it before it calls racing off)
     }
-    const sea = this.sea.flat ? 'flat water' : 'the sea from the wind' + (this.sea.swell ? ' and the swell' : '');
-    const laid = !this.freeSail && Math.abs(wrap(this.windModel.base - this.C.base)) > 20 ? ' The marks stay where the committee laid them, for the old wind: a real committee would postpone or move the marks (RRS 27.3, 33).' : '';
-    this.emit({ type: 'toast', msg: `Conditions changed: ${Math.round(this.wind.kt)} kt from ${String(Math.round(this.wind.from) % 360).padStart(3, '0')}°, ${this.cur.label.toLowerCase()}, ${sea}.${laid}`, ms: laid ? 7000 : 4500 });
   }
 
   /** Just sail: tell her when she gets to where she was going. */

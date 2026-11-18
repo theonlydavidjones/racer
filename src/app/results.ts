@@ -25,6 +25,7 @@ import { compass } from '../environment/sun';
 import { $ } from '../ui/dom';
 import { toast } from '../ui/feedback';
 import { fmtClock } from '../ui/hud';
+import { sfClock } from '../environment/tide';
 import { onSaveTrouble } from '../store/cloud';
 import type { AppCtx } from '../app';
 
@@ -36,7 +37,11 @@ $('bPause').onclick = () => {
   mountDebriefTactics(d);
   $('bWatch2').hidden = !html || app.w.track.length < 2;
   $('pause').querySelector('.panel')!.classList.toggle('nodeb', !html); // (no debrief: the column alone)
+  // aground on a cruise: wait for the tide to float her, the time she floats on the button (the owner, 14 Nov 2026)
+  const floats = app.w.cruising ? app.w.floatTime() : null, wait = $('bWaitTide');
+  wait.hidden = floats === null; if (floats !== null) wait.textContent = `Wait for the Tide (afloat ${sfClock(floats / 60e3)})`;
 };
+$('bWaitTide').onclick = () => { $('pause').hidden = true; app.send({ k: 'waitTide' }); app.send({ k: 'pause', on: false }); };
 /** What the replay's comparison with the winner needs: every boat's start, marks and finish, and the legs. */
 function vsInput(log: NonNullable<typeof app.w.log>): VsInput {
   const C = app.w.C, wind = app.w.committeeFrom, last = C.marks[C.marks.length - 1]?.p ?? C.center;

@@ -83,6 +83,8 @@ export type Command =
   | { k: 'retire'; why?: string; afterFinish?: boolean }
   /** Wrecked: carry on anyway, marked wrecked. */
   | { k: 'carryOn' }
+  /** Aground on a cruise: wait for the tide to float her (the pause menu). */
+  | { k: 'waitTide' }
   /** Take a penalty (by boat id): after an incident's replay. */
   | { k: 'penalty'; boat: number }
   /** New conditions for the sail that's running (the conditions panel from the pause menu). */
@@ -159,6 +161,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'dest': w.setDest(c.p, c.name); return;
     case 'retire': return w.retire(c.why, c.afterFinish);
     case 'carryOn': w.carryOn(); return;
+    case 'waitTide': w.waitForTide(); return;
     case 'penalty': w.penaltyFor(w.boats[c.boat]); return;
     case 'conditions': w.applyConditions(c.settings); return;
     case 'look': w.applyLook(c.spec); return;
