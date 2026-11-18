@@ -1044,7 +1044,9 @@ sources. Each shipped item is added there when it's published.
      from Tools". Like wind in the air and the flow view: the current drawn on the water around her (its set and drift,
      from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
      move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
-     it and it can't bring back the rushing water.
+     it and it can't bring back the rushing water. Asked again 18 November (not urgent): "I'd like to toggle on and off a
+     view of the current directly on the water around me to help me understand the nuances of the bay and the ocean."
+     A feature, so after the sprint.
    - **A heel indicator at the top-center of the sail controls** (owner, 15 November; feature; next; 2–3 h; drawings first):
      "at top-center of the sail controls, I want a heel indicator. show me drawings before building anything." Then:
      "need to see it in situ with the sail panel." Three options shown in place on the real band:
