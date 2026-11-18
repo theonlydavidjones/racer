@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { DEFAULT_CREW, Z, newCrew } from '../src/boat/crewPhys';
-import type { Boat } from '../src/boat/boat';
+import { SETTLE, type Boat } from '../src/boat/boat';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { engage } from '../src/boat/autopilot';
 import { LL } from '../src/geo/geo';
 import { n360 } from '../src/core/math';
+import { carInFor, defaultControls } from '../src/boat/controls';
+import { optimalSheet } from '../src/boat/trim';
+import train from '../src/courses/data/training-windward-return.json';
+import type { CourseFile } from '../src/courses/course';
 
 // Two of the crew's habits in light air, from Deep Physics' traces of crewstation's 6 kt races (16 Nov 2026).
 const crew = () => newCrew(JSON.parse(JSON.stringify(DEFAULT_CREW)), 'S');
@@ -126,3 +130,47 @@ describe('Up at the cabin top, they see to what\'s coming due there in the same 
   });
 });
 
+
+describe('The lazy jib car planned for the course she holds, not each wander of the wind (physics.ts, the crew\'s plan)', () => {
+  it('a beat in the Bay\'s gusty 12 kt westerly: the lazy car\'s plan holds while her guide does, and the crew go forward only for one that has lasted', () => {
+    // (crewstation's 12 kt seed 2, with helm-travel's quicker turn: the plan for the lazy car was read from the jib's
+    // wanted angle at her apparent wind of a few seconds, and on a beat it hunted across all five athwartships holes every
+    // few seconds; the crew's wait for a change that had lasted ran on through the hunting, and the bow hand went forward
+    // to move the lazy car twice on the beat for a wish that had lasted a second, and the race went over the trips' backstop)
+    const w = new World(train as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, sea: 'flat', traffic: 0, tideDate: '2026-11-14', fleet: 2, opponents: ['stock:1', 'stock:2'] } as unknown as Settings, 2);
+    const ai = w.boats.filter(x => !x.isUser), flips = ai.map(() => 0), was = ai.map(() => ''), changed = ai.map(() => -1e9), busy = ai.map(() => false);
+    const quick: string[] = [], far: string[] = [];
+    const setUp: string[] = [], ready = ai.map(() => false);
+    while (w.t < 360) {
+      w.step(DT);
+      // (set up before she sails, both cars at the hole for the wind she has: not left at the boat's default hole)
+      ai.forEach((b, k) => { if (b.crewReady && !ready[k]) { ready[k] = true; const want = carInFor(optimalSheet('jib', b.settle![SETTLE.guideAwa]) - 0.25);
+        for (const t of ['P', 'S'] as const) if (b.ctl.car[t].ins !== want) setUp.push(`boat ${k + 1} ${t}: hole ${b.ctl.car[t].ins}, ${want} for the wind`);
+        if (want === defaultControls().car.P.ins) setUp.push(`boat ${k + 1}: the wind's hole is the default's, ${want}: this race can't tell them apart`); } });
+      if (w.t < 20) continue;
+      ai.forEach((b, k) => {
+        const p = b.carPlan ? `${b.carPlan.fore}/${b.carPlan.ins}` : ''; if (p !== was[k]) changed[k] = w.t;
+        // (a trip to the lazy car: for a plan that has stood 30 s at least, CAR.hold's least, an expert's)
+        const onCar = b.crew!.people.some(a => a.job?.line === 'car');
+        if (onCar && !busy[k] && w.t - changed[k] < 30) quick.push(`boat ${k + 1} at ${w.t.toFixed(0)} s: the plan ${(w.t - changed[k]).toFixed(0)} s old`);
+        busy[k] = onCar;
+        if (b.leg !== 0 || b.tacking) { was[k] = p; return; }
+        // (while she holds her course, 10 s and more since she last swung, crewSettle's NEW_HELD: out of a tack her
+        // apparent wind swings 15-45° as she gathers way; the crew don't go to a car then)
+        if (was[k] && p !== was[k] && b.settle![SETTLE.since] >= 10) flips[k]++; was[k] = p;
+        // (and no lazy car's lead CAR_HOLES (3) or more outboard of the hole for her guide's angle, the jib held off its
+        // angle, once she's held a course past the crew's wait: brought in for a lasting change)
+        const ideal = carInFor(optimalSheet('jib', b.settle![SETTLE.guideAwa]) - 0.25);
+        // (once the plan and her course have stood longer than the crew's wait, CAR.hold's most, 90 s, and the trip itself;
+        // crewWork.ts carJob can still hold a right trip back, with the hand hiking, heeled 20° or more, or the car set on
+        // that side since the breeze last changed (`real`): on this race none of those holds it)
+        if (w.t - changed[k] >= 110 && b.settle![SETTLE.since] >= 110 && !onCar) { const lz = b.ctl.car[b.tack].ins; if (lz - ideal >= 3) far.push(`boat ${k + 1} at ${w.t.toFixed(0)} s: hole ${lz}, ${ideal} for her guide`); }
+      });
+    }
+    // (a few in these five minutes, for a new breeze: before, 168 on the first boat)
+    flips.forEach((f, k) => expect(f, `boat ${k + 1}: changes of the lazy car's plan on the beat`).toBeLessThanOrEqual(6));
+    expect(setUp, 'the cars as set up before she sails').toEqual([]);
+    expect(quick, 'trips forward to the lazy car for a plan that had only just come').toEqual([]);
+    expect(far.slice(0, 3), 'the lazy car left far from where her guide wants it, past the crew\'s wait').toEqual([]);
+  }, 300_000);
+});

@@ -1,4 +1,5 @@
 import { lineNotes } from './boat/coach';
+import { FULL_RUDDER, HELM_MAX } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
 import { trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
@@ -385,7 +386,7 @@ function word(id: string, t: string): void { const e = $(id).querySelector('.w')
  * starboard turns the boat to port, as on a real boat. It stays where you leave it. */
 /** The tiller angle the page last sent: what it meant the tiller to be (its own copy of the race is a frame or two behind). */
 let tillerSent = 0, tillerSentFrames = 0;
-function setTiller(v: number): void { tillerSent = Math.max(-1, Math.min(1, v)); tillerSentFrames = 30; send({ k: 'tiller', v }); }
+function setTiller(v: number): void { tillerSent = Math.max(-HELM_MAX, Math.min(HELM_MAX, v)); tillerSentFrames = 30; send({ k: 'tiller', v: tillerSent }); }
 /** Where the tiller is meant to be: where the page last put it, if it has in its last 30 frames (your hand, the spring;
  * counted in frames, as the race's copy lags by frames: a slow machine's second can be a frame or two);
  * otherwise where the race has it (the pilot's ram, a reset). */
@@ -399,7 +400,7 @@ const lashPending = () => lashPendingFrames > 0;
 /* Lashing the tiller: a line from the tiller to a cleat holds it where you leave it, hands off (heaving to). It's done on
  * the tiller itself: right-click (or double-click, or the key) to lash it where it is. The lashing shows on the tiller guide; a click
  * or A/D takes the tiller and the lashing comes off; double-click again to lash it somewhere else. */
-const lashWhere = (t: number) => Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'starboard' : 'port'}`;
+const lashWhere = (t: number) => Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'starboard' : 'port'}`;
 function lash(at = tillerMeant()): void {
   if (!w.running || w.paused) return;
   const u = w.user;
@@ -419,18 +420,18 @@ function showLash(): void {
   const l = w.user.lashed, on = l != null;
   document.body.classList.toggle('lashed', on); $('tiller').classList.toggle('lashed', on);
   if (on) {
-    $('tgCur').style.left = `${50 + l * TILLER_SPAN * 100}%`;
+    $('tgCur').style.left = `${50 + l / HELM_MAX * TILLER_SPAN * 100}%`;
     const txt = `Tiller lashed ${lashWhere(l)} · click to take it`; if ($('tgLash').textContent !== txt) $('tgLash').textContent = txt;
   }
 }
 function centreTiller(): void { setTiller(0); }
 function showTiller(): void {
   const t = w.user.tiller; showLash();
-  $('tillerHandle').style.left = `${50 + t * 44}%`;
-  if (tillerHeld) $('tgCur').style.left = `${50 + t * TILLER_SPAN * 100}%`;
-  setAttr($('tiller'), 'aria-valuenow', String(Math.round(t * 100)));
-  setText($('tillerLab'), w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
-    : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * 100)}% to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`);
+  $('tillerHandle').style.left = `${50 + t / HELM_MAX * 44}%`;
+  if (tillerHeld) $('tgCur').style.left = `${50 + t / HELM_MAX * TILLER_SPAN * 100}%`;
+  setAttr($('tiller'), 'aria-valuenow', String(Math.round(t / HELM_MAX * 100)));
+  setText($('tillerLab'), w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
+    : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`);
 }
 // Tiller bar: drag the handle left/right. Let go and it springs back to centre.
 let barDrag = false;
@@ -442,7 +443,7 @@ let barDrag = false;
     pilotOff('Pilot on standby: you have the tiller.');
     start = { x: e.clientX, t: w.user.tiller }; barDrag = true;
   });
-  pad.addEventListener('pointermove', e => { if (start) setTiller(start.t + (e.clientX - start.x) / (pad.clientWidth * 0.45)); });
+  pad.addEventListener('pointermove', e => { if (start) setTiller(start.t + (e.clientX - start.x) / (pad.clientWidth * 0.45) * HELM_MAX); });
   const end = () => { start = null; barDrag = false; };
   pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
 }
@@ -451,10 +452,14 @@ let barDrag = false;
  * (the boat turns to port). T, a click on the water, or Esc takes it or lets go. Let go and it springs
  * back to centre. Over the buttons and panels the tiller stays put, so you can reach them. */
 const gl = $('gl');
-const TILLER_SPAN = 0.35; // fraction of the window width from centre to hard over
+// (fraction of the window width from center to hard over. Hard over is where the tiller comes down onto the after deck, 46.5 degrees
+// (balance.ts HARD_OVER, the owner's ruling, 18 Nov 2026; 75 before, and 30 at 0.35 of the width before that): the whole
+// swing across the whole window, in step with the cursor. An ESTIMATE of what feels right: 30 degrees is now 0.32 of the
+// width out)
+const TILLER_SPAN = 0.5;
 let tillerHeld = false, toldTiller = false, panning = false;
 let lastCursorX: number | undefined;
-function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN)); }
+function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN) * HELM_MAX); }
 function takeTiller(x?: number): void {
   if (!w.running || w.paused || tillerHeld) return;
   pilotOff('Pilot on standby: you have the tiller.'); unlash();
@@ -481,7 +486,7 @@ function tillerSpring(dt: number): void {
   if (w.user.lashed != null) lashPendingFrames = 0; else if (lashPendingFrames > 0) lashPendingFrames--; // (the lash has reached the page's copy; or not yet)
   if (w.pilot.mode !== 'off' || w.user.lashed != null || lashPending()) return; // the pilot's ram has it, or it's lashed
   if (tillerHeld || barDrag || !w.running || w.paused) return;
-  const t = w.user.tiller; if (t !== 0) setTiller(t - Math.sign(t) * Math.min(Math.abs(t), 2.5 * dt));
+  const t = w.user.tiller; if (t !== 0) setTiller(t - Math.sign(t) * Math.min(Math.abs(t), 2.5 * HELM_MAX * dt)); // (from hard over to amidships in 0.4 s, as before)
 }
 // Trackpad: two-finger up/down zooms the overhead map, or moves your eye fore and aft in the cockpit. (Sideways swipes don't steer: their direction
 // depends on the "natural scrolling" setting, and a stray swipe would turn the boat.)

@@ -238,7 +238,11 @@ sources. Each shipped item is added there when it's published.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   **Now, first in the pass: the helm's travel and response** (owner, 15 November; accuracy; now; 3–5 h): "the turning
+   ~~**Now, first in the pass: the helm's travel and response**~~ (done, Deep Physics: the tiller to 75° each side, the
+   turn rounding off to the rudder's stall at 40° (a 7.7 m circle for 9) and braking past it; her yaw inertia from her
+   ballast keel, so the turn answers in 0.36 s at 4.7 kt, not 0.6; the chase camera close behind her; tests/helm-travel.
+   Left: the AI, a called tack and the tiller pilot still use 30° at most, so a hand on the tiller out-turns them by a
+   sixth; and the mouse's travel is linear to 75° at the window's edge, for the owner to try) (owner, 15 November; accuracy): "the turning
    radius is too slow and not wide enough when I'm tacking ... short tacks in the marina. I need to be able to push the
    tiller about 50% wider, and I would expect the tiller to be much more reactive ... There should be no delay in the
    turn of the boat and the push of the tiller ... exactly in line." The owner's answers:

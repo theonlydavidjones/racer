@@ -353,7 +353,17 @@ export function aimPoint(w: World, b: Boat): Vec {
   if (d > 35) {
     const e = dist(b, M), dx = (M.x - b.x) / e, dy = (M.y - b.y) / e;
     P = off(m.side === 's' ? { x: -dy, y: dx } : { x: dy, y: -dx }, 10);
-  } else P = off(m.r, 12);
+  } else {
+    // At a mark where she bears away (the next leg further off the wind than this one), the ray at her own distance out,
+    // 12 m at the least: rounding wide, outside a boat with room, she steered back in for the point 12 m off, crossed
+    // the ray heading near the way she'd come, then turned back for the next mark through a gybe into the boats still
+    // coming in (the owner's race with the shallow-water waves, #454). Where she heads up (a leeward mark, a reach to a
+    // beat) the 12 m point still: swept wide there, a helm comes up close-hauled past the mark, wide and tight, not
+    // reaching on out to the ray (physics review), and that's her proper course too (properTwa, world.ts)
+    const twa = (p: Vec, q: Vec) => Math.abs(wrap(w.wind.from - brg(q.x - p.x, q.y - p.y)));
+    const bearAway = twa(M, m.next) > twa(m.prev, M);
+    P = off(m.r, bearAway ? clamp(dot(sub(b, M), m.r), 12, 30) : 12);
+  }
   return m.reach ? aroundIsland(m, b, P, w.wind.from) : P;
 }
 
@@ -903,6 +913,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
     const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
     if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+      // (about to touch, as the Rule 14 branch below reckons it: rule 14 binds her too, and the keep-clear boat is the one
+      // whose helm goes over hardest at the last moment, to the rudder's stall: physics.ts, the physics review)
+      if (cp.t < lagT + 1 && cp.d < 4.5 + 0.5 * lagM) ai.urgent = true;
       // Already opening, with room between the hulls: she is keeping clear (Definitions, Keep Clear: the other boat can
       // sail her course with no need to act), so she sails on at full speed: on her course if that keeps the room, on
       // her heading if her course would close it again. (Easing and heading up on regardless, a windward boat slowed

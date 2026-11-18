@@ -1099,9 +1099,11 @@ export class SceneView {
       // distance and height are always the framed ones for that direction, so she's framed even while it swings round
       const want = u.h - look.yaw / D2R;
       if (this.lastView !== 1 || !Number.isFinite(this.chaseDir)) this.chaseDir = want;
+      // (close behind her: a third of a second behind, the turn looked later than it was, the owner's "delay" between the
+      // tiller and the boat; a tenth of a second still takes the frame-to-frame jitter out)
       // the shorter way round, and kept within a turn: unwrapped, after two whole turns one way (penalty turns) the
       // remainder's sign flipped and the camera swung the long way round, a full circle (the owner, 16 Nov 2026)
-      else this.chaseDir = easeAngle(this.chaseDir, want, Math.min(1, dt * 3));
+      else this.chaseDir = easeAngle(this.chaseDir, want, Math.min(1, dt * 10));
       const hv = V(this.chaseDir), ratio = Math.max(0.05, (9 + look.pitch * 25) / 24); // (the camera's height over its distance)
       const fit = this.chaseFit(this.chaseDir, ratio), dist = look.chase ?? fit.dist;
       this.chaseDist = dist;

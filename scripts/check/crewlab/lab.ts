@@ -2,17 +2,19 @@
  * Crew lab (dev only: npm run dev, then http://localhost:5173/scripts/check/crewlab/): one boat sailing with the real
  * physics in steady wind on flat water, and a camera you put anywhere around her crew. For checking the crew's seats,
  * paths and poses from both sides on both tacks (scripts/check/crew.cjs drives it).
- *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n?, pole?, sea? (pitch amplitude, rad) })  then lab.sail(seconds)
+ *   lab.setup({ windKt, twa, tack: 'S'|'P', place?: {across, fore}, n?, pole?, sea? (pitch amplitude, rad), spec? (her BoatSpec) })  then lab.sail(seconds)
  *   lab.tack()  (starts a tack; then lab.sail(s) in small steps to see the crossing)
  *   lab.cam(yawDeg, pitchDeg, dist, [x, y, z] boat-frame target)  (yaw 0: from dead astern; 90: from starboard)
  *   lab.mesh()  (the boat's mesh, its crew figures in .crew: for finding which part of whom is where)
  */
+import { DEFAULT_BOAT, type BoatSpec } from '../../../src/boat/spec';
 import '../../../src/render/three-setup';
 import * as THREE from 'three';
 import { buildBoatMesh, syncBoatMesh, type BoatMesh } from '../../../src/render/boatMesh';
 import { newCrew, DEFAULT_CREW, type CrewPlace } from '../../../src/boat/crewPhys';
 import { testBoat, sail, startTack } from '../../../tests/helpers/testBoat';
 import { beatAngle } from '../../../src/boat/polar';
+import { FULL_RUDDER } from '../../../src/boat/balance';
 import type { Boat } from '../../../src/boat/boat';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -31,6 +33,7 @@ sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.sha
 /** Hold a crew member where the physics would have them (lab.pin): applied after each step, before the figures are posed. */
 const pinNow = () => { const pn = (lab as any).pins as Record<number, object> | undefined; if (pn && b.crew) for (const [i, v] of Object.entries(pn)) Object.assign(b.crew.people[+i], v); };
 function render(): void {
+  if ((lab as any).rud != null) b.helm = (lab as any).rud / FULL_RUDDER; // (the tiller held at an angle: lab.rudder)
   pinNow();
   syncBoatMesh(m!, b, t, undefined, (lab as any).farOn && (lab as any).farN % 3 !== 0);
   sun.target.position.copy(m!.grp.position); sun.position.copy(m!.grp.position).add(new THREE.Vector3(-30, 50, 20));
@@ -50,13 +53,16 @@ function render(): void {
 }
 
 const lab = {
-  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number }) {
+  setup(o: { windKt: number; twa?: number; tack?: 'S' | 'P'; place?: CrewPlace; n?: number; pole?: boolean; sea?: number; ensign?: Boat['ensign'] }) {
     (lab as any).seaA = o.sea ?? 0; // (pitching in a seaway: that many radians either way every 2.6 s, crew.ts rough)
     const twa = o.twa ?? beatAngle(o.windKt), tack = o.tack ?? 'S', h = tack === 'S' ? 360 - twa : twa;
     b = testBoat({ heading: h, kt: 3, windKt: o.windKt }); b.tack = tack;
     b.crew = newCrew({ helm: DEFAULT_CREW.helm, crew: DEFAULT_CREW.crew.slice(0, o.n ?? 2) }, tack);
     if (o.place) b.crew.place = o.place;
     if (o.pole) b.poleWant = true;
+    if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: the tiller's sweep past it)
+    if (o.spec) b.spec = { ...structuredClone(DEFAULT_BOAT), ...o.spec }; // (her looks: the boat editor's choices, e.g. her lines' colorways)
+    if (o.ensign) b.ensign = o.ensign; // (her ensign on its staff at the stern: 'us', …)
     if (m) scene.remove(m.grp);
     m = buildBoatMesh(b); scene.add(m.grp); t = 0;
     m.grp.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); // (as render/scene.ts does)
@@ -76,6 +82,8 @@ const lab = {
   /** As a boat far off is drawn in the game (scene.ts FAR_SYNC): her crew and cloth posed every third frame. */
   far(on: boolean) { (lab as any).farOn = on; (lab as any).farN = 0; },
   tack() { (lab as any).hold = null; startTack(b); },
+  /** The rudder (and tiller) held at `deg` (+ the blade to starboard, as b.helm), or null to let the physics have it. */
+  rudder(deg: number | null) { (lab as any).rud = deg; for (let i = 0; i < 60; i++) { if (deg != null) b.helm = deg / FULL_RUDDER; syncBoatMesh(m!, b, t += 1 / 60); } render(); },
   /** Hold crew member `i` (crew.people's index) at these fields each step ({ pose, x, z, lean, job, goal }), or null to let go. */
   pin(i: number, v: object | null) { const pn = ((lab as any).pins ??= {}) as Record<number, object>; if (v) pn[i] = v; else delete pn[i]; },
   /** The helm calls the turn ("Ready about", "Ready to jibe"): the crew get ready for it (the helper's clock starts again

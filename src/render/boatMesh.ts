@@ -4,18 +4,19 @@ import { workPace } from '../boat/crewWork';
 import { ensignStep, flagDrawn, flagExtension, flagHang, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
+import { FULL_RUDDER, HARD_OVER } from '../boat/balance';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, SHEET_N, sheetTail, syncCrew, tillerTip, travCam, travTail, type Crew } from './crew';
+import { buildCrew, dockhand, SHEET_N, sheetTail, syncCrew, tillerJointAt, tillerRootAt, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, TRANSOM_TOP, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerLift, tillerPivot, tillerRestDir, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -338,8 +339,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // the wooden cap, one piece from the cabin along both sides and round the after coaming (Josephine, the owner's photo)
     const cap = [...side(-1), ...lip, ...side(1).reverse()].map(q => q.clone().setY(q.y + COAMING_H(q.z)));
     grp.add(new THREE.Mesh(wall(cap, () => 0.02, 0.04), MAT.wood));
-    // a mooring cleat on the after deck, a little to starboard of the centreline (as on Josephine)
-    const cz = (z1 + L / 2) / 2, cx = 0.12, cy = deckY(uAtZ(cz), cx);
+    // a mooring cleat on the after deck, on the centerline (the owner, 18 Nov 2026: "the aft cleat should be at centerline,
+    // not offset"), midway between the cockpit's after end and the transom; the tiller passes over it amidships, 7.8 cm clear
+    const cz = (z1 + L / 2) / 2, cx = 0, cy = deckY(uAtZ(cz), cx);
     const cleat = new THREE.Mesh(cleatGeometry(0.2, 0.016), STEEL); cleat.position.set(cx, cy, cz); grp.add(cleat);
   }
   // the footrest (Josephine, the owner's photo): one teak plank right across the cockpit's after end, its grain across
@@ -370,7 +372,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const cols = new Float32Array(rg.blade.attributes.position.count * 3).fill(1);
   rg.blade.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
-  turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
+  { const til = new THREE.Mesh(rg.tiller, MAT.tiller); til.position.copy(tillerPivot()); turn.add(til); } // (on its pin: lifted there in syncBoatMesh)
+  // the rudder head's cheeks: two bronze plates either side of its top, the tiller's root held between them (bolted
+  // through), so it reads as fitted into the head, not standing on it
+  { const root = tillerPivot(), d = tillerRestDir(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
+    for (const sx of [1, -1]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.07, 0.15), BRONZE); ch.quaternion.copy(q); ch.position.copy(root).addScaledVector(d, 0.03).setX(sx * 0.031); turn.add(ch); } }
   grp.add(rud);
   // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
   // prop turning, from the motor's state (syncBoatMesh)
@@ -798,7 +804,7 @@ function deckFittings(grp: THREE.Group): void {
   for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
   screw(FORESTAY_DECK.clone(), HOUNDS);
   parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
-  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * 0.3, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
+  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * BS_CHAINPLATE_X, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
   { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
     parts.push(cleatGeometry(0.2, 0.016).translate(0, cy, cz)); }
   const flat = parts.map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
@@ -1113,6 +1119,18 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
+/** The toerail's inner face, in from the sheer (it stands 3 cm in, 3 cm thick), and the backstay's chainplates, out from
+ * the centerline (deckFittings). */
+const TOERAIL_IN = 0.045, BS_CHAINPLATE_X = 0.3;
+/**
+ * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. Its foot in a flush silver socket in the
+ * after deck at the starboard quarter, where the owner measured Josephine's (18 Nov 2026): "equidistant from the toe rail
+ * and the starboard chain plate of the back stay", and "about two inches forward" of the deck's aft edge. The tiller stops
+ * on the deck well short of it (tests/ensignstaff.test.ts). Photos: reference/photos/josephine-ensign-socket-port-
+ * quarter.jpg (from the dock looking aft: her starboard side) and josephine-ensign-socket-from-cockpit.jpg.
+ */
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = (halfBeam(uAtZ(z)) - TOERAIL_IN + BS_CHAINPLATE_X) / 2, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+  return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
   const alu = b.build.spars === 'aluminium', aluBoom = (b.build.boom ?? b.build.spars) === 'aluminium';
@@ -1317,14 +1335,17 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), flagBlock(1), 0.25, rig); clubHoist(-1); }
   else clubHoist(1);
   if (b.ensign) {
-    // on an ensign staff in a socket on the starboard quarter, close to the centreline (the backstay and tiller have the
-    // middle of the transom), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly)
-    const ens = flagArtCanvas(b.ensign), staffH = 1.0, rake = 0.22, base = new THREE.Vector3(0.3, sheer(1) + 0.02, L / 2 - 0.08);
+    // on an ensign staff in its deck socket at the starboard quarter (ENSIGN_STAFF), raked aft; the flag about an
+    // inch of fly per foot of boat (a 24-inch fly)
+    const ens = flagArtCanvas(b.ensign), { h: staffH, rake, base } = ENSIGN_STAFF;
     const staffG = new THREE.Group(); grp.add(staffG);
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, staffH, 6), MAT.wood);
-    const top = base.clone().add(new THREE.Vector3(0, Math.cos(rake) * staffH, Math.sin(rake) * staffH));
+    const top = ENSIGN_STAFF.top;
     staff.position.copy(base.clone().lerp(top, 0.5)); staff.rotation.x = rake; staffG.add(staff);
     const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); staffG.add(truck);
+    // (its socket: a flush silver ring in the deck, there whether the staff's shipped or not)
+    const socket = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 16).scale(1, 1, 0.4).rotateX(Math.PI / 2), CHROME);
+    socket.position.copy(base).add(new THREE.Vector3(0, 0.002, 0)); grp.add(socket);
     if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, staffG, false);
     const flag = ens ? flags[flags.length - 1].mesh : null;
     // (down the staff no further than leaves the flag's foot clear of the deck: a Danish or Norwegian ensign is deep in the hoist)
@@ -1508,8 +1529,9 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
     u.uLampUp.value.set(0, 1, 0).applyQuaternion(m.lantern.arm.quaternion); }
-  const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
-  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);
+  const want = Math.max(-HARD_OVER, Math.min(HARD_OVER, (b.helm ?? 0) * FULL_RUDDER)) * D2R; // (the blade and the tiller where they are: to hard over, almost flush with the transom)
+  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 20); // (with your hand: no slower than a tiller swings)
+  m.rudder.children[1].rotation.x = tillerLift(m.rudder.rotation.y); // (riding up on its pin over the coaming and the rail, turned far over)
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
@@ -1546,7 +1568,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const live = !hold || m.liveT == null, ldt = m.liveT == null || m.liveT < 0 ? dt : Math.min(0.15, Math.max(0, t - m.liveT));
   if (live) m.liveT = t;
   const pd = b.paddle, who = pd ? paddler(b) : 0;
-  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
+  if (live) m.crew.tillerRoot = tillerRootAt(m.rudder);
+  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerJointAt(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
   if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
