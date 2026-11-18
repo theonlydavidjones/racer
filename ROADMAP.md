@@ -1221,6 +1221,13 @@ sources. Each shipped item is added there when it's published.
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
      the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
      these.
+     - **Bug: the jumpers' control** (owner, 18 November; bug; now; 2–3 h): "jumper control are confusing and glitchy.
+       can't seem to reach the minimum 0 or maximum 5. left/right arrow control UI is super weird. and the controls should
+       show on the panel by default." In src/ui/sailBand.ts `jumpers()`, the dial shows only when her Rig tune has
+       `jumpersUnderWay`: the owner wants it shown by default. 0 and 5 aren't reached: check jumpersBy's step from
+       jumpersNow/jumperTarget (two quick presses, the guide's tune with no tune set) against condition.ts wantJumpers'
+       clamp and fixTune. Add a test that presses take it from 2.5 to 0 and to 5. The left/right halves of the dial go;
+       in their place, a plain − 2.5 + stepper in the band, its mock-up to the owner first.
      - **First: the sail band's and coach's tips** (owner, 18 November, with a screenshot of Jumpers' tip, 11 lines; now;
        3–5 h): "we need to work on these gargantuan copy blocks. no one will read this." Each tip (src/ui/sailBand.ts,
        e.g. `jt`) becomes one line of about 12 words: what it does, and the cue to act (Jumpers: "More turns stiffen the
