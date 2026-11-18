@@ -192,6 +192,8 @@ describe('pushed off astern', () => {
     expect(bow.went).toBe(false); expect(bow.msgs).toEqual(['The breeze on her starboard bow would carry her into the boats astern: she stays fast until it eases.']);
     expect(said('horseshoe-bay:A12', 90, 12, true).msgs).toEqual(['The breeze on her starboard bow would carry her into the boats astern: motor out, or wait for it to ease.']);
     expect(said('south-beach:A77', 90, 12, false).msgs).toEqual(['The breeze on her port bow would carry her into the boats astern: she stays fast until it eases.']);
+    // (and nearly dead ahead, within 30 degrees, plainly on her bow: West Harbor 203 in 12 kt from 278, the Coordinator, 18 Nov 2026)
+    expect(said('west-harbor:203', 278, 12, false).msgs).toEqual(['The breeze on her bow would carry her into the boats astern: she stays fast until it eases.']);
     // (and a berth kept fast for the room: short of the clearance or the steerage in any wind, a calm too, NO_ASTERN)
     const room = said(NO_ASTERN[0], 270, 12, false);
     expect(room.went).toBe(false); expect(room.msgs).toEqual(['No room to push her off from this berth in this wind: she stays fast until it changes.']);
