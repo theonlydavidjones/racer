@@ -127,7 +127,7 @@ physics, ranked like the ten above:
 | RUDDER.arm | 2.6 | 91 | unsourced |  |
 | RUDDER.aspect | 1.4 | 91 | unsourced |  |
 | FULL_RUDDER | 30 | 93 | unsourced | the helm's unit, and the most the AI and the tiller pilot use |
-| HARD_OVER, RUDDER_STALL (balance.ts) | 75°, 40° | | estimate | the tiller's swing each side (the owner, of his boat, and a seasoned skipper's account, 15 Nov 2026); the stall for a keel-hung blade working as the keel's flap. No Folkboat measurement found. rudderTurn's rounding from 30° to the stall (a sixth more turn at 40°) and the stalled plate past it (Kirchhoff; Hoerner), and rudderBrake, are estimates on these |
+| HARD_OVER, RUDDER_STALL (balance.ts) | 46.5°, 40° | | derived / estimate | the tiller's swing each side, to where its arc meets the after deck (the owner's ruling, 18 Nov 2026; from render/hull.ts TILLER, len 1.2 m and 4° above level at rest, both estimates from the owner's photos, and the hull's rudder rake; tests/tillerpath holds it; 75° before); the stall for a keel-hung blade working as the keel's flap. No Folkboat measurement found. rudderTurn's rounding from 30° to the stall (a sixth more turn at 40°) and the stalled plate past it (Kirchhoff; Hoerner), and rudderBrake, are estimates on these |
 | IDEAL_HELM | 2.5 | 95 | unsourced |  |
 | MAIN_C.kpp | 0.01379 | 127 | sourced |  |
 | JIB_C.kpp | 0.016 | 135 | sourced |  |

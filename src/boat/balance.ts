@@ -99,9 +99,13 @@ export const RUDDER = { area: 0.42, slope: 3.0, arm: 2.6, aspect: 1.4 };
  * her AI helmsman and the tiller pilot use. */
 export const FULL_RUDDER = 30;
 /**
- * The tiller's swing, deg each side: pushed until it's almost flush with the transom (the owner, of his own boat, 15 Nov
- * 2026: "the entire radius ... maybe 150 degrees"). The tiller is fast to the rudder's head, so this is the blade's
- * angle too. And the angle the blade stalls at: up to it the turn grows with the angle; past it the water breaks away
+ * The tiller's swing, deg each side: to where it comes down onto the after deck, the same both sides (the owner's
+ * ruling, 18 Nov 2026: "the tiller swings on a slight arc, up off the deck at center and down onto the deck at the
+ * extremes"; his first account, 15 Nov, was "the entire radius ... maybe 150 degrees", and it was 75 here until then).
+ * Not a free number: it's where the drawn tiller's arc about the raked rudder line meets the deck (render/hull.ts
+ * tillerClearance: 46.5 degrees, from TILLER.len 1.2 m, its 4 degrees above level at rest, an ESTIMATE, and the class
+ * hull's rudder rake; Crew Figures, 18 Nov 2026), and tests/tillerpath.test.ts holds the two together within half a
+ * degree. The tiller is fast to the rudder's head, so this is the blade's angle too. And the angle the blade stalls at: up to it the turn grows with the angle; past it the water breaks away
  * from the blade's back, its side force falls off and it mostly brakes. 40 degrees is an ESTIMATE: a free-standing blade
  * of this shape stalls at 20 to 25 (Molland & Turnock, Marine Rudders and Control Surfaces), but hers is hung on the
  * keel's after edge and works as its flap, which holds on to about twice that; no measurement for a Folkboat was found
@@ -110,7 +114,7 @@ export const FULL_RUDDER = 30;
  * by the owner, 15 Nov 2026): "it was immediately apparent that the tiller was wrong. sixty degrees turning radius is
  * 'crazy'" (the tiller's whole swing was 60 degrees, 30 each side).
  */
-export const HARD_OVER = 75, RUDDER_STALL = 40;
+export const HARD_OVER = 46.5, RUDDER_STALL = 40;
 /** Hard over, and the stall, in the helm's units (FULL_RUDDER each). */
 export const HELM_MAX = HARD_OVER / FULL_RUDDER, HELM_STALL = RUDDER_STALL / FULL_RUDDER;
 /** A stalled flat plate's normal force coefficient at `a` rad to the flow (Kirchhoff's free-streamline result, as in
@@ -124,8 +128,8 @@ const TURN_PEAK = 1 + (HELM_STALL - 1) / 2;
  * the angle up to full helm, as it has always been here. From there to the stall it rounds off, as a flap's lift does
  * well before it stalls (a parabola from full helm's slope to none at the stall): a sixth more turn at 40 degrees than
  * at 30, a 7.7 m radius for 9. Past the stall it falls as a stalled plate's side force does, its normal force's part
- * across the flow (0.94 of the most at 50 degrees, 0.79 at 60, 0.43 at 75: hard over she turns half as fast as at full
- * helm, and stops). The shape past full helm is an ESTIMATE (the physics review, 15 Nov 2026: growth in step with the
+ * across the flow (0.97 of the most at the deck's stop, 46.5 degrees: hard over she turns nearly as fast as at the stall,
+ * and brakes a little, 133 N at 4.7 kt). The shape past full helm is an ESTIMATE (the physics review, 15 Nov 2026: growth in step with the
  * angle all the way to 40 degrees would ask a lift coefficient over 2 of the blade).
  */
 export function rudderTurn(helm: number): number {

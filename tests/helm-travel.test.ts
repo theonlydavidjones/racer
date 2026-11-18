@@ -10,7 +10,7 @@ import { sail, testBoat } from './helpers/testBoat';
 /**
  * The helm's travel and response (the owner, 15 Nov 2026, of his own boat: "I need to be able to push the tiller about
  * 50% wider ... no delay in the turn of the boat and the push of the tiller", short-tacking in the marina). The tiller
- * swings to 75 degrees each side; the turn grows with it, rounding off, to the rudder's stall at 40 and falls off past it,
+ * swings to the deck's stop, 46.5 degrees each side (75 until 18 Nov 2026); the turn grows with it, rounding off, to the rudder's stall at 40 and falls off past it,
  * where the blade brakes; and her turn answers the helm sooner (her yaw inertia worked from her ballast keel). ESTIMATES all, with
  * the owner's boat as the reference: these hold them where they were set.
  */
@@ -33,22 +33,27 @@ const tack = (kt: number, til: number, called = true) => {
   return { t, adv, v: u.v };
 };
 
-describe('the helm\'s travel: the tiller to 75 degrees, the rudder stalling past 40', () => {
+describe('the helm\'s travel: the tiller to the deck at 46.5 degrees, the rudder stalling past 40', () => {
   it('the turn grows with the helm to the stall, then falls off; past the stall it brakes', () => {
     expect(rudderTurn(0.5)).toBeCloseTo(0.5, 9); expect(rudderTurn(1)).toBeCloseTo(1, 9); expect(rudderTurn(HELM_STALL)).toBeCloseTo(1 + (HELM_STALL - 1) / 2, 9); // (rounding off to a sixth more at the stall)
     for (let h = 1.02; h <= HELM_STALL; h += 0.02) { expect(rudderTurn(h)).toBeGreaterThan(rudderTurn(h - 0.02)); expect(rudderTurn(h)).toBeLessThan(h); }
     let prev = rudderTurn(HELM_STALL);
     for (let h = HELM_STALL + 0.05; h <= HELM_MAX + 1e-9; h += 0.05) { const r = rudderTurn(h); expect(r).toBeLessThan(prev); prev = r; }
-    expect(rudderTurn(HELM_MAX)).toBeLessThan(0.55); expect(rudderTurn(HELM_MAX)).toBeGreaterThan(0.45); // (hard over: half of full helm's turn)
+    // (hard over is the deck's stop, 46.5 degrees, since 18 Nov 2026, the owner's ruling: 1.134 of full helm's turn there,
+    // just under the stall's 1.167. At 75, as it was, 0.507 in a band of 0.45 to 0.55: the same tenth either side)
+    expect(rudderTurn(HELM_MAX)).toBeLessThan(1.23); expect(rudderTurn(HELM_MAX)).toBeGreaterThan(1.01);
     expect(rudderBrake(HELM_STALL, 2.4)).toBe(0); expect(rudderBrake(1, 2.4)).toBe(0);
-    expect(rudderBrake(HELM_MAX, 2.4)).toBeGreaterThan(600); expect(rudderBrake(HELM_MAX, 2.4)).toBeLessThan(1000); // (N at 4.7 kt)
+    expect(rudderBrake(HELM_MAX, 2.4)).toBeGreaterThan(100); expect(rudderBrake(HELM_MAX, 2.4)).toBeLessThan(166); // (N at 4.7 kt: 133 at the deck's stop, 18 Nov 2026; 801 at 75 in 600 to 1000, the same quarter either side)
   });
-  it('her turning circle from a beam reach in 10 kt: 9 m at 30 degrees of helm as before, under 8 m at the stall, and wide, slowing, hard over', () => {
+  it('her turning circle from a beam reach in 10 kt: 9 m at 30 degrees of helm as before, under 8 m at the stall, and a little wider and slower hard over', () => {
     const full = circle(10, 1), stall = circle(10, HELM_STALL), hard = circle(10, HELM_MAX);
     expect(full.radius).toBeGreaterThan(8); expect(full.radius).toBeLessThan(9.5);
     expect(stall.radius).toBeGreaterThan(6.8); expect(stall.radius).toBeLessThan(7.8);
-    expect(hard.radius).toBeGreaterThan(12); expect(hard.rate).toBeLessThan(0.5 * stall.rate);
-    expect((stall.v - hard.v) / KT).toBeGreaterThan(0.3); // (hard over she's lost more way in 3 s, turning half as fast)
+    // (hard over at the deck's stop, 18 Nov 2026: 7.47 m against the stall's 7.33, 17.3 degrees a second against 18.4, and
+    // 0.19 kt more way lost in 3 s. At 75: 15.8 m asked over 12, 0.40 of the stall's rate asked under 0.5, 0.58 kt asked
+    // over 0.3. The stop is 6.5 degrees past the stall now, so she no longer turns half as fast there)
+    expect(hard.radius).toBeGreaterThan(stall.radius); expect(hard.radius).toBeLessThan(7.8); expect(hard.rate).toBeLessThan(stall.rate);
+    expect((stall.v - hard.v) / KT).toBeGreaterThan(0.1);
   }, 60_000);
   it('the turn starts with the tiller: 5.5 degrees in the first half second at 5.8 kn, 3 at 4 kn; her lag under 0.4 s at 4.7 kt and 0.9 s at 2 kt', () => {
     expect(circle(10, HELM_STALL).half).toBeGreaterThan(5.5);
@@ -56,7 +61,7 @@ describe('the helm\'s travel: the tiller to 75 degrees, the rudder stalling past
     expect(yawLag(4.7 * KT)).toBeLessThan(0.4); expect(yawLag(2 * KT)).toBeLessThan(0.9);
     expect(yawLag(1 * KT)).toBeGreaterThan(2 * yawLag(2 * KT) - 1e-9); // (and still by her speed: at a crawl she answers slowly)
   }, 60_000);
-  it('a tack with the helm at the stall: inside 8 s and 8.6 m of carry in 6, 8 and 14 kt, a second quicker and a meter shorter than at 30 degrees; hard over, far slower', () => {
+  it('a tack with the helm at the stall: inside 8 s and 8.6 m of carry in 6, 8 and 14 kt, a second quicker and a meter shorter than at 30 degrees; hard over, half a second slower', () => {
     for (const kt of [6, 8, 14]) {
       const full = tack(kt, 1), stall = tack(kt, HELM_STALL);
       expect(stall.t, `${kt} kt`).toBeLessThan(8); expect(stall.adv, `${kt} kt`).toBeLessThan(8.6);
@@ -65,7 +70,9 @@ describe('the helm\'s travel: the tiller to 75 degrees, the rudder stalling past
     // (uncalled, the tack at the stall in 14 kt is a fifth of a second slower: the crew late on the jib)
     expect(tack(14, HELM_STALL, false).t).toBeGreaterThan(tack(14, HELM_STALL).t + 0.1);
     const hard = tack(8, HELM_MAX), stall = tack(8, HELM_STALL);
-    expect(hard.t).toBeGreaterThan(2 * stall.t); expect(hard.v).toBeLessThan(0.6 * stall.v);
+    // (hard over at the deck's stop, 18 Nov 2026: 7.50 s against 6.87 and 2.54 kt out of it against 2.80. At 75: 19.98 s,
+    // asked over twice the stall's, and 0.98 kt, asked under 0.6 of it)
+    expect(hard.t).toBeGreaterThan(stall.t + 0.3); expect(hard.t).toBeLessThan(8); expect(hard.v).toBeLessThan(0.95 * stall.v);
   }, 120_000);
   it('the physics review\'s cases: a turn by the flow past full helm isn\'t sculling; a key with the tiller over the same way stops at the stall; going astern the blade is drawn where it\'s held', () => {
     // (a key's turn with way on, the helm at the stall, turns her faster than full helm's flow: no sculling latched, so
@@ -73,7 +80,7 @@ describe('the helm\'s travel: the tiller to 75 degrees, the rudder stalling past
     { const w = mk(10), u = w.user; settle(w, 60); for (let i = 0; i < 120; i++) { u.steer = 1; w.step(DT); } expect(u.v).toBeGreaterThan(1); expect(u.scullDir).toBeUndefined(); }
     { const w = mk(10), u = w.user; settle(w, 90);
       for (let i = 0; i < 30; i++) { u.steer = 1; u.tiller = -HELM_STALL; w.step(DT); } expect(Math.abs(u.helm ?? 0)).toBeCloseTo(HELM_STALL, 6); // (the key adds nothing past the stall)
-      for (let i = 0; i < 30; i++) { u.steer = 1; u.tiller = -2; w.step(DT); } expect(Math.abs(u.helm ?? 0)).toBeCloseTo(2, 6); // (the hand alone holds it past the stall)
+      for (let i = 0; i < 30; i++) { u.steer = 1; u.tiller = -HELM_MAX; w.step(DT); } expect(Math.abs(u.helm ?? 0)).toBeCloseTo(HELM_MAX, 6); // (the hand alone holds it past the stall)
       for (let i = 0; i < 30; i++) { u.steer = 1; u.tiller = 0.5; w.step(DT); } expect(Math.abs(u.helm ?? 0)).toBeCloseTo(HELM_STALL - 0.5, 6); } // (against the hand, they sum)
     // (sternway, the tiller held past full helm: the blade drawn on the same side as at full helm)
     const drawn = (til: number) => { const b = testBoat({ heading: 5, kt: 0, windKt: 10, windFrom: 0 }) as ReturnType<typeof testBoat> & { handsOff?: boolean }; b.isUser = true; b.v = 0; b.astern = 0.5; b.scullDir = -Math.sign(til); sail(b, 0.4, () => { b.tiller = til; b.steer = 0; b.handsOff = true; }); return b.helm ?? 0; };

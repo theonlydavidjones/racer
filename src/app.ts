@@ -452,9 +452,10 @@ let barDrag = false;
  * (the boat turns to port). T, a click on the water, or Esc takes it or lets go. Let go and it springs
  * back to centre. Over the buttons and panels the tiller stays put, so you can reach them. */
 const gl = $('gl');
-// (fraction of the window width from center to hard over. Hard over is now 75 degrees of tiller, almost flush with the
-// transom (balance.ts HARD_OVER; it was 30 at 0.35 of the width): the whole swing across the whole window, in step with the
-// cursor. An ESTIMATE of what feels right: 30 degrees is now 0.2 of the width out)
+// (fraction of the window width from center to hard over. Hard over is where the tiller comes down onto the after deck, 46.5 degrees
+// (balance.ts HARD_OVER, the owner's ruling, 18 Nov 2026; 75 before, and 30 at 0.35 of the width before that): the whole
+// swing across the whole window, in step with the cursor. An ESTIMATE of what feels right: 30 degrees is now 0.32 of the
+// width out)
 const TILLER_SPAN = 0.5;
 let tillerHeld = false, toldTiller = false, panning = false;
 let lastCursorX: number | undefined;
