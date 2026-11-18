@@ -35,3 +35,14 @@ you hold the tiller. A pill, dark text on a light fill, says the tiller's averag
   the pill on the foot under it.
 
 Each on both tacks (starboard: 4° weather; port: 9° weather; c also at 1° lee); `_close` crops the foot.
+
+## Round 4: quieter, at the same foot (`quiet/`)
+
+The owner found the pills too prominent. Each is in the guide's own faint white (its dashes: 2 px at .55), at the dashed
+line's foot, on the side the tiller's held; starboard tack at 4° weather (balanced), port tack at 9° weather.
+
+- **q1.** A small thin number, "4°", no fill.
+- **q2.** Nothing while she's balanced (2–5°); a faint amber "9°" only out of the band (also at 1° lee).
+- **q3.** No text: a short tick on the foot at the average, and a faint bar for the balanced band to windward.
+
+`_close` crops the foot. On a light deck under the line, q1's number is close to vanishing; a little more shadow would fix that.
