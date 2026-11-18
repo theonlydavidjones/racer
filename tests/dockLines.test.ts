@@ -15,10 +15,10 @@ describe('dock lines', () => {
     const b = boat(0.5), L: DockLine = { role: 'bow', at: 3.6, side: 1, to: { x: 1.4, y: 2.4 }, len: 0, state: 'made' };
     const p0 = cleatOf(b, L); L.len = Math.hypot(L.to.x - p0.x, L.to.y - p0.y);
     // (her energy, as a share of what she came in with, every step for a minute)
-    let maxT = 0, maxY = 0, at3 = 1, at15 = 1, swing1 = 0, swing2 = 0;
+    let maxT = 0, maxY = 0, at3 = 1, at15 = 1; const es: number[] = [];
     for (let i = 0; i < 3600; i++) {
       dockStep(b, [L], calm, still, 1 / 60, open); maxT = Math.max(maxT, L.T ?? 0); maxY = Math.max(maxY, b.y);
-      const e = (b.vx ** 2 + b.vy ** 2) / 0.25; if (i === 180) at3 = e; if (i === 899) at15 = e; if (i > 180 && i < 1800) swing1 = Math.max(swing1, e); if (i >= 1800) swing2 = Math.max(swing2, e);
+      const e = (b.vx ** 2 + b.vy ** 2) / 0.25; if (i === 180) at3 = e; if (i === 899) at15 = e; es.push(e);
     }
     expect(maxY).toBeLessThan(1.2); // (she goes on no more than a metre or so while the line takes her way off)
     // the line takes her way: nine tenths of her energy within 3 s (the snub itself)
@@ -32,7 +32,14 @@ describe('dock lines', () => {
     // 17 Nov 2026: 11.1% of her energy left at 15 s; on the earlier unsourced drag 4.1%, under a bound of 10%. The same
     // headroom: 11.06 x 10 / 4.13 = 26.8%. (The Coordinator's ruling, 17 Nov 2026.) The swings' checks are extra.
     expect(at15).toBeLessThan(0.268);
-    expect(swing1).toBeLessThan(0.15); expect(swing2).toBeLessThan(0.5 * swing1);
+    // (each swing's own peak, 18 Nov 2026: her energy's high points after the snub, each the most within 2 s either side.
+    // They were read as the most before 30 s and the most after, which split one swing in two once her yaw inertia was
+    // re-estimated (physics.ts HOVE.gyration, v206's other change): with both in, the first swing peaks at 6.8% near 10 s
+    // and is still coming down at 30 s, 4.1%, which was taken for the second; the second's own peak is 1.1%, near 50 s.
+    // On the sourced drag alone, 11.1% at 13.6 s and 3.2% at 43.3 s, as before)
+    const peaks: number[] = []; for (let i = 300; i < es.length - 120; i++) if (es[i] > 1e-4 && es[i] >= Math.max(...es.slice(i - 120, i + 121))) { peaks.push(es[i]); i += 120; }
+    const swing1 = peaks[0] ?? 0, swing2 = peaks[1] ?? 0;
+    expect(peaks.length).toBeGreaterThan(0); expect(swing1).toBeLessThan(0.15); expect(swing2).toBeLessThan(0.5 * swing1);
     expect(maxT).toBeGreaterThan(200); expect(maxT).toBeLessThan(LINE_BREAK / 2);
     expect(Number.isFinite(b.x) && Number.isFinite(b.h)).toBe(true);
   });
@@ -54,7 +61,13 @@ describe('dock lines', () => {
     expect(sumT).toBeGreaterThan(0.6 * q); expect(sumT).toBeLessThan(1.6 * q);
     expect(Math.abs(b.sway ?? 0)).toBeLessThan(0.02);
     const free = boat(0, 0); run(free, [], { from: 270, kt: 15 }, 30);
-    expect(free.sway).toBeGreaterThan(0.15); expect(free.sway).toBeLessThan(0.6); // (blown off sideways, slowly: the keel's broadside drag)
+    // (blown off sideways, slowly: the keel's broadside drag. Her sway after 30 s, sim-measured, 18 Nov 2026, with both of
+    // v206's changes in: 0.139 m/s; it was 0.200, asked over 0.15. She's blown off no slower (0.33 m/s over the ground,
+    // 0.24 before): her bow has fallen off 47 degrees by then, and with the sourced sternway drag in place of the old
+    // law's (3 to 20 times her hull's own at a walk, fore and aft) more of that drift is headway and less of it sway
+    // (0.158 on that alone), and with her yaw inertia re-estimated she falls off a little sooner. The bound, 0.10: the same
+    // headroom, 0.15 over 0.200, on the new measurement)
+    expect(free.sway).toBeGreaterThan(0.10); expect(free.sway).toBeLessThan(0.6);
   });
   it('a 20 kt gust abeam on her made lines: held, with no growing oscillation (the stiff lines integrate stably at a 60th of a second)', () => {
     const b = boat(0, 0), lines: DockLine[] = [{ role: 'bow', at: 3.6, side: -1, to: { x: -1.6, y: 3.6 }, len: 0.6, state: 'made' }, { role: 'stern', at: -3.6, side: -1, to: { x: -1.6, y: -3.6 }, len: 0.6, state: 'made' }, { role: 'spring', at: 0, side: -1, to: { x: -1.6, y: -2.0 }, len: 2.3, state: 'made' }];
