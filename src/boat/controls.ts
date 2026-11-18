@@ -451,12 +451,17 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
     return settingsDrive(v, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, fixed.mainsheet) - 0.0005 * ease;
   };
   let best = score(x);
+  // (each trial moves one setting in x itself and puts it back if it scores no better: the same trials, in the same order,
+  // as a copy of x with that one setting moved, without a new object for each of the ~150 a call)
   for (const step of [0.25, 0.1, 0.04]) for (let pass = 0; pass < 3; pass++) {
-    for (const k of keys) for (const d of [-step, step]) {
-      const v = { ...x, [k]: clamp(x[k] + d, lo(k), hi(k)) }, sc = score(v);
-      if (sc > best) { best = sc; Object.assign(x, v); }
+    for (const k of keys) for (let s = 0; s < 2; s++) {
+      const was = x[k]; x[k] = clamp(was + (s ? step : -step), lo(k), hi(k));
+      const sc = score(x); if (sc > best) best = sc; else x[k] = was;
     }
-    for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, carMin, carMax) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
+    for (let s = 0; s < 2; s++) {
+      const was = x.carFore; x.carFore = clamp(was + (s ? 1 : -1), carMin, carMax);
+      const sc = score(x); if (sc > best) best = sc; else x.carFore = was;
+    }
   }
   return x;
 }
@@ -481,9 +486,13 @@ export function crewShapes(tws: number, awa: number, depower: number, mainAngle:
 }
 
 /** The drive (as a share of the best) the sails' shapes give with these settings, for the sheet angles wanted. */
+/** settingsDrive's controls, filled in afresh each call (crewSolve asks ~150 times a call; the shapes only read it). */
+const SD: Controls = { mainsheet: 0, traveller: 0, vang: 0, outhaul: 0, cunningham: 0, downhaul: 0, backstay: 0, jibsheet: 0, jibsheetW: 1, jibCunningham: 0, jibHalyard: 0, car: { S: { fore: 0, ins: 0 }, P: { fore: 0, ins: 0 } } };
 function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: number, jibAng: number, tm: Shape, tj: Shape, rig: SailRig, jibWear: SailWear, aws: number, mainsheet?: number): number {
-  const c: Controls = { mainsheet: mainsheet ?? mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
-    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+  const c = SD;
+  c.mainsheet = mainsheet ?? mainsheetFor(mainAngle, v.traveller); c.traveller = v.traveller; c.vang = v.vang; c.outhaul = v.outhaul; c.cunningham = v.cunningham; c.downhaul = v.downhaul;
+  c.backstay = v.backstay; c.jibsheet = 0; c.jibsheetW = 1; c.jibCunningham = v.jibCunningham; c.jibHalyard = v.jibHalyard;
+  c.car.S.fore = v.carFore; c.car.S.ins = v.carIn; c.car.P.fore = v.carFore; c.car.P.ins = v.carIn;
   c.jibsheet = jibsheetFor(jibAng, c, tack);
   return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws, rig.tune), tj);
 }
