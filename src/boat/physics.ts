@@ -4,7 +4,7 @@ import { KT, V, clamp, wrap, n360, D2R, type Vec, hypot } from '../core/math';
 import { hitsWharf, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
-import { bow, stern, type Boat, type LineKey, type Tack } from './boat';
+import { SETTLE, bow, stern, type Boat, type LineKey, type Tack } from './boat';
 import { HANDLING, HULL, airDrag, driveExponent, flogAmount, flowTurnRate, hullResistance, luffDriveFactor, maxTurnRate, speedForDrive, surgeAccel } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { motorForce, motorYaw } from './motor';
@@ -15,12 +15,28 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, LEVER, RUDDER, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderDrag, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { bodyJob, crewJobs, mainHand, ownerOf } from './crewWork';
+import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
+/** Swinging: her heading this far (deg) past where it has been over SWING_TAU (s), a turn kept up at over about
+ * SWING_DEG / SWING_TAU, 3.2°/s; and settled this long after it (s) before her crew go to the cabin top for a small gain
+ * (estimates: past a helm's correction, a key's tap at 5°/s for a fraction of a second; a turn's settling, crewPhys.ts
+ * HOLD.settle's 4 s and her speed and heel coming back). */
+const SWING_DEG = 8, SWING_TAU = 2.5, SETTLE_S = 5;
+/** A new course: her true wind angle NEW_COURSE (crewWork.ts) from where the guide was last read, on either tack, held NEW_HELD s without a swing (an
+ * estimate: past a turn's own settling, SETTLE_S, and a helm's first corrections on the new course). */
+const NEW_HELD = 10, HELD_DEG = 3;
+/** ... and her heading this far (deg) from where it was then: a new course she's steered, not the wind shifting under a
+ * held one, which the backlash is for (on the tiller pilot in a light, shifty breeze her apparent angle wandered 39-76° on a
+ * beam reach, and each shift read the guide afresh: the vang eased and set again 25 s apart; an estimate). */
+const NEW_HEADING = 10;
+/** The longest (s) the guide's angle is held through swings (an estimate): a slow penalty circle took 44 s in 6 kt,
+ * crewstation's seed 14, so a two-turns penalty and its NEW_HELD after about 98 s. At 60 s the hold let go part way
+ * through the light air's slow turns, and seed 15's trips went over the backstop. */
+const HOLD_MAX = 120;
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, GUIDE_BACKLASH, GUIDE_LIGHT, GUIDE_LIGHT_KT, GUIDE_DEAD, GUIDE_FAST, GUIDE_KT, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -760,7 +776,7 @@ function crewAndHeel(b: Boat, cs: CrewState, F: number, ceh: number, disp: numbe
     shows = (twa < beatAngle(tws) + 5 && Math.sign(rate) === toWind) || (twa > 150 && Math.sign(rate) === -toWind);
   }
   b.comingFor = shows ? Math.min(CUE_MAX, (b.comingFor ?? 0) + dt) : Math.max(0, (b.comingFor ?? 0) - dt);
-  placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
+  placeCrew(cs, { called: b.callOn, coming: b.comingFor, need, twa, tws, v: b.v, pole: b.pole === 'set' || b.pole === 'setting', tack: b.tack, windward: b.tack === 'S' ? 1 : -1, beat: beatAngle(tws), extraMoment, sea: seaNow(b, dt), heel: b.heelMag, bestHeel: bh, tackComing, held: courseHeld_(b), steadyFor: b.settle ? b.settle[SETTLE.since] : undefined, courseTwa: b.settle && b.crewReady ? b.settle[SETTLE.twaGuide] : undefined, rmPerDeg: hullRighting(bh + 1, disp, crewMass(cs.spec)) - hullRighting(bh, disp, crewMass(cs.spec)) }, dt);
   const m0 = crewMoment(cs, 0); // (their moment upright; it goes with the cosine of the heel)
   return b.heelEqLast = heelWithCrew(F, ceh, disp, h => m0 * Math.cos(h * D2R) + rmExtra(h), crewMass(cs.spec), b.heelEqLast);
 }
@@ -1360,6 +1376,86 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
   else if (!leeMine) emit({ type: 'toast', msg: 'The jib sheets changed sides: the one you held is now the leeward sheet, and yours to trim (tap its Auto to give it to the crew).', ms: 5000 });
 }
 
+/** (crewSettle's imports, read once at load: loaded through a module runner, as perf-pair and perf.test load the sim,
+ * each use of an imported name is a lookup in the module's namespace and a call to its getter, about 20 a call here:
+ * Capacity, 16 Nov 2026) */
+const GUIDE_BACKLASH_ = GUIDE_BACKLASH, GUIDE_LIGHT_ = GUIDE_LIGHT, GUIDE_LIGHT_KT_ = GUIDE_LIGHT_KT, GUIDE_DEAD_ = GUIDE_DEAD, GUIDE_FAST_ = GUIDE_FAST, GUIDE_KT_ = GUIDE_KT, LINE_GAP_ = LINE_GAP, LINE_TAU_ = LINE_TAU;
+const clamp_ = clamp, wrap_ = wrap, n360_ = n360, courseHeld_ = courseHeld, NEW_COURSE_ = NEW_COURSE;
+
+/**
+ * What the crew's trim reads its guide by and waits on, each step (trimSails): the apparent angle and the wind the
+ * tuning guide's settings are read at (Boat.settle: SETTLE.guideAwa, guideKt), and whether she's swinging or settled (settleLeft). Kept
+ * out of trimSails, a function of its own: the step ran 2.6-3.8% slower with it inside for the same work, and trimSails
+ * is large enough that what it grows by can cost its own callees their inlining (Capacity, 16 Nov 2026; the irons'
+ * and the paddle's work moved out of aiThink the same way).
+ */
+function crewSettle(b: Boat, dt: number): void {
+  const s = b.settle ??= new Float64Array(10); // (the World's boats have it from birth: world.ts makeBoat)
+  // (the angle the guide's settings are read at: hers, but past a backlash: controls.ts GUIDE_BACKLASH_)
+  // (and once she holds a course it comes to hers, over a gust-lull cycle, LINE_GAP_: the backlash stops a wandering
+  // course flipping their settings, but doesn't keep a reach on the beat's settings for the leg, the Deep Physics review)
+  // (past a few degrees of it: a couple of degrees' drift inside the guide's 40-60° blend slid the vang's ceiling under
+  // its setting and sent them up to ease it)
+  // (wider in light air, controls.ts GUIDE_LIGHT_, read for the guide's wind as it was last read)
+  { const a = Math.abs(b.awaSlow), bl = GUIDE_BACKLASH_ + GUIDE_LIGHT_ * clamp_((GUIDE_LIGHT_KT_ + 5 - s[SETTLE.guideKt]) / 5, 0, 1);
+    // (not while she's swinging, or till she's held a course NEW_HELD after: the angles she turns through aren't a course.
+    // Dragged round by a slow penalty circle on the beat, it came back through the backlash and the blend over a minute,
+    // and the vang came off in two trips, crewstation's 6 kt seed 14; a new course is read at once when it's held, below)
+    // (held only against loosening: coming up through the swing, the beat's settings, the vang's ceiling under 18 kt, come
+    // in as she comes up, as before; frozen, they came 10 s after a rounding, the physics review)
+    // (for a swing begun in light air only, where the wider backlash is, GUIDE_LIGHT_: the angle coming back through it
+    // after a swing is what took a minute there. In a breeze the beat's settings held through each bear-away of a boat
+    // lying to off the harbor in 26 kt, and her tacks there nearly doubled, tests/abandon-home.test.ts's northerly. Judged
+    // as the swing begins: let go part way as a building breeze crossed 10 kt, the outhaul's ease for a run fell between
+    // the crew's waits and its worth, tests/crew.test.ts. And for HOLD_MAX at most: a helm swinging without end doesn't
+    // hold it for good, the physics review)
+    const held = s[SETTLE.held];
+    s[SETTLE.held] = s[SETTLE.since] >= NEW_HELD ? 0 : held === 0 && s[SETTLE.guideKt] >= GUIDE_LIGHT_KT_ + 5 ? HOLD_MAX + 1 : held + dt;
+    if (!b.crewReady) s[SETTLE.guideAwa] = a;
+    else if (s[SETTLE.since] >= NEW_HELD || s[SETTLE.held] > HOLD_MAX) {
+      s[SETTLE.guideAwa] = clamp_(s[SETTLE.guideAwa], a - bl, a + bl);
+      const off = a - s[SETTLE.guideAwa]; if (Math.abs(off) > GUIDE_DEAD_) s[SETTLE.guideAwa] += (off - Math.sign(off) * GUIDE_DEAD_) * Math.min(1, dt / LINE_GAP_);
+    } else s[SETTLE.guideAwa] = Math.min(s[SETTLE.guideAwa], a + bl); }
+  // (and the wind it's read for: the breeze she's sailing in, not each puff. Read again only once it's GUIDE_KT_ from where
+  // it was read: up to her wind over a few seconds as it builds, down to her wind over 20 s as it falls. In 4-6 kt, a
+  // breeze wandering across the guide's 5 kt step sent them to the outhaul and back, three times in a beat)
+  { const kt = b.ww.kt;
+    s[SETTLE.twsFast] = !b.crewReady ? kt : s[SETTLE.twsFast] + (kt - s[SETTLE.twsFast]) * Math.min(1, dt / GUIDE_FAST_);
+    const slow = b.twsSlow ?? kt;
+    if (!b.crewReady) s[SETTLE.guideKt] = kt;
+    // (up when her few seconds' wind is a knot past it, or past it and well over her 20 s wind: a build under way, read
+    // right up to it, not a knot short; down when both her winds are a knot under it, or under it with her 20 s wind well
+    // over her few seconds': a lull settled in. Each only past both, so a build doesn't flip it from one to the other
+    // each step, the physics review: 2022 times in 38 s after a step to 12 kt)
+    else { const hi = Math.max(slow, s[SETTLE.twsFast]);
+      if (s[SETTLE.twsFast] > s[SETTLE.guideKt] + GUIDE_KT_ || (s[SETTLE.twsFast] > s[SETTLE.guideKt] && s[SETTLE.twsFast] - slow > GUIDE_KT_ / 2)) s[SETTLE.guideKt] = s[SETTLE.twsFast];
+      else if (hi < s[SETTLE.guideKt] - GUIDE_KT_ || (hi < s[SETTLE.guideKt] && slow - s[SETTLE.twsFast] > GUIDE_KT_ / 2)) s[SETTLE.guideKt] = hi; } }
+  // (swinging, her heading running away from where it was a few seconds ago, SWING_DEG past her heading over SWING_TAU:
+  // a turn kept up at over about 3°/s, not a helm's correction; then they're on the sheets, and the cabin-top lines that
+  // only gain a little wait till she's settled, SETTLE_S after (crewWork.ts): a crew resets them for the course she's on,
+  // not the angles she passes through. A failed tack in a drifter falling off and round through a jibe swept her 14 to
+  // 100° apparent, and her crew went up to set the vang for the reach and back to ease it for the beat)
+  s[SETTLE.hSwing] = !b.crewReady ? b.h : n360_(s[SETTLE.hSwing] + wrap_(b.h - s[SETTLE.hSwing]) * Math.min(1, dt / SWING_TAU));
+  const swung = Math.abs(wrap_(b.h - s[SETTLE.hSwing])) > SWING_DEG;
+  s[SETTLE.left] = swung ? SETTLE_S : Math.max(0, s[SETTLE.left] - dt);
+  s[SETTLE.since] = swung || !b.crewReady ? 0 : s[SETTLE.since] + dt;
+  // (on a new course, her true wind angle NEW_COURSE (crewWork.ts) from where they last read the guide, either tack, as
+  // the guide is read, and not turning this moment, the
+  // guide's settings are read at her angle now, not past the backlash, which is for a course wandering, not a new one:
+  // bearing away onto a reach, held 10° short, the vang went on in two trips. New: after a turn, once she's held it
+  // NEW_HELD without a swing (her heading's own mean over 20 s took a minute to come to it after a 90° bear-away); after
+  // a change too slow to be a swing, once her heading has come to its own mean over LINE_TAU, which a course wandering
+  // either side of its mean doesn't do at its ends)
+  s[SETTLE.hHeld] = !b.crewReady ? b.h : n360_(s[SETTLE.hHeld] + wrap_(b.h - s[SETTLE.hHeld]) * Math.min(1, dt / LINE_TAU_));
+  const twa = Math.abs(b.twa ?? 0);
+  if (!b.crewReady) { s[SETTLE.twaGuide] = twa; s[SETTLE.hGuide] = b.h; }
+  else if (Math.abs(twa - s[SETTLE.twaGuide]) > NEW_COURSE_ && Math.abs(wrap_(b.h - s[SETTLE.hGuide])) > NEW_HEADING && Math.abs(wrap_(b.h - s[SETTLE.hSwing])) < 1
+    && ((s[SETTLE.since] >= NEW_HELD && s[SETTLE.since] < LINE_GAP_) || Math.abs(wrap_(b.h - s[SETTLE.hHeld])) < HELD_DEG)) { s[SETTLE.twaGuide] = twa; s[SETTLE.hGuide] = b.h; s[SETTLE.guideAwa] = Math.abs(b.awaSlow); }
+  // (and back on the course it was read for after a swing, held NEW_HELD: read at her angle now, as it was held through
+  // the swing, above)
+  else if (s[SETTLE.since] >= NEW_HELD && s[SETTLE.since] - dt < NEW_HELD && Math.abs(twa - s[SETTLE.twaGuide]) <= NEW_COURSE_) s[SETTLE.guideAwa] = Math.abs(b.awaSlow);
+}
+
 /**
  * Work the sheets and every other control. The crew trims each sail toward its best sheet angle at a human
  * pace, reacting to the apparent wind with a short lag (so a quick luff or bear-away shows on the telltales
@@ -1424,6 +1520,7 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
   // unless the change calls for moving them)
   const mineNow = b.isUser ? linesByHand(b).join() : '';
   if (mineNow !== (b.crewFixed ?? '')) { b.crewFixed = mineNow; b.crewPlanT = 0; }
+  crewSettle(b, dt);
   if (!b.crewPlan || !(b.crewPlanT! > 0)) {
     // the lines you hold stay where you have them, and the crew sets the rest around them (your sheets at their angles)
     const fixed: Partial<CrewSettings> & { mainsheet?: number } = {};
@@ -1439,16 +1536,16 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // (held there, but inside the band for the wind and their depowering floor, controls.ts depowerLimits, which doesn't
     // depend on your sheet: the car still goes down as the breeze builds, up in a drifter, and from the start when you
     // trim the sheets from the off)
-    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, tws); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
+    if (fixed.mainsheet != null && !byHand(b, 'traveller')) { const L = depowerLimits(b.depower ?? 0, b.awaSlow, b.settle![SETTLE.guideKt], b.settle![SETTLE.guideAwa]); fixed.traveller = clamp(c.traveller, L.min.traveller ?? -1, L.max.traveller ?? 1); }
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
-    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed); b.crewPlanT = 1;
-    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)));
+    b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]); b.crewPlanT = 1;
+    b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)), b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]);
     b.crewTogether = worthTogether(b.crewWorth); // (worked out with the worth, once a second: not looked up each step)
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
-      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}) : b.crewPlan;
+      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]) : b.crewPlan;
       b.crewIdeal = { ...free, mainsheet: mainsheetFor(wantMain, free.traveller), jibsheet: jibsheetFor(wantJib, c, b.tack) };
     }
   }
