@@ -29,12 +29,15 @@ export function leeWarmPoints(waters: Vec[], from: Vec): Vec[] {
   return pts.sort((a, b) => a.d - b.d).map(q => q.p);
 }
 
+const SLICE_MS = 8;
 let queue: Vec[] = [], at = 0, windFrom = 0, running = false;
 /** Start (or start again, for a new race) filing her race's waters, a few ms at a time when the page is idle. */
 export function warmLeeIdle(w: Pick<SimView, 'C' | 'user' | 'wind'>): void {
   queue = leeWarmPoints(raceWaters(w), w.user); at = 0; windFrom = w.wind.from;
   if (running) return; running = true;
-  const idle = (cb: (ms: number) => void) => typeof requestIdleCallback === 'function' ? requestIdleCallback(d => cb(Math.max(0, d.timeRemaining() - 1)), { timeout: 1000 }) : setTimeout(() => cb(4), 50);
+  // (a slice at most SLICE_MS, however idle the page says it is, so a click on the setup's chart is never kept waiting;
+  // called by the timeout on a page with no idle time, there's none left, and it does nothing: Go never waits on it)
+  const idle = (cb: (ms: number) => void) => typeof requestIdleCallback === 'function' ? requestIdleCallback(d => cb(Math.min(SLICE_MS, Math.max(0, d.timeRemaining() - 1))), { timeout: 1000 }) : setTimeout(() => cb(4), 50);
   const tick = (ms: number) => {
     const t0 = performance.now();
     // (any wind direction files the cell for all of them; a point outside every harbor's reach is passed at once)
