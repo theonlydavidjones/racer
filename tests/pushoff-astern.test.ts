@@ -110,7 +110,7 @@ describe('pushed off astern', () => {
         const out = Math.hypot(u.x - sl.p.x, u.y - sl.p.y);
         if (bumps.length || way <= 0.3 || out <= 12) clean = `${id} from ${from} at ${kt} kt: ${bumps[0] ?? ''} least way ${way.toFixed(2)} m/s, ${out.toFixed(0)} m out`;
       }
-      return { astern, walked, went, noRoom: plan.kind === 'astern' && !!plan.noRoom, docked: !!u.docked, told: msgs.some(m => /^(No room to push her off from this berth in this wind|Too much wind on her (bow|stern|port side|starboard side) to push her off)/.test(m)), clean };
+      return { astern, walked, went, noRoom: plan.kind === 'astern' && !!plan.noRoom, docked: !!u.docked, told: msgs.some(m => /^(No room to push her off from this berth in this wind|Too much wind on her (bow|stern|port side|starboard side) to push her off|The breeze on her (bow|port bow|starboard bow) would carry her into the boats astern)/.test(m)), clean };
     };
     // (each run, the berths kept fast and told, by name, and how many get out, exactly as today, 16 Nov 2026: a change to
     // the planner that moves a berth between them has to say why. Kept fast: planned astern and flagged, NO_ASTERN and
@@ -185,6 +185,13 @@ describe('pushed off astern', () => {
     expect(jo.plan.kind === 'astern' && jo.plan.noRoom && jo.plan.why).toBe('wind');
     expect(jo.msgs).toEqual(['Too much wind on her stern to push her off: she stays fast until it eases.']);
     expect(said('gashouse-cove:572', 180, 30, true).msgs).toEqual(['Too much wind on her stern to push her off: motor out, or wait for it to ease.']);
+    // (a breeze on her bow isn't too much to push against: shoved off stern first with it she'd never lose her way, and
+    // the line says where it would take her. Horseshoe Bay A12 and South Beach A77 in a 12 kt easterly, two of the 73 the
+    // way-lost horizon keeps fast, the second with it broad on her port bow: the Coordinator's line, 18 Nov 2026)
+    const bow = said('horseshoe-bay:A12', 90, 12, false);
+    expect(bow.went).toBe(false); expect(bow.msgs).toEqual(['The breeze on her starboard bow would carry her into the boats astern: she stays fast until it eases.']);
+    expect(said('horseshoe-bay:A12', 90, 12, true).msgs).toEqual(['The breeze on her starboard bow would carry her into the boats astern: motor out, or wait for it to ease.']);
+    expect(said('south-beach:A77', 90, 12, false).msgs).toEqual(['The breeze on her port bow would carry her into the boats astern: she stays fast until it eases.']);
     // (and a berth kept fast for the room: short of the clearance or the steerage in any wind, a calm too, NO_ASTERN)
     const room = said(NO_ASTERN[0], 270, 12, false);
     expect(room.went).toBe(false); expect(room.msgs).toEqual(['No room to push her off from this berth in this wind: she stays fast until it changes.']);

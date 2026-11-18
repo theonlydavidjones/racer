@@ -2086,7 +2086,12 @@ export class World {
    * room", where it was the wind): too much wind, and where it is on her; or no room to get her out and sail off. */
   private keptFast(u: Boat, why: 'wind' | 'room', windFrom: number): void {
     const rel = wrap(windFrom - u.h), on = Math.abs(rel) < 45 ? 'bow' : Math.abs(rel) > 135 ? 'stern' : rel > 0 ? 'starboard side' : 'port side';
-    const msg = why === 'wind'
+    // (forward of her beam it isn't too much to push against: shoved off stern first with it, she'd never lose her way.
+    // The Coordinator's line, 18 Nov 2026; broad on her bow it names the side, as most of those berths have it)
+    const fwd = Math.abs(rel) < 90, bow = Math.abs(rel) < 30 ? 'bow' : rel > 0 ? 'starboard bow' : 'port bow';
+    const msg = why === 'wind' && fwd
+      ? `The breeze on her ${bow} would carry her into the boats astern: ${u.motor ? 'motor out, or wait for it to ease.' : 'she stays fast until it eases.'}`
+      : why === 'wind'
       ? `Too much wind on her ${on} to push her off: ${u.motor ? 'motor out, or wait for it to ease.' : 'she stays fast until it eases.'}`
       : `No room to push her off from this berth in this wind: ${u.motor ? 'motor out, or wait for the wind to change.' : 'she stays fast until it changes.'}`;
     this.emit({ type: 'toast', ms: 6000, msg });

@@ -363,8 +363,15 @@ sources. Each shipped item is added there when it's published.
    - **A gentler way out than the walk-pace shove (Marinas; from the sourced sternway drag, 17 Nov 2026):** the gentlest
      shove the crew give is their walk, 0.45 m/s, which now glides her 23 m in still air, so six South Beach berths
      (D2, E1, E2, F1, F2, G1; 9–12 m of clear water astern) are kept fast in a dead calm. A real crew hands her out
-     slower, checks her on a line, or paddles. And the plan is judged over 90 s, after which she still has about
-     0.2 m/s and creeps on some 14 m: judge it to her way lost, with a longer look.
+     slower, checks her on a line, or paddles. (The plan is judged to her way lost, 240 s, since 18 Nov 2026: at 90 s
+     she crept on some 14 m, and five light-air shoves crept into a dock, the breakwater or the next boat.)
+   - **Her crew take charge at the coast's end in a breeze forward of her beam (Marinas; the creep sweep, 18 Nov 2026):**
+     shoved off stern first with a breeze on her bow, a bare-poled boat never loses her way (0.76 m/s in 15 kt on the
+     sourced drag), so on the way-lost horizon 73 berths that were shoved are kept fast, nearly all in a 12 or 20 kt
+     easterly (West Harbor 373–407 odd and 637–649, Gashouse Cove 516/518/520, Corinthian A5–A14 and B30–B35, South
+     Beach A77/A79/A81, Horseshoe Bay A12, A15, C21, Corinthian B3). A real crew finds that the easy way out: the jib up
+     or the main, and she's sailed off where her coast ends. The push-off ends passively, and steered and left alone 87
+     such shoves touched. Let the crew sail her out, with its own every-berth sweep, and those berths come back.
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
      from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. The lee's edge is allowed for in the shove (done,
      Deep Physics: gauged to the wind along her line out and to leeward of it, World.windAstern; Corinthian B16 in a 20 kt
