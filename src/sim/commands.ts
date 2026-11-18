@@ -165,7 +165,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'castOff': return w.castOff();
     case 'pushOff': return w.pushOff();
-    case 'turn': if (w.pilot.mode === 'off') w.pilot.onPin = false; return w.callTurn(); // (putting her about yourself: your hand on the tiller, the ram lifted off)
+    case 'turn': { const ok = w.callTurn(); if (ok && w.pilot.mode === 'off') w.pilot.onPin = false; return ok; } // (putting her about yourself: your hand on the tiller, the ram lifted off)
     case 'lines': return w.linesReady();
     case 'letGo': return w.letGoLines();
     case 'hail': w.userHail(); return;

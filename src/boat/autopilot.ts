@@ -117,8 +117,9 @@ export function adjust(b: Boat, p: Pilot, d: number): void {
  * in Auto or Wind.
  */
 export function tack(b: Boat, p: Pilot): string | null {
-  // (a tack, through the wind: from close-hauled or a close reach, Auto's 100° toward the wind, or Wind's mirrored angle)
-  const through = Math.abs(b.arel) < 90;
+  // (a tack, into or through the wind: Wind's mirrored angle crosses the bow from forward of the beam; Auto's 100° toward
+  // the wind ends within 10° of it, or past it, from a true wind angle under 110°)
+  const through = p.mode === 'wind' ? Math.abs(b.arel) < 90 : Math.abs(wrap(b.ww.from - b.h)) < AUTO_TACK + 10;
   if (p.mode === 'auto') p.course = n360(p.course + (b.arel >= 0 ? AUTO_TACK : -AUTO_TACK));
   else if (p.mode === 'wind') p.awa = -p.awa;
   else return null;

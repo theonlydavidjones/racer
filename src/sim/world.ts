@@ -1315,7 +1315,7 @@ export class World {
     if (this.user.paddle || this.steps % 30 === 0) this.paddleTick(dt); // (the crutch: a jam looked for twice a second, and the paddling while it's out; in a method of its own, entered only then: in World.step itself the two calls cost every step about 1%, perf-pair (Capacity))
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
-      if (b.docked) { if (b.isUser) this.pilot.onPin = false; this.dockStep(b, dt); b.turnRate = 0; continue; } // (made fast, the pilot's unshipped, as the lashing comes off)
+      if (b.docked) { if (b.isUser && (this.pilot.mode !== 'off' || this.pilot.onPin)) liftOff(this.pilot); this.dockStep(b, dt); b.turnRate = 0; continue; } // (made fast, the pilot's unshipped, as the lashing comes off)
       // wrecked (physics.ts wreck): held where she is, while you choose ashore, a tow or carrying on (the page)
       if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)

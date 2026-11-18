@@ -52,6 +52,7 @@ describe('the tiller pilot', () => {
 
   it('the buttons turn the set course; Standby leaves the ram on the tiller pin, holding it, until you lift it off or take the tiller', () => {
     const w = new World(COURSES[0], S(), 7, { freeSail: true }), u = w.user;
+    applyCommand(w, { k: 'running', on: true }); // (a called tack needs the clock going: World.callTurn)
     engage(u, w.pilot, 'auto'); const c = w.pilot.course;
     adjust(u, w.pilot, 10); expect(wrap(w.pilot.course - c)).toBeCloseTo(10);
     run(w, 3); standby(w.pilot); const held = w.pilot.ram;
