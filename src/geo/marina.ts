@@ -41,19 +41,19 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'west-harbor', name: 'West Harbor, San Francisco Marina', short: 'West Harbor', data: westHarbor as unknown as HarborData },
   { id: 'gashouse-cove', name: 'Gashouse Cove, San Francisco Marina East Harbor', short: 'Gashouse Cove', data: gashouseCove as unknown as HarborData },
   { id: 'south-beach', name: 'South Beach Harbor, San Francisco', short: 'South Beach Harbor', data: southBeach as unknown as HarborData },
-  { id: 'corinthian', name: 'Corinthian Yacht Club, Tiburon', short: 'Corinthian YC', data: corinthian as unknown as HarborData },
+  { id: 'corinthian', name: 'Olympian Yacht Club, Tiburon', short: 'Olympian YC', data: corinthian as unknown as HarborData },
   { id: 'horseshoe-bay', name: 'Travis Marina, Horseshoe Bay (Fort Baker)', short: 'Horseshoe Bay', data: horseshoeBay as unknown as HarborData },
   // the East Bay's racing harbors (Bay East, November 2026): docks and breakwaters from OSM and NOAA's chart. Richmond YC's
   // slips are laid out from the club's own harbor plan (docks A–F, its slip numbers and lengths); Berkeley has a berth
   // alongside Berkeley Yacht Club's guest dock; the others' slips aren't published where we could reach
-  { id: 'berkeley', name: 'Berkeley Marina (Berkeley Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
-  { id: 'richmond-yc', name: 'Richmond Yacht Club, Brickyard Cove', short: 'Richmond YC', data: richmondYc as unknown as HarborData },
-  { id: 'encinal', name: 'Encinal Yacht Club, Alameda', short: 'Encinal YC', data: encinal as unknown as HarborData },
-  { id: 'oakland-yc', name: 'Oakland Yacht Club, Alameda', short: 'Oakland YC', data: oaklandYc as unknown as HarborData },
+  { id: 'berkeley', name: 'Berkeley Marina (Campanile Yacht Club)', short: 'Berkeley Marina', data: berkeley as unknown as HarborData },
+  { id: 'richmond-yc', name: 'Brickyard Racing Club, Brickyard Cove', short: 'Brickyard RC', data: richmondYc as unknown as HarborData },
+  { id: 'encinal', name: 'Live Oak Yacht Club, Alameda', short: 'Live Oak YC', data: encinal as unknown as HarborData },
+  { id: 'oakland-yc', name: 'Oaktown Yacht Club, Alameda', short: 'Oaktown YC', data: oaklandYc as unknown as HarborData },
   { id: 'marina-village', name: 'Marina Village Yacht Harbor, Alameda', short: 'Marina Village', data: marinaVillage as unknown as HarborData },
   { id: 'fortmann', name: 'Fortmann Marina, Alameda', short: 'Fortmann Marina', data: fortmann as unknown as HarborData },
   { id: 'grand-marina', name: 'Grand Marina, Alameda', short: 'Grand Marina', data: grandMarina as unknown as HarborData },
-  { id: 'alameda-marina', name: 'Alameda Marina (Island Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
+  { id: 'alameda-marina', name: 'Alameda Marina (Sandbar Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
 

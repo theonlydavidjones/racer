@@ -1,6 +1,7 @@
 import type { Settings } from '../settings';
 import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
-import { CLUBS, burgeeCanvas } from '../render/burgees';
+import { burgeeCanvas } from '../render/burgees';
+import { clubFullName } from '../club/clubs';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
 import { boatThumb } from '../render/thumbs';
 import { dockName, harborOf, marinaName, MARINAS, slipById } from '../geo/marina';
@@ -301,7 +302,7 @@ const slot = (img: string) => `<span class="fslot">${img}</span>`;
 const ensignImg = (b: BoatSpec) => { const id = ensignFor(b.sails.country); return slot(id ? flagImg('e:' + id, () => flagArtCanvas(id), ENSIGNS.find(e => e.id === id)?.name ?? '') : ''); };
 const burgeeImg = (b: BoatSpec) => slot(b.club ? flagImg('b:' + b.club, () => burgeeCanvas(b.club), clubName(b.club)) : '');
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-export const clubName = (id: string) => CLUBS.find(c => c.id === id)?.club ?? '';
+export const clubName = (id: string) => clubFullName(id);
 const skipperName = (b: BoatSpec) => b.skipper === 'you' ? 'You' : 'AI skipper (generic)';
 const shortMarina = (id: string | undefined) => MARINAS.find(m => m.id === id)?.short ?? '';
 const nth = (n: number) => n + (['th', 'st', 'nd', 'rd'][n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || 'th');
