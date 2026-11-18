@@ -110,13 +110,16 @@ const shown = (p, q) => p.evaluate(s => { const e = document.querySelector(s); i
 
 // close whatever is open, by each one's own close control (Escape only for the chart: on the surface it opens Pause)
 const closeAll = async p => {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     const left = await p.evaluate(() => {
       const open = q => { const e = document.querySelector(q); if (!e) return false; for (let n = e; n; n = n.parentElement) if (n.hidden || getComputedStyle(n).display === 'none') return false; return true; };
       for (const [q, c] of [['#motorAsk', '#bMotorNo'], ['#homeAsk', '#bHomeNo'], ['#leaveAsk', '#bLeaveNo'], ['#flagIndex', '#bFlagIndexX'], ['#keysView', '#bKeysClose'], ['#condDlg', '#bCondClose'], ['#pause', '#bResume'], ['#courseView', '#bCvClose'], ['#navView', '#bNavClose'], ['#coachPanel', '#bCoachX'], ['#crewPop', '#bCrew'], ['#toolsTray', '#bTools'], ['#trimNotes', '#bCoachX']])
         if (open(q)) { document.querySelector(c)?.click(); return q; }
       if (open('#plan')) { dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return '#plan'; }
       if (open('#boatPanel')) { const e = [...document.querySelectorAll('#boatPanel button')].find(b => /^(done|close|back|×)/i.test(b.innerText.trim())); e?.click(); return '#boatPanel'; }
+      if (open('#fleetBoat')) { document.querySelector('#fleetBoat [data-f="toList"]')?.click(); document.querySelector('#fleet [data-f="back"]')?.click(); return '#fleetBoat'; }
+      if (open('#fleet')) { document.querySelector('#fleet [data-f="back"]')?.click(); return '#fleet'; }
+      if (false) { const e = [...document.querySelectorAll('#boatPanel button')].find(b => /^(done|close|back|×)/i.test(b.innerText.trim())); e?.click(); return '#boatPanel'; }
       return '';
     });
     if (!left) return; await p.waitForTimeout(500);
@@ -148,21 +151,24 @@ const closeAll = async p => {
         await p.waitForTimeout(700); await sweep(p, sc, `setup-row:${r}`);
         if (r === 'boat' && await shown(p, '#bBoat')) {
           await click(p, '#bBoat'); await p.waitForTimeout(1500); await sweep(p, sc, 'yacht-club');
-          // the Yacht Club: each boat opened in its editor, every tab, the crew seats and the skipper (never New or Delete)
+          // the Yacht Club: her page (#fleetBoat), then Edit (the boat editor, #boatPanel): each section's buttons (never New, Delete or Discard)
           const fclick = (sel, i = 0) => p.evaluate(([q, n]) => { const e = [...document.querySelectorAll(q)].filter(x => x.offsetParent)[n]; if (!e) return false; e.click(); return true; }, [sel, i]);
-          const nBoats = await p.evaluate(() => [...document.querySelectorAll('#fleet [data-f="edit"], #fleet [data-f="view"]')].filter(x => x.offsetParent).length);
-          for (let bi = 0; bi < Math.min(nBoats, 2); bi++) {
-            if (!(await fclick('#fleet [data-f="edit"], #fleet [data-f="view"]', bi))) break;
-            await p.waitForTimeout(1500); await sweep(p, sc, `boat-editor:${bi}`);
-            const nTabs = await p.evaluate(() => [...document.querySelectorAll('#fleet [data-f="tab"]')].filter(x => x.offsetParent).length);
-            for (let ti = 0; ti < nTabs; ti++) {
-              const nm = await p.evaluate(n => { const e = [...document.querySelectorAll('#fleet [data-f="tab"]')].filter(x => x.offsetParent)[n]; e.click(); return (e.innerText || e.dataset.t || '').trim().slice(0, 20); }, ti);
-              await p.waitForTimeout(700); await sweep(p, sc, `boat-editor:${bi}:${nm}`);
-            }
-            for (const [q, nm] of [['#fleet [data-f="seat"]', 'seat'], ['#fleet [data-f="skipper"]', 'skipper'], ['#boatPanel button', 'boatpanel-btn']]) if (await fclick(q, 0)) { await p.waitForTimeout(700); await sweep(p, sc, `boat-editor:${bi}:${nm}`); }
-            await fclick('#fleet [data-f="back"]', 0); await p.waitForTimeout(700); // (back to the list; a "Save changes?" question would be answered by closeAll's Back below)
-          }
-          for (let i = 0; i < 4 && (await shown(p, '#fleet')); i++) { await p.evaluate(() => { const q = [...document.querySelectorAll('#fleet button')].filter(x => x.offsetParent); (q.find(x => /discard|don.t save|^no/i.test(x.innerText)) || q.find(x => x.dataset.f === 'back') || q.find(x => /^(done|close|back)/i.test(x.innerText.trim())))?.click(); }); await p.waitForTimeout(700); }
+          if (await fclick('#fleet [data-f="boat"]', 0)) {
+            await p.waitForTimeout(2500); await sweep(p, sc, 'boat-page');
+            if (await shown(p, '#bShowCond')) { await click(p, '#bShowCond'); await p.waitForTimeout(1000); await sweep(p, sc, 'boat-page-conditions'); await closeAll(p); }
+            if (await fclick('#fleetBoat [data-f="edit"]', 0)) {
+              await p.waitForTimeout(2500); await sweep(p, sc, 'boat-editor');
+              const names = await p.evaluate(() => [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].filter(e => e.offsetParent && !/delete|remove|discard|sell|scrap|done|close|back|^new|reset/i.test(e.innerText + e.title + (e.getAttribute('aria-label') || ''))).map(e => (e.innerText || e.title || e.getAttribute('aria-label') || '').trim().slice(0, 40)));
+              const seen = new Set();
+              for (const nm of names.slice(0, 50)) {
+                if (seen.has(nm)) continue; seen.add(nm);
+                const ok = await p.evaluate(t => { const e = [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].find(x => x.offsetParent && (x.innerText || x.title || x.getAttribute('aria-label') || '').trim().slice(0, 40) === t); if (!e) return false; e.click(); return true; }, nm);
+                if (ok) { await p.waitForTimeout(500); await sweep(p, sc, `boat-editor:${nm || 'icon'}`); }
+                if (!(await shown(p, '#boatPanel'))) break;
+              }
+            } else unreached.push(`${sc}/boat-editor: no Edit button on her page`);
+          } else unreached.push(`${sc}/boat-page: no boat card`);
+          await closeAll(p);
           if (!(await shown(p, '#setup'))) { unreached.push(`${sc}/setup: not back after the boat panel`); }
         }
       }
