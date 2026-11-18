@@ -447,6 +447,10 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q2. **The crew bring the boom back to the centerline when the main drops** (owner, 18 November; accuracy; later, "not
+   urgent"; 1–2 h; Crew Model): "when the main drops, the crew should bring the boom back to centerline." 8q does this
+   only in the slip. On the water, once the main is down, the crew sheet in and center the traveler as a called job, and
+   the boom stays there. A test: the boom within a few degrees of the centerline after the main drops.
 8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (in PR #337) (bug; 2–3 h): owner, "at aquatic park, auto
    nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
    curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
