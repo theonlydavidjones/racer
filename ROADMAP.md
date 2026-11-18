@@ -151,6 +151,11 @@ What's planned, roughly in order. Done work is described in the README.
 
 **v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
 
+**v206 (18 Nov):** tiller travel to the deck's stop and the AI's helm (#437), the boat editor's groups, picker and colorways
+(#354), sternway drag and push-off reasons (#458), the navigator home and as a layer on the chart, the burgees and five
+club bases, Rule 44.1 jams as one incident, the outboard in 5 s. Held: shallow waves (#454, cleared for v207), the first
+run (FTUE, its inset cost).
+
 **v205 (18 Nov):** fewer first-mark pile-ups (#453), the committee's beat-start course (#452), hands on the lines when
 hiking, crew stations (#446) and habits (#455), Sail Home paced, the destination pin, the 8 m slip walk-out, the rounding
 note (#447), the coach's heeled speed (#449), the wind to the second (#451). Still open: shallow waves (#454, pulled: it
@@ -171,7 +176,7 @@ sources. Each shipped item is added there when it's published.
   alone against motor and sails on a reach and close-hauled (faster, toward hull speed), head to wind (the flogging
   sails slow her), and the apparent wind the sails see while she motors (her motored speed in it); then the physics
   review.
-- **Mounting the outboard takes far too long: 5 seconds at most** (owner, 17 November; polish; later, "low priority";
+- ~~**Mounting the outboard takes far too long: 5 seconds at most**~~ (done, v206: running in 1.9 s, 4.9 s at worst) (owner, 17 November; polish; later, "low priority";
   1–2 h; Marinas): "mounting the motor takes way, way too long. 5 seconds max." The crew's lowering and mounting of the
   outboard on its bracket, from the call to running, in 5 s or less.
 
@@ -254,11 +259,28 @@ sources. Each shipped item is added there when it's published.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   ~~**Now, first in the pass: the helm's travel and response**~~ (done, Deep Physics: the tiller to 75° each side, the
-   turn rounding off to the rudder's stall at 40° (a 7.7 m circle for 9) and braking past it; her yaw inertia from her
-   ballast keel, so the turn answers in 0.36 s at 4.7 kt, not 0.6; the chase camera close behind her; tests/helm-travel.
-   Left: the AI, a called tack and the tiller pilot still use 30° at most, so a hand on the tiller out-turns them by a
-   sixth; and the mouse's travel is linear to 75° at the window's edge, for the owner to try) (owner, 15 November; accuracy): "the turning
+   ~~**Now, first in the pass: the helm's travel and response**~~ (done, v206: #437, Crew Figures + Deep Physics; ai-helm,
+   Skipper Model). Where it stands:
+   - The after deck stops the tiller, the same both sides (the owner chose option (a)): HARD_OVER 46.5°, fitted to three
+     of the owner's photos (41–49°) and labeled as fitted. Drawn with an 8 cm pin and 6° rest, so the stop is 46.8°.
+   - The ensign staff is at the owner's spot on the starboard quarter, 0.46 m out and 2 in forward of the deck's aft
+     edge, clear of the tiller. The aft cleat is on the centerline.
+   - The rudder stalls at 40°. Her gyration is 0.25 → 0.19, so the turn answers in 0.36 s at 4.7 kt, not 0.6.
+   - The AI's helm: 30° normally, the stall (40°) when about to touch another boat, never hard over. Start penalties are
+     unchanged over 60 paired starts; hits went 53 → 50. The first-mark fix took the AI's penalties at a crowded mark from
+     15 to 9 over nine seeds.
+   - Speed: the pair passed at 0.972. Changes to how boats sail or are judged are now budgeted on the ten-race mean (the
+     owner, 18 Nov; Capacity's PR #465).
+   - Optional, for the owner: measure hard-over at Josephine.
+   - Open: **turn drag** (Deep Physics, turn-drag). It replaces the uncited 0.15 with ORC VPP 6.37 induced drag and the
+     blade's separation from 15° (NACA Report 938; the 15–40° ramp is an estimate), so a tack loses 0.8–2.1 lengths. The
+     physics review is done; the full suite and the ten-race budget are left. A known limit: the keel's side forces are
+     charged separately, not as their sum squared.
+   - Open: **the slow-boat AI** (Skipper Model). It centers the helm under 1 kt instead of hunting, then looks ahead to
+     keep clear by its speed (every fouler was under 2.7 m/s). Judged with fouls-pair (#461).
+   - Open: weather helm against the AI's turn (not started), and the #460 rules contact fix (held from v208 for the
+     duck test, with Rules).
+   - The request (owner, 15 November; accuracy): "the turning
    radius is too slow and not wide enough when I'm tacking ... short tacks in the marina. I need to be able to push the
    tiller about 50% wider, and I would expect the tiller to be much more reactive ... There should be no delay in the
    turn of the boat and the push of the tiller ... exactly in line." The owner's answers:
@@ -268,13 +290,13 @@ sources. Each shipped item is added there when it's published.
    - The delay is from tiller to boat.
    - Responsiveness shouldn't depend on her speed, as long as she's moving.
 
-   Today:
+   Before #437 (15 November):
    - The rudder stops at ±30° (FULL_RUDDER, src/boat/balance.ts:99), a 60° arc against the owner's ~150°.
    - The mouse span is TILLER_SPAN 0.35 of the window (app.ts:450).
    - The turn radius at full helm is 9 m, an estimate (dynamics.ts:46), capped at 22°/s.
    - The turn reaches the helm's rate through yawLag (physics.ts:544), the delay the owner feels.
 
-   The fix:
+   The first plan (replaced by the deck's stop at 46.5°, v206):
    - The tiller swings about ±75°. Past about 35–45° the rudder stalls and brakes more than it turns, as a real one does,
      so the extra travel is for short-tacking, sculling and braking, not a free tighter circle.
    - The yaw response is tightened until the turn visibly starts with the tiller. Test it on the water at slow speeds
@@ -901,7 +923,7 @@ sources. Each shipped item is added there when it's published.
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
      to here", and nothing on the screen.
-   - **The navigator doesn't see piers, and can't bring her home** (owner, 15 November; bug; now; 6–10 h):
+   - ~~**The navigator doesn't see piers, and can't bring her home**~~ (done, v206: the way in from the harbor's mouth) (owner, 15 November; bug; now; 6–10 h):
      "navigator not detecting this pier. I ran right into it." The planned track runs straight along a long NE–SW pier
      to its tip, in the Precautionary Area (20–39 ft charted). Suspects: the planner's land test (src/sim/routing.ts
      landDist, :47-66) uses the terrain's land mask and the Cityfront's hand-drawn shore, not the wharf layer
@@ -1050,7 +1072,7 @@ sources. Each shipped item is added there when it's published.
      "when in inset map, clicking the navigator button opens the navigator modal, which fails to populate with the
      map." The navigator's own panel (ui/navView.ts) opens empty of its chart. Fix, with a test that its chart draws
      (scripts/check/setup-map.cjs's way), from the inset and from the expanded chart.
-   - **One chart: the navigator as a layer on the map, not a map of its own** (owner, 16 November; feature, design;
+   - ~~**One chart: the navigator as a layer on the map, not a map of its own**~~ (done, v206: marinas-nav) (owner, 16 November; feature, design;
      next; 4–8 h; mock-up to the owner first): "tapping the navigator button should just surface the navigation map on
      the map directly, or as its own layer, rather than opening a separate map. I see no reason why an IRL sailor would
      have two separate maps: one for conditions and one for navigation." The passage plan (destination, track, hazards)
