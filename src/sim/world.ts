@@ -43,7 +43,7 @@ import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWake
 import { MOUTH_REFS, mouthState, nearMouth, refreshMouths, withHarborMouths, type MouthState } from '../environment/harborMouth';
 import { destMark, place as getPlace } from './places';
 import { sunPosition } from '../environment/sun';
-import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
+import { berthClear, harborAt, harborOf, hitsHarbor, hitsMooredBoat, holdPivot, inBasin, keptFastWhy, noAsternPushOff, pushOffPlan, slipById, slipPlace, slipTaken, slipsIn, useAsternGlide, ASTERN_GLIDE_S, COAST_SHORT, type Slip } from '../geo/marina';
 import { ensignFor, sailNo, type BoatSpec } from '../boat/spec';
 import { ensignDue } from '../boat/colours';
 import { HARD_BUMP, HAND_N, STEP_SPEED, cleatOf, dockStep as lineStep, stepGap, type DockLine } from '../boat/dockLines';
@@ -206,14 +206,15 @@ export const ASTERN_SHOVE = Math.sqrt(WALK * WALK + 2 * SHOVE_N * 1 / HANDLING.m
 /** How long she's to have steerage way stern first once she's shoved, s (over 0.3 m/s: about 1.3 deg/s with the helm hard
  * over): the bar's 10 s, and three more for the sim's scatter about asternGlide (0.4 s held straight, Deep Physics' check;
  * more on an arc: West Harbor 691 and 681 had 9.9 s on 11 and 12). In still air that's from 0.362 m/s on the sourced drag
- * (0.555 on the old: Deep Physics, 17 Nov 2026), and the gentlest such shove glides her 19 m in 90 s; a breeze on her
+ * (0.555 on the old: Deep Physics, 17 Nov 2026), and the gentlest such shove glides her 30 m to her way's end (ASTERN_GLIDE_S); a breeze on her
  * stern asks more of the shove (where even the full shove can't give it, she has the full shove), one on her bow less. */
 const STEER_FOR = 13;
 /** How far along her line astern the crew read the breeze before the shove, how far to leeward of it, and how often, m
- * (windAstern): past her longest glide in a breeze (ASTERN_LOOK_MAX, 24 m, and what a bow wind adds) and the furthest
+ * (windAstern): past the furthest the planner looks (ASTERN_LOOK_MAX, 32 m) and the furthest
  * the wind sets her across it meanwhile, at the scale a harbor's lee changes over (Corinthian's: 0.32 to 0.55 of the open
  * wind in 20 m). And her set to leeward, m/s per knot of the breeze on her beam, lying stern first with no sail up: the
- * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. */
+ * sim's own (0.15 m/s in 10.5 kt, 49 degrees off her bow). ESTIMATES. Her glides now run on past it (50 to 85 m with a
+ * breeze on her bow, on the sourced drag): beyond ASTERN_WIND_FAR she's taken to meet the last reading. */
 const ASTERN_WIND_FAR = 40, ASTERN_SET_FAR = 16, ASTERN_WIND_STEP = 4, SET_PER_KT = 0.019;
 useAsternGlide((v0, h, wf, wk, secs) => asternGlide(v0, h, wf, wk, secs), ASTERN_SHOVE, WALK, STEER_FOR); // (the planner's look along her glide, and the gentlest shove's)
 /**
@@ -2081,6 +2082,22 @@ export class World {
     if (a === 'ready') { u.callWait = null; u.callT = this.t; this.putOver(u); return; }
     if (a === 'busy' && !w.notReady && this.t - w.t0 > 0.6) { w.notReady = true; this.emit({ type: 'toast', ms: 4000, msg: '"Not ready!" Call again to go.' }); }
   }
+  /** Kept fast at her berth, and why, in one line (the owner, 18 Nov 2026: in a strong southerly on her stern it said "no
+   * room", where it was the wind): too much wind, and where it is on her; or no room to get her out and sail off. */
+  private keptFast(u: Boat, why: 'wind' | 'room', windFrom: number): void {
+    const rel = wrap(windFrom - u.h), on = Math.abs(rel) < 45 ? 'bow' : Math.abs(rel) > 135 ? 'stern' : rel > 0 ? 'starboard side' : 'port side';
+    const msg = why === 'wind'
+      ? `Too much wind on her ${on} to push her off: ${u.motor ? 'motor out, or wait for it to ease.' : 'she stays fast until it eases.'}`
+      : `No room to push her off from this berth in this wind: ${u.motor ? 'motor out, or wait for the wind to change.' : 'she stays fast until it changes.'}`;
+    this.emit({ type: 'toast', ms: 6000, msg });
+  }
+  /** How far the gentlest shove her crew give carries her stern first, m, to where her way's gone, in the breeze she meets
+   * along her line out (windAstern): their walk, or more where that wouldn't steer her STEER_FOR s, as handStep gauges it. */
+  private leastGlideOut(b: Boat, h: number, ww: { from: number; kt: number }, calm = false): number {
+    const along = calm ? undefined : this.windAstern(b, h), g = (v: number) => asternGlide(v, h, ww.from, calm ? 0 : ww.kt, ASTERN_GLIDE_S, undefined, along);
+    let flo = 0, fhi = ASTERN_SHOVE; for (let k = 0; k < 20; k++) { const m = (flo + fhi) / 2; if (g(m).steerable < STEER_FOR) flo = m; else fhi = m; }
+    return g(Math.max(WALK, fhi)).dist;
+  }
   pushOff(): boolean {
     const u = this.user, H = u.handled;
     // held head to wind on the bow line: let her go now, her bow pushed off
@@ -2091,7 +2108,12 @@ export class World {
     const wind = this.windHere(u, u, false), plan = slip ? pushOffPlan(slip, wind.from, wind.kt) : null;
     // (a berth she can't be shoved off astern from in this wind: her crew keeps her fast, geo/marina.ts NO_ASTERN, NO_ASTERN_WEST;
     // or where her coast would end with no clear water to sail off in, 8m3)
-    if (slip && plan?.kind === 'astern' && (plan.noRoom || noAsternPushOff(slip, wind.from, wind.kt))) { this.emit({ type: 'toast', ms: 6000, msg: u.motor ? 'No room to push her off from this berth in this wind: motor out, or wait for the wind to change.' : 'No room to push her off from this berth in this wind: she stays fast until it changes.' }); return false; }
+    // (and kept fast where even the gentlest shove would glide her past her clear water in the breeze along her line out:
+    // the planner judges it in her slip's wind, and let go in a harbor's lee she glides out of it into more. Horseshoe Bay
+    // A6 in a 12 kt easterly, 18 Nov 2026: planned in the lee, she glided 138 m and was still going after 10 minutes, into
+    // the boats: the creep sweep)
+    if (slip && plan?.kind === 'astern' && !plan.noRoom && this.leastGlideOut(u, plan.h, wind) > plan.coast + COAST_SHORT) { this.keptFast(u, this.leastGlideOut(u, plan.h, wind, true) > plan.coast + COAST_SHORT ? 'room' : 'wind', wind.from); return false; } // (the wind, where her glide in a calm would fit)
+    if (slip && plan?.kind === 'astern' && (plan.noRoom || noAsternPushOff(slip, wind.from, wind.kt))) { this.keptFast(u, keptFastWhy(slip, plan), wind.from); return false; }
     u.docked = undefined; u.astern = 0; u.v = 0;
     if (!slip || !plan) { u.v = SHOVE; return true; }
     u.handled = { plan, from: { x: u.x, y: u.y }, h0: u.h, s: 0, a: 0, slip: slip.id };
