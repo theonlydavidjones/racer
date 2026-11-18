@@ -109,7 +109,7 @@ const TANGLE_MAX = 30;
  * 3°/s) and nothing either can do in the seconds between touches. A modelling choice, no source gives a figure. */
 const STEERAGE = 0.5, JAM_CLOSING = 0.4;
 /** Pressed together: never more than this past touching (CONTACT_GAP) since the last contact, m. A modelling choice: the
- * contact response (boat/contact.ts) holds boats lying together at touching, give or take the step's motion. */
+ * contact response (World.hulls) holds boats lying together at touching, give or take the step's motion. */
 const PRESSED_SLACK = 0.3;
 /** However long a jam holds two boats together, a contact this long after its first is a new incident, s (a modeling
  * cap), unless the boat at fault is pinned (PIN_SLACK). */
@@ -126,6 +126,9 @@ const JAM_MAX = 2 * TANGLE_MAX;
  * push (0.9 m) is fitted to that one race. */
 const CONTACT_PUSH = 2 * 0.8, PIN_DRIFT = 0.15, PIN_DRIFT_MIN_S = 10;
 const PIN_SLACK = CONTACT_PUSH + 0.9;
+/** Hulls together (World.hulls): still the same contact until they've been this far past touching, m: the push apart at
+ * the impact and the pressed-together margin. Drifting back onto her inside the bounce is still the same lean. */
+const CONTACT_RELEASE = CONTACT_PUSH + PRESSED_SLACK;
 
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
@@ -408,6 +411,7 @@ export class World {
    * chooses later, or the other boat's own breach, is judged afresh. Pinned (`fmax`, `near`: see PIN_SLACK), the boat at fault
    * held against the other with no way of her own: one incident however long it lasts (Rule 44.1, "an incident"; US
    * Appeal 65, "the inevitable result of the first"). */
+  private touching = new Set<string>(); // (pairs whose hulls are together: World.hulls)
   private tangles = new Map<string, { t0: number; t: number; clear: boolean; fouler: number; parted: boolean; g0: number; steered: boolean; wayT: number | null; pen: boolean; contact: boolean; opened: boolean; fmax: number; near: boolean; x0: number; y0: number }>();
   private lastTouch = new Map<number, { t: number; near: number[]; loaded?: boolean }>(); // (the boats within ENGAGED of her as she touched; whether her turn for it was loaded, or she declined it)
   /** The last breach against each boat: by whom, when it was called (`t`), where she was then, and the last moment it was
@@ -1664,6 +1668,7 @@ export class World {
     // (each boat's speed, and her velocity, before any contact this step takes her way off: a jam is judged on how they
     // were sailing, not on what the touch did to them)
     const pre = found.length ? new Map(this.boats.map(b => [b.id, { v: b.v, vx: b.vx, vy: b.vy }])) : null; // (only when there's something to judge)
+    let hit: Set<string> | undefined; // (the pairs whose contact this step has had its physics)
     for (const { A, B, incident } of found) {
       if (incident.kind === 'hail' && A.ai && B.ai) continue; // AI boats always answer hails; nothing to do
       // Rule 43.1(a): a boat compelled into this by another boat's breach (against her, just now) is exonerated
@@ -1680,11 +1685,7 @@ export class World {
       if (f.script && !this.caseRun?.free.includes(f.script)) incident.scripted = true; // (a Case's boat on its track: the card says so)
       const pA = pre!.get(A.id)!, pB = pre!.get(B.id)!;
       const jammed = Math.max(pA.v, pB.v) < STEERAGE && hypot(pA.vx - pB.vx, pA.vy - pB.vy) < JAM_CLOSING;
-      if (incident.kind === 'contact') {
-        A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
-        const dx = B.x - A.x, dy = B.y - A.y, l = hypot(dx, dy) || 1;
-        A.x -= dx / l * CONTACT_PUSH / 2; A.y -= dy / l * CONTACT_PUSH / 2; B.x += dx / l * CONTACT_PUSH / 2; B.y += dy / l * CONTACT_PUSH / 2;
-      }
+      if (incident.kind === 'contact') { this.hulls(A, B, hullGap(A, B)); (hit ??= new Set()).add(pairKey(A, B)); }
       // Rule 44.1: a penalty is for an incident. Contact again with the boat she fouled, while the two are still tangled
       // from that foul (not a length clear of each other since), is that same incident: no second foul. (The AI gets clear
       // before turning, and again if a new penalty comes mid-turns: rule 44.2.)
@@ -1735,6 +1736,42 @@ export class World {
         if (after != null) this.pendingProtests.push({ by: victim.id, vs: f.id, at: this.t + after, inc: { vs: f.id, t: this.t, rule: incident.rule, fouler: f.id, kind: incident.kind, part: incident.part } });
       }
     }
+    // (and every pair touching that wasn't judged this step: the physics doesn't wait on the rules' cooldown)
+    for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+      const A = bs[i], B = bs[j], dx = A.x - B.x, dy = A.y - B.y, near = LOA + CONTACT_GAP + CONTACT_RELEASE;
+      if (dx * dx + dy * dy > near * near || ((A.finished || A.retired) && (B.finished || B.retired))) continue; // (as the rules: two boats both done sail through, assessPair)
+      const key = pairKey(A, B);
+      if (hit?.has(key)) continue;
+      const g = hullGap(A, B);
+      if (g < CONTACT_GAP) this.hulls(A, B, g);
+      else if (g > CONTACT_GAP + CONTACT_RELEASE) this.touching.delete(key);
+    }
+  }
+
+  /**
+   * Hulls together, the physics of it (the rules judge the contact; this is what it does to the boats), every step the
+   * two are within CONTACT_GAP, whatever the rules' cooldown. Before, it came only with a contact incident, and those
+   * wait INCIDENT_COOLDOWN (6 s) between them: two boats lying together had no contact at all for 6 s, then lost 65% of
+   * their way at once, every 6 s exactly (Deep Physics' turn-drag, crewstation 6 kt seed 4, 18 Nov 2026: Blue against
+   * Red at 113.7, 119.7, 125.7, 131.7, 137.7 s, 0.58 kt to 0.20 each time). The first touch is the impact, as before:
+   * each keeps 0.35 of her way (a modeling choice) and they're pushed CONTACT_PUSH apart. Then, until they've been
+   * CONTACT_RELEASE past touching, it's the same contact going on: no new impact; each held off the other at touching,
+   * and losing only the part of her way that's into the other boat, as a hull leaning on a hull does (her velocity's
+   * component along the line between them taken out: what's left along her heading is v(1 - cos²)).
+   */
+  private hulls(A: Boat, B: Boat, g: number): void {
+    const key = pairKey(A, B), dx = B.x - A.x, dy = B.y - A.y, l = hypot(dx, dy) || 1, nx = dx / l, ny = dy / l;
+    if (!this.touching.has(key)) {
+      this.touching.add(key);
+      A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
+      A.x -= nx * CONTACT_PUSH / 2; A.y -= ny * CONTACT_PUSH / 2; B.x += nx * CONTACT_PUSH / 2; B.y += ny * CONTACT_PUSH / 2;
+      return;
+    }
+    const push = Math.min(CONTACT_GAP - g, CONTACT_PUSH) / 2;
+    if (push > 0) { A.x -= nx * push; A.y -= ny * push; B.x += nx * push; B.y += ny * push; }
+    const ua = V(A.h), ca = ua.x * nx + ua.y * ny, ub = V(B.h), cb = -(ub.x * nx + ub.y * ny); // (each one's heading into the other)
+    if (ca > 0 && A.v > 0) A.v *= 1 - ca * ca;
+    if (cb > 0 && B.v > 0) B.v *= 1 - cb * cb;
   }
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
