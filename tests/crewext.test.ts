@@ -76,6 +76,7 @@ describe("The helm's hand holds the extension or the tiller, to hard over both w
     for (let deg = -HARD_OVER; deg <= HARD_OVER; deg += 15) {
       turn.rotation.y = deg * R; til.rotation.x = tillerLift(deg * R);
       const joint = tillerJointAt(turn), a = tillerRootAt(turn), e = tillerTip(turn);
+      cr.tillerRoot = a; // (as boatMesh.ts gives it, each frame: the tiller's root on the rudder head)
       // (long enough for the extension's swing and the hand's move: 2 s)
       for (let i = 0; i < 60; i++) { sail(b, 1 / 30); syncCrew(cr, w, b.crew, 1 / 30, false, joint, b.heel, b.tacking); }
       const ex = cr.extension; ex.updateMatrix(); const g = ex.geometry; g.computeBoundingBox();

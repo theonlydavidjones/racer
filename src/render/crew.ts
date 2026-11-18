@@ -898,12 +898,12 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   // (the tiller pushed far across the other way, the extension out: hiked right out, the hand can't reach its grip even
   // slid along the deck toward it; a helm comes in off the rail to push it across. Drawn sat up as far as that needs:
   // the physics' lean is theirs, this is only the pose)
+  // (the seat stays where hiking put it: only the torso comes up)
+  const hx = Math.min(e - 0.04 + 0.06 * lean, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * lean));
   if ((fig.extOut ?? 0) > 0) for (let ln = lean; ln >= 0; ln -= 0.1) {
-    const hxl = Math.min(e - 0.04 + 0.06 * ln, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * ln));
-    const shl = shoulderAt({ hip: V(s * hxl, deckY(u, hxl) + 0.09 * k, z), yaw: s * (0.55 + 0.5 * ln), pitch: 0.05 + 1.1 * ln, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
+    const shl = shoulderAt({ hip: V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw: s * (0.55 + 0.5 * ln), pitch: 0.05 + 1.1 * ln, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
     lean = Math.max(0, ln); if (tip.distanceTo(shl) - 0.7 <= EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.85) break;
   }
-  const hx = Math.min(e - 0.04 + 0.06 * lean, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * lean));
   const hip = V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw = s * (0.55 + 0.5 * lean), r = right(yaw);
   // (the tiller hard over away from them, to 75°: its end across the far quarter, out of reach of the extension and an
   // arm from where they sit. They slide aft and in along the after deck toward it, as a helm does, as far as they need
@@ -912,10 +912,16 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   // (the reach is from the shoulder the hand hangs from, not the hip: sat out hiking, leant back, it's well aft and out
   // of the hip, and a hand reaching from it fell short of the grip of a stick only half the tiller's length)
   { const sh = shoulderAt({ hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
-    const far = Math.max(Math.hypot(tip.x - hip.x, tip.z - hip.z) - (EXT_LEN + 0.5 * k), tip.distanceTo(sh) - (EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.75));
+    // (and the extension stowed, the tiller's end come round behind them, hard over their way: the hand on the tiller
+    // itself, the reach the arm's alone; they shuffle toward it, no more than 0.2 m, not into the tiller's sweep)
+    const stowedBehind = (fig.extOut ?? 0) < 0.02 && tip.clone().sub(hip).dot(fwd(yaw)) < 0.1;
+    const farHand = stowedBehind ? Math.min(0.2, tip.distanceTo(sh) - (BONE.upper + BONE.fore) * k * 0.8) : -1;
+    const far = Math.max(Math.hypot(tip.x - hip.x, tip.z - hip.z) - (EXT_LEN + 0.5 * k), tip.distanceTo(sh) - (EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.75), farHand);
     if (far > 0) {
       const dx = tip.x - hip.x, dz = tip.z - hip.z, n = Math.hypot(dx, dz) || 1, go = Math.min(0.7, far);
-      const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nx = s * Math.max(0.08, s * (hip.x + go * dx / n)), nu = uAtZ(nz);
+      const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nu = uAtZ(nz);
+      // (to the middle of the after deck at most; beside the cockpit, still on the side deck, not over the well)
+      const nx = s * Math.max(nz < COCK1 + 0.05 ? chz(nz) + 0.12 : 0.08, s * (hip.x + go * dx / n));
       fz = Math.min(COCK1 - 0.12, fz + (nz - hip.z));
       hip.set(nx, Math.max(deckY(nu, Math.min(Math.abs(nx), halfBeam(nu))), ground(nx, nz)) + 0.09 * k, nz);
     } }
@@ -933,7 +939,12 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   let out = rest.clone().sub(tip).normalize(), reaching = false;
   if (tip.clone().addScaledVector(out, EXT_LEN).distanceTo(chest) > 0.62 * k) { out = chest.clone().sub(tip).normalize(); reaching = true; } // (reaching for it)
   fig.onTiller = eo < 0.02;
-  let ext = fig.onTiller ? tip.clone().addScaledVector(along, 0.1) : tip.clone().addScaledVector(slerpDir(along, out, eo), Math.min(EXT_GRIP, eo >= 1 && reaching ? Math.max(0.2, tip.distanceTo(chest) - 0.28 * k) : EXT_GRIP));
+  // (on the tiller, the hand just short of its end; or, its end come round by them, behind the hip, where along it the
+  // hand reaches from its shoulder: a hand takes the tiller where it can, nearer the rudder head)
+  const onAt = () => { const a = tip.clone().addScaledVector(along, 0.1); if (!tRoot || !fig.cur) return a;
+    const sh = shoulderDrawn(fig, s > 0 ? 0 : 1), b = tRoot.clone().lerp(tip, 0.15), ab = a.clone().sub(b), t = Math.max(0, Math.min(1, sh.clone().sub(b).dot(ab) / Math.max(1e-9, ab.lengthSq())));
+    const q = b.addScaledVector(ab, t); return q.distanceTo(sh) < a.distanceTo(sh) ? q.add(V(0, 0.03, 0)) : a; };
+  let ext = fig.onTiller ? onAt() : tip.clone().addScaledVector(slerpDir(along, out, eo), Math.min(EXT_GRIP, eo >= 1 && reaching ? Math.max(0.2, tip.distanceTo(chest) - 0.28 * k) : EXT_GRIP));
   // (the hand on the tiller: the fist round it there, the wrist's target back by the fist's offset as drawn)
   if (fig.onTiller && fig.cur) { const iT = s > 0 ? 0 : 1; ext.sub(fistAt(fig, iT).sub(wristAt(fig, iT))); }
   if (!fig.onTiller) {
@@ -1670,7 +1681,11 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
     // (and out whenever the tiller's end is beyond the hand's reach from its shoulder: the tiller pushed across toward
     // the far side short of EXT_TILLER, its end out of reach, the hand reached for it in the air)
     const iE = cr.helmSide > 0 ? 0 : 1, beyond = !!h.cur && t.distanceTo(shoulderDrawn(h, iE)) > (BONE.upper + BONE.fore) * h.scale * 0.95;
-    const want = (hp?.lean ?? 0) > EXT_HIKE || ((ang > EXT_TILLER && !close) || beyond) || !!h.going; // (close by but out of the hand's reach, behind them: the extension)
+    // (but not swung out at the body: the tiller's end come round behind them, the stick would run through them; the hand
+    // takes the tiller where it reaches it, helmPose)
+    const behind = !!h.cur && _t.copy(t).sub(h.cur.hip).dot(fwd(h.cur.yaw)) < 0.1;
+    // (hard over their way, hiked out or not, the tiller's end is right by them: they hold the tiller itself)
+    const want = !!h.going || (!behind && ((hp?.lean ?? 0) > EXT_HIKE || (ang > EXT_TILLER && !close) || beyond));
     h.stowT = want ? 0 : (h.stowT ?? EXT_STOW) + dt; // (how long it's been wanted stowed, s)
     const goOut = want || (h.stowT < EXT_STOW && (h.extOut ?? 0) > 0);
     h.extOut = Math.max(0, Math.min(1, (h.extOut ?? 0) + (goOut ? 1 : -1) * dt / EXT_SWING)); }
