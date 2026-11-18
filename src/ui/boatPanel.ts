@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, LINE_COLORS, ROPES, ROPE_COLORS, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, lineColor, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
+import { BOTTOM_COLORS, BRIGHT_FINISH, DEFAULT_ROPES, HULL_COLORS, ROPES, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, lineRope, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
 import { saveSettings } from '../settings';
 import { ROPE_SHADE, hexToHsv, hsvToHex, isHex, pickerHtml, ropeSvg, ropesHtml } from './colorPicker';
 import { CLUBS } from '../render/burgees';
@@ -123,7 +123,7 @@ export class BoatPanel {
       case 'pick': this.pickKey = this.pickKey === v ? null : v as ColorKey; this.render(); return;
       case 'ropePick': this.ropeKey = this.ropeKey === v ? null : v as LineColorKey; this.render(); return;
       case 'rope': { const k = t.dataset.line as LineColorKey, r = ROPES.find(x => x.id === v); if (!r) return;
-        this.set(b => { b.lineRopes = { ...b.lineRopes, [k]: r.id }; b.lineColors = { ...b.lineColors, [k]: r.band }; }); return; }
+        this.set(b => { const l = { ...b.lineRopes, [k]: r.id }; if (r.id === DEFAULT_ROPES[k]) delete l[k]; if (Object.keys(l).length) b.lineRopes = l; else delete b.lineRopes; }); return; }
       case 'toClub': this.leave(() => this.done(false)); return; // (her skipper is chosen on her page in the Yacht Club)
       case 'deckKind': this.set(b => { if (v === 'painted') { if (!isHex(b.deck)) b.deck = '#8e9f7c'; } else b.deck = v; }); return;
       case 'done': this.leave(() => this.done(false)); return;
@@ -160,8 +160,7 @@ export class BoatPanel {
       }); return;
       case 'outboardHp': this.set(b => { b.perf.outboardHp = Number(v) as 2.5 | 3.5 | 6; }); return;
       case 'finish': this.set(b => { b.perf.finish = v as BoatSpec['perf']['finish']; }); return;
-      case 'lineColor': { const k = t.dataset.line as LineColorKey; this.set(b => { const c = { ...b.lineColors, [k]: v }; if (v === LINE_COLORS[k]) delete c[k]; if (Object.keys(c).length) b.lineColors = c; else delete b.lineColors; }); return; }
-      case 'lineColorsReset': this.set(b => { delete b.lineColors; delete b.lineRopes; }); return;
+      case 'lineColorsReset': this.set(b => { delete b.lineRopes; }); return;
     }
   }
   private input(e: Event): void {
@@ -244,9 +243,9 @@ export class BoatPanel {
       return kv(c.label, `<button type="button" class="be-cbtn${on ? ' on' : ''}" data-act="pick" data-v="${k}">${isHex(v) ? `<i style="background:${v}"></i>${esc(colorName(v, c.presets(b)))}` : `<i class="none"></i>${esc(c.clear ?? '')}`}</button>`)
         + (on ? pickerHtml(k, v, c.presets(b), S.myColors ?? [], c.clear) : '');
     };
-    const rope = (k: LineColorKey) => { const r = ROPES.find(x => x.id === b.lineRopes?.[k]); return r ? { svg: ropeSvg(r), name: r.name } : { svg: ropeSvg({ base: lineColor(b, k), kind: 'solid' }), name: colorName(lineColor(b, k), ROPE_COLORS.map(([n, c]) => [n, c] as [string, string])) || 'Band color' }; };
+    const rope = (k: LineColorKey) => { const r = lineRope(b, k); return { svg: ropeSvg(r), name: r.name }; };
     const ropeRow = (k: LineColorKey, n: string) => { const r = rope(k), on = this.ropeKey === k;
-      return kv(n, `<button type="button" class="be-cbtn${on ? ' on' : ''}" data-act="ropePick" data-v="${k}">${r.svg}${esc(r.name)}</button>`) + (on ? ropesHtml(k, b.lineRopes?.[k]) : ''); };
+      return kv(n, `<button type="button" class="be-cbtn${on ? ' on' : ''}" data-act="ropePick" data-v="${k}">${r.svg}${esc(r.name)}</button>`) + (on ? ropesHtml(k, lineRope(b, k).id) : ''); };
     const deckKind = b.deck.startsWith('teak') ? b.deck : 'painted';
     const tune = b.perf.tune ? tuneName(fixTune(b.perf.tune)) : 'auto';
     const slip = slipById(b.slip);
@@ -304,7 +303,7 @@ export class BoatPanel {
         colorRow('numberColor'), colorRow('insigniaColor')
       ].join(''))}
       ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change to see', true))], () =>
-        LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineColors || b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the band\'s colors</button>') : ''))}
+        LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual ropes</button>') : ''))}
       ${grp('berth', 'Home berth', [kv('Marina', val(esc(b.marina ? MARINAS.find(m => m.id === b.marina)?.name ?? '' : 'None'))), ...(b.marina ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
         kv('Marina', `<select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`),
         b.marina ? kv(`Slip in ${esc(harborOf(b.marina)?.short ?? '')}`, `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
@@ -375,7 +374,9 @@ function rigTuneFields(b: BoatSpec, seg: Seg): string {
   };
   const row = (k: string, key: keyof RigTune, label: string, scale: number, step: number) =>
     `<div class="field"><span>${label} · <b id="bp_${k}">${tuneLabel(key, t ?? TUNE_DEFAULT)}</b></span>${range(k, key, scale, step)}</div>`;
-  return `<div class="field"><span>Rig tune · set at the dock</span>${seg('tune', [['auto', 'For the forecast'], ['light', 'North Sails light'], ['medium', 'North Sails medium'], ['strong', 'North Sails strong'], ['heikkila', 'Heikkilä'], ...(cur === 'custom' ? [['custom', 'Your own'] as [string, string]] : [])], cur)}</div>
+  // (the tunes, by the wind they're for, without the sailmakers' names on the player's page (the owner, 18 Nov 2026):
+  // light, medium and strong are North Sails' Nordic Folkboat guide's, raked is Heikkilä Sailmaker's, boat/rigTune.ts)
+  return `<div class="field"><span>Rig tune · set at the dock</span>${seg('tune', [['auto', 'For the forecast'], ['light', 'Light air'], ['medium', 'Medium'], ['strong', 'Strong wind'], ['heikkila', 'Raked'], ...(cur === 'custom' ? [['custom', 'Your own'] as [string, string]] : [])], cur)}</div>
     ${t ? `${row('tuneMark', 'forestayMark', 'Forestay mark (rake)', 100, 0.5)}
     ${row('tuneFoot', 'footAft', 'Mast foot', 1, 1)}
     ${row('tuneShroud', 'shroudTurns', 'Shrouds', 1, 0.25)}

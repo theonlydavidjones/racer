@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BOAT, LINE_COLORS, ROPES, fixSpec, type Rope } from '../src/boat/spec';
+import { DEFAULT_BOAT, DEFAULT_ROPES, ROPES, fixSpec, type Rope } from '../src/boat/spec';
 import { ROPE_LAYERS, ROPE_TILE, ropeLook, ropeTile, tileMean } from '../src/render/ropeLook';
 
 // The lines in real rope colorways, drawn as rope on the 3D boat (ROADMAP 8i). What's drawn on the boat itself is checked
@@ -20,19 +20,17 @@ const rope = (id: string) => ROPES.find(r => r.id === id)!;
 describe('Rope colorways on the 3D boat (render/ropeLook.ts)', () => {
   it('each colorway is its own layer, and a line wears the one chosen for it', () => {
     expect(ROPE_LAYERS).toBe(ROPES.length + 1);
-    const b = fixSpec({ ...structuredClone(DEFAULT_BOAT), lineRopes: { jibsheet: 'red-tracers', mainsheet: 'green-fleck' }, lineColors: { jibsheet: '#c8312f', mainsheet: '#2f7a45' } });
+    const b = fixSpec({ ...structuredClone(DEFAULT_BOAT), lineRopes: { jibsheet: 'red-tracers', mainsheet: 'green-fleck' } });
     const j = ropeLook(b, 'jibsheet'), m = ropeLook(b, 'mainsheet');
     expect(j.layer).toBe(1 + ROPES.findIndex(r => r.id === 'red-tracers'));
     expect(m.layer).toBe(1 + ROPES.findIndex(r => r.id === 'green-fleck'));
     expect([j.tint, m.tint]).toEqual(['#ffffff', '#ffffff']); // (the layer carries the colors: not tinted again)
     expect(j.rope?.id).toBe('red-tracers');
   });
-  it('a line with no colorway is plain braid in its band color, as before', () => {
-    const plain = ropeLook(DEFAULT_BOAT, 'vang');
-    expect(plain).toEqual({ layer: 0, tint: LINE_COLORS.vang, far: LINE_COLORS.vang });
-    const chosen = ropeLook(fixSpec({ ...structuredClone(DEFAULT_BOAT), lineColors: { vang: '#d8343a' } }), 'vang');
-    expect(chosen.layer).toBe(0); expect(chosen.tint).toBe('#d8343a');
-    expect(share(ropeTile(), '#ffffff')).toBe(1); // (plain braid: white, shaded, for the tint)
+  it('a line with none chosen wears its usual colorway; plain braid is left for the lines no one colors', () => {
+    const v = ropeLook(DEFAULT_BOAT, 'vang');
+    expect(v.rope.id).toBe(DEFAULT_ROPES.vang); expect(v.layer).toBe(1 + ROPES.findIndex(r => r.id === DEFAULT_ROPES.vang)); expect(v.tint).toBe('#ffffff');
+    expect(share(ropeTile(), '#ffffff')).toBe(1); // (plain braid: white, shaded, for its own color's tint)
   });
   it('a solid colorway is its own color all over', () => {
     for (const r of ROPES.filter(x => x.kind === 'solid')) expect(share(ropeTile(r), r.base), r.id).toBe(1);

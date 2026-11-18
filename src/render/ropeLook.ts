@@ -1,4 +1,4 @@
-import { ROPES, lineColor, type BoatSpec, type LineColorKey, type Rope } from '../boat/spec';
+import { ROPES, lineRope, type BoatSpec, type LineColorKey, type Rope } from '../boat/spec';
 
 /**
  * How a line's rope looks on the 3D boat (8i: the lines in their real colorways, drawn as rope). Each colorway is one
@@ -6,7 +6,7 @@ import { ROPES, lineColor, type BoatSpec, type LineColorKey, type Rope } from '.
  * way), its strands over and under each other, and the colored yarns where the colorway has them. A fleck rope has a
  * colored yarn in a few carriers, which shows as a short mark wherever that carrier comes over the top; a tracer is a
  * whole carrier of the other color, showing as a dashed spiral (it's hidden where it passes under). Layer 0 is plain
- * white braid, tinted with the line's band color when no colorway is chosen.
+ * white braid, for the lines no one colors (tinted in their own color).
  *
  * ESTIMATES, by eye (no maker gives them): the lay (one carrier's turn around the rope in 32 mm of its length), how many
  * carriers carry a fleck (two one way, one the other), how wide a fleck yarn is (a third of its strand) and how many of
@@ -72,14 +72,13 @@ export function tileMean(t: Uint8Array): string {
 export const ROPE_LAYERS = 1 + ROPES.length;
 
 /**
- * A line's look on this boat: its texture layer, the tint the layer is drawn in (the band color for plain braid, white
- * for a colorway, which carries its own colors) and the color of the thin line that shows it from afar.
+ * A line's look on this boat: its colorway's texture layer, the tint the layer is drawn in (white: the layer carries the
+ * colors) and the color of the thin line that shows it from afar (the colorway's blend). Every line is a real colorway,
+ * hers or the usual one (spec.ts lineRope); plain braid (layer 0) is for the lines no one colors.
  */
-export function ropeLook(spec: Pick<BoatSpec, 'lineColors' | 'lineRopes'> | null | undefined, key: LineColorKey): { layer: number; tint: string; far: string; rope?: Rope } {
-  const id = spec?.lineRopes?.[key], i = id ? ROPES.findIndex(r => r.id === id) : -1;
-  if (i < 0) return { layer: 0, tint: lineColor(spec, key), far: lineColor(spec, key) };
-  const rope = ROPES[i];
-  return { layer: i + 1, tint: '#ffffff', far: farOf(rope), rope };
+export function ropeLook(spec: Pick<BoatSpec, 'lineRopes'> | null | undefined, key: LineColorKey): { layer: number; tint: string; far: string; rope: Rope } {
+  const rope = lineRope(spec, key);
+  return { layer: 1 + ROPES.indexOf(rope), tint: '#ffffff', far: farOf(rope), rope };
 }
 const FAR = new Map<string, string>();
 const farOf = (r: Rope) => { let f = FAR.get(r.id); if (!f) FAR.set(r.id, f = tileMean(ropeTile(r))); return f; };

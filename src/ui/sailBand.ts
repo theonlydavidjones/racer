@@ -9,7 +9,7 @@ import { CAR, carFree, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
 import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
-import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
+import { DEFAULT_ROPES, lineRope, type BoatSpec, type LineColorKey, type Rope } from '../boat/spec';
 import { JUMPER_HALF_TURN_S } from '../boat/condition';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
@@ -86,29 +86,33 @@ const chev = (dir: 'u' | 'd' | 'l' | 'r') => {
 };
 /** Short two-line names over the vertical lines. */
 const SHORT: Partial<Record<CtlKey, string>> = { downhaul: 'Main<br>hal.', jibHalyard: 'Jib<br>hal.', jibCunningham: 'Jib<br>Cunn', cunningham: 'Main<br>Cunn', outhaul: 'Out-<br>haul', vang: 'Vang', jibsheet: 'Jib<br>sheet', jibsheetW: 'Jib<br>sheet' };
-/** Each rope's colour, with a laid fleck: the boat's own (chosen in the boat editor, boat/spec.ts lineColors), or the
- * usual ones (the owner: for usability; none port red or starboard green). */
-const ROPE: Partial<Record<CtlKey | 'jib', string>> = { ...LINE_COLORS, jib: LINE_COLORS.jibsheet };
+/**
+ * Each rope as it is: her colorway (the boat editor's Lines, boat/spec.ts lineRope; the usual ones until she has her
+ * own), its color laid with the braid's twill, and its fleck or tracer over it (styles 07-band). The usual ones keep
+ * the band's idea (the owner: the jib's lines warm, the main's cool; none plain port red or starboard green).
+ */
+const ropeVars = (r: Rope) => `--rope:${r.base};--fleck:${r.kind === 'fleck' ? r.mark : 'transparent'};--tracer:${r.kind === 'tracer' ? r.mark : 'transparent'}`;
+const ROPE: Partial<Record<CtlKey | 'jib', string>> = Object.fromEntries([...Object.keys(DEFAULT_ROPES), 'jib'].map(k => [k, ropeVars(lineRope(null, (k === 'jib' ? 'jibsheet' : k) as LineColorKey))]));
 /** The colour key of a band element's line ('jib' is both jib sheets; the traveller's car rides with the mainsheet). */
-const colorKey = (k: string): LineColorKey | null => (k === 'jib' ? 'jibsheet' : k === 'traveller' ? 'mainsheet' : k in LINE_COLORS ? (k as LineColorKey) : null);
+const colorKey = (k: string): LineColorKey | null => (k === 'jib' ? 'jibsheet' : k === 'traveller' ? 'mainsheet' : k in DEFAULT_ROPES ? (k as LineColorKey) : null);
 
 /** A vertical line: its name, ▲ eases, the well with the rope showing how much is on, ▼ pulls on. */
 const vert = (key: CtlKey | 'jib', side: Side) => {
-  const k = key === 'jib' ? 'jibsheet' : key, col = ROPE[key] ?? '#ccc';
-  return `<div class="sb-v" data-line="${key}" data-side="${side}" style="--rope:${col}">
+  const k = key === 'jib' ? 'jibsheet' : key, col = ROPE[key] ?? '--rope:#ccc';
+  return `<div class="sb-v" data-line="${key}" data-side="${side}" style="${col}">
   <button type="button" class="sb-nm" data-act="name">${SHORT[k]}</button>
   <button type="button" class="sb-a" data-act="ease" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: ease">${chev('u')}</button>
   <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span>
   <button type="button" class="sb-a" data-act="pull" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: pull on">${chev('d')}</button></div>`;
 };
 /** The backstay's end on one side, pulled outboard. */
-const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="--rope:${ROPE.backstay}">
+const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="${ROPE.backstay}">
   <button type="button" class="sb-nm" data-act="name">Backstay</button>
   <span class="sb-hrow">${side === 'P'
     ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
     : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
 /** A track across the boat (port end left): the mainsheet's boom marker or the traveller's car. */
-const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="--rope:${ROPE.mainsheet}">
+const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="${ROPE.mainsheet}">
   <button type="button" class="sb-nm" data-act="name">${label}</button><span class="sb-end p">P</span>
   <button type="button" class="sb-a" data-act="left" aria-label="${k === 'mainsheet' ? 'Boom toward port' : 'Car to port'}">${chev('l')}</button>
   <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
@@ -430,10 +434,11 @@ export class SailBand {
     });
   }
 
-  /** Each rope in her own colours (the boat editor's Lines), set again only when they change. */
+  /** Each rope in her own colorways (the boat editor's Lines), set again only when they change. */
   private colours(spec: BoatSpec | undefined): void {
-    const key = JSON.stringify(spec?.lineColors ?? null); if (key === this.colorsOf) return; this.colorsOf = key;
-    this.el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { const k = colorKey(d.dataset.line!); if (k) d.style.setProperty('--rope', lineColor(spec, k)); });
+    const key = JSON.stringify(spec?.lineRopes ?? null); if (key === this.colorsOf) return; this.colorsOf = key;
+    this.el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { const k = colorKey(d.dataset.line!); if (!k) return; const r = lineRope(spec, k);
+      d.style.setProperty('--rope', r.base); d.style.setProperty('--fleck', r.kind === 'fleck' ? r.mark! : 'transparent'); d.style.setProperty('--tracer', r.kind === 'tracer' ? r.mark! : 'transparent'); });
   }
 
   /**

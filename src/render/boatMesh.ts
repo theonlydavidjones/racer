@@ -722,9 +722,9 @@ function line(points: THREE.Vector3[], mat: THREE.Material | Rope = LINE_MAT, ke
   return l;
 }
 /**
- * Each line in the colour of its control (the owner: the drawn lines wear the colours chosen for the sail controls band,
- * the Boat page's line colours, spec.ts lineColor; none chosen: the band's defaults). One screen-line material per
- * colour, dimmed with the daylight as the role materials are (syncRopes).
+ * Each line's thin screen line in its rope's color from afar (render/ropeLook.ts: the colorway's blend; the rope's own
+ * braid is the mesh over it). One screen-line material per color, dimmed with the daylight as the role materials are
+ * (syncRopes).
  */
 const KEY_MATS = new Map<string, { mat: THREE.LineBasicMaterial; base: THREE.Color }>();
 function keyMat(hex: string): THREE.LineBasicMaterial {
@@ -775,7 +775,7 @@ diffuseColor.rgb *= texture(uRope, vec3(vRope.x, vRope.y, floor(vRope.z + 0.5)))
   m.customProgramCacheKey = () => 'rope-braid';
   return ROPE_MESH_MAT = m;
 }
-function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineColors' | 'lineRopes'> | null): Ropes {
+function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineRopes'> | null): Ropes {
   const lines: Ropes['lines'] = [], colors: THREE.Color[] = [], layers: number[] = [];
   grp.traverse(o => {
     const l = o as THREE.Line; if (!l.isLine) return;
@@ -784,7 +784,7 @@ function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineColors' | 'line
     lines.push({ l, r: wire ? 0.0035 : 0.004 });
     // its colorway (or its band color on plain braid); the wire and the uncolored lines plain, in their own colors
     const look = key ? ropeLook(spec, key) : null;
-    if (look) { l.material = keyMat(look.far); l.userData.ropeLayer = look.layer; l.userData.ropeId = look.rope?.id; }
+    if (look) { l.material = keyMat(look.far); l.userData.ropeLayer = look.layer; l.userData.ropeId = look.rope.id; }
     const c = new THREE.Color(look ? look.tint : ROPE_COLOR[role ?? 'wire']);
     for (let i = 0; i < l.geometry.attributes.position.count - 1; i++) { colors.push(c); layers.push(look ? look.layer : 0); }
   });
