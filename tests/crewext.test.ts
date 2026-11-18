@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
-import { buildCrew, syncCrew, tillerJointAt, tillerRootAt, tillerTip } from '../src/render/crew';
+import { buildCrew, fistAt, syncCrew, tillerJointAt, tillerRootAt, tillerTip } from '../src/render/crew';
 import { HEEL, RUDDER_RAKE, rudderGeometry, tillerLift, tillerPivot } from '../src/render/hull';
 import { HARD_OVER } from '../src/boat/balance';
 
@@ -60,4 +60,29 @@ describe("The tiller extension's root sits on the tiller (crew.ts: its joint, ti
     }
     expect(bad).toEqual([]);
   }, 60_000);
+});
+
+// The helm's hand on the extension's grip, or on the tiller itself, wherever the tiller is (the stills, 18 Nov: pushed
+// across toward the far side short of the extension's 30°, the extension lay stowed along the tiller and the hand reached
+// for the tiller's end in the air, out of its reach). Every 15° to hard over both ways, on both tacks, light and fresh: the
+// steering fist within 3.5 cm (crewgrip's GRIP: a gloved fist closed round it, ESTIMATE) of the extension's stick or the tiller.
+describe("The helm's hand holds the extension or the tiller, to hard over both ways (crew.ts helmPose)", () => {
+  const seg = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3) => offTiller(p, a, b).d;
+  for (const tack of ['S', 'P'] as const) for (const kt of [8, 18]) it(`${tack === 'S' ? 'starboard' : 'port'} tack, ${kt} kt, to ±${HARD_OVER}°`, () => {
+    const twa = beatAngle(kt), b = testBoat({ heading: tack === 'S' ? 360 - twa : twa, kt: 5, windKt: kt }); b.tack = tack;
+    b.crew = newCrew(DEFAULT_CREW, tack); sail(b, 10);
+    const cr = buildCrew(DEFAULT_CREW.helm, DEFAULT_CREW.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), { turn, til } = rudder(), bad: string[] = [];
+    const w = tack === 'S' ? 1 : -1;
+    for (let deg = -HARD_OVER; deg <= HARD_OVER; deg += 15) {
+      turn.rotation.y = deg * R; til.rotation.x = tillerLift(deg * R);
+      const joint = tillerJointAt(turn), a = tillerRootAt(turn), e = tillerTip(turn);
+      // (long enough for the extension's swing and the hand's move: 2 s)
+      for (let i = 0; i < 60; i++) { sail(b, 1 / 30); syncCrew(cr, w, b.crew, 1 / 30, false, joint, b.heel, b.tacking); }
+      const ex = cr.extension; ex.updateMatrix(); const g = ex.geometry; g.computeBoundingBox();
+      const s0 = new THREE.Vector3(0, g.boundingBox!.min.y, 0).applyMatrix4(ex.matrix), s1 = new THREE.Vector3(0, g.boundingBox!.max.y, 0).applyMatrix4(ex.matrix);
+      const i = cr.helmSide > 0 ? 0 : 1, f = fistAt(cr.helm, i), d = Math.min(seg(f, s0, s1), seg(f, a, e));
+      if (d > 0.035 * cr.helm.scale) bad.push(`${deg}°: the steering fist ${(d * 100).toFixed(0)} cm from the extension and the tiller${(globalThis as { __hx?: (c: unknown) => string }).__hx?.(cr) ?? ''}`);
+    }
+    expect(bad).toEqual([]);
+  }, 120_000);
 });
