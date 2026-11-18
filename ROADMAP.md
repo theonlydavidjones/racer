@@ -753,7 +753,7 @@ sources. Each shipped item is added there when it's published.
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
    beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
    dial under the inset map, 8b), and a test that it's on screen.
-8i. **The boat editor reorganized, with a real color picker** (in PR #354; any color kept already, 1271a6f) (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+8i. ~~**The boat editor reorganized, with a real color picker**~~ (done, v206: #354; the Yacht Club move still open; any color kept already, 1271a6f) (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
    the owner first):
    - "all sail stuff together, all hull stuff together, etc." Proposed groups:
      - **Her:** name, sail number and country, club.
@@ -784,6 +784,15 @@ sources. Each shipped item is added there when it's published.
      Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
      fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
      Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
+8i2. **The editor's folded groups: buttons that say what they do** (owner, 18 November; polish; now; ½–1 h; UI &
+   Experience; src/ui/boatPanel.ts `grp`): "Change to See is terrible content design. Buttons should say what they do;
+   here, you don't change anything by clicking change. Just say "View", and remove the "Change to see" string
+   altogether. or replace it with some kind of cumulative statistic, in which case View should say Expand."
+   - Speed (read-only): its header says View ▾ (Hide ▴ open), and "What she gives away / Change to see" goes. If its
+     folded line shows one total instead (her all-together loss upwind, from the same bench the table uses), the header
+     says Expand ▾.
+   - Lines: "N more / Change to see" becomes "N more"; its header keeps Change, since there you do change them.
+   - Check every group's folded line for the same pattern.
 8k. **Drop and raise the anchor** (in PR #339; rule 22 in PR #335) (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
    later cruising mode's anchoring challenge):
    - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
