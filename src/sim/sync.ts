@@ -23,7 +23,7 @@ import { SeaField } from '../environment/sea';
 /** The World's own members changed only by being replaced: walked only when replaced. */
 const BY_IDENTITY = new Set(['C', 'file', 'sequence', 'weather', 'field', 'opts', 'traffic']);
 /** Never sent: the World's own machinery (its random streams and callbacks live on each side), and its events. */
-const NEVER = new Set(['rng', 'motorRng', 'emit', 'keepsClearOf', 'obstacle', 'events']);
+const NEVER = new Set(['rng', 'motorRng', 'emit', 'keepsClearOf', 'obstacle', 'events', 'navPlan']); // (navPlan: the helm's copy of the page's own plan)
 /** Grown at the end, with the oldest dropped from the front: only what's new is sent. */
 const APPEND = new Set(['rec', 'track']);
 /**

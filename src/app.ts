@@ -1,3 +1,4 @@
+import { helmPoints, type PassageNow } from './sim/navigator';
 import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
@@ -921,7 +922,17 @@ function pilotNote(word: string): void {
 function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
+/** The plan last sent to the helm (navPlanTick). */
+let helmPlan: PassageNow | null = null;
+/** On Nav, the navigator's plan to the helm as each comes in (World.planTarget: the pilot follows the plotted course, not
+ * the rhumb line, the owner's r253): the same plan the inset and the chart draw (Hud.navPassage). */
+function navPlanTick(): void {
+  if (w.pilot.mode !== 'nav' || !w.running || !w.cruising || !w.dest) return;
+  const pn = hud.navPassage(w); if (!pn || pn === helmPlan || !pn.ok) return;
+  helmPlan = pn; send({ k: 'navPlan', to: { x: w.dest.p.x, y: w.dest.p.y }, pts: helmPoints(pn) });
+}
 function pilotTick(dt: number): void {
+  navPlanTick();
   const p = w.pilot, on = p.mode !== 'off' && w.running;
   if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) send({ k: 'pilot', op: 'adjust', d: d * 20 * dt }); }
   const chip = $('bPilot'), hide = !w.running || !w.cruising;

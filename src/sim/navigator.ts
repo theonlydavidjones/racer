@@ -1,4 +1,4 @@
-import { KT, LOA, dist, dot, segCross, sub, unit, type Vec } from '../core/math';
+import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -131,6 +131,23 @@ export interface PassageNow {
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
+/**
+ * A plan's plotted course for the helm (World.planTarget): its track, from where she was when it was planned, thinned to
+ * its corners (Douglas-Peucker, within HELM_TOL m of the track: the tacks, gybes and the bends round a tide or a shadow
+ * are corners; the steps along a straight board aren't).
+ */
+export function helmPoints(pn: PassageNow): Vec[] {
+  const p = pn.track.map(q => q.p); if (p.length < 3) return p.slice();
+  const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
+  const stack: [number, number][] = [[0, p.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL;
+    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } }
+    if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+  }
+  return p.filter((_, i) => keep[i]);
+}
+const HELM_TOL = 8;
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
 /** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause
  * menu, World.applyConditions, they're new objects). */

@@ -72,6 +72,8 @@ export type Command =
   | { k: 'pilot'; op: 'standby' }
   | { k: 'pilot'; op: 'tack' }
   | { k: 'pilot'; op: 'adjust'; d: number }
+  /** The navigator's plan for Nav to steer (World.planTarget): where it was planned to, and its plotted course's corners. */
+  | { k: 'navPlan'; to: Vec; pts: Vec[] }
   /** The outboard. */
   | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' | 'stow' }
   | { k: 'motor'; op: 'start'; retireFirst: boolean }
@@ -142,6 +144,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'lights': u.lightsOff = c.off; return;
     case 'lessonReady': w.lesson?.ready(w.isNight()); return;
     case 'sail': w.setSail(c.sail, c.up); return;
+    case 'navPlan': w.setNavPlan(c.to, c.pts); return;
     case 'pilot':
       if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);
       else if (c.op === 'standby') pilotStandby(w.pilot);

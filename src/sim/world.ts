@@ -67,6 +67,10 @@ import { RaceLog } from './debrief';
  * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
  * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
 const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
+/** Nav on the navigator's plan (planTarget): a corner of the plotted course counts as made within NAV_MADE m of it, about
+ * four of her lengths (a pilot steering for a point turns for the next a little before it, as a navigator calling the
+ * marks does), or once she's past it (across the line square to the leg through it). */
+const NAV_MADE = 30;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -2614,7 +2618,7 @@ export class World {
   private navTarget(b: Boat): Vec | null {
     const d = this.dest; if (!d) return null;
     const slip = d.key === 'slip' ? this.homeSlip : null, H = slip ? harborOf(slip.marina) : null;
-    if (!slip || !H || !H.exits.length) return d.p;
+    if (!slip || !H || !H.exits.length) return this.planTarget(b, d.p);
     const yours = (where: string) => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours.`, ms: 5000 }); } };
     // (inside her harbor's water: handed over at once, sent home from there; or as she crosses into it on her way, where
     // its water runs out past the breakwater ends, as at Richmond)
@@ -2643,7 +2647,35 @@ export class World {
         if (hitsHarbor(q) || hitsMooredBoat(q) || onLand(q)) { yours('Something ahead of her'); this.homeOut = false; return null; }
       }
     }
-    return mouth;
+    return this.planTarget(b, mouth);
+  }
+  /**
+   * The navigator's plotted course, for the helm (the owner, r253: "when in autonav, the boat doesn't seem to be following
+   * the plotted course. it just follows the rhum line to the destination", when the plan bends round a foul tide or a
+   * wind shadow). The page works the plan out (sim/navigator.ts passageLive) and sends its track's corners as each plan
+   * comes in (commands.ts navPlan): the pilot steers for the next corner, its tacks among them, so it tacks where the plan
+   * does, and for `end` (the destination, or her harbor's mouth: navTarget's hand-over is untouched) on the last leg. A
+   * leg she can't make isn't cut across: she keeps steering for its corner, and the page plans afresh from where she is
+   * as she sails on (each 150 m, navigator.ts LIVE_M), which replaces this one. Without a plan for where she's going
+   * (none yet, or a new destination), the destination itself, as before.
+   */
+  private planTarget(b: Boat, end: Vec): Vec {
+    const P = this.navPlan; if (!P || !this.dest || P.to.x !== this.dest.p.x || P.to.y !== this.dest.p.y) return end;
+    const n = P.pts.length;
+    while (P.i < n - 1) {
+      const q = P.pts[P.i], o = P.pts[P.i - 1];
+      if (dist(b, q) < NAV_MADE || dot(sub(b, q), sub(q, o)) > 0) P.i++; else break;
+    }
+    return P.i >= n - 1 ? end : P.pts[P.i];
+  }
+  /** The navigator's plan for the helm (planTarget): where it was planned to, its corners, and the next one she's making. */
+  private navPlan: { to: Vec; pts: Vec[]; i: number } | null = null;
+  /** A plan in from the page (commands.ts navPlan): she picks it up at the leg she's nearest. */
+  setNavPlan(to: Vec, pts: Vec[]): void {
+    if (pts.length < 2) { this.navPlan = null; return; }
+    const u = this.user; let i = 1, best = Infinity;
+    for (let k = 1; k < pts.length; k++) { const e = segPt(u, pts[k - 1], pts[k]); if (e < best) { best = e; i = k; } }
+    this.navPlan = { to: { x: to.x, y: to.y }, pts: pts.map(p => ({ x: p.x, y: p.y })), i };
   }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
