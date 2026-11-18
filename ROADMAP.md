@@ -793,6 +793,8 @@ sources. Each shipped item is added there when it's published.
      says Expand ▾.
    - Lines: "N more / Change to see" becomes "N more"; its header keeps Change, since there you do change them.
    - Check every group's folded line for the same pattern.
+   - The rope picker (owner, 18 November, with a screenshot): "copy strings here should right-align close to their
+     swatches." Each colorway's name sits right-aligned, just left of its swatch, not at the far left of its cell.
 8k. **Drop and raise the anchor** (in PR #339; rule 22 in PR #335) (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
    later cruising mode's anchoring challenge):
    - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
