@@ -11,6 +11,7 @@ import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { sunPosition } from '../environment/sun';
 import { rainLevel } from '../environment/rain';
 import { LL } from '../geo/geo';
+import { slipAt } from '../geo/marina';
 import { laylinesFor } from '../sim/laylines';
 import { disposeUnused } from './dispose';
 import { FittingCull, boatShadows, farShadows } from './fittings';
@@ -683,7 +684,18 @@ export class SceneView {
       // a lesson's buoy (the tiller: steer for it): a yellow practice ball, as sailing schools lay
       if (w.lesson?.buoy) this.addMark(add, w.lesson.buoy, 'sphere', 'Y');
       for (const pl of PLACES) if (pl.buoy) this.addMark(add, pl.p, pl.buoy.shape, pl.buoy.look ?? 'Y');
-      if (w.dest && !PLACES.some(pl => pl.buoy && pl.p === w.dest!.p) && aids) {
+      const berth = w.dest ? slipAt(w.dest.p) : undefined;
+      if (berth && aids) {
+        // bound for a berth: the berth lit, not a ring round it (the owner, 18 Nov 2026): her length and a little, a Folkboat's
+        // beam and fenders wide (3.0 m, as the slips are laid out: render/mooredBoats.ts), an outline and a faint fill on the
+        // water, unlit by the sun so it reads at night as by day
+        // (the outline in strips a fifth of a meter wide: a line is a pixel, lost at a slip's length off)
+        const L = 8.5, B = 3.0, E = 0.2, g = new THREE.Group(), edge = new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
+        for (const [w2, l2, x, z] of [[B, E, 0, -L / 2], [B, E, 0, L / 2], [E, L, -B / 2, 0], [E, L, B / 2, 0]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w2, l2), edge); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.01, z); g.add(m); }
+        const fill = new THREE.Mesh(new THREE.PlaneGeometry(B, L), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false }));
+        fill.rotation.x = -Math.PI / 2; g.add(fill);
+        g.position.copy(P3(berth.p.x, berth.p.y, 0.35)); g.rotation.y = -berth.heading * D2R; add(g);
+      } else if (w.dest && !PLACES.some(pl => pl.buoy && pl.p === w.dest!.p) && aids) {
         // a spot rather than a buoy: a faint ring on the water where you're heading
         const ring = new THREE.Mesh(new THREE.RingGeometry(38, 40, 64), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
         ring.rotation.x = -Math.PI / 2; ring.position.copy(P3(w.dest.p.x, w.dest.p.y, 0.3)); add(ring);
