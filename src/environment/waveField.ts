@@ -4,14 +4,15 @@ import type { SeaHere } from './sea';
 /**
  * The waves on the water: one field, the same for the boats' motions (boat/seaway.ts) and the water you see
  * (render/waves.ts). A sum of wave components built from the sea state:
- * - Twelve wind-sea components at fixed wavelengths from 1.6 to 24 m (geometric steps). Their heights come from the
+ * - Twelve wind-sea components at fixed frequencies, those of the waves 1.6 to 24 m long in deep water (geometric steps). Their heights come from the
  *   JONSWAP spectrum (Hasselmann et al. 1973, γ = 3.3) for the chop's peak period. Their directions come from the
  *   cos^2s spreading of a young wind sea (s ≈ 8: most energy within ±30° of the wind, a little out to ±60°; Mitsuyasu
  *   et al. 1975, s ≈ 5–15 near the spectral peak; Holthuijsen, Waves in Oceanic and Coastal Waters, ch. 6), with
  *   irregular phases. Neighbouring wavelengths travel at different angles, so the crests are short and broken, as a
  *   real wind sea's are, not long parallel rows.
  * - Three swell components around the swell's period, from the swell's direction.
- * Fixed wavelengths mean the pattern never jumps as the sea changes: only the heights move. How big the waves are
+ * Fixed frequencies mean the pattern never jumps as the sea changes: only the heights move (and the lengths, slowly,
+ * with the depth, below). How big the waves are
  * elsewhere on the water scales from this field's reference sea, by the sea there (SeaHere), as a sea map does.
  *
  * It belongs to the World and steps with it, on the race's clock, so the race (in its worker) and the page's mirror
@@ -20,11 +21,21 @@ import type { SeaHere } from './sea';
  * turns: as the wind comes round its components give way, pair by pair, to new ones born for the new wind (update), so
  * nothing sweeps past anyone. The swell turns about your boat, slowly (turnCap). A change of conditions sets both at once.
  * All of it is the World's own state, not the camera's.
+ *
+ * The depth (setDepth): each component keeps its frequency, and its wavenumber follows the water's depth at the
+ * reference place by linear dispersion, ω² = g·k·tanh(k·d) (Airy wave theory: Dean & Dalrymple, Water Wave Mechanics
+ * for Engineers and Scientists, ch. 3; Holthuijsen, Waves in Oceanic and Coastal Waters, ch. 5). Inside the Gate the
+ * swell is a shallow-water wave: a 14 s swell in 14 m of water is 156 m long and runs at 11.2 m/s (toward √(g·d),
+ * 11.7 m/s, the shallow-water limit), not its 306 m and 22 m/s offshore. The chop (2–4 s) shortens by more than 5% only in water under about
+ * 1.7 m (2 s), 3.8 m (3 s) or 7 m (4 s): on the flats, not the Central Bay. One depth for the whole field: the sum is
+ * of plane waves, so it can't bend crests toward a shoal (true refraction needs a field for each place, ROADMAP).
  */
 
 const G = 9.81;
 export const N_WAVES = 15;
 export const N_WIND = 12;
+/** The most any component's wavenumber changes with the depth, as a fraction a second (update). */
+const DLNK = 3e-3;
 const WIND_L = Array.from({ length: N_WIND }, (_, i) => 1.6 * Math.pow(24 / 1.6, i / (N_WIND - 1)));
 // directions: the twelve quantiles of a cos^2s(θ/2) spread with s = 8 (close to a normal spread of σ ≈ 27°: ±3, 9, 15,
 // 22, 31, 47°), dealt out left and right of the wind so no two neighbours run within 10° of each other; the widest
@@ -39,6 +50,21 @@ const PHASES = [0.3, 2.1, 4.4, 1.2, 5.6, 3.3, 0.8, 2.7, 5.1, 1.9, 3.9, 0.1, 4.8,
 function jonswap(f: number, tp: number): number {
   const fp = 1 / tp, s = f <= fp ? 0.07 : 0.09, r = Math.exp(-((f - fp) ** 2) / (2 * s * s * fp * fp));
   return Math.pow(f, -5) * Math.exp(-1.25 * Math.pow(fp / f, 4)) * Math.pow(3.3, r);
+}
+
+/** The wavenumber (rad/m) of a wave of angular frequency w (rad/s) in water d m deep, by linear dispersion
+ * ω² = g·k·tanh(k·d): Newton's method from Eckart's approximation (1952, within about 5%), a few steps to a part in a
+ * million. Deep (d = Infinity, or more than half the deep-water wavelength): k = ω²/g. */
+export function waveNumber(w: number, d: number): number {
+  const k0 = w * w / G;
+  if (!(d < Infinity) || k0 * d > 20) return k0;
+  const h = Math.max(0.1, d);
+  let k = k0 / Math.sqrt(Math.tanh(k0 * h));
+  for (let i = 0; i < 8; i++) {
+    const t = Math.tanh(k * h), f = G * k * t - w * w, df = G * t + G * k * h * (1 - t * t), dk = f / df;
+    k -= dk; if (Math.abs(dk) < 1e-7 * k) break;
+  }
+  return k;
 }
 
 /** The wave time for the World's clock t (s): the waves' own clock, the race's plus a constant (so the pattern at the gun isn't its t = 0). */
@@ -60,6 +86,15 @@ function windSpectrum(tp: number): void {
   specTot = tot || 1; specTp = tp;
 }
 
+/** A wave's group speed (m/s) in water `h` deep (m; Infinity: deep), for its frequency w and wavenumber k there: n·ω/k,
+ * n = ½(1 + 2kh / sinh 2kh) (linear theory: the Shore Protection Manual, and any text). In deep water n is ½, the speed
+ * half the wave's own (to the bit as before the depth, where the depth is infinite: offshore and off the chart; at a
+ * course's 5-60 m the longest components feel it, by a few parts in 1e5 to a per cent); in the shallows it rises toward 1. Past kh ≈ 10 the term is under
+ * 1e-7 of n, and sinh would overflow past ~350: deep. */
+export function groupSpeedAt(w: number, k: number, h: number): number {
+  const kh = k * h, n = kh > 10 ? 0.5 : 0.5 * (1 + 2 * kh / Math.sinh(2 * kh));
+  return n * w / k;
+}
 /** How far (deg) the wind may go from the direction a pair was born for before the pair changes over: past a gust's
  * wobble and the minute's easing. AN ESTIMATE, the model's own. */
 const REAIM_OFF = 12;
@@ -129,8 +164,12 @@ export class WaveField {
   readonly stage = new Uint8Array(N_WIND / 2);
   readonly share = new Float64Array(N_WIND / 2).fill(NaN);
   readonly full = new Float64Array(N_WIND);
+  /** The water's depth the wavenumbers are for (m; Infinity: deep), easing toward depthTo, the reference place's (setDepth). */
+  depth = Infinity; depthTo = Infinity;
 
   constructor(swellTp = 12) {
+    // (each wind-sea component's frequency is that of its wavelength in deep water: in shallower water the same
+    // frequency is a shorter wave, setDepth)
     WIND_L.forEach((L, i) => { this.k[i] = 2 * Math.PI / L; this.w[i] = Math.sqrt(G * this.k[i]); this.phase[i] = PHASES[i]; });
     for (let i = N_WIND; i < N_WAVES; i++) { this.swell[i] = 1; this.phase[i] = PHASES[i]; }
     this.setSwellPeriod(swellTp, 0);
@@ -138,14 +177,19 @@ export class WaveField {
   }
 
   /** Set the swell's period (from the buoy record for the day). At wave time t each component's phase is carried over, so the surface doesn't jump where it is. */
-  setSwellPeriod(tp: number, t: number): void {
+  setSwellPeriod(tp: number, t: number, about: Vec = { x: 0, y: 0 }): void {
     const L = G * tp * tp / (2 * Math.PI);
     for (let j = 0; j < SWELL_F.length; j++) {
-      const i = N_WIND + j, w0 = this.w[i];
-      this.k[i] = 2 * Math.PI / (L * SWELL_F[j]); this.w[i] = Math.sqrt(G * this.k[i]);
-      if (w0 > 0) this.phase[i] = (this.phase[i] + (this.w[i] - w0) * t) % (2 * Math.PI);
+      const i = N_WIND + j, w0 = this.w[i], k0 = this.k[i];
+      this.w[i] = Math.sqrt(G * 2 * Math.PI / (L * SWELL_F[j])); this.k[i] = waveNumber(this.w[i], this.depth);
+      // (the surface held where you are, `about`: in time, and for the new wavenumber in place)
+      if (w0 > 0) this.phase[i] = (this.phase[i] + (this.w[i] - w0) * t + (k0 - this.k[i]) * (this.sd[i] * about.x + this.cd[i] * about.y)) % (2 * Math.PI);
     }
   }
+
+  /** The water's depth at the reference place (m, the chart's below MLLW and the tide's height; null off the chart:
+   * deep). The field eases to it (update), so a boat sailing on into shoaler water sees the waves shorten, not jump. */
+  setDepth(d: number | null): void { this.depthTo = d == null || Number.isNaN(d) ? Infinity : Math.max(0.3, d); } // (never under 0.3 m: a guard for the arithmetic, not a depth she sails in)
 
   /**
    * Ease the heights toward the sea `s` (the reference sea), the chop for the wind from `windFrom` (the course's mean
@@ -174,6 +218,35 @@ export class WaveField {
     if (Number.isNaN(this.swellDir)) this.swellDir = swellTravel;
     this.swellDir += clampTurn((((swellTravel - this.swellDir + 540) % 360) - 180) * Math.min(1, dt * 0.05), turnCap(this, N_WIND, N_WAVES) * dt);
     const ease = this.primed ? Math.min(1, dt * 0.5) : 1; this.primed = true;
+    // the depth: at once on the first update, then slowly: each component's wavenumber for it, and its phase taking up
+    // the change at `about`, as for a turn, so the surface there doesn't move. Away from `about` the change runs the
+    // pattern by at R·Δk/k a second, R from her: so no wavenumber changes by more than DLNK a second (at 1 km the
+    // water then runs by at 3 m/s at most, the far waves small to the eye; eased as the turn is it reached 21 m/s, the
+    // physics review). The World gives one depth for the field, the course's or the Central Bay's, and only the tide
+    // moves it (World.waveRef): this easing is for the first depth after a change of conditions, and for the tide.
+    // (deep water, Infinity, eases from 1000 m: there even a 20 s swell is within 1e-8 of its deep-water length)
+    const d0 = this.depth, dTo = Math.min(this.depthTo, 1e3), dFrom = Math.min(d0, 1e3);
+    let d = dTo;
+    if (ease < 1 && dFrom !== dTo) {
+      // (the most change of any wavenumber going to depth x; as far toward dTo as keeps it within DLNK·dt, by halving)
+      const most = (x: number) => { let m = 0; for (let i = 0; i < N_WAVES; i++) m = Math.max(m, Math.abs(Math.log(waveNumber(this.w[i], x) / this.k[i]))); return m; };
+      const may = DLNK * dt;
+      if (most(dTo) > may) {
+        let lo = Math.log(dFrom), hi = Math.log(dTo);
+        for (let n = 0; n < 16; n++) { const mid = (lo + hi) / 2; if (most(Math.exp(mid)) > may) hi = mid; else lo = mid; }
+        d = Math.exp(lo);
+      }
+    }
+    if (Math.abs(d - dTo) < 1e-4 * dTo) d = dTo;
+    if (d >= 1e3) d = Infinity;
+    if (d !== d0) {
+      this.depth = d;
+      for (let i = 0; i < N_WAVES; i++) {
+        const k1 = waveNumber(this.w[i], d);
+        this.phase[i] = (this.phase[i] + (this.k[i] - k1) * (this.sd[i] * about.x + this.cd[i] * about.y)) % (2 * Math.PI);
+        this.k[i] = k1;
+      }
+    }
     // (never quite flat: a reference sea in a lee would leave nothing for the rougher water elsewhere to scale up)
     const hsW = Math.max(0.05, s.hsW), hsS = Math.max(0.05, s.hsS);
     // wind sea: heights shaped by the spectrum, scaled so the sum has the right significant height
@@ -196,7 +269,7 @@ export class WaveField {
       if (this.stage[p] === 0 && Math.max(off(i), off(j)) > REAIM_OFF) this.stage[p] = 1; // (either of them: the second is born a stage after the first, for the wind as it was then)
       const st = this.stage[p], to = st === 1 ? 0 : st === 2 ? 1 : home;
       // (the pair's time: its shorter wave's, the quicker to answer, and never longer than the waves take to cross the fetch)
-      const step = dt / Math.min(lifeTime(this.k[i], this.w[i], windKt), Math.max(60, (s.fetch || 0) / (0.5 * this.w[j] / this.k[j])));
+      const step = dt / Math.min(lifeTime(this.k[i], this.w[i], windKt), Math.max(60, (s.fetch || 0) / groupSpeedAt(this.w[j], this.k[j], this.depth)));
       let x = this.share[p]; x += Math.max(-step, Math.min(step, to - x)); this.share[p] = x;
       this.amp[i] = Math.sqrt(e * x); this.amp[j] = Math.sqrt(e * (1 - x));
       // (flat: born again for the wind as it is now. Its phase stays: at no height there's no jump)
@@ -211,6 +284,13 @@ export class WaveField {
     for (let j = 0; j < SWELL_F.length; j++) {
       const i = N_WIND + j, target = (j === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
       this.amp[i] += (target - this.amp[i]) * ease; turn(i, this.swellDir + SWELL_SPREAD[j]); this.q[i] = 0.3;
+    }
+    // (in shoal water the same heights on shorter waves are steeper: the crests' sharpening, Σ Q·k·a, kept to what it is
+    // in deep water, so the sum doesn't loop (at 0.3 m of water it doubled, the physics review). The heights themselves
+    // limited by the depth are sea.ts's, ROADMAP)
+    if (this.depth < Infinity) {
+      let deep = 0, here = 0; for (let i = 0; i < N_WAVES; i++) { deep += this.q[i] * this.w[i] * this.w[i] / G * this.amp[i]; here += this.q[i] * this.k[i] * this.amp[i]; }
+      if (here > deep && here > 0) { const f = deep / here; for (let i = 0; i < N_WAVES; i++) this.q[i] *= f; }
     }
     this.refW += (hsW - this.refW) * ease; this.refS += (hsS - this.refS) * ease;
   }

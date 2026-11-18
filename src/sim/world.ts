@@ -17,7 +17,7 @@ import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
 import { bodyJob } from '../boat/crewWork';
 import { buildCourse, classifyLegs, type Course, type CourseFile, type CourseMark } from '../courses/course';
 import { CURRENTS, basinCalm, basinCalmIfBuilt, currentAt, prepareBasins, currentVector, windOnWater, type CurrentPreset } from '../environment/current';
-import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor } from '../environment/tide';
+import { CurrentField, nextSaturday, sfClock, sfLocalToUtcMin, stationsFor, tideHeightAt } from '../environment/tide';
 import { FLAT_SEA, SeaField, type SeaHere } from '../environment/sea';
 import { WaveField, waveTime } from '../environment/waveField';
 import { waveMotion } from '../boat/seaway';
@@ -59,8 +59,8 @@ const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toU
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
 import { helmPlan, nextCorner, type HelmPlan } from './helmPlan';
-import { landAt } from '../environment/sea';
-import { toLL } from '../geo/geo';
+import { chartDepth, landAt } from '../environment/sea';
+import { LL, toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
 import { RaceLog } from './debrief';
 
@@ -2350,9 +2350,28 @@ export class World {
    * pattern past everywhere but her, the owner's "rushing water" in v176). Worked out twice a second.
    */
   private waveRefSea: SeaHere | null = null;
+  /** The chart's depth for the waves (below MLLW, m; null: deep) and the place the tide's read at: worked out once. */
+  private waveChart: { p: Vec; d: number | null } | null = null;
   waveRef(): SeaHere {
     if (this.waveRefSea) return this.waveRefSea;
-    const mid = this.seaHere(this.C.center), s = this.freeSail || this.cruising ? this.user.sea ?? FLAT_SEA : mid;
+    const own = this.freeSail || this.cruising, mid = this.seaHere(this.C.center), s = own ? this.user.sea ?? FLAT_SEA : mid;
+    // (the waves' length for the water's depth: the chart's, NOAA's ENC depth areas at the middle of their band (a band
+    // 9–18 m deep reads 13.6 m: coarse, an estimate of the depth at any one place), and the tide's height above the
+    // chart's datum, MLLW, now (waveField.ts setDepth). Racing, the course's water: its line and marks, each by the swell
+    // there (the swell is the wave the depth lengthens or shortens, and the biggest where the course runs out toward the
+    // Gate). Cruising, the Central Bay's, the same way, over a kilometer's grid from the Gate to the Bay Bridge. Each
+    // worked out once, an estimate, one depth for the whole field: a depth that followed her boat changed every wave's
+    // length as she sailed, and the field, a sum of plane waves, ran past by the change times the distance from her,
+    // many times the waves' own speed 3 km off (tests/rushing.test.ts). Only the tide moves it, slowly. One depth a World
+    // for now: sailing on into the South Bay's or San Pablo Bay's shoal water she doesn't yet meet their shorter, steeper
+    // chop (ROADMAP: with the old sea dying and a new one growing, where the field can change without sweeping).
+    if (!this.waveChart) {
+      const pts = own ? Array.from({ length: 8 * 13 }, (_, n) => LL(37.79 + 0.01 * Math.floor(n / 13), -122.50 + 0.01 * (n % 13))).filter(q => !onLand(q)) : [this.C.center, ...this.C.marks.map(m => m.p)];
+      let sum = 0, wt = 0; for (const q of pts) { const dq = chartDepth(q); if (dq == null) continue; const k = this.seaHere(q).hsS + 0.05; sum += k * dq; wt += k; }
+      this.waveChart = { p: own ? LL(37.82, -122.43) : { ...this.C.center }, d: wt > 0 ? sum / wt : null };
+    }
+    const d = this.waveChart.d;
+    this.waves.setDepth(d == null ? null : d + tideHeightAt(this.waveChart.p, this.clockUtc * 60000));
     return this.waveRefSea = { ...s, fromS: mid.fromS, wake: undefined };
   }
 
@@ -2579,7 +2598,7 @@ export class World {
     this.weather = n.weather; this.windKind = n.windKind; this.windDay = n.windDay; this.seaBreeze = n.seaBreeze; this.realTime = n.realTime;
     this.cur = n.cur; this.cvec = n.cvec; this.tide = n.tide; this.flowsT = NaN; if (newTide) this.mouthS = { ...mouthState(), phase: this.mouthS.phase }; // (the piers' wakes, and with another tide the harbor mouths' water, from the new stream at once)
     this.sea = n.sea; this.sea.field = this.waves; this.seaNodes = undefined; this.sea.duration = this.seaDurationAt(this.clockUtc); // (a sea breeze's sea grown from the new day's wind)
-    this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t)); // (the new day's swell, the waves where they are carried on)
+    this.waves.setSwellPeriod(this.sea.swell?.tp ?? 12, waveTime(this.t), this.user); // (the new day's swell, the waves where she is carried on)
     // (and the new wind's sea runs its way at once: left to change over wave by wave after a change of conditions the
     // chop would run askew of the wind for an hour, and the swell, whose turn is capped, far longer: waveField.ts)
     this.waves.windDir = this.waves.swellDir = NaN;

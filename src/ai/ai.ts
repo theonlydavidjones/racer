@@ -221,11 +221,23 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
     // (the way starts where she was when it was asked: she lay to, a few meters off it, the while)
     ai.home = { route: r.value, i: 0, at: job.stand, lying: false };
   }
-  const h = ai.home, toLee = (p: Vec, d: number) => { const u = V(from + 180); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; };
-  // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
+  // (land to leeward: straight downwind, and along her set and drift, the way she goes over the ground less her own way
+  // through the water: her leeway and the current, what she'll drift on once stopped. Lying to in a 26 kt westerly she
+  // sagged off some 25° from dead to leeward, onto a shore the downwind look missed, and lay against it: abandon-home's
+  // westerly, seed 7, on rules-incident. Not her velocity over the ground whole: still sailing as she came within 60 m of
+  // her spot, that looked along her heading and found the shore 110-125 m ahead, and she went from lying to to sailing and
+  // back seven times in 12 s: the physics review)
+  const hu = V(b.h), way = b.v - (b.astern ?? 0), sx = b.vx - hu.x * way, sy = b.vy - hu.y * way;
+  const drift = hypot(sx, sy) > 0.05 ? brg(sx, sy) : null;
+  const h = ai.home, toLee = (p: Vec, d: number) => [from + 180, drift].some(a => { if (a == null) return false; const u = V(a); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; });
+  // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward or
+  // along her drift (toLee)
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
-  if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
-  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300)) { h.lying = true; h.tack = b.tack; }
+  // (and not with land, a pier or a breakwater within LIE_OFF m of her, whichever way: drifting beam-on, her length sweeps a
+  // swath no single line from her middle covers, and Red drifted down to within 12 m of a jetty's end that lay off both,
+  // still lying to, then bore away onto it to get way on. Settling only with LIE_OFF + 20 m clear all round)
+  if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150) || !clearRound(b, LIE_OFF))) h.lying = false;
+  else if (!h.lying && dist(b, h.at) < 60 && !toLee(b, 300) && clearRound(b, LIE_OFF + 20)) { h.lying = true; h.tack = b.tack; }
   if (h.lying) {
     // (another boat lying to, or stopped, within a couple of lengths: they'd drift down together side by side, stopped,
     // for as long as they lay there. The one further from her own spot sails off clear before lying to again)
@@ -261,6 +273,9 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
   }
   return { desired, luff: false, beating };
 }
+/** Lying to, the least room (m) she keeps from land, a pier or a breakwater, any way: about five lengths, an ESTIMATE (time
+ * to get way on and sail clear, in a breeze that has her sagging off at 0.4 m/s: a minute and a half). */
+const LIE_OFF = 40;
 /** No land, pier, dock or breakwater within r m of p, looking out eight ways (anyShoreDist doesn't see what's built). */
 function clearRound(p: Vec, r: number): boolean {
   for (let a = 0; a < 360; a += 45) { const u = V(a); if (landAlong(p, { x: p.x + u.x * r, y: p.y + u.y * r }) < Infinity) return false; }
@@ -268,7 +283,7 @@ function clearRound(p: Vec, r: number): boolean {
 }
 /**
  * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
- * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, has the land 150 m to leeward or along her drift, or land, a pier or a breakwater within LIE_OFF); the nearest
  * such, a little upwind of it the better (on a lee shore, well out): the fleet's spot; each boat her own place 80 m apart along the wind's line
  * across, so the fleet isn't all on one point. All the fleet's places (non-user boats, in order).
  */

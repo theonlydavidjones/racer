@@ -71,7 +71,8 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
   // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
   // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried.
   // An estimate: docs/CONSTANTS.md)
-  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity);
+  // (a front that has lost the way given up here, router.ts GIVE_UP, only when the stretches follow to try again)
+  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity, route.length > 2);
   if (direct.ok && (!rules.ok || direct.minutes <= rules.minutes)) return { ok: true, minutes: direct.minutes, track: direct.path, legs: [direct] };
   if (rules.ok && (!direct.ok || rules.minutes < direct.minutes)) return rules;
   if (route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };
