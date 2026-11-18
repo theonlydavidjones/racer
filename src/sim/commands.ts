@@ -125,7 +125,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
     case 'tiller': if (w.pilot.mode === 'off') w.pilot.onPin = false; // (your hand on the tiller: the ram lifted off its pin)
       u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
-    case 'lash': if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.at)); u.lashed = c.on ? u.tiller : null; return;
+    case 'lash': if (w.pilot.mode === 'off') w.pilot.onPin = false; // (a tiller the ram holds can't be lashed: it comes off first)
+      if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.at)); u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
     case 'lazyCar': takeLine(u, 'car'); moveLazyCar(u, c.fore, c.ins); return;
@@ -164,7 +165,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
       return;
     case 'castOff': return w.castOff();
     case 'pushOff': return w.pushOff();
-    case 'turn': return w.callTurn();
+    case 'turn': if (w.pilot.mode === 'off') w.pilot.onPin = false; return w.callTurn(); // (putting her about yourself: your hand on the tiller, the ram lifted off)
     case 'lines': return w.linesReady();
     case 'letGo': return w.letGoLines();
     case 'hail': w.userHail(); return;

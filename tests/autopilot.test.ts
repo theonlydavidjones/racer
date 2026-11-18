@@ -61,6 +61,19 @@ describe('the tiller pilot', () => {
     // your hand on the tiller lifts it off as well
     engage(u, w.pilot, 'auto'); run(w, 1); standby(w.pilot);
     applyCommand(w, { k: 'tiller', v: -0.2 }); expect(w.pilot.onPin).toBe(false); run(w, 1); expect(u.tiller).toBe(-0.2);
+    // and so do putting her about yourself, a lashing, and a jump to somewhere else (the physics review, 18 Nov)
+    for (const lift of [() => applyCommand(w, { k: 'turn' }), () => applyCommand(w, { k: 'lash', on: true, at: 0 }), () => w.moveHere(place('alcatraz')!.p, 'Alcatraz')]) {
+      applyCommand(w, { k: 'lash', on: false }); u.v = 2.5; engage(u, w.pilot, 'auto'); run(w, 1); standby(w.pilot); expect(w.pilot.onPin).toBe(true);
+      lift(); expect(w.pilot.onPin).toBe(false);
+    }
+  });
+
+  it('a tack you call yourself on standby goes about: your hand lifts the ram off the pin', () => {
+    const w = new World(COURSES[0], S({ windKt: 14, sea: 'flat' }), 7, { freeSail: true }), u = w.user;
+    applyCommand(w, { k: 'running', on: true }); u.h = n360(w.wind.from + 42); u.v = 3; engage(u, w.pilot, 'auto'); run(w, 20);
+    standby(w.pilot); const before = u.tack;
+    applyCommand(w, { k: 'turn' }); run(w, 15);
+    expect(u.tack).not.toBe(before);
   });
 
   // The bug (Crew Habits, 18 Nov 2026): Wind, close-hauled in 22 kt, a seaway, off Alcatraz, seed 3: Tack pressed with her

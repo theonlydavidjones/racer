@@ -57,7 +57,7 @@ import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
-import { newPilot, pilotStep, standbyNote, tack as pilotTackOrder, type Pilot } from '../boat/autopilot';
+import { liftOff, newPilot, pilotStep, ramHolds, standbyNote, tack as pilotTackOrder, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -1315,7 +1315,7 @@ export class World {
     if (this.user.paddle || this.steps % 30 === 0) this.paddleTick(dt); // (the crutch: a jam looked for twice a second, and the paddling while it's out; in a method of its own, entered only then: in World.step itself the two calls cost every step about 1%, perf-pair (Capacity))
     for (const b of this.boats) if (b.jumperTarget != null) stepJumpers(b, dt, b.ww.kt); // (the crew on the jumpers' turnbuckle)
     for (const b of this.boats) {
-      if (b.docked) { this.dockStep(b, dt); b.turnRate = 0; continue; }
+      if (b.docked) { if (b.isUser) this.pilot.onPin = false; this.dockStep(b, dt); b.turnRate = 0; continue; } // (made fast, the pilot's unshipped, as the lashing comes off)
       // wrecked (physics.ts wreck): held where she is, while you choose ashore, a tow or carrying on (the page)
       if (b.wrecked && !b.wrecked.carryOn) { b.v = 0; b.sway = 0; b.astern = 0; b.vx = 0; b.vy = 0; b.turnRate = 0; if (b.motor?.running) b.motor.running = false; if (b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); continue; } // (retired at once, however she was wrecked: by a ship too)
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
@@ -2544,7 +2544,7 @@ export class World {
     const u = this.user;
     u.x = p.x; u.y = p.y; u.v = 0; u.astern = 0; u.sway = 0; u.vx = 0; u.vy = 0; u.turnTarget = null;
     u.docked = undefined; u.handled = undefined; u.pushing = undefined;
-    if (this.pilot.mode !== 'off') this.pilot.mode = 'off'; // (stopped: a tiller pilot needs way on)
+    if (this.pilot.mode !== 'off' || this.pilot.onPin) liftOff(this.pilot); // (stopped, a fresh start: a tiller pilot needs way on, and it's off its pin)
     if (this.dest && this.arrivedT != null && markDist(u, this.dest) > 40) this.arrivedT = null; // (somewhere to sail to again)
     this.emit({ type: 'toast', msg: `Moved to ${name}. The cruise and its log carry on.`, ms: 3500 });
     return true;
@@ -2620,7 +2620,7 @@ export class World {
     const d = this.dest; if (!d) return null;
     const slip = d.key === 'slip' ? this.homeSlip : null, H = slip ? harborOf(slip.marina) : null;
     if (!slip || !H || !H.exits.length) return d.p;
-    const yours = (where: string) => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours.`, ms: 5000 }); } };
+    const yours = (where: string) => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours. ${ramHolds(this.pilot.ram)}`, ms: 6000 }); } };
     // (inside her harbor's water: handed over at once, sent home from there; or as she crosses into it on her way, where
     // its water runs out past the breakwater ends, as at Richmond)
     if (harborAt(b) === H) { yours(this.homeOut ? 'At the harbor mouth' : 'In the harbor'); this.homeOut = false; return null; }

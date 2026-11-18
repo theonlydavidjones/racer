@@ -407,7 +407,7 @@ function lash(at = tillerMeant()): void {
   const u = w.user;
   if (u.lashed != null || lashPending()) { unlash(); return; }
   if (u.pushing) return; // (being pushed off: her crew are fending, and the race takes the lashing straight off)
-  pilotOff('Pilot on standby.'); releaseTiller();
+  pilotGrab(); releaseTiller();
   // (lashed at the angle meant, sent with the command: not at whatever the tiller is when the command lands)
   tillerSent = at; lashPendingFrames = 30; send({ k: 'lash', on: true, at }); showLash();
   const t = at, lee = (u.tack === 'S') === (t < 0); // on starboard tack the leeward side is port
@@ -1255,7 +1255,7 @@ function runAction(a: Action): void {
     case 'lookInstrument': toggleInstrumentLook(); break;
     case 'flowView': openFlow(); break;
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
-    case 'centreTiller': pilotOff('Pilot on standby.'); unlash(); centreTiller(); break;
+    case 'centreTiller': pilotGrab(); unlash(); centreTiller(); break;
     case 'lashTiller': lash(); break;
     case 'autopilot': pilotButton(); break;
     case 'pole': togglePole(); break;

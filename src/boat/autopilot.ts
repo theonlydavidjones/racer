@@ -92,10 +92,12 @@ export function liftOff(p: Pilot): void { p.mode = 'off'; p.onPin = false; }
 
 /** The alarm's line when the pilot goes to standby on its own: what it couldn't do, and that the stopped ram still holds
  * the tiller (tiller angle as the rudder's: FULL_RUDDER per unit of b.tiller, + pushed to starboard). */
-export function standbyNote(why: string, tiller: number): string {
-  const deg = Math.round(Math.abs(tiller) * FULL_RUDDER);
-  const where = deg < 1 ? 'amidships' : `${deg}° to ${tiller > 0 ? 'starboard' : 'port'}`;
-  return `Pilot alarm: ${why}. On standby, the ram's still on the tiller pin, holding it ${where}: take the helm, or lift the pilot off.`;
+export function standbyNote(why: string, tiller: number): string { return `Pilot alarm: ${why}. ${ramHolds(tiller)}`; }
+
+/** On standby, where the stopped ram holds the tiller ("amidships" within 0.04, as the tiller guide says it, app.ts lashWhere). */
+export function ramHolds(tiller: number): string {
+  const where = Math.abs(tiller) < 0.04 ? 'amidships' : `${Math.round(Math.abs(tiller) * FULL_RUDDER)}° to ${tiller > 0 ? 'starboard' : 'port'}`;
+  return `On standby, the ram's still on the tiller pin, holding it ${where}: take the helm, or lift the pilot off.`;
 }
 
 /** Turn the set course by d degrees (+ to starboard), as the −10/−1/+1/+10 buttons do. */
@@ -110,13 +112,17 @@ export function adjust(b: Boat, p: Pilot, d: number): void {
  * Tack (or gybe): Auto turns 100° toward the wind; Wind puts the same apparent wind angle on the other side ("the
  * autopilot will then trim the heading to mirror the locked wind angle from the previous tack": Raymarine 81402 Rev 6,
  * "Using AutoTack in Wind Vane mode", p.50). The handbook gives AutoTack no speed check, so neither does this: ordered
- * too slow, she tacks anyway (and may stall head to wind). The return is a warning for you, or null: in Wind, below
- * physics.ts SLOW_TACK, the speed under which a Folkboat won't carry her way through a tack.
+ * too slow, she tacks anyway (and may stall head to wind). The return is a warning for you, or null: below
+ * physics.ts SLOW_TACK (the speed under which a Folkboat won't carry her way through a tack), when it takes her through the wind,
+ * in Auto or Wind.
  */
 export function tack(b: Boat, p: Pilot): string | null {
+  // (a tack, through the wind: from close-hauled or a close reach, Auto's 100° toward the wind, or Wind's mirrored angle)
+  const through = Math.abs(b.arel) < 90;
   if (p.mode === 'auto') p.course = n360(p.course + (b.arel >= 0 ? AUTO_TACK : -AUTO_TACK));
-  else if (p.mode === 'wind') { p.awa = -p.awa; if (b.v < SLOW_TACK && Math.abs(p.awa) < 90) return 'Too slow to tack: bear away for way first.'; }
-  return null;
+  else if (p.mode === 'wind') p.awa = -p.awa;
+  else return null;
+  return b.v < SLOW_TACK && through ? 'Too slow to tack: bear away for way first.' : null;
 }
 
 /**
