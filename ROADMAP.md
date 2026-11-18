@@ -262,7 +262,8 @@ sources. Each shipped item is added there when it's published.
    ~~**Now, first in the pass: the helm's travel and response**~~ (done, v206: #437, Crew Figures + Deep Physics; ai-helm,
    Skipper Model). Where it stands:
    - The after deck stops the tiller, the same both sides (the owner chose option (a)): HARD_OVER 46.5°, fitted to three
-     of the owner's photos (41–49°) and labeled as fitted. Drawn with an 8 cm pin and 6° rest, so the stop is 46.8°.
+     of the owner's photos (41–49°) and labeled as fitted. Drawn with a 12 cm pin and 4° rest (Deep Physics suggests
+     8 cm and 6°, a 46.8° stop; held by Crew Figures, not shipped).
    - The ensign staff is at the owner's spot on the starboard quarter, 0.46 m out and 2 in forward of the deck's aft
      edge, clear of the tiller. The aft cleat is on the centerline.
    - The rudder stalls at 40°. Her gyration is 0.25 → 0.19, so the turn answers in 0.36 s at 4.7 kt, not 0.6.
@@ -447,6 +448,13 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q3. **Now — bug: no Hoist tabs on a cruise started mid-water with the sails down** (owner, 18 November; bug; now; 1–2 h):
+   "while cruising, I started a cruise mid-water with sails down. I don't see hoist buttons. I should always see those if
+   sails are down." The tabs come from app.ts `hoistTab()` and are drawn by sailBand.ts (`.sb-hoist`, ~L553). It hides
+   them when `!w.running`, or when the rig says up and hoisted outside a basin. Check how a mid-water start with sails
+   down sets `rig` (mainUp/jibUp and the hoist fraction), and whether the band or its tabs are shown at all then. The rule:
+   a sail that's down always has its Hoist tab while she's on the water. Add a test: a mid-water cruise start with the
+   sails down shows Hoist main and Hoist jib.
 8q2. **The crew bring the boom back to the centerline when the main drops** (owner, 18 November; accuracy; later, "not
    urgent"; 1–2 h; Crew Model): "when the main drops, the crew should bring the boom back to centerline." 8q does this
    only in the slip. On the water, once the main is down, the crew sheet in and center the traveler as a called job, and
@@ -578,7 +586,7 @@ sources. Each shipped item is added there when it's published.
       exist, but the current's edge widths are estimates with no measured source. Size how sharp the edge is from real
       data (NOAA currents, observations at the Marina and Fort Mason), not invented numbers, and test that the heel, speed
       and set all change within a few boat lengths of the entrance, on a flood and on an ebb.
-   6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
+   6. ~~**"Fort Mason Center" lettering on the big pier**~~ (done, merged 15 Nov, batch44) (owner, 15 November; the shore; Boat Detail): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
    7. **The cove's edge: the harbor's buildings and trees** (Bay East, 15 November; physics; after the wind-shadow seams;
@@ -602,11 +610,11 @@ sources. Each shipped item is added there when it's published.
    - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
      gap between them is the bias;
    - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
-8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
+8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; later, Crew Figures; earlier Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
-   Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
+   later, Crew Figures with a physics check; earlier Boat Detail): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
    josephine-confirmed.md, "Open: the hull's bow profile"): the class construction plan (SSA / NFIA: profile, half-breadths,
    midsection), an older lines drawing, and a photo of a clinker Folkboat on its trailer; the stem a long, fine, nearly
@@ -840,7 +848,7 @@ sources. Each shipped item is added there when it's published.
      it lasts before a rest come from the paddler's fitness and the same fatigue model as hiking (crewPhys.ts), with a
      sourced sustainable-power curve for one person paddling; a tired paddler slows, rests and can be swapped.
    - ~~**The paddle tab as arrows**~~ (done: paddle-arrows) (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
-     clickable arrows like < PADDLE >"; Crew Controls): ‹ paddles on port, › on starboard (the side the crew kneels on,
+     clickable arrows like < PADDLE >"; UI & Copy): ‹ paddles on port, › on starboard (the side the crew kneels on,
      as you face forward); tap the lit one again to stop.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
@@ -1202,7 +1210,7 @@ sources. Each shipped item is added there when it's published.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
-   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Experience to design,
+   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Copy to design after the copy audit,
      to the owner before building): "there's a lot of really cool shit we've built, like wind-in-air and wind-over-sails,
      but it's hard to find these things. I think we need a 'more' (not that copy though) button on the game surface for
      all features that show up on the game surface itself." One button, an icon rather than the word "More", that opens a
@@ -1211,12 +1219,12 @@ sources. Each shipped item is added there when it's published.
      course and strategist or navigator, the cabin-top instrument, the paddle, the navigation lights, the hail, the
      views, all messages and the frame-time readout. The owner asked for this button; it should also absorb scattered
      on-screen toggles, so the surface ends up with fewer controls, not more. Ties in with the UI audit (#236).
-   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
+   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; Crew Figures from 18 Nov, with the tiller guide): "we took away the copy
      on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
      small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
      far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
      November the owner said "no tiller strip"; this is a needle, not the old strip).
-   - **Now — an audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
+   - **Now — an audit for that kind of noise everywhere** (UI & Copy from 18 Nov; earlier Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
      the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
@@ -1363,7 +1371,7 @@ is now "much better" (owner).
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
    - **Bug: in heavy weather the lantern swings up through the cabin top** (owner, 16 November, a screenshot; bug;
-     next, not urgent; 1–2 h; Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
+     later; 1–2 h; Crew Figures, after its tiller and crew queue; earlier Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
      The pendulum's angle is unbounded, so a big roll swings it up past the overhead and it shows above the deck. Stop
      its swing where the lantern meets the cabin top or the bulkhead (it knocks against it and falls back), so it never
      leaves the cabin; check at 25 kt on both tacks.
@@ -2015,16 +2023,16 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
   Owner's requests, 12 November (unranked; the owner will rank them):
-  1. Significantly more hull paint colors (Boat Detail).
-  2. Color options for the sail numbers and the F class letter (Boat Detail).
-  3. The interior and cockpit material, teak or fibreglass (Boat Detail).
+  1. Significantly more hull paint colors (later, Crew Figures; partly #354).
+  2. Color options for the sail numbers and the F class letter (later, Crew Figures).
+  3. The interior and cockpit material, teak or fiberglass (later, Crew Figures).
   4. The drawn rigging lines in the colors chosen for the control panel (the Boat page's line colors), so each line
      wears its control's color (Rigging, with the rigging rendering).
   5. A tactical compass on the cabin top, as Josephine's Tacktick-style unit at the mast foot
      (reference/photos/josephine-cabin-top-forward-port.png): usable in the game, readable from the cockpit camera,
      showing heading, and used tack to tack to read lifts and headers like the real one (Boat Detail for the unit,
      UI & Experience for its readout).
-  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (Boat Detail).
+  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (later, Crew Figures).
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)
