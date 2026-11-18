@@ -3,7 +3,8 @@
 // painted decks, every cabin top, clean and fouled.
 import { describe, expect, it } from 'vitest';
 import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, newBoat, type BoatSpec } from '../src/boat/spec';
-import { boatFacts } from '../src/ui/boatFacts';
+import { boatFacts, boatSummaryText, startHead } from '../src/ui/boatFacts';
+import { PLACES } from '../src/sim/places';
 
 const MIXED = '#3a4b5c';
 const paints = (list: [string, string][]) => [...list.map(x => x[1]), MIXED, list[0][1].toUpperCase()];
@@ -33,5 +34,22 @@ describe('the fleet page: no particular is blank', () => {
     const b = newBoat('Test');
     expect(boatFacts({ ...b, hull: { ...b.hull, lower: MIXED } }).find(r => r[0] === 'Bottom')![1]).toMatch(/^Custom, /);
     expect(boatFacts({ ...b, hull: { ...b.hull, lower: BOTTOM_COLORS[2][1].toUpperCase() } }).find(r => r[0] === 'Bottom')![1]).toMatch(new RegExp(`^${BOTTOM_COLORS[2][0]}, `));
+  });
+});
+
+describe('the setup page and the log: no blank parts either', () => {
+  it("the boat's one-line summary names her topsides for every paint", () => {
+    for (const b of boats()) { const t = boatSummaryText(b); expect(/^\s|\s\s|,\s*[,;.]|undefined/.test(t), t).toBe(false); }
+    const b = newBoat('Test');
+    expect(boatSummaryText({ ...b, hull: { ...b.hull, upper: MIXED } })).toMatch(/^Custom-painted fiberglass hull; /);
+  });
+  it('the log line at the start: a cruise has no trailing separator, from her slip or anywhere, with or without a destination', () => {
+    const froms = [...PLACES.map(p => p.name), 'her slip', undefined];
+    for (const from of froms) for (const dest of [undefined, 'Alcatraz']) for (const mode of ['sail', 'race', 'drill']) {
+      const t = startHead(mode, { from, dest, course: 'Cityfront' });
+      expect(/·\s*$|·\s*·|\s\s/.test(t), t).toBe(false);
+    }
+    expect(startHead('sail', { from: 'her slip', dest: 'Alcatraz', course: 'X' })).toBe('— Cruise · her slip to Alcatraz');
+    expect(startHead('race', { course: 'Cityfront' })).toBe('— Race · Cityfront');
   });
 });

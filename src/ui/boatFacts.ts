@@ -25,3 +25,18 @@ export function boatFacts(b: BoatSpec): [string, string][] {
     ['Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminum mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminum'} boom`]
   ];
 }
+
+/** The setup page's one line on the boat picked (app.ts boatSummary): her topsides, hull and condition. */
+export function boatSummaryText(b: BoatSpec): string {
+  const p = b.perf;
+  const cond = [p.cleanedWeeks ? `bottom ${p.cleanedWeeks} wk` : 'clean bottom', p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : 'used sails', p.mast === 'wood' ? 'wooden mast' : ''].filter(Boolean).join(', ');
+  const c = colorLabel(b.hull.upper, [...HULL_COLORS, BRIGHT_FINISH]);
+  return `${c === 'Custom' ? 'Custom-painted' : c} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull; ${cond}.`;
+}
+
+/** The log's line at the start of a session (app/setup.ts): what, from where to where, on which course; no blank parts. */
+export function startHead(mode: string, o: { from?: string; dest?: string; course?: string }): string {
+  const parts = mode === 'sail' ? ['Cruise', [o.from, o.dest && `to ${o.dest}`].filter(Boolean).join(' ')]
+    : [mode === 'drill' ? 'Start practice' : 'Race', o.course];
+  return `— ${parts.filter(Boolean).join(' · ')}`;
+}

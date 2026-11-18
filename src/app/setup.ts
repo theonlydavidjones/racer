@@ -12,6 +12,7 @@ import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
+import { startHead } from '../ui/boatFacts';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
 import { laidUp, type BoatSpec } from '../boat/spec';
@@ -525,7 +526,7 @@ function beginRaceNow(seed?: number): void {
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
-  logMessage(`— ${app.S.mode === 'sail' ? `Cruise · ${place(app.S.sailFrom)?.name ?? ''}${app.w.dest ? ' to ' + app.w.dest.name : ''}` : app.S.mode === 'drill' ? 'Start practice' : 'Race'} · ${app.S.mode === 'sail' ? '' : app.w.C.title}`);
+  logMessage(startHead(app.S.mode, { from: app.S.sailFrom === 'slip' ? 'her slip' : place(app.S.sailFrom)?.name, dest: app.w.dest?.name, course: app.w.C.title }));
   app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false });
   app.word('bFast', 'Speed 1×');
   horn(1.0);

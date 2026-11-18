@@ -10,7 +10,8 @@ import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { loadLog, type LogEntry } from './boat/logbook';
 import { harborAt, inBasin } from './geo/marina';
-import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
+import { sailNo, type BoatSpec } from './boat/spec';
+import { boatSummaryText } from './ui/boatFacts';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
@@ -1486,11 +1487,10 @@ function lookOnly(a: BoatSpec, b: BoatSpec): boolean {
   return strip(a) === strip(b);
 }
 function boatSummary(): void {
-  const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '', p = b.perf;
+  const b = S.boat;
   const pick = $('boatPick') as HTMLSelectElement;
   pick.innerHTML = S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${(x.name || 'Unnamed').replace(/</g, '&lt;')} · ${sailNo(x)}</option>`).join('');
-  const cond = [p.cleanedWeeks ? `bottom ${p.cleanedWeeks} wk` : 'clean bottom', p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : 'used sails', p.mast === 'wood' ? 'wooden mast' : ''].filter(Boolean).join(', ');
-  $('boatSum').textContent = `${colour} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull; ${cond}.`;
+  $('boatSum').textContent = boatSummaryText(b);
   morph($('boatTiles'), S.boats.map(x => { const [ctry, n] = splitNo(sailNo(x)); return tile(n, x.name || 'Unnamed', x.hull.upper, { country: ctry, on: x.id === b.id, data: { boat: x.id }, title: `${sailNo(x)} ${x.name || 'Unnamed'}${x.id === b.id ? `: ${$('boatSum').textContent}` : ''}` }); }).join(''));
   setup.setupHeads();
 }

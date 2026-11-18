@@ -6,7 +6,7 @@ import { CLUBS } from '../render/burgees';
 import { conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
 import { TUNE_DEFAULT, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
-import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
+import { dockName, harborOf, marinaName, MARINAS, slipById, slipsIn } from '../geo/marina';
 import { morph } from './morph';
 
 /**
@@ -304,9 +304,9 @@ export class BoatPanel {
       ].join(''))}
       ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change to see', true))], () =>
         LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual ropes</button>') : ''))}
-      ${grp('berth', 'Home berth', [kv('Marina', val(esc(b.marina ? MARINAS.find(m => m.id === b.marina)?.name ?? '' : 'None'))), ...(b.marina ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
+      ${grp('berth', 'Home berth', [kv('Marina', val(esc(marinaName(b.marina) || 'None'))), ...(b.marina ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
         kv('Marina', `<select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`),
-        b.marina ? kv(`Slip in ${esc(harborOf(b.marina)?.short ?? '')}`, `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
+        b.marina ? kv(harborOf(b.marina) ? `Slip in ${esc(harborOf(b.marina)!.short)}` : 'Slip', `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
       ].join(''))}
       ${grp('speed', 'Speed', [kv(`What she gives away`, val('Change to see', true))], () => '<div class="bpreport" id="bpReport"></div>')}
       </div>`);
