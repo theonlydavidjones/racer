@@ -41,7 +41,8 @@ const lint = (mark) => {
     if (t) {
       if (BAD.test(t)) add('token', e, t.match(BAD)[0]);
       if (NUM.test(t)) add('number', e, t.match(NUM)[0]);
-      if (/(^|\s)(Slip in|Berth|Home berth|Moored at|Leaving from|Heading to|To|From)\s*:?\s*$/.test(t) || /:\s*$/.test(t)) {
+      // (a label ends bare only when nothing follows it in its parent: "Start:" then the place in the next node is fine)
+      if ((/(^|\s)(Slip in|Berth|Home berth|Moored at|Leaving from|Heading to|To|From)\s*:?\s*$/.test(t) || /:\s*$/.test(t)) && (e.parentElement?.innerText || '').replace(/\s+/g, ' ').trim().length <= t.length + 1 && !e.nextElementSibling?.innerText?.trim()) {
         add('empty', e, `label ends bare: "${t.slice(-40)}"`);
       }
       // text outside its own box, or off screen
