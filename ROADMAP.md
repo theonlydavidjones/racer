@@ -191,6 +191,13 @@ sources. Each shipped item is added there when it's published.
 4. Each bug gets a test that reproduces it before it's fixed.
 5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
 6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
+   (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
+   data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
+   sessions where possible (Blender with Blosm, compressed glTF with levels of detail) to save tokens; (3) one
+   integration session to wire them in, checked against frame speed and the page's 16 MB size budget (about 6 MB used
+   today). It takes over the "Alcatraz, properly built out" item (6–10 h) and widens it. The plan, in four phases
+   (Alcatraz, then the city blocks, then the hero landmarks, then night windows): docs/plans/cityfront-alcatraz.md.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
@@ -458,6 +465,20 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q6. **Now — bug: the OpenStreetMap attribution isn't on screen** (the Coordinator, 18 November; legal, an ODbL
+   requirement; now, a sprint bug; 1 h; UI & Copy): wherever the page draws OSM-derived data (the chart, the shore, the
+   buildings), "© OpenStreetMap contributors" shows, on the chart and in the credits. One short line, in an existing
+   element, no new button.
+8q5. **Now — bug: on Nav, she steers the rhumb line, not the plotted course** (owner, 18 November; bug; now, a sprint
+   bug; 4–8 h; owner of the navigator and pilot): "when in autonav, the boat doesn't seem to be following the plotted
+   course. it just follows the rhum line to the destination. this is bad, especially if the plotted route is avoiding a
+   strong tide or wind shadows." The pilot steers for one point: world.ts `navTarget()` returns `dest.p` (or her
+   harbor's mouth), and `pilotStep` steers there with its own look ahead (boat/autopilot.ts), so the plan's legs
+   (navigator.ts, hud.ts `navRoute`) never reach the helm. The fix: the pilot's target is the plan's next leg point (the
+   one the route reaches by tide and shadow), advanced as she gets within a few boat lengths of it. A leg she can't
+   reach is the pilot's cue to re-plan, not to cut across. Keep it working with the way in (the hand-over at the mouth).
+   First a test that reproduces it: a route that bends round a foul-tide patch or a wind shadow, then the pilot's track
+   stays within a tolerance of the plotted legs (and fails on main).
 8q4. **Now — the backstay's chainplates where the tiller would hit them** (owner, 18 November, with a screenshot;
    accuracy; now; 1 h): "backstay attachments are too far forward. the tiller would run right into them. they should sit
    about one inch forward of the aft edge of the deck, about six inches from the tiller on either side." In
@@ -1260,6 +1281,11 @@ sources. Each shipped item is added there when it's published.
        masthead. Tall tick: North's 2.5."). The click and scroll use goes to Keys. The sources and the physics go into the
        code's comments, or into one "Why" link per control if the owner wants them kept. All the band's new lines go to
        the owner as one table before they replace the old ones. A test: no band tip over about 90 characters.
+       - The Jib car tip covers both settings (owner, 18 November, with a screenshot of "In medium air, the jib car sits in
+         the middle, for an even twist."): "jib car guidance should provide advice about both settings: fore/aft, and
+         athwartship." One line each, within the same limit: fore/aft sets the twist (aft eases the leech, forward
+         tightens it); athwartship sets the slot and the pointing angle (in to point, out to reach). The wording goes to
+         the owner in the tips table; its figures follow the car's real track and sheeting range in the sim.
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
