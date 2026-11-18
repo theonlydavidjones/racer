@@ -8,9 +8,8 @@ import type { Command } from '../sim/commands';
 import { CAR, carFree, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
-import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
+import { LINE_LABEL, LINE_NAME, type CtlKey } from './lines';
 import { DEFAULT_ROPES, lineRope, type BoatSpec, type LineColorKey, type Rope } from '../boat/spec';
-import { JUMPER_HALF_TURN_S } from '../boat/condition';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
 import { pointOfSailWord } from './pointOfSail';
@@ -170,6 +169,38 @@ const jcar = (side: Side) => {
   <span class="sb-h-grid">${holes}<span class="sb-xbar"></span><span class="sb-jcar"></span><span class="sb-jwant"></span><span class="sb-jideal"></span></span><span class="sb-tag"></span></div>`;
 };
 
+/**
+ * What each control does and why, one line (the owner, 18 Nov 2026: "no one will read this"; no brand names on screen).
+ * Their bases, for whoever changes a line: jumpers, the class tuning guide (tight: lower mast curves, top straight, so a
+ * closed upper leech; loose: the top bends open; loose in light air and strong winds, 2-3 turns in medium) and rigTune.ts
+ * JUMPER (-0.6 deg of twist a turn); the vang, the guide's "never use the kickingstrap upwind in less than 18 knots"
+ * (controls.ts guideLimits); the outhaul and Cunningham, the guide's 5 and 12 kt ranges; the rest, lines.ts LINE_ENDS and
+ * LINE_WHAT (the model's own effects). The jib car's in-out lead is left out: no Folkboat source says what it does in chop
+ * or flat water. The band's clicks and scrolls are in the Keys screen's "How to sail her".
+ */
+export const BAND_TIPS = {
+  jumpers: "More turns close the main's top leech: medium air. Loose in light air and a breeze.",
+  mainsheet: 'In for power and pointing; ease to spill a puff or reach.',
+  traveller: 'Up to windward in light air; down to leeward in a puff to spill power.',
+  backstay: 'On in a breeze: flatter main, less power, straighter jib luff.',
+  vang: 'On to hold the leech closed reaching and running; upwind only past 18 kt.',
+  outhaul: 'Eased for a fuller, powerful foot in light air; on to flatten in a breeze.',
+  cunningham: 'On as the wind builds, to keep the draft forward.',
+  downhaul: 'Set before the start: tight keeps the draft forward for a breeze.',
+  jibCunningham: "On as the wind builds, to hold the jib's draft forward.",
+  jibHalyard: "Set before the start: tight keeps the jib's draft forward for a breeze.",
+  jib: 'In to point; eased for speed and reaching.',
+  car: 'Forward closes the leech for power; aft opens it to depower.',
+  windex: 'Arrow: the apparent wind. Red wedge: too close, the sails luff.',
+  pole: 'Holds the jib out for wing-on-wing, past about 150° true.',
+  hoistMain: 'Hauls the main up; head to wind makes it easy.',
+  hoistJib: 'Hauls the jib up, or lets it run.',
+  paddle: 'Paddle on port or starboard; click again to stop.',
+  motor: 'Down, Start, then gear and throttle; tilt up to sail.',
+  autoTrim: 'The crew trims every line; touch one to take it.',
+  handBack: 'Your lines go back to the crew; the pole stays yours.'
+} as const;
+
 /** The jumpers (CR 7.40: adjustable above deck while racing), when her Rig tune says so: a small dial at each end of
  * the band, as her two jumpers are, one each side, set alike (the crew turns both). A turnbuckle's turns, 0 to 5 in half
  * turns, round the dial's arc: the tall tick North Sails' medium, the needle where they are, a dashed one where the crew
@@ -227,9 +258,9 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="Paddle with the boom crutch over port (&lt;) or starboard (&gt;); click it again to stop. Racing, only as rule 42.3 allows."><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="Her outboard: tilt it down into the water, pull-start it (in neutral), then the gear and the throttle. Tilt it up to sail."><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="${BAND_TIPS.hoistMain}"></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="${BAND_TIPS.hoistJib}"></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="${BAND_TIPS.paddle}"><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="${BAND_TIPS.motor}"><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
 <span class="sb-tillerslot"></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="${BAND_TIPS.pole}"></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
@@ -249,22 +280,12 @@ export class SailBand {
     el.addEventListener('pointerover', e => { this.helpOver = (e.target as HTMLElement).closest<HTMLElement>('[data-help]'); this.showHelp(); });
     el.addEventListener('pointerleave', () => { this.helpOver = null; this.showHelp(); });
     el.addEventListener('pointerdown', e => { const h = (e.target as HTMLElement).closest<HTMLElement>('[data-help]'); if (h) { this.helpLast = h; this.helpLastT = performance.now(); } }, true);
-    // what each control does: shown in the Coach card for the control under the mouse, or the one last touched (the
-    // owner: hover titles popped up over the controls you were reaching for)
-    el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => {
-      const k = d.dataset.line!;
-      d.dataset.help = k === 'jib' ? 'Jib sheet: ' + lineHelp('jibsheet') : k === 'car' ? 'Jib car: click a hole to move it. Forward is up, inboard toward the middle. ' + lineHelp('carFore') + ' ' + lineHelp('carIn').replace(/^The lazy car[^:]*: /, '')
-        : k === 'mainsheet' ? 'Mainsheet: the blue marker is where the boom is. Toward the middle trims, out to leeward eases. ' + lineHelp('mainsheet')
-        : `${LINE_LABEL[k as CtlKey]}: ${lineHelp(k as CtlKey)}`;
-      // (the rope's ticks: what each one is)
-      const r = ROPE_IN[k as keyof typeof ROPE_IN];
-      if (r) d.dataset.help += ` The faint ticks: about ${r.inches < 3 ? (Math.round(r.inches * 2) / 2).toFixed(1) : Math.round(r.inches)} in of rope from off to full on${r.even ? '' : ', marked evenly here though a bridle really pays out unevenly'} (${r.note}).`;
-      else if (k === 'jib') d.dataset.help += ' The faint ticks on the working sheet: every foot of sheet eased, by its lead (closer together toward hard in).';
-      else if (k === 'mainsheet') d.dataset.help += ' Under the track: where so many inches of sheet eased put the boom (four parts: the first few inches swing it furthest), and how much is out now.';
-    });
-    const jt = `Jumpers: turns on their turnbuckle, 0 to ${JMAX}. On (more turns) stiffens the top of the mast, so the main's head twists off less; off lets it bend and twist (about ±1.5° up top). North Sails' medium is ${TUNE_PRESETS.medium.jumperTurns} turns (the tall tick); Heikkilä Sailmaker's guide: loose in light air, tighter in medium, tighter again in a breeze if the mast bends past the main's luff round. The crew turns them a half turn at a time, about ${JUMPER_HALF_TURN_S} s each. Hand Back leaves them alone. Click the left half for a half turn off, the right half for a half turn on, or scroll.`;
+    // what each control does and why, one line each, in the Coach card for the control under the mouse or the one last
+    // touched (the owner: hover titles popped up over the controls you were reaching for; 18 Nov: "no one will read
+    // this", so BAND_TIPS holds one line of what to do and why; the clicks and scrolls are in Keys' "How to sail her")
+    el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { d.dataset.help = BAND_TIPS[d.dataset.line as keyof typeof BAND_TIPS]; });
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
-      d.dataset.help = jt; // (in the Coach card, as every control's help: no hover titles)
+      d.dataset.help = BAND_TIPS.jumpers; // (in the Coach card, as every control's help: no hover titles)
       d.addEventListener('wheel', e => { if (!this.ok()) return; e.preventDefault(); this.turnJumpers(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
     });
   }
@@ -549,7 +570,7 @@ export class SailBand {
     // her point of sail under the vane (the owner: the windex names it: Close-hauled, Beam reach, Broad reach, Run)
     const pos = pointOfSailWord(u); put(wx.querySelector('.sb-pos')!, pos);
     attr(wx, 'aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
-    { const help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`; if (wx.dataset.help !== help) wx.dataset.help = help; }
+    if (wx.dataset.help !== BAND_TIPS.windex) wx.dataset.help = BAND_TIPS.windex;
     // hoisting and dropping the sails at the mast: a tab for a sail that's down, on its way, or (in a harbor) to drop
     this.el.querySelectorAll<HTMLElement>('.sb-hoist').forEach(tab => {
       const txt = this.host.hoistTab(tab.dataset.sail as 'main' | 'jib');
@@ -560,7 +581,7 @@ export class SailBand {
     const all = this.el.querySelector<HTMLElement>('.sb-all')!, word = trimTab(u);
     if (all.textContent !== word) {
       all.textContent = word; all.classList.toggle('mine', word === 'Hand Back');
-      all.dataset.help = word === 'Hand Back' ? 'Hand Back: every line you hold (the amber ones) and both jib cars go back to the crew. The whisker pole stays your call.' : 'Auto-Trim: the crew trims every line. Work any line, or tap its name, and it\'s yours (its name turns amber).';
+      all.dataset.help = word === 'Hand Back' ? BAND_TIPS.handBack : BAND_TIPS.autoTrim;
     }
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;
