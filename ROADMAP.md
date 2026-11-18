@@ -363,6 +363,11 @@ sources. Each shipped item is added there when it's published.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **Known effect of the turn's sourced cost (Capacity's measurement, 18 Nov 2026):** the shore-distance lattice
+     (geo/shore.ts anyShoreDistNear) now moves a race about 1.3 times as much as a 0.1% change in the current does
+     (over 48 fixed seeds, 3.71% of the fleet's mean speed against 2.77%; about 1.0 before, 2.61% against 2.67%). The
+     lattice itself is unchanged and passes point by point; races fork more readily now that a hard turn costs twice a
+     gentle one. tests/approx holds it over 24 fixed seeds, inside its bound of 1.5 times and half a point.
    - **The turn's side force and the sails', together (Deep Physics; the physics review of turnBleed, 18 Nov 2026):** her
      keel carries both, so its induced drag goes as their sum squared; they're charged apart now (netDrive for the sails',
      turnBleed for the turn's). Luffing with her sails drawing costs more than charged, bearing away less, and through a
