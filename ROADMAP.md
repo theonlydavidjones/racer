@@ -191,6 +191,12 @@ sources. Each shipped item is added there when it's published.
 4. Each bug gets a test that reproduces it before it's fixed.
 5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
 6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
+   (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
+   data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
+   sessions where possible (Blender with Blosm, compressed glTF with levels of detail) to save tokens; (3) one
+   integration session to wire them in, checked against frame speed and the page's 16 MB size budget (about 6 MB used
+   today). It takes over the "Alcatraz, properly built out" item (6–10 h) and widens it.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
