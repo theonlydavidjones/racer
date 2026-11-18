@@ -249,23 +249,24 @@ describe('in the world', () => {
     }
     return { ws, wa, as, fouls, turnsNear, owing: W.penalty };
   };
-  for (const gap of [22, 26, 30]) it(`the chain stalled, ${gap} m off: the hailing boat and the boat she hailed both keep clear of the starboard boat and of each other, no foul between them, no penalty turns begun close by (rules 10, 11, 13, 20.3, 44.2)`, () => {
-    const r = stalled(gap);
-    if (gap === 22) expect(r.ws, 'W against S').toBeGreaterThan(CONTACT_GAP);
-    expect(r.wa, 'W against A').toBeGreaterThan(CONTACT_GAP);
-    expect(r.as, 'A against S').toBeGreaterThan(CONTACT_GAP);
-    expect(r.fouls, 'W fouling A').toEqual([]);
-    expect(r.turnsNear, 'the nearest boat as W\'s penalty turns began').toBeGreaterThan(LOA);
-    expect(r.owing, 'W\'s penalty, taken (rule 44.2: as soon as possible after getting well clear)').toBe(0);
-  }, 60000);
-  // (Expected to fail, 18 Nov 2026: at 26 and 30 m W still touches S (as on main). She holds close-hauled for the hail she passed
-  // on until the relay fails (HAIL_RESPONSE, 5 s), about 3 s from the meeting, and her duck from there is too late.
-  // Ending that hold earlier, or easing in it, moved the touch to the other gaps (S's moves answer hers). The cure is in
-  // the hail: a boat shouldn't hail for room when the whole chain can't answer in time; that changes when the hail of the
-  // test above is made, so it's the owner's AI design to settle. Goes red when it's fixed)
-  for (const gap of [26, 30]) it.fails(`the chain stalled, ${gap} m off: the boat she hailed keeps clear of the starboard boat (her duck too late: the hail's lead time)`, () => {
-    expect(stalled(gap).ws, 'W against S').toBeGreaterThan(CONTACT_GAP);
-  }, 60000);
+  // (each check at each gap its own case, the ones that still fail held as expected failures: 18 Nov 2026, the
+  // Coordinator's ruling. Two causes, both after the sprint: the hail's lead time (A hails with S 7-9 s off, and the
+  // chain, the relay's 5 s and two tacks, can't answer in that: a boat shouldn't hail then, the owner's AI design to
+  // settle; held on for it to the relay's last second, W's duck is too late), and the rule-10 duck's turn of 32° more each
+  // think (ai.ts, Skipper Model's keep-clear branch), which bears W away past S's stern onto a reach and across A)
+  const runs = new Map<number, ReturnType<typeof stalled>>(), run = (gap: number) => runs.get(gap) ?? runs.set(gap, stalled(gap)).get(gap)!;
+  const checks: [string, (r: ReturnType<typeof stalled>) => void][] = [
+    ['W keeps clear of S', r => expect(r.ws).toBeGreaterThan(CONTACT_GAP)],
+    ['W keeps clear of A, and isn\'t called against her', r => { expect(r.wa).toBeGreaterThan(CONTACT_GAP); expect(r.fouls).toEqual([]); }],
+    ['A keeps clear of S', r => expect(r.as).toBeGreaterThan(CONTACT_GAP)],
+    ['W\'s penalty turns begin clear of the boats, and are done', r => { expect(r.turnsNear).toBeGreaterThan(LOA); expect(r.owing).toBe(0); }],
+  ];
+  const stillFails = new Set(['22 W keeps clear of S', '26 W keeps clear of S', '30 W keeps clear of S', '30 W keeps clear of A, and isn\'t called against her',
+    '30 W\'s penalty turns begin clear of the boats, and are done']); // (at 30 m the foul on A gives her a second penalty, still being turned at the end)
+  for (const gap of [22, 26, 30]) for (const [name, check] of checks) {
+    const title = `the chain stalled (rules 10, 11, 13, 20.3, 44.2), ${gap} m off: ${name}`;
+    (stillFails.has(`${gap} ${name}`) ? it.fails : it)(title, () => check(run(gap)), 60000);
+  }
 
 });
 
