@@ -33,7 +33,7 @@ function watch(w: World, label: string, minutes: number, each?: (w: World) => vo
   const racing = !w.freeSail;
   while (w.t < end && !(racing && w.boats.slice(1).every(b => b.finished || b.retired))) {
     const s0 = performance.now();
-    try { each?.(w); w.step(DT); } catch (e) { err = String((e as Error)?.stack ?? e).slice(0, 1500); say('threw', null, err); break; }
+    try { each?.(w); w.step(DT); w.drainEvents(); } // (the page drains them each frame: sim/host.ts) catch (e) { err = String((e as Error)?.stack ?? e).slice(0, 1500); say('threw', null, err); break; }
     const ms = performance.now() - s0; if (steps > 600 && ms > worst) worst = ms;
     if (++steps % 30) continue;
     if (!Number.isFinite(w.t)) say('nonfinite', null, 'w.t');
