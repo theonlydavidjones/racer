@@ -895,19 +895,27 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
  * the cockpit's after end, the extension in the inboard hand and the mainsheet's tail in the other. */
 function helmPose(fig: Figure, x: number, z: number, lean: number, windward: number, tip: THREE.Vector3): PoseT {
   const k = fig.scale, s = Math.abs(x) > 0.05 ? Math.sign(x) : windward, u = uAtZ(z), e = halfBeam(u);
+  // (the tiller pushed far across the other way, the extension out: hiked right out, the hand can't reach its grip even
+  // slid along the deck toward it; a helm comes in off the rail to push it across. Drawn sat up as far as that needs:
+  // the physics' lean is theirs, this is only the pose)
+  if ((fig.extOut ?? 0) > 0) for (let ln = lean; ln >= 0; ln -= 0.1) {
+    const hxl = Math.min(e - 0.04 + 0.06 * ln, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * ln));
+    const shl = shoulderAt({ hip: V(s * hxl, deckY(u, hxl) + 0.09 * k, z), yaw: s * (0.55 + 0.5 * ln), pitch: 0.05 + 1.1 * ln, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
+    lean = Math.max(0, ln); if (tip.distanceTo(shl) - 0.7 <= EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.85) break;
+  }
   const hx = Math.min(e - 0.04 + 0.06 * lean, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * lean));
   const hip = V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw = s * (0.55 + 0.5 * lean), r = right(yaw);
   // (the tiller hard over away from them, to 75°: its end across the far quarter, out of reach of the extension and an
   // arm from where they sit. They slide aft and in along the after deck toward it, as a helm does, as far as they need
-  // and up to 0.35 m; their feet come aft with them)
+  // and up to 0.7 m, to the middle of the after deck at most, ESTIMATES; their feet come aft with them)
   let fz = COCK1 - 0.24;
   // (the reach is from the shoulder the hand hangs from, not the hip: sat out hiking, leant back, it's well aft and out
   // of the hip, and a hand reaching from it fell short of the grip of a stick only half the tiller's length)
   { const sh = shoulderAt({ hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
-    const far = Math.max(Math.hypot(tip.x - hip.x, tip.z - hip.z) - (EXT_LEN + 0.5 * k), tip.distanceTo(sh) - (EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.85));
+    const far = Math.max(Math.hypot(tip.x - hip.x, tip.z - hip.z) - (EXT_LEN + 0.5 * k), tip.distanceTo(sh) - (EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.75));
     if (far > 0) {
-      const dx = tip.x - hip.x, dz = tip.z - hip.z, n = Math.hypot(dx, dz) || 1, go = Math.min(0.35, far);
-      const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nx = s * Math.max(0.25, s * (hip.x + go * dx / n)), nu = uAtZ(nz);
+      const dx = tip.x - hip.x, dz = tip.z - hip.z, n = Math.hypot(dx, dz) || 1, go = Math.min(0.7, far);
+      const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nx = s * Math.max(0.08, s * (hip.x + go * dx / n)), nu = uAtZ(nz);
       fz = Math.min(COCK1 - 0.12, fz + (nz - hip.z));
       hip.set(nx, Math.max(deckY(nu, Math.min(Math.abs(nx), halfBeam(nu))), ground(nx, nz)) + 0.09 * k, nz);
     } }
@@ -926,6 +934,8 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
   if (tip.clone().addScaledVector(out, EXT_LEN).distanceTo(chest) > 0.62 * k) { out = chest.clone().sub(tip).normalize(); reaching = true; } // (reaching for it)
   fig.onTiller = eo < 0.02;
   let ext = fig.onTiller ? tip.clone().addScaledVector(along, 0.1) : tip.clone().addScaledVector(slerpDir(along, out, eo), Math.min(EXT_GRIP, eo >= 1 && reaching ? Math.max(0.2, tip.distanceTo(chest) - 0.28 * k) : EXT_GRIP));
+  // (the hand on the tiller: the fist round it there, the wrist's target back by the fist's offset as drawn)
+  if (fig.onTiller && fig.cur) { const iT = s > 0 ? 0 : 1; ext.sub(fistAt(fig, iT).sub(wristAt(fig, iT))); }
   if (!fig.onTiller) {
     // the grip within the arm's reach of its shoulder: swung toward the shoulder on its joint where it would be out of
     // reach (the fist fell short of a stick of its own length), then the wrist's target a fist's length back from the
@@ -1657,7 +1667,10 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   { const ang = cr.tillerRoot ? Math.atan2(Math.abs(t.x - cr.tillerRoot.x), Math.max(1e-3, cr.tillerRoot.z - t.z)) * 180 / Math.PI : 0;
     // (but the tiller's end come round close by them, hard over their way, they take the tiller itself)
     const close = !!h.cur && t.distanceTo(h.cur.hip) < EXT_CLOSE;
-    const want = (hp?.lean ?? 0) > EXT_HIKE || (ang > EXT_TILLER && !close) || !!h.going;
+    // (and out whenever the tiller's end is beyond the hand's reach from its shoulder: the tiller pushed across toward
+    // the far side short of EXT_TILLER, its end out of reach, the hand reached for it in the air)
+    const iE = cr.helmSide > 0 ? 0 : 1, beyond = !!h.cur && t.distanceTo(shoulderDrawn(h, iE)) > (BONE.upper + BONE.fore) * h.scale * 0.95;
+    const want = (hp?.lean ?? 0) > EXT_HIKE || ((ang > EXT_TILLER && !close) || beyond) || !!h.going; // (close by but out of the hand's reach, behind them: the extension)
     h.stowT = want ? 0 : (h.stowT ?? EXT_STOW) + dt; // (how long it's been wanted stowed, s)
     const goOut = want || (h.stowT < EXT_STOW && (h.extOut ?? 0) > 0);
     h.extOut = Math.max(0, Math.min(1, (h.extOut ?? 0) + (goOut ? 1 : -1) * dt / EXT_SWING)); }
