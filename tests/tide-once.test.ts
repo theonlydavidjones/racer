@@ -23,12 +23,15 @@ describe('the tide predicted once at load', () => {
     // windows that cover() keeps (a long one), and the edges of "certainly": the old way's result either way
     const g = gun, now = g - 5;
     for (const to of [g + 495 - 12, g + 495 - 6, g + 495, g + 495 + 6, g + 900]) same(old(now, now - 30, to), CurrentField.covering(now, now - 30, to));
+    // off the 6-minute grid, where the field's span and the window's edges part (the review: fractional from, off-grid to)
+    for (const [n, fr, to] of [[g - 5.9, g, g + 495 - 6 + 0.5], [g + 0.3, g + 6.1, g + 600], [g - 2, g - 2.5, g + 489.7], [g + 1.7, g - 30.25, g + 493.2]])
+      same(old(n, fr, to), CurrentField.covering(n, fr, to));
   }, 120_000);
 
   it('a World reads the same tide as before, race and cruise, real current', () => {
-    for (const o of [{ mode: 'race' }, { mode: 'sail', sailFrom: 'cityfront', sailTo: '' }, { mode: 'drill' }] as Partial<Settings>[]) for (const tideDate of ['2026-11-14', '2026-11-25']) {
+    for (const o of [{ mode: 'race' }, { mode: 'sail', sailFrom: 'cityfront', sailTo: '' }, { mode: 'drill' }, { mode: 'race', startAt: 8000 }] as (Partial<Settings> & { startAt?: number })[]) for (const tideDate of ['2026-11-14', '2026-11-25']) {
       const S = { ...DEFAULT_SETTINGS, ...o, current: 'real', tideDate } as Settings;
-      const w = new World(COURSES[0], S, 3, { freeSail: S.mode === 'sail' });
+      const w = new World(COURSES[0], S, 3, { freeSail: S.mode === 'sail', ...(o.startAt ? { startAt: o.startAt } : {}) });
       const wt = (w as unknown as { tide: CurrentField; gunUtc: number; startAt: number; clockUtc: number });
       same(old(wt.clockUtc, wt.gunUtc - wt.startAt / 60 - 30, wt.gunUtc + 360), wt.tide);
     }

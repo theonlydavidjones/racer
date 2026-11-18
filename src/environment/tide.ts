@@ -353,11 +353,14 @@ export class CurrentField {
    * set thrown away (Capacity's profile, 18 Nov 2026: ~20 ms on the page and again in the worker). When cover would
    * certainly predict afresh, the stations are predicted once over cover's own window: the same call cover makes, so the
    * same series to the bit. ("Certainly": some harmonic station's predictions end within one STEP after `to` and start
-   * within one STEP before `from`, so the field's span lies inside [from − STEP, to + STEP].)
+   * within one STEP before `from`, so the field's span lies inside [from − STEP, to + STEP]. That needs a harmonic station
+   * in the field, as there always is: the Gate's and the Bay's are; with subordinates alone it would not hold, so then
+   * the old way.) It ends with cover(now), as the World's load did: a no-op when predicted afresh, else what cover does.
    */
   static covering(now: number, from: number, to: number): CurrentField {
-    const fresh = now < from - STEP || now + COVER_AHEAD > to + STEP;
-    return new CurrentField(fresh ? stationsFor(now - COVER_BACK, now + COVER_ON) : stationsFor(from, to));
+    const fresh = DEFS.some(d => d.kind === 'harmonic' && !d.refOnly && !d.flowOnly) && (now < from - STEP || now + COVER_AHEAD > to + STEP);
+    const f = new CurrentField(fresh ? stationsFor(now - COVER_BACK, now + COVER_ON) : stationsFor(from, to));
+    f.cover(now); return f;
   }
   /** Station i's current (m/s) at the field's time. */
   stationVec(i: number): Vec {
