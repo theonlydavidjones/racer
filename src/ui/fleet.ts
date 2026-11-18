@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
+import { countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
 import { burgeeCanvas } from '../render/burgees';
 import { clubFullName } from '../club/clubs';
 import { ENSIGNS, flagArtCanvas } from '../render/flagArt';
@@ -9,6 +9,7 @@ import { logFor, record, type LogEntry } from '../boat/logbook';
 import { YOU, newMember, type Member } from '../club/members';
 import { applyMemberInput, askSaveHtml, memberPage, membersGrid } from './members';
 import { morph } from './morph';
+import { boatFacts } from './boatFacts';
 
 /**
  * The Fleet: your boats, as a grid of cards (her profile, name and number) or a table of her particulars (name,
@@ -249,8 +250,6 @@ export class Fleet {
     const b = this.cur!, log = logFor(b.id), rec = record(log), races = log.filter(e => e.kind === 'race');
     const slip = slipById(b.slip);
     const row = (k: string, v: string) => `<tr><td>${k}</td><td>${v}</td></tr>`;
-    const colour = (list: [string, string][], c: string) => list.find(x => x[1] === c)?.[0] ?? '';
-    const p = b.perf, ages = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
     morph(this.page, `
       <div class="bphead"><button type="button" class="linkbtn" data-f="toList">${esc(this.hooks.backLabel())}</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
       <div class="garage">
@@ -268,14 +267,7 @@ export class Fleet {
         ${row('Slip', slip ? `${slip.label.replace(/^Slip /, '')} (${dockName(slip.dock)}, ${harborOf(slip.marina)?.short ?? ''})` : 'None')}
       </table></section>
       <section><h3>The boat</h3><table class="ftab">
-        ${row('Hull', b.hull.material === 'wood' ? 'Wood' : 'Fiberglass')}
-        ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
-        ${row('Bottom', `${colour(BOTTOM_COLORS, b.hull.lower)}, ${p.cleanedWeeks ? `cleaned ${p.cleanedWeeks} wk ago` : 'just cleaned'}`)}
-        ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
-        ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
-        ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}
-        ${row('Sails', `${b.sails.color === 'black' ? 'Black' : 'White'}; main ${ages[p.mainAge]}, jib ${ages[p.jibAge]}`)}
-        ${row('Spars', `${p.mast === 'wood' ? `Spruce mast (${p.mastStiffness})` : 'Aluminum mast'}, ${p.boom === 'wood' ? 'spruce' : 'aluminum'} boom`)}
+        ${boatFacts(b).map(([k, v]) => row(k, esc(v))).join('')}
       </table></section>
       <section><h3>Race record</h3>
         ${rec.races ? `<p class="frec"><b>${rec.races}</b> race${rec.races === 1 ? '' : 's'} · <b>${rec.wins}</b> win${rec.wins === 1 ? '' : 's'} · <b>${rec.podiums}</b> in the top three${rec.avg != null ? ` · average place <b>${rec.avg.toFixed(1)}</b>` : ''}</p>
