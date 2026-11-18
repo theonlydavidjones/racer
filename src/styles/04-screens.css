@@ -123,16 +123,6 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .modecard span{font-size:13px;line-height:1.45;color:var(--muted)}
 .modecard:hover,.modecard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
 .modecard.soon b{color:var(--muted)}
-/* the start page while the app loads (src/app/firstRun.ts): the cards dimmed and not taking clicks, a thin bar running
-   under the title; it keeps its place once loaded, so the cards don't jump */
-#home:not([aria-busy="true"]) .modecard,#home:not([aria-busy="true"]) #bKeys0{transition:opacity .25s}
-#home[aria-busy="true"] .modecard,#home[aria-busy="true"] #bKeys0{opacity:.4;pointer-events:none;cursor:progress}
-.homeload{position:relative;height:2px;margin:2px 0 12px;overflow:hidden;border-radius:1px;background:var(--rule)}
-.homeload i{position:absolute;inset:0 auto 0 0;width:30%;background:var(--accent);animation:homeload 1.3s ease-in-out infinite}
-#home:not([aria-busy="true"]) .homeload{visibility:hidden}
-#home:not([aria-busy="true"]) .homeload i{animation:none}
-@keyframes homeload{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
-@media (prefers-reduced-motion:reduce){.homeload i{animation:none;width:100%;opacity:.5}}
 .panel .linkbtn.back{align-self:flex-start;background:none;border:0;padding:0;color:var(--accent);font:600 13px/1 var(--f-inst);letter-spacing:.04em;cursor:pointer}
 /* the conditions adjuster */
 .adjust{display:flex;flex-direction:column;gap:10px}
