@@ -129,7 +129,7 @@ const closeAll = async p => {
   for (const mode of ['race', 'cruise']) for (const kt of [8, 25]) for (const tod of ['day', 'night']) {
     const sc = `${mode}-${kt}kt-${tod}`; if (only && !sc.includes(only)) continue;
     console.log(sc);
-    const p = await b.newPage({ viewport: { width: VW, height: VH } }); p.on('pageerror', e => errs.push(`${sc}: ${e.message}`));
+    const p = await b.newPage({ viewport: { width: VW, height: VH } }); p.on('pageerror', e => errs.push(`${sc}: ${e.message}`)); p.on('framenavigated', f => { if (f === p.mainFrame() && !f.url().startsWith(URL.split('?')[0] + '?inproc') && !f.url().endsWith(':5173/?inproc')) console.log('  NAVIGATED', f.url()); });
     // wind speed is settings.windKt (the conditions screen's Wind speed slider); the day is tideDate + the gun's/leaving time tideTime (sunset ~17:00 in November)
     const S = { mode: mode === 'race' ? 'race' : 'sail', seq: 1, windKt: kt, windKind: 'west', tideDate: '2026-11-21', tideTime: tod === 'day' ? '13:00' : '22:00', ...(mode === 'cruise' ? { sailFrom: 'crissy', sailTo: 'pier39' } : {}) };
     await p.addInitScript(s => { if (sessionStorage.getItem('__swept')) return; sessionStorage.setItem('__swept', '1'); const o = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(o, s); localStorage.setItem('fbsim-settings-v2', JSON.stringify(o)); }, S);
@@ -147,16 +147,22 @@ const closeAll = async p => {
         await p.evaluate(id => { const e = document.querySelector(`#setup .srow[data-row="${id}"] .srow-head`) || document.querySelector(`#${id} .srow-head`); e?.click(); }, r);
         await p.waitForTimeout(700); await sweep(p, sc, `setup-row:${r}`);
         if (r === 'boat' && await shown(p, '#bBoat')) {
-          await click(p, '#bBoat'); await p.waitForTimeout(1500); await sweep(p, sc, 'boat-panel');
-          const names = await p.evaluate(() => [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].filter(e => e.offsetParent && !/delete|remove|discard|sell|scrap|done|close|back/i.test(e.innerText + e.title + (e.getAttribute('aria-label') || ''))).map(e => (e.innerText || e.title || e.getAttribute('aria-label') || '').trim().slice(0, 40)));
-          const seen = new Set();
-          for (const nm of names.slice(0, 40)) {
-            if (seen.has(nm)) continue; seen.add(nm);
-            const ok = await p.evaluate(t => { const e = [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].find(x => x.offsetParent && (x.innerText || x.title || x.getAttribute('aria-label') || '').trim().slice(0, 40) === t); if (!e) return false; e.click(); return true; }, nm);
-            if (ok) { await p.waitForTimeout(500); await sweep(p, sc, `boat-panel:${nm || 'icon'}`); }
-            if (!(await shown(p, '#boatPanel'))) break;
+          await click(p, '#bBoat'); await p.waitForTimeout(1500); await sweep(p, sc, 'yacht-club');
+          // the Yacht Club: each boat opened in its editor, every tab, the crew seats and the skipper (never New or Delete)
+          const fclick = (sel, i = 0) => p.evaluate(([q, n]) => { const e = [...document.querySelectorAll(q)].filter(x => x.offsetParent)[n]; if (!e) return false; e.click(); return true; }, [sel, i]);
+          const nBoats = await p.evaluate(() => [...document.querySelectorAll('#fleet [data-f="edit"], #fleet [data-f="view"]')].filter(x => x.offsetParent).length);
+          for (let bi = 0; bi < Math.min(nBoats, 2); bi++) {
+            if (!(await fclick('#fleet [data-f="edit"], #fleet [data-f="view"]', bi))) break;
+            await p.waitForTimeout(1500); await sweep(p, sc, `boat-editor:${bi}`);
+            const nTabs = await p.evaluate(() => [...document.querySelectorAll('#fleet [data-f="tab"]')].filter(x => x.offsetParent).length);
+            for (let ti = 0; ti < nTabs; ti++) {
+              const nm = await p.evaluate(n => { const e = [...document.querySelectorAll('#fleet [data-f="tab"]')].filter(x => x.offsetParent)[n]; e.click(); return (e.innerText || e.dataset.t || '').trim().slice(0, 20); }, ti);
+              await p.waitForTimeout(700); await sweep(p, sc, `boat-editor:${bi}:${nm}`);
+            }
+            for (const [q, nm] of [['#fleet [data-f="seat"]', 'seat'], ['#fleet [data-f="skipper"]', 'skipper'], ['#boatPanel button', 'boatpanel-btn']]) if (await fclick(q, 0)) { await p.waitForTimeout(700); await sweep(p, sc, `boat-editor:${bi}:${nm}`); }
+            await fclick('#fleet [data-f="back"]', 0); await p.waitForTimeout(700); // (back to the list; a "Save changes?" question would be answered by closeAll's Back below)
           }
-          await closeAll(p);
+          for (let i = 0; i < 4 && (await shown(p, '#fleet')); i++) { await p.evaluate(() => { const q = [...document.querySelectorAll('#fleet button')].filter(x => x.offsetParent); (q.find(x => /discard|don.t save|^no/i.test(x.innerText)) || q.find(x => x.dataset.f === 'back') || q.find(x => /^(done|close|back)/i.test(x.innerText.trim())))?.click(); }); await p.waitForTimeout(700); }
           if (!(await shown(p, '#setup'))) { unreached.push(`${sc}/setup: not back after the boat panel`); }
         }
       }
