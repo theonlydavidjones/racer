@@ -283,7 +283,7 @@ function clearRound(p: Vec, r: number): boolean {
 }
 /**
  * Where she stands off the harbour (h: its entrance): open water within 800 m of it, 100 m from any shore, pier or breakwater, reached from
- * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, or has the land 150 m to leeward); the nearest
+ * it straight, with no land for 500 m to leeward (she sails back once she's drifted 300 m, has the land 150 m to leeward or along her drift, or land, a pier or a breakwater within LIE_OFF); the nearest
  * such, a little upwind of it the better (on a lee shore, well out): the fleet's spot; each boat her own place 80 m apart along the wind's line
  * across, so the fleet isn't all on one point. All the fleet's places (non-user boats, in order).
  */
