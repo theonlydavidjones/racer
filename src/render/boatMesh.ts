@@ -1118,8 +1118,15 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
-/** The ensign staff (boat frame): its foot, its length, its rake aft and its truck. */
-export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, base = new THREE.Vector3(0.38, sheer(1) - 0.04, L / 2 + 0.03);
+/**
+ * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. In a socket on the after deck at the
+ * starboard quarter, close to the corner, as Josephine's (the owner's photo: reference/photos/
+ * josephine-helm-on-aft-deck-underway.jpg): 3 cm forward of the transom's top and 6 cm in from the rail. There it's out of
+ * the tiller's sweep, which passes inboard of it to hard over (about 7 cm between them at the least: tests/
+ * ensignstaff.test.ts). Further in, 8 cm forward of the transom as it was, the tiller swung through its foot; on the
+ * transom's face, as it then was, its foot was in the air (the owner, 18 Nov 2026).
+ */
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, x = 0.6, z = L / 2 - 0.03, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
   return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
@@ -1325,11 +1332,8 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), flagBlock(1), 0.25, rig); clubHoist(-1); }
   else clubHoist(1);
   if (b.ensign) {
-    // on an ensign staff in a bracket on the transom's face, to starboard (the backstay and the rudder head have its
-    // middle), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly). On the after deck, in a socket
-    // 8 cm forward of the transom, it stood in the tiller's sweep: put hard over to starboard, the tiller swings across
-    // the quarter at the deck's height, through the staff's foot. On the transom's face it's aft of all of it (about 10 cm clear
-    // at 75°)
+    // on an ensign staff in a socket on the after deck at the starboard quarter (ENSIGN_STAFF), raked aft; the flag about an
+    // inch of fly per foot of boat (a 24-inch fly)
     const ens = flagArtCanvas(b.ensign), { h: staffH, rake, base } = ENSIGN_STAFF;
     const staffG = new THREE.Group(); grp.add(staffG);
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, staffH, 6), MAT.wood);
