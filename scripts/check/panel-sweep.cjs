@@ -155,7 +155,7 @@ const closeAll = async p => {
           const fclick = (sel, i = 0) => p.evaluate(([q, n]) => { const e = [...document.querySelectorAll(q)].filter(x => x.offsetParent)[n]; if (!e) return false; e.click(); return true; }, [sel, i]);
           if (await fclick('#fleet [data-f="boat"]', 0)) {
             await p.waitForTimeout(2500); await sweep(p, sc, 'boat-page');
-            if (await shown(p, '#bShowCond')) { await click(p, '#bShowCond'); await p.waitForTimeout(1000); await sweep(p, sc, 'boat-page-conditions'); await closeAll(p); }
+            if (await shown(p, '#bShowCond')) { await click(p, '#bShowCond'); await p.waitForTimeout(1000); await sweep(p, sc, 'boat-page-conditions'); await click(p, '#bCondClose'); await p.waitForTimeout(500); }
             if (await fclick('#fleetBoat [data-f="edit"]', 0)) {
               await p.waitForTimeout(2500); await sweep(p, sc, 'boat-editor');
               const names = await p.evaluate(() => [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].filter(e => e.offsetParent && !/delete|remove|discard|sell|scrap|done|close|back|^new|reset/i.test(e.innerText + e.title + (e.getAttribute('aria-label') || ''))).map(e => (e.innerText || e.title || e.getAttribute('aria-label') || '').trim().slice(0, 40)));
@@ -201,6 +201,7 @@ const closeAll = async p => {
       // the inset map -> the chart, its Layers; N the navigator (cruise), M the course (race)
       const mr = await p.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
       await p.mouse.click(mr[0], mr[1]); await p.waitForTimeout(1800);
+      if (!(await shown(p, '#plan'))) { await click(p, '#map'); await p.waitForTimeout(1800); }
       if (await shown(p, '#plan')) {
         await sweep(p, sc, 'chart');
         if (await click(p, '#bChartLayers')) { await p.waitForTimeout(500); await sweep(p, sc, 'chart-layers'); await click(p, '#bChartLayers'); }
