@@ -78,6 +78,8 @@ npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
 node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
 node scripts/check/perf-pair.mjs --ai         # ~11 min: an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), the mean
+node scripts/check/fouls-pair.mjs            # ~25 min: an AI, rules or physics PR's gate for the AI's fouls: 60 races (seeds 1–30,
+                                              # 12 and 22 kt) on this tree and origin/main, paired by seed; fails at +0.5 a race, sign p < 0.05
 node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
                                               # this tree and the published one back to back; fails on a clear regression
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
