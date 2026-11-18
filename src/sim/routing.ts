@@ -80,7 +80,7 @@ function chopSpeed(kt: number, twa: number, hs: number, tp: number): number {
 /**
  * Seconds a tack or a gybe costs, by the true wind (kt): the distance made good the sim's own Folkboat loses in one
  * (boat/physics.ts, measured against a twin sailing on until she's back to speed: tests/manoeuvre.test.ts keeps this
- * table in step with it), over her VMG. A tack loses about 1 to 2.5 boat lengths (0.8-2.1 before 18 Nov 2026): most in light air, where she's slowest to get
+ * table in step with it), over her VMG. A tack loses 0.8-2.1 boat lengths (0.7-1.8 before 18 Nov 2026, worked from this table and her polar VMG): most in light air, where she's slowest to get
  * going again (keelboats generally lose 1-2: US Sailing, "Tacking Tips Part II – The Acceleration", a secondary figure;
  * none Folkboat-specific was found). A gybe is from her deep run angle, poled out wing-on-wing as a Folkboat runs (no
  * spinnaker): a small turn, and the crew gybes the pole end for end. Flat water: in the sim's own chop a tack costs more
