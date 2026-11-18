@@ -182,6 +182,23 @@ sources. Each shipped item is added there when it's published.
 
 ## Priorities (owner's ranking, November 2026)
 
+**The sprint: stability, performance, playability** (owner's ruling, 18 November 2026, via the Coordinator):
+1. In-flight work finishes and ships: what's already built or approved (the sail band's tips, the jumpers and the
+   Hoist tabs, Sail home and tie-up, the tiller-angle needle, Mile Rock and the rest of v208).
+2. After that, no new features until the sprint ends.
+3. The sprint's order: the owner's bugs first, then lag and frame time, then playability end to end (slip out,
+   hoist, sail, home, tie up, and a race).
+4. Each bug gets a test that reproduces it before it's fixed.
+5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
+6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
+   (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
+   data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
+   sessions where possible (Blender with Blosm, compressed glTF with levels of detail) to save tokens; (3) one
+   integration session to wire them in, checked against frame speed and the page's 16 MB size budget (about 6 MB used
+   today). It takes over the "Alcatraz, properly built out" item (6–10 h) and widens it. The plan, in four phases
+   (Alcatraz, then the city blocks, then the hero landmarks, then night windows): docs/plans/cityfront-alcatraz.md.
+
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
    shelves and fiddles, floorboards, knees, a hanging locker, the forepeak opening to the rule, the keel-stepped mast).
@@ -262,7 +279,8 @@ sources. Each shipped item is added there when it's published.
    ~~**Now, first in the pass: the helm's travel and response**~~ (done, v206: #437, Crew Figures + Deep Physics; ai-helm,
    Skipper Model). Where it stands:
    - The after deck stops the tiller, the same both sides (the owner chose option (a)): HARD_OVER 46.5°, fitted to three
-     of the owner's photos (41–49°) and labeled as fitted. Drawn with an 8 cm pin and 6° rest, so the stop is 46.8°.
+     of the owner's photos (41–49°) and labeled as fitted. Drawn with a 12 cm pin and 4° rest (Deep Physics suggests
+     8 cm and 6°, a 46.8° stop; held by Crew Figures, not shipped).
    - The ensign staff is at the owner's spot on the starboard quarter, 0.46 m out and 2 in forward of the deck's aft
      edge, clear of the tiller. The aft cleat is on the centerline.
    - The rudder stalls at 40°. Her gyration is 0.25 → 0.19, so the turn answers in 0.36 s at 4.7 kt, not 0.6.
@@ -272,11 +290,11 @@ sources. Each shipped item is added there when it's published.
    - Speed: the pair passed at 0.972. Changes to how boats sail or are judged are now budgeted on the ten-race mean (the
      owner, 18 Nov; Capacity's PR #465).
    - Optional, for the owner: measure hard-over at Josephine.
-   - Open: **turn drag** (Deep Physics, turn-drag). It replaces the uncited 0.15 with ORC VPP 6.37 induced drag and the
+   - Open, parked for the sprint: **turn drag** (Deep Physics, turn-drag). It replaces the uncited 0.15 with ORC VPP 6.37 induced drag and the
      blade's separation from 15° (NACA Report 938; the 15–40° ramp is an estimate), so a tack loses 0.8–2.1 lengths. The
      physics review is done; the full suite and the ten-race budget are left. A known limit: the keel's side forces are
      charged separately, not as their sum squared.
-   - Open: **the slow-boat AI** (Skipper Model). It centers the helm under 1 kt instead of hunting, then looks ahead to
+   - Open, parked for the sprint: **the slow-boat AI** (Skipper Model). It centers the helm under 1 kt instead of hunting, then looks ahead to
      keep clear by its speed (every fouler was under 2.7 m/s). Judged with fouls-pair (#461).
    - Open: weather helm against the AI's turn (not started), and the #460 rules contact fix (held from v208 for the
      duck test, with Rules).
@@ -447,6 +465,28 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q6. **Now — bug: the OpenStreetMap attribution isn't on screen** (the Coordinator, 18 November; legal, an ODbL
+   requirement; now, a sprint bug; 1 h; UI & Copy): wherever the page draws OSM-derived data (the chart, the shore, the
+   buildings), "© OpenStreetMap contributors" shows, on the chart and in the credits. One short line, in an existing
+   element, no new button.
+8q5. **Now — bug: on Nav, she steers the rhumb line, not the plotted course** (owner, 18 November; bug; now, a sprint
+   bug; 4–8 h; owner of the navigator and pilot): "when in autonav, the boat doesn't seem to be following the plotted
+   course. it just follows the rhum line to the destination. this is bad, especially if the plotted route is avoiding a
+   strong tide or wind shadows." The pilot steers for one point: world.ts `navTarget()` returns `dest.p` (or her
+   harbor's mouth), and `pilotStep` steers there with its own look ahead (boat/autopilot.ts), so the plan's legs
+   (navigator.ts, hud.ts `navRoute`) never reach the helm. The fix: the pilot's target is the plan's next leg point (the
+   one the route reaches by tide and shadow), advanced as she gets within a few boat lengths of it. A leg she can't
+   reach is the pilot's cue to re-plan, not to cut across. Keep it working with the way in (the hand-over at the mouth).
+   First a test that reproduces it: a route that bends round a foul-tide patch or a wind shadow, then the pilot's track
+   stays within a tolerance of the plotted legs (and fails on main).
+8q4. **Now — the backstay's chainplates where the tiller would hit them** (owner, 18 November, with a screenshot;
+   accuracy; now; 1 h): "backstay attachments are too far forward. the tiller would run right into them. they should sit
+   about one inch forward of the aft edge of the deck, about six inches from the tiller on either side." In
+   src/render/boatMesh.ts the plates are BS_CHAINPLATE_X = 0.3 m out, forward of the deck's edge. Move them to 2.5 cm
+   forward of the after deck's aft edge, and about 15 cm clear of the tiller each side (≈0.17 m out with its width).
+   The bridle's legs follow. The ensign staff's place was measured as "equidistant from the toe rail and the starboard
+   chain plate", so keep it at the owner's 0.46 m and check the two stay clear. Add a test that the tiller's swing,
+   hard over at 46.5°, stays clear of both plates. Check it from both quarters.
 8q3. **Now — bug: no Hoist tabs on a cruise started mid-water with the sails down** (owner, 18 November; bug; now; 1–2 h):
    "while cruising, I started a cruise mid-water with sails down. I don't see hoist buttons. I should always see those if
    sails are down." The tabs come from app.ts `hoistTab()` and are drawn by sailBand.ts (`.sb-hoist`, ~L553). It hides
@@ -1004,7 +1044,9 @@ sources. Each shipped item is added there when it's published.
      from Tools". Like wind in the air and the flow view: the current drawn on the water around her (its set and drift,
      from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
      move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
-     it and it can't bring back the rushing water.
+     it and it can't bring back the rushing water. Asked again 18 November (not urgent): "I'd like to toggle on and off a
+     view of the current directly on the water around me to help me understand the nuances of the bay and the ocean."
+     A feature, so after the sprint.
    - **A heel indicator at the top-center of the sail controls** (owner, 15 November; feature; next; 2–3 h; drawings first):
      "at top-center of the sail controls, I want a heel indicator. show me drawings before building anything." Then:
      "need to see it in situ with the sail panel." Three options shown in place on the real band:
@@ -1241,6 +1283,16 @@ sources. Each shipped item is added there when it's published.
        masthead. Tall tick: North's 2.5."). The click and scroll use goes to Keys. The sources and the physics go into the
        code's comments, or into one "Why" link per control if the owner wants them kept. All the band's new lines go to
        the owner as one table before they replace the old ones. A test: no band tip over about 90 characters.
+       - The Jib car tip covers both settings (owner, 18 November, with a screenshot of "In medium air, the jib car sits in
+         the middle, for an even twist."): "jib car guidance should provide advice about both settings: fore/aft, and
+         athwartship." One line each, within the same limit: fore/aft sets the twist (aft eases the leech, forward
+         tightens it); athwartship sets the slot and the pointing angle (in to point, out to reach). The wording goes to
+         the owner in the tips table; its figures follow the car's real track and sheeting range in the sim.
+       - The pole toast's "Up here" (owner, 18 November, with a screenshot of hud.ts:437, "Up here the poled-out jib does
+         less than it would to leeward…"): "what does 'up here' mean? clarify this copy." It fires with the pole set at a
+         true wind angle under 154.5°, a broad reach, not a run. It says so, in one line ("Poled out on a broad reach,
+         the jib pulls less than on the lee side. Stow the pole (Pole tab, O) or bear away."). The other toasts and tips
+         get a read for the same kind of word ("up here", "down here", "this").
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
