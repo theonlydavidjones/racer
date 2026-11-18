@@ -56,6 +56,7 @@ import { horn, logMessage, messageLog, setLogClock, sound, toast, headline } fro
 import { Hud, fmtClock } from './ui/hud';
 import { CourseView } from './ui/courseView';
 import { NavView } from './ui/navView';
+import { dockHint } from './ui/dockHint';
 import { FIELD_LAYERS, fieldLayer, layerMenu, withLayer, type LayerKey, type MenuView, type MenuChoice } from './ui/layers';
 import { Chart } from './ui/chart';
 import { SetupChart, type SetupPicks } from './ui/setupChart';
@@ -179,6 +180,8 @@ S.windKind ??= 'auto';
 const view = new SceneView($<HTMLCanvasElement>('gl'));
 const labels = new Labels($('labels'));
 // the hint by her for the turn's key, until the helm's called a few turns (render/labels.ts)
+// (coming in, slow, by a free berth, her lines not yet ready: the key that gets them ready, by her)
+labels.dockHint = () => dockHint(w, keymap.label('pushOff')); // (coming in to a berth: ui/dockHint.ts)
 labels.hint = () => { const k = keymap.label('turnHo'); return (S.turnHoUses ?? 0) >= 3 || k === 'none' ? null : k; };
 const hud = new Hud();
 const replayView = new ReplayView($<HTMLCanvasElement>('rcanvas'));

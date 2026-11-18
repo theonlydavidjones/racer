@@ -67,6 +67,8 @@ import { RaceLog } from './debrief';
  * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
  * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
 const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
+/** How far off her own slip the crew can get her lines ready, m (freeBerthsNear): its fairway and the turn into it. */
+const HOME_REACH = 50;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -1935,7 +1937,10 @@ export class World {
   freeBerthsNear(p: Vec, within = 16): Slip[] {
     const H = harborAt(p); if (!H) return [];
     const mine = this.homeSlip?.id;
-    return slipsIn(H.id).filter(s => (s.id === mine || !slipTaken(s)) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
+    // (her own slip from further off: lines got ready as she turns into its fairway, as a crew does coming home, not only
+    // once she's at its mouth: the owner, 18 Nov 2026, "the tie-up option never appeared" coming home to slip 572, where
+    // its fairway square lies 16 m off and G there said "no free berth here")
+    return slipsIn(H.id).filter(s => s.id === mine ? dist(s.p, p) < HOME_REACH : !slipTaken(s) && dist(s.p, p) < within).sort((a, b) => dist(a.p, p) - dist(b.p, p));
   }
   /**
    * Lines ready (the Crew panel, or G coming in): a hand goes to the shrouds on the dock's side with the line coiled (the bow
