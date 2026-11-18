@@ -1,7 +1,7 @@
 import { harborNear, hitsHarbor, hitsMooredBoat, hitsWall } from '../geo/marina';
 import { damageOf, impactEnergy, type DamageLevel, type Struck } from './damage';
 import { KT, V, clamp, wrap, n360, D2R, type Vec, hypot } from '../core/math';
-import { hitsWharf, onLand, pierNear } from '../geo/shore';
+import { hitsWharf, wharfPartAt, onLand, pierNear } from '../geo/shore';
 import { underPier } from '../geo/fortMason';
 import type { Emit } from '../sim/events';
 import { SETTLE, bow, stern, type Boat, type LineKey, type Tack } from './boat';
@@ -1039,7 +1039,8 @@ function whatHit(hit: Vec): { kind: Struck; name: string } {
   const pier = pierNear(hit, 6); if (pier) return { kind: 'concrete', name: `the ${pier.name.replace(/^(.*?), (.*)$/, '$1\'s $2')}` };
   if (hitsWall(hit)) return { kind: 'concrete', name: 'the breakwater' };
   if (hitsHarbor(hit)) return { kind: 'dock', name: 'the dock' };
-  if (hitsWharf(hit)) return { kind: 'concrete', name: 'the wharf' };
+  // (by its name where it has one: off Berkeley, "the wharf" read as Fisherman's; the stability soak, 18 Nov 2026)
+  if (hitsWharf(hit)) { const n = wharfPartAt(hit) ?? wharfPartAt({ x: hit.x + 1, y: hit.y }) ?? wharfPartAt({ x: hit.x - 1, y: hit.y }); return { kind: 'concrete', name: n ? `the ${n.replace(/ \(abandoned\)$/, '').replace(/^(.*) \((.*)\)$/, '$1')}${/abandoned/.test(n) ? "'s abandoned outer part" : ''}` : 'the wharf' }; }
   return { kind: 'mud', name: 'the shore' };
 }
 const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];

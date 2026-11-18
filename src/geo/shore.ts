@@ -227,6 +227,16 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
   }
 }
 
+/** The named pier part at p, if any (the Berkeley Pier and its abandoned outer part, Chevron's Long Wharf, the Wharf's
+ * named piers): for the message when she hits one. */
+export function wharfPartAt(p: Vec): string | null {
+  for (const G of GROUPS) {
+    if (!inB(p, G.box)) continue;
+    for (const a of G.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return a.name ?? null;
+    for (const l of G.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return l.name ?? null;
+  }
+  return null;
+}
 export function hitsWharf(p: Vec): boolean {
   if (hitsPier(p)) return true;
   for (let g = 0; g < GROUPS.length; g++) { // (indexed: every land check asks)

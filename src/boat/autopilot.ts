@@ -46,6 +46,8 @@ export interface Pilot {
   lastH: number;
   /** Nav: when it last tacked (s), so it doesn't tack and tack again; a detour round land, worked out now and then. */
   lastTackT: number; detour: Vec | null; detourT: number;
+  /** The side of her bearing the detour goes round (+1 right, −1 left, 0 none), kept until the way is clear. */
+  detourSide?: number;
   /** Nav: the heading it's steering now, for the display. */
   navH: number;
   /** Nav: the tack it has decided to go onto, held until she's round. */
@@ -107,6 +109,20 @@ function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
 
 /** Land within `d` m ahead on heading h? The whole way, exactly (geo/shore.ts landAlong): a pier or a dock a metre
  * or two wide is in the way, however far ahead it is. */
+/** Clear water from her to q: her track, and 25 m either side of it from 50 m on (as ai.ts detour's clearRun, but the
+ * side lines not begun abreast of her: 20 m off a pier, one of them began on its far side, every way looked blocked, and
+ * she gave up the way round at the pier's very end; tests/pilot-pier.test.ts). */
+const clearTo = (b: Vec, q: Vec) => {
+  const L = hypot(q.x - b.x, q.y - b.y) || 1, ux = (q.x - b.x) / L, uy = (q.y - b.y) / L, ox = -uy, oy = ux, s0 = Math.min(50, L);
+  if (landAlong(b, q) < Infinity) return false;
+  return L <= s0 || [-25, 25].every(k => landAlong({ x: b.x + ux * s0 + ox * k, y: b.y + uy * s0 + oy * k }, { x: q.x + ox * k, y: q.y + oy * k }) === Infinity);
+};
+/** A way round on one side (+1 to the right of the bearing, −1 to the left): the least turn off it that's clear 500 m on (as ai.ts detour, on one side only). */
+function sideWay(b: Vec, P: Vec, side: number): Vec | null {
+  const L = Math.min(hypot(P.x - b.x, P.y - b.y), 500), bP = brg(P.x - b.x, P.y - b.y);
+  for (let dev = 10; dev <= 170; dev += 10) { const u = V(bP + side * dev), q = { x: b.x + u.x * L, y: b.y + u.y * L }; if (clearTo(b, q)) return q; }
+  return null;
+}
 const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); return landAlong(b, { x: b.x + u.x * d, y: b.y + u.y * d }) <= d; };
 
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
@@ -119,7 +135,26 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   let P = dest;
   const bP0 = brg(P.x - b.x, P.y - b.y);
   if (Math.abs(wrap(from - bP0)) > 50) { // reaching or running: round any land in the way
-    if (t - p.detourT > 2) { p.detour = detour(b, P); p.detourT = t; }
+    // (a way round, once chosen, is kept while it's still clear and she's not yet at it: with a long pier in the way its
+    // two ends can be about as good, and choosing afresh every 2 s it swapped between them, so she wove along it; the
+    // stability soak, 18 Nov 2026, the abandoned Berkeley Pier, tests/pilot-pier.test.ts)
+    if (t - p.detourT > 2) {
+      // (and its side, kept until the way's clear: each new point is only 500 m on, and choosing the nearer end each time
+      // took her back and forth along the pier; her side's given up only when it has no clear way at all, a dead end)
+      const keep = !!p.detour && hypot(p.detour.x - b.x, p.detour.y - b.y) > 40 && clearTo(b, p.detour) && !clearTo(b, P);
+      if (!keep) {
+        if (clearTo(b, { x: b.x + (P.x - b.x) * Math.min(1, 700 / (hypot(P.x - b.x, P.y - b.y) || 1)), y: b.y + (P.y - b.y) * Math.min(1, 700 / (hypot(P.x - b.x, P.y - b.y) || 1)) })) { p.detour = null; p.detourSide = 0; }
+        else {
+          let q = p.detourSide ? sideWay(b, P, p.detourSide) : null;
+          if (!q) { q = detour(b, P); const bP = brg(P.x - b.x, P.y - b.y); p.detourSide = q ? Math.sign(wrap(brg(q.x - b.x, q.y - b.y) - bP)) || 1 : 0; }
+          p.detour = q;
+        }
+      }
+      p.detourT = t;
+      // (no way round it, and the land in the way: the navigator can't find one, so the pilot hands her back, as it does
+      // with land ahead on both tacks; steering on for the destination ran her onto that pier at 5.4 kt)
+      if (!p.detour && landAlong(b, P) < Math.min(hypot(P.x - b.x, P.y - b.y), 150)) { p.alarm = 'Pilot alarm: land in the way and no clear way round it. Pilot on standby: you have the tiller.'; return b.h; }
+    }
     if (p.detour) P = p.detour;
   } else p.detour = null;
   const bP = brg(P.x - b.x, P.y - b.y), vs = Math.max(b.v, targetFor(b, Math.abs(wrap(from - bP))) * 0.8);

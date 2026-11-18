@@ -13,7 +13,7 @@ import { onLand } from '../../src/geo/shore';
 import { DEFAULT_BOAT } from '../../src/boat/spec';
 import type { Boat } from '../../src/boat/boat';
 
-const proc = (globalThis as any).process, fs = await import('node:fs');
+const proc = (globalThis as any).process, FS = 'node:fs', fs = await import(/* @vite-ignore */ FS);
 const out: string = proc.env.SOAK_OUT, K = +(proc.env.SOAK_K ?? 0), N = +(proc.env.SOAK_N ?? 1), ONLY = proc.env.SOAK_ONLY, MIN = +(proc.env.SOAK_MIN ?? 0);
 const gc: (() => void) | undefined = (globalThis as any).gc;
 const CORE = ['x', 'y', 'h', 'v', 'heel', 'sway', 'astern', 'turnRate', 'boom', 'jib', 'tiller', 'steer', 'twa', 'rel'];
