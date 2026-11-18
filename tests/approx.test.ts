@@ -49,7 +49,8 @@ describe('the shore distance off a 10 m lattice', () => {
     // turnBleed) the eight drew two wild races, 13.5% and 11.9%: 4.96% against a bound of 4.71%. The lattice itself was
     // unchanged and passes point by point (above); over these 24 it gave 3.79% against 4.69%, over the AI case's 48 3.71%
     // against 4.66% (and before that change, 2.61% against 4.51%): Capacity's measurement. The same formula and the same
-    // bound on more seeds, not a looser bound: the Coordinator's ruling, as for the AI's case on 15 Nov 2026)
+    // bound on more seeds, not a looser bound: the Coordinator's ruling, as for the AI's case on 15 Nov 2026. The seeds
+    // were chosen before the ruling, and Capacity's figures for them had been worked out by then: the two crossed)
     const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [0, 11], [0, 12], [0, 13], [0, 14], [1, 7], [1, 8], [1, 9], [1, 10], ...Array.from({ length: 12 }, (_, k) => [k % 2, 19 + k] as const)] as const;
     const jobs = SEEDS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: false, skip: false, seed }], [i, { grid: true, skip: false, seed }],
       [i, { grid: false, skip: false, seed, curK: 1.001 }], [i, { grid: false, skip: false, seed, curK: 0.999 }]]);
