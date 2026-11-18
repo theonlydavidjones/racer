@@ -578,7 +578,7 @@ sources. Each shipped item is added there when it's published.
       exist, but the current's edge widths are estimates with no measured source. Size how sharp the edge is from real
       data (NOAA currents, observations at the Marina and Fort Mason), not invented numbers, and test that the heel, speed
       and set all change within a few boat lengths of the entrance, on a flood and on an ebb.
-   6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
+   6. ~~**"Fort Mason Center" lettering on the big pier**~~ (done, merged 15 Nov, batch44) (owner, 15 November; the shore; Boat Detail): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
    7. **The cove's edge: the harbor's buildings and trees** (Bay East, 15 November; physics; after the wind-shadow seams;
@@ -1211,12 +1211,12 @@ sources. Each shipped item is added there when it's published.
      course and strategist or navigator, the cabin-top instrument, the paddle, the navigation lights, the hail, the
      views, all messages and the frame-time readout. The owner asked for this button; it should also absorb scattered
      on-screen toggles, so the surface ends up with fewer controls, not more. Ties in with the UI audit (#236).
-   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
+   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; Crew Figures from 18 Nov, with the tiller guide): "we took away the copy
      on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
      small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
      far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
      November the owner said "no tiller strip"; this is a needle, not the old strip).
-   - **Now — an audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
+   - **Now — an audit for that kind of noise everywhere** (UI & Copy from 18 Nov; earlier Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
      the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
