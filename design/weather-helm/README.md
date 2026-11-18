@@ -21,3 +21,17 @@ degrees of weather helm for optimal performance upwind"; "above 8 degrees ... to
 gives 3–5 as ideal and about 10 as too much. Nothing specific to the Folkboat was found. The band is an ESTIMATE.
 
 (The first mock-up, the pill at the top of the screen, is kept in this folder's `weatherhelm-mockup_*` stills; superseded.)
+
+## Round 3: at the foot of the dotted line, on the game surface (`foot/`)
+
+The owner: "it's not working in the panel. maybe we can put it at the bottom of the dotted line somewhere, on the game
+surface". `which-line.jpg` marks the line taken to be "the dotted line": the tiller guide's dashed center line, shown while
+you hold the tiller. A pill, dark text on a light fill, says the tiller's average over the last few seconds: "4° weather"
+(teal, a balanced 2–5°), "9° weather" (amber, past 8°), "1° lee" (light, neither). Shown with the guide.
+
+- **a.** The pill on the line's foot, centered.
+- **b.** The pill beside the foot on the side the tiller's held, with a short tick on the foot at the average.
+- **c.** A small ±10° scale just above the foot (the teal balanced band to windward, the middle, a tick at the average),
+  the pill on the foot under it.
+
+Each on both tacks (starboard: 4° weather; port: 9° weather; c also at 1° lee); `_close` crops the foot.
