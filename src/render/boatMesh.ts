@@ -339,8 +339,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // the wooden cap, one piece from the cabin along both sides and round the after coaming (Josephine, the owner's photo)
     const cap = [...side(-1), ...lip, ...side(1).reverse()].map(q => q.clone().setY(q.y + COAMING_H(q.z)));
     grp.add(new THREE.Mesh(wall(cap, () => 0.02, 0.04), MAT.wood));
-    // a mooring cleat on the after deck, a little to starboard of the centreline (as on Josephine)
-    const cz = (z1 + L / 2) / 2, cx = 0.12, cy = deckY(uAtZ(cz), cx);
+    // a mooring cleat on the after deck, on the centerline (the owner, 18 Nov 2026: "the aft cleat should be at centerline,
+    // not offset"), midway between the cockpit's after end and the transom; the tiller passes over it amidships, 7.8 cm clear
+    const cz = (z1 + L / 2) / 2, cx = 0, cy = deckY(uAtZ(cz), cx);
     const cleat = new THREE.Mesh(cleatGeometry(0.2, 0.016), STEEL); cleat.position.set(cx, cy, cz); grp.add(cleat);
   }
   // the footrest (Josephine, the owner's photo): one teak plank right across the cockpit's after end, its grain across

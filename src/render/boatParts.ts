@@ -62,7 +62,7 @@ const topsides = (s: number) => US(0, 1, 16).flatMap(u => [v3(s * halfBeam(u), s
 /** Her mooring cleats, on deck: the foredeck's (just aft of the stemhead), the two midships, and the after deck's (boatMesh.ts). */
 export const CLEATS = (() => {
   const fz = RIG.FORESTAY_DECK.z + 0.35, mz = (WINDOW.z0 + WINDOW.z1) / 2, mu = uAtZ(mz), az = (zOf(COCKPIT.u1) + COAMING_T / 2 + L / 2) / 2;
-  return [v3(0, deckY(uAtZ(fz), 0), fz), ...[-1, 1].map(s => v3(s * (halfBeam(mu) - 0.075), deckY(mu, halfBeam(mu) - 0.075), mz)), v3(0.12, deckY(uAtZ(az), 0.12), az)];
+  return [v3(0, deckY(uAtZ(fz), 0), fz), ...[-1, 1].map(s => v3(s * (halfBeam(mu) - 0.075), deckY(mu, halfBeam(mu) - 0.075), mz)), v3(0, deckY(uAtZ(az), 0), az)] // (the after deck's on the centerline: the owner, 18 Nov 2026);
 })();
 /** One half of the deck, the centerline out to the sheer. */
 const deckHalf = (s: number) => US(0, 1, 16).flatMap(u => [v3(s * halfBeam(u), sheer(u), zOf(u)), v3(0, deckY(u, 0), zOf(u))]);
