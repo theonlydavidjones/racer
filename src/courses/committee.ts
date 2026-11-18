@@ -177,7 +177,7 @@ const NEAREST_FEW = 3;
  *     courses within a few percent of that, the day decides (the same day always gives the same course).
  */
 export function chooseCourse(courses: CourseFile[], S: Settings): CommitteeChoice | null {
-  const pool = courses.filter(c => c.group?.startsWith('Seaweed Soup'));
+  const pool = courses.filter(c => c.group?.startsWith('Kelp Chowder'));
   if (!pool.length) return null;
   const day = raceDay(S, pool[0].windBase), target = TARGET_MIN[(S.raceLength ?? 'medium') as RaceLength] ?? 60;
   const off = (e: CourseEstimate) => Math.abs(Math.log(e.minutes / target)) + (e.slowestKt < 1 ? 1 : 0);

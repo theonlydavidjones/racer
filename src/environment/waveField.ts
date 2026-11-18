@@ -16,9 +16,9 @@ import type { SeaHere } from './sea';
  *
  * It belongs to the World and steps with it, on the race's clock, so the race (in its worker) and the page's mirror
  * hold the same field (sim/sync.ts) and every boat rides the waves you see. The reference sea is the World's (World.waveRef:
- * the course's middle in a race, so the fleet's waves don't depend on where your boat is), eased in; the field turns with
- * the course's mean wind about your boat (so turning it doesn't sweep the pattern past you), and slowly: no faster than
- * keeps every wave within 3 km at its own speed (turnCap, a stopgap), set at once to a new wind when the conditions change.
+ * the course's middle in a race, so the fleet's waves don't depend on where your boat is), eased in. No wave of the chop
+ * turns: as the wind comes round its components give way, pair by pair, to new ones born for the new wind (update), so
+ * nothing sweeps past anyone. The swell turns about your boat, slowly (turnCap). A change of conditions sets both at once.
  * All of it is the World's own state, not the camera's.
  */
 
@@ -60,16 +60,38 @@ function windSpectrum(tp: number): void {
   specTot = tot || 1; specTp = tp;
 }
 
+/** How far (deg) the wind may go from the direction a pair was born for before the pair changes over: past a gust's
+ * wobble and the minute's easing. AN ESTIMATE, the model's own. */
+const REAIM_OFF = 12;
 /**
- * How fast a set of waves may turn (deg/s): a STOPGAP that stops the sweep. The field is plane waves turned about your
- * boat, so at a distance R from her a turn at rate r carries each pattern sideways, its phase running k·R·r faster or
- * slower than its own ω. Held to SWEEP_MAX of ω out to SWEEP_R for the set's slowest wave (r = SWEEP_MAX·c/R, c = ω/k):
- * for the chop's shortest, 1.6 m/s, about 4° an hour. On a day sailed from the observed record the course's mean wind
- * steps a degree or two every minute (Fort Point's 6-minute record), the field eased after it at 5% a second, and at
- * 200 m to 3 km the short waves ran at 1.3 to 4.4 times their own speed for a moment each minute: the owner's "rushing
- * water", back with the weather refresh of 16 Nov 2026 (tests/rushing).
- * Not true to life: real short chop comes round to a new wind in ten minutes or so, the old waves dying as new ones
- * grow; here it lags a big shift for hours. The true model, two seas cross-faded, is on the ROADMAP.
+ * How long (s) a pair's change of direction takes at each step (one dying, the other growing) in a wind of `kt`: the
+ * time the wind takes to raise a wave's height by a factor e, as Snyder et al. (1981) measured the wind's input to
+ * waves and Komen et al. (1984) put it on the friction velocity, the form the wave models use (read in van Agthoven
+ * 1994, TU Delft, eq. 3.4): energy grows at 0.25·(rho_air/rho_water)·(28·ustar/c − 1)·omega, the height at half that;
+ * nothing for a wave the wind can't keep up with. ustar from the 10 m wind by a drag coefficient of 1.2e-3 (Large &
+ * Pond 1981's value under 11 m/s, FROM MEMORY: a search on 17 Nov 2026 could not open it or another drag law to read;
+ * the one figure read, an often-used constant of 1.5e-3, would make these times about a fifth shorter). In 10 kt: a 1 s wave in about 8 minutes, a 2 s
+ * wave in an hour; in 20 kt, 3.4 and 16.5 minutes. And never longer than the waves take to cross the fetch at their group
+ * speed (update): past that every wave at a place was raised by the new wind. CARRIED from open-water measurements to
+ * a bay, where the sea's height is the sea model's (sea.ts, by fetch and duration): this only times the change.
+ * That the height holds through a shift, the pair's energy kept, is a MODELING CHOICE, not a measurement: it keeps the
+ * drawn sea and the sea the boat's drag meets one and the same. The
+ * dying is given the growing's time, an ESTIMATE: no measurement of short chop's decay after a shift was found (the
+ * measured turning of a whole sea's mean direction, Hasselmann et al. 1980, is of the same order: an hour or more).
+ */
+const RHO_RATIO = 1.2 / 1025, CD10 = 1.2e-3, KT_MS = 0.5144;
+function lifeTime(k: number, w: number, kt: number): number {
+  const c = w / k, us = Math.sqrt(CD10) * Math.max(2, kt) * KT_MS, g = 0.25 * RHO_RATIO * (28 * us / c - 1) * w;
+  return g > 0 ? Math.max(20, 2 / g) : Infinity;
+}
+/**
+ * How fast the swell may turn (deg/s). Its three components are plane waves turned together about your boat (its
+ * direction changes with where she is, over the bar), so at a distance R from her a turn at rate r carries each pattern
+ * sideways, its phase running k·R·r faster or slower than its own ω. Held to SWEEP_MAX of ω out to SWEEP_R for the
+ * slowest of them (r = SWEEP_MAX·c/R, c = ω/k): about 46° an hour at a 12 s period, which the swell never asks for.
+ * (The chop was turned the same way, and capped the same way for a release, at 4° an hour: on a day sailed from the
+ * observed record its turning swept the short waves past at 1.3 to 4.4 times their own speed, the owner's "rushing
+ * water" of 16 Nov 2026, tests/rushing. It no longer turns at all: update.)
  */
 const SWEEP_MAX = 0.04, SWEEP_R = 3000;
 function turnCap(f: WaveField, from: number, to: number): number {
@@ -97,6 +119,16 @@ export class WaveField {
   windDir = NaN; swellDir = NaN;
   /** Set once the heights have been set (the first update sets them; later ones ease toward the sea). */
   primed = false;
+  /** Where the chop as a whole comes from (deg): the mean, by their energy, of the winds its components were born for. Through a
+   *  shift it goes from the old wind's to the new as the energy does. (Two seas crossing are read as one from between:
+   *  good to a right angle or so; past that the mean says little, and a new day's wind sets the sea at once anyway.) */
+  chopFrom = 270;
+  /** The chop's components in pairs of neighbors in wavelength (update): each pair's stage in a change of direction
+   *  (0 steady, 1 the first dying into the second, 2 the first reborn and taking it all, 3 the second reborn and both
+   *  back to their shares), the first's share of the pair's energy, and each component's height for the sea alone. */
+  readonly stage = new Uint8Array(N_WIND / 2);
+  readonly share = new Float64Array(N_WIND / 2).fill(NaN);
+  readonly full = new Float64Array(N_WIND);
 
   constructor(swellTp = 12) {
     WIND_L.forEach((L, i) => { this.k[i] = 2 * Math.PI / L; this.w[i] = Math.sqrt(G * this.k[i]); this.phase[i] = PHASES[i]; });
@@ -116,14 +148,14 @@ export class WaveField {
   }
 
   /**
-   * Ease the heights toward the sea `s` (the reference: the sea at your boat), the chop running downwind of `windFrom`
-   * (the course's mean wind, so the pattern doesn't swing with every shift), turning about `about` (your boat).
+   * Ease the heights toward the sea `s` (the reference sea), the chop for the wind from `windFrom` (the course's mean
+   * wind) at `windKt`, the swell turning about `about` (your boat).
    * A wave's phase is k·(d·p) − ωt + φ at the world position p; swinging its direction d about the world's origin,
    * kilometres off on the Bay, would sweep the whole pattern past you (at 3.6 km a 10° swing over half a minute ran
-   * the water by at many times the waves' own speed: the owner's "the water surface starts rushing by"). So as d turns,
-   * φ takes up the change at `about`, and the pattern turns about there.
+   * the water by at many times the waves' own speed: the owner's "the water surface starts rushing by"). So as the
+   * swell's d turns, φ takes up the change at `about`, and its pattern turns about there. The chop's d never turns.
    */
-  update(s: SeaHere, windFrom: number, dt: number, about: Vec): void {
+  update(s: SeaHere, windFrom: number, dt: number, about: Vec, windKt = 10): void {
     const turn = (i: number, dir: number) => {
       if (dir === this.dir[i]) return;
       // (the old direction's sine and cosine are the ones setDir kept, sd and cd; the new one's worked out once, for both)
@@ -131,9 +163,11 @@ export class WaveField {
       this.phase[i] = (this.phase[i] + this.k[i] * ((this.sd[i] - s1) * about.x + (this.cd[i] - c1) * about.y)) % (2 * Math.PI); // (kept small: float32 in the shader)
       this.dir[i] = dir; this.sd[i] = s1; this.cd[i] = c1;
     };
-    const travel = windFrom + 180;
-    if (Number.isNaN(this.windDir)) this.windDir = travel;
-    this.windDir += clampTurn((((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt * 0.05), turnCap(this, 0, N_WIND) * dt);
+    // (the chop: no wave turns. `windDir` is where the wind is sending it now, eased over a minute so a gust's wobble
+    // isn't read as a shift; each component keeps the direction it was born with, and gives way to a new one, below)
+    const travel = windFrom + 180, fresh = Number.isNaN(this.windDir);
+    if (fresh) this.windDir = travel;
+    this.windDir += (((travel - this.windDir + 540) % 360) - 180) * Math.min(1, dt / 60);
     // (the swell eases round as the chop does: a direction that jumped, even turned about `about`, swept the pattern past
     // everywhere else at many times its own speed: the owner's "rushing water", v176)
     const swellTravel = s.fromS + 180;
@@ -147,10 +181,33 @@ export class WaveField {
     windSpectrum(tp);
     for (let i = 0; i < N_WIND; i++) {
       const target = Math.sqrt(2 * spec[i] / specTot) * hsW / 4; // Σ a²/2 = (Hs/4)²
-      this.amp[i] += (target - this.amp[i]) * ease;
-      turn(i, this.windDir + WIND_SPREAD[i]);
+      this.full[i] += (target - this.full[i]) * ease;
+      if (fresh) setDir(this, i, this.windDir + WIND_SPREAD[i]); // (the sea as it is at the start, or set to a new day's wind)
       this.q[i] = 0.45; // sharpen the crests of the chop (less with more components, so the sum never loops)
     }
+    // A change of direction, a pair of neighbors at a time, the pair's energy kept throughout (so the sea's height is the
+    // sea model's all the while): the first dies into the second; flat, it is born again for the wind as it is now and
+    // takes the pair's energy from the second; that one, flat in its turn, is born again, and both come back to their
+    // shares. The old sea fades as the new one grows across it; nothing turns, so nothing sweeps, at any distance.
+    for (let p = 0; p < N_WIND / 2; p++) {
+      const i = 2 * p, j = i + 1, e = this.full[i] ** 2 + this.full[j] ** 2, home = e > 0 ? this.full[i] ** 2 / e : 0.5;
+      if (fresh || Number.isNaN(this.share[p])) { this.share[p] = home; this.stage[p] = 0; }
+      const off = (q: number) => Math.abs((((this.windDir + WIND_SPREAD[q] - this.dir[q]) % 360) + 540) % 360 - 180);
+      if (this.stage[p] === 0 && Math.max(off(i), off(j)) > REAIM_OFF) this.stage[p] = 1; // (either of them: the second is born a stage after the first, for the wind as it was then)
+      const st = this.stage[p], to = st === 1 ? 0 : st === 2 ? 1 : home;
+      // (the pair's time: its shorter wave's, the quicker to answer, and never longer than the waves take to cross the fetch)
+      const step = dt / Math.min(lifeTime(this.k[i], this.w[i], windKt), Math.max(60, (s.fetch || 0) / (0.5 * this.w[j] / this.k[j])));
+      let x = this.share[p]; x += Math.max(-step, Math.min(step, to - x)); this.share[p] = x;
+      this.amp[i] = Math.sqrt(e * x); this.amp[j] = Math.sqrt(e * (1 - x));
+      // (flat: born again for the wind as it is now. Its phase stays: at no height there's no jump)
+      if (st === 1 && x <= 0) { setDir(this, i, this.windDir + WIND_SPREAD[i]); this.stage[p] = 2; }
+      else if (st === 2 && x >= 1) { setDir(this, j, this.windDir + WIND_SPREAD[j]); this.stage[p] = 3; }
+      else if (st === 3 && Math.abs(x - home) < 1e-9) this.stage[p] = 0;
+    }
+    // (each by the wind it was born for, its own place in the spread taken off: settled, the chop comes from the wind
+    // exactly, so she meets it alike on either tack)
+    { let sx = 0, sy = 0; for (let i = 0; i < N_WIND; i++) { const e = this.amp[i] * this.amp[i], b = (this.dir[i] - WIND_SPREAD[i]) * D2R; sx += e * Math.sin(b); sy += e * Math.cos(b); }
+      if (sx * sx + sy * sy > 1e-18) this.chopFrom = ((Math.atan2(sx, sy) / D2R + 180) % 360 + 360) % 360; }
     for (let j = 0; j < SWELL_F.length; j++) {
       const i = N_WIND + j, target = (j === 1 ? 0.75 : 0.47) * hsS / 4 * Math.SQRT2;
       this.amp[i] += (target - this.amp[i]) * ease; turn(i, this.swellDir + SWELL_SPREAD[j]); this.q[i] = 0.3;

@@ -2,9 +2,9 @@
   "$schema": "../course.schema.json",
   "id": "ss16",
   "order": 16,
-  "title": "Seaweed Soup · Course 16",
+  "title": "Kelp Chowder · Course 16",
   "area": "San Francisco Central Bay",
-  "group": "Seaweed Soup · starting west",
+  "group": "Kelp Chowder · starting west",
   "distanceNm": 6.1,
   "source": "GGYC Manuel Fagundes Seaweed Soup Regatta 2026–27, Addendum B: Courses and Marks, Revision 1 (2026-11-05). Mark positions from the YRA (github.com/nkiesel/YRA-Marks). Main sailing instructions not available.",
   "notes": "GGYC Seaweed Soup 2026–27, course 16. About 6.1 nm. Start heading west: Blackaller to starboard, pass X to starboard, Blossom Rock to starboard, then finish. The start line runs from the flagpole on the GGYC deck out to X. X is not a rounding mark: just pass it on the side shown, which keeps you off the line. Crossing the start/finish line in the middle of the race costs a two-turn penalty.",
@@ -33,7 +33,7 @@
   },
   "startLine": {
     "committee": {
-      "label": "GGYC flagpole",
+      "label": "Dorado YC flagpole",
       "kind": "shore",
       "lat": 37.80799,
       "lon": -122.4426,

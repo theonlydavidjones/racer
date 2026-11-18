@@ -87,7 +87,9 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 - The step's speed (the owner, 14 Nov 2026): measured paired, both versions sailed by turns in one process, so the
   host's drift cancels (scripts/check/perf-pair.mjs, docs/CAPACITY.md §8). The budget holds: perf.test requires the
   step within v168 × 1.019 (the same 43.1 as before, now without the drift), on twelve ratios, six with each loaded
-  first (the owner, 14 Nov 2026). A PR that touches the step (src/boat,
+  first (the owner, 14 Nov 2026). A change to how boats sail or are judged (the physics, src/ai, src/rules) is judged against the budget
+  on the ten-race mean (`--budget --ai`), not the one budget race, since it changes the race itself; anything else keeps
+  the one race. The budget figure is unchanged (the owner, 18 Nov 2026). A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
   A PR that changes how boats sail or are judged (src/ai, src/rules) uses `--ai` instead, the mean over ten races: it

@@ -81,7 +81,7 @@ export function fillFlagIndex(el: HTMLElement, o: { flying: Flag[]; prep: PrepFl
   for (const [title, rows] of SECTIONS) { h4(title); for (const r of rows) row(r, r.flags[0] === o.prep && r.flags.length === 1 ? 'This race' : ''); }
   h4('Numeral pennants: the course number');
   const pin = document.createElement('div'); pin.style.marginBottom = '8px';
-  pin.textContent = `The Seaweed Soup sailing instructions fly the course number in these with the warning signal, read top to bottom; over AP, a pennant is a postponement of that many hours.${o.course != null ? ` Flying now: course ${o.course}.` : ''}`;
+  pin.textContent = `The Kelp Chowder sailing instructions fly the course number in these with the warning signal, read top to bottom; over AP, a pennant is a postponement of that many hours.${o.course != null ? ` Flying now: course ${o.course}.` : ''}`;
   el.appendChild(pin);
   const pens = document.createElement('div'); pens.className = 'fi-pens';
   for (let d = 0; d <= 9; d++) { const p = document.createElement('div'); p.appendChild(canvasOf(pennantCanvas(String(d)), 88, 44)); p.appendChild(document.createTextNode(String(d))); pens.appendChild(p); }

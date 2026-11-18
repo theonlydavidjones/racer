@@ -13,6 +13,7 @@ import type { LineKey, Boat } from '../boat/boat';
 import type { PlaceAcross, PlaceFore } from '../boat/crewPhys';
 import { allToCrew, moveLazyCar, takeLine } from '../boat/physics';
 import { carFree } from '../boat/crewWork';
+import { HELM_MAX } from '../boat/balance';
 import { wantJumpers } from '../boat/condition';
 import { guideTune } from '../boat/rigTune';
 import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from '../boat/autopilot';
@@ -119,8 +120,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
       u.ctlCmd = c.ctl; u.sheetCmd.main = c.ctl.mainsheet ?? 0; u.sheetCmd.jib = c.ctl.jibsheet ?? 0;
       return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
-    case 'tiller': u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
-    case 'lash': if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-1, Math.min(1, c.at)); u.lashed = c.on ? u.tiller : null; return;
+    case 'tiller': u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
+    case 'lash': if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.at)); u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
     case 'lazyCar': takeLine(u, 'car'); moveLazyCar(u, c.fore, c.ins); return;

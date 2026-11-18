@@ -64,6 +64,14 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   turnCap), a stopgap that stops the "rushing water" on days sailed from the observed record but leaves the chop
   lagging a big shift for hours. Real short chop comes round in ten minutes or so, the old waves dying as new ones
   grow from the new direction: model that, two seas cross-faded, and take the cap out.
+- ~~**The sea turning with the wind, truly**~~ (done on branch sea-born, Deep Physics, 17 November; awaiting the batch):
+  no wave of the chop turns now. Its components change direction in pairs, one dying into its neighbor and born again
+  for the new wind, the pair's energy kept, so the old sea fades as the new one grows across it and nothing sweeps at
+  any distance (environment/waveField.ts update); the cap on the chop's turn is gone, and the boat's wave drag reads
+  the chop's direction from the same components. The time is the wind's input to waves as measured (Snyder et al.
+  1981, Komen et al. 1984): in 10 kt the 1 s waves in about 8 minutes, the main chop in about an hour. (The earlier
+  line here, and #450, said real chop "comes round in ten minutes or so": that was unsourced, and true only of the
+  shortest waves in a breeze.)
 - **Smooth the drive curve's other corners** (later, for Deep Physics; the Coordinator, 16 November; 4–8 h, an
   estimate): the polar's straight lines between its tabulated angles, and the hull resistance's table over Froude number,
   put kinks in every boat's speed curve. The beat-chop fix (8e8e7c06) fixed the choice of angle without touching them.
@@ -118,6 +126,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   (the sails' own side force: done, with leeway, Deep Physics item 7), but the AI's sailing doesn't reckon with sternway
   yet (an AI boat luffing by the committee boat drifts onto it), so with sails up she still stops dead. Also: heaveTo still clamps
   sternway; ~~the end tie's push-off doesn't allow for the wind setting her back onto the dock~~ (done: her bow's pushed off to close-hauled, away from the dock; a boat set sideways now stops against a dock or the shore instead of passing through).
+- **Her bare hull's windage at its own height, and the bare-poles drift ahead** (physics review of the sternway drag,
+  17 Nov 2026; for Deep Physics, later): the wind on her bare hull and rig (windageCdA 2.0, ORC) is all taken at the
+  sails' height (4.29 m), but about 1.17 m² of it is hull near 0.6 m, where the log profile gives 0.63 of the wind
+  against 0.889: weighted by height the push falls about 30% and her terminal sternway about 15%. And a wind abaft the
+  beam drifts her ahead at a tenth of the wind (1.03 m/s in 20 kt), unsourced, where a force balance on the same
+  windage gives about 1.4 m/s; stern first she now makes 1.07 m/s against twice the drag.
 - ~~**The sea inside the marinas**~~ (done, bay-east-7: the swell diffracts through each entrance by the exact gap solution, scripts/make-gap-diffraction.py, the Penney & Price problem the Shore Protection Manual draws for B/L 0.5–5; the fetch is traced finely just outside a marina as well as inside, every 2° by one, and blended between its 10 m nodes;
   swell running past an entrance bends round its breakwater head by Sommerfeld's half-plane solution; over a swell's
   spread of directions, Mitsuyasu/Goda s 75. Left out, from review: the basin's own walls reflecting the waves (Gashouse
@@ -134,6 +148,13 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   (fetch 194 m against 108 m), from the open-water ray's 50 m minimum fetch (2–4 h).
 
 What's planned, roughly in order. Done work is described in the README.
+
+**v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
+
+**v206 (18 Nov):** tiller travel to the deck's stop and the AI's helm (#437), the boat editor's groups, picker and colorways
+(#354), sternway drag and push-off reasons (#458), the navigator home and as a layer on the chart, the burgees and five
+club bases, Rule 44.1 jams as one incident, the outboard in 5 s. Held: shallow waves (#454, cleared for v207), the first
+run (FTUE, its inset cost).
 
 **v205 (18 Nov):** fewer first-mark pile-ups (#453), the committee's beat-start course (#452), hands on the lines when
 hiking, crew stations (#446) and habits (#455), Sail Home paced, the destination pin, the 8 m slip walk-out, the rounding
@@ -155,11 +176,21 @@ sources. Each shipped item is added there when it's published.
   alone against motor and sails on a reach and close-hauled (faster, toward hull speed), head to wind (the flogging
   sails slow her), and the apparent wind the sails see while she motors (her motored speed in it); then the physics
   review.
-- **Mounting the outboard takes far too long: 5 seconds at most** (owner, 17 November; polish; later, "low priority";
+- ~~**Mounting the outboard takes far too long: 5 seconds at most**~~ (done, v206: running in 1.9 s, 4.9 s at worst) (owner, 17 November; polish; later, "low priority";
   1–2 h; Marinas): "mounting the motor takes way, way too long. 5 seconds max." The crew's lowering and mounting of the
   outboard on its bracket, from the call to running, in 5 s or less.
 
 ## Priorities (owner's ranking, November 2026)
+
+**The sprint: stability, performance, playability** (owner's ruling, 18 November 2026, via the Coordinator):
+1. In-flight work finishes and ships: what's already built or approved (the sail band's tips, the jumpers and the
+   Hoist tabs, Sail home and tie-up, the tiller-angle needle, Mile Rock and the rest of v208).
+2. After that, no new features until the sprint ends.
+3. The sprint's order: the owner's bugs first, then lag and frame time, then playability end to end (slip out,
+   hoist, sail, home, tie up, and a race).
+4. Each bug gets a test that reproduces it before it's fixed.
+5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
+6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
@@ -238,7 +269,29 @@ sources. Each shipped item is added there when it's published.
    race's window; the swell from the bar buoy's own swell part (NDBC SwH/SwP/SwD); the chase camera rides the swell,
    with a switch). Open: the swell's reach into the Gate is an estimate.
 5. Heavy weather, the depowering question and the rest of the deep physics pass, as one pass (14–24 h).
-   **Now, first in the pass: the helm's travel and response** (owner, 15 November; accuracy; now; 3–5 h): "the turning
+   ~~**Now, first in the pass: the helm's travel and response**~~ (done, v206: #437, Crew Figures + Deep Physics; ai-helm,
+   Skipper Model). Where it stands:
+   - The after deck stops the tiller, the same both sides (the owner chose option (a)): HARD_OVER 46.5°, fitted to three
+     of the owner's photos (41–49°) and labeled as fitted. Drawn with a 12 cm pin and 4° rest (Deep Physics suggests
+     8 cm and 6°, a 46.8° stop; held by Crew Figures, not shipped).
+   - The ensign staff is at the owner's spot on the starboard quarter, 0.46 m out and 2 in forward of the deck's aft
+     edge, clear of the tiller. The aft cleat is on the centerline.
+   - The rudder stalls at 40°. Her gyration is 0.25 → 0.19, so the turn answers in 0.36 s at 4.7 kt, not 0.6.
+   - The AI's helm: 30° normally, the stall (40°) when about to touch another boat, never hard over. Start penalties are
+     unchanged over 60 paired starts; hits went 53 → 50. The first-mark fix took the AI's penalties at a crowded mark from
+     15 to 9 over nine seeds.
+   - Speed: the pair passed at 0.972. Changes to how boats sail or are judged are now budgeted on the ten-race mean (the
+     owner, 18 Nov; Capacity's PR #465).
+   - Optional, for the owner: measure hard-over at Josephine.
+   - Open, parked for the sprint: **turn drag** (Deep Physics, turn-drag). It replaces the uncited 0.15 with ORC VPP 6.37 induced drag and the
+     blade's separation from 15° (NACA Report 938; the 15–40° ramp is an estimate), so a tack loses 0.8–2.1 lengths. The
+     physics review is done; the full suite and the ten-race budget are left. A known limit: the keel's side forces are
+     charged separately, not as their sum squared.
+   - Open, parked for the sprint: **the slow-boat AI** (Skipper Model). It centers the helm under 1 kt instead of hunting, then looks ahead to
+     keep clear by its speed (every fouler was under 2.7 m/s). Judged with fouls-pair (#461).
+   - Open: weather helm against the AI's turn (not started), and the #460 rules contact fix (held from v208 for the
+     duck test, with Rules).
+   - The request (owner, 15 November; accuracy): "the turning
    radius is too slow and not wide enough when I'm tacking ... short tacks in the marina. I need to be able to push the
    tiller about 50% wider, and I would expect the tiller to be much more reactive ... There should be no delay in the
    turn of the boat and the push of the tiller ... exactly in line." The owner's answers:
@@ -248,13 +301,13 @@ sources. Each shipped item is added there when it's published.
    - The delay is from tiller to boat.
    - Responsiveness shouldn't depend on her speed, as long as she's moving.
 
-   Today:
+   Before #437 (15 November):
    - The rudder stops at ±30° (FULL_RUDDER, src/boat/balance.ts:99), a 60° arc against the owner's ~150°.
    - The mouse span is TILLER_SPAN 0.35 of the window (app.ts:450).
    - The turn radius at full helm is 9 m, an estimate (dynamics.ts:46), capped at 22°/s.
    - The turn reaches the helm's rate through yawLag (physics.ts:544), the delay the owner feels.
 
-   The fix:
+   The first plan (replaced by the deck's stop at 46.5°, v206):
    - The tiller swings about ±75°. Past about 35–45° the rudder stalls and brakes more than it turns, as a real one does,
      so the extra travel is for short-tacking, sculling and braking, not a free tighter circle.
    - The yaw response is tightened until the turn visibly starts with the tiller. Test it on the water at slow speeds
@@ -359,6 +412,18 @@ sources. Each shipped item is added there when it's published.
      because her rig's windage is forward of her lateral resistance. She doesn't come head to wind; that happens with
      the main up and free. The sim should show whichever is sourced for a Folkboat, and the coach should say how to
      get out: walk her out further, hoist the main at the dock head to wind, or paddle (8c).
+   - **A gentler way out than the walk-pace shove (Marinas; from the sourced sternway drag, 17 Nov 2026):** the gentlest
+     shove the crew give is their walk, 0.45 m/s, which now glides her 23 m in still air, so six South Beach berths
+     (D2, E1, E2, F1, F2, G1; 9–12 m of clear water astern) are kept fast in a dead calm. A real crew hands her out
+     slower, checks her on a line, or paddles. (The plan is judged to her way lost, 240 s, since 18 Nov 2026: at 90 s
+     she crept on some 14 m, and five light-air shoves crept into a dock, the breakwater or the next boat.)
+   - **Her crew take charge at the coast's end in a breeze forward of her beam (Marinas; the creep sweep, 18 Nov 2026):**
+     shoved off stern first with a breeze on her bow, a bare-poled boat never loses her way (0.76 m/s in 15 kt on the
+     sourced drag), so on the way-lost horizon 73 berths that were shoved are kept fast, nearly all in a 12 or 20 kt
+     easterly (West Harbor 373–407 odd and 637–649, Gashouse Cove 516/518/520, Corinthian A5–A14 and B30–B35, South
+     Beach A77/A79/A81, Horseshoe Bay A12, A15, C21, Corinthian B3). A real crew finds that the easy way out: the jib up
+     or the main, and she's sailed off where her coast ends. The push-off ends passively, and steered and left alone 87
+     such shoves touched. Let the crew sail her out, with its own every-berth sweep, and those berths come back.
    - **Next for the push-off (Marinas):** a walk-out on a stern line from the twelve berths her crew won't shove her off
      from (geo/marina.ts NO_ASTERN, NO_ASTERN_WEST): it un-flags them, with the test. The lee's edge is allowed for in the shove (done,
      Deep Physics: gauged to the wind along her line out and to leeward of it, World.windAstern; Corinthian B16 in a 20 kt
@@ -393,6 +458,25 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q4. **Now — the backstay's chainplates where the tiller would hit them** (owner, 18 November, with a screenshot;
+   accuracy; now; 1 h): "backstay attachments are too far forward. the tiller would run right into them. they should sit
+   about one inch forward of the aft edge of the deck, about six inches from the tiller on either side." In
+   src/render/boatMesh.ts the plates are BS_CHAINPLATE_X = 0.3 m out, forward of the deck's edge. Move them to 2.5 cm
+   forward of the after deck's aft edge, and about 15 cm clear of the tiller each side (≈0.17 m out with its width).
+   The bridle's legs follow. The ensign staff's place was measured as "equidistant from the toe rail and the starboard
+   chain plate", so keep it at the owner's 0.46 m and check the two stay clear. Add a test that the tiller's swing,
+   hard over at 46.5°, stays clear of both plates. Check it from both quarters.
+8q3. **Now — bug: no Hoist tabs on a cruise started mid-water with the sails down** (owner, 18 November; bug; now; 1–2 h):
+   "while cruising, I started a cruise mid-water with sails down. I don't see hoist buttons. I should always see those if
+   sails are down." The tabs come from app.ts `hoistTab()` and are drawn by sailBand.ts (`.sb-hoist`, ~L553). It hides
+   them when `!w.running`, or when the rig says up and hoisted outside a basin. Check how a mid-water start with sails
+   down sets `rig` (mainUp/jibUp and the hoist fraction), and whether the band or its tabs are shown at all then. The rule:
+   a sail that's down always has its Hoist tab while she's on the water. Add a test: a mid-water cruise start with the
+   sails down shows Hoist main and Hoist jib.
+8q2. **The crew bring the boom back to the centerline when the main drops** (owner, 18 November; accuracy; later, "not
+   urgent"; 1–2 h; Crew Model): "when the main drops, the crew should bring the boom back to centerline." 8q does this
+   only in the slip. On the water, once the main is down, the crew sheet in and center the traveler as a called job, and
+   the boom stays there. A test: the boom within a few degrees of the centerline after the main drops.
 8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (in PR #337) (bug; 2–3 h): owner, "at aquatic park, auto
    nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
    curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
@@ -520,7 +604,7 @@ sources. Each shipped item is added there when it's published.
       exist, but the current's edge widths are estimates with no measured source. Size how sharp the edge is from real
       data (NOAA currents, observations at the Marina and Fort Mason), not invented numbers, and test that the heel, speed
       and set all change within a few boat lengths of the entrance, on a flood and on an ebb.
-   6. **"Fort Mason Center" lettering on the big pier** (owner, 15 November; the shore; Boat Detail; for v198): the
+   6. ~~**"Fort Mason Center" lettering on the big pier**~~ (done, merged 15 Nov, batch44) (owner, 15 November; the shore; Boat Detail): the
       lettering on the pier by Gashouse Cove, drawn as it is in life (its words, color and place from photos). Before
       and after pictures go to the owner before it ships.
    7. **The cove's edge: the harbor's buildings and trees** (Bay East, 15 November; physics; after the wind-shadow seams;
@@ -544,11 +628,11 @@ sources. Each shipped item is added there when it's published.
    - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
      gap between them is the bias;
    - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
-8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
+8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; later, Crew Figures; earlier Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
-   Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
+   later, Crew Figures with a physics check; earlier Boat Detail): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
    josephine-confirmed.md, "Open: the hull's bow profile"): the class construction plan (SSA / NFIA: profile, half-breadths,
    midsection), an older lines drawing, and a photo of a clinker Folkboat on its trailer; the stem a long, fine, nearly
@@ -643,6 +727,12 @@ sources. Each shipped item is added there when it's published.
    Batch 40 is held until the frame fix lands, so nothing adds load meanwhile.
    frame-time check to the release smoke test so a stuttering build
    can't ship.
+8v2. **Now — lag again: in the boat editor, and at the start of cruises** (owner, 18 November, on v207; bug; now; 2–4 h;
+   Capacity): "getting a lot of lag, in boat editor, at beginning of cruises. it tends to resolve after a while, but still
+   not good." Lag that clears by itself points to work done once at the start: the planner's or inset's first slices,
+   the weather loading, the shaders compiling, or the editor's speed report benching while it's open. First, profile both
+   on the published page (perf.cjs's views, plus the editor open and a cruise's first 60 s), and name what runs. Then
+   spread it out or defer it. Add both to perf-ab's views so it doesn't come back.
 8v. ~~**Now — the boat editor is very slow**~~ (done: look-only changes restyle her in place, sail pictures shared, the cockpit linings worked out once; a speed check) (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
@@ -695,7 +785,7 @@ sources. Each shipped item is added there when it's published.
    it. pointOfSail() in src/ui/hud.ts (head to wind, close-hauled, close reach, beam reach, broad reach, run, by her own
    beat angle) is still there but called nowhere. Show it with the windex again, wherever the windex is (the band, and the
    dial under the inset map, 8b), and a test that it's on screen.
-8i. **The boat editor reorganized, with a real color picker** (in PR #354; any color kept already, 1271a6f) (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
+8i. ~~**The boat editor reorganized, with a real color picker**~~ (done, v206: #354; the Yacht Club move still open; any color kept already, 1271a6f) (owner, 13 November; next; 4–6 h; UI & Experience, a mock-up to
    the owner first):
    - "all sail stuff together, all hull stuff together, etc." Proposed groups:
      - **Her:** name, sail number and country, club.
@@ -726,6 +816,21 @@ sources. Each shipped item is added there when it's published.
      Marlow's Excel Racing also has a "mottled" range from 3 mm (search snippet only; the site blocks automated
      fetches). Samson and the others are not yet sourced. Add colorways as each maker is sourced, or from the lines on
      Josephine in the owner's photos (reference/photos). No color-coding convention by function was found.
+8i2. **The editor's folded groups: buttons that say what they do** (owner, 18 November; polish; now; ½–1 h; UI &
+   Experience; src/ui/boatPanel.ts `grp`): "Change to See is terrible content design. Buttons should say what they do;
+   here, you don't change anything by clicking change. Just say "View", and remove the "Change to see" string
+   altogether. or replace it with some kind of cumulative statistic, in which case View should say Expand."
+   - Speed (read-only): its header says View ▾ (Hide ▴ open), and "What she gives away / Change to see" goes. If its
+     folded line shows one total instead (her all-together loss upwind, from the same bench the table uses), the header
+     says Expand ▾.
+   - Lines: "N more / Change to see" becomes "N more"; its header keeps Change, since there you do change them.
+   - Check every group's folded line for the same pattern.
+   - Bug: a boat's page reads "Bottom: , just cleaned" (owner, 18 November: "copy error on this ', just cleaned'
+     string"). In src/ui/fleet.ts, colour() returns '' when her color isn't a named one (any color is kept since
+     #354's picker), and the row joins it with ", " anyway. The fix: name the nearest swatch, or say "Custom", and join
+     only the parts that exist. Topsides uses the same colour() and needs the same fix.
+   - The rope picker (owner, 18 November, with a screenshot): "copy strings here should right-align close to their
+     swatches." Each colorway's name sits right-aligned, just left of its swatch, not at the far left of its cell.
 8k. **Drop and raise the anchor** (in PR #339; rule 22 in PR #335) (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
    later cruising mode's anchoring challenge):
    - Drop anchor: a crew member goes forward, the anchor and rode go over, she drifts back and the anchor sets. Raise
@@ -761,7 +866,7 @@ sources. Each shipped item is added there when it's published.
      it lasts before a rest come from the paddler's fitness and the same fatigue model as hiking (crewPhys.ts), with a
      sourced sustainable-power curve for one person paddling; a tired paddler slows, rests and can be swapped.
    - ~~**The paddle tab as arrows**~~ (done: paddle-arrows) (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
-     clickable arrows like < PADDLE >"; Crew Controls): ‹ paddles on port, › on starboard (the side the crew kneels on,
+     clickable arrows like < PADDLE >"; UI & Copy): ‹ paddles on port, › on starboard (the side the crew kneels on,
      as you face forward); tap the lit one again to stop.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
@@ -859,7 +964,7 @@ sources. Each shipped item is added there when it's published.
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
      to here", and nothing on the screen.
-   - **The navigator doesn't see piers, and can't bring her home** (owner, 15 November; bug; now; 6–10 h):
+   - ~~**The navigator doesn't see piers, and can't bring her home**~~ (done, v206: the way in from the harbor's mouth) (owner, 15 November; bug; now; 6–10 h):
      "navigator not detecting this pier. I ran right into it." The planned track runs straight along a long NE–SW pier
      to its tip, in the Precautionary Area (20–39 ft charted). Suspects: the planner's land test (src/sim/routing.ts
      landDist, :47-66) uses the terrain's land mask and the Cityfront's hand-drawn shore, not the wharf layer
@@ -887,6 +992,19 @@ sources. Each shipped item is added there when it's published.
      destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
      at 6 kt (tests/insetRoute).
    - ~~**A clicked destination shown as a pin, not coordinates, and moved when the destination changes**~~ (done, v205: nav-dest-pin) (owner, 16
+   - **The passage plan's cold first fill: exact speedups left** (17 November; perf; later; each 1–3 h). From Mile Rock to
+     Gashouse Cove the first plan now takes 63 s of work, not 87 s. Two changes did that, both exact (the same track point
+     for point; branch cold-current): the lee rays skip open water, and the current grid keeps the shore's share per
+     point. The Coordinator stopped the work there. What's left, from a CPU profile of that plan (the profiler adds ~3%):
+     - the router's clear-water test (sim/router.ts `clear`): ≈15 s, about half of it the exact `landAlong` walk;
+     - routeLegSteps' own loop: ≈9 s;
+     - the polar speed in chop (`chopSpeed`): ≈6 s;
+     - the weather field (`wx.field`): ≈5 s;
+     - windTerrain's shore distance (`shoreDistAt`): ≈5 s;
+     - the land's lee: ≈6 s, down from ≈20 s.
+     Each needs a test that the plan is identical. Changes that alter accuracy (a coarser lee grid, a shipped table) go to
+     Deep Physics.
+   - **A clicked destination shown as a pin, not coordinates, and moved when the destination changes** (owner, 16
      November: "bug: when I change sailing destinations, the destination pin on the horizon doesn't seem to update. we
      could bundle this fix with the earlier request to use pins instead of coordinates for non-named destinations."; bug
      and polish; now; 1–2 h). The 3D marker's place and label follow every change of destination (a click on the chart,
@@ -995,7 +1113,7 @@ sources. Each shipped item is added there when it's published.
      "when in inset map, clicking the navigator button opens the navigator modal, which fails to populate with the
      map." The navigator's own panel (ui/navView.ts) opens empty of its chart. Fix, with a test that its chart draws
      (scripts/check/setup-map.cjs's way), from the inset and from the expanded chart.
-   - **One chart: the navigator as a layer on the map, not a map of its own** (owner, 16 November; feature, design;
+   - ~~**One chart: the navigator as a layer on the map, not a map of its own**~~ (done, v206: marinas-nav) (owner, 16 November; feature, design;
      next; 4–8 h; mock-up to the owner first): "tapping the navigator button should just surface the navigation map on
      the map directly, or as its own layer, rather than opening a separate map. I see no reason why an IRL sailor would
      have two separate maps: one for conditions and one for navigation." The passage plan (destination, track, hazards)
@@ -1110,7 +1228,7 @@ sources. Each shipped item is added there when it's published.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
-   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Experience to design,
+   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Copy to design after the copy audit,
      to the owner before building): "there's a lot of really cool shit we've built, like wind-in-air and wind-over-sails,
      but it's hard to find these things. I think we need a 'more' (not that copy though) button on the game surface for
      all features that show up on the game surface itself." One button, an icon rather than the word "More", that opens a
@@ -1119,16 +1237,29 @@ sources. Each shipped item is added there when it's published.
      course and strategist or navigator, the cabin-top instrument, the paddle, the navigation lights, the hail, the
      views, all messages and the frame-time readout. The owner asked for this button; it should also absorb scattered
      on-screen toggles, so the surface ends up with fewer controls, not more. Ties in with the UI audit (#236).
-   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; UI & Experience to design): "we took away the copy
+   - **Show the tiller angle** (owner, 15 November; polish; 1–2 h; Crew Figures from 18 Nov, with the tiller guide): "we took away the copy
      on the tiller interface, which was good. but it might be nice to show the tiller angle." A picture, not words: a
      small tiller (or rudder) needle in an existing element, such as the sail band or beside the wind dial, showing how
      far it's over to port or starboard and where it's lashed. No new button, and no new strip across the screen (on 12
      November the owner said "no tiller strip"; this is a needle, not the old strip).
-   - **An audit for that kind of noise everywhere** (in progress: Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
+   - **Now — an audit for that kind of noise everywhere** (UI & Copy from 18 Nov; earlier Crew Art, annotated screenshots to the owner; fixes so far a756fbf, 848df4b) (owner: "let's do an audit for this kind of noise throughout"; part
      of the UI audit; 2–4 h): every explanatory line on every screen (setup, boat editor, Yacht Club, Settings, the chart,
      the logbook, the panels, the coach) listed and kept only if the player needs it to act. The rest is cut, or moved to
      the coach, the help or the Keys. The list goes to the owner before cutting, unless a line is plainly noise like
      these.
+     - **Bug: the jumpers' control** (owner, 18 November; bug; now; 2–3 h): "jumper control are confusing and glitchy.
+       can't seem to reach the minimum 0 or maximum 5. left/right arrow control UI is super weird. and the controls should
+       show on the panel by default." In src/ui/sailBand.ts `jumpers()`, the dial shows only when her Rig tune has
+       `jumpersUnderWay`: the owner wants it shown by default. 0 and 5 aren't reached: check jumpersBy's step from
+       jumpersNow/jumperTarget (two quick presses, the guide's tune with no tune set) against condition.ts wantJumpers'
+       clamp and fixTune. Add a test that presses take it from 2.5 to 0 and to 5. The left/right halves of the dial go;
+       in their place, a plain − 2.5 + stepper in the band, its mock-up to the owner first.
+     - **First: the sail band's and coach's tips** (owner, 18 November, with a screenshot of Jumpers' tip, 11 lines; now;
+       3–5 h): "we need to work on these gargantuan copy blocks. no one will read this." Each tip (src/ui/sailBand.ts,
+       e.g. `jt`) becomes one line of about 12 words: what it does, and the cue to act (Jumpers: "More turns stiffen the
+       masthead. Tall tick: North's 2.5."). The click and scroll use goes to Keys. The sources and the physics go into the
+       code's comments, or into one "Why" link per control if the owner wants them kept. All the band's new lines go to
+       the owner as one table before they replace the old ones. A test: no band tip over about 90 characters.
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
@@ -1258,7 +1389,7 @@ is now "much better" (owner).
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
    - **Bug: in heavy weather the lantern swings up through the cabin top** (owner, 16 November, a screenshot; bug;
-     next, not urgent; 1–2 h; Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
+     later; 1–2 h; Crew Figures, after its tiller and crew queue; earlier Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
      The pendulum's angle is unbounded, so a big roll swings it up past the overhead and it shows above the deck. Stop
      its swing where the lantern meets the cabin top or the bulkhead (it knocks against it and falls back), so it never
      leaves the cabin; check at 25 kt on both tacks.
@@ -1910,16 +2041,16 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
   Owner's requests, 12 November (unranked; the owner will rank them):
-  1. Significantly more hull paint colors (Boat Detail).
-  2. Color options for the sail numbers and the F class letter (Boat Detail).
-  3. The interior and cockpit material, teak or fibreglass (Boat Detail).
+  1. Significantly more hull paint colors (later, Crew Figures; partly #354).
+  2. Color options for the sail numbers and the F class letter (later, Crew Figures).
+  3. The interior and cockpit material, teak or fiberglass (later, Crew Figures).
   4. The drawn rigging lines in the colors chosen for the control panel (the Boat page's line colors), so each line
      wears its control's color (Rigging, with the rigging rendering).
   5. A tactical compass on the cabin top, as Josephine's Tacktick-style unit at the mast foot
      (reference/photos/josephine-cabin-top-forward-port.png): usable in the game, readable from the cockpit camera,
      showing heading, and used tack to tack to read lifts and headers like the real one (Boat Detail for the unit,
      UI & Experience for its readout).
-  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (Boat Detail).
+  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (later, Crew Figures).
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)

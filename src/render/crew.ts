@@ -4,7 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { CrewState, Person, Pose as Job } from '../boat/crewPhys';
 import { DECK_ARM, slotOf } from '../boat/crewPhys';
 import { BONE, buildBody, type Body } from './crewBody';
-import { sheer, CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, HEEL, JIB_WINCH_Z, L, TRANSOM_TOP, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, thwartBottom, uAtZ, benchOut } from './hull';
+import { sheer, CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY, canoe, FOOTREST, footrestEdge, JIB_WINCH_Z, L, cabinHalf, cabinTopAt, cockpitHalf, deckY, halfBeam, hullInnerHalf, thwartTop, thwartBottom, uAtZ, benchOut, TILLER, tillerRestDir, RUDDER_RAKE } from './hull';
 
 /**
  * The people aboard, drawn as people: a jointed figure for each (pelvis, torso, head, arms with elbows and hands,
@@ -26,6 +26,9 @@ import { sheer, CABIN, COAMING_H, COAMING_T, COCKPIT, COCKPIT_FIT, COMPANIONWAY,
 export interface Figure extends Body {
   /** (render state: the pose being eased toward, where they were last frame, a step's phase, their speed) */
   cur?: PoseT; last?: THREE.Vector3; gait: number; speed: number;
+  /** the helm's hand on the tiller itself, the extension stowed along it (helmPose); and how far the extension's swung
+   * out on its joint (0 stowed … 1 out, in the hand: syncCrew), and for how long it's been wanted stowed (s) */
+  onTiller?: boolean; extOut?: number; stowT?: number;
   /** the foot hooked under the thwart (or on its way out from under it): ease reads what's under it at its height */
   hookFoot?: number;
   /** walking this frame: the pose's feet step (syncCrew) */
@@ -33,13 +36,25 @@ export interface Figure extends Body {
   /** (the hips' and the lean's velocities, for their springs; on the move or not; a foot's swing under way) */
   hipV?: THREE.Vector3; pitchV?: number; going?: boolean; /** a turn given its way round (+1, −1): back from facing aft after a tack */ turnDir?: number; route?: { side: number; z: number; goal: number; down?: boolean; /** how long they've been sitting down at its end */ sitT?: number; /** which way they face along the deck: −1 forward, +1 aft (fixed for the route) */ face?: number }; walked?: boolean; /** aft of the thwart, the side deck they're sat on (aftSide) */ aftSide?: number; /** two in the middle, this one on the bench's edge: which side */ benchSide?: number; /** the side the physics is sending them to, if well out to one */ goalSide?: number; vel?: THREE.Vector3; upr?: number; tack?: boolean; swing?: ({ from: THREE.Vector3; to: THREE.Vector3; t: number; top: number; /** the share of the step spent lifting before it sets off along (something high right where it starts) */ hold?: number } | null)[];
 }
-export interface Crew { /** where the helm has the mainsheet's tail (boat frame, the fist), sat steering; none if not */ mainHand?: THREE.Vector3; /** where the hiker holding the traveller's tail has it (boat frame), for boatMesh.ts to lead it there */ travHand?: THREE.Vector3; /** where the hiker holding the lee jib sheet has its tail (boat frame), for boatMesh.ts to lead it to the hand; none if nobody does */ sheetHand?: THREE.Vector3; /** the working sheet's second hand on it, if both are (the fist) */ sheetHand2?: THREE.Vector3; group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
+export interface Crew { /** where the helm has the mainsheet's tail (boat frame, the fist), sat steering; none if not */ mainHand?: THREE.Vector3; /** where the hiker holding the traveller's tail has it (boat frame), for boatMesh.ts to lead it there */ travHand?: THREE.Vector3; /** where the hiker holding the lee jib sheet has its tail (boat frame), for boatMesh.ts to lead it to the hand; none if nobody does */ sheetHand?: THREE.Vector3; /** the working sheet's second hand on it, if both are (the fist) */ sheetHand2?: THREE.Vector3; group: THREE.Group; helm: Figure; crew: Figure[]; helmSide: number; side: number; extension: THREE.Mesh; /** its universal joint on the tiller's end */ ujoint: THREE.Mesh; /** the tiller's root on the rudder head, this frame (boatMesh.ts: tillerRootAt), for laying the extension along it */ tillerRoot?: THREE.Vector3; /** the boom crutch, out for paddling (boat/paddle.ts); and the paddling as drawn: since when (the race's clock), and when it stopped */ crutch: THREE.Mesh; pd?: { key: number; t0: number; end?: number }; /** who paddles (CrewState.people's index) */ pdWho?: number; /** the race's clock at the last frame (CrewState.clock) */ clock?: number; /** her pitch at the last frame, rad, and its rate's smoothed mean square (syncCrew: how rough it is) */ seaP?: number; seaMs?: number;
   /** the jib winch being cranked: its side (+1 starboard) and the handle's turn about the spindle (rad, 0 pointing aft, + toward
    * +x), for boatMesh.ts to draw the handle where the hand has it */ winch?: { side: 1 | -1; turn: number } }
 type Limb = Body['arm'][number];
 
 /** A sailor (crewBody.ts): their body, and the state the posing keeps. */
 const figure = (p: Person, jacket: number, seed: number): Figure => ({ ...buildBody(p, jacket, seed), gait: 0, speed: 0, swing: [null, null] });
+
+/**
+ * The tiller extension (the owner's: all black, a telescoping tube with a D-loop grip at its end, extension-style.png), from
+ * its joint (the origin) along +y, EXT_LEN to the grip's far side.
+ */
+function extensionGeometry(): THREE.BufferGeometry {
+  const outer = new THREE.CylinderGeometry(0.013, 0.013, 0.32, 8).translate(0, 0.17, 0), inner = new THREE.CylinderGeometry(0.011, 0.011, 0.2, 8).translate(0, 0.4, 0);
+  // the D: a loop of a 0.05 m radius, in the plane of the stick, its near side across the tube's end
+  const loop = new THREE.TorusGeometry(0.05, 0.012, 6, 18).translate(0, EXT_LEN - 0.06, 0);
+  const g = mergeGeometries([outer, inner, loop].map(q => q.toNonIndexed()));
+  return g;
+}
 
 /**
  * Where a line's tail ends (boatMesh.ts, the jib sheet's and the traveller's): in the hand of whoever holds it
@@ -112,6 +127,11 @@ const FIST = 0.065;
 /** How far a point is from the straight run between two others. */
 const onRun = (p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3) => { const ab = _ab.copy(b).sub(a), t = Math.max(0, Math.min(1, _ap.copy(p).sub(a).dot(ab) / Math.max(1e-9, ab.lengthSq()))); return p.distanceTo(_ap.copy(a).addScaledVector(ab, t)); };
 const _ab = new THREE.Vector3(), _ap = new THREE.Vector3();
+/** The shoulder as drawn (boat frame): the upper arm's root. */
+function shoulderDrawn(f: Figure, i: 0 | 1): THREE.Vector3 {
+  const par = f.root.parent; f.root.updateWorldMatrix(true, true);
+  const at = f.arm[i].root.getWorldPosition(new THREE.Vector3()); return par ? par.worldToLocal(at) : at;
+}
 /** The wrist as drawn (boat frame): the forearm's end. */
 function wristAt(f: Figure, i: 0 | 1): THREE.Vector3 {
   const par = f.root.parent; f.root.updateWorldMatrix(true, true);
@@ -122,10 +142,11 @@ export function buildCrew(helm: Person, people: Person[], jackets: number[], see
   const h = figure(helm, jackets[0], seed); group.add(h.root);
   const crew = people.map((p, i) => { const f = figure(p, jackets[(i + 1) % jackets.length], seed + i + 1); group.add(f.root); return f; });
   // the tiller extension (a black glassfibre stick on a universal joint at the tiller's end), in the helm's hand
-  const extension = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 1, 6), new THREE.MeshLambertMaterial({ color: 0x1b1d20 }));
+  const extension = new THREE.Mesh(extensionGeometry(), new THREE.MeshLambertMaterial({ color: 0x141518 }));
   extension.castShadow = true; group.add(extension);
+  const ujoint = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), new THREE.MeshLambertMaterial({ color: 0x2a2c30 })); group.add(ujoint);
   const crutch = new THREE.Mesh(crutchGeometry(), new THREE.MeshLambertMaterial({ color: 0x9a6a3c })); crutch.visible = false; crutch.castShadow = true; group.add(crutch);
-  return { group, helm: h, crew, helmSide: 1, side: 1, extension, crutch };
+  return { group, helm: h, crew, helmSide: 1, side: 1, extension, ujoint, crutch };
 }
 
 /**
@@ -171,6 +192,22 @@ let poseClock = 0;
  * the Bay's westerly sea about 0.006 rad/s at 6 kt, 0.025 at 14, 0.066 at 22 (measured, an AI boat racing on the default
  * course). Going forward in it, a crew goes lower and slower, both hands down. */
 let rough = 0;
+/** The tiller extension's length (m): about half the tiller's (the owner: a long one is "visually intrusive and not true
+ * to life"), ESTIMATE. And the tiller's root this frame (syncCrew), for folding it back along the tiller. */
+const EXT_LEN = 0.6, /** the D-grip's middle, along the extension from its joint */ EXT_GRIP = EXT_LEN - 0.06;
+let tRoot: THREE.Vector3 | undefined;
+/** Back along the top of the tiller from its end, toward the rudder head: the stowed extension's way. */
+const extAlong = (tip: THREE.Vector3) => tRoot ? tRoot.clone().sub(tip).normalize().add(V(0, 0.05, 0)).normalize() : V(0, 0.1, 1).normalize();
+/** Between two directions, the share `e` of the way round (on the joint). */
+function slerpDir(a: THREE.Vector3, b: THREE.Vector3, e: number): THREE.Vector3 {
+  const ang = Math.acos(Math.max(-1, Math.min(1, a.dot(b)))); if (ang < 1e-4) return b.clone();
+  const ax = new THREE.Vector3().crossVectors(a, b); if (ax.lengthSq() < 1e-10) ax.set(0, 1, 0); return a.clone().applyAxisAngle(ax.normalize(), ang * e);
+}
+/** The extension swung out (ESTIMATES): when the helm is hiking (lean past EXT_HIKE) or the tiller's past EXT_TILLER
+ * degrees off the centerline; stowed again once neither has been so for EXT_STOW s; the swing takes EXT_SWING s. */
+const EXT_HIKE = 0.3, EXT_TILLER = 30, EXT_STOW = 3, EXT_SWING = 0.6;
+/** …unless the tiller's end is within EXT_CLOSE m of their hips (ESTIMATE): then the hand's on the tiller. */
+const EXT_CLOSE = 0.9;
 /** The winch someone is cranking this frame, if anyone (Crew.winch). */
 type Cranked = { side: 1 | -1; turn: number; fig?: Figure; hand?: number };
 let cranked: Cranked | undefined;
@@ -858,16 +895,70 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
  * the cockpit's after end, the extension in the inboard hand and the mainsheet's tail in the other. */
 function helmPose(fig: Figure, x: number, z: number, lean: number, windward: number, tip: THREE.Vector3): PoseT {
   const k = fig.scale, s = Math.abs(x) > 0.05 ? Math.sign(x) : windward, u = uAtZ(z), e = halfBeam(u);
+  // (the tiller pushed far across the other way, the extension out: hiked right out, the hand can't reach its grip even
+  // slid along the deck toward it; a helm comes in off the rail to push it across. Drawn sat up as far as that needs:
+  // the physics' lean is theirs, this is only the pose)
+  // (the seat stays where hiking put it: only the torso comes up)
   const hx = Math.min(e - 0.04 + 0.06 * lean, Math.max(0.3, Math.abs(x) + 0.1 + 0.12 * lean));
+  if ((fig.extOut ?? 0) > 0) for (let ln = lean; ln >= 0; ln -= 0.1) {
+    const shl = shoulderAt({ hip: V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw: s * (0.55 + 0.5 * ln), pitch: 0.05 + 1.1 * ln, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
+    lean = Math.max(0, ln); if (tip.distanceTo(shl) - 0.7 <= EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.85) break;
+  }
   const hip = V(s * hx, deckY(u, hx) + 0.09 * k, z), yaw = s * (0.55 + 0.5 * lean), r = right(yaw);
-  const fz = COCK1 - 0.24, fc = chz(fz) - 0.16; // (feet on the seat inside the coaming, the shins clear of it)
+  // (the tiller hard over away from them, to 75°: its end across the far quarter, out of reach of the extension and an
+  // arm from where they sit. They slide aft and in along the after deck toward it, as a helm does, as far as they need
+  // and up to 0.7 m, to the middle of the after deck at most, ESTIMATES; their feet come aft with them)
+  let fz = COCK1 - 0.24;
+  // (the reach is from the shoulder the hand hangs from, not the hip: sat out hiking, leant back, it's well aft and out
+  // of the hip, and a hand reaching from it fell short of the grip of a stick only half the tiller's length)
+  { const sh = shoulderAt({ hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0 } as PoseT, k, s > 0 ? 0 : 1);
+    // (and the extension stowed, the tiller's end come round behind them, hard over their way: the hand on the tiller
+    // itself, the reach the arm's alone; they shuffle toward it, no more than 0.2 m, not into the tiller's sweep)
+    const stowedBehind = (fig.extOut ?? 0) < 0.02 && tip.clone().sub(hip).dot(fwd(yaw)) < 0.1;
+    const farHand = stowedBehind ? Math.min(0.2, tip.distanceTo(sh) - (BONE.upper + BONE.fore) * k * 0.8) : -1;
+    const far = Math.max(Math.hypot(tip.x - hip.x, tip.z - hip.z) - (EXT_LEN + 0.5 * k), tip.distanceTo(sh) - (EXT_GRIP + (BONE.upper + BONE.fore) * k * 0.75), farHand);
+    if (far > 0) {
+      const dx = tip.x - hip.x, dz = tip.z - hip.z, n = Math.hypot(dx, dz) || 1, go = Math.min(0.7, far);
+      const nz = Math.min(L / 2 - 0.5, hip.z + go * dz / n), nu = uAtZ(nz);
+      // (to the middle of the after deck at most; beside the cockpit, still on the side deck, not over the well)
+      const nx = s * Math.max(nz < COCK1 + 0.05 ? chz(nz) + 0.12 : 0.08, s * (hip.x + go * dx / n));
+      fz = Math.min(COCK1 - 0.12, fz + (nz - hip.z));
+      hip.set(nx, Math.max(deckY(nu, Math.min(Math.abs(nx), halfBeam(nu))), ground(nx, nz)) + 0.09 * k, nz);
+    } }
+  const fc = chz(fz) - 0.16; // (feet on the seat inside the coaming, the shins clear of it)
   const foot = (j: number) => { const q = V(s * Math.min(fc - 0.1 * lean, Math.max(0.12, hx - (0.3 + 0.2 * lean) * k)), 0, fz).addScaledVector(r, (j ? 1 : -1) * 0.12 * k); q.x = Math.sign(q.x) * Math.min(Math.abs(q.x), chz(q.z) - 0.16); onGround(q);
     // (sitting out on the side deck, the knees over the coaming: the feet hang from them, on the footrest or just off it)
     if (hx > chz(fz) - 0.05) q.y = Math.max(q.y, deckY(uAtZ(fz), chz(fz)) + coamH(fz) + 0.04 - BONE.shin * k);
     return q; }
-  // the extension: from the tiller's end toward the chest, as long as the hand is from it (it's about a metre long)
-  const chest = hip.clone().add(V(0, 0.42 * k, 0)), d = chest.clone().sub(tip), reach = Math.min(0.95, d.length() - 0.28 * k);
-  const ext = tip.clone().addScaledVector(d.normalize(), Math.max(0.2, reach));
+  // the extension (EXT_LEN, on its universal joint on the tiller's top, EXT_AFT short of its end: the owner). Stowed (extOut 0), lying back along
+  // the top of the tiller, the hand on the tiller just short of its end (the owner's photo of hers); swung out, its grip in
+  // the hand: out toward where a hand rests in front of them, or as far toward the tiller's end as they reach when it's
+  // across the far quarter. Between, the hand carries the grip round on the joint
+  const chest = hip.clone().add(V(0, 0.42 * k, 0)), rest = chest.clone().addScaledVector(fwd(yaw), 0.3 * k).add(V(0, -0.22 * k, 0));
+  const along = extAlong(tip), eo = fig.extOut ?? 0;
+  let out = rest.clone().sub(tip).normalize(), reaching = false;
+  if (tip.clone().addScaledVector(out, EXT_LEN).distanceTo(chest) > 0.62 * k) { out = chest.clone().sub(tip).normalize(); reaching = true; } // (reaching for it)
+  fig.onTiller = eo < 0.02;
+  // (on the tiller, the hand just short of its end; or, its end come round by them, behind the hip, where along it the
+  // hand reaches from its shoulder: a hand takes the tiller where it can, nearer the rudder head)
+  const onAt = () => { const a = tip.clone().addScaledVector(along, 0.1); if (!tRoot || !fig.cur) return a;
+    const sh = shoulderDrawn(fig, s > 0 ? 0 : 1), b = tRoot.clone().lerp(tip, 0.15), ab = a.clone().sub(b), t = Math.max(0, Math.min(1, sh.clone().sub(b).dot(ab) / Math.max(1e-9, ab.lengthSq())));
+    const q = b.addScaledVector(ab, t); return q.distanceTo(sh) < a.distanceTo(sh) ? q.add(V(0, 0.03, 0)) : a; };
+  let ext = fig.onTiller ? onAt() : tip.clone().addScaledVector(slerpDir(along, out, eo), Math.min(EXT_GRIP, eo >= 1 && reaching ? Math.max(0.2, tip.distanceTo(chest) - 0.28 * k) : EXT_GRIP));
+  // (the hand on the tiller: the fist round it there, the wrist's target back by the fist's offset as drawn)
+  if (fig.onTiller && fig.cur) { const iT = s > 0 ? 0 : 1; ext.sub(fistAt(fig, iT).sub(wristAt(fig, iT))); }
+  if (!fig.onTiller) {
+    // the grip within the arm's reach of its shoulder: swung toward the shoulder on its joint where it would be out of
+    // reach (the fist fell short of a stick of its own length), then the wrist's target a fist's length back from the
+    // grip, so the fist closes round the grip (the hand's target is the wrist: fistAt)
+    // (the shoulder as drawn, once there is a figure drawn: leant out hiking, it's well back of where the pose's own
+    // reckoning has it)
+    const iE = s > 0 ? 0 : 1, sh = fig.cur ? shoulderDrawn(fig, iE) : shoulderAt({ hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0 } as PoseT, k, iE), reach = (BONE.upper + BONE.fore) * k * 0.92;
+    if (ext.distanceTo(sh) > reach - FIST * k) ext = tip.clone().addScaledVector(sh.clone().sub(tip).normalize(), Math.max(0.2, Math.min(EXT_GRIP, tip.distanceTo(sh) - reach + FIST * k)));
+    // (the fist's offset from the wrist as the arm is drawn, once there is one: where the elbow is decides it; before, back
+    // toward the shoulder)
+    if (fig.cur) ext.sub(fistAt(fig, iE).sub(wristAt(fig, iE))); else ext.addScaledVector(sh.clone().sub(ext).normalize(), FIST * k);
+  }
   const sheet = V(s * 0.12, 0.95, THWART.z + 0.15).lerp(chest, 0.35);
   const hands: [THREE.Vector3, THREE.Vector3] = s > 0 ? [ext, sheet] : [sheet, ext];
   // (sat out on the side deck, the knees up over the coaming's top as the legs come in over it, not let down level with
@@ -1075,7 +1166,7 @@ function ik(limb: Limb, base: THREE.Vector3, target: THREE.Vector3, l1: number, 
   limb.mid.rotation.set(Math.atan2(-v.z, -v.y), 0, 0);
 }
 
-const _kn = V(0, 0, 0), _p2 = V(0, 0, 0), _p = V(0, 0, 0), _h = V(0, 0, 0), _inv = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _e = new THREE.Euler();
+const _kn = V(0, 0, 0), _kn2 = V(0, 0, 0), _p2 = V(0, 0, 0), _p = V(0, 0, 0), _h = V(0, 0, 0), _inv = new THREE.Quaternion(), _tq = new THREE.Quaternion(), _e = new THREE.Euler();
 /** Put a figure in a pose: the hips placed and turned, the torso leaned, each limb reaching its foot or hand. */
 const _ax = V(0, 0, 0), _qc = new THREE.Quaternion();
 /** Put a figure in a pose (`upright` rad: how far the torso leans against the boat's heel, to stay over the hips as she
@@ -1109,7 +1200,13 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
     const bad = () => {
       f.root.updateMatrixWorld(true);
       const el = par.worldToLocal(a.mid.getWorldPosition(_h));
-      return !underDeck(el.x, el.y, el.z) && el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z)); // (in under the side deck is open: the winch)
+      if (!underDeck(el.x, el.y, el.z) && el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z))) return true; // (in under the side deck is open: the winch)
+      // (nor an elbow stuck out forward of the line from shoulder to wrist, the way an elbow doesn't bend: a hand drawn in
+      // close to the shoulder, turned aft to the mainsheet in a tack, folded the arm up with the elbow out in front)
+      const sh = a.root.getWorldPosition(_s), wr = a.mid.localToWorld(_u.set(0, -BONE.fore, 0)), w = a.mid.getWorldPosition(_t);
+      const line = wr.sub(sh), tt = w.clone().sub(sh).dot(line) / Math.max(1e-9, line.lengthSq()), off = w.sub(sh).addScaledVector(line, -tt);
+      const fw = f.root.localToWorld(_kn2.set(0, 0, -1)).sub(f.root.getWorldPosition(_p2)).setY(0), ahead = off.dot(fw) / Math.max(1e-9, fw.length());
+      return ahead > 0.05 && -off.y < ahead;
     };
     for (let h = 0; h < hints.length && bad(); h++) { a.root.userData.bend = undefined; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, hints[h], -1); }
   });
@@ -1209,7 +1306,12 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       // under the deck's edge to it, not down through the deck)
       const gw = want.hands[i], inTo = !passes && underDeck(gw.x, gw.y, gw.z) && !underDeck(hd.x, hd.y, hd.z) && Math.abs(hd.y - gw.y) > 0.03;
       if (inTo) _w.set(Math.sign(gw.x) * (chz(gw.z) - 0.08), gw.y, gw.z);
-      toward(hd, passes || inTo ? _w : gw, a, LIMB_SPEED * dt);
+      // (and coming out from under it, the other way round: in to the cockpit's edge below the deck first, then up. Rising
+      // where it was, it came up past the deck's underside and was put on top of the deck in a frame, 0.27 m: a hand at
+      // the winch's grip off forward to the cabin top's lines)
+      const wasUnder = underDeck(hx, hy, hz), outOf = !passes && !inTo && wasUnder && !underDeck(gw.x, gw.y, gw.z);
+      if (outOf) _w.set(Math.sign(hx) * (chz(hz) - 0.08), Math.min(hy, gw.y), hz);
+      toward(hd, passes || inTo || outOf ? _w : gw, a, LIMB_SPEED * dt);
       // (coming to a step up, the bench's edge or the coaming, it stops and rises to it at a hand's pace: never snapped up onto it)
       if (handFloor(hd.x, hd.y, hd.z) + 0.02 > hy + LIMB_SPEED * dt) { hd.x = hx; hd.z = hz; hd.y = Math.max(hy, handFloor(hx, hy, hz) + 0.02) + LIMB_SPEED * dt; }
       // (rising early to clear an edge it's coming to, at a hand's pace; never inside what's under it)
@@ -1220,7 +1322,9 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       if (far && !inTo) { let top = 0; for (let q = 1; q < 5; q++) { _u.copy(hd).lerp(want.hands[i], q / 5); top = Math.max(top, ground(_u.x, _u.z)); }
         if (top > Math.max(ground(hd.x, hd.z), ground(want.hands[i].x, want.hands[i].z)) + 0.03) clear = top + 0.04; }
       // (the rise from where it was this frame, at a hand's pace in all: not that on top of the move toward its place)
-      hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02); }
+      hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02);
+      // (still in under the side deck: below its underside, never up through it)
+      if (wasUnder && underDeck(hd.x, SEAT_Y + 0.01, hd.z)) hd.y = Math.min(hd.y, deckY(uAtZ(hd.z), Math.abs(hd.x)) - 0.031); }
     const foot = c.feet[i], sw = f.swing![i];
     if (want.step || sw) {
       // walking or crawling (and a step under way is finished, whatever comes next): each foot stays planted until it's left behind, then swings (lifted) to a new place
@@ -1353,15 +1457,21 @@ function toward(p: THREE.Vector3, q: THREE.Vector3, a: number, max: number): voi
 }
 
 /** Where the tiller's end is in the boat's frame, from the rudder (boatMesh.ts: the group turned to steer). */
-const TILLER_TIP = (() => {
-  // (rudderGeometry: the tiller from the rudder head, 1.3 m forward and a little up, in the hinge's frame)
-  const len = Math.hypot(TRANSOM_TOP.z - HEEL.z, TRANSOM_TOP.y - HEEL.y) + 0.1;
-  return V(0, len - 0.03, 0.04).addScaledVector(V(0, -0.317, -0.949).normalize(), 1.3);
-})();
-export function tillerTip(turn: THREE.Object3D): THREE.Vector3 {
-  const rud = turn.parent!; turn.updateMatrix(); rud.updateMatrix();
-  return TILLER_TIP.clone().applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
-}
+// (the tiller's end and its pin, in the tiller's own frame: it's turned with the rudder and lifted on its pin, boatMesh.ts)
+const TILLER_TIP = tillerRestDir().multiplyScalar(TILLER.len), TILLER_PIN = V(0, 0, 0);
+/** The extension's universal joint: on the tiller's top, 18 cm short of its end (the owner: 6–8 in), ESTIMATE. */
+const EXT_AFT = 0.18, TILLER_JOINT = (() => { const d = tillerRestDir(), r = RUDDER_RAKE, up = V(0, Math.cos(r), -Math.sin(r)); // (the boat's up, in the rudder's frame)
+  up.addScaledVector(d, -up.dot(d)).normalize(); return d.clone().multiplyScalar(TILLER.len - EXT_AFT).addScaledVector(up, 0.03); })();
+const onTiller = (turn: THREE.Object3D, local: THREE.Vector3) => {
+  const rud = turn.parent!, til = turn.children[1]; til.updateMatrix(); turn.updateMatrix(); rud.updateMatrix();
+  return local.clone().applyMatrix4(til.matrix).applyMatrix4(turn.matrix).applyMatrix4(rud.matrix);
+};
+/** Where the tiller's pin (its root, on the rudder head) is in the boat's frame. */
+export const tillerRootAt = (turn: THREE.Object3D) => onTiller(turn, TILLER_PIN);
+/** Where the tiller's end is in the boat's frame, from the rudder (boatMesh.ts: the group turned to steer). */
+export const tillerTip = (turn: THREE.Object3D) => onTiller(turn, TILLER_TIP);
+/** Where the extension's joint is in the boat's frame: the helm's hold on the tiller, whichever way they steer. */
+export const tillerJointAt = (turn: THREE.Object3D) => onTiller(turn, TILLER_JOINT);
 
 /**
  * (Moving, and which way: from where the physics has them now against last frame, over the time the race moved
@@ -1423,6 +1533,7 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   // (how she's moving in the sea, from her pitch as drawn, rad: its rate's mean square over about four seconds)
   if (pitch != null && dt > 0 && dt < 0.5) { if (cr.seaP != null) { const r = (pitch - cr.seaP) / dt; cr.seaMs = (cr.seaMs ?? 0) + (r * r - (cr.seaMs ?? 0)) * (1 - Math.exp(-dt / 4)); } cr.seaP = pitch; }
   rough = Math.max(0, Math.min(1, (Math.sqrt(cr.seaMs ?? 0) - 0.012) / 0.04));
+  tRoot = cr.tillerRoot;
   // (sitting, people hold their bodies near upright as she heels; hiking or kneeling at a job, braced, less)
   const heel = heelDeg * Math.PI / 180, against = (pose: string) => -heel * (pose === 'sit' || pose === 'lee' || pose === 'helm' ? 0.55 : pose === 'cross' ? 0.3 : 0.2);
   const ppl = c?.people;
@@ -1564,6 +1675,20 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   const paddling = pdl?.f === h, away = hp?.pose === 'piano' || paddling;
   const dir = track(h, x, z, sdt);
   const t = tip ?? V(0, 0.8, 2.6);
+  { const ang = cr.tillerRoot ? Math.atan2(Math.abs(t.x - cr.tillerRoot.x), Math.max(1e-3, cr.tillerRoot.z - t.z)) * 180 / Math.PI : 0;
+    // (but the tiller's end come round close by them, hard over their way, they take the tiller itself)
+    const close = !!h.cur && t.distanceTo(h.cur.hip) < EXT_CLOSE;
+    // (and out whenever the tiller's end is beyond the hand's reach from its shoulder: the tiller pushed across toward
+    // the far side short of EXT_TILLER, its end out of reach, the hand reached for it in the air)
+    const iE = cr.helmSide > 0 ? 0 : 1, beyond = !!h.cur && t.distanceTo(shoulderDrawn(h, iE)) > (BONE.upper + BONE.fore) * h.scale * 0.95;
+    // (but not swung out at the body: the tiller's end come round behind them, the stick would run through them; the hand
+    // takes the tiller where it reaches it, helmPose)
+    const behind = !!h.cur && _t.copy(t).sub(h.cur.hip).dot(fwd(h.cur.yaw)) < 0.1;
+    // (hard over their way, hiked out or not, the tiller's end is right by them: they hold the tiller itself)
+    const want = !!h.going || (!behind && ((hp?.lean ?? 0) > EXT_HIKE || (ang > EXT_TILLER && !close) || beyond));
+    h.stowT = want ? 0 : (h.stowT ?? EXT_STOW) + dt; // (how long it's been wanted stowed, s)
+    const goOut = want || (h.stowT < EXT_STOW && (h.extOut ?? 0) > 0);
+    h.extOut = Math.max(0, Math.min(1, (h.extOut ?? 0) + (goOut ? 1 : -1) * dt / EXT_SWING)); }
   let want = paddling ? crewPose(h, x, z, 0, hp?.pose ?? 'car', windward, (h.going = travelling(h, hp, x)) && h.speed > 0.18, dir, 9)
     : away ? crewPose(h, x, z, hp?.lean ?? 0, 'piano', windward, h.speed > 0.18, dir, 9)
     : (h.going = travelling(h, hp, x)) ? helmCrossing(h, x, z, dir, t) : helmPose(h, x, z, hp?.lean ?? 0, windward, t);
@@ -1572,16 +1697,15 @@ export function syncCrew(cr: Crew, windward: number, c: CrewState | undefined, d
   apply(h, ease(h, want, dt), upright(h, against(hp?.pose ?? 'helm'), dt), dt);
   h.root.visible = !hideHelm;
   // the extension, from the tiller's end to the helm's hand (and a little past it), unless they've let go
-  // (to the middle of the fist round it, and a little past: not to the wrist, beside it)
+  // (a straight stick of its own length from its joint on the tiller's end, swung to the hand: to the middle of the fist
+  // round its grip, not the wrist beside it; or, the hand on the tiller, folded back along it. Let go, it lies along the
+  // tiller too)
   const hi = cr.helmSide > 0 ? 0 : 1, hand = fistAt(h, hi), ex = cr.extension, held = !away && !hideHelm;
-  ex.visible = held;
+  ex.visible = !hideHelm; cr.ujoint.visible = !hideHelm; cr.ujoint.position.copy(t);
   // (the mainsheet's tail in the other hand, sat at the helm: boatMesh.ts leads it from the car's block to the fist)
   cr.mainHand = held && !h.going && !paddling ? fistAt(h, hi ? 0 : 1) : undefined;
-  if (held) {
-    const d = hand.clone().sub(t), len = d.length() + 0.05;
-    ex.position.copy(t).addScaledVector(d.normalize(), len / 2); ex.scale.set(1, len, 1);
-    ex.quaternion.setFromUnitVectors(V(0, 1, 0), d);
-  }
+  { const d = !held || h.onTiller ? extAlong(t) : hand.clone().sub(t).normalize();
+    ex.position.copy(t); ex.quaternion.setFromUnitVectors(V(0, 1, 0), d); }
   // the crutch, in the paddler's hands from when it comes up out of the companionway: along the line from the lower hand
   // to the upper, its foot below the lower (over the side and in the water, paddling)
   const cf = pdl?.f, cu = cr.crutch;
