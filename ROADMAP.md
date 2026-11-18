@@ -651,7 +651,7 @@ sources. Each shipped item is added there when it's published.
    - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
      gap between them is the bias;
    - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
-8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; later, Crew Figures; earlier Boat Detail): "I'm having trouble seeing
+8z. **DONE (15 Nov, 4f410526): the cabin-top instrument on a taller mount** (owner, 15 November; shipped as the unit's own black stand, taller and sturdier, no separate riser, after a post, a teak block and a 5 cm riser were tried): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
