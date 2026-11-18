@@ -103,9 +103,12 @@ export const FULL_RUDDER = 30;
  * ruling, 18 Nov 2026: "the tiller swings on a slight arc, up off the deck at center and down onto the deck at the
  * extremes"; his first account, 15 Nov, was "the entire radius ... maybe 150 degrees", and it was 75 here until then).
  * Not a free number: it's where the drawn tiller's arc about the raked rudder line meets the deck (render/hull.ts
- * tillerClearance: 46.5 degrees, from TILLER.len 1.2 m, its 4 degrees above level at rest, an ESTIMATE, and the class
- * hull's rudder rake; Crew Figures, 18 Nov 2026), and tests/tillerpath.test.ts holds the two together within half a
- * degree. The tiller is fast to the rudder's head, so this is the blade's angle too. And the angle the blade stalls at: up to it the turn grows with the angle; past it the water breaks away
+ * tillerClearance: 46.5 degrees, from TILLER.len 1.2 m, its 4 degrees above level at rest, and the class hull's rudder
+ * rake; Crew Figures, 18 Nov 2026), and tests/tillerpath.test.ts holds the two together within half a degree. The rest
+ * angle is measured from the owner's photos (two of Josephine's tiller, 18 Nov 2026, scaled from the tiller's own
+ * thickness): its end 15 cm over the deck at the after coaming, give or take 4, so 4 degrees give or take 2, and the
+ * stop anywhere from 41 to 49 degrees: past the stall throughout. The hinge's rake and the pin's height are ESTIMATES
+ * still; the tiller's end measured from the centerline with it down on the deck would make the stop a measurement. The tiller is fast to the rudder's head, so this is the blade's angle too. And the angle the blade stalls at: up to it the turn grows with the angle; past it the water breaks away
  * from the blade's back, its side force falls off and it mostly brakes. 40 degrees is an ESTIMATE: a free-standing blade
  * of this shape stalls at 20 to 25 (Molland & Turnock, Marine Rudders and Control Surfaces), but hers is hung on the
  * keel's after edge and works as its flap, which holds on to about twice that; no measurement for a Folkboat was found

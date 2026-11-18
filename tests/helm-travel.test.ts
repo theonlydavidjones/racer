@@ -71,7 +71,8 @@ describe('the helm\'s travel: the tiller to the deck at 46.5 degrees, the rudder
     expect(tack(14, HELM_STALL, false).t).toBeGreaterThan(tack(14, HELM_STALL).t + 0.1);
     const hard = tack(8, HELM_MAX), stall = tack(8, HELM_STALL);
     // (hard over at the deck's stop, 18 Nov 2026: 7.50 s against 6.87 and 2.54 kt out of it against 2.80. At 75: 19.98 s,
-    // asked over twice the stall's, and 0.98 kt, asked under 0.6 of it)
+    // asked over twice the stall's, and 0.98 kt, asked under 0.6 of it: the old properties belonged to a tiller 35 degrees past
+    // the stall, and the stop is 6.5 past it now)
     expect(hard.t).toBeGreaterThan(stall.t + 0.3); expect(hard.t).toBeLessThan(8); expect(hard.v).toBeLessThan(0.95 * stall.v);
   }, 120_000);
   it('the physics review\'s cases: a turn by the flow past full helm isn\'t sculling; a key with the tiller over the same way stops at the stall; going astern the blade is drawn where it\'s held', () => {
