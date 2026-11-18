@@ -148,12 +148,22 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
   return m;
 }
 /** Of the sailable headings near `want`, the one that keeps her furthest from other boats (the nearest to `want` among near-equals). */
+// (only headings on the tack she's on: one on the other side of the wind is a tack or a gybe, not a way round a boat,
+// and slow she'd commit to it as a gybe the long way round. And the offset she chose last time holds while it's within
+// a metre of the best: two about as good, she swapped between them every second or two, the helm slammed across each time,
+// tacking for one and back for the other: Red, 6 kt, seed 4, the start's crowd, beside Blue tacking)
 function clearestHeading(w: World, b: Boat, want: number): number {
-  let best = want, bestS = -Infinity;
+  const side = wrap(b.ww.from - b.h) > 0, held = b.ai?.clearK;
+  let best = want, bestS = -Infinity, bestK = 0, heldS = -Infinity, heldH = want;
   for (const k of [0, 20, -20, 40, -40, 60, -60, 90, -90]) {
-    const h = sailable(b, want + k), sc = Math.min(15, clearanceOn(w, b, h)) - Math.abs(k) * 0.02;
-    if (sc > bestS) { bestS = sc; best = h; }
+    const h = sailable(b, want + k);
+    if (k && (wrap(b.ww.from - h) > 0) !== side) continue;
+    const sc = Math.min(15, clearanceOn(w, b, h)) - Math.abs(k) * 0.02;
+    if (k === held) { heldS = sc; heldH = h; }
+    if (sc > bestS) { bestS = sc; best = h; bestK = k; }
   }
+  if (held != null && heldS > bestS - 1) { best = heldH; bestK = held; }
+  if (b.ai) b.ai.clearK = bestK;
   return best;
 }
 
