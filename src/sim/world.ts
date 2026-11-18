@@ -9,7 +9,7 @@ import { CASE_WIND, CaseRun, caseById, foulTitle } from './caseRun';
 import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, crewRig, moveBoat, settleTrim, tackTarget, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
-import { HANDLING } from '../boat/dynamics';
+import { HANDLING, HULL } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
 import { D2R, HALF, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
@@ -121,18 +121,19 @@ const JAM_MAX = 2 * TANGLE_MAX;
 /** Pinned: the boat at fault held against the other with no way of her own since her last contact with her: then her next
  * touch is the same incident however long after, since she could do nothing in between (US Appeal 65). Three signs, all
  * needed: never at steerage way through the water, not for a moment (STEERAGE, the sim's one line for "could steer
- * clear"); the hulls never more than PIN_SLACK past touching, m (the contact's own push apart is 1.6 m, CONTACT_PUSH);
+ * clear"); the hulls never more than PIN_SLACK past touching, m (fitted when the impact still shoved them 1.6 m apart; kept, as a
+ * bounce's room);
  * and held over the ground (PIN_DRIFT: under that, averaged, since the last contact; two boats drifting together at a
  * few tenths of a knot, or carried by the tide, aren't held, and could luff clear in a minute at the 3°/s or so they
  * have: those stay capped at JAM_MAX). Modeling choices, from Deep Physics' seed 16 (sea-born, 17 Nov 2026): a boat in
  * the corner of the Marina jetty at 0.00-0.37 m/s through the water, making 0.07-0.08 m/s good, touched again 50-76 s
- * on with the hulls never 1.9 m past touching, was given a new two-turn penalty each time. PIN_SLACK's margin past the
- * push (0.9 m) is fitted to that one race. */
+ * on with the hulls never 1.9 m past touching, was given a new two-turn penalty each time. PIN_SLACK (2.5 m) is fitted to that one race.
+ * CONTACT_PUSH: the most the hulls are put back to touching in one step, m (World.hulls). */
 const CONTACT_PUSH = 2 * 0.8, PIN_DRIFT = 0.15, PIN_DRIFT_MIN_S = 10;
-const PIN_SLACK = CONTACT_PUSH + 0.9;
-/** Hulls together (World.hulls): still the same contact until they've been this far past touching, m: the push apart at
- * the impact and the pressed-together margin. Drifting back onto her inside the bounce is still the same lean. */
-const CONTACT_RELEASE = CONTACT_PUSH + PRESSED_SLACK;
+const PIN_SLACK = 2.5;
+/** Hulls together (World.hulls): still the same contact until they've been this far past touching, m (1.9 m: a bounce's
+ * room and the pressed-together margin). Drifting back onto her inside it is still the same lean. */
+const CONTACT_RELEASE = 1.6 + PRESSED_SLACK;
 
 /** Rule 43.1(a), how soon: a helmsman's reaction and a turn's worth, s (the 1 s reaction of rule 16.1's RESPOND_DELAY
  * and about 2 s to turn: a modelling choice). */
@@ -344,6 +345,8 @@ function contactNormal(A: Boat, B: Boat, crossed: boolean): { x: number; y: numb
 }
 /** A change in her velocity over the ground (dx, dy, m/s) from a hull against hers, into her own terms: ahead or astern
  * along her heading, and sideways (sway, + to starboard; physics.ts). */
+/** Mass of a hull and the water she carries with her, as multiples of her displacement: fore and aft, and abeam. */
+const SURGE_M = HANDLING.mass / HULL.displacement, SWAY_M = 1 + HOVE.swayAdded;
 function giveWay(b: Boat, dx: number, dy: number): void {
   const u = V(b.h), du = dx * u.x + dy * u.y, ds = dx * u.y - dy * u.x; // (starboard is V(h + 90) = (u.y, −u.x))
   const fwd = b.v - (b.astern ?? 0) + du;
@@ -430,7 +433,7 @@ export class World {
    * is several pairs; each pair's contacts while it lasts are one incident (US Appeal 65: "the inevitable result of the
    * first") by the same fouler, for TANGLE_MAX from the first contact. The other boat touching back is her own breach,
    * except while the two are jammed (see STEERAGE) or haven't parted at all since (`parted`: never a metre wider than
-   * just after the last touch, `g0`, its push apart included, nor than touching, CONTACT_GAP: a touch with the hulls
+   * just after the last touch, `g0` (put back to touching by then, World.hulls), nor than touching, CONTACT_GAP: a touch with the hulls
    * overlapping reads g0 = 0; one collision going on, the boats swinging against each other, whoever's right of way it is
    * at each touch). Once the fouler's turns have begun (rules 44.2 and 21.2), a touch after they've parted is a new
    * breach if she has had steerage way since the last (`steered`: through the water, ahead or astern, at STEERAGE or
@@ -1790,13 +1793,16 @@ export class World {
    * two are within CONTACT_GAP, whatever the rules' cooldown. Before, it came only with a contact incident, and those
    * wait INCIDENT_COOLDOWN (6 s) between them: two boats lying together had no contact at all for 6 s, then lost 65% of
    * their way at once, every 6 s exactly (Deep Physics' turn-drag, crewstation 6 kt seed 4, 18 Nov 2026: Blue against
-   * Red at 113.7, 119.7, 125.7, 131.7, 137.7 s, 0.58 kt to 0.20 each time). The first touch is the impact, as before:
-   * each keeps 0.35 of her way (a modeling choice) and they're pushed CONTACT_PUSH apart. Then, until they've been
-   * CONTACT_RELEASE past touching, it's the same contact going on: no new impact; each held off the other at touching
-   * (along the normal between the hulls, contactNormal), and the speed at which they're closing along it taken out,
-   * shared, as two hulls leaning together (perfectly inelastic, equal masses: an approximation, since abeam a hull has
-   * the water alongside to move as well, about 1.9 × her displacement against 1.08 × fore and aft (HOVE.swayAdded,
-   * HANDLING.mass), so a boat struck abeam should take nearer a third of it than half). Sliding along each other goes on.
+   * Red at 113.7, 119.7, 125.7, 131.7, 137.7 s, 0.58 kt to 0.20 each time). From the first touch until they've been
+   * CONTACT_RELEASE past touching it's one contact: each held off the other at touching (along the normal between the
+   * hulls, contactNormal), and the speed at which they're closing along it taken out, shared (perfectly inelastic: a
+   * collision changes the boats' speeds along the normal, not their places or their speed along each other). The impact
+   * is the first step of that, no different: it used to take 65% of both boats' way and shove them 1.6 m apart in one
+   * step, which threw a boat that was struck sideways into the boat beside her (v208's tests/rules-finish.test.ts, the
+   * unanswered hail: W hit S, and S was thrown at A ducking her) and cost a glancing touch as much as a T-bone.
+   * Shared by each boat's mass along the normal, with the water she carries (a boat struck abeam is thrown less than the
+   * one that struck her is stopped). Sliding along each other goes on: no friction between the hulls yet (it needs a
+   * sourced μ for wet topsides), so a T-bone costs the struck boat none of her way ahead.
    */
   /** Can't be moved by another boat leaning on her: wrecked and stopped, in her berth, or on a Case's set track (not one
    * the Case has freed, caseStep: "she's a boat, not a track"). */
@@ -1809,16 +1815,17 @@ export class World {
     if (fA && fB) return;
     // (a boat that can't move, wrecked aground, made fast in her berth or on a Case's track, takes none of it: the other
     // takes it all)
-    const wA = fA ? 0 : fB ? 1 : 0.5, wB = fB ? 0 : fA ? 1 : 0.5;
-    if (!this.touching.has(key)) {
-      this.touching.add(key);
-      A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
-      A.x -= n.x * CONTACT_PUSH * wA; A.y -= n.y * CONTACT_PUSH * wA; B.x += n.x * CONTACT_PUSH * wB; B.y += n.y * CONTACT_PUSH * wB;
-      return;
-    }
+    // (each takes her share by her mass along the normal: struck abeam she has the water alongside to move as well,
+    // 1.9 × her displacement (HOVE.swayAdded) against 1.08 × fore and aft (HANDLING.mass), so a boat hit on her side is
+    // thrown less than the one that hit her is stopped. 1/m along n = cos²/m_surge + sin²/m_sway, same class, so the
+    // displacement cancels. Yaw from a hit off her center isn't modeled)
+    const inv = (b: Boat) => { const u = V(b.h), c = n.x * u.x + n.y * u.y; return c * c / SURGE_M + (1 - c * c) / SWAY_M; };
+    const iA = fA ? 0 : inv(A), iB = fB ? 0 : inv(B), wA = iA / (iA + iB), wB = iB / (iA + iB);
+    this.touching.add(key);
     if (g >= CONTACT_GAP) return;
-    A.lastHitT = B.lastHitT = this.t; // (still against her: getting clear after it goes on, 42.3(h))
-    const push = g === 0 ? CONTACT_GAP + n.d : Math.min(CONTACT_GAP - g, CONTACT_PUSH); // (crossed: back out the way she came in, all of it)
+    A.lastHitT = B.lastHitT = this.t; // (against her: getting clear after it, 42.3(h))
+    // (back to touching and no further: crossed, back out the way she came in, all of it)
+    const push = g === 0 ? CONTACT_GAP + n.d : Math.min(CONTACT_GAP - g, CONTACT_PUSH);
     A.x -= n.x * push * wA; A.y -= n.y * push * wA; B.x += n.x * push * wB; B.y += n.y * push * wB;
     // (the closing speed along the normal, over the ground: both in the same stream, so it cancels. Taken out between
     // them, equal masses, as two hulls leaning together: what's left is sliding along each other, which the contact

@@ -19,28 +19,38 @@ function world() {
   w.boats[0].x += 500; // (the third boat well out of it)
   return w;
 }
-function lean(user: boolean, w = world(), secs = 40) {
+function lean(user: boolean, w = world(), secs = 40, retired = false) {
   const A = user ? w.user : w.boats[1], B = w.boats[2];
+  const incidents: number[] = []; w.onIncident = (a, b, inc) => { if ((a === A && b === B) || (a === B && b === A)) { incidents.push(w.t); void inc; } };
   const hA = (w.wind.from + 95) % 360, hB = (hA + 90) % 360, ahead = V(hA), B0 = { x: A.x + ahead.x * 6, y: A.y + ahead.y * 6 };
   Object.assign(A, { h: hA, desired: hA, v: 1.0 });
-  const hits: number[] = [], tw = w as unknown as { touching: Set<string> }, key = `${Math.min(A.id, B.id)}-${Math.max(A.id, B.id)}`; let was = false, minGap = Infinity;
+  const hits: number[] = [], tw = w as unknown as { touching: Set<string> }, key = `${Math.min(A.id, B.id)}-${Math.max(A.id, B.id)}`; let was = false, minGap = Infinity, drop = 0, prev = NaN;
   for (let i = 0; i < Math.round(secs / DT); i++) {
+    if (retired) Object.assign(A, { retired: true, penalty: 0, penaltyTotal: 0, penaltyDir: 0 }); // (not racing: her contacts carry no penalty)
     Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: 0, turnRate: 0, yawRate: 0 });
     Object.assign(A, { desired: hA, h: hA, turnRate: 0, yawRate: 0 }); // (held on her heading: leaning on her all along)
     w.step(DT); w.paused = false;
     const now = tw.touching.has(key); if (now && !was) hits.push(w.t); was = now; // (an impact: the pair's contact begun)
-    if (hits.length && w.t > hits[0] + 1) minGap = Math.min(minGap, hullGap(A, B));
+    if (hits.length && w.t > hits[0] + 1) { minGap = Math.min(minGap, hullGap(A, B)); drop = Math.max(drop, prev - A.v); }
+    prev = A.v;
   }
-  return { hits, minGap };
+  return { hits, minGap, drop, incidents };
 }
 
 describe('Hulls together: the contact\'s physics every step, not on the rules\' cooldown', () => {
   it('a boat leaning on another for 40 s: one impact, not one every INCIDENT_COOLDOWN, and the hulls held at touching, not through each other', () => {
     for (const user of [false, true]) {
-      const { hits, minGap } = lean(user);
+      const { hits, minGap, drop } = lean(user);
       expect(hits.length, `impacts at ${hits.map(t => t.toFixed(2)).join(', ')} (cooldown ${INCIDENT_COOLDOWN} s)`).toBe(1);
       expect(minGap).toBeGreaterThan(CONTACT_GAP - 0.3);
+      expect(drop, 'the most way she loses in one step, after the first second (no knock every cooldown)').toBeLessThan(0.05);
     }
+  }, 60000);
+  it('a contact with no penalty (she\'s not racing), the boat leaning on with no way to steer off: the same incident all along, not one every cooldown (44.1, US Appeal 65)', () => {
+    // (the hulls stay at touching after the impact now, nothing shoves them apart, so they're still pressed together
+    // when the cooldown runs out: before, the shove put them 1.6 m apart and the next touch was judged afresh)
+    const { incidents } = lean(false, world(), 40, true);
+    expect(incidents.length, `incidents at ${incidents.map(t => t.toFixed(2)).join(', ')}`).toBe(1);
   }, 60000);
   it('rule 42.3(h): still against her after 30 s, she may still paddle to get clear', () => {
     // (lastHitT kept up while the hulls touch, not only at the first: paddleAllowed's 30 s runs from the last contact)
