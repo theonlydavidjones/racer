@@ -58,6 +58,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
+import { helmPlan, nextCorner, type HelmPlan } from './helmPlan';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -67,10 +68,9 @@ import { RaceLog } from './debrief';
  * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
  * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
 const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
-/** Nav on the navigator's plan (planTarget): a corner of the plotted course counts as made within NAV_MADE m of it, about
- * four of her lengths (a pilot steering for a point turns for the next a little before it, as a navigator calling the
- * marks does), or once she's past it (across the line square to the leg through it). */
-const NAV_MADE = 30;
+/** The navigator's plan at the helm, for each World (planTarget): kept off the World itself, so its shape is as it was
+ * (the step's cost, perf-pair, is judged on it) and the page's mirror never walks it (sim/sync.ts). */
+const HELM = new WeakMap<object, HelmPlan>();
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -2400,7 +2400,7 @@ export class World {
   setDest(p: Vec, name: string): void {
     if (!this.cruising) return;
     this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
-    this.arrivedT = null; this.navPlan = null;
+    this.arrivedT = null; HELM.delete(this);
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
@@ -2524,7 +2524,7 @@ export class World {
     const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
     this.retire();
-    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' }; this.navPlan = null;
+    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' }; HELM.delete(this);
     this.arrivedT = null;
     harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
@@ -2663,27 +2663,16 @@ export class World {
    * judged or replayed (the pilot is off when racing, RRS 52); navTarget's way into a harbor, which a race can use, isn't.
    */
   private planTarget(b: Boat, end: Vec): Vec {
-    const P = this.navPlan; if (!P || !this.dest || P.to.x !== this.dest.p.x || P.to.y !== this.dest.p.y) return end;
+    const P = HELM.get(this); if (!P || !this.dest || P.to.x !== this.dest.p.x || P.to.y !== this.dest.p.y) return end;
     // (under power, not the sailing plan's boards: the motor points her straight at it, autopilot.ts, as before. The
     // physics review: corner to corner, she motored the plan's tacks)
     if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
-    const n = P.pts.length;
-    while (P.i < n - 1) {
-      const q = P.pts[P.i], o = P.pts[P.i - 1], next = P.i + 1 < n - 1 ? P.pts[P.i + 1] : end;
-      // (made: past it, or within NAV_MADE of it with the way to the next one clear: turning early mustn't cut inside a
-      // corner the plan put there to clear the land)
-      if (dot(sub(b, q), sub(q, o)) > 0 || (dist(b, q) < NAV_MADE && landAlong(b, next) === Infinity)) P.i++; else break;
-    }
-    return P.i >= n - 1 ? end : P.pts[P.i];
+    return nextCorner(P, b, end);
   }
-  /** The navigator's plan for the helm (planTarget): where it was planned to, its corners, and the next one she's making. */
-  private navPlan: { to: Vec; pts: Vec[]; i: number } | null = null;
-  /** A plan in from the page (commands.ts navPlan): she picks it up at the leg she's nearest. */
+  /** A plan in from the page (commands.ts navPlan), picked up at the leg she's nearest; null drops it. */
   setNavPlan(to: Vec | null, pts: Vec[] = []): void {
-    if (!to || pts.length < 2) { this.navPlan = null; return; }
-    const u = this.user; let i = 1, best = Infinity;
-    for (let k = 1; k < pts.length; k++) { const e = segPt(u, pts[k - 1], pts[k]); if (e < best) { best = e; i = k; } }
-    this.navPlan = { to: { x: to.x, y: to.y }, pts: pts.map(p => ({ x: p.x, y: p.y })), i };
+    const P = to ? helmPlan(to, pts, this.user) : null;
+    if (P) HELM.set(this, P); else HELM.delete(this);
   }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {

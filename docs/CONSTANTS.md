@@ -637,6 +637,7 @@ physics, ranked like the ten above:
 | LIVE_M, LIVE_MIN | 150 m, 2 min | 143 | numerical | how often the page's live plan is worked out again |
 | SLICE_MS, TICK_MS | 2 ms per 16 ms | 187 | design | the background plan's share of the page's thread (an eighth of a 60 fps frame; Capacity's budget) |
 | HELM_TOL | 8 m | 152 | estimate | the plotted track thinned to its corners for the helm (about one boat length; inside NAV_MADE). Settled by: the pilot's track against the plan at a few tolerances (tests/nav-follows-plan) |
+| HELM_NEAR, HELM_OFF, HELM_WIND, HELM_KT, HELM_TIDE, HELM_EVERY (app.ts) | 400 m, 100 m, 10°, 3 kt, 0.3 kt, 5 min | 958 | estimate | when Nav's plan is worked out afresh (navPlanTick: on events, not a timer). Settled by: the page's profile on a Nav passage against how far she strays from a plan grown stale |
 
 ### src/sim/outlook.ts (router, 15 Nov 2026)
 
@@ -693,7 +694,7 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | DT | 1/60 | 50 | numerical |  |
-| NAV_MADE | 30 m | 73 | estimate | a plan corner counts as made within this (about four boat lengths), the way to the next clear; else once past it. Settled by: where she tacks against the plan's tack points (tests/nav-follows-plan: within 30 m) |
+| NAV_MADE (sim/helmPlan.ts) | 30 m | 10 | estimate | a plan corner counts as made within this (about four boat lengths), the way to the next clear; else once past it. Settled by: where she tacks against the plan's tack points (tests/nav-follows-plan: within 30 m) |
 | TWO_TURNS | 720 | 52 | standard |  |
 | ONE_TURN | 360 | 60 | standard |  |
 | HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |

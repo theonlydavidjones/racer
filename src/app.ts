@@ -1,4 +1,5 @@
-import { helmPoints, type PassageNow } from './sim/navigator';
+import { helmPoints, passageLive, type PassageNow } from './sim/navigator';
+import { helmPlan, nextCorner, offLeg, type HelmPlan } from './sim/helmPlan';
 import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
@@ -922,22 +923,39 @@ function pilotNote(word: string): void {
 function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
-/** The plan last sent to the helm, and to which race, with the pilot on Nav since (navPlanTick). */
-let helmPlan: PassageNow | null = null, helmWorld: unknown = null, helmNav = false;
-/** On Nav, the navigator's plan to the helm as each comes in (World.planTarget: the pilot follows the plotted course, not
- * the rhumb line, the owner's r253): the same plan the inset and the chart draw (Hud.navPassage). Sent again after the
- * pilot's engaged afresh or in a new race (the World drops its plan then), and only a plan begun near where she is
- * (HELM_NEAR m: one held over from before she was steered off it waits for the next). */
+/**
+ * On Nav, the navigator's plan to the helm (World.planTarget: the pilot follows the plotted course, not the rhumb line,
+ * the owner's r253). Planned afresh only when something calls for it, not on a timer (the Coordinator, 18 Nov 2026: a
+ * plan worked out each 150 m took up to an eighth of the page's thread for the whole passage): when the pilot's engaged
+ * or it's a new race; a corner made (the next leg, from where she is); off the plan by more than HELM_OFF m; the wind or
+ * the tide at the course changed by more than HELM_WIND, HELM_KT or HELM_TIDE since it was planned; or, failing all of
+ * those, HELM_EVERY minutes of the clock on. Meanwhile the helm keeps the plan it has. A plan's taken only if begun
+ * within HELM_NEAR m of her (one held over from before waits for the next). The corners are counted here as the World
+ * counts them (sim/helmPlan.ts), on the page's copy of the race.
+ */
+let helm: { pn: PassageNow; P: HelmPlan; world: unknown; t: number; wind: { from: number; kt: number }; tide: number } | null = null, helmWant = true, helmNav = false;
 function navPlanTick(): void {
   const nav = w.pilot.mode === 'nav' && w.running && w.cruising && !!w.dest;
-  if (!nav || !helmNav || helmWorld !== w) { helmPlan = null; helmWorld = w; }
+  if (!nav || !helmNav || helm?.world !== w) { helm = null; helmWant = true; }
   helmNav = nav; if (!nav) return;
-  const pn = hud.navPassage(w); if (!pn || pn === helmPlan || !pn.ok || !pn.track.length) return;
-  const s = pn.track[0].p; if (Math.hypot(s.x - w.user.x, s.y - w.user.y) > HELM_NEAR) return;
-  helmPlan = pn; send({ k: 'navPlan', to: { x: w.dest!.p.x, y: w.dest!.p.y }, pts: helmPoints(pn) });
+  const dest = w.dest!.p, u = w.user;
+  if (helm && !helmWant) {
+    const was = helm.P.i; nextCorner(helm.P, u, dest);
+    const dw = Math.abs(((w.wind.from - helm.wind.from + 540) % 360) - 180);
+    helmWant = helm.P.i !== was || offLeg(helm.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - helm.wind.kt) > HELM_KT
+      || Math.abs(w.cur.kt - helm.tide) > HELM_TIDE || w.clockUtc - helm.t >= HELM_EVERY || helm.P.to.x !== dest.x || helm.P.to.y !== dest.y;
+    if (!helmWant) return;
+  }
+  const pn = passageLive(w); if (!pn || pn === helm?.pn || !pn.ok || !pn.track.length) return; // (the job runs between frames; asked again till it's in)
+  const s0 = pn.track[0].p; if (Math.hypot(s0.x - u.x, s0.y - u.y) > HELM_NEAR) return;
+  const pts = helmPoints(pn), P = helmPlan(dest, pts, u); if (!P) return;
+  helm = { pn, P, world: w, t: w.clockUtc, wind: { from: w.wind.from, kt: w.wind.kt }, tide: w.cur.kt }; helmWant = false;
+  send({ k: 'navPlan', to: { x: dest.x, y: dest.y }, pts });
 }
-/** How near her a plan must have begun for the helm to take it (the HUD's own refresh is each 300 m: ui/hud.ts navPassage). */
-const HELM_NEAR = 400;
+/** navPlanTick's triggers (estimates, docs/CONSTANTS.md): a plan begun within HELM_NEAR m of her; planned afresh off it by
+ * HELM_OFF m (a few times what she strays sailing it: tests/nav-follows-plan, 11-26 m), the wind HELM_WIND° or HELM_KT kt
+ * off what it was planned in, the tide HELM_TIDE kt, or HELM_EVERY minutes on. */
+const HELM_NEAR = 400, HELM_OFF = 100, HELM_WIND = 10, HELM_KT = 3, HELM_TIDE = 0.3, HELM_EVERY = 5;
 function pilotTick(dt: number): void {
   navPlanTick();
   const p = w.pilot, on = p.mode !== 'off' && w.running;
