@@ -1001,6 +1001,15 @@ function helmPose(fig: Figure, x: number, z: number, lean: number, windward: num
     // reckoning has it)
     const iE = s > 0 ? 0 : 1, sh = fig.cur ? shoulderDrawn(fig, iE) : shoulderAt({ hip, yaw, pitch: 0.05 + 1.1 * lean, roll: 0 } as PoseT, k, iE), reach = (BONE.upper + BONE.fore) * k * 0.92;
     if (ext.distanceTo(sh) > reach - FIST * k) ext = tip.clone().addScaledVector(sh.clone().sub(tip).normalize(), Math.max(0.2, Math.min(EXT_GRIP, tip.distanceTo(sh) - reach + FIST * k)));
+    // (held short of its grip, the stick runs on past the fist for the rest of its length: not on toward the shoulder, up
+    // the arm and through it (the owner, 18 Nov 2026: "handle extension coming through skipper's shoulder"), but up past
+    // the shoulder on its inboard side, clear of the arm and the head, where a helm holding it short has the rest of it)
+    if (tip.distanceTo(ext) < EXT_GRIP - 0.03) {
+      const past = sh.clone().add(V(-s * 0.24 * k, 0.3 * k, 0)), dir = past.sub(tip).normalize();
+      // (the fist where a hand rests in front of them, on the stick, no higher: the rest of it above, by the head)
+      let hold = Math.max(0.2, Math.min(EXT_GRIP, rest.clone().sub(tip).dot(dir))); while (hold > 0.2 && tip.clone().addScaledVector(dir, hold).distanceTo(sh) > reach - FIST * k) hold -= 0.02;
+      ext = tip.clone().addScaledVector(dir, hold);
+    }
     // (the fist's offset from the wrist as the arm is drawn, once there is one: where the elbow is decides it; before, back
     // toward the shoulder)
     if (fig.cur) ext.sub(fistAt(fig, iE).sub(wristAt(fig, iE))); else ext.addScaledVector(sh.clone().sub(ext).normalize(), FIST * k);
