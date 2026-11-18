@@ -33,10 +33,17 @@ const NEW_HEADING = 10;
  * crewstation's seed 14, so a two-turns penalty and its NEW_HELD after about 98 s. At 60 s the hold let go part way
  * through the light air's slow turns, and seed 15's trips went over the backstop. */
 const HOLD_MAX = 120;
+/** How many of the car's athwartships holes (half a degree of lead each, controls.ts leadAt) the lazy car's lead must be
+ * outboard of the hole for her guide's angle before the crew's own plan brings it in (an estimate): three. Kept, the jib
+ * on it sits at most about 1.3° wide of its angle (two holes and the quarter degree carInFor leaves in hand), inside its
+ * luffing margin (trim.ts sailTrim, 2°). The track's five holes span only 2° of lead, the apparent wind from about 28° to
+ * 30.5° on a beat, inside her guide's own dead band (GUIDE_DEAD): in 12 kt her guide wandered 29.6° to 31.9° on
+ * crewstation's seed 2, across holes 2 to 4. A trip forward to the car is a body off the rail for most of a minute. */
+const CAR_HOLES = 3;
 import { clrShift, heelWettedResistance, trimResistance } from './hullTrim';
 import { SAILS, optimalSheet, sailTrim, trimDrive } from './trim';
 import { condition, foulingDrag, mainRig } from './condition';
-import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, GUIDE_BACKLASH, GUIDE_LIGHT, GUIDE_LIGHT_KT, GUIDE_DEAD, GUIDE_FAST, GUIDE_KT, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, CONTROL_RATE, carInFor, HALYARD, boomAngle, depowerLimits, hoistDraw, hoistedShare, crewShapes, crewSolve, GUIDE_BACKLASH, GUIDE_LIGHT, GUIDE_LIGHT_KT, GUIDE_DEAD, GUIDE_FAST, GUIDE_KT, jibAngle, planWorth, worthTogether, jibClew, jibShape, jibsheetFor, mainShape, mainsheetFor, shapeEfficiency, targetShape, travellerRate, winchFactor, type Controls, type CrewSettings, type Shape } from './controls';
 
 /** Turn rate during penalty turns, deg/s: the crew backs the jib and main to spin her round. The least: she turns at
  * her own hard-over rate when that's faster (dynamics.ts maxTurnRate). An uncited estimate. In the sim's own fleet races
@@ -1371,7 +1378,7 @@ function jibSheetsAtTack(b: Boat, emit: Emit): void {
  * each use of an imported name is a lookup in the module's namespace and a call to its getter, about 20 a call here:
  * Capacity, 16 Nov 2026) */
 const GUIDE_BACKLASH_ = GUIDE_BACKLASH, GUIDE_LIGHT_ = GUIDE_LIGHT, GUIDE_LIGHT_KT_ = GUIDE_LIGHT_KT, GUIDE_DEAD_ = GUIDE_DEAD, GUIDE_FAST_ = GUIDE_FAST, GUIDE_KT_ = GUIDE_KT, LINE_GAP_ = LINE_GAP, LINE_TAU_ = LINE_TAU;
-const clamp_ = clamp, wrap_ = wrap, n360_ = n360, courseHeld_ = courseHeld, NEW_COURSE_ = NEW_COURSE;
+const clamp_ = clamp, wrap_ = wrap, n360_ = n360, courseHeld_ = courseHeld, NEW_COURSE_ = NEW_COURSE, carInFor_ = carInFor, optimalSheet_ = optimalSheet;
 
 /**
  * What the crew's trim reads its guide by and waits on, each step (trimSails): the apparent angle and the wind the
@@ -1531,12 +1538,29 @@ function trimSails(b: Boat, awa: number, plan: SailPlan, dt: number): void {
     // heaving to (the windward jib sheet yours, or the jib aback): your eased main is deliberate, the car stays put
     if ((b.hove || byHand(b, 'jibsheetW')) && !byHand(b, 'traveller')) fixed.traveller = c.traveller;
     const mAng = wantMain, jAng = b.isUser && byHand(b, 'jibsheet') ? clamp(jibAngle(c, b.tack), SAILS.jib.min, SAILS.jib.max) : wantJib;
+    // (the lazy car is set for the course she holds, at the guide's angle (crewSettle), not for the jib's angle in the wind
+    // of the last few seconds: read that way, on a beat in the Bay's gusty westerly the plan hunted across all five
+    // athwartships holes every few seconds, the crew's wait for a change that had lasted ran on through the hunting, and the
+    // bow hand went forward to move it for nothing, crewstation's 12 kt seed 2. Set up before she sails at the hole for the
+    // wind she has; then moved in only when its lead is CAR_HOLES wider than her guide's angle wants, the jib held off its
+    // angle, and only once she's held her course NEW_HELD (out of a tack the guide's angle lags 5-10° low as she gathers
+    // way). Not out again for their own wish: off a lead inboard of its angle the jib still reaches it, the sheet eased, at
+    // a degree of twist more at most, a few hundredths of a percent of her drive (the physics review), not a trip forward.
+    // That's this model's truth, not a sailing one: on a real boat a lead left inboard as the breeze builds closes the
+    // slot, backwinds the main and heels her, and crews take it out; none of that is priced here, only the twist. If the
+    // slot is ever modeled, the move out comes back. With your own jib sheet, the hole for your sheet's angle, the same way)
+    const yourJib = b.isUser && byHand(b, 'jibsheet');
+    const carIdeal = carInFor_((yourJib ? jAng : optimalSheet_('jib', b.settle![SETTLE.guideAwa])) - 0.25);
+    const carLz = c.car[b.tack].ins;
+    const carIn = b.crewReady && (b.settle![SETTLE.since] < NEW_HELD || carLz - carIdeal < CAR_HOLES) ? carLz : carIdeal;
+    if (fixed.carIn == null) fixed.carIn = carIn;
     b.crewPlan = crewSolve(tws, b.awaSlow, b.tack, mAng, jAng, b.crewPlan ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]); b.crewPlanT = 1;
     b.crewWorth = planWorth(c, b.crewPlan, tws, b.awaSlow, b.tack, mAng, jAng, mainRig(b), cond?.jib, b.aws / KT, b.depower, fixed.mainsheet, 0.001 + 0.003 * (1 - crewSkill(b.crew)), b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]);
     b.crewTogether = worthTogether(b.crewWorth); // (worked out with the worth, once a second: not looked up each step)
     // (the band's marks: where the crew would set your lines too; a second solve only while you hold any; nothing reads it)
     if (b.isUser) {
-      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, {}, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]) : b.crewPlan;
+      // (the car's mark by the crew's own rule, above: not one hopping across the holes with each puff)
+      const free = mineNow ? crewSolve(tws, b.awaSlow, b.tack, wantMain, wantJib, b.crewIdeal ?? undefined, mainRig(b), cond?.jib, b.aws / KT, b.depower, { carIn }, b.settle![SETTLE.guideAwa], b.settle![SETTLE.guideKt]) : b.crewPlan;
       b.crewIdeal = { ...free, mainsheet: mainsheetFor(wantMain, free.traveller), jibsheet: jibsheetFor(wantJib, c, b.tack) };
     }
   }
