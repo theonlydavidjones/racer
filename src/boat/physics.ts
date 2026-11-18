@@ -343,15 +343,19 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // Her helm goes to full helm, 30°, as it always has, for her tacks, gybes and her own steering. Only about to touch
     // another boat (rule 14, ai.ts urgent) does she put it to the rudder's stall, 40°, her quickest turn (balance.ts
     // STALL_TURN, a sixth more than full helm's), as your steering key does; never past it, where the blade brakes and
-    // turns her less: no helmsman steering for a turn shoves it hard over. (Turning at the stall in every tack and turn,
-    // the fleet fouled more round the start: 31 penalties in fouls-start's sixteen starts against 25, 20 against 14 in
-    // 22 kt. Real helmsmen tack on a moderate helm: more of it only slows her through the turn.) Short of that she holds
-    // the helm the turn wants (balance.ts helmFor), the drawn tiller with it.
+    // turns her less: no helmsman steering for a turn shoves it hard over. Short of that she holds the helm the turn wants
+    // (balance.ts helmFor), the drawn tiller with it. (Full helm for her tacks is a choice made by the fleet's fouls, not
+    // by the physics: at the stall in every tack and turn the fleet fouled more round the start, 31 penalties in
+    // fouls-start's sixteen starts against 25, 20 against 14 in 22 kt. Real helmsmen tack on a moderate helm, more only
+    // slowing her through the turn, but this model charges nothing for the rudder's angle short of the stall (rudderBrake
+    // starts there; turnBleed goes by the turn), so your key, which asks for the stall, tacks her a sixth quicker than
+    // her AI: the physics review. The rudder's induced drag below the stall is the missing piece.)
     const most = ai?.urgent ? HELM_STALL : 1, quick = ai?.urgent ? Math.min(STALL_TURN * flow, Math.max(flow, HANDLING.maxTurnRate)) : flow;
     const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? Math.max(quick, rateFor(Math.sign(lead))) : quick;
     rate = clamp(lead * 1.6, -lim, lim);
     const need = (rate - balRate - motRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
     rudder = Math.sign(need) * Math.min(most, helmFor(Math.abs(need)));
+    flowMost = Math.max(flow, quick); // (at the stall the flow turns her faster than `flow`: that isn't sculling, as yours)
   }
   // (sculling in use: she's turning faster than the flow alone would turn her; latched to that way until close-hauled)
   if (Math.abs(rate - (b.turnTarget == null && b.isUser ? balRate + motRate : 0)) > flowMost + 1e-6 && b.penalty <= 0) b.scullDir = Math.sign(rate);
