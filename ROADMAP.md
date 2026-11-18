@@ -1260,6 +1260,11 @@ sources. Each shipped item is added there when it's published.
        masthead. Tall tick: North's 2.5."). The click and scroll use goes to Keys. The sources and the physics go into the
        code's comments, or into one "Why" link per control if the owner wants them kept. All the band's new lines go to
        the owner as one table before they replace the old ones. A test: no band tip over about 90 characters.
+       - The Jib car tip covers both settings (owner, 18 November, with a screenshot of "In medium air, the jib car sits in
+         the middle, for an even twist."): "jib car guidance should provide advice about both settings: fore/aft, and
+         athwartship." One line each, within the same limit: fore/aft sets the twist (aft eases the leech, forward
+         tightens it); athwartship sets the slot and the pointing angle (in to point, out to reach). The wording goes to
+         the owner in the tips table; its figures follow the car's real track and sheeting range in the sim.
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
