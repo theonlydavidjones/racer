@@ -149,6 +149,8 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
+
 **v205 (18 Nov):** fewer first-mark pile-ups (#453), the committee's beat-start course (#452), hands on the lines when
 hiking, crew stations (#446) and habits (#455), Sail Home paced, the destination pin, the 8 m slip walk-out, the rounding
 note (#447), the coach's heeled speed (#449), the wind to the second (#451). Still open: shallow waves (#454, pulled: it
