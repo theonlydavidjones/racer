@@ -917,6 +917,11 @@ function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<ty
   f = { key, from, at, open, mouthOf }; harborFloods.set(H.id, f); return f;
 }
 const harborRoutes = new Map<string, HarborRoute | null>();
+/** The way in to her slip if it's been worked out already (undefined if not yet; null if there's none): for drawing it
+ * without working it out in a frame (ui/hud.ts). */
+export const harborRouteCached = (s: Slip): HarborRoute | null | undefined => harborRoutes.get(s.id);
+/** The slip a destination is, if it's one (a destination's place is its slip's own). */
+export const slipAt = (p: Vec): Slip | undefined => SLIPS.find(s => s.p.x === p.x && s.p.y === p.y);
 export function harborRoute(s: Slip): HarborRoute | null {
   const g = harborRouteSteps(s); let r = g.next(); while (!r.done) r = g.next(); return r.value;
 }

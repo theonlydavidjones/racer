@@ -4,6 +4,7 @@ import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
 import { PLACES, isSpot } from '../sim/places';
+import { harborRouteCached, slipAt } from '../geo/marina';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
 import { currentWords } from '../sim/outlook';
@@ -1041,6 +1042,17 @@ const NAV_GATE = '#6fd0ff', NAV_WIND = '#e9f2f5';
 function drawNavLayer(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark, now: PassageNow, plan: PassagePlan | null, I: Ink, chart: boolean): void {
   ctx.save(); ctx.lineJoin = 'round';
   const say = (t: string, x: number, y: number, col: string, font: string) => { ctx.font = font; ctx.textAlign = 'left'; ctx.lineWidth = 3.5; ctx.strokeStyle = I.halo; ctx.strokeText(t, x, y); ctx.fillStyle = col; ctx.fillText(t, x, y); };
+  // bound for her slip: the way in from the harbor's mouth, along the fairways to off her slip, for her to be brought in by
+  // hand (the pilot hands her over at the mouth: world.ts navTarget), once it's worked out (the passage's plan works it out)
+  const slip = slipAt(dest.p), way = slip ? harborRouteCached(slip) : null;
+  if (way) {
+    const pts = [way.mouth, way.entry, ...way.path.slice(1), way.approach].map(q => tf(q.x, q.y));
+    const path = () => { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();
+    ctx.setLineDash(PEN.dest.dash); ctx.strokeStyle = I.line; ctx.lineWidth = PEN.dest.w; path(); ctx.stroke(); ctx.setLineDash([]);
+    for (const q of pts.slice(1, -1)) { ctx.fillStyle = I.halo; ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 6.29); ctx.fill(); ctx.fillStyle = I.line; ctx.beginPath(); ctx.arc(q[0], q[1], 2, 0, 6.29); ctx.fill(); }
+  }
   const tr = now.track;
   if (chart && tr.length > 1) {
     const step = 15; let next = Math.ceil(tr[0].t / step) * step; if (next - tr[0].t < 3) next += step; // (none on top of her)
