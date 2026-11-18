@@ -104,7 +104,8 @@ export const FULL_RUDDER = 30;
  * extremes"; his first account, 15 Nov, was "the entire radius ... maybe 150 degrees", and it was 75 here until then).
  * Not a free number: it's where the drawn tiller's arc about the raked rudder line meets the deck (render/hull.ts
  * tillerClearance: 46.5 degrees, from TILLER.len 1.2 m, its 4 degrees above level at rest, and the class hull's rudder
- * rake; Crew Figures, 18 Nov 2026), and tests/tillerpath.test.ts holds the two together within half a degree. The rest
+ * rake; Crew Figures, 18 Nov 2026; the same 46.5 with the pin re-placed, 9 cm up and 18 aft, and 5.75 degrees at rest:
+ * hull.ts TILLER, 18 Nov 2026), and tests/tillerpath.test.ts holds the two together within half a degree. The rest
  * angle is measured from the owner's photos (two of Josephine's tiller, 18 Nov 2026, scaled from the tiller's own
  * thickness): its end 15 cm over the deck at the after coaming, give or take 4, so 4 degrees give or take 2, and the
  * stop anywhere from 41 to 49 degrees: past the stall throughout. The hinge's rake and the pin's height are ESTIMATES
