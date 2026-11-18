@@ -53,3 +53,9 @@
 #boatPanel .be-ropes button.on .be-rope{outline:2px solid var(--accent);outline-offset:1px}
 #boatPanel .be-tune .field{margin:8px 0 0}
 #boatPanel .be .bpreport{padding-top:8px}
+/* every swatch at the right, its name to its left, so a column of rows lines its swatches up (the owner, 18 Nov 2026:
+   the colorways' swatches staggered with their names' lengths) */
+#boatPanel .be-cbtn{justify-content:flex-end;padding:5px 5px 5px 9px}
+#boatPanel .be-cbtn>i,#boatPanel .be-cbtn>.be-rope,#boatPanel .be-v>.be-sq,#boatPanel .be-v>.be-rope{order:2}
+#boatPanel .be-ropes button{justify-content:space-between}
+#boatPanel .be-ropes button>.be-rope{order:2}
