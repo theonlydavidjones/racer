@@ -82,13 +82,15 @@ export interface MotorState {
   shifting?: { to: 'stowed' | 'bracket'; left: number; of: number };
 }
 /**
- * The crew's time to stow it and to ship it again: ESTIMATES, nothing published. Stowing is the fuel cock shut and the
+ * The crew's time to stow it and to ship it again. Stowing is an ESTIMATE, nothing published: the fuel cock shut and the
  * tank vent closed, the safety lanyard and the two clamp screws off, an 18 kg motor (the 3.5, OUTBOARDS) lifted off the
  * bracket and over the after deck, laid in the lazarette on its proper side (a four-stroke laid down must lie as its
- * maker says), the hatch shut: about 45 s for a crew who've done it before. Shipping is the reverse, lining the clamps up
- * on the bracket's board and screwing them down, about a minute. A slower crewmate takes longer (workPace).
+ * maker says), the hatch shut: about 45 s for a crew who've done it before, longer for a slower crewmate (workPace).
+ * Shipping it is the owner's: "mounting the motor takes way, way too long. 5 seconds max." (17 Nov 2026; it was a minute):
+ * from the call to running, out and onto the bracket in MOTOR_SHIP_S, tilted down, and a pull-start's 1.5 s, whoever's
+ * aft (a pull that doesn't catch, one cold start in four, is another 1.5 s: world.ts motorStart).
  */
-export const MOTOR_STOW_S = 45, MOTOR_SHIP_S = 60;
+export const MOTOR_STOW_S = 45, MOTOR_SHIP_S = 3.4; // (3.4 and a pull's 1.5: 4.9 s, inside the owner's 5 at the sim's step)
 
 /** The prop's static thrust at full power (N), from momentum theory and the figure of merit. */
 export function staticThrust(o: Outboard): number {
