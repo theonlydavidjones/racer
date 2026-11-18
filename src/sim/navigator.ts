@@ -147,6 +147,8 @@ export function helmPoints(pn: PassageNow): Vec[] {
   }
   return p.filter((_, i) => keep[i]);
 }
+/** helmPoints' tolerance (m): about one of her lengths, well inside World.planTarget's 30 m for a corner made, so the
+ * pilot's course between two corners is the plotted one to within a boat length (an estimate, not a measured figure). */
 const HELM_TOL = 8;
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
 /** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause

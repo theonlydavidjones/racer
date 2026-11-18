@@ -2400,7 +2400,7 @@ export class World {
   setDest(p: Vec, name: string): void {
     if (!this.cruising) return;
     this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
-    this.arrivedT = null;
+    this.arrivedT = null; this.navPlan = null;
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
@@ -2524,7 +2524,7 @@ export class World {
     const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
     this.retire();
-    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
+    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' }; this.navPlan = null;
     this.arrivedT = null;
     harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
@@ -2655,24 +2655,32 @@ export class World {
    * wind shadow). The page works the plan out (sim/navigator.ts passageLive) and sends its track's corners as each plan
    * comes in (commands.ts navPlan): the pilot steers for the next corner, its tacks among them, so it tacks where the plan
    * does, and for `end` (the destination, or her harbor's mouth: navTarget's hand-over is untouched) on the last leg. A
-   * leg she can't make isn't cut across: she keeps steering for its corner, and the page plans afresh from where she is
-   * as she sails on (each 150 m, navigator.ts LIVE_M), which replaces this one. Without a plan for where she's going
-   * (none yet, or a new destination), the destination itself, as before.
+   * leg she can't make isn't cut across: she keeps steering for its corner, and the page's next plan, from where she was
+   * a minute or so before (ui/hud.ts navPassage: each minute of the clock or 300 m), replaces this one. Without a plan
+   * for where she's going (none yet, a new destination, the pilot just engaged), the destination itself, as before; under
+   * power, always (the motor needn't tack). The plan comes from the page, so the step it lands on hangs on how fast the
+   * host works it out: the same cruise sailed twice on Nav can go two ways. Accepted for cruising, where nothing is
+   * judged or replayed (the pilot is off when racing, RRS 52); navTarget's way into a harbor, which a race can use, isn't.
    */
   private planTarget(b: Boat, end: Vec): Vec {
     const P = this.navPlan; if (!P || !this.dest || P.to.x !== this.dest.p.x || P.to.y !== this.dest.p.y) return end;
+    // (under power, not the sailing plan's boards: the motor points her straight at it, autopilot.ts, as before. The
+    // physics review: corner to corner, she motored the plan's tacks)
+    if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
     const n = P.pts.length;
     while (P.i < n - 1) {
-      const q = P.pts[P.i], o = P.pts[P.i - 1];
-      if (dist(b, q) < NAV_MADE || dot(sub(b, q), sub(q, o)) > 0) P.i++; else break;
+      const q = P.pts[P.i], o = P.pts[P.i - 1], next = P.i + 1 < n - 1 ? P.pts[P.i + 1] : end;
+      // (made: past it, or within NAV_MADE of it with the way to the next one clear: turning early mustn't cut inside a
+      // corner the plan put there to clear the land)
+      if (dot(sub(b, q), sub(q, o)) > 0 || (dist(b, q) < NAV_MADE && landAlong(b, next) === Infinity)) P.i++; else break;
     }
     return P.i >= n - 1 ? end : P.pts[P.i];
   }
   /** The navigator's plan for the helm (planTarget): where it was planned to, its corners, and the next one she's making. */
   private navPlan: { to: Vec; pts: Vec[]; i: number } | null = null;
   /** A plan in from the page (commands.ts navPlan): she picks it up at the leg she's nearest. */
-  setNavPlan(to: Vec, pts: Vec[]): void {
-    if (pts.length < 2) { this.navPlan = null; return; }
+  setNavPlan(to: Vec | null, pts: Vec[] = []): void {
+    if (!to || pts.length < 2) { this.navPlan = null; return; }
     const u = this.user; let i = 1, best = Infinity;
     for (let k = 1; k < pts.length; k++) { const e = segPt(u, pts[k - 1], pts[k]); if (e < best) { best = e; i = k; } }
     this.navPlan = { to: { x: to.x, y: to.y }, pts: pts.map(p => ({ x: p.x, y: p.y })), i };

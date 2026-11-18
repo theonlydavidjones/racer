@@ -922,15 +922,22 @@ function pilotNote(word: string): void {
 function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
-/** The plan last sent to the helm (navPlanTick). */
-let helmPlan: PassageNow | null = null;
+/** The plan last sent to the helm, and to which race, with the pilot on Nav since (navPlanTick). */
+let helmPlan: PassageNow | null = null, helmWorld: unknown = null, helmNav = false;
 /** On Nav, the navigator's plan to the helm as each comes in (World.planTarget: the pilot follows the plotted course, not
- * the rhumb line, the owner's r253): the same plan the inset and the chart draw (Hud.navPassage). */
+ * the rhumb line, the owner's r253): the same plan the inset and the chart draw (Hud.navPassage). Sent again after the
+ * pilot's engaged afresh or in a new race (the World drops its plan then), and only a plan begun near where she is
+ * (HELM_NEAR m: one held over from before she was steered off it waits for the next). */
 function navPlanTick(): void {
-  if (w.pilot.mode !== 'nav' || !w.running || !w.cruising || !w.dest) return;
-  const pn = hud.navPassage(w); if (!pn || pn === helmPlan || !pn.ok) return;
-  helmPlan = pn; send({ k: 'navPlan', to: { x: w.dest.p.x, y: w.dest.p.y }, pts: helmPoints(pn) });
+  const nav = w.pilot.mode === 'nav' && w.running && w.cruising && !!w.dest;
+  if (!nav || !helmNav || helmWorld !== w) { helmPlan = null; helmWorld = w; }
+  helmNav = nav; if (!nav) return;
+  const pn = hud.navPassage(w); if (!pn || pn === helmPlan || !pn.ok || !pn.track.length) return;
+  const s = pn.track[0].p; if (Math.hypot(s.x - w.user.x, s.y - w.user.y) > HELM_NEAR) return;
+  helmPlan = pn; send({ k: 'navPlan', to: { x: w.dest!.p.x, y: w.dest!.p.y }, pts: helmPoints(pn) });
 }
+/** How near her a plan must have begun for the helm to take it (the HUD's own refresh is each 300 m: ui/hud.ts navPassage). */
+const HELM_NEAR = 400;
 function pilotTick(dt: number): void {
   navPlanTick();
   const p = w.pilot, on = p.mode !== 'off' && w.running;

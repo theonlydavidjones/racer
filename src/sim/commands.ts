@@ -146,8 +146,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'sail': w.setSail(c.sail, c.up); return;
     case 'navPlan': w.setNavPlan(c.to, c.pts); return;
     case 'pilot':
-      if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);
-      else if (c.op === 'standby') pilotStandby(w.pilot);
+      if (c.op === 'engage') { pilotEngage(u, w.pilot, c.mode); w.setNavPlan(null); } // (engaged afresh: the page sends the plan from where she is now)
+      else if (c.op === 'standby') { pilotStandby(w.pilot); w.setNavPlan(null); }
       else if (c.op === 'tack') pilotTack(u, w.pilot);
       else pilotAdjust(u, w.pilot, c.d);
       return;
