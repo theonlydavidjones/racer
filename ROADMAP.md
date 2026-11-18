@@ -1288,6 +1288,11 @@ sources. Each shipped item is added there when it's published.
          athwartship." One line each, within the same limit: fore/aft sets the twist (aft eases the leech, forward
          tightens it); athwartship sets the slot and the pointing angle (in to point, out to reach). The wording goes to
          the owner in the tips table; its figures follow the car's real track and sheeting range in the sim.
+       - The pole toast's "Up here" (owner, 18 November, with a screenshot of hud.ts:437, "Up here the poled-out jib does
+         less than it would to leeward…"): "what does 'up here' mean? clarify this copy." It fires with the pole set at a
+         true wind angle under 154.5°, a broad reach, not a run. It says so, in one line ("Poled out on a broad reach,
+         the jib pulls less than on the lee side. Stow the pole (Pole tab, O) or bear away."). The other toasts and tips
+         get a read for the same kind of word ("up here", "down here", "this").
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
