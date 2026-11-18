@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { ENSIGN_STAFF } from '../src/render/boatMesh';
-import { HEEL, RUDDER_RAKE, deckY, halfBeam, rudderGeometry, tillerLift, tillerPivot, uAtZ } from '../src/render/hull';
+import { HEEL, RUDDER_RAKE, deckY, halfBeam, rudderGeometry, tillerPivot, uAtZ } from '../src/render/hull';
 import { tillerRootAt, tillerTip } from '../src/render/crew';
 import { HARD_OVER } from '../src/boat/balance';
 
 // The ensign staff stands in a socket in the after deck at the starboard quarter, as Josephine's does (the owner's
-// photos, reference/photos/josephine-ensign-socket-port-quarter.jpg and josephine-helm-on-aft-deck-underway.jpg); not floating (the owner, 18 Nov 2026: its foot ended in
+// photos, reference/photos/josephine-ensign-socket-port-quarter.jpg and josephine-ensign-socket-from-cockpit.jpg; the owner's
+// measurement: midway between the toerail and the backstay chainplate, about 2 in forward of the deck's aft edge); not floating (the owner, 18 Nov 2026: its foot ended in
 // the air past the transom), and clear of the tiller's sweep to hard over both ways. The staff is part of the hull's own
 // frame, drawn in her group: what holds here holds at every heel and on either tack, the boat heeling and turning with it.
 const segDist = (a0: THREE.Vector3, a1: THREE.Vector3, b0: THREE.Vector3, b1: THREE.Vector3) => {
@@ -21,13 +22,13 @@ describe('The ensign staff (boatMesh.ts ENSIGN_STAFF)', () => {
     expect(Math.abs(base.x)).toBeLessThan(halfBeam(u) - 0.03); // (a socket's room inside the rail)
     expect(base.x).toBeGreaterThan(0); // (the starboard quarter, as hers)
   });
-  it(`clear of the tiller swept to ±${HARD_OVER}°: 2 cm between them at the least`, () => {
+  it(`clear of the tiller swept to its stop, ±${HARD_OVER}° where it meets the deck: 2 cm between them at the least`, () => {
     const rud = new THREE.Group(); rud.position.set(0, HEEL.y, HEEL.z); rud.rotation.x = RUDDER_RAKE;
     const turn = new THREE.Group(); rud.add(turn); const rg = rudderGeometry(); turn.add(new THREE.Mesh(rg.blade));
     const til = new THREE.Mesh(rg.tiller); til.position.copy(tillerPivot()); turn.add(til);
     const bad: string[] = [];
     for (let deg = -HARD_OVER; deg <= HARD_OVER; deg += 5) {
-      turn.rotation.y = deg * Math.PI / 180; til.rotation.x = tillerLift(deg * Math.PI / 180);
+      turn.rotation.y = deg * Math.PI / 180; // (on its arc, no lift: hull.ts tillerLift)
       // (axis to axis, less the tiller's 2.8 cm and the staff's 1.6 cm at their thickest)
       const gap = segDist(base, top, tillerRootAt(turn), tillerTip(turn)) - 0.028 - 0.016;
       if (gap < 0.02) bad.push(`${deg}°: ${(gap * 100).toFixed(1)} cm`);
