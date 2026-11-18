@@ -602,11 +602,11 @@ sources. Each shipped item is added there when it's published.
    - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
      gap between them is the bias;
    - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
-8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; Boat Detail): "I'm having trouble seeing
+8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; later, Crew Figures; earlier Boat Detail): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
-   Boat Detail with a physics check): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
+   later, Crew Figures with a physics check; earlier Boat Detail): owner, "the hull shape, particularly the profile of the prow, isn't matching the true
    Folkboat shape. current shape is too full and round. I want to work on it." Their references (reference/
    josephine-confirmed.md, "Open: the hull's bow profile"): the class construction plan (SSA / NFIA: profile, half-breadths,
    midsection), an older lines drawing, and a photo of a clinker Folkboat on its trailer; the stem a long, fine, nearly
@@ -840,7 +840,7 @@ sources. Each shipped item is added there when it's published.
      it lasts before a rest come from the paddler's fitness and the same fatigue model as hiking (crewPhys.ts), with a
      sourced sustainable-power curve for one person paddling; a tired paddler slows, rests and can be swapped.
    - ~~**The paddle tab as arrows**~~ (done: paddle-arrows) (owner, 15 November: "the P and S buttons on the paddle tab are confusing. maybe
-     clickable arrows like < PADDLE >"; Crew Controls): ‹ paddles on port, › on starboard (the side the crew kneels on,
+     clickable arrows like < PADDLE >"; UI & Copy): ‹ paddles on port, › on starboard (the side the crew kneels on,
      as you face forward); tap the lit one again to stop.
 8b. **A UI audit with real rigor** (owner, 13 November; next; drafted in docs/UI-AUDIT.md; built so far: one back stack with named back links and Esc as back, the Yacht Club's members as two plain lists): "a UI audit on the roadmap to focus on real rigor on these
    screens, with a focus on navigation, cognitive load of information, and IA." UI & Experience is drafting
@@ -1202,7 +1202,7 @@ sources. Each shipped item is added there when it's published.
    - ~~**The on-screen tiller instructions out**~~ (done: 848df4b, 80d5b36) (owner, 13 November; minutes): the keys line across the screen (#keysHint,
      "click: take or let go of tiller · right-click, double-click… lash it · … steer · … luff · …", src/app.ts keysHint).
      The keys stay in the Keys panel. Such instructions belong only in a learn-to-sail mode (Training tools, below).
-   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Experience to design,
+   - **One way in to the features on the game surface** (owner, 15 November; feature; 2–4 h; UI & Copy to design after the copy audit,
      to the owner before building): "there's a lot of really cool shit we've built, like wind-in-air and wind-over-sails,
      but it's hard to find these things. I think we need a 'more' (not that copy though) button on the game surface for
      all features that show up on the game surface itself." One button, an icon rather than the word "More", that opens a
@@ -1363,7 +1363,7 @@ is now "much better" (owner).
    of the boat"): a pendulum on its short chain from the cabin top (render/cabinInterior.ts LANTERN), driven by the
    hull's heel, pitch and roll, its light moving with it (1–2 h).
    - **Bug: in heavy weather the lantern swings up through the cabin top** (owner, 16 November, a screenshot; bug;
-     next, not urgent; 1–2 h; Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
+     later; 1–2 h; Crew Figures, after its tiller and crew queue; earlier Boat Detail): "in heavy conditions, cabin lantern can start to swing through the deck."
      The pendulum's angle is unbounded, so a big roll swings it up past the overhead and it shows above the deck. Stop
      its swing where the lantern meets the cabin top or the bulkhead (it knocks against it and falls back), so it never
      leaves the cabin; check at 25 kt on both tacks.
@@ -2015,16 +2015,16 @@ traveling over the hull and sails to help players learn about sail shape and lam
 - **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
   Owner's requests, 12 November (unranked; the owner will rank them):
-  1. Significantly more hull paint colors (Boat Detail).
-  2. Color options for the sail numbers and the F class letter (Boat Detail).
-  3. The interior and cockpit material, teak or fibreglass (Boat Detail).
+  1. Significantly more hull paint colors (later, Crew Figures; partly #354).
+  2. Color options for the sail numbers and the F class letter (later, Crew Figures).
+  3. The interior and cockpit material, teak or fiberglass (later, Crew Figures).
   4. The drawn rigging lines in the colors chosen for the control panel (the Boat page's line colors), so each line
      wears its control's color (Rigging, with the rigging rendering).
   5. A tactical compass on the cabin top, as Josephine's Tacktick-style unit at the mast foot
      (reference/photos/josephine-cabin-top-forward-port.png): usable in the game, readable from the cockpit camera,
      showing heading, and used tack to tack to read lifts and headers like the real one (Boat Detail for the unit,
      UI & Experience for its readout).
-  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (Boat Detail).
+  6. The deck less flat and static: texture and depth, the non-skid pattern and wear, as in the photos (later, Crew Figures).
 - **The Seaweed Soup courses** (done: all 41). Done too: the race committee choosing the course from the wind and the tide, flown in numeral pennants. Later: postponement (AP) when there's no wind to race in; shortening course (S); laylines that clear Alcatraz's shore rather than its light; the wind's shadow behind Angel Island and the current around the islands (today the current is the open-water current everywhere but the Cityfront).
 
 ## Sea state, and reading the water (requested)
