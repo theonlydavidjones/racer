@@ -61,6 +61,9 @@ body{
   width:96px;height:96px;background:var(--pod);border:1px solid var(--rule);border-radius:50%;pointer-events:none}
 #map{position:fixed;top:calc(env(safe-area-inset-top,0px) + 74px);right:max(16px,env(safe-area-inset-right,0px));
   width:132px;height:168px;background:var(--pod);border:1px solid var(--rule);border-radius:6px;cursor:pointer}
+/* the data credit ODbL asks for (OpenStreetMap: the coast, piers and harbors), small, under the inset, always shown with it */
+#mapCredit{position:fixed;top:calc(env(safe-area-inset-top,0px) + 246px);right:max(16px,env(safe-area-inset-right,0px));width:132px;text-align:center;font:500 8px/1.2 var(--f-inst);color:var(--muted);opacity:.75;text-decoration:none}
+#mapCredit:hover{opacity:1;text-decoration:underline}
 #mapHint{position:fixed;top:calc(env(safe-area-inset-top,0px) + 246px);right:max(16px,env(safe-area-inset-right,0px));
   width:132px;text-align:center;font:600 10px/1 var(--f-inst);letter-spacing:.1em;color:var(--muted);text-transform:uppercase;pointer-events:none}
 
