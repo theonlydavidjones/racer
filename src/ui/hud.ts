@@ -992,6 +992,14 @@ export function navRouteFinish(): void {
   routeMemo = { dest: job.dest, from: job.from, at: job.at, pts: r.value }; routeJob = null;
 }
 
+/** A slip's destination, once its way in is worked out: its harbor's mouth (the same object while it's the same, so the
+ * route to it is worked out once: navRoute). Any other: itself. */
+let mouthMemo: { dest: CourseMark; m: CourseMark } | null = null;
+function toMouth(dest: CourseMark): CourseMark {
+  if (mouthMemo?.dest === dest) return mouthMemo.m;
+  const s = slipAt(dest.p), way = s ? harborRouteCached(s) : null; if (!way) return dest;
+  mouthMemo = { dest, m: { ...dest, p: { ...way.mouth } } }; return mouthMemo.m;
+}
 /**
  * Just sailing, on the map: the buoys around you, and where you're heading, by the navigator's route. If that's off the map, an arrow at the
  * edge points to it.
@@ -1006,7 +1014,8 @@ function drawSailing(ctx: CanvasRenderingContext2D, tf: Tf, dest: CourseMark | n
   if (!dest) return;
   const a = tf(u.x, u.y), b = tf(dest.p.x, dest.p.y), inside = b[0] > 8 && b[0] < w - 8 && b[1] > 8 && b[1] < h - 8;
   // the navigator's route there (the passage plan's: round the land, sim/navigator.ts), from where she is now
-  const legs = navRoute(u, dest).map(q => tf(q.x, q.y)); legs[0] = a;
+  // (bound for her slip with the way in drawn: the route to its harbor's mouth, where the way in takes over: drawNavLayer)
+  const legs = navRoute(u, toMouth(dest)).map(q => tf(q.x, q.y)); legs[0] = a;
   const path = () => { ctx.beginPath(); legs.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); };
   ctx.save(); ctx.lineJoin = 'round';
   ctx.strokeStyle = I.halo; ctx.lineWidth = PEN.dest.halo; path(); ctx.stroke();
