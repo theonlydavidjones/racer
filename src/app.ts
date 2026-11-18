@@ -1014,8 +1014,8 @@ $('bEnsign').onclick = () => { const struck = !w.user.ensignStruck; send({ k: 'e
 $('bView').onclick = () => setView((viewMode + 1) % 3);
 $('bLook').onclick = lookAhead;
 // Course view: from the setup screen (before racing) or any time during the race. The race keeps running.
-// Cruising, the same button (and key) opens the navigator's passage plan instead.
-$('bCourse').onclick = () => (w.cruising ? navView.toggle(w) : courseView.toggle(w));
+// Cruising, the same button (and key) opens the chart, the navigator's passage its layer (the owner, 17 Nov 2026).
+$('bCourse').onclick = () => (w.cruising ? navToggle() : courseView.toggle(w));
 // the start practice's restart, in the start line's card (the owner, 15 Nov 2026: "I need an actual restart button"):
 // the same as Shift+R, until the results open
 $('ncRestart').addEventListener('click', e => { e.stopPropagation(); if (S.mode === 'drill') results.restartDrill(); });
@@ -1025,11 +1025,13 @@ $('ncAsk').addEventListener('click', e => {
   e.stopPropagation(); const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-end]'); if (!b || w.t >= 0) return;
   favCall = b.dataset.end === 'pin' ? 'pin' : 'committee'; hud.favCall = favCall;
 });
-$('nextCard').addEventListener('click', () => (w.cruising ? navView.toggle(w) : courseView.toggle(w)));
-$('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navView.toggle(w) : courseView.toggle(w)); } });
+$('nextCard').addEventListener('click', () => (w.cruising ? navToggle() : courseView.toggle(w)));
+$('nextCard').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (w.cruising ? navToggle() : courseView.toggle(w)); } });
 $('bPreview').onclick = () => (S.mode === 'sail' ? navView.open(w) : courseView.open(w));
 $('bCvClose').onclick = () => courseView.close();
 $('bNavClose').onclick = () => navView.close();
+// the passage plan in words, from the chart's one line about the passage (the navigator's layer)
+$('chartPlanLink').onclick = e => { e.preventDefault(); navView.open(w); };
 /** The speed of time you've set (kept here: the race's own reaches the page a frame later, and two quick presses must make 4×). */
 let speedSet = 1;
 /** The results shown for this race (kept here too: the race's own flag reaches the page a frame later). */
@@ -1086,16 +1088,22 @@ const chart = new Chart(hud, () => { if (w.dest !== chartDest) view.refreshCours
   };
   const menus = [layerMenu($('bChartLayers'), $('chartLayersPop'), () => S, setLayer, () => {}, (el, f) => hud.keyInto(el, 'chart', f), views, [insetChoice])];
 }
-$('map').addEventListener('click', () => {
-  if (!w.running || chart.isOpen) return;
-  if (w.cruising && hud.insetView === 'nav') { navView.toggle(w); return; } // (the navigator's view: its passage plan)
-  releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); chartNavLabel();
-});
+$('map').addEventListener('click', () => { if (w.running && !chart.isOpen) openChart(); });
+function openChart(): void { releaseTiller(); setControlsIdle(); chartDest = w.dest; chart.open(w); openChartHook(); chartNavLabel(); }
+/** Cruising, the navigator: the chart with its passage over it (ui/hud.ts drawNavLayer), the plan in words behind the
+ * chart's Plan link; before she's under way, the plan in words (the owner, 17 Nov 2026: the navigator a layer on the one
+ * chart, its panel retired). */
+function navToggle(): void {
+  if (chart.isOpen) { chart.close(); return; }
+  if (navView.isOpen) { navView.close(); return; }
+  if (w.running) openChart(); else navView.open(w);
+}
 /** The navigator (cruising) or the course and strategist (racing) from the full chart: its button in the chart's own
  * row, and its key, both close the chart and open it (the owner: "when in a cruise, if I expand the inset map I can no
  * longer find navigator mode"). */
 function chartNavLabel(): void {
   const b = $('bChartNav'), k = keymap.label('course');
+  b.hidden = w.cruising; // (cruising, the navigator's the chart's own layer, and its plan the Plan link: no button for it)
   b.textContent = w.cruising ? 'Navigator' : 'Strategist';
   b.title = `${w.cruising ? 'The navigator: the passage plan' : 'The course and the strategist'}${k ? ` (${k})` : ''}`;
 }
@@ -1107,6 +1115,7 @@ function insetViews(): void {
   const cruising = !!w?.cruising;
   $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
   hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in the full chart's Layers menu, and remembered)
+  $('map').title = hud.insetView === 'nav' ? 'Click for the chart, with the passage plan' : 'Click the map for the chart'; // (the hover says it: no words on the inset)
 }
 
 /* ---------------- keyboard (bindings in ui/keys.ts, editable in Keyboard settings) ---------------- */
@@ -1210,7 +1219,7 @@ addEventListener('keydown', e => {
   }
   if (a === 'keys') { keysView.open(); return; }
   if (a === 'log') { if ($('logView').hidden) openLog(); else $('logView').hidden = true; return; }
-  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.cruising) navView.toggle(w); else courseView.toggle(w); return; }
+  if (a === 'course' && $('replay').hidden && $('results').hidden && $('drill').hidden) { if (w.cruising) navToggle(); else courseView.toggle(w); return; }
   if (raceReplay.isOpen) return; // the replay's own buttons only
   if (a === 'pause' && w.running) { if ($('pause').hidden) $('bPause').click(); else $('bResume').click(); return; }
   if (a === 'trimNotes') { if ($('trimNotes').hidden) { if (!anyOverlay()) openTrimNotes(); } else closeTrimNotes(); return; }
@@ -1402,13 +1411,13 @@ const perf = new PerfMeter([ // (the GPU's share by part, on a real machine: ui/
 ]);
 /* Tools (ui/toolsTray.ts): what shows on the surface, each tile its key's action, lit while it's on. Hail stays on the band,
  * one press away (the owner); time's speed is the tray's last row. */
-const toggleCourse = () => { if (w.cruising) navView.toggle(w); else courseView.toggle(w); };
+const toggleCourse = () => { if (w.cruising) navToggle(); else courseView.toggle(w); };
 const toolKey = (a: Action) => keymap.label(a);
 const TOOLS: Tool[] = [
   { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
-  { id: 'course', label: 'Course chart', icon: 'chart', key: () => toolKey('course'), on: () => courseView.isOpen || navView.isOpen, act: toggleCourse },
+  { id: 'course', label: 'Course chart', icon: 'chart', key: () => toolKey('course'), on: () => courseView.isOpen || navView.isOpen || (w.cruising && chart.isOpen), act: toggleCourse },
   { id: 'lookInstrument', label: 'Cabin-top instrument', icon: 'inst', key: () => toolKey('lookInstrument'), on: () => !!instLook, act: () => runAction('lookInstrument'), hidden: () => !view.userMesh?.instrument }, // (her boat may have none: BoatSpec.instrument)
   { id: 'navLights', label: 'Nav lights', icon: 'lights', key: () => toolKey('navLights'), on: () => !w.user.lightsOff, act: () => runAction('navLights') },
   { id: 'paddle', label: 'Paddle', icon: 'paddle', key: () => toolKey('paddle'), act: () => runAction('paddle') },

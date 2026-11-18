@@ -87,6 +87,7 @@ export class Chart {
       const r = this.c.getBoundingClientRect();
       Object.assign(this.fx.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
       this.hud.chartFx(this.fx, this.w, (t - last) / 1000, this.cursor); last = t;
+      if (this.hud.navRev !== this.navRev) this.draw(); // (the navigator's passage or plan came in: its layer drawn)
       this.raf = requestAnimationFrame(tick);
     };
     if (!this.raf) this.raf = requestAnimationFrame(tick);
@@ -139,5 +140,14 @@ export class Chart {
       + `<p>Current there now: ${ckt < 0.1 ? 'slack' : `${ckt.toFixed(1)} kt setting ${String(Math.round(brg(cur.x, cur.y)) % 360).padStart(3, '0')}°`}.</p>`;
   }
 
-  draw(): void { if (this.w && this.isOpen) this.hud.drawChart(this.c, this.w, this.cx, this.cy, this.scale, this.pick?.p ?? null); }
+  private navRev = -1;
+  draw(): void {
+    if (!this.w || !this.isOpen) return;
+    this.navRev = this.hud.navRev;
+    this.hud.drawChart(this.c, this.w, this.cx, this.cy, this.scale, this.pick?.p ?? null);
+    // (the passage in one line at the chart's top, the plan in words behind its link: the navigator's layer, the owner's)
+    const line = this.hud.navLine(this.w), el = $('chartPlan');
+    if (el.hidden !== !line) el.hidden = !line;
+    if (line && $('chartPlanText').textContent !== line) $('chartPlanText').textContent = line;
+  }
 }
