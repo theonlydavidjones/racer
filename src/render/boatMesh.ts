@@ -1119,14 +1119,16 @@ const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
 /**
- * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. In a socket on the after deck at the
- * starboard quarter, close to the corner, as Josephine's (the owner's photo: reference/photos/
- * josephine-helm-on-aft-deck-underway.jpg): 3 cm forward of the transom's top and 6 cm in from the rail. There it's out of
- * the tiller's sweep, which passes inboard of it to hard over (about 7 cm between them at the least: tests/
- * ensignstaff.test.ts). Further in, 8 cm forward of the transom as it was, the tiller swung through its foot; on the
- * transom's face, as it then was, its foot was in the air (the owner, 18 Nov 2026).
+ * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. Its foot in a flush silver socket in the
+ * after deck at the starboard quarter, as Josephine's (the owner's photos: reference/photos/josephine-ensign-socket-port-
+ * quarter.jpg, taken from the dock looking aft, so the circled socket is on her starboard side, and josephine-helm-on-aft-
+ * deck-underway.jpg, the staff to starboard looking aft): just forward of the transom's edge, about halfway out from the
+ * backstay's chainplate to the corner. Read from the photo it's about 0.47 m out and 5 cm in from the edge, ESTIMATE; drawn
+ * 0.50 m out and 3 cm in, where the tiller's sweep passes 2.5 cm clear of it at 75° (tests/ensignstaff.test.ts: at the
+ * photo's own reading the tiller would touch it in its last 2.5° of travel). On the transom's face, as it once was, its foot
+ * was in the air (the owner, 18 Nov 2026).
  */
-export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, x = 0.6, z = L / 2 - 0.03, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, x = 0.5, z = L / 2 - 0.03, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
   return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
@@ -1332,7 +1334,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), flagBlock(1), 0.25, rig); clubHoist(-1); }
   else clubHoist(1);
   if (b.ensign) {
-    // on an ensign staff in a socket on the after deck at the starboard quarter (ENSIGN_STAFF), raked aft; the flag about an
+    // on an ensign staff in its deck socket at the starboard quarter (ENSIGN_STAFF), raked aft; the flag about an
     // inch of fly per foot of boat (a 24-inch fly)
     const ens = flagArtCanvas(b.ensign), { h: staffH, rake, base } = ENSIGN_STAFF;
     const staffG = new THREE.Group(); grp.add(staffG);
@@ -1340,6 +1342,9 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const top = ENSIGN_STAFF.top;
     staff.position.copy(base.clone().lerp(top, 0.5)); staff.rotation.x = rake; staffG.add(staff);
     const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); staffG.add(truck);
+    // (its socket: a flush silver ring in the deck, there whether the staff's shipped or not)
+    const socket = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.006, 6, 16).scale(1, 1, 0.4).rotateX(Math.PI / 2), CHROME);
+    socket.position.copy(base).add(new THREE.Vector3(0, 0.002, 0)); grp.add(socket);
     if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, staffG, false);
     const flag = ens ? flags[flags.length - 1].mesh : null;
     // (down the staff no further than leaves the flag's foot clear of the deck: a Danish or Norwegian ensign is deep in the hoist)

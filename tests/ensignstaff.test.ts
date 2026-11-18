@@ -5,8 +5,8 @@ import { HEEL, RUDDER_RAKE, deckY, halfBeam, rudderGeometry, tillerLift, tillerP
 import { tillerRootAt, tillerTip } from '../src/render/crew';
 import { HARD_OVER } from '../src/boat/balance';
 
-// The ensign staff stands in a socket on the after deck at the starboard quarter, as Josephine's does (the owner's
-// photo, reference/photos/josephine-helm-on-aft-deck-underway.jpg); not floating (the owner, 18 Nov 2026: its foot ended in
+// The ensign staff stands in a socket in the after deck at the starboard quarter, as Josephine's does (the owner's
+// photos, reference/photos/josephine-ensign-socket-port-quarter.jpg and josephine-helm-on-aft-deck-underway.jpg); not floating (the owner, 18 Nov 2026: its foot ended in
 // the air past the transom), and clear of the tiller's sweep to hard over both ways. The staff is part of the hull's own
 // frame, drawn in her group: what holds here holds at every heel and on either tack, the boat heeling and turning with it.
 const segDist = (a0: THREE.Vector3, a1: THREE.Vector3, b0: THREE.Vector3, b1: THREE.Vector3) => {
