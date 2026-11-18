@@ -12,6 +12,7 @@ import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { homeScene } from './firstRun';
+import { warmLeeIdle } from './leeWarm';
 import { place } from '../sim/places';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
@@ -86,6 +87,7 @@ function prepare(seed = randomSeed()): void {
   }
   app.w = app.host.view; app.shownDest = app.w.dest; app.speedSet = app.w.speed; app.drillShown = false; app.resultsShown = false;
   warmBasinsIdle(() => app.w);
+  if (!homeBuilt) warmLeeIdle(app.w); // (the harbors' lee over her race's waters, filed while you set up: app/leeWarm.ts)
   document.documentElement.dataset.sim = app.host.mode; // (where the race sails, for the checks: 'worker' or 'local')
   app.unshown = true; document.documentElement.dataset.prepared = String(++app.prepared);
 }
