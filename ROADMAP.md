@@ -701,6 +701,12 @@ sources. Each shipped item is added there when it's published.
    Batch 40 is held until the frame fix lands, so nothing adds load meanwhile.
    frame-time check to the release smoke test so a stuttering build
    can't ship.
+8v2. **Now — lag again: in the boat editor, and at the start of cruises** (owner, 18 November, on v207; bug; now; 2–4 h;
+   Capacity): "getting a lot of lag, in boat editor, at beginning of cruises. it tends to resolve after a while, but still
+   not good." Lag that clears by itself points to work done once at the start: the planner's or inset's first slices,
+   the weather loading, the shaders compiling, or the editor's speed report benching while it's open. First, profile both
+   on the published page (perf.cjs's views, plus the editor open and a cruise's first 60 s), and name what runs. Then
+   spread it out or defer it. Add both to perf-ab's views so it doesn't come back.
 8v. ~~**Now — the boat editor is very slow**~~ (done: look-only changes restyle her in place, sail pictures shared, the cockpit linings worked out once; a speed check) (regression, performance; 2–3 h): owner, on the new release, "moving very,
    very slow in the boat editor. each click (entering the editor, switching the time of day, opening the hatch) takes
    several full seconds." Every change should land within a frame or two, as before. Suspects:
