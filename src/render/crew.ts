@@ -787,6 +787,10 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   // (to the mast, too, from a job well aft of it: walked there, not the standing pose eased up out of the cockpit, the
   // feet together and gliding up a metre onto the cabin top)
   else if (job === 'mast' && fig.cur && Math.abs(fig.cur.hip.z - Math.max(z, CAB0 + 0.45)) > 0.4) { isMoving = true; dest = z; } // (where its pose kneels: below)
+  // (called to the mast, but still where they sat in the cockpit, before they've reacted (crewPhys.ts react): sat there
+  // still, not knelt where they are with their hands reaching two meters forward to the mast through the cabin's after
+  // end, the sprint's soak and tests/crewkneel)
+  if (job === 'mast' && !isMoving && z > COCK0) job = 'sit';
   if (z < COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) isMoving = true;
   // (sat beside the cabin's after end, by the physics, while they're out on the side deck aft of it, as when the cabin-top
   // lines are done from there and the physics sits them down where its weight is: they stay sat on the deck at its
