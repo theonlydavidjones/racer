@@ -1033,6 +1033,16 @@ function closingAt(b: Boat, p: Vec): number {
 export const mooredBoats: { empty: ReadonlySet<string> } = { empty: new Set() };
 /** Land, a dock, or (near a harbor: `nearHarbor`, looked up once a step) a boat lying in a slip: what stops her. */
 const solidAt = (p: Vec, nearHarbor: boolean): boolean => onLand(p) || (nearHarbor && hitsMooredBoat(p, mooredBoats.empty));
+/** A pier part's name as a sailor says it (OpenStreetMap's names, geo/data/wharf.json and east-piers.json): "Pier 39" and
+ * "Pier 41" with no article ("San Francisco Pier 33" is Pier 33; Pier 41's gates are Pier 41's), Pier 39's marina docks by
+ * their marina ("Pier 39's A Dock"), "the Berkeley Pier's abandoned outer part", "the Long Wharf", "the Municipal Pier". */
+export function wharfName(n: string): string {
+  const pier = /^(?:San Francisco )?(Pier \d+)/.exec(n);
+  if (pier) return pier[1];
+  if (/^[A-Z] Dock$/.test(n)) return `Pier 39's ${n}`;
+  if (/ \(abandoned\)$/.test(n)) return `the ${n.replace(/ \(abandoned\)$/, '')}'s abandoned outer part`;
+  return `the ${n.replace(/ \(.*\)$/, '')}`;
+}
 function whatHit(hit: Vec): { kind: Struck; name: string } {
   if (!onLand(hit) && hitsMooredBoat(hit, mooredBoats.empty)) return { kind: 'boat', name: 'the boat in the next slip' };
   const piles = underPier(hit); if (piles) return { kind: 'piles', name: `the piles of ${piles.name}` };
@@ -1040,7 +1050,7 @@ function whatHit(hit: Vec): { kind: Struck; name: string } {
   if (hitsWall(hit)) return { kind: 'concrete', name: 'the breakwater' };
   if (hitsHarbor(hit)) return { kind: 'dock', name: 'the dock' };
   // (by its name where it has one: off Berkeley, "the wharf" read as Fisherman's; the stability soak, 18 Nov 2026)
-  if (hitsWharf(hit)) { const n = wharfPartAt(hit) ?? wharfPartAt({ x: hit.x + 1, y: hit.y }) ?? wharfPartAt({ x: hit.x - 1, y: hit.y }); return { kind: 'concrete', name: n ? `the ${n.replace(/ \(abandoned\)$/, '').replace(/^(.*) \((.*)\)$/, '$1')}${/abandoned/.test(n) ? "'s abandoned outer part" : ''}` : 'the wharf' }; }
+  if (hitsWharf(hit)) { const n = wharfPartAt(hit) ?? wharfPartAt({ x: hit.x + 1, y: hit.y }) ?? wharfPartAt({ x: hit.x - 1, y: hit.y }); return { kind: 'concrete', name: n ? wharfName(n) : 'the wharf' }; }
   return { kind: 'mud', name: 'the shore' };
 }
 const RANK: DamageLevel[] = ['none', 'scrape', 'damage', 'serious', 'wreck'];

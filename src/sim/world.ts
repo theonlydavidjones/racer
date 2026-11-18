@@ -1464,7 +1464,11 @@ export class World {
           // (her way lost only as she sails into it: the share of her heading toward it. Lying along it, the wind pressing her
           // sideways onto it, she slides off it as a boat does a buoy; taxed whatever her heading, she lay on mark A at 0.1
           // m/s for five minutes in 22 kt: the stability soak, 18 Nov 2026, tests/mark-pinned.test.ts)
-          const into = Math.max(0, -(dx * -ax + dy * -ay) / (l * (hypot(ax, ay) || 1)));
+          // (into it: her heading against the contact's normal. For a round mark that's from the mark to her nearest point; for
+          // the committee boat, its own side's normal, toward her: the line from its middle to hers runs square to it only when
+          // she's abreast of it, and a bow driven into its side at 45° read as lying along it: the physics review)
+          const sl = m.q ? hypot(m.q.x - m.p.x, m.q.y - m.p.y) || 1 : 1, sn = m.q ? (() => { const nx = -(m.q!.y - m.p.y) / sl, ny = (m.q!.x - m.p.x) / sl, s = Math.sign(nx * (b.x - np.x) + ny * (b.y - np.y)) || 1; return { x: nx * s, y: ny * s }; })() : { x: dx / l, y: dy / l };
+          const into = Math.max(0, (sn.x * ax + sn.y * ay) / (hypot(ax, ay) || 1));
           b.v *= 1 - (m.q ? 0.1 : 0.03) * into; b.lastHitT = this.t;
         }
       }
