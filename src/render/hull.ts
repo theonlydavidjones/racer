@@ -729,14 +729,19 @@ export function tillerClearance(turn: number, lift: number, n = 40): number {
   }
   return w;
 }
-/** How far the tiller's lifted on its pin (rad) when turned `turn` rad: as far as it rides up to clear by a centimeter;
- * none while it clears lying at rest. Worked out once, a degree apart, and read between. */
+/** How far the tiller's lifted on its pin (rad) when turned `turn` rad. It turns about the raked rudder line, so its end
+ * comes down as it swings out (the owner, 18 Nov 2026: "the tiller path is on a slight arc, so it's up off the deck at
+ * center, but travels slightly down and touches the deck at the extremes of its travel path"): from about 45° it rests on
+ * what's under it, riding up on it no more than it must (TILLER_REST_ON); none while it clears lying at rest. Worked out
+ * once, a degree apart, and read between. */
+/** How far up off what it rests on the tiller's round stays (m): touching (a millimeter, for the drawing's facets). */
+export const TILLER_REST_ON = 0.001;
 let liftTab: Float64Array | null = null;
 export function tillerLift(turn: number): number {
   if (!liftTab) { liftTab = new Float64Array(91);
     for (let g = 0; g <= 90; g++) { const th = g * Math.PI / 180;
-      if (tillerClearance(th, 0) >= 0.01 && tillerClearance(-th, 0) >= 0.01) continue;
-      let lo = 0, hi = 1.4; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (tillerClearance(th, m) >= 0.01 && tillerClearance(-th, m) >= 0.01) hi = m; else lo = m; }
+      if (tillerClearance(th, 0) >= TILLER_REST_ON && tillerClearance(-th, 0) >= TILLER_REST_ON) continue;
+      let lo = 0, hi = 1.4; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (tillerClearance(th, m) >= TILLER_REST_ON && tillerClearance(-th, m) >= TILLER_REST_ON) hi = m; else lo = m; }
       liftTab[g] = Math.max(hi, liftTab[g - 1] ?? 0); } } // (never less as it goes further over)
   const g = Math.min(89.999, Math.abs(turn) * 180 / Math.PI), i = Math.floor(g);
   return liftTab[i] + (liftTab[i + 1] - liftTab[i]) * (g - i);
