@@ -134,6 +134,18 @@ export function rudderTurn(helm: number): number {
   const a = Math.min(helm, HELM_MAX) * FULL_RUDDER * D2R;
   return TURN_PEAK * plateCn(a) * Math.cos(a) / STALL_SIDE;
 }
+/** The most turn the rudder gives, at the stall, as a multiple of full helm's (rudderTurn at HELM_STALL). */
+export const STALL_TURN = TURN_PEAK;
+/**
+ * The helm (its units) that gives `turn` (a multiple of full helm's turn, as rudderTurn), up to the stall: rudderTurn
+ * turned round on its rising side. Past what the stall gives, the stall: a helmsman steering for her quickest turn holds
+ * the blade there, not past it, where it brakes and turns her less (her AI helmsman, physics.ts).
+ */
+export function helmFor(turn: number): number {
+  if (turn <= 1) return Math.max(0, turn);
+  const k = HELM_STALL - 1, r = Math.min(turn, TURN_PEAK);
+  return 1 + k * (1 - Math.sqrt(Math.max(0, 1 - 2 * (r - 1) / k)));
+}
 /**
  * The stalled rudder's braking, N, at `helm` (its units) and v m/s (ahead: sternway isn't braked by it here): a flat
  * plate's drag at that angle, ½ρv²·A·Cn·sin a, less a share for what the turn's own bleed of speed already has
