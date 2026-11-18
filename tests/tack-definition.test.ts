@@ -78,11 +78,14 @@ describe('her tack, by the definitions', () => {
 });
 
 describe('in a race', () => {
-  it('no boat is ever on one tack with her mainsail on the other side, off the wind: a start and three minutes of a fleet of eight in 22 kt', () => {
+  it('no boat is ever on one tack with her mainsail on the other side, off the wind: a start and five minutes of a fleet of eight in 22 kt', () => {
     const opponents = ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'gen:1', 'gen:2'];
     const w = new World(ss10 as unknown as CourseFile, { ...DEFAULT_SETTINGS, tideDate: '2026-11-14', windKind: 'west', windKt: 22, current: 'real', opponents, fleet: 7 }, 3);
     let wrong = 0, offWind = 0, gybes = 0; const was = new Map<number, string>();
-    while (w.t < 180) {
+    // (five minutes, not three, from 18 Nov 2026: with the turn's sourced cost (physics.ts turnBleed) this fleet jibes twice in
+    // the first three minutes and four times in five; on main it was six in three, three of them one boat flipping across
+    // dead downwind and back inside 3 s. The same limits, over more steps)
+    while (w.t < 300) {
       w.step(DT);
       for (const b of w.boats) {
         if (b.isUser || !(b.rig?.mainUp ?? true)) continue;
