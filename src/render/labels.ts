@@ -94,7 +94,8 @@ export class Labels {
       if (d !== this.destOf) { // (a new destination, or none: its words and its look, once)
         this.destOf = d;
         const pin = !!d && isSpot(d.name);
-        de.textContent = d && !pin ? d.name : ''; if (pin) de.appendChild(document.createElement('b')); de.className = pin ? 'tag mk pin' : 'tag mk';
+        // (bound for her own slip: "Home", the owner, 18 Nov 2026)
+        de.textContent = d && !pin ? (d.key === 'slip' ? 'Home' : d.name) : ''; if (pin) de.appendChild(document.createElement('b')); de.className = pin ? 'tag mk pin' : 'tag mk';
         if (pin) de.title = d!.name; else de.removeAttribute('title');
       }
       if (d) this.place(de, camera, d.p.x, d.p.y, 6); else if (!de.hidden) de.hidden = true;
