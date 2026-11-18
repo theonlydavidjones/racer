@@ -31,7 +31,7 @@ export const CLUB_TABLE: ClubInfo[] = [
   C('ggyc', 'Dorado Yacht Club', 'DYC', 'ggyc'),
   C('sbyc', 'China Basin Yacht Club', 'CBYC', 'sbyc'),
   C('bvbc', 'Dry Dock Boat Club', 'DDBC', 'bvbc'),
-  C('mhpyc', 'Monarch Point Yacht Club', 'MPYC', 'mhpyc'),
+  C('mhpyc', 'Monarch Point Yacht Club', 'MPYC', 'mhpyc', 1, { base: [37.77259, -122.38727] }), // base: OSM way 695040124, building tagged with the club's name and address (405 Terry A. Francois Blvd, per the SF Legacy Business Registry report, 2022); a footprint match
   C('tiyc', 'Clipper Cove Yacht Club', 'CCYC', 'tiyc'),
   // Tier 1 · Marin
   C('sfyc', 'Belvedere Cove Yacht Club', 'BCYC', 'sfyc'),
@@ -39,13 +39,13 @@ export const CLUB_TABLE: ClubInfo[] = [
   C('tyc', 'Shark Point Yacht Club', 'ShPYC', 'tyc'),
   C('pyc', 'Battery Yacht Club', 'BatYC', 'pyc', 1, { base: [37.83400, -122.47455], harbor: 'horseshoe-bay' }), // base: OSM nodes 1974693051 and 1974693718, clubhouse, about 20 m
   C('ssyc', 'Willow Grove Yacht Club', 'WGYC', 'ssyc'),
-  C('myc', 'Tamalpais Yacht Club', 'TamYC', 'myc'),
-  C('sryc', 'Mission Canal Yacht Club', 'MCYC', 'sryc'),
+  C('myc', 'Tamalpais Yacht Club', 'TamYC', 'myc', 1, { base: [37.9717, -122.4985] }), // base: ESTIMATE, about 150 m. Not in OSM. The address is 24 Summit Ave, San Rafael (CA Division of Boating and Waterways facility 412); two directory listings put it at 37.9716, -122.4986 (marinas.com, from degrees-minutes-seconds) and 37.97268, -122.4982 (ports.marinelink.com), and house numbers on Summit Ave in OSM agree
+  C('sryc', 'Mission Canal Yacht Club', 'MCYC', 'sryc', 1, { base: [37.9688, -122.5182] }), // base: ESTIMATE, about 300 m, from one directory listing (marinas.com, 37 58' 7.63" N, 122 31' 5.64" W, converted here). Not in OSM. The address is 200 Yacht Club Dr, San Rafael, at the west end of the canal (CA Division of Boating and Waterways facility 418)
   // Tier 1 · East Bay
   C('ryc', 'Brickyard Racing Club', 'BRC', 'ryc', 1, { harbor: 'richmond-yc' }),
   C('byc', 'Campanile Yacht Club', 'CamYC', 'byc', 1, { harbor: 'berkeley' }),
   C('csc', "People's Sailing Club", 'PSC', 'csc', 1, { base: [37.86307, -122.31383] }), // base: OSM way 454025334, building footprint
-  C('emyc', 'Mudflat Yacht Club', 'MfYC', 'emyc'),
+  C('emyc', 'Mudflat Yacht Club', 'MfYC', 'emyc', 1, { base: [37.83736, -122.30933] }), // base: OSM way 432711694, the harbor building at 3300 Powell St, the address a club directory gives for it, about 50 m; the club has no building of its own in OSM, and the address is secondhand
   C('eyc', 'Live Oak Yacht Club', 'LOYC', 'eyc', 1, { harbor: 'encinal' }),
   C('oyc', 'Oaktown Yacht Club', 'OtYC', 'oyc', 1, { harbor: 'oakland-yc' }),
   C('iyc', 'Sandbar Yacht Club', 'SdbYC', 'iyc', 1, { harbor: 'alameda-marina' }),
@@ -57,7 +57,7 @@ export const CLUB_TABLE: ClubInfo[] = [
   // Tier 1 · Peninsula / South Bay
   C('seqyc', 'Evergreen Yacht Club', 'EgYC', 'seqyc'),
   C('cpyc', 'Wolf Point Yacht Club', 'WPYC', 'cpyc'),
-  C('spyc', 'Cordillera Point Yacht Club', 'CoPYC', 'spyc'),
+  C('spyc', 'Cordillera Point Yacht Club', 'CoPYC', 'spyc', 1, { base: [37.67298, -122.3816] }), // base: ESTIMATE, about 100 m, from one directory listing (denisonyachtsales.com, 37 40' 22.716" N, 122 22' 53.761" W, converted here) for 500 Sierra Point Pkwy, Brisbane. Not in OSM
   // Tier 2 · cruising and social (labels only; not joinable)
   C('mbyc', 'Riveter Bay Yacht Club', 'RBYC', 'mbyc', 2),
   C('slyc', 'Cherry Harbor Yacht Club', 'CHYC', 'slyc', 2),
