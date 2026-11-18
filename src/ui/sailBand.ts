@@ -176,6 +176,9 @@ const jcar = (side: Side) => {
  * is turning them to. Click the dial's left half for a half turn off, the right half for a half turn on, or scroll on it.
  * Steel grey, as the standing rigging. */
 const JMAX = TUNE_RANGE.jumperTurns[1];
+/** The jumpers' turns as the band shows them: the nearest half turn, within the turnbuckle's 0 to 5 (and 0 for anything
+ * not a number), so the readout is never longer than "2.5". */
+export const jumperTurnsShown = (v: number) => Number.isFinite(v) ? Math.max(0, Math.min(JMAX, Math.round(v * 2) / 2)) : 0;
 /** Where on the dial's arc a setting sits: 0 turns at lower left, 5 at lower right (a 270° sweep, clockwise). */
 const jAng = (v: number) => -135 + (v / JMAX) * 270;
 const jdial = (side: Side) => {
@@ -414,8 +417,10 @@ export class SailBand {
       : j.reach > 0 ? `${name} to ${at}: the crew is going forward to it.${left}` : `${name} to ${at}: the crew is pulling the pin and sliding it.${left}`, until: Infinity };
   }
 
-  /** Where the jumpers are now: her tune, or North's for the wind when she has none (cruising: rigTune.ts guideTune). */
-  private jumpersNow(u: Boat): number { return (u.tune ?? guideTune(u.ww.kt)).jumperTurns; }
+  /** Where the jumpers are now, in half turns as the crew counts them: her tune, or North's for the wind when she has
+   * none (cruising: rigTune.ts guideTune, which sits between the marks around 9 and 15 kt and moves with the wind: shown
+   * raw, it ran on as a long run of digits under the dial, the owner's bug). */
+  private jumpersNow(u: Boat): number { return jumperTurnsShown((u.tune ?? guideTune(u.ww.kt)).jumperTurns); }
   /** Ask the crew for a half turn more or less on the jumpers, from where they're going (or where they are). */
   private turnJumpers(d: number): void {
     this.host.send({ k: 'jumpersBy', d }); this.host.changed(); // (worked out in the race: two quick presses make a whole turn)
