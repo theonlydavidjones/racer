@@ -221,7 +221,11 @@ function homeCourse(w: World, b: Boat): { desired: number; luff: boolean; beatin
     // (the way starts where she was when it was asked: she lay to, a few meters off it, the while)
     ai.home = { route: r.value, i: 0, at: job.stand, lying: false };
   }
-  const h = ai.home, toLee = (p: Vec, d: number) => { const u = V(from + 180); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; };
+  // (land to leeward: straight downwind, and along the way she's actually drifting over the ground, when she is. Lying to
+  // in a 26 kt westerly she sagged off some 25° from dead to leeward, onto a shore the downwind look missed, and lay against
+  // it: abandon-home's westerly, seed 7, on rules-incident)
+  const ds = hypot(b.vx, b.vy), drift = ds > 0.05 ? brg(b.vx, b.vy) : null;
+  const h = ai.home, toLee = (p: Vec, d: number) => [from + 180, drift].some(a => { if (a == null) return false; const u = V(a); return landAlong(p, { x: p.x + u.x * d, y: p.y + u.y * d }) < Infinity; });
   // lying to at her spot: from coming within 60 m of it until she's drifted 300 m off, or the land's 150 m to leeward
   // (lying to she sags off to leeward at about 0.8 kt: some ten minutes, then a beat back)
   if (h.lying && (dist(b, h.at) > 300 || toLee(b, 150))) h.lying = false;
