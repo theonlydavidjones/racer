@@ -167,6 +167,8 @@ export function crabFor(brgT: number, v: number, cur: Vec): number {
 
 /** Whether turning from her heading to `h` the short way takes her through head to wind: a tack (as physics.ts's own
  * throughWind reckons it). A bear-away onto the other gybe isn't one. */
+/** Rule 14's luff, degrees off the wind at the least: outside physics.ts's 20° mid-tack zone, with a margin. */
+const LUFF_OFF = 24;
 function tacksTo(b: Boat, h: number): boolean {
   const toWind = wrap(b.ww.from - b.h), err = wrap(h - b.h);
   return Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
@@ -178,7 +180,11 @@ function tacksTo(b: Boat, h: number): boolean {
  * her penalty, close-hauled. Off the wind, a bear-away or a gybe, as before. */
 function awayOnSide(b: Boat, h: number, luffUp = false): number {
   if (!tacksTo(b, h)) return sailable(b, h);
-  const from = b.ww.from, off = luffUp ? 5 : beatFor(b) + 1;
+  // (the luff: well short of head to wind, LUFF_OFF, about half her beat angle: her drive's mostly gone there, and it
+  // leaves room for the wind's wander and her helm's overshoot. Inside 20° of the wind physics.ts takes a big turn
+  // toward it for a tack and holds her to it, midTack: aimed 5° short, she was held there after the danger had gone,
+  // and fell through head to wind, stopped, beside the other boat. The second physics review, 18 Nov 2026)
+  const from = b.ww.from, off = luffUp ? Math.max(LUFF_OFF, beatFor(b) / 2) : beatFor(b) + 1;
   return b.tack === 'S' ? n360(from - off) : n360(from + off);
 }
 /** Close-hauled course on the current tack, or the requested heading if it is sailable. */
@@ -590,7 +596,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     ai.penSeen = b.penaltyTotal;
     if (!near) ai.reclear = false;
     ai.clearing = !!near && (b.penalty >= b.penaltyTotal - 1 || !!ai.reclear);
-    b.desired = near && ai.clearing ? awayOnSide(b, brg(b.x - near.x, b.y - near.y)) : b.h + 60;
+    // (away from a boat without tacking into her; from a mark, as before: no other boat's water to cross)
+    const awayP = near ? brg(b.x - near.x, b.y - near.y) : 0, fromBoat = !!near && w.boats.includes(near as Boat);
+    b.desired = near && ai.clearing ? (fromBoat ? awayOnSide(b, awayP) : sailable(b, awayP)) : b.h + 60;
     if (!ai.clearing) decideTurn(b, w.t, true); // (spinning her turns: a skipper always calls those, boat/calls.ts)
     b.luff = false; crewPoleCall(w, b); return; // (the pole in for the turns: the physics review)
   }
@@ -953,6 +961,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     // her. Not end to end, where two boats a length apart have little water between bow and stern but plenty of time)
     const inside = r.rule === '11' && dx * (o.vx - b.vx) + dy * (o.vy - b.vy) < 0 && hullGap(b, o) < OPEN_GAP;
     if (r.kc === b && (cp.t < ai.kn.keepClearS && cp.d < ai.kn.keepClearM + lagM || inside)) {
+      luffToWind = null; // (a boat she must keep clear of: her move for her comes after, and wins)
       // (about to touch, as the Rule 14 branch below reckons it: rule 14 binds her too, and the keep-clear boat is the one
       // whose helm goes over hardest at the last moment, to the rudder's stall: physics.ts, the physics review)
       if (cp.t < lagT + 1 && cp.d < 4.5 + 0.5 * lagM) ai.urgent = true;
@@ -1030,13 +1039,14 @@ export function aiThink(w: World, b: Boat, dt: number): void {
   else if (ht && !tackNow && !holdForHail && !avoiding) { desired = ht.to === 'P' ? csP : csS; luff = false; tackNow = true; }
   if (holdForHail) desired = b.tack === 'S' ? csS : csP;
   ai.tackNow = tackNow && !holdForHail;
-  desired = sailable(b, avoidMarks(w, b, desired, avoiding));
-  // (sailable holds her to close-hauled; rule 14's luff goes on above it, toward head to wind, short of it)
-  if (luffToWind != null && !tackNow) desired = luffToWind;
+  // (rule 14's luff goes above close-hauled, toward head to wind, short of it: sailable would hold her to close-hauled.
+  // It still answers to the marks; and it's a heading, not a course to make good, so no leeway is allowed on it)
+  const luffing = luffToWind != null && !tackNow;
+  desired = luffing ? avoidMarks(w, b, luffToWind!, avoiding) : sailable(b, avoidMarks(w, b, desired, avoiding));
   // the courses above are her track's through the water (the beat angle, the laylines, the crab): her heading is above
   // each by the leeway she makes there (physics.ts b.leeway), as a sailor steers a little higher to make good her course
   const lw = b.leeway ?? 0, r = wrap(ww.from - desired);
-  if (lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
+  if (!luffing && lw > 0 && Math.abs(r) > lw + 1 && Math.abs(r) < 150) desired = n360(desired + Math.sign(r) * lw);
   // any course that takes her through the wind (a tack or jibe she's decided on: an avoidance, a duck that becomes a tack,
   // a rounding, the pre-start), called by skill (the owner, 15 Nov 2026: boat/calls.ts; once a turn, decideTurn). Not a
   // bear-away duck or a luff, which keep her on her side of the wind; and not dead downwind, where a degree flips it

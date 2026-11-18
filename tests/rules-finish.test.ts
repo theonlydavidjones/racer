@@ -240,29 +240,30 @@ describe('in the world', () => {
     sail(w, S, off(X, V(hS), -gap), 'S');
     const fouls: string[] = [];
     w.onIncident = (a, b, inc) => { if (inc.fouler === W && (a === A || b === A)) fouls.push(`W vs A at ${w.t.toFixed(1)} s`); };
-    let ws = Infinity, wa = Infinity, as = Infinity, turnsNear = Infinity;
+    let ws = Infinity, wa = Infinity, as = Infinity, turnsNear = Infinity, given = 0;
     for (let t = 0; t < 150; t += DT) { // (long enough to see any penalty she owes taken)
       const dir0 = W.penaltyDir;
       u.h = hP; u.desired = hP; w.step(DT);
+      given = Math.max(given, W.penaltyTotal);
       ws = Math.min(ws, hullGap(W, S)); wa = Math.min(wa, hullGap(W, A)); as = Math.min(as, hullGap(A, S));
       if (!dir0 && W.penaltyDir) turnsNear = Math.min(...[A, S, u].map(o => hullGap(W, o))); // (where her turns began)
     }
-    return { ws, wa, as, fouls, turnsNear, owing: W.penalty };
+    return { ws, wa, as, fouls, turnsNear, owing: W.penalty, given };
   };
   // (each check at each gap its own case, the ones that still fail held as expected failures: 18 Nov 2026, the
   // Coordinator's ruling. Two causes, both after the sprint: the hail's lead time (A hails with S 7-9 s off, and the
   // chain, the relay's 5 s and two tacks, can't answer in that: a boat shouldn't hail then, the owner's AI design to
   // settle; held on for it to the relay's last second, W's duck is too late), and the rule-10 duck's turn of 32° more each
-  // think (ai.ts, Skipper Model's keep-clear branch), which bears W away past S's stern onto a reach and across A)
+  // think (ai.ts, Skipper Model's keep-clear branch), which bears W away past S's stern and on: W's touch on S, at all
+  // three gaps)
   const runs = new Map<number, ReturnType<typeof stalled>>(), run = (gap: number) => runs.get(gap) ?? runs.set(gap, stalled(gap)).get(gap)!;
   const checks: [string, (r: ReturnType<typeof stalled>) => void][] = [
     ['W keeps clear of S', r => expect(r.ws).toBeGreaterThan(CONTACT_GAP)],
     ['W keeps clear of A, and isn\'t called against her', r => { expect(r.wa).toBeGreaterThan(CONTACT_GAP); expect(r.fouls).toEqual([]); }],
     ['A keeps clear of S', r => expect(r.as).toBeGreaterThan(CONTACT_GAP)],
-    ['W\'s penalty turns begin clear of the boats, and are done', r => { expect(r.turnsNear).toBeGreaterThan(LOA); expect(r.owing).toBe(0); }],
+    ['W\'s penalty turns begin clear of the boats, and are done', r => { expect(r.given, 'a penalty given her (or there\'s nothing here to check)').toBeGreaterThan(0); expect(r.turnsNear).toBeGreaterThan(LOA); expect(r.owing).toBe(0); }],
   ];
-  const stillFails = new Set(['22 W keeps clear of S', '26 W keeps clear of S', '30 W keeps clear of S', '30 W keeps clear of A, and isn\'t called against her',
-    '30 W\'s penalty turns begin clear of the boats, and are done']); // (at 30 m the foul on A gives her a second penalty, still being turned at the end)
+  const stillFails = new Set(['22 W keeps clear of S', '26 W keeps clear of S', '30 W keeps clear of S']);
   for (const gap of [22, 26, 30]) for (const [name, check] of checks) {
     const title = `the chain stalled (rules 10, 11, 13, 20.3, 44.2), ${gap} m off: ${name}`;
     (stillFails.has(`${gap} ${name}`) ? it.fails : it)(title, () => check(run(gap)), 60000);
