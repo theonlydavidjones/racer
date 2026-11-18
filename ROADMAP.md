@@ -135,10 +135,18 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v205 (18 Nov):** fewer first-mark pile-ups (#453), the committee's beat-start course (#452), hands on the lines when
+hiking, crew stations (#446) and habits (#455), Sail Home paced, the destination pin, the 8 m slip walk-out, the rounding
+note (#447), the coach's heeled speed (#449), the wind to the second (#451). Still open: shallow waves (#454, pulled: it
+broke the first-mark test), the navigator's harbor-mouth pilot home, the navigator as a layer.
+
 **Every owner request is also kept in Owner's Requests** (https://claude.ai/artifact/9LqaHyCJvUStsifA29UAj3; the owner,
 17 November: "I feel like features I've requested are being lost"): one row per request, ranked now · next · later ·
 done, in the artifact's own database, so it survives compaction. Each new request goes there as well as here, and moves
 to done there when it ships.
+**Every finished feature is kept in Finished Features** (https://claude.ai/artifact/RzR3C42c24ZiGNCWsrPn7Q; the owner,
+17 November, for documentation later): one row per feature, by area, with what it does, its key, the version and its
+sources. Each shipped item is added there when it's published.
 
 - **Motor sailing: her speed with the sails up and the motor on** (owner, 17 November; accuracy; later, "low priority";
   1–3 h; Deep Physics): "motoring speed should account for sails being up. sails should impact physics when motor
@@ -596,7 +604,7 @@ to done there when it ships.
      the rail"; bug; now; 1–3 h): a crew figure stands straight-legged on the side deck at the rail, leaning outboard,
      with no seat under him. Find the state that poses it (a move or a hike pose before he sits), and a test in
      tests/crewfig.test.ts that no hand is standing on the deck while she's sailing and he isn't moving.
-   - Hands on what they'd really hold, hiking on a beat (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
+   - ~~Hands on what they'd really hold, hiking on a beat~~ (done, v205: hike-hands) (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
      out, crew seem to be holding on to thin air. IRL, when beating, forward crew would be holding the lee jib sheet, and
      middle crew would be holding the traveller and/or mainsheet, often tucking their aft leg under the thwart for
      stability. if only one crew, they would hold the jib sheet and the traveller." The hands go on the lee jib sheet's
@@ -873,7 +881,7 @@ to done there when it ships.
        src/geo/marina.ts), finishing with the docking hand-over;
      - (3) moored boats solid, the same fix as slip 572 (8m2);
      - (4) a test that the navigator brings her home from the Bay to slip 572 with no contact.
-   - **Bug: "Sail Home" from Mile Rock still plotting after ten minutes** (owner, 16 November; bug; now; 2–4 h): "I was
+   - ~~**Bug: "Sail Home" from Mile Rock still plotting after ten minutes**~~ (done, v205: nav-pace) (owner, 16 November; bug; now; 2–4 h): "I was
      sailing outside of the gate, with a destination near the old mile rock lighthouse. when I got near to the
      lighthouse, I went into the nav view and clicked Sail Home. It appears that my destination has updated, but we're a
      full ten minutes in and the course is still plotting in the nav map. I need that to move more quickly." Lead: since
@@ -882,7 +890,7 @@ to done there when it ships.
      each time, never finishing. Finish (or carry on) the search under way rather than restart it, and give a new
      destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
      at 6 kt (tests/insetRoute).
-   - **A clicked destination shown as a pin, not coordinates, and moved when the destination changes** (owner, 16
+   - ~~**A clicked destination shown as a pin, not coordinates, and moved when the destination changes**~~ (done, v205: nav-dest-pin) (owner, 16
      November: "bug: when I change sailing destinations, the destination pin on the horizon doesn't seem to update. we
      could bundle this fix with the earlier request to use pins instead of coordinates for non-named destinations."; bug
      and polish; now; 1–2 h). The 3D marker's place and label follow every change of destination (a click on the chart,
