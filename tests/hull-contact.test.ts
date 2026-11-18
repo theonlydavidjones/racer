@@ -72,6 +72,14 @@ describe('Hulls together: the contact\'s physics every step, not on the rules\' 
     const { A, B } = hold((A, B) => { Object.assign(B, { x: 0, y: 0, h: 90, v: 0, astern: 0, sway: 0, wrecked: { how: 'aground' } }); Object.assign(A, { x: 0, y: -(HALF + 1.5), h: 0, v: 1.0, astern: 0, sway: 0 }); });
     expect(A.v).toBeLessThan(0.05); expect(B.x).toBe(0); expect(B.y).toBe(0);
   });
+  it('one hull put through the other (a placement, hullGap 0): backed out the way she came, not driven deeper', () => {
+    // (physics-review, 18 Nov 2026: past the other's centerline the nearest end's vector points back toward her stern)
+    for (const depth of [0.3, 3.0]) {
+      const y0 = depth - HALF; // (her bow `depth` m through the other's side)
+      const { A, B } = hold((A, B) => { Object.assign(B, { x: 0, y: 0, h: 90, v: 0, astern: 0, sway: 0 }); Object.assign(A, { x: 0, y: y0, h: 0, v: 1.0, astern: 0, sway: 0 }); });
+      expect(A.y, `${depth} m through`).toBeLessThan(y0); expect(hullGap(A, B), `${depth} m through`).toBeGreaterThan(CONTACT_GAP - 0.05);
+    }
+  });
   it('once they\'ve parted, the next touch is a new impact: a boat into another\'s transom, then that one sailing on 30 m', () => {
     const w = world(), A = w.boats[1], B = w.boats[2], hw = w as unknown as { touching: Set<string> };
     const h = (w.wind.from + 95) % 360, u = V(h);

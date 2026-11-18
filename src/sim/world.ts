@@ -321,8 +321,10 @@ export function boatLook(spec: BoatSpec) {
 }
 /** Hulls together (World.hulls): the unit normal from A's hull to B's, from the closest points of their bow-to-stern
  * segments (rules/geometry.ts hullGap's hulls), not the line between their centers: two hulls overlapped side by side
- * touch abeam, though their centers may lie mostly fore and aft of each other. */
-function contactNormal(A: Boat, B: Boat): Vec {
+ * touch abeam, though their centers may lie mostly fore and aft of each other. With the hulls crossed (one put through
+ * the other, hullGap 0: a placement, never a step's sailing), the nearest end lies past the other's centerline and its
+ * vector points back the way it came, so it's turned round to point from A's side to B's; `d`, how deep. */
+function contactNormal(A: Boat, B: Boat, crossed: boolean): { x: number; y: number; d: number } {
   const ua = V(A.h), ub = V(B.h), a1 = { x: A.x + ua.x * HALF, y: A.y + ua.y * HALF }, a2 = { x: A.x - ua.x * HALF, y: A.y - ua.y * HALF };
   const b1 = { x: B.x + ub.x * HALF, y: B.y + ub.y * HALF }, b2 = { x: B.x - ub.x * HALF, y: B.y - ub.y * HALF };
   const near = (p: Vec, q1: Vec, q2: Vec): Vec => { const ex = q2.x - q1.x, ey = q2.y - q1.y, t = clamp(((p.x - q1.x) * ex + (p.y - q1.y) * ey) / (ex * ex + ey * ey || 1), 0, 1); return { x: q1.x + ex * t, y: q1.y + ey * t }; };
@@ -331,11 +333,9 @@ function contactNormal(A: Boat, B: Boat): Vec {
     const ex = (q.x - p.x) * flip, ey = (q.y - p.y) * flip, d = ex * ex + ey * ey;
     if (d < best && d > 1e-6) { best = d; nx = ex; ny = ey; }
   }
-  const l = hypot(nx, ny) || 1;
-  return { x: nx / l, y: ny / l };
+  const l = hypot(nx, ny) || 1, flip = crossed && nx * (B.x - A.x) + ny * (B.y - A.y) < 0 ? -1 : 1;
+  return { x: flip * nx / l, y: flip * ny / l, d: Math.sqrt(best) };
 }
-/** Can't be moved by another boat leaning on her: wrecked and stopped, in her berth, or sailing a Case's set track. */
-const held = (b: Boat) => !!(b.wrecked && !b.wrecked.carryOn) || !!b.docked || !!b.script;
 /** A change in her velocity over the ground (dx, dy, m/s) from a hull against hers, into her own terms: ahead or astern
  * along her heading, and sideways (sway, + to starboard; physics.ts). */
 function giveWay(b: Boat, dx: number, dy: number): void {
@@ -1728,7 +1728,9 @@ export class World {
       // collision still going on), or both are jammed below steerage way: drifting together in the ebb, neither can
       // choose anything)
       // (pressed together, one collision going on: however long it lasts, no cap)
-      const pressed = !!prior && prior.contact && !prior.opened && this.t - prior.t <= INCIDENT_COOLDOWN + 1;
+      // (only while she's had no steerage way: lying on the other hull with way enough to steer off isn't "the inevitable
+      // result of the first", and is capped like any tangle, TANGLE_MAX from its first contact)
+      const pressed = !!prior && prior.contact && !prior.opened && !prior.steered && this.t - prior.t <= INCIDENT_COOLDOWN + 1;
       // (pinned: see PIN_SLACK. A live pin isn't replaced by the other boat's touch either: her breach is her own incident,
       // and the pinned boat's next touch is still the first's)
       const pinLive = (tg: typeof prior) => !!tg && tg.pen && !tg.clear && tg.near && tg.fmax < STEERAGE && this.heldSince(tg);
@@ -1783,12 +1785,20 @@ export class World {
    * their way at once, every 6 s exactly (Deep Physics' turn-drag, crewstation 6 kt seed 4, 18 Nov 2026: Blue against
    * Red at 113.7, 119.7, 125.7, 131.7, 137.7 s, 0.58 kt to 0.20 each time). The first touch is the impact, as before:
    * each keeps 0.35 of her way (a modeling choice) and they're pushed CONTACT_PUSH apart. Then, until they've been
-   * CONTACT_RELEASE past touching, it's the same contact going on: no new impact; each held off the other at touching,
-   * and losing only the part of her way that's into the other boat, as a hull leaning on a hull does (her velocity's
-   * component along the line between them taken out: what's left along her heading is v(1 - cos²)).
+   * CONTACT_RELEASE past touching, it's the same contact going on: no new impact; each held off the other at touching
+   * (along the normal between the hulls, contactNormal), and the speed at which they're closing along it taken out,
+   * shared, as two hulls leaning together (perfectly inelastic, equal masses: an approximation, since abeam a hull has
+   * the water alongside to move as well, about 1.9 × her displacement against 1.08 × fore and aft (HOVE.swayAdded,
+   * HANDLING.mass), so a boat struck abeam should take nearer a third of it than half). Sliding along each other goes on.
    */
+  /** Can't be moved by another boat leaning on her: wrecked and stopped, in her berth, or on a Case's set track (not one
+   * the Case has freed, caseStep: "she's a boat, not a track"). */
+  private held(b: Boat): boolean {
+    return !!(b.wrecked && !b.wrecked.carryOn) || !!b.docked || (!!b.script && !this.caseRun?.free.includes(b.script));
+  }
+
   private hulls(A: Boat, B: Boat, g: number): void {
-    const key = pairKey(A, B), n = contactNormal(A, B), fA = held(A), fB = held(B);
+    const key = pairKey(A, B), n = contactNormal(A, B, g === 0), fA = this.held(A), fB = this.held(B);
     if (fA && fB) return;
     // (a boat that can't move, wrecked aground, made fast in her berth or on a Case's track, takes none of it: the other
     // takes it all)
@@ -1801,7 +1811,7 @@ export class World {
     }
     if (g >= CONTACT_GAP) return;
     A.lastHitT = B.lastHitT = this.t; // (still against her: getting clear after it goes on, 42.3(h))
-    const push = Math.min(CONTACT_GAP - g, CONTACT_PUSH);
+    const push = g === 0 ? CONTACT_GAP + n.d : Math.min(CONTACT_GAP - g, CONTACT_PUSH); // (crossed: back out the way she came in, all of it)
     A.x -= n.x * push * wA; A.y -= n.y * push * wA; B.x += n.x * push * wB; B.y += n.y * push * wB;
     // (the closing speed along the normal, over the ground: both in the same stream, so it cancels. Taken out between
     // them, equal masses, as two hulls leaning together: what's left is sliding along each other, which the contact
