@@ -48,7 +48,7 @@ export const CREW_LAG = 0.8;
  * section in two dimensions, not a hull, so still an estimate).
  * It replaces dv/dt = −(0.005 + 0.035·v), which had no source and was 6 to 20 times her hull's own resistance at a
  * walk (48 N against 8 N at 0.4 m/s), with a constant part a hull's drag doesn't have. So she carries her way as a
- * two-tonne keelboat does: shoved off at 0.5 m/s she has lost it (WAY_LOST) after 40 m and four minutes, not 8 m and
+ * two-tonne keelboat does: shoved off at 0.5 m/s she has lost it (WAY_LOST) after 37 m and four minutes, not 8 m and
  * half a minute. The owner's own observation agrees (16 Nov 2026): shoved off astern at a walking pace in still air a
  * Folkboat "glides a fair bit. Closer to five [boat lengths] than one, for sure", by the wind and the push: five of her
  * lengths is 38 m.
