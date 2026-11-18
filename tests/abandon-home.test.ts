@@ -41,7 +41,10 @@ function sailHome(s: Partial<Settings>, seed: number, far = false) {
 
 describe('the AI boats after racing is called off', () => {
   for (const [name, s, seed, far] of [
-    ['a westerly over the limit', { windKind: 'west', windKt: 26 }, 9, false],
+    ['a westerly over the limit', { windKind: 'west', windKt: 26 }, 7, false],
+    // (Seed 9 too, 18 Nov 2026: before main's crowded-mark AI, seed 7's race went differently and had Red clip the shore
+    // for about 0.7 s on her way home, ai.ts homeCourse. Skipper Model has that repro; a second westerly keeps watch)
+    ['a westerly over the limit, seed 9', { windKind: 'west', windKt: 26 }, 9, false],
     ['a northerly over the limit (the harbour on a lee shore)', { windKind: 'north', windKt: 26 }, 7, false],
     ['from north of Alcatraz in a flood (the island between them and home, the current setting onto it)', { windKind: 'west', windKt: 20, current: 'flood' }, 4, true]
   ] as const) it(name, () => {
@@ -50,14 +53,6 @@ describe('the AI boats after racing is called off', () => {
     expect(r.settledAt, 'all lying to off the harbour within an hour').toBeLessThan(60);
     expect(r.close, 'boats within 3 m of each other (samples)').toBeLessThan(20);
     expect(r.tacks, 'tacks in the 20 minutes after, the most of any boat').toBeLessThanOrEqual(8);
-  }, 1_200_000);
-  // (Expected to fail, 18 Nov 2026: seed 7's westerly has Red on the land for about 0.7 s, 454 s into the sail home, no boat
-  // near her. The AI's homing course (ai.ts homeCourse) clips the shore; the contact physics changed (rules-incident) only
-  // how the race went before it was called off. Skipper Model has the repro: this goes red when that's fixed, and then
-  // it's an ordinary case again)
-  it.fails('a westerly over the limit, seed 7 (the homing course clips the land: Skipper Model)', () => {
-    const r = sailHome({ windKind: 'west', windKt: 26 }, 7);
-    expect([...r.land.entries()], 'on the land').toEqual([]);
   }, 1_200_000);
 });
 
