@@ -1,5 +1,5 @@
 import { lineNotes } from './boat/coach';
-import { FULL_RUDDER, HELM_MAX } from './boat/balance';
+import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
 import { trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
@@ -458,6 +458,9 @@ const gl = $('gl');
 // swing across the whole window, in step with the cursor. An ESTIMATE of what feels right: 30 degrees is now 0.32 of the
 // width out)
 const TILLER_SPAN = 0.5;
+// (the guide's two yellow lines: the rudder's stall, balance.ts RUDDER_STALL, each side of center, placed by the cursor's
+// own mapping so the cursor reaches them just as the blade stalls: past them it brakes more than it turns)
+$('tillerGuide').style.setProperty('--tg-stall', `${HELM_STALL / HELM_MAX * TILLER_SPAN * 100}%`);
 let tillerHeld = false, toldTiller = false, panning = false;
 let lastCursorX: number | undefined;
 function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN) * HELM_MAX); }
