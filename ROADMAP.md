@@ -909,6 +909,19 @@ sources. Each shipped item is added there when it's published.
      destination a bigger share of the frame. The bar: Mile Rock to her slip drawn within a few seconds, tested sailing
      at 6 kt (tests/insetRoute).
    - ~~**A clicked destination shown as a pin, not coordinates, and moved when the destination changes**~~ (done, v205: nav-dest-pin) (owner, 16
+   - **The passage plan's cold first fill: exact speedups left** (17 November; perf; later; each 1–3 h). From Mile Rock to
+     Gashouse Cove the first plan now takes 63 s of work, not 87 s. Two changes did that, both exact (the same track point
+     for point; branch cold-current): the lee rays skip open water, and the current grid keeps the shore's share per
+     point. The Coordinator stopped the work there. What's left, from a CPU profile of that plan (the profiler adds ~3%):
+     - the router's clear-water test (sim/router.ts `clear`): ≈15 s, about half of it the exact `landAlong` walk;
+     - routeLegSteps' own loop: ≈9 s;
+     - the polar speed in chop (`chopSpeed`): ≈6 s;
+     - the weather field (`wx.field`): ≈5 s;
+     - windTerrain's shore distance (`shoreDistAt`): ≈5 s;
+     - the land's lee: ≈6 s, down from ≈20 s.
+     Each needs a test that the plan is identical. Changes that alter accuracy (a coarser lee grid, a shipped table) go to
+     Deep Physics.
+   - **A clicked destination shown as a pin, not coordinates, and moved when the destination changes** (owner, 16
      November: "bug: when I change sailing destinations, the destination pin on the horizon doesn't seem to update. we
      could bundle this fix with the earlier request to use pins instead of coordinates for non-named destinations."; bug
      and polish; now; 1–2 h). The 3D marker's place and label follow every change of destination (a click on the chart,
