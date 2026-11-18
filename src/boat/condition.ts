@@ -109,7 +109,9 @@ export function stepJumpers(b: Pick<Boat, 'tune' | 'rigMain' | 'jumperTarget' | 
   b.jumperT = (b.jumperT ?? 0) + dt;
   if (b.jumperT < JUMPER_HALF_TURN_S) return;
   b.jumperT = 0;
-  setJumpers(b, now + Math.sign(b.jumperTarget - now) * Math.min(0.5, Math.abs(b.jumperTarget - now)), tws);
+  // (to the next half-turn mark that way: off the marks only on the guide's tune for the wind, set for her by none)
+  const up = b.jumperTarget > now, next = up ? Math.floor(now * 2 + 1 + 1e-9) / 2 : Math.ceil(now * 2 - 1 - 1e-9) / 2;
+  setJumpers(b, up ? Math.min(b.jumperTarget, next) : Math.max(b.jumperTarget, next), tws);
 }
 
 /**

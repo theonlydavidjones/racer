@@ -102,6 +102,10 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
 });
 
 import { stepJumpers, wantJumpers } from '../src/boat/condition';
+import ss10 from '../src/courses/data/seaweed-soup-2026-course10.json';
+import type { CourseFile } from '../src/courses/course';
+import { DT } from '../src/sim/world';
+import { applyCommand } from '../src/sim/commands';
 describe('the jumpers under way', () => {
   it('the crew turns them a half turn at a time toward what you ask, and the rig follows', () => {
     const b = { tune: { ...TUNE_PRESETS.medium }, rigMain: undefined } as { tune: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
@@ -110,6 +114,31 @@ describe('the jumpers under way', () => {
     expect(b.tune.jumperTurns).toBe(2.5);
     for (let t = 0; t < 12.5; t += 0.1) stepJumpers(b as never, 0.1, 12);
     expect(b.tune.jumperTurns).toBe(4); expect(b.jumperTarget).toBeUndefined();
+  });
+  // (the owner, r246: "can't seem to reach the minimum 0 or maximum 5": the band's own command, in the race, as the
+  // band sends it, presses quicker than the crew's half turns)
+  const sailing = (setup: Partial<Settings>) => new World(ss10 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, fleet: 0, opponents: [], ...setup } as Settings, 3);
+  const turns = (w: World) => (w.user.tune ?? guideTune(w.user.ww.kt)).jumperTurns;
+  const sail = (w: World, s: number) => { const T = w.t + s; while (w.t < T) w.step(DT); };
+  it('presses take her from 2.5 all the way to 0, and to 5, and she stays there', () => {
+    const w = sailing({ mode: 'race' }); sail(w, 2); expect(turns(w)).toBe(2.5);
+    for (let i = 0; i < 7; i++) applyCommand(w, { k: 'jumpersBy', d: -0.5 }); // (two more than it takes: she stops at 0)
+    sail(w, 30); expect(turns(w)).toBe(0); expect(w.user.jumperTarget).toBeUndefined();
+    sail(w, 20); expect(turns(w)).toBe(0);
+    for (let i = 0; i < 12; i++) { applyCommand(w, { k: 'jumpersBy', d: 0.5 }); sail(w, 0.3); }
+    sail(w, 60); expect(turns(w)).toBe(5); expect(w.user.jumperTarget).toBeUndefined();
+    sail(w, 20); expect(turns(w)).toBe(5);
+  }, 120_000);
+  it('on the guide\'s tune for the wind (none set), between the marks: a press counts from the half turn shown, and the crew turn to the marks', () => {
+    const b = { tune: undefined, rigMain: undefined } as { tune?: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
+    const kt = [9, 9.5, 14.5, 15].find(k => Math.abs(guideTune(k).jumperTurns * 2 - Math.round(guideTune(k).jumperTurns * 2)) > 0.1)!;
+    expect(kt).toBeDefined(); // (a wind whose guide tune is between the marks)
+    const shown = Math.round(guideTune(kt).jumperTurns * 2) / 2;
+    wantJumpers(b, shown - 0.5);
+    for (let t = 0; t < 30; t += 0.1) stepJumpers(b as never, 0.1, kt);
+    expect(b.tune!.jumperTurns).toBe(shown - 0.5);
+    wantJumpers(b, 0); for (let t = 0; t < 60; t += 0.1) stepJumpers(b as never, 0.1, kt);
+    expect(b.tune!.jumperTurns).toBe(0);
   });
 });
 
