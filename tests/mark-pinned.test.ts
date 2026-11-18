@@ -27,3 +27,24 @@ describe('a mark touched in a breeze', () => {
     expect(clear, `clear of A (8 m): she's ${Math.hypot(b.x - A.x, b.y - A.y).toFixed(1)} m from it at ${b.v.toFixed(2)} m/s`).toBeLessThan(30);
   }, 120_000);
 });
+
+describe('the committee boat run into end on', () => {
+  // (the physics review, round two, 18 Nov 2026: the side's normal used off its ends read a boat driving onto its bow as
+  // lying along it, and she lost no way there: held on her heading, still in contact and gaining, 1.0 to 1.27 m/s, for
+  // 20 s. Off its ends the normal is the end's, as a round mark's)
+  it('a boat held driving onto its end loses her way, as square onto its side', () => {
+    const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, windTurn: 0, current: 'slack', fleet: 0, opponents: [] } as Settings;
+    const w = new World(COURSES.find(c => c.id === 'train')!, S, 3), u = w.boats[0];
+    while (w.t < 2) w.step(DT);
+    const cb = w.committeeHull!, L = Math.hypot(cb.q!.x - cb.p.x, cb.q!.y - cb.p.y), ax = { x: (cb.q!.x - cb.p.x) / L, y: (cb.q!.y - cb.p.y) / L };
+    // (along its axis onto whichever end she can run down onto: the wind behind her)
+    const down = { x: -Math.sin(u.ww.from * Math.PI / 180), y: -Math.cos(u.ww.from * Math.PI / 180) }, s = ax.x * down.x + ax.y * down.y > 0 ? 1 : -1;
+    const d = { x: ax.x * s, y: ax.y * s }, end = s > 0 ? cb.p : cb.q!, h = (Math.atan2(d.x, d.y) * 180 / Math.PI + 360) % 360;
+    u.x = end.x - d.x * 14; u.y = end.y - d.y * 14; u.h = h; u.v = 2.5;
+    const t0 = w.t; let touched = 0;
+    while (w.t < t0 + 20) { w.step(DT); u.h = h; if (u.lastHitT != null && u.lastHitT > w.t - DT * 1.5) touched++; }
+    expect(touched, 'she reached it').toBeGreaterThan(0);
+    // (0.21 m/s after 20 s; with the side's normal off its ends, 1.27, still in contact: 18 Nov 2026)
+    expect(u.v, 'her way after 20 s held onto its end (m/s)').toBeLessThan(0.5);
+  }, 120_000);
+});

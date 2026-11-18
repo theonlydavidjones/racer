@@ -125,21 +125,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   const bP = brg(P.x - b.x, P.y - b.y), vs = Math.max(b.v, targetFor(b, Math.abs(wrap(from - bP))) * 0.8);
   const cts = courseToSteer(bP, vs, c);
   // she can lay it: steer the course that makes good the bearing (her leeway higher, toward the wind)
-  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) {
-    const r = wrap(from - cts), h = Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts;
-    // (never onto land: the course she can lay, land on it within her look ahead, goes round it if there's a clear way,
-    // and if there isn't the pilot hands her back, as with land ahead on both tacks. Without it, with no way round in
-    // sight, or within 50° of the wind where no detour is sought, it steered her straight on: onto the abandoned Berkeley
-    // Pier at 5.4 kt, and aground on Treasure Island; the stability soak and its review, 18 Nov 2026,
-    // tests/pilot-pier.test.ts)
-    const look = Math.min(hypot(P.x - b.x, P.y - b.y), 40 + b.v * 15);
-    if (landAhead(b, h, look)) {
-      const q = P === dest ? detour(b, dest) : null;
-      if (q) { p.detour = q; p.detourT = t; return n360(brg(q.x - b.x, q.y - b.y)); }
-      p.alarm = 'Pilot alarm: land ahead and no clear way round it. Pilot on standby: you have the tiller.'; return b.h;
-    }
-    return h;
-  }
+  if (cts != null && Math.abs(wrap(from - cts)) >= beat + 2) { const r = wrap(from - cts); return Math.abs(r) < 150 ? n360(cts + Math.sign(r) * lw) : cts; }
   // upwind: close-hauled; tack when the other tack fetches (made good through the current), or when the shore's close ahead
   const onS = b.tack === 'S', other = onS ? 'P' : 'S', cur = close(b.tack);
   if (t - p.lastTackT > 12 && !b.tacking) {

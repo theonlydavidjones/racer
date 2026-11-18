@@ -1457,7 +1457,8 @@ export class World {
         if (gap < 0) {
           if (m.rule31 !== false) touching = m;
           // bounce off: push her clear, away from the nearest point
-          const np = m.q ? (() => { const ax = m.q!.x - m.p.x, ay = m.q!.y - m.p.y, k = Math.max(0, Math.min(1, ((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay))); return { x: m.p.x + ax * k, y: m.p.y + ay * k }; })() : m.p;
+          const kq = m.q ? ((b.x - m.p.x) * (m.q.x - m.p.x) + (b.y - m.p.y) * (m.q.y - m.p.y)) / ((m.q.x - m.p.x) ** 2 + (m.q.y - m.p.y) ** 2 || 1) : 0;
+          const np = m.q ? (() => { const ax = m.q!.x - m.p.x, ay = m.q!.y - m.p.y, k = Math.max(0, Math.min(1, kq)); return { x: m.p.x + ax * k, y: m.p.y + ay * k }; })() : m.p;
           const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
           const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = hypot(dx, dy) || 1;
           b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
@@ -1466,8 +1467,9 @@ export class World {
           // m/s for five minutes in 22 kt: the stability soak, 18 Nov 2026, tests/mark-pinned.test.ts)
           // (into it: her heading against the contact's normal. For a round mark that's from the mark to her nearest point; for
           // the committee boat, its own side's normal, toward her: the line from its middle to hers runs square to it only when
-          // she's abreast of it, and a bow driven into its side at 45° read as lying along it: the physics review)
-          const sl = m.q ? hypot(m.q.x - m.p.x, m.q.y - m.p.y) || 1 : 1, sn = m.q ? (() => { const nx = -(m.q!.y - m.p.y) / sl, ny = (m.q!.x - m.p.x) / sl, s = Math.sign(nx * (b.x - np.x) + ny * (b.y - np.y)) || 1; return { x: nx * s, y: ny * s }; })() : { x: dx / l, y: dy / l };
+          // she's abreast of it, and a bow driven into its side at 45° read as lying along it: the physics review. Off its ends,
+          // as a round mark: end on, the side's normal read her as lying along it, and she lost no way on its bow: round two)
+          const sl = m.q ? hypot(m.q.x - m.p.x, m.q.y - m.p.y) || 1 : 1, sn = m.q && kq > 0 && kq < 1 ? (() => { const nx = -(m.q!.y - m.p.y) / sl, ny = (m.q!.x - m.p.x) / sl, s = Math.sign(nx * (b.x - np.x) + ny * (b.y - np.y)) || 1; return { x: nx * s, y: ny * s }; })() : { x: dx / l, y: dy / l };
           const into = Math.max(0, (sn.x * ax + sn.y * ay) / (hypot(ax, ay) || 1));
           b.v *= 1 - (m.q ? 0.1 : 0.03) * into; b.lastHitT = this.t;
         }
