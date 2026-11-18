@@ -250,9 +250,10 @@ export class BoatPanel {
     const tune = b.perf.tune ? tuneName(fixTune(b.perf.tune)) : 'auto';
     const slip = slipById(b.slip);
     // the groups: folded to a short summary; Change opens one (and folds the others)
-    const grp = (id: string, label: string, sum: string[], open: () => string) => {
+    // (each group's own verb: a read-only one says View / Hide, an editable one Change / Done)
+    const grp = (id: string, label: string, sum: string[], open: () => string, verb: [string, string] = ['Change ▾', 'Done ▴']) => {
       const on = this.grpOpen === id;
-      return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i>${on ? 'Done ▴' : 'Change ▾'}</i></header><div class="be-in">${on ? open() : sum.join('')}</div></section>`;
+      return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i>${on ? verb[1] : verb[0]}</i></header><div class="be-in">${on ? open() : sum.join('')}</div></section>`;
     };
     morph(this.el, `
       <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button>${this.leaving ? '' : this.edited ? '<button type="button" class="cta" data-act="save">Save</button>' : '<button type="button" class="cta" data-act="done">Done</button>'}</div>
@@ -302,13 +303,13 @@ export class BoatPanel {
         kv('Mainsail', seg('mainAge', ages, b.perf.mainAge)), kv('Jib', seg('jibAge', ages, b.perf.jibAge)),
         colorRow('numberColor'), colorRow('insigniaColor')
       ].join(''))}
-      ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change to see', true))], () =>
+      ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change', true))], () =>
         LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual ropes</button>') : ''))}
       ${grp('berth', 'Home berth', [kv('Marina', val(esc(b.marina ? MARINAS.find(m => m.id === b.marina)?.name ?? '' : 'None'))), ...(b.marina ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
         kv('Marina', `<select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`),
         b.marina ? kv(`Slip in ${esc(harborOf(b.marina)?.short ?? '')}`, `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
       ].join(''))}
-      ${grp('speed', 'Speed', [kv(`What she gives away`, val('Change to see', true))], () => '<div class="bpreport" id="bpReport"></div>')}
+      ${grp('speed', 'Speed', [], () => '<div class="bpreport" id="bpReport"></div>', ['View ▾', 'Hide ▴'])}
       </div>`);
     this.report();
   }
