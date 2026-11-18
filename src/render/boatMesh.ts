@@ -849,7 +849,7 @@ function deckFittings(grp: THREE.Group): void {
   for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
   screw(FORESTAY_DECK.clone(), HOUNDS);
   parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
-  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * BS_CHAINPLATE_X, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
+  for (const q of BACKSTAY_PLATES) parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y, q.z));
   { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
     parts.push(cleatGeometry(0.2, 0.016).translate(0, cy, cz)); }
   const flat = parts.map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
@@ -1164,9 +1164,19 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
-/** The toerail's inner face, in from the sheer (it stands 3 cm in, 3 cm thick), and the backstay's chainplates, out from
- * the centerline (deckFittings). */
-const TOERAIL_IN = 0.045, BS_CHAINPLATE_X = 0.3;
+/** The backstay's chainplates (deckFittings):
+ * where the owner has them, "about one inch forward of the aft edge of the deck, about six inches from the tiller on either
+ * side" (18 Nov 2026, ROADMAP 8q4): 2.5 cm in from the transom's top, 0.17 m out (6 in from the tiller's 2.8 cm side). */
+const BS_CHAINPLATE_X = 0.17, BS_CHAINPLATE_Z = TRANSOM_TOP.z - 0.025;
+/** The backstay bridle's chainplates on the after deck (port, starboard): where its two legs come down to. */
+export const BACKSTAY_PLATES = [-1, 1].map(sx => new THREE.Vector3(sx * BS_CHAINPLATE_X, deckY(uAtZ(BS_CHAINPLATE_Z), BS_CHAINPLATE_X) + 0.02, BS_CHAINPLATE_Z));
+/** The bridle's foot: where the wire would meet the deck on the centerline, its legs' apex on the line to it (as it was
+ * before the plates moved aft, 8q4: the wire above the apex unchanged). */
+const BRIDLE_FOOT = new THREE.Vector3(0, sheer(1), 3.74);
+/** The bridle's apex with it `y` m up (2.7 slack … 1.4 hard on, syncLines), on the straight wire from the masthead. */
+export const bridleApex = (y: number) => MASTHEAD.clone().lerp(BRIDLE_FOOT, (MASTHEAD.y - y) / (MASTHEAD.y - BRIDLE_FOOT.y));
+/** The bridle's two legs, port and starboard, from their plates up to the apex (`y` m up). */
+export const bridleLegs = (y: number): [THREE.Vector3, THREE.Vector3][] => BACKSTAY_PLATES.map(p => [p.clone(), bridleApex(y)]);
 /**
  * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. Its foot in a flush silver socket in the
  * after deck at the starboard quarter, where the owner measured Josephine's (18 Nov 2026): "equidistant from the toe rail
@@ -1174,7 +1184,11 @@ const TOERAIL_IN = 0.045, BS_CHAINPLATE_X = 0.3;
  * on the deck well short of it (tests/ensignstaff.test.ts). Photos: reference/photos/josephine-ensign-socket-port-
  * quarter.jpg (from the dock looking aft: her starboard side) and josephine-ensign-socket-from-cockpit.jpg.
  */
-export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = (halfBeam(uAtZ(z)) - TOERAIL_IN + BS_CHAINPLATE_X) / 2, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+/** The staff's foot out from the centerline: the owner's measurement, 0.46 m (midway between the toe rail's inner face and
+ * the starboard backstay chainplate where it was then; it stays there with the plates moved aft and in, 8q4: the
+ * Coordinator, 18 Nov 2026). */
+const ENSIGN_X = 0.46;
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = ENSIGN_X, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
   return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
@@ -1817,12 +1831,12 @@ function syncLines(m: BoatMesh, b: Boat): void {
   // the traveller's control lines: from the car's ends to the blocks at the track's ends
   L2.travLines.forEach((tl, k) => { const side = k ? 1 : -1, q = tl.geometry.attributes.position as THREE.BufferAttribute; q.setXYZ(0, cx + side * 0.045, L2.travCar.position.y + 0.005, TRAV_Z); q.needsUpdate = true; });
   // backstay: the bridle's apex is pulled down as the backstay goes on
-  { const q = L2.backstay.geometry.attributes.position as THREE.BufferAttribute, foot = new THREE.Vector3(0, sheer(1), 3.74);
-    const ay = 2.7 - 1.3 * c.backstay, f = (MASTHEAD.y - ay) / (MASTHEAD.y - foot.y), apex = MASTHEAD.clone().lerp(foot, f);
+  { const q = L2.backstay.geometry.attributes.position as THREE.BufferAttribute, foot = BRIDLE_FOOT;
+    const ay = 2.7 - 1.3 * c.backstay, f = (MASTHEAD.y - ay) / (MASTHEAD.y - foot.y), apex = bridleApex(ay);
     // (the masthead where the bent mast has it; the apex on the straight wire from there to the fixed foot: both legs meet it)
     const headAft = -mastFwd(MAST_TOP - DECK_AT_MAST, m.rigDrawn.bow, m.rigDrawn.topAft); apex.z += headAft * (1 - f);
     q.setXYZ(0, MASTHEAD.x, MASTHEAD.y, MASTHEAD.z + headAft); q.setXYZ(1, apex.x, apex.y, apex.z);
-    q.setXYZ(2, 0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, -0.3, deckY(uAtZ(foot.z - 0.1), 0.3) + 0.02, foot.z - 0.1); q.needsUpdate = true;
+    { const [pp, ps] = BACKSTAY_PLATES; q.setXYZ(2, ps.x, ps.y, ps.z); q.setXYZ(3, apex.x, apex.y, apex.z); q.setXYZ(4, pp.x, pp.y, pp.z); } q.needsUpdate = true;
     // (the protest flag on the wire, 0.6 m above the bridle's apex)
     m.protest.visible = !!b.protestFlag;
     if (m.protest.visible) { const k = 0.6 / Math.max(0.1, MASTHEAD.y - apex.y); m.protest.position.set(0, apex.y + 0.6, apex.z + (MASTHEAD.z + headAft - apex.z) * k); } }
