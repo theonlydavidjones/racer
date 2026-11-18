@@ -1,6 +1,8 @@
 /** A paint's name for a hex: the swatch's own name if it matches, else the nearest named swatch when it is close enough
  * to read as that color, else "Custom" (a color picked off the wheel must not leave a blank in the boat's particulars). */
 export function colorName(list: readonly (readonly [string, string])[], hex: string): string {
+  // (an exact match first: a teak deck is stored as an id, 'teak-silver', not a hex)
+  const hit = list.find(([, v]) => v.toLowerCase() === hex.toLowerCase()); if (hit) return hit[0];
   const rgb = (h: string) => { const m = /^#?([0-9a-f]{6})$/i.exec(h.trim()); return m ? [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)) : null; };
   const c = rgb(hex); if (!c) return 'Custom';
   let best = '', bd = Infinity;
