@@ -1044,7 +1044,9 @@ sources. Each shipped item is added there when it's published.
      from Tools". Like wind in the air and the flow view: the current drawn on the water around her (its set and drift,
      from the sim's own current field, NOAA's), switched on and off in the Tools tray, with no new button. Its marks
      move over the ground at exactly the current's speed and direction, never faster, so the every-layer test (8l) covers
-     it and it can't bring back the rushing water.
+     it and it can't bring back the rushing water. Asked again 18 November (not urgent): "I'd like to toggle on and off a
+     view of the current directly on the water around me to help me understand the nuances of the bay and the ocean."
+     A feature, so after the sprint.
    - **A heel indicator at the top-center of the sail controls** (owner, 15 November; feature; next; 2–3 h; drawings first):
      "at top-center of the sail controls, I want a heel indicator. show me drawings before building anything." Then:
      "need to see it in situ with the sail panel." Three options shown in place on the real band:
@@ -1286,6 +1288,11 @@ sources. Each shipped item is added there when it's published.
          athwartship." One line each, within the same limit: fore/aft sets the twist (aft eases the leech, forward
          tightens it); athwartship sets the slot and the pointing angle (in to point, out to reach). The wording goes to
          the owner in the tips table; its figures follow the car's real track and sheeting range in the sim.
+       - The pole toast's "Up here" (owner, 18 November, with a screenshot of hud.ts:437, "Up here the poled-out jib does
+         less than it would to leeward…"): "what does 'up here' mean? clarify this copy." It fires with the pole set at a
+         true wind angle under 154.5°, a broad reach, not a run. It says so, in one line ("Poled out on a broad reach,
+         the jib pulls less than on the lee side. Stow the pole (Pole tab, O) or bear away."). The other toasts and tips
+         get a read for the same kind of word ("up here", "down here", "this").
    - ~~Remove the body line under "Chart · Pick a destination"~~ (done: c1ea689; the title kept) ("Paused. Tap the water or a place: sail there, or move her
      there. Drag to move, scroll to zoom."), keeping the title (owner, 13 November; minutes).
 8a. ~~Clean up the wind controls in "Change the conditions"~~ (done: a1e833e5, 9b735925; Kind of wind is the one choice, Turn the wind nudges it up to 30°; tests/windkind.test.ts covers the 355° case) (owner; Crew Controls proposes options to the owner before
@@ -2089,6 +2096,29 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
 - ~~**Duration:** the chop takes time to build when the breeze fills in~~ (done: CEM's duration-limited growth, run up through the day's own wind from the calm morning; a set strength has been blowing for hours). Later: a sea that lingers as the wind drops.
 - **Pitching in the physics** (today it's visual): hobby-horsing in a short chop, and steering harder through it.
 - **Archived buoy data for a past race day** (with real past races), and the ocean wind sea through the Gate as its own component.
+- ~~**Shallow-water waves: length and speed for the depth**~~ (done, Bay East, branch shallow-waves: each component's
+  wavenumber by linear dispersion at the reference place's chart depth and the tide, eased in, its phase and its groups
+  carried on where you are. Off the Cityfront, 15 m, an 18 s swell is 212 m long and runs at 11.8 m/s, not 506 m and
+  28 m/s; the chop is deep there and unchanged.) Still to do:
+  - **Depth-limited growth of the chop** (sea.ts: Hs and Tp lower over shoal water, g·d/U² below about 5; the
+    Coordinator: after beat-chop lands, its own PR, with Deep Physics' agreement on what seaway.ts reads). The
+    coefficients from Young & Verhagen 1996 (Coastal Engineering 29) checked against the paper, or else the USACE
+    Coastal Engineering Manual's (EM 1110-2-1100, Part II-2). With it, the deep-water lengths still in sea.ts and
+    seaway.ts (the physics review of shallow-waves): sea.ts onCurrent's dispersion (the breaking caps, Hs ≤ 0.1·L, and
+    `steep`, the HUD's "steep chop"), groupSpeed in the current's stretch of the fetch, harborSwell's depth without the
+    tide; seaway.ts awAt's λ = gT²/2π and waveYaw's k = 4π²/(gT²). Each the local depth's, as the field's are the
+    reference place's.
+  - **True refraction** (crests bending toward a shoal across the field): the field is a sum of plane waves, one
+    direction each, the same everywhere, so it can't. It needs a field for each place (or rays traced from the Gate).
+    And with it each place's own depth: racing, the field takes the course's water's (its line and marks, by the swell
+    at each), cruising the Central Bay's, one depth for all the water you see. (A depth that followed her boat ran the
+    far water past as it changed: a sum of plane waves can't change its lengths in one place only.)
+  - **The depth varying across the water** (the Coordinator, 16 Nov 2026): one depth a World for now, so a boat sailing
+    into the South Bay's or San Pablo Bay's shoal water doesn't meet their shorter, steeper chop. It comes with Deep
+    Physics' (b), the old sea dying and a new one growing, where the field can change without sweeping the far water.
+  - **The depths are the ENC's band middles** (a band 9–18 m deep reads 13.6 m). Open question: the chart reads 2.7 m
+    (its 1.8–3.6 m band) for the Berkeley Circle at 37.857 N, 122.345 W; NOAA ENC (src/geo/data/enc-chart.json). Is
+    that the band the Circle is in, or the polygon's edge? To check against chart 18649.
 - **Shoaling** over Harding Rock, Point Blunt and the bar.
 
 ### What the water looks like (the cues sailors actually use)
