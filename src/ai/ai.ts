@@ -665,10 +665,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
       if (ai.detour) P = ai.detour;
-    } else if (b.started && !ai.detour && refresh && landAlong(b, P) < 500 && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
+    } else if (b.started && refresh && (ai.detour ? landAlong(b, ai.detour) < Infinity && landAlong(b, P) < Infinity : landAlong(b, P) < 500) && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
       // beating toward a point with land close ahead on the straight line to it (a jetty, a point, the harbor's mouth
       // she's in): tacking off the shore would only take her back and forth into the corner it makes, so she lays the
       // end of it first, as a sailor does: the first turn of the way round by water (the navigator's route)
+      // (and again if the turn she was laying is no longer in sight: set or sailed round to the other side of the
+      // jetty from it, she'd steer for it through the stones. Seaweed Soup course 2's last beat, seed 16: a boat inside
+      // the Marina's jetty held a turn outside it and struck the jetty for forty minutes)
       ai.detour = escape(b, P);
       if (ai.detour) P = ai.detour;
     } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)
