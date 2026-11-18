@@ -11,7 +11,7 @@ import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, c
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING } from '../boat/dynamics';
 import { BOOM_STOP, defaultControls } from '../boat/controls';
-import { D2R, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec, hypot } from '../core/math';
+import { D2R, HALF, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
 import { bodyJob } from '../boat/crewWork';
@@ -319,6 +319,32 @@ export function boatLook(spec: BoatSpec) {
     paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
   };
 }
+/** Hulls together (World.hulls): the unit normal from A's hull to B's, from the closest points of their bow-to-stern
+ * segments (rules/geometry.ts hullGap's hulls), not the line between their centers: two hulls overlapped side by side
+ * touch abeam, though their centers may lie mostly fore and aft of each other. */
+function contactNormal(A: Boat, B: Boat): Vec {
+  const ua = V(A.h), ub = V(B.h), a1 = { x: A.x + ua.x * HALF, y: A.y + ua.y * HALF }, a2 = { x: A.x - ua.x * HALF, y: A.y - ua.y * HALF };
+  const b1 = { x: B.x + ub.x * HALF, y: B.y + ub.y * HALF }, b2 = { x: B.x - ub.x * HALF, y: B.y - ub.y * HALF };
+  const near = (p: Vec, q1: Vec, q2: Vec): Vec => { const ex = q2.x - q1.x, ey = q2.y - q1.y, t = clamp(((p.x - q1.x) * ex + (p.y - q1.y) * ey) / (ex * ex + ey * ey || 1), 0, 1); return { x: q1.x + ex * t, y: q1.y + ey * t }; };
+  let best = Infinity, nx = B.x - A.x, ny = B.y - A.y;
+  for (const [p, q, flip] of [[a1, near(a1, b1, b2), 1], [a2, near(a2, b1, b2), 1], [b1, near(b1, a1, a2), -1], [b2, near(b2, a1, a2), -1]] as const) {
+    const ex = (q.x - p.x) * flip, ey = (q.y - p.y) * flip, d = ex * ex + ey * ey;
+    if (d < best && d > 1e-6) { best = d; nx = ex; ny = ey; }
+  }
+  const l = hypot(nx, ny) || 1;
+  return { x: nx / l, y: ny / l };
+}
+/** Can't be moved by another boat leaning on her: wrecked and stopped, in her berth, or sailing a Case's set track. */
+const held = (b: Boat) => !!(b.wrecked && !b.wrecked.carryOn) || !!b.docked || !!b.script;
+/** A change in her velocity over the ground (dx, dy, m/s) from a hull against hers, into her own terms: ahead or astern
+ * along her heading, and sideways (sway, + to starboard; physics.ts). */
+function giveWay(b: Boat, dx: number, dy: number): void {
+  const u = V(b.h), du = dx * u.x + dy * u.y, ds = dx * u.y - dy * u.x; // (starboard is V(h + 90) = (u.y, −u.x))
+  const fwd = b.v - (b.astern ?? 0) + du;
+  if (fwd >= 0) { b.v = fwd; if (b.astern) b.astern = 0; } else { b.v = 0; b.astern = -fwd; }
+  b.sway = (b.sway ?? 0) + ds; b.vx += dx; b.vy += dy;
+}
+
 export class World {
   readonly C: Course;
   settings: Settings;
@@ -1739,8 +1765,10 @@ export class World {
     // (and every pair touching that wasn't judged this step: the physics doesn't wait on the rules' cooldown)
     for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
       const A = bs[i], B = bs[j], dx = A.x - B.x, dy = A.y - B.y, near = LOA + CONTACT_GAP + CONTACT_RELEASE;
-      if (dx * dx + dy * dy > near * near || ((A.finished || A.retired) && (B.finished || B.retired))) continue; // (as the rules: two boats both done sail through, assessPair)
+      const far = dx * dx + dy * dy > near * near;
+      if (far && !this.touching.size) continue;
       const key = pairKey(A, B);
+      if (far || ((A.finished || A.retired) && (B.finished || B.retired))) { this.touching.delete(key); continue; } // (as the rules: two boats both done sail through, assessPair)
       if (hit?.has(key)) continue;
       const g = hullGap(A, B);
       if (g < CONTACT_GAP) this.hulls(A, B, g);
@@ -1760,19 +1788,29 @@ export class World {
    * component along the line between them taken out: what's left along her heading is v(1 - cos²)).
    */
   private hulls(A: Boat, B: Boat, g: number): void {
-    const key = pairKey(A, B), dx = B.x - A.x, dy = B.y - A.y, l = hypot(dx, dy) || 1, nx = dx / l, ny = dy / l;
+    const key = pairKey(A, B), n = contactNormal(A, B), fA = held(A), fB = held(B);
+    if (fA && fB) return;
+    // (a boat that can't move, wrecked aground, made fast in her berth or on a Case's track, takes none of it: the other
+    // takes it all)
+    const wA = fA ? 0 : fB ? 1 : 0.5, wB = fB ? 0 : fA ? 1 : 0.5;
     if (!this.touching.has(key)) {
       this.touching.add(key);
       A.v *= 0.35; B.v *= 0.35; A.lastHitT = B.lastHitT = this.t; // (rule 42.3(h): getting clear after it)
-      A.x -= nx * CONTACT_PUSH / 2; A.y -= ny * CONTACT_PUSH / 2; B.x += nx * CONTACT_PUSH / 2; B.y += ny * CONTACT_PUSH / 2;
+      A.x -= n.x * CONTACT_PUSH * wA; A.y -= n.y * CONTACT_PUSH * wA; B.x += n.x * CONTACT_PUSH * wB; B.y += n.y * CONTACT_PUSH * wB;
       return;
     }
-    const push = Math.min(CONTACT_GAP - g, CONTACT_PUSH) / 2;
-    if (push > 0) { A.x -= nx * push; A.y -= ny * push; B.x += nx * push; B.y += ny * push; }
-    const ua = V(A.h), ca = ua.x * nx + ua.y * ny, ub = V(B.h), cb = -(ub.x * nx + ub.y * ny); // (each one's heading into the other)
-    if (ca > 0 && A.v > 0) A.v *= 1 - ca * ca;
-    if (cb > 0 && B.v > 0) B.v *= 1 - cb * cb;
+    if (g >= CONTACT_GAP) return;
+    A.lastHitT = B.lastHitT = this.t; // (still against her: getting clear after it goes on, 42.3(h))
+    const push = Math.min(CONTACT_GAP - g, CONTACT_PUSH);
+    A.x -= n.x * push * wA; A.y -= n.y * push * wA; B.x += n.x * push * wB; B.y += n.y * push * wB;
+    // (the closing speed along the normal, over the ground: both in the same stream, so it cancels. Taken out between
+    // them, equal masses, as two hulls leaning together: what's left is sliding along each other, which the contact
+    // doesn't stop. Once they're not closing nothing more is taken, so it doesn't grind a sliding boat to a halt)
+    const vn = (A.vx - B.vx) * n.x + (A.vy - B.vy) * n.y;
+    if (vn <= 0) return;
+    giveWay(A, -n.x * vn * wA, -n.y * vn * wA); giveWay(B, n.x * vn * wB, n.y * vn * wB);
   }
+
 
   /** The race committee: flags and sounds on time (RRS 26), the individual recall (29.1), and the last-minute rules (30). */
   /**
