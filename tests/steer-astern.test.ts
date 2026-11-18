@@ -79,10 +79,9 @@ describe('steering astern, shoved off under bare poles', () => {
     const key = turn(b => { b.steer = 1; }), hand = Math.abs(turn(b => { b.tiller = -1; b.steer = 0; b.handsOff = true; }));
     expect(key).toBeGreaterThan(10); // (sculled to starboard, toward 4 deg/s as her turn gathers: the way the key asks)
     // (the held tiller: by the flow past her rudder, little at 0.3 m/s. Sim-measured on the sourced sternway drag and the
-    // re-estimated yaw inertia (physics.ts HOVE.gyration) together, 18 Nov 2026: MEASURE degrees in the 8 s; it was 5.87,
-    // under a bound of 6, before either. And what the case is about, the contrast: well under half the key's turn)
-    console.log('STEERHAND', hand, key);
-    expect(hand).toBeLessThan(BOUND); expect(hand).toBeLessThan(0.4 * key);
+    // re-estimated yaw inertia (physics.ts HOVE.gyration) together, 18 Nov 2026: 8.75 degrees in the 8 s (the key's: 22.2); it was 5.87,
+    // under a bound of 6, before either. 8.95: the old bound's headroom, 6 over 5.87. The Coordinator, 18 Nov 2026. And the contrast: under 0.4 of the key's turn)
+    expect(hand).toBeLessThan(8.95); expect(hand).toBeLessThan(0.4 * key);
   });
   it('a wind on her stern shortens the glide, a wind on her bow carries her on', () => {
     const calm = asternGlide(0.64, 0, 90, 0), stern = asternGlide(0.64, 0, 180, 20), bow = asternGlide(0.64, 0, 0, 20);
