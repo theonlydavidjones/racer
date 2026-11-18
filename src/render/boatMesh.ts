@@ -1128,7 +1128,7 @@ const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
  * photo's own reading the tiller would touch it in its last 2.5° of travel). On the transom's face, as it once was, its foot
  * was in the air (the owner, 18 Nov 2026).
  */
-export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, x = 0.5, z = L / 2 - 0.03, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = L / 2 - 0.0508, x = (halfBeam(uAtZ(z)) - 0.045 + 0.3) / 2, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
   return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
