@@ -64,6 +64,8 @@ const VIEWS = [
   await p.goto(process.env.PERF_URL || 'http://localhost:5173/?inproc'); await p.waitForTimeout(5000);
   await p.evaluate(() => { window.__reseed(); document.querySelector('[data-home="create"]').click(); }); await p.waitForTimeout(1500);
   await p.evaluate(() => { window.__reseed(); document.getElementById('bGo').click(); }); await p.waitForTimeout(4000); // (again at Go: the setup may make its race again, on its debounce, before)
+  // (the race sailed: its course, the day's wind and the fleet, for perf-ab.cjs to check both versions sailed the same one)
+  const race = await p.evaluate(() => { const w = window.sim(), m = w.windModel; return { course: w.C?.id ?? null, base: m ? Math.round(m.base) : null, kt: m ? Math.round(m.kt * 2) / 2 : null, fleet: w.boats.map(b => b.name) }; });
   // the sim's steps and the scene's update/draw, timed inside the frame
   await p.evaluate(() => {
     const w = window.sim(), v = window.__view, h = window.__hud, acc = window.__acc = { step: 0, render: 0, inset: 0 };
@@ -129,7 +131,7 @@ const VIEWS = [
     if (extra > 50 || growT > 4 || growH > 30) { over = true; console.log(`LEAK: ${extra} geometries on the GPU beyond the scene's, textures +${growT}, heap +${growH.toFixed(0)} MB over ${seen.length - 2} races`); }
   }
   // (PERF_JSON: the rows and the races' memory as data, for perf-ab.cjs)
-  if (process.env.PERF_JSON) require('fs').writeFileSync(process.env.PERF_JSON, JSON.stringify({ rows, races: seen, errs }));
+  if (process.env.PERF_JSON) require('fs').writeFileSync(process.env.PERF_JSON, JSON.stringify({ rows, races: seen, errs, race }));
   console.log('ERRORS:', errs.join('\n') || 'none'); await b.close();
   process.exit(over || errs.length ? 1 : 0);
 })();
