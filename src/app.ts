@@ -1028,15 +1028,15 @@ $('bNavHome').onclick = () => { if (homeWhyNot()) return; navView.close(); goHom
 $('bCvHome').onclick = () => { if (homeWhyNot()) return; courseView.close(); goHome(); };
 $('bHomeYes').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); homeNow(); };
 $('bHomeNo').onclick = () => { $('homeAsk').hidden = true; send({ k: 'pause', on: false }); };
-/** Why she can't be sent home just now, in a few words for the button's hover (null: she can). Racing, not from here: it
- * would retire her, too much for one click (the Coordinator, 18 Nov 2026); the pause menu's Home asks first. */
+/** Why she can't be sent home just now, in a few words for the button's hover (null: she can). Racing she can: it asks
+ * first, Keep racing the default (the owner, 18 Nov 2026: "should surface a dialog first ... the chance to keep racing if
+ * you fat-fingered"), and retiring scores her RET (goHome, World.sendHome). */
 function homeWhyNot(): string | null {
   const u = w.user;
   if (!w.running) return 'Once she\'s under way';
   if (S.mode === 'drill') return 'Not in a start practice';
   if (S.mode === 'lesson') return 'Not in a lesson';
   if (S.mode === 'manoeuvres' || S.mode === 'roundings') return 'Not in practice';
-  if (!w.freeSail && !u.finished && !u.retired) return 'Retire from the race to sail home';
   if (w.dest?.key === 'slip' && w.arrivedT != null) return 'She\'s home already';
   if (u.docked) return 'She\'s made fast: push off first';
   if (u.handled) return 'Her crew are pushing her off: once she\'s free';
@@ -1048,7 +1048,7 @@ function homeWhyNot(): string | null {
 function homeButton(): void {
   // (in the navigator, not on the game surface: the owner, 13 Nov; the old button stays hidden. And in the Course panel,
   // which M opens racing and in a lesson, where the navigator doesn't)
-  const why = homeWhyNot(), t = why ? `${why}.` : 'Send her back to her home slip';
+  const racing = !w.freeSail && !w.user.finished && !w.user.retired, why = homeWhyNot(), t = why ? `${why}.` : racing ? 'Retire from the race and sail her home (it asks first)' : 'Send her back to her home slip';
   for (const el of [$('bNavHome'), $('bCvHome')]) {
     if (el.hidden) el.hidden = false;
     el.classList.toggle('dim', !!why); el.setAttribute('aria-disabled', why ? 'true' : 'false');
