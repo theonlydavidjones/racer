@@ -1,0 +1,114 @@
+Crew soak on v208 (main b4334c09): pose faults from the drawn figures (render/crew.ts syncCrew each step, checked every 0.1 s).
+Checks: crewfig.test.ts through() at 10 cm along each bone against render/crew.ts ground() (5 cm allowed), and elbows() at 8 cm forward. Run: see scripts/check/crewsoak/soak.ts's header.
+Cruise = the user's boat; race = the first AI boat (Red), seed 3, west wind, real sea.
+
+cruise 8 kt 87.5 s: POSE through crew2(mast) upper0 22 cm
+cruise 8 kt 104.5 s: POSE through crew2(lee) shin0 6 cm
+cruise 8 kt 122.1 s: POSE through crew1(lee) thigh0 6 cm
+cruise 8 kt 186.0 s: POSE through crew2(sit) thigh1 28 cm
+cruise 8 kt 195.3 s: POSE through crew2(car) shin1 21 cm
+cruise 8 kt 245.1 s: POSE elbow crew1(sit) arm1 13 cm forward
+cruise 8 kt 246.8 s: POSE through crew1(hike) shin1 10 cm
+cruise 8 kt 366.4 s: POSE elbow crew1(hike) arm1 11 cm forward
+cruise 8 kt 367.7 s: POSE through crew1(hike) shin0 10 cm
+cruise 8 kt 376.8 s: POSE through crew1(sit) fore0 6 cm
+cruise 8 kt 612.8 s: POSE through crew2(lee) thigh1 49 cm
+cruise 8 kt 621.4 s: POSE through crew1(lee) upper1 5 cm
+cruise 8 kt 634.1 s: POSE through crew2(piano) thigh1 17 cm
+cruise 8 kt 644.9 s: POSE through crew2(mast) thigh1 8 cm
+cruise 8 kt 722.3 s: POSE through crew2(mast) shin0 5 cm
+cruise 8 kt 738.3 s: POSE through crew1(lee) thigh1 6 cm
+cruise 8 kt 1007.0 s: POSE through crew2(piano) shin0 5 cm
+cruise 8 kt 1007.1 s: POSE through crew2(piano) shin1 8 cm
+cruise 14 kt 87.5 s: POSE through crew2(mast) upper0 22 cm
+cruise 14 kt 89.4 s: POSE through crew1(sit) upper1 5 cm
+cruise 14 kt 104.5 s: POSE through crew2(piano) shin0 6 cm
+cruise 14 kt 104.8 s: POSE through crew2(piano) shin1 5 cm
+cruise 14 kt 247.5 s: POSE through crew1(hike) shin1 8 cm
+cruise 14 kt 365.2 s: POSE elbow crew1(sit) arm0 8 cm forward
+cruise 14 kt 366.0 s: POSE elbow crew1(hike) arm1 8 cm forward
+cruise 14 kt 394.2 s: POSE through crew2(piano) thigh0 8 cm
+cruise 14 kt 487.2 s: POSE through crew1(hike) thigh0 5 cm
+cruise 14 kt 490.3 s: POSE through crew1(hike) thigh0 7 cm (30th time)
+cruise 14 kt 609.8 s: POSE through crew1(cross) thigh0 7 cm
+cruise 14 kt 656.1 s: POSE through crew2(sit) thigh1 26 cm
+cruise 14 kt 957.6 s: POSE through crew2(mast) upper1 19 cm
+cruise 14 kt 958.4 s: POSE through crew2(mast) thigh1 7 cm
+cruise 14 kt 998.5 s: POSE through crew2(mast) shin1 6 cm
+cruise 14 kt 1000.9 s: POSE through crew1(sit) shin0 13 cm
+cruise 14 kt 1001.0 s: POSE through crew1(sit) thigh0 10 cm
+cruise 14 kt 1008.2 s: POSE through crew2(sit) thigh0 43 cm
+cruise 22 kt 5.2 s: POSE through crew2(mast) upper0 28 cm
+cruise 22 kt 33.1 s: POSE through crew2(sit) thigh0 23 cm
+cruise 22 kt 33.5 s: POSE through crew2(sit) thigh1 39 cm
+cruise 22 kt 42.8 s: POSE elbow crew1(sit) arm1 10 cm forward
+cruise 22 kt 168.8 s: POSE elbow crew1(hike) arm0 8 cm forward
+cruise 22 kt 168.9 s: POSE through crew1(hike) shin1 7 cm
+cruise 22 kt 180.2 s: POSE through crew2(car) thigh1 6 cm
+cruise 22 kt 191.4 s: POSE through crew2(hike) shin1 10 cm
+cruise 22 kt 281.5 s: POSE elbow crew1(sit) arm0 8 cm forward
+cruise 22 kt 380.3 s: POSE elbow crew1(lee) arm1 11 cm forward
+cruise 22 kt 438.8 s: POSE elbow crew1(hike) arm1 11 cm forward
+cruise 22 kt 508.1 s: POSE elbow crew1(cross) arm1 9 cm forward
+cruise 22 kt 673.9 s: POSE elbow crew1(sit) arm1 11 cm forward (30th time)
+cruise 22 kt 875.3 s: POSE through crew2(mast) fore0 10 cm
+cruise 22 kt 875.6 s: POSE through crew2(mast) fore1 14 cm
+cruise 22 kt 916.5 s: POSE through crew2(mast) upper1 24 cm
+race 8 kt Red 23.6 s: POSE through crew2(sit) thigh1 28 cm
+race 8 kt Red 62.9 s: POSE through crew1(hike) shin0 10 cm
+race 8 kt Red 77.9 s: POSE elbow crew1(sit) arm1 8 cm forward
+race 8 kt Red 138.2 s: POSE through crew2(car) shin0 6 cm
+race 8 kt Red 138.3 s: POSE through crew2(car) thigh1 6 cm
+race 8 kt Red 148.2 s: POSE through crew2(sit) shin1 5 cm
+race 8 kt Red 151.7 s: POSE through crew2(sit) thigh0 15 cm
+race 8 kt Red 162.2 s: POSE through crew2(piano) thigh0 6 cm
+race 8 kt Red 226.5 s: POSE through helm(helm) thigh1 8 cm
+race 8 kt Red 226.7 s: POSE through helm(helm) shin1 7 cm
+race 8 kt Red 338.9 s: POSE through crew2(lee) thigh1 22 cm
+race 8 kt Red 340.6 s: POSE elbow crew1(lee) arm1 8 cm forward
+race 8 kt Red 536.2 s: POSE through crew2(piano) upper0 8 cm
+race 8 kt Red 536.8 s: POSE through crew1(sit) thigh0 6 cm
+race 8 kt Red 629.4 s: POSE through crew2(mast) upper0 16 cm
+race 8 kt Red 640.1 s: POSE through crew2(piano) shin0 7 cm
+race 8 kt Red 650.6 s: POSE through crew2(bow) thigh0 8 cm
+race 14 kt Red 69.0 s: POSE through crew2(lee) fore1 5 cm
+race 14 kt Red 70.1 s: POSE elbow crew1(sit) arm1 11 cm forward
+race 14 kt Red 161.0 s: POSE through crew2(hike) thigh1 6 cm
+race 14 kt Red 161.1 s: POSE through crew2(hike) shin1 5 cm
+race 14 kt Red 174.7 s: POSE through helm(helm) thigh1 6 cm
+race 14 kt Red 174.9 s: POSE through helm(helm) shin1 10 cm
+race 14 kt Red 176.4 s: POSE through crew1(hike) shin0 9 cm
+race 14 kt Red 233.6 s: POSE through crew2(mast) upper0 15 cm
+race 14 kt Red 233.7 s: POSE through crew2(mast) fore0 13 cm
+race 14 kt Red 233.8 s: POSE through crew2(mast) upper1 26 cm
+race 14 kt Red 233.9 s: POSE through crew2(mast) thigh1 8 cm
+race 14 kt Red 234.0 s: POSE through crew2(mast) shin1 6 cm
+race 14 kt Red 245.5 s: POSE through crew2(sit) thigh1 5 cm
+race 14 kt Red 245.6 s: POSE through crew2(sit) thigh0 8 cm
+race 14 kt Red 271.1 s: POSE through crew2(piano) thigh0 9 cm
+race 14 kt Red 271.3 s: POSE through crew2(piano) shin0 7 cm
+race 14 kt Red 274.5 s: POSE through crew1(lee) upper0 6 cm
+race 14 kt Red 275.1 s: POSE through crew2(cross) fore0 6 cm
+race 14 kt Red 279.6 s: POSE through crew2(lee) fore0 32 cm
+race 14 kt Red 300.0 s: POSE through crew2(piano) shin1 7 cm
+race 14 kt Red 361.4 s: POSE through crew2(lee) thigh0 7 cm
+race 14 kt Red 361.6 s: POSE through crew2(lee) thigh1 6 cm
+race 14 kt Red 583.3 s: POSE through crew2(mast) thigh0 8 cm
+race 14 kt Red 595.4 s: POSE through crew2(lee) shin0 6 cm
+race 14 kt Red 616.6 s: POSE through crew2(sit) shin0 14 cm
+race 14 kt Red 637.9 s: POSE through crew2(mast) shin0 8 cm
+race 14 kt Red 716.8 s: POSE through crew2(mast) upper1 17 cm (30th time)
+race 14 kt Red 727.8 s: POSE through crew2(sit) shin1 22 cm
+race 14 kt Red 780.8 s: POSE through crew2(lee) upper0 14 cm
+race 14 kt Red 899.3 s: POSE through crew2(car) thigh1 14 cm
+race 14 kt Red 899.4 s: POSE through crew2(car) shin1 19 cm
+race 14 kt Red 908.7 s: POSE through crew2(hike) shin0 12 cm
+race 22 kt Red 43.7 s: POSE through crew2(piano) thigh0 14 cm
+race 22 kt Red 154.5 s: POSE through crew1(hike) shin1 5 cm
+race 22 kt Red 190.7 s: POSE through crew2(mast) upper0 15 cm
+race 22 kt Red 201.4 s: POSE through crew2(piano) shin0 7 cm
+race 22 kt Red 238.9 s: POSE through crew1(sit) upper1 7 cm
+race 22 kt Red 240.2 s: POSE through crew2(sit) fore0 5 cm
+race 22 kt Red 253.1 s: POSE through crew2(sit) thigh0 8 cm
+race 22 kt Red 253.7 s: POSE through crew2(sit) shin0 6 cm
+race 22 kt Red 1159.2 s: POSE through crew2(piano) thigh1 56 cm
