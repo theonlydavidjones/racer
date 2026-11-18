@@ -38,6 +38,10 @@ to a club, and no single person can know or do everything required to sail and m
 and training of crew, the flying of burgees, the traditions, the legacies and the trophies all belong to that community
 element. Eventually: a live multiplayer mode.
 
+Focus (the owner, 17 Nov 2026): the game is the Nordic Folkboat on San Francisco Bay, and nothing wider. No other
+classes of boat and no other waters: depth in this one boat and this one place is what sets it apart from general
+sailing sims. Work that widens the scope beyond them is out unless the owner asks for it.
+
 Priority (the owner, 13 Nov 2026): physics and racing first. "Physics is the key to the true-to-life element of the
 simulator. If it's not real and accurate, then it's not a simulator." The Bay's beauty and a robust open-Bay cruising mode
 come later, once the physics and racing are dialed in.
