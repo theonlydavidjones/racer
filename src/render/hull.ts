@@ -729,18 +729,15 @@ export function tillerClearance(turn: number, lift: number, n = 40): number {
   }
   return w;
 }
-/** How far the tiller's lifted on its pin (rad) when turned `turn` rad: as far as it rides up to clear by a centimeter;
- * none while it clears lying at rest. Worked out once, a degree apart, and read between. */
-let liftTab: Float64Array | null = null;
-export function tillerLift(turn: number): number {
-  if (!liftTab) { liftTab = new Float64Array(91);
-    for (let g = 0; g <= 90; g++) { const th = g * Math.PI / 180;
-      if (tillerClearance(th, 0) >= 0.01 && tillerClearance(-th, 0) >= 0.01) continue;
-      let lo = 0, hi = 1.4; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (tillerClearance(th, m) >= 0.01 && tillerClearance(-th, m) >= 0.01) hi = m; else lo = m; }
-      liftTab[g] = Math.max(hi, liftTab[g - 1] ?? 0); } } // (never less as it goes further over)
-  const g = Math.min(89.999, Math.abs(turn) * 180 / Math.PI), i = Math.floor(g);
-  return liftTab[i] + (liftTab[i + 1] - liftTab[i]) * (g - i);
-}
+/**
+ * How far the tiller's lifted on its pin (rad) when turned `turn` rad: not at all. It turns about the raked rudder line,
+ * so its end comes down as it swings out, and it stops where it meets the after deck, the same both sides (the owner,
+ * 18 Nov 2026: "the tiller path is on a slight arc, so it's up off the deck at center, but travels slightly down and
+ * touches the deck at the extremes of its travel path"; "the staff doesn't block the tiller. The deck does, equally on
+ * both sides"). That stop is HARD_OVER (boat/balance.ts), about 46.5° on this geometry (tests/tillerpath.test.ts). It
+ * used to ride up on its pin past the deck, to 75°, which no tiller does.
+ */
+export function tillerLift(_turn: number): number { return 0; }
 
 function rudderGeometryBuild(): { blade: THREE.BufferGeometry; tiller: THREE.BufferGeometry } {
   // the class's rudder (CR 5.20): breadth square off the fore edge (the hinge), at distances up the fore edge from the

@@ -16,7 +16,7 @@ import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerLift, tillerPivot, tillerRestDir, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, TRANSOM_TOP, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerLift, tillerPivot, tillerRestDir, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -804,7 +804,7 @@ function deckFittings(grp: THREE.Group): void {
   for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
   screw(FORESTAY_DECK.clone(), HOUNDS);
   parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
-  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * 0.3, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
+  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * BS_CHAINPLATE_X, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
   { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
     parts.push(cleatGeometry(0.2, 0.016).translate(0, cy, cz)); }
   const flat = parts.map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
@@ -1119,17 +1119,17 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
+/** The toerail's inner face, in from the sheer (it stands 3 cm in, 3 cm thick), and the backstay's chainplates, out from
+ * the centerline (deckFittings). */
+const TOERAIL_IN = 0.045, BS_CHAINPLATE_X = 0.3;
 /**
  * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. Its foot in a flush silver socket in the
- * after deck at the starboard quarter, as Josephine's (the owner's photos: reference/photos/josephine-ensign-socket-port-
- * quarter.jpg, taken from the dock looking aft, so the circled socket is on her starboard side, and josephine-helm-on-aft-
- * deck-underway.jpg, the staff to starboard looking aft): just forward of the transom's edge, about halfway out from the
- * backstay's chainplate to the corner. Read from the photo it's about 0.47 m out and 5 cm in from the edge, ESTIMATE; drawn
- * 0.50 m out and 3 cm in, where the tiller's sweep passes 2.5 cm clear of it at 75° (tests/ensignstaff.test.ts: at the
- * photo's own reading the tiller would touch it in its last 2.5° of travel). On the transom's face, as it once was, its foot
- * was in the air (the owner, 18 Nov 2026).
+ * after deck at the starboard quarter, where the owner measured Josephine's (18 Nov 2026): "equidistant from the toe rail
+ * and the starboard chain plate of the back stay", and "about two inches forward" of the deck's aft edge. The tiller stops
+ * on the deck well short of it (tests/ensignstaff.test.ts). Photos: reference/photos/josephine-ensign-socket-port-
+ * quarter.jpg (from the dock looking aft: her starboard side) and josephine-ensign-socket-from-cockpit.jpg.
  */
-export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, x = 0.5, z = L / 2 - 0.03, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = (halfBeam(uAtZ(z)) - TOERAIL_IN + BS_CHAINPLATE_X) / 2, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
   return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
@@ -1344,7 +1344,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     staff.position.copy(base.clone().lerp(top, 0.5)); staff.rotation.x = rake; staffG.add(staff);
     const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); staffG.add(truck);
     // (its socket: a flush silver ring in the deck, there whether the staff's shipped or not)
-    const socket = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.006, 6, 16).scale(1, 1, 0.4).rotateX(Math.PI / 2), CHROME);
+    const socket = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 16).scale(1, 1, 0.4).rotateX(Math.PI / 2), CHROME);
     socket.position.copy(base).add(new THREE.Vector3(0, 0.002, 0)); grp.add(socket);
     if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, staffG, false);
     const flag = ens ? flags[flags.length - 1].mesh : null;
