@@ -5,8 +5,9 @@
  *     clicks a card that can't answer yet;
  *  2. the loading mark clears (within 90 s, software graphics allowed for), and then a click on a card answers at
  *     once: Cruise opens its setup;
- *  3. behind it, a quiet cruise: her alone, no fleet, start line or clock (dev server), and again on coming back to it
- *     from a race's setup, which still sets up its race;
+ *  3. behind it, quiet: her alone (the fleet, marks and line hidden: dev server) and none of the game's displays (the
+ *     clock, the hails), the inset map still its size; the same again on coming back from a race's setup, which shows
+ *     its race; the readouts kept up to date behind it (a first frame's negative step once held them back);
  *  4. the boat a new player is given is their own: not JOSEPHINE, USA 122 (the owner's).
  * Fails (exit 1) on any of these, or on a page error. Needs the dev server (default :5173).
  *
@@ -47,30 +48,34 @@ const URL = process.argv[2] || 'http://localhost:5173/', OUT = process.argv[3];
   ok(R.busyAtShow, `the start page shows marked as loading (shown at ${Math.round(R.shown)} ms)`);
   ok(st.busy && st.pointer === 'none' && st.opacity < 0.8, `while loading, its cards are drawn dimmed and take no clicks (styled at ${Math.round(st.t)} ms: busy ${st.busy}, pointer-events ${st.pointer}, opacity ${st.opacity})`);
   const ready = await p.waitForFunction(() => window.__ftue.ready, null, { timeout: 90000 }).then(h => h.jsonValue()).catch(() => null);
-  // (the readouts behind it, four frames on: a cruise's, not a race's "Start in 3:00", nor held up by a first frame's
-  // negative time step)
-  const labAtReady = ready == null ? '' : await p.evaluate(() => new Promise(res => { let n = 0; const f = () => (++n >= 4 ? res(document.getElementById('clockLab').textContent) : requestAnimationFrame(f)); requestAnimationFrame(f); }));
+  // (the readouts behind it, four frames on: up to date, not held back by a first frame's negative time step; the HTML's
+  // own is "Prep")
+  const subAtReady = ready == null ? '' : await p.evaluate(() => new Promise(res => { let n = 0; const f = () => (++n >= 4 ? res(document.getElementById('clockSub').textContent) : requestAnimationFrame(f)); requestAnimationFrame(f); }));
   ok(ready != null, `the loading mark clears${ready != null ? ` (at ${(ready / 1000).toFixed(1)} s)` : ' (not within 90 s)'}`);
   await shot('ftue-02-ready');
   if (ready != null) {
     const t = Date.now();
-    // the scene behind the start page: a quiet cruise, her alone (no fleet, start line or clock); the dev server's handle
-    // (__w, the page's World) only, so not on the built page
-    const scene = () => p.evaluate(() => window.__w ? { freeSail: window.__w().freeSail, boats: window.__w().boats.length } : null);
-    const quiet = s => s && s.freeSail && s.boats === 1;
+    // the scene behind the start page, quiet: the view's own boats and course (the dev server's __view only, so not on
+    // the built page), and the game's displays as the player sees them
+    const scene = () => p.evaluate(() => {
+      const v = window.__view, vis = id => { const e = document.getElementById(id); return e ? getComputedStyle(e).visibility : 'none'; };
+      return { atHome: document.body.classList.contains('atHome'), shown: { hud: vis('hudRight'), left: vis('leftCol'), labels: vis('labels'), coach: vis('coachTip') }, mapW: document.getElementById('map').getBoundingClientRect().width,
+        ...(v ? { fleet: v.boatMeshes.slice(1).filter(m => m.grp.visible).length, ofFleet: v.boatMeshes.length - 1, course: v.courseObjs.filter(o => o.visible).length, her: !!v.boatMeshes[0]?.grp.visible } : {}) };
+    });
+    const quiet = s => s.atHome && Object.values(s.shown).every(x => x === 'hidden') && s.mapW > 0 && (s.fleet == null || (s.fleet === 0 && s.course === 0 && s.her));
     const s0 = await scene();
-    if (s0) {
-      ok(quiet(s0), `behind the start page, a quiet cruise: her alone (${JSON.stringify(s0)})`);
-      ok(labAtReady === 'Sailing', `its clock reads as a cruise's within four frames of the page being ready (${labAtReady})`);
+    ok(quiet(s0), `behind the start page, quiet: her alone, the game's displays hidden, the map still drawn (${JSON.stringify(s0)})`);
+    ok(subAtReady && subAtReady !== 'Prep', `its readouts kept up to date behind it, four frames after it's ready (${subAtReady})`);
+    if (s0.fleet != null) {
       const go = sel => p.evaluate(sel => { const e = [...document.querySelectorAll(sel)].find(e => e.offsetParent); if (e) e.click(); }, sel);
       await go('#home [data-home="race"]'); await go('[data-home="create"]'); await p.waitForTimeout(1500);
       const s1 = await scene();
-      ok(s1 && !s1.freeSail && s1.boats > 1, `Create a race still sets up the race, fleet and all (${JSON.stringify(s1)})`);
+      ok(!s1.atHome && s1.fleet === s1.ofFleet && s1.ofFleet > 0 && s1.course > 0, `Create a race: its fleet and course shown again (${JSON.stringify(s1)})`);
       await go('#setupBack'); await go('#raceBack'); await p.waitForTimeout(1500);
       const s2 = await scene(), back = await p.evaluate(() => !document.getElementById('home').hidden);
-      ok(back && quiet(s2), `back on the start page, the quiet cruise again (${JSON.stringify(s2)})`);
+      ok(back && quiet(s2), `back on the start page, quiet again (${JSON.stringify(s2)})`);
       await shot('ftue-02b-home-again');
-    } else console.log('(the scene behind the start page: checked on the dev server only)');
+    } else console.log('(the fleet and course behind the start page: checked on the dev server only)');
     // (the click dispatched as the browser would: with software graphics a frame takes seconds here, too slow for a
     // mouse click's own checks; on a real GPU the page answers at once)
     await p.evaluate(() => document.querySelector('#home [data-home="cruise"]').click());

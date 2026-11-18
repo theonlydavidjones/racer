@@ -1,5 +1,3 @@
-import type { Settings } from '../settings';
-import type { WorldOptions } from '../sim/world';
 /**
  * The first run (docs/FTUE-PLAN.md). For now, the start page's wait: index.html shows it marked aria-busy, its cards
  * dimmed and not taking clicks (styles 04-screens), while your saves come back (store/cloud.ts, up to 8 s) and the app
@@ -11,11 +9,12 @@ export function startPageReady(): void {
 }
 
 /**
- * The scene behind the start page (docs/FTUE-PLAN.md step 0; the owner, 17 Nov 2026): a quiet cruise, her alone, under
- * way off her cruising start, not the last setup's race (its fleet, start line, clock and right-of-way hails). Her own
- * boat, wind, tide and day as set; only the fleet left out and the slip left for open water (a boat tied up in her slip
- * is no picture). Read-only: the player's own settings are left as they are. Each setup builds its own race on opening.
+ * The start page quiet behind it (docs/FTUE-PLAN.md step 0; the owner, 17 Nov 2026): her alone, sailing, not the setup's
+ * race with its fleet, start line, clock and right-of-way hails. The race is the same one the setup built (the same World
+ * as ever, so what's filed, built and drawn after it is the same: Capacity's release gate, v206 and v208); only the fleet
+ * and the course are hidden in the view, and the game's own displays (body.atHome, 04-screens.css), with `visibility`, so
+ * the inset map goes on drawing at its size and readies the race's wind shadows as before.
  */
-export function homeScene(S: Settings): { settings: Settings; opts: WorldOptions } {
-  return { settings: { ...S, opponents: [], fleet: 0, sailFrom: S.sailFrom === 'slip' ? 'cityfront' : S.sailFrom, sailTo: '' }, opts: { freeSail: true } };
+export function startPageQuiet(on: boolean, view: { quiet(on: boolean): void }): void {
+  document.body.classList.toggle('atHome', on); view.quiet(on);
 }
