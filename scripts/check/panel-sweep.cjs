@@ -41,7 +41,8 @@ const lint = (mark) => {
     if (t) {
       if (BAD.test(t)) add('token', e, t.match(BAD)[0]);
       if (NUM.test(t)) add('number', e, t.match(NUM)[0]);
-      if (/(^|\s)(Slip in|Berth|Home berth|Moored at|Leaving from|Heading to|To|From)\s*:?\s*$/.test(t) || /:\s*$/.test(t)) {
+      // (a label ends bare only when nothing follows it in its parent: "Start:" then the place in the next node is fine)
+      if ((/(^|\s)(Slip in|Berth|Home berth|Moored at|Leaving from|Heading to|To|From)\s*:?\s*$/.test(t) || /:\s*$/.test(t)) && (e.parentElement?.innerText || '').replace(/\s+/g, ' ').trim().length <= t.length + 1 && !e.nextElementSibling?.innerText?.trim()) {
         add('empty', e, `label ends bare: "${t.slice(-40)}"`);
       }
       // text outside its own box, or off screen
@@ -110,13 +111,16 @@ const shown = (p, q) => p.evaluate(s => { const e = document.querySelector(s); i
 
 // close whatever is open, by each one's own close control (Escape only for the chart: on the surface it opens Pause)
 const closeAll = async p => {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     const left = await p.evaluate(() => {
       const open = q => { const e = document.querySelector(q); if (!e) return false; for (let n = e; n; n = n.parentElement) if (n.hidden || getComputedStyle(n).display === 'none') return false; return true; };
       for (const [q, c] of [['#motorAsk', '#bMotorNo'], ['#homeAsk', '#bHomeNo'], ['#leaveAsk', '#bLeaveNo'], ['#flagIndex', '#bFlagIndexX'], ['#keysView', '#bKeysClose'], ['#condDlg', '#bCondClose'], ['#pause', '#bResume'], ['#courseView', '#bCvClose'], ['#navView', '#bNavClose'], ['#coachPanel', '#bCoachX'], ['#crewPop', '#bCrew'], ['#toolsTray', '#bTools'], ['#trimNotes', '#bCoachX']])
         if (open(q)) { document.querySelector(c)?.click(); return q; }
       if (open('#plan')) { dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return '#plan'; }
       if (open('#boatPanel')) { const e = [...document.querySelectorAll('#boatPanel button')].find(b => /^(done|close|back|×)/i.test(b.innerText.trim())); e?.click(); return '#boatPanel'; }
+      if (open('#fleetBoat')) { document.querySelector('#fleetBoat [data-f="toList"]')?.click(); document.querySelector('#fleet [data-f="back"]')?.click(); return '#fleetBoat'; }
+      if (open('#fleet')) { document.querySelector('#fleet [data-f="back"]')?.click(); return '#fleet'; }
+      if (false) { const e = [...document.querySelectorAll('#boatPanel button')].find(b => /^(done|close|back|×)/i.test(b.innerText.trim())); e?.click(); return '#boatPanel'; }
       return '';
     });
     if (!left) return; await p.waitForTimeout(500);
@@ -129,7 +133,7 @@ const closeAll = async p => {
   for (const mode of ['race', 'cruise']) for (const kt of [8, 25]) for (const tod of ['day', 'night']) {
     const sc = `${mode}-${kt}kt-${tod}`; if (only && !sc.includes(only)) continue;
     console.log(sc);
-    const p = await b.newPage({ viewport: { width: VW, height: VH } }); p.on('pageerror', e => errs.push(`${sc}: ${e.message}`));
+    const p = await b.newPage({ viewport: { width: VW, height: VH } }); p.on('pageerror', e => errs.push(`${sc}: ${e.message}`)); p.on('framenavigated', f => { if (f === p.mainFrame() && !f.url().startsWith(URL.split('?')[0] + '?inproc') && !f.url().endsWith(':5173/?inproc')) console.log('  NAVIGATED', f.url()); });
     // wind speed is settings.windKt (the conditions screen's Wind speed slider); the day is tideDate + the gun's/leaving time tideTime (sunset ~17:00 in November)
     const S = { mode: mode === 'race' ? 'race' : 'sail', seq: 1, windKt: kt, windKind: 'west', tideDate: '2026-11-21', tideTime: tod === 'day' ? '13:00' : '22:00', ...(mode === 'cruise' ? { sailFrom: 'crissy', sailTo: 'pier39' } : {}) };
     await p.addInitScript(s => { if (sessionStorage.getItem('__swept')) return; sessionStorage.setItem('__swept', '1'); const o = JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}'); Object.assign(o, s); localStorage.setItem('fbsim-settings-v2', JSON.stringify(o)); }, S);
@@ -147,15 +151,24 @@ const closeAll = async p => {
         await p.evaluate(id => { const e = document.querySelector(`#setup .srow[data-row="${id}"] .srow-head`) || document.querySelector(`#${id} .srow-head`); e?.click(); }, r);
         await p.waitForTimeout(700); await sweep(p, sc, `setup-row:${r}`);
         if (r === 'boat' && await shown(p, '#bBoat')) {
-          await click(p, '#bBoat'); await p.waitForTimeout(1500); await sweep(p, sc, 'boat-panel');
-          const names = await p.evaluate(() => [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].filter(e => e.offsetParent && !/delete|remove|discard|sell|scrap|done|close|back/i.test(e.innerText + e.title + (e.getAttribute('aria-label') || ''))).map(e => (e.innerText || e.title || e.getAttribute('aria-label') || '').trim().slice(0, 40)));
-          const seen = new Set();
-          for (const nm of names.slice(0, 40)) {
-            if (seen.has(nm)) continue; seen.add(nm);
-            const ok = await p.evaluate(t => { const e = [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].find(x => x.offsetParent && (x.innerText || x.title || x.getAttribute('aria-label') || '').trim().slice(0, 40) === t); if (!e) return false; e.click(); return true; }, nm);
-            if (ok) { await p.waitForTimeout(500); await sweep(p, sc, `boat-panel:${nm || 'icon'}`); }
-            if (!(await shown(p, '#boatPanel'))) break;
-          }
+          await click(p, '#bBoat'); await p.waitForTimeout(1500); await sweep(p, sc, 'yacht-club');
+          // the Yacht Club: her page (#fleetBoat), then Edit (the boat editor, #boatPanel): each section's buttons (never New, Delete or Discard)
+          const fclick = (sel, i = 0) => p.evaluate(([q, n]) => { const e = [...document.querySelectorAll(q)].filter(x => x.offsetParent)[n]; if (!e) return false; e.click(); return true; }, [sel, i]);
+          if (await fclick('#fleet [data-f="boat"]', 0)) {
+            await p.waitForTimeout(2500); await sweep(p, sc, 'boat-page');
+            if (await shown(p, '#bShowCond')) { await click(p, '#bShowCond'); await p.waitForTimeout(1000); await sweep(p, sc, 'boat-page-conditions'); await click(p, '#bCondClose'); await p.waitForTimeout(500); }
+            if (await fclick('#fleetBoat [data-f="edit"]', 0)) {
+              await p.waitForTimeout(2500); await sweep(p, sc, 'boat-editor');
+              const names = await p.evaluate(() => [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].filter(e => e.offsetParent && !/delete|remove|discard|sell|scrap|done|close|back|^new|reset/i.test(e.innerText + e.title + (e.getAttribute('aria-label') || ''))).map(e => (e.innerText || e.title || e.getAttribute('aria-label') || '').trim().slice(0, 40)));
+              const seen = new Set();
+              for (const nm of names.slice(0, 50)) {
+                if (seen.has(nm)) continue; seen.add(nm);
+                const ok = await p.evaluate(t => { const e = [...document.querySelectorAll('#boatPanel button, #boatPanel [role=tab], #boatPanel summary')].find(x => x.offsetParent && (x.innerText || x.title || x.getAttribute('aria-label') || '').trim().slice(0, 40) === t); if (!e) return false; e.click(); return true; }, nm);
+                if (ok) { await p.waitForTimeout(500); await sweep(p, sc, `boat-editor:${nm || 'icon'}`); }
+                if (!(await shown(p, '#boatPanel'))) break;
+              }
+            } else unreached.push(`${sc}/boat-editor: no Edit button on her page`);
+          } else unreached.push(`${sc}/boat-page: no boat card`);
           await closeAll(p);
           if (!(await shown(p, '#setup'))) { unreached.push(`${sc}/setup: not back after the boat panel`); }
         }
@@ -189,6 +202,7 @@ const closeAll = async p => {
       // the inset map -> the chart, its Layers; N the navigator (cruise), M the course (race)
       const mr = await p.evaluate(() => { const r = document.getElementById('map').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
       await p.mouse.click(mr[0], mr[1]); await p.waitForTimeout(1800);
+      if (!(await shown(p, '#plan'))) { await click(p, '#map'); await p.waitForTimeout(1800); }
       if (await shown(p, '#plan')) {
         await sweep(p, sc, 'chart');
         if (await click(p, '#bChartLayers')) { await p.waitForTimeout(500); await sweep(p, sc, 'chart-layers'); await click(p, '#bChartLayers'); }
