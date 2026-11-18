@@ -37,7 +37,7 @@ export type RO<T> = T extends (...a: never[]) => unknown ? T
 /** The World's members that change the race: the page reaches them only through SimHost (commands and steps). */
 type Changes = 'step' | 'idle' | 'drainEvents' | 'pushOff' | 'callTurn' | 'setSail' | 'setDest' | 'retire' | 'motorTilt' | 'motorStart'
   | 'motorStop' | 'motorGear' | 'motorThrottle' | 'motorSwivel' | 'motorStow' | 'castOff' | 'sendHome' | 'moveHere' | 'applyConditions'
-  | 'userHail' | 'assignPenalty' | 'hail' | 'replyYouTack' | 'passOnHail' | 'paddle' | 'rule42';
+  | 'userHail' | 'pilotTack' | 'assignPenalty' | 'hail' | 'replyYouTack' | 'passOnHail' | 'paddle' | 'rule42';
 
 /*
  * What the page reads, for step 3 (when the view is the worker's state sent back each frame, not the World itself):

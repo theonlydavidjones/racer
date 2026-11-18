@@ -441,7 +441,7 @@ let barDrag = false;
   let start: { x: number; t: number } | null = null;
   pad.addEventListener('pointerdown', e => {
     e.preventDefault(); pad.setPointerCapture?.(e.pointerId);
-    pilotOff('Pilot on standby: you have the tiller.');
+    pilotGrab();
     start = { x: e.clientX, t: w.user.tiller }; barDrag = true;
   });
   pad.addEventListener('pointermove', e => { if (start) setTiller(start.t + (e.clientX - start.x) / (pad.clientWidth * 0.45) * HELM_MAX); });
@@ -463,7 +463,7 @@ let lastCursorX: number | undefined;
 function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN) * HELM_MAX); }
 function takeTiller(x?: number): void {
   if (!w.running || w.paused || tillerHeld) return;
-  pilotOff('Pilot on standby: you have the tiller.'); unlash();
+  pilotGrab(); unlash();
   // the tiller's words (which way it turns her) only in the Learn to sail lessons (the owner, 14 Nov 2026: no on-screen
   // tiller instructions elsewhere; the Rules trainer's case sails as a lesson but isn't one)
   const learning = !!w.lesson && w.lesson.id !== 'case';
@@ -485,7 +485,7 @@ function tillerSpring(dt: number): void {
   if (tillerHeld && (!w.running || w.paused)) releaseTiller(); // paused or stopped: hands off
   if (tillerSentFrames > 0) tillerSentFrames--;
   if (w.user.lashed != null) lashPendingFrames = 0; else if (lashPendingFrames > 0) lashPendingFrames--; // (the lash has reached the page's copy; or not yet)
-  if (w.pilot.mode !== 'off' || w.user.lashed != null || lashPending()) return; // the pilot's ram has it, or it's lashed
+  if (w.pilot.mode !== 'off' || w.pilot.onPin || w.user.lashed != null || lashPending()) return; // the pilot's ram has it (on standby too, still on its pin), or it's lashed
   if (tillerHeld || barDrag || !w.running || w.paused) return;
   const t = w.user.tiller; if (t !== 0) setTiller(t - Math.sign(t) * Math.min(Math.abs(t), 2.5 * HELM_MAX * dt)); // (from hard over to amidships in 0.4 s, as before)
 }
@@ -918,7 +918,18 @@ function pilotNote(word: string): void {
   const my = ++pilotNoteT;
   setTimeout(() => { if (my !== pilotNoteT) return; lab.textContent = 'Autopilot'; pilotShown = ''; chip.classList.remove('refused'); $('pilot').classList.remove('refused'); }, 3000);
 }
-function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
+function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 3500); }
+/** Lift the ram off the tiller pin (on standby it still holds the tiller: autopilot.ts onPin). */
+function pilotLift(msg?: string): void { if (w.pilot.mode !== 'off' || !w.pilot.onPin) return; send({ k: 'pilot', op: 'lift' }); if (msg) toast(msg, 2500); }
+/** Your hand on the tiller: the pilot off and its ram lifted off the pin, in one (a lift is a standby as well). */
+function pilotGrab(): void { if (w.pilot.mode === 'off' && !w.pilot.onPin) return; send({ k: 'pilot', op: 'lift' }); toast('Pilot off the tiller pin: you have the tiller.', 2500); }
+/** The pilot's button and key: engage it; on, standby; on standby with the ram still on the pin, lift it off. */
+function pilotButton(): void {
+  if (w.pilot.mode !== 'off') pilotOff(STANDBY_MSG);
+  else if (w.pilot.onPin) pilotLift('Pilot lifted off the tiller pin: you have the tiller.');
+  else pilotOn('auto');
+}
+const STANDBY_MSG = 'Pilot on standby: the ram\'s still on the tiller pin, holding it. Take the helm, or lift the pilot off.';
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
 function pilotTick(dt: number): void {
@@ -927,6 +938,9 @@ function pilotTick(dt: number): void {
   const chip = $('bPilot'), hide = !w.running || !w.cruising;
   if (chip.hidden !== (hide || on)) chip.hidden = hide || on; // (while it steers, its panel takes the button's place)
   chip.classList.toggle('on', on);
+  // (on standby with the ram still on the tiller pin, the same button lifts it off)
+  const word = !on && w.pilot.onPin ? 'Lift pilot off' : 'Autopilot', lab = chip.querySelector<HTMLElement>('.w')!;
+  if (performance.now() > pilotNoteUntil && lab.textContent !== word) lab.textContent = word;
   const panel = $('pilot'); if (panel.hidden === on) { panel.hidden = !on; document.body.classList.toggle('pilot-on', on); }
   if (!on) return;
   const u = w.user, side = (a: number) => `${Math.abs(Math.round(a))}° ${a >= 0 ? 'stbd' : 'port'}`;
@@ -982,11 +996,11 @@ function homeButton(): void {
   const t = w.homeSlip ? 'Send her back to her home slip' : 'Send her back to her home slip (give her one in the Yacht Club first)';
   if (el.title !== t) el.title = t;
 }
-$('bPilot').onclick = () => { if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); };
+$('bPilot').onclick = pilotButton;
 for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pm]')) b.onclick = () => pilotOn(b.dataset.pm as Exclude<PilotMode, 'off'>);
 for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pa]')) b.onclick = () => {
   const a = b.dataset.pa!, p = w.pilot;
-  if (a === 'off') pilotOff('Pilot on standby: you have the tiller.');
+  if (a === 'off') pilotOff(STANDBY_MSG);
   else if (a === 'tack') { if (p.mode === 'nav') toast('Nav calls its own tacks, on the laylines. Switch to Auto or Wind to tack when you choose.', 3500); else send({ k: 'pilot', op: 'tack' }); }
   else send({ k: 'pilot', op: 'adjust', d: +a });
 };
@@ -1158,7 +1172,7 @@ function keysHint(): void {
   const tip: [string, string, Action][] = [['bPause', 'Pause', 'pause'],
     ['bCourse', w?.cruising ? 'Navigator: the passage plan' : 'Course and strategist', 'course'], ['bOrient', 'Overhead: north up / bow up / wind up', 'orient'],
     ['bRecentre', 'Overhead: back to your boat', 'recentre'], ['bPushOff', 'Push off: the crew shoves her off the dock astern', 'pushOff'],
-    ['bPilot', 'Tiller pilot: steers for you (cruising only)', 'autopilot']];
+    ['bPilot', 'Tiller pilot: steers for you (cruising only); on standby, lifts it off the tiller pin', 'autopilot']];
   for (const [id, t, a] of tip) $(id).title = `${t} (${k(a)})`;
   $('bFast').title = 'Speed up time: 1×, 2×, 4×'; $('bSound').title = 'Sound on or off'; $('bExit').title = 'Exit to the start page';
 }
@@ -1243,7 +1257,7 @@ function runAction(a: Action): void {
     case 'takeTiller': if (tillerHeld) releaseTiller(); else takeTiller(lastCursorX); break;
     case 'centreTiller': pilotOff('Pilot on standby.'); unlash(); centreTiller(); break;
     case 'lashTiller': lash(); break;
-    case 'autopilot': if (w.pilot.mode === 'off') pilotOn('auto'); else pilotOff('Pilot on standby: you have the tiller.'); break;
+    case 'autopilot': pilotButton(); break;
     case 'pole': togglePole(); break;
     case 'paddle': cyclePaddle(); break;
     case 'crewLee': stepCrew('across', -1); break;

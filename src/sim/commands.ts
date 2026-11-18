@@ -16,7 +16,7 @@ import { carFree } from '../boat/crewWork';
 import { HELM_MAX } from '../boat/balance';
 import { wantJumpers } from '../boat/condition';
 import { guideTune } from '../boat/rigTune';
-import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack, type PilotMode } from '../boat/autopilot';
+import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, liftOff as pilotLift, type PilotMode } from '../boat/autopilot';
 import type { Settings } from '../settings';
 import type { BoatSpec } from '../boat/spec';
 import type { Moment } from './debrief';
@@ -71,6 +71,8 @@ export type Command =
   | { k: 'pilot'; op: 'engage'; mode: Exclude<PilotMode, 'off'> }
   | { k: 'pilot'; op: 'standby' }
   | { k: 'pilot'; op: 'tack' }
+  /** Lift the ram off the tiller pin (on standby it still holds the tiller): the tiller's free. */
+  | { k: 'pilot'; op: 'lift' }
   | { k: 'pilot'; op: 'adjust'; d: number }
   /** The outboard. */
   | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' | 'stow' }
@@ -116,11 +118,13 @@ export function applyCommand(w: World, c: Command): CommandResult {
   const u: Boat = w.user;
   switch (c.k) {
     case 'helm':
+      if (c.steer && w.pilot.mode === 'off') w.pilot.onPin = false; // (taking the helm on standby: you lift the ram off the pin)
       u.steer = c.steer; u.luff = c.luff;
       u.ctlCmd = c.ctl; u.sheetCmd.main = c.ctl.mainsheet ?? 0; u.sheetCmd.jib = c.ctl.jibsheet ?? 0;
       return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
-    case 'tiller': u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
+    case 'tiller': if (w.pilot.mode === 'off') w.pilot.onPin = false; // (your hand on the tiller: the ram lifted off its pin)
+      u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
     case 'lash': if (c.on && c.at != null && Number.isFinite(c.at)) u.tiller = Math.max(-HELM_MAX, Math.min(HELM_MAX, c.at)); u.lashed = c.on ? u.tiller : null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
@@ -145,7 +149,8 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'pilot':
       if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);
       else if (c.op === 'standby') pilotStandby(w.pilot);
-      else if (c.op === 'tack') pilotTack(u, w.pilot);
+      else if (c.op === 'lift') pilotLift(w.pilot);
+      else if (c.op === 'tack') w.pilotTack();
       else pilotAdjust(u, w.pilot, c.d);
       return;
     case 'motor':

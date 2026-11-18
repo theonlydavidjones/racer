@@ -57,7 +57,7 @@ import { genericSpec, realSpec, genericTag, isGeneric } from '../boat/generic';
 const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24b', '#9fb4ff'];
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
-import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
+import { newPilot, pilotStep, standbyNote, tack as pilotTackOrder, type Pilot } from '../boat/autopilot';
 import { landAt } from '../environment/sea';
 import { toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -1321,11 +1321,13 @@ export class World {
       if (b.handled) { this.handStep(b, dt); b.turnRate = 0; continue; } // (held or walked: no turn of her own carried on)
       if (b.mooring?.lines.length) { this.mooringStep(b, dt); continue; } // (a line ashore: she's held, or not, by her lines: boat/dockLines.ts)
       const x0 = b.x, y0 = b.y;
-      if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
+      // (on standby with the ram still on the tiller pin, the stopped ram has the tiller: it holds it where it left it,
+      // whoever is or isn't at the helm, until it's lifted off: autopilot.ts onPin)
+      if (b.isUser) { if (!this.cruising) this.pilot.onPin = false; b.pilotSteers = this.cruising && (this.pilot.mode !== 'off' || this.pilot.onPin); }
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
         pilotStep(b, this.pilot, this.arrivedT == null ? (this.pilot.mode === 'nav' ? this.navTarget(b) : this.dest?.p ?? null) : null, this.t, dt); // (the way in worked out only on Nav: its harbor's flood is a third of a second, once)
-        if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
-      }
+        if (this.pilot.alarm) { this.emit({ type: 'toast', msg: standbyNote(this.pilot.alarm, this.pilot.ram), ms: 6000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
+      } else if (b.isUser && this.cruising && this.pilot.onPin) { b.tiller = this.pilot.ram; b.steer = 0; b.turnTarget = null; }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
       if (b.wrecked && b.isUser && !this.freeSail) this.retire(`, wrecked: ${b.wrecked.how}`); // (in a season race, RET only: the Coordinator)
       if (b.isUser) this.sailedM += hypot(b.x - x0, b.y - y0);
@@ -2527,6 +2529,9 @@ export class World {
     this.emit({ type: 'toast', msg: `Heading home: her slip, ${slipPlace(slip)}. The navigator has the passage plan${this.pilot.mode === 'nav' ? ', and the pilot is steering for it' : ''}; you bring her into the slip.`, ms: 5000 });
     return true;
   }
+
+  /** The pilot's Tack button: it tacks as the handbook says, and warns you when she's too slow to carry through. */
+  pilotTack(): void { const warn = pilotTackOrder(this.user, this.pilot); if (warn) this.emit({ type: 'toast', msg: warn, ms: 4000 }); }
 
   /**
    * Cruising, a new start without ending the cruise: she's put at `p`, stopped, on the heading she had, her sails as they

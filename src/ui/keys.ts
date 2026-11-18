@@ -38,7 +38,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'crewUp', label: 'Crew weight a step to windward (leeward → middle → up → hike)', group: 'Crew' },
   { id: 'crewFwd', label: 'Crew weight forward a step', group: 'Crew' },
   { id: 'crewAft', label: 'Crew weight aft a step', group: 'Crew' },
-  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby (cruising only)', group: 'Helm' },
+  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby / lift off the tiller pin (cruising only)', group: 'Helm' },
   { id: 'navLights', label: 'Navigation lights on (lit after dark) / off', group: 'Helm' },
   { id: 'pushOff', label: 'At the dock: push off from her berth (the crew walks her out; held head to wind, let her go); coming in, lines ready (again: stand down); lying to her lines, let go', group: 'Helm' },
   { id: 'jibHalyard', label: 'Hoist or strike the jib', group: 'Sails' },
