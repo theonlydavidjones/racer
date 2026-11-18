@@ -29,9 +29,9 @@ import { n360 } from '../src/core/math';
  */
 type Watch = { seat?: number; inJob?: boolean; jobEnd?: number; fam?: string; famNew?: string; famT?: number; secs: number; trips: number; poses: number; knee: number; lean: number; crawl: number; cross: number; mastCross?: number; excusedAt?: number; spin: number; turned: number; hist: number[]; dance: number; prev?: { pose: string; gz: number; x: number; yaw: number; knee: number[]; hip: { x: number; y: number; z: number }; pitch: number; roll: number } };
 
-function cruise(twa: number, kt: number, mins: number) {
+function cruise(twa: number, kt: number, mins: number, seed = 3) {
   const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: kt, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'real', traffic: 0 } as Settings;
-  const w = new World(COURSES[0], S, 3, { freeSail: true }), u = w.user;
+  const w = new World(COURSES[0], S, seed, { freeSail: true }), u = w.user;
   const p = LL(37.835, -122.40); u.x = p.x; u.y = p.y;
   w.step(DT); u.h = n360(u.ww.from + twa); u.v = 2.5; engage(u, w.pilot, 'auto');
   const cr = buildCrew(u.crew!.spec.helm, u.crew!.spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1), figs = [cr.helm, ...cr.crew];
@@ -107,6 +107,32 @@ function cruise(twa: number, kt: number, mins: number) {
   return ws.map((s, i) => { const m = s.secs / 60; return { who: i ? `crew ${i}` : 'helm', mins: m, trips: s.trips / m, poses: s.poses / m, cross: s.cross / m, mastCross: s.mastCross ?? 0, mastEvents, crawl: s.crawl / m, lean: s.lean / m, knee: s.knee / m, spin: s.spin * 180 / Math.PI, dance: s.dance }; });
 }
 
+/**
+ * Trips a minute on a cruise, each crew member's (`runs[seed][who]`), over several seeds: under TRIPS_MEAN on the mean,
+ * and no one run over TRIPS_CAP, twice it, a backstop (the Coordinator, 16 Nov 2026: on one seed a 0.01 m/s change put
+ * two lines' trims 94 s apart instead of together, and the count over the bound, as crewstation's was on three seeds).
+ */
+export const CRUISE_SEEDS = [1, 2, 3, 4, 5, 6], TRIPS_MEAN = 0.6, TRIPS_CAP = 1.2;
+export function cruiseTripsVerdict(runs: number[][]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < runs[0]!.length; i++) {
+    const v = runs.map(r => r[i]!), mean = v.reduce((a, b) => a + b, 0) / v.length, who = i ? `crew ${i}` : 'helm';
+    if (mean >= TRIPS_MEAN) out.push(`${who}: trips a minute over the runs, ${mean.toFixed(2)}`);
+    v.forEach((x, q) => { if (x > TRIPS_CAP) out.push(`${who}, run ${q + 1}: ${x.toFixed(2)}`); });
+  }
+  return out;
+}
+
+describe('Trips on a cruise over the seeds (cruiseTripsVerdict): a crew that over-trips still fails', () => {
+  it('at their usual rate it passes; a trip a minute more on each run fails the mean; one run far over fails the backstop', () => {
+    const usual = CRUISE_SEEDS.map((_, q) => [0, 0.36 + 0.03 * q, 0.18]);
+    expect(cruiseTripsVerdict(usual)).toEqual([]);
+    expect(cruiseTripsVerdict(usual.map(r => [r[0]!, r[1]! + 1, r[2]!])).some(v => /over the runs/.test(v))).toBe(true);
+    expect(cruiseTripsVerdict([...usual.slice(0, 5), [0, 1.25, 0.18]]).some(v => /run 6: 1.25/.test(v))).toBe(true);
+    expect(cruiseTripsVerdict([...usual.slice(0, 5), [0, 1.2, 0.18]])).toEqual([]);
+  });
+});
+
 describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/crewWork.ts)', () => {
   for (const kt of [6, 14]) for (const [twa, name] of [[45, 'close-hauled'], [90, 'a beam reach'], [135, 'a broad reach'], [170, 'a run']] as const) {
     it(`on the tiller pilot, ${name} in ${kt} kt`, () => {
@@ -115,10 +141,6 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
       for (const o of out) {
         const t = `${o.who}, ${name} in ${kt} kt`;
         expect(o.mins, t).toBeGreaterThan(3); // (of six: the first half-minute, and 10 s after any gybe she makes, aren't counted)
-        // (a job now and then: the cabin top's lines, the jib car; a job every couple of minutes at most. Each job and the
-        // way back from it is one trip: counted as two, out and back, this was 1 a minute. In 6 kt on a reach the jib car's
-        // set once for the new course, the vang as the breeze comes and goes: three in five and a half minutes)
-        expect(o.trips, `${t}: trips a minute`).toBeLessThan(0.6);
         // (to a job and back is two; the trips' 0.6 a minute and a crossing now and then: under 1.5. Counted by the labels,
         // with the leaning in and out on the rail and each move's flicker of labels, this was 3)
         expect(o.poses, `${t}: changes of posture a minute`).toBeLessThan(1.5);
@@ -141,7 +163,13 @@ describe('A crew sits still on a cruise (render/crew.ts, boat/crewPhys.ts, boat/
         expect(o.spin, `${t}: turned within 4 s`).toBeLessThan(320);
         expect(o.dance, `${t}: seconds close to another while moving`).toBeLessThan(5);
       }
-    }, 300000);
+      // (a job now and then: the cabin top's lines, the jib car; a job every couple of minutes at most. Each job and the
+      // way back from it is one trip: counted as two, out and back, this was 1 a minute. In 6 kt on a reach the jib car's
+      // set once for the new course, the vang as the breeze comes and goes: three in five and a half minutes. Over the
+      // seeds, CRUISE_SEEDS: cruiseTripsVerdict)
+      const runs = CRUISE_SEEDS.map(s => (s === 3 ? out : cruise(twa, kt, 6, s)).map(o => o.trips));
+      expect(cruiseTripsVerdict(runs), `${name} in ${kt} kt: trips a minute`).toEqual([]);
+    }, 600000);
   }
 
   // (v162 sails the race in a Web Worker and draws its copy a frame later: a frame gets no steps, one, or two, as it

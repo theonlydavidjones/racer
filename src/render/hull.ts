@@ -373,6 +373,10 @@ export const COAMING_H = fairCurve([[-L / 2 + COCKPIT.u0 * L, 0.22], [L / 2 - 3.
  * the cabin, and another, with a little less room, between it and the thwart (the owner, and Josephine's profile photo).
  */
 export const JIB_WINCH_Z = 1.64;
+/** The thwart's underside (m over the waterline) at x: deepest in the middle, shallower at the ends (COCKPIT_FIT.thwart
+ * depth and depthEnd: ESTIMATES, uncited), the same curve the thwart's drawn with (thwartGeometryBuild). Open below it:
+ * there's no post under the thwart. */
+export const thwartBottom = (x: number) => { const { depth, depthEnd, z } = COCKPIT_FIT.thwart, w = cockpitHalf(zU(z)) + COAMING_T; return thwartTop() - (depthEnd + (depth - depthEnd) * (1 - Math.min(1, (x / w) ** 2))); };
 export const thwartTop = () => { const u = zU(COCKPIT_FIT.thwart.z), w = cockpitHalf(u); return deckY(u, w) + COAMING_H(COCKPIT_FIT.thwart.z) - COCKPIT_FIT.thwart.belowCap; };
 /** How far out a bench or the after shelf reaches under the side deck at station u (m from the centreline). */
 export const benchOut = (u: number) => Math.min(innerAt(0, u, COCKPIT_FIT.seat) - 0.03, cockpitHalf(u) + 0.2);
@@ -653,7 +657,7 @@ export function lazaretteLids(): { x0: number; x1: number; z0: number; z1: numbe
 /** The thwart: a beam across the cockpit between the coamings, its top flat and its underside curved (boat's frame). */
 function thwartGeometryBuild(): THREE.BufferGeometry[] {
   const { z, half, depth, depthEnd } = COCKPIT_FIT.thwart, top = thwartTop(), w = cockpitHalf(zU(z)) + COAMING_T, N = 16;
-  const bot = (x: number) => top - (depthEnd + (depth - depthEnd) * (1 - (x / w) ** 2));
+  const bot = (x: number) => top - (depthEnd + (depth - depthEnd) * (1 - (x / w) ** 2)); // (thwartBottom)
   const pos: number[] = [], P = (x: number, y: number, zz: number) => pos.push(x, y, zz);
   const q = (a: number[], b: number[], c: number[], d: number[]) => { P(a[0], a[1], a[2]); P(b[0], b[1], b[2]); P(c[0], c[1], c[2]); P(a[0], a[1], a[2]); P(c[0], c[1], c[2]); P(d[0], d[1], d[2]); };
   for (let i = 0; i < N; i++) {

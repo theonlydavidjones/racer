@@ -49,8 +49,15 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   Model's crewstation work): in races whose 6 kt westerly dies to 1–4 kt, the AI's tacks stall at about 2.3 kn and fall
   off the long way round through a jibe, and its desired heading flips 190↔284 every 10–20 s, or zig-zags 55°↔105–160°
   true, each held 20–100 s. Her crew trim for each course (the vang on for the reach, off again for the beat), and
-  tests/crewstation.test.ts's 2.0 backstop fails on 6 kt seeds 4, 11, 14, 20 and 21: held there as an `it.fails` case,
-  which goes red when this is fixed and is then switched to a normal test.
+  tests/crewstation.test.ts's 2.0 backstop failed on 6 kt seeds 4, 11 and 15; since the AI's pole call waits for the run to
+  hold and the guide's angle holds through a swing (claude/crew-habits), all 24 seeds pass it and nothing is held. The
+  steering itself is still to fix.
+- **The outhaul in a breeze wandering across the guide's steps** (Crew Model; the physics review of the crew habits,
+  16 November): two cases left after the guide's steps were read as its ranges (controls.ts guideLimits):
+  - a light-air beat whose breeze swings across both 4 and 5 kt (3.5 to 5.7 kt read) still has them at the outhaul
+    every 70-90 s, 0.05 to 0.45 and back: what the guide says for those winds, but more than a crew would do;
+  - in 11.5 ± 1.2 kt the outhaul creeps off the mark in six trips, a trip each 95 s, for one ease.
+  Both want the trip judged against what it's worth and the wait since the last, not forced by the band.
 - **The sea turning with the wind, truly** (for Deep Physics, next after the boom's place on a beat; the Coordinator,
   16 November; Capacity to check the frame's cost): the wave field is plane waves turned about your boat, so any turn
   sweeps the pattern sideways at a distance; its turn is now capped at about 4° an hour (environment/waveField.ts
@@ -92,6 +99,12 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   a follow-up): routeAround's lesser room is one for the whole way, so once a narrow channel needs 60 or 30 m the open
   Bay's legs keep only as far off too (Encinal to Berkeley: 57 m where 120 m would give 62–102 m). Each cell the most of
   120/60/30 m it allows, or a cost for less, so only the narrow reach is sailed close.
+- **Prepare for the rounding** (Crew Model; the Coordinator, 16 November): with a mark close ahead, the crew get ready for
+  the rounding (the pole, the vang, the jib car for the next leg) and make no small-gain cabin-top trips for this leg:
+  within about 30 s of a mark (an ESTIMATE, to be sourced if possible). Found on the shelved back-up-to-speed branch
+  (claude/back-to-speed, 60e0dbb4): waiting for her speed after a tack moved a jib-halyard trim to five seconds before
+  the windward mark, undone after the bear-away (12 kt seed 6: three extra trips). Back-up-to-speed returns on top of
+  this and the AI's light-air steering.
 - **AI boats into the harbor after an abandonment** Also, from the perf branch's checks: a boat right by the West Harbor entrance at the
   call-off can brush a breakwater's end with her side as she leaves (westerly, seed 6 of 16: 1.5 s; routeAround lets a way
   come close near its start). (for Marinas, with Deep Physics; the owner, 12 Nov 2026: later):
@@ -121,6 +134,22 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   (fetch 194 m against 108 m), from the open-water ray's 50 m minimum fetch (2–4 h).
 
 What's planned, roughly in order. Done work is described in the README.
+
+**Every owner request is also kept in Owner's Requests** (https://claude.ai/artifact/9LqaHyCJvUStsifA29UAj3; the owner,
+17 November: "I feel like features I've requested are being lost"): one row per request, ranked now · next · later ·
+done, in the artifact's own database, so it survives compaction. Each new request goes there as well as here, and moves
+to done there when it ships.
+
+- **Motor sailing: her speed with the sails up and the motor on** (owner, 17 November; accuracy; later, "low priority";
+  1–3 h; Deep Physics): "motoring speed should account for sails being up. sails should impact physics when motor
+  sailing, if they don't already." Found (Roadmap, 17 Nov): physics.ts already adds the outboard's thrust (motor.ts
+  motorForce) to the sails' drive and drag in the one surge equation, so the sails do count. To check and test: motor
+  alone against motor and sails on a reach and close-hauled (faster, toward hull speed), head to wind (the flogging
+  sails slow her), and the apparent wind the sails see while she motors (her motored speed in it); then the physics
+  review.
+- **Mounting the outboard takes far too long: 5 seconds at most** (owner, 17 November; polish; later, "low priority";
+  1–2 h; Marinas): "mounting the motor takes way, way too long. 5 seconds max." The crew's lowering and mounting of the
+  outboard on its bracket, from the call to running, in 5 s or less.
 
 ## Priorities (owner's ranking, November 2026)
 
@@ -248,6 +277,9 @@ What's planned, roughly in order. Done work is described in the README.
      - An "On-the-water judging" setting in the race setup: Protests for races, Umpired for practice and the drills.
      - Hearings find the facts exactly, from the sim's own record. Testimony through the skippers' beliefs is a later
        option.
+     - Known modeling limit: the engine names one boat at fault per incident. Under the RRS both may have broken a rule:
+       a boat that interferes with a boat on another leg (23.2), and that boat failing to keep clear of her from astern
+       (12). Only one is penalized, and a hearing finds only that one.
      - Rule 31 under protests (branch rules-31): a mark touch is any boat's to protest that saw it (60.1,
        60.4(a)(2)). The boats within four lengths saw it: you may hail, and the nearest AI boat hails at once. The toucher's turn is her own choice, as for a foul.
        The hearing decides it as a foul.
@@ -431,10 +463,19 @@ What's planned, roughly in order. Done work is described in the README.
      12 kt northwesterly is walked out, 68 degrees off. tests/pushoff-sweep.test.ts (a sample, in npm test, every plan
      held to zero touches and each plan's count exact; PUSHOFF_SWEEP=all sails the whole 1,604).
    - **Still to do (Deep Physics' review, 16 Nov 2026):**
-     - **The berths kept fast: the stern-line walk-out's target.** 31 of the 1,604; over the sample of every 25th bow-in
-       berth in seven winds, 90 of 434, mostly South Beach and Gashouse Cove in a northerly (their astern shove would
-       leave her within 60 degrees of the wind, or with no clear water). In real life she'd be walked out on a stern line,
-       or motored out. The sweep test fails if the count rises.
+     - **~~The berths kept fast: the stern-line walk-out's target~~** (done, 16 Nov 2026, the coordinator's calls). Where
+       the shove would leave her kept fast, she's walked out by hand instead, even from a slip the wind blows straight out
+       of, and turned the way a crew does it (the physics review): about her bow at the finger's end by a hand on the dock
+       with a stern line, who then steps aboard (in about 8 kt and less, either way round: the line to her stern runs
+       nearly through her bow, a lever of 1.1–1.4 m, and turned with the wind she still has to be checked before she lies
+       head to wind), or, where that won't do, out in the fairway about her middle on a slip line round the finger's cleat,
+       all hands aboard, hauled in as she comes round (set no more than 2 m to leeward while the crew's haul, 271 N on her
+       less the cleat's friction, beats the wind's push with a third to spare, to about 16 kt; set more and more beyond, to
+       her bare-rig drift where the push beats the haul outright, about 18.7 kt). Every let-go 60 degrees and more off the
+       real wind. Sample of every 25th bow-in berth in seven winds: kept fast 90 of 434 to 31 (8 by a hand on the dock,
+       383 on a slip line), none touching. The 1,604 once swung on the bow line: 1,254 on a slip line, 106 kept fast (31 before the review), none
+       touching. In 20 kt from the north no berth is shoved off astern any more: walked out or
+       kept fast. In 12 kt from 090, the easterly, rare on the Bay, the sample still keeps most fast: not in the sweep test.
      - **Two winds it doesn't hold in yet:** in 12 kt from 090 and from 180 the sample has one touch each, both shoved off
        astern (Richmond YC B5, her bow on the dock; West Harbor 757, onto the breakwater). 20 kt from 270 holds, and is in
        the test.
@@ -561,6 +602,14 @@ What's planned, roughly in order. Done work is described in the README.
      stability. if only one crew, they would hold the jib sheet and the traveller." The hands go on the lee jib sheet's
      tail and the traveller or mainsheet; the middle hand's aft foot hooked under the thwart. Checked from both sides on
      both tacks.
+   - Arms through bodies in a tack (Crew Figures, 17 November; from the owner's "his right arm seems to extend through his
+     torso"; bug; next; most of a day): tests/crewarms.test.ts holds the steady poses (sitting out, the lines in hand);
+     through a tack in 15 and 18 kt, getting ready, crossing and hiking again on the new side, the hikers' arms pass
+     through their own torsos by up to 12 cm in many frames, the lone hand's getting up off the cabin top to the rail too.
+     Hands go straight from place to place, through the chest and thighs, and the tack's poses don't keep each hand on its
+     side; a hand put to rest on the lap sinks 3–4 cm into the thigh (lifting it pushed elbows forward: crewfig's arm checks).
+     A test of its own first, failing on main (every frame of a tack and of the moves, both tacks, one and two crew),
+     then hands that go round the torso and poses with each hand on its own side. Checked from both sides on both tacks.
    - Open question (Coordinator, 14 November; from the physics review of claude/crew-mast-sheets): in about 16 kt and
      up the crew won't leave the rail to set the lazy jib car (crewWork.ts carJob: not while she needs their weight), so
      after a change of breeze she sails the next tack on the old car. Arguably right: a good crew stays hiked and sets

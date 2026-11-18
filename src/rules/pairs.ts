@@ -621,8 +621,10 @@ function rule19<B extends RulesBoat>(A: B, B: B, basic: string, rec: PairRecord,
   const ov = rec.ovStart, unable = !!ov && ov.insideObst === I.id && ov.obstUnable;
   if (oI.continuing && unable && ov!.astern === I.id) return { fouler: I, part: '19.2(c)' };
   // squeezing: the outside boat moving in toward the obstruction (and the inside boat), more than the inside boat is
-  // moving out toward her
-  const inward = -dot({ x: O.vx, y: O.vy }, oI.n), outward = dot({ x: I.vx, y: I.vy }, oI.n);
+  // moving out toward her. Through the water, where the boats steer: a current they share sets both toward (or off) it
+  // alike and is no one's doing (as rule 16.1's room is judged)
+  const wv = (b: RulesBoat) => ({ x: b.vx - (b.cur?.x ?? 0), y: b.vy - (b.cur?.y ?? 0) });
+  const inward = -dot(wv(O), oI.n), outward = dot(wv(I), oI.n);
   const squeeze = inward > 0.15 && inward > outward;
   if (squeeze && !unable) return { fouler: O, part: '19.2(b)' };
   return null;

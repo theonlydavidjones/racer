@@ -324,8 +324,9 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  *   luff." The guide gives no jib Cunningham setting: the halyard is the jib's luff control (as on Josephine). Its
  *   most: 0.3 (the default, small wrinkles) below 5 kt, 0.6 (just smooth) to 15 kt, then free, as the main's Cunningham
  *   goes hard above 15 kt. The 0.3 and 0.6 are estimates of where the wrinkles go, not measured.
- * Each line's least and most, upwind (`tws` kt); off the wind, the crew sets them for shape alone. A setting changes
- * over a knot or so either side of the guide's wind, as a crew would.
+ * Each line's least and most, upwind (`tws` kt); off the wind, the crew sets them for shape alone. In the knot below
+ * each of the guide's wind ranges' edges either range's setting is the guide's (guideLimits, below); the kicker's rule
+ * holds from 18 kt itself.
  */
 /** The guide's beat settings give way to the crew's own off the wind over this much apparent angle (deg) of backlash:
  * the angle they're read at (Boat.settle, SETTLE.guideAwa) follows hers only once she's this far past it, so a course swinging about
@@ -338,18 +339,32 @@ export interface CrewSettings { traveller: number; vang: number; outhaul: number
  * read again only once it's GUIDE_KT from where it was read: up to her wind over GUIDE_FAST s as it builds, down to her
  * wind over 20 s (Boat.twsSlow) as it falls. Estimates: the guide gives no time; reading a build sooner than a lull is this model's choice, unsourced. */
 export const GUIDE_BACKLASH = 10, GUIDE_DEAD = 3, GUIDE_FAST = 5, GUIDE_KT = 1;
+/** ... and in light air this much more (deg), full at GUIDE_LIGHT_KT and gone by GUIDE_LIGHT_KT + 5: in a light breeze
+ * the wind's direction wanders more and her apparent angle swings with each change of her speed, so on a held heading in
+ * 3-5 kt it wandered 39-76° (crewcruise's 6 kt beam reach, seed 2), and the vang was eased and set again. A new course
+ * she's steered is read at once whatever this is (physics.ts NEW_HEADING). Estimates. */
+export const GUIDE_LIGHT = 10, GUIDE_LIGHT_KT = 5;
 export function guideLimits(tws: number, awa: number): { min: Partial<Record<keyof CrewSettings, number>>; max: Partial<Record<keyof CrewSettings, number>> } {
   // (the guide's settings are for sailing upwind: full to 40° apparent, gone by a close reach at 60°, where the crew sets
   // the lines for shape alone)
   const u = smooth((60 - Math.abs(awa)) / 20);
   if (u <= 0) return { min: {}, max: {} };
-  const over = (kt: number) => smooth((tws - kt + 1) / 2); // 0 below the guide's wind, 1 above, over ±1 kt
-  const outhaul = 0.5 * over(5) + 0.5 * over(12);
+  // (each of the guide's steps, its wind ranges' edges, and the knot below it: there either range's setting is the
+  // guide's, so its floors are the lower range's, `down`, and its ceilings the higher's, `up`. Blended across the knot,
+  // the band was a tenth of the outhaul's travel wide and slid a quarter of it a knot: a light breeze wandering across
+  // 5 kt moved it out from under the setting each time, and the crew went up to move the outhaul 1.5 cm and back, every
+  // minute and a half, Deep Physics' trace, 6 kt seed 15. North gives the ranges, "very light winds (0-5 knots)",
+  // "medium winds (5-12 knots)", not a setting between them)
+  // (floors from the range's edge itself, "above 15 knots", "5-12 knots"; ceilings a knot early, either range's setting
+  // in that knot: the window's one knot, not two, as the guide's wind is read with a knot's backlash already, guideKt.
+  // The kicker's ceiling is no range but a rule, "Never use the kickingstrap upwind in less than 18 knots": from 18 itself)
+  const down = (kt: number) => (tws >= kt ? 1 : 0), up = (kt: number) => (tws > kt - 1 ? 1 : 0);
+  const outLo = 0.5 * down(5) + 0.5 * down(12), outHi = 0.5 * up(5) + 0.5 * up(12);
   const lo = (v: number, free = 0) => free + (v - free) * u, hi = (v: number) => 1 + (v - 1) * u;
   return {
-    min: { outhaul: lo(Math.max(0, outhaul - 0.05 * (1 - over(12)))), // (above 12 kt "all the way to the mark")
-      cunningham: lo(0.9 * over(15)), traveller: lo(-0.4 + 0.35 * over(6) + 0.05 * over(14), -1), vang: lo(0.3 * over(18)) },
-    max: { outhaul: hi(Math.min(1, outhaul + 0.05)), cunningham: hi(over(5) > 0 ? 1 : 0), jibHalyard: hi(0.3 + 0.3 * over(5) + 0.4 * over(15)), traveller: hi(-0.3 + 0.35 * over(6) + 0.95 * over(14)), vang: hi(0.1 + 0.9 * over(18)) }
+    min: { outhaul: lo(Math.max(0, outLo - 0.05 * (1 - down(12)))), // (above 12 kt "all the way to the mark")
+      cunningham: lo(0.9 * down(15)), traveller: lo(-0.4 + 0.35 * down(6) + 0.05 * down(14), -1), vang: lo(0.3 * down(18)) },
+    max: { outhaul: hi(Math.min(1, outHi + 0.05)), cunningham: hi(up(5)), jibHalyard: hi(0.3 + 0.3 * up(5) + 0.4 * up(15)), traveller: hi(-0.3 + 0.35 * up(6) + 0.95 * up(14)), vang: hi(0.1 + 0.9 * down(18)) }
   };
 }
 

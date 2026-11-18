@@ -11,7 +11,7 @@ import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
 import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tillerJointAt, tillerRootAt, type Crew } from './crew';
+import { buildCrew, dockhand, SHEET_N, sheetTail, syncCrew, tillerJointAt, tillerRootAt, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -519,7 +519,7 @@ function grainUV(g: THREE.BufferGeometry, across = false): THREE.BufferGeometry 
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
-const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
+export const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [], n = pts.length;
@@ -707,7 +707,7 @@ const fairlead = (side: number) => { const u = uAtZ(FAIRLEAD_Z), x = side * (hal
  * cabin top's arch), the car, two on the cabin top (it's arched: a straight run would cut through it), the cabin's edge,
  * the fairlead, the winch and two in the tail.
  * The whole line: both halves and the ring between them. */
-const JIB_HALF_PTS = 20, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
+const JIB_HALF_PTS = 18 + SHEET_N, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
 /**
  * The cockpit coaming's height (m) along the boat: at least 200 mm just aft of the cabin, 140 mm at station 4.5 and
  * 80 mm at station 3 (CR 3.22); drawn a little above each.
@@ -851,11 +851,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // forward face to a cam (Josephine under way, looking aft: the lines along the thwart's face to its ends)
   const travLines: THREE.Line[] = [];
   for (const side of [-1, 1]) {
-    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
+    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = travCam(side);
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
     // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
-    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl);
+    const tl = line([end.clone(), end.clone(), cam, ...travTail(cam, undefined, side)], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl); // (its last two: over the hiker's lap and into the hand, or falling from the cam)
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
@@ -1063,8 +1063,6 @@ const VANG_FOOT = horseshoeAt(0).add(new THREE.Vector3(0, 0.05, 0)); // (shackle
  * frame). Estimates from the photos. */
 const VANG_BOOM = 0.9, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
 const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
-/** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
-const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
 const MAIN_CUNNINGHAM_UP = 0.22, JIB_CUNNINGHAM_UP = 0.3;
 
@@ -1728,6 +1726,11 @@ function syncLines(m: BoatMesh, b: Boat): void {
   const L2 = m.lines, c = b.ctl, lee = b.tack === 'S' ? -1 : 1; // the leeward side (x sign)
   // traveller car: +1 is to leeward; the mainsheet runs from the boom end down to it
   const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
+  // (the windward traveller line's tail up to the hiker holding it, if one is: Crew.travHand; else hanging from its cam)
+  { const th = (m.crew as { travHand?: THREE.Vector3 }).travHand;
+    for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
+      travTail(tmpG.set(pa.getX(2), pa.getY(2), pa.getZ(2)), th, side).forEach((q, j) => pa.setXYZ(3 + j, q.x, q.y, q.z));
+      pa.needsUpdate = true; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
   // (four parts between the car's block and the two blocks under the boom, the after one then the forward one, then the
@@ -1738,7 +1741,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
       if (i % 2) { const r = MS_R + (i === 1 ? MS_GAP / 2 : -MS_GAP / 2); p.setXYZ(i, Math.sin(a) * r + ux * o, hy, boomZ + Math.cos(a) * r + uz * o); }
       else p.setXYZ(i, lo.x + ux * o, lo.y, lo.z + uz * o);
     }
-    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
+    // (the tail, aft to the helm's fist when they have it, else falling to the helmsman's side of the cockpit)
+    const mh = (m.crew as { mainHand?: THREE.Vector3 }).mainHand;
+    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); if (mh) p.setXYZ(6, mh.x, mh.y, mh.z); else p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; }
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
     const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
@@ -1814,11 +1819,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
     for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(13 + k, x, restOn(x, z) + 0.012, z); }
     at(17, fl.x, fl.y + 0.035, fl.z);
     const wv = L2.winches[tk]; at(18, wv.x, wv.y, wv.z);
-    // (the tail: off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down
-    // onto the cockpit seat)
-    const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
-    at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
-    at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
+    // (the tail: crew.ts sheetTail, over the coaming onto the seat, or across to the hand of the hiker who has the working
+    // sheet: Crew.sheetHand)
+    const sh = (m.crew as { sheetHand?: THREE.Vector3 }).sheetHand;
+    sheetTail(wv, side, loaded ? sh : undefined, loaded ? (m.crew as { sheetHand2?: THREE.Vector3 }).sheetHand2 : undefined).forEach((p, j) => at(19 + j, p.x, p.y, p.z));
   }
   q.needsUpdate = true;
 }
