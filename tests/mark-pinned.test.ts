@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';
-import { DT, World, contactNormal } from '../src/sim/world';
+import { DT, World, markContactNormal } from '../src/sim/world';
 
 describe('a mark touched in a breeze', () => {
   it('a boat laid along mark A by 22 kt abeam is clear of it within half a minute', () => {
@@ -53,7 +53,7 @@ describe('the committee boat run into end on', () => {
     const cb = { name: 'committee', p: { x: 0, y: 0 }, q: { x: 12, y: 0 }, r: 2 };
     const into = (cx: number, cy: number, hx: number, hy: number) => {
       const l = Math.hypot(hx, hy), ux = hx / l, uy = hy / l, bw = { x: cx + ux * 3.82, y: cy + uy * 3.82 }, st = { x: cx - ux * 3.82, y: cy - uy * 3.82 };
-      const n = contactNormal(bw, st, cb); return Math.max(0, (n.x * (st.x - bw.x) + n.y * (st.y - bw.y)) / 7.64);
+      const n = markContactNormal(bw, st, cb); return Math.max(0, (n.x * (st.x - bw.x) + n.y * (st.y - bw.y)) / 7.64);
     };
     // (her middle off the end, x −1, her bow over the side at x 1.7, driven in at 45°: before, 0, no way lost)
     expect(into(-1, 4, 1, -1)).toBeCloseTo(Math.SQRT1_2, 2);
@@ -65,7 +65,7 @@ describe('the committee boat run into end on', () => {
     expect(into(6, 2.6, 1, 0)).toBeCloseTo(0, 2);
     // (a buoy: straight at it, and with it abeam)
     const buoy = { name: 'A', p: { x: 0, y: 0 }, r: 1 };
-    const n1 = contactNormal({ x: 0, y: 1.5 }, { x: 0, y: 9.1 }, buoy); expect(n1.y).toBeCloseTo(1, 5);
-    const n2 = contactNormal({ x: 1.5, y: 3.8 }, { x: 1.5, y: -3.8 }, buoy); expect(n2.x).toBeCloseTo(1, 5);
+    const n1 = markContactNormal({ x: 0, y: 1.5 }, { x: 0, y: 9.1 }, buoy); expect(n1.y).toBeCloseTo(1, 5);
+    const n2 = markContactNormal({ x: 1.5, y: 3.8 }, { x: 1.5, y: -3.8 }, buoy); expect(n2.x).toBeCloseTo(1, 5);
   });
 });

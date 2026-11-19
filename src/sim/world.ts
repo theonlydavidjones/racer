@@ -104,7 +104,7 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
  * nearest point to hers. (Chosen by her middle, a bow driven into the side near its end at 45° read as off the end and
  * lost no way, and one brushing round the end lost it as if driven into the side: the physics review, 19 Nov 2026)
  */
-export function contactNormal(bw: Vec, st: Vec, m: Touchable): Vec {
+export function markContactNormal(bw: Vec, st: Vec, m: Touchable): Vec {
   const radial = (from: Vec, to: Vec): Vec => { const dx = to.x - from.x, dy = to.y - from.y, l = hypot(dx, dy); return l > 1e-9 ? { x: dx / l, y: dy / l } : { x: 0, y: 0 }; };
   const nearOn = (p: Vec, a: Vec, b: Vec): { q: Vec; k: number } => { const ax = b.x - a.x, ay = b.y - a.y, kk = ((p.x - a.x) * ax + (p.y - a.y) * ay) / (ax * ax + ay * ay || 1), k = Math.max(0, Math.min(1, kk)); return { q: { x: a.x + ax * k, y: a.y + ay * k }, k: kk }; };
   let best = Infinity, n: Vec = { x: 0, y: 0 };
@@ -1479,11 +1479,11 @@ export class World {
         const gap = solidGap(bw, st, m) - m.r - HULL_HALF_BEAM;
         if (gap < 0) {
           if (m.rule31 !== false) touching = m;
-          // bounce off: pushed clear along the contact's normal (contactNormal), and her way lost only as she sails into it:
+          // bounce off: pushed clear along the contact's normal (markContactNormal), and her way lost only as she sails into it:
           // the share of her heading toward it. Lying along it, the wind pressing her sideways onto it, she slides off it as
           // a boat does a buoy; taxed whatever her heading, she lay on mark A at 0.1 m/s for five minutes in 22 kt: the
           // stability soak, 18 Nov 2026, tests/mark-pinned.test.ts
-          const sn = contactNormal(bw, st, m), ax = st.x - bw.x, ay = st.y - bw.y;
+          const sn = markContactNormal(bw, st, m), ax = st.x - bw.x, ay = st.y - bw.y;
           b.x -= sn.x * (gap - 0.05); b.y -= sn.y * (gap - 0.05);
           const into = Math.max(0, (sn.x * ax + sn.y * ay) / (hypot(ax, ay) || 1));
           b.v *= 1 - (m.q ? 0.1 : 0.03) * into; b.lastHitT = this.t;
