@@ -34,7 +34,12 @@ Status: planned, starts after the stability sprint. Research by the researcher a
 2. Alcatraz: island terrain from the 1 m DEM. Structures modeled from the HABS drawings and the lidar, by hand in
    Blender or by script. Positions are checked against the drawings.
 3. Hero landmarks: Fort Point, the Palace, Coit, Ghirardelli and the Hyde Street ships, at 20–60k triangles each.
-   Modeled in Blender by the owner or a hired modeler, which costs no tokens. The Palace starts from the CC-BY scan.
+   The owner doesn't use Blender (18 Nov), so there are two routes:
+   (i) an agent models them in code from the HABS/NPS drawings and photos: no money, more tokens, architectural rather
+       than photo-real;
+   (ii) a hired freelance modeler delivers glTF, about $50–300 each (an estimate).
+   Ruled (the owner, 18 Nov 2026): route (i) for every landmark, with no hire. Agents model them in code from the
+   drawings and photos, with stills to the owner at each landmark. The Palace can start from the CC-BY scan.
 4. three r186 loads meshopt, Draco and KTX2 with no new npm package. Meshopt first, since it inlines easily. KTX2
    textures only if the budget allows: its wasm must be inlined or fetched.
 5. Level of detail: full detail within ~1 km of the boat, merged blocks beyond, the current boxes inland.

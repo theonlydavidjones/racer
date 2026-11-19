@@ -141,7 +141,7 @@ export function outlookFor(w: SimView, exact = false): Outlook {
       const q = { x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, tq = Math.round(t / 10) * 10;
       const c = current(q, tq); yield;
       const ww = windOnWater(wind(q, tq), c); yield;
-      const to = V(ww.from + 180); current({ x: q.x - to.x * 1000, y: q.y - to.y * 1000 }, tq); yield; w.sea.fetch(q, ww.from); yield; w.seaDurationAt(tq); yield; // (the water the waves came through: sea.at's)
+      const to = V(ww.from + 180); current({ x: q.x - to.x * 1000, y: q.y - to.y * 1000 }, tq); yield; yield* w.sea.fetchSteps(q, ww.from); w.seaDurationAt(tq); yield; // (the water the waves came through: sea.at's)
       chop(p, t);
     }
   };
