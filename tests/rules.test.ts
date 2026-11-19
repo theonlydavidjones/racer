@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ZONE } from '../src/core/math';
+import { V, ZONE } from '../src/core/math';
 import { CONTACT_GAP, hullGap, type RulesMark } from '../src/rules';
 import { boat, moveTo, pair, verdict } from './diagram';
 
@@ -456,6 +456,41 @@ describe('Rule 21.2 · taking a penalty', () => {
     red.penaltyDir = 1; moveTo(red, [-0.6, -0.4], 290, 315); // her turns begun, bearing away into Blue, who holds her course
     expect(hullGap(red, blue)).toBeLessThan(CONTACT_GAP);
     expect(p.at(51).foul).toMatchObject({ by: 'Red', rule: '21.2' });
+  });
+});
+
+describe('Rule 21.2 · dodging a boat doing her turns (owner, 19 Nov 2026: "called for a penalty because a boat doing turns forced me to change course")', () => {
+  // Red turns her penalty circles to starboard, 20°/s at 2 m/s; Blue sails starboard close-hauled at 2.5 m/s, sees her
+  // coming and, two seconds in, luffs or bears away 30° at 15°/s. Stepped every 0.1 s, as the World does, so the judge
+  // has both boats' histories. Returns the first foul called.
+  function dodge(redAt: [number, number], turn: number) {
+    const blue = boat('Blue', { at: [0, 0], heading: 315, speed: 2.5 });
+    const red = boat('Red', { at: redAt, heading: 90, speed: 2, penalty: 360 }); red.penaltyDir = 1; // (her turns begun)
+    const p = pair(red, blue), was: number[] = [];
+    const off = (h: number) => ((h - 315 + 540) % 360) - 180;
+    for (let i = 0; i <= 120; i++) {
+      const t = 40 + i * 0.1, a = p.at(t);
+      if (a.foul) return a.foul;
+      was.push(blue.h);
+      moveTo(red, [red.x + V(red.h + 2).x * 0.2, red.y + V(red.h + 2).y * 0.2], (red.h + 2) % 360, red.headingAgo);
+      red.tack = 'S'; // (rule 21.2 doesn't look at her tack)
+      const h = t + 0.1 > 42 && Math.abs(off(blue.h)) < Math.abs(turn) ? (blue.h + Math.sign(turn) * 1.5 + 360) % 360 : blue.h;
+      moveTo(blue, [blue.x + V(h).x * 0.25, blue.y + V(h).y * 0.25], h, was[Math.max(0, was.length - 30)]);
+      blue.aboveProper = off(h) > 10;
+    }
+    return null;
+  }
+  it('she luffs to dodge, and the circling boat still reaches her bow: the turning boat broke 21.2, not Blue 23.2 (43.1(a))', () => {
+    expect(dodge([-12, 16], 30)).toMatchObject({ by: 'Red', rule: '21.2' });
+    expect(dodge([-10, 18], 30)).toMatchObject({ by: 'Red', rule: '21.2' });
+  });
+  it('she bears away to dodge: the turning boat\'s too', () => {
+    expect(dodge([-12, 16], -30)).toMatchObject({ by: 'Red', rule: '21.2' });
+    expect(dodge([-10, 18], -30)).toMatchObject({ by: 'Red', rule: '21.2' });
+  });
+  it('but a boat that luffs onto one doing her turns, which would have missed her, still interfered (23.2)', () => {
+    expect(dodge([-8, 20], 0)).toBeNull(); // (held on, they'd have passed)
+    expect(dodge([-8, 20], 30)).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
   });
 });
 

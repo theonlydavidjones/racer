@@ -259,24 +259,63 @@ export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): bool
 }
 
 /** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
-export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): number {
-  const R = RINGS.get(row), K = RINGS.get(kc);
-  if (!R || !K || R.n < 2) return 0;
+/** When the right-of-way boat's latest turn began (from her ring), with the ring's newest and oldest times; null if she
+ * hasn't turned within the last RULE16_WINDOW. */
+function turnStart(row: RulesBoat, R: PoseRing): { t0: number; now: number; oldest: number } | null {
   const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)];
   const dir = Math.sign(wrap(row.h - (row.headingAgo ?? row.h))) || Math.sign(wrap(R.h[at(R, 0)] - R.h[at(R, 1)]));
-  if (!dir) return 0;
+  if (!dir) return null;
   const W = Math.min(TURN_WINDOW, now - oldest);
   const turned = (t: number) => wrap(poseAt(R, t).h - poseAt(R, t - W).h) * dir / W; // deg/s her way, over the window
   // the end of her latest turn: within the last RULE16_WINDOW (the turn may be over by the time they touch, Case 105)
   let tEnd: number | null = null;
   for (let t = now; t >= Math.max(oldest + W, now - RULE16_WINDOW) - 1e-9; t -= RING_DT) if (turned(t) >= 1.5) { tEnd = t; break; }
-  if (tEnd == null) return 0;
+  if (tEnd == null) return null;
   // and its start: back while she was still turning that way, at 1°/s or more
   let t0 = tEnd - W;
   for (let t = tEnd; t - W >= oldest - 1e-9; t -= RING_DT) { if (turned(t) < 1) break; t0 = t - W; }
-  // where the keep-clear boat was then, and the turn she was already making
+  return { t0, now, oldest };
+}
+
+/** Her pose at t0 from the ring, with the turn she was making then (deg/s, over a window, through the waves' yaw). */
+function poseTurning(K: PoseRing, t0: number): Pose & { turnRate: number } {
   const kOld = K.t[at(K, K.n - 1)], kw = Math.min(TURN_WINDOW, t0 - kOld), k0 = poseAt(K, t0);
-  const kc0 = { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 }; // (over a window, through the waves' yaw)
+  return { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 };
+}
+
+/**
+ * Was `kc` already failing to keep clear of `row` when `row`'s latest turn began? Definitions, Keep Clear (a): the
+ * right-of-way boat "can sail her course with no need to take avoiding action". From where both were then, `row`
+ * holding on as she was and `kc` carrying on as she was, her turn too: would they have come within KEEP_CLEAR_GAP?
+ * Then `row`'s turn was the avoiding action rule 14 asks of her ("if reasonably possible"), not a course change that
+ * took the other boat's room away, and a breach it led to is exonerated under 43.1(a): "When as a consequence of
+ * breaking a rule a boat has compelled another boat to break a rule, the other boat is exonerated for her breach."
+ * Used for a boat under rule 21 (taking a penalty, returning to start, backing a sail), whose course nobody can read: a
+ * boat turning circles crosses every bearing, so a dodge either way that she still meets at the bow reads as a turn
+ * toward her (turnedToward). Without a history, false: the turn is judged as before.
+ */
+export function wasFailing(row: RulesBoat, kc: RulesBoat): boolean {
+  const R = RINGS.get(row), K = RINGS.get(kc);
+  if (!R || !K || R.n < 2 || K.n < 2) return false;
+  const s = turnStart(row, R);
+  if (!s) return false;
+  const k = poseTurning(K, s.t0), held = straightOn(poseAt(R, s.t0)), theirs = straightOn(k, k.turnRate);
+  const me = { x: 0, y: 0, h: 0 }, horizon = s.now - s.t0 + 2;
+  for (let tau = 0; tau <= horizon + 1e-9; tau += RING_DT) {
+    const a = held(tau); me.x = a.x; me.y = a.y; me.h = a.h;
+    if (hullGap(me, theirs(tau)) < KEEP_CLEAR_GAP) return true;
+  }
+  return false;
+}
+
+export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): number {
+  const R = RINGS.get(row), K = RINGS.get(kc);
+  if (!R || !K || R.n < 2) return 0;
+  const s = turnStart(row, R);
+  if (!s) return 0;
+  const { t0, now, oldest } = s;
+  // where the keep-clear boat was then, and the turn she was already making
+  const kc0 = poseTurning(K, t0);
   // the right-of-way boat's actual course from t0 (then on as she is)
   const v = row.v ?? hypot(row.vx, row.vy), last = poseAt(R, now);
   const actual = (tau: number): Pose => {
@@ -492,6 +531,7 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   // boat that gets the inside (leeward) overlap from clear astern and holds her course to the mark isn't the one at fault
   // for not giving the tacker time: the tacker keeps clear (11). (Luffing at once is not sailing within mark-room: WS
   // Case 93, she broke 15 and 16.1.)
+  const avoided21 = (r.rule === '21.1' || r.rule === '21.2' || r.rule === '21.3') && wasFailing(row, kc);
   const r183b = !!r3?.binds && r.rule === '11' && kc.id === r3.tacker && rec.by === row.id && turnedToward(row, kc) === 0;
   if (notRacing(kc) && !notRacing(row)) {
     // Rule 23.1: a boat not racing (she has retired, or finished and cleared the line) shall not interfere with a boat that is racing
@@ -518,6 +558,10 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
+  } else if (avoided21) {
+    // Rule 21: she was taking a penalty, returning or backing a sail, and was already set to meet the right-of-way boat
+    // when that boat turned: the turn was the avoiding action rule 14 asks for (wasFailing, 43.1(a)), not interference
+    // (23.2) or a course change that took her room (16.1). The call stays hers.
   } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0)
     || (takingPenalty(kc) && (ctx.t > 0 ? !!row.aboveProper : true) && turnedToward(row, kc) > 0))) {
     // (a boat taking a penalty: only one that turned toward her interfered. A boat that had luffed to keep clear of her
