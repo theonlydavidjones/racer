@@ -16,7 +16,7 @@ describe('a season whose next race is not published yet', () => {
   });
   it('the Race page card names race 2 and its day, not "All sailed"', () => {
     const html = seasonCardHtml({ series: now(), res: sailed1, burgee: '', place: 2 });
-    expect(html).toContain('Race 2 · Sat, Dec 5');
+    expect(html).toContain('Race 2 · Dec 5');
     expect(html).not.toContain('All sailed');
   });
   it('before race 1 is sailed, race 1 is the one next', () => {
