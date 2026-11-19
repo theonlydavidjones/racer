@@ -36,7 +36,7 @@ import type { Settings } from '../settings';
 import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
-import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
+import { GIVES_WAY, Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
@@ -1290,7 +1290,7 @@ export class World {
       b.forced14 = null; b.cur = this.currentAt(b, true); b.ww = windOnWater(this.windHere(b, b), b.cur);
       b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
     }
-    this.vessels = this.traffic.vessels(this.trafficT);
+    this.vessels = this.traffic.vessels(this.trafficT, this.boats, dt, this.vesselSkip); // (the small vessels slow or stop for the boats first: traffic.ts yieldStep)
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour
     // (under way as COLREGS Rule 3(i) has it: not made fast to the shore, not at anchor; going ahead, astern or stopped)
@@ -1358,7 +1358,7 @@ export class World {
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
     // (the start-line drill keeps its whole short sequence, for the debrief's look at your run to the line)
-    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
+    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats, this.traffic.givingWay()));
   }
 
   private checkLines(prevT: number): void {
@@ -1818,6 +1818,8 @@ export class World {
     return lineTransit({ x: mark.x - track.x * 1000, y: mark.y - track.y * 1000 }, mark, p => landAt(p), toLL);
   }
 
+  /** Boats a vessel doesn't slow for: in her slip, on her lines, being walked out, or in a harbor (traffic.ts yieldStep). */
+  private readonly vesselSkip = (p: Vec): boolean => { const b = p as Boat; return !!b.docked || !!b.mooring || !!b.handled || !!b.pushing || inBasin(b); };
   /** The traffic's clock: seconds since midnight UTC of the race day, so the ships keep their schedule through the day. */
   get trafficT(): number { return (this.clockUtc * 60) % 86400; }
 
@@ -1858,15 +1860,24 @@ export class World {
       if (this.t - last > 90) {
         this.warned.set(v.id, this.t);
         const big = v.kind === 'container' || v.kind === 'tanker';
-        this.emit({ type: 'toast', ms: 7000, msg: big
+        // (she gives way under Rule 18 only to a sailing vessel not overtaking her: overtaking, from more than 22.5° abaft
+        // her beam, you keep clear, Rule 13; under power you're a power-driven vessel, and the crossing rules depend on
+        // where she is, so it's just: keep clear)
+        const rx = u.x - v.x, ry = u.y - v.y, over = (rx * uv.x + ry * uv.y) / (hypot(rx, ry) || 1) < -0.383 && u.vx * uv.x + u.vy * uv.y > v.v;
+        const kt = v.v > 0.5 ? `, ${Math.round(v.v / 0.5144)} kt` : ', stopped';
+        this.emit({ type: 'toast', ms: 7000, msg: !big && over ? `${ty.name} ahead${kt}: you're overtaking her, so keep clear (Rule 13).`
+          : !big && u.motor?.running ? `${ty.name} close${kt}. Under power, keep clear.`
+          : big
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
-          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
+          : `${ty.name} approaching${kt}. She slows or stops for a boat under sail (Rule 18): hold your course, and expect a wake.` }); // (Rule 17(a)(i): the stand-on vessel keeps her course and speed)
       }
       // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
       if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
         this.warned.set(-1 - v.id, this.t);
         for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
-        this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+        this.emit({ type: 'toast', ms: 6000, msg: GIVES_WAY[v.kind]
+          ? `Five short blasts from the ${ty.name.toLowerCase()}: she doubts what you're doing. If she can't miss you alone, act now (Rule 17(b)).`
+          : `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
       }
     }
   }
