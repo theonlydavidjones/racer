@@ -58,6 +58,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
+import { helmPlan, nextCorner, type HelmPlan } from './helmPlan';
 import { chartDepth, landAt } from '../environment/sea';
 import { LL, toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -67,6 +68,9 @@ import { RaceLog } from './debrief';
  * time to throttle back and take the tiller before the entrance; at least HANDOVER_MIN m; under sail, HANDOVER_SAIL m
  * out. ESTIMATES (no published figure): a 1.9 t boat at 4.5 kt carries her way a boat length or two once throttled back. */
 const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
+/** The navigator's plan at the helm, for each World (planTarget): kept off the World itself, so its shape is as it was
+ * (the step's cost, perf-pair, is judged on it) and the page's mirror never walks it (sim/sync.ts). */
+const HELM = new WeakMap<object, HelmPlan>();
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -2507,7 +2511,7 @@ export class World {
   setDest(p: Vec, name: string): void {
     if (!this.cruising) return;
     this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
-    this.arrivedT = null;
+    this.arrivedT = null; HELM.delete(this);
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
@@ -2631,7 +2635,7 @@ export class World {
     const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
     this.retire();
-    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' };
+    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' }; HELM.delete(this);
     this.arrivedT = null;
     harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
@@ -2725,7 +2729,7 @@ export class World {
   private navTarget(b: Boat): Vec | null {
     const d = this.dest; if (!d) return null;
     const slip = d.key === 'slip' ? this.homeSlip : null, H = slip ? harborOf(slip.marina) : null;
-    if (!slip || !H || !H.exits.length) return d.p;
+    if (!slip || !H || !H.exits.length) return this.planTarget(b, d.p);
     const yours = (where: string) => { if (this.pilot.mode === 'nav') { this.pilot.mode = 'off'; this.emit({ type: 'toast', msg: `${where}: she's yours.`, ms: 5000 }); } };
     // (inside her harbor's water: handed over at once, sent home from there; or as she crosses into it on her way, where
     // its water runs out past the breakwater ends, as at Richmond)
@@ -2754,7 +2758,32 @@ export class World {
         if (hitsHarbor(q) || hitsMooredBoat(q) || onLand(q)) { yours('Something ahead of her'); this.homeOut = false; return null; }
       }
     }
-    return mouth;
+    return this.planTarget(b, mouth);
+  }
+  /**
+   * The navigator's plotted course, for the helm (the owner, r253: "when in autonav, the boat doesn't seem to be following
+   * the plotted course. it just follows the rhum line to the destination", when the plan bends round a foul tide or a
+   * wind shadow). The page works the plan out (sim/navigator.ts passageLive) and sends its track's corners as each plan
+   * comes in (commands.ts navPlan): the pilot steers for the next corner, its tacks among them, so it tacks where the plan
+   * does, and for `end` (the destination, or her harbor's mouth: navTarget's hand-over is untouched) on the last leg. A
+   * leg she can't make isn't cut across: she keeps steering for its corner, and the page's next plan, from where she was
+   * a minute or so before (ui/hud.ts navPassage: each minute of the clock or 300 m), replaces this one. Without a plan
+   * for where she's going (none yet, a new destination, the pilot just engaged), the destination itself, as before; under
+   * power, always (the motor needn't tack). The plan comes from the page, so the step it lands on hangs on how fast the
+   * host works it out: the same cruise sailed twice on Nav can go two ways. Accepted for cruising, where nothing is
+   * judged or replayed (the pilot is off when racing, RRS 52); navTarget's way into a harbor, which a race can use, isn't.
+   */
+  private planTarget(b: Boat, end: Vec): Vec {
+    const P = HELM.get(this); if (!P || !this.dest || P.to.x !== this.dest.p.x || P.to.y !== this.dest.p.y) return end;
+    // (under power, not the sailing plan's boards: the motor points her straight at it, autopilot.ts, as before. The
+    // physics review: corner to corner, she motored the plan's tacks)
+    if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
+    return nextCorner(P, b, end);
+  }
+  /** A plan in from the page (commands.ts navPlan), picked up at the leg she's nearest; null drops it. */
+  setNavPlan(to: Vec | null, pts: Vec[] = []): void {
+    const P = to ? helmPlan(to, pts, this.user) : null;
+    if (P) HELM.set(this, P); else HELM.delete(this);
   }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {

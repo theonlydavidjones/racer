@@ -1,3 +1,4 @@
+import { HelmFeed, passageLive } from './sim/navigator';
 import { lineNotes } from './boat/coach';
 import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
@@ -925,7 +926,11 @@ function pilotNote(word: string): void {
 function pilotOff(msg?: string): void { if (w.pilot.mode === 'off') return; send({ k: 'pilot', op: 'standby' }); if (msg) toast(msg, 2500); }
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
+/** On Nav, the navigator's plan to the helm when something calls for one (sim/navigator.ts HelmFeed). */
+const helmFeed = new HelmFeed(passageLive);
+function navPlanTick(): void { const c = helmFeed.tick(w); if (c) send(c); }
 function pilotTick(dt: number): void {
+  navPlanTick();
   const p = w.pilot, on = p.mode !== 'off' && w.running;
   if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) send({ k: 'pilot', op: 'adjust', d: d * 20 * dt }); }
   const chip = $('bPilot'), hide = !w.running || !w.cruising;

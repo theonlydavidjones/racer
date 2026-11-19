@@ -1,4 +1,5 @@
-import { KT, LOA, dist, dot, segCross, sub, unit, type Vec } from '../core/math';
+import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
+import { helmPlan, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -132,6 +133,65 @@ export interface PassageNow {
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
+/**
+ * A plan's plotted course for the helm (World.planTarget): its track, from where she was when it was planned, thinned to
+ * its corners (Douglas-Peucker, within HELM_TOL m of the track: the tacks, gybes and the bends round a tide or a shadow
+ * are corners; the steps along a straight board aren't).
+ */
+export function helmPoints(pn: PassageNow): Vec[] {
+  const p = pn.track.map(q => q.p); if (p.length < 3) return p.slice();
+  const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
+  const stack: [number, number][] = [[0, p.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL;
+    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } }
+    if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+  }
+  return p.filter((_, i) => keep[i]);
+}
+/** helmPoints' tolerance (m): about one of her lengths, well inside World.planTarget's 30 m for a corner made, so the
+ * pilot's course between two corners is the plotted one to within a boat length (an estimate, not a measured figure). */
+const HELM_TOL = 8;
+/**
+ * On Nav, the navigator's plan to the helm (World.planTarget: the pilot follows the plotted course, not the rhumb line,
+ * the owner's r253), as a navPlan command for the page to send. A plan is asked of `plan` (the page's passageLive,
+ * worked out between frames) only when something calls for one, not on a timer (the Coordinator, 18 Nov 2026: a plan
+ * each 150 m took up to an eighth of the page's thread for the whole passage): the pilot engaged, or a new race; a corner
+ * made; off the plan by more than HELM_OFF m; the wind or the tide at the course changed by more than HELM_WIND, HELM_KT
+ * or HELM_TIDE since it was planned; or, failing all of those, HELM_EVERY minutes of the clock on. Meanwhile the helm
+ * keeps the plan it has. A plan's taken only if she's within HELM_OFF m of its track (one held over from before she was
+ * steered off it waits for the next; one begun some way back, as a long plan is by the time it's in, is taken up at the
+ * leg she's on). The corners are counted as the World counts them (sim/helmPlan.ts), on the page's copy of the race.
+ */
+export class HelmFeed {
+  private helm: { pn: PassageNow; P: HelmPlan; world: unknown; t: number; wind: { from: number; kt: number }; tide: number } | null = null;
+  private want = true; private nav = false;
+  /** How many plans it has asked for, and taken (for the tests). */
+  asked = 0; taken = 0;
+  constructor(private plan: (w: SimView) => PassageNow | null) {}
+  tick(w: SimView): { k: 'navPlan'; to: Vec; pts: Vec[] } | null {
+    const nav = w.pilot.mode === 'nav' && w.running && w.cruising && !!w.dest;
+    if (!nav || !this.nav || this.helm?.world !== w) { this.helm = null; this.want = true; }
+    this.nav = nav; if (!nav) return null;
+    const dest = w.dest!.p, u = w.user, h = this.helm;
+    if (h && !this.want) {
+      const was = h.P.i; nextCorner(h.P, u, dest);
+      const dw = Math.abs(((w.wind.from - h.wind.from + 540) % 360) - 180);
+      this.want = h.P.i !== was || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
+        || Math.abs(w.cur.kt - h.tide) > HELM_TIDE || w.clockUtc - h.t >= HELM_EVERY || h.P.to.x !== dest.x || h.P.to.y !== dest.y;
+      if (!this.want) return null;
+    }
+    this.asked++;
+    const pn = this.plan(w); if (!pn || pn === h?.pn || !pn.ok || !pn.track.length) return null; // (asked again each frame till it's in)
+    const pts = helmPoints(pn), P = helmPlan(dest, pts, u); if (!P || offLeg(P, u) > HELM_OFF) return null; // (she's not on it: the next)
+    this.helm = { pn, P, world: w, t: w.clockUtc, wind: { from: w.wind.from, kt: w.wind.kt }, tide: w.cur.kt }; this.want = false; this.taken++;
+    return { k: 'navPlan', to: { x: dest.x, y: dest.y }, pts };
+  }
+}
+/** HelmFeed's triggers (estimates, docs/CONSTANTS.md): planned afresh off the plan by HELM_OFF m (a few times what she
+ * strays sailing one: tests/nav-follows-plan, 11-26 m), the wind HELM_WIND° or HELM_KT kt off what it was planned in, the
+ * tide at the course HELM_TIDE kt, or HELM_EVERY minutes on. */
+const HELM_OFF = 100, HELM_WIND = 10, HELM_KT = 3, HELM_TIDE = 0.3, HELM_EVERY = 5;
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
 /** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause
  * menu, World.applyConditions, they're new objects). */
