@@ -1,11 +1,13 @@
 // On Nav the tiller pilot gets round the abandoned outer Berkeley Pier, a 3 km line of ruin, by the navigator's plan,
-// not a local detour (the stability soak, 18 Nov 2026; Deep Physics' cases, tests/pilot-pier on branch soak, and their
-// review's ask: the plan's way round the land, replanned rather than re-picked). From off the Berkeley Marina toward off
-// Emeryville in 14 kt, main wrecks her on it at 5.0 kn after 20 minutes; from other starts it circled beside it for up
-// to 45 minutes. Sailed as the page sails it: the plan from the navigator when the helm asks (HelmFeed, worked out at
-// once here), each frame a second of her clock. She must arrive, never be wrecked, and never strike anything (Deep
-// Physics: not wrecked alone passed while she circled for 45 minutes). The fixes: the pier and its ruin one hazard
-// (geo/data/east-piers.json), and the plan's corners at the helm kept 20 m off structures (sim/helmPlan.ts).
+// not a local detour (the stability soak, 18 Nov 2026; Deep Physics' cases, tests/pilot-pier on branch soak). From off
+// the Berkeley Marina toward off Emeryville in 14 kt, main wrecks her on it at 5.0 kn after 20 minutes; from other starts
+// it circled beside it for up to 45 minutes. The way is through the 45 m gap at the usable deck's end, which sailors use
+// and the owner has sailed in a Folkboat (geo/data/east-piers.json, the ruin's note), or round its west end. Sailed as
+// the page sails it: the plan from the navigator when the helm asks (HelmFeed, worked out at once here), each frame a
+// second of her clock. She must arrive (or be handed over off her harbor's mouth, bound for her slip), within half as
+// long again as planned, never strike anything, and keep off the structures; the gap alarm doesn't pass a case. The
+// fixes: the plan's corners and open legs at the helm (sim/helmPlan.ts), the pilot trusting an open leg
+// (boat/autopilot.ts navHeading), and her hand-over before a gap narrower than her turning room.
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';

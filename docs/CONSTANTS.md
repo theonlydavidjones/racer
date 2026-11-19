@@ -701,6 +701,8 @@ physics, ranked like the ten above:
 | LAND_SIDE (sim/helmPlan.ts) | 8 m | 139 | estimate | an open leg's land clearance either side (about her length). Settled by: the land along open legs, the physics review's probe |
 | GAP_MIN (sim/helmPlan.ts) | 3 × LOA (~23 m) | 20 | estimate | the narrowest gap between structures the pilot sails: her turning room (her 9 m turn, a little over); narrower, the alarm. The Berkeley Pier's 45 m gap is wider, and sailed (the owner) |
 | GAP_WARN (sim/helmPlan.ts) | 150 m | 22 | design | how far short of a gap too narrow the pilot hands her over: time to take the helm |
+| GAP_DIRS, opposite pairs, 0.15 (sim/helmPlan.ts narrowOn) | 36 rays; 150–210°; 0.15 × the nearer hit | — | measured | the narrow-gap test: a pair of hits on opposite sides, the line between them within 0.15 × the nearer's distance of her. The physics review's probe: 36 rays miss 0.3% or less of in-line gaps, none false along one face; GAP_MIN in effect soft between ~18 and 23 m |
+| legOpen's "nearer than she is" margin (sim/helmPlan.ts) | 1 m | — | estimate | a leg begun beside a structure is open if it comes no nearer than her distance less 1 m (unsourced; 8q7 may floor it at ~3 m) |
 | TWO_TURNS | 720 | 52 | standard |  |
 | ONE_TURN | 360 | 60 | standard |  |
 | HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |

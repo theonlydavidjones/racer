@@ -56,10 +56,13 @@ function clearOf(p: Vec, prev: Vec, next: Vec): Vec {
 }
 
 /** Where the leg a→b passes between two structures (or a structure and the land) less than GAP_MIN apart, if it does:
- * at each 5 m along it near a structure, what's solid within GAP_MIN in twelve directions, and a pair on opposite sides
- * (150° or more apart) nearer together than GAP_MIN. (Along the normal from the nearest alone, it missed a gap between two
- * pier ends in line: the physics review, 19 Nov 2026.) */
-const DIRS = Array.from({ length: 12 }, (_, k) => ({ x: Math.sin(k * Math.PI / 6), y: Math.cos(k * Math.PI / 6) }));
+ * at each 5 m along it near a structure, what's solid within GAP_MIN in GAP_DIRS directions, and a pair on opposite sides
+ * (150–210° apart) nearer together than GAP_MIN. (Along the normal from the nearest alone, it missed a gap between two
+ * pier ends in line; at 30° apart the rays missed a 4 m pier seen end on half the time: the physics reviews, 19 Nov
+ * 2026; at 10°, missed 0.3% or less, with no false alarms along one face.) */
+const GAP_DIRS = 36, DIRS = Array.from({ length: GAP_DIRS }, (_, k) => ({ x: Math.sin(2 * k * Math.PI / GAP_DIRS), y: Math.cos(2 * k * Math.PI / GAP_DIRS) }));
+/** The opposite-side pairs: 150° to 210° apart, in steps of the rays'. */
+const PAIR_LO = Math.round(GAP_DIRS * 150 / 360), PAIR_HI = Math.round(GAP_DIRS * 210 / 360);
 function narrowOn(a: Vec, b: Vec): Vec | null {
   const L = dist(a, b), n = Math.max(1, Math.ceil(L / 5));
   for (let k = 1; k <= n; k++) {
@@ -69,7 +72,7 @@ function narrowOn(a: Vec, b: Vec): Vec | null {
     const hit = (i: number) => ({ x: p.x + DIRS[i].x * d[i], y: p.y + DIRS[i].y * d[i] });
     // (on opposite sides: the line between the two hits passes by her, not along one face off to one side, as two rays
     // 150° apart both meeting one long pier do)
-    for (let i = 0; i < 12; i++) for (let j = i + 5; j <= i + 7; j++) { const jj = j % 12; if (d[i] + d[jj] < GAP_MIN && segPt(p, hit(i), hit(jj)) < 0.15 * Math.min(d[i], d[jj])) return p; }
+    for (let i = 0; i < GAP_DIRS; i++) for (let j = i + PAIR_LO; j <= i + PAIR_HI; j++) { const jj = j % GAP_DIRS; if (d[i] + d[jj] < GAP_MIN && segPt(p, hit(i), hit(jj)) < 0.15 * Math.min(d[i], d[jj])) return p; }
   }
   return null;
 }
