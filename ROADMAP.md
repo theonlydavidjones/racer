@@ -248,6 +248,8 @@ sources. Each shipped item is added there when it's published.
    game. No session starts work on the Nav pilot, its planner or its follow-ups (8s and PR #337, closed; 8q5, 8q7, 8q9).
    Bugs that break something else (a test, a race) are still fixed, kept small. Land and water true to life stays:
    see "Real shoreline" (the shoreline survey) and 8q8.
+   Exception (owner, 19 November): about a day of Nav work to unblock the beat-in-chop fix (beat-chop) for v212: the
+   router's front looping back near a structure, its replans flip-flopping, and a gap's corner at its middle (Bay East).
 7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
    (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
    data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
