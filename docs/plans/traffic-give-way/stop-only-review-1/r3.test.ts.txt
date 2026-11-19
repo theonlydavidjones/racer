@@ -1,0 +1,73 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { SERVICES, Traffic, VESSEL, vesselHull, type Moving } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+import { DT as WDT, World } from '/home/user/stop/src/sim/world';
+import { DEFAULT_SETTINGS } from '/home/user/stop/src/settings';
+import { bow, stern } from '/home/user/stop/src/boat/boat';
+import ss2 from '/home/user/stop/src/courses/data/seaweed-soup-2026-course2.json';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev/r3.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+const gap = (b: Moving, v: any) => { const hv = vesselHull(v); return segPt(b, hv.a, hv.b) - hv.r; };
+function run(i: number, T: number, b0: Moving, dur: number, skip?: (b: Moving) => boolean, trace?: string[]) {
+  const tr = new Traffic(true, SEED), b = { ...b0 };
+  let least = Infinity, vAt = 0, n = 0;
+  for (let t = T; t < T + dur; t += DT) {
+    const v = tr.vessels(t, [b], DT, skip)[i];
+    const g = gap(b, v); if (g < least) { least = g; vAt = v.v; }
+    if (trace && n++ % 600 === 0) { const ux = Math.sin(v.h * D2R), uy = Math.cos(v.h * D2R), rx = b.x - v.x, ry = b.y - v.y; trace.push(`t${(t - T).toFixed(0)} k${tr.give[i].k.toFixed(2)} ahead${(rx * ux + ry * uy).toFixed(0)} side${(rx * uy - ry * ux).toFixed(0)}`); }
+    b.x += b.vx * DT; b.y += b.vy * DT;
+  }
+  return { least, vAt };
+}
+it('overtaken boat', () => {
+  P('=== E11 she comes up on a slower boat going nearly her way (she is the overtaking vessel, Rule 13)');
+  for (const i of [3, 4, 2, 6]) {
+    const s = SERVICES[i], tr0 = new Traffic(true, SEED), V = VESSEL[s.kind].kt * 0.5144;
+    let T = 0; for (let t = 100; t < 40000; t += 1) { const v0 = tr0.vessels(t)[i], v1 = tr0.vessels(t + 200)[i]; if (v0.moving && v1.moving && Math.abs(v0.h - v1.h) < 0.01 && Math.abs(v0.h - tr0.vessels(t + 100)[i].h) < 0.01) { T = t; break; } }
+    const v0 = tr0.vessels(T)[i], ux = Math.sin(v0.h * D2R), uy = Math.cos(v0.h * D2R);
+    for (const [sp, off, ahead, side] of [[2.7, 20, 250, -60], [2.7, 0, 250, 0], [2.0, 0, 300, 0], [3.2, 10, 200, -30], [2.7, 20, 150, -40]] as const) {
+      const c = (v0.h + off) * D2R, b = { x: v0.x + ux * ahead + uy * side, y: v0.y + uy * ahead - ux * side, vx: Math.sin(c) * sp, vy: Math.cos(c) * sp };
+      const trc: string[] = [], a = run(i, T, b, 195, undefined, trc), tt = run(i, T, b, 195, () => true);
+      P(`${s.kind}#${i}: boat ${(sp / 0.5144).toFixed(1)} kt, ${off} deg off her course, starting ${ahead} m ahead ${side} m to the side: least gap ${a.least.toFixed(1)} m at her ${(a.vAt / 0.5144).toFixed(1)} kt (timetable alone ${tt.least.toFixed(1)}); ${trc.join(' | ')}`);
+    }
+  }
+});
+it('the AI dodge, sailed', () => {
+  P('=== W3 an AI boat that wants to run 090 past a cruise boat stopped heading 270 (the dodge on / off), 12 kt west');
+  for (const side of [10, 14, 18, 25, 40, 70, -14, -40]) for (const dodge of [true, false]) {
+    const w: any = new World(ss2 as any, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime: '13:35', windKind: 'west', windKt: 12, current: 'none', traffic: 1, opponents: ['stock:1'], fleet: 1 } as any, 3);
+    for (let k = 0; k < 60; k++) w.step(WDT);
+    const b = w.boats.find((q: any) => !q.isUser), u = w.user;
+    const v = { id: 4, kind: 'tour', x: b.x + 800, y: b.y + 900, h: 270, v: 0, moving: true };
+    w.traffic = { on: true, vessels: () => [{ ...v }], wakeAt: () => null, givingWay: () => undefined };
+    const orig = w.keepClearOfShips.bind(w); let fired = 0;
+    w.keepClearOfShips = (q: any) => { q.desired = 90; q.luff = false; const d0 = q.desired; if (dodge) orig(q); if (q.desired !== d0) fired++; };
+    b.x = v.x - 400; b.y = v.y + side; b.h = 90; b.v = 3; b.vx = 3; b.vy = 0;
+    const hullGap = (q: any, vv: any) => { const hv = vesselHull(vv); return Math.min(segPt(bow(q), hv.a, hv.b), segPt(stern(q), hv.a, hv.b), segPt(q, hv.a, hv.b)) - hv.r; };
+    let least = Infinity, hit = false, sideAtBow = NaN;
+    for (let k = 0; k < 60 * 200; k++) { u.x = v.x + 3000; u.y = v.y + 3000; const x0 = b.x; w.step(WDT); const g = hullGap(b, v); least = Math.min(least, g); if (b.lastHitT === w.t) hit = true; if (x0 < v.x - 22.5 && b.x >= v.x - 22.5) sideAtBow = b.y - v.y; }
+    P(`  starting 400 m ahead, ${side} m off her line, dodge ${dodge ? 'on ' : 'off'}: least hull gap ${least.toFixed(1)} m${hit ? ' CONTACT' : ''}; abreast of her bow ${sideAtBow.toFixed(1)} m off her line; dodge steps ${fired}`);
+  }
+});
+it('cost', () => {
+  P('=== cost of Traffic.vessels per call (µs), 8 boats');
+  const mk = (n: number, near: boolean, tr: Traffic, t: number) => { const vs = tr.vessels(t); return Array.from({ length: n }, (_, k) => ({ x: near ? vs[4].x - 300 - 40 * k : 1e6, y: near ? vs[4].y + 30 * (k % 3) : 1e6, vx: -1.5, vy: 0.5 })); };
+  const skip = (b: any) => false;
+  for (let rep = 0; rep < 3; rep++) for (const [name, f] of [
+    ['main-like: vessels(t) alone', (tr: Traffic, t: number, bs: Moving[]) => tr.vessels(t)],
+    ['boats all far (> 1.5 km)', (tr: Traffic, t: number, bs: Moving[]) => tr.vessels(t, bs, DT, skip)],
+    ['8 boats near one cruise boat', (tr: Traffic, t: number, bs: Moving[]) => tr.vessels(t, bs, DT, skip)],
+  ] as const) {
+    const tr = new Traffic(true, SEED), near = name.startsWith('8'); let t = 77000; const bs = mk(8, near, tr, t);
+    const N = 300000, t0 = performance.now(); let s = 0;
+    for (let k = 0; k < N; k++) { t += DT; s += (f as any)(tr, t, bs).length; }
+    if (rep === 2) P(`  ${name}: ${((performance.now() - t0) / N * 1000).toFixed(2)} µs`);
+  }
+  const w: any = new World(ss2 as any, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime: '13:35', windKind: 'west', windKt: 12, current: 'real', traffic: 1, opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'stock:6', 'stock:7'], fleet: 7 } as any, 1);
+  for (let k = 0; k < 6000; k++) w.step(WDT);
+  const t0 = performance.now(); for (let k = 0; k < 18000; k++) w.step(WDT);
+  P(`  World.step, 8 boats, this tree: ${((performance.now() - t0) / 18000 * 1000).toFixed(1)} µs a step (unpaired, for scale only)`);
+});

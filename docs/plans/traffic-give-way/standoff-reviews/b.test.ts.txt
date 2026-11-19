@@ -1,0 +1,73 @@
+import { appendFileSync } from 'node:fs'; const P = (...a: any[]) => appendFileSync('/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/outb.txt', a.join(' ') + '\n');
+import { it } from 'vitest';
+import { DT } from '/home/user/yield/src/sim/world';
+import { LL } from '/home/user/yield/src/geo/geo';
+import { segPt } from '/home/user/yield/src/core/math';
+import { GIVES_WAY, SERVICES, Traffic, VESSEL, vesselHull, type Moving } from '/home/user/yield/src/sim/traffic';
+import { landAt } from '/home/user/yield/src/environment/sea';
+const SEED = 2434542977, KT = 0.5144;
+const LEG_E = LL(37.8128, -122.4140);
+const land = (p: { x: number; y: number }) => !!landAt(p);
+function tourOnLeg(tr: Traffic, fromT: number) {
+  for (let T = fromT; T < fromT + 4 * 3600; T += 1) { const vs = tr.vessels(T);
+    for (let i = 0; i < vs.length; i++) { const v = vs[i]; if (v.kind === 'tour' && v.moving && Math.abs(v.h - 270) < 1 && Math.abs(v.x - LEG_E.x) < 8 && Math.abs(v.y - LEG_E.y) < 8) return { T, i }; } }
+  throw new Error('none');
+}
+type B = Moving;
+function run(i: number, T: number, boats: B[], dur: number, give = true, trace?: (t: number, v: any, g: any, bs: B[], base: any) => void) {
+  const tr = new Traffic(true, SEED), tb = new Traffic(true, SEED);
+  let least = Infinity, tl = 0, sides: number[] = [], onLand = 0, baseLand = 0, maxOffLand = 0, minK = 1, maxRate = 0, h0 = NaN;
+  const bs = boats.map(b => ({ ...b }));
+  for (let t = T, n = 0; t < T + dur; t += DT, n++) {
+    const v = tr.vessels(t, bs, DT, land, give ? undefined : () => true)[i], hv = vesselHull(v), g = tr.give[i];
+    for (const b of bs) { const d = segPt(b, hv.a, hv.b) - hv.r; if (d < least) { least = d; tl = t - T; } }
+    if (g.side && sides[sides.length - 1] !== g.side) sides.push(g.side); minK = Math.min(minK, g.k);
+    const base = tb.vessels(t)[i];
+    if (Math.abs(base.h - (tb as any)._h) < 0.01 && !isNaN(h0)) maxRate = Math.max(maxRate, Math.abs(((v.h - h0 + 540) % 360) - 180) / DT); h0 = v.h; (tb as any)._h = base.h;
+    if (n % 30 === 0) { const l = land(v) || land(hv.a) || land(hv.b); if (l) { onLand++; maxOffLand = Math.max(maxOffLand, Math.hypot(g.ox, g.oy)); } if (land(base)) baseLand++; }
+    trace?.(t - T, v, g, bs, base);
+    for (const b of bs) { b.x += b.vx * DT; b.y += b.vy * DT; }
+  }
+  return { least: +least.toFixed(1), tl: +tl.toFixed(0), sides: sides.join('>'), minK: +minK.toFixed(2), maxRate: +maxRate.toFixed(1), onLand, baseLand, maxOffLand: +maxOffLand.toFixed(0) };
+}
+const tr0 = new Traffic(true, SEED), { T, i } = tourOnLeg(tr0, 21 * 3600), V0 = tr0.vessels(T)[i], VS = 11 * KT;
+const log = (s: string, r: any, r0?: any) => P(s.padEnd(50), JSON.stringify(r), r0 ? '| no give-way: ' + r0.least : '');
+
+it('late crossers', () => {
+  P('--- I: boats on a steady course and speed crossing her route BEHIND her (she would pass ahead of them): ahead<0 = m astern of her middle when they reach her route');
+  let n = 0, worse = 0, hits = 0;
+  for (const kt of [2, 3, 4, 5, 6]) for (const c of [0, 180, 30, 330, 150, 210, 60, 300, 120, 240]) for (const ahead of [-30, -60, -100, -150, -220, -300]) {
+    const at = 120, bx = Math.sin(c * Math.PI / 180) * kt * KT, by = Math.cos(c * Math.PI / 180) * kt * KT;
+    const mx = V0.x - (VS * at + ahead), my = V0.y, b = { x: mx - bx * at, y: my - by * at, vx: bx, vy: by };
+    const r = run(i, T, [b], 300), r0 = run(i, T, [b], 300, false); n++;
+    if (r.least < r0.least - 10) worse++; if (r.least < 4) hits++;
+    if (r.least < 15) log(kt + ' kt on ' + c + ', crossing ' + (-ahead) + ' m astern', r, r0);
+  }
+  P('late crossers: ' + n + ' cases; closer than with no give-way by >10 m: ' + worse + '; hull-to-centre gap < 4 m (hit): ' + hits);
+});
+it('dead ahead side', () => {
+  P('--- J: a boat stopped exactly on her route 700 m ahead: which side she takes (+1 starboard, -1 port), per service at several times');
+  for (let si = 0; si < SERVICES.length; si++) { if (!GIVES_WAY[SERVICES[si].kind]) continue; const out: string[] = [];
+    for (let t0 = 20 * 3600; t0 < 22 * 3600; t0 += 311) { const v = new Traffic(true, SEED).vessels(t0)[si]; if (!v.moving) continue;
+      const p = { x: v.x + Math.sin(v.h * Math.PI / 180) * 700, y: v.y + Math.cos(v.h * Math.PI / 180) * 700, vx: 0, vy: 0 };
+      const r = run(si, t0, [p], 20, true); out.push(v.h.toFixed(0) + ':' + r.sides); }
+    P(SERVICES[si].kind + '#' + si + ' (heading:side) ' + out.join(' ')); }
+  // head-on, the boat coming straight at her at 4 kt under power
+  const r = run(i, T, [{ x: V0.x - 900, y: V0.y, vx: 4 * KT, vy: 0 }], 150); log('head-on at 4 kt on the reciprocal', r);
+});
+it('grounding', () => {
+  P('--- K: boat stopped on the route of the westbound tour boat (leg along 37.8128N): where she is on land');
+  for (const d of [600, 900, 1200]) { let first = '';
+    const r = run(i, T, [{ x: V0.x - d, y: V0.y, vx: 0, vy: 0 }], 400, true, (t, v, g) => { if (!first && land(v)) first = 't=' + t.toFixed(0) + ' at x ' + v.x.toFixed(0) + ' y ' + v.y.toFixed(0) + ' off ' + g.ox.toFixed(0) + ',' + g.oy.toFixed(0) + ' k ' + g.k.toFixed(2) + ' side ' + g.side; });
+    log('stopped boat ' + d + ' m ahead', r); P('   first on land: ' + first); }
+  P('--- K2: all services, stopped boat on route 300/600 m ahead over 2 h: runs where her middle or ends are on land while the timetable place is not');
+  for (let si = 0; si < SERVICES.length; si++) { if (!GIVES_WAY[SERVICES[si].kind]) continue;
+    let n = 0, agr = 0, hits = 0, ex = '';
+    for (const d of [300, 600]) for (let t0 = 20 * 3600; t0 < 22 * 3600; t0 += 97) {
+      const v = new Traffic(true, SEED).vessels(t0)[si]; if (!v.moving) continue;
+      const p = { x: v.x + Math.sin(v.h * Math.PI / 180) * d, y: v.y + Math.cos(v.h * Math.PI / 180) * d, vx: 0, vy: 0 }; if (land(p)) continue; n++;
+      const r = run(si, t0, [p], 240); if (r.onLand > r.baseLand + 2 && r.maxOffLand > 20) { agr++; if (!ex) ex = 't0=' + t0 + ' d=' + d + ' ' + JSON.stringify(r); } if (r.least < 4) { hits++; P('   hit: ' + SERVICES[si].kind + ' t0=' + t0 + ' d=' + d + ' ' + JSON.stringify(r)); }
+    }
+    P(SERVICES[si].kind + '#' + si + ': ' + n + ' runs, aground off her route in ' + agr + ', hits ' + hits + '; e.g. ' + ex);
+  }
+});

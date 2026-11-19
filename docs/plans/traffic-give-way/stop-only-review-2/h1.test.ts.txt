@@ -1,0 +1,38 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { ROUTES, SERVICES, Traffic, VESSEL, vesselHull, GIVES_WAY, type Moving } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h1.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+const gives = SERVICES.map((_, i) => i).filter(i => GIVES_WAY[SERVICES[i].kind]);
+/** time she's under way at the start of her longest leg +100 m */
+function onLongLeg(i: number) {
+  const R = ROUTES[SERVICES[i].route]; let wp = 0, best = 0;
+  for (let k = 0; k < R.length - 1; k++) { const l = Math.hypot(R[k + 1].x - R[k].x, R[k + 1].y - R[k].y); if (l > best) { best = l; wp = k; } }
+  const tr = new Traffic(true, SEED), c = R[wp], V = VESSEL[SERVICES[i].kind].kt * 0.5144;
+  for (let T = 20 * 3600; T < 28 * 3600; T += 0.5) { const v = tr.vessels(T)[i]; if (v.moving && Math.hypot(v.x - c.x, v.y - c.y) < 10) { const v2 = tr.vessels(T + 100 / V)[i]; const d = Math.hypot(R[wp + 1].x - c.x, R[wp + 1].y - c.y); if (Math.abs(Math.atan2(R[wp + 1].x - c.x, R[wp + 1].y - c.y) / D2R - (v2.h > 180 ? v2.h - 360 : v2.h)) < 1) return { T: T + 100 / V, L: best }; } }
+  throw new Error('none');
+}
+it('H1 head-on on her route, the boat holding her course', () => {
+  for (const i of gives) {
+    const { T, L } = onLongLeg(i), s = SERVICES[i], tr0 = new Traffic(true, SEED), v0 = tr0.vessels(T)[i], ux = Math.sin(v0.h * D2R), uy = Math.cos(v0.h * D2R);
+    P(`== ${s.kind}#${i} leg ${L.toFixed(0)} m`);
+    for (const sp of [0.26, 1.0, 1.5, 2.5, 3.1]) for (const off of [0, 10, 30, 60]) {
+      const D = Math.min(700, L - 250);
+      const b: Moving = { x: v0.x + ux * D + uy * off, y: v0.y + uy * D - ux * off, vx: -ux * sp, vy: -uy * sp, id: 0 };
+      const tr = new Traffic(true, SEED); let least = Infinity, vAt = 0, tAt = 0, minK = 1, kAfterStop = 0, stoppedAt = -1; const trc: string[] = []; let n = 0;
+      const dur = Math.min(900, D / sp + 120);
+      for (let t = T; t < T + dur; t += DT) {
+        const v = tr.vessels(t, [b], DT)[i], hv = vesselHull(v), g = segPt(b, hv.a, hv.b) - hv.r;
+        if (g < least) { least = g; vAt = v.v; tAt = t - T; }
+        const k = tr.give[i].k; if (k < minK) minK = k; if (k === 0 && stoppedAt < 0) stoppedAt = t - T; if (stoppedAt >= 0 && k > kAfterStop) kAfterStop = k;
+        if (n++ % 1200 === 0) trc.push(`t${(t - T).toFixed(0)}:k${k.toFixed(2)}/w${tr.give[i].want}/d${Math.hypot(b.x - v.x, b.y - v.y).toFixed(0)}`);
+        if (g < 0) break;
+        b.x += b.vx * DT; b.y += b.vy * DT;
+      }
+      P(`boat ${(sp / 0.5144).toFixed(1)} kt reciprocal, ${off} m off her line: least hull gap ${least.toFixed(1)} m at t=${tAt.toFixed(0)} s, she then making ${(vAt / 0.5144).toFixed(1)} kt; slowest k ${minK.toFixed(2)}; stopped at ${stoppedAt.toFixed(0)}, fastest after stopping k=${kAfterStop.toFixed(2)}  ${least < 4 ? '<<< CONTACT' : ''}\n     ${trc.join(' ')}`);
+    }
+  }
+});

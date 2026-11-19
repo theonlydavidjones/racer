@@ -1,0 +1,37 @@
+import { appendFileSync } from 'node:fs'; const P = (...a: any[]) => appendFileSync('/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/outd.txt', a.join(' ') + '\n');
+import { it } from 'vitest';
+import { DT } from '/home/user/yield/src/sim/world';
+import { LL } from '/home/user/yield/src/geo/geo';
+import * as geo from '/home/user/yield/src/geo/geo';
+import { segPt } from '/home/user/yield/src/core/math';
+import { SERVICES, Traffic, VESSEL, vesselHull, ROUTES } from '/home/user/yield/src/sim/traffic';
+import { landAt } from '/home/user/yield/src/environment/sea';
+const SEED = 2434542977, KT = 0.5144, LEG_E = LL(37.8128, -122.4140);
+const land = (p: any) => !!landAt(p);
+const ll = (p: any) => { const f = (geo as any).toLL ?? (geo as any).XY2LL ?? (geo as any).unLL; if (f) { const r = f(p); return JSON.stringify(r); } const a = LL(37.8128, -122.4140), b = LL(37.8138, -122.4130); return (37.8128 + (p.y - a.y) / (b.y - a.y) * 0.001).toFixed(5) + 'N ' + (-122.4140 + (p.x - a.x) / (b.x - a.x) * 0.001).toFixed(5); };
+it('traces', () => {
+  P('geo exports: ' + Object.keys(geo).join(','));
+  const tr0 = new Traffic(true, SEED); let T = 0, i = 0;
+  outer: for (T = 21 * 3600; ; T++) { const vs = tr0.vessels(T); for (i = 0; i < vs.length; i++) { const v = vs[i]; if (v.kind === 'tour' && v.moving && Math.abs(v.h - 270) < 1 && Math.abs(v.x - LEG_E.x) < 8 && Math.abs(v.y - LEG_E.y) < 8) break outer; } }
+  const V0 = tr0.vessels(T)[i];
+  const trace = (name: string, si: number, t0: number, b: any, dur: number, upd?: (b: any, t: number) => void, every = 10) => {
+    P('--- ' + name); const tr = new Traffic(true, SEED); let hit = false;
+    for (let t = t0, n = 0; t < t0 + dur; t += DT, n++) {
+      upd?.(b, t - t0);
+      const v = tr.vessels(t, [b], DT, land)[si], hv = vesselHull(v), g = tr.give[si], gap = segPt(b, hv.a, hv.b) - hv.r;
+      const rx = b.x - v.x, ry = b.y - v.y, hr = v.h * Math.PI / 180, fwd = rx * Math.sin(hr) + ry * Math.cos(hr), stb = rx * Math.cos(hr) - ry * Math.sin(hr);
+      if (n % (60 * every) === 0 || (gap < 4 && !hit)) P('t ' + (t - t0).toFixed(0).padStart(3) + ' vessel ' + ll(v) + ' h ' + v.h.toFixed(0) + ' v ' + (v.v / KT).toFixed(1) + ' kt, k ' + g.k.toFixed(2) + ' side ' + g.side + ' off ' + Math.hypot(g.ox, g.oy).toFixed(0) + ' m lat ' + g.lat.toFixed(2) + (land(v) ? ' ON LAND' : '') + ' | boat ' + fwd.toFixed(0) + ' m ahead, ' + stb.toFixed(0) + ' m to stbd, course ' + ((Math.atan2(b.vx, b.vy) * 180 / Math.PI + 360) % 360).toFixed(0) + ' gap ' + gap.toFixed(1));
+      if (gap < 4) hit = true;
+      b.x += b.vx * DT; b.y += b.vy * DT;
+    }
+  };
+  const vel = (kt: number, c: number) => ({ vx: Math.sin(c * Math.PI / 180) * kt * KT, vy: Math.cos(c * Math.PI / 180) * kt * KT });
+  trace('tour boat W on the cityfront leg; a boat 700 m ahead on her route at 4.5 kt, on 135 for 70 s then 045 (one jibe/tack)', i, T, { x: V0.x - 700, y: V0.y, vx: 0, vy: 0 }, 160, (b, t) => Object.assign(b, vel(4.5, t < 70 ? 135 : 45)));
+  trace('same, beating W: 400 m ahead, 4.5 kt on 315/225 tacking every 70 s (phase .75)', i, T, { x: V0.x - 400, y: V0.y, vx: 0, vy: 0 }, 130, (b, t) => Object.assign(b, vel(4.5, Math.floor(t / 70 + 0.75) % 2 ? 225 : 315)));
+  for (const [si, t0, d] of [[3, 72291, 600], [3, 72388, 300], [4, 74037, 600], [6, 72582, 600]] as const) {
+    const v = new Traffic(true, SEED).vessels(t0)[si], r = ROUTES[SERVICES[si].route];
+    const p = { x: v.x + Math.sin(v.h * Math.PI / 180) * d, y: v.y + Math.cos(v.h * Math.PI / 180) * d, vx: 0, vy: 0 };
+    trace(SERVICES[si].kind + '#' + si + ' t0 ' + t0 + ': boat stopped ' + d + ' m ahead on her route at ' + ll(p) + ' (' + Math.min(Math.hypot(p.x - r[0].x, p.y - r[0].y), Math.hypot(p.x - r[r.length - 1].x, p.y - r[r.length - 1].y)).toFixed(0) + ' m from her berth)', si, t0, p, 240, undefined, 20);
+  }
+  trace('tour boat W, boat stopped on her route 600 m ahead (grounding)', i, T, { x: V0.x - 600, y: V0.y, vx: 0, vy: 0 }, 230, undefined, 10);
+});

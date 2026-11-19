@@ -1,0 +1,17 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { GIVES_WAY, ROUTES, SERVICES, Traffic, VESSEL } from '/home/user/stop/src/sim/traffic';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev/r4.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+it('jumps', () => {
+  // a boat parked on each route for 20 min in every hour, 5 h, away from midnight: the biggest one-step move of each give-way vessel
+  for (let i = 0; i < SERVICES.length; i++) { if (!GIVES_WAY[SERVICES[i].kind]) continue;
+    const r = ROUTES[SERVICES[i].route], tr = new Traffic(true, 2434542977), mid = { x: (r[1].x + r[2].x) / 2, y: (r[1].y + r[2].y) / 2 };
+    const b = { x: 1e6, y: 1e6, vx: 0, vy: 0 }; let prev: any = null, big = 0, bigAt = '', maxLag = 0, dv = 0, pv = -1; const dt = 1 / 60, lim = VESSEL[SERVICES[i].kind].kt * 0.5144 * dt * 1.01;
+    for (let t = 30000; t < 30000 + 5 * 3600; t += dt) { const on = (t % 3600) < 1200; b.x = on ? mid.x : 1e6; b.y = on ? mid.y : 1e6; const v = tr.vessels(t, [b], dt)[i];
+      if (prev) { const d = Math.hypot(v.x - prev.x, v.y - prev.y); if (d > big) { big = d; bigAt = `t+${(t - 30000).toFixed(0)} moving ${prev.moving}->${v.moving}`; } if (pv >= 0) dv = Math.max(dv, Math.abs(v.v - pv)); }
+      prev = { x: v.x, y: v.y, moving: v.moving }; pv = v.v; maxLag = Math.max(maxLag, tr.give[i].lag); }
+    P(`${SERVICES[i].kind}#${i}: biggest one-step move ${big.toFixed(2)} m (a step at service speed ${lim.toFixed(2)}) ${bigAt}; biggest one-step change of speed ${dv.toFixed(2)} m/s; max lag ${maxLag.toFixed(0)} s; lag at the end ${tr.give[i].lag.toFixed(0)} s`);
+  }
+});

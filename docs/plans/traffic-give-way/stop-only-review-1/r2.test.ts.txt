@@ -1,0 +1,78 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { GIVES_WAY, ROUTES, SERVICES, Traffic, VESSEL, vesselHull, type Moving } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+import { DT as WDT, World } from '/home/user/stop/src/sim/world';
+import { DEFAULT_SETTINGS } from '/home/user/stop/src/settings';
+import { bow, stern } from '/home/user/stop/src/boat/boat';
+import ss2 from '/home/user/stop/src/courses/data/seaweed-soup-2026-course2.json';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev/r2.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+const gap = (b: Moving, v: any) => { const hv = vesselHull(v); return segPt(b, hv.a, hv.b) - hv.r; };
+function run(i: number, T: number, b0: Moving, dur: number, skip?: (b: Moving) => boolean) {
+  const tr = new Traffic(true, SEED), b = { ...b0 };
+  let least = Infinity, vAt = 0, tAt = 0, kAtStart = 1;
+  for (let t = T; t < T + dur; t += DT) {
+    const v = tr.vessels(t, [b], DT, skip)[i];
+    const g = gap(b, v); if (g < least) { least = g; vAt = v.v; tAt = t - T; }
+    b.x += b.vx * DT; b.y += b.vy * DT;
+  }
+  return { least, vAt, tAt };
+}
+it('straight boats on straight legs', () => {
+  P('=== E6b straight-line boats, constant speed, she on a straight leg throughout (no bend within the run)');
+  let seedR = 777; const rnd = () => (seedR = (seedR * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (const i of [2, 3, 4, 6]) {
+    const s = SERVICES[i], tr0 = new Traffic(true, SEED), vk = VESSEL[s.kind].kt;
+    let n = 0, ranDown = 0, rammedStopped = 0, under30moving = 0, worseTT = 0; const ex: string[] = [];
+    for (let c = 0; c < 160; c++) {
+      let T = 0, v0: any, v1: any; do { T = rnd() * 40000; v0 = tr0.vessels(T)[i]; v1 = tr0.vessels(T + 215)[i]; } while (!v0.moving || !v1.moving || Math.abs(v0.h - v1.h) > 0.01 || Math.abs(v0.h - tr0.vessels(T + 100)[i].h) > 0.01);
+      const at = 50 + rnd() * 80, m = tr0.vessels(T + at)[i], sp = 0.3 + rnd() * 3.2, c2 = rnd() * 2 * Math.PI, off = (rnd() - 0.5) * 240, o2 = rnd() * 2 * Math.PI;
+      const b = { x: m.x + Math.sin(o2) * off - Math.sin(c2) * sp * at, y: m.y + Math.cos(o2) * off - Math.cos(c2) * sp * at, vx: Math.sin(c2) * sp, vy: Math.cos(c2) * sp };
+      const a = run(i, T, b, 210), tt = run(i, T, b, 210, () => true);
+      n++; const rel = ((c2 / D2R - v0.h + 540) % 360) - 180;
+      if (a.least < 4 && a.vAt > 0.5) { ranDown++; if (ex.length < 8) ex.push(`   RAN DOWN at ${(a.vAt / 0.5144).toFixed(1)} kt: boat ${(sp / 0.5144).toFixed(1)} kt on ${rel.toFixed(0)} deg off her course; timetable alone ${tt.least.toFixed(0)} m`); }
+      else if (a.least < 4) { rammedStopped++; if (ex.length < 8) ex.push(`   she stopped across the boat's course and it sailed into her: boat ${(sp / 0.5144).toFixed(1)} kt on ${rel.toFixed(0)} deg off her course; timetable alone ${tt.least.toFixed(0)} m`); }
+      else if (a.least < 30 && a.vAt > 0.5) under30moving++;
+      if (a.least < tt.least - 1 && a.least < 30) worseTT++;
+    }
+    P(`${s.kind}#${i} (${vk} kt): ${n} boats; run down while making way ${ranDown}; boat into her stopped ${rammedStopped}; other passes under 30 m while making way ${under30moving}; closer than the timetable alone and under 30 m: ${worseTT}`); for (const e of ex) P(e);
+  }
+});
+it('the AI dodge against a stopped vessel', () => {
+  P('=== W1 keepClearOfShips with a give-way vessel stopped (v.v = 0, moving = true)');
+  const w: any = new World(ss2 as any, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime: '13:35', windKind: 'west', windKt: 12, current: 'real', traffic: 1, opponents: ['stock:1', 'stock:2'], fleet: 2 } as any, 3);
+  for (let k = 0; k < 600; k++) w.step(WDT);
+  const b = w.boats.find((q: any) => !q.isUser);
+  const hullGap = (q: any, v: any) => { const hv = vesselHull(v); return Math.min(segPt(bow(q), hv.a, hv.b), segPt(stern(q), hv.a, hv.b), segPt(q, hv.a, hv.b)) - hv.r; };
+  // a Bay cruise boat stopped (as when she has taken all way off for another boat), heading 270; the boat ahead of her bow, running east past her
+  const base = { x: b.x, y: b.y };
+  for (const [ahead, side, hdg] of [[300, 60, 90], [300, -60, 90], [200, 80, 100], [250, 40, 80], [150, 85, 90], [300, 60, 135]] as const) {
+    const v = { id: 4, kind: 'tour', x: base.x + 2000, y: base.y, h: 270, v: 0, moving: true };
+    b.x = v.x - ahead; b.y = v.y + side; b.h = hdg; b.v = 3; b.vx = Math.sin(hdg * D2R) * 3; b.vy = Math.cos(hdg * D2R) * 3; b.desired = hdg;
+    w.vessels = [v];
+    const before = b.desired; w.keepClearOfShips(b);
+    const toHull = Math.atan2(v.x - b.x, v.y - b.y) / D2R, toBow = Math.atan2(v.x - 22.5 - b.x, v.y - b.y) / D2R;
+    P(`  boat ${ahead} m ahead of her middle, ${side} m to the side, steering ${hdg}: her straight course would pass ${Math.abs(side + Math.tan((hdg - 90) * D2R) * -ahead).toFixed(0)} m from her track line; the dodge sets desired ${before} -> ${b.desired.toFixed(1)} (bearing of her bow ${((toBow + 360) % 360).toFixed(1)}, her middle ${((toHull + 360) % 360).toFixed(1)})`);
+  }
+});
+it('the AI dodge, sailed', () => {
+  P('=== W2 the same, sailed in the World: an AI boat running east past a stopped cruise boat (vessels held by a stub Traffic), the fleet and the wind as they are');
+  for (const [ahead, side] of [[300, 60], [300, -60], [300, 85], [250, 30], [400, -80]] as const) for (const dodge of [true, false]) {
+    const w: any = new World(ss2 as any, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime: '13:35', windKind: 'west', windKt: 12, current: 'real', traffic: 1, opponents: ['stock:1'], fleet: 1 } as any, 3);
+    for (let k = 0; k < 60; k++) w.step(WDT);
+    const b = w.boats.find((q: any) => !q.isUser), u = w.user;
+    const v = { id: 4, kind: 'tour', x: b.x + 1200, y: b.y + 600, h: 270, v: 0, moving: true };
+    // (open water? the vessel is put 1.2 km east and 600 m north of where the boat started)
+    w.traffic = { on: true, vessels: () => [{ ...v }], wakeAt: () => null, givingWay: () => undefined };
+    if (!dodge) w.keepClearOfShips = () => {};
+    b.x = v.x - ahead; b.y = v.y + side; b.h = 90; b.v = 3; b.vx = 3; b.vy = 0;
+    const hullGap = (q: any, vv: any) => { const hv = vesselHull(vv); return Math.min(segPt(bow(q), hv.a, hv.b), segPt(stern(q), hv.a, hv.b), segPt(q, hv.a, hv.b)) - hv.r; };
+    let least = Infinity, hit = false; const hs: string[] = [];
+    // her own skipper wants to run east (her course held by ai.desired being overwritten each step is not possible; so: her mark is wherever, we only watch)
+    for (let k = 0; k < 60 * 240; k++) { u.x = v.x + 3000; u.y = v.y + 3000; w.step(WDT); const g = hullGap(b, v); least = Math.min(least, g); if (b.lastHitT === w.t || g < 0.85) hit = true; if (k % 600 === 0) hs.push(`${b.h.toFixed(0)}/${b.desired.toFixed(0)}@${(v.x - b.x).toFixed(0)},${(b.y - v.y).toFixed(0)}`); }
+    P(`  ${ahead} m ahead, ${side} m to the side, dodge ${dodge ? 'on ' : 'off'}: least hull gap ${least.toFixed(1)} m${hit ? ' CONTACT' : ''}; heading/desired@ahead,side every 10 s: ${hs.slice(0, 12).join(' ')}`);
+  }
+});

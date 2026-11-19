@@ -1,0 +1,60 @@
+import { appendFileSync } from 'node:fs'; const P = (...a: any[]) => appendFileSync('/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/outc.txt', a.join(' ') + '\n');
+import { it } from 'vitest';
+const ROOT = process.env.TREE || '/home/user/yield';
+const SEED = 2434542977, KT = 0.5144;
+it('world', async () => {
+  const { DT, World } = await import(ROOT + '/src/sim/world');
+  const { DEFAULT_SETTINGS } = await import(ROOT + '/src/settings');
+  const { LL } = await import(ROOT + '/src/geo/geo');
+  const { segPt } = await import(ROOT + '/src/core/math');
+  const { Traffic, vesselHull, VESSEL } = await import(ROOT + '/src/sim/traffic');
+  const { landAt } = await import(ROOT + '/src/environment/sea');
+  const { bow, stern } = await import(ROOT + '/src/boat/boat');
+  const ss2 = (await import(ROOT + '/src/courses/data/seaweed-soup-2026-course2.json')).default;
+  const hullGap = (b: any, v: any) => { const hv = vesselHull(v); return Math.min(segPt(bow(b), hv.a, hv.b), segPt(stern(b), hv.a, hv.b), segPt(b, hv.a, hv.b)) - hv.r; };
+  P('=== tree ' + ROOT);
+  if (process.env.PART !== 'fleet') {
+    // the owner's case, as tests/give-way.test.ts encounter(): what she's told, the horn, the side, land
+    const mark6 = LL(37.811667, -122.43);
+    const tourAt = (fromT: number) => { const tr = new Traffic(true, SEED); for (let T = fromT; T < fromT + 4 * 3600; T += 2) for (const v of tr.vessels(T)) if (v.kind === 'tour' && v.moving && v.h > 240 && v.h < 300 && Math.abs(v.x - mark6.x) < 15 && Math.abs(v.y - mark6.y) < 200) return T; throw 0; };
+    for (const [kt, h, motor] of [[0.5, 81, 0], [0, 81, 0], [4, 81, 1]] as const) {
+      const T = tourAt(21 * 3600 + 35 * 60), startMin = Math.floor((T - 600) / 60) - 8 * 60;
+      const tideTime = String(Math.floor(startMin / 60)).padStart(2, '0') + ':' + String(startMin % 60).padStart(2, '0');
+      const w = new World(ss2, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime, windKind: 'west', windKt: 7, current: 'real', traffic: 1, opponents: ['stock:1'], fleet: 1 }, SEED);
+      const tour = () => w.vessels.filter((v: any) => v.kind === 'tour').sort((a: any, b: any) => Math.hypot(a.x - mark6.x, a.y - mark6.y) - Math.hypot(b.x - mark6.x, b.y - mark6.y))[0];
+      while (w.trafficT < T - 100) w.step(DT); w.drainEvents();
+      const u = w.user, v0 = tour(), ux = Math.sin(v0.h * Math.PI / 180), uy = Math.cos(v0.h * Math.PI / 180);
+      const p = { x: v0.x + ux * 500, y: v0.y + uy * 500 }, vx = Math.sin(h * Math.PI / 180) * kt * KT, vy = Math.cos(h * Math.PI / 180) * kt * KT;
+      let least = Infinity, onLand = 0, sides: number[] = [], ev: string[] = [], t0 = w.t;
+      for (let i = 0; i < 60 * 240; i++) {
+        u.x = p.x; u.y = p.y; u.h = h; u.vx = vx; u.vy = vy; u.v = kt * KT; u.turnRate = 0; u.desired = h; if (motor && u.motor) u.motor.running = true;
+        w.step(DT); p.x += vx * DT; p.y += vy * DT; const tv = tour();
+        least = Math.min(least, hullGap(u, tv));
+        if (i % 30 === 0 && landAt(tv)) onLand++;
+        const g = w.traffic.give?.[tv.id]; if (g && g.side && sides[sides.length - 1] !== g.side) sides.push(g.side);
+        for (const e of w.drainEvents()) { if (e.type === 'toast' && /cruise|Rule|blast/i.test(e.msg)) ev.push('[' + (w.t - t0).toFixed(0) + 's, gap ' + hullGap(u, tv).toFixed(0) + ' m] ' + e.msg); if (e.type === 'horn' && e.delayMs === 0) ev.push('[' + (w.t - t0).toFixed(0) + 's] HORN x5'); }
+      }
+      P('--- user ' + kt + ' kt on ' + h + (motor ? ' motoring (motor state: ' + JSON.stringify(u.motor) + ')' : '') + ': least hull gap ' + least.toFixed(1) + ', sides ' + sides.join('>') + ', tour boat on land ' + onLand / 2 + ' s, wrecked ' + !!u.wrecked); for (const e of ev) P('   ' + e);
+    }
+  } else {
+    // a fleet racing Course 2 with the traffic on: AI boats' contacts with vessels
+    for (const seed of [1, 2, 3, 4]) for (const tideTime of ['13:35', '14:05']) {
+      const w = new World(ss2, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime, windKind: 'west', windKt: 12, current: 'real', traffic: 1, opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'stock:6', 'stock:7'], fleet: 7 }, seed);
+      w.user.ai = true; if ('autopilot' in w.user) (w.user as any).autopilot = true;
+      const inC = new Set<string>(); let contacts = 0, near30 = 0, gave = 0; const who: string[] = [];
+      const nearSet = new Set<string>();
+      for (let i = 0; i < 60 * 60 * 35 && !w.finished; i++) {
+        w.step(DT);
+        if (i % 6) continue;
+        if (w.traffic.givingWay?.()) gave++;
+        for (const v of w.vessels) for (const b of w.boats) { if (b.isUser) continue;
+          if (Math.abs(b.x - v.x) > 250 || Math.abs(b.y - v.y) > 250) continue;
+          const g = hullGap(b, v), k = b.id + ':' + v.id;
+          if (g < 0.85) { if (!inC.has(k)) { inC.add(k); contacts++; who.push(v.kind + (v.moving ? '' : '(berthed)') + '@' + w.t.toFixed(0)); } } else if (g > 20) inC.delete(k);
+          if (g < 30 && v.moving) { if (!nearSet.has(k)) { nearSet.add(k); near30++; } } else if (g > 60) nearSet.delete(k);
+        }
+      }
+      P('seed ' + seed + ' ' + tideTime + ': boats ' + w.boats.length + ', t ' + w.t.toFixed(0) + ', vessel contacts ' + contacts + ' ' + who.join(' ') + ', passes under 30 m ' + near30 + ', give-way samples ' + gave);
+    }
+  }
+}, 3000000);

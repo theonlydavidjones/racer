@@ -1,0 +1,32 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { SERVICES, Traffic, VESSEL, vesselHull } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h8.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+it('E6b again, tracing the run-down', () => {
+  let seedR = 777; const rnd = () => (seedR = (seedR * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (const i of [2, 3]) {
+    const tr0 = new Traffic(true, SEED);
+    for (let c = 0; c < 160; c++) {
+      let T = 0, v0: any, v1: any; do { T = rnd() * 40000; v0 = tr0.vessels(T)[i]; v1 = tr0.vessels(T + 215)[i]; } while (!v0.moving || !v1.moving || Math.abs(v0.h - v1.h) > 0.01 || Math.abs(v0.h - tr0.vessels(T + 100)[i].h) > 0.01);
+      const at = 50 + rnd() * 80, m = tr0.vessels(T + at)[i], sp = 0.3 + rnd() * 3.2, c2 = rnd() * 2 * Math.PI, off = (rnd() - 0.5) * 240, o2 = rnd() * 2 * Math.PI;
+      const b0 = { x: m.x + Math.sin(o2) * off - Math.sin(c2) * sp * at, y: m.y + Math.cos(o2) * off - Math.cos(c2) * sp * at, vx: Math.sin(c2) * sp, vy: Math.cos(c2) * sp };
+      if (i !== 3) continue;
+      for (const withId of [false, true]) {
+        const tr = new Traffic(true, SEED), b: any = { ...b0, ...(withId ? { id: 7 } : {}) }, ux = Math.sin(v0.h * D2R), uy = Math.cos(v0.h * D2R);
+        let least = Infinity, vAt = 0, tAt = 0; const trc: string[] = []; let n = 0;
+        for (let t = T; t < T + 210; t += DT) {
+          const v = tr.vessels(t, [b], DT)[i], hv = vesselHull(v), g = segPt(b, hv.a, hv.b) - hv.r, rx = b.x - v.x, ry = b.y - v.y, r = Math.hypot(rx, ry);
+          if (g < least) { least = g; vAt = v.v; tAt = t - T; }
+          const cs = (rx * ux + ry * uy) / r, stateless = cs < -0.383 && b.vx * ux + b.vy * uy > v.v;
+          if (n++ % 600 === 0) trc.push(`t${(t - T).toFixed(0)}: k${tr.give[i].k.toFixed(2)} want${tr.give[i].want}; boat ${(rx * ux + ry * uy).toFixed(0)} ahead ${(rx * uy - ry * ux).toFixed(0)} stbd (${(Math.acos(cs) / D2R).toFixed(0)} deg off her bow)${stateless ? ' OVERTAKING by the test' : ''}${tr.give[i].over.length ? ' LATCHED' : ''}`);
+          b.x += b.vx * DT; b.y += b.vy * DT;
+        }
+        if (least < 4 && vAt > 0.5) P(`alcatraz#3 case ${c}${withId ? ' (boat with an id, as in the World)' : ''}: boat ${(sp / 0.5144).toFixed(1)} kt (${(Math.cos(c2 - v0.h * D2R) * sp / 0.5144).toFixed(1)} kt along her course; she 10 kt): contact at t=${tAt.toFixed(0)}, she making ${(vAt / 0.5144).toFixed(1)} kt\n   ` + trc.join('\n   '));
+      }
+    }
+  }
+});

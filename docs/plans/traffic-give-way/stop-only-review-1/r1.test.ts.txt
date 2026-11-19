@@ -1,0 +1,140 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { GIVES_WAY, ROUTES, SERVICES, Traffic, VESSEL, vesselHull, type Moving } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+import { inBasin } from '/home/user/stop/src/geo/marina';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev/r1.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+const gap = (b: Moving, v: any) => { const hv = vesselHull(v); return segPt(b, hv.a, hv.b) - hv.r; };
+type Steer = (b: Moving, t: number) => void;
+function run(i: number, T: number, boats0: Moving[], dur: number, opt: { skip?: (b: Moving) => boolean; steer?: Steer; log?: (t: number, tr: Traffic, v: any, bs: Moving[]) => void } = {}) {
+  const tr = new Traffic(true, SEED), bs = boats0.map(b => ({ ...b }));
+  let least = Infinity, minK = 1, vAt = 0;
+  for (let t = T; t < T + dur; t += DT) {
+    for (const b of bs) opt.steer?.(b, t - T);
+    const v = tr.vessels(t, bs, DT, opt.skip)[i];
+    for (const b of bs) { const g = gap(b, v); if (g < least) { least = g; vAt = v.v; } }
+    minK = Math.min(minK, tr.give[i].k);
+    opt.log?.(t - T, tr, v, bs);
+    for (const b of bs) { b.x += b.vx * DT; b.y += b.vy * DT; }
+  }
+  return { least, minK, vAt, tr };
+}
+const all = () => true;
+it('corners', () => {
+  P('=== E1 corners: boat beyond a route bend (D m along the next leg at the time she turns)');
+  for (let i = 0; i < SERVICES.length; i++) {
+    const s = SERVICES[i]; if (!GIVES_WAY[s.kind]) continue; if (i === 5) continue;
+    const r = ROUTES[s.route], tr0 = new Traffic(true, SEED), V = VESSEL[s.kind].kt * 0.5144;
+    for (let j = 1; j < r.length - 1; j++) {
+      // the time she's at waypoint j, outbound
+      let T = -1; const hin = Math.atan2(r[j].x - r[j - 1].x, r[j].y - r[j - 1].y) / D2R;
+      for (let t = 0; t < 40000; t += 0.5) { const v = tr0.vessels(t)[i]; if (v.moving && Math.hypot(v.x - r[j].x, v.y - r[j].y) < V * 0.6 && Math.abs(((v.h - hin + 540) % 360) - 180) < 2) { T = t; break; } }
+      if (T < 0) { P(s.kind, 'wp', j, 'not found'); continue; }
+      const nx = r[j + 1].x - r[j].x, ny = r[j + 1].y - r[j].y, nl = Math.hypot(nx, ny), ux = nx / nl, uy = ny / nl;
+      const hout = Math.atan2(nx, ny) / D2R, turn = ((hout - hin + 540) % 360) - 180;
+      for (const bv of [0, 2.5]) for (const D of [60, 90, 110, 130, 150, 180, 220, 260]) {
+        if (D > nl) continue;
+        const lead = Math.min(150, Math.hypot(r[j].x - r[j - 1].x, r[j].y - r[j - 1].y) / V - 1);
+        const b = { x: r[j].x + ux * (D + bv * lead), y: r[j].y + uy * (D + bv * lead), vx: -ux * bv, vy: -uy * bv };
+        const a = run(i, T - lead, [b], lead + 150), n = run(i, T - lead, [b], lead + 150, { skip: all });
+        if (a.least < 15) P(`${s.kind}#${i} wp${j} turn ${turn.toFixed(0)} deg, boat ${bv} m/s toward corner, ${D} m beyond: least gap ${a.least.toFixed(1)} m, her speed then ${(a.vAt / 0.5144).toFixed(1)} kt (timetable alone ${n.least.toFixed(1)})`);
+      }
+    }
+  }
+});
+it('following and hunting', () => {
+  P('=== E2 a boat ahead on her route, same way, slower: her speed share over 10 min');
+  const i = 4, tr0 = new Traffic(true, SEED); let T = 0;
+  for (let t = 75600; t < 90000; t += 1) { const v = tr0.vessels(t)[i]; if (v.moving && Math.abs(v.h - 270) < 1 && Math.abs(v.x - ROUTES.tour[1].x + 100) < 8) { T = t; break; } }
+  const v0 = tr0.vessels(T)[i];
+  for (const [name, boats, steer] of [
+    ['3 m/s dead ahead 400 m, same way', [{ x: v0.x - 400, y: v0.y, vx: -3, vy: 0 }], undefined],
+    ['2 m/s VMG short-tacking ahead (4.5 kt, 90 deg, every 45 s)', [{ x: v0.x - 500, y: v0.y, vx: 0, vy: 0 }], ((b: Moving, t: number) => { const c = (Math.floor(t / 45) % 2 ? 315 : 225) * D2R; b.vx = Math.sin(c) * 2.3; b.vy = Math.cos(c) * 2.3; }) as Steer],
+    ['A stationary 600 m ahead for 120 s then gone; B 3 m/s 60 m astern-quarter same way', [{ x: v0.x - 600, y: v0.y, vx: 0, vy: 0 }, { x: v0.x + 400, y: v0.y + 40, vx: -3, vy: 0 }], ((b: Moving, t: number) => { if (b.vx === 0 && t > 120) { b.x = 1e6; } }) as Steer],
+  ] as const) {
+    let rev = 0, lastDir = 0, lastK = 1; const ks: string[] = []; let stops = 0, wasStop = false;
+    const r = run(i, T, boats as Moving[], 600, { steer, log: (t, tr) => { const k = tr.give[i].k, d = Math.sign(k - lastK); if (d && d !== lastDir) { if (lastDir) rev++; lastDir = d; } lastK = k; if (k === 0 && !wasStop) stops++; wasStop = k === 0; if (Math.abs(t / 10 - Math.round(t / 10)) < DT / 20) ks.push(k.toFixed(2)); } });
+    P(name + ': reversals ' + rev + ', stops ' + stops + ', least gap ' + r.least.toFixed(0) + ', lag ' + r.tr.give[i].lag.toFixed(0) + ' s; k every 10 s: ' + ks.join(' '));
+  }
+  P('=== E4 both cruise boats and a boat stopped on the route for 2 h');
+  { const tr = new Traffic(true, SEED), b = [{ x: ROUTES.tour[2].x + 300, y: ROUTES.tour[2].y, vx: 0, vy: 0 }];
+    let over = 0, n = 0;
+    for (let t = 75600; t < 75600 + 7200; t += 0.1) { const vs = tr.vessels(t, b, 0.1); if (++n % 6000 === 0) P('  t+' + (t - 75600).toFixed(0), 'tour4', vs[4].x.toFixed(0), vs[4].y.toFixed(0), 'k', tr.give[4].k.toFixed(2), 'lag', tr.give[4].lag.toFixed(0), '| tour5', vs[5].x.toFixed(0), vs[5].y.toFixed(0), 'k', tr.give[5].k.toFixed(2), 'lag', tr.give[5].lag.toFixed(0), '| apart', Math.hypot(vs[4].x - vs[5].x, vs[4].y - vs[5].y).toFixed(0)); }
+  }
+  P('=== E7 pinned by a boat near her that she would leave behind');
+  for (const [dx, dy, bvx] of [[60, 50, 0], [0, 80, 0], [40, 60, -0.3], [-30, 90, 0]] as const) {
+    // she is stopped for boat A; A leaves at 60 s; boat B sits dx m astern (+) and dy m to the side
+    const r = run(i, T, [{ x: v0.x - 150, y: v0.y, vx: 0, vy: 0 }, { x: 0, y: 0, vx: bvx, vy: 0 }], 600, { steer: (b, t) => { }, log: undefined });
+    const tr = new Traffic(true, SEED); const A = { x: v0.x - 150, y: v0.y, vx: 0, vy: 0 }, B = { x: 1e6, y: 1e6, vx: bvx, vy: 0 }; let placed = false, x60 = 0, v: any;
+    for (let t = T; t < T + 600; t += DT) { v = tr.vessels(t, [A, B], DT)[i]; if (t - T > 60 && !placed) { placed = true; A.x = 1e6; B.x = v.x + dx; B.y = v.y + dy; x60 = v.x; } B.x += B.vx * DT; }
+    P(`  B ${dx} m astern, ${dy} m abeam, ${bvx} m/s: in the 9 min after A left she moved ${(x60 - v.x).toFixed(0)} m, k ${tr.give[i].k.toFixed(2)}, lag ${tr.give[i].lag.toFixed(0)} s`);
+  }
+});
+it('late tack', () => {
+  P('=== E5 a boat sailing parallel to her route the other way, L m off it, tacks through 90 deg toward it when she is D m off: gap with give-way vs timetable');
+  for (const i of [2, 3, 4, 6]) {
+    const s = SERVICES[i], r = ROUTES[s.route], V = VESSEL[s.kind].kt * 0.5144, tr0 = new Traffic(true, SEED);
+    // the longest leg, outbound; T: 30 % along it
+    let J = 1, best = 0; for (let j = 1; j < r.length; j++) { const l = Math.hypot(r[j].x - r[j - 1].x, r[j].y - r[j - 1].y); if (l > best) { best = l; J = j; } }
+    const ux = (r[J].x - r[J - 1].x) / best, uy = (r[J].y - r[J - 1].y) / best, px = r[J - 1].x + ux * best * 0.2, py = r[J - 1].y + uy * best * 0.2;
+    let T = -1; for (let t = 0; t < 40000; t += 0.25) { const v = tr0.vessels(t)[i]; if (v.moving && Math.hypot(v.x - px, v.y - py) < V * 0.3 && Math.abs(Math.sin(v.h * D2R) - ux) < 0.01 && Math.abs(Math.cos(v.h * D2R) - uy) < 0.01) { T = t; break; } }
+    if (T < 0) { P(s.kind, 'no T'); continue; }
+    const v0 = tr0.vessels(T)[i]; let n = 0, worse = 0, hits = 0; const ex: string[] = [];
+    for (const side of [1, -1]) for (const L of [100, 110, 130, 160, 200]) for (const D of [100, 150, 200, 250, 300, 400, 500]) for (const sp of [2.3, 3.2]) for (const ang of [45, 90]) {
+      const nx = uy * side, ny = -ux * side, lead = 60;
+      // at time `lead` she (on timetable) is D m from the boat along the route; before that the boat runs opposite to her, L m off
+      const bx = v0.x + ux * (V * lead + D) + nx * L, by = v0.y + uy * (V * lead + D) + ny * L;
+      const b = { x: bx + ux * sp * lead, y: by + uy * sp * lead, vx: -ux * sp, vy: -uy * sp };
+      const c = ang * D2R, tx = -ux * Math.cos(c) - nx * Math.sin(c), ty = -uy * Math.cos(c) - ny * Math.sin(c);
+      const steer: Steer = (q, t) => { if (t >= lead) { q.vx = tx * sp; q.vy = ty * sp; } };
+      const a = run(i, T, [b], lead + 200, { steer }), tt = run(i, T, [b], lead + 200, { steer, skip: all });
+      n++; if (a.least < tt.least - 1 && a.least < 30) worse++;
+      if (a.least < 4 && tt.least >= 4) { hits++; if (ex.length < 6) ex.push(`   L ${L} D ${D} ${sp} m/s turn ${ang}: gap ${a.least.toFixed(1)} m at her ${(a.vAt / 0.5144).toFixed(1)} kt (timetable ${tt.least.toFixed(1)} m)`); }
+    }
+    P(`${s.kind}#${i}: ${n} cases; closer than the timetable and under 30 m: ${worse}; contact (gap < 4 m to her middle) where the timetable missed: ${hits}`); for (const e of ex) P(e);
+  }
+});
+it('straight boats', () => {
+  P('=== E6 straight-line boats from far off (no turns): least gaps');
+  let seedR = 12345; const rnd = () => (seedR = (seedR * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (const i of [2, 3, 4, 6]) {
+    const s = SERVICES[i], V = VESSEL[s.kind].kt * 0.5144, tr0 = new Traffic(true, SEED);
+    let n = 0, under30 = 0, under4 = 0, worst = Infinity, wdesc = '', worseTT = 0;
+    for (let c = 0; c < 400; c++) {
+      // a random time under way, a random meeting point 60-170 s ahead on her timetable, a boat aimed to be near it
+      let T = 0, v0: any; do { T = rnd() * 40000; v0 = tr0.vessels(T)[i]; } while (!v0.moving || !tr0.vessels(T + 200)[i].moving);
+      const at = 60 + rnd() * 110, m = tr0.vessels(T + at)[i], sp = 0.3 + rnd() * 4.2, c2 = rnd() * 2 * Math.PI, off = (rnd() - 0.5) * 240, o2 = rnd() * 2 * Math.PI;
+      const b = { x: m.x + Math.sin(o2) * off - Math.sin(c2) * sp * at, y: m.y + Math.cos(o2) * off - Math.cos(c2) * sp * at, vx: Math.sin(c2) * sp, vy: Math.cos(c2) * sp };
+      const a = run(i, T, [b], at + 200), tt = run(i, T, [b], at + 200, { skip: all });
+      n++; if (a.least < 30) under30++; if (a.least < 4) under4++; if (a.least < tt.least - 1 && a.least < 30) worseTT++;
+      if (a.least < worst) { worst = a.least; wdesc = `boat ${sp.toFixed(1)} m/s, timetable gap ${tt.least.toFixed(0)}, her speed then ${(a.vAt / 0.5144).toFixed(1)} kt`; }
+    }
+    P(`${s.kind}#${i}: ${n} boats; under 30 m ${under30}, contact ${under4}, closer than timetable & <30: ${worseTT}; worst ${worst.toFixed(1)} m (${wdesc})`);
+  }
+});
+it('berth, basins, midnight', () => {
+  P('=== E9 leaving her berth with a boat D m ahead on her route');
+  for (const i of [2, 3, 4, 6]) {
+    const s = SERVICES[i], r = ROUTES[s.route], tr0 = new Traffic(true, SEED);
+    let T = -1, prev = tr0.vessels(0)[i].moving; for (let t = 0.5; t < 40000; t += 0.5) { const v = tr0.vessels(t)[i]; if (v.moving && !prev && Math.hypot(v.x - r[0].x, v.y - r[0].y) < 20) { T = t; break; } prev = v.moving; }
+    if (T < 0) { P(s.kind, 'no departure found'); continue; }
+    const l = Math.hypot(r[1].x - r[0].x, r[1].y - r[0].y), ux = (r[1].x - r[0].x) / l, uy = (r[1].y - r[0].y) / l; const res: string[] = [];
+    for (const D of [40, 60, 80, 100, 150, 200]) { if (D > l) continue; const b = { x: r[0].x + ux * D, y: r[0].y + uy * D, vx: 0, vy: 0 }; const a = run(i, T - 30, [b], 150); res.push(`${D} m: ${a.least.toFixed(0)} m${a.least < 4 ? ' HIT at ' + (a.vAt / 0.5144).toFixed(1) + ' kt' : ''}`); }
+    P(`${s.kind}#${i} (berth in a basin: ${inBasin(r[0])}): ` + res.join('; '));
+  }
+  P('=== E10 route points inside a harbor basin (boats there are skipped)');
+  for (const [k, r] of Object.entries(ROUTES)) { let inside = 0, tot = 0; for (let j = 1; j < r.length; j++) { const l = Math.hypot(r[j].x - r[j - 1].x, r[j].y - r[j - 1].y); for (let d = 0; d < l; d += 5) { tot++; if (inBasin({ x: r[j - 1].x + (r[j].x - r[j - 1].x) * d / l, y: r[j - 1].y + (r[j].y - r[j - 1].y) * d / l })) inside++; } } P('  ' + k + ': ' + inside * 5 + ' m of ' + tot * 5 + ' m inside a basin'); }
+  P('=== E8 midnight UTC: her place and the wake record across the wrap');
+  { const i = 4, tr = new Traffic(true, SEED), far = [{ x: 1e6, y: 1e6, vx: 0, vy: 0 }]; let prev: any = null, jump = 0;
+    for (let t = 86400 - 300; t < 86400 + 300; t += DT) { const tt = t % 86400, v = tr.vessels(tt, far, DT)[i]; if (prev) jump = Math.max(jump, Math.hypot(v.x - prev.x, v.y - prev.y)); prev = v; }
+    P('  tour#4, nobody near: biggest one-step move across midnight ' + jump.toFixed(1) + ' m (a step at 11 kt is 0.09 m)');
+    const anyTr = tr as any, pa = (t: number) => anyTr.placeAt(SERVICES[i], i, t), pl = (t: number) => anyTr.place(SERVICES[i], i, t);
+    const now = 299.99; const rows: string[] = [];
+    for (const age of [4, 100, 200, 296, 300, 304, 400]) { const q = pa(now - age), e = pl(now - age); rows.push(`age ${age}: recorded-vs-timetable ${Math.hypot(q.x - e.x, q.y - e.y).toFixed(1)} m`); }
+    P('  placeAt after the wrap (t = 300 s past midnight): ' + rows.join('; '));
+    P('  record length ' + anyTr.past[i].length + ', buckets ' + anyTr.past[i].slice(0, 3).map((q: any) => q.b).join(',') + ' ... ' + anyTr.past[i].slice(-3).map((q: any) => q.b).join(','));
+  }
+});

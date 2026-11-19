@@ -1,0 +1,45 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { ROUTES, SERVICES, Traffic, VESSEL, vesselHull, GIVES_WAY, type Moving } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h3.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+it('H3 the two cruise boats: one held up for `pin` s, then nobody about for hours', () => {
+  const R = ROUTES.tour;
+  const tr0 = new Traffic(true, SEED);
+  // tour #4 on the westbound leg (wp1->wp2), 200 m in
+  let T = 0; for (let t = 20 * 3600; t < 30 * 3600; t += 1) { const v = tr0.vessels(t)[4]; if (v.moving && Math.abs(v.h - 270) < 1 && Math.abs(v.x - (R[1].x - 200)) < 6) { T = t; break; } }
+  const v0 = tr0.vessels(T)[4];
+  const leg = (() => { let L = 0; for (let k = 1; k < R.length; k++) L += Math.hypot(R[k].x - R[k - 1].x, R[k].y - R[k - 1].y); return L; })();
+  P(`tour loop ${leg.toFixed(0)} m, leg time ${(leg / (11 * 0.5144)).toFixed(0)} s, period ${(leg / (11 * 0.5144) + 300).toFixed(0)} s; last leg heading ${(Math.atan2(R[9].x - R[8].x, R[9].y - R[8].y) / D2R).toFixed(0)}, first leg heading ${(Math.atan2(R[1].x - R[0].x, R[1].y - R[0].y) / D2R).toFixed(0)}`);
+  for (const pin of [300, 900, 1200, 1500, 1800, 2400, 3000]) {
+    const tr = new Traffic(true, SEED), X: Moving = { x: v0.x - 600, y: v0.y, vx: 0, vy: 0, id: 1 }, far: Moving[] = [];
+    let stuck4 = 0, stuck5 = 0, maxStuck4 = 0, maxStuck5 = 0, least = Infinity; const trc: string[] = []; let n = 0;
+    const H = 6 * 3600;
+    for (let t = T; t < T + H; t += DT) {
+      const vs = tr.vessels(t, t - T < pin ? [X] : far, DT), a = vs[4], b = vs[5];
+      const ha = vesselHull(a), hb = vesselHull(b);
+      const g = Math.min(segPt(hb.a, ha.a, ha.b), segPt(hb.b, ha.a, ha.b), segPt(ha.a, hb.a, hb.b), segPt(ha.b, hb.a, hb.b)) - ha.r - hb.r; if (g < least) least = g;
+      const g4 = tr.give[4], g5 = tr.give[5];
+      if (t - T >= pin) { if (!g4.alongside && g4.k === 0) { stuck4 += DT; maxStuck4 = Math.max(maxStuck4, stuck4); } else stuck4 = 0; if (!g5.alongside && g5.k === 0) { stuck5 += DT; maxStuck5 = Math.max(maxStuck5, stuck5); } else stuck5 = 0; }
+      if (n++ % (60 * 1800) === 0) trc.push(`t${(t - T).toFixed(0)}: #4 k${g4.k.toFixed(2)} lag${g4.lag.toFixed(0)}${g4.alongside ? ' berth' : ''} | #5 k${g5.k.toFixed(2)} lag${g5.lag.toFixed(0)}${g5.alongside ? ' berth' : ''} | apart ${Math.hypot(a.x - b.x, a.y - b.y).toFixed(0)}`);
+    }
+    P(`pin ${pin} s: after 6 h #4 lag ${tr.give[4].lag.toFixed(0)} k ${tr.give[4].k}, #5 lag ${tr.give[5].lag.toFixed(0)} k ${tr.give[5].k}; longest stopped under way with no boat about: #4 ${maxStuck4.toFixed(0)} s, #5 ${maxStuck5.toFixed(0)} s; least hull gap between the two ${least.toFixed(1)} m\n    ${trc.join('\n    ')}`);
+  }
+});
+it('H4 a boat lying still beside her route (not on it), she under way or at her berth: how long she waits', () => {
+  for (const i of [2, 3, 4, 6]) {
+    const s = SERVICES[i], R = ROUTES[s.route], ty = VESSEL[s.kind], tr0 = new Traffic(true, SEED);
+    // leaving her berth: first time she starts moving from R[0]
+    let T = 0; for (let t = 20 * 3600; t < 30 * 3600; t += 1) { const v = tr0.vessels(t)[i], w = tr0.vessels(t + 1)[i]; if (!v.moving && w.moving && Math.hypot(w.x - R[0].x, w.y - R[0].y) < 20) { T = t - 30; break; } }
+    const a = R[0], b = R[1], L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
+    for (const [out, off] of [[150, 40], [150, 70], [150, 90], [150, 110], [60, 60]]) {
+      const X: Moving = { x: a.x + ux * out + uy * off, y: a.y + uy * out - ux * off, vx: 0, vy: 0, id: 1 };
+      const tr = new Traffic(true, SEED); let moved = 0;
+      for (let t = T; t < T + 3600; t += DT) { const v = tr.vessels(t, [X], DT)[i]; moved = Math.max(moved, Math.hypot(v.x - a.x, v.y - a.y)); }
+      P(`${s.kind}#${i} at her berth, a boat lying still ${out} m along her way out and ${off} m to the side (her beam ${ty.beam}, pass ${ty.len / 2 + 75}): after an hour she's ${moved.toFixed(0)} m from her berth, lag ${tr.give[i].lag.toFixed(0)} s, k ${tr.give[i].k}`);
+    }
+  }
+});

@@ -1,0 +1,19 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { ROUTES, Traffic, type Moving } from '/home/user/stop/src/sim/traffic';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h3b.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60;
+it('where they lock', () => {
+  const R = ROUTES.tour, tr0 = new Traffic(true, SEED);
+  let T = 0; for (let t = 20 * 3600; t < 30 * 3600; t += 1) { const v = tr0.vessels(t)[4]; if (v.moving && Math.abs(v.h - 270) < 1 && Math.abs(v.x - (R[1].x - 200)) < 6) { T = t; break; } }
+  const v0 = tr0.vessels(T)[4];
+  for (const pin of [1300, 1400, 1500]) {
+  const tr = new Traffic(true, SEED), X: Moving = { x: v0.x - 600, y: v0.y, vx: 0, vy: 0, id: 1 }; let n = 0, last = '';
+  for (let t = T; t < T + 7200; t += DT) {
+    const vs = tr.vessels(t, t - T < pin ? [X] : [], DT), a = vs[4], b = vs[5], g4 = tr.give[4], g5 = tr.give[5];
+    if (n++ % 600 === 0 && t - T > pin) { const s = `#4 (${(a.x - R[0].x).toFixed(0)},${(a.y - R[0].y).toFixed(0)}) h${a.h.toFixed(0)} k${g4.k.toFixed(2)} want${g4.want} ${g4.alongside ? 'berth' : a.moving ? 'under way' : '?'} lag${g4.lag.toFixed(0)} | #5 (${(b.x - R[0].x).toFixed(0)},${(b.y - R[0].y).toFixed(0)}) h${b.h.toFixed(0)} k${g5.k.toFixed(2)} want${g5.want} ${g5.alongside ? 'berth' : b.moving ? 'under way' : '?'} lag${g5.lag.toFixed(0)}`; if (s.replace(/lag\d+/g, '') !== last.replace(/lag\d+/g, '')) P(`pin ${pin} t${(t - T).toFixed(0)}: ${s}`); last = s; }
+  } }
+  P('route (m from berth): ' + R.map(p => `(${(p.x - R[0].x).toFixed(0)},${(p.y - R[0].y).toFixed(0)})`).join(' '));
+});

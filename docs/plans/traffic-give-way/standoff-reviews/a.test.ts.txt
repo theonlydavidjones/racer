@@ -1,0 +1,118 @@
+import { appendFileSync } from 'node:fs'; const P = (...a: any[]) => appendFileSync('/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/out.txt', a.join(' ') + '\n');
+import { it } from 'vitest';
+import { DT } from '/home/user/yield/src/sim/world';
+import { LL } from '/home/user/yield/src/geo/geo';
+import { segPt } from '/home/user/yield/src/core/math';
+import { GIVES_WAY, SERVICES, Traffic, VESSEL, vesselHull, type Moving, type Vessel } from '/home/user/yield/src/sim/traffic';
+import { landAt } from '/home/user/yield/src/environment/sea';
+
+const SEED = 2434542977, KT = 0.5144;
+const LEG_E = LL(37.8128, -122.4140), LEG_W = LL(37.8128, -122.4300);
+const land = (p: { x: number; y: number }) => !!landAt(p);
+function tourOnLeg(tr: Traffic, fromT: number, dxE = 0) {
+  for (let T = fromT; T < fromT + 4 * 3600; T += 1) {
+    const vs = tr.vessels(T);
+    for (let i = 0; i < vs.length; i++) { const v = vs[i]; if (v.kind === 'tour' && v.moving && Math.abs(v.h - 270) < 1 && Math.abs(v.x - (LEG_E.x - dxE)) < 8 && Math.abs(v.y - LEG_E.y) < 8) return { T, i }; }
+  }
+  throw new Error('none');
+}
+type B = Moving & { upd?: (b: B, t: number) => void; name?: string };
+function run(i: number, T: number, boats: B[], dur: number, give = true) {
+  const tr = new Traffic(true, SEED);
+  let least = Infinity, who = -1, maxRate = 0, h0 = NaN, flips = 0, lastSign = 0, lastLat = 0, kflips = 0, lastK = 1, lastKs = 0, sides = new Set<number>(), tl = 0, grounded = 0, minK = 1;
+  const bs = boats.map(b => ({ ...b }));
+  for (let t = T, n = 0; t < T + dur; t += DT, n++) {
+    for (const b of bs) b.upd?.(b, t - T);
+    const v = tr.vessels(t, bs, DT, land, give ? undefined : () => true)[i];
+    const hv = vesselHull(v);
+    bs.forEach((b, k) => { const g = segPt(b, hv.a, hv.b) - hv.r; if (g < least) { least = g; who = k; tl = t - T; } });
+    if (!isNaN(h0)) maxRate = Math.max(maxRate, Math.abs(((v.h - h0 + 540) % 360) - 180) / DT); h0 = v.h;
+    const g = tr.give[i];
+    const dl = g.lat - lastLat; lastLat = g.lat; const sg = Math.sign(dl); if (sg && lastSign && sg !== lastSign) flips++; if (sg) lastSign = sg;
+    const dk = g.k - lastK; lastK = g.k; const ks = Math.sign(dk); if (ks && lastKs && ks !== lastKs) kflips++; if (ks) lastKs = ks;
+    if (g.side) sides.add(g.side); minK = Math.min(minK, g.k);
+    if (n % 30 === 0 && land(v)) grounded++;
+    for (const b of bs) { b.x += b.vx * DT; b.y += b.vy * DT; }
+  }
+  return { least: +least.toFixed(1), who, tl: +tl.toFixed(0), maxRate: +maxRate.toFixed(1), flips, kflips, sides: [...sides].join('/'), minK: +minK.toFixed(2), grounded, lag: +tr.give[i].lag.toFixed(0) };
+}
+const vel = (kt: number, c: number) => ({ vx: Math.sin(c * Math.PI / 180) * kt * KT, vy: Math.cos(c * Math.PI / 180) * kt * KT });
+const tr0 = new Traffic(true, SEED), { T, i } = tourOnLeg(tr0, 21 * 3600), V0 = tr0.vessels(T)[i], VS = 11 * KT;
+const log = (s: string, r: any, r0?: any) => P(s.padEnd(58), JSON.stringify(r), r0 ? `| no give-way: ${r0.least}` : '');
+
+it('A slow crossers', () => {
+  P('--- A: slow crossers. vessel heading 270 from', V0.x.toFixed(0), V0.y.toFixed(0));
+  // boat crossing N (toward her starboard, heading W: starboard = north) or S at speed c m/s; at time `at` it's `ahead` m ahead of where vessel would be, and `lateral` m off the route (negative: not yet across)
+  for (const c of [0.2, 0.31, 0.5, 0.8, 1.2]) for (const dir of [1, -1]) for (const lateral of [-80, -50, -20, 0, 20, 50]) for (const ahead of [0, 60]) {
+    const at = 120, mx = V0.x - (VS * at + ahead), my = V0.y + dir * lateral; // lateral<0: at CPA still on the side it comes from
+    const b: B = { x: mx, y: my - dir * c * at, vx: 0, vy: dir * c };
+    const r = run(i, T, [b], 300), r0 = run(i, T, [b], 300, false);
+    if (r.least < 30 || r.least < r0.least - 5) log(`cross ${c} m/s ${dir > 0 ? 'to N(stbd)' : 'to S(port)'} lat ${lateral} ahead ${ahead}`, r, r0);
+  }
+});
+it('B tacking', () => {
+  P('--- B: boats tacking across the route (beating W at 4.5 kt on 225/315, or running/reaching E on 045/135)');
+  for (const [h1, h2] of [[225, 315], [45, 135], [200, 340], [20, 160]]) for (const per of [40, 70, 110]) for (const ph of [0, 0.25, 0.5, 0.75]) for (const dist of [400, 700, 1000]) {
+    const b: B = { x: V0.x - dist, y: V0.y, vx: 0, vy: 0, upd: (b, t) => { const k = Math.floor(t / per + ph) % 2; Object.assign(b, vel(4.5, k ? h1 : h2)); } };
+    const r = run(i, T, [b], 300), r0 = run(i, T, [b], 300, false);
+    if (r.least < 25 || r.maxRate > 5) log(`tack ${h1}/${h2} every ${per}s ph ${ph} from ${dist} m ahead`, r, r0);
+  }
+});
+it('C two boats', () => {
+  P('--- C: two stopped boats either side of the route');
+  for (const n of [40, 60, 80, 100, 140]) for (const s of [0, -n, n]) for (const stag of [0, 100, 250]) {
+    const bs: B[] = [{ x: V0.x - 800, y: V0.y + n + s, vx: 0, vy: 0 }, { x: V0.x - 800 - stag, y: V0.y - n + s, vx: 0, vy: 0 }];
+    const r = run(i, T, bs, 400), r0 = run(i, T, bs, 400, false);
+    if (r.least < 30) log(`boats at ${n + s} and ${-n + s} m N of route, stagger ${stag}`, r, r0);
+  }
+  P('--- C2: two crossers from opposite sides');
+  for (const kt of [3, 5]) for (const gap of [0, 80, 200]) for (const a1 of [0, 60]) {
+    const at = 120, mx = V0.x - (VS * at + a1);
+    const bs: B[] = [{ x: mx, y: V0.y - kt * KT * at, vx: 0, vy: kt * KT }, { x: mx - gap, y: V0.y + kt * KT * (at + gap / VS), vx: 0, vy: -kt * KT }];
+    const r = run(i, T, bs, 300), r0 = run(i, T, bs, 300, false);
+    log(`crossers ${kt} kt from S and N, ${gap} m apart, ahead ${a1}`, r, r0);
+  }
+});
+it('D fleet', () => {
+  P('--- D: 8 boats beating W across her route at 4.5 kt (she overtakes), and 8 running E');
+  for (const mode of ['beat', 'run']) for (const sp of [40, 80, 150]) for (const per of [60, 100]) {
+    const bs: B[] = [];
+    for (let k = 0; k < 8; k++) { const ph = (k * 0.37) % 1; bs.push({ x: V0.x - 500 - k * sp, y: V0.y + ((k * 53) % 120) - 60, vx: 0, vy: 0, upd: (b, t) => { const j = Math.floor(t / per + ph) % 2; Object.assign(b, vel(4.5, mode === 'beat' ? (j ? 225 : 315) : (j ? 60 : 120))); } }); }
+    const r = run(i, T, bs, 420), r0 = run(i, T, bs, 420, false);
+    log(`${mode} fleet spaced ${sp} m, tacks every ${per}s`, r, r0);
+  }
+});
+it('E hold', () => {
+  P('--- E: a boat staying near her route (same way W, or toward her E), on it or off to a side');
+  for (const kt of [0.5, 2, 3.5, 5, 6.5]) for (const c of [270, 90]) for (const n of [0, 30, -30, 80, 110]) {
+    const b: B = { x: V0.x - 600, y: V0.y + n, ...vel(kt, c) };
+    const r = run(i, T, [b], 500), r0 = run(i, T, [b], 500, false);
+    if (r.least < 40 || r.flips > 6 || r.kflips > 6) log(`boat ${kt} kt on ${c}, ${n} m N of route`, r, r0);
+  }
+});
+it('H corner', () => {
+  P('--- H: a boat stopped on her route past the corner at mark 6 (next leg toward 37.8145,-122.4560)');
+  const C2 = LL(37.8145, -122.4560), L = Math.hypot(C2.x - LEG_W.x, C2.y - LEG_W.y), ux = (C2.x - LEG_W.x) / L, uy = (C2.y - LEG_W.y) / L;
+  for (const d of [60, 120, 200, 300, 450]) for (const n of [0, 20, -20]) {
+    const b: B = { x: LEG_W.x + ux * d + uy * n, y: LEG_W.y + uy * d - ux * n, vx: 0, vy: 0 };
+    const r = run(i, T, [b], 500), r0 = run(i, T, [b], 500, false);
+    log(`boat ${d} m past the corner, ${n} m to stbd`, r, r0);
+  }
+});
+it('G berths', () => {
+  P('--- G: every give-way service, a boat stopped on the route d m ahead, placed at intervals over 2 h: hits');
+  for (let si = 0; si < SERVICES.length; si++) {
+    if (!GIVES_WAY[SERVICES[si].kind]) continue;
+    for (const d of [300, 600]) {
+      let hits = 0, hits0 = 0, n = 0, worst = Infinity, wt = 0, grounded = 0, stops = 0;
+      for (let t0 = 20 * 3600; t0 < 22 * 3600; t0 += 97) {
+        const v = new Traffic(true, SEED).vessels(t0)[si]; if (!v.moving) continue;
+        const p = { x: v.x + Math.sin(v.h * Math.PI / 180) * d, y: v.y + Math.cos(v.h * Math.PI / 180) * d }; if (land(p)) continue;
+        const b: B = { ...p, vx: 0, vy: 0 }; n++;
+        const r = run(si, t0, [b], 240), r0 = run(si, t0, [b], 240, false);
+        if (r.least < 4) hits++; if (r0.least < 4) hits0++; if (r.least < worst) { worst = r.least; wt = t0; } grounded += r.grounded ? 1 : 0; if (r.minK < 0.05) stops++;
+      }
+      P(`${SERVICES[si].kind}#${si} d=${d}: ${n} cases, hits ${hits} (no give-way ${hits0}), worst ${worst} at t0=${wt}, runs aground-in ${grounded}, stopped ${stops}`);
+    }
+  }
+});

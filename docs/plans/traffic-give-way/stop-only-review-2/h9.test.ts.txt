@@ -1,0 +1,40 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import ss2 from '/home/user/stop/src/courses/data/seaweed-soup-2026-course2.json';
+import { DEFAULT_SETTINGS } from '/home/user/stop/src/settings';
+import { DT, World } from '/home/user/stop/src/sim/world';
+import { LL } from '/home/user/stop/src/geo/geo';
+import { Traffic } from '/home/user/stop/src/sim/traffic';
+import { SyncMirror, SyncSource } from '/home/user/stop/src/sim/sync';
+import { firstDifference } from '/home/user/stop/tests/helpers/worlds';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h9.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, KT = 0.5144, mark6 = LL(37.811667, -122.43);
+function tourAtMark6(fromT: number): number {
+  const tr = new Traffic(true, SEED);
+  for (let T = fromT; T < fromT + 4 * 3600; T += 2) for (const v of tr.vessels(T)) if (v.kind === 'tour' && v.moving && v.h > 240 && v.h < 300 && Math.abs(v.x - mark6.x) < 15 && Math.abs(v.y - mark6.y) < 200) return T;
+  throw new Error('none');
+}
+it('H9 the mirror with a vessel giving way and a boat latched as overtaking', () => {
+  const T = tourAtMark6(13 * 3600 + 35 * 60 + 8 * 3600), startMin = Math.floor((T - 600) / 60) - 8 * 60;
+  const tideTime = `${String(Math.floor(startMin / 60)).padStart(2, '0')}:${String(startMin % 60).padStart(2, '0')}`;
+  const s: any = { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime, windKind: 'west', windKt: 7, current: 'real', traffic: 1, opponents: ['stock:1'], fleet: 1 };
+  const make = () => new World(ss2 as any, s, SEED) as any;
+  const A = make(), M = make(), src = new SyncSource(A), mirror = new SyncMirror(M);
+  const frame = () => { A.step(DT); mirror.apply(structuredClone(src.capture(A.drainEvents()))); };
+  while (A.trafficT < T - 100) frame();
+  const tour = () => A.vessels.filter((v: any) => v.kind === 'tour').sort((a: any, b: any) => Math.hypot(a.x - mark6.x, a.y - mark6.y) - Math.hypot(b.x - mark6.x, b.y - mark6.y))[0];
+  const u = A.user, o = A.boats.find((q: any) => !q.isUser), v0 = tour(), id = v0.id, ux = Math.sin(v0.h * Math.PI / 180), uy = Math.cos(v0.h * Math.PI / 180);
+  const p = { x: v0.x + ux * 500, y: v0.y + uy * 500 }, q = { x: v0.x - ux * 120 + uy * 30, y: v0.y - uy * 120 - ux * 30 };
+  let diffs = 0, first = '', sawOver = false, sawGive = false, vesselDiff = 0;
+  for (let i = 0; i < 60 * 200; i++) {
+    u.x = p.x; u.y = p.y; u.h = 81; u.vx = 0; u.vy = 0; u.v = 0; u.turnRate = 0; u.desired = 81;
+    o.x = q.x; o.y = q.y; o.h = v0.h; o.vx = ux * 3; o.vy = uy * 3; o.v = 3; o.desired = v0.h; q.x += ux * 3 * DT; q.y += uy * 3 * DT;
+    frame();
+    if (A.traffic.give[id].over.length) sawOver = true; if (A.traffic.givingWay()) sawGive = true;
+    if (i % 20 === 0) { const d = firstDifference(A, M); if (d) { diffs++; if (!first) first = `step ${i}: ${d}`; }
+      if (JSON.stringify(M.traffic.vessels(M.trafficT)) !== JSON.stringify(A.vessels)) vesselDiff++; }
+  }
+  P(`gave way: ${sawGive}; a boat latched as overtaking: ${sawOver}; checks with a difference between the race and the mirror: ${diffs} ${first}; checks where the mirror's own traffic.vessels(now) differs from the race's vessels: ${vesselDiff}`);
+}, 1800000);

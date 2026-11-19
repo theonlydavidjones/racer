@@ -1,0 +1,28 @@
+import { appendFileSync } from 'node:fs'; const P = (...a: any[]) => appendFileSync('/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/oute.txt', a.join(' ') + '\n');
+import { it } from 'vitest';
+import { DT, World } from '/home/user/yield/src/sim/world';
+import { DEFAULT_SETTINGS } from '/home/user/yield/src/settings';
+import { segPt } from '/home/user/yield/src/core/math';
+import { vesselHull, VESSEL } from '/home/user/yield/src/sim/traffic';
+import { bow, stern } from '/home/user/yield/src/boat/boat';
+import { cpa } from '/home/user/yield/src/rules/geometry';
+import ss2 from '/home/user/yield/src/courses/data/seaweed-soup-2026-course2.json';
+const KT = 0.5144;
+it('fleet detail', () => {
+  for (const [seed, tideTime, from, to] of [[3, '14:05', 1190, 1310], [1, '13:35', 1620, 1690]] as const) {
+    const w = new World(ss2 as any, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime, windKind: 'west', windKt: 12, current: 'real', traffic: 1, opponents: ['stock:1', 'stock:2', 'stock:3', 'stock:4', 'stock:5', 'stock:6', 'stock:7'], fleet: 7 } as any, seed);
+    P('=== seed ' + seed + ' ' + tideTime);
+    const hullGap = (b: any, v: any) => { const hv = vesselHull(v); return Math.min(segPt(bow(b), hv.a, hv.b), segPt(stern(b), hv.a, hv.b), segPt(b, hv.a, hv.b)) - hv.r; };
+    const prevDes = new Map<number, number>();
+    for (let i = 0; w.t < to; i++) {
+      w.step(DT); if (w.t < from) continue;
+      for (const v of w.vessels) { if (v.kind !== 'tour' || !v.moving) continue; const g = (w as any).traffic.give[v.id];
+        const near = w.boats.filter((b: any) => !b.isUser && Math.hypot(b.x - v.x, b.y - v.y) < 160);
+        if (!near.length) continue;
+        const hr = v.h * Math.PI / 180, ux = Math.sin(hr), uy = Math.cos(hr);
+        const hitNow = near.some((b: any) => hullGap(b, v) < 0.85);
+        if (i % 180 === 0 || hitNow) P('t ' + w.t.toFixed(1) + ' tour#' + v.id + ' h ' + v.h.toFixed(0) + ' ' + (v.v / KT).toFixed(1) + ' kt k ' + g.k.toFixed(2) + ' side ' + g.side + ' off ' + Math.hypot(g.ox, g.oy).toFixed(0) + ' | ' + near.map((b: any) => { const rx = b.x - v.x, ry = b.y - v.y, c = cpa(b, { x: v.x, y: v.y, vx: ux * v.v, vy: uy * v.v }); return 'b' + b.id + ' ' + (rx * ux + ry * uy).toFixed(0) + ' ahead ' + (rx * uy - ry * ux).toFixed(0) + ' stbd, h ' + b.h.toFixed(0) + ' ' + (Math.hypot(b.vx, b.vy) / KT).toFixed(1) + ' kt along ' + ((b.vx * ux + b.vy * uy) / KT).toFixed(1) + ' gap ' + hullGap(b, v).toFixed(1) + ' cpa ' + c.d.toFixed(0) + '/' + c.t.toFixed(0) + 's des ' + (b.desired ?? NaN).toFixed(0) + (b.leg != null ? ' leg ' + b.leg : ''); }).join(' ; '));
+      }
+    }
+  }
+}, 3000000);

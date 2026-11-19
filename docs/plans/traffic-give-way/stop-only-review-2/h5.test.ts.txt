@@ -1,0 +1,22 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { SERVICES, Traffic, type Moving } from '/home/user/stop/src/sim/traffic';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h5.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60;
+it('H5 cost', () => {
+  for (const nb of [0, 1, 6, 20, 40]) for (const near of [1, 5]) {
+    const tr = new Traffic(true, SEED), T0 = 21.6 * 3600;
+    // warm
+    const mk = (t: number) => { const vs = tr.vessels(t); const boats: Moving[] = []; const tg = near === 1 ? [4] : [2, 3, 4, 5, 6]; for (let k = 0; k < nb; k++) { const v = vs[tg[k % tg.length]]; boats.push({ x: v.x + 300 + 37 * k, y: v.y + 200 - 23 * k, vx: 1.5, vy: -1, id: k }); } return boats; };
+    let boats = mk(T0);
+    const N = 60 * 600; let tot = 0, peak = 0, totBase = 0; const per: number[] = [];
+    for (let rep = 0; rep < 2; rep++) { tot = 0; peak = 0; totBase = 0; per.length = 0;
+      for (let k = 0; k < N; k++) { const t = T0 + k * DT; if (k % 600 === 0) boats = mk(t);
+        const a = performance.now(); tr.vessels(t, boats, DT); const b = performance.now(); tr.vessels(t); const c = performance.now();
+        tot += b - a; totBase += c - b; if (b - a > peak) peak = b - a; per.push(b - a); for (const q of boats) { q.x += q.vx * DT; q.y += q.vy * DT; } } }
+    per.sort((x, y) => x - y);
+    P(`${nb} boats near ${near} vessel(s): mean ${(tot / N * 1000).toFixed(1)} us a step (the timetable alone ${(totBase / N * 1000).toFixed(1)} us); p99 ${(per[Math.floor(N * 0.99)] * 1000).toFixed(0)} us, p99.9 ${(per[Math.floor(N * 0.999)] * 1000).toFixed(0)} us, peak ${(peak * 1000).toFixed(0)} us`);
+  }
+});

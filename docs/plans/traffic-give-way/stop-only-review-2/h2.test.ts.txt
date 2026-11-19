@@ -1,0 +1,43 @@
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { it } from 'vitest';
+import { ROUTES, SERVICES, Traffic, VESSEL, vesselHull, GIVES_WAY, type Moving } from '/home/user/stop/src/sim/traffic';
+import { segPt } from '/home/user/stop/src/core/math';
+const OUT = '/tmp/claude-0/-home-user-racer/781bdda1-9a86-5cd6-bb3f-ed2540f513a9/scratchpad/rev2/h2.txt';
+writeFileSync(OUT, '');
+const P = (...a: any[]) => appendFileSync(OUT, a.join(' ') + '\n');
+const SEED = 2434542977, DT = 1 / 60, D2R = Math.PI / 180;
+const gives = SERVICES.map((_, i) => i).filter(i => GIVES_WAY[SERVICES[i].kind]);
+function onLongLeg(i: number) {
+  const R = ROUTES[SERVICES[i].route]; let wp = 0, best = 0;
+  for (let k = 0; k < R.length - 1; k++) { const l = Math.hypot(R[k + 1].x - R[k].x, R[k + 1].y - R[k].y); if (l > best) { best = l; wp = k; } }
+  const tr = new Traffic(true, SEED), c = R[wp], V = VESSEL[SERVICES[i].kind].kt * 0.5144;
+  for (let T = 20 * 3600; T < 28 * 3600; T += 0.5) { const v = tr.vessels(T)[i]; if (v.moving && Math.hypot(v.x - c.x, v.y - c.y) < 10) { const v2 = tr.vessels(T + 100 / V)[i]; if (Math.abs(Math.atan2(R[wp + 1].x - c.x, R[wp + 1].y - c.y) / D2R - (v2.h > 180 ? v2.h - 360 : v2.h)) < 1) return { T: T + 100 / V, L: best }; } }
+  throw new Error('none');
+}
+it('H2 the overtaking latch: she is slowed/stopped for X; Y sails up from astern past her and on along her route; X leaves', () => {
+  for (const i of gives) {
+    const { T, L } = onLongLeg(i), s = SERVICES[i], tr0 = new Traffic(true, SEED), v0 = tr0.vessels(T)[i], ux = Math.sin(v0.h * D2R), uy = Math.cos(v0.h * D2R), ty = VESSEL[s.kind];
+    P(`== ${s.kind}#${i} leg ${L.toFixed(0)} m`);
+    for (const ysp of [2.0, 2.6, 3.1]) for (const yoff of [25, 40, 60]) for (const leave of [40, 80, 120, 160]) {
+      // X lies still 450 m ahead on her line. Y starts 150 m astern, yoff m to starboard, on her course at ysp; once Y is `leave` m ahead of
+      // her middle X is gone (sailed off) and Y, once 30 m past her bow, bears away 20 deg across her bow line and then runs on along it.
+      const X: Moving = { x: v0.x + ux * 450, y: v0.y + uy * 450, vx: 0, vy: 0, id: 1 };
+      const Y: Moving = { x: v0.x - ux * 150 + uy * yoff, y: v0.y - uy * 150 - ux * yoff, vx: ux * ysp, vy: uy * ysp, id: 2 };
+      const tr = new Traffic(true, SEED); let least = Infinity, vAt = 0, tAt = 0, gone = false, latchedEver = false, latchedAtHit = false; const trc: string[] = []; let n = 0;
+      for (let t = T; t < T + 900; t += DT) {
+        const boats = gone ? [Y] : [X, Y];
+        const v = tr.vessels(t, boats, DT)[i], hv = vesselHull(v), g = segPt(Y, hv.a, hv.b) - hv.r;
+        const ahead = (Y.x - v.x) * ux + (Y.y - v.y) * uy, side = (Y.x - v.x) * uy - (Y.y - v.y) * ux;
+        if (tr.give[i].over.includes(2)) latchedEver = true;
+        if (g < least) { least = g; vAt = v.v; tAt = t - T; latchedAtHit = tr.give[i].over.includes(2); }
+        if (!gone && ahead > leave) gone = true;
+        // Y: once past her bow by 30 m, steers onto her line and along it
+        if (ahead > ty.len / 2 + 30 && side > 1) { const c = (v0.h - 20) * D2R; Y.vx = Math.sin(c) * ysp; Y.vy = Math.cos(c) * ysp; } else if (ahead > ty.len / 2 + 30) { Y.vx = ux * ysp; Y.vy = uy * ysp; }
+        if (n++ % 1800 === 0) trc.push(`t${(t - T).toFixed(0)}:k${tr.give[i].k.toFixed(2)}/Yahead${ahead.toFixed(0)}/side${side.toFixed(0)}${tr.give[i].over.includes(2) ? '/R13' : ''}`);
+        if (g < 0) break;
+        Y.x += Y.vx * DT; Y.y += Y.vy * DT;
+      }
+      if (least < 30) P(`Y ${(ysp / 0.5144).toFixed(1)} kt, ${yoff} m abeam, X gone when Y ${leave} m ahead: least hull gap to Y ${least.toFixed(1)} m at t=${tAt.toFixed(0)}, she making ${(vAt / 0.5144).toFixed(1)} kt, Y latched as overtaking then: ${latchedAtHit} (ever ${latchedEver}) ${least < 4 ? '<<< CONTACT' : ''}\n     ${trc.join(' ')}`);
+    }
+  }
+});
