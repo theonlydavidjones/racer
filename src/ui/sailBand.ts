@@ -404,7 +404,9 @@ export class SailBand {
     // never does (the car was already there)
     if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || !carFree(u, a.side)) {
       const set = car.fore === a.fore && car.ins === a.ins;
-      this.note = { text: set ? `${name}: set at ${at}. ${a.side === windSide(u) ? 'It takes over at the next tack.' : 'It takes the sheet when the jib goes up.'}` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
+      // (dropped, its car loaded before the crew got there: the World says so in a line for every call, the band's and the
+      // keys': world.ts carCallStep. Not said twice here, nor with a cause it may not have, the jib's hoist as well as a tack)
+      this.note = set ? { text: `${name}: set at ${at}. ${a.side === windSide(u) ? 'It takes over at the next tack.' : 'It takes the sheet when the jib goes up.'}`, until: performance.now() + 5000 } : null;
       this.carAsked = null; return;
     }
     const people = u.crew?.people ?? [], i = people.findIndex(p => p.job?.line === 'car'), j = i >= 0 ? people[i].job! : null;

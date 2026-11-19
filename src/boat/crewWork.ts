@@ -545,7 +545,9 @@ function carJob(b: Boat, dt: number): void {
 export function bodyJob(b: Boat, line: 'pole' | 'hoist' | 'outboard', on: boolean): number {
   const c = b.crew; if (!c) return 1;
   const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, c.layout ?? 'cockpit'), a = c.people[who];
-  if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
+  // (a car job of your own call they finish first, then this; one of the crew's own plan waits for the sails: called
+  // "sails down", a hand re-pins and goes, the physics review of the dock's jobs)
+  if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car' && b.carCmd)) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);
 }

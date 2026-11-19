@@ -195,7 +195,11 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
   const say = (msg: string) => { if (b.isUser) emit({ type: 'toast', msg, ms: 3500 }); };
   // (the forward hand on the halyards at the mast, or whoever there is: at their pace)
   const busy = !!r && ((r.mainUp && r.main < 1) || (!r.mainUp && r.main > 0) || (r.jibUp && r.jib < 1) || (!r.jibUp && r.jib > 0));
-  const hands = bodyJob(b, 'hoist', busy);
+  const hands0 = bodyJob(b, 'hoist', busy);
+  // (worked once the hand is at the mast: kneeling at the jib car still, bodyJob leaves them at it till it's done, and the
+  // sail went up at their pace with nobody on the halyard: the physics review of the dock's jobs, 18 Nov 2026)
+  const cw = busy ? b.crew : undefined, hand = cw ? cw.people[ownerOf('hoist', cw.spec.crew.length, cw.spec, cw.layout ?? 'cockpit')] : undefined;
+  const hands = !hand || hand.job?.line === 'hoist' ? hands0 : 0;
   const twa = Math.abs(wrap(b.ww.from - b.h)), offWind = twa <= 45 ? 1 : twa >= 120 ? 0.3 : 1 - 0.7 * (twa - 45) / 75;
   const step = (k: 'main' | 'jib') => {
     const up = k === 'main' ? r.mainUp : r.jibUp, was = r[k];
@@ -203,7 +207,7 @@ export function crewRig(b: Boat, dt: number, emit: Emit): void {
     if (up && was < 1 && k === 'jib' && r.mainUp && r.main < 1) return;
     if (up && was < 1) {
       r[k] = Math.min(1, was + dt * hands * (k === 'main' ? offWind : 1) / HOIST[k]);
-      if (k === 'main' && was === 0 && offWind < 0.7) say('Hoisting the main off the wind: it fills and catches on the spreaders. It goes up much more easily head to wind.');
+      if (k === 'main' && was === 0 && r[k] > 0 && offWind < 0.7) say('Hoisting the main off the wind: it fills and catches on the spreaders. It goes up much more easily head to wind.');
       // up at the mast: the last inches are the piano's (the crew take them up, or you, if the halyard's yours)
       if (r[k] === 1) say(byHand(b, k === 'main' ? 'downhaul' : 'jibHalyard') ? `${k === 'main' ? 'Main' : 'Jib'} up at the mast: take up the ${k === 'main' ? 'main' : 'jib'} halyard at the piano.` : k === 'main' ? 'Main up.' : 'Jib up.');
     } else if (!up && was > 0) {
