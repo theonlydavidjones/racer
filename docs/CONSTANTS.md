@@ -718,7 +718,7 @@ physics, ranked like the ten above:
 | OFF_HELD_S (sim/world.ts offPier) | 5 s | 82 | estimate | a way off begun is held for no longer than this since it was found (her turn's time, about), kept across an open leg that flickers shut |
 | TWO_TURNS | 720 | 52 | standard |  |
 | ONE_TURN | 360 | 60 | standard |  |
-| HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |
+| HULL_HALF_BEAM | 0.85 | 106 | unsourced | not the half-beam (1.1 m, NFIA class rules): a half-width averaged along her length, the hull a line bow to stern for mark contact |
 | SAME_INCIDENT | 8 | 73 | unsourced | RRS names the rule, not the number |
 | TANGLE_MAX | 30 | 75 | sourced |  |
 | COMPELLED_WINDOW | 3 | 78 | unsourced | RRS names the rule, not the number |
