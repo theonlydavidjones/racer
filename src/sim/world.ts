@@ -666,9 +666,13 @@ export class World {
   private tuneAtDock(): void {
     const o = outlookFor(this);
     let n = 0, sum = 0; for (let m = 0; m <= 60; m += 10) { sum += o.breeze(this.gunUtc + m).kt; n++; }
-    // (a lesson or a Case: the wind she'll sail it in, held to its range where it's sailed (lessonKt), not the setup's)
+    // (a lesson or a Case: the wind she'll sail it in, held to its range where it's sailed (lessonKt), not the setup's;
+    // cruising, the forecast where she sails, the course's mean over the field there: the Cityfront's about 1.2, so a
+    // mean of 8 kt is near 10 under her, and a crew sets up for what they'll sail in. From her slip, the Cityfront's, as
+    // a lesson takes it. Racing keeps the course's mean, as the fleet reads the forecast.)
     const lesson = this.settings.mode === 'lesson';
-    const kt = this.forecastKt = lesson ? this.windModel.kt * (this.lessonField ?? 1) : sum / n, right = presetFor(kt);
+    const here = () => this.fieldAt(this.fromSlip ? getPlace('cityfront')?.p ?? this.user : this.user).k;
+    const kt = this.forecastKt = lesson ? this.windModel.kt * (this.lessonField ?? 1) : this.freeSail ? sum / n * here() : sum / n, right = presetFor(kt);
     const r = makeRng((this.seed ^ 0x71a3e) >>> 0), order = ['light', 'medium', 'strong'] as const;
     for (const b of this.boats) {
       if (b.tune) continue;
