@@ -1372,9 +1372,9 @@ function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vec
           const d = ground(q.x, q.z, q.y) - q.y; if (d > 0.025 && inCockpit(Math.abs(q.x), q.z)) into = Math.max(into, d); any = Math.max(any, d - 0.02);
         }
       };
-      if (!all && !nearEnd) { at(knee, true); at(_t.copy(knee).lerp(ank, 0.9), true); return; }
+      if (!all && !nearEnd) { at(knee, true); for (const t of [0.25, 0.5, 0.9]) at(_t.copy(knee).lerp(ank, t), true); return; } // (along it too: its ankle end can be in under a bench)
       for (let t = 0.4; t < 1.01; t += 0.1) at(_t.copy(hip).lerp(knee, t), t > 0.95);
-      for (let t = 0.1; t < 0.95; t += 0.1) at(_t.copy(knee).lerp(ank, t), t > 0.85);
+      for (let t = 0.1; t < 0.95; t += 0.1) at(_t.copy(knee).lerp(ank, t), t > 0.2);
     };
     measure(false); if (into === 0) return;
     measure(true);
