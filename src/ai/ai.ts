@@ -740,7 +740,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // minutes.) Crew Controls' whole-hull latch and Crew Figures' re-arming, together.
       const half = w.lineLen / 2 - 12, a = clamp(w.lineA(b), -half, half);
       if (w.lineD(bow(b)) > 0) ai.below = true; else if (Math.max(w.lineD(bow(b)), w.lineD(stern(b))) < -2) ai.below = false;
-      const off = ai.below ? -18 : 10;
+      // (and from below but beyond an end, first in between the ends, below the line: from there the straight course to a
+      // point over the line crosses its extension, which isn't a start, and she'd go round, back below and up again, for
+      // good: sim-ai's tack test, 19 Nov 2026, a boat 90–105 m along a 154 m line)
+      const off = ai.below || Math.abs(w.lineA(b)) > half ? -8 - (ai.below ? 10 : 0) : 10;
       P = { x: w.center.x + N.x * off + L.x * a, y: w.center.y + N.y * off + L.y * a }; void along;
     }
     else {
