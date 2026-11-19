@@ -147,6 +147,34 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
   }
   return m;
 }
+/** How far off a boat turning circles she passes, m, beyond the circle's sweep (a modelling margin: about half a length
+ * of water outside the hull at the circle's edge). */
+const CIRCLE_BERTH = 4;
+/** The turning circle a boat is sailing: its center and the radius her hull's ends sweep, m; null if she isn't turning
+ * hard enough to be circling (2°/s: well under a penalty turn, about 10–20°/s). */
+function circleOf(o: Boat): { x: number; y: number; r: number } | null {
+  const rate = o.turnRate ?? 0;
+  if (Math.abs(rate) < 2) return null;
+  const R = Math.min(30, Math.max(0.5, o.v) / (Math.abs(rate) * Math.PI / 180)), side = V(o.h + Math.sign(rate) * 90);
+  return { x: o.x + side.x * R, y: o.y + side.y * R, r: R + LOA / 2 };
+}
+/** Steering `want`, does she pass inside the circle `o` is turning in, within the next 15 s? Then the sailable heading
+ * nearest `want` that takes her past it with CIRCLE_BERTH to spare (or the one that passes widest); else null. */
+function pastCircle(b: Boat, o: Boat, want: number): number | null {
+  const c = circleOf(o);
+  if (!c) return null;
+  const v = Math.max(b.v, 1.2), reach = v * 15, need = c.r + CIRCLE_BERTH;
+  const miss = (h: number) => { const u = V(h), ax = c.x - b.x, ay = c.y - b.y, s = clamp(ax * u.x + ay * u.y, 0, reach); return hypot(ax - u.x * s, ay - u.y * s); };
+  if (hypot(c.x - b.x, c.y - b.y) - need > reach || miss(want) >= need) return null;
+  let best = want, bestM = -Infinity;
+  for (const k of [10, -10, 20, -20, 30, -30, 45, -45, 60, -60]) {
+    const h = sailable(b, want + k), m = miss(h);
+    if (m >= need) return h;
+    if (m > bestM) { bestM = m; best = h; }
+  }
+  return best;
+}
+
 /** Of the sailable headings near `want`, the one that keeps her furthest from other boats (the nearest to `want` among near-equals). */
 function clearestHeading(w: World, b: Boat, want: number): number {
   let best = want, bestS = -Infinity;
@@ -982,6 +1010,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (and not once they're touching: that's a contact, its own incident, not a swerve to avoid one; held against her,
       // a swerve every step would keep the pair's tangle going (world.ts) and swallow a later breach of the other's)
       if (hypot(dx, dy) < 10 && (o.isUser || (hullGap(b, o) >= CONTACT_GAP && wouldTouch(b, o, lagT + 1)))) b.forced14 = o.id;
+    } else if (r.kc === o && r.rule === '21.2' && !avoiding) {
+      // A boat doing her penalty turns: she must keep clear (21.2), but a circling boat has no course anyone can read, and
+      // a fleet sailing on into her circle meets her whichever way she turns. Sailors give her a berth (rule 23.2 has a
+      // boat not interfere with one taking a penalty; rule 14, avoid contact): she steers past outside the water the
+      // circle sweeps, not the late swerve above.
+      const h = pastCircle(b, o, desired);
+      if (h != null) { desired = h; avoiding = true; }
     }
   }
   for (const o of w.boats) {
