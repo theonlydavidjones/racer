@@ -15,7 +15,7 @@ const IN = 0.0254;
  * evenly until its curve is worked). */
 export const ROPE_IN: Partial<Record<keyof Controls, { inches: number; even: boolean; note: string }>> = {
   vang: { inches: 4 * 6.5 / 2.54, even: true, note: '4:1 (parts read off a photo), 5–8 cm at the boom: an estimate' },
-  outhaul: { inches: 3 / 2.54, even: true, note: '1:1 to the clew, 3 cm of travel (North Sails)' },
+  outhaul: { inches: 3 / 2.54, even: true, note: '1:1 to the clew, 3 cm of travel (tuning guide)' },
   cunningham: { inches: 6.5 / 2.54, even: true, note: '1:1, 5–8 cm at the cringle: an estimate' },
   jibCunningham: { inches: 6.5 / 2.54, even: true, note: '1:1, a few cm: an estimate' },
   downhaul: { inches: 2 * 5 / 2.54, even: true, note: '2:1 at the mast foot, a few cm at the head: an estimate' },
