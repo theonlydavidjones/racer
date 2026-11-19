@@ -288,23 +288,31 @@ function poseTurning(K: PoseRing, t0: number): Pose & { turnRate: number } {
 const COURSE_CHANGE = 10;
 /** Her heading smoothed over a second, deg (unwrapped from `ref`): the course she's steering, through the yaw. */
 function courseAt(R: PoseRing, t: number, ref: number): number {
-  const lo = R.t[at(R, R.n - 1)], hi = R.t[at(R, 0)]; // (within the ring: poseAt gives her oldest pose outside it)
-  let s = 0;
-  for (let k = -2; k <= 2; k++) s += wrap(poseAt(R, clamp(t + k * 0.25, lo, hi)).h - ref);
-  return ref + s / 5;
+  return meanHeading(R, t - 0.5, t + 0.5, ref);
 }
+/** Her mean heading from t1 to t2, deg (unwrapped from `ref`), every quarter second, kept within her ring (poseAt gives
+ * her oldest pose outside it). */
+function meanHeading(R: PoseRing, t1: number, t2: number, ref: number): number {
+  const lo = R.t[at(R, R.n - 1)], hi = R.t[at(R, 0)], n = Math.max(1, Math.round((t2 - t1) / 0.25));
+  let s = 0;
+  for (let k = 0; k <= n; k++) s += wrap(poseAt(R, clamp(t1 + (t2 - t1) * k / n, lo, hi)).h - ref);
+  return ref + s / (n + 1);
+}
+/** The course she held before a turn of hers that began at t0: her mean heading over the HELD_MEAN s before it, through
+ * a wave or so of yaw (a turn found on the smoothed course can begin in a yaw's trough or crest, a few degrees off). */
+const HELD_MEAN = 3;
 /** Each time in her ring a course change of hers began, either way, the oldest first: on her course (courseAt), every
  * half second, a run of steps one way (a step under 0.5°, 1°/s, is holding on; up to a second of it may come inside a
- * run) that comes to COURSE_CHANGE or more net. NaN for one already under way at her oldest pose (half that will do). */
+ * run) that comes to COURSE_CHANGE or more net. NaN for one already under way at her oldest pose. */
 function turnStarts(R: PoseRing): number[] {
   const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)], ref = R.h[at(R, 0)];
   const out: number[] = [];
   let t0: number | null = null, dir = 0, h0 = 0, still = 0, prev = courseAt(R, oldest + 0.5, ref);
-  // (a run already under way at her oldest pose, coming to half COURSE_CHANGE or more: the course she held before it is
-  // older than the ring, so nothing can be said from it: NaN, and wasFailing excuses nothing. The safe way to be wrong:
-  // a dodge left unexcused is judged as before, where an unseen first luff would excuse a hunt)
+  // (a course change already under way at her oldest pose: the course she held before it is older than the ring, so
+  // nothing can be said from it: NaN, and wasFailing excuses nothing, the call as it was. The full COURSE_CHANGE, as
+  // anywhere: half of it is inside a seaway's yaw, and called honest dodgers in a ±4° sea)
   const edge = oldest + 0.5;
-  const close = (hEnd: number) => { if (t0 != null && Math.abs(hEnd - h0) >= (t0 <= edge + 1e-9 ? COURSE_CHANGE / 2 : COURSE_CHANGE)) out.push(t0 <= edge + 1e-9 ? NaN : t0); t0 = null; dir = 0; still = 0; };
+  const close = (hEnd: number) => { if (t0 != null && Math.abs(hEnd - h0) >= COURSE_CHANGE) out.push(t0 <= edge + 1e-9 ? NaN : t0); t0 = null; dir = 0; still = 0; };
   for (let t = oldest + 1; t <= now + 1e-9; t += 0.5) {
     const h = courseAt(R, t, ref), d = h - prev;
     if (Math.abs(d) < 0.5) { if (t0 != null && (still += 0.5) > 1) close(prev); }
@@ -345,8 +353,8 @@ export function wasFailing(row: RulesBoat, kc: RulesBoat): boolean {
   const me = { x: 0, y: 0, h: 0 };
   const now = R.t[at(R, 0)];
   return starts.every(t0 => {
-    // (held on her course then, through the yaw; to the later of HELD_HORIZON and a few seconds past now)
-    const k = poseTurning(K, t0), p0 = poseAt(R, t0), held = straightOn({ ...p0, h: courseAt(R, t0, p0.h) }), theirs = straightOn(k, k.turnRate);
+    // (held on her course then, her mean heading before it; to the later of HELD_HORIZON and a few seconds past now)
+    const k = poseTurning(K, t0), p0 = poseAt(R, t0), held = straightOn({ ...p0, h: meanHeading(R, t0 - HELD_MEAN, t0, p0.h) }), theirs = straightOn(k, k.turnRate);
     for (let tau = 0; tau <= Math.max(HELD_HORIZON, now - t0 + 3) + 1e-9; tau += RING_DT) {
       const a = held(tau); me.x = a.x; me.y = a.y; me.h = a.h;
       if (hullGap(me, theirs(tau)) < APPREHENSION_GAP) return true;
