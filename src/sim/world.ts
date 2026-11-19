@@ -36,7 +36,7 @@ import type { Settings } from '../settings';
 import { aiThink, poleMustCome, poleRefused } from '../ai/ai';
 import { legacyKnobs } from '../ai/skipper';
 import type { SimEvent } from './events';
-import { Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
+import { GIVES_WAY, Traffic, VESSEL, vesselHull, type Vessel } from './traffic';
 import { lineTransit } from './transits';
 import { SHIP_AIR, WindSum, addBoatWake, addCommitteeWake, addShipWake, prepareLee, type Shadow } from '../environment/shadows';
 import { WAKE_PIERS, addPierWakes, withPierWakes } from '../environment/pierWakes';
@@ -1862,13 +1862,15 @@ export class World {
         const big = v.kind === 'container' || v.kind === 'tanker';
         this.emit({ type: 'toast', ms: 7000, msg: big
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
-          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. The racing rules don't apply between you and her; the collision regulations do. Keep clear, and expect a wake.` });
+          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. She gives way to you under sail (Rule 18): hold your course and speed, and expect a wake.` }); // (Rule 17(a)(i): the stand-on vessel keeps her course and speed)
       }
       // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
       if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
         this.warned.set(-1 - v.id, this.t);
         for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
-        this.emit({ type: 'toast', ms: 6000, msg: `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
+        this.emit({ type: 'toast', ms: 6000, msg: GIVES_WAY[v.kind]
+          ? `Five short blasts from the ${ty.name.toLowerCase()}: she doubts what you're doing. If she can't miss you alone, act now (Rule 17(b)).`
+          : `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
       }
     }
   }
