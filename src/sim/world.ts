@@ -10,7 +10,7 @@ import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, crewRig, crewTiedUp, moveBoat, settleTrim, tackTarget, tiedTack, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING, HULL } from '../boat/dynamics';
-import { BOOM_STOP, defaultControls } from '../boat/controls';
+import { BOOM_STOP, defaultControls, mainsheetFor } from '../boat/controls';
 import { D2R, HALF, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
@@ -352,6 +352,12 @@ export function boatLook(spec: BoatSpec) {
     no: sailNo(spec), hullColor: spec.hull.upper, sailColor: spec.sails.color === 'black' ? '#232427' : '#fbfaf5',
     paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
   };
+}
+/** A main that's up and let fly at the dock or on her lines: its sheet eased out to the boom on the shroud (dockStep). */
+function letRun(b: Boat, k: number): void {
+  // (a sheet you've set yourself at the dock, from the sail band, is left as you set it: worked once she's let go)
+  if (b.ctlTarget?.mainsheet != null) return;
+  b.ctl.mainsheet += (mainsheetFor(BOOM_STOP, b.ctl.traveller) - b.ctl.mainsheet) * k;
 }
 /** Hulls together (World.hulls): the unit normal from A's hull to B's, from the closest points of their bow-to-stern
  * segments (rules/geometry.ts hullGap's hulls), not the line between their centers: two hulls overlapped side by side
@@ -2119,7 +2125,8 @@ export class World {
     crewAtDock(b, dt);
     const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true;
-    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
+    b.boom += ((up ? side * BOOM_STOP : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly to the shroud; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
+    if (up) letRun(b, k); // (its sheet let run with it: dockStep)
     if (out.bump != null && out.bump > HARD_BUMP && this.t - (m.cueT ?? -9) > 2) { this.cue(m, 'Bump'); this.emit({ type: 'toast', msg: `Hard bump against the dock, at ${(out.bump / 0.5144).toFixed(1)} kn.`, ms: 3000 }); }
     if (out.parted) this.emit({ type: 'toast', msg: `The ${out.parted.role === 'midships' ? 'midships line' : `${out.parted.role} line`} parted.`, ms: 4000 });
     const first = m.lines[0];
@@ -2540,7 +2547,11 @@ export class World {
     // the main down, tied up: the mainsheet hauled in and made fast, the traveller car in the middle, so the boom lies on
     // the centerline, clear of the dock and the boats either side (8q, the owner: "when in a slip, boom should be at
     // centerline (when starting) or brought to centerline (when finishing a sail and docking)")
+    // (the main up, let fly: its sheet let run with it, so the crew's trim takes over from where the boom really is once
+    // she's let go. Left made fast hard in from when the main was down, the boom was hauled from the shroud to her
+    // centerline the moment she was let go, and on a run that's a crash jibe waiting: 18 Nov 2026, tests/letgo-sheet.test.ts)
     if (!up) { b.ctl.mainsheet += (0 - b.ctl.mainsheet) * k; b.ctl.traveller += (0 - b.ctl.traveller) * k; if (b.ctlTarget) { delete b.ctlTarget.mainsheet; delete b.ctlTarget.traveller; } }
+    else letRun(b, k);
     crewRig(b, dt, this.emit);
     crewTiedUp(b, dt, this.emit); // (the pole stowed, your car call worked, the rest of sailing's jobs ended: physics.ts)
     crewAtDock(b, dt); // (the crew sit centred at the dock and through the push-off, not hiked or to leeward)
