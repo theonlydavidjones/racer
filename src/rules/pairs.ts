@@ -283,7 +283,7 @@ function poseTurning(K: PoseRing, t0: number): Pose & { turnRate: number } {
   return { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 };
 }
 
-/** A course change, as against the yaw a seaway gives her every wave or a helm's corrections, deg net (a modelling
+/** A course change, as against the yaw a seaway gives her every wave or a helm's corrections, deg net (a modeling
  * threshold: a few degrees either way is how a boat steers in waves, and a dodge is a turn of tens of degrees). */
 const COURSE_CHANGE = 10;
 /** Her heading smoothed over a second, deg (unwrapped from `ref`): the course she's steering, through the yaw. */
@@ -327,7 +327,7 @@ function turnStarts(R: PoseRing): number[] {
 
 /** The water a right-of-way boat may keep from a boat under rule 21 before she's entitled to act, hull to hull, m: a meter
  * more than KEEP_CLEAR_GAP. WS Case 50: she may act on "a genuine and reasonable apprehension of collision", and a boat
- * about to pass a meter from a hull swinging round at 10–20°/s has one. A modelling choice. */
+ * about to pass a meter from a hull swinging round at 10–20°/s has one. A modeling choice. */
 export const APPREHENSION_GAP = KEEP_CLEAR_GAP + 1;
 /** How far ahead to follow the courses they held, s, at the least: past their closest approach, for a boat a few lengths off. */
 const HELD_HORIZON = 10;
