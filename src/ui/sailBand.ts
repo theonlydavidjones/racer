@@ -179,7 +179,7 @@ const jcar = (side: Side) => {
  * lower jib; controls.ts leadAt, 11.6 to 13.7 deg); "chop" is left out, no Folkboat source says it (the owner picked this line, r252). The band's clicks and scrolls are in the Keys screen's "How to sail her".
  */
 export const BAND_TIPS = {
-  jumpers: "More turns close the main's top leech: medium air. Loose in light air and a breeze. Left arrow on, right off.",
+  jumpers: "On closes the main's top leech: medium air. Off in light air and a breeze. Left arrow on.",
   mainsheet: 'In for power and pointing; ease to spill a puff or reach.',
   traveller: 'Up to windward in light air; down to leeward in a puff to spill power.',
   backstay: 'On in a breeze: flatter main, less power, straighter jib luff.',
