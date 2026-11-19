@@ -300,7 +300,7 @@ export class BoatPanel {
         kv('Boom', seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood']], b.perf.boom)),
         `<div class="be-tune">${rigTuneFields(b, seg)}</div>`
       ].join(''))}
-      ${grp('sails', 'Sails', [kv('Sailcloth', val(b.sails.color === 'black' ? 'Black' : 'White Dacron')), kv('Main · jib', val(b.perf.mainAge === b.perf.jibAge ? ageName(b.perf.mainAge) : `${ageName(b.perf.mainAge)} · ${ageName(b.perf.jibAge).toLowerCase()}`)), kv('Numbers and F', colorVal('numberColor'))], () => [
+      ${grp('sails', 'Sails', [kv('Sailcloth', val(b.sails.color === 'black' ? 'Black' : 'White polyester')), kv('Main · jib', val(b.perf.mainAge === b.perf.jibAge ? ageName(b.perf.mainAge) : `${ageName(b.perf.mainAge)} · ${ageName(b.perf.jibAge).toLowerCase()}`)), kv('Numbers and F', colorVal('numberColor'))], () => [
         kv('Sailcloth', seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)),
         kv('Mainsail', seg('mainAge', ages, b.perf.mainAge)), kv('Jib', seg('jibAge', ages, b.perf.jibAge)),
         colorRow('numberColor'), colorRow('insigniaColor')
@@ -366,7 +366,7 @@ function tuneLabel(k: keyof RigTune, t: RigTune): string {
 function tuneReadout(t: RigTune): string {
   const T = forestayTension(t), sag = (tws: number) => { const m = forestaySag(T, tws * 1.45); return `${m >= 0.2 ? '20+' : Math.round(100 * m)} cm in ${tws} kt`; }; // (apparent ≈ 1.45 × true, beating)
   const dr = rakeDeg(t) - rakeDeg(TUNE_DEFAULT);
-  return `Forestay sag beating, backstay off: ${[6, 12, 18].map(sag).join(' · ')}. Rake ${Math.abs(dr) < 0.05 ? 'as North Sails sets it' : `${Math.abs(dr).toFixed(1)}° ${dr > 0 ? 'more aft (more weather helm)' : 'more upright (less weather helm)'} than North Sails'`}.`;
+  return `Forestay sag beating, backstay off: ${[6, 12, 18].map(sag).join(' · ')}. Rake ${Math.abs(dr) < 0.05 ? 'as the medium setting sets it' : `${Math.abs(dr).toFixed(1)}° ${dr > 0 ? 'more aft (more weather helm)' : 'more upright (less weather helm)'} than the medium setting`}.`;
 }
 type Seg = (act: string, opts: [string, string][], cur: string) => string;
 function rigTuneFields(b: BoatSpec, seg: Seg): string {

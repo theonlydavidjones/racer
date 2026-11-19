@@ -63,9 +63,9 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .tchip.off{opacity:.45}
 .tchip i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .tchip i.dia{border:1.5px solid;border-radius:0;transform:rotate(45deg);width:7px;height:7px;background:none}
-.tgrid{display:flex;gap:16px;align-items:flex-start}
+.tgrid{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
 .tchart{flex:0 0 auto;max-width:100%;height:auto}
-.ttakes{flex:1;min-width:0}
+.ttakes{flex:1 1 170px;min-width:170px}
 .ttk{display:grid;grid-template-columns:26px 1fr 48px;gap:6px;align-items:center;height:46px;border-bottom:1px solid rgba(150,196,218,.1);font-size:14px;cursor:pointer}
 .tac.compact .ttk{height:auto;padding:4px 0;font-size:13px}
 .ttk b{color:var(--muted)} .ttk small{color:var(--muted)}
