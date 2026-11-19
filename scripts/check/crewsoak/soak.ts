@@ -1,4 +1,5 @@
 // Crew stability soak (the sprint, the Coordinator, 18 Nov 2026), not part of the suite. To run it:
+//   (needs tests/helpers/trueDepth.ts, Crew Figures' crew-poses)
 //   cp scripts/check/crewsoak/soak.ts tests/zz-soak.test.ts && SOAK_OUT=soak.txt npx vitest run tests/zz-soak.test.ts
 // (-t "slip out" for the cruises alone, -t "races" for the races; TRACE=1 logs her state every 30 s and the toasts).
 // Faults go to SOAK_OUT, one line each, the first of each kind and the 30th. Pose checks: crewfig.test.ts through(), at
@@ -18,6 +19,7 @@ import { buildCrew, ground, syncCrew, underDeck, type Crew, type Figure } from '
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
 import type { Boat } from '../src/boat/boat';
+import { trueDepth } from './helpers/trueDepth';
 
 const OUT = process.env.SOAK_OUT!;
 const log = (s: string) => appendFileSync(OUT, s + '\n');
@@ -42,7 +44,10 @@ function poseFaults(cr: Crew, b: Boat): string[] {
       if (Math.abs(p.z) > L / 2 - 0.05 || Math.abs(p.x) > halfBeam(uAtZ(p.z)) - 0.02) continue;
       const g = ground(p.x, p.z, p.y);
       if (underDeck(p.x, p.y, p.z)) continue;
-      if (p.y < g - 0.05) { bad.push(`through ${who}(${pose}) ${name} ${((g - p.y) * 100).toFixed(0)} cm at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}) under ground() ${g.toFixed(2)}, tack ${b.tack}, twa ${b.twa.toFixed(0)}, heel ${b.heel.toFixed(0)}, docked ${!!b.docked}`); break; }
+      // (true depth, Crew Figures' tests/helpers/trueDepth.ts: the lesser of straight down under ground() and sideways out
+      // from under it at the point's height; straight down alone read a knee by the cabin's after face as 49 cm into it)
+      const d = p.y < g - 0.05 ? trueDepth(p.x, p.y, p.z, 0.05) : 0;
+      if (d > 0.05) { bad.push(`through ${who}(${pose}) ${name} ${(d * 100).toFixed(0)} cm (straight down ${((g - p.y) * 100).toFixed(0)}) at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}) under ground() ${g.toFixed(2)}, tack ${b.tack}, twa ${b.twa.toFixed(0)}, heel ${b.heel.toFixed(0)}, docked ${!!b.docked}`); break; }
     }
     const w = (o: THREE.Object3D, x = 0, y = 0, z = 0) => o.localToWorld(new THREE.Vector3(x, y, z));
     const fw = w(f.root, 0, 0, -1).sub(w(f.root)).setY(0);

@@ -1,0 +1,15 @@
+Crew soak on crew-poses 2ec30579 + crew-dock-more 3d22e06f: pose faults, true depth (tests/helpers/trueDepth.ts), 13 hits.
+
+cruise 22 kt 916.3 s: POSE through crew2(mast, job hoist) fore0 7 cm (straight down 11) at (-0.32, 0.96, 0.97) under ground() 1.07, tack S, twa 1, heel -15, docked false
+cruise 22 kt 916.6 s: POSE through crew2(mast, job hoist) upper1 7 cm (straight down 10) at (0.32, 0.98, 0.98) under ground() 1.07, tack S, twa 2, heel -14, docked false
+race 8 kt Red 148.1 s: POSE through crew2(sit) shin1 7 cm (straight down 7) at (-0.66, 0.80, -0.50) under ground() 0.87, tack P, twa 40, heel -4, docked false
+race 8 kt Red 226.5 s: POSE through helm(helm) thigh1 7 cm (straight down 8) at (0.50, 0.53, 2.88) under ground() 0.61, tack S, twa 21, heel -6, docked false
+race 8 kt Red 340.6 s: POSE elbow crew1(lee) arm1 8 cm forward, tack S, twa 44, docked false
+race 14 kt Red 161.1 s: POSE through crew2(hike) shin1 5 cm (straight down 5) at (-0.63, 0.83, -0.42) under ground() 0.88, tack P, twa 34, heel -22, docked false
+race 14 kt Red 174.7 s: POSE through helm(helm) thigh1 6 cm (straight down 6) at (0.34, 0.56, 3.01) under ground() 0.61, tack S, twa 20, heel 30, docked false
+race 14 kt Red 245.6 s: POSE through crew2(sit) fore0 7 cm (straight down 7) at (-0.58, 0.95, 0.95) under ground() 1.02, tack P, twa 154, heel -2, docked false
+race 20 kt Red 169.3 s: POSE through helm(helm) thigh1 5 cm (straight down 5) at (0.57, 0.55, 2.86) under ground() 0.60, tack S, twa 23, heel -1, docked false
+race 20 kt Red 460.0 s: POSE through crew2(lee) fore0 7 cm (straight down 7) at (-0.50, 0.97, 0.98) under ground() 1.04, tack P, twa 173, heel -2, docked false
+race 20 kt Red 774.0 s: POSE elbow crew2(lee) arm1 17 cm forward, tack P, twa 171, docked false
+race 20 kt Red 774.6 s: POSE through crew2(lee) shin0 6 cm (straight down 7) at (-0.70, 0.81, -0.45) under ground() 0.87, tack P, twa 173, heel -0, docked false
+race 20 kt Red 859.6 s: POSE through crew2(lee) fore1 7 cm (straight down 7) at (0.61, 0.94, 0.95) under ground() 1.01, tack P, twa 174, heel -1, docked false
