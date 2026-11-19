@@ -651,7 +651,7 @@ sources. Each shipped item is added there when it's published.
    - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
      gap between them is the bias;
    - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
-8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; later, Crew Figures; earlier Boat Detail): "I'm having trouble seeing
+8z. **DONE (15 Nov, 4f410526): the cabin-top instrument on a taller mount** (owner, 15 November; shipped as the unit's own black stand, taller and sturdier, no separate riser, after a post, a teak block and a 5 cm riser were tried): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
@@ -1918,7 +1918,7 @@ Also asked for:
 
 - **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
 - **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
-- **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
+- ~~**Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.~~ Done (built and live, the owner, 18 Nov): the rig tunes in the boat editor and the coach's rig line (tests/rigtune).
   - **The boom's place on a beat** (next for Deep Physics, after the beat angle in chop; Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
   conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
