@@ -1,5 +1,5 @@
 import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
-import { heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
+import { clearTo, heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -38,15 +38,17 @@ const ROUTE_NAME: Record<string, string> = {
 /**
  * Where the next stretch of a passage starts: from where the last one ended (`end`, within its arrive of the turn) if
  * the next turn can be seen from there clear of the land, else from the turn itself, the track jumping to it. That jump
- * is sailed by nobody and judged by nothing, so it's taken only if it crosses no land and no gap narrower than the
- * pilot's turning room (helmPlan.ts narrowOn); else the next stretch starts where she is and the router finds the way.
- * Jumped regardless, a 119 m jump ran across the Berkeley Pier ruin's west tip, and the pilot was handed over before a
- * gap too narrow that a meter's shift in the plan made or unmade (Deep Physics, 19 Nov 2026, on beat-chop).
+ * is sailed by nobody and judged by nothing, so it's taken only if it's clear as the router judges a line (helmPlan.ts
+ * clearTo: no land, and STRUCTURE_CLEAR off the structures, or no nearer than she is) and through no gap narrower than
+ * the pilot's turning room (narrowOn); else the next stretch starts where she is and the router finds the way. Jumped
+ * regardless, a 119 m jump ran across the Berkeley Pier ruin's west tip, and the pilot was handed over before a gap too
+ * narrow that a meter's shift in the plan made or unmade; and another, to a corner of the way round the land 3.6 m off
+ * that tip, took her within 10 m of it (Deep Physics, 19 Nov 2026, on beat-chop).
  */
 function onFrom(end: Vec, turn: Vec, next: Vec | undefined): Vec {
   if (!next) return turn;
   if (landAlong(end, next) === Infinity && landDist(end) > 20) return end;
-  return landAlong(end, turn) === Infinity && !narrowOn(end, turn) ? turn : end;
+  return clearTo(end, turn, false) && !narrowOn(end, turn) ? turn : end;
 }
 function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
   let tt = t, ok = true, why: 'land' | 'time' | undefined, at = route[0];

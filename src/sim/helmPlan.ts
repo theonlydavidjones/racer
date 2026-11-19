@@ -104,7 +104,7 @@ export function heldPast(P: HelmPlan, b: Vec): boolean {
  * a point near a structure fails only if it's nearer than she already is (beside one, the way off it isn't refused:
  * refused, she circled beside Pier 45's head, the physics review, 19 Nov 2026).
  */
-function clearTo(b: Vec, q: Vec, toEnd: boolean): boolean {
+export function clearTo(b: Vec, q: Vec, toEnd: boolean): boolean {
   if (landAlong(b, q) !== Infinity) return false;
   const L = dist(b, q), n = Math.max(1, Math.ceil(L / 5)), w0 = wharfNearest(b, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR;
   for (let k = 1; k <= n; k++) {
