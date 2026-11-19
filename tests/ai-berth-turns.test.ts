@@ -1,14 +1,19 @@
 // The fleet and a boat doing her penalty turns (the owner, v208, 19 Nov 2026: "Penalty pileups at the turns, unusable").
 // A boat doing turns keeps clear (21.2), but a circling boat has no course anyone can read, and a fleet sailing on into her
-// circle meets her whichever way she turns: the AI gives her a berth (ai.ts pastCircle). Two cases, over 20 Seaweed Soup
-// starts and the owner's v208 race at the first mark: your boat dropped 14 m ahead of the fleet's most crowded boat,
-// turning two turns on the spot as a sailor does (a called turn held 90° ahead of her heading: 3–10°/s at a knot or two);
-// and that most crowded AI boat given two turns, taking them as the AI does. Every incident is counted.
-// Measured (physics review, 19 Nov 2026), main's AI → with the berth:
-//   21.2 calls on the boat turning: 7 → 5 (yours), 6 → 3 (the AI's): 13 → 8
-//   every incident in the runs: 28 → 27, 16 → 10: 44 → 37 (16.1 on an AI boat: 2 → 2)
-//   turns done within 150 s: 36 → 40 of 44
-// (Excluded from test:fast: 44 fleet races, several minutes.)
+// circle meets her whichever way she turns: the AI gives her a berth (ai.ts pastCircle). Two cases, over 60 Seaweed Soup
+// starts (seeds 1–30 at 12 and 22 kt) and the owner's v208 race at the first mark: your boat dropped 14 m ahead of the
+// fleet's most crowded boat, turning two turns on the spot as a sailor does (a called turn held 90° ahead of her heading:
+// 3–10°/s at a knot or two); and that most crowded AI boat given two turns, taking them as the AI does. 124 runs, every
+// incident counted.
+// Measured (19 Nov 2026), v209 as it ships (9d5476a9, no berth: main once it lands) → with the berth (3593cac5):
+//   21.2 calls on the boat turning: 34 → 22 (bound ≤ 28)
+//   every incident in the runs: 93 → 76 (bound ≤ 118)
+//   turns done within 150 s: 110 → 116 of 124 (bound ≥ 107)
+// The bounds are the same rates a run as when this test sailed 44 runs (≤ 10, ≤ 42, ≥ 38: the Coordinator, 19 Nov 2026).
+// At 44 runs, changes that never touched the berth moved the count from 4 to 11 (a fleet race's chaos: who meets whom);
+// 124 runs hold it steadier. (One file, not shards: split in two by seed, the halves read 10 and 12 against a bound of
+// 14 each, too near.)
+// (Excluded from test:fast: 124 fleet races, about 40 minutes.)
 import { describe, expect, it } from 'vitest';
 import { World, startPenalty } from '../src/sim/world';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
@@ -50,15 +55,15 @@ function ownersRace(): World {
 const atFirstMark = (w: World) => w.t > 0 && w.boats.some(b => !b.isUser && b.leg === 0 && markDist(b, w.C.marks[0]) < 25);
 
 describe('a boat doing her turns in the fleet', () => {
-  it('the fleet gives her a berth: fewer 21.2 calls on her, and no more incidents about her', () => {
+  it('the fleet gives her a berth: fewer 21.2 calls on her, and no more incidents about her (124 runs)', () => {
     const runs: Run[] = [];
     for (const aiTurns of [false, true]) {
-      for (const kt of [12, 22]) for (let s = 1; s <= 10; s++) runs.push(turnsIn(seaweedRace(s, kt), w => w.t >= 60, aiTurns));
+      for (const kt of [12, 22]) for (let s = 1; s <= 30; s++) runs.push(turnsIn(seaweedRace(s, kt), w => w.t >= 60, aiTurns));
       for (const dir of [1, -1]) runs.push(turnsIn(ownersRace(), atFirstMark, aiTurns, dir));
     }
     const sum = (k: 'calls' | 'incidents') => runs.reduce((s, r) => s + r[k], 0);
-    expect(runs.filter(r => r.done).length, 'the turns get done').toBeGreaterThanOrEqual(38);
-    expect(sum('calls'), '21.2 calls on the boat turning').toBeLessThanOrEqual(10);
-    expect(sum('incidents'), 'every incident').toBeLessThanOrEqual(42);
-  }, 3_000_000);
+    expect(runs.filter(r => r.done).length, 'the turns get done').toBeGreaterThanOrEqual(107);
+    expect(sum('calls'), '21.2 calls on the boat turning').toBeLessThanOrEqual(28);
+    expect(sum('incidents'), 'every incident').toBeLessThanOrEqual(118);
+  }, 7_000_000);
 });
