@@ -191,9 +191,8 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   return after < before - 5 ? Math.abs(turn) : 0;
 }
 
-/** How many poses a pair keeps of each boat, and how often: 12 s at 0.1 s (long enough to see the start of a hunt made
- * in two luffs a few seconds apart, wasFailing). */
-const RING = 120, RING_DT = 0.1;
+/** How many poses a pair keeps of each boat, and how often: 8 s at 0.1 s. */
+const RING = 80, RING_DT = 0.1;
 
 /**
  * Keep `b`'s pose in her history (at most every RING_DT s, however many pairs she's in): a fixed ring, no allocation once
@@ -259,119 +258,25 @@ export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): bool
   return roomGap(row, kc, ctx) >= KEEP_CLEAR_GAP;
 }
 
-/** When the right-of-way boat's latest turn began (from her ring), with the ring's newest and oldest times; null if she
- * hasn't turned within the last RULE16_WINDOW. */
-function turnStart(row: RulesBoat, R: PoseRing): { t0: number; now: number; oldest: number } | null {
+/** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
+export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): number {
+  const R = RINGS.get(row), K = RINGS.get(kc);
+  if (!R || !K || R.n < 2) return 0;
   const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)];
   const dir = Math.sign(wrap(row.h - (row.headingAgo ?? row.h))) || Math.sign(wrap(R.h[at(R, 0)] - R.h[at(R, 1)]));
-  if (!dir) return null;
+  if (!dir) return 0;
   const W = Math.min(TURN_WINDOW, now - oldest);
   const turned = (t: number) => wrap(poseAt(R, t).h - poseAt(R, t - W).h) * dir / W; // deg/s her way, over the window
   // the end of her latest turn: within the last RULE16_WINDOW (the turn may be over by the time they touch, Case 105)
   let tEnd: number | null = null;
   for (let t = now; t >= Math.max(oldest + W, now - RULE16_WINDOW) - 1e-9; t -= RING_DT) if (turned(t) >= 1.5) { tEnd = t; break; }
-  if (tEnd == null) return null;
+  if (tEnd == null) return 0;
   // and its start: back while she was still turning that way, at 1°/s or more
   let t0 = tEnd - W;
   for (let t = tEnd; t - W >= oldest - 1e-9; t -= RING_DT) { if (turned(t) < 1) break; t0 = t - W; }
-  return { t0, now, oldest };
-}
-
-/** Her pose at t0 from the ring, with the turn she was making then (deg/s, over a window, through the waves' yaw). */
-function poseTurning(K: PoseRing, t0: number): Pose & { turnRate: number } {
-  const kOld = K.t[at(K, K.n - 1)], kw = Math.min(TURN_WINDOW, t0 - kOld), k0 = poseAt(K, t0);
-  return { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 };
-}
-
-/** A course change, as against the yaw a seaway gives her every wave or a helm's corrections, deg net (a modelling
- * threshold: a few degrees either way is how a boat steers in waves, and a dodge is a turn of tens of degrees). */
-const COURSE_CHANGE = 10;
-/** Her heading smoothed over a second, deg (unwrapped from `ref`): the course she's steering, through the yaw. */
-function courseAt(R: PoseRing, t: number, ref: number): number {
-  return meanHeading(R, t - 0.5, t + 0.5, ref);
-}
-/** Her mean heading from t1 to t2, deg (unwrapped from `ref`), every quarter second, kept within her ring (poseAt gives
- * her oldest pose outside it). */
-function meanHeading(R: PoseRing, t1: number, t2: number, ref: number): number {
-  const lo = R.t[at(R, R.n - 1)], hi = R.t[at(R, 0)], n = Math.max(1, Math.round((t2 - t1) / 0.25));
-  let s = 0;
-  for (let k = 0; k <= n; k++) s += wrap(poseAt(R, clamp(t1 + (t2 - t1) * k / n, lo, hi)).h - ref);
-  return ref + s / (n + 1);
-}
-/** The course she held before a turn of hers that began at t0: her mean heading over the HELD_MEAN s before it, through
- * a wave or so of yaw (a turn found on the smoothed course can begin in a yaw's trough or crest, a few degrees off). */
-const HELD_MEAN = 3;
-/** Each time in her ring a course change of hers began, either way, the oldest first: on her course (courseAt), every
- * half second, a run of steps one way (a step under 0.5°, 1°/s, is holding on; up to a second of it may come inside a
- * run) that comes to COURSE_CHANGE or more net. NaN for one already under way at her oldest pose. */
-function turnStarts(R: PoseRing): number[] {
-  const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)], ref = R.h[at(R, 0)];
-  const out: number[] = [];
-  let t0: number | null = null, dir = 0, h0 = 0, still = 0, prev = courseAt(R, oldest + 0.5, ref);
-  // (a course change already under way at her oldest pose: the course she held before it is older than the ring, so
-  // nothing can be said from it: NaN, and wasFailing excuses nothing, the call as it was. The full COURSE_CHANGE, as
-  // anywhere: half of it is inside a seaway's yaw, and called honest dodgers in a ±4° sea)
-  const edge = oldest + 0.5;
-  const close = (hEnd: number) => { if (t0 != null && Math.abs(hEnd - h0) >= COURSE_CHANGE) out.push(t0 <= edge + 1e-9 ? NaN : t0); t0 = null; dir = 0; still = 0; };
-  for (let t = oldest + 1; t <= now + 1e-9; t += 0.5) {
-    const h = courseAt(R, t, ref), d = h - prev;
-    if (Math.abs(d) < 0.5) { if (t0 != null && (still += 0.5) > 1) close(prev); }
-    else if (t0 == null || Math.sign(d) !== dir) { close(prev); t0 = t - 0.5; dir = Math.sign(d); h0 = prev; }
-    else still = 0;
-    prev = h;
-  }
-  // (a turn still going on when they meet: as far as her heading now, since the smoothing lags the last half second)
-  close(t0 != null && Math.sign(wrap(R.h[at(R, 0)] - ref) - (prev - ref)) === dir ? ref + wrap(R.h[at(R, 0)] - ref) : prev);
-  return out;
-}
-
-/** The water a right-of-way boat may keep from a boat under rule 21 before she's entitled to act, hull to hull, m: a meter
- * more than KEEP_CLEAR_GAP. WS Case 50: she may act on "a genuine and reasonable apprehension of collision", and a boat
- * about to pass a meter from a hull swinging round at 10–20°/s has one. A modelling choice. */
-export const APPREHENSION_GAP = KEEP_CLEAR_GAP + 1;
-/** How far ahead to follow the courses they held, s, at the least: past their closest approach, for a boat a few lengths off. */
-const HELD_HORIZON = 10;
-
-/**
- * Was `kc` already failing to keep clear of `row` before `row` changed course? Definitions, Keep Clear (a): the
- * right-of-way boat "can sail her course with no need to take avoiding action". From where both were when each of
- * `row`'s turns in the lead-up began (her pose ring, 12 s), `row` holding on as she was then and `kc` carrying on as
- * she was, her turn too: would they have come within APPREHENSION_GAP? At every turn's start, not only the latest: a
- * luff onto a boat that would have missed, then a second luff once on a collision course, is a hunt, and the first luff
- * is where it began. Then `row`'s turns were the avoiding action rule 14 asks of her ("if reasonably possible"), not
- * course changes that took the other boat's room, and a breach they led to is exonerated under 43.1(a): "When as a
- * consequence of breaking a rule a boat has compelled another boat to break a rule, the other boat is exonerated for her
- * breach." Used for a boat under rule 21 (taking a penalty, returning to start, backing a sail), whose course nobody can
- * read: a boat turning circles crosses every bearing, so a dodge either way that she still meets at the bow reads as a
- * turn toward her (turnedToward). Without a history of both boats from the first turn, false: judged as before.
- */
-export function wasFailing(row: RulesBoat, kc: RulesBoat): boolean {
-  const R = RINGS.get(row), K = RINGS.get(kc);
-  if (!R || !K || R.n < 2 || K.n < 2) return false;
-  const starts = turnStarts(R);
-  if (!starts.length || !(starts[0] >= K.t[at(K, K.n - 1)])) return false; // (NaN too: a turn begun before the ring)
-  const me = { x: 0, y: 0, h: 0 };
-  const now = R.t[at(R, 0)];
-  return starts.every(t0 => {
-    // (held on her course then, her mean heading before it; to the later of HELD_HORIZON and a few seconds past now)
-    const k = poseTurning(K, t0), p0 = poseAt(R, t0), held = straightOn({ ...p0, h: meanHeading(R, t0 - HELD_MEAN, t0, p0.h) }), theirs = straightOn(k, k.turnRate);
-    for (let tau = 0; tau <= Math.max(HELD_HORIZON, now - t0 + 3) + 1e-9; tau += RING_DT) {
-      const a = held(tau); me.x = a.x; me.y = a.y; me.h = a.h;
-      if (hullGap(me, theirs(tau)) < APPREHENSION_GAP) return true;
-    }
-    return false;
-  });
-}
-
-/** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
-export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): number {
-  const R = RINGS.get(row), K = RINGS.get(kc);
-  if (!R || !K || R.n < 2) return 0;
-  const s = turnStart(row, R);
-  if (!s) return 0;
-  const { t0, now, oldest } = s;
   // where the keep-clear boat was then, and the turn she was already making
-  const kc0 = poseTurning(K, t0);
+  const kOld = K.t[at(K, K.n - 1)], kw = Math.min(TURN_WINDOW, t0 - kOld), k0 = poseAt(K, t0);
+  const kc0 = { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 }; // (over a window, through the waves' yaw)
   // the right-of-way boat's actual course from t0 (then on as she is)
   const v = row.v ?? hypot(row.vx, row.vy), last = poseAt(R, now);
   const actual = (tau: number): Pose => {
@@ -587,7 +492,6 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   // boat that gets the inside (leeward) overlap from clear astern and holds her course to the mark isn't the one at fault
   // for not giving the tacker time: the tacker keeps clear (11). (Luffing at once is not sailing within mark-room: WS
   // Case 93, she broke 15 and 16.1.)
-  const avoided21 = (r.rule === '21.1' || r.rule === '21.2' || r.rule === '21.3') && wasFailing(row, kc);
   const r183b = !!r3?.binds && r.rule === '11' && kc.id === r3.tacker && rec.by === row.id && turnedToward(row, kc) === 0;
   if (notRacing(kc) && !notRacing(row)) {
     // Rule 23.1: a boat not racing (she has retired, or finished and cleared the line) shall not interfere with a boat that is racing
@@ -614,10 +518,6 @@ export function assessPair<B extends RulesBoat>(rec: PairRecord, A: B, B: B, ctx
   } else if ((r.rule === '18.2(a)' || r.rule === '18.2(c)') && r.mr?.overlapped && r.mr.inside === row.id && wideOfGybe(row, r.mr.idx, ctx)) {
     // Rule 18.4: the inside boat had to gybe at the mark, and sailed on past it instead, taking the outside boat wide
     fouler = row; rule = '18.4';
-  } else if (avoided21) {
-    // Rule 21: she was taking a penalty, returning or backing a sail, and was already set to meet the right-of-way boat
-    // when that boat turned: the turn was the avoiding action rule 14 asks for (wasFailing, 43.1(a)), not interference
-    // (23.2) or a course change that took her room (16.1). The call stays hers.
   } else if (!done(row) && (((kc.leg !== row.leg && kc.started && row.started) || (returning(kc) && ctx.t > 0)) && (ctx.t > 0 ? !!row.aboveProper : turnedToward(row, kc) > 0)
     || (takingPenalty(kc) && (ctx.t > 0 ? !!row.aboveProper : true) && turnedToward(row, kc) > 0))) {
     // (a boat taking a penalty: only one that turned toward her interfered. A boat that had luffed to keep clear of her
