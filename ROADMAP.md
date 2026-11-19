@@ -742,9 +742,9 @@ sources. Each shipped item is added there when it's published.
      tests/crewfig.test.ts that no hand is standing on the deck while she's sailing and he isn't moving.
    - ~~Hands on what they'd really hold, hiking on a beat~~ (done, v205: hike-hands) (owner, 16 November; accuracy; not urgent; 3–5 h): "when hiking
      out, crew seem to be holding on to thin air. IRL, when beating, forward crew would be holding the lee jib sheet, and
-     middle crew would be holding the traveller and/or mainsheet, often tucking their aft leg under the thwart for
-     stability. if only one crew, they would hold the jib sheet and the traveller." The hands go on the lee jib sheet's
-     tail and the traveller or mainsheet; the middle hand's aft foot hooked under the thwart. Checked from both sides on
+     middle crew would be holding the traveler and/or mainsheet, often tucking their aft leg under the thwart for
+     stability. if only one crew, they would hold the jib sheet and the traveler." The hands go on the lee jib sheet's
+     tail and the traveler or mainsheet; the middle hand's aft foot hooked under the thwart. Checked from both sides on
      both tacks.
    - Arms through bodies in a tack (Crew Figures, 17 November; from the owner's "his right arm seems to extend through his
      torso"; bug; next; most of a day): tests/crewarms.test.ts holds the steady poses (sitting out, the lines in hand);
@@ -882,9 +882,9 @@ sources. Each shipped item is added there when it's published.
    - Lines: "N more / Change to see" becomes "N more"; its header keeps Change, since there you do change them.
    - Check every group's folded line for the same pattern.
    - Bug: a boat's page reads "Bottom: , just cleaned" (owner, 18 November: "copy error on this ', just cleaned'
-     string"). In src/ui/fleet.ts, colour() returns '' when her color isn't a named one (any color is kept since
+     string"). In src/ui/fleet.ts, color() returns '' when her color isn't a named one (any color is kept since
      #354's picker), and the row joins it with ", " anyway. The fix: name the nearest swatch, or say "Custom", and join
-     only the parts that exist. Topsides uses the same colour() and needs the same fix.
+     only the parts that exist. Topsides uses the same color() and needs the same fix.
    - The rope picker (owner, 18 November, with a screenshot): "copy strings here should right-align close to their
      swatches." Each colorway's name sits right-aligned, just left of its swatch, not at the far left of its cell.
 8k. **Drop and raise the anchor** (in PR #339; rule 22 in PR #335) (owner, 13 November; feature, seamanship and racing; next; 4–6 h; it also seeds the
