@@ -1,8 +1,7 @@
 // Crew stability soak (the sprint, the Coordinator, 18 Nov 2026), not part of the suite. To run it:
-//   (needs tests/helpers/trueDepth.ts, Crew Figures' crew-poses)
 //   cp scripts/check/crewsoak/soak.ts tests/zz-soak.test.ts && SOAK_OUT=soak.txt npx vitest run tests/zz-soak.test.ts
 // (-t "slip out" for the cruises alone, -t "races" for the races; TRACE=1 logs her state every 30 s and the toasts).
-// Faults go to SOAK_OUT, one line each, the first of each kind and the 30th. Pose checks: crewfig.test.ts through(), at
+// Faults go to SOAK_OUT, one line each, the first of each kind and the 30th; pose faults as POSE (lasting) or BRIEF (one check). Pose checks: crewfig.test.ts through(), at
 // 10 cm along each bone against render/crew.ts ground() (the same surfaces crewfig uses, 5 cm allowed), and elbows().
 import { it } from 'vitest';
 import { writeFileSync, appendFileSync } from 'fs';
@@ -91,11 +90,24 @@ function watcher(label: string, b: Boat, w: World) {
   };
 }
 function drawn(label: string, b: Boat, w: World) {
-  const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [1, 2, 3], 1); let k = 0; const seen = new Map<string, number>();
+  const cr = buildCrew(b.crew!.spec.helm, b.crew!.spec.crew, [1, 2, 3], 1); let k = 0; const seen = new Map<string, number>(), brief = new Map<string, number>(), run = new Map<string, number>(), first = new Map<string, string>();
   return () => {
     syncCrew(cr, b.rel >= 0 ? 1 : -1, b.crew, DT, false, undefined, b.heel, b.tacking);
     if (++k % 6 || w.t < 3) return;
-    for (const f of poseFaults(cr, b)) { const key = f.replace(/ \d+ cm.*/, ''); const c = (seen.get(key) ?? 0) + 1; seen.set(key, c); if (c === 1 || c === 30) log(`${label} ${w.t.toFixed(1)} s: POSE ${f}${c === 30 ? ' (30th time)' : ''}`); }
+    // (checked every 0.1 s. A fault that lasts, on consecutive checks, is logged as POSE: a limb through the boat on 2 or
+    // more, an elbow forward on 3 or more (0.2 s: a frame or two's lag as the body turns sharply is ik()'s BEND_RATE and
+    // ELBOW_SPEED holding the bend, not a held backwards arm, Crew Figures, 19 Nov 2026). One that shows on a single check
+    // and is gone by the next is logged apart, as BRIEF: the one-frame knee sweeps)
+    const now = new Map<string, string>();
+    for (const f of poseFaults(cr, b)) { const key = f.replace(/ \d+ cm.*/, ''); if (!now.has(key)) now.set(key, f); }
+    for (const [key, f] of now) {
+      const r = (run.get(key) ?? 0) + 1; run.set(key, r); if (r === 1) first.set(key, `${w.t.toFixed(1)} s: ${f}`);
+      if (r === (key.startsWith('elbow') ? 3 : 2)) { const c = (seen.get(key) ?? 0) + 1; seen.set(key, c); if (c === 1 || c === 30) log(`${label} ${first.get(key)}: POSE (lasting, ${c === 30 ? '30th time' : 'from here'}) ${f}`); }
+    }
+    for (const [key, r] of run) if (!now.has(key)) {
+      run.delete(key);
+      if (r === 1 || (key.startsWith('elbow') && r === 2)) { const c = (brief.get(key) ?? 0) + 1; brief.set(key, c); if (c === 1 || c === 30) log(`${label} ${first.get(key)}: BRIEF (${r} check${r > 1 ? 's' : ''}${c === 30 ? ', 30th time' : ''})`); }
+    }
   };
 }
 
