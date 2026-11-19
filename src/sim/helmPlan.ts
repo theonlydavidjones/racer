@@ -154,19 +154,24 @@ const OFF_LOOK = 3 * LOA;
 const OFF_TRY = [0, ...Array.from({ length: 12 }, (_, k) => [15 * (k + 1), -15 * (k + 1)]).flat()];
 /** Her turn's radius under sail, the arc she sweeps turning for a way off (m): boat/dynamics.ts HANDLING.turnRadius. */
 const OFF_TURN_R = HANDLING.turnRadius;
-/** How long she runs on before her turn bites, from the helm amidships (s): the ram takes 2.25 s from there to hard
- * over (autopilot.ts RAM_RATE), so about half that straight before the arc (the second review: the arc without it said
- * 4.3 m and she got 3.4); none with the helm already hard over into the turn, twice it hard over the other way. An
- * estimate (docs/CONSTANTS.md). */
+/** How long she runs on before her turn bites, from the helm amidships (s): half the ram's 2.25 s to hard over
+ * (autopilot.ts RAM_RATE). The pilot's turn lags more than this: 1.5 s measured on a 98° turn (the fourth review), and
+ * for a small one its gain never puts the helm hard over at all, so an arc accepted near its keep may pass closer. Tried
+ * and not kept (19 Nov 2026): 1.5 s here handed over a start the pilot took clear, and the helm put hard over onto a
+ * way off spun her 183° from 8 m off Pier 45. None with the helm already hard over into the turn, twice it hard over
+ * the other way. An estimate (docs/CONSTANTS.md). */
 const OFF_LAG_S = 1;
 /** Slower than this through the water (m/s), her course held is no way off: she hasn't the way on to hold it past a
  * pier. An estimate (docs/CONSTANTS.md). */
 const OFF_SLOW = 1;
-/** A turn through the wind she's taken only with this way on (m/s): a Folkboat, 1930 kg under 24 m², wants about 4 kn to carry a tack (the third review: from 3 kn, pinched at 23°
- * apparent, the turn to the other tack stalled her onto the wharf). An estimate (docs/CONSTANTS.md). */
+/** A way off through the wind she's taken only with this way on (m/s). Not that she can't tack slower: in the sim she
+ * gets round from 1 m/s, in 17 s, and pinched no slower (the fourth review's trials). But a tack is 8 to 18 s of slow
+ * turning, down to 0.1–1.5 m/s in it, that a 9 m arc at her speed doesn't describe: beside a structure, the room for that
+ * isn't judged, so slower than this it isn't tried (the third review's starts, pinched at 3 and at 4.5 kn beside a wharf,
+ * stalled in the tack and struck). Fitted to those starts, not a measured figure (docs/CONSTANTS.md). */
 const OFF_TACK = 2;
-/** ...and pinched inside her close-hauled angle, a quarter more (m/s): her way already falling off (the third review's start,
- * 2.3 m/s and pinched beside a wharf, stalled in the tack and struck). An estimate (docs/CONSTANTS.md). */
+/** ...and pinched inside her close-hauled angle, a quarter more (m/s): fitted, as OFF_TACK, to the third review's start,
+ * 2.3 m/s and pinched beside a wharf, which stalled in the tack and struck (docs/CONSTANTS.md). */
 const OFF_TACK_PINCHED = 1.25 * OFF_TACK;
 /** What her turn's arc may give up of how far off she is (m), as with way on she can't help a little: a pier face
  * converging on her course closed it 0.6 m in the first 10° of any turn, 8 m off Pier 45's head. Turns that keep that
@@ -188,8 +193,8 @@ export const turnClear = (b: Vec & { h: number; v: number }, h: number, ram = 0)
  * then took a tighter one. */
 const hullKeep = (d: number) => Math.min(OFF_HULL, d - 0.5);
 /** The straight line from `a` to `q` crosses no land, her hull's sides included, and keeps `k` off the structures
- * (OFF_HULL, or what she has if she's nearer than that), every tenth of it. */
-export function lineClear(a: Vec, q: Vec, k = Math.min(OFF_HULL, near(a) - 0.5)): boolean {
+ * (OFF_HULL, or what she has if she's nearer than that, never under HULL_MIN), every tenth of it. */
+export function lineClear(a: Vec, q: Vec, k = Math.max(HULL_MIN, Math.min(OFF_HULL, near(a) - 0.5))): boolean {
   if (onLand(q) || landAlong(a, q) !== Infinity) return false;
   const h = brg(q.x - a.x, q.y - a.y);
   for (let j = 1; j <= 10; j++) { const p = { x: a.x + (q.x - a.x) * j / 10, y: a.y + (q.y - a.y) * j / 10 }; if (near(p) < k || sideOnLand(p, h)) return false; }
