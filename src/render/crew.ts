@@ -1415,6 +1415,13 @@ function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vec
     l.root.userData.bend = bestB ? undefined : keep; ik(l, l.root.position, tgt, BONE.thigh, BONE.shin, bestB ?? keep ?? kneeHint(p, i), 1);
   });
 }
+/** A foot picked up and put down at `to`: lifted over whatever is highest on the way, held a moment first if that's
+ * right where it starts. */
+function stepTo(foot: THREE.Vector3, want: THREE.Vector3): NonNullable<NonNullable<Figure['swing']>[number]> {
+  const to = want.clone(); let top = Math.max(foot.y, to.y), near = 0;
+  const nq = Math.max(12, Math.ceil(foot.distanceTo(to) / 0.012)); for (let q = 1; q < nq; q++) { _t.copy(foot).lerp(to, q / nq); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= nq / 3) near = Math.max(near, g); }
+  return { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
+}
 /** Ease the pose shown toward the pose wanted (a quarter of a second or so). */
 function ease(f: Figure, want: PoseT, dt: number): PoseT {
   // (no time passed, a frame drawn twice: nothing moves; a jump, a new start: straight there)
@@ -1526,7 +1533,13 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
       hd.y = Math.max(hd.y, Math.min(clear, hy + LIMB_SPEED * dt), handFloor(hd.x, hd.y, hd.z) + 0.02);
       // (still in under the side deck: below its underside, never up through it)
       if (wasUnder && underDeck(hd.x, SEAT_Y + 0.01, hd.z)) hd.y = Math.min(hd.y, deckY(uAtZ(hd.z), Math.abs(hd.x)) - 0.031); }
-    const foot = c.feet[i], sw = f.swing![i];
+    const foot = c.feet[i];
+    // (sat down, a step still on its way to the after deck, begun as they crossed it, where this foot's place is now down
+    // in the cockpit: it goes there instead, from where it's got to. Landed on the deck first and stepped down after, it
+    // was up by the hip for most of a second, the knee folded to the chest: the owner, 19 Nov 2026, tests/crewreplay)
+    { const s0 = f.swing![i], wf = want.feet[i];
+      if (s0 && !want.step && !f.going && s0.to.z > COCK1 - 0.02 && wf.z < COCK1 - 0.05 && s0.to.y > wf.y + 0.15) f.swing![i] = stepTo(foot, wf); }
+    const sw = f.swing![i];
     if (want.step || sw) {
       // walking or crawling (and a step under way is finished, whatever comes next): each foot stays planted until it's left behind, then swings (lifted) to a new place
       // ahead, one foot at a time, about a quarter of a second a step: no foot slides on the deck
@@ -1573,14 +1586,17 @@ function ease(f: Figure, want: PoseT, dt: number): PoseT {
         let near = 0; const nq = Math.max(12, Math.ceil(foot.distanceTo(to) / 0.012)); for (let q = 1; q < nq; q++) { _t.copy(foot).lerp(to, q / nq); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= nq / 3) near = Math.max(near, g); }
         f.swing![i] = { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
       }
-    } else if (!rising && !f.going && !f.swing![1 - i] && Math.abs(want.feet[i].y - foot.y) < 0.15 && foot.distanceTo(want.feet[i]) > 0.5 * f.scale && !outOfReach(c.hip, want.feet[i], f.scale)) {
+    } else if (!rising && !f.going && !f.swing![1 - i] && !outOfReach(c.hip, want.feet[i], f.scale) && ((Math.abs(want.feet[i].y - foot.y) < 0.15 && foot.distanceTo(want.feet[i]) > 0.5 * f.scale)
+      // (or sat down with a foot still up on the after deck, its place down in the cockpit: the helm after crossing the boat
+      // in a tack. Slid there at a limb's pace, held at the deck's height till past its edge, it took half a second and the
+      // knee folded up to the chest the while; it's stepped down at once, as anyone sitting puts a foot down: the owner,
+      // 19 Nov 2026, tests/crewreplay)
+      || (foot.z > COCK1 - 0.02 && want.feet[i].z < COCK1 - 0.05 && foot.y > want.feet[i].y + 0.15 && foot.distanceTo(want.feet[i]) > 0.15))) {
       // (a foot left well behind, half a metre and more from its place (out on the far bench after a crossing, its owner
       // already sat on the cabin top's edge), is picked up and put down there, not slid across the cockpit at 2 m/s. Along
       // the level only, once they've arrived, and to a place the hips can reach: a leap across the cockpit to where they
       // weren't yet, or lifted in an arc to a kneeling place up a step, the leg went into the cabin's after end)
-      const to = want.feet[i].clone(); let top = Math.max(foot.y, to.y), near = 0;
-      const nq = Math.max(12, Math.ceil(foot.distanceTo(to) / 0.012)); for (let q = 1; q < nq; q++) { _t.copy(foot).lerp(to, q / nq); const g = ground(_t.x, _t.z) + 0.06; top = Math.max(top, g); if (q <= nq / 3) near = Math.max(near, g); }
-      f.swing![i] = { from: foot.clone(), to, t: 0, top, hold: near > foot.y + 0.03 ? 0.25 : 0 };
+      f.swing![i] = stepTo(foot, want.feet[i]);
     } else {
       f.swing![i] = null;
       // (on its way, it clears what it passes over; once there, it rests on what's under it)

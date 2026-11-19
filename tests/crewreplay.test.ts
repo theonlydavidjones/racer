@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { replayDeepest, type CrewRecording } from './helpers/crewReplay';
+import { mirrored, replayDeepest, replayHelmKnee, type CrewRecording } from './helpers/crewReplay';
 import HELM_TACK from './fixtures/crew-helm-tack-14kt.json';
 import SIDE_DECK from './fixtures/crew-sidedeck-8kt.json';
 import EDGE_1 from './fixtures/crew-cabinedge-20kt-1.json';
@@ -33,4 +33,17 @@ describe('The soak, replayed: the crew clear of the boat (render/crew.ts)', () =
   it('turning on the foredeck to come aft, 8 kt', () => {
     expect(replayDeepest(FOREDECK as unknown as CrewRecording, 553)).toBe('');
   }, 120_000);
+  // (and seated after that tack, the foot still up on the after deck by the hip from crossing comes down to its place in
+  // the cockpit as they sit, not slid there over most of a second with the knee folded up to the chest (the owner, 19 Nov
+  // 2026: "fix it"). Once they're down on the deck (174.6 s on), the knees no higher than 0.9 m: sat there with both feet
+  // in the cockpit they're at 0.75; with the foot left up by the hip, the knee was held at 1.0 to 1.13 until 175.2 s)
+  // (on both tacks: the recording's own, onto starboard, and its mirror, onto port)
+  for (const [tack, rec] of [['starboard', HELM_TACK as unknown as CrewRecording], ['port', mirrored(HELM_TACK as unknown as CrewRecording)]] as const) {
+    it(`the helm sat down after the tack onto ${tack}, 14 kt: the foot off the after deck, the knee not up at the chest`, () => {
+      expect(replayHelmKnee(rec, 174.6)).toBeLessThan(0.9);
+    }, 120_000);
+    it(`the helm sat down after the tack onto ${tack}, 14 kt: clear of the boat`, () => {
+      expect(replayDeepest(rec, 173)).toBe('');
+    }, 120_000);
+  }
 });
