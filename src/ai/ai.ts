@@ -147,20 +147,20 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
   }
   return m;
 }
-/** How much water she leaves outside the sweep of a boat turning circles, m: about half a length (a modelling choice). */
+/** How much water she leaves outside the sweep of a boat turning circles, m: about half a length (a modeling choice). */
 const CIRCLE_BERTH = 4;
 /** The water a boat doing her turns will sweep: the circle she's turning in (its center, and the radius her hull's ends
  * sweep, R + half a length: a little more than the true √(R² + (LOA/2)²)), m. R = v/ω, capped at 30 m. Turning at
  * under 2°/s (a penalty turn runs at about 3–10°/s; slower through the tack, or slowed almost to a stop by it), the
  * radius is too uncertain to steer by: then a length's radius round where she'll be in two seconds, as she's going.
- * Both modelling choices. */
+ * Both modeling choices. */
 function circleOf(o: Boat): { x: number; y: number; r: number } {
   const rate = o.turnRate ?? 0;
   if (Math.abs(rate) < 2) return { x: o.x + o.vx * 2, y: o.y + o.vy * 2, r: LOA };
   const R = Math.min(30, Math.max(0.5, o.v) / (Math.abs(rate) * Math.PI / 180)), side = V(o.h + Math.sign(rate) * 90);
   return { x: o.x + side.x * R, y: o.y + side.y * R, r: R + LOA / 2 };
 }
-/** How far she looks ahead along a heading for the berth, s (a modelling choice: about the time a helmsman watching a
+/** How far she looks ahead along a heading for the berth, s (a modeling choice: about the time a helmsman watching a
  * boat spin her turns would start to steer round her, a few lengths off). */
 const BERTH_LOOK = 15;
 /**
