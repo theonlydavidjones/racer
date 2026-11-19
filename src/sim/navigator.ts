@@ -1,5 +1,5 @@
 import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
-import { helmPlan, nextCorner, offLeg, type HelmPlan } from './helmPlan';
+import { heldPast, helmPlan, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -157,7 +157,7 @@ const HELM_TOL = 8;
  * the owner's r253), as a navPlan command for the page to send. A plan is asked of `plan` (the page's passageLive,
  * worked out between frames) only when something calls for one, not on a timer (the Coordinator, 18 Nov 2026: a plan
  * each 150 m took up to an eighth of the page's thread for the whole passage): the pilot engaged, or a new race; a corner
- * made; off the plan by more than HELM_OFF m; the wind or the tide at the course changed by more than HELM_WIND, HELM_KT
+ * made, or past one and not yet clear to turn for the next; off the plan by more than HELM_OFF m; the wind or the tide at the course changed by more than HELM_WIND, HELM_KT
  * or HELM_TIDE since it was planned; or, failing all of those, HELM_EVERY minutes of the clock on. Meanwhile the helm
  * keeps the plan it has. A plan's taken only if she's within HELM_OFF m of its track (one held over from before she was
  * steered off it waits for the next; one begun some way back, as a long plan is by the time it's in, is taken up at the
@@ -177,7 +177,7 @@ export class HelmFeed {
     if (h && !this.want) {
       const was = h.P.i; nextCorner(h.P, u, dest);
       const dw = Math.abs(((w.wind.from - h.wind.from + 540) % 360) - 180);
-      this.want = h.P.i !== was || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
+      this.want = h.P.i !== was || heldPast(h.P, u) || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
         || Math.abs(w.cur.kt - h.tide) > HELM_TIDE || w.clockUtc - h.t >= HELM_EVERY || h.P.to.x !== dest.x || h.P.to.y !== dest.y;
       if (!this.want) return null;
     }

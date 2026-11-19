@@ -473,6 +473,24 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
+8q9. **Bug: on Nav, a replan after a corner she can't turn from waits on the live plan's cadence** (the physics review of
+   nav-pier, 19 November; bug; a sprint bug; 1–2 h; owner of the navigator): past a plan corner with the way on not yet
+   clear, HelmFeed asks for a new plan at once (sim/helmPlan.ts heldPast), but on the page passageLive gives back its
+   memoized plan until she leaves its 150 m cell or the 2-minute bucket turns (sim/navigator.ts LIVE_M, LIVE_MIN): 52–142 s
+   a passage spent wanting a plan, steering meanwhile for the corner astern. The fix: a fresh plan from where she is when
+   the helm asks for one, not the cell's memo.
+8q8. **Bug: phantom land astride the Berkeley Pier's deck** (the physics review of nav-pier, 19 November; bug; a sprint
+   bug; 1 h; data): two 50 m terrain cells read as land across the deck, about (10308–10356, 5480–5530), ~100 m east of
+   the gap at its end, and (10880–10930, 5730–5780): ~20 m either side of a 6.6 m deck, where in fact only the deck is
+   solid. It's the water a boat turns into after the gap, northbound for the marina. The fix: the terrain mask there
+   from the shore's data, not the 50 m cells (geo/shore.ts onLand), with a test that the water beside the deck is water.
+8q7. **Bug: Nav engaged with way on alongside a pier wrecks or strikes it** (the physics review of nav-pier, 19 November;
+   bug; a sprint bug, after nav-pier; 2–4 h; owner of the navigator and pilot): engaged a meter or two along or in from
+   8 m off Pier 45's head bound for off Alcatraz, she's wrecked on the wharf or strikes it (one start has no plan from
+   there at all). Main does the same. The pilot's own way round (ai.ts detour, rays 25 m either side) turns her into the
+   pier when the plan's first leg begins beside it. Kept in tests/nav-pier.test.ts as it.fails (known to fail), to be
+   seen and to show the fix. The fix: off a leg begun beside a structure, steer the plan's line off it (the router's
+   "no nearer than she is"), or hand over with the alarm.
 8q6. **Now — bug: the OpenStreetMap attribution isn't on screen** (the Coordinator, 18 November; legal, an ODbL
    requirement; now, a sprint bug; 1 h; UI & Copy): wherever the page draws OSM-derived data (the chart, the shore, the
    buildings), "© OpenStreetMap contributors" shows, on the chart and in the credits. One short line, in an existing

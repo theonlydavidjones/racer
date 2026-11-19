@@ -141,7 +141,7 @@ function courseToSteer(brgT: number, v: number, cur: Vec): number | null {
 const landAhead = (b: Boat, h: number, d: number) => { const u = V(h); return landAlong(b, { x: b.x + u.x * d, y: b.y + u.y * d }) <= d; };
 
 /** What Nav steers for: the course to the waypoint allowing for the current, close-hauled on the right tack when it's upwind, round land in the way. */
-function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
+function navHeading(b: Boat, p: Pilot, dest: Vec, t: number, planned = false): number {
   // (the headings: her course is the polar's angle, so she steers her leeway higher than it, physics.ts b.leeway)
   const from = b.ww.from, beat = beatFor(b) + 1, lw = b.leeway ?? 0, csS = n360(from - beat + lw), csP = n360(from + beat - lw), c = b.cur;
   const close = (tk: 'S' | 'P') => tk === 'S' ? csS : csP;
@@ -149,7 +149,11 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
   if (p.goTack) { if (b.tack === p.goTack && !b.tacking) p.goTack = null; else return close(p.goTack); }
   let P = dest;
   const bP0 = brg(P.x - b.x, P.y - b.y);
-  if (Math.abs(wrap(from - bP0)) > 50) { // reaching or running: round any land in the way
+  // (steering for a corner of the navigator's plan with the way to it open (World.planTarget: helmPlan.ts legOpen): the
+  // plan's already been routed round the land and the piers, so no way round of its own. Its own, looked for every 2 s along rays 25 m either side, swung her
+  // to and fro in the 45 m gap at the Berkeley Pier's deck end, which the plan goes through: World.planTarget)
+  if (planned && landAlong(b, P) === Infinity) p.detour = null;
+  else if (Math.abs(wrap(from - bP0)) > 50) { // reaching or running: round any land in the way
     if (t - p.detourT > 2) { p.detour = detour(b, P); p.detourT = t; }
     if (p.detour) P = p.detour;
   } else p.detour = null;
@@ -178,7 +182,8 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
  * One step of the pilot: it reads the compass and the masthead unit, works out the helm, and the ram moves the tiller
  * toward it. Sets b.tiller (−1 pushed to port … +1 pushed to starboard; pushing it to starboard turns her to port).
  */
-export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: number): void {
+/** `planned`: `dest` is a corner of the navigator's plan (World.planTarget), already routed round the land. */
+export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: number, planned = false): void {
   if (p.mode === 'off') return;
   if ((b.astern ?? 0) > 0.1) { p.alarm = 'she\'s going astern, and a pilot can\'t steer backwards'; return; }
   if (p.lastTack && b.tack !== p.lastTack && !b.tacking) { p.trim = -p.trim; p.lastTack = b.tack; } // weather helm is now on the other side
@@ -199,7 +204,7 @@ export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: nu
     const reach = Math.min(p.direct ? 100 : 150, Math.max(0, dd - 12));
     const clear = !!dest && landAlong(b, { x: b.x + u.x * reach, y: b.y + u.y * reach }) === Infinity;
     p.direct = motoring && clear;
-    want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
+    want = dest ? (motoring && clear ? direct : navHeading(b, p, dest, t, planned)) : b.h; p.navH = want; // (land within 150 m on the direct line: the navigator's way round)
   }
   const err = wrap(want - b.h), rate = wrap(b.h - p.lastH) / Math.max(dt, 1e-6); p.lastH = b.h;
   // (turning her onto a new course is a turn called: if her stern passes the wind in it, her crew jibe the main, as for a
