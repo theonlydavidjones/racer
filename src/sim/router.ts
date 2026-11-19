@@ -225,6 +225,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
       // point, four cold ones ran a slice to 32 ms from Mile Rock, its budget 6)
       const n = nodes[i];
       if (o.chopSteps) { yield* o.chopSteps(n.p, n.t); } // (the chop's cell made ready a piece a slice, cold)
+      if (o.windSteps) { yield* o.windSteps(n.p, n.t); } // (the lee there made ready a cold grid point a slice)
       const w = windOn(o, n.p, n.t); yield; const c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
       // (becalmed here, under 0.5 kt on the water: she can't sail, but the tide still carries her. The front keeps her,
       // drifting the minute on the same board with no turn, so a hole in the breeze doesn't delete the routes through it:
@@ -245,7 +246,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
       }
       let tried = 0;
       for (const [twa, sd] of cand) {
-        if (++tried % 6 === 0) yield; // (and between a point's headings: each one's exact check against the land and the piers, clear; a point's 30-odd ran a slice long)
+        if (++tried % 3 === 0) yield; // (and between a point's headings: each one's exact check against the land and the piers, clear, and its speed in the chop, solved cold: six of them held a slice to 13 ms from Mile Rock, 18 Nov 2026)
         const h = w.from - sd * twa, v = twa === twa ? chopSpeed(w.kt, twa, ch.hs, ch.tp) : 0; // (sd +1: wind from starboard, starboard tack/jibe)
         // a tack or jibe costs its time, drifting with the current: the minute's sailing is that much shorter
         const turn: Node['turn'] = v && n.side && sd !== n.side ? (twa < 90 ? 'tack' : 'gybe') : '', lost = turn ? manoeuvreS(turn, w.kt, ch.hs) : 0;

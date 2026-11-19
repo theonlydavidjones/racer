@@ -619,6 +619,26 @@ Also measured: the double `%` in wrap and n360 is a call to C's fmod (about 10 n
 2·10⁷ inputs, every value within 64 ulps of a multiple of 180 included) at about half the time. The step makes about 346
 such calls, so roughly 0.4% to gain; not yet applied.
 
+### 8d. The budget's noise: two runs, and PRs judged against main (19 Nov 2026)
+
+The ten races' ratios against v168 run 0.96–1.04 (standard deviation about 0.028), so one run's mean carries about
+±0.9%. That's half the budget's 1.9% of room. Two quiet runs of one tree read 2% apart on the same day:
+
+| tree | quiet runs, ten races against v168 |
+|---|---|
+| main 4ef0708f (before v208) | 1.0210 (VM just restarted), 1.0104 |
+| main dcc707a2 (v208's src) | 1.0059 |
+| Deep Physics' soak b31b28a3 (1.0040 against b4334c09, the same src as dcc707a2) | 1.0226, 1.0232 |
+
+So a tree about 1% over v168 passed or failed on the run. The rule since then (the Coordinator, 19 Nov 2026; the limit unchanged):
+
+- **PRs** are judged against main: `--ai` (≤1.015), or the plain gate for a change that doesn't change the race. A
+  budget run within main's own margin no longer holds a PR.
+- **Main** is measured against the budget once a release, before publishing: `--budget --ai`, which now runs twice by
+  default (`--repeat 2`). The second run swaps which races go with which load order, so each of the ten races sails once
+  in each order: twenty ratios, about ±0.6%, their mean against 1.019. perf.test does the same with `PERF_BUDGET_AI=1`.
+  If main reads above about 1.015, making headroom on main (bit-identical savings first) comes ahead of other work.
+
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
 v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):

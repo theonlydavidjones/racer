@@ -164,7 +164,7 @@ function ownerWith(line: string, nCrew: number, main: number, layout: Forward, f
 }
 
 /** Where working a line puts a person (null: they work it from where they are). */
-function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
+export function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
   if (line === 'car') return { arm: CAR_ARM, z: Z.car, pose: 'car' };
   if (line === 'pole' || line === 'hoist') return { arm: 0.25, z: Z.mast, pose: 'mast' };
   // the outboard (stowed or shipped, sim/world.ts motorStow): kneeling on the after deck at the bracket, aft of the helm
@@ -490,6 +490,9 @@ export const CAR = {
 };
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
+/** Made fast or on her lines: only your own call for a lazy car is worked (physics.ts crewTiedUp); the crew's own plan for
+ * it waits till she's sailing, for the course she'll be on. */
+export function carCall(b: Boat, dt: number): void { if (b.carCmd && b.crew) carJob(b, dt); }
 function carJob(b: Boat, dt: number): void {
   const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, c.layout ?? 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
@@ -542,7 +545,9 @@ function carJob(b: Boat, dt: number): void {
 export function bodyJob(b: Boat, line: 'pole' | 'hoist' | 'outboard', on: boolean): number {
   const c = b.crew; if (!c) return 1;
   const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, c.layout ?? 'cockpit'), a = c.people[who];
-  if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
+  // (a car job of your own call they finish first, then this; one of the crew's own plan waits for the sails: called
+  // "sails down", a hand re-pins and goes, the physics review of the dock's jobs)
+  if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car' && b.carCmd)) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);
 }

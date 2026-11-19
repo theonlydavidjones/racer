@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { testBoat, sail, startTack, courseHeading } from './helpers/testBoat';
+import { trueDepth } from './helpers/trueDepth';
 import { beatAngle } from '../src/boat/polar';
 import { DEFAULT_CREW, newCrew, slotOf, type CrewPlace } from '../src/boat/crewPhys';
 import { buildCrew, fistAt, ground, syncCrew, tailEnd, underDeck, winchGrip, type Crew, type Figure, type PaddleDraw } from '../src/render/crew';
@@ -36,9 +37,11 @@ function through(cr: Crew, label: string, bad: string[]): void {
     // be worked through, a follow-up)
     for (const { name, p } of bones(f, 0.05)) {
       if (Math.abs(p.z) > L / 2 - 0.05 || Math.abs(p.x) > halfBeam(uAtZ(p.z)) - 0.02) continue; // (outboard: hiking out over the side)
-      const g = ground(p.x, p.z, p.y); // (at the bone's height: under the thwart's beam is open)
       if (underDeck(p.x, p.y, p.z)) continue; // (in under the side deck, reaching the winch's handle: open to the cockpit)
-      if (p.y < g - 0.025) bad.push(`${label}: ${who} ${name} ${(g - p.y).toFixed(2)} m into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`);
+      // (how far into it: straight down from ground(), at the bone's height (under the thwart's beam is open), or sideways
+      // out from under it, the lesser: tests/helpers/trueDepth)
+      const d = trueDepth(p.x, p.y, p.z, 0.025);
+      if (d > 0.025) bad.push(`${label}: ${who} ${name} ${d.toFixed(2)} m into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)})`);
     }
   }
 }
