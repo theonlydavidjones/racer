@@ -70,6 +70,8 @@ export function driveCurveFor(tws: number, twa: number, vt: number): (v: number)
     return lo * (1 - f) + hi * f;
   };
 }
+/** One entry of the table (for tests/drive-curve-exact.test.ts): w knots, a5 the angle / 5, speed step q. */
+export const driveTableEntry = (w: number, a5: number, q: number): number => at(w, a5 * 5, q);
 function at(w: number, a: number, q: number): number {
   const key = (w * 64 + a / 5) * 32 + q; // (w ≤ 40, a/5 ≤ 36, q ≤ 30: each in its own field, no two conditions share a key)
   let k = cache[key];
