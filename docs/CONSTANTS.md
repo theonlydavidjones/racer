@@ -695,7 +695,12 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | DT | 1/60 | 50 | numerical |  |
-| NAV_MADE (sim/helmPlan.ts) | 30 m | 10 | estimate | a plan corner counts as made within this (about four boat lengths), the way to the next clear; else once past it. Settled by: where she tacks against the plan's tack points (tests/nav-follows-plan: within 30 m) |
+| NAV_MADE (sim/helmPlan.ts) | 30 m | 11 | estimate | a plan corner counts as made within this (about four boat lengths), the way to the next clear; else once past it. Settled by: where she tacks against the plan's tack points (tests/nav-follows-plan: within 30 m) |
+| STRUCTURE_CLEAR (sim/helmPlan.ts) | 20 m | 15 | design | the helm's clearance off the piers, wharves and bridge piers: the router's WHARF_CLEAR (router.ts), kept the same |
+| legOpen's clearance (sim/helmPlan.ts) | 10 m | 15 | estimate | STRUCTURE_CLEAR / 2: a plan leg the pilot steers as given, with no way round of its own, keeps this off structures (or no nearer than she is). Settled by: tests/nav-pier.test.ts's starts beside a pier |
+| LAND_SIDE (sim/helmPlan.ts) | 8 m | 139 | estimate | an open leg's land clearance either side (about her length). Settled by: the land along open legs, the physics review's probe |
+| GAP_MIN (sim/helmPlan.ts) | 3 × LOA (~23 m) | 20 | estimate | the narrowest gap between structures the pilot sails: her turning room (her 9 m turn, a little over); narrower, the alarm. The Berkeley Pier's 45 m gap is wider, and sailed (the owner) |
+| GAP_WARN (sim/helmPlan.ts) | 150 m | 22 | design | how far short of a gap too narrow the pilot hands her over: time to take the helm |
 | TWO_TURNS | 720 | 52 | standard |  |
 | ONE_TURN | 360 | 60 | standard |  |
 | HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |
