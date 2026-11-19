@@ -149,6 +149,10 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v210 (19 Nov, main 08afb104):** the AI's penalty turns (#483), the soak, letting a sheet go, detours near boats (#480), the helm's foot, headroom (#482), the jumpers' arrows and readout rounding, Hoist tabs, the weather refresh, the Berkeley Pier gap reopened.
+
+**v209 (19 Nov, main c1e3b75a):** #460 and #467–#479, crew hands, the weather-helm chip, crew dock jobs and poses, the tide-leg coach line, brand names out of player text, approx.test on 24 seeds.
+
 **v208 (18 Nov, main b4334c09):** shallow waves (#454: the chop at the depth's group speed), the router's give-up fixes (Deep Physics' reviews), lying to after racing is called off, the setup chart's lee warm-up, the ten-race-mean budget for AI and rules changes. perf-ab clean against v207. Held out: FTUE's first run (reverted again). v209 is collecting.
 
 **v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
