@@ -1345,16 +1345,22 @@ function inCabinEnd(q: THREE.Vector3): number {
   const top = cabinTopAt(u, ax); if (q.y > top) return 0;
   return Math.min(COCK0 - q.z, top - q.y, ch - ax);
 }
+/** How far a point is into the after deck (m), from its top or its forward face over the cockpit's after end; 0 if not. */
+function inAfterDeck(q: THREE.Vector3): number {
+  if (q.z <= COCK1 || q.z > L / 2 - 0.05 || Math.abs(q.x) > halfBeam(uAtZ(q.z)) - 0.02 || underDeck(q.x, q.y, q.z)) return 0;
+  const g = ground(q.x, q.z, q.y); return q.y >= g ? 0 : Math.min(g - q.y, q.z - COCK1);
+}
 const _lp = V(0, 0, 0), _toBoat = new THREE.Matrix4();
-/** The legs clear of the cabin's after end and the cockpit's sole: stepping up out of the cockpit's forward corner, or
- * sat by it, a knee bent forward the usual way went into the cabin's face, the thigh 5 to 9 cm through it; getting up
- * off one knee at a cabin-top line to go to the next, the other knee went down through the sole, 4 to 14 cm (the sprint's
- * soak, tests/crewtransit). As the elbows are (apply), a leg in either is bent the other ways a knee goes (in or out to
+/** The legs clear of the cabin's after end, the cockpit's sole and the after deck: stepping up out of the cockpit's forward
+ * corner, or sat by it, a knee bent forward the usual way went into the cabin's face, the thigh 5 to 9 cm through it;
+ * getting up off one knee at a cabin-top line to go to the next, the other knee went down through the sole, 4 to 14 cm;
+ * and the helm sat down on the new side after crossing in a tack, a foot still up on the after deck by the hip, the knee
+ * swung round under it, through the deck, up to 17 cm (the sprint's soak, tests/crewtransit, tests/crewhelmbench). As the elbows are (apply), a leg in either is bent the other ways a knee goes (in or out to
  * the side, up) until one clears it and everything else, the one that goes least into anything if none does. */
 function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vector3) => THREE.Vector3, kneeHint: (q: PoseT, i: number) => THREE.Vector3): void {
-  const par = f.root.parent; if (!par || p.hip.z > COCK1 || p.hip.z < COCK0 - 0.5) return;
-  const nearEnd = p.hip.z < COCK0 + BONE.thigh * f.scale + 0.1, inC = inCockpit(Math.abs(p.hip.x), p.hip.z);
-  if (!nearEnd && !inC) return;
+  const par = f.root.parent; if (!par || p.hip.z < COCK0 - 0.5) return;
+  const nearEnd = p.hip.z < COCK0 + BONE.thigh * f.scale + 0.1, inC = inCockpit(Math.abs(p.hip.x), p.hip.z), nearAft = p.hip.z > COCK1 - (BONE.thigh + BONE.shin) * f.scale;
+  if (!nearEnd && !inC && !nearAft) return;
   const toBoat = _toBoat.copy(par.matrixWorld).invert();
   f.leg.forEach((l, i) => {
     // (how far the leg's into the cabin's end or down through the sole; and, for the other ways tried, into anything at
@@ -1368,11 +1374,12 @@ function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vec
       // tried, all along)
       const at = (q: THREE.Vector3, end: boolean) => {
         if (nearEnd) { const c = inCabinEnd(q); if (c >= 0.01) into = Math.max(into, c); any = Math.max(any, c); }
+        if (nearAft && q.z > COCK1 && q.y < 0.66) { const c = inAfterDeck(q); if (c >= 0.01) into = Math.max(into, c); any = Math.max(any, c); }
         if ((all || (end && q.y < 0.3)) && !underDeck(q.x, q.y, q.z) && Math.abs(q.x) < halfBeam(uAtZ(q.z)) - 0.02) {
           const d = ground(q.x, q.z, q.y) - q.y; if (d > 0.025 && inCockpit(Math.abs(q.x), q.z)) into = Math.max(into, d); any = Math.max(any, d - 0.02);
         }
       };
-      if (!all && !nearEnd) { at(knee, true); for (const t of [0.25, 0.5, 0.9]) at(_t.copy(knee).lerp(ank, t), true); return; } // (along it too: its ankle end can be in under a bench)
+      if (!all && !nearEnd && !nearAft) { at(knee, true); for (const t of [0.25, 0.5, 0.9]) at(_t.copy(knee).lerp(ank, t), true); return; } // (along it too: its ankle end can be in under a bench)
       for (let t = 0.4; t < 1.01; t += 0.1) at(_t.copy(hip).lerp(knee, t), t > 0.95);
       for (let t = 0.1; t < 0.95; t += 0.1) at(_t.copy(knee).lerp(ank, t), t > 0.2);
     };
