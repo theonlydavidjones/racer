@@ -11,6 +11,7 @@ import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { loadLog, type LogEntry } from './boat/logbook';
 import { harborAt, inBasin } from './geo/marina';
+import { hoistTabWord } from './ui/hoistTab';
 import { sailNo, type BoatSpec } from './boat/spec';
 import { boatSummaryText } from './ui/readouts';
 import { ReplayView, type ReplayClip } from './replay/replayView';
@@ -1044,11 +1045,7 @@ for (const b of $('pilot').querySelectorAll<HTMLButtonElement>('[data-pa]')) b.o
 };
 /** The band's hoist tabs (ROADMAP 8o: hoisted and dropped at the mast; the old Hoist buttons are gone): a sail that's
  * down, or on its way up or down, always has one; striking a sail is for the harbor. */
-function hoistTab(k: 'main' | 'jib'): string | null {
-  const u = w.user, r = u.rig, h = r ? r[k] : 1, up = r ? (k === 'main' ? r.mainUp : r.jibUp) : true;
-  if (!w.running || (up && h >= 1 && !inBasin(u))) return null;
-  return up ? (h < 1 ? `Hoisting ${k}…` : `Strike ${k}`) : h > 0 ? `Striking ${k}…` : `Hoist ${k}`;
-}
+function hoistTab(k: 'main' | 'jib'): string | null { return hoistTabWord(w.user, k, w.running, inBasin(w.user)); }
 /**
  * Strike the ensign: cruising in a blow, a crew takes the ensign down and unships its staff before it flogs itself to
  * rags; a second press hoists it again. The button shows from 20 kt of true wind (the 20 s mean the crew works by;
