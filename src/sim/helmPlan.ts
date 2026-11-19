@@ -4,6 +4,7 @@
 // HelmFeed).
 import { LOA, V, brg, dist, dot, segPt, sub, wrap, type Vec } from '../core/math';
 import { landAlong, onLand, wharfNearest } from '../geo/shore';
+import { HANDLING } from '../boat/dynamics';
 
 /** A corner counts as made within NAV_MADE m of it, about four of her lengths (a pilot steering for a point turns for the
  * next a little before it, as a navigator calling the marks does), with the way to the next clear; or once she's past
@@ -151,63 +152,103 @@ export const BESIDE = STRUCTURE_CLEAR / 2;
 const OFF_LOOK = 3 * LOA;
 /** The headings tried for the way off, either side of the way on (deg): every 15°, nearest it first (docs/CONSTANTS.md). */
 const OFF_TRY = [0, ...Array.from({ length: 12 }, (_, k) => [15 * (k + 1), -15 * (k + 1)]).flat()];
-/** Her turn's radius under sail, the arc she sweeps turning for a way off (m; boat/dynamics.ts HANDLING.turnRadius). */
-const OFF_TURN_R = 9;
-/** Slower than this through the water (m/s), she can't be tacked through the wind: a way off that needs it is a last
- * resort (the physics review: in irons beside a pier head, held hard over for one across the wind, she went astern and
+/** Her turn's radius under sail, the arc she sweeps turning for a way off (m): boat/dynamics.ts HANDLING.turnRadius. */
+const OFF_TURN_R = HANDLING.turnRadius;
+/** How long she runs on before her turn bites, from the helm amidships (s): the ram takes 2.25 s from there to hard
+ * over (autopilot.ts RAM_RATE), so about half that straight before the arc (the second review: the arc without it said
+ * 4.3 m and she got 3.4); none with the helm already hard over into the turn, twice it hard over the other way. An
+ * estimate (docs/CONSTANTS.md). */
+const OFF_LAG_S = 1;
+/** Slower than this through the water (m/s), she can't be tacked through the wind: a way off that needs it isn't one
+ * (the physics review: in irons beside a pier head, held hard over for one across the wind, she went astern and
  * was handed over; borne away on her own tack she'd have sailed clear). An estimate (docs/CONSTANTS.md). */
 const OFF_SLOW = 1;
 /** What her turn's arc may give up of how far off she is (m), as with way on she can't help a little: a pier face
- * converging on her course closed it 0.6 m in the first 10° of any turn, 8 m off Pier 45's head. But never nearer than
- * OFF_ARC_MIN, her half-beam and as much again (as the router lets a plan begun beside a pier keep, router.ts clear); the
- * review's wreck, a turn toward the pier from 7.9 m to 4.2, gives up nearly twice OFF_ARC_GIVE. Estimates
- * (docs/CONSTANTS.md). */
+ * converging on her course closed it 0.6 m in the first 10° of any turn, 8 m off Pier 45's head. Turns that keep that
+ * come first; failing those, any that keeps OFF_ARC_MIN, her half-beam and as much again (as the router lets a plan
+ * begun beside a pier keep, router.ts clear): held to the first alone, she was handed over 8 m off a wharf with a turn
+ * away keeping 5.9 m (the second review). Estimates (docs/CONSTANTS.md). */
 const OFF_ARC_GIVE = 2, OFF_ARC_MIN = 3;
+/** Failing every way that keeps OFF_ARC_MIN, the turn that keeps her farthest off is taken if it keeps this (m), her
+ * half-beam (1.1 m) and a little under a meter, and does better than her course held, as a helmsman luffs off a pier
+ * face closing on her rather than let go the helm (the second review: 4 m off Pier 45's face, the turn the pilot began
+ * cleared her by 2.4 m; handed over, she struck a meter east). An estimate (docs/CONSTANTS.md). */
+const OFF_HULL = 2;
+/** Her turn onto heading `h` keeps OFF_ARC_MIN off the structures (turnArc): an open leg is trusted only so (World.offPier). */
+export const turnClear = (b: Vec & { h: number; v: number }, h: number, ram = 0) => !!turnArc(b, h, OFF_ARC_MIN, ram);
+/** The straight line from `a` to `q` crosses no land and keeps OFF_HULL off the structures, every tenth of it. */
+export function lineClear(a: Vec, q: Vec): boolean {
+  if (onLand(q) || landAlong(a, q) !== Infinity) return false;
+  for (let j = 1; j <= 10; j++) if (near({ x: a.x + (q.x - a.x) * j / 10, y: a.y + (q.y - a.y) * j / 10 }) < OFF_HULL) return false;
+  return true;
+}
+/** How near her turn may bring her to a structure she's `d` m off, giving up OFF_ARC_GIVE at most (m). */
+export const arcKeep = (d: number) => Math.min(d - 0.5, Math.max(d - OFF_ARC_GIVE, OFF_ARC_MIN));
+const near = (p: Vec) => wharfNearest(p, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR;
+/**
+ * Her turn from her heading to `h`, the pilot's way (the shorter way round): a run on as the helm comes over (OFF_LAG_S,
+ * by where the ram is, −1 hard over to starboard … +1 to port, autopilot.ts), then an arc of OFF_TURN_R, every 10° of
+ * it. Where it ends and the least it keeps off the structures, or null if it crosses land or comes within `keep` of one.
+ * Stopped, she turns where she is.
+ */
+export function turnArc(b: Vec & { h: number; v: number }, h: number, keep: number, ram = 0): { e: Vec; least: number } | null {
+  const turn = wrap(h - b.h), s = Math.sign(turn) || 1;
+  if (b.v <= 0.3) return { e: { x: b.x, y: b.y }, least: near(b) };
+  const u0 = V(b.h), run = b.v * OFF_LAG_S * Math.max(0, 1 + s * ram), a = { x: b.x + u0.x * run, y: b.y + u0.y * run };
+  let least = near(a);
+  if (onLand(a) || least < keep || landAlong(b, a) !== Infinity) return null;
+  const c = V(b.h + 90 * s), cx = a.x + c.x * OFF_TURN_R, cy = a.y + c.y * OFF_TURN_R;
+  let e: Vec = a;
+  for (let th = 10; th < Math.abs(turn) + 10; th += 10) {
+    const r = V(b.h + s * Math.min(th, Math.abs(turn)) + 90 * s), p = { x: cx - r.x * OFF_TURN_R, y: cy - r.y * OFF_TURN_R }, d = near(p);
+    if (onLand(p) || d < keep) return null;
+    least = Math.min(least, d); e = p;
+  }
+  return { e, least };
+}
 /**
  * The way off a structure she's beside, as a sailor takes her off before setting a course: a point OFF_LOOK ahead on
- * the heading nearest the way on (toward `to`) that she reaches by the pilot's turn (the shorter way round from her
- * heading, sweeping an arc of OFF_TURN_R, which may give up OFF_ARC_GIVE of her offing) and then a straight line, along which she
- * comes no nearer any structure than the arc left her, crossing no land, ending farther off (or at BESIDE). Without the turn's arc, a way on astern
- * turned her through the pier she was running along (the physics review, 19 Nov 2026). Headings she can sail from where
- * she is come first: outside her close-hauled angle (`from` the wind, `beat` her angle to it), and, with too little way
- * on to tack, not across the wind from her; with none of those and way on, her course held if it keeps OFF_ARC_MIN off.
- * Null when there's none: the pilot then hands her over.
+ * a heading she reaches by the pilot's turn (turnArc) and then a straight line, along which she comes no nearer any
+ * structure than the arc left her, crossing no land, ending farther off (or at BESIDE). Without the turn's arc, a way
+ * on astern turned her through the pier she was running along (the physics review, 19 Nov 2026). In order, nearest the
+ * way on (toward `to`) first within each: a heading she can sail (outside her close-hauled angle, `from` the wind,
+ * `beat` her angle to it) by a turn giving up no more than OFF_ARC_GIVE of her offing; one by a turn keeping
+ * OFF_ARC_MIN; her track held, keeping OFF_ARC_MIN; one she can only pinch toward, keeping OFF_ARC_MIN; and the turn
+ * keeping her farthest off, if it keeps OFF_HULL and does better than her track held. With too little way on to tack,
+ * none across the wind from her (a pilot can't back a jib). Null when there's none: the pilot then hands her over.
  */
-export function wayOff(b: Vec & { h: number; v: number }, to: Vec, from: number, beat: number): Vec | null {
-  const w0 = wharfNearest(b, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR, base = brg(to.x - b.x, to.y - b.y), keep = w0 - 0.5;
-  const arcKeep = Math.min(keep, Math.max(w0 - OFF_ARC_GIVE, OFF_ARC_MIN));
-  const nearer = (p: Vec, k = keep) => { const r = wharfNearest(p, STRUCTURE_CLEAR); return !!r && r.d < k; };
-  let last: Vec | null = null;
+export function wayOff(b: Vec & { h: number; v: number; vx: number; vy: number }, to: Vec, from: number, beat: number, ram = 0): Vec | null {
+  const w0 = near(b), base = brg(to.x - b.x, to.y - b.y), keep = w0 - 0.5, give = arcKeep(w0), wind = wrap(from - b.h);
+  let sail3: Vec | null = null, pinch3: Vec | null = null, best: { q: Vec; least: number } | null = null;
   for (const a of OFF_TRY) {
     const h = base + a, turn = wrap(h - b.h), s = Math.sign(turn) || 1;
-    // (the turn's arc: about the center OFF_TURN_R to the side she turns to, every 10° of it)
-    let ok = true, e: Vec = { x: b.x, y: b.y };
-    if (b.v > 0.3) {
-      const c = V(b.h + 90 * s), cx = b.x + c.x * OFF_TURN_R, cy = b.y + c.y * OFF_TURN_R;
-      for (let th = 10; th < Math.abs(turn) + 10 && ok; th += 10) {
-        const r = V(b.h + s * Math.min(th, Math.abs(turn)) + 90 * s), p = { x: cx - r.x * OFF_TURN_R, y: cy - r.y * OFF_TURN_R };
-        if (onLand(p) || nearer(p, arcKeep)) ok = false; else e = p;
-      }
-    }
-    if (!ok) continue;
-    const u = V(h), q = { x: e.x + u.x * OFF_LOOK, y: e.y + u.y * OFF_LOOK };
+    if (b.v < OFF_SLOW && Math.sign(wind) === s && Math.abs(wind) < Math.abs(turn)) continue;
+    const arc = turnArc(b, h, OFF_HULL, ram);
+    if (!arc) continue;
+    const { e } = arc, u = V(h), q = { x: e.x + u.x * OFF_LOOK, y: e.y + u.y * OFF_LOOK };
     if (onLand(q) || landAlong(e, q) !== Infinity) continue;
     // (on from the arc's end, no nearer than it left her, nor than she is)
-    const lineKeep = Math.min(keep, (wharfNearest(e, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR) - 0.5);
-    for (let k = 1; k <= 10 && ok; k++) if (nearer({ x: e.x + u.x * OFF_LOOK * k / 10, y: e.y + u.y * OFF_LOOK * k / 10 }, lineKeep)) ok = false;
-    if (!ok || (wharfNearest(q, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR) < Math.min(BESIDE, w0 + 2)) continue;
-    const wind = wrap(from - b.h), across = b.v < OFF_SLOW && Math.sign(wind) === s && Math.abs(wind) < Math.abs(turn);
-    if (Math.abs(wrap(from - h)) >= beat + 5 && !across) return q;
-    last ??= q;
+    const lineKeep = Math.min(keep, near(e) - 0.5);
+    let ok = true;
+    for (let j = 1; j <= 10 && ok; j++) if (near({ x: e.x + u.x * OFF_LOOK * j / 10, y: e.y + u.y * OFF_LOOK * j / 10 }) < lineKeep) ok = false;
+    if (!ok || near(q) < Math.min(BESIDE, w0 + 2)) continue;
+    const sail = Math.abs(wrap(from - h)) >= beat + 5;
+    if (sail && arc.least >= give) return q;
+    if (arc.least >= OFF_ARC_MIN) { if (sail) sail3 ??= q; else pinch3 ??= q; }
+    if (!best || arc.least > best.least) best = { q, least: arc.least };
   }
-  // (none she can sail, with way on: her course held, if it keeps OFF_ARC_MIN off and crosses no land, as a sailor
-  // slipping past a pier's corner holds on rather than turn: 4 m off a face converging on her at 4 kn, every turn closed
-  // it, and on as she was she passed the corner clear)
+  if (sail3) return sail3;
+  // (her track held, as a sailor slipping past a pier's corner holds on rather than turn. Her track over the ground, not
+  // her heading: half a knot of current across it is meters over the look, the second review)
+  let held = 0;
   if (b.v >= OFF_SLOW) {
-    const u = V(b.h), q = { x: b.x + u.x * OFF_LOOK, y: b.y + u.y * OFF_LOOK };
-    let ok = !onLand(q) && landAlong(b, q) === Infinity;
-    for (let k = 1; k <= 10 && ok; k++) if (nearer({ x: b.x + u.x * OFF_LOOK * k / 10, y: b.y + u.y * OFF_LOOK * k / 10 }, OFF_ARC_MIN)) ok = false;
-    if (ok) return q;
+    const g = Math.hypot(b.vx, b.vy), u = g > 0.3 ? { x: b.vx / g, y: b.vy / g } : V(b.h), q = { x: b.x + u.x * OFF_LOOK, y: b.y + u.y * OFF_LOOK };
+    if (!onLand(q) && landAlong(b, q) === Infinity) {
+      held = Infinity;
+      for (let j = 1; j <= 10; j++) held = Math.min(held, near({ x: b.x + u.x * OFF_LOOK * j / 10, y: b.y + u.y * OFF_LOOK * j / 10 }));
+      if (held >= OFF_ARC_MIN) return q;
+    }
   }
-  return last;
+  if (pinch3) return pinch3;
+  return best && best.least > held ? best.q : null;
 }

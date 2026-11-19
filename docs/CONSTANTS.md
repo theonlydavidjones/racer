@@ -705,11 +705,14 @@ physics, ranked like the ten above:
 | legOpen's "nearer than she is" margin (sim/helmPlan.ts) | 1 m | — | estimate | a leg begun beside a structure is open if it comes no nearer than her distance less 1 m (unsourced; beside a structure the pilot now takes her off first, BESIDE, so this margin no longer steers her alongside) |
 | BESIDE (sim/helmPlan.ts) | 10 m | 149 | estimate | STRUCTURE_CLEAR / 2: within this of a structure (stopped) with the way on not open, the pilot takes her off it first (World.offPier, wayOff; ROADMAP 8q7). Settled by: tests/nav-pier.test.ts's starts beside Pier 45 |
 | OFF_AHEAD_S (sim/world.ts) | 4 s | 78 | estimate | with way on, beside counts out to BESIDE + 4 s of it (up to STRUCTURE_CLEAR): her turn's worth, a little over. Settled by: the Pier 45 start that ran onto the pier's head at 4.6 kn, engaged at 10 m |
-| OFF_LOOK (sim/helmPlan.ts wayOff) | 3 × LOA (~23 m) | 151 | estimate | how far along a way off is looked (and steered for, a point that far ahead) |
+| OFF_LOOK (sim/helmPlan.ts wayOff) | 3 × LOA (~23 m) | 152 | estimate | how far along a way off is looked (and steered for, a point that far ahead) |
 | OFF_TRY (sim/helmPlan.ts wayOff) | every 15°, ±180° | 153 | numerical | the headings tried for a way off, nearest the way on first |
-| OFF_TURN_R (sim/helmPlan.ts wayOff) | 9 m | 155 | estimate | her turn's arc swept to a way off: HANDLING.turnRadius (boat/dynamics.ts) |
-| OFF_SLOW (sim/helmPlan.ts wayOff) | 1 m/s | 159 | estimate | slower than this, a way off across the wind from her (a tack) is a last resort: in irons she can't be tacked. Settled by: the physics review's start in irons by a pier head |
-| OFF_ARC_GIVE, OFF_ARC_MIN (sim/helmPlan.ts wayOff) | 2 m; 3 m | 165 | estimate | what her turn's arc may give up of her offing (with way on she can't help a little), never nearer than her half-beam and as much again (the router's keep beside a pier). The review's wreck turn, 7.9 m to 4.2, gives up nearly twice OFF_ARC_GIVE |
+| OFF_TURN_R (sim/helmPlan.ts turnArc) | HANDLING.turnRadius (9 m) | 156 | estimate | her turn's arc swept to a way off: boat/dynamics.ts's own figure, imported |
+| OFF_SLOW (sim/helmPlan.ts wayOff) | 1 m/s | 165 | estimate | slower than this, a way off across the wind from her (a tack) is none: in irons she can't be tacked, and a pilot can't back a jib. Settled by: the physics reviews' starts in irons by a pier head and beside a wharf |
+| OFF_ARC_GIVE, OFF_ARC_MIN (sim/helmPlan.ts wayOff) | 2 m; 3 m | 171 | estimate | turns that give up no more than OFF_ARC_GIVE of her offing come first, then any keeping OFF_ARC_MIN (her half-beam and as much again, the router's keep beside a pier). Held to the first alone, she was handed over 8 m off a wharf with a turn away keeping 5.9 m (the second review) |
+| OFF_LAG_S (sim/helmPlan.ts turnArc) | 1 s × (1 + the turn's side × ram) | 161 | estimate | her straight run before the turn bites: the ram takes 2.25 s amidships to hard over (autopilot.ts RAM_RATE), so about half that; none with the helm already over into the turn. The arc without it said 4.3 m and she got 3.4 (the second review) |
+| OFF_HULL (sim/helmPlan.ts wayOff) | 2 m | 176 | estimate | failing all else, the turn keeping her farthest off is taken if it keeps this (half-beam 1.1 m and a little under a meter) and beats her track held: 4 m off Pier 45's face it clears her by 2.3 m |
+| OFF_LOOK_HELD (sim/world.ts offPier) | 2 × LOA (~15 m) | 80 | estimate | a way off begun is held, with none found anew, till she's within this of it: she sees the turn through, the helm already over |
 | TWO_TURNS | 720 | 52 | standard |  |
 | ONE_TURN | 360 | 60 | standard |  |
 | HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |

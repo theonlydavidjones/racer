@@ -74,15 +74,32 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     // (the third review's: running along a pier's face at 3 m/s with the way on astern, the way off dead astern turned her
     // through the pier; and in irons by a pier head, a way off across the wind held her hard over till she went astern)
     ['running along a pier\'s face, the way on astern', { x: 3129, y: -113 }, 'alcatraz', 107, 3, { h: 164, v: 2.9 }],
-    ['in irons by a pier head in a northerly', { x: 2646, y: -122 }, 'alcatraz', 107, 3, { h: 27, v: 0.1, wind: 'north' }]
+    ['in irons by a pier head in a northerly', { x: 2646, y: -122 }, 'alcatraz', 107, 3, { h: 27, v: 0.1, wind: 'north' }],
+    // (the fourth review's: 4 m and 8 m off a pier face converging on her, handed over where a turn away kept 6 m, once
+    // her turn could give up no more than 2 m; the turn onto an open leg astern, the shorter way round, through the wharf;
+    // and a tack the pilot had decided on, toward Bay Bridge Pier D, overriding the way off)
+    ['beside it, 6 m out', { x: 1994, y: 78 }, 'alcatraz', 107, 3],
+    ['beside it, 8 m off its face', { x: 1994, y: 74 }, 'alcatraz', 107, 3],
+    ['beside Bay Bridge Pier D, a tack decided', { x: 5973, y: -1085 }, 'alcatraz', 107, 3, { h: 116, v: 2.4 }]
   ];
-  // (4 m off the pier's face converging on her at 4 kn: every turn closes it, held on she'd pass its corner a meter off her
-  // side. No way off for a pilot: handed over at once with its alarm, and on as she was, ten seconds, she strikes nothing)
-  it('beside it, 6 m out: handed over, too close alongside', () => {
-    const r = passage({ x: 1994, y: 78 }, 'alcatraz', 107);
-    console.log(`beside it, 6 m out: ${r.where}`);
+  // (the fourth review's: stopped head to wind 4.5 m off a wharf in the westerly. A pilot can't back a jib, nor tack her
+  // without way on: handed over within seconds with an alarm, not held hard over for 11 s while she drifted to 1.9 m off;
+  // and on as she was, ten seconds, she strikes nothing)
+  it('in irons beside a wharf: handed over within seconds', () => {
+    const r = passage({ x: 3249, y: -50 }, 'alcatraz', 107, 60, { h: 267, v: 0.2 });
+    console.log(`in irons beside a wharf: ${r.where}`);
+    expect(r.w.pilot.mode, r.where).toBe('off'); expect(r.u.wrecked, r.where).toBeUndefined(); expect(r.hits, r.where).toBe(0);
+    expect(r.min, `handed over within 8 s, and ten on: ${r.where}`).toBeLessThan(18 / 60);
+  }, 900_000);
+  // (the fourth review's: along a wharf at 2.3 m/s, the plan's first leg open but astern; the pilot's shorter way round
+  // onto it went through the wharf, wrecked in 4 s. She's taken off it first, and the plan from there later meets a gap
+  // too narrow for the pilot west of the Hyde Street Pier, where she's handed over with its alarm and sea room)
+  it('along a wharf, the open leg astern', () => {
+    const r = passage({ x: 1887, y: -242 }, 'alcatraz', 107, 60, { h: 110, v: 2.3 });
+    console.log(`along a wharf, the open leg astern: ${r.where}`);
     expect(r.u.wrecked, r.where).toBeUndefined(); expect(r.hits, r.where).toBe(0);
-    expect(r.alarm, r.where).toMatch(/Too close alongside/); expect(r.min, r.where).toBeLessThan(0.5);
+    expect(r.w.arrivedT != null || /too narrow/.test(r.alarm), r.where).toBe(true);
+    expect(r.near, `kept off the structures: ${r.where}`).toBeGreaterThan(3);
   }, 900_000);
   for (const [name, from, to, seed, keep = 10, start] of cases) it(name, () => {
     const r = passage(from, to, seed, 60, start);

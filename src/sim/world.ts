@@ -58,7 +58,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
-import { BESIDE, NAV_MADE, STRUCTURE_CLEAR, helmPlan, legOpen, narrowAhead, nextCorner, wayOff, type HelmPlan } from './helmPlan';
+import { BESIDE, NAV_MADE, STRUCTURE_CLEAR, helmPlan, legOpen, lineClear, narrowAhead, nextCorner, turnClear, wayOff, type HelmPlan } from './helmPlan';
 import { chartDepth, landAt } from '../environment/sea';
 import { LL, toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -76,6 +76,8 @@ const OFF = new WeakMap<object, { t: number; q: Vec | null }>();
 /** How many seconds of her way on count as beside a structure (World.offPier): her turn's, a little over. An estimate
  * (docs/CONSTANTS.md). */
 const OFF_AHEAD_S = 4;
+/** A way off begun is held, with none found anew, till she's within this of it (m): two of her lengths. An estimate. */
+const OFF_LOOK_HELD = 2 * LOA;
 /** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
  * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
 let onPlan = false;
@@ -2711,15 +2713,23 @@ export class World {
    */
   private offPier(b: Boat, t: Vec, P: HelmPlan | null, end: Vec): Vec | null {
     let o = OFF.get(this);
-    if (o && this.t - o.t < 0.5) { if (o.q) onPlan = true; return o.q; }
+    if (o && this.t - o.t < 0.5) { if (o.q) { onPlan = true; this.pilot.goTack = null; } return o.q; }
     // (looked for farther off with way on: about four seconds of it, her turn's worth, a little over)
     const r = wharfNearest(b, o?.q ? STRUCTURE_CLEAR : Math.min(STRUCTURE_CLEAR, BESIDE + b.v * OFF_AHEAD_S));
     // (at a corner of the plan that she can't leave for the next (helmPlan.ts nextCorner), beside a structure: steered
     // for, it falls astern and the pilot turns her round toward it, through the pier off Pier 45's head)
     const stuck = !!P && P.i < P.pts.length - 1 && dist(b, t) < NAV_MADE / 2, to = stuck ? (P!.i + 1 < P!.pts.length - 1 ? P!.pts[P!.i + 1] : end) : t;
-    if (!r || (!stuck && (P ? onPlan : legOpen(b, t)))) { if (o) OFF.delete(this); return null; }
-    o = { t: this.t, q: wayOff(b, to, b.ww.from, beatFor(b) + 1) }; OFF.set(this, o);
-    if (o.q) { onPlan = true; return o.q; }
+    // (an open leg is trusted only if her turn onto it keeps clear of the structure too (helmPlan.ts turnClear): legOpen
+    // looks along the leg from where she is, not round her turn, and the pilot's shorter way round to a corner astern took
+    // her through the wharf, the second review)
+    if (!r || (!stuck && (P ? onPlan : legOpen(b, t)) && turnClear(b, brg(t.x - b.x, t.y - b.y), this.pilot.ram))) { if (o) OFF.delete(this); return null; }
+    // (none now, on one begun: she's held to it, the helm already over, till she's on it, as a helmsman sees a turn through
+    // rather than let go the tiller half way round, the second review, 4 m off Pier 45's face; while the way to it still
+    // keeps her hull clear: a way off along a wharf converging on her, held, ran her into it)
+    const q = wayOff(b, to, b.ww.from, beatFor(b) + 1, this.pilot.ram) ?? (o?.q && dist(b, o.q) > OFF_LOOK_HELD && lineClear(b, o.q) ? o.q : null);
+    o = { t: this.t, q }; OFF.set(this, o);
+    // (a tack the pilot had decided on, close-hauled the other way, would override the way off: autopilot.ts goTack)
+    if (o.q) { onPlan = true; this.pilot.goTack = null; return o.q; }
     // (no way off: beside it, she's handed over; farther off, the pilot's own way round, as before)
     if (r.d < BESIDE && this.pilot.mode === 'nav') this.pilot.alarm = 'Too close alongside for the pilot to get her off: she\'s yours.';
     return null;
