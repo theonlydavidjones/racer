@@ -28,21 +28,26 @@ function passage(from: { x: number; y: number }, to: string, seed: number, mins 
   if (to !== 'slip') applyCommand(w, { k: 'dest', p: place(to), name: to });
   applyCommand(w, { k: 'pilot', op: 'engage', mode: 'nav' });
   const feed = new HelmFeed(v => passageNow(v as never)), first = passageNow(w as never);
-  let hits = 0, last = u.lastHitT, near = Infinity, turned = 0, h0 = u.h, alarm = '';
-  const step = () => { w.step(DT); if (u.lastHitT !== last) { last = u.lastHitT; hits++; } turned += Math.abs(((u.h - h0 + 540) % 360) - 180); h0 = u.h; for (const e of w.drainEvents()) if (e.type === 'toast' && /too narrow/.test((e as { msg: string }).msg)) alarm = (e as { msg: string }).msg; };
+  let hits = 0, last = u.lastHitT, near = Infinity, turned = 0, h0 = u.h, alarm = '', mouth = false, clear = false;
+  const step = () => {
+    w.step(DT); if (u.lastHitT !== last) { last = u.lastHitT; hits++; } turned += Math.abs(((u.h - h0 + 540) % 360) - 180); h0 = u.h;
+    for (const e of w.drainEvents()) if (e.type === 'toast') { const m = (e as { msg: string }).msg; if (/too narrow/.test(m)) alarm = m; if (/harbor mouth: she's yours/.test(m)) mouth = true; }
+  };
   while (w.t < mins * 60 && !u.wrecked && w.arrivedT == null && w.pilot.mode !== 'off') {
-    if (w.steps % 60 === 0) { const c = feed.tick(w as never); if (c) applyCommand(w, c as never); const r = wharfNearest(u, 200); if (r) near = Math.min(near, r.d); }
+    if (w.steps % 60 === 0) { const c = feed.tick(w as never); if (c) applyCommand(w, c as never); const r = wharfNearest(u, 200); if (!r || r.d >= 20) clear = true; if (r && clear) near = Math.min(near, r.d); }
     step();
   }
   // (handed over: she has sea room, sailing on ten seconds as she was without striking anything)
   if (w.pilot.mode === 'off' && w.arrivedT == null) for (let i = 0; i < 600 && !u.wrecked; i++) step();
   const min = w.t / 60;
-  return { w, u, hits, near, alarm, turned, min, planned: first?.ok ? first.minutes : NaN, plans: feed.taken,
+  return { w, u, hits, near, alarm, mouth, turned, min, planned: first?.ok ? first.minutes : NaN, plans: feed.taken,
     where: `at ${u.x.toFixed(0)}, ${u.y.toFixed(0)} after ${min.toFixed(1)} min (planned ${first?.ok ? first.minutes.toFixed(0) : 'none'}), pilot ${w.pilot.mode}${alarm ? ' (' + alarm + ')' : ''}${u.wrecked ? ', wrecked: ' + u.wrecked.how : ''}, ${feed.taken} plans, nearest structure ${near.toFixed(0)} m, turned ${turned.toFixed(0)}°` };
 }
 
 describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
-  const cases: [string, { x: number; y: number }, string, number][] = [
+  // (the least she keeps off the structures once she's first been clear of them: 10 m about the Berkeley Pier; 3 m in the
+  // Wharf's piers, her half-beam and as much again, where a plan begun beside one may keep near it: router.ts clear)
+  const cases: [string, { x: number; y: number }, string, number, number?][] = [
     ['off the Berkeley Marina to off Emeryville (the soak\'s wreck)', place('berkeley'), 'emeryville', 105],
     ['the same, another day', place('berkeley'), 'emeryville', 107],
     ['50 m south of the pier\'s west end, to the marina', { x: 7742, y: 4283 }, 'berkeley', 107],
@@ -51,16 +56,17 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     ['Clipper Cove to north of Treasure Island', place('clipper'), 'ti-north', 107],
     ['the Bay Bridge to Clipper Cove', place('baybridge'), 'clipper', 107],
     ['home to her Berkeley slip from off Emeryville, south of the pier (the physics review)', place('emeryville'), 'slip', 107],
-    ['from 8 m off Pier 45\'s head to off Alcatraz (the physics review)', { x: 1988, y: 78 }, 'alcatraz', 107]
+    ['from 8 m off Pier 45\'s head to off Alcatraz (the physics review)', { x: 1988, y: 78 }, 'alcatraz', 107, 3]
   ];
-  for (const [name, from, to, seed] of cases) it(name, () => {
+  for (const [name, from, to, seed, keep = 10] of cases) it(name, () => {
     const r = passage(from, to, seed);
     console.log(`${name}: ${r.where}`);
     expect(r.u.wrecked, r.where).toBeUndefined();
     expect(r.hits, `times she struck anything, ${r.where}`).toBe(0);
     // she gets there, or the pilot hands her over before a gap too narrow for it, with its alarm and sea room
-    expect(r.w.arrivedT != null || !!r.alarm, `arrived or handed over: ${r.where}`).toBe(true);
-    if (r.w.arrivedT != null && r.planned === r.planned) expect(r.min, `no circling: within half as long again as planned, ${r.where}`).toBeLessThan(r.planned * 1.5 + 5);
-    expect(r.near, `kept off the structures: ${r.where}`).toBeGreaterThan(5);
+    // (bound for her slip, arrived is the pilot's hand-over off the harbor's mouth: World.navTarget, you take her in)
+    expect(r.w.arrivedT != null || !!r.alarm || (to === 'slip' && r.mouth), `arrived or handed over: ${r.where}`).toBe(true);
+    if ((r.w.arrivedT != null || r.mouth) && r.planned === r.planned) expect(r.min, `no circling: within half as long again as planned, ${r.where}`).toBeLessThan(r.planned * 1.5 + 5);
+    expect(r.near, `kept off the structures: ${r.where}`).toBeGreaterThan(keep);
   }, 900_000);
 });

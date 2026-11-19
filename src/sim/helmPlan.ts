@@ -109,5 +109,14 @@ function clearTo(b: Vec, q: Vec, toEnd: boolean): boolean {
 export function narrowAhead(P: HelmPlan, b: Vec): boolean {
   return P.tight.some(t => (t.leg === P.i || t.leg === P.i + 1) && dist(b, t.p) < GAP_WARN);
 }
+/** The way from her to a corner open enough for the pilot to steer it as the plan has it, without a way round of its
+ * own (World.planTarget, autopilot.ts navHeading): clear of the land, and nowhere along it within STRUCTURE_CLEAR / 2 of
+ * a structure (trusted along a pier's side, the plan's leg begun beside one, she struck its head 9 times off Pier 45). */
+export function legOpen(b: Vec, q: Vec): boolean {
+  if (landAlong(b, q) !== Infinity) return false;
+  const L = dist(b, q), n = Math.max(1, Math.ceil(L / 5));
+  for (let k = 0; k <= n; k++) { const p = { x: b.x + (q.x - b.x) * k / n, y: b.y + (q.y - b.y) * k / n }; if (wharfNearest(p, STRUCTURE_CLEAR / 2)) return false; }
+  return true;
+}
 /** How far she is off the leg she's on (m). */
 export const offLeg = (P: HelmPlan, b: Vec) => segPt(b, P.pts[Math.max(0, P.i - 1)], P.pts[Math.min(P.pts.length - 1, P.i)]);

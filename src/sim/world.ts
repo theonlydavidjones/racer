@@ -58,7 +58,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
-import { helmPlan, narrowAhead, nextCorner, type HelmPlan } from './helmPlan';
+import { helmPlan, legOpen, narrowAhead, nextCorner, type HelmPlan } from './helmPlan';
 import { chartDepth, landAt } from '../environment/sea';
 import { LL, toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -71,6 +71,9 @@ const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
 /** The navigator's plan at the helm, for each World (planTarget): kept off the World itself, so its shape is as it was
  * (the step's cost, perf-pair, is judged on it) and the page's mirror never walks it (sim/sync.ts). */
 const HELM = new WeakMap<object, HelmPlan>();
+/** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
+ * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
+let onPlan = false;
 /** Fixed simulation step. Rendering runs at whatever rate the browser gives; the sim always steps at 60 Hz. */
 export const DT = 1 / 60;
 /** How long the showroom sails her through before she's first shown, so her crew's trim has settled (s): from a cold
@@ -1327,7 +1330,7 @@ export class World {
       const x0 = b.x, y0 = b.y;
       if (b.isUser) b.pilotSteers = this.cruising && this.pilot.mode !== 'off';
       if (b.isUser && this.cruising && this.pilot.mode !== 'off') {
-        pilotStep(b, this.pilot, this.arrivedT == null ? (this.pilot.mode === 'nav' ? this.navTarget(b) : this.dest?.p ?? null) : null, this.t, dt); // (the way in worked out only on Nav: its harbor's flood is a third of a second, once)
+        { onPlan = false; const tg = this.arrivedT == null ? (this.pilot.mode === 'nav' ? this.navTarget(b) : this.dest?.p ?? null) : null; pilotStep(b, this.pilot, tg, this.t, dt, onPlan); } // (the way in worked out only on Nav: its harbor's flood is a third of a second, once)
         if (this.pilot.alarm) { this.emit({ type: 'toast', msg: this.pilot.alarm, ms: 5000 }); this.emit({ type: 'horn', dur: 0.25 }); this.pilot.alarm = null; this.pilot.mode = 'off'; }
       }
       moveBoat(b, dt, this.t, this.emit, this.groundToast);
@@ -2686,7 +2689,7 @@ export class World {
     // (under power, not the sailing plan's boards: the motor points her straight at it, autopilot.ts, as before. The
     // physics review: corner to corner, she motored the plan's tacks)
     if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
-    const t = nextCorner(P, b, end);
+    const t = nextCorner(P, b, end); onPlan = t !== end && legOpen(b, t);
     // (a gap too narrow for the pilot ahead on her way: its alarm, and she's yours, short of it; helmPlan.ts GAP_MIN)
     if (narrowAhead(P, b) && this.pilot.mode === 'nav') this.pilot.alarm = 'A gap too narrow for the pilot ahead: she\'s yours.';
     return t;
