@@ -75,13 +75,13 @@ describe('The outhaul set for the breeze, not re-trimmed as a light wind wanders
   };
   it('a light-air beat whose breeze swings across both 4 and 5 kt: not at the outhaul every minute and a half', () => {
     // (3.5 to 5.7 kt: the guide's ceiling 3 cm off the mark under 4 kt read, its floor 1.5 cm from 5; before, 0.05 to 0.45
-    // and back, a trip each 50-220 s, six in fifteen minutes, for moves worth under 0.02% of drive)
+    // and back, a trip each 50-220 s, five in fifteen minutes, for moves worth under 0.02% of drive)
     const { trips } = outhaulTrips(t => 4.6 + 1.1 * Math.sin(2 * Math.PI * t / 150) + 0.3 * Math.sin(2 * Math.PI * t / 23), 2.5, 900);
     expect(trips, 'outhaul trips in fifteen minutes').toHaveLength(0);
   });
   it('a beat in 11.5 ± 1.2 kt: the outhaul not taken to the mark and eased back each puff and lull', () => {
     // (the guide's medium ceiling, 1.5 cm off, read under 11 kt, its "all the way to the mark" from 12: before, 1 to 0.55
-    // and back, twelve trips in fifteen minutes)
+    // and back, ten trips in fifteen minutes)
     const { trips } = outhaulTrips(t => 11.5 + 1.2 * Math.sin(2 * Math.PI * t / 150) + 0.3 * Math.sin(2 * Math.PI * t / 23), 4.5, 900);
     expect(trips, 'outhaul trips in fifteen minutes').toHaveLength(0);
   });

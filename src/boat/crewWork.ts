@@ -1,6 +1,6 @@
 import { clamp, wrap } from '../core/math';
 import { SETTLE, type Boat, type Tack } from './boat';
-import { CAR_FORE_PINS, CAR_IN_PINS, guideOnly, type Controls } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, crewSkill, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
@@ -70,14 +70,17 @@ export const LINE_MOVED = 2;
  * than the crew's least gain in drive (physics.ts minGain), is a trip once the guide's read has stayed past that step
  * this long (s): a gust-lull cycle and a half, as LINE_TRIP. North's ranges are for the breeze ("very light winds (0-5
  * knots)", "medium winds (5-12 knots)"), and a crew sets the outhaul for the breeze and leaves it; a light wind swinging
- * 3.5 to 5.7 kt had them at it every 70-90 s, 0.05 to 0.45 and back, and 11.5 ± 1.2 kt from 0.55 to 1 and back, for
+ * 3.5 to 5.7 kt had them at it every 50-220 s, 0.05 to 0.45 and back, and 11.5 ± 1.2 kt from 0.55 to 1 and back, for
  * moves their own sail model put at under 0.03% of drive. A move worth its gain, a new point of sail, or a breeze that
- * holds past the step goes as before. An estimate, unsourced.
+ * holds past the step goes as before; so does a line the guide is well past. A crew you've placed waits the same way
+ * for the lines they reach from their seats. The hold judges the worth only until it runs out: a breeze that swings
+ * slower, each side held a minute and a half or more, has them at it each side (11.5 ± 1.2 kt on a 4 min swing: four
+ * trips in fifteen minutes, the physics review), the guide's setting kept over the sail model's. An estimate, unsourced.
  */
 export const GUIDE_HOLD = 90;
 /** Off only the guide's settings, and worth less than their least gain (GUIDE_HOLD): for how long, else -1. */
 function guideWait(b: Boat, c: CrewState, k: string): number {
-  const g = b.crewWorth && guideOnly(b.crewWorth)?.get(k);
+  const g = b.crewGuide?.get(k);
   if (g == null || g >= 0.001 + 0.003 * (1 - crewSkill(c))) return -1;
   const t0 = c.guideT?.[k] ?? -1;
   return t0 >= 0 ? (c.clock ?? 0) - t0 : 0;
@@ -378,7 +381,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       lw[k] = l0 == null ? w : l0 + (w - l0) * fT; ls[k] = s0 == null ? w : s0 + (w - s0) * fG;
     }
     // (since when each line has been off only the guide's settings: GUIDE_HOLD)
-    const gw = b.crewWorth && guideOnly(b.crewWorth);
+    const gw = b.crewGuide;
     // (every line's place kept, -1 while it isn't: the mirror sees a deleted key only when the count changes, sim/sync.ts)
     if (gw || c.guideT) { const gt = c.guideT ??= {}; for (const k of PIANO_LIST) { const was = gt[k] ?? -1; gt[k] = gw?.has(k) ? (was >= 0 ? was : c.clock ?? 0) : -1; } }
     c.lineT = 0;

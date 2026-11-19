@@ -266,6 +266,8 @@ export interface Boat {
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** The cabin-top lines worth a trip together though each is under it alone (controls.ts worthTogether), with crewWorth. */
   crewTogether?: ReadonlySet<string>;
+  /** The cabin-top lines off only a step of the guide's, with what their move is worth (controls.ts guideOnly), with crewWorth: on the boat, not looked up by the result's object, so the page's mirror has it too (crewWork.ts GUIDE_HOLD). */
+  crewGuide?: ReadonlyMap<string, number>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
   /**

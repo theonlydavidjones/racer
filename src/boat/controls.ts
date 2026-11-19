@@ -516,16 +516,17 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
 const TOGETHER = new WeakMap<object, ReadonlySet<string>>();
 const NONE: ReadonlySet<string> = new Set();
 export const worthTogether = (W: object): ReadonlySet<string> => TOGETHER.get(W) ?? NONE;
+/** How far the breeze wanders about the wind there is in a gust-lull cycle (kt): ±1.2 kt about 11.5 and 3.5 to 5.7 kt in
+ * the cases that had the crew chasing the guide's steps (the physics review of the crew habits, 16 Nov 2026). An estimate. */
+export const GUIDE_STEP = 1.5;
 /**
  * The cabin-top lines planWorth counts worth a trip (its 1) only because the guide's settings for the wind and angle
  * she's read at (guideLimits) leave them outside, not the depowering steps, with what the move is worth in drive alone:
  * a step of the guide's (3 cm to 1.5 cm off the outhaul's mark at 5 kt, 1.5 cm to on it at 12) crossed as the breeze
  * wanders across it is a setting for a breeze that may not stay, and the crew judge the trip by its worth and by how
- * long the breeze has held there (crewWork.ts GUIDE_HOLD). Worked out with the plan, kept with its result.
+ * long the breeze has held there (crewWork.ts GUIDE_HOLD). Worked out with the plan, kept with its result (and on the
+ * boat, physics.ts crewGuide).
  */
-/** How far the breeze wanders about the wind there is in a gust-lull cycle (kt): ±1.2 kt about 11.5 and 3.5 to 5.7 kt in
- * the cases that had the crew chasing the guide's steps (the physics review of the crew habits, 16 Nov 2026). An estimate. */
-export const GUIDE_STEP = 1.5;
 const GUIDE_ONLY = new WeakMap<object, ReadonlyMap<string, number>>();
 export const guideOnly = (W: object): ReadonlyMap<string, number> | undefined => GUIDE_ONLY.get(W);
 const TOP_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'] as const;
