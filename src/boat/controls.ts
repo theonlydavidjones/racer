@@ -516,6 +516,19 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
 const TOGETHER = new WeakMap<object, ReadonlySet<string>>();
 const NONE: ReadonlySet<string> = new Set();
 export const worthTogether = (W: object): ReadonlySet<string> => TOGETHER.get(W) ?? NONE;
+/** How far the breeze wanders about the wind there is in a gust-lull cycle (kt): ±1.2 kt about 11.5 and 3.5 to 5.7 kt in
+ * the cases that had the crew chasing the guide's steps (the physics review of the crew habits, 16 Nov 2026). An estimate. */
+export const GUIDE_STEP = 1.5;
+/**
+ * The cabin-top lines planWorth counts worth a trip (its 1) only because the guide's settings for the wind and angle
+ * she's read at (guideLimits) leave them outside, not the depowering steps, with what the move is worth in drive alone:
+ * a step of the guide's (3 cm to 1.5 cm off the outhaul's mark at 5 kt, 1.5 cm to on it at 12) crossed as the breeze
+ * wanders across it is a setting for a breeze that may not stay, and the crew judge the trip by its worth and by how
+ * long the breeze has held there (crewWork.ts GUIDE_HOLD). Worked out with the plan, kept with its result (and on the
+ * boat, physics.ts crewGuide).
+ */
+const GUIDE_ONLY = new WeakMap<object, ReadonlyMap<string, number>>();
+export const guideOnly = (W: object): ReadonlyMap<string, number> | undefined => GUIDE_ONLY.get(W);
 const TOP_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'] as const;
 /**
  * What moving each line from where it is to the crew's plan is worth: the drive it gains (a share: 0.002 = 0.2%), or 1
@@ -527,9 +540,25 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
   const loaded = loadedCar(c, tack);
   const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, jibHalyard: c.jibHalyard ?? 0.3, carFore: loaded.fore, carIn: loaded.ins };
   const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet), out: Partial<Record<keyof CrewSettings, number>> = {};
+  let steps: ReturnType<typeof depowerLimits> | undefined, guide: Map<string, number> | undefined, near: ReturnType<typeof guideLimits>[] | undefined;
   for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
     const m = lim.min[k], mx = lim.max[k];
-    if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) { out[k] = 1; continue; }
+    if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) {
+      out[k] = 1;
+      // (outside only by the guide's settings, inside the depowering steps alone, and inside the guide's for a breeze
+      // within GUIDE_STEP of the one read: a step of the breeze, not of her angle or a rule well clear of it. guideOnly, with the drive
+      // the move is worth)
+      if (k !== 'traveller' && k !== 'backstay') {
+        steps ??= depowerLimits(depower ?? 0, awa);
+        const sm = steps.min[k], sx = steps.max[k];
+        if (!((sm != null && now[k] < sm - 0.02) || (sx != null && now[k] > sx + 0.02))) {
+          // (its steps fall on whole knots, so a look each half knot finds every setting in that span)
+          near ??= [-3, -2, -1, 1, 2, 3].map(i => guideLimits(guideKt + i * GUIDE_STEP / 3, guideAwa));
+          if (near.some(g => !((g.min[k] ?? -1) > now[k] + 0.02 || (g.max[k] ?? 1) < now[k] - 0.02))) (guide ??= new Map()).set(k, settingsDrive({ ...now, [k]: plan[k] }, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet) - base);
+        }
+      }
+      continue;
+    }
     // with your mainsheet held, the traveller is how they put the boom where it should be: that's the sheet's angle of
     // attack, worth more than any shape
     if (k === 'traveller' && mainsheet != null) { out[k] = Math.abs(plan.traveller - now.traveller) > 0.02 ? 1 : 0; continue; }
@@ -549,5 +578,6 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
       }
     }
   }
+  if (guide) GUIDE_ONLY.set(out, guide);
   return out;
 }
