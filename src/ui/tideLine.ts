@@ -22,6 +22,15 @@ export function speedAlong(kt: number, from: number, h: number): number {
   return polar(kt, a);
 }
 
+/** Is the best track's side (offset `off`, + to starboard of from→to) the side with the nearer shore? The first land met
+ *  walking out from the leg's middle each way, to 3 km. */
+function shoreward(from: Vec, to: Vec, off: number): boolean {
+  const L = Math.hypot(to.x - from.x, to.y - from.y), nx = (to.y - from.y) / L, ny = -(to.x - from.x) / L, mx = (from.x + to.x) / 2, my = (from.y + to.y) / 2;
+  const reach = (sgn: number): number => { for (let d = 50; d <= 3000; d += 50) if (landAt({ x: mx + sgn * nx * d, y: my + sgn * ny * d })) return d; return Infinity; };
+  const side = Math.sign(off), here = reach(side), other = reach(-side);
+  return here < other;
+}
+
 /** The line to say for the leg from `from` to `to`, or null: the tide must be against her down the leg, and the best
  *  track inshore of the rhumb line save at least TIDE_SAVING_S. */
 export function tideLine(from: Vec, to: Vec, env: TideEnv): string | null {
@@ -31,5 +40,6 @@ export function tideLine(from: Vec, to: Vec, env: TideEnv): string | null {
   const wind = env.windHere(mid);
   const r = tideLeg(from, to, p => env.currentAt(p), h => speedAlong(wind.kt, wind.from, h), p => !landAt(p));
   if (!Number.isFinite(r.rhumb) || r.off === 0 || r.saved < TIDE_SAVING_S) return null;
+  if (!shoreward(from, to, r.off)) return null; // (a saving from standing out into the stream isn't "inshore": no word)
   return `Foul tide: stay inshore on this leg, it saves about ${Math.round(r.saved / 60)} min.`;
 }
