@@ -10,7 +10,7 @@ import { FLEET, bow, stern, type Boat } from '../boat/boat';
 import { HOVE, KEY_HELD, POLE, apparent, asternGlide, mooredBoats, crewAtDock, crewRig, crewTiedUp, moveBoat, settleTrim, tackTarget, tiedTack, wreck } from '../boat/physics';
 import orc from '../boat/data/nordic-folkboat-orc.json';
 import { HANDLING, HULL } from '../boat/dynamics';
-import { BOOM_STOP, defaultControls } from '../boat/controls';
+import { BOOM_STOP, defaultControls, mainsheetFor } from '../boat/controls';
 import { D2R, HALF, KT, LOA, V, brg, clamp, cross, dist, dot, ZONE, markDist, markReach, n360, segPt, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { makeRng, type Rng } from '../core/rng';
 import { MOTOR_SHIP_S, MOTOR_STOW_S, OUTBOARDS } from '../boat/motor';
@@ -112,6 +112,29 @@ export interface Touchable { name: string; p: Vec; r: number; q?: Vec; rule31?: 
 function solidGap(bw: Vec, st: Vec, m: Touchable): number {
   if (!m.q) return segPt(m.p, bw, st);
   return Math.min(segPt(m.p, bw, st), segPt(m.q, bw, st), segPt(bw, m.p, m.q), segPt(st, m.p, m.q));
+}
+/**
+ * The contact's normal between a hull (bow to stern) and a mark, from the mark toward her (unit): from where they
+ * actually touch, the nearest of the pairs solidGap measures. A hull end on the committee boat's side: the side's normal,
+ * toward her; anything else (a hull end off its ends, one of its ends on her side, a round mark): from the mark's
+ * nearest point to hers. (Chosen by her middle, a bow driven into the side near its end at 45° read as off the end and
+ * lost no way, and one brushing round the end lost it as if driven into the side: the physics review, 19 Nov 2026)
+ */
+export function markContactNormal(bw: Vec, st: Vec, m: Touchable): Vec {
+  const radial = (from: Vec, to: Vec): Vec => { const dx = to.x - from.x, dy = to.y - from.y, l = hypot(dx, dy); return l > 1e-9 ? { x: dx / l, y: dy / l } : { x: 0, y: 0 }; };
+  const nearOn = (p: Vec, a: Vec, b: Vec): { q: Vec; k: number } => { const ax = b.x - a.x, ay = b.y - a.y, kk = ((p.x - a.x) * ax + (p.y - a.y) * ay) / (ax * ax + ay * ay || 1), k = Math.max(0, Math.min(1, kk)); return { q: { x: a.x + ax * k, y: a.y + ay * k }, k: kk }; };
+  let best = Infinity, n: Vec = { x: 0, y: 0 };
+  // (the mark's point(s) against her hull: radial)
+  for (const e of m.q ? [m.p, m.q] : [m.p]) { const h = nearOn(e, bw, st).q, d = hypot(h.x - e.x, h.y - e.y); if (d < best) { best = d; n = radial(e, h); } }
+  if (m.q) for (const e of [bw, st]) {
+    // (her bow or stern against the committee boat's side: its normal where she's abreast of it, radial off its ends)
+    const { q, k } = nearOn(e, m.p, m.q), d = hypot(e.x - q.x, e.y - q.y);
+    if (d >= best) continue;
+    best = d;
+    if (k > 0 && k < 1) { const ax = m.q.x - m.p.x, ay = m.q.y - m.p.y, l = hypot(ax, ay) || 1, nx = -ay / l, ny = ax / l, sg = Math.sign(nx * (e.x - q.x) + ny * (e.y - q.y)) || 1; n = { x: nx * sg, y: ny * sg }; }
+    else n = radial(q, e);
+  }
+  return n;
 }
 /**
  * Rule 44.1(a): a Part 2 breach and a rule 31 touch "in the same incident" need only the Part 2 penalty. "Incident" isn't
@@ -341,6 +364,12 @@ export function boatLook(spec: BoatSpec) {
     no: sailNo(spec), hullColor: spec.hull.upper, sailColor: spec.sails.color === 'black' ? '#232427' : '#fbfaf5',
     paint: { numberColor: spec.sails.numberColor, insigniaColor: spec.sails.insigniaColor, deck: spec.deck, boot: spec.hull.stripe, bottom: spec.hull.lower, boatName: spec.name, cabinTop: spec.cabinTop, poleSide: spec.poleSide, navLights: spec.navLights, hatch: spec.hatch, companionway: spec.companionway, nameColor: spec.nameColor }
   };
+}
+/** A main that's up and let fly at the dock or on her lines: its sheet eased out to the boom on the shroud (dockStep). */
+function letRun(b: Boat, k: number): void {
+  // (a sheet you've set yourself at the dock, from the sail band, is left as you set it: worked once she's let go)
+  if (b.ctlTarget?.mainsheet != null) return;
+  b.ctl.mainsheet += (mainsheetFor(BOOM_STOP, b.ctl.traveller) - b.ctl.mainsheet) * k;
 }
 /** Hulls together (World.hulls): the unit normal from A's hull to B's, from the closest points of their bow-to-stern
  * segments (rules/geometry.ts hullGap's hulls), not the line between their centers: two hulls overlapped side by side
@@ -1508,12 +1537,14 @@ export class World {
         const gap = solidGap(bw, st, m) - m.r - HULL_HALF_BEAM;
         if (gap < 0) {
           if (m.rule31 !== false) touching = m;
-          // bounce off: push her clear, away from the nearest point
-          const np = m.q ? (() => { const ax = m.q!.x - m.p.x, ay = m.q!.y - m.p.y, k = Math.max(0, Math.min(1, ((b.x - m.p.x) * ax + (b.y - m.p.y) * ay) / (ax * ax + ay * ay))); return { x: m.p.x + ax * k, y: m.p.y + ay * k }; })() : m.p;
-          const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
-          const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = hypot(dx, dy) || 1;
-          b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          b.v *= m.q ? 0.9 : 0.97; b.lastHitT = this.t;
+          // bounce off: pushed clear along the contact's normal (markContactNormal), and her way lost only as she sails into it:
+          // the share of her heading toward it. Lying along it, the wind pressing her sideways onto it, she slides off it as
+          // a boat does a buoy; taxed whatever her heading, she lay on mark A at 0.1 m/s for five minutes in 22 kt: the
+          // stability soak, 18 Nov 2026, tests/mark-pinned.test.ts
+          const sn = markContactNormal(bw, st, m), ax = st.x - bw.x, ay = st.y - bw.y;
+          b.x -= sn.x * (gap - 0.05); b.y -= sn.y * (gap - 0.05);
+          const into = Math.max(0, (sn.x * ax + sn.y * ay) / (hypot(ax, ay) || 1));
+          b.v *= 1 - (m.q ? 0.1 : 0.03) * into; b.lastHitT = this.t;
         }
       }
       // the same touch until she's got clearly away from that mark
@@ -2106,7 +2137,8 @@ export class World {
     crewAtDock(b, dt);
     const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true;
-    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
+    b.boom += ((up ? side * BOOM_STOP : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly to the shroud; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
+    if (up) letRun(b, k); // (its sheet let run with it: dockStep)
     if (out.bump != null && out.bump > HARD_BUMP && this.t - (m.cueT ?? -9) > 2) { this.cue(m, 'Bump'); this.emit({ type: 'toast', msg: `Hard bump against the dock, at ${(out.bump / 0.5144).toFixed(1)} kn.`, ms: 3000 }); }
     if (out.parted) this.emit({ type: 'toast', msg: `The ${out.parted.role === 'midships' ? 'midships line' : `${out.parted.role} line`} parted.`, ms: 4000 });
     const first = m.lines[0];
@@ -2527,7 +2559,11 @@ export class World {
     // the main down, tied up: the mainsheet hauled in and made fast, the traveller car in the middle, so the boom lies on
     // the centerline, clear of the dock and the boats either side (8q, the owner: "when in a slip, boom should be at
     // centerline (when starting) or brought to centerline (when finishing a sail and docking)")
+    // (the main up, let fly: its sheet let run with it, so the crew's trim takes over from where the boom really is once
+    // she's let go. Left made fast hard in from when the main was down, the boom was hauled from the shroud to her
+    // centerline the moment she was let go, and on a run that's a crash jibe waiting: 18 Nov 2026, tests/letgo-sheet.test.ts)
     if (!up) { b.ctl.mainsheet += (0 - b.ctl.mainsheet) * k; b.ctl.traveller += (0 - b.ctl.traveller) * k; if (b.ctlTarget) { delete b.ctlTarget.mainsheet; delete b.ctlTarget.traveller; } }
+    else letRun(b, k);
     crewRig(b, dt, this.emit);
     crewTiedUp(b, dt, this.emit); // (the pole stowed, your car call worked, the rest of sailing's jobs ended: physics.ts)
     crewAtDock(b, dt); // (the crew sit centred at the dock and through the push-off, not hiked or to leeward)
