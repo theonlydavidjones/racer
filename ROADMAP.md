@@ -149,6 +149,10 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v210 (19 Nov, main 08afb104):** the AI's penalty turns (#483), the soak, letting a sheet go, detours near boats (#480), the helm's foot, headroom (#482), the jumpers' arrows and readout rounding, Hoist tabs, the weather refresh, the Berkeley Pier gap reopened.
+
+**v209 (19 Nov, main c1e3b75a):** #460 and #467–#479, crew hands, the weather-helm chip, crew dock jobs and poses, the tide-leg coach line, brand names out of player text, approx.test on 24 seeds.
+
 **v208 (18 Nov, main b4334c09):** shallow waves (#454: the chop at the depth's group speed), the router's give-up fixes (Deep Physics' reviews), lying to after racing is called off, the setup chart's lee warm-up, the ten-race-mean budget for AI and rules changes. perf-ab clean against v207. Held out: FTUE's first run (reverted again). v209 is collecting.
 
 **v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
@@ -208,6 +212,10 @@ sources. Each shipped item is added there when it's published.
    0.58). It moved penalties to the marks: 76 within 35 m vs 62. A boat owing turns waited up to 30 s in the mark
    traffic before turning. To do: no keep-clear-first inside a mark's zone, then census again. Its three W–S stalled-hail
    checks stay it.fails, for the hail lead time and the rule-10 ratchet.
+7. **Auto-nav paused** (owner, 19 November 2026): "pause all future work on autonav"; auto-navigation isn't the point of the
+   game. No session starts work on the Nav pilot, its planner or its follow-ups (8s and PR #337, closed; 8q5, 8q7, 8q9).
+   Bugs that break something else (a test, a race) are still fixed, kept small. Land and water true to life stays:
+   see "Real shoreline" (the shoreline survey) and 8q8.
 7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
    (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
    data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
@@ -482,7 +490,7 @@ sources. Each shipped item is added there when it's published.
    centerline (when starting) or brought to centerline (when finishing a sail and docking)." She starts in her slip
    with the boom amidships, and docking brings it amidships: the mainsheet hauled in and made fast, as a crew does
    tied up.
-8q9. **Bug: on Nav, a replan after a corner she can't turn from waits on the live plan's cadence** (the physics review of
+8q9. **PAUSED: auto-nav (owner, 19 Nov 2026)** **Bug: on Nav, a replan after a corner she can't turn from waits on the live plan's cadence** (the physics review of
    nav-pier, 19 November; bug; a sprint bug; 1–2 h; owner of the navigator): past a plan corner with the way on not yet
    clear, HelmFeed asks for a new plan at once (sim/helmPlan.ts heldPast), but on the page passageLive gives back its
    memoized plan until she leaves its 150 m cell or the 2-minute bucket turns (sim/navigator.ts LIVE_M, LIVE_MIN): 52–142 s
@@ -493,7 +501,7 @@ sources. Each shipped item is added there when it's published.
    the gap at its end, and (10880–10930, 5730–5780): ~20 m either side of a 6.6 m deck, where in fact only the deck is
    solid. It's the water a boat turns into after the gap, northbound for the marina. The fix: the terrain mask there
    from the shore's data, not the 50 m cells (geo/shore.ts onLand), with a test that the water beside the deck is water.
-8q7. **Bug: Nav engaged with way on alongside a pier wrecks or strikes it** (the physics review of nav-pier, 19 November;
+8q7. **PAUSED: auto-nav (owner, 19 Nov 2026)** **Bug: Nav engaged with way on alongside a pier wrecks or strikes it** (the physics review of nav-pier, 19 November;
    bug; a sprint bug, after nav-pier; 2–4 h; owner of the navigator and pilot): engaged a meter or two along or in from
    8 m off Pier 45's head bound for off Alcatraz, she's wrecked on the wharf or strikes it (one start has no plan from
    there at all). Main does the same. The pilot's own way round (ai.ts detour, rays 25 m either side) turns her into the
@@ -504,7 +512,7 @@ sources. Each shipped item is added there when it's published.
    requirement; now, a sprint bug; 1 h; UI & Copy): wherever the page draws OSM-derived data (the chart, the shore, the
    buildings), "© OpenStreetMap contributors" shows, on the chart and in the credits. One short line, in an existing
    element, no new button.
-8q5. **Now — bug: on Nav, she steers the rhumb line, not the plotted course** (owner, 18 November; bug; now, a sprint
+8q5. **PAUSED: auto-nav (owner, 19 Nov 2026)** **Now — bug: on Nav, she steers the rhumb line, not the plotted course** (owner, 18 November; bug; now, a sprint
    bug; 4–8 h; owner of the navigator and pilot): "when in autonav, the boat doesn't seem to be following the plotted
    course. it just follows the rhum line to the destination. this is bad, especially if the plotted route is avoiding a
    strong tide or wind shadows." The pilot steers for one point: world.ts `navTarget()` returns `dest.p` (or her
@@ -533,7 +541,7 @@ sources. Each shipped item is added there when it's published.
    urgent"; 1–2 h; Crew Model): "when the main drops, the crew should bring the boom back to centerline." 8q does this
    only in the slip. On the water, once the main is down, the crew sheet in and center the traveler as a called job, and
    the boom stays there. A test: the boom within a few degrees of the centerline after the main drops.
-8s. **Now — the navigator can't find its way round the Aquatic Park seawall** (in PR #337) (bug; 2–3 h): owner, "at aquatic park, auto
+8s. **PAUSED: auto-nav (owner, 19 Nov 2026)** **Now — the navigator can't find its way round the Aquatic Park seawall** (in PR #337) (bug; 2–3 h): owner, "at aquatic park, auto
    nav failed to navigate around the seawall." The route, or the tiller pilot following it, doesn't get round the
    curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
    geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
@@ -2107,7 +2115,15 @@ traveling over the hull and sails to help players learn about sail shape and lam
   physics-reviewed).
 - ~~**Remaining rules.**~~ (done: 18.2(c)/(d), 18.4, 19, 21.3, 23, 43.1(a), 44.1(a), touching the committee boat). Later: backing a sail. (Rule 19 and 20 now apply at the islands and the Marin shore too, and 20.2(e).)
 - ~~**GGYC and StFYC, and the start line.**~~ (done: the GGYC clubhouse on OSM's footprint at 37.8077 N, the line's inner end on the seawall in front of it, about 410 m to X on 351°; StFYC was already right). Later: the race-deck marker's exact spot and the line's wording from GGYC's own current sailing instructions (only third-party summaries of past SIs were reachable: "an orange marker on the race deck" to X), and whether X is the YRA's position or NOAA's 66 m away.
-- **Real shoreline.** ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
+- **Real shoreline: land and water true to the chart** (owner, 19 November 2026: part of the broader work on the Bay,
+  its hydrography and coastlines; after SFBOFS; Bay East). The survey (docs/plans/shoreline-survey.md, branch
+  shoreline-survey 5976fe30) against NOAA's ENC at 10 m: sim water on charted land in 1,568 patches, 35 of them 50 m+
+  (the 50 m terrain mask reads low fill as water): Alameda by Coast Guard Island 270 m, Point Richmond 128 m, the
+  Port of Oakland fill 125 m, Clinton Basin 103 m, Strawberry and Sausalito Points 96 and 79 m, Mission Rock to Rincon
+  Point 57–69 m; sim land in charted water at most 47 m (outer coast); the Cityfront mostly within 15 m (Gashouse Cove
+  and Telegraph Hill 45 m). Proposed (the owner to decide): the land mask built from the ENC at 5–10 m, which also
+  covers 8q8. Then the shore's kinds and damage (#338, Bay East), lower priority.
+  Earlier: ~~Make Marin, Angel Island and Alcatraz solid~~ (done, from the 50 m terrain). ~~Replace the hand-traced Cityfront outline with real coastline data~~ (done: OSM's coast from the Gate's south shore round Fort Point to Pier 27, with the open piers, breakwaters and Pier 39's docks; east of Pier 27 is still hand-traced). ~~The AI's and the tiller pilot's look-ahead stepping over piers~~ (done: geo/shore.ts landAlong tests the whole line exactly) and ~~Rule 20 hails at the islands~~ (done: at every obstruction, src/sim/obstruction.ts). Still to do at the Wharf: the sea lions' floats at Pier 39 aren't solid. Rule 20 still to finish (from the final review): 20.3, passing a hail on to a third boat on the same tack (a hailed boat tacks at once now, even with a boat to windward); 20.2(e) should keep 18.2 off until the hailer has tacked and kept clear (it lapses on a breach call or after 30 s); `fetchingIsland` should also require passing to windward of the island (not reachable today); and an AI boat pinned by a windward boat that could clear by bearing away 10° tacks instead of sailing round.
 - **Your boat** (done: looks, flags, condition; the stern, transom, cabin, coamings, her name on the cabin side, the cockpit lip and the after-deck cleat, v71–v77). Later: rig tune (mast rake and the mast-heel position that sets pre-bend, forestay sag); a varied AI fleet (some boats with dirty bottoms and tired sails); hours on each sail instead of three ages; the US courtesy flag's placement checked against the club's own rules; flags hoisted again after you finish.
   Owner's requests, 12 November (unranked; the owner will rank them):
   1. Significantly more hull paint colors (later, Crew Figures; partly #354).
