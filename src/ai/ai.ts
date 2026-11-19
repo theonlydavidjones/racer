@@ -693,7 +693,9 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // with a long pier in the way its ends can be about as good, and she'd weave along it; Deep Physics, the soak)
       if (refresh || ai.detour === undefined) {
         const d = ai.detour, D = dist(b, P), k = Math.min(1, 700 / (D || 1)), keep = !!d && dist(b, d) > 40 && clearRun(b, d) && !clearRun(b, { x: b.x + (P.x - b.x) * k, y: b.y + (P.y - b.y) * k }); // (the way on, as far as detour looks: 700 m)
-        if (!keep) { const r = wayRound(b, P, ai.detourSide ?? 0); ai.detour = r.q; ai.detourSide = r.side; }
+        // (close-hauled, pinned against it by a boat to windward she'd hit tacking, she hails for room instead, as when
+        // beating below (Rule 20): seeing a way round from close beside the shore, she'd bear off it under that boat)
+        if (!keep) { const r = pinnedAt(w, b) ? { q: null, side: ai.detourSide ?? 0 } : wayRound(b, P, ai.detourSide ?? 0); ai.detour = r.q; ai.detourSide = r.side; }
       }
       if (ai.detour) P = ai.detour;
     } else if (b.started && refresh && (ai.detour ? landAlong(b, ai.detour) < Infinity && landAlong(b, P) < Infinity : landAlong(b, P) < 500) && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
