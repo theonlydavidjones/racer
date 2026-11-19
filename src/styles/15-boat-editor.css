@@ -57,5 +57,5 @@
    the colorways' swatches staggered with their names' lengths) */
 #boatPanel .be-cbtn{justify-content:flex-end;padding:5px 5px 5px 9px}
 #boatPanel .be-cbtn>i,#boatPanel .be-cbtn>.be-rope,#boatPanel .be-v>.be-sq,#boatPanel .be-v>.be-rope{order:2}
-#boatPanel .be-ropes button{justify-content:space-between}
+#boatPanel .be-ropes button{justify-content:flex-end;text-align:right}
 #boatPanel .be-ropes button>.be-rope{order:2}

@@ -82,12 +82,16 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
     expect(tangle({ vA: 1.5, apart: JUST })).toBe(1);
     expect(tangle({ user: true, vA: 1.5, apart: JUST })).toBe(1);
   }, 60000);
-  it('pressed together, lying side by side touching all along, for longer than TANGLE_MAX: one incident', () => {
-    expect(tangle({ vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
-    expect(tangle({ user: true, vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
+  it('pressed together, lying side by side touching all along without steerage way, for longer than TANGLE_MAX: one incident', () => {
+    expect(tangle({ vA: 0.3, apart: 0, pressed: 45 })).toBe(1);
+    expect(tangle({ user: true, vA: 0.3, apart: 0, pressed: 45 })).toBe(1);
+  }, 60000);
+  it('but rubbing along her with way enough to steer off isn\'t the inevitable result of the first: capped at TANGLE_MAX like any tangle', () => {
+    // (physics-review, 18 Nov 2026: a keep-clear boat at 2 kt and more lying on the other's hull for 100 s, one penalty)
+    expect(tangle({ vA: 1.5, apart: 0, pressed: 45 })).toBe(2);
   }, 60000);
   it('a contact with no penalty (she\'s retired, not racing) pressed together all along: one incident too, not one at every cooldown', () => {
-    expect(tangle({ vA: 1.5, apart: 0, pressed: 45, retired: true })).toBe(1);
+    expect(tangle({ vA: 0.3, apart: 0, pressed: 45, retired: true })).toBe(1);
   }, 60000);
   it('but sailing alongside within a metre, touching every 25 s, isn\'t pressed: the tangle\'s 30 s still bounds it', () => {
     expect(tangle({ vA: 1.5, apart: JUST, every: 25, n: 4 })).toBe(2);

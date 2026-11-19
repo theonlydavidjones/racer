@@ -1919,6 +1919,7 @@ Also asked for:
 - **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
 - **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
 - ~~**Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.~~ Done (built and live, the owner, 18 Nov): the rig tunes in the boat editor and the coach's rig line (tests/rigtune).
+  - **Turnbuckle guidance in the trim coach** (owner, 19 November; feature; next, after the sprint; Rigging; 2–3 h): "turnbuckle guidance should appear in trim coach overlay". The coach's rig line (boat/coach.ts ~L679) says "Backstay on hard/off" but never the shrouds' or jumpers' turns. Add one short line from TUNE_PRESETS (boat/rigTune.ts) for the current wind band, e.g. shrouds 1½ turns, jumpers 2–3; no copy block.
   - **The boom's place on a beat** (next for Deep Physics, after the beat angle in chop; Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
   conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
@@ -2223,6 +2224,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **A hit off a boat's center turns her** (owner question; the physics review of the hull contact, #460, 18 Nov 2026): struck near her bow or stern, a hull mostly swings rather than slides sideways (effective mass there about a third of hers). The contact now moves boats only along the line between the hulls, with no yaw; and no friction between them yet, as there's no sourced value for wet topsides. Build it?
 
 - **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a

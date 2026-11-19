@@ -55,7 +55,7 @@
 /* Behind the setup (body.still, app.ts setStill): the last frame of the Bay, still, and none of the game's own displays,
    which would otherwise show a race that isn't built yet (the owner: finish configuring before the game loads) */
 body.still #coachPanel,body.still #coachTip,body.still #compassTape,body.still #crewPop,body.still #dial,body.still #flagIndex,body.still #hudRight,body.still #leftCol,body.still #linebox,body.still #sigPanel,body.still #situ,body.still #tillerGuide,body.still #transit,body.still .sailband{visibility:hidden}
-body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar,body.still #keysHint{display:none!important}
+body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #controls,body.still #flowPanel,body.still #hud,body.still #labels,body.still #map,body.still #mapBar,body.still #mapHint,body.still #mapCredit,body.still #mapLayersPop,body.still #msgLog,body.still #trimPanel,body.still #viewBar,body.still #keysHint{display:none!important}
 /* the tactical debrief (ui/tacticsView.ts): a chart a leg against the fleet's middle, the best and the ideal */
 .tac{display:flex;flex-direction:column;gap:8px}
 .tchips{display:flex;gap:6px;flex-wrap:wrap}
@@ -63,9 +63,9 @@ body.still #appBar,body.still #bMapLayers,body.still #bMapNav,body.still #contro
 .tchip.off{opacity:.45}
 .tchip i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .tchip i.dia{border:1.5px solid;border-radius:0;transform:rotate(45deg);width:7px;height:7px;background:none}
-.tgrid{display:flex;gap:16px;align-items:flex-start}
+.tgrid{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
 .tchart{flex:0 0 auto;max-width:100%;height:auto}
-.ttakes{flex:1;min-width:0}
+.ttakes{flex:1 1 170px;min-width:170px}
 .ttk{display:grid;grid-template-columns:26px 1fr 48px;gap:6px;align-items:center;height:46px;border-bottom:1px solid rgba(150,196,218,.1);font-size:14px;cursor:pointer}
 .tac.compact .ttk{height:auto;padding:4px 0;font-size:13px}
 .ttk b{color:var(--muted)} .ttk small{color:var(--muted)}
