@@ -19,9 +19,10 @@
 import type { World } from './world';
 import { CurrentField } from '../environment/tide';
 import { SeaField } from '../environment/sea';
+import { Traffic } from './traffic';
 
 /** The World's own members changed only by being replaced: walked only when replaced. */
-const BY_IDENTITY = new Set(['C', 'file', 'sequence', 'weather', 'field', 'opts', 'traffic']);
+const BY_IDENTITY = new Set(['C', 'file', 'sequence', 'weather', 'field', 'opts']); // (not the traffic: its vessels give way from the race's state, 19 Nov 2026, traffic.ts yieldStep)
 /** Never sent: the World's own machinery (its random streams and callbacks live on each side), and its events. */
 const NEVER = new Set(['rng', 'motorRng', 'emit', 'keepsClearOf', 'obstacle', 'events']);
 /** Grown at the end, with the oldest dropped from the front: only what's new is sent. */
@@ -88,7 +89,10 @@ const UNNUMBERED = new Set(['flows', 'flowsC', 'mouthS', 'mouthC', '_transit', '
 const LOCAL = new Map<object, ReadonlySet<string>>([
   [CurrentField.prototype, new Set(['vecs', 'stamp', 'bayFlow', 'cells', 'lastKey', 'lastList'])],
   // (the fetch on a 150 m grid by wind direction, worked out at the grid's node: the same whoever asks first)
-  [SeaField.prototype, new Set(['cache'])]
+  [SeaField.prototype, new Set(['cache'])],
+  // (where each vessel actually was every 4 s, for her wake: worked out in the race; the page's wake reads her timetable
+  // and her lag, which are sent)
+  [Traffic.prototype, new Set(['past'])]
 ]);
 /** (tests: each side's own memos, by class) */
 export const localOf = (v: object, key: string): boolean => LOCAL.get(Object.getPrototypeOf(v))?.has(key) ?? false;

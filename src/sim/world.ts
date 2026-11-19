@@ -1829,7 +1829,10 @@ export class World {
       if (!v.moving) continue;
       const ty = VESSEL[v.kind], u = V(v.h), c = cpa(b, { x: v.x, y: v.y, vx: u.x * v.v, vy: u.y * v.v });
       if (c.d > ty.len / 2 + 70 || dist(b, v) > 900) continue;
-      const aim = { x: v.x - u.x * (ty.len * 0.8 + 60), y: v.y - u.y * (ty.len * 0.8 + 60) }; // behind her stern
+      // behind her stern; one making no way (stopped for another boat), past her on the side the boat's on, clear of her
+      // beam: aiming astern of a vessel lying still would bring a boat coming from ahead down her length (the review, 19 Nov 2026)
+      const side = Math.sign((b.x - v.x) * u.y - (b.y - v.y) * u.x) || 1;
+      const aim = v.v < 0.5 ? { x: v.x + u.y * side * (ty.beam / 2 + 60), y: v.y - u.x * side * (ty.beam / 2 + 60) } : { x: v.x - u.x * (ty.len * 0.8 + 60), y: v.y - u.y * (ty.len * 0.8 + 60) };
       b.desired = sailable(b, brg(aim.x - b.x, aim.y - b.y)); b.luff = false;
     }
   }
@@ -1850,7 +1853,7 @@ export class World {
           const k = Math.max(0, Math.min(1, ((b.x - hv.a.x) * (hv.b.x - hv.a.x) + (b.y - hv.a.y) * (hv.b.y - hv.a.y)) / ((hv.b.x - hv.a.x) ** 2 + (hv.b.y - hv.a.y) ** 2)));
           const cx = hv.a.x + (hv.b.x - hv.a.x) * k, cy = hv.a.y + (hv.b.y - hv.a.y) * k, l = hypot(b.x - cx, b.y - cy) || 1;
           b.x += (b.x - cx) / l * (-gap + 0.5); b.y += (b.y - cy) / l * (-gap + 0.5); b.v = 0; b.lastHitT = this.t;
-          if (b.isUser) wreck(b, `hit by the ${ty.name.toLowerCase()}`, b, this.emit); // (a ship: a wreck at any speed, WRECK-PROPOSAL section 1)
+          if (b.isUser) wreck(b, v.v < 0.3 ? `ran into the ${ty.name.toLowerCase()}, stopped` : `hit by the ${ty.name.toLowerCase()}`, b, this.emit); // (a ship: a wreck at any speed, WRECK-PROPOSAL section 1)
           if (b.isUser && !b.wrecked && this.t - this.groundToast.t > 4) { this.groundToast.t = this.t; this.emit({ type: 'toast', ms: 6000, msg: `You hit the ${ty.name.toLowerCase()}. In real life that ends your day, or worse. Keep well clear of ships.` }); }
         }
       }
@@ -1866,7 +1869,8 @@ export class World {
         const rx = u.x - v.x, ry = u.y - v.y, over = (rx * uv.x + ry * uv.y) / (hypot(rx, ry) || 1) < -0.383 && u.vx * uv.x + u.vy * uv.y > v.v;
         const kt = v.v > 0.5 ? `, ${Math.round(v.v / 0.5144)} kt` : ', stopped';
         this.emit({ type: 'toast', ms: 7000, msg: !big && over ? `${ty.name} ahead${kt}: you're overtaking her, so keep clear (Rule 13).`
-          : !big && u.motor?.running ? `${ty.name} close${kt}. Under power, keep clear.`
+          : !big && (u.motor?.running || this.vesselSkip(u)) ? `${ty.name} close${kt}. Keep clear.` // (under power, a power-driven vessel; in harbor, she doesn't slow for you)
+          : !big && v.v <= 0.5 ? `${ty.name} stopped, waiting for a boat. Keep clear of her.`
           : big
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
           : `${ty.name} approaching${kt}. She slows or stops for a boat under sail (Rule 18): hold your course, and expect a wake.` }); // (Rule 17(a)(i): the stand-on vessel keeps her course and speed)
@@ -1875,7 +1879,8 @@ export class World {
       if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
         this.warned.set(-1 - v.id, this.t);
         for (let i = 0; i < 5; i++) this.emit({ type: 'horn', dur: 0.35, delayMs: i * 550 });
-        this.emit({ type: 'toast', ms: 6000, msg: GIVES_WAY[v.kind]
+        const rx = u.x - v.x, ry = u.y - v.y, over = (rx * uv.x + ry * uv.y) / (hypot(rx, ry) || 1) < -0.383 && u.vx * uv.x + u.vy * uv.y > v.v;
+        this.emit({ type: 'toast', ms: 6000, msg: GIVES_WAY[v.kind] && !over && !u.motor?.running && !this.vesselSkip(u)
           ? `Five short blasts from the ${ty.name.toLowerCase()}: she doubts what you're doing. If she can't miss you alone, act now (Rule 17(b)).`
           : `Five short blasts from the ${ty.name.toLowerCase()}: the danger signal. She doubts you're keeping clear. Get out of her way now: bear away and pass astern of her.` });
       }

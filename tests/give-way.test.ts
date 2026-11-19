@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
 import { LL } from '../src/geo/geo';
 import { segPt } from '../src/core/math';
-import { GIVES_WAY, SERVICES, Traffic, VESSEL, vesselHull, type Moving, type Vessel } from '../src/sim/traffic';
+import { GIVES_WAY, ROUTES, SERVICES, Traffic, VESSEL, vesselHull, type Moving, type Vessel } from '../src/sim/traffic';
 import { bow, stern } from '../src/boat/boat';
 
 /**
@@ -126,11 +126,11 @@ describe('the small vessels give way to a sailing boat (Rule 18); the ships in t
   }, 600_000);
   it('a boat stopped dead 900 m ahead on her route: she stops for it, clear (8(e)), and goes on once it\'s out of her way', () => {
     const tr = new Traffic(true, SEED), { T, i } = tourOnLeg(tr, 21 * 3600), v = tr.vessels(T)[i];
-    const r = drive(tr, i, T, { x: v.x - 900, y: v.y, vx: 0, vy: 0 }, 300);
+    const r = drive(tr, i, T, { x: v.x - 900, y: v.y, vx: 0, vy: 0 }, 600); // (she slows by stages, and stops when she must)
     expect(r.minK, 'she took all way off').toBe(0);
     expect(r.least).toBeGreaterThan(40);
     // (the boat gone, she picks up again: 4 minutes later she's back to her service speed)
-    const far = [{ x: 1e6, y: 1e6, vx: 0, vy: 0 }]; for (let t = T + 300; t < T + 540; t += DT) tr.vessels(t, far, DT);
+    const far = [{ x: 1e6, y: 1e6, vx: 0, vy: 0 }]; for (let t = T + 600; t < T + 840; t += DT) tr.vessels(t, far, DT);
     expect(tr.give[i].k).toBe(1);
   }, 60_000);
   it('boats crossing ahead of her, from either side, at 3 and 5 kt, on a collision course or passing ahead: she slows and lets them across, well clear', () => {
@@ -174,4 +174,89 @@ describe('the small vessels give way to a sailing boat (Rule 18); the ships in t
     drive(tr2, i, T, { x: v.x - 500, y: v.y, vx: 0, vy: 0 }, 60, () => true);
     expect(tr2.givingWay()).toBeUndefined();
   }, 60_000);
+  // (the second review, 19 Nov 2026: each case below was a contact or a vessel stuck for good in the version it reviewed)
+  /** The first time from T0 that service i is under way within 10 m of her route's corner `wp`, coming to it. */
+  const atCorner = (i: number, wp: number, T0 = 20 * 3600) => {
+    const tr = new Traffic(true, SEED), c = ROUTES[SERVICES[i].route][wp];
+    for (let T = T0; T < T0 + 8 * 3600; T += 0.5) { const v = tr.vessels(T)[i]; if (v.moving && Math.hypot(v.x - c.x, v.y - c.y) < 10) return T; }
+    return NaN;
+  };
+  const gives = SERVICES.map((_, i) => i).filter(i => GIVES_WAY[SERVICES[i].kind]);
+  it('a boat stopped just past a bend in her route, or just off her berth: she sees it round the bend, and leaves her berth looking, and stops clear', () => {
+    const out: string[] = [];
+    for (const i of gives) {
+      const R = ROUTES[SERVICES[i].route];
+      for (let wp = 1; wp < R.length - 1; wp++) {
+        const T = atCorner(i, wp); if (isNaN(T)) continue;
+        const a = R[wp], b = R[wp + 1], L = Math.hypot(b.x - a.x, b.y - a.y), V = VESSEL[SERVICES[i].kind].kt * KT;
+        for (const past of [90, 150, 200]) {
+          if (past > L - 20) continue;
+          const boat = { x: a.x + (b.x - a.x) / L * past, y: a.y + (b.y - a.y) / L * past, vx: 0, vy: 0 };
+          const r = drive(new Traffic(true, SEED), i, T - 600 / V, boat, 240);
+          if (r.least < 4) out.push(`${SERVICES[i].kind}#${i} corner ${wp}, ${past} m past: ${r.least.toFixed(1)} m`);
+        }
+      }
+      // (her berth: the route's first point, a boat 40–200 m along her way out, as she lies alongside)
+      const T = atCorner(i, 0) ; if (isNaN(T)) continue;
+      const a = R[0], b = R[1], L = Math.hypot(b.x - a.x, b.y - a.y);
+      for (const out_ of [40, 100, 200]) {
+        const boat = { x: a.x + (b.x - a.x) / L * out_, y: a.y + (b.y - a.y) / L * out_, vx: 0, vy: 0 };
+        const r = drive(new Traffic(true, SEED), i, T - 60, boat, 300);
+        if (r.least < 4) out.push(`${SERVICES[i].kind}#${i} leaving her berth, a boat ${out_} m out: ${r.least.toFixed(1)} m`);
+      }
+    }
+    expect(out).toEqual([]);
+  }, 600_000);
+  it('a boat on the opposite course 100–130 m off her route that tacks toward it as she comes: never a contact where her timetable alone would have missed', () => {
+    const out: string[] = [];
+    for (const i of gives) {
+      const R = ROUTES[SERVICES[i].route];
+      // (her longest straight leg)
+      let wp = 0, best = 0; for (let k = 0; k < R.length - 1; k++) { const l = Math.hypot(R[k + 1].x - R[k].x, R[k + 1].y - R[k].y); if (l > best) { best = l; wp = k; } }
+      const T = atCorner(i, wp); if (isNaN(T)) continue;
+      const tr0 = new Traffic(true, SEED), V = VESSEL[SERVICES[i].kind].kt * KT;
+      const T1 = T + 100 / V, v0 = tr0.vessels(T1)[i], ux = Math.sin(v0.h * Math.PI / 180), uy = Math.cos(v0.h * Math.PI / 180);
+      for (const off of [100, 130, -100, -130]) for (const at of [100, 200, 350, 500]) for (const turn of [45, 90]) {
+        const start = { x: v0.x + ux * 1000 + uy * off, y: v0.y + uy * 1000 - ux * off, vx: -ux * 2.3, vy: -uy * 2.3 };
+        let tacked = false;
+        const steer = (b: Moving, t: number) => {
+          // (she tacks toward the route once the vessel is `at` m off)
+          const v = tr0.vessels(T1 + t)[i]; if (tacked || Math.hypot(b.x - v.x, b.y - v.y) > at) return; tacked = true;
+          const c = Math.atan2(b.vx, b.vy) + (off > 0 ? 1 : -1) * turn * Math.PI / 180; b.vx = Math.sin(c) * 2.3; b.vy = Math.cos(c) * 2.3;
+        };
+        const a = drive(new Traffic(true, SEED), i, T1, start, 300, undefined, (b, t) => { steer(b, t); }); tacked = false;
+        const none = drive(new Traffic(true, SEED), i, T1, start, 300, () => true, (b, t) => { steer(b, t); });
+        if (a.least < 4 && none.least >= 4) out.push(`${SERVICES[i].kind}#${i}: ${off} m off, tacks ${turn}° at ${at} m: ${a.least.toFixed(1)} m (timetable ${none.least.toFixed(1)})`);
+      }
+    }
+    expect(out).toEqual([]);
+  }, 900_000);
+  it('a boat lying still close beside her, that she\'s already passing: it doesn\'t hold her up', () => {
+    const tr0 = new Traffic(true, SEED), { T, i } = tourOnLeg(tr0, 21 * 3600), v = tr0.vessels(T)[i];
+    for (const [ahead, abeam] of [[-60, 50], [0, 80], [30, 90]]) {
+      const tr = new Traffic(true, SEED), b = { x: v.x - ahead, y: v.y + abeam, vx: 0, vy: 0 };
+      for (let t = T; t < T + 120; t += DT) tr.vessels(t, [b], DT);
+      expect(tr.give[i].lag, `a boat ${ahead} m ahead, ${abeam} m abeam: she lost no more than a minute`).toBeLessThan(60);
+    }
+  }, 120_000);
+  it('an AI boat running down past a cruise boat lying stopped: her dodge takes her past the vessel\'s side, clear, not down her length', () => {
+    // (the second review, 19 Nov 2026: aiming astern of a vessel lying still brought a boat coming from ahead onto her:
+    // 0.8 m at 14 and 18 m off her line)
+    for (const side of [14, 18, 25, -14]) {
+      const w: any = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, course: 'ss2', tideDate: '2026-11-07', tideTime: '13:35', windKind: 'west', windKt: 12, current: 'none', traffic: 1, opponents: ['stock:1'], fleet: 1 } as Settings, 3);
+      for (let k = 0; k < 60; k++) w.step(DT);
+      const b = w.boats.find((q: any) => !q.isUser), u = w.user;
+      const v = { id: 4, kind: 'tour', x: b.x + 800, y: b.y + 900, h: 270, v: 0, moving: true };
+      w.traffic = { on: true, vessels: () => [{ ...v }], wakeAt: () => null, givingWay: () => undefined };
+      const orig = w.keepClearOfShips.bind(w);
+      w.keepClearOfShips = (q: any) => { q.desired = 90; q.luff = false; orig(q); }; // (she wants to run 090; the dodge has its say)
+      b.x = v.x - 400; b.y = v.y + side; b.h = 90; b.v = 3; b.vx = 3; b.vy = 0;
+      let least = Infinity;
+      for (let k = 0; k < 60 * 200; k++) {
+        u.x = v.x + 3000; u.y = v.y + 3000; w.step(DT);
+        const hv = vesselHull(v as Vessel); least = Math.min(least, Math.min(segPt(bow(b), hv.a, hv.b), segPt(stern(b), hv.a, hv.b), segPt(b, hv.a, hv.b)) - hv.r);
+      }
+      expect(least, `${side} m off her line`).toBeGreaterThan(10);
+    }
+  }, 300_000);
 });
