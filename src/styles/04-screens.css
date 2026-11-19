@@ -166,6 +166,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .mhead h2{margin:0;font:600 22px var(--f-inst);letter-spacing:.03em}
 .mfield input[data-m=w]{width:90px}
 .fhead > div:first-child{flex:1}
+.fhead .eyebrow{margin-bottom:6px} /* (the panel sweep: the eyebrow's box overlapped the h1's by 12 px) */
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .fcard{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px 12px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);cursor:pointer;font:inherit}
 .fcard:hover,.fcard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
