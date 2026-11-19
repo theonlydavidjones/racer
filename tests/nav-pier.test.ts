@@ -38,7 +38,7 @@ function passage(from: { x: number; y: number }, to: string | { x: number; y: nu
   let hits = 0, hitsOn = 0, last = u.lastHitT, near = Infinity, turned = 0, h0 = u.h, alarm = '', mouth = false, clear = false;
   const step = () => {
     w.step(DT); if (u.lastHitT !== last) { last = u.lastHitT; hits++; if (w.pilot.mode !== 'off') hitsOn++; } turned += Math.abs(((u.h - h0 + 540) % 360) - 180); h0 = u.h;
-    for (const e of w.drainEvents()) if (e.type === 'toast') { const m = (e as { msg: string }).msg; if (/too narrow|Too close alongside/.test(m)) alarm = m; if (/harbor mouth: she's yours/.test(m)) mouth = true; }
+    for (const e of w.drainEvents()) if (e.type === 'toast') { const m = (e as { msg: string }).msg; if (/too narrow|too close alongside/.test(m)) alarm = m; if (/harbor mouth: she's yours/.test(m)) mouth = true; }
   };
   while (w.t < mins * 60 && !u.wrecked && w.arrivedT == null && w.pilot.mode !== 'off') {
     if (w.steps % 60 === 0) { const c = feed.tick(w as never); if (c) applyCommand(w, c as never); const r = wharfNearest(u, 200); if (!r || r.d >= 20) clear = true; if (r && clear) near = Math.min(near, r.d); }
@@ -115,7 +115,7 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     const r = passage(from, 'alcatraz', 107, 60, start);
     console.log(`${name}: ${r.where}, ${r.hitsOn} struck engaged, ${r.hits} in all`);
     expect(r.hitsOn, r.where).toBe(0);
-    expect(r.w.arrivedT != null || /Too close alongside|too narrow/.test(r.alarm), r.where).toBe(true);
+    expect(r.w.arrivedT != null || /too close alongside|too narrow/.test(r.alarm), r.where).toBe(true);
   }, 900_000);
   for (const [name, from, to, seed, keep = 10, start] of cases) it(name, () => {
     const r = passage(from, to, seed, 60, start);

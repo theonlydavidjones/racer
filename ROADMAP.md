@@ -2243,6 +2243,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 
 ## Later
 
+- **A hit off a boat's center turns her** (owner question; the physics review of the hull contact, #460, 18 Nov 2026): struck near her bow or stern, a hull mostly swings rather than slides sideways (effective mass there about a third of hers). The contact now moves boats only along the line between the hulls, with no yaw; and no friction between them yet, as there's no sourced value for wet topsides. Build it?
+
 - **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a
   short statement of where and how, logged, or you carry on marked wrecked. Optional towing ends it "towed in". Repairs

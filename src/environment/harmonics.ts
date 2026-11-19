@@ -48,49 +48,92 @@ const mul = (...xs: [Nodal, number][]): Nodal => xs.reduce<Nodal>((a, [n, k]) =>
 
 /** The longitude of the solar perigee (deg; it moves about 1.7° a century: 282.9° in 2000, 283.3° by 2026). */
 const P1 = 283.2;
-/** Equilibrium argument V (deg) and nodal correction for a constituent at a time. */
-function constituent(name: string, a: ReturnType<typeof astro>, nd: ReturnType<typeof nodal>): { V: number; n: Nodal } | null {
+/** Equilibrium argument V (deg) of a constituent at a time (NaN for one not known here). */
+function argument(name: string, a: ReturnType<typeof astro>): number {
   const { T, s, h, p } = a, M2 = 2 * T - 2 * s + 2 * h, S2 = 2 * T, N2 = 2 * T - 3 * s + 2 * h + p, K1 = T + h - 90, O1 = T - 2 * s + h + 90;
   switch (name) {
-    case 'M2': return { V: M2, n: nd.M2 };
-    case 'S2': return { V: S2, n: one };
-    case 'N2': return { V: N2, n: nd.M2 };
-    case '2N2': return { V: 2 * T - 4 * s + 2 * h + 2 * p, n: nd.M2 };
-    case 'K2': return { V: 2 * T + 2 * h, n: nd.K2 };
-    case 'L2': return { V: 2 * T - s + 2 * h - p + 180, n: nd.M2 }; // f, u of L2 are close to M2's
-    case 'K1': return { V: K1, n: nd.K1 };
-    case 'O1': return { V: O1, n: nd.O1 };
-    case 'P1': return { V: T - h + 90, n: one };
-    case 'Q1': return { V: T - 3 * s + h + p + 90, n: nd.O1 };
-    case '2Q1': return { V: T - 4 * s + h + 2 * p + 90, n: nd.O1 };
-    case 'J1': return { V: T + s + h - p - 90, n: nd.J1 };
-    case 'OO1': return { V: T + 2 * s + h - 90, n: nd.OO1 };
-    case 'M1': return { V: T - s + h + p - 90, n: one }; // NOAA's M1 (Schureman's A16 form, with the perigee: it cut the stations' error by half); small, its nodal factor varies a lot and is ignored
-    case 'M3': return { V: 1.5 * M2, n: mul([nd.M2, 1.5]) }; // 3T − 3s + 3h (Schureman, Table 2)
-    case 'M4': return { V: 2 * M2, n: mul([nd.M2, 2]) };
-    case 'M6': return { V: 3 * M2, n: mul([nd.M2, 3]) };
-    case 'M8': return { V: 4 * M2, n: mul([nd.M2, 4]) };
-    case 'S4': return { V: 2 * S2, n: one };
-    case 'S6': return { V: 3 * S2, n: one };
-    case 'MN4': return { V: M2 + N2, n: mul([nd.M2, 2]) };
-    case 'MS4': return { V: M2 + S2, n: nd.M2 };
-    case '2SM2': return { V: 2 * S2 - M2, n: mul([nd.M2, -1]) };
-    case 'MK3': return { V: M2 + K1, n: mul([nd.M2, 1], [nd.K1, 1]) };
-    case '2MK3': return { V: 2 * M2 - K1, n: mul([nd.M2, 2], [nd.K1, -1]) };
+    case 'M2': return M2;
+    case 'S2': return S2;
+    case 'N2': return N2;
+    case '2N2': return 2 * T - 4 * s + 2 * h + 2 * p;
+    case 'K2': return 2 * T + 2 * h;
+    case 'L2': return 2 * T - s + 2 * h - p + 180; // f, u of L2 are close to M2's
+    case 'K1': return K1;
+    case 'O1': return O1;
+    case 'P1': return T - h + 90;
+    case 'Q1': return T - 3 * s + h + p + 90;
+    case '2Q1': return T - 4 * s + h + 2 * p + 90;
+    case 'J1': return T + s + h - p - 90;
+    case 'OO1': return T + 2 * s + h - 90;
+    case 'M1': return T - s + h + p - 90; // NOAA's M1 (Schureman's A16 form, with the perigee: it cut the stations' error by half); small, its nodal factor varies a lot and is ignored
+    case 'M3': return 1.5 * M2; // 3T − 3s + 3h (Schureman, Table 2)
+    case 'M4': return 2 * M2;
+    case 'M6': return 3 * M2;
+    case 'M8': return 4 * M2;
+    case 'S4': return 2 * S2;
+    case 'S6': return 3 * S2;
+    case 'MN4': return M2 + N2;
+    case 'MS4': return M2 + S2;
+    case '2SM2': return 2 * S2 - M2;
+    case 'MK3': return M2 + K1;
+    case '2MK3': return 2 * M2 - K1;
     // (added with the East Bay's stations, which carry them: in the Estuary and the shallows the smaller semidiurnal
     // constituents, the solar annual and semiannual tides and the fortnightly ones add up to a tenth of a knot)
-    case 'NU2': return { V: 2 * T - 3 * s + 4 * h - p, n: nd.M2 };
-    case 'MU2': return { V: 2 * T - 4 * s + 4 * h, n: nd.M2 };
-    case 'LAM2': return { V: 2 * T - s + p + 180, n: nd.M2 };
-    case 'T2': return { V: 2 * T - h + P1, n: one };
-    case 'R2': return { V: 2 * T + h - P1 + 180, n: one };
-    case 'RHO': return { V: T - 3 * s + 3 * h - p + 90, n: nd.O1 };
-    case 'S1': return { V: T, n: one };
-    case 'SA': return { V: h, n: one };
-    case 'SSA': return { V: 2 * h, n: one };
-    case 'MM': return { V: s - p, n: nd.Mm };
-    case 'MF': return { V: 2 * s, n: nd.Mf };
-    case 'MSF': return { V: 2 * s - 2 * h, n: mul([nd.M2, -1]) };
+    case 'NU2': return 2 * T - 3 * s + 4 * h - p;
+    case 'MU2': return 2 * T - 4 * s + 4 * h;
+    case 'LAM2': return 2 * T - s + p + 180;
+    case 'T2': return 2 * T - h + P1;
+    case 'R2': return 2 * T + h - P1 + 180;
+    case 'RHO': return T - 3 * s + 3 * h - p + 90;
+    case 'S1': return T;
+    case 'SA': return h;
+    case 'SSA': return 2 * h;
+    case 'MM': return s - p;
+    case 'MF': return 2 * s;
+    case 'MSF': return 2 * s - 2 * h;
+    default: return NaN;
+  }
+}
+/** A constituent's nodal correction (it changes over years: worked out once for a prediction's span), or null for one not known here. */
+function nodalOf(name: string, nd: ReturnType<typeof nodal>): Nodal | null {
+  switch (name) {
+    case 'M2': return nd.M2;
+    case 'S2': return one;
+    case 'N2': return nd.M2;
+    case '2N2': return nd.M2;
+    case 'K2': return nd.K2;
+    case 'L2': return nd.M2;
+    case 'K1': return nd.K1;
+    case 'O1': return nd.O1;
+    case 'P1': return one;
+    case 'Q1': return nd.O1;
+    case '2Q1': return nd.O1;
+    case 'J1': return nd.J1;
+    case 'OO1': return nd.OO1;
+    case 'M1': return one;
+    case 'M3': return mul([nd.M2, 1.5]);
+    case 'M4': return mul([nd.M2, 2]);
+    case 'M6': return mul([nd.M2, 3]);
+    case 'M8': return mul([nd.M2, 4]);
+    case 'S4': return one;
+    case 'S6': return one;
+    case 'MN4': return mul([nd.M2, 2]);
+    case 'MS4': return nd.M2;
+    case '2SM2': return mul([nd.M2, -1]);
+    case 'MK3': return mul([nd.M2, 1], [nd.K1, 1]);
+    case '2MK3': return mul([nd.M2, 2], [nd.K1, -1]);
+    case 'NU2': return nd.M2;
+    case 'MU2': return nd.M2;
+    case 'LAM2': return nd.M2;
+    case 'T2': return one;
+    case 'R2': return one;
+    case 'RHO': return nd.O1;
+    case 'S1': return one;
+    case 'SA': return one;
+    case 'SSA': return one;
+    case 'MM': return nd.Mm;
+    case 'MF': return nd.Mf;
+    case 'MSF': return mul([nd.M2, -1]);
     default: return null;
   }
 }
@@ -105,13 +148,12 @@ export type Constituents = [string, number, number][];
 export function predict(z0: number, hc: Constituents, times: number[]): number[] {
   if (!times.length) return [];
   const nd = nodal(astro((times[0] + times[times.length - 1]) / 2).N);
+  // (the nodal factors once, not at every time: the same numbers, summed in the same order, so the same to the bit)
+  const K = hc.map(([name, A, G]) => { const n = nodalOf(name, nd); return n && { name, fA: n.f * A, u: n.u, G }; }).filter((k): k is { name: string; fA: number; u: number; G: number } => !!k);
   return times.map(ms => {
     const a = astro(ms);
     let v = z0;
-    for (const [name, A, G] of hc) {
-      const c = constituent(name, a, nd);
-      if (c) v += c.n.f * A * cos(c.V + c.n.u - G);
-    }
+    for (const k of K) v += k.fA * cos(argument(k.name, a) + k.u - k.G);
     return v;
   });
 }
