@@ -546,7 +546,7 @@ export class World {
       this.sea.field = this.waves; // (the wave drag meets the sea that's drawn)
     }
     if (settings.current === 'real') {
-      this.tide = new CurrentField(stationsFor(this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60));
+      this.tide = CurrentField.covering(this.clockUtc, this.gunUtc - this.startAt / 60 - 30, this.gunUtc + 6 * 60); // (predicted once: tide.ts covering)
       this.updateTide();
     }
     const r = this.rng;
