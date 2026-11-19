@@ -31,6 +31,9 @@ export interface Outlook {
    * the wind, the fetch and the sea's duration, each its own step, then the chop itself (cold, all at once, a cell held
    * the page's thread up to 100 ms from Mile Rock). Nothing if the cell's known. The same chop either way. */
   chopSteps?(p: Vec, tMin: number): Generator<void, void, void>;
+  /** wind's lee at p made ready a cold grid point a step, for a plan worked out between frames (each a cast of the land's
+   * lee, ~1 ms or more). Nothing if they're known. The same wind either way. */
+  windSteps?(p: Vec, tMin: number): Generator<void, void, void>;
   /** The course-wide wind at a time (no place): for the day's timeline. */
   breeze(tMin: number): { kt: number; from: number; gust: number };
 }
@@ -46,8 +49,9 @@ export interface Outlook {
  */
 const LEE_M = 25;
 const leeCache = new Map<number, number>();
+const leeKey = (i: number, j: number, a: number) => ((i + 5000) * 10000 + (j + 5000)) * 72 + a;
 function leeNode(i: number, j: number, a: number): number {
-  const k = ((i + 5000) * 10000 + (j + 5000)) * 72 + a;
+  const k = leeKey(i, j, a);
   let v = leeCache.get(k);
   if (v === undefined) { const q = { x: i * LEE_M, y: j * LEE_M }; v = onGround(q) ? NaN : landLee(q, a * 5); if (leeCache.size > 600000) leeCache.clear(); leeCache.set(k, v); }
   return v;
@@ -64,6 +68,17 @@ function leeAt(p: Vec, from: number): number {
     }
   }
   return sw > 1e-9 ? s / sw : landLee(p, from); // (all four on land: she's against the shore; the exact reading)
+}
+/** leeAt's grid points made ready a cold one a step (each is a cast of the land's lee, ~1 ms or more: eight cold in one
+ * reading held a slice of the page's thread to 16 ms from Mile Rock, the Coordinator's 20.3 ms at the 99.9th, 18 Nov 2026).
+ * The same cache, so leeAt reads the same afterward. */
+function* leeSteps(p: Vec, from: number): Generator<void, void, void> {
+  const af = (((from / 5) % 72) + 72) % 72, a0 = Math.floor(af), fa = af - a0;
+  const i = Math.floor(p.x / LEE_M), j = Math.floor(p.y / LEE_M);
+  for (let da = 0; da < 2; da++) {
+    const a = (a0 + da) % 72, wa = da ? fa : 1 - fa; if (wa === 0) continue;
+    for (let dj = 0; dj < 2; dj++) for (let di = 0; di < 2; di++) if (!leeCache.has(leeKey(i + di, j + dj, a))) { leeNode(i + di, j + dj, a); yield; }
+  }
 }
 
 /** The outlook for a World's day, with its settings (a set wind strength or direction, a practice current) as it sails them. */
@@ -106,9 +121,8 @@ export function outlookFor(w: SimView, exact = false): Outlook {
   // grid each half minute, which keeps a whole briefing (thousands of points) quick. The land's lee changes over tens of
   // meters under a bluff, so it's read at the point itself (leeAt, its own 25 m grid)
   const winds = new Map<string, Wind & { gust: number; leeFrom: number }>();
-  const wind = (p: Vec, t: number) => {
+  const cell = (p: Vec, t: number) => {
     const i = Math.round(p.x / 150), j = Math.round(p.y / 150), m = Math.round(t * 2), k = `${i},${j},${m}`;
-    if (exact) { const b = breeze(m / 2), f = wx.field(p, m / 2, b.from); return { kt: b.kt * f.k * landLee(p, b.from), from: (b.from + f.turn + 360) % 360, gust: b.gust }; }
     let v = winds.get(k);
     if (!v) {
       const q = { x: i * 150, y: j * 150 }, tt = m / 2, b = breeze(tt), f = wx.field(q, tt, b.from);
@@ -116,8 +130,15 @@ export function outlookFor(w: SimView, exact = false): Outlook {
       if (winds.size > 200000) winds.clear();
       winds.set(k, v);
     }
+    return v;
+  };
+  const wind = (p: Vec, t: number) => {
+    if (exact) { const m = Math.round(t * 2), b = breeze(m / 2), f = wx.field(p, m / 2, b.from); return { kt: b.kt * f.k * landLee(p, b.from), from: (b.from + f.turn + 360) % 360, gust: b.gust }; }
+    const v = cell(p, t);
     return { kt: v.kt * leeAt(p, v.leeFrom), from: v.from, gust: v.gust }; // (the lee at the point itself, off its own grid)
   };
+  /** wind's lee made ready a cold grid point a step (leeSteps), for a plan worked out between frames. */
+  const windSteps = function* (p: Vec, t: number): Generator<void, void, void> { if (!exact) yield* leeSteps(p, cell(p, t).leeFrom); };
   // (the chop as developed as the day's wind will have made it then: World.seaDurationAt)
   const sea = (p: Vec, t: number) => { const c = current(p, t); return w.sea.at(p, windOnWater(wind(p, t), c), c, q => current(q, t), w.seaDurationAt(t)); };
   const chops = new Map<string, { hs: number; tp: number }>();
@@ -134,14 +155,14 @@ export function outlookFor(w: SimView, exact = false): Outlook {
   return {
     t0: gun, stations: w.tide?.stations ?? null, breeze, wind, current,
     windOnWater: (p, t) => windOnWater(wind(p, t), current(p, t)),
-    sea, chop,
+    sea, chop, windSteps,
     chopSteps: function* (p: Vec, t: number) {
       const k = `${Math.round(p.x / 400)},${Math.round(p.y / 400)},${Math.round(t / 10)}`;
       if (chops.has(k)) return;
       const q = { x: Math.round(p.x / 400) * 400, y: Math.round(p.y / 400) * 400 }, tq = Math.round(t / 10) * 10;
       const c = current(q, tq); yield;
-      const ww = windOnWater(wind(q, tq), c); yield;
-      const to = V(ww.from + 180); current({ x: q.x - to.x * 1000, y: q.y - to.y * 1000 }, tq); yield; w.sea.fetch(q, ww.from); yield; w.seaDurationAt(tq); yield; // (the water the waves came through: sea.at's)
+      yield* windSteps(q, tq); const ww = windOnWater(wind(q, tq), c); yield;
+      const to = V(ww.from + 180); current({ x: q.x - to.x * 1000, y: q.y - to.y * 1000 }, tq); yield; yield* w.sea.fetchSteps(q, ww.from); w.seaDurationAt(tq); yield; // (the water the waves came through: sea.at's)
       chop(p, t);
     }
   };

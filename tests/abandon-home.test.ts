@@ -42,6 +42,9 @@ function sailHome(s: Partial<Settings>, seed: number, far = false) {
 describe('the AI boats after racing is called off', () => {
   for (const [name, s, seed, far] of [
     ['a westerly over the limit', { windKind: 'west', windKt: 26 }, 7, false],
+    // (Seed 9 too, 18 Nov 2026: before main's crowded-mark AI, seed 7's race went differently and had Red clip the shore
+    // for about 0.7 s on her way home, ai.ts homeCourse. Skipper Model has that repro; a second westerly keeps watch)
+    ['a westerly over the limit, seed 9', { windKind: 'west', windKt: 26 }, 9, false],
     ['a northerly over the limit (the harbour on a lee shore)', { windKind: 'north', windKt: 26 }, 7, false],
     ['from north of Alcatraz in a flood (the island between them and home, the current setting onto it)', { windKind: 'west', windKt: 20, current: 'flood' }, 4, true]
   ] as const) it(name, () => {

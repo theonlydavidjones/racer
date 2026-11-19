@@ -74,6 +74,8 @@ export type Command =
   /** Lift the ram off the tiller pin (on standby it still holds the tiller): the tiller's free. */
   | { k: 'pilot'; op: 'lift' }
   | { k: 'pilot'; op: 'adjust'; d: number }
+  /** The navigator's plan for Nav to steer (World.planTarget): where it was planned to, and its plotted course's corners. */
+  | { k: 'navPlan'; to: Vec; pts: Vec[] }
   /** The outboard. */
   | { k: 'motor'; op: 'tilt' | 'stop' | 'swivel' | 'stow' }
   | { k: 'motor'; op: 'start'; retireFirst: boolean }
@@ -147,9 +149,10 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'lights': u.lightsOff = c.off; return;
     case 'lessonReady': w.lesson?.ready(w.isNight()); return;
     case 'sail': w.setSail(c.sail, c.up); return;
+    case 'navPlan': w.setNavPlan(c.to, c.pts); return;
     case 'pilot':
-      if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode);
-      else if (c.op === 'standby') pilotStandby(w.pilot);
+      if (c.op === 'engage') { pilotEngage(u, w.pilot, c.mode); w.setNavPlan(null); } // (engaged afresh: the page sends the plan from where she is now)
+      else if (c.op === 'standby') { pilotStandby(w.pilot); w.setNavPlan(null); }
       else if (c.op === 'lift') pilotLift(w.pilot);
       else if (c.op === 'tack') w.pilotTack();
       else pilotAdjust(u, w.pilot, c.d);

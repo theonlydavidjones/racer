@@ -243,22 +243,38 @@ export function waveLength(T: number, h: number): number {
 }
 
 /** The water's depth below MLLW (m) at a point on NOAA's chart: the middle of its depth area's band; failing that, the nearest sounding within 200 m. */
-export function chartDepth(p: Vec): number | null {
+/** The chart's depth areas as the sim's coordinates, each polygon with its bounding box, and the soundings: worked out
+ * once (chartDepth converted every ring of every polygon on each call, 5–9 ms). */
+let ENC_DEPTH: { mid: number; polys: { rings: Vec[][]; x0: number; y0: number; x1: number; y1: number }[] }[] | null = null, ENC_SOUND: { q: Vec; d: number }[] = [];
+function encDepth() {
+  if (ENC_DEPTH) return ENC_DEPTH;
   const E = enc as unknown as { depth: { d: number; d2?: number; p: number[][][] }[]; soundings: number[] };
   const bands = E.depth.map(b => b.d).filter((d, i, a) => a.indexOf(d) === i).sort((a, b) => a - b);
-  for (const band of E.depth) {
-    for (const poly of band.p) {
+  ENC_DEPTH = E.depth.map(band => {
+    const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10;
+    return { mid: Math.max(0, (band.d + deep) / 2), polys: band.p.map(poly => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      const rings = poly.map(enc1 => { let x = 0, y = 0; const ring: Vec[] = [];
+        for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; const q = LL(y / 1e5, x / 1e5); ring.push(q); x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y); }
+        return ring; });
+      return { rings, x0, y0, x1, y1 };
+    }) };
+  });
+  for (let i = 0; i < E.soundings.length; i += 3) ENC_SOUND.push({ q: LL(E.soundings[i + 1] / 1e5, E.soundings[i] / 1e5), d: E.soundings[i + 2] / 10 });
+  return ENC_DEPTH;
+}
+export function chartDepth(p: Vec): number | null {
+  for (const band of encDepth()) {
+    for (const poly of band.polys) {
+      if (p.x < poly.x0 || p.x > poly.x1 || p.y < poly.y0 || p.y > poly.y1) continue;
       let inside = false;
-      for (const enc1 of poly) {
-        let x = 0, y = 0; const ring: Vec[] = [];
-        for (let i = 0; i < enc1.length; i += 2) { x += enc1[i]; y += enc1[i + 1]; ring.push(LL(y / 1e5, x / 1e5)); }
+      for (const ring of poly.rings)
         for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const a = ring[i], b = ring[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside; }
-      }
-      if (inside) { const deep = band.d2 ?? bands.find(d => d > band.d) ?? band.d + 10; return Math.max(0, (band.d + deep) / 2); }
+      if (inside) return band.mid;
     }
   }
   let best: number | null = null, bd = 200;
-  for (let i = 0; i < E.soundings.length; i += 3) { const q = LL(E.soundings[i + 1] / 1e5, E.soundings[i] / 1e5), d = hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = E.soundings[i + 2] / 10; } }
+  for (const s of ENC_SOUND) { const d = hypot(s.q.x - p.x, s.q.y - p.y); if (d < bd) { bd = d; best = s.d; } }
   return best;
 }
 
@@ -557,6 +573,41 @@ export class SeaField {
     const a = ok(i, j), b = ok(i + 1, j), c = ok(i, j + 1), d = ok(i + 1, j + 1);
     if (a === null || b === null || c === null || d === null) return here();
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+  }
+
+  /**
+   * fetch made ready a ray at a time, for the planner's slices (sim/outlook.ts chopSteps): each cell fetch would read, its
+   * number worked out by fetchAt's sum in fetchAt's order and kept under fetch's key, so fetch then finds them all and
+   * answers the same to the last bit. Cold, a cell held one slice for up to 44 ms from Mile Rock (by Gashouse Cove, the
+   * fine map's 43 rays at each of four nodes), against the page's 20.
+   */
+  *fetchSteps(p: Vec, from: number): Generator<void, void, void> {
+    const fine = fineFetch(p), basin = inBasin(p), g = fine ? 10 : 150, w = Math.round(from / 2) * 2, step = fine ? 2 : 6;
+    const self = this;
+    function* warm(key: string, at: Vec): Generator<void, void, void> {
+      if (self.cache.get(key) !== undefined) return;
+      let num = 0, den = 0;
+      for (let a = -42; a <= 42; a += step) { const c = Math.cos(a * D2R); num += fetchRay(at, w + a, fine) * c * c; den += c; yield; }
+      if (self.cache.get(key) !== undefined) return; // (filled meanwhile, by a fetch between the slices)
+      if (self.cache.size > 60000) self.cache.clear();
+      self.cache.set(key, num / den);
+    }
+    // (the nodes fetch reads: the same tests, in the same order)
+    const node = (i: number, j: number): { key: string; at: Vec } | null => {
+      const c = { x: i * g, y: j * g };
+      return fineFetch(c) !== fine || inBasin(c) !== basin ? null : { key: `${w}:${g}:${i}:${j}`, at: c };
+    };
+    const x = Math.round(p.x), y = Math.round(p.y), here = { key: `${w}:1:${x}:${y}`, at: { x, y } };
+    if (!fine) { const n = node(Math.round(p.x / g), Math.round(p.y / g)); if (n) yield* warm(n.key, n.at); return; } // (no node: fetch works it out at p, uncached)
+    const H = fineHarbor(p)!, i = Math.floor(p.x / g), j = Math.floor(p.y / g);
+    const seen = (ni: number, nj: number) => {
+      const dx = ni * g - p.x, dy = nj * g - p.y, n = Math.ceil(hypot(dx, dy) / 1);
+      for (let k = 0; k <= n; k++) if (walled(H, { x: p.x + dx * k / Math.max(1, n), y: p.y + dy * k / Math.max(1, n) })) return false;
+      return true;
+    };
+    const ns = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]].map(([a, b]) => seen(a, b) ? node(a, b) : null);
+    for (const n of ns) if (n) yield* warm(n.key, n.at);
+    if (ns.some(n => n === null)) yield* warm(here.key, here.at);
   }
 
   /**

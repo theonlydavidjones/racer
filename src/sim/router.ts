@@ -173,7 +173,7 @@ export function routeLeg(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, ma
  * (sim/navigator.ts passageLive) instead of holding a frame up for a second or two. */
 /** `limit`: an arrival (minute since epoch UTC) another plan already makes. A point that couldn't get there sooner even
  * at OPTIMISTIC over the ground is dropped, and the search ends there: it can't lose a quicker route. */
-export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE, limit = Infinity): Generator<void, SailResult, void> {
+export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 30, maxMin = 360, grain: Grain = FINE, limit = Infinity, giveUp = false): Generator<void, SailResult, void> {
   const STEP_MIN = grain.step, HEADING_STEP = grain.heading, SECTOR = grain.sector;
   const nodes: Node[] = [{ p: { ...a }, t: t0, side: 0, parent: -1, turn: '', kt: 0, cur: 0 }];
   let front = [0], best = -1;
@@ -195,7 +195,28 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
   // sailLeg): that arrival is kept as the time to beat, and the front searches on until it beats it or passes it. Taken
   // as the end at once, a light-air case (Horseshoe Bay to Yellow Bluff, 25 Nov 15:30, 6 kt) took the rules' 221 min
   // where the front, searching on, got there in 131. STALL is an estimate: docs/CONSTANTS.md)
-  const STALL = 10; let nearD = dist(a, b), nearStep = 0, bound: { k: number; r: SailResult; t: number } | null = null;
+  // (and, asked to (`giveUp`: only the passage's direct try, with a try stretch by stretch to follow), a front that has
+  // lost the way, given up: no nearer the mark for GIVE_UP minutes, no time to beat from a rescue
+  // or from the rules' plan, fallen back by more than half the ground it had made, and none of its points now descended
+  // from the point that made its last gain: the way that was getting there has died out of the front. The passage then
+  // tries the way round the land stretch by stretch, as it does when this try fails. The lost one: from Mile Rock, some departures' fronts came within ~130 m of Gashouse Cove's
+  // way in, lost it, fell back ~3.8 km across the Bay and searched it to maxMin, 360 minutes, every rescue ashore or
+  // blocked: ~25 s of the page's thread for an answer the stretches gave in ~4 (the passage panel's plan missed its 120 s
+  // three runs in four). A front that is waiting is kept, however it's set back: stemming a spring ebb into the Gate in
+  // 4 kt (25 Nov, 14:30) the front is carried backward from the start and gets through on the turn at 168 minutes; its
+  // last gain is the start, and every point descends from that: given up on the stall and the retreat alone (Deep
+  // Physics' review), that passage couldn't get there. And one waiting without falling back: from Coyote Point to the
+  // Gate at 07:30 in 14 kt the front lay 500-700 m off the Gate for 70 minutes against the flood, the way of its last
+  // gain pruned out of the front meanwhile, and got through at 168: given up on the stall and the dead way alone, it
+  // couldn't either. Each test alone cut a real passage; the two together cut neither. But a long foul tide can still
+  // make both hold for a front that is waiting (Raccoon Strait eastbound against the ebb in 5 kt, 25 Nov 15:00: given up
+  // at 218 min where it arrives at 328: the review's second pass): so it's asked only where the passage tries again
+  // stretch by stretch after, and a front cut wrongly costs a little time, not the answer. GIVE_UP and the half are
+  // estimates: docs/CONSTANTS.md)
+  const STALL = 10, GIVE_UP = 3 * STALL;
+  // (line[n]: the gain a node's way descends from; a node is on the gaining way if line[n] === gains)
+  const line = [0]; let gainNode = 0, gains = 0;
+  let nearD = dist(a, b), nearStep = 0, gainStep = 0, bound: { k: number; r: SailResult; t: number } | null = null;
   const beatBy = () => Math.min(limit, bound ? bound.t : Infinity);
   for (let step = 0; step * STEP_MIN < maxMin && best < 0 && t0 + step * STEP_MIN < beatBy(); step++) {
     const sectors = new Map<number, Node>(); // sector → the point kept there (only those are stored: the rest are many)
@@ -204,6 +225,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
       // point, four cold ones ran a slice to 32 ms from Mile Rock, its budget 6)
       const n = nodes[i];
       if (o.chopSteps) { yield* o.chopSteps(n.p, n.t); } // (the chop's cell made ready a piece a slice, cold)
+      if (o.windSteps) { yield* o.windSteps(n.p, n.t); } // (the lee there made ready a cold grid point a slice)
       const w = windOn(o, n.p, n.t); yield; const c = o.current(n.p, n.t), ch = o.chop(n.p, n.t);
       // (becalmed here, under 0.5 kt on the water: she can't sail, but the tide still carries her. The front keeps her,
       // drifting the minute on the same board with no turn, so a hole in the breeze doesn't delete the routes through it:
@@ -224,7 +246,7 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
       }
       let tried = 0;
       for (const [twa, sd] of cand) {
-        if (++tried % 6 === 0) yield; // (and between a point's headings: each one's exact check against the land and the piers, clear; a point's 30-odd ran a slice long)
+        if (++tried % 3 === 0) yield; // (and between a point's headings: each one's exact check against the land and the piers, clear, and its speed in the chop, solved cold: six of them held a slice to 13 ms from Mile Rock, 18 Nov 2026)
         const h = w.from - sd * twa, v = twa === twa ? chopSpeed(w.kt, twa, ch.hs, ch.tp) : 0; // (sd +1: wind from starboard, starboard tack/jibe)
         // a tack or jibe costs its time, drifting with the current: the minute's sailing is that much shorter
         const turn: Node['turn'] = v && n.side && sd !== n.side ? (twa < 90 ? 'tack' : 'gybe') : '', lost = turn ? manoeuvreS(turn, w.kt, ch.hs) : 0;
@@ -251,16 +273,18 @@ export function* routeLegSteps(o: Outlook, a: Vec, b: Vec, t0: number, arrive = 
       }
     }
     if (best >= 0) break;
-    front = []; for (const nd of sectors.values()) { front.push(nodes.length); nodes.push(nd); }
+    front = []; for (const nd of sectors.values()) { front.push(nodes.length); line[nodes.length] = nd.parent === gainNode ? gains : line[nd.parent]; nodes.push(nd); }
     if (!front.length) return yield* (bound ? finish(bound.k, true, undefined, bound.r) : finish(0, false, 'land'));
     let k = front[0]; for (const i of front) if (dist(nodes[i].p, b) < dist(nodes[k].p, b)) k = i;
     const dk = dist(nodes[k].p, b);
-    if (dk < nearD - 10) { nearD = dk; nearStep = step; }
+    if (dk < nearD - 10) { nearD = dk; nearStep = gainStep = step; gainNode = k; gains++; }
     else if ((step - nearStep) * STEP_MIN >= STALL) {
       const n = nodes[k], r = yield* sailLegSteps(o, n.p, b, n.t, 'middle', undefined, arrive, Math.max(10, maxMin - (n.t - t0)));
       if (r.ok && (!bound || n.t + r.minutes < bound.t) && trackClear(r.path, b, arrive)) bound = { k, r, t: n.t + r.minutes }; // (the rules sample every 10 s: a pier can slip between)
       nearStep = step; // (and tries again after another stall, from wherever the front has got to)
     }
+    // (lost: see GIVE_UP. Checked after the step's rescue, which may yet give it a time to beat)
+    if (giveUp && !bound && limit === Infinity && (step - gainStep) * STEP_MIN >= GIVE_UP && dk - nearD > 0.5 * (dist(a, b) - nearD) && !front.some(i => i === gainNode || line[i] === gains)) return yield* finish(k, false, 'time');
     yield;
   }
   if (best >= 0 && (!bound || nodes[best].t <= bound.t)) return yield* finish(best, true);

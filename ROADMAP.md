@@ -149,6 +149,8 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v208 (18 Nov, main b4334c09):** shallow waves (#454: the chop at the depth's group speed), the router's give-up fixes (Deep Physics' reviews), lying to after racing is called off, the setup chart's lee warm-up, the ten-race-mean budget for AI and rules changes. perf-ab clean against v207. Held out: FTUE's first run (reverted again). v209 is collecting.
+
 **v206 (18 Nov):** the tiller's travel to the after deck (46.5° hard over, fitted to three photos; #437) with the AI's helm to the stall near a boat and its first-mark fix; the boat editor's colors (#354); push-off reasons and the sourced sternway drag (#458); Nav home's way in and the navigator layer; the cold current and the pump fix; the club burgees and five club bases; shore-pinned and sea-born (#456, #457); rules incidents; the outboard's start under 5 s. Held: shallow waves (#454, cleared, v207), FTUE's first run (back once its inset cost is fixed).
 
 **v206 (18 Nov):** tiller travel to the deck's stop and the AI's helm (#437), the boat editor's groups, picker and colorways
@@ -191,6 +193,12 @@ sources. Each shipped item is added there when it's published.
 4. Each bug gets a test that reproduces it before it's fixed.
 5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
 6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+   Also parked (the Coordinator, 19 Nov): **the unanswered-hail duck** (Rules, branch ai-keepclear-hail, c59e42c7). On
+   main, W never ducks S when her hail goes unanswered (rules-finish). The branch fixes it with a keep-clear-first state
+   for a boat owing turns, but the 92-race census read 300 fouls vs main's 295 and 30 touches vs 26 (sign test p 0.77,
+   0.58). It moved penalties to the marks: 76 within 35 m vs 62. A boat owing turns waited up to 30 s in the mark
+   traffic before turning. To do: no keep-clear-first inside a mark's zone, then census again. Its three W–S stalled-hail
+   checks stay it.fails, for the hail lead time and the rule-10 ratchet.
 7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
    (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
    data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
@@ -649,7 +657,7 @@ sources. Each shipped item is added there when it's published.
    - **the compass:** a white tick on the heading tape at the line's square heading, beside the wind's blue one, so the
      gap between them is the bias;
    - **sighting down the line:** from either end, in the cockpit view, the line against the wind.
-8z. **The cabin-top instrument on a taller mount** (owner, 15 November; not urgent; later, Crew Figures; earlier Boat Detail): "I'm having trouble seeing
+8z. **DONE (15 Nov, 4f410526): the cabin-top instrument on a taller mount** (owner, 15 November; shipped as the unit's own black stand, taller and sturdier, no separate riser, after a post, a teak block and a 5 cm riser were tried): "I'm having trouble seeing
    the cabin top instrument over the hatch door. let's put it on a mount that's two or three inches taller." Raise it
    5–8 cm on a bracket, readable over the hatch boards from the helm; pictures to the owner before it ships.
 9a. **The bow profile, true to the class plans** (owner, 14 November; accuracy; not for now, to slot when the owner says;
@@ -1916,7 +1924,7 @@ Also asked for:
 
 - **The called turn's effect on the crew** (owner, 15 Nov): experienced crews mostly anticipate a tack or jibe; a novice crew needs the call to move in time and clear the boom. The call (Space) speeds the crew's reaction by skill; an uncalled jibe with a novice crew risks the boom and a slow sheet. Crew Model designs first, owner OKs.
 - **Sound, as one holistic effort** (owner, 15 Nov: "much later"): spoken or sounded hails ("Ready about", "Tacking!", "Jibe-ho!"), with the boat's and the Bay's sounds. Not before the physics and racing are dialed in.
-- **Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.
+- ~~**Rig tuning:** mast rake, shroud tension, pre-bend from the mast heel, forestay sag; each in the physics.~~ Done (built and live, the owner, 18 Nov): the rig tunes in the boat editor and the coach's rig line (tests/rigtune).
   - **The boom's place on a beat** (next for Deep Physics, after the beat angle in chop; Deep Physics, 15 Nov): the main's working angle (trim.ts SAILS.main.aoa 22°) holds the boom 6–8° out at 6–12 kt, where North's guides center it (about 200 mm to leeward under 6 kt). So the model wants the traveler car down where sailors keep it in the middle or to windward. Fix it with the weather-helm and rake recalibration (#345), since the angle feeds helmNeeded and the polar.
 - **A race strategist** in the course view before each race, there to teach, not to win the game for you: the day's
   conditions and how they'll change, the favored side and course options (one plan, or several when it's uncertain), the
@@ -2096,6 +2104,29 @@ Done: wind chop from the wind over the water and the fetch on the real coastline
 - ~~**Duration:** the chop takes time to build when the breeze fills in~~ (done: CEM's duration-limited growth, run up through the day's own wind from the calm morning; a set strength has been blowing for hours). Later: a sea that lingers as the wind drops.
 - **Pitching in the physics** (today it's visual): hobby-horsing in a short chop, and steering harder through it.
 - **Archived buoy data for a past race day** (with real past races), and the ocean wind sea through the Gate as its own component.
+- ~~**Shallow-water waves: length and speed for the depth**~~ (done, Bay East, branch shallow-waves: each component's
+  wavenumber by linear dispersion at the reference place's chart depth and the tide, eased in, its phase and its groups
+  carried on where you are. Off the Cityfront, 15 m, an 18 s swell is 212 m long and runs at 11.8 m/s, not 506 m and
+  28 m/s; the chop is deep there and unchanged.) Still to do:
+  - **Depth-limited growth of the chop** (sea.ts: Hs and Tp lower over shoal water, g·d/U² below about 5; the
+    Coordinator: after beat-chop lands, its own PR, with Deep Physics' agreement on what seaway.ts reads). The
+    coefficients from Young & Verhagen 1996 (Coastal Engineering 29) checked against the paper, or else the USACE
+    Coastal Engineering Manual's (EM 1110-2-1100, Part II-2). With it, the deep-water lengths still in sea.ts and
+    seaway.ts (the physics review of shallow-waves): sea.ts onCurrent's dispersion (the breaking caps, Hs ≤ 0.1·L, and
+    `steep`, the HUD's "steep chop"), groupSpeed in the current's stretch of the fetch, harborSwell's depth without the
+    tide; seaway.ts awAt's λ = gT²/2π and waveYaw's k = 4π²/(gT²). Each the local depth's, as the field's are the
+    reference place's.
+  - **True refraction** (crests bending toward a shoal across the field): the field is a sum of plane waves, one
+    direction each, the same everywhere, so it can't. It needs a field for each place (or rays traced from the Gate).
+    And with it each place's own depth: racing, the field takes the course's water's (its line and marks, by the swell
+    at each), cruising the Central Bay's, one depth for all the water you see. (A depth that followed her boat ran the
+    far water past as it changed: a sum of plane waves can't change its lengths in one place only.)
+  - **The depth varying across the water** (the Coordinator, 16 Nov 2026): one depth a World for now, so a boat sailing
+    into the South Bay's or San Pablo Bay's shoal water doesn't meet their shorter, steeper chop. It comes with Deep
+    Physics' (b), the old sea dying and a new one growing, where the field can change without sweeping the far water.
+  - **The depths are the ENC's band middles** (a band 9–18 m deep reads 13.6 m). Open question: the chart reads 2.7 m
+    (its 1.8–3.6 m band) for the Berkeley Circle at 37.857 N, 122.345 W; NOAA ENC (src/geo/data/enc-chart.json). Is
+    that the band the Circle is in, or the polygon's edge? To check against chart 18649.
 - **Shoaling** over Harding Rock, Point Blunt and the bar.
 
 ### What the water looks like (the cues sailors actually use)
@@ -2198,6 +2229,8 @@ The **piano** is the row of cam cleats on the aft face of the cabin top (the bri
 - Main halyard tackle: drawn as a gooseneck downhaul until redrawn; to be relabelled and led to port.
 
 ## Later
+
+- **A hit off a boat's center turns her** (owner question; the physics review of the hull contact, #460, 18 Nov 2026): struck near her bow or stern, a hull mostly swings rather than slides sideways (effective mass there about a third of hers). The contact now moves boats only along the line between the hulls, with no yaw; and no friction between them yet, as there's no sourced value for wet topsides. Build it?
 
 - **Wrecks** (built 14 November, docs/WRECK-PROPOSAL.md section 8; to publish. Next: the shore's kinds and the charted rocks from the NOAA chart, so a seawall or a rock grades as one. Was: designed, the owner's answers 14 November; Marinas; 6–10 h):
   the contacts in its table as wrecks, damage or notes, the damage cutoffs ESTIMATES. A wreck ends the outing with a

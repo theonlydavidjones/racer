@@ -1,5 +1,6 @@
+import { HelmFeed, passageLive } from './sim/navigator';
 import { lineNotes } from './boat/coach';
-import { FULL_RUDDER, HELM_MAX } from './boat/balance';
+import { FULL_RUDDER, HELM_MAX, HELM_STALL } from './boat/balance';
 import type { CoachStep } from './sim/coachRun';
 import { trimNotesHtml } from './ui/trimNotes';
 import './styles.css';
@@ -10,7 +11,8 @@ import { BoatPanel } from './ui/boatPanel';
 import { Fleet } from './ui/fleet';
 import { loadLog, type LogEntry } from './boat/logbook';
 import { harborAt, inBasin } from './geo/marina';
-import { HULL_COLORS, BRIGHT_FINISH, sailNo, type BoatSpec } from './boat/spec';
+import { sailNo, type BoatSpec } from './boat/spec';
+import { boatSummaryText } from './ui/readouts';
 import { ReplayView, type ReplayClip } from './replay/replayView';
 import { RaceReplay } from './replay/raceReplay';
 import { Labels } from './render/labels';
@@ -23,7 +25,8 @@ import { MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './sett
 import { FLEET } from './boat/boat';
 import { currentSeason, seasonById, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
 import { seasonHtml } from './ui/season';
-import { nextRace, paintSeasonView, seasonCardHtml } from './ui/seasonView';
+import { tideLine } from './ui/tideLine';
+import { nextRace, paintSeasonView, seasonCardHtml, upcomingRace } from './ui/seasonView';
 import { burgeeCanvas } from './render/burgees';
 import { raceDisplayName } from './club/raceNames';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
@@ -46,6 +49,7 @@ import { LINE_NAME } from './ui/lines';
 import { autoAcross, openCrewChoices, showCrewRow, toggleCrewOpen } from './ui/crewWords';
 import { PerfMeter } from './ui/perfMeter';
 import { ToolsTray, type Tool } from './ui/toolsTray';
+import { weatherHelmChip } from './ui/weatherHelm';
 import { degAndPoint, turnWords } from './core/compass';
 import { WIND_KIND_LABEL, type WindKind } from './environment/wind';
 import { sunPosition } from './environment/sun';
@@ -434,6 +438,21 @@ function showTiller(): void {
   setText($('tillerLab'), w.user.lashed != null ? `Tiller lashed · ${Math.abs(t) < 0.04 ? 'amidships' : `${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'stbd' : 'port'}`} · drag to move it`
     : Math.abs(t) < 0.04 ? 'Tiller · centered' : `Tiller · ${Math.round(Math.abs(t) * FULL_RUDDER)}° to ${t > 0 ? 'stbd' : 'port'} · turning ${t > 0 ? 'to port' : 'to starboard'}`);
 }
+// Weather helm at the foot of the tiller guide's dashed line (ui/weatherHelm.ts): shown with the guide, while you hold the
+// tiller; Tools (or its key) turns it off.
+const WH_TAU = 3;
+let whAvg: number | null = null, whT = 0;
+function showWeatherHelm(): void {
+  const el = $('tgWh'), on = S.weatherHelm !== false && tillerHeld && w.running && !w.paused;
+  if (!on) { whAvg = null; if (!el.hidden) el.hidden = true; return; }
+  // (the rudder she's held on with, deg to windward; its average over about the last five seconds of the race's own
+  // time, so it keeps pace at any speed of time and on a slow frame)
+  const now = w.user.weatherHeld ?? 0, dts = Math.max(0, Math.min(5, w.t - whT)); whT = w.t;
+  whAvg = whAvg == null ? now : whAvg + (now - whAvg) * (1 - Math.exp(-dts / WH_TAU));
+  const c = weatherHelmChip(whAvg), cls = c.tone ? `tg-wh ${c.tone}` : 'tg-wh';
+  if (el.className !== cls) el.className = cls;
+  setText(el, c.text); if (el.hidden) el.hidden = false;
+}
 // Tiller bar: drag the handle left/right. Let go and it springs back to centre.
 let barDrag = false;
 {
@@ -458,6 +477,9 @@ const gl = $('gl');
 // swing across the whole window, in step with the cursor. An ESTIMATE of what feels right: 30 degrees is now 0.32 of the
 // width out)
 const TILLER_SPAN = 0.5;
+// (the guide's two yellow lines: the rudder's stall, balance.ts RUDDER_STALL, each side of center, placed by the cursor's
+// own mapping so the cursor reaches them just as the blade stalls: past them it brakes more than it turns)
+$('tillerGuide').style.setProperty('--tg-stall', `${HELM_STALL / HELM_MAX * TILLER_SPAN * 100}%`);
 let tillerHeld = false, toldTiller = false, panning = false;
 let lastCursorX: number | undefined;
 function tillerFromCursor(x: number): void { setTiller((x - innerWidth / 2) / (innerWidth * TILLER_SPAN) * HELM_MAX); }
@@ -714,6 +736,17 @@ $('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closes
 $('bCoach').onclick = () => openTrimNotes();
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
+/** The foul-tide word (ui/tideLine.ts): once a leg, a few seconds after the start or the rounding, when the tide's against
+ *  her down the leg and an inshore track saves real time. It sums a few hundred steps, so once, never a frame. */
+let tideLeg = -1, tideRace: unknown = null;
+function tideWord(u: typeof w.user): void {
+  if (tideRace !== w) { tideRace = w; tideLeg = -1; }
+  if (w.freeSail || w.t < 5 || w.t - legT < 12 || u.leg === tideLeg || w.rounding) return;
+  tideLeg = u.leg;
+  const m = w.nextMark(u); if (!m) return;
+  const line = tideLine(u, m.p, { currentAt: p => w.currentAt(p), windHere: p => w.windHere(p, undefined, false) });
+  if (line) toast(line, 6000);
+}
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(): void {
   document.body.classList.toggle('inLesson', !!w.lesson && w.running); // (the lesson's line at the top: 11-lessons.css)
@@ -722,6 +755,7 @@ function coachTick(): void {
   const u = w.user;
   if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
   // (the coach weighs her lines beside the race, in the worker, twice a second: its newest word, when one's come)
+  tideWord(u);
   const got = host.coach({ preStart: !w.freeSail && w.t < 0, justRounded: w.t - legT < 12 });
   if (!got) { tipFade(); return; }
   coachShown = got;
@@ -932,7 +966,11 @@ function pilotButton(): void {
 const STANDBY_MSG = 'Pilot on standby: the ram\'s still on the tiller pin, holding it. Take the helm, or lift the pilot off.';
 let pilotShown = '';
 /** Each frame: the steering keys turn the pilot's course (20°/s held), and the control head shows what it's doing. */
+/** On Nav, the navigator's plan to the helm when something calls for one (sim/navigator.ts HelmFeed). */
+const helmFeed = new HelmFeed(passageLive);
+function navPlanTick(): void { const c = helmFeed.tick(w); if (c) send(c); }
 function pilotTick(dt: number): void {
+  navPlanTick();
   const p = w.pilot, on = p.mode !== 'off' && w.running;
   if (on && !w.paused) { const d = (held.has('steerStbd') ? 1 : 0) - (held.has('steerPort') ? 1 : 0); if (d) send({ k: 'pilot', op: 'adjust', d: d * 20 * dt }); }
   const chip = $('bPilot'), hide = !w.running || !w.cruising;
@@ -1278,6 +1316,7 @@ function runAction(a: Action): void {
     case 'viewOverhead': setView(2); break;
     case 'cycleView': setView((viewMode + 1) % 3); break;
     case 'windLadder': windShow(!S.windLadder); break;
+    case 'weatherHelm': S.weatherHelm = S.weatherHelm === false; saveSettings(S); toast(`Weather helm at the tiller guide ${S.weatherHelm ? 'on' : 'off'}.`, 1600); break;
     case 'restartStart': if (S.mode === 'drill') results.restartDrill(); break;
     case 'pointsRose': roseShow(!roseOn()); break;
     case 'perfMeter': perf.toggle(); break; // (the frame-time readout, ui/perfMeter.ts: Shift+F unless rebound (F9 until the owner's no-F-keys ruling, 15 Nov); ` went to the wind indicator)
@@ -1430,6 +1469,7 @@ const toggleCourse = () => { if (w.cruising) navToggle(); else courseView.toggle
 const toolKey = (a: Action) => keymap.label(a);
 const TOOLS: Tool[] = [
   { id: 'windLadder', label: 'Wind in the air', icon: 'wind', key: () => toolKey('windLadder'), on: () => !!S.windLadder, act: () => runAction('windLadder') },
+  { id: 'weatherHelm', label: 'Weather helm', icon: 'helm', key: () => toolKey('weatherHelm'), on: () => S.weatherHelm !== false, act: () => runAction('weatherHelm') },
   { id: 'flowView', label: 'Flow over the sails', icon: 'flow', key: () => toolKey('flowView'), on: () => flowPanel.open, act: () => runAction('flowView') },
   { id: 'sailBand', label: 'Sail band', icon: 'band', key: () => toolKey('sailBand'), on: () => band.open, act: () => runAction('sailBand') },
   { id: 'course', label: 'Course chart', icon: 'chart', key: () => toolKey('course'), on: () => courseView.isOpen || navView.isOpen || (w.cruising && chart.isOpen), act: toggleCourse },
@@ -1463,7 +1503,7 @@ function frame(now: number): void {
   // (a new destination, from the chart or a command's answer: the course drawn to it)
   if (w.dest !== shownDest) { shownDest = w.dest; if (w.running) view.refreshCourse(w); }
   setHidden($('bPushOff'), !(w.running && (!!w.user.docked || !!w.user.handled?.held))); homeButton(); ghostNote(); ensignButton(); linesUi(); // (held head to wind on the bow line: push off again to let her go)
-  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showLines(); coachTick(); windTick(); if (tools.open) tools.refresh(); drills.drillTick(); drills.roundTick();
+  keyLook(dt); lookLabel(); tillerSpring(dt); pilotTick(dt); showTiller(); showWeatherHelm(); showLines(); coachTick(); windTick(); if (tools.open) tools.refresh(); drills.drillTick(); drills.roundTick();
   const t1 = performance.now();
   boatLesson.tick();
   // (the full chart covers the whole screen, opaque: the 3D scene behind it isn't drawn, nor its labels. The race sails
@@ -1500,11 +1540,10 @@ function lookOnly(a: BoatSpec, b: BoatSpec): boolean {
   return strip(a) === strip(b);
 }
 function boatSummary(): void {
-  const b = S.boat, colour = [...HULL_COLORS, BRIGHT_FINISH].find(c => c[1] === b.hull.upper)?.[0] ?? '', p = b.perf;
+  const b = S.boat;
   const pick = $('boatPick') as HTMLSelectElement;
   pick.innerHTML = S.boats.map(x => `<option value="${x.id}"${x.id === b.id ? ' selected' : ''}>${(x.name || 'Unnamed').replace(/</g, '&lt;')} · ${sailNo(x)}</option>`).join('');
-  const cond = [p.cleanedWeeks ? `bottom ${p.cleanedWeeks} wk` : 'clean bottom', p.mainAge === 'new' && p.jibAge === 'new' ? 'new sails' : 'used sails', p.mast === 'wood' ? 'wooden mast' : ''].filter(Boolean).join(', ');
-  $('boatSum').textContent = `${colour} ${b.hull.material === 'wood' ? 'wooden' : 'fiberglass'} hull; ${cond}.`;
+  $('boatSum').textContent = boatSummaryText(b);
   morph($('boatTiles'), S.boats.map(x => { const [ctry, n] = splitNo(sailNo(x)); return tile(n, x.name || 'Unnamed', x.hull.upper, { country: ctry, on: x.id === b.id, data: { boat: x.id }, title: `${sailNo(x)} ${x.name || 'Unnamed'}${x.id === b.id ? `: ${$('boatSum').textContent}` : ''}` }); }).join(''));
   setup.setupHeads();
 }
@@ -1753,7 +1792,7 @@ function seasonApply(series: Series, no: number): boolean {
 /** The season's overview (ui/seasonView.ts): race `no` (or the next one) set up and shown, beside the calendar and the standings. */
 function openSeason(id: string, no?: number): void {
   const series = seasonById(id) ?? currentSeason(); if (!series) return;
-  const res = seasonResults(series.id), pick = no ?? nextRace(series, res) ?? series.races.filter(r => !r.abandoned).at(-1)?.no ?? null;
+  const res = seasonResults(series.id), pick = no ?? nextRace(series, res) ?? (upcomingRace(series) ? null : series.races.filter(r => !r.abandoned).at(-1)?.no ?? null); // (a race still to come is shown as such, not race 1 again)
   const ok = pick != null && seasonApply(series, pick);
   if (!ok) seasonPick = null;
   $('seasonBack').textContent = nav.backLabel() || '‹ Race';

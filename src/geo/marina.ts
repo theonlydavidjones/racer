@@ -1017,15 +1017,21 @@ const ROUTE_CLEAR = 2.5;
 /** How far in from an entrance's middle the way in may start, m: the water in clear sight of the gap. */
 const MOUTH_R = 40;
 const harborFloods = new Map<string, { key: (q: Vec) => string; from: Map<string, string | null>; at: Map<string, Vec>; open: (q: Vec) => boolean; mouthOf: Map<string, Vec> }>();
+/** harborFloodSteps' step, in hit tests (each ~20-30 µs among the moored boats): about a millisecond and a half. */
+const FLOOD_WORK = 60;
 function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<typeof harborFloods.get>>, void> {
   let f = harborFloods.get(H.id); if (f) return f;
-  let work = 0; // (a yield every few hundred cells looked at: the flood is 75–385 ms at once, a frame's worth many times over)
+  // (a yield every FLOOD_WORK hit tests, counted as they're made: the flood is 75–385 ms at once, a frame's worth many times
+  // over; counted in cells, a step of 256 near the mouth, each cell's 17 tests and its sight line's 160, held a slice of
+  // the page's thread to 13 ms from Mile Rock, 18 Nov 2026)
+  let work = 0;
   const G = 1.5, key = (q: Vec) => `${Math.round(q.x / G)},${Math.round(q.y / G)}`;
   const ring = Array.from({ length: 8 }, (_, k) => [Math.sin(k * Math.PI / 4), Math.cos(k * Math.PI / 4)]);
   const openMemo = new Map<string, boolean>();
   const open = (q: Vec) => {
     const k = key(q); let v = openMemo.get(k);
     if (v == null) {
+      work += 17;
       v = harborAt(q) === H && !hitsHarbor(q) && !hitsMooredBoat(q);
       for (const r of [ROUTE_CLEAR / 2, ROUTE_CLEAR]) for (const [sx, sy] of ring) if (v) { const p = { x: q.x + sx * r, y: q.y + sy * r }; v = !hitsHarbor(p) && !hitsMooredBoat(p) && inBasin(p); }
       openMemo.set(k, v);
@@ -1037,24 +1043,25 @@ function* harborFloodSteps(H: Harbor): Generator<void, NonNullable<ReturnType<ty
   // (the straight run from an entrance's middle to a cell: nothing solid on it, so the way in starts in the gap between
   // the breakwater ends, not behind one: the physics review, 17 Nov 2026, found West Harbor's start 86 m from its
   // entrance with a breakwater between them, and Richmond's clipping the west breakwater's tip)
-  const inSight = (e: Vec, q: Vec) => { const n = Math.max(1, Math.ceil(hypot(q.x - e.x, q.y - e.y) / 0.25)); for (let i = 0; i <= n; i++) { const p = { x: e.x + (q.x - e.x) * i / n, y: e.y + (q.y - e.y) * i / n }; if (hitsHarbor(p) || hitsMooredBoat(p)) return false; } return true; };
+  // (a yield along it too: a sight line near the mouth is up to 160 tests among the moored boats, each tens of µs)
+  const inSight = function* (e: Vec, q: Vec): Generator<void, boolean, void> { const n = Math.max(1, Math.ceil(hypot(q.x - e.x, q.y - e.y) / 0.25)); for (let i = 0; i <= n; i++) { if ((work += 8) >= FLOOD_WORK) { work = 0; yield; } const p = { x: e.x + (q.x - e.x) * i / n, y: e.y + (q.y - e.y) * i / n }; if (hitsHarbor(p) || hitsMooredBoat(p)) return false; } return true; };
   for (const e of H.exits) {
     // (the mouth: every open cell within MOUTH_R of the entrance's middle in clear sight of it, so the flood starts on all
     // the water that opens off the gap; or, with none in sight, the open cell nearest it)
     // (anywhere in the basin: an entrance's middle may lie between the breakwater ends, outside the basin's own outline)
     const seen: Vec[] = []; let best: Vec | null = null, bd = Infinity;
     for (let x = Math.floor(H.box.x0 / G) * G; x <= H.box.x1; x += G) for (let y = Math.floor(H.box.y0 / G) * G; y <= H.box.y1; y += G) {
-      if (++work % 256 === 0) yield;
+      if (++work >= FLOOD_WORK) { work = 0; yield; }
       const q = { x, y }, dd = hypot(q.x - e.x, q.y - e.y); if (!open(q)) continue;
       if (dd < bd) { bd = dd; best = q; }
-      if (dd < MOUTH_R && inSight(e, q)) seen.push(q);
+      if (dd < MOUTH_R && (yield* inSight(e, q))) seen.push(q);
     }
     for (const q of seen.length ? seen : best ? [best] : []) if (!from.has(key(q))) { from.set(key(q), null); at.set(key(q), q); mouthOf.set(key(q), e); fr.push(q); }
   }
   while (fr.length) {
     const nx: Vec[] = [];
     for (const p of fr) for (const [dx, dy] of [[G, 0], [-G, 0], [0, G], [0, -G]]) {
-      if (++work % 64 === 0) yield;
+      if (++work >= FLOOD_WORK) { work = 0; yield; }
       const q = { x: p.x + dx, y: p.y + dy }, k = key(q);
       if (from.has(k) || !open(q)) continue;
       from.set(k, key(p)); at.set(k, q); nx.push(q);

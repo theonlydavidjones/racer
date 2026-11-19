@@ -53,6 +53,7 @@ function rippleNormals(): THREE.Texture {
 
 function setup(): GL {
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.debug.checkShaderErrors = import.meta.env.DEV; // (as scene.ts: no wait on each program's compile outside the dev server)
   renderer.setSize(W, H, false); renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // as the main view (three-setup.ts)
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(27, W / H, 0.5, 20000);
