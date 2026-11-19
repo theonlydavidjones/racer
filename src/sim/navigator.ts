@@ -1,5 +1,5 @@
 import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
-import { clearTo, heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
+import { STRUCTURE_CLEAR, clearTo, heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -9,7 +9,7 @@ import type { SimView } from './host';
 import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from './outlook';
 import { FINE, routeLegSteps, trackClear, type Grain } from './router';
 import { groundLaylines, landDist, routeAroundSteps, sailLegSteps, type SailResult } from './routing';
-import { landAlong } from '../geo/shore';
+import { landAlong, wharfNearest } from '../geo/shore';
 import { harborAt, harborRouteSteps, slipAt } from '../geo/marina';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
@@ -165,10 +165,21 @@ export function helmPoints(pn: PassageNow): Vec[] {
     // too narrow for the pilot (helmPlan.ts narrowOn), else the track's own corner is kept. Cut without that, rounding
     // the Berkeley Pier ruin's west tip 8 m inside the tolerance, a chord ran across the tip, and a meter's shift in the
     // track flipped the pilot's verdict on it to a gap too narrow: Deep Physics, 19 Nov 2026)
-    if (far < 0 && most >= 0 && (landAlong(p[a], p[b]) !== Infinity || narrowOn(p[a], p[b]))) far = most;
+    if (far < 0 && most >= 0 && (landAlong(p[a], p[b]) !== Infinity || narrowOn(p[a], p[b]) || nearerThanTrack(p, a, b))) far = most;
     if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
   }
   return p.filter((_, i) => keep[i]);
+}
+/** Does the chord from track point a to b come nearer a pier, wharf or breakwater than the track it stands for, under
+ * STRUCTURE_CLEAR? (The router keeps WHARF_CLEAR off them; cut within the tolerance, a chord through the 45 m gap at
+ * the Berkeley Pier deck's end passed 10 m off its tip where the track rounded it wider, and she sailed it at 9.98 m.) */
+function nearerThanTrack(p: Vec[], a: number, b: number): boolean {
+  const off = (q: Vec) => wharfNearest(q, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR;
+  let track = STRUCTURE_CLEAR;
+  for (let i = a; i <= b; i++) track = Math.min(track, off(p[i]));
+  const L = dist(p[a], p[b]), n = Math.max(1, Math.ceil(L / 5));
+  for (let k = 1; k < n; k++) if (off({ x: p[a].x + (p[b].x - p[a].x) * k / n, y: p[a].y + (p[b].y - p[a].y) * k / n }) < track - 1) return true;
+  return false;
 }
 /** helmPoints' tolerance (m): about one of her lengths, well inside World.planTarget's 30 m for a corner made, so the
  * pilot's course between two corners is the plotted one to within a boat length (an estimate, not a measured figure). */
