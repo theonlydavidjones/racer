@@ -131,6 +131,47 @@ const VIEWS = [
     if (extra > 50 || growT > 4 || growH > 30) { over = true; console.log(`LEAK: ${extra} geometries on the GPU beyond the scene's, textures +${growT}, heap +${growH.toFixed(0)} MB over ${seen.length - 2} races`); }
   }
   // (PERF_JSON: the rows and the races' memory as data, for perf-ab.cjs)
+  // The start-up views (ROADMAP 8v2, the owner, 18 Nov 2026: "a lot of lag, in boat editor, at beginning of cruises. it
+  // tends to resolve after a while"): each in a page of its own, fresh from the start page as a player comes to it. The
+  // first 30 frames after the editor opens or a cruise sets off: their JS's mean is the view's JS (perf-ab.cjs gates it as
+  // the others'), their worst beside it. And a cruise on Nav, once under way: the page working the passage's live plan in
+  // its slices the whole way (r253), a standing load, measured as the race views are. (PERF_NO_START: without them.)
+  const START = [
+    { name: 'editor_open', first: true, act: async q => { await q.evaluate(() => document.querySelector('[data-home="fleet"]').click()); await q.waitForTimeout(1500);
+      await q.evaluate(() => document.querySelector('[data-f="tab"][data-v="boats"]').click()); await q.waitForTimeout(600); return () => q.evaluate(() => document.querySelector('.fcard').click()); } },
+    { name: 'cruise_start', first: true, cruise: true, act: async q => { await q.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await q.waitForTimeout(3000);
+      return () => q.evaluate(() => document.getElementById('bGo').click()); } },
+    { name: 'cruise_nav', cruise: true, act: async q => { await q.evaluate(() => document.querySelector('[data-home="cruise"]').click()); await q.waitForTimeout(3000);
+      await q.evaluate(() => document.getElementById('bGo').click()); await q.waitForTimeout(4000);
+      return async () => { await q.evaluate(() => window.__host().send({ k: 'pilot', op: 'engage', mode: 'nav' })); await q.waitForTimeout(8000); }; } },
+  ];
+  // (the race's page closed first: left drawing beside them, it shares the software GL and its frames land in theirs)
+  if (!process.env.PERF_NO_START && START.some(V => !only.length || only.includes(V.name))) await p.close();
+  for (const V of process.env.PERF_NO_START ? [] : START) {
+    if (only.length && !only.includes(V.name)) continue;
+    const q = await b.newPage({ viewport: { width: Math.round(1280 * sc), height: Math.round(760 * sc) } }); q.setDefaultTimeout(180000);
+    q.on('pageerror', e => errs.push(`${V.name}: ${e.message}`));
+    await q.addInitScript(() => { const raf = window.requestAnimationFrame.bind(window); window.__frames = new Map();
+      window.requestAnimationFrame = cb => raf(t => { const t0 = performance.now(); cb(t); window.__frames.set(t, (window.__frames.get(t) || 0) + performance.now() - t0); }); });
+    await q.addInitScript(() => { let a = 12345; Math.random = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
+    // (a fixed day and passage for the cruises, Alcatraz to Crissy Field in the west wind, as scripts/check/pilot-engage.cjs sails it)
+    await q.addInitScript(c => { localStorage.setItem('fbsim-settings-v2', JSON.stringify(c ? { windDay: 2, traffic: 1, mode: 'sail', sailFrom: 'alcatraz', sailTo: 'crissy', windKind: 'west', windKt: 12, tideDate: '2026-07-11', tideTime: '15:00' } : { windDay: 2, traffic: 1 })); }, !!V.cruise);
+    // (the race in its worker, as the published page sails it: in the page's thread, ?inproc, the World's own start-up
+    // lands in the first frames, which a player's page never does)
+    await q.goto((process.env.PERF_URL || 'http://localhost:5173/').replace(/[?&]inproc\b/, '')); await q.waitForTimeout(5000);
+    const go = await V.act(q);
+    await q.evaluate(() => window.__frames.clear()); await go();
+    let fr;
+    if (V.first) { await q.waitForFunction(() => window.__frames.size >= 31, null, { timeout: 300000 }); fr = (await q.evaluate(() => [...window.__frames.values()])).slice(0, 30); }
+    else { await q.evaluate(() => window.__frames.clear()); await q.waitForFunction(() => window.__frames.size >= 10, null, { timeout: 300000 }); fr = (await q.evaluate(() => [...window.__frames.values()])).slice(1, 10); }
+    const info = await q.evaluate(() => { const i = window.__renderer.info; return { calls: i.render.calls, tris: i.render.triangles, programs: i.programs.length, geo: i.memory.geometries, tex: i.memory.textures }; });
+    const nav = V.cruise ? await q.evaluate(() => window.sim().pilot?.mode) : undefined;
+    if (V.name === 'cruise_nav' && nav !== 'nav') errs.push(`cruise_nav: the pilot isn't on Nav (${nav})`);
+    const r = { js: fr.reduce((a, x) => a + x, 0) / fr.length, worst: Math.max(...fr), step: 0, render: 0, ...info };
+    console.log(`${V.name.padEnd(19)} ${String(r.calls).padStart(6)} ${String(r.tris).padStart(9)} ${String(r.programs).padStart(6)} ${String(r.geo).padStart(4)} ${String(r.tex).padStart(4)}   ${r.js.toFixed(1).padStart(5)} (${V.first ? `the first 30 frames' mean; the worst ${r.worst.toFixed(0)}` : 'under way'})`);
+    rows.push({ view: V.name, ...r });
+    await q.close();
+  }
   if (process.env.PERF_JSON) require('fs').writeFileSync(process.env.PERF_JSON, JSON.stringify({ rows, races: seen, errs, race }));
   console.log('ERRORS:', errs.join('\n') || 'none'); await b.close();
   process.exit(over || errs.length ? 1 : 0);
