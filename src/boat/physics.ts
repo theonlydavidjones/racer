@@ -386,7 +386,17 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
     // her AI: the physics review. The rudder's induced drag below the stall is the missing piece.)
     const most = ai?.urgent ? HELM_STALL : 1, quick = ai?.urgent ? Math.min(STALL_TURN * flow, Math.max(flow, HANDLING.maxTurnRate)) : flow;
     const lead = err - r0 * tau, lim = Math.sign(lead) === Math.sign(err) ? Math.max(quick, rateFor(Math.sign(lead))) : quick;
-    rate = clamp(lead * 1.6, -lim, lim);
+    // (below steerage way, STEERAGE, asked for the same turn rate per degree of error as with way on, any error over a
+    // degree took the most turn the flow gives, the helm hard over: her tiller swung from full helm one side to full
+    // helm the other four to eight times a minute under a knot in light air. Under STEERAGE she asks only for the turn
+    // rate the helm she'd hold at steerage way gives her now, so a small error takes a little helm, a big turn full
+    // helm, and the tiller drawn is the turn she makes. (That a helmsman steers so is an ESTIMATE, as STEERAGE is.) About
+    // to touch a boat (rule 14, ai.ts urgent), her quickest turn, whatever her speed. Sculling toward close-hauled (rule
+    // 42.3(d)) isn't scaled by the flow either: a pumped tiller makes its own, so stopped head to wind in a tack she
+    // sculls round as before)
+    const steerFlow = STEERAGE_FLOW * (aheadK + HANDLING.asternRudder * (1 - aheadK)); // (astern, the blade works less well: as flow)
+    const gain = ai?.urgent ? 1 : Math.min(1, lim / steerFlow); // (lim: the flow's turn, or sculling's where 42.3(d) allows it)
+    rate = clamp(lead * 1.6 * gain, -lim, lim);
     const need = (rate - balRate - motRate) / Math.max(1e-6, maxRate); // the AI holds whatever helm the boat needs
     rudder = Math.sign(need) * Math.min(most, helmFor(Math.abs(need)));
     flowMost = Math.max(flow, quick); // (at the stall the flow turns her faster than `flow`: that isn't sculling, as yours)
@@ -1110,6 +1120,8 @@ function onPiles(b: Boat, pier: string, closing: number, endOn: boolean, hit: Ve
 /** Below this speed through the water (m/s), about a knot, her rudder barely bites and she goes where the stream and wind
  * set her (ESTIMATE: no source found for a Folkboat; a long keel's rudder needs some way to answer) */
 const STEERAGE = 0.5;
+/** Her rudder's turn rate at steerage way, STEERAGE, ahead (deg/s), as dynamics.ts flowTurnRate: with STEERAGE, an ESTIMATE. */
+const STEERAGE_FLOW = flowTurnRate(STEERAGE);
 /** Her outboard driving her: running, down and in gear (idling in neutral it gives no steerage). */
 const motorDrives = (b: Boat) => !!b.motor?.running && b.motor.down && b.motor.gear !== 'N';
 /** Move her over the ground (through the water plus the current), and stop her on a dock or the shore. */
