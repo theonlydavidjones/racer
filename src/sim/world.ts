@@ -648,7 +648,7 @@ export class World {
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
-    if (!this.freeSail) this.tuneAtDock();
+    this.tuneAtDock(); // (cruising too: tuned once for the day, not following each puff: the owner, 19 Nov 2026)
     if (!this.freeSail) this.log = new RaceLog(this);
     this.committeeFrom = this.C.base;
   }
@@ -656,8 +656,9 @@ export class World {
   /** The wind the forecast gives for the race (kt): the course-wide breeze over the first hour from the gun (outlook.ts). */
   forecastKt = 0;
   /**
-   * Racing, each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
-   * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5). A boat set up in the Boat panel keeps her
+   * Each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
+   * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5), and cruising nobody retunes for each puff
+   * either (the owner, 19 Nov 2026: "maybe once per sail"); only the crew's turns on the jumpers change it after. A boat set up in the Boat panel keeps her
    * own tune. With none, you're set to North Sails' setting for the forecast (rigTune.ts presetFor); the club boats
    * mostly are too, a few on Heikkilä Sailmaker's tune for the day and a few on the setting next to the right one (a crew
    * that read the forecast differently). Their own random draw, so the race's other draws (and replays) don't move.
@@ -665,12 +666,18 @@ export class World {
   private tuneAtDock(): void {
     const o = outlookFor(this);
     let n = 0, sum = 0; for (let m = 0; m <= 60; m += 10) { sum += o.breeze(this.gunUtc + m).kt; n++; }
-    const kt = this.forecastKt = sum / n, right = presetFor(kt);
+    // (a lesson or a Case: the wind she'll sail it in, held to its range where it's sailed (lessonKt), not the setup's;
+    // cruising, the forecast where she sails, the course's mean over the field there: the Cityfront's about 1.2, so a
+    // mean of 8 kt is near 10 under her, and a crew sets up for what they'll sail in. From her slip, the Cityfront's, as
+    // a lesson takes it. Racing keeps the course's mean, as the fleet reads the forecast.)
+    const lesson = this.settings.mode === 'lesson';
+    const here = () => this.fieldAt(this.fromSlip ? getPlace('cityfront')?.p ?? this.user : this.user).k;
+    const kt = this.forecastKt = lesson ? this.windModel.kt * (this.lessonField ?? 1) : this.freeSail ? sum / n * here() : sum / n, right = presetFor(kt);
     const r = makeRng((this.seed ^ 0x71a3e) >>> 0), order = ['light', 'medium', 'strong'] as const;
     for (const b of this.boats) {
       if (b.tune) continue;
       let t: RigTune = TUNE_PRESETS[right];
-      if (!b.isUser) {
+      if (!b.isUser && !lesson) { // (a Case's boats all on the right one: it's the rules being taught, not the tune)
         const x = r(), i = order.indexOf(right);
         if (x > 0.85) t = heikkilaFor(kt);
         else if (x > 0.7) t = TUNE_PRESETS[order[i === 0 ? 1 : i === 2 ? 1 : (r() < 0.5 ? 0 : 2)]];

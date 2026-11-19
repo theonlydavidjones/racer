@@ -22,6 +22,6 @@ export class CoachRun {
     if (this.t < COACH_EVERY && this.had) return null;
     this.t = 0; this.had = true;
     // (advice only: a slip in it never stops the race, which in the worker would send it back to the page)
-    try { return this.mem.step(w.user, w.t, ctx); } catch (e) { console.error('The trim coach failed:', e); return null; }
+    try { return this.mem.step(w.user, w.t, w.cruising ? { ...ctx, cruising: true } : ctx); } catch (e) { console.error('The trim coach failed:', e); return null; }
   }
 }
