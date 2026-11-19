@@ -1289,7 +1289,7 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   // way they faced, at the cabin top's lines it pointed forward, toward the hands, and both arms were bent backwards:
   // the owner, "these arms are backwards. poor guy")
   f.arm.forEach((a, i) => {
-    const tgt = local(p.hands[i], _p).applyQuaternion(_tq).clone();
+    const tgt = local(edgeHand(p.hands[i], shoulderAt(p, k, i)) ?? p.hands[i], _p).applyQuaternion(_tq).clone();
     // (a pose that says which way an elbow goes has it go that way, not the way the last one bent it)
     if (p.elbow?.[i]) a.root.userData.bend = a.root.userData.u1 = undefined; // (nor held to ELBOW_SPEED from it)
     ik(a, a.root.position, tgt, BONE.upper, BONE.fore, p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
@@ -1304,7 +1304,7 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
       if (!underDeck(el.x, el.y, el.z) && el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z))) return 1; // (in under the side deck is open: the winch)
       // (nor the forearm across the cabin's after edge, a hand on its top reached from the cockpit's forward corner: the
       // sprint's soak, tests/crewtransit)
-      let cab = 0; if (el.z < COCK0 + BONE.fore + 0.05) { const wr0 = par.worldToLocal(a.mid.localToWorld(_u.set(0, -BONE.fore, 0))); for (let t = 0.15; t < 0.95; t += 0.1) cab = Math.max(cab, inCabinEnd(_lp.copy(el).lerp(wr0, t))); }
+      let cab = 0; if (el.z < COCK0 + BONE.fore + 0.05) { const wr0 = par.worldToLocal(a.mid.localToWorld(_u.set(0, -BONE.fore, 0))); for (let t = 0.15; t < 0.95; t += 0.1) cab = Math.max(cab, inCabin(_lp.copy(el).lerp(wr0, t))); }
       // (nor an elbow stuck out forward of the line from shoulder to wrist, the way an elbow doesn't bend: a hand drawn in
       // close to the shoulder, turned aft to the mainsheet in a tack, folded the arm up with the elbow out in front)
       const sh = a.root.getWorldPosition(_s), wr = a.mid.localToWorld(_u.set(0, -BONE.fore, 0)), w = a.mid.getWorldPosition(_t);
@@ -1336,14 +1336,26 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
   local(p.look, _h).applyQuaternion(_tq).sub(f.head.position);
   f.head.rotation.set(Math.max(-0.6, Math.min(0.5, Math.atan2(_h.y - 0.1, Math.hypot(_h.x, _h.z)))), Math.max(-1.3, Math.min(1.3, Math.atan2(-_h.x, -_h.z))), 0);
 }
-/** How far a point is into the cabin's after end (m), from its face (aft) or its top (above); 0 if it isn't in it. */
-function inCabinEnd(q: THREE.Vector3): number {
-  if (q.z > COCK0 || q.z < COCK0 - 0.4) return 0;
+/** A hand aimed from shoulders leant forward over the cabin top down into the cockpit just aft of it, stepping down off
+ * the side deck at its forward end: the straight line from the shoulder to it goes through the cabin's after corner, and
+ * no bend of the elbow clears it (the sprint's soak, the forearm 6 to 8 cm through it, tests/crewreplay). Someone there
+ * braces on the cabin's after edge instead: the hand on the edge beside where it was going. Null where the way's clear. */
+function edgeHand(h: THREE.Vector3, sh: THREE.Vector3): THREE.Vector3 | null {
+  if (sh.z > COCK0 + 0.05 || h.z < COCK0 || sh.z < CAB0) return null;
+  let deep = 0; for (let t = 0.1; t < 0.95; t += 0.1) deep = Math.max(deep, inCabin(_lp.copy(sh).lerp(h, t)));
+  if (deep < 0.02) return null;
+  const ze = COCK0 - 0.02, u = uAtZ(ze), ax = Math.min(Math.abs(h.x), cabinHalf(u) - 0.04);
+  return V(Math.sign(h.x || sh.x) * ax, cabinTopAt(u, ax) + 0.03, ze);
+}
+/** How far a point is into the cabin (m): the least way out of it, aft through its after face, forward through its front,
+ * out through its side or up through its top; 0 if it isn't in it. */
+function inCabin(q: THREE.Vector3): number {
+  if (q.z > COCK0 || q.z < CAB0) return 0;
   const u = uAtZ(q.z), ch = cabinHalf(u), ax = Math.abs(q.x); if (ax > ch) return 0;
   // (the companionway's open: its sill's below, ground's own)
   if (ax < COMPANIONWAY.hw - 0.02 && q.z > COCK0 - COMPANIONWAY.len + 0.02) return 0;
   const top = cabinTopAt(u, ax); if (q.y > top) return 0;
-  return Math.min(COCK0 - q.z, top - q.y, ch - ax);
+  return Math.min(COCK0 - q.z, q.z - CAB0, top - q.y, ch - ax);
 }
 /** How far a point is into the after deck (m), from its top or its forward face over the cockpit's after end; 0 if not. */
 function inAfterDeck(q: THREE.Vector3): number {
@@ -1351,16 +1363,22 @@ function inAfterDeck(q: THREE.Vector3): number {
   const g = ground(q.x, q.z, q.y); return q.y >= g ? 0 : Math.min(g - q.y, q.z - COCK1);
 }
 const _lp = V(0, 0, 0), _toBoat = new THREE.Matrix4();
-/** The legs clear of the cabin's after end, the cockpit's sole and the after deck: stepping up out of the cockpit's forward
+/** The legs clear of the cabin, the cockpit's sole, the after deck and the foredeck: stepping up out of the cockpit's forward
  * corner, or sat by it, a knee bent forward the usual way went into the cabin's face, the thigh 5 to 9 cm through it;
  * getting up off one knee at a cabin-top line to go to the next, the other knee went down through the sole, 4 to 14 cm;
  * and the helm sat down on the new side after crossing in a tack, a foot still up on the after deck by the hip, the knee
- * swung round under it, through the deck, up to 17 cm (the sprint's soak, tests/crewtransit, tests/crewhelmbench). As the elbows are (apply), a leg in either is bent the other ways a knee goes (in or out to
+ * swung round under it, through the deck, up to 17 cm; on the way forward along the side deck, a knee bent in toward the
+ * cabin's side, 5 to 9 cm; and turning on the foredeck to come aft, a shin down through it, 5 to 9 cm (the sprint's soak,
+ * tests/crewtransit, tests/crewhelmbench, tests/crewreplay). As the elbows are (apply), a leg in either is bent the other ways a knee goes (in or out to
  * the side, up) until one clears it and everything else, the one that goes least into anything if none does. */
 function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vector3) => THREE.Vector3, kneeHint: (q: PoseT, i: number) => THREE.Vector3): void {
-  const par = f.root.parent; if (!par || p.hip.z < COCK0 - 0.5) return;
-  const nearEnd = p.hip.z < COCK0 + BONE.thigh * f.scale + 0.1, inC = inCockpit(Math.abs(p.hip.x), p.hip.z), nearAft = p.hip.z > COCK1 - (BONE.thigh + BONE.shin) * f.scale;
-  if (!nearEnd && !inC && !nearAft) return;
+  const par = f.root.parent; if (!par) return;
+  // (by the cabin: within a leg of it, fore and aft or out to the side)
+  const leg = (BONE.thigh + BONE.shin) * f.scale;
+  const nearEnd = p.hip.z < COCK0 + BONE.thigh * f.scale + 0.1 && p.hip.z > CAB0 - leg && Math.abs(p.hip.x) < cabinHalf(uAtZ(Math.min(COCK0, Math.max(CAB0, p.hip.z)))) + leg, inC = inCockpit(Math.abs(p.hip.x), p.hip.z), nearAft = p.hip.z > COCK1 - (BONE.thigh + BONE.shin) * f.scale;
+  // (forward of the cabin, on the foredeck: its deck all round them, its hatch and its crown)
+  const fore = p.hip.z < CAB0 - 0.2;
+  if (!nearEnd && !inC && !nearAft && !fore) return;
   const toBoat = _toBoat.copy(par.matrixWorld).invert();
   f.leg.forEach((l, i) => {
     // (how far the leg's into the cabin's end or down through the sole; and, for the other ways tried, into anything at
@@ -1373,13 +1391,15 @@ function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vec
       // and the ankle's end of the shin, and only near it; the cabin's corner, and anything at all for the other ways
       // tried, all along)
       const at = (q: THREE.Vector3, end: boolean) => {
-        if (nearEnd) { const c = inCabinEnd(q); if (c >= 0.01) into = Math.max(into, c); any = Math.max(any, c); }
+        // (in the cabin, how far in it is, not how far under its top: beside its side, the top's well above)
+        if (nearEnd) { const c = inCabin(q); if (c > 0) { if (c >= 0.01) into = Math.max(into, c); any = Math.max(any, c); return; } }
         if (nearAft && q.z > COCK1 && q.y < 0.66) { const c = inAfterDeck(q); if (c >= 0.01) into = Math.max(into, c); any = Math.max(any, c); }
+        if (fore && q.z < CAB0 && Math.abs(q.x) < halfBeam(uAtZ(q.z)) - 0.02) { const d = ground(q.x, q.z, q.y) - q.y; if (d > 0.025) into = Math.max(into, d); any = Math.max(any, d - 0.02); return; }
         if ((all || (end && q.y < 0.3)) && !underDeck(q.x, q.y, q.z) && Math.abs(q.x) < halfBeam(uAtZ(q.z)) - 0.02) {
           const d = ground(q.x, q.z, q.y) - q.y; if (d > 0.025 && inCockpit(Math.abs(q.x), q.z)) into = Math.max(into, d); any = Math.max(any, d - 0.02);
         }
       };
-      if (!all && !nearEnd && !nearAft) { at(knee, true); for (const t of [0.25, 0.5, 0.9]) at(_t.copy(knee).lerp(ank, t), true); return; } // (along it too: its ankle end can be in under a bench)
+      if (!all && !nearEnd && !nearAft && !fore) { at(knee, true); for (const t of [0.25, 0.5, 0.9]) at(_t.copy(knee).lerp(ank, t), true); return; } // (along it too: its ankle end can be in under a bench)
       for (let t = 0.4; t < 1.01; t += 0.1) at(_t.copy(hip).lerp(knee, t), t > 0.95);
       for (let t = 0.1; t < 0.95; t += 0.1) at(_t.copy(knee).lerp(ank, t), t > 0.2);
     };

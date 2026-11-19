@@ -7,12 +7,12 @@ import { DEFAULT_CREW, newCrew } from '../src/boat/crewPhys';
 import { buildCrew, syncCrew, underDeck, type Figure } from '../src/render/crew';
 import { BONE } from '../src/render/crewBody';
 import { halfBeam, uAtZ, L } from '../src/render/hull';
-import HELM_TACK from './fixtures/crew-helm-tack-14kt.json';
 
 // The sprint's soak (19 Nov 2026): the helm's thigh 5 to 7 cm into the after deck's forward edge, z 2.86 to 3.01, beating
 // in a breeze, as the helm went out from sitting toward hiking (the physics' weight from 0.6 m out to 1.1). Here the helm
 // at their place (z 2.95) goes out from sitting to hiking flat out and back in, at the race's pace (0.4 m/s), on both tacks
-// at 8, 14 and 20 kt: no bone more than crewfig's 2.5 cm into the boat (true depth), any frame.
+// at 8, 14 and 20 kt: no bone more than crewfig's 2.5 cm into the boat (true depth), any frame. (The soak's own tack,
+// replayed, is in tests/crewreplay.)
 function bones(f: Figure, step = 0.05): { name: string; p: THREE.Vector3 }[] {
   f.root.updateMatrixWorld(true);
   const w = (o: THREE.Object3D, y = 0) => o.localToWorld(new THREE.Vector3(0, y, 0)), out: { name: string; p: THREE.Vector3 }[] = [];
@@ -52,26 +52,3 @@ describe('The helm going out to hike and back, clear of the after deck (render/c
   }, 120_000);
 });
 
-// (and the soak's own tack, replayed: the race at 14 kt, Red, seed 3, 172.5 to 175.5 s, the crew's places, poses, jobs, her
-// heel and the windward side each frame as the physics had them (tests/fixtures/crew-helm-tack-14kt.json, recorded from the
-// soak's harness). The helm crossed the after deck and sat down on the new side with a foot still up on the deck by the
-// hip; the knee swung round under it, through the deck, up to 17 cm, at 174.65 to 174.82 s)
-describe('The soak\'s tack at 14 kt, replayed: the helm clear of the after deck (render/crew.ts)', () => {
-  it('every figure, every frame', () => {
-    const { spec, frames } = HELM_TACK as unknown as { spec: typeof DEFAULT_CREW; frames: { t: number; w: number; heel: number; tacking?: boolean; clock: number; roll?: unknown; people: Record<string, unknown>[] }[] };
-    const c = newCrew(spec, 'S'), cr = buildCrew(spec.helm, spec.crew, [0xc8372d, 0x2b4f8a, 0xe8b21c], 1);
-    let prev = frames[0]!.t, worst = '', wd = 0;
-    for (const [n, r] of frames.entries()) {
-      c.clock = r.clock; (c as { roll?: unknown }).roll = r.roll;
-      r.people.forEach((p, i) => Object.assign(c.people[i]!, { goal: undefined, job: null, ready: false, outUntil: 0, lean: 0 }, p));
-      syncCrew(cr, r.w, c, Math.max(1e-3, r.t - prev), false, undefined, r.heel, !!r.tacking); prev = r.t;
-      if (r.t < 173) continue; // (half a second to settle from where the figures are built)
-      for (const [who, f] of [['helm', cr.helm], ...cr.crew.map((f, j) => [`crew${j + 1}`, f] as const)] as const) for (const { name, p } of bones(f as Figure)) {
-        if (Math.abs(p.z) > L / 2 - 0.05 || Math.abs(p.x) > halfBeam(uAtZ(p.z)) - 0.02 || underDeck(p.x, p.y, p.z)) continue;
-        const d = trueDepth(p.x, p.y, p.z, 0.025);
-        if (d > wd) { wd = d; worst = `${who} ${name} ${(d * 100).toFixed(0)} cm into it at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}), ${r.t.toFixed(2)} s (frame ${n})`; }
-      }
-    }
-    expect(wd > 0.025 ? worst : '').toBe('');
-  }, 120_000);
-});
