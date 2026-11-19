@@ -149,13 +149,14 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
 }
 /** How much water she leaves outside the sweep of a boat turning circles, m: about half a length (a modelling choice). */
 const CIRCLE_BERTH = 4;
-/** The turning circle a boat is sailing: its center and the radius her hull's ends sweep (R + half a length: a little
- * more than the true √(R² + (LOA/2)²)), m; null if she isn't turning at 2°/s or more (a modelling threshold: a penalty
- * turn runs at about 3–10°/s, slower through the tack, and below 2°/s the radius, v/ω, is too uncertain to steer by; the
- * berth then drops out, and rule 14's last-moment swerve remains). R is capped at 30 m. */
-function circleOf(o: Boat): { x: number; y: number; r: number } | null {
+/** The water a boat doing her turns will sweep: the circle she's turning in (its center, and the radius her hull's ends
+ * sweep, R + half a length: a little more than the true √(R² + (LOA/2)²)), m. R = v/ω, capped at 30 m. Turning at
+ * under 2°/s (a penalty turn runs at about 3–10°/s; slower through the tack, or slowed almost to a stop by it), the
+ * radius is too uncertain to steer by: then a length's radius round where she'll be in two seconds, as she's going.
+ * Both modelling choices. */
+function circleOf(o: Boat): { x: number; y: number; r: number } {
   const rate = o.turnRate ?? 0;
-  if (Math.abs(rate) < 2) return null;
+  if (Math.abs(rate) < 2) return { x: o.x + o.vx * 2, y: o.y + o.vy * 2, r: LOA };
   const R = Math.min(30, Math.max(0.5, o.v) / (Math.abs(rate) * Math.PI / 180)), side = V(o.h + Math.sign(rate) * 90);
   return { x: o.x + side.x * R, y: o.y + side.y * R, r: R + LOA / 2 };
 }
@@ -163,17 +164,17 @@ function circleOf(o: Boat): { x: number; y: number; r: number } | null {
  * boat spin her turns would start to steer round her, a few lengths off). */
 const BERTH_LOOK = 15;
 /**
- * Steering `want`, does she pass inside the circle `o` is turning in, within BERTH_LOOK? Then the heading nearest
- * `want`, up to 45° off it, that takes her past it with CIRCLE_BERTH to spare (or, failing that, the one that passes
- * widest, if it gains two meters on `want`), else null. Only headings on her own tack (no tack or gybe for this), with
- * no shore along the way, that keep her as far from every other boat as `want` does (or 10 m): a berth that turned her
- * across a third boat or toward the beach would be no seamanship. Not an obligation: 21.2 and 44.2 put keeping clear on
- * the boat turning, and rule 14 binds this one only once it's clear the other isn't. Prudence, as sailors give a boat
- * spinning her turns room.
+ * Steering `want`, does she pass inside the water `o` sweeps doing her turns (circleOf), within BERTH_LOOK? Then the
+ * heading nearest `want`, up to 45° off it, that takes her past it with CIRCLE_BERTH to spare (or, failing that, the one
+ * that passes widest, if it gains two meters on `want`), else null. Only headings on her own tack (no tack or gybe for
+ * this), with no shore along the way, that keep her as far from every other boat as `want` does (or 10 m): a berth that
+ * turned her across a third boat or toward the beach would be no seamanship. (Not slowing when no heading clears: let
+ * go beside the circle she was the boat the turning one came round into, 11 calls on her to 15 in the berth test.) Not
+ * an obligation: 21.2 and 44.2 put keeping clear on the boat turning, and rule 14 binds this one only once it's clear
+ * the other isn't. Prudence, as sailors give a boat spinning her turns room.
  */
 function pastCircle(w: World, b: Boat, o: Boat, want: number): number | null {
   const c = circleOf(o);
-  if (!c) return null;
   const v = Math.max(b.v, 1.2), reach = v * BERTH_LOOK, need = c.r + CIRCLE_BERTH;
   const miss = (h: number) => { const u = V(h), ax = c.x - b.x, ay = c.y - b.y, s = clamp(ax * u.x + ay * u.y, 0, reach); return hypot(ax - u.x * s, ay - u.y * s); };
   const m0 = miss(want);
