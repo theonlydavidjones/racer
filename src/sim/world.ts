@@ -98,6 +98,29 @@ function solidGap(bw: Vec, st: Vec, m: Touchable): number {
   return Math.min(segPt(m.p, bw, st), segPt(m.q, bw, st), segPt(bw, m.p, m.q), segPt(st, m.p, m.q));
 }
 /**
+ * The contact's normal between a hull (bow to stern) and a mark, from the mark toward her (unit): from where they
+ * actually touch, the nearest of the pairs solidGap measures. A hull end on the committee boat's side: the side's normal,
+ * toward her; anything else (a hull end off its ends, one of its ends on her side, a round mark): from the mark's
+ * nearest point to hers. (Chosen by her middle, a bow driven into the side near its end at 45° read as off the end and
+ * lost no way, and one brushing round the end lost it as if driven into the side: the physics review, 19 Nov 2026)
+ */
+export function contactNormal(bw: Vec, st: Vec, m: Touchable): Vec {
+  const radial = (from: Vec, to: Vec): Vec => { const dx = to.x - from.x, dy = to.y - from.y, l = hypot(dx, dy); return l > 1e-9 ? { x: dx / l, y: dy / l } : { x: 0, y: 0 }; };
+  const nearOn = (p: Vec, a: Vec, b: Vec): { q: Vec; k: number } => { const ax = b.x - a.x, ay = b.y - a.y, kk = ((p.x - a.x) * ax + (p.y - a.y) * ay) / (ax * ax + ay * ay || 1), k = Math.max(0, Math.min(1, kk)); return { q: { x: a.x + ax * k, y: a.y + ay * k }, k: kk }; };
+  let best = Infinity, n: Vec = { x: 0, y: 0 };
+  // (the mark's point(s) against her hull: radial)
+  for (const e of m.q ? [m.p, m.q] : [m.p]) { const h = nearOn(e, bw, st).q, d = hypot(h.x - e.x, h.y - e.y); if (d < best) { best = d; n = radial(e, h); } }
+  if (m.q) for (const e of [bw, st]) {
+    // (her bow or stern against the committee boat's side: its normal where she's abreast of it, radial off its ends)
+    const { q, k } = nearOn(e, m.p, m.q), d = hypot(e.x - q.x, e.y - q.y);
+    if (d >= best) continue;
+    best = d;
+    if (k > 0 && k < 1) { const ax = m.q.x - m.p.x, ay = m.q.y - m.p.y, l = hypot(ax, ay) || 1, nx = -ay / l, ny = ax / l, sg = Math.sign(nx * (e.x - q.x) + ny * (e.y - q.y)) || 1; n = { x: nx * sg, y: ny * sg }; }
+    else n = radial(q, e);
+  }
+  return n;
+}
+/**
  * Rule 44.1(a): a Part 2 breach and a rule 31 touch "in the same incident" need only the Part 2 penalty. "Incident" isn't
  * defined; US Sailing Appeal 65: "The test of whether two occurrences were one or two incidents is whether the second
  * occurrence was the inevitable result of the first. Times, distances, the actions of each boat and the prevailing
@@ -1456,20 +1479,12 @@ export class World {
         const gap = solidGap(bw, st, m) - m.r - HULL_HALF_BEAM;
         if (gap < 0) {
           if (m.rule31 !== false) touching = m;
-          // bounce off: push her clear, away from the nearest point
-          const kq = m.q ? ((b.x - m.p.x) * (m.q.x - m.p.x) + (b.y - m.p.y) * (m.q.y - m.p.y)) / ((m.q.x - m.p.x) ** 2 + (m.q.y - m.p.y) ** 2 || 1) : 0;
-          const np = m.q ? (() => { const ax = m.q!.x - m.p.x, ay = m.q!.y - m.p.y, k = Math.max(0, Math.min(1, kq)); return { x: m.p.x + ax * k, y: m.p.y + ay * k }; })() : m.p;
-          const ax = st.x - bw.x, ay = st.y - bw.y, k = Math.max(0, Math.min(1, ((np.x - bw.x) * ax + (np.y - bw.y) * ay) / (ax * ax + ay * ay)));
-          const dx = bw.x + ax * k - np.x, dy = bw.y + ay * k - np.y, l = hypot(dx, dy) || 1;
-          b.x -= dx / l * (gap - 0.05); b.y -= dy / l * (gap - 0.05);
-          // (her way lost only as she sails into it: the share of her heading toward it. Lying along it, the wind pressing her
-          // sideways onto it, she slides off it as a boat does a buoy; taxed whatever her heading, she lay on mark A at 0.1
-          // m/s for five minutes in 22 kt: the stability soak, 18 Nov 2026, tests/mark-pinned.test.ts)
-          // (into it: her heading against the contact's normal. For a round mark that's from the mark to her nearest point; for
-          // the committee boat, its own side's normal, toward her: the line from its middle to hers runs square to it only when
-          // she's abreast of it, and a bow driven into its side at 45° read as lying along it: the physics review. Off its ends,
-          // as a round mark: end on, the side's normal read her as lying along it, and she lost no way on its bow: round two)
-          const sl = m.q ? hypot(m.q.x - m.p.x, m.q.y - m.p.y) || 1 : 1, sn = m.q && kq > 0 && kq < 1 ? (() => { const nx = -(m.q!.y - m.p.y) / sl, ny = (m.q!.x - m.p.x) / sl, s = Math.sign(nx * (b.x - np.x) + ny * (b.y - np.y)) || 1; return { x: nx * s, y: ny * s }; })() : { x: dx / l, y: dy / l };
+          // bounce off: pushed clear along the contact's normal (contactNormal), and her way lost only as she sails into it:
+          // the share of her heading toward it. Lying along it, the wind pressing her sideways onto it, she slides off it as
+          // a boat does a buoy; taxed whatever her heading, she lay on mark A at 0.1 m/s for five minutes in 22 kt: the
+          // stability soak, 18 Nov 2026, tests/mark-pinned.test.ts
+          const sn = contactNormal(bw, st, m), ax = st.x - bw.x, ay = st.y - bw.y;
+          b.x -= sn.x * (gap - 0.05); b.y -= sn.y * (gap - 0.05);
           const into = Math.max(0, (sn.x * ax + sn.y * ay) / (hypot(ax, ay) || 1));
           b.v *= 1 - (m.q ? 0.1 : 0.03) * into; b.lastHitT = this.t;
         }

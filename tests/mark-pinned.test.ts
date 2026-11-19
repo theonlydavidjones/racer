@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';
-import { DT, World } from '../src/sim/world';
+import { DT, World, contactNormal } from '../src/sim/world';
 
 describe('a mark touched in a breeze', () => {
   it('a boat laid along mark A by 22 kt abeam is clear of it within half a minute', () => {
@@ -47,4 +47,25 @@ describe('the committee boat run into end on', () => {
     // (0.21 m/s after 20 s; with the side's normal off its ends, 1.27, still in contact: 18 Nov 2026)
     expect(u.v, 'her way after 20 s held onto its end (m/s)').toBeLessThan(0.5);
   }, 120_000);
+  it('the contact is judged where she touches, not by her middle: near the committee boat\'s corners, a bow into its side, and one brushing round its end', () => {
+    // (the committee hull along x from p = (0, 0) to q = (12, 0); her half-length 3.82 m; her way into it is the share of
+    // her heading, bow to stern reversed, along the normal toward her: physics review, 19 Nov 2026)
+    const cb = { name: 'committee', p: { x: 0, y: 0 }, q: { x: 12, y: 0 }, r: 2 };
+    const into = (cx: number, cy: number, hx: number, hy: number) => {
+      const l = Math.hypot(hx, hy), ux = hx / l, uy = hy / l, bw = { x: cx + ux * 3.82, y: cy + uy * 3.82 }, st = { x: cx - ux * 3.82, y: cy - uy * 3.82 };
+      const n = contactNormal(bw, st, cb); return Math.max(0, (n.x * (st.x - bw.x) + n.y * (st.y - bw.y)) / 7.64);
+    };
+    // (her middle off the end, x −1, her bow over the side at x 1.7, driven in at 45°: before, 0, no way lost)
+    expect(into(-1, 4, 1, -1)).toBeCloseTo(Math.SQRT1_2, 2);
+    // (her middle abreast of the side, x 1.2, her bow brushing the end's round at (−1.5, 2.3): before, 0.707, as if
+    // driven into the side)
+    expect(into(1.2, 5, -1, -1)).toBeCloseTo(0.21, 1);
+    // (end on, straight at its bow; and lying along its side, sliding)
+    expect(into(-6, 0, 1, 0)).toBeCloseTo(1, 2);
+    expect(into(6, 2.6, 1, 0)).toBeCloseTo(0, 2);
+    // (a buoy: straight at it, and with it abeam)
+    const buoy = { name: 'A', p: { x: 0, y: 0 }, r: 1 };
+    const n1 = contactNormal({ x: 0, y: 1.5 }, { x: 0, y: 9.1 }, buoy); expect(n1.y).toBeCloseTo(1, 5);
+    const n2 = contactNormal({ x: 1.5, y: 3.8 }, { x: 1.5, y: -3.8 }, buoy); expect(n2.x).toBeCloseTo(1, 5);
+  });
 });
