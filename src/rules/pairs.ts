@@ -282,18 +282,33 @@ function poseTurning(K: PoseRing, t0: number): Pose & { turnRate: number } {
   return { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 };
 }
 
-/** Every time in her ring a turn of hers began, either way (her heading changing 1.5°/s or more, over TURN_WINDOW): the
- * oldest first. */
+/** A course change, as against the yaw a seaway gives her every wave or a helm's corrections, deg net (a modelling
+ * threshold: a few degrees either way is how a boat steers in waves, and a dodge is a turn of tens of degrees). */
+const COURSE_CHANGE = 10;
+/** Her heading smoothed over a second, deg (unwrapped from `ref`): the course she's steering, through the yaw. */
+function courseAt(R: PoseRing, t: number, ref: number): number {
+  const lo = R.t[at(R, R.n - 1)], hi = R.t[at(R, 0)]; // (within the ring: poseAt gives her oldest pose outside it)
+  let s = 0;
+  for (let k = -2; k <= 2; k++) s += wrap(poseAt(R, clamp(t + k * 0.25, lo, hi)).h - ref);
+  return ref + s / 5;
+}
+/** Each time in her ring a course change of hers began, either way, the oldest first: on her course (courseAt), every
+ * half second, a run of steps one way (a step under 0.5°, 1°/s, is holding on; up to a second of it may come inside a
+ * run) that comes to COURSE_CHANGE or more net. */
 function turnStarts(R: PoseRing): number[] {
-  const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)], W = Math.min(TURN_WINDOW, now - oldest);
-  if (W <= 0) return [];
+  const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)], ref = R.h[at(R, 0)];
   const out: number[] = [];
-  let was = false;
-  for (let t = oldest + W; t <= now + 1e-9; t += RING_DT) {
-    const turning = Math.abs(wrap(poseAt(R, t).h - poseAt(R, t - W).h) / W) >= 1.5;
-    if (turning && !was) out.push(t - W);
-    was = turning;
+  let t0: number | null = null, dir = 0, h0 = 0, still = 0, prev = courseAt(R, oldest + 0.5, ref);
+  const close = (hEnd: number) => { if (t0 != null && Math.abs(hEnd - h0) >= COURSE_CHANGE) out.push(t0); t0 = null; dir = 0; still = 0; };
+  for (let t = oldest + 1; t <= now + 1e-9; t += 0.5) {
+    const h = courseAt(R, t, ref), d = h - prev;
+    if (Math.abs(d) < 0.5) { if (t0 != null && (still += 0.5) > 1) close(prev); }
+    else if (t0 == null || Math.sign(d) !== dir) { close(prev); t0 = t - 0.5; dir = Math.sign(d); h0 = prev; }
+    else still = 0;
+    prev = h;
   }
+  // (a turn still going on when they meet: as far as her heading now, since the smoothing lags the last half second)
+  close(t0 != null && Math.sign(wrap(R.h[at(R, 0)] - ref) - (prev - ref)) === dir ? ref + wrap(R.h[at(R, 0)] - ref) : prev);
   return out;
 }
 
@@ -301,7 +316,7 @@ function turnStarts(R: PoseRing): number[] {
  * more than KEEP_CLEAR_GAP. WS Case 50: she may act on "a genuine and reasonable apprehension of collision", and a boat
  * about to pass a meter from a hull swinging round at 10–20°/s has one. A modelling choice. */
 export const APPREHENSION_GAP = KEEP_CLEAR_GAP + 1;
-/** How far ahead to follow the courses they held, s: past their closest approach, for a boat a few lengths off. */
+/** How far ahead to follow the courses they held, s, at the least: past their closest approach, for a boat a few lengths off. */
 const HELD_HORIZON = 10;
 
 /**
@@ -323,9 +338,11 @@ export function wasFailing(row: RulesBoat, kc: RulesBoat): boolean {
   const starts = turnStarts(R);
   if (!starts.length || starts[0] < K.t[at(K, K.n - 1)]) return false;
   const me = { x: 0, y: 0, h: 0 };
+  const now = R.t[at(R, 0)];
   return starts.every(t0 => {
-    const k = poseTurning(K, t0), held = straightOn(poseAt(R, t0)), theirs = straightOn(k, k.turnRate);
-    for (let tau = 0; tau <= HELD_HORIZON + 1e-9; tau += RING_DT) {
+    // (held on her course then, through the yaw; to the later of HELD_HORIZON and a few seconds past now)
+    const k = poseTurning(K, t0), p0 = poseAt(R, t0), held = straightOn({ ...p0, h: courseAt(R, t0, p0.h) }), theirs = straightOn(k, k.turnRate);
+    for (let tau = 0; tau <= Math.max(HELD_HORIZON, now - t0 + 3) + 1e-9; tau += RING_DT) {
       const a = held(tau); me.x = a.x; me.y = a.y; me.h = a.h;
       if (hullGap(me, theirs(tau)) < APPREHENSION_GAP) return true;
     }
