@@ -2,7 +2,7 @@
 // the plan's corners, which one she's making next, and when a corner's made. The World steers by it (world.ts
 // planTarget); the page keeps the same count, from its copy of the race, to know when to plan afresh (navigator.ts
 // HelmFeed).
-import { LOA, dist, dot, segPt, sub, type Vec } from '../core/math';
+import { LOA, V, brg, dist, dot, segPt, sub, wrap, type Vec } from '../core/math';
 import { landAlong, onLand, wharfNearest } from '../geo/shore';
 
 /** A corner counts as made within NAV_MADE m of it, about four of her lengths (a pilot steering for a point turns for the
@@ -142,3 +142,33 @@ export function legOpen(b: Vec, q: Vec): boolean {
 const LAND_SIDE = 8;
 /** How far she is off the leg she's on (m). */
 export const offLeg = (P: HelmPlan, b: Vec) => segPt(b, P.pts[Math.max(0, P.i - 1)], P.pts[Math.min(P.pts.length - 1, P.i)]);
+
+/** Within this of a structure (m), with the way on not open (legOpen), the pilot first takes her off it (wayOff): a
+ * pilot engaged with way on beside a pier (the physics review of nav-pier, 19 Nov 2026: a meter or two in from 8 m off
+ * Pier 45's head, she was wrecked on it or struck it; ROADMAP 8q7). Half the structures' clearance. */
+export const BESIDE = STRUCTURE_CLEAR / 2;
+/** How far ahead the way off is looked along (m): about three of her lengths. An estimate. */
+const OFF_LOOK = 3 * LOA;
+/** The headings tried for the way off, either side of the way on (deg): every 15°, nearest it first. */
+const OFF_TRY = [0, ...Array.from({ length: 12 }, (_, k) => [15 * (k + 1), -15 * (k + 1)]).flat()];
+/**
+ * The way off a structure she's beside, as a sailor takes her off before setting a course: a point OFF_LOOK ahead on
+ * the heading nearest the way on (toward `to`) along which she never comes nearer any structure than she is, the land
+ * isn't crossed, and she ends farther off (or at BESIDE). One she can sail first, outside her close-hauled angle
+ * (`from` the wind, `beat` her angle to it): beating off a pier, she'd tack beside it. Null when there's none: the
+ * pilot then hands her over.
+ */
+export function wayOff(b: Vec, to: Vec, from: number, beat: number): Vec | null {
+  const w0 = wharfNearest(b, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR, base = brg(to.x - b.x, to.y - b.y);
+  let upwind: Vec | null = null;
+  for (const a of OFF_TRY) {
+    const h = base + a, u = V(h), q = { x: b.x + u.x * OFF_LOOK, y: b.y + u.y * OFF_LOOK };
+    if (onLand(q) || landAlong(b, q) !== Infinity) continue;
+    let ok = true;
+    for (let k = 1; k <= 10 && ok; k++) { const r = wharfNearest({ x: b.x + u.x * OFF_LOOK * k / 10, y: b.y + u.y * OFF_LOOK * k / 10 }, STRUCTURE_CLEAR); if (r && r.d < w0 - 0.5) ok = false; }
+    if (!ok || (wharfNearest(q, STRUCTURE_CLEAR)?.d ?? STRUCTURE_CLEAR) < Math.min(BESIDE, w0 + 2)) continue;
+    if (Math.abs(wrap(from - h)) >= beat + 5) return q;
+    upwind ??= q;
+  }
+  return upwind;
+}

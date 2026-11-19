@@ -7,7 +7,8 @@
 // second of her clock. She must arrive (or be handed over off her harbor's mouth, bound for her slip), within half as
 // long again as planned, never strike anything, and keep off the structures; the gap alarm doesn't pass a case. The
 // fixes: the plan's corners and open legs at the helm (sim/helmPlan.ts), the pilot trusting an open leg
-// (boat/autopilot.ts navHeading), and her hand-over before a gap narrower than her turning room.
+// (boat/autopilot.ts navHeading), her hand-over before a gap narrower than her turning room, and, engaged beside a pier,
+// her way off it first (World.offPier, helmPlan.ts wayOff).
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';
@@ -61,16 +62,13 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     ['from 8 m off Pier 45\'s head to off Alcatraz (the physics review)', { x: 1988, y: 78 }, 'alcatraz', 107, 3],
     // (the second review: starts a meter or two either way were wrecked or struck, and the gap on the plan's last leg)
     ['through the Berkeley gap on the last leg, south to north', { x: 10323, y: 5173 }, { x: 10083, y: 5725 }, 107],
-    ['through it on the last leg, north to south', { x: 10083, y: 5725 }, { x: 10323, y: 5173 }, 107]
+    ['through it on the last leg, north to south', { x: 10083, y: 5725 }, { x: 10323, y: 5173 }, 107],
+    // (engaged with way on beside Pier 45's head, a meter or two along or in from the one above: wrecked on it or struck
+    // it, one with no plan from there at all, till the pilot took her off it first, ROADMAP 8q7)
+    ['beside Pier 45\'s head, 2 m in', { x: 1986, y: 78 }, 'alcatraz', 107, 3],
+    ['beside it, along it', { x: 1984, y: 80 }, 'alcatraz', 107, 3],
+    ['beside it, 6 m out', { x: 1994, y: 78 }, 'alcatraz', 107, 3]
   ];
-  // Known to fail, the second review's (19 Nov 2026): starts a meter or two along or in from the one above, with way on
-  // beside Pier 45's head, wreck or strike (one has no plan from there at all). Main does the same: a pilot engaged
-  // alongside a pier, not this branch's Berkeley Pier. Kept here so they're seen, and so a fix shows.
-  const beside: [string, { x: number; y: number }][] = [['2 m in', { x: 1986, y: 78 }], ['along it', { x: 1984, y: 80 }], ['6 m out', { x: 1994, y: 78 }]];
-  for (const [name, from] of beside) it.fails(`known to fail: Nav engaged with way on beside Pier 45's head, ${name}`, () => {
-    const r = passage(from, 'alcatraz', 107);
-    expect(r.u.wrecked, r.where).toBeUndefined(); expect(r.hits, r.where).toBe(0);
-  }, 900_000);
   for (const [name, from, to, seed, keep = 10] of cases) it(name, () => {
     const r = passage(from, to, seed);
     console.log(`${name}: ${r.where}`);
