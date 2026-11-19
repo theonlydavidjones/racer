@@ -72,12 +72,14 @@ const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
  * (the step's cost, perf-pair, is judged on it) and the page's mirror never walks it (sim/sync.ts). */
 const HELM = new WeakMap<object, HelmPlan>();
 /** The way off a structure she's beside, for each World, and when it was looked for (World.offPier). */
-const OFF = new WeakMap<object, { t: number; q: Vec | null }>();
+const OFF = new WeakMap<object, { t: number; q: Vec | null; held: Vec | null; f: number }>();
 /** How many seconds of her way on count as beside a structure (World.offPier): her turn's, a little over. An estimate
  * (docs/CONSTANTS.md). */
 const OFF_AHEAD_S = 4;
 /** A way off begun is held, with none found anew, till she's within this of it (m): two of her lengths. An estimate. */
 const OFF_LOOK_HELD = 2 * LOA;
+/** ...and for no longer than this since it was found (s): her turn's time, about. An estimate. */
+const OFF_HELD_S = 5;
 /** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
  * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
 let onPlan = false;
@@ -2713,25 +2715,31 @@ export class World {
    */
   private offPier(b: Boat, t: Vec, P: HelmPlan | null, end: Vec): Vec | null {
     let o = OFF.get(this);
-    if (o && this.t - o.t < 0.5) { if (o.q) { onPlan = true; this.pilot.goTack = null; } return o.q; }
+    if (o && this.t - o.t < 0.5) { if (o.q) { onPlan = true; if (!b.tacking) this.pilot.goTack = null; } return o.q; }
     // (looked for farther off with way on: about four seconds of it, her turn's worth, a little over)
-    const r = wharfNearest(b, o?.q ? STRUCTURE_CLEAR : Math.min(STRUCTURE_CLEAR, BESIDE + b.v * OFF_AHEAD_S));
+    const r = wharfNearest(b, o?.held ? STRUCTURE_CLEAR : Math.min(STRUCTURE_CLEAR, BESIDE + b.v * OFF_AHEAD_S));
     // (at a corner of the plan that she can't leave for the next (helmPlan.ts nextCorner), beside a structure: steered
     // for, it falls astern and the pilot turns her round toward it, through the pier off Pier 45's head)
     const stuck = !!P && P.i < P.pts.length - 1 && dist(b, t) < NAV_MADE / 2, to = stuck ? (P!.i + 1 < P!.pts.length - 1 ? P!.pts[P!.i + 1] : end) : t;
     // (an open leg is trusted only if her turn onto it keeps clear of the structure too (helmPlan.ts turnClear): legOpen
     // looks along the leg from where she is, not round her turn, and the pilot's shorter way round to a corner astern took
     // her through the wharf, the second review)
-    if (!r || (!stuck && (P ? onPlan : legOpen(b, t)) && turnClear(b, brg(t.x - b.x, t.y - b.y), this.pilot.ram))) { if (o) OFF.delete(this); return null; }
+    const open = !stuck && (P ? onPlan : legOpen(b, t));
+    if (!r) { if (o) OFF.delete(this); return null; }
+    // (the way on open, she's on it; the way off she had is kept a while, looked at afresh each step: an open leg that
+    // flickered shut again a step later lost it, and she was handed over half way round her turn, the third review)
+    if (open && turnClear(b, brg(t.x - b.x, t.y - b.y), this.pilot.ram)) { if (o) { o.t = -Infinity; o.q = null; } return null; }
     // (none now, on one begun: she's held to it, the helm already over, till she's on it, as a helmsman sees a turn through
     // rather than let go the tiller half way round, the second review, 4 m off Pier 45's face; while the way to it still
     // keeps her hull clear: a way off along a wharf converging on her, held, ran her into it)
-    const q = wayOff(b, to, b.ww.from, beatFor(b) + 1, this.pilot.ram) ?? (o?.q && dist(b, o.q) > OFF_LOOK_HELD && lineClear(b, o.q) ? o.q : null);
-    o = { t: this.t, q }; OFF.set(this, o);
+    const found = wayOff(b, to, b.ww.from, beatFor(b) + 1, this.pilot.ram);
+    const held = o?.held && this.t - o.f < OFF_HELD_S && dist(b, o.held) > OFF_LOOK_HELD && lineClear(b, o.held) ? o.held : null;
+    o = found ? { t: this.t, q: found, held: found, f: this.t } : { t: this.t, q: held, held, f: o?.f ?? this.t }; OFF.set(this, o);
     // (a tack the pilot had decided on, close-hauled the other way, would override the way off: autopilot.ts goTack)
-    if (o.q) { onPlan = true; this.pilot.goTack = null; return o.q; }
-    // (no way off: beside it, she's handed over; farther off, the pilot's own way round, as before)
-    if (r.d < BESIDE && this.pilot.mode === 'nav') this.pilot.alarm = 'Too close alongside for the pilot to get her off: she\'s yours.';
+    if (o.q) { onPlan = true; if (!b.tacking) this.pilot.goTack = null; return o.q; }
+    // (no way off: beside it, she's handed over; so too farther off with the way on open but her turn onto it not clear,
+    // or the pilot makes the very turn refused, the third review; farther off otherwise, the pilot's own way round)
+    if ((r.d < BESIDE || open) && this.pilot.mode === 'nav') this.pilot.alarm = 'Too close alongside for the pilot to get her off: she\'s yours.';
     return null;
   }
   /** A plan in from the page (commands.ts navPlan), picked up at the leg she's nearest; null drops it. */

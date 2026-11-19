@@ -35,9 +35,9 @@ function passage(from: { x: number; y: number }, to: string | { x: number; y: nu
   if (to !== 'slip') applyCommand(w, { k: 'dest', p: typeof to === 'string' ? place(to) : to, name: typeof to === 'string' ? to : 'a spot' });
   applyCommand(w, { k: 'pilot', op: 'engage', mode: 'nav' });
   const feed = new HelmFeed(v => passageNow(v as never)), first = passageNow(w as never);
-  let hits = 0, last = u.lastHitT, near = Infinity, turned = 0, h0 = u.h, alarm = '', mouth = false, clear = false;
+  let hits = 0, hitsOn = 0, last = u.lastHitT, near = Infinity, turned = 0, h0 = u.h, alarm = '', mouth = false, clear = false;
   const step = () => {
-    w.step(DT); if (u.lastHitT !== last) { last = u.lastHitT; hits++; } turned += Math.abs(((u.h - h0 + 540) % 360) - 180); h0 = u.h;
+    w.step(DT); if (u.lastHitT !== last) { last = u.lastHitT; hits++; if (w.pilot.mode !== 'off') hitsOn++; } turned += Math.abs(((u.h - h0 + 540) % 360) - 180); h0 = u.h;
     for (const e of w.drainEvents()) if (e.type === 'toast') { const m = (e as { msg: string }).msg; if (/too narrow|Too close alongside/.test(m)) alarm = m; if (/harbor mouth: she's yours/.test(m)) mouth = true; }
   };
   while (w.t < mins * 60 && !u.wrecked && w.arrivedT == null && w.pilot.mode !== 'off') {
@@ -47,7 +47,7 @@ function passage(from: { x: number; y: number }, to: string | { x: number; y: nu
   // (handed over: she has sea room, sailing on ten seconds as she was without striking anything)
   if (w.pilot.mode === 'off' && w.arrivedT == null) for (let i = 0; i < 600 && !u.wrecked; i++) step();
   const min = w.t / 60;
-  return { w, u, hits, near, alarm, mouth, turned, min, planned: first?.ok ? first.minutes : NaN, plans: feed.taken,
+  return { w, u, hits, hitsOn, near, alarm, mouth, turned, min, planned: first?.ok ? first.minutes : NaN, plans: feed.taken,
     where: `at ${u.x.toFixed(0)}, ${u.y.toFixed(0)} after ${min.toFixed(1)} min (planned ${first?.ok ? first.minutes.toFixed(0) : 'none'}), pilot ${w.pilot.mode}${alarm ? ' (' + alarm + ')' : ''}${u.wrecked ? ', wrecked: ' + u.wrecked.how : ''}, ${feed.taken} plans, nearest structure ${near.toFixed(0)} m, turned ${turned.toFixed(0)}°` };
 }
 
@@ -100,6 +100,22 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     expect(r.u.wrecked, r.where).toBeUndefined(); expect(r.hits, r.where).toBe(0);
     expect(r.w.arrivedT != null || /too narrow/.test(r.alarm), r.where).toBe(true);
     expect(r.near, `kept off the structures: ${r.where}`).toBeGreaterThan(3);
+  }, 900_000);
+  // (the fifth review's: beside a wharf or a pier's face, pinched or stopped or already within 2 m: a tack she hadn't the
+  // way to carry stalled her onto the wharf and held her there, engaged, struck eight times; a stopped boat always had a
+  // way off; and inside 2 m every turn was refused, the one away included. The pilot must never strike anything while it
+  // has her: it gets her off, or hands her over at once)
+  const tight: [string, { x: number; y: number }, Start?][] = [
+    ['pinched at 3 kn, 5.7 m off a wharf', { x: 2646, y: -122 }, { h: 252, v: 1.56 }],
+    ['converging on a wharf at 4.5 kn, 4.5 m off', { x: 3249, y: -50 }, { h: 241, v: 2.3 }],
+    ['2 m off Pier 45\'s face', { x: 1995, y: 82 }],
+    ['6 m off Pier 45\'s face, converging', { x: 1996, y: 74 }]
+  ];
+  for (const [name, from, start] of tight) it(`${name}: strikes nothing while the pilot has her`, () => {
+    const r = passage(from, 'alcatraz', 107, 60, start);
+    console.log(`${name}: ${r.where}, ${r.hitsOn} struck engaged, ${r.hits} in all`);
+    expect(r.hitsOn, r.where).toBe(0);
+    expect(r.w.arrivedT != null || /Too close alongside|too narrow/.test(r.alarm), r.where).toBe(true);
   }, 900_000);
   for (const [name, from, to, seed, keep = 10, start] of cases) it(name, () => {
     const r = passage(from, to, seed, 60, start);
