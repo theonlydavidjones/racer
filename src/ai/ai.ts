@@ -11,7 +11,7 @@ import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCro
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
-import { routeAround, routeAroundSteps } from '../sim/routing';
+import { HULL_CLEAR, routeAround, routeAroundSteps } from '../sim/routing';
 import { HARBORS, inBasin } from '../geo/marina';
 import { AI_EVERY, type World } from '../sim/world';
 
@@ -463,28 +463,54 @@ const ISLAND_BERTH = 70;
  * more on its downwind side, out of the worst of its wind shadow (the near-calm reaches about four island heights
  * downwind; Alcatraz is ~40 m high).
  */
+/** Where clearRun's side lines reach their full 25 m off her track, m (an ESTIMATE, about five boat lengths; Deep Physics
+ * used 50 m in the tiller pilot's copy on the unmerged soak branch). Lying d m off a pier, a heading turning away from it
+ * by θ passes when 50·sinθ + d ≥ 25·cosθ: about 27° right beside it, 16° from 10 m off, so close in she turns away a
+ * little more than she must, which errs safe. */
+const SIDE_FROM = 50;
 const islandBerth = (u: Vec, windFrom: number): number => ISLAND_BERTH + 230 * Math.max(0, dot(u, V(windFrom + 180)));
 /**
  * If land lies within the next 700 m toward P, the nearest heading either side of it with clear water (the side
  * that comes back toward P sooner wins a tie); null when the way is clear. Upwind, the beat logic tacks along it.
  */
-export function detour(b: Vec, P: Vec): Vec | null {
+export function detour(b: Vec, P: Vec, side = 0): Vec | null {
   const D = dist(b, P), L = Math.min(D, 700), bP = brg(P.x - b.x, P.y - b.y);
   const ray = (h: number, l: number) => { const u = V(h); return { x: b.x + u.x * l, y: b.y + u.y * l }; };
   if (clearRun(b, ray(bP, L))) return null;
+  // (with `side` (+1 right of the bearing, −1 left), that side first: a long pier's two ends can be about as good, and
+  // choosing afresh each time she'd go back and forth along it; the other side only if hers has no clear way at all)
+  if (side) for (let dev = 10; dev <= 150; dev += 10) { const q = ray(bP + side * dev, Math.min(L, 500)); if (clearRun(b, q)) return q; }
   for (let dev = 10; dev <= 150; dev += 10) {
     const c = [1, -1].map(s => ray(bP + s * dev, Math.min(L, 500))).filter(q => clearRun(b, q));
     if (c.length) return c.sort((a, z) => dist(a, P) - dist(z, P))[0];
   }
   return null;
 }
+/** The side of the bearing to P a way round q goes (+1 right, −1 left). */
+const sideOf = (b: Vec, P: Vec, q: Vec) => Math.sign(wrap(brg(q.x - b.x, q.y - b.y) - brg(P.x - b.x, P.y - b.y))) || 1;
+/**
+ * The AI's way round land toward P, and its side: `side` (her side so far) kept, else the nearer clear heading.
+ * (Still to do: chosen afresh, the side that turns least can be the long way, to a pier's shore end and back. The way
+ * by water, routeAround at 30 m, was no better a guide beside the outer Berkeley Pier: shorter from half the starts
+ * tried, longer from the rest.)
+ */
+export function wayRound(b: Vec, P: Vec, side = 0): { q: Vec | null; side: number } {
+  const q = detour(b, P, side);
+  return { q, side: q ? sideOf(b, P, q) : 0 };
+}
 /** Clear water all the way from a to b, with some room either side (her track, and 25 m to each side of it, exactly,
- * so no pier slips between samples)? With `lee` (the wind direction), out of any island's wind shadow too. */
+ * so no pier slips between samples)? With `lee` (the wind direction), out of any island's wind shadow too.
+ * (The side lines full width from SIDE_FROM on, not abreast of her: within 25 m of a long pier one of them began on its
+ * far side, so every way read blocked, detour found none, and she steered straight on through it; Deep Physics found it
+ * in the tiller pilot's copy. Nearer, they widen from her hull's clearance, HULL_CLEAR either side as routing.ts keeps,
+ * at HULL_CLEAR along, to 25 m: with her track alone checked there a way passed 1 m off the end of a pier at Pier 39.) */
 function clearRun(a: Vec, b: Vec, lee?: number): boolean {
-  const L = dist(a, b), ux = (b.x - a.x) / (L || 1), uy = (b.y - a.y) / (L || 1);
-  for (const k of [0, -25, 25]) {
-    const o = { x: -uy * k, y: ux * k };
-    if (landAlong({ x: a.x + o.x, y: a.y + o.y }, { x: b.x + o.x, y: b.y + o.y }) < Infinity) return false;
+  const L = dist(a, b), ux = (b.x - a.x) / (L || 1), uy = (b.y - a.y) / (L || 1), s0 = Math.min(SIDE_FROM, L);
+  if (landAlong(a, b) < Infinity) return false;
+  const at = (s: number, k: number) => ({ x: a.x + ux * s - uy * k, y: a.y + uy * s + ux * k });
+  for (const k of [-1, 1]) {
+    if (s0 > HULL_CLEAR && landAlong(at(HULL_CLEAR, k * HULL_CLEAR), at(s0, k * 25 * s0 / SIDE_FROM)) < Infinity) return false;
+    if (L > s0 && landAlong(at(s0, k * 25), at(L, k * 25)) < Infinity) return false;
   }
   if (lee != null) for (let s = 60; s <= L; s += 30) if (inIslandLee({ x: a.x + ux * s, y: a.y + uy * s }, lee)) return false;
   return true;
@@ -758,7 +784,16 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
-      if (refresh || ai.detour === undefined) ai.detour = detour(b, P);
+      // (a way round, once chosen, kept while it's still clear and she's not yet at it, and its side kept for the next one:
+      // with a long pier in the way its ends can be about as good, and she'd weave along it; Deep Physics, the soak)
+      if (refresh || ai.detour === undefined) {
+        const d = ai.detour, D = dist(b, P), k = Math.min(1, 700 / (D || 1)), keep = !!d && dist(b, d) > 40 && clearRun(b, d) && !clearRun(b, { x: b.x + (P.x - b.x) * k, y: b.y + (P.y - b.y) * k }); // (the way on, as far as detour looks: 700 m)
+        // (close-hauled, pinned against it by a boat to windward she'd hit tacking, she hails for room instead, as when
+        // beating below (Rule 20): seeing a way round that needed a tack from close beside Alcatraz, she tacked into the
+        // boat she'd hailed (tests/rule20-obstructions). Not when she may not hail, the island her mark and that boat
+        // fetching it (20.1's last sentence): then the way round)
+        if (!keep) { const r = pinnedAt(w, b) && !w.roomBlockedByMark(b) ? { q: null, side: ai.detourSide ?? 0 } : wayRound(b, P, ai.detourSide ?? 0); ai.detour = r.q; ai.detourSide = r.side; }
+      }
       if (ai.detour) P = ai.detour;
     } else if (b.started && refresh && (ai.detour ? landAlong(b, ai.detour) < Infinity && landAlong(b, P) < Infinity : landAlong(b, P) < 500) && !pinnedAt(w, b)) { // (pinned at it with a boat to windward: she hails instead, below)
       // beating toward a point with land close ahead on the straight line to it (a jetty, a point, the harbor's mouth
@@ -767,10 +802,10 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (and again if the turn she was laying is no longer in sight: set or sailed round to the other side of the
       // jetty from it, she'd steer for it through the stones. Seaweed Soup course 2's last beat, seed 16: a boat inside
       // the Marina's jetty held a turn outside it and struck the jetty for forty minutes)
-      ai.detour = escape(b, P);
+      ai.detour = escape(b, P); ai.detourSide = 0; // (a reaching way's side means nothing here, nor after: chosen afresh)
       if (ai.detour) P = ai.detour;
     } else if (ai.detour && b.started && landAlong(b, P) < Infinity && dist(b, ai.detour) > 25) P = ai.detour; // (on her way out of it)
-    else ai.detour = null;
+    else { ai.detour = null; ai.detourSide = 0; }
     aim = P;
     const bP = brg(P.x - b.x, P.y - b.y);
     // a tack (or gybe) she's decided on she carries out, as a sailor does: round onto the new tack's close-hauled (or
