@@ -97,11 +97,11 @@ export function tuneName(t: RigTune): 'light' | 'medium' | 'strong' | 'heikkila'
 export const rakeDeg = (t: RigTune) => Math.atan2((t.forestayMark - TUNE_DEFAULT.forestayMark) * HOUNDS_AFT_PER_M, STAY.rise) * 180 / Math.PI;
 /** Short notes in the Boat panel. */
 export const TUNE_INFO = {
-  tune: 'Set before you leave the dock: the class rules forbid adjusting the forestay, the shrouds or the mast\'s foot while racing (CR 7.40, 12.10, 6.1.5); the backstay is free, and the jumpers may be adjusted above deck. "For the forecast": racing, North Sails\' setting for the forecast wind (so a big change in the wind leaves her on the wrong tune); cruising, always right. Heikkilä Sailmaker fixes the rake and the mast foot for every wind and sets the shrouds (for 4–6 cm of sag) and the jumpers for the day: his preset here is for the wind you\'ve set up.',
-  forestayMark: 'The forestay laid along the mast, marked at the gooseneck, then measured from the deck: North Sails 131 cm, Heikkilä 135–136. Longer rakes the mast aft and moves the sails\' push aft: more weather helm.',
-  footAft: 'How hard the foot is pressed aft along its rail once the mast touches the hole\'s after edge: North Sails 22 mm in 0–8 kt, 16 in 9–14, 10 in a breeze. The deck pushes the mast\'s middle forward: pre-bend (a flatter main) and a slacker forestay (a fuller jib).',
-  shroudTurns: 'Turns on the shroud turnbuckles past the light-air setting (about 8 cm of forestay sag in light air): North Sails 1½ in medium air, 3 in a breeze. Tighter shrouds pull the forestay straighter: a flatter jib that points higher.',
-  jumperTurns: 'Turns on the jumpers\' common turnbuckle: loose in light air and a breeze, 2–3 turns in medium (North Sails). Tight curves the lower mast and leaves the top straight (a closed upper leech); loose lets the top bend (a more open one).'
+  tune: 'Set before you leave the dock: the class rules forbid adjusting the forestay, the shrouds or the mast\'s foot while racing (CR 7.40, 12.10, 6.1.5); the backstay is free, and the jumpers may be adjusted above deck. "For the forecast": racing, the setting for the forecast wind (so a big change in the wind leaves her on the wrong tune); cruising, always right. The locked-foot setting fixes the rake and the mast foot for every wind and sets the shrouds (for 4–6 cm of sag) and the jumpers for the day: its preset here is for the wind you\'ve set up.',
+  forestayMark: 'The forestay laid along the mast, marked at the gooseneck, then measured from the deck: medium setting 131 cm, locked-foot setting 135–136. Longer rakes the mast aft and moves the sails\' push aft: more weather helm.',
+  footAft: 'How hard the foot is pressed aft along its rail once the mast touches the hole\'s after edge: 22 mm in 0–8 kt, 16 in 9–14, 10 in a breeze. The deck pushes the mast\'s middle forward: pre-bend (a flatter main) and a slacker forestay (a fuller jib).',
+  shroudTurns: 'Turns on the shroud turnbuckles past the light-air setting (about 8 cm of forestay sag in light air): 1½ in medium air, 3 in a breeze. Tighter shrouds pull the forestay straighter: a flatter jib that points higher.',
+  jumperTurns: 'Turns on the jumpers\' common turnbuckle: loose in light air and a breeze, 2–3 turns in medium. Tight curves the lower mast and leaves the top straight (a closed upper leech); loose lets the top bend (a more open one).'
 };
 
 /** The middle setting: the zero each tune's own part is measured from (not what a boat with no tune sails on: that's
@@ -310,7 +310,7 @@ export function jibTune(e: TuneEffect, tws: number, backstay: number, aws: numbe
 
 /* ---------- the coach's words ---------- */
 
-const NAMES = { light: 'North Sails\' light-air setting (0–8 kt)', medium: 'North Sails\' medium setting (9–14 kt)', strong: 'North Sails\' strong-wind setting', heikkila: 'Heikkilä Sailmaker\'s tune', custom: 'your own tune' } as const;
+const NAMES = { light: 'the light-air setting (0–8 kt)', medium: 'the medium setting (9–14 kt)', strong: 'the strong-wind setting', heikkila: 'the locked-foot setting', custom: 'your own tune' } as const;
 /** A tune in words. */
 export const tuneWords = (t: RigTune) => NAMES[tuneName(t)];
 const fmtSet = (t: RigTune) => `forestay mark ${(t.forestayMark * 100).toFixed(1)} cm, foot ${Math.round(t.footAft)} mm aft, shrouds ${t.shroudTurns ? `+${t.shroudTurns} turns` : 'at the light-air setting'}, jumpers ${t.jumperTurns ? `${t.jumperTurns} turns` : 'loose'}`;
@@ -332,12 +332,12 @@ export function tuneBrief(t: RigTune, lo: number, mean: number, hi: number, jump
   if (name === want) return `She's on ${NAMES[name]}, right for ${Math.round(mean)} kt. ${sagNow}${spans} ${locked}`;
   if (name === 'heikkila' || name === 'custom') {
     const tighter = T > forestayTension(g) * 1.15, softer = T < forestayTension(g) / 1.15;
-    return `She's on ${NAMES[name]} (${fmtSet(t)}). For ${Math.round(mean)} kt North Sails would set ${fmtSet(g)}. ${sagNow} ${softer ? 'Her forestay is softer than theirs: a fuller jib with a rounder entry, more power and less pointing, and in the gusts she\'ll need the backstay on hard.' : tighter ? 'Her forestay is tighter than theirs: a flatter jib that points but has less punch through the chop.' : 'Her forestay comes out about as tight as theirs.'}${t.forestayMark > g.forestayMark + 0.01 ? ' Raked further aft: a little more weather helm.' : t.forestayMark < g.forestayMark - 0.01 ? ' More upright: a little less weather helm.' : ''}${spans} ${locked}`;
+    return `She's on ${NAMES[name]} (${fmtSet(t)}). For ${Math.round(mean)} kt the guide would set ${fmtSet(g)}. ${sagNow} ${softer ? 'Her forestay is softer than the guide's: a fuller jib with a rounder entry, more power and less pointing, and in the gusts she\'ll need the backstay on hard.' : tighter ? 'Her forestay is tighter than the guide's: a flatter jib that points but has less punch through the chop.' : 'Her forestay comes out about as tight as the guide's.'}${t.forestayMark > g.forestayMark + 0.01 ? ' Raked further aft: a little more weather helm.' : t.forestayMark < g.forestayMark - 0.01 ? ' More upright: a little less weather helm.' : ''}${spans} ${locked}`;
   }
   const order = ['light', 'medium', 'strong'], soft = order.indexOf(name) < order.indexOf(want);
   return `She's on ${NAMES[name]}, with ${Math.round(lo)}–${Math.round(hi)} kt forecast: ${soft
     ? 'too soft a rig for it. The forestay will sag (a full jib with a round entry that won\'t point), and she\'ll heel and carry more helm: get the backstay on early and hard, and the traveler down sooner.'
-    : 'too tight a rig for it. The forestay will be straight and the jib flat: it points, but has no power to drive through a lull or the chop. Keep the backstay right off, ease the jib sheet a touch, and foot for speed.'} ${sagNow} For next time, North Sails' setting: ${fmtSet(g)}. ${locked}`;
+    : 'too tight a rig for it. The forestay will be straight and the jib flat: it points, but has no power to drive through a lull or the chop. Keep the backstay right off, ease the jib sheet a touch, and foot for speed.'} ${sagNow} For next time, the guide's setting: ${fmtSet(g)}. ${locked}`;
 }
 
 /** Heikkilä's tune for a medium day (12 kt), worked out once the forestay's figures above are (for the tests). */

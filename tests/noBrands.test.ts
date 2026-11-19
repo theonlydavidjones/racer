@@ -5,8 +5,6 @@ import { describe, expect, it } from 'vitest';
 const BRAND = /North Sails|Heikkil|Dacron|Harken|Lewmar|Selden|Ronstan|Sparcraft|Dyneema|Kevlar/;
 const src = import.meta.glob('../src/**/*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 const html = import.meta.glob('../index.html', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-/** Until docs/brand-names/src-boat.patch is applied (src/boat is the physics owner's): remove this list then. */
-const PENDING = ['../src/boat/rigTune.ts', '../src/boat/condition.ts'];
 
 /** The code's lines without comments (whole-line, block and trailing ones). */
 const code = (t: string) => t.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).map(l => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
@@ -15,12 +13,8 @@ describe('no brand names in what the player reads', () => {
   it('src code strings and index.html carry none', () => {
     const hits: string[] = [];
     for (const [f, t] of [...Object.entries(src), ...Object.entries(html)]) {
-      if (PENDING.includes(f)) continue;
       const m = code(t).match(new RegExp(BRAND.source, 'g')); if (m) hits.push(`${f}: ${[...new Set(m)].join(', ')}`);
     }
     expect(hits).toEqual([]);
-  });
-  it('the pending files are still the only ones, so the list shrinks to nothing', () => {
-    for (const f of PENDING) expect(BRAND.test(code(src[f])), `${f} is clean: drop it from PENDING`).toBe(true);
   });
 });
