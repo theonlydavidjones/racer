@@ -666,12 +666,14 @@ export class World {
   private tuneAtDock(): void {
     const o = outlookFor(this);
     let n = 0, sum = 0; for (let m = 0; m <= 60; m += 10) { sum += o.breeze(this.gunUtc + m).kt; n++; }
-    const kt = this.forecastKt = sum / n, right = presetFor(kt);
+    // (a lesson or a Case: the wind she'll sail it in, held to its range where it's sailed (lessonKt), not the setup's)
+    const lesson = this.settings.mode === 'lesson';
+    const kt = this.forecastKt = lesson ? this.windModel.kt * (this.lessonField ?? 1) : sum / n, right = presetFor(kt);
     const r = makeRng((this.seed ^ 0x71a3e) >>> 0), order = ['light', 'medium', 'strong'] as const;
     for (const b of this.boats) {
       if (b.tune) continue;
       let t: RigTune = TUNE_PRESETS[right];
-      if (!b.isUser) {
+      if (!b.isUser && !lesson) { // (a Case's boats all on the right one: it's the rules being taught, not the tune)
         const x = r(), i = order.indexOf(right);
         if (x > 0.85) t = heikkilaFor(kt);
         else if (x > 0.7) t = TUNE_PRESETS[order[i === 0 ? 1 : i === 2 ? 1 : (r() < 0.5 ? 0 : 2)]];

@@ -68,6 +68,13 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     }
   });
 
+  it('a lesson or a Case is tuned for the wind she sails it in, not the setup\'s (the physics review, 19 Nov 2026)', () => {
+    const L = (o: Partial<Settings>) => new World(COURSES[0], S({ windKind: 'west', mode: 'lesson', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0, ...o }), 3, { freeSail: true });
+    expect(tuneName(L({ windKt: 6, lesson: 'breeze' }).user.tune!)).toBe('strong'); // (the breeze lesson: 15 kt where she sails)
+    const c = L({ windKt: 22, lesson: 'case', rulesCase: 1 });
+    expect(c.boats.map(b => tuneName(b.tune!)).every(n => n === 'medium')).toBe(true); // (a Case: 10–14 kt, every boat on it)
+  });
+
   // the owner's bug (19 Nov 2026): "the jumper setting changes all the time. Nobody changes the jumper settings every
   // five minutes, maybe once per sail." Cruising with no tune she was on the guide's tune for the wind under her, so in
   // a breeze near one of its marks (14.5 kt) every puff turned the dial and bent the drawn mast. Tuned at the dock, only
