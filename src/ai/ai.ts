@@ -147,6 +147,58 @@ function clearanceOn(w: World, b: Boat, h: number, only?: Boat): number {
   }
   return m;
 }
+/** How much water she leaves outside the sweep of a boat turning circles, m: about half a length (a modelling choice). */
+const CIRCLE_BERTH = 4;
+/** The turning circle a boat is sailing: its center and the radius her hull's ends sweep (R + half a length: a little
+ * more than the true √(R² + (LOA/2)²)), m; null if she isn't turning at 2°/s or more (a modelling threshold: a penalty
+ * turn runs at about 3–10°/s, slower through the tack, and below 2°/s the radius, v/ω, is too uncertain to steer by; the
+ * berth then drops out, and rule 14's last-moment swerve remains). R is capped at 30 m. */
+function circleOf(o: Boat): { x: number; y: number; r: number } | null {
+  const rate = o.turnRate ?? 0;
+  if (Math.abs(rate) < 2) return null;
+  const R = Math.min(30, Math.max(0.5, o.v) / (Math.abs(rate) * Math.PI / 180)), side = V(o.h + Math.sign(rate) * 90);
+  return { x: o.x + side.x * R, y: o.y + side.y * R, r: R + LOA / 2 };
+}
+/** How far she looks ahead along a heading for the berth, s (a modelling choice: about the time a helmsman watching a
+ * boat spin her turns would start to steer round her, a few lengths off). */
+const BERTH_LOOK = 15;
+/**
+ * Steering `want`, does she pass inside the circle `o` is turning in, within BERTH_LOOK? Then the heading nearest
+ * `want`, up to 45° off it, that takes her past it with CIRCLE_BERTH to spare (or, failing that, the one that passes
+ * widest, if it gains two meters on `want`), else null. Only headings on her own tack (no tack or gybe for this), with
+ * no shore along the way, that keep her as far from every other boat as `want` does (or 10 m): a berth that turned her
+ * across a third boat or toward the beach would be no seamanship. Not an obligation: 21.2 and 44.2 put keeping clear on
+ * the boat turning, and rule 14 binds this one only once it's clear the other isn't. Prudence, as sailors give a boat
+ * spinning her turns room.
+ */
+function pastCircle(w: World, b: Boat, o: Boat, want: number): number | null {
+  const c = circleOf(o);
+  if (!c) return null;
+  const v = Math.max(b.v, 1.2), reach = v * BERTH_LOOK, need = c.r + CIRCLE_BERTH;
+  const miss = (h: number) => { const u = V(h), ax = c.x - b.x, ay = c.y - b.y, s = clamp(ax * u.x + ay * u.y, 0, reach); return hypot(ax - u.x * s, ay - u.y * s); };
+  const m0 = miss(want);
+  if (hypot(c.x - b.x, c.y - b.y) - need > reach || m0 >= need) return null;
+  const side = Math.sign(wrap(b.ww.from - b.h)), others = (h: number) => {
+    const u = V(h), hu = V(b.h), me = { x: b.x, y: b.y, vx: b.vx - hu.x * b.v + u.x * v, vy: b.vy - hu.y * b.v + u.y * v }; // (her drift with the current kept, as clearanceOn)
+    let m = Infinity;
+    for (const x of w.boats) if (x !== b && x !== o && !x.finished && dist(x, b) < 40) m = Math.min(m, cpa(me, x).d);
+    return m;
+  };
+  const room = Math.min(10, others(want));
+  let best: number | null = null, bestM = m0 + 2;
+  for (const k of [10, -10, 20, -20, 30, -30, 45, -45]) {
+    const h = sailable(b, want + k);
+    if (Math.sign(wrap(b.ww.from - h)) !== side) continue;
+    const m = miss(h);
+    if (m < bestM && m < need) continue;
+    const u = V(h);
+    if (others(h) < room || landAlong(b, { x: b.x + u.x * reach, y: b.y + u.y * reach }) < Infinity) continue;
+    if (m >= need) return h;
+    best = h; bestM = m;
+  }
+  return best;
+}
+
 /** Of the sailable headings near `want`, the one that keeps her furthest from other boats (the nearest to `want` among near-equals). */
 // (only headings on her own tack: one across the wind is a tack or a gybe, not a way round a boat, and slow she'd
 // commit to it as a gybe the long way round; a tack away she may, with way on for it (below). Her tack is her boom's side, as physics.ts tackStep keeps it: within 4° of
@@ -933,7 +985,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
     desired = ok;
   }
   // Then what she must keep clear of, which comes before any right of way she holds over a third boat (Rule 14 too).
-  let avoiding = false;
+  let avoiding = false, berthed = false;
   const course = desired; // (where she'd steer with no boat to keep clear of)
   // (her turn answers the helm over a moment, physics.ts yawLag, in which she covers the same ground at any speed, the
   // time growing as the speed falls: v·τ = 1.46 m. She starts her keep-clear moves that much further off; and her Rule
@@ -1004,6 +1056,13 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // (and not once they're touching: that's a contact, its own incident, not a swerve to avoid one; held against her,
       // a swerve every step would keep the pair's tangle going (world.ts) and swallow a later breach of the other's)
       if (hypot(dx, dy) < 10 && (o.isUser || (hullGap(b, o) >= CONTACT_GAP && wouldTouch(b, o, lagT + 1)))) b.forced14 = o.id;
+    } else if (r.kc === o && r.rule === '21.2' && !avoiding && !berthed) {
+      // A boat doing her penalty turns: she must keep clear (21.2), but a circling boat has no course anyone can read, and
+      // a fleet sailing on into her circle meets her whichever way she turns. She steers past outside the water the
+      // circle sweeps (pastCircle), well before rule 14's late swerve above. Not `avoiding`: that's for what she must
+      // keep clear of, and it holds a tack for a hail, a turn clear of a mark and the crew's pace; this is room given.
+      const h = pastCircle(w, b, o, desired);
+      if (h != null) { desired = h; berthed = true; }
     }
   }
   for (const o of w.boats) {

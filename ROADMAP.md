@@ -193,6 +193,12 @@ sources. Each shipped item is added there when it's published.
 4. Each bug gets a test that reproduces it before it's fixed.
 5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
 6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+   Also parked (the Coordinator, 19 Nov): **the unanswered-hail duck** (Rules, branch ai-keepclear-hail, c59e42c7). On
+   main, W never ducks S when her hail goes unanswered (rules-finish). The branch fixes it with a keep-clear-first state
+   for a boat owing turns, but the 92-race census read 300 fouls vs main's 295 and 30 touches vs 26 (sign test p 0.77,
+   0.58). It moved penalties to the marks: 76 within 35 m vs 62. A boat owing turns waited up to 30 s in the mark
+   traffic before turning. To do: no keep-clear-first inside a mark's zone, then census again. Its three W–S stalled-hail
+   checks stay it.fails, for the hail lead time and the rule-10 ratchet.
 7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
    (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
    data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
