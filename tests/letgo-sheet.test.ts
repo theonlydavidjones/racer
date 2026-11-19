@@ -14,10 +14,10 @@ import { DT, World } from '../src/sim/world';
  * then eased out again over 8 s. Dead downwind with the boom amidships the main has nothing to hold it: the wind a degree
  * past her stern and it's across (physics.ts boomStep). A main that's up and let fly has its sheet let run with it.
  */
-function leave(mainUp: boolean) {
+function leave(mainUp: boolean, windDir = 274) {
   const s = slipsIn('gashouse-cove').find(x => x.id === 'gashouse-cove:572')!;
   const boat = { ...DEFAULT_BOAT, marina: s.marina, slip: s.id };
-  const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, windDir: 274, mode: 'sail', sailFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings, 2, { freeSail: true });
+  const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, windDir, mode: 'sail', sailFrom: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings, 2, { freeSail: true });
   for (let i = 0; i < 30; i++) w.step(DT);
   const u = w.user;
   const docked = boomAngle(u.ctl);
@@ -28,7 +28,7 @@ function leave(mainUp: boolean) {
   for (let t = 0; t < 60 * 150 && (u.handled || u.pushing); t++) { w.step(DT); if (u.handled?.held) w.pushOff(); }
   let least = 99;
   for (let t = 0; t < 60 * 10; t++) { w.step(DT); least = Math.min(least, Math.abs(u.boom)); }
-  return { docked, hoisted, least, twa: u.twa };
+  return { docked, hoisted, least, twa: u.twa, tack: u.tack };
 }
 
 describe('let go with the main up', () => {
@@ -43,5 +43,9 @@ describe('let go with the main up', () => {
   it('the main down in her slip, the sheet stays hauled in and made fast, the boom on her centerline (8q)', () => {
     const r = leave(false);
     expect(r.docked).toBeLessThan(10); expect(r.hoisted.boom).toBeLessThan(3); expect(r.hoisted.sheet).toBeLessThan(10);
+  }, 120_000);
+  it('on the other tack, the wind from 250 (she lies on starboard after her swing): the same, the boom out to port', () => {
+    const r = leave(true, 250);
+    expect(r.hoisted.sheet).toBeGreaterThan(65); expect(r.least).toBeGreaterThan(55);
   }, 120_000);
 });

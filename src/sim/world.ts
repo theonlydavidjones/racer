@@ -324,7 +324,9 @@ export function boatLook(spec: BoatSpec) {
 }
 /** A main that's up and let fly at the dock or on her lines: its sheet eased out to the boom on the shroud (dockStep). */
 function letRun(b: Boat, k: number): void {
-  b.ctl.mainsheet += (mainsheetFor(BOOM_STOP, b.ctl.traveller) - b.ctl.mainsheet) * k; if (b.ctlTarget) delete b.ctlTarget.mainsheet;
+  // (a sheet you've set yourself at the dock, from the sail band, is left as you set it: worked once she's let go)
+  if (b.ctlTarget?.mainsheet != null) return;
+  b.ctl.mainsheet += (mainsheetFor(BOOM_STOP, b.ctl.traveller) - b.ctl.mainsheet) * k;
 }
 
 export class World {
@@ -1990,7 +1992,7 @@ export class World {
     b.rel = wrap(b.ww.from - b.h); b.twa = Math.abs(b.rel); b.tack = b.rel >= 0 ? 'S' : 'P';
     const aw = apparent(b.ww.from, b.ww.kt, b.h, b.v - (b.astern ?? 0)); b.awa = aw.awa; b.arel = aw.arel; b.aws = aw.aws;
     const side = b.tack === 'S' ? -1 : 1, k = Math.min(1, dt * 2), up = b.rig?.mainUp ?? true;
-    b.boom += ((up ? side * 75 : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
+    b.boom += ((up ? side * BOOM_STOP : 0) - b.boom) * k; b.jib += (side * 35 - b.jib) * k; // (a sail up, let fly to the shroud; the main down, its boom sheeted in amidships, clear of the dock and her neighbors)
     if (up) letRun(b, k); // (its sheet let run with it: dockStep)
     if (out.bump != null && out.bump > HARD_BUMP && this.t - (m.cueT ?? -9) > 2) { this.cue(m, 'Bump'); this.emit({ type: 'toast', msg: `Hard bump against the dock, at ${(out.bump / 0.5144).toFixed(1)} kn.`, ms: 3000 }); }
     if (out.parted) this.emit({ type: 'toast', msg: `The ${out.parted.role === 'midships' ? 'midships line' : `${out.parted.role} line`} parted.`, ms: 4000 });
