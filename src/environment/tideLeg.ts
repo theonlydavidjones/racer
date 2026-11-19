@@ -7,7 +7,8 @@ import { brg, hypot, type Vec } from '../core/math';
  * gone inshore, where the stream is weaker: environment/current.ts shoreRelief, an estimate).
  *
  * Each track: from the start, out to the offset line by 15% of the way along the leg, along it, and back in to the mark
- * over the last 15%. Each piece is sailed in steps of `step` m: in the current at the step's middle, the boat holds
+ * over the last 15% (or each fraction in `backs`: 0 stays on the offset line until abeam of the mark and crosses
+ * straight to it, as a boat working the beach does before she crosses the stream to a mark out in it; Skipper Model). Each piece is sailed in steps of `step` m: in the current at the step's middle, the boat holds
  * her course over the ground along the piece by steering up into the cross-current (she makes good
  * √(v² − c⊥²) + c∥ along it, v her speed through the water); a cross-current as fast as she sails, or a foul one she
  * can't stem, and that track can't be sailed. A step on land, and that track's out.
@@ -36,7 +37,7 @@ export interface TideLeg {
 export const TIDE_LEG_OFFSETS = [-600, -500, -400, -300, -200, -100, 0, 100, 200, 300, 400, 500, 600];
 
 export function tideLeg(from: Vec, to: Vec, cur: (p: Vec) => Vec, speed: (h: number) => number, wet: (p: Vec) => boolean,
-  offsets: readonly number[] = TIDE_LEG_OFFSETS, step = 50): TideLeg {
+  offsets: readonly number[] = TIDE_LEG_OFFSETS, step = 50, backs: readonly number[] = [0.15]): TideLeg {
   const L = hypot(to.x - from.x, to.y - from.y);
   if (L < 1) return { off: 0, time: 0, rhumb: 0, saved: 0, path: [from, to] };
   const ux = (to.x - from.x) / L, uy = (to.y - from.y) / L, nx = uy, ny = -ux; // (starboard of the leg's direction)
@@ -56,8 +57,8 @@ export function tideLeg(from: Vec, to: Vec, cur: (p: Vec) => Vec, speed: (h: num
     return t;
   };
   let best: TideLeg | null = null, rhumb = Infinity;
-  for (const d of offsets) {
-    const path = d === 0 ? [from, to] : [from, { x: from.x + ux * 0.15 * L + nx * d, y: from.y + uy * 0.15 * L + ny * d }, { x: to.x - ux * 0.15 * L + nx * d, y: to.y - uy * 0.15 * L + ny * d }, to];
+  for (const d of offsets) for (const f of d === 0 ? [0] : backs) {
+    const path = d === 0 ? [from, to] : [from, { x: from.x + ux * 0.15 * L + nx * d, y: from.y + uy * 0.15 * L + ny * d }, { x: to.x - ux * f * L + nx * d, y: to.y - uy * f * L + ny * d }, to];
     let time = 0; for (let i = 1; i < path.length && time < Infinity; i++) time += piece(path[i - 1], path[i]);
     if (d === 0) rhumb = time;
     if (!best || time < best.time) best = { off: d, time, rhumb: 0, saved: 0, path };

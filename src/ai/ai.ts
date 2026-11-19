@@ -8,10 +8,11 @@ import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { SLOW_TACK, yawLag } from '../boat/physics';
 import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec, hypot } from '../core/math';
-import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
+import { anyShoreDist, anyShoreDistNear, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
 import { routeAround, routeAroundSteps } from '../sim/routing';
+import { tideLeg } from '../environment/tideLeg';
 import { HARBORS, inBasin } from '../geo/marina';
 import { AI_EVERY, type World } from '../sim/world';
 
@@ -403,6 +404,45 @@ export function detour(b: Vec, P: Vec): Vec | null {
   }
   return null;
 }
+/** Her speed made good through the water toward heading h (m/s), for tideLeg: her target speed there; closer to the
+ * wind than her beat, tacking toward it, her beat's speed made good along h, v·cos(beat)/cos(angle off the wind); and
+ * the same past her best running angle, gybing down toward it. */
+function madeThrough(b: Boat, h: number): number {
+  const twa = Math.abs(wrap(b.ww.from - h)), beat = beatFor(b), ra = runAngle(b.ww.kt);
+  if (twa < beat) return targetFor(b, beat) * Math.cos(beat * Math.PI / 180) / Math.max(0.05, Math.cos(twa * Math.PI / 180));
+  if (twa > ra) return targetFor(b, ra) * Math.cos((180 - ra) * Math.PI / 180) / Math.max(0.05, Math.cos((180 - twa) * Math.PI / 180));
+  return targetFor(b, twa);
+}
+/** Foul current along her leg (m/s) before she weighs cheating it: about half a knot. (An ESTIMATE: below it the stream
+ * across the Cityfront's 400 m inshore band differs by too little to pay for the way in and out.) */
+const TIDE_FOUL = 0.25;
+/** How often she weighs it again (s of race time), and the least it must save to be worth it: 20 s and 5% of the leg (ESTIMATES). */
+const TIDE_EVERY = 15, TIDE_GAIN_S = 20, TIDE_GAIN_F = 0.05, TIDE_SHORE = 40;
+/**
+ * Cheating the tide, reaching or running into it: the track stood off the rhumb line to P with the least time in the
+ * current as it is (environment/tideLeg.ts, Deep Physics), and she steers for its next corner. The real fleet ran east
+ * along the Cityfront on the 7 Nov 2026 race (Course 2, a 2.4 kt ebb) in 51–55 min, inshore where the stream is
+ * weaker (current.ts shoreRelief, an estimate); the AI, on the rhumb line in mid-stream, took 96–118. Weighed only with
+ * foul current where she is (the cheap test), then every TIDE_EVERY s on the leg; near the mark, the mark.
+ */
+function tideAim(w: World, b: Boat, P: Vec): Vec {
+  const ai = b.ai!, D = dist(b, P);
+  if (D < 250) { ai.tide = null; return P; }
+  const foul = -(b.cur.x * (P.x - b.x) + b.cur.y * (P.y - b.y)) / D;
+  if (!ai.tide && foul < TIDE_FOUL) return P;
+  if (!ai.tide || ai.tide.leg !== b.leg || w.t - ai.tide.t >= TIDE_EVERY) {
+    // (the tracks that come back to the mark over the last 15%, or stay in until abeam of it and cross the stream square
+    // to it; each step 60 m and 40 m clear (so no pier slips between) of the shore, its jetties' ends and the room to gybe (an ESTIMATE): along
+    // the beach at 25 m she met the Marina's jetty and lost a minute and a half round it)
+    const tl = tideLeg(b, P, q => w.currentAt(q), h => madeThrough(b, h), q => !onLand(q) && anyShoreDistNear(q) > TIDE_SHORE, undefined, 60, [0.15, 0]);
+    // (not across the start/finish line mid-race, an obstruction: Course 2's runs from X to the club's seawall, and the
+    // way inshore from X lay over it, so she tacked back and forth inside it, penalised each time; past it, a fresh look)
+    const overLine = w.obstructed(b) && tl.path.some((q, i) => i > 0 && segCross(tl.path[i - 1], q, w.pin, w.committee));
+    const worth = tl.off !== 0 && tl.time < Infinity && !overLine && tl.saved > Math.max(TIDE_GAIN_S, TIDE_GAIN_F * Math.min(tl.rhumb, 1e5));
+    ai.tide = foul < TIDE_FOUL && !worth ? null : { leg: b.leg, t: w.t, aim: worth ? tl.path[1] : null };
+  }
+  return ai.tide?.aim ?? P;
+}
 /** Clear water all the way from a to b, with some room either side (her track, and 25 m to each side of it, exactly,
  * so no pier slips between samples)? With `lee` (the wind direction), out of any island's wind shadow too. */
 function clearRun(a: Vec, b: Vec, lee?: number): boolean {
@@ -676,6 +716,7 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       if (prev?.reach && dist(b, prev.p) < 900) P = aroundIsland(prev, b, P, w.wind.from, true);
     }
     if (b.started && Math.abs(wrap(ww.from - brg(P.x - b.x, P.y - b.y))) > 50) {
+      P = tideAim(w, b, P);
       // reaching or running with land in the way (an island, a headland): steer for clear water round it. (Beating,
       // she tacks off the shore as she reaches it, as boats do working up the Cityfront beach.)
       if (refresh || ai.detour === undefined) ai.detour = detour(b, P);

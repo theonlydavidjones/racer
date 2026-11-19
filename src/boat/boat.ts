@@ -62,6 +62,8 @@ export interface AiState {
   leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
+  /** Cheating a foul tide on this leg: when she last weighed it, and the inshore (or offshore) corner she steers for, or null for the rhumb line. */
+  tide?: { leg: number; t: number; aim: Vec | null } | null;
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
