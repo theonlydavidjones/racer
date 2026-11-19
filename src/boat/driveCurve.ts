@@ -40,14 +40,17 @@ function sailDrive(tws: number, twa: number, u: number): number {
  */
 /** One entry of the table by its place in it (row: (knots × 64 + angle / 5) × 32), worked out the first time it's read. */
 const read = (row: number, q: number): number => { const k = cache[row + q]; return k === 0 ? at(row >> 11, ((row >> 5) & 63) * 5, q) : k; };
+/** Which rows of the table are filled in whole (by row: knots × 64 + angle / 5), and the filling: every speed step of
+ * one wind and angle, each worked out as it would be alone (at), so the same numbers whenever it's done. */
+const rowFull = new Uint8Array(41 * 64);
+function fillRow(row: number): void { for (let q = 0; q <= 30; q++) read(row, q); rowFull[row >> 5] = 1; }
 /** Drive at speed v over drive at the polar's speed vt (both m/s), for tws kt at the course's angle twa. 1 at v = vt. */
 export function driveRatio(tws: number, twa: number, v: number, vt: number): number {
   return driveCurveFor(tws, twa, vt)(v);
 }
 /**
  * driveRatio as a curve for one wind, angle and polar speed: the rows and their shares worked out once, so each look is
- * a multiply and a few reads of the table (the AI's predictions step a speed along it hundreds of times). Rows with no
- * share (a whole knot, an angle on the 5°) aren't read.
+ * a multiply and a few reads of the table (the AI's predictions step a speed along it hundreds of times).
  */
 export function driveCurveFor(tws: number, twa: number, vt: number): (v: number) => number {
   if (vt <= 0.05) return () => 1;
@@ -55,13 +58,15 @@ export function driveCurveFor(tws: number, twa: number, vt: number): (v: number)
   const w = clamp(tws, 2, 40), w0 = Math.min(39, Math.floor(w)), fw = w - w0, a = clamp(twa, 30, 180) / 5, a0 = Math.min(35, Math.floor(a)), fa = a - a0, s = 20 / vt;
   const k00 = (1 - fw) * (1 - fa), k01 = (1 - fw) * fa, k10 = fw * (1 - fa), k11 = fw * fa;
   const r00 = (w0 * 64 + a0) * 32, r01 = r00 + 32, r10 = r00 + 64 * 32, r11 = r10 + 32;
+  if (!rowFull[r00 >> 5]) fillRow(r00); if (!rowFull[r01 >> 5]) fillRow(r01); if (!rowFull[r10 >> 5]) fillRow(r10); if (!rowFull[r11 >> 5]) fillRow(r11);
   return (v: number) => {
     const x = clamp(v * s, 0, 29.999), q = Math.floor(x), f = x - q;
-    let lo = 0, hi = 0;
-    if (k00 > 0) { lo += k00 * read(r00, q); hi += k00 * read(r00, q + 1); }
-    if (k01 > 0) { lo += k01 * read(r01, q); hi += k01 * read(r01, q + 1); }
-    if (k10 > 0) { lo += k10 * read(r10, q); hi += k10 * read(r10, q + 1); }
-    if (k11 > 0) { lo += k11 * read(r11, q); hi += k11 * read(r11, q + 1); }
+    // (the four rows read straight from the table, filled in whole when the curve was made: a row with no share adds
+    // exactly nothing, so these are the same sums in the same order as reading only the rows with a share, to the last
+    // bit. Kept this small, the compiler inlines the curve where it's used: with the rows read and filled in as needed
+    // inside it, it didn't, and that cost the step 1.2%, the AI's predictions calling it thousands of times a step)
+    const lo = k00 * cache[r00 + q] + k01 * cache[r01 + q] + k10 * cache[r10 + q] + k11 * cache[r11 + q];
+    const hi = k00 * cache[r00 + q + 1] + k01 * cache[r01 + q + 1] + k10 * cache[r10 + q + 1] + k11 * cache[r11 + q + 1];
     return lo * (1 - f) + hi * f;
   };
 }
