@@ -23,7 +23,7 @@ import { MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './sett
 import { FLEET } from './boat/boat';
 import { currentSeason, seasonById, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
 import { seasonHtml } from './ui/season';
-import { nextRace, paintSeasonView, seasonCardHtml } from './ui/seasonView';
+import { nextRace, paintSeasonView, seasonCardHtml, upcomingRace } from './ui/seasonView';
 import { burgeeCanvas } from './render/burgees';
 import { raceDisplayName } from './club/raceNames';
 import { fillFleet, genericSpec, genericTag, isGeneric, isReal } from './boat/generic';
@@ -1739,7 +1739,7 @@ function seasonApply(series: Series, no: number): boolean {
 /** The season's overview (ui/seasonView.ts): race `no` (or the next one) set up and shown, beside the calendar and the standings. */
 function openSeason(id: string, no?: number): void {
   const series = seasonById(id) ?? currentSeason(); if (!series) return;
-  const res = seasonResults(series.id), pick = no ?? nextRace(series, res) ?? series.races.filter(r => !r.abandoned).at(-1)?.no ?? null;
+  const res = seasonResults(series.id), pick = no ?? nextRace(series, res) ?? (upcomingRace(series) ? null : series.races.filter(r => !r.abandoned).at(-1)?.no ?? null); // (a race still to come is shown as such, not race 1 again)
   const ok = pick != null && seasonApply(series, pick);
   if (!ok) seasonPick = null;
   $('seasonBack').textContent = nav.backLabel() || '‹ Race';
