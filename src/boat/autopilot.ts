@@ -2,7 +2,7 @@ import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
 import { thrust } from './motor';
 import { FULL_RUDDER } from './balance';
-import { SLOW_TACK } from './physics';
+import { slowTack } from './physics';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { landAlong } from '../geo/shore';
@@ -113,7 +113,7 @@ export function adjust(b: Boat, p: Pilot, d: number): void {
  * autopilot will then trim the heading to mirror the locked wind angle from the previous tack": Raymarine 81402 Rev 6,
  * "Using AutoTack in Wind Vane mode", p.50). The handbook gives AutoTack no speed check, so neither does this: ordered
  * too slow, she tacks anyway (and may stall head to wind). The return is a warning for you, or null: below
- * physics.ts SLOW_TACK (the speed under which a Folkboat won't carry her way through a tack), when it takes her through the wind,
+ * physics.ts slowTack (the speed under which she won't carry her way through a tack, in the wind she has), when it takes her through the wind,
  * in Auto or Wind.
  */
 export function tack(b: Boat, p: Pilot): string | null {
@@ -123,7 +123,7 @@ export function tack(b: Boat, p: Pilot): string | null {
   if (p.mode === 'auto') p.course = n360(p.course + (b.arel >= 0 ? AUTO_TACK : -AUTO_TACK));
   else if (p.mode === 'wind') p.awa = -p.awa;
   else return null;
-  return b.v < SLOW_TACK && through ? 'Too slow to tack: bear away for way first.' : null;
+  return b.v < slowTack(b) && through ? 'Too slow to tack: bear away for way first.' : null;
 }
 
 /**

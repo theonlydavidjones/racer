@@ -37,7 +37,7 @@ export interface AiState {
   /** The heading ai.ts clearestHeading chose (deg), and when (s, World.t): held on her next thinks while it's about as good as any. */
   clearH?: number; clearT?: number;
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
-   * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
+   * wind however slow she is, as the rule asks, rather than gybing round (physics.ts slowTack). */
   tackNow?: boolean;
   /** Stopped or going astern: sheets in, and off the wind if she's in irons, until she has way on again (ai.ts). */
   keptEased?: boolean; // (irons: her sails kept eased for a boat close by she must keep clear of, ai.ts, with a band)
