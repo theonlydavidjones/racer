@@ -2,7 +2,7 @@
 // the plan's corners, which one she's making next, and when a corner's made. The World steers by it (world.ts
 // planTarget); the page keeps the same count, from its copy of the race, to know when to plan afresh (navigator.ts
 // HelmFeed).
-import { LOA, V, brg, dist, dot, segPt, sub, wrap, type Vec } from '../core/math';
+import { LOA, V, brg, dist, dot, hypot, segPt, sub, wrap, type Vec } from '../core/math';
 import { landAlong, onLand, wharfNearest } from '../geo/shore';
 import { HANDLING } from '../boat/dynamics';
 
@@ -273,7 +273,7 @@ export function wayOff(b: Vec & { h: number; v: number; vx: number; vy: number }
   // her heading: half a knot of current across it is meters over the look, the second review)
   let held = 0;
   if (b.v >= OFF_SLOW) {
-    const g = Math.hypot(b.vx, b.vy), u = g > 0.3 ? { x: b.vx / g, y: b.vy / g } : V(b.h), q = { x: b.x + u.x * OFF_LOOK, y: b.y + u.y * OFF_LOOK };
+    const g = hypot(b.vx, b.vy), u = g > 0.3 ? { x: b.vx / g, y: b.vy / g } : V(b.h), q = { x: b.x + u.x * OFF_LOOK, y: b.y + u.y * OFF_LOOK };
     if (!onLand(q) && landAlong(b, q) === Infinity) {
       held = Infinity;
       for (let j = 1; j <= 10; j++) held = Math.min(held, near({ x: b.x + u.x * OFF_LOOK * j / 10, y: b.y + u.y * OFF_LOOK * j / 10 }));
