@@ -135,7 +135,7 @@ export function applyCommand(w: World, c: Command): CommandResult {
     case 'ctlTarget': (u.ctlTarget ??= {})[c.key] = c.v; takeLine(u, c.key); return;
     case 'ctlTargetClear': if (u.ctlTarget) for (const key of c.keys) delete u.ctlTarget[key]; return;
     case 'jumpers': wantJumpers(u, c.turns); return;
-    case 'jumpersBy': wantJumpers(u, (u.jumperTarget ?? (u.tune ?? guideTune(u.ww.kt)).jumperTurns) + c.d); return;
+    case 'jumpersBy': wantJumpers(u, (u.jumperTarget ?? Math.round((u.tune ?? guideTune(u.ww.kt)).jumperTurns * 2) / 2) + c.d); return; // (from the half turn the band shows)
     case 'lazyCarTo': {
       // (as the band did it: from where she'd been asked to put the car, or where the lazy car is; moveLazyCar works from the same)
       // (a side: the leeward car too, with the jib down and no load on it, crewWork.ts carFree)

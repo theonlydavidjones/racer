@@ -102,6 +102,7 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
 });
 
 import { stepJumpers, wantJumpers } from '../src/boat/condition';
+import { jumperTurnsShown } from '../src/ui/sailBand';
 describe('the jumpers under way', () => {
   it('the crew turns them a half turn at a time toward what you ask, and the rig follows', () => {
     const b = { tune: { ...TUNE_PRESETS.medium }, rigMain: undefined } as { tune: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
@@ -110,6 +111,23 @@ describe('the jumpers under way', () => {
     expect(b.tune.jumperTurns).toBe(2.5);
     for (let t = 0; t < 12.5; t += 0.1) stepJumpers(b as never, 0.1, 12);
     expect(b.tune.jumperTurns).toBe(4); expect(b.jumperTarget).toBeUndefined();
+  });
+  // (the owner's bug: under the dial a long run of digits, the guide's tune for the wind with none set shown raw: 2.2148…)
+  it('the band\'s readout is a half turn, short and finite, whatever the wind (the guide\'s tune between the marks too)', () => {
+    for (let kt = 0; kt <= 30; kt += 0.1) {
+      const s = String(jumperTurnsShown(guideTune(kt).jumperTurns));
+      expect(s.length).toBeLessThanOrEqual(3); expect(Number.isFinite(+s)).toBe(true); expect(+s * 2 % 1).toBe(0);
+    }
+    for (const v of [NaN, Infinity, -3, 7.26, 2.2148343130807246]) { const s = String(jumperTurnsShown(v)); expect(s.length).toBeLessThanOrEqual(3); expect(+s).toBeGreaterThanOrEqual(0); expect(+s).toBeLessThanOrEqual(5); }
+  });
+  it('on the guide\'s tune between the marks (none set), the crew turn from mark to mark: what the band shows is where she is', () => {
+    const b = { tune: undefined, rigMain: undefined } as { tune?: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
+    const kt = 14.5, shown = jumperTurnsShown(guideTune(kt).jumperTurns);
+    expect(guideTune(kt).jumperTurns).not.toBe(shown); // (between the marks)
+    wantJumpers(b, shown - 0.5); for (let t = 0; t < 30; t += 0.1) stepJumpers(b as never, 0.1, kt);
+    expect(b.tune!.jumperTurns).toBe(shown - 0.5);
+    wantJumpers(b, 0); for (let t = 0; t < 60; t += 0.1) stepJumpers(b as never, 0.1, kt);
+    expect(b.tune!.jumperTurns).toBe(0);
   });
 });
 

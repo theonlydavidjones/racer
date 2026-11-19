@@ -179,7 +179,7 @@ const jcar = (side: Side) => {
  * lower jib; controls.ts leadAt, 11.6 to 13.7 deg); "chop" is left out, no Folkboat source says it (the owner picked this line, r252). The band's clicks and scrolls are in the Keys screen's "How to sail her".
  */
 export const BAND_TIPS = {
-  jumpers: "More turns close the main's top leech: medium air. Loose in light air and a breeze.",
+  jumpers: "On closes the main's top leech: medium air. Off in light air and a breeze. Left arrow on.",
   mainsheet: 'In for power and pointing; ease to spill a puff or reach.',
   traveller: 'Up to windward in light air; down to leeward in a puff to spill power.',
   backstay: 'On in a breeze: flatter main, less power, straighter jib luff.',
@@ -212,20 +212,28 @@ const bandHelp = (k: keyof typeof BAND_TIPS) => `${BAND_NAME[k]}: ${BAND_TIPS[k]
 /** The jumpers (CR 7.40: adjustable above deck while racing), when her Rig tune says so: a small dial at each end of
  * the band, as her two jumpers are, one each side, set alike (the crew turns both). A turnbuckle's turns, 0 to 5 in half
  * turns, round the dial's arc: the tall tick North Sails' medium, the needle where they are, a dashed one where the crew
- * is turning them to. Click the dial's left half for a half turn off, the right half for a half turn on, or scroll on it.
- * Steel grey, as the standing rigging. */
+ * is turning them to. A curved arrow each side, both pointing up, the way the needle goes (the owner, 18 Nov 2026): the
+ * left one round clockwise, a half turn on; the right one counterclockwise, a half turn off. Steel gray, as the standing
+ * rigging. */
 const JMAX = TUNE_RANGE.jumperTurns[1];
+/** The jumpers' turns as the band shows them: the nearest half turn, within the turnbuckle's 0 to 5 (and 0 for anything
+ * not a number), so the readout is never longer than "2.5". */
+export const jumperTurnsShown = (v: number) => Number.isFinite(v) ? Math.max(0, Math.min(JMAX, Math.round(v * 2) / 2)) : 0;
 /** Where on the dial's arc a setting sits: 0 turns at lower left, 5 at lower right (a 270° sweep, clockwise). */
 const jAng = (v: number) => -135 + (v / JMAX) * 270;
 const jdial = (side: Side) => {
   let ticks = '';
   for (let i = 0; i <= JMAX * 2; i++) { const v = i / 2, med = v === TUNE_PRESETS.medium.jumperTurns; ticks += `<line x1="20" y1="${med ? 1.5 : 3}" x2="20" y2="${i % 2 ? 5.5 : 6.5}" transform="rotate(${jAng(v)} 20 20)" class="${med ? 'med' : ''}"/>`; }
   return `<div class="sb-jd" data-jump data-side="${side}" hidden><span class="sb-jl">Jumpers</span>
-  <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18.5" class="ring"/><g class="tk">${ticks}</g>
+  <span class="sb-jrow">${jarrow('cw')}<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18.5" class="ring"/><g class="tk">${ticks}</g>
   <line class="tgt" x1="20" y1="20" x2="20" y2="7"/><line class="ndl" x1="20" y1="20" x2="20" y2="6.5"/><circle cx="20" cy="20" r="2"/>
-  <text x="20" y="33" text-anchor="middle" class="jv"></text></svg>
-  <button type="button" class="sb-jh l" data-act="jless" aria-label="Jumpers: a half turn off"></button><button type="button" class="sb-jh r" data-act="jmore" aria-label="Jumpers: a half turn on"></button></div>`;
+  <text x="20" y="33" text-anchor="middle" class="jv"></text></svg>${jarrow('ccw')}</span>
+  </div>`;
 };
+/** A curved arrow up the dial's side (the left one clockwise round it, the right one counterclockwise): its button. */
+const jarrow = (dir: 'cw' | 'ccw') => `<button type="button" class="sb-ja" data-act="${dir === 'cw' ? 'jmore' : 'jless'}" aria-label="Jumpers: a half turn ${dir === 'cw' ? 'on (clockwise)' : 'off (counterclockwise)'}"><svg viewBox="0 0 14 40" aria-hidden="true">${dir === 'cw'
+  ? '<path d="M11 33 A15 15 0 0 1 9 9"/><path d="M5 10 L9.5 5 L12 11" class="hd"/>'
+  : '<path d="M3 33 A15 15 0 0 0 5 9"/><path d="M9 10 L4.5 5 L2 11" class="hd"/>'}</svg></button>`;
 
 /** The tab on the band's top edge that says who trims (the owner, 13 Nov 2026: "tab should just say 'Auto-Trim' when its
  * all auto trim, and 'Hand Back' when 1 or more lines are manual"): any line or either jib car yours. (Not the whisker
@@ -294,7 +302,6 @@ export class SailBand {
     el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { d.dataset.help = bandHelp(d.dataset.line as keyof typeof BAND_TIPS); });
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
       d.dataset.help = bandHelp('jumpers'); // (in the Coach card, as every control's help: no hover titles)
-      d.addEventListener('wheel', e => { if (!this.ok()) return; e.preventDefault(); this.turnJumpers(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
     });
   }
 
@@ -445,15 +452,17 @@ export class SailBand {
       : j.reach > 0 ? `${name} to ${at}: the crew is going forward to it.${left}` : `${name} to ${at}: the crew is pulling the pin and sliding it.${left}`, until: Infinity };
   }
 
-  /** Where the jumpers are now: her tune, or North's for the wind when she has none (cruising: rigTune.ts guideTune). */
-  private jumpersNow(u: Boat): number { return (u.tune ?? guideTune(u.ww.kt)).jumperTurns; }
+  /** Where the jumpers are now, in half turns as the crew counts them: her tune, or North's for the wind when she has
+   * none (cruising: rigTune.ts guideTune, which sits between the marks around 9 and 15 kt and moves with the wind: shown
+   * raw, it ran on as a long run of digits under the dial, the owner's bug). */
+  private jumpersNow(u: Boat): number { return jumperTurnsShown((u.tune ?? guideTune(u.ww.kt)).jumperTurns); }
   /** Ask the crew for a half turn more or less on the jumpers, from where they're going (or where they are). */
   private turnJumpers(d: number): void {
     this.host.send({ k: 'jumpersBy', d }); this.host.changed(); // (worked out in the race: two quick presses make a whole turn)
   }
-  /** The jumpers' dials: shown only if her Rig tune has them adjusted under way. */
+  /** The jumpers' dials: on the band unless her Boat panel has them left alone under way (the owner, r246). */
   private jumpers(u: Boat): void {
-    const on = !!u.spec?.perf.jumpersUnderWay, now = this.jumpersNow(u), want = u.jumperTarget, busy = on && want != null && Math.abs(want - now) > 1e-6;
+    const on = u.spec?.perf.jumpersUnderWay !== false, now = this.jumpersNow(u), want = u.jumperTarget, busy = on && want != null && Math.abs(want - now) > 1e-6;
     const fmt = (v: number) => (v === 1 ? '1 turn' : `${v} turns`);
     this.el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
       hide(d, !on); if (!on) return;
@@ -461,6 +470,9 @@ export class SailBand {
       const tg = d.querySelector<SVGElement>('.tgt')!; tg.style.display = busy ? '' : 'none'; if (busy) attr(tg, 'transform', `rotate(${jAng(want!)} 20 20)`);
       put(d.querySelector('.jv')!, String(now));
       d.classList.toggle('busy', busy);
+      // (none further than the turnbuckle goes: off at 0, on at 5, counted from where the crew is turning them to)
+      const to = busy ? want! : now;
+      d.querySelectorAll<HTMLButtonElement>('.sb-ja').forEach(b => { const off = b.dataset.act === 'jless' ? to <= 0 : to >= JMAX; if (b.disabled !== off) b.disabled = off; });
       attr(d, 'aria-label', `Jumpers: ${fmt(now)}${busy ? `, the crew turning them to ${fmt(want!)}` : ''}`);
     });
   }
