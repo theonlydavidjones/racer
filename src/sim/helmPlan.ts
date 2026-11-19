@@ -13,11 +13,11 @@ export const NAV_MADE = 30;
  * router's own clearance for them (router.ts WHARF_CLEAR). The marinas' docks and breakwaters aren't among them: the
  * pilot hands her over off a harbor's mouth (World.navTarget). */
 export const STRUCTURE_CLEAR = 20;
-/** The narrowest gap between structures the pilot takes her through: STRUCTURE_CLEAR off each side and her turning
- * circle between, about three of her lengths across at sailing speed (an estimate: her 9 m turn, world.ts navTarget,
- * a little over). Narrower, Nav hands her over before it with its alarm (the Coordinator, 19 Nov 2026: the ~45 m gap at
- * the Berkeley Pier's deck end, which sailors use but the pilot, threading it 22 m off the ruin, ran her onto). */
-export const GAP_MIN = 2 * STRUCTURE_CLEAR + 3 * LOA;
+/** The narrowest gap between structures the pilot takes her through: her turning room, about three of her lengths
+ * across at sailing speed (an estimate: her 9 m turn, world.ts navTarget, a little over). Narrower, Nav hands her over
+ * before it with its alarm (the Coordinator, 19 Nov 2026: only a gap truly narrower than her turning room; the ~45 m
+ * gap at the Berkeley Pier's deck end is wider, and the owner has sailed a Folkboat through it without trouble). */
+export const GAP_MIN = 3 * LOA;
 /** How far ahead of a gap too narrow Nav hands her over (m): time to take the helm and choose. */
 export const GAP_WARN = 150;
 

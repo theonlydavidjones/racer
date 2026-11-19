@@ -10,8 +10,9 @@
  *   2026): no chart or notice gives a passage there, and Coast Pilot 7 (ch. 7, para. 322) says only "the outer 1.7
  *   miles of the pier is in ruins"; but sailors use it. In Latitude 38's "Is There a Safe Break in the Berkeley Pier?"
  *   one long-time Berkeley Marina sailor advises against the cut, others report using it regularly, boats drawing up to
- *   7 ft among them, and Wikipedia's article mentions a gap for small boats. A Folkboat draws 1.2 m. (The tiller pilot
- *   won't thread it: World.planTarget hands her over before a gap narrower than her room, sim/helmPlan.ts.)
+ *   7 ft among them, and Wikipedia's article mentions a gap for small boats; and the owner has sailed a Folkboat through it without trouble (first-hand, 19 Nov 2026; the tide then not recalled). A Folkboat
+ *   draws 1.2 m. It's navigable here: the tiller pilot sails it (sim/helmPlan.ts hands her over only before a gap
+ *   narrower than her turning room).
  * - Chevron's Long Wharf at Richmond (way 35442255, an area): the causeway from the shore by Point Richmond and its
  *   T-head of tanker berths.
  *
@@ -29,7 +30,7 @@ const WAYS = [
 ];
 const r7 = x => Math.round(x * 1e7) / 1e7;
 /** The gap at the deck's end, as the data says it (see above). */
-const GAP = 'about 45 m open between the usable deck and the ruin, as OSM maps it: sailors use it (Latitude 38, "Is There a Safe Break in the Berkeley Pier?": boats drawing up to 7 ft; Wikipedia: a gap for small boats), one long-time Berkeley Marina sailor advises against it, and no chart or notice gives a passage (Coast Pilot 7, ch. 7, para. 322: "the outer 1.7 miles of the pier is in ruins")';
+const GAP = 'about 45 m open between the usable deck and the ruin, as OSM maps it: sailors use it (Latitude 38, "Is There a Safe Break in the Berkeley Pier?": boats drawing up to 7 ft; Wikipedia: a gap for small boats), one long-time Berkeley Marina sailor advises against it, the owner has sailed a Folkboat through it without trouble (first-hand, 19 Nov 2026; the tide then not recalled), and no chart or notice gives a passage (Coast Pilot 7, ch. 7, para. 322: "the outer 1.7 miles of the pier is in ruins")';
 const piers = [], lines = [];
 for (const w of WAYS) {
   let xml = null;
