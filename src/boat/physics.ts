@@ -58,14 +58,24 @@ export const PENALTY_TURN_RATE = 10;
  * seamanship (claude/irons) and Deep Physics' measure of how she gathers way after a slow tack. */
 export const SLOW_TACK = 1.3;
 /** In light air, the way she needs for a tack is a share of the speed the wind can give her close-hauled, not SLOW_TACK:
- * in 1-4 kt she sails close-hauled at 0.4-1.2 m/s, all under it, and every tack became a gybe right round (ROADMAP, "AI
- * steering in a dying breeze"). Measured in this sim in flat water, a committed tack gets through in 1-10 kt from her own
- * close-hauled speed in 6-24 s, and from 0.3 of it in 17-29 s (sculling round the last of it head to wind, rule 42.3(d),
- * as light-air sailors do); a gybe right round at those speeds took 100 s. TACK_WAY 0.6 is an ESTIMATE with a margin
- * over that 0.3: not measured on a real Folkboat. SLOW_TACK still caps it, so from about 8 kt nothing changes. */
+ * in 1-4 kt she sails close-hauled at 0.4-1.2 m/s, all under it, and every tack became a gybe right round, 100 s at
+ * 0.3 m/s (ROADMAP, "AI steering in a dying breeze"). A share is the right form: coasting into the wind on a fixed turning
+ * circle against drag that goes as her speed squared, the turn she gains depends on the ratio of her speeds, and the
+ * windage head to wind and her hull's drag stay in proportion as the wind changes (the physics review).
+ * TACK_WAY 0.6 is an ESTIMATE, the sailor's rule of a good part of her way on before a light-air tack: nothing here
+ * measures it. In this sim a committed tack gets round even from a dead stop, as the sculling floor (dynamics.ts
+ * HANDLING.minTurnRate, rule 42.3(d)) turns her the last of the way, so the sim has no edge to set it by.
+ * The wind it's judged in: the lighter of the wind now and her 20 s mean (Boat.twsSlow), as her speed lags the wind;
+ * judged on a fresh puff's, she'd be "too slow" for the wind just arrived and gybe round at the moment a light-air
+ * sailor most wants to tack (the physics review). SLOW_TACK still caps it, so from about 9 kt nothing changes.
+ * Not yet in it: a seaway stops her head to wind more than flat water does, but targetFor falls in chop, so this falls
+ * with it (by 0.05-0.08 m/s at 6-8 kt; capped from 10 kt), and swell isn't in targetFor at all: a follow-up. */
 export const TACK_WAY = 0.6;
 /** The least speed (m/s) at which the AI takes a turn through the wind as a tack rather than gybing round. */
-export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea'] }): number => Math.min(SLOW_TACK, TACK_WAY * targetFor(b, beatFor(b)));
+export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): number => {
+  const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
+  return Math.min(SLOW_TACK, TACK_WAY * targetFor(her, beatFor(her)));
+};
 
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
