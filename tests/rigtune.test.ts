@@ -123,6 +123,18 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     expect(l).toBeTruthy(); expect(l!.head).toMatch(/set for less wind than this/);
     const ok = testBoat({ heading: 42, kt: 5, windKt: 18 }); ok.tune = { ...TUNE_PRESETS.strong }; sail(ok, 30);
     expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
+    // (racing it cites the class rules that fix the rig; cruising there are none to cite: the Coordinator, 19 Nov 2026)
+    expect(l!.why).toMatch(/CR 7\.40/);
+    const c = lessons(b, { cruising: true }).list.find(x => x.id === 'rig:soft')!;
+    expect(c.why).not.toMatch(/CR /); expect(c.why).toMatch(/set at the dock/);
+  });
+
+  it('a change of conditions mid-sail leaves her tune as it is: only the crew\'s turns change it', () => {
+    const w = new World(COURSES[0], S({ windKt: 8, fleet: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 }), 3, { freeSail: true });
+    const before = { ...w.user.tune! };
+    w.applyConditions({ ...w.settings, windKt: 22 });
+    expect(w.user.tune).toEqual(before);
+    expect(tuneName(w.user.tune!)).not.toBe(presetFor(22));
   });
 });
 
