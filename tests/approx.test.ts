@@ -33,7 +33,7 @@ describe('the shore distance off a 10 m lattice', () => {
     expect(worstK).toBeLessThan(0.013); // (0.75 / 350 per metre: 6 m is 1.3% of the current)
   }, 180_000);
 
-  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over eight races', async () => {
+  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over 24 races', async () => {
     // A race isn't chaotic to a nudge (a boat moved a micrometre sails the same race), but a small change to the forces
     // moves the AI's decisions (a tack a step sooner, a contact, a penalty's turns) and the race goes its own way from
     // there, by as much as its own luck: one race's fleet speed moved 1–17% for the current 0.1% stronger or weaker (far
@@ -42,8 +42,12 @@ describe('the shore distance off a 10 m lattice', () => {
     // the mean the current's ±0.1% makes, within half as much again and half a point. (A lattice that's subtly wrong is
     // the test above's to catch, point by point; this is that it doesn't sail a different kind of race.)
     const dev: number[] = [], nudge: number[] = [];
-    // (the 32 races sailed side by side on the pool's threads; then, seed by seed as before)
-    const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const;
+    // (the 96 races sailed side by side on the pool's threads; then, seed by seed as before)
+    const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10], [0, 11], [0, 12], [0, 13], [0, 14], [1, 15], [1, 16],
+      [1, 17], [1, 18], [0, 19], [0, 20], [0, 21], [0, 22], [1, 23], [1, 24], [1, 25], [1, 26]] as const;
+    // (24 races, not 8: a race's change is heavy-tailed, about 2% sd, and over 8 the bound sat ~1.4 sd above an honest
+    // lattice, a chance fail about 1 run in 12 whenever the fleet's paths reshuffled; over 24 it's ~2.4 sd, about 1%.
+    // The bound's formula is unchanged. Capacity, 19 Nov 2026)
     const jobs = SEEDS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: false, skip: false, seed }], [i, { grid: true, skip: false, seed }],
       [i, { grid: false, skip: false, seed, curK: 1.001 }], [i, { grid: false, skip: false, seed, curK: 0.999 }]]);
     const R = await sail('approxRace', jobs);

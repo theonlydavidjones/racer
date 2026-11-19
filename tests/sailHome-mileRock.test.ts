@@ -8,63 +8,37 @@
 //   (154–192 s alone, 16–17 Nov 2026: the first plan's cold fill of the router's outlook), not a goal: the cold fill is
 //   its own work (the corridor-only lee, next). What tells this from main is the one plan: main started one each 150 m,
 //   and the way round the land wasn't on the map at all.
-// - Its bars are wall clock, as perf.test's are (the Coordinator, 17 Nov 2026): a failure under the full suite's load is
-//   run again alone, once, and counts only if it fails again (in the full suite, 16 Nov, the plan ran past 240 s; alone,
-//   192 s). The bars aren't widened for the load.
-// - The page's thread held no longer than SLICE_MAX at the 99.9th percentile: its budget (6 ms, a new destination's) and
+// - This file is its correctness, and its bars are work, not the wall clock (the Coordinator, 18 Nov 2026: on a loaded
+//   host the wall clock failed it on main too, a slice of 22.7 ms and then no panel plan in 120 s). The plan's and the
+//   panel's bars are the work that fits in PLAN_S and PANEL_S at the page's share of its thread (SHARE: a 6 ms slice
+//   each 16 ms tick, navigator.ts SLICE_NEW_MS, TICK_MS), the same bars as before, counted on the process's CPU time
+//   (perf.test's clock: it doesn't run while the process waits for a core). The wall clock only stops a hung run
+//   (HUNG: three times the bar). The bars aren't widened for the load.
+// - (Timing, in perf.test, with its rerun-alone rule: the slice is a wall-clock bar, and the process's CPU time can't
+//   judge one slice: it counts the compiler's and the collector's threads too, 27.7 ms at the 99.9th alone where the
+//   wall read 13-18.) The page's thread held no longer than SLICE_MAX at the 99.9th percentile: its budget (6 ms, a new destination's) and
 //   one step of the work past it (a step can't be stopped part way; the longest left, a cold wind reading, ~12 ms):
 //   13–16 ms alone. Main's worst frame on this
 //   passage was 38 ms over its 16, and a cold chop cell's swell (no part of the chop) held one 100 ms.
 // - Then the passage panel's plan (navView: passagePlanLater, leaving now and later): it briefs from the live plan, not a
 //   second one of its own (that was ~45 s more of the page's thread), and is in within PANEL_S, measured likewise.
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { COURSES } from '../src/courses/registry';
-import { DT, World } from '../src/sim/world';
-import { SLIPS } from '../src/geo/marina';
-import { LL } from '../src/geo/geo';
-import { liveLog, passageLive, passagePlanLater, type PassagePlan } from '../src/sim/navigator';
-import { navRoute, navRoutePending } from '../src/ui/hud';
-
-const PLAN_S = 240, SLICE_MAX = 20, PANEL_S = 120;
+import { HUNG, PANEL_S, PLAN_S, SHARE, pct, sailHomeFromMileRock } from './helpers/mileRock';
+/** The process's own CPU time, ms (perf.test's clock): Node's process, typed here (the project doesn't take Node's types). */
+const proc = (globalThis as unknown as { process: { cpuUsage(): { user: number; system: number } } }).process;
+const cpu = () => { const c = proc.cpuUsage(); return (c.user + c.system) / 1000; };
+const sum = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / 1000;
 
 describe('Sail Home from Mile Rock: the way drawn at once, the plan in while she sails', () => {
-  it('the route within 5 s, the timed plan once and within PLAN_S, every slice within its budget', async () => {
-    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: '', current: 'real', tideDate: '2026-11-14', traffic: 0, fleet: 0, opponents: [], windKind: 'west', windKt: 14 } as Settings, 1, { freeSail: true });
-    w.step(DT);
-    const p = LL(37.7955, -122.512); w.user.x = p.x; w.user.y = p.y; w.step(DT);
-    w.setDest(SLIPS.find(s => s.marina === 'gashouse-cove')!.p, 'Her slip');
-    const dest = w.dest!, t0 = performance.now(), V = 6 * 1852 / 3600, h = 75 * Math.PI / 180; // (6 kt, in toward the Gate)
-    let plan = null as ReturnType<typeof passageLive>, last = t0, routeS = NaN, before = 0;
-    liveLog.on = true; liveLog.slices.length = 0; liveLog.starts = 0;
-    navRoute(w.user, dest);
-    while (!plan && performance.now() - t0 < PLAN_S * 1000) {
-      await new Promise(r => setTimeout(r, 16));
-      const now = performance.now(), dt = (now - last) / 1000; last = now;
-      w.user.x += Math.sin(h) * V * dt; w.user.y += Math.cos(h) * V * dt; // (sailing, her clock with her)
-      (w as unknown as { t: number }).t += dt;
-      const r = navRoute(w.user, dest); if (isNaN(routeS) && !navRoutePending() && r.length > 2) routeS = (now - t0) / 1000;
-      before = liveLog.starts; plan = passageLive(w);
-    }
-    const s = (performance.now() - t0) / 1000, sl = liveLog.slices.slice().sort((x, y) => x - y), pct = (q: number) => sl[Math.min(sl.length - 1, Math.floor(sl.length * q / 100))];
-    console.log(`Mile Rock to Gashouse Cove: the route in ${routeS.toFixed(1)} s, the plan in ${s.toFixed(0)} s (${before} plan${before === 1 ? '' : 's'} started before it was in), the slices: 99.9th percentile ${pct(99.9).toFixed(1)} ms, the longest ${pct(100).toFixed(1)}`); liveLog.on = false;
-    expect(routeS, 'the way round the land on the map (s)').toBeLessThan(5);
-    expect(plan, `no plan after ${s.toFixed(0)} s, ${(s * V).toFixed(0)} m sailed`).not.toBeNull();
-    expect(before, 'plans started before the first was in').toBe(1); // (then the next, from where she is)
-    // (a percentile, not the longest: on a shared host a collection or the machine's other work can land in one slice)
-    expect(pct(99.9), 'the slices, 99.9th percentile (ms)').toBeLessThan(SLICE_MAX);
-    // the panel opened now: the HUD still asking for the live plan each frame, as she sails on
-    liveLog.on = true; liveLog.starts = 0;
-    let panel: PassagePlan | null | undefined; const p0 = performance.now(); last = p0;
-    passagePlanLater(w, pl => { panel = pl; });
-    while (panel === undefined && performance.now() - p0 < PANEL_S * 1000) {
-      await new Promise(r => setTimeout(r, 16));
-      const now = performance.now(), dt = (now - last) / 1000; last = now;
-      w.user.x += Math.sin(h) * V * dt; w.user.y += Math.cos(h) * V * dt; (w as unknown as { t: number }).t += dt;
-      passageLive(w);
-    }
-    const ps = (performance.now() - p0) / 1000; liveLog.on = false;
-    console.log(`the panel's plan in ${ps.toFixed(0)} s (live plans started meanwhile: ${liveLog.starts})`);
-    expect(panel, `no panel plan after ${ps.toFixed(0)} s`).toBeTruthy();
+  it('the route within 5 s, the timed plan once and within PLAN_S\'s work, the panel\'s within PANEL_S\'s', async () => {
+    const r = await sailHomeFromMileRock({ clock: cpu, panel: true, hungPlanS: HUNG * PLAN_S, hungPanelS: HUNG * PANEL_S });
+    const work = sum(r.slices), pw = r.panel ? sum(r.panel.slices) : NaN;
+    console.log(`Mile Rock to Gashouse Cove: the route in ${r.routeS.toFixed(1)} s, the plan in ${r.planS.toFixed(0)} s on the wall, ${work.toFixed(1)} s of CPU (${r.before} plan${r.before === 1 ? '' : 's'} started before it was in); the panel's in ${r.panel?.s.toFixed(0)} s, ${pw.toFixed(1)} s of CPU (live plans started meanwhile: ${r.panel?.starts}); the slices (CPU, for the record): 99.9th percentile ${pct(r.slices, 99.9).toFixed(1)} ms`);
+    expect(r.routeS, 'the way round the land on the map (s)').toBeLessThan(5);
+    expect(r.plan, `no plan after ${r.planS.toFixed(0)} s`).not.toBeNull();
+    expect(r.before, 'plans started before the first was in').toBe(1); // (then the next, from where she is)
+    expect(work, 'the plan\'s work (CPU s): what fits in PLAN_S at the page\'s share').toBeLessThan(PLAN_S * SHARE);
+    expect(r.panel?.plan, `no panel plan after ${r.panel?.s.toFixed(0)} s`).toBeTruthy();
+    expect(pw, 'the panel\'s work (CPU s): what fits in PANEL_S at the page\'s share').toBeLessThan(PANEL_S * SHARE);
   }, 1_000_000);
 });
