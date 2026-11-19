@@ -15,7 +15,7 @@ const env = { currentAt: (p: { x: number; y: number }) => w.currentAt(p), windHe
 
 describe('the foul-tide coach line', () => {
   it('speaks on the run east into the ebb, with the saving in minutes', () => {
-    expect(tideLine(X, M6, env)).toMatch(/^Foul tide: stay inshore on this leg, it saves about \d+ min\.$/);
+    expect(tideLine(X, M6, env)).toMatch(/^Foul tide: stay inshore on this leg, it saves (about \d+ min|over half an hour)\.$/);
   });
   it('is silent with the tide fair (the beat back west) and with no current', () => {
     expect(tideLine(M6, X, env)).toBeNull();

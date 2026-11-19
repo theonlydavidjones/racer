@@ -41,5 +41,6 @@ export function tideLine(from: Vec, to: Vec, env: TideEnv): string | null {
   const r = tideLeg(from, to, p => env.currentAt(p), h => speedAlong(wind.kt, wind.from, h), p => !landAt(p));
   if (!Number.isFinite(r.rhumb) || r.off === 0 || r.saved < TIDE_SAVING_S) return null;
   if (!shoreward(from, to, r.off)) return null; // (a saving from standing out into the stream isn't "inshore": no word)
-  return `Foul tide: stay inshore on this leg, it saves about ${Math.round(r.saved / 60)} min.`;
+  // (dead downwind into the stream mid-channel she may barely stem it: the rhumb line's time is then hours, so say "over half an hour")
+  return r.saved > 1800 ? 'Foul tide: stay inshore on this leg, it saves over half an hour.' : `Foul tide: stay inshore on this leg, it saves about ${Math.round(r.saved / 60)} min.`;
 }
