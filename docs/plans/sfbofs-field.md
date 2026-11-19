@@ -96,6 +96,47 @@ With 8 constituents instead of 12 it's about 0.7 MB raw. For scale, the page alr
 
 shoreRelief isn't refitted in the meantime (the Coordinator, 19 Nov 2026): SFBOFS replaces it.
 
+## Step 1 results (19 Nov 2026)
+
+The script is scripts/data/sfbofs-harmonics.mjs: `extract` keeps each hour's top layer for the area, `fit` does the
+least squares.
+
+- **The data.** 29 days of hourly nowcasts in each of two seasons: December 2024 (wet) and September 2025 (dry),
+  1,392 hours, all present (two dropped on connection resets were fetched again).
+  - The area, from Point Bonita to the Bay Bridge and Richmond to Hunters Point, is 13,579 elements on 7,339 nodes.
+  - Kept: about 75 MB a month of float32, in the session's scratchpad, not the repository. The download took 1.6 s
+    an hour.
+- **Why two windows nine months apart.** K1/P1 and S2/K2 are two cycles a year apart. Two months nine months apart see
+  them half a cycle out of step, so one fit separates them.
+  - Normal-matrix condition: 2.2, against 66 for one month alone.
+- **The fit is checked on synthetic hours.** Hours were made from known constants through the sim's own predict. Every
+  amplitude and phase came back exactly, K1/P1 and S2/K2 included, with each season's mean and nothing spurious.
+- **The fit to the model.** It has 26 terms: twelve constituents for each of u and v, and the two seasons' means.
+  - The residual RMS is 0.148 m/s (0.29 kt) over every element and hour.
+  - The worst single element's residual is 0.39 m/s.
+  - The residual is what the tide doesn't explain: the wind-driven flow, December's storm runoff, the model's weather.
+    The plan's 0.2 kt target is for the racing area against held-out hours, which is step 2.
+
+**Against NOAA's harmonic constants** (sf-currents.json), with the fit along each station's flood axis, kt:
+
+| Station | M2 NOAA / fit | M2 phase, fit − NOAA | K1 | S2 | Mean NOAA | Mean Dec / Sep |
+|---|---|---|---|---|---|---|
+| SFB1204 SW of Alcatraz | 1.49 / 1.38 | +5° | 0.45 / 0.43 | 0.33 / 0.33 | −0.17 | −0.77 / −0.03 |
+| SFB1205 N of Pier 35 | 2.13 / 1.89 | +6° | 0.54 / 0.49 | 0.48 / 0.41 | −0.13 | −0.82 / +0.03 |
+| SFB1203 E of the Gate Bridge | 1.95 / 1.82 | +6° | 0.59 / 0.56 | 0.42 / 0.51 | +0.16 | −0.36 / +0.31 |
+| SFB1202 Golden Gate Bridge | 2.02 / 1.81 | +5° | 0.63 / 0.64 | 0.46 / 0.52 | +0.27 | −0.35 / +0.29 |
+| SFB1211 N of Alcatraz | 1.37 / 1.19 | +2° | 0.52 / 0.41 | 0.29 / 0.35 | −0.09 | −0.70 / +0.23 |
+
+- **The model's tidal stream is 5–13% weaker than NOAA's in M2, and 2–6° late (4 to 12 minutes).**
+  - Some of the gap is depth: NOAA's bins are 0.5–9 m down; the fit is the top layer.
+  - The overtides (M4, MS4, MN4, M6) differ more, as expected of small terms.
+- **Step 2 has to decide** whether to scale the field to NOAA's constants at the stations: a correction field fading
+  between them, or one factor and lag for the whole area.
+- **The seasons' mean flow differs by up to 0.8 kt.** December 2024 had a strong surface ebb everywhere; September
+  2025 had about none.
+  - Which mean a race day gets (by month, or from the Delta outflow on the day) is a step 2 decision.
+  - The source to check it against is DWR's DAYFLOW (estimate: the December figure is storm runoff, not yet checked).
+
 ## Tools and data
 
 - h5wasm, a devDependency (the owner, 19 Nov 2026), used only by scripts under scripts/data/ and never in the page.
