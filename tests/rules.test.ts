@@ -470,7 +470,7 @@ describe('Rule 21.2 · dodging a boat doing her turns (owner, 19 Nov 2026: "call
     const red = boat('Red', { at: redAt, heading: redHeading, speed: 2, penalty: 360 }); red.penaltyDir = 1; // (her turns begun)
     const p = pair(red, blue), was: number[] = [], plan = typeof turn === 'number' ? (turn ? [[2, turn]] as [number, number][] : []) : turn;
     let course = 0;
-    for (let i = 0; i <= 160; i++) {
+    for (let i = 0; i <= 220; i++) {
       const t = 40 + i * 0.1, a = p.at(t);
       if (a.foul) return a.foul;
       was.push(blue.h);
@@ -508,6 +508,9 @@ describe('Rule 21.2 · dodging a boat doing her turns (owner, 19 Nov 2026: "call
     expect(dodge([-16, 12], 30, 0)).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
   });
   it('and a hunt in two bites, a luff onto a collision course and then another, is judged from the first (23.2)', () => {
+    // (four seconds between them, after eight of sailing: the first luff at the far end of what the judge keeps of her)
+    expect(dodge([-20, 32], [], 270)).toBeNull();
+    expect(dodge([-20, 32], [[8, 20], [13.3, 12]], 270)).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
     expect(dodge([-8, 34], 0)).toBeNull(); // (held on, about 5 m of water)
     expect(dodge([-8, 34], [[2, 20], [5, 12]])).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
   });

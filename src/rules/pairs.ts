@@ -191,8 +191,9 @@ export function turnedToward(row: RulesBoat, other: RulesBoat): number {
   return after < before - 5 ? Math.abs(turn) : 0;
 }
 
-/** How many poses a pair keeps of each boat, and how often: 8 s at 0.1 s. */
-const RING = 80, RING_DT = 0.1;
+/** How many poses a pair keeps of each boat, and how often: 12 s at 0.1 s (long enough to see the start of a hunt made
+ * in two luffs a few seconds apart, wasFailing). */
+const RING = 120, RING_DT = 0.1;
 
 /**
  * Keep `b`'s pose in her history (at most every RING_DT s, however many pairs she's in): a fixed ring, no allocation once
@@ -294,12 +295,16 @@ function courseAt(R: PoseRing, t: number, ref: number): number {
 }
 /** Each time in her ring a course change of hers began, either way, the oldest first: on her course (courseAt), every
  * half second, a run of steps one way (a step under 0.5°, 1°/s, is holding on; up to a second of it may come inside a
- * run) that comes to COURSE_CHANGE or more net. */
+ * run) that comes to COURSE_CHANGE or more net. NaN for one already under way at her oldest pose (half that will do). */
 function turnStarts(R: PoseRing): number[] {
   const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)], ref = R.h[at(R, 0)];
   const out: number[] = [];
   let t0: number | null = null, dir = 0, h0 = 0, still = 0, prev = courseAt(R, oldest + 0.5, ref);
-  const close = (hEnd: number) => { if (t0 != null && Math.abs(hEnd - h0) >= COURSE_CHANGE) out.push(t0); t0 = null; dir = 0; still = 0; };
+  // (a run already under way at her oldest pose, coming to half COURSE_CHANGE or more: the course she held before it is
+  // older than the ring, so nothing can be said from it: NaN, and wasFailing excuses nothing. The safe way to be wrong:
+  // a dodge left unexcused is judged as before, where an unseen first luff would excuse a hunt)
+  const edge = oldest + 0.5;
+  const close = (hEnd: number) => { if (t0 != null && Math.abs(hEnd - h0) >= (t0 <= edge + 1e-9 ? COURSE_CHANGE / 2 : COURSE_CHANGE)) out.push(t0 <= edge + 1e-9 ? NaN : t0); t0 = null; dir = 0; still = 0; };
   for (let t = oldest + 1; t <= now + 1e-9; t += 0.5) {
     const h = courseAt(R, t, ref), d = h - prev;
     if (Math.abs(d) < 0.5) { if (t0 != null && (still += 0.5) > 1) close(prev); }
@@ -322,7 +327,7 @@ const HELD_HORIZON = 10;
 /**
  * Was `kc` already failing to keep clear of `row` before `row` changed course? Definitions, Keep Clear (a): the
  * right-of-way boat "can sail her course with no need to take avoiding action". From where both were when each of
- * `row`'s turns in the lead-up began (her pose ring, about 8 s), `row` holding on as she was then and `kc` carrying on as
+ * `row`'s turns in the lead-up began (her pose ring, 12 s), `row` holding on as she was then and `kc` carrying on as
  * she was, her turn too: would they have come within APPREHENSION_GAP? At every turn's start, not only the latest: a
  * luff onto a boat that would have missed, then a second luff once on a collision course, is a hunt, and the first luff
  * is where it began. Then `row`'s turns were the avoiding action rule 14 asks of her ("if reasonably possible"), not
@@ -336,7 +341,7 @@ export function wasFailing(row: RulesBoat, kc: RulesBoat): boolean {
   const R = RINGS.get(row), K = RINGS.get(kc);
   if (!R || !K || R.n < 2 || K.n < 2) return false;
   const starts = turnStarts(R);
-  if (!starts.length || starts[0] < K.t[at(K, K.n - 1)]) return false;
+  if (!starts.length || !(starts[0] >= K.t[at(K, K.n - 1)])) return false; // (NaN too: a turn begun before the ring)
   const me = { x: 0, y: 0, h: 0 };
   const now = R.t[at(R, 0)];
   return starts.every(t0 => {
