@@ -479,7 +479,7 @@ sources. Each shipped item is added there when it's published.
    solid. It's the water a boat turns into after the gap, northbound for the marina. The fix: the terrain mask there
    from the shore's data, not the 50 m cells (geo/shore.ts onLand), with a test that the water beside the deck is water.
 8q7. **Bug: Nav engaged with way on alongside a pier wrecks or strikes it** (the physics review of nav-pier, 19 November;
-   bug; a sprint bug, after nav-pier; 2–4 h; owner of the navigator and pilot): engaged a metre or two along or in from
+   bug; a sprint bug, after nav-pier; 2–4 h; owner of the navigator and pilot): engaged a meter or two along or in from
    8 m off Pier 45's head bound for off Alcatraz, she's wrecked on the wharf or strikes it (one start has no plan from
    there at all). Main does the same. The pilot's own way round (ai.ts detour, rays 25 m either side) turns her into the
    pier when the plan's first leg begins beside it. Kept in tests/nav-pier.test.ts as it.fails (known to fail), to be

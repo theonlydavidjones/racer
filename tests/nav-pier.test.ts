@@ -57,11 +57,11 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     ['the Bay Bridge to Clipper Cove', place('baybridge'), 'clipper', 107],
     ['home to her Berkeley slip from off Emeryville, south of the pier (the physics review)', place('emeryville'), 'slip', 107],
     ['from 8 m off Pier 45\'s head to off Alcatraz (the physics review)', { x: 1988, y: 78 }, 'alcatraz', 107, 3],
-    // (the second review: starts a metre or two either way were wrecked or struck, and the gap on the plan's last leg)
+    // (the second review: starts a meter or two either way were wrecked or struck, and the gap on the plan's last leg)
     ['through the Berkeley gap on the last leg, south to north', { x: 10323, y: 5173 }, { x: 10083, y: 5725 }, 107],
     ['through it on the last leg, north to south', { x: 10083, y: 5725 }, { x: 10323, y: 5173 }, 107]
   ];
-  // Known to fail, the second review's (19 Nov 2026): starts a metre or two along or in from the one above, with way on
+  // Known to fail, the second review's (19 Nov 2026): starts a meter or two along or in from the one above, with way on
   // beside Pier 45's head, wreck or strike (one has no plan from there at all). Main does the same: a pilot engaged
   // alongside a pier, not this branch's Berkeley Pier. Kept here so they're seen, and so a fix shows.
   const beside: [string, { x: number; y: number }][] = [['2 m in', { x: 1986, y: 78 }], ['along it', { x: 1984, y: 80 }], ['6 m out', { x: 1994, y: 78 }]];
