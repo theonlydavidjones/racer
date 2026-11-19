@@ -231,16 +231,18 @@ export class SyncSource {
     if (proto === CurrentField.prototype) for (const st of (v as unknown as CurrentField).stations) { REPLACED.add(st.t); REPLACED.add(st.v); }
     let b = was as Record<string, Val> | undefined;
     const fresh = !b; if (!b) { b = {}; rec.last = b; }
-    let set: Record<string, Val> | null = fresh ? {} : null, keys = 0;
+    let set: Record<string, Val> | null = fresh ? {} : null, keys = 0, added = 0;
     for (const key in o) {
       const x = o[key]; if (typeof x === 'function' || (loc && loc.has(key))) continue;
       keys++;
       const s = this.val(x);
       const prev = b[key];
-      if (fresh || !Object.is(s, prev) || (prev === undefined && !(key in b))) { (set ??= {})[key] = s; b[key] = s; }
+      if (fresh || !Object.is(s, prev) || (prev === undefined && !(key in b))) { if (!fresh && prev === undefined && !(key in b)) added++; (set ??= {})[key] = s; b[key] = s; }
     }
     let del: string[] | undefined;
-    if (!fresh && rec.n !== keys) {
+    // (the copy had rec.n keys and gained `added`; more than the object has now means some went: deleted, perhaps in the
+    // same frame as others came, which leaves the count as it was. Crew Habits, 19 Nov 2026)
+    if (!fresh && rec.n + added !== keys) {
       for (const key of Object.keys(b)) if (!Object.prototype.hasOwnProperty.call(o, key) || typeof o[key] === 'function' || (loc && loc.has(key))) { (del ??= []).push(key); delete b[key]; }
     }
     rec.n = keys;
