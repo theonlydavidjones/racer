@@ -3,8 +3,9 @@
 // review's ask: the plan's way round the land, replanned rather than re-picked). From off the Berkeley Marina toward off
 // Emeryville in 14 kt, main wrecks her on it at 5.0 kn after 20 minutes; from other starts it circled beside it for up
 // to 45 minutes. Sailed as the page sails it: the plan from the navigator when the helm asks (HelmFeed, worked out at
-// once here), each frame a second of her clock. She must arrive, never strike anything, and never be closer than
-// CLEAR_M to the ruin or any land.
+// once here), each frame a second of her clock. She must arrive, never be wrecked, and never strike anything (Deep
+// Physics: not wrecked alone passed while she circled for 45 minutes). The fixes: the pier and its ruin one hazard
+// (geo/data/east-piers.json), and the plan's corners at the helm kept 20 m off structures (sim/helmPlan.ts).
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';
