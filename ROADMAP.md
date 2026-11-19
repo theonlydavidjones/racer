@@ -52,6 +52,38 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   tests/crewstation.test.ts's 2.0 backstop failed on 6 kt seeds 4, 11 and 15; since the AI's pole call waits for the run to
   hold and the guide's angle holds through a swing (claude/crew-habits), all 24 seeds pass it and nothing is held. The
   steering itself is still to fix.
+- **The light-air tack's follow-ups** (after the sprint; Skipper Model, from the physics review of claude/ai-light-steer,
+  19 November): physics.ts slowTack, the speed the AI tacks from (TACK_WAY, 0.6 of her close-hauled speed, an estimate):
+  - **Chop lowers it, the wrong way:** a seaway stops her head to wind more than flat water does, but targetFor falls in
+    chop, so slowTack falls with it (0.05–0.08 m/s at 6–8 kt; SLOW_TACK caps it from 10 kt). It wants an allowance for
+    the waves' braking, not only her lower target speed.
+  - **Swell isn't in it:** targetFor reads only the wind sea (hsW, tpW), so in 3 kt with the Gate's swell slowTack is
+    0.56 m/s, where a real Folkboat would be stopped dead in a tack.
+  - **Sternway head to wind in a breeze** (with the heavy-air tack work, SLOW_TACK itself, still unsourced): stopped head
+    to wind in 12 kt, a committed tack showed no sternway over 23 s; her rig's windage, about 110 N there, should start
+    her drifting astern. The sculling floor (dynamics.ts HANDLING.minTurnRate, 4°/s, an estimate) gets every tack round
+    from rest in this sim, so it, not the boat's way, decides whether a slow tack succeeds.
+- **AI late-start strategy after the gun** (after the sprint; Skipper Model and the Coordinator, 19 November; found by the
+  light-air tack's race test): a boat late and deep at the gun, 50–90 m below a line square to the wind in a dying 4–6 kt
+  with a foul tide (crewstation's 6 kt west, training course, tide of 14 Nov), has no plan for getting started:
+  - In ai.ts's `!b.started` aim, between the ends she aims straight across from wherever she is, a point that moves with
+    her: beating up to the line she never overstands it, slides its whole length on one tack and out past an end. Beyond
+    an end she aims for the end itself, 18 m below the line and 10–20 m off, whose bearing swings 100° and more as she
+    moves: her plan changes mid-turn and she circles 200–380° (seed 11, Blue, twice, 9–12 minutes after the gun).
+  - On main some never start at all: 6 kt fleet-2 seeds 10 and 11 each have a boat not started by 900 s; seed 1's boats
+    start at 248 and 178 s, seed 12's at 193 and 374. In 12 kt fleet-6 runs, most AI boats are 55–210 m below the line at
+    the gun and many haven't started by 90 s (physics review).
+  - Patching the aim point moved the failure around (claude/ai-late-start, 5da5e984 and a rework, not taken): held in
+    from the ends it stopped the circling (long turns 9 to 0 over seeds 1–12) but pulled on-time starters near an end off
+    the line at the gun (seed 6 Red 9 s to 66 s, Blue in 12 kt fleet-6 seed 4 not started at 120 s) and swapped which boat
+    never starts in seed 11; aiming in only from beyond an end, seed 1 Red 248 to 562 s and seeds 10 and 11 with neither
+    boat started. The ends as walls (tack back in while the other tack still fetches the line inside the end, with room
+    growing as depth·tan(beat)) did little on its own.
+  - Wants a real plan, as a sailor late for a start has: which end and which tack lays the line, how many tacks, the
+    ends as walls with room for her depth, the current along and across the line, a biased line (the aim's tan(beat)
+    assumed it square to the wind), and when to bear off below the line and come again; with tests that boats near the
+    line at the gun start as before (seed 6 Red within about 10 s), that late boats start by a deadline, and the circling
+    (tests/late-start.test.ts on claude/ai-late-start: no turn of more than 200° one way before starting).
 - **The outhaul in a breeze wandering across the guide's steps** (Crew Model; the physics review of the crew habits,
   16 November): two cases left after the guide's steps were read as its ranges (controls.ts guideLimits):
   - a light-air beat whose breeze swings across both 4 and 5 kt (3.5 to 5.7 kt read) still has them at the outhaul
