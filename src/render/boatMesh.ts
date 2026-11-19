@@ -12,7 +12,7 @@ import { guideTune, rigDrawn } from '../boat/rigTune';
 import { ROPES, type BoatSpec, type LineColorKey } from '../boat/spec';
 import { ROPE_LAYERS, ROPE_TILE, ropeLook, ropeTile } from './ropeLook';
 import { P3 } from './coords';
-import { buildCrew, dockhand, SHEET_N, sheetTail, syncCrew, tillerJointAt, tillerRootAt, travCam, travTail, type Crew } from './crew';
+import { buildCrew, dockhand, pianoTail, pianoTailHeld, SHEET_N, sheetTail, syncCrew, tillerJointAt, tillerRootAt, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
@@ -465,6 +465,8 @@ interface Lines {
   cringles: { l: THREE.Line; sail: 'main' | 'jib' }[];
   /** The vang's tackle, from the boom's block (it swings with the boom) to the lower block on the mast's foot. */
   vang: THREE.Line;
+  /** The piano's tails (crew.ts pianoTail): each laid once, and again when someone has it in hand (Crew.pianoHold) or lets it go. */
+  pianoTails: { l: THREE.Line; side: number; i: number }[];
 }
 /**
  * The hiking rail (as on Josephine, the owner's photo): a varnished plank about 80 × 28 mm laid flat along the deck's edge
@@ -1031,6 +1033,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), STEEL); ring.position.set(MAST_ATH / 2 + 0.006, JC.top + 0.05, JC.z); ring.rotation.y = Math.PI / 2; grp.add(ring); // (the ring it clips to with the sails stowed)
     for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
   const cringles: Lines['cringles'] = [];
+  const pianoTails: Lines['pianoTails'] = [];
   const PIANO: Record<'S' | 'P', LineColorKey[]> = { S: ['vang', 'outhaul', 'jibCunningham', 'jibHalyard'], P: ['vang', 'outhaul', 'cunningham', 'jibCunningham', 'downhaul'] };
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) PIANO[tk].forEach((key, i) => {
     const x = side * (0.37 + 0.065 * i), cp = onTop(x, zA), role: Rope = key === 'jibCunningham' || key === 'jibHalyard' ? 'jib' : 'main';
@@ -1042,8 +1045,9 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const fb = footBlock(side, i), mid = new THREE.Vector3(x * 0.95, 0, zClear);
     fixed(line([cp, ...lay(cp, mid), ...lay(mid, fb.clone())], role, key));
     // the tail: aft over the cabin's after edge and down its face into the cockpit (not through the cabin's corner)
-    { const zE = -L / 2 + CABIN.u1 * L, top = cabinTopAt(uAtZ(zE - 0.004), x) + 0.012;
-      fixed(line([cp.clone().setZ(zA + 0.02), new THREE.Vector3(x, top, zE - 0.004), new THREE.Vector3(x, top - 0.02, zE + 0.012), new THREE.Vector3(x + side * 0.02, cp.y - 0.25 - 0.04 * i, zE + 0.05)], role, key)); }
+    // (crew.ts pianoTail: where the hands of whoever works it close on it, so the hands and the line agree; drawn to
+    // their fists while it's in hand, syncLines)
+    pianoTails.push({ l: fixed(line(pianoTail(side, i), role, key)), side, i });
     if (key === 'vang') fixed(line([fb, VANG_FOOT.clone().add(new THREE.Vector3(side * 0.012, -0.02, 0))], 'main', 'vang')); // the vang's tail, to its lower block
     else if (key === 'outhaul') upMast([fb, new THREE.Vector3(side * 0.03, fb.y + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(side * 0.015, BOOM_TOP - BOOM_R, MAST_AFT_Z + 0.012)], 'main', 'outhaul');
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
@@ -1080,7 +1084,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
   }
-  const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang, pianoTails };
   // the fittings that never move on her (the blocks, cleats, eyes, the jammer): one mesh per material, not one each,
   // so the rigging's dozens of small parts cost the GPU a couple of draw calls a boat
   const moving = new Set<THREE.Object3D>(); for (const v of Object.values(out)) for (const o of (Array.isArray(v) ? v : [v])) if (o instanceof THREE.Object3D) moving.add(o);
@@ -1789,6 +1793,14 @@ function syncLines(m: BoatMesh, b: Boat): void {
     for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
       travTail(tmpG.set(pa.getX(2), pa.getY(2), pa.getZ(2)), th, side).forEach((q, j) => pa.setXYZ(3 + j, q.x, q.y, q.z));
       pa.needsUpdate = true; } }
+  // (the cabin-top line in someone's hands: its tail pulled off the cabin's face to their fists, Crew.pianoHold; let go,
+  // it hangs back where it was)
+  { const ph = m.crew.pianoHold;
+    for (const pt of L2.pianoTails) { const held = !!ph && ph.side === pt.side && ph.i === pt.i;
+      if (!held && !pt.l.userData.held) continue;
+      const pa = pt.l.geometry.attributes.position as THREE.BufferAttribute;
+      (held ? pianoTailHeld(pt.side, pt.i, ph!.fists) : pianoTail(pt.side, pt.i)).forEach((q, j) => pa.setXYZ(j, q.x, q.y, q.z));
+      pa.needsUpdate = true; pt.l.userData.held = held; pt.l.userData.laid = false; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
   // (four parts between the car's block and the two blocks under the boom, the after one then the forward one, then the

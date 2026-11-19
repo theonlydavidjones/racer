@@ -164,7 +164,7 @@ function ownerWith(line: string, nCrew: number, main: number, layout: Forward, f
 }
 
 /** Where working a line puts a person (null: they work it from where they are). */
-function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
+export function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
   if (line === 'car') return { arm: CAR_ARM, z: Z.car, pose: 'car' };
   if (line === 'pole' || line === 'hoist') return { arm: 0.25, z: Z.mast, pose: 'mast' };
   // the outboard (stowed or shipped, sim/world.ts motorStow): kneeling on the after deck at the bracket, aft of the helm
