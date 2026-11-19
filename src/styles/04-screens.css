@@ -24,7 +24,7 @@
 .bpreport td{padding:2px 0}.bpreport td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .bpreport .tot td{border-top:1px solid var(--rule);font-weight:700;padding-top:5px}
 .bpreport small{color:var(--muted)}
-body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #bMapLayers,body.showroom #mapLayersPop,body.showroom #keysHint,
+body.showroom #hud,body.showroom #labels,body.showroom #trimPanel,body.showroom #controls,body.showroom #appBar,body.showroom #mapBar,body.showroom #viewBar,body.showroom #msgLog,body.showroom #map,body.showroom #mapHint,body.showroom #mapCredit,body.showroom #bMapLayers,body.showroom #mapLayersPop,body.showroom #keysHint,
 #showBar{display:none}
 body.showroom #showBar{display:flex;position:fixed;right:16px;bottom:16px;z-index:5;align-items:center;gap:10px;background:var(--pod);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;font:600 12px/1 var(--f-inst);letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 #showBar label{display:flex;align-items:center;gap:8px}
@@ -166,6 +166,7 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 .mhead h2{margin:0;font:600 22px var(--f-inst);letter-spacing:.03em}
 .mfield input[data-m=w]{width:90px}
 .fhead > div:first-child{flex:1}
+.fhead .eyebrow{margin-bottom:6px} /* (the panel sweep: the eyebrow's box overlapped the h1's by 12 px) */
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .fcard{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;padding:10px 12px 12px;border-radius:10px;border:1px solid var(--rule);background:var(--btn);color:var(--text);cursor:pointer;font:inherit}
 .fcard:hover,.fcard:focus-visible{border-color:var(--accent);background:var(--btn-hi)}
@@ -209,6 +210,9 @@ body.showroom #linebox,body.showroom #transit,body.showroom #toast,body.showroom
 #chartFx,#mapFx,#planFx{position:fixed;pointer-events:none}
 #chartFx,#planFx{z-index:1}
 /* the cruise planner: the start and the destination on one big chart, over the setup (ui/planChart.ts) */
+/* the data credit ODbL asks for, in the corner of the big charts, above the NOAA strip drawn along their bottom edge (hud.ts) */
+.ch-credit{position:absolute;right:12px;bottom:26px;z-index:3;font:500 10px/1 var(--f-inst);color:var(--muted);background:rgba(11,28,40,.7);padding:3px 6px;border-radius:4px;opacity:.9;text-decoration:none}
+.ch-credit:hover{opacity:1;text-decoration:underline}
 #plan{position:fixed;inset:0;z-index:58;background:#0b1c28;display:flex;flex-direction:column}
 #planC{flex:1;min-height:0;width:100%;display:block;cursor:crosshair;touch-action:none}
 #planC.grab{cursor:grab} #planC.grabbing{cursor:grabbing}

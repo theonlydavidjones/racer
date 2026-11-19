@@ -1,6 +1,8 @@
 import type { Boat } from './boat';
 import { maxTurnRate } from './dynamics';
 import { thrust } from './motor';
+import { FULL_RUDDER } from './balance';
+import { SLOW_TACK } from './physics';
 import { beatFor, targetFor } from './seaway';
 import { D2R, V, brg, clamp, cross, dot, n360, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { landAlong } from '../geo/shore';
@@ -54,6 +56,10 @@ export interface Pilot {
   lastTack: 'S' | 'P' | null;
   /** Something the pilot can't handle: it sounds its alarm and goes to standby (the World says so and clears it). */
   alarm: string | null;
+  /** The ram's push rod is on the tiller pin. Standby only stops the ram: it stays on the pin, holding the tiller where it
+   * left it, until you lift it off (Raymarine 81402 Rev 6, Evolution autopilot handbook, "Disengaging the autopilot",
+   * p.43: "Press [Standby]", then "Tiller Pilot: Remove the drive unit from the tiller pin"). */
+  onPin: boolean;
 }
 
 /** Tiller travel per second: hard over to hard over (2 units) in about 4.5 s (see above: unconfirmed). */
@@ -69,17 +75,30 @@ const AWA_TAU = 2.5;
 export const AUTO_TACK = 100;
 
 export function newPilot(): Pilot {
-  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, navH: 0, goTack: null, lastTack: null, alarm: null };
+  return { mode: 'off', course: 0, awa: 40, awaSeen: { s: 0, c: 1 }, trim: 0, ram: 0, lastH: 0, lastTackT: -1e9, detour: null, detourT: -1e9, navH: 0, goTack: null, lastTack: null, alarm: null, onPin: false };
 }
 
 /** Engage in a mode, taking up where she is now: Auto holds her heading, Wind her apparent wind angle. */
 export function engage(b: Boat, p: Pilot, mode: Exclude<PilotMode, 'off'>): void {
   if (p.mode === 'off') { p.trim = 0; p.ram = b.tiller; p.lastH = b.h; p.awaSeen = { s: Math.sin(b.arel * Math.PI / 180), c: Math.cos(b.arel * Math.PI / 180) }; }
-  p.mode = mode; p.course = n360(b.h); p.awa = b.arel; p.navH = b.h; p.goTack = null; p.lastTack = b.tack; p.alarm = null;
+  p.mode = mode; p.course = n360(b.h); p.awa = b.arel; p.navH = b.h; p.goTack = null; p.lastTack = b.tack; p.alarm = null; p.onPin = true;
 }
 
-/** Back to standby: the ram lets go and the tiller is yours, where it is. */
+/** Back to standby: the ram stops, still on the tiller pin, so the tiller stays where it put it (see onPin). */
 export function standby(p: Pilot): void { p.mode = 'off'; }
+
+/** Lift the ram off the tiller pin: the tiller is free, yours to steer (or, with nobody at it, trailing in the flow). */
+export function liftOff(p: Pilot): void { p.mode = 'off'; p.onPin = false; }
+
+/** The alarm's line when the pilot goes to standby on its own: what it couldn't do, and that the stopped ram still holds
+ * the tiller (tiller angle as the rudder's: FULL_RUDDER per unit of b.tiller, + pushed to starboard). */
+export function standbyNote(why: string, tiller: number): string { return `Pilot alarm: ${why}. ${ramHolds(tiller)}`; }
+
+/** On standby, where the stopped ram holds the tiller ("amidships" within 0.04, as the tiller guide says it, app.ts lashWhere). */
+export function ramHolds(tiller: number): string {
+  const where = Math.abs(tiller) < 0.04 ? 'amidships' : `${Math.round(Math.abs(tiller) * FULL_RUDDER)}° to ${tiller > 0 ? 'starboard' : 'port'}`;
+  return `On standby, the ram's still on the tiller pin, holding it ${where}: take the helm, or lift the pilot off.`;
+}
 
 /** Turn the set course by d degrees (+ to starboard), as the −10/−1/+1/+10 buttons do. */
 export function adjust(b: Boat, p: Pilot, d: number): void {
@@ -89,10 +108,22 @@ export function adjust(b: Boat, p: Pilot, d: number): void {
   void b;
 }
 
-/** Tack (or gybe): Auto turns 100° toward the wind; Wind puts the same apparent wind angle on the other side. */
-export function tack(b: Boat, p: Pilot): void {
+/**
+ * Tack (or gybe): Auto turns 100° toward the wind; Wind puts the same apparent wind angle on the other side ("the
+ * autopilot will then trim the heading to mirror the locked wind angle from the previous tack": Raymarine 81402 Rev 6,
+ * "Using AutoTack in Wind Vane mode", p.50). The handbook gives AutoTack no speed check, so neither does this: ordered
+ * too slow, she tacks anyway (and may stall head to wind). The return is a warning for you, or null: below
+ * physics.ts SLOW_TACK (the speed under which a Folkboat won't carry her way through a tack), when it takes her through the wind,
+ * in Auto or Wind.
+ */
+export function tack(b: Boat, p: Pilot): string | null {
+  // (a tack, into or through the wind: Wind's mirrored angle crosses the bow from forward of the beam; Auto's 100° toward
+  // the wind ends within 10° of it, or past it, from a true wind angle under 110°)
+  const through = p.mode === 'wind' ? Math.abs(b.arel) < 90 : Math.abs(wrap(b.ww.from - b.h)) < AUTO_TACK + 10;
   if (p.mode === 'auto') p.course = n360(p.course + (b.arel >= 0 ? AUTO_TACK : -AUTO_TACK));
   else if (p.mode === 'wind') p.awa = -p.awa;
+  else return null;
+  return b.v < SLOW_TACK && through ? 'Too slow to tack: bear away for way first.' : null;
 }
 
 /**
@@ -137,7 +168,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
       return tk === 'S' ? lat > 3 : lat < -3;
     };
     const look = 40 + b.v * 15, shore = landAhead(b, cur, look);
-    if (shore && landAhead(b, close(other), look)) { p.alarm = 'Pilot alarm: land ahead on both tacks. Pilot on standby: you have the tiller.'; return cur; }
+    if (shore && landAhead(b, close(other), look)) { p.alarm = 'land ahead on both tacks'; return cur; }
     if ((fetch(other) && !fetch(b.tack)) || shore) { p.lastTackT = t; p.goTack = other; return close(other); }
   }
   return cur;
@@ -149,7 +180,7 @@ function navHeading(b: Boat, p: Pilot, dest: Vec, t: number): number {
  */
 export function pilotStep(b: Boat, p: Pilot, dest: Vec | null, t: number, dt: number): void {
   if (p.mode === 'off') return;
-  if ((b.astern ?? 0) > 0.1) { p.alarm = 'Pilot alarm: she\'s going astern, and a pilot can\'t steer backwards. Pilot on standby: you have the tiller.'; return; }
+  if ((b.astern ?? 0) > 0.1) { p.alarm = 'she\'s going astern, and a pilot can\'t steer backwards'; return; }
   if (p.lastTack && b.tack !== p.lastTack && !b.tacking) { p.trim = -p.trim; p.lastTack = b.tack; } // weather helm is now on the other side
   else if (!p.lastTack) p.lastTack = b.tack;
   const k = Math.min(1, dt / AWA_TAU), ar = b.arel * Math.PI / 180;

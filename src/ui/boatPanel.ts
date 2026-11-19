@@ -1,12 +1,13 @@
 import type { Settings } from '../settings';
 import { BOTTOM_COLORS, BRIGHT_FINISH, DEFAULT_ROPES, HULL_COLORS, ROPES, SAIL_COUNTRIES, TEAK_DECKS, fixSpec, lineRope, type BoatSpec, type LineColorKey, type SailAge } from '../boat/spec';
 import { saveSettings } from '../settings';
+import { berthRows } from './berthName';
 import { ROPE_SHADE, hexToHsv, hsvToHex, isHex, pickerHtml, ropeSvg, ropesHtml } from './colorPicker';
 import { CLUBS } from '../render/burgees';
 import { conditionItems, referencePerf } from '../boat/condition';
 import { benchAngles, benchSpeed } from '../boat/benchmark';
 import { TUNE_DEFAULT, heikkilaFor, TUNE_PRESETS, TUNE_RANGE, fixTune, forestaySag, forestayTension, rakeDeg, tuneName, type RigTune } from '../boat/rigTune';
-import { dockName, harborOf, MARINAS, slipById, slipsIn } from '../geo/marina';
+import { dockName, MARINAS, slipById, slipsIn } from '../geo/marina';
 import { morph } from './morph';
 
 /**
@@ -250,9 +251,11 @@ export class BoatPanel {
     const tune = b.perf.tune ? tuneName(fixTune(b.perf.tune)) : 'auto';
     const slip = slipById(b.slip);
     // the groups: folded to a short summary; Change opens one (and folds the others)
-    const grp = (id: string, label: string, sum: string[], open: () => string) => {
+    // (each group's own verb: a read-only one says View / Hide, an editable one Change / Done)
+    const berth = berthRows(b.marina);
+    const grp = (id: string, label: string, sum: string[], open: () => string, verb: [string, string] = ['Change ▾', 'Done ▴']) => {
       const on = this.grpOpen === id;
-      return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i>${on ? 'Done ▴' : 'Change ▾'}</i></header><div class="be-in">${on ? open() : sum.join('')}</div></section>`;
+      return `<section class="be-grp${on ? ' open' : ''}" data-grp="${id}"><header data-act="grp" data-v="${id}" role="button" tabindex="0" aria-expanded="${on}"><b>${label}</b><i>${on ? verb[1] : verb[0]}</i></header><div class="be-in">${on ? open() : sum.join('')}</div></section>`;
     };
     morph(this.el, `
       <div class="bphead"><h2>Edit ${esc(b.name || 'her')}</h2><button type="button" class="ghost sm" data-act="spin" aria-pressed="${!this.spinning}">${this.spinning ? 'Pause turning' : 'Turn her'}</button>${this.leaving ? '' : this.edited ? '<button type="button" class="cta" data-act="save">Save</button>' : '<button type="button" class="cta" data-act="done">Done</button>'}</div>
@@ -297,18 +300,18 @@ export class BoatPanel {
         kv('Boom', seg('boom', [['aluminium', 'Aluminum'], ['wood', 'Wood']], b.perf.boom)),
         `<div class="be-tune">${rigTuneFields(b, seg)}</div>`
       ].join(''))}
-      ${grp('sails', 'Sails', [kv('Sailcloth', val(b.sails.color === 'black' ? 'Black' : 'White Dacron')), kv('Main · jib', val(b.perf.mainAge === b.perf.jibAge ? ageName(b.perf.mainAge) : `${ageName(b.perf.mainAge)} · ${ageName(b.perf.jibAge).toLowerCase()}`)), kv('Numbers and F', colorVal('numberColor'))], () => [
+      ${grp('sails', 'Sails', [kv('Sailcloth', val(b.sails.color === 'black' ? 'Black' : 'White polyester')), kv('Main · jib', val(b.perf.mainAge === b.perf.jibAge ? ageName(b.perf.mainAge) : `${ageName(b.perf.mainAge)} · ${ageName(b.perf.jibAge).toLowerCase()}`)), kv('Numbers and F', colorVal('numberColor'))], () => [
         kv('Sailcloth', seg('sailColor', [['white', 'White'], ['black', 'Black']], b.sails.color)),
         kv('Mainsail', seg('mainAge', ages, b.perf.mainAge)), kv('Jib', seg('jibAge', ages, b.perf.jibAge)),
         colorRow('numberColor'), colorRow('insigniaColor')
       ].join(''))}
-      ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change to see', true))], () =>
+      ${grp('lines', 'Lines', [...(['jibsheet', 'mainsheet', 'downhaul'] as LineColorKey[]).map(k => kv(LINE_ROWS.find(x => x[0] === k)![1], val(`${rope(k).svg}`))), kv(`${LINE_ROWS.length - 3} more`, val('Change', true))], () =>
         LINE_ROWS.map(([k, n]) => ropeRow(k, n)).join('') + (b.lineRopes ? kv('', '<button type="button" class="linkbtn" data-act="lineColorsReset">Back to the usual ropes</button>') : ''))}
-      ${grp('berth', 'Home berth', [kv('Marina', val(esc(b.marina ? MARINAS.find(m => m.id === b.marina)?.name ?? '' : 'None'))), ...(b.marina ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
+      ${grp('berth', 'Home berth', [kv('Marina', val(esc(berth.marina))), ...(berth.slipRow ? [kv('Slip', val(slip ? esc(`${(n => n[0].toUpperCase() + n.slice(1))(dockName(slip.dock))}, ${slip.label.toLowerCase()}`) : 'None'))] : [])], () => [
         kv('Marina', `<select data-k="marina" class="pick"><option value="">None</option>${MARINAS.map(m => `<option value="${m.id}"${m.id === b.marina ? ' selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`),
-        b.marina ? kv(`Slip in ${esc(harborOf(b.marina)?.short ?? '')}`, `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
+        berth.slipRow ? kv(esc(berth.slipRow), `<select data-k="slip" class="pick">${slipOptions(b, this.S.boats)}</select>`) : ''
       ].join(''))}
-      ${grp('speed', 'Speed', [kv(`What she gives away`, val('Change to see', true))], () => '<div class="bpreport" id="bpReport"></div>')}
+      ${grp('speed', 'Speed', [], () => '<div class="bpreport" id="bpReport"></div>', ['View ▾', 'Hide ▴'])}
       </div>`);
     this.report();
   }
@@ -363,7 +366,7 @@ function tuneLabel(k: keyof RigTune, t: RigTune): string {
 function tuneReadout(t: RigTune): string {
   const T = forestayTension(t), sag = (tws: number) => { const m = forestaySag(T, tws * 1.45); return `${m >= 0.2 ? '20+' : Math.round(100 * m)} cm in ${tws} kt`; }; // (apparent ≈ 1.45 × true, beating)
   const dr = rakeDeg(t) - rakeDeg(TUNE_DEFAULT);
-  return `Forestay sag beating, backstay off: ${[6, 12, 18].map(sag).join(' · ')}. Rake ${Math.abs(dr) < 0.05 ? 'as North Sails sets it' : `${Math.abs(dr).toFixed(1)}° ${dr > 0 ? 'more aft (more weather helm)' : 'more upright (less weather helm)'} than North Sails'`}.`;
+  return `Forestay sag beating, backstay off: ${[6, 12, 18].map(sag).join(' · ')}. Rake ${Math.abs(dr) < 0.05 ? 'as the medium setting sets it' : `${Math.abs(dr).toFixed(1)}° ${dr > 0 ? 'more aft (more weather helm)' : 'more upright (less weather helm)'} than the medium setting`}.`;
 }
 type Seg = (act: string, opts: [string, string][], cur: string) => string;
 function rigTuneFields(b: BoatSpec, seg: Seg): string {
