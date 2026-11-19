@@ -13,7 +13,9 @@ import { wrap } from '../core/math';
  *   (Boat.shadowK, world.ts shadowAt: 1 = clear air), so the debrief can weigh everyone's dirty air, not just yours.
  */
 export type BoatSnap = [x: number, y: number, h: number, tack: Tack, boom: number, shift?: number, wind?: number, pen?: number, cx?: number, cy?: number, air?: number];
-export interface Frame { t: number; b: BoatSnap[] }
+/** `v`: the vessels giving way at that instant (sim/traffic.ts givingWay): [service, stood off east m, north m, behind
+ * her timetable s], only those off it; missing (as in replays saved before vessels gave way, 18 Nov 2026), none. */
+export interface Frame { t: number; b: BoatSnap[]; v?: [number, number, number, number][] }
 
 export const RECORD_EVERY_STEPS = 6; // 0.1 s at 60 Hz
 export const RECORD_KEEP = 450; // 45 s of history (incident replays use the last 10 s, start replays the last 45 s)
@@ -22,8 +24,8 @@ export const snapshot = (t: number, boats: { x: number; y: number; h: number; ta
   ({ t, b: boats.map(b => [b.x, b.y, b.h, b.tack, b.boom]) });
 
 /** A frame of the race track: as snapshot(), with each boat's wind shift. */
-export const trackSnapshot = (t: number, boats: { x: number; y: number; h: number; tack: Tack; boom: number; ww: { from: number }; avgFrom?: number; penalty: number; cur?: { x: number; y: number }; shadowK?: number }[]): Frame =>
-  ({ t, b: boats.map(b => { const dev = wrap(b.ww.from - (b.avgFrom ?? b.ww.from)); return [b.x, b.y, b.h, b.tack, b.boom, Math.round((b.tack === 'S' ? -dev : dev) * 10) / 10, Math.round(b.ww.from * 10) / 10, b.penalty > 0 ? 1 : 0, Math.round((b.cur?.x ?? 0) * 100) / 100, Math.round((b.cur?.y ?? 0) * 100) / 100, Math.round((b.shadowK ?? 1) * 100) / 100]; }) });
+export const trackSnapshot = (t: number, boats: { x: number; y: number; h: number; tack: Tack; boom: number; ww: { from: number }; avgFrom?: number; penalty: number; cur?: { x: number; y: number }; shadowK?: number }[], vessels?: [number, number, number, number][]): Frame =>
+  ({ t, ...(vessels ? { v: vessels } : {}), b: boats.map(b => { const dev = wrap(b.ww.from - (b.avgFrom ?? b.ww.from)); return [b.x, b.y, b.h, b.tack, b.boom, Math.round((b.tack === 'S' ? -dev : dev) * 10) / 10, Math.round(b.ww.from * 10) / 10, b.penalty > 0 ? 1 : 0, Math.round((b.cur?.x ?? 0) * 100) / 100, Math.round((b.cur?.y ?? 0) * 100) / 100, Math.round((b.shadowK ?? 1) * 100) / 100]; }) });
 
 /** The whole race, for the race replay: every boat once a second, from TRACK_FROM s before the gun to the end. */
 export const TRACK_EVERY_STEPS = 60;

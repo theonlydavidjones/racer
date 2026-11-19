@@ -1290,7 +1290,7 @@ export class World {
       b.forced14 = null; b.cur = this.currentAt(b, true); b.ww = windOnWater(this.windHere(b, b), b.cur);
       b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
     }
-    this.vessels = this.traffic.vessels(this.trafficT);
+    this.vessels = this.traffic.vessels(this.trafficT, this.boats, dt, this.vesselLand); // (the small vessels give way to the boats first: traffic.ts yieldStep)
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour
     // (under way as COLREGS Rule 3(i) has it: not made fast to the shore, not at anchor; going ahead, astern or stopped)
@@ -1358,7 +1358,7 @@ export class World {
       if (this.rec.length > RECORD_KEEP) this.rec.shift();
     }
     // (the start-line drill keeps its whole short sequence, for the debrief's look at your run to the line)
-    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats));
+    if (this.log && this.t >= (this.settings.mode === 'drill' ? -this.startAt : TRACK_FROM) && this.steps % TRACK_EVERY_STEPS === 0) this.track.push(trackSnapshot(this.t, this.boats, this.traffic.givingWay()));
   }
 
   private checkLines(prevT: number): void {
@@ -1818,6 +1818,8 @@ export class World {
     return lineTransit({ x: mark.x - track.x * 1000, y: mark.y - track.y * 1000 }, mark, p => landAt(p), toLL);
   }
 
+  /** Land in a give-way vessel's way (traffic.ts yieldStep): made once, not a closure each step. */
+  private readonly vesselLand = (p: Vec): boolean => !!landAt(p);
   /** The traffic's clock: seconds since midnight UTC of the race day, so the ships keep their schedule through the day. */
   get trafficT(): number { return (this.clockUtc * 60) % 86400; }
 

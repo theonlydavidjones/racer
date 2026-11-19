@@ -12,6 +12,15 @@ import { LL } from '../geo/geo';
  * as distance^(1/3)); their period follows the vessel's speed. When an arm passes under a boat she gets a short
  * burst of steep waves. The racing rules don't apply between a racing boat and a ship; the collision regulations
  * (IRPCAS / COLREGS) do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).
+ *
+ * The ships in the deep-water route keep their course and speed: they can navigate only in the lanes, and a sailing
+ * boat must not impede them (Rule 9; NOAA Coast Pilot 7 ch. 7 designates the SF Bay RNA's lanes and precautionary areas,
+ * 33 CFR 165.1181, as narrow channels for enforcing the Inland Rules). The smaller vessels don't need the lanes, and under
+ * the Inland Rules (33 CFR 83.18(a)(iv)) a power-driven vessel keeps out of the way of a sailing vessel: they give way
+ * (Traffic.yieldStep), as Rule 8 asks, early and substantially, by slowing (8(e)) and standing off to one side. The
+ * cityfront isn't one of the designated narrow channels ("The charted recreation area extending along this shore is
+ * intended primarily for use by recreation vessels": Coast Pilot 7). (The owner's race, 18 Nov 2026: run down by the
+ * Bay cruise boat on Course 2, her route straight down the course and blind to the fleet.)
  */
 
 export type VesselKind = 'container' | 'tanker' | 'ferry' | 'alcatraz' | 'tour' | 'coastguard';
@@ -24,6 +33,26 @@ export const VESSEL: Record<VesselKind, VesselType> = {
   tour: { name: 'Bay cruise boat', len: 45, beam: 12, kt: 11, wakeH: 0.4 },
   coastguard: { name: 'Coast Guard boat', len: 14, beam: 4.3, kt: 20, wakeH: 0.3 }
 };
+
+/** The vessels that give way to a sailing boat (Rule 18): not the ships in the lanes (Rule 9). */
+export const GIVES_WAY: Record<VesselKind, boolean> = { container: false, tanker: false, ferry: true, alcatraz: true, tour: true, coastguard: true };
+/**
+ * How a vessel gives way. Estimates, the model's reading of Rule 8 for a 15–50 m passenger vessel, not measured:
+ * - she watches for a risk of collision 3 minutes ahead (8(a): "in ample time"), any sailing boat within 1.5 km;
+ * - she means to pass at least her half-length and 75 m more from the boat's middle (8(d): "at a safe distance");
+ * - she slackens her speed to 60% of her service speed, 30% inside a minute of the closest approach (8(e)), slowing or
+ *   picking up at 0.25 m/s² (a passenger vessel's engines astern; ahead again, the same);
+ * - she stands off to the side away from the boat, turning 25° off her course for it (8(b): "large enough to be readily
+ *   apparent"), up to 150 m off her route, or stops (8(e)) if there's land that way and the other way both;
+ * - clear, she comes back to her route at 10° and her speed, and the time she lost she makes up at her next stop.
+ */
+const GIVE_LOOK = 180, GIVE_RANGE = 1500, GIVE_PASS = 75, GIVE_SLOW = 0.6, GIVE_SLOWER = 0.3, GIVE_ACCEL = 0.25, GIVE_TURN = 25, GIVE_BACK = 10, GIVE_OFF = 150;
+/** A vessel's way off her timetable as she gives way: stood off her route (m east, north: on the chart, so a corner in
+ * her route doesn't swing it), how fast she's standing off (m/s east, north), running behind her timetable (s), and her
+ * speed as a share of her service speed. */
+export interface GiveWay { ox: number; oy: number; rx: number; ry: number; lag: number; k: number }
+/** What a vessel gives way to: a boat's place and her velocity over the ground (m/s). */
+export interface Moving { x: number; y: number; vx: number; vy: number }
 
 const route = (pts: [number, number][]) => pts.map(([la, lo]) => LL(la, lo));
 // Approximate tracks (lat, lon). Ships keep to the deep water north of the race area, inside Alcatraz.
@@ -72,9 +101,77 @@ function at(s: Service, id: number, t: number, seed: number): Vessel {
 }
 
 export class Traffic {
+  /** Each service's way off its timetable (GiveWay), from giving way; all zero for the ships in the lanes. */
+  readonly give: GiveWay[] = SERVICES.map(() => ({ ox: 0, oy: 0, rx: 0, ry: 0, lag: 0, k: 1 }));
   constructor(readonly on: boolean, private seed: number) {}
-  /** All the vessels at time t (the race clock plus the time of day, so the schedule runs continuously). */
-  vessels(t: number): Vessel[] { return this.on ? SERVICES.map((s, i) => at(s, i, t, this.seed)) : []; }
+  /**
+   * All the vessels at time t (the race clock plus the time of day, so the schedule runs continuously), where giving way
+   * has put them. Given the boats and the step, the vessels first give way to them (yieldStep): the race's step, once.
+   */
+  vessels(t: number, boats?: readonly Moving[], dt = 0, land?: (p: Vec) => boolean): Vessel[] {
+    if (!this.on) return [];
+    if (boats && dt > 0) this.yieldStep(t, dt, boats, land);
+    return SERVICES.map((s, i) => this.place(s, i, t));
+  }
+  /** Service i at time t: its timetable's place `lag` s ago, stood off where it is, its heading and speed over the
+   * ground its slowed way along the route and its standing off together. */
+  private place(s: Service, i: number, t: number): Vessel {
+    const g = this.give[i], v = at(s, i, t - g.lag, this.seed);
+    if (g.ox === 0 && g.oy === 0 && g.k === 1 && g.rx === 0 && g.ry === 0) return v;
+    v.x += g.ox; v.y += g.oy;
+    if (v.moving) { const h = v.h * D2R, vx = Math.sin(h) * v.v * g.k + g.rx, vy = Math.cos(h) * v.v * g.k + g.ry; v.v = Math.hypot(vx, vy); if (v.v > 0.05) v.h = brg(vx, vy); }
+    return v;
+  }
+  /**
+   * The give-way vessels keep out of the way of the boats (Rule 18), as GIVE_* has it: each looks for the boat she'd
+   * pass closest to inside GIVE_LOOK s at her speed and course now and, if that's too close, slows and stands off away
+   * from it; clear, she comes back. Deterministic: it depends only on the race's own state, step by step.
+   */
+  yieldStep(t: number, dt: number, boats: readonly Moving[], land?: (p: Vec) => boolean): void {
+    for (let i = 0; i < SERVICES.length; i++) {
+      const s = SERVICES[i]; if (!GIVES_WAY[s.kind]) continue;
+      const g = this.give[i], ty = VESSEL[s.kind], vs = ty.kt * 0.5144;
+      if (!at(s, i, t - g.lag, this.seed).moving) { g.ox = 0; g.oy = 0; g.rx = 0; g.ry = 0; g.k = 1; g.lag = Math.max(0, g.lag - dt); continue; } // (alongside: back at her berth, and she makes up lost time by leaving on schedule)
+      const me = this.place(s, i, t), ux = Math.sin(me.h * D2R), uy = Math.cos(me.h * D2R), mvx = ux * me.v, mvy = uy * me.v;
+      const pass = ty.len / 2 + GIVE_PASS;
+      let soon = Infinity, side = 0;
+      for (const b of boats) {
+        const rx = b.x - me.x, ry = b.y - me.y; if (rx * rx + ry * ry > GIVE_RANGE * GIVE_RANGE) continue;
+        const wx = b.vx - mvx, wy = b.vy - mvy, ww = wx * wx + wy * wy;
+        const tc = ww > 1e-6 ? Math.max(0, Math.min(GIVE_LOOK, -(rx * wx + ry * wy) / ww)) : 0;
+        if (Math.hypot(rx + wx * tc, ry + wy * tc) >= pass || tc >= soon) continue;
+        soon = tc; side = ux * ry - uy * rx; // (+: the boat is on her port side; −: starboard)
+      }
+      // (her route's heading here, from her timetable: the stand-off is square to it)
+      const rh = at(s, i, t - g.lag, this.seed).h * D2R, sx = Math.cos(rh), sy = -Math.sin(rh); // (starboard of heading h: (cos h, −sin h))
+      let kWant = 1; g.rx = 0; g.ry = 0;
+      if (soon < Infinity) {
+        kWant = soon < 60 ? GIVE_SLOWER : GIVE_SLOW;
+        // away from the boat: a boat on her port side, she stands off to starboard; one dead ahead, to starboard
+        let dir = side >= -1 ? 1 : -1;
+        const clear = (d: number) => !land || !land({ x: me.x + ux * 120 + sx * d * 60, y: me.y + uy * 120 + sy * d * 60 });
+        if (!clear(dir)) dir = clear(-dir) ? -dir : 0;
+        const off = g.ox * sx + g.oy * sy; // (how far she's off to starboard of her route now)
+        if (dir === 0) kWant = 0; // (land both ways: she stops, 8(e))
+        else if (!(Math.abs(off) >= GIVE_OFF && Math.sign(off) === dir)) { const r = dir * Math.max(me.v, 1) * Math.sin(GIVE_TURN * D2R); g.rx = sx * r; g.ry = sy * r; }
+      } else {
+        const o = Math.hypot(g.ox, g.oy);
+        if (o > 0) { const r = Math.min(o / dt, vs * Math.sin(GIVE_BACK * D2R)); g.rx = -g.ox / o * r; g.ry = -g.oy / o * r; }
+      }
+      const dk = GIVE_ACCEL / vs * dt; g.k += Math.max(-dk, Math.min(dk, kWant - g.k));
+      g.ox += g.rx * dt; g.oy += g.ry * dt;
+      const o = Math.hypot(g.ox, g.oy); if (o > GIVE_OFF) { g.ox *= GIVE_OFF / o; g.oy *= GIVE_OFF / o; } else if (o < 1e-3 && g.rx === 0 && g.ry === 0) { g.ox = 0; g.oy = 0; }
+      if (g.k > 0.9999 && kWant === 1) g.k = 1;
+      g.lag += (1 - g.k) * dt;
+    }
+  }
+  /** The give-way state worth recording (the race track's frames): [service, stood off east m, north m, lag s] for each
+   * vessel off her timetable; undefined when none is. */
+  givingWay(): [number, number, number, number][] | undefined {
+    let out: [number, number, number, number][] | undefined;
+    this.give.forEach((g, i) => { if (g.ox !== 0 || g.oy !== 0 || g.lag !== 0) (out ??= []).push([i, Math.round(g.ox * 10) / 10, Math.round(g.oy * 10) / 10, Math.round(g.lag * 10) / 10]); });
+    return out;
+  }
 
   /**
    * The wake reaching point p at time t: the strongest Kelvin arm passing under it now. Height (m), period (s) and the
@@ -85,10 +182,10 @@ export class Traffic {
     let best: { h: number; t: number; from: number; by: VesselKind } | null = null;
     const tan = Math.tan(19.47 * D2R);
     SERVICES.forEach((s, i) => {
-      const now = at(s, i, t, this.seed), ty = VESSEL[s.kind];
+      const now = this.place(s, i, t), ty = VESSEL[s.kind];
       if (hypot(now.x - p.x, now.y - p.y) > 2500) return;
       for (let age = 4; age < 240; age += 4) {
-        const q = at(s, i, t - age, this.seed);
+        const q = this.place(s, i, t - age); // (her track behind her as her timetable and her stand-off now put it: near enough over 4 minutes)
         if (!q.moving) continue;
         const u = { x: Math.sin(q.h * D2R), y: Math.cos(q.h * D2R) }, n = { x: u.y, y: -u.x };
         const spread = q.v * age * tan, rx = p.x - q.x, ry = p.y - q.y, along = rx * u.x + ry * u.y, side = rx * n.x + ry * n.y;
