@@ -4,18 +4,20 @@ import { workPace } from '../boat/crewWork';
 import { ensignStep, flagDrawn, flagExtension, flagHang, flagRow } from './flagWave';
 import * as THREE from 'three';
 import { D2R, KT } from '../core/math';
+import { FULL_RUDDER, HARD_OVER } from '../boat/balance';
 import { FLEET, type Boat, type Tack } from '../boat/boat';
 import { CAR_AFT, CAR_FORE_PINS, CAR_IN_PINS, JOSEPHINE_CAR, hoistedShare } from '../boat/controls';
 import { sailPlan } from '../boat/physics';
 import { guideTune, rigDrawn } from '../boat/rigTune';
-import { lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
+import { ROPES, type BoatSpec, type LineColorKey } from '../boat/spec';
+import { ROPE_LAYERS, ROPE_TILE, ropeLook, ropeTile } from './ropeLook';
 import { P3 } from './coords';
-import { buildCrew, dockhand, syncCrew, tillerTip, type Crew } from './crew';
+import { buildCrew, dockhand, pianoTail, pianoTailHeld, SHEET_N, sheetTail, syncCrew, tillerJointAt, tillerRootAt, travCam, travTail, type Crew } from './crew';
 import { burgeeCanvas, officerRule } from './burgees';
 import { flagArtCanvas, needsCourtesy } from './flagArt';
 import { DEFAULT_CREW } from '../boat/crewPhys';
 import { buildInstrument, syncInstrument, UNIT, type Instrument } from './tacktick';
-import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
+import { cabinHalf, CABIN, COCKPIT, COAMING_T, HEEL, L, TRANSOM_TOP, aftLineZ, PAINT_LINES, RUDDER_RAKE, cabinGeometry, cabinTopAt, sidePatch, cockpitLid, companionwayLid, slidingHatch, COMPANIONWAY, sheer, uAtZ, cockpitGeometry, cockpitHalf, COCKPIT_FIT, COAMING_H, thwartTop, lazaretteLids, thwartGeometry, deckGeometry, deckY, fairCurve, halfBeam, hullLevel, rail, rudderGeometry, tillerLift, tillerPivot, tillerRestDir, sheerLine, JIB_WINCH_Z, CABIN_LEAN, WINDOW, FOOTREST, footrestEdge } from './hull';
 import { NIGHT } from './night';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { cabinInteriorGeometry, cabinInteriorMaterial, lanternGeometry, makeLanternSwing, swingLantern, windowLids, type LanternSwing } from './cabinInterior';
@@ -338,8 +340,9 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
     // the wooden cap, one piece from the cabin along both sides and round the after coaming (Josephine, the owner's photo)
     const cap = [...side(-1), ...lip, ...side(1).reverse()].map(q => q.clone().setY(q.y + COAMING_H(q.z)));
     grp.add(new THREE.Mesh(wall(cap, () => 0.02, 0.04), MAT.wood));
-    // a mooring cleat on the after deck, a little to starboard of the centreline (as on Josephine)
-    const cz = (z1 + L / 2) / 2, cx = 0.12, cy = deckY(uAtZ(cz), cx);
+    // a mooring cleat on the after deck, on the centerline (the owner, 18 Nov 2026: "the aft cleat should be at centerline,
+    // not offset"), midway between the cockpit's after end and the transom; the tiller passes over it amidships, 7.8 cm clear
+    const cz = (z1 + L / 2) / 2, cx = 0, cy = deckY(uAtZ(cz), cx);
     const cleat = new THREE.Mesh(cleatGeometry(0.2, 0.016), STEEL); cleat.position.set(cx, cy, cz); grp.add(cleat);
   }
   // the footrest (Josephine, the owner's photo): one teak plank right across the cockpit's after end, its grain across
@@ -370,7 +373,11 @@ function buildHull(b: Boat, grp: THREE.Group): THREE.Group {
   const cols = new Float32Array(rg.blade.attributes.position.count * 3).fill(1);
   rg.blade.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
   turn.add(new THREE.Mesh(rg.blade, paintMaterial(hullMat.clone() as THREE.MeshPhongMaterial, C(b.hullColor), C(boot), C(paint.bottom), true)));
-  turn.add(new THREE.Mesh(rg.tiller, MAT.tiller));
+  { const til = new THREE.Mesh(rg.tiller, MAT.tiller); til.position.copy(tillerPivot()); turn.add(til); } // (on its pin: lifted there in syncBoatMesh)
+  // the rudder head's cheeks: two bronze plates either side of its top, the tiller's root held between them (bolted
+  // through), so it reads as fitted into the head, not standing on it
+  { const root = tillerPivot(), d = tillerRestDir(), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
+    for (const sx of [1, -1]) { const ch = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.07, 0.15), BRONZE); ch.quaternion.copy(q); ch.position.copy(root).addScaledVector(d, 0.03).setX(sx * 0.031); turn.add(ch); } }
   grp.add(rud);
   // her outboard on its lifting bracket on the port quarter (outboard.ts), if she carries it there: tilted up or down, the
   // prop turning, from the motor's state (syncBoatMesh)
@@ -458,6 +465,8 @@ interface Lines {
   cringles: { l: THREE.Line; sail: 'main' | 'jib' }[];
   /** The vang's tackle, from the boom's block (it swings with the boom) to the lower block on the mast's foot. */
   vang: THREE.Line;
+  /** The piano's tails (crew.ts pianoTail): each laid once, and again when someone has it in hand (Crew.pianoHold) or lets it go. */
+  pianoTails: { l: THREE.Line; side: number; i: number }[];
 }
 /**
  * The hiking rail (as on Josephine, the owner's photo): a varnished plank about 80 × 28 mm laid flat along the deck's edge
@@ -514,7 +523,7 @@ function grainUV(g: THREE.BufferGeometry, across = false): THREE.BufferGeometry 
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
 }
-const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
+export const HIKE_RAIL = { z0: CABIN_Z1, z1: -L / 2 + COCKPIT.u1 * L, inset: 0.1, w: 0.08, t: 0.028, gap: 0.014 }; // (inset: its middle, so it lies just inboard of the toerail)
 /** A plank swept along a line of points (laid flat, w across and t thick, its underside on the points): closed, with ends. */
 function plank(pts: THREE.Vector3[], w: number, t: number): THREE.BufferGeometry {
   const pos: number[] = [], idx: number[] = [], n = pts.length;
@@ -702,7 +711,7 @@ const fairlead = (side: number) => { const u = uAtZ(FAIRLEAD_Z), x = side * (hal
  * cabin top's arch), the car, two on the cabin top (it's arched: a straight run would cut through it), the cabin's edge,
  * the fairlead, the winch and two in the tail.
  * The whole line: both halves and the ring between them. */
-const JIB_HALF_PTS = 20, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
+const JIB_HALF_PTS = 18 + SHEET_N, JIB_SHEET_PTS = 2 * JIB_HALF_PTS + 1;
 /**
  * The cockpit coaming's height (m) along the boat: at least 200 mm just aft of the cabin, 140 mm at station 4.5 and
  * 80 mm at station 3 (CR 3.22); drawn a little above each.
@@ -721,9 +730,9 @@ function line(points: THREE.Vector3[], mat: THREE.Material | Rope = LINE_MAT, ke
   return l;
 }
 /**
- * Each line in the colour of its control (the owner: the drawn lines wear the colours chosen for the sail controls band,
- * the Boat page's line colours, spec.ts lineColor; none chosen: the band's defaults). One screen-line material per
- * colour, dimmed with the daylight as the role materials are (syncRopes).
+ * Each line's thin screen line in its rope's color from afar (render/ropeLook.ts: the colorway's blend; the rope's own
+ * braid is the mesh over it). One screen-line material per color, dimmed with the daylight as the role materials are
+ * (syncRopes).
  */
 const KEY_MATS = new Map<string, { mat: THREE.LineBasicMaterial; base: THREE.Color }>();
 function keyMat(hex: string): THREE.LineBasicMaterial {
@@ -737,22 +746,64 @@ function keyMat(hex: string): THREE.LineBasicMaterial {
  * braid, the wire 7 mm, CR 7.10), in its colour, all one instanced mesh, following the lines each frame as they move.
  * The thin screen lines under them still show the rig from afar, where 8 mm is less than a pixel.
  */
-interface Ropes { mesh: THREE.InstancedMesh; lines: { l: THREE.Line; r: number }[] }
-function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineColors'> | null): Ropes {
-  const lines: Ropes['lines'] = [], colors: THREE.Color[] = [];
+interface Ropes { mesh: THREE.InstancedMesh; lines: { l: THREE.Line; r: number }[]; look: THREE.InstancedBufferAttribute }
+/**
+ * The braid's texture, one layer per colorway (render/ropeLook.ts), made once and shared by every boat; mipmapped, so a
+ * rope far off reads as its colorway's blend rather than shimmering.
+ */
+let ROPE_TEX: THREE.DataArrayTexture | null = null;
+function ropeTexture(): THREE.DataArrayTexture {
+  if (ROPE_TEX) return ROPE_TEX;
+  const { around: W, along: H } = ROPE_TILE, data = new Uint8Array(W * H * 4 * ROPE_LAYERS);
+  data.set(ropeTile(), 0); ROPES.forEach((r, i) => data.set(ropeTile(r), W * H * 4 * (i + 1)));
+  const t = new THREE.DataArrayTexture(data, W, H, ROPE_LAYERS);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true;
+  return ROPE_TEX = t;
+}
+/**
+ * The rope's material: lit, with the braid's layer wrapped around each piece. Each piece carries its length, how far
+ * along its line it starts (so the braid runs on unbroken from piece to piece) and its colorway's layer.
+ */
+let ROPE_MESH_MAT: THREE.MeshLambertMaterial | null = null;
+function ropeMaterial(): THREE.MeshLambertMaterial {
+  if (ROPE_MESH_MAT) return ROPE_MESH_MAT;
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uRope = { value: ropeTexture() };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+attribute vec3 aRope;
+varying vec3 vRope;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+vRope = vec3(uv.x, (aRope.y + uv.y * aRope.x) / ${ROPE_TILE.length.toFixed(4)}, aRope.z);`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+uniform highp sampler2DArray uRope;
+varying vec3 vRope;`).replace('#include <color_fragment>', `#include <color_fragment>
+diffuseColor.rgb *= texture(uRope, vec3(vRope.x, vRope.y, floor(vRope.z + 0.5))).rgb;`);
+  };
+  m.customProgramCacheKey = () => 'rope-braid';
+  return ROPE_MESH_MAT = m;
+}
+function buildRopes(grp: THREE.Group, spec?: Pick<BoatSpec, 'lineRopes'> | null): Ropes {
+  const lines: Ropes['lines'] = [], colors: THREE.Color[] = [], layers: number[] = [];
   grp.traverse(o => {
     const l = o as THREE.Line; if (!l.isLine) return;
     const role = l.userData.rope as Rope | undefined, wire = l.material === MAT.wire, key = l.userData.key as LineColorKey | undefined;
     if (!role && !wire) return;
     lines.push({ l, r: wire ? 0.0035 : 0.004 });
-    if (key) l.material = keyMat(lineColor(spec, key));
-    const c = new THREE.Color(key ? lineColor(spec, key) : ROPE_COLOR[role ?? 'wire']);
-    for (let i = 0; i < l.geometry.attributes.position.count - 1; i++) colors.push(c);
+    // its colorway (or its band color on plain braid); the wire and the uncolored lines plain, in their own colors
+    const look = key ? ropeLook(spec, key) : null;
+    if (look) { l.material = keyMat(look.far); l.userData.ropeLayer = look.layer; l.userData.ropeId = look.rope.id; }
+    const c = new THREE.Color(look ? look.tint : ROPE_COLOR[role ?? 'wire']);
+    for (let i = 0; i < l.geometry.attributes.position.count - 1; i++) { colors.push(c); layers.push(look ? look.layer : 0); }
   });
-  const mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, colors.length));
+  const geo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), n = Math.max(1, colors.length);
+  const look = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3); look.setUsage(THREE.DynamicDrawUsage);
+  layers.forEach((z, i) => look.setZ(i, z));
+  geo.setAttribute('aRope', look);
+  const mesh = new THREE.InstancedMesh(geo, ropeMaterial(), n);
   colors.forEach((c, i) => mesh.setColorAt(i, c));
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; grp.add(mesh);
-  return { mesh, lines };
+  return { mesh, lines, look };
 }
 const R_M = new THREE.Matrix4(), R_T = new THREE.Matrix4(), R_ZERO = new THREE.Matrix4().makeScale(0, 0, 0), R_A = new THREE.Vector3(), R_B = new THREE.Vector3(), R_Q = new THREE.Quaternion(), R_S = new THREE.Vector3(), R_UP = new THREE.Vector3(0, 1, 0), R_D = new THREE.Vector3();
 const ROPE_BASE = Object.fromEntries(Object.entries(ROPE_MAT).map(([k, mt]) => [k, mt.color.clone()])) as Record<Rope, THREE.Color>;
@@ -761,7 +812,7 @@ function syncRopes(m: BoatMesh): void {
   const day = 1 - 0.85 * NIGHT.uNight.value;
   for (const k of Object.keys(ROPE_MAT) as Rope[]) ROPE_MAT[k].color.copy(ROPE_BASE[k]).multiplyScalar(day);
   for (const { mat, base } of KEY_MATS.values()) mat.color.copy(base).multiplyScalar(day);
-  const { mesh, lines } = m.ropes; let k = 0;
+  const { mesh, lines, look } = m.ropes; let k = 0;
   for (const { l, r } of lines) {
     // (a line that never moves in the boat's frame is laid once)
     if (l.userData.fixed && l.userData.laid) { k += l.geometry.attributes.position.count - 1; continue; }
@@ -770,15 +821,17 @@ function syncRopes(m: BoatMesh): void {
     R_M.identity(); let shown = true;
     for (let o: THREE.Object3D | null = l; o && o !== m.grp; o = o.parent) { if (!o.visible) shown = false; o.updateMatrix(); R_M.premultiply(o.matrix); }
     const P = l.geometry.attributes.position, n = P.count;
+    let along = 0; // (how far along the line each piece starts, within one tile: the braid runs on unbroken)
     for (let i = 0; i < n - 1; i++, k++) {
       R_A.fromBufferAttribute(P, i).applyMatrix4(R_M); R_B.fromBufferAttribute(P, i + 1).applyMatrix4(R_M);
       const len = R_D.subVectors(R_B, R_A).length();
+      look.setXY(k, len, along); along = (along + len) % ROPE_TILE.length;
       if (!shown || len < 1e-4) { mesh.setMatrixAt(k, R_ZERO); continue; }
       R_Q.setFromUnitVectors(R_UP, R_D.divideScalar(len));
       mesh.setMatrixAt(k, R_T.compose(R_A.add(R_B).multiplyScalar(0.5), R_Q, R_S.set(r, len, r)));
     }
   }
-  mesh.instanceMatrix.needsUpdate = true;
+  mesh.instanceMatrix.needsUpdate = true; look.needsUpdate = true;
 }
 
 /**
@@ -798,7 +851,7 @@ function deckFittings(grp: THREE.Group): void {
   for (const sx of [-1, 1]) screw(new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z));
   screw(FORESTAY_DECK.clone(), HOUNDS);
   parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.16).translate(0, FORESTAY_DECK.y + 0.006, FORESTAY_DECK.z - 0.03)); // the stemhead plate
-  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * 0.3, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
+  for (const sx of [-1, 1]) { const q = new THREE.Vector3(sx * BS_CHAINPLATE_X, sheer(1) + 0.01, 3.64); parts.push(new THREE.BoxGeometry(0.025, 0.04, 0.05).translate(q.x, q.y + 0.01, q.z)); }
   { const cz = FORESTAY_DECK.z + 0.35, cy = deckY(uAtZ(cz), 0);
     parts.push(cleatGeometry(0.2, 0.016).translate(0, cy, cz)); }
   const flat = parts.map(g => { const q = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(q.attributes)) if (k !== 'position' && k !== 'normal') q.deleteAttribute(k); return q; });
@@ -846,11 +899,11 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   // forward face to a cam (Josephine under way, looking aft: the lines along the thwart's face to its ends)
   const travLines: THREE.Line[] = [];
   for (const side of [-1, 1]) {
-    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = new THREE.Vector3(side * (TRAV_HALF + 0.12), ty - 0.06, TRAV_Z - THWART_FACE);
+    const end = new THREE.Vector3(side * (TRAV_HALF + 0.04), ty + 0.02, TRAV_Z), cam = travCam(side);
     const bk = sheaveBlock(0.018, 0.03); bk.position.copy(end).setY(ty); bk.rotation.y = Math.PI / 2; grp.add(bk);
     const cm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.025), BLACK); cm.position.copy(cam).setZ(cam.z - 0.012); grp.add(cm);
     // (in the mainsheet's colour, as the sail band shows the traveller: its car rides with the mainsheet)
-    const tl = line([end.clone(), end.clone(), cam, cam.clone().add(new THREE.Vector3(-side * 0.02, -0.2, -0.03))], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl);
+    const tl = line([end.clone(), end.clone(), cam, ...travTail(cam, undefined, side)], 'main', 'mainsheet'); grp.add(tl); travLines.push(tl); // (its last two: over the hiker's lap and into the hand, or falling from the cam)
   }
   // backstay: masthead down to a bridle, which splits to both quarters (pulling the bridle down tensions it)
   const backstay = line([MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD, MASTHEAD], MAT.wire); grp.add(backstay);
@@ -980,6 +1033,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.012, 0.003, 6, 12), STEEL); ring.position.set(MAST_ATH / 2 + 0.006, JC.top + 0.05, JC.z); ring.rotation.y = Math.PI / 2; grp.add(ring); // (the ring it clips to with the sails stowed)
     for (const [y, dy] of [[JC.top, 0.03], [JC.low, -0.03]] as const) { const bk = sheaveBlock(0.014, dy); bk.position.set(JC.x, y, JC.z); bk.rotation.y = Math.PI / 2; grp.add(bk); } }
   const cringles: Lines['cringles'] = [];
+  const pianoTails: Lines['pianoTails'] = [];
   const PIANO: Record<'S' | 'P', LineColorKey[]> = { S: ['vang', 'outhaul', 'jibCunningham', 'jibHalyard'], P: ['vang', 'outhaul', 'cunningham', 'jibCunningham', 'downhaul'] };
   for (const [tk, side] of [['S', 1], ['P', -1]] as const) PIANO[tk].forEach((key, i) => {
     const x = side * (0.37 + 0.065 * i), cp = onTop(x, zA), role: Rope = key === 'jibCunningham' || key === 'jibHalyard' ? 'jib' : 'main';
@@ -991,8 +1045,9 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
     const fb = footBlock(side, i), mid = new THREE.Vector3(x * 0.95, 0, zClear);
     fixed(line([cp, ...lay(cp, mid), ...lay(mid, fb.clone())], role, key));
     // the tail: aft over the cabin's after edge and down its face into the cockpit (not through the cabin's corner)
-    { const zE = -L / 2 + CABIN.u1 * L, top = cabinTopAt(uAtZ(zE - 0.004), x) + 0.012;
-      fixed(line([cp.clone().setZ(zA + 0.02), new THREE.Vector3(x, top, zE - 0.004), new THREE.Vector3(x, top - 0.02, zE + 0.012), new THREE.Vector3(x + side * 0.02, cp.y - 0.25 - 0.04 * i, zE + 0.05)], role, key)); }
+    // (crew.ts pianoTail: where the hands of whoever works it close on it, so the hands and the line agree; drawn to
+    // their fists while it's in hand, syncLines)
+    pianoTails.push({ l: fixed(line(pianoTail(side, i), role, key)), side, i });
     if (key === 'vang') fixed(line([fb, VANG_FOOT.clone().add(new THREE.Vector3(side * 0.012, -0.02, 0))], 'main', 'vang')); // the vang's tail, to its lower block
     else if (key === 'outhaul') upMast([fb, new THREE.Vector3(side * 0.03, fb.y + 0.1, MAST_AFT_Z + 0.012), new THREE.Vector3(side * 0.015, BOOM_TOP - BOOM_R, MAST_AFT_Z + 0.012)], 'main', 'outhaul');
     else if (key === 'cunningham') { // up the port side outside the boom, a block at the gooseneck, and in to the cringle (which comes down with the sail)
@@ -1029,7 +1084,7 @@ function buildLines(grp: THREE.Group, boomPivot: THREE.Group): Lines {
   for (const [y0, h] of [[DECK_AT_MAST - 0.01, 0.13], [BOOM_TOP - 0.03, 0.03]] as const) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, h, 14), BLACK); band.scale.set(MAST_ATH + 0.006, 1, MAST_FA + 0.006); band.position.set(0, y0 + h / 2, MAST_Z); grp.add(band);
   }
-  const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang };
+  const out: Lines = { travCar, backstay, cars, carBars, handles, jibSheet, clewRing, winches, travLines, mastLines, cringles, vang, pianoTails };
   // the fittings that never move on her (the blocks, cleats, eyes, the jammer): one mesh per material, not one each,
   // so the rigging's dozens of small parts cost the GPU a couple of draw calls a boat
   const moving = new Set<THREE.Object3D>(); for (const v of Object.values(out)) for (const o of (Array.isArray(v) ? v : [v])) if (o instanceof THREE.Object3D) moving.add(o);
@@ -1058,8 +1113,6 @@ const VANG_FOOT = horseshoeAt(0).add(new THREE.Vector3(0, 0.05, 0)); // (shackle
  * frame). Estimates from the photos. */
 const VANG_BOOM = 0.9, VANG_LEGS = [VANG_BOOM - 0.2, VANG_BOOM + 0.2];
 const VANG_SPAN = (() => { const top = new THREE.Vector3(0, BOOM_TOP - 2 * BOOM_R, VANG_BOOM), foot = new THREE.Vector3(0, VANG_FOOT.y, VANG_FOOT.z - MAST_AFT_Z); return top.addScaledVector(foot.sub(top).normalize(), 0.3); })();
-/** The thwart's forward face from the track's centreline (its half depth, hull.ts). */
-const THWART_FACE = COCKPIT_FIT.thwart.half;
 /** The Cunninghams' cringles: the main's above its tack, the jib's up its luff from the tack (estimates: not in the photos). */
 const MAIN_CUNNINGHAM_UP = 0.22, JIB_CUNNINGHAM_UP = 0.3;
 
@@ -1115,6 +1168,18 @@ const TAPE_HEIGHT = 1.4, RIBBON_LEN = 0.45, RIBBON_W = 0.025, RIBBON_N = 8;
 const RIBBON_MAT = new THREE.MeshPhongMaterial({ color: 0x3b2516, specular: 0x8a7a6a, shininess: 80, side: THREE.DoubleSide });
 const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
 
+/** The toerail's inner face, in from the sheer (it stands 3 cm in, 3 cm thick), and the backstay's chainplates, out from
+ * the centerline (deckFittings). */
+const TOERAIL_IN = 0.045, BS_CHAINPLATE_X = 0.3;
+/**
+ * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. Its foot in a flush silver socket in the
+ * after deck at the starboard quarter, where the owner measured Josephine's (18 Nov 2026): "equidistant from the toe rail
+ * and the starboard chain plate of the back stay", and "about two inches forward" of the deck's aft edge. The tiller stops
+ * on the deck well short of it (tests/ensignstaff.test.ts). Photos: reference/photos/josephine-ensign-socket-port-
+ * quarter.jpg (from the dock looking aft: her starboard side) and josephine-ensign-socket-from-cockpit.jpg.
+ */
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = (halfBeam(uAtZ(z)) - TOERAIL_IN + BS_CHAINPLATE_X) / 2, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+  return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
   const alu = b.build.spars === 'aluminium', aluBoom = (b.build.boom ?? b.build.spars) === 'aluminium';
@@ -1319,14 +1384,17 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (needsCourtesy(b.ensign)) { hoist(flagArtCanvas('us'), flagBlock(1), 0.25, rig); clubHoist(-1); }
   else clubHoist(1);
   if (b.ensign) {
-    // on an ensign staff in a socket on the starboard quarter, close to the centreline (the backstay and tiller have the
-    // middle of the transom), raked aft; the flag about an inch of fly per foot of boat (a 24-inch fly)
-    const ens = flagArtCanvas(b.ensign), staffH = 1.0, rake = 0.22, base = new THREE.Vector3(0.3, sheer(1) + 0.02, L / 2 - 0.08);
+    // on an ensign staff in its deck socket at the starboard quarter (ENSIGN_STAFF), raked aft; the flag about an
+    // inch of fly per foot of boat (a 24-inch fly)
+    const ens = flagArtCanvas(b.ensign), { h: staffH, rake, base } = ENSIGN_STAFF;
     const staffG = new THREE.Group(); grp.add(staffG);
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, staffH, 6), MAT.wood);
-    const top = base.clone().add(new THREE.Vector3(0, Math.cos(rake) * staffH, Math.sin(rake) * staffH));
+    const top = ENSIGN_STAFF.top;
     staff.position.copy(base.clone().lerp(top, 0.5)); staff.rotation.x = rake; staffG.add(staff);
     const truck = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), MAT.wood); truck.position.copy(top); staffG.add(truck);
+    // (its socket: a flush silver ring in the deck, there whether the staff's shipped or not)
+    const socket = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.005, 6, 16).scale(1, 1, 0.4).rotateX(Math.PI / 2), CHROME);
+    socket.position.copy(base).add(new THREE.Vector3(0, 0.002, 0)); grp.add(socket);
     if (ens) hoist(ens, top.clone().add(new THREE.Vector3(0, -0.03, 0)), 0.61 * ens.height / ens.width, staffG, false);
     const flag = ens ? flags[flags.length - 1].mesh : null;
     // (down the staff no further than leaves the flag's foot clear of the deck: a Danish or Norwegian ensign is deep in the hoist)
@@ -1510,8 +1578,9 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   { const u = (m.grp.userData.below as ReturnType<typeof cabinInteriorMaterial>).uniforms;
     swingLantern(m.lantern, m.grp, Math.max(0, dt), u.uLampAt.value);
     u.uLampUp.value.set(0, 1, 0).applyQuaternion(m.lantern.arm.quaternion); }
-  const want = Math.max(-0.5, Math.min(0.5, (b.helm ?? 0) * 0.5)); // full helm ~0.5 rad
-  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 8);
+  const want = Math.max(-HARD_OVER, Math.min(HARD_OVER, (b.helm ?? 0) * FULL_RUDDER)) * D2R; // (the blade and the tiller where they are: to hard over, almost flush with the transom)
+  m.rudder.rotation.y += (want - m.rudder.rotation.y) * Math.min(1, dt * 20); // (with your hand: no slower than a tiller swings)
+  m.rudder.children[1].rotation.x = tillerLift(m.rudder.rotation.y); // (riding up on its pin over the coaming and the rail, turned far over)
   // the windex swings into the apparent wind (damped, as a real one is); the compass card turns with the heading
   const wantW = -b.arel * D2R, curW = m.windex.rotation.y, dW = Math.atan2(Math.sin(wantW - curW), Math.cos(wantW - curW));
   m.windex.rotation.y = curW + dW * Math.min(1, dt * 5);
@@ -1548,7 +1617,8 @@ export function syncBoatMesh(m: BoatMesh, b: Boat, t: number, wave?: { heave: nu
   const live = !hold || m.liveT == null, ldt = m.liveT == null || m.liveT < 0 ? dt : Math.min(0.15, Math.max(0, t - m.liveT));
   if (live) m.liveT = t;
   const pd = b.paddle, who = pd ? paddler(b) : 0;
-  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerTip(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
+  if (live) m.crew.tillerRoot = tillerRootAt(m.rudder);
+  if (live) syncCrew(m.crew, b.rel >= 0 ? 1 : -1, b.crew, ldt, m.hideHelm, tillerJointAt(m.rudder), b.heel, b.tacking, pitch, pd ? { side: pd.side, back: !!pd.back, fetch: PADDLE.fetchS / workPace(b, who), who, key: pd.t0 } : null, Math.abs(b.rel) > 110);
   if (live && b.pushing) dockhand(m.crew, b.pushing, 0.45, deckY(uAtZ(-0.55), halfBeam(uAtZ(-0.55)) - 0.15), t); // (the docks' top: render/marina.ts)
   // positive rotation swings the boom to starboard (+x); b.boom is negative when the wind is from starboard, so it goes to port, to leeward
   m.boomPivot.rotation.y = b.boom * D2R;
@@ -1718,6 +1788,19 @@ function syncLines(m: BoatMesh, b: Boat): void {
   const L2 = m.lines, c = b.ctl, lee = b.tack === 'S' ? -1 : 1; // the leeward side (x sign)
   // traveller car: +1 is to leeward; the mainsheet runs from the boom end down to it
   const cx = lee * c.traveller * TRAV_HALF; L2.travCar.position.x = cx;
+  // (the windward traveller line's tail up to the hiker holding it, if one is: Crew.travHand; else hanging from its cam)
+  { const th = (m.crew as { travHand?: THREE.Vector3 }).travHand;
+    for (const [n, tl] of L2.travLines.entries()) { const side = n ? 1 : -1, pa = tl.geometry.attributes.position as THREE.BufferAttribute;
+      travTail(tmpG.set(pa.getX(2), pa.getY(2), pa.getZ(2)), th, side).forEach((q, j) => pa.setXYZ(3 + j, q.x, q.y, q.z));
+      pa.needsUpdate = true; } }
+  // (the cabin-top line in someone's hands: its tail pulled off the cabin's face to their fists, Crew.pianoHold; let go,
+  // it hangs back where it was)
+  { const ph = m.crew.pianoHold;
+    for (const pt of L2.pianoTails) { const held = !!ph && ph.side === pt.side && ph.i === pt.i;
+      if (!held && !pt.l.userData.held) continue;
+      const pa = pt.l.geometry.attributes.position as THREE.BufferAttribute;
+      (held ? pianoTailHeld(pt.side, pt.i, ph!.fists) : pianoTail(pt.side, pt.i)).forEach((q, j) => pa.setXYZ(j, q.x, q.y, q.z));
+      pa.needsUpdate = true; pt.l.userData.held = held; pt.l.userData.laid = false; } }
   const a = b.boom * D2R, p = m.mainsheet.geometry.attributes.position as THREE.BufferAttribute;
   // (from the lower block's sheave on the car up to the upper block's under the boom)
   // (four parts between the car's block and the two blocks under the boom, the after one then the forward one, then the
@@ -1728,7 +1811,9 @@ function syncLines(m: BoatMesh, b: Boat): void {
       if (i % 2) { const r = MS_R + (i === 1 ? MS_GAP / 2 : -MS_GAP / 2); p.setXYZ(i, Math.sin(a) * r + ux * o, hy, boomZ + Math.cos(a) * r + uz * o); }
       else p.setXYZ(i, lo.x + ux * o, lo.y, lo.z + uz * o);
     }
-    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; } // (the tail, falling to the helmsman's side of the cockpit)
+    // (the tail, aft to the helm's fist when they have it, else falling to the helmsman's side of the cockpit)
+    const mh = (m.crew as { mainHand?: THREE.Vector3 }).mainHand;
+    p.setXYZ(5, cx, lo.y + 0.04, TRAV_Z + 0.06); if (mh) p.setXYZ(6, mh.x, mh.y, mh.z); else p.setXYZ(6, cx * 0.6, lo.y - 0.3, TRAV_Z + 0.4); p.needsUpdate = true; }
   // the vang: four parts from the boom's block (where the boom has swung it) down to the lower block on the mast's foot
   { const q = L2.vang.geometry.attributes.position as THREE.BufferAttribute, ux = Math.cos(a), uz = -Math.sin(a), boomZ = m.boomPivot.position.z;
     const top = tmpG.set(Math.sin(a) * VANG_SPAN.z, VANG_SPAN.y, boomZ + Math.cos(a) * VANG_SPAN.z); // (the span's block, where the boom has swung it)
@@ -1804,11 +1889,10 @@ function syncLines(m: BoatMesh, b: Boat): void {
     for (let k = 1; k <= 3; k++) { const t = k / 3, x = car.x + (ex - car.x) * t, z = car.z + (ez - car.z) * t; at(13 + k, x, restOn(x, z) + 0.012, z); }
     at(17, fl.x, fl.y + 0.035, fl.z);
     const wv = L2.winches[tk]; at(18, wv.x, wv.y, wv.z);
-    // (the tail: off the winch's top, over the coaming, clear of its top now the winch is about flush with it, and down
-    // onto the cockpit seat)
-    const u = uAtZ(wv.z), ci = cockpitHalf(u), coam = deckY(u, ci + COAMING_T) + COAMING_H(wv.z);
-    at(19, side * (ci - 0.01), Math.max(wv.y + 0.02, coam + 0.02), wv.z + 0.04);
-    at(20, side * (ci - 0.2), wv.y - 0.32, wv.z + 0.3);
+    // (the tail: crew.ts sheetTail, over the coaming onto the seat, or across to the hand of the hiker who has the working
+    // sheet: Crew.sheetHand)
+    const sh = (m.crew as { sheetHand?: THREE.Vector3 }).sheetHand;
+    sheetTail(wv, side, loaded ? sh : undefined, loaded ? (m.crew as { sheetHand2?: THREE.Vector3 }).sheetHand2 : undefined).forEach((p, j) => at(19 + j, p.x, p.y, p.z));
   }
   q.needsUpdate = true;
 }

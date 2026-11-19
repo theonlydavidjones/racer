@@ -60,7 +60,9 @@ describe('In light air the crew set the lines for her course, not the angles she
     const steady = run(false), worked = run(true);
     expect(worked.first.outhaul, 'the outhaul flattened within a gust-lull cycle of the breeze').toBeLessThan(120 + LINE_GAP);
     expect(Math.abs(worked.first.outhaul! - steady.first.outhaul!), 'as soon as with a steady helm').toBeLessThan(5);
-    const b = worked.b, L = depowerLimits(b.depower ?? 0, b.awaSlow, 16, b.settle![SETTLE.guideAwa]);
+    // (their floors as they read the guide: a steady 16 kt can read a little under, in the 15 kt step's knot, where its
+    // floor is the lower range's: controls.ts guideLimits)
+    const b = worked.b, L = depowerLimits(b.depower ?? 0, b.awaSlow, b.settle![SETTLE.guideKt], b.settle![SETTLE.guideAwa]);
     for (const k of ['outhaul', 'cunningham'] as const) expect(b.ctl[k], `${k} up to its floor`).toBeGreaterThan((L.min[k] ?? 0) - 0.05);
   });
   it('a steady close reach is read the same whichever way she came to it: the guide\'s angle and its ceiling, from the beat or from a broad reach', () => {

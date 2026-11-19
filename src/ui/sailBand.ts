@@ -8,9 +8,8 @@ import type { Command } from '../sim/commands';
 import { CAR, carFree, workPace } from '../boat/crewWork';
 import { mainsheetFor } from '../boat/controls';
 import { D2R } from '../core/math';
-import { LINE_LABEL, LINE_NAME, lineHelp, type CtlKey } from './lines';
-import { LINE_COLORS, lineColor, type BoatSpec, type LineColorKey } from '../boat/spec';
-import { JUMPER_HALF_TURN_S } from '../boat/condition';
+import { LINE_LABEL, LINE_NAME, type CtlKey } from './lines';
+import { DEFAULT_ROPES, lineRope, type BoatSpec, type LineColorKey, type Rope } from '../boat/spec';
 import { TUNE_PRESETS, TUNE_RANGE, guideTune } from '../boat/rigTune';
 import { ROPE_IN, boomAtIn, jibsheetAtIn, jibsheetTotal, mainsheetIn } from './ropeScale';
 import { pointOfSailWord } from './pointOfSail';
@@ -86,29 +85,33 @@ const chev = (dir: 'u' | 'd' | 'l' | 'r') => {
 };
 /** Short two-line names over the vertical lines. */
 const SHORT: Partial<Record<CtlKey, string>> = { downhaul: 'Main<br>hal.', jibHalyard: 'Jib<br>hal.', jibCunningham: 'Jib<br>Cunn', cunningham: 'Main<br>Cunn', outhaul: 'Out-<br>haul', vang: 'Vang', jibsheet: 'Jib<br>sheet', jibsheetW: 'Jib<br>sheet' };
-/** Each rope's colour, with a laid fleck: the boat's own (chosen in the boat editor, boat/spec.ts lineColors), or the
- * usual ones (the owner: for usability; none port red or starboard green). */
-const ROPE: Partial<Record<CtlKey | 'jib', string>> = { ...LINE_COLORS, jib: LINE_COLORS.jibsheet };
+/**
+ * Each rope as it is: her colorway (the boat editor's Lines, boat/spec.ts lineRope; the usual ones until she has her
+ * own), its color laid with the braid's twill, and its fleck or tracer over it (styles 07-band). The usual ones keep
+ * the band's idea (the owner: the jib's lines warm, the main's cool; none plain port red or starboard green).
+ */
+const ropeVars = (r: Rope) => `--rope:${r.base};--fleck:${r.kind === 'fleck' ? r.mark : 'transparent'};--tracer:${r.kind === 'tracer' ? r.mark : 'transparent'}`;
+const ROPE: Partial<Record<CtlKey | 'jib', string>> = Object.fromEntries([...Object.keys(DEFAULT_ROPES), 'jib'].map(k => [k, ropeVars(lineRope(null, (k === 'jib' ? 'jibsheet' : k) as LineColorKey))]));
 /** The colour key of a band element's line ('jib' is both jib sheets; the traveller's car rides with the mainsheet). */
-const colorKey = (k: string): LineColorKey | null => (k === 'jib' ? 'jibsheet' : k === 'traveller' ? 'mainsheet' : k in LINE_COLORS ? (k as LineColorKey) : null);
+const colorKey = (k: string): LineColorKey | null => (k === 'jib' ? 'jibsheet' : k === 'traveller' ? 'mainsheet' : k in DEFAULT_ROPES ? (k as LineColorKey) : null);
 
 /** A vertical line: its name, ▲ eases, the well with the rope showing how much is on, ▼ pulls on. */
 const vert = (key: CtlKey | 'jib', side: Side) => {
-  const k = key === 'jib' ? 'jibsheet' : key, col = ROPE[key] ?? '#ccc';
-  return `<div class="sb-v" data-line="${key}" data-side="${side}" style="--rope:${col}">
+  const k = key === 'jib' ? 'jibsheet' : key, col = ROPE[key] ?? '--rope:#ccc';
+  return `<div class="sb-v" data-line="${key}" data-side="${side}" style="${col}">
   <button type="button" class="sb-nm" data-act="name">${SHORT[k]}</button>
   <button type="button" class="sb-a" data-act="ease" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: ease">${chev('u')}</button>
   <span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span>
   <button type="button" class="sb-a" data-act="pull" aria-label="${key === 'jib' ? 'Jib sheet' : LINE_LABEL[k]}: pull on">${chev('d')}</button></div>`;
 };
 /** The backstay's end on one side, pulled outboard. */
-const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="--rope:${ROPE.backstay}">
+const bstay = (side: Side) => `<div class="sb-h sb-${side}" data-line="backstay" data-side="${side}" style="${ROPE.backstay}">
   <button type="button" class="sb-nm" data-act="name">Backstay</button>
   <span class="sb-hrow">${side === 'P'
     ? `<button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('r')}</button>`
     : `<button type="button" class="sb-a" data-act="ease" aria-label="Backstay: ease">${chev('l')}</button><span class="sb-well" data-act="drag"><span class="sb-rope"></span><span class="sb-tk"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span></span><button type="button" class="sb-a" data-act="pull" aria-label="Backstay: pull on">${chev('r')}</button>`}</span></div>`;
 /** A track across the boat (port end left): the mainsheet's boom marker or the traveller's car. */
-const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="--rope:${ROPE.mainsheet}">
+const track = (k: 'mainsheet' | 'traveller', label: string) => `<div class="sb-trk" data-line="${k}" style="${ROPE.mainsheet}">
   <button type="button" class="sb-nm" data-act="name">${label}</button><span class="sb-end p">P</span>
   <button type="button" class="sb-a" data-act="left" aria-label="${k === 'mainsheet' ? 'Boom toward port' : 'Car to port'}">${chev('l')}</button>
   <span class="sb-rail" data-act="drag"><span class="sb-mid"></span><span class="sb-mark"></span><span class="sb-cue" hidden></span><span class="sb-${k === 'mainsheet' ? 'boom' : 'car'}"></span></span>
@@ -166,23 +169,71 @@ const jcar = (side: Side) => {
   <span class="sb-h-grid">${holes}<span class="sb-xbar"></span><span class="sb-jcar"></span><span class="sb-jwant"></span><span class="sb-jideal"></span></span><span class="sb-tag"></span></div>`;
 };
 
+/**
+ * What each control does and why, one line (the owner, 18 Nov 2026: "no one will read this"; no brand names on screen).
+ * Their bases, for whoever changes a line: jumpers, the class tuning guide (tight: lower mast curves, top straight, so a
+ * closed upper leech; loose: the top bends open; loose in light air and strong winds, 2-3 turns in medium) and rigTune.ts
+ * JUMPER (-0.6 deg of twist a turn); the vang, the guide's "never use the kickingstrap upwind in less than 18 knots"
+ * (controls.ts guideLimits); the outhaul and Cunningham, the guide's 5 and 12 kt ranges; the rest, lines.ts LINE_ENDS and
+ * LINE_WHAT (the model's own effects). The jib car's in-out lead says only what the sim does (a wider lead, the clew outboard, a fuller
+ * lower jib; controls.ts leadAt, 11.6 to 13.7 deg); "chop" is left out, no Folkboat source says it (the owner picked this line, r252). The band's clicks and scrolls are in the Keys screen's "How to sail her".
+ */
+export const BAND_TIPS = {
+  jumpers: "On closes the main's top leech: medium air. Off in light air and a breeze. Left arrow on.",
+  mainsheet: 'In for power and pointing; ease to spill a puff or reach.',
+  traveller: 'Up to windward in light air; down to leeward in a puff to spill power.',
+  backstay: 'On in a breeze: flatter main, less power, straighter jib luff.',
+  vang: 'On to hold the leech closed reaching and running; upwind only past 18 kt.',
+  outhaul: 'Eased for a fuller, powerful foot in light air; on to flatten in a breeze.',
+  cunningham: 'On as the wind builds, to keep the draft forward.',
+  downhaul: 'Set before the start: tight keeps the draft forward for a breeze.',
+  jibCunningham: "On as the wind builds, to hold the jib's draft forward.",
+  jibHalyard: "Set before the start: tight keeps the jib's draft forward for a breeze.",
+  jib: 'In to point; eased for speed and reaching.',
+  car: 'Forward for power, aft to depower. In to point; out for a wider, fuller slot.',
+  windex: 'Arrow: the apparent wind. Red wedge: too close, the sails luff.',
+  pole: 'Holds the jib out for wing-on-wing, past about 150° true.',
+  hoistMain: 'Hauls the main up; head to wind makes it easy.',
+  hoistJib: 'Hauls the jib up, or lets it run.',
+  paddle: 'Paddle on port or starboard; click again to stop.',
+  motor: 'Down, Start, then gear and throttle; tilt up to sail.',
+  autoTrim: 'The crew trims every line; touch one to take it.',
+  handBack: 'Your lines go back to the crew; the pole stays yours.'
+} as const;
+/** The control's name, bold in the Coach card ahead of its tip (app.ts help() bolds what comes before the first colon). */
+const BAND_NAME: Record<keyof typeof BAND_TIPS, string> = {
+  jumpers: 'Jumpers', mainsheet: 'Mainsheet', traveller: 'Traveler', backstay: 'Backstay', vang: 'Vang', outhaul: 'Outhaul',
+  cunningham: 'Cunningham', downhaul: 'Main halyard', jibCunningham: 'Jib Cunningham', jibHalyard: 'Jib halyard', jib: 'Jib sheet',
+  car: 'Jib car', windex: 'Windex', pole: 'Whisker pole', hoistMain: 'Main hoist', hoistJib: 'Jib hoist', paddle: 'Paddle',
+  motor: 'Motor', autoTrim: 'Auto-Trim', handBack: 'Hand Back'
+};
+const bandHelp = (k: keyof typeof BAND_TIPS) => `${BAND_NAME[k]}: ${BAND_TIPS[k]}`;
+
 /** The jumpers (CR 7.40: adjustable above deck while racing), when her Rig tune says so: a small dial at each end of
  * the band, as her two jumpers are, one each side, set alike (the crew turns both). A turnbuckle's turns, 0 to 5 in half
  * turns, round the dial's arc: the tall tick North Sails' medium, the needle where they are, a dashed one where the crew
- * is turning them to. Click the dial's left half for a half turn off, the right half for a half turn on, or scroll on it.
- * Steel grey, as the standing rigging. */
+ * is turning them to. A curved arrow each side, both pointing up, the way the needle goes (the owner, 18 Nov 2026): the
+ * left one round clockwise, a half turn on; the right one counterclockwise, a half turn off. Steel gray, as the standing
+ * rigging. */
 const JMAX = TUNE_RANGE.jumperTurns[1];
+/** The jumpers' turns as the band shows them: the nearest half turn, within the turnbuckle's 0 to 5 (and 0 for anything
+ * not a number), so the readout is never longer than "2.5". */
+export const jumperTurnsShown = (v: number) => Number.isFinite(v) ? Math.max(0, Math.min(JMAX, Math.round(v * 2) / 2)) : 0;
 /** Where on the dial's arc a setting sits: 0 turns at lower left, 5 at lower right (a 270° sweep, clockwise). */
 const jAng = (v: number) => -135 + (v / JMAX) * 270;
 const jdial = (side: Side) => {
   let ticks = '';
   for (let i = 0; i <= JMAX * 2; i++) { const v = i / 2, med = v === TUNE_PRESETS.medium.jumperTurns; ticks += `<line x1="20" y1="${med ? 1.5 : 3}" x2="20" y2="${i % 2 ? 5.5 : 6.5}" transform="rotate(${jAng(v)} 20 20)" class="${med ? 'med' : ''}"/>`; }
   return `<div class="sb-jd" data-jump data-side="${side}" hidden><span class="sb-jl">Jumpers</span>
-  <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18.5" class="ring"/><g class="tk">${ticks}</g>
+  <span class="sb-jrow">${jarrow('cw')}<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18.5" class="ring"/><g class="tk">${ticks}</g>
   <line class="tgt" x1="20" y1="20" x2="20" y2="7"/><line class="ndl" x1="20" y1="20" x2="20" y2="6.5"/><circle cx="20" cy="20" r="2"/>
-  <text x="20" y="33" text-anchor="middle" class="jv"></text></svg>
-  <button type="button" class="sb-jh l" data-act="jless" aria-label="Jumpers: a half turn off"></button><button type="button" class="sb-jh r" data-act="jmore" aria-label="Jumpers: a half turn on"></button></div>`;
+  <text x="20" y="33" text-anchor="middle" class="jv"></text></svg>${jarrow('ccw')}</span>
+  </div>`;
 };
+/** A curved arrow up the dial's side (the left one clockwise round it, the right one counterclockwise): its button. */
+const jarrow = (dir: 'cw' | 'ccw') => `<button type="button" class="sb-ja" data-act="${dir === 'cw' ? 'jmore' : 'jless'}" aria-label="Jumpers: a half turn ${dir === 'cw' ? 'on (clockwise)' : 'off (counterclockwise)'}"><svg viewBox="0 0 14 40" aria-hidden="true">${dir === 'cw'
+  ? '<path d="M11 33 A15 15 0 0 1 9 9"/><path d="M5 10 L9.5 5 L12 11" class="hd"/>'
+  : '<path d="M3 33 A15 15 0 0 0 5 9"/><path d="M9 10 L4.5 5 L2 11" class="hd"/>'}</svg></button>`;
 
 /** The tab on the band's top edge that says who trims (the owner, 13 Nov 2026: "tab should just say 'Auto-Trim' when its
  * all auto trim, and 'Hand Back' when 1 or more lines are manual"): any line or either jib car yours. (Not the whisker
@@ -223,9 +274,9 @@ export class SailBand {
   constructor(private host: BandHost, parent: HTMLElement) {
     const el = this.el = document.createElement('div');
     el.id = 'sailBand'; el.className = 'sailband'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Sail controls, as you face forward from the helm: port on the left');
-    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="The main: hauled up (or struck: its halyard let run) at the mast, by the forward hand or, sailing alone, by you. Head to wind it goes up easily; the last few inches are the main halyard's at the piano."></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="The jib: hauled up (or struck: its halyard let run) at the mast. The last few inches are the jib halyard's at the piano."></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="Paddle with the boom crutch over port (&lt;) or starboard (&gt;); click it again to stop. Racing, only as rule 42.3 allows."><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="Her outboard: tilt it down into the water, pull-start it (in neutral), then the gear and the throttle. Tilt it up to sail."><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
+    el.innerHTML = `<div class="sb-edge"><span class="sb-ltabs"><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="main" hidden data-help="${bandHelp('hoistMain')}"></button><button type="button" class="sb-tab sb-hoist" data-act="hoist" data-sail="jib" hidden data-help="${bandHelp('hoistJib')}"></button><button type="button" class="sb-tab sb-hail" data-act="hail" hidden></button><span class="sb-tab sb-pen" hidden></span><span class="sb-tab sb-paddle" hidden data-help="${bandHelp('paddle')}"><button type="button" data-act="padP" aria-label="Paddle on port">&lt;</button><span>Paddle</span><button type="button" data-act="padS" aria-label="Paddle on starboard">&gt;</button></span><span class="sb-tab sb-motor" hidden data-help="${bandHelp('motor')}"><span class="mo-n">Motor</span><button type="button" data-act="mo" data-mo="tilt">Down</button><button type="button" data-act="mo" data-mo="start">Start</button><span class="mo-g"><button type="button" data-act="mo" data-mo="F" title="Ahead">F</button><button type="button" data-act="mo" data-mo="N" title="Neutral">N</button><button type="button" data-act="mo" data-mo="R" title="Astern">R</button><button type="button" data-act="mo" data-mo="swivel" title="No reverse gear: turn it round on its bracket to push astern (then F)">Swivel</button></span><button type="button" data-act="mo" data-mo="less" title="Throttle back">−</button><span class="mo-thr">0%</span><button type="button" data-act="mo" data-mo="more" title="More throttle">+</button><button type="button" data-act="mo" data-mo="castoff" title="The crew casts off her lines: she's yours to motor out">Cast off</button><button type="button" data-act="mo" data-mo="stow">Stow</button></span></span>
 <span class="sb-tillerslot"></span>
-<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="Whisker pole: it goes out to windward, opposite the boom, and holds the jib's clew out there (wing-on-wing). It pays sailing deep, past about 150° true; on a reach the poled-out jib is aback. Tap to set or stow it (the crew takes a few seconds). It goes out only when you call it; the crew stows it if she comes up past where it pays, in a harbor, or at the dock."></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
+<span class="sb-tabs"><button type="button" class="sb-tab sb-pole" data-act="pole" hidden data-help="${bandHelp('pole')}"></button><button type="button" class="sb-tab sb-all" data-act="all"></button><button type="button" class="sb-tab sb-away" aria-label="Put the sail controls away" title="Put the sail controls away (4). The windex stays: click it to bring them back.">▾</button></span></div>
 <div class="sb-top">
   ${jcar('P')}${vert('jib', 'P')}<span class="sb-div"></span>
   ${vert('downhaul', 'P')}${vert('jibCunningham', 'P')}${vert('cunningham', 'P')}${vert('outhaul', 'P')}${vert('vang', 'P')}
@@ -245,23 +296,12 @@ export class SailBand {
     el.addEventListener('pointerover', e => { this.helpOver = (e.target as HTMLElement).closest<HTMLElement>('[data-help]'); this.showHelp(); });
     el.addEventListener('pointerleave', () => { this.helpOver = null; this.showHelp(); });
     el.addEventListener('pointerdown', e => { const h = (e.target as HTMLElement).closest<HTMLElement>('[data-help]'); if (h) { this.helpLast = h; this.helpLastT = performance.now(); } }, true);
-    // what each control does: shown in the Coach card for the control under the mouse, or the one last touched (the
-    // owner: hover titles popped up over the controls you were reaching for)
-    el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => {
-      const k = d.dataset.line!;
-      d.dataset.help = k === 'jib' ? 'Jib sheet: ' + lineHelp('jibsheet') : k === 'car' ? 'Jib car: click a hole to move it. Forward is up, inboard toward the middle. ' + lineHelp('carFore') + ' ' + lineHelp('carIn').replace(/^The lazy car[^:]*: /, '')
-        : k === 'mainsheet' ? 'Mainsheet: the blue marker is where the boom is. Toward the middle trims, out to leeward eases. ' + lineHelp('mainsheet')
-        : `${LINE_LABEL[k as CtlKey]}: ${lineHelp(k as CtlKey)}`;
-      // (the rope's ticks: what each one is)
-      const r = ROPE_IN[k as keyof typeof ROPE_IN];
-      if (r) d.dataset.help += ` The faint ticks: about ${r.inches < 3 ? (Math.round(r.inches * 2) / 2).toFixed(1) : Math.round(r.inches)} in of rope from off to full on${r.even ? '' : ', marked evenly here though a bridle really pays out unevenly'} (${r.note}).`;
-      else if (k === 'jib') d.dataset.help += ' The faint ticks on the working sheet: every foot of sheet eased, by its lead (closer together toward hard in).';
-      else if (k === 'mainsheet') d.dataset.help += ' Under the track: where so many inches of sheet eased put the boom (four parts: the first few inches swing it furthest), and how much is out now.';
-    });
-    const jt = `Jumpers: turns on their turnbuckle, 0 to ${JMAX}. On (more turns) stiffens the top of the mast, so the main's head twists off less; off lets it bend and twist (about ±1.5° up top). North Sails' medium is ${TUNE_PRESETS.medium.jumperTurns} turns (the tall tick); Heikkilä Sailmaker's guide: loose in light air, tighter in medium, tighter again in a breeze if the mast bends past the main's luff round. The crew turns them a half turn at a time, about ${JUMPER_HALF_TURN_S} s each. Hand Back leaves them alone. Click the left half for a half turn off, the right half for a half turn on, or scroll.`;
+    // what each control does and why, one line each, in the Coach card for the control under the mouse or the one last
+    // touched (the owner: hover titles popped up over the controls you were reaching for; 18 Nov: "no one will read
+    // this", so BAND_TIPS holds one line of what to do and why; the clicks and scrolls are in Keys' "How to sail her")
+    el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { d.dataset.help = bandHelp(d.dataset.line as keyof typeof BAND_TIPS); });
     el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
-      d.dataset.help = jt; // (in the Coach card, as every control's help: no hover titles)
-      d.addEventListener('wheel', e => { if (!this.ok()) return; e.preventDefault(); this.turnJumpers(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
+      d.dataset.help = bandHelp('jumpers'); // (in the Coach card, as every control's help: no hover titles)
     });
   }
 
@@ -400,7 +440,9 @@ export class SailBand {
     // never does (the car was already there)
     if ((!u.carCmd && (a.seen || performance.now() - a.t > 1500)) || !carFree(u, a.side)) {
       const set = car.fore === a.fore && car.ins === a.ins;
-      this.note = { text: set ? `${name}: set at ${at}. ${a.side === windSide(u) ? 'It takes over at the next tack.' : 'It takes the sheet when the jib goes up.'}` : `${name}: the tack loaded it before the crew got there; it stays where it was.`, until: performance.now() + 5000 };
+      // (dropped, its car loaded before the crew got there: the World says so in a line for every call, the band's and the
+      // keys': world.ts carCallStep. Not said twice here, nor with a cause it may not have, the jib's hoist as well as a tack)
+      this.note = set ? { text: `${name}: set at ${at}. ${a.side === windSide(u) ? 'It takes over at the next tack.' : 'It takes the sheet when the jib goes up.'}`, until: performance.now() + 5000 } : null;
       this.carAsked = null; return;
     }
     const people = u.crew?.people ?? [], i = people.findIndex(p => p.job?.line === 'car'), j = i >= 0 ? people[i].job! : null;
@@ -410,15 +452,17 @@ export class SailBand {
       : j.reach > 0 ? `${name} to ${at}: the crew is going forward to it.${left}` : `${name} to ${at}: the crew is pulling the pin and sliding it.${left}`, until: Infinity };
   }
 
-  /** Where the jumpers are now: her tune, or North's for the wind when she has none (cruising: rigTune.ts guideTune). */
-  private jumpersNow(u: Boat): number { return (u.tune ?? guideTune(u.ww.kt)).jumperTurns; }
+  /** Where the jumpers are now, in half turns as the crew counts them: her tune, or North's for the wind when she has
+   * none (cruising: rigTune.ts guideTune, which sits between the marks around 9 and 15 kt and moves with the wind: shown
+   * raw, it ran on as a long run of digits under the dial, the owner's bug). */
+  private jumpersNow(u: Boat): number { return jumperTurnsShown((u.tune ?? guideTune(u.ww.kt)).jumperTurns); }
   /** Ask the crew for a half turn more or less on the jumpers, from where they're going (or where they are). */
   private turnJumpers(d: number): void {
     this.host.send({ k: 'jumpersBy', d }); this.host.changed(); // (worked out in the race: two quick presses make a whole turn)
   }
-  /** The jumpers' dials: shown only if her Rig tune has them adjusted under way. */
+  /** The jumpers' dials: on the band unless her Boat panel has them left alone under way (the owner, r246). */
   private jumpers(u: Boat): void {
-    const on = !!u.spec?.perf.jumpersUnderWay, now = this.jumpersNow(u), want = u.jumperTarget, busy = on && want != null && Math.abs(want - now) > 1e-6;
+    const on = u.spec?.perf.jumpersUnderWay !== false, now = this.jumpersNow(u), want = u.jumperTarget, busy = on && want != null && Math.abs(want - now) > 1e-6;
     const fmt = (v: number) => (v === 1 ? '1 turn' : `${v} turns`);
     this.el.querySelectorAll<HTMLElement>('.sb-jd').forEach(d => {
       hide(d, !on); if (!on) return;
@@ -426,14 +470,18 @@ export class SailBand {
       const tg = d.querySelector<SVGElement>('.tgt')!; tg.style.display = busy ? '' : 'none'; if (busy) attr(tg, 'transform', `rotate(${jAng(want!)} 20 20)`);
       put(d.querySelector('.jv')!, String(now));
       d.classList.toggle('busy', busy);
+      // (none further than the turnbuckle goes: off at 0, on at 5, counted from where the crew is turning them to)
+      const to = busy ? want! : now;
+      d.querySelectorAll<HTMLButtonElement>('.sb-ja').forEach(b => { const off = b.dataset.act === 'jless' ? to <= 0 : to >= JMAX; if (b.disabled !== off) b.disabled = off; });
       attr(d, 'aria-label', `Jumpers: ${fmt(now)}${busy ? `, the crew turning them to ${fmt(want!)}` : ''}`);
     });
   }
 
-  /** Each rope in her own colours (the boat editor's Lines), set again only when they change. */
+  /** Each rope in her own colorways (the boat editor's Lines), set again only when they change. */
   private colours(spec: BoatSpec | undefined): void {
-    const key = JSON.stringify(spec?.lineColors ?? null); if (key === this.colorsOf) return; this.colorsOf = key;
-    this.el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { const k = colorKey(d.dataset.line!); if (k) d.style.setProperty('--rope', lineColor(spec, k)); });
+    const key = JSON.stringify(spec?.lineRopes ?? null); if (key === this.colorsOf) return; this.colorsOf = key;
+    this.el.querySelectorAll<HTMLElement>('[data-line]').forEach(d => { const k = colorKey(d.dataset.line!); if (!k) return; const r = lineRope(spec, k);
+      d.style.setProperty('--rope', r.base); d.style.setProperty('--fleck', r.kind === 'fleck' ? r.mark! : 'transparent'); d.style.setProperty('--tracer', r.kind === 'tracer' ? r.mark! : 'transparent'); });
   }
 
   /**
@@ -544,7 +592,7 @@ export class SailBand {
     // her point of sail under the vane (the owner: the windex names it: Close-hauled, Beam reach, Broad reach, Run)
     const pos = pointOfSailWord(u); put(wx.querySelector('.sb-pos')!, pos);
     attr(wx, 'aria-label', `Windex: ${pos}, apparent wind ${awa}° ${u.arel >= 0 ? 'to starboard' : 'to port'}`);
-    { const help = `Windex, as you'd see it looking up at the masthead: the yellow arrowhead points into the apparent wind (${awa}° over the ${u.tack === 'S' ? 'starboard' : 'port'} side, ${Math.round(Math.abs(u.twa))}° off the true wind). The white tabs mark close-hauled; the red wedge between them is too close to the wind.`; if (wx.dataset.help !== help) wx.dataset.help = help; }
+    if (wx.dataset.help !== bandHelp('windex')) wx.dataset.help = bandHelp('windex');
     // hoisting and dropping the sails at the mast: a tab for a sail that's down, on its way, or (in a harbor) to drop
     this.el.querySelectorAll<HTMLElement>('.sb-hoist').forEach(tab => {
       const txt = this.host.hoistTab(tab.dataset.sail as 'main' | 'jib');
@@ -555,7 +603,7 @@ export class SailBand {
     const all = this.el.querySelector<HTMLElement>('.sb-all')!, word = trimTab(u);
     if (all.textContent !== word) {
       all.textContent = word; all.classList.toggle('mine', word === 'Hand Back');
-      all.dataset.help = word === 'Hand Back' ? 'Hand Back: every line you hold (the amber ones) and both jib cars go back to the crew. The whisker pole stays your call.' : 'Auto-Trim: the crew trims every line. Work any line, or tap its name, and it\'s yours (its name turns amber).';
+      all.dataset.help = word === 'Hand Back' ? bandHelp('handBack') : bandHelp('autoTrim');
     }
     // a penalty's turns still to do
     const pen = this.el.querySelector<HTMLElement>('.sb-pen')!, turns = u.penalty > 0 ? Math.ceil(u.penalty / 360) : 0;

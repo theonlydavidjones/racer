@@ -32,6 +32,8 @@ export interface TideStation {
 }
 
 const STEP = 6; // minutes between harmonic predictions
+/** CurrentField.cover's window (minutes): predicted afresh when less than COVER_AHEAD is left, from COVER_BACK back to COVER_ON on. */
+const COVER_AHEAD = 8 * 60 + 15, COVER_BACK = 4 * 60, COVER_ON = 14 * 60;
 
 /** Times (minutes since epoch) of slack and peak events in a regular series: [t, v, kind]. kind: 0 max flood, 1 slack before ebb, 2 max ebb, 3 slack before flood. */
 export function events(t: number[], v: number[]): [number, number, number][] {
@@ -339,10 +341,26 @@ export class CurrentField {
    * from 4 hours back (the conditions graph and the strategist look back) to 14 hours on.
    */
   cover(tMin: number): void {
-    if (!this.stations.length || (tMin >= this.from && tMin + 8 * 60 + 15 <= this.to)) return;
-    const fresh = new Map(stationsFor(tMin - 4 * 60, tMin + 14 * 60).map(x => [x.id, x]));
+    if (!this.stations.length || (tMin >= this.from && tMin + COVER_AHEAD <= this.to)) return;
+    const fresh = new Map(stationsFor(tMin - COVER_BACK, tMin + COVER_ON).map(x => [x.id, x]));
     for (const st of this.stations) { const n = fresh.get(st.id); if (n) { st.t = n.t; st.v = n.v; } }
     this.span(); this.epoch++;
+  }
+  /**
+   * The field for a race or a sail over [from, to] (minutes, UTC) that starts at `now`. The World asks for its window
+   * and at once calls cover(now), which predicts every station afresh whenever less than 8¼ hours are left ahead. For a
+   * window ending a few hours after the gun, that was always so: every station was predicted twice at load, the first
+   * set thrown away (Capacity's profile, 18 Nov 2026: ~20 ms on the page and again in the worker). When cover would
+   * certainly predict afresh, the stations are predicted once over cover's own window: the same call cover makes, so the
+   * same series to the bit. ("Certainly": some harmonic station's predictions end within one STEP after `to` and start
+   * within one STEP before `from`, so the field's span lies inside [from − STEP, to + STEP]. That needs a harmonic station
+   * in the field, as there always is: the Gate's and the Bay's are; with subordinates alone it would not hold, so then
+   * the old way.) It ends with cover(now), as the World's load did: a no-op when predicted afresh, else what cover does.
+   */
+  static covering(now: number, from: number, to: number): CurrentField {
+    const fresh = DEFS.some(d => d.kind === 'harmonic' && !d.refOnly && !d.flowOnly) && (now < from - STEP || now + COVER_AHEAD > to + STEP);
+    const f = new CurrentField(fresh ? stationsFor(now - COVER_BACK, now + COVER_ON) : stationsFor(from, to));
+    f.cover(now); return f;
   }
   /** Station i's current (m/s) at the field's time. */
   stationVec(i: number): Vec {
@@ -454,6 +472,32 @@ export class CurrentField {
     const k = 1 - (1 - shoreRelief(p, lattice)) * Math.min(1, dn / 600) * (1 - bay), c = this.at(p, B); // (the bay found once)
     return { x: c.x * k, y: c.y * k };
   }
+  /**
+   * atShore for a point asked about again and again as the tide turns (the passage planner's 100 m grid, afresh each half
+   * minute of its clock): the shore's share doesn't change with the tide, so it's kept by p's exact coordinates, the
+   * same number worked out once, as atShore works it out (tests/current-kept.test.ts holds them equal to the bit). Not
+   * for a boat's own current, which is never at the same spot twice: atShore itself is left as it was for the step.
+   */
+  atShoreKept(p: Vec, cell: number): Vec {
+    // (two maps of numbers by the point's own cell number, no object per point: kept as objects, ~100,000 of them in a
+    // plan, they're the likely cause of the plan's slices running past their budget now and then, the collector's work)
+    let k = this.keptK.get(cell), bi: number;
+    if (k === undefined) {
+      let dn = Infinity;
+      { const list = this.near(p); for (let n = 0; n < list.length; n++) { const i = list[n], dx = p.x - this.sx[i], dy = p.y - this.sy[i]; dn = Math.min(dn, dx * dx + dy * dy); } }
+      dn = Math.sqrt(dn);
+      const B = bayAt(p);
+      let bay = B ? Math.min(1, Math.max(0, bayIn(B, p) / B.hand)) : 0;
+      for (const m of B?.inflows ?? []) bay = Math.min(bay, hypot(p.x - m.mouth.x, p.y - m.mouth.y) / B!.hand);
+      k = 1 - (1 - shoreRelief(p, false)) * Math.min(1, dn / 600) * (1 - bay); bi = B ? BAYS.indexOf(B) : -1;
+      if (this.keptK.size >= 200000) { this.keptK.clear(); this.keptB.clear(); }
+      this.keptK.set(cell, k); this.keptB.set(cell, bi);
+    } else bi = this.keptB.get(cell)!;
+    const c = this.at(p, bi < 0 ? null : BAYS[bi]);
+    return { x: c.x * k, y: c.y * k };
+  }
+  private keptK = new Map<number, number>();
+  private keptB = new Map<number, number>();
 }
 
 /* ---------- local time in San Francisco ---------- */

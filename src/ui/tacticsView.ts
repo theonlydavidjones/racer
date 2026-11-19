@@ -19,15 +19,19 @@ export function tacticsHtml(T: Tactics, boats: { id: number; name: string; short
   const name = (id: number) => id === you ? 'You' : boats.find(b => b.id === id)?.name ?? '';
   const short = (b: { name: string; short?: string }) => b.short || b.name;
   // a boat off the scale sits at its edge with her number beside her; several there stack, one under another
-  let edge = { l: 0, r: 0 };
+  // (two boats off the scale by the same seconds share one label rather than print it twice)
+  let edge = { l: 0, r: 0 }, seen = new Set<string>();
   const offLab = (x: number, y: number, d: number, c: string) => {
     if (Math.abs(d) <= RANGE) return '';
+    const key = `${d > 0 ? 'l' : 'r'}${Math.round(Math.abs(d))}`;
+    if (seen.has(key)) return '';
+    seen.add(key);
     const n = d > 0 ? edge.l++ : edge.r++, dy = [4, -8, -20, 28][n % 4]; // (up first, clear of the cause bars under the row)
     return `<text x="${(x + (d > 0 ? 10 : -10)).toFixed(1)}" y="${y + dy}" fill="${c}" font-size="10" text-anchor="${d > 0 ? 'start' : 'end'}">${d > 0 ? '−' : '+'}${Math.round(Math.abs(d))} s</text>`;
   };
   const rows = T.rows.map((r, i) => {
     const y = 34 + i * RH, d = (v: number) => v - r.mid, me = r.times[boats.findIndex(b => b.id === you)];
-    edge = { l: 0, r: 0 };
+    edge = { l: 0, r: 0 }; seen = new Set();
     const dot = (v: number, c: string, R: number, lab: string) => { const x = sx(d(v)); return `<circle cx="${x.toFixed(1)}" cy="${y}" r="${R}" fill="${c}" stroke="#0c2534" stroke-width="1.5"><title>${esc(lab)}</title></circle>${offLab(x, y, d(v), c)}`; };
     let out = `<g class="tacRow" data-tleg="${r.i}" style="cursor:pointer"><rect x="0" y="${y - RH / 2 + 4}" width="${W}" height="${RH - 4}" fill="transparent"/>`
       + `<text x="6" y="${y + 4}" fill="#e9f2f5" font-size="12" font-weight="700">${r.i ? `L${r.i}` : 'S'}</text>`

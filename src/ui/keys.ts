@@ -3,7 +3,7 @@ export type Action =
   | 'steerPort' | 'steerStbd' | 'centreTiller' | 'takeTiller' | 'lashTiller' | 'turnHo' | 'luff'
   | 'mainIn' | 'mainOut' | 'travUp' | 'travDown' | 'jibIn' | 'jibOut' | 'ctlPrev' | 'ctlNext' | 'ctlDown' | 'ctlUp' | 'pole' | 'sailBand' | 'navLights' | 'hail' | 'pushOff' | 'jibHalyard' | 'mainHalyard' | 'autopilot'
   | 'crewLee' | 'crewUp' | 'crewFwd' | 'crewAft' | 'paddle'
-  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'restartStart' | 'pointsRose' | 'flowView' | 'perfMeter'
+  | 'viewCockpit' | 'viewChase' | 'viewOverhead' | 'cycleView' | 'lookInstrument' | 'windLadder' | 'weatherHelm' | 'restartStart' | 'pointsRose' | 'flowView' | 'perfMeter'
   | 'lookLeft' | 'lookRight' | 'lookUp' | 'lookDown' | 'lookAhead'
   | 'orient' | 'zoomIn' | 'zoomOut' | 'recentre'
   | 'course' | 'log' | 'pause' | 'keys' | 'trimNotes';
@@ -38,7 +38,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'crewUp', label: 'Crew weight a step to windward (leeward → middle → up → hike)', group: 'Crew' },
   { id: 'crewFwd', label: 'Crew weight forward a step', group: 'Crew' },
   { id: 'crewAft', label: 'Crew weight aft a step', group: 'Crew' },
-  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby (cruising only)', group: 'Helm' },
+  { id: 'autopilot', label: 'Autopilot on (Auto, holding her course) / standby / lift off the tiller pin (cruising only)', group: 'Helm' },
   { id: 'navLights', label: 'Navigation lights on (lit after dark) / off', group: 'Helm' },
   { id: 'pushOff', label: 'At the dock: push off from her berth (the crew walks her out; held head to wind, let her go); coming in, lines ready (again: stand down); lying to her lines, let go', group: 'Helm' },
   { id: 'jibHalyard', label: 'Hoist or strike the jib', group: 'Sails' },
@@ -52,6 +52,7 @@ export const ACTIONS: { id: Action; label: string; group: string }[] = [
   { id: 'lookInstrument', label: 'Look at the cabin-top instrument from the helm (press again to look back)', group: 'Views' },
   { id: 'restartStart', label: 'Start practice: a new countdown from the same start, now (your starts so far kept)', group: 'Racing' },
   { id: 'windLadder', label: 'Wind indicator: the true and apparent wind in the air beside her, at three heights (on / off)', group: 'Views' },
+  { id: 'weatherHelm', label: 'Weather helm at the foot of the tiller guide: the tiller\'s average, teal when balanced, amber past 8° (on / off)', group: 'Views' },
   { id: 'pointsRose', label: 'Points of sail on the water round her, and the wind (on / off)', group: 'Views' },
   { id: 'flowView', label: 'Flow view: the air over the sails, at three heights (show / put away)', group: 'Views' },
   { id: 'lookLeft', label: 'Look left', group: 'Views' },
@@ -73,7 +74,7 @@ export const DEFAULT_KEYS: Record<Action, string[]> = {
   takeTiller: ['t'], steerPort: ['a'], steerStbd: ['d'], centreTiller: ['c'], lashTiller: ['i'], turnHo: ['Space'],
   luff: ['s'], mainIn: ['z'], mainOut: ['x'], travUp: ['Shift+Z'], travDown: ['Shift+X'], jibIn: [','], jibOut: ['.'], ctlPrev: ['['], ctlNext: [']'], ctlDown: [';'], ctlUp: ["'"], pole: ['o'], sailBand: ['4'], crewLee: ['7'], crewUp: ['8'], crewFwd: ['9'], crewAft: ['0'], pushOff: ['g'], paddle: ['/'], navLights: ['5'], autopilot: ['y'], jibHalyard: ['j'], mainHalyard: ['u'],
   hail: ['h'], course: ['m'],
-  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], restartStart: ['Shift+R'], pointsRose: ['Shift+P'], flowView: ['\\'],
+  viewCockpit: ['1'], viewChase: ['2'], viewOverhead: ['3'], cycleView: ['v'], lookInstrument: ['6'], windLadder: ['`'], weatherHelm: ['Shift+W'], restartStart: ['Shift+R'], pointsRose: ['Shift+P'], flowView: ['\\'],
   lookLeft: ['ArrowLeft', 'q'], lookRight: ['ArrowRight', 'e'], lookUp: ['ArrowUp', 'r'], lookDown: ['ArrowDown', 'f'], lookAhead: ['w'],
   orient: ['n'], zoomIn: ['=', '+'], zoomOut: ['-'], recentre: ['b'],
   log: ['l'], pause: ['p'], keys: ['k'], perfMeter: ['Shift+F'], trimNotes: ['Shift+T'],

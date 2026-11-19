@@ -81,7 +81,7 @@ export function windKindFor(date: string, choice: WindKind | 'auto' = 'auto'): W
 /** The wind for a time (minutes since epoch, UTC), kind of day, and light/typical/windy, interpolated between the hourly records. */
 export function breezeAt(tMin: number, day: WindDay, kind: WindKind = 'west'): Breeze {
   const parts = Object.fromEntries(fmt.formatToParts(new Date(tMin * 60000)).map(p => [p.type, p.value]));
-  const m = (+parts.month - 1 + 12) % 12, h = (+parts.hour % 24) + +parts.minute / 60;
+  const m = (+parts.month - 1 + 12) % 12, h = (+parts.hour % 24) + (+parts.minute + (tMin - Math.floor(tMin))) / 60; // (to the second: by whole minutes the wind came on in a step a minute)
   const cells = MONTHS[m].kinds[kind] ?? MONTHS[m].kinds.west!; // a kind that (almost) never comes this month: the westerly
   const h0 = Math.floor(h) % 24, h1 = (h0 + 1) % 24, f = h - Math.floor(h);
   const a = cells[h0], b = cells[h1];

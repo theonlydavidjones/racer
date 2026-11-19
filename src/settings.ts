@@ -60,8 +60,13 @@ export interface Settings {
   prepFlag: 'P' | 'I' | 'Z' | 'U' | 'black';
   traffic: 0 | 1; // ship traffic through the race area
   windDial: 0 | 1; // the wind-angle dial (a training aid: real boats don't have one)
+  /** Your own colors, saved from the boat editor's color picker (the owner, 8i: "like in Google Docs"), shared by every picker. */
+  myColors?: string[];
   /** The wind indicator (render/windLadder.ts) showing: off unless you turn it on, and remembered. */
   windLadder?: boolean;
+  /** The weather-helm chip at the foot of the tiller guide (app.ts showWeatherHelm): on unless you turn it off (the
+   * owner, 18 Nov 2026), and remembered. */
+  weatherHelm?: boolean;
   /** The points of sail on the water round her (render/windRose.ts): unset, on in the lessons and off otherwise; on or
    * off once you've switched it (the inset map's Layers menu, or its key). */
   pointsRose?: boolean;

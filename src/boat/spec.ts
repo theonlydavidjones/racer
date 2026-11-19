@@ -56,9 +56,12 @@ export interface BoatSpec {
   /** Her home marina (geo/marina.ts MARINAS), and her slip in it. */
   marina?: string;
   slip?: string;
-  /** Each line's colour in the sail controls band (and on the 3D lines once they're drawn): the owner, 12 Nov 2026.
-   * Absent: the band's defaults (LINE_COLORS). */
+  /** Older saves only: each line's free color in the sail controls band (the owner, 12 Nov 2026). Read once, as the
+   * nearest real colorway (fixSpec), and not kept: her lines are rope now (lineRopes). */
   lineColors?: Partial<Record<LineColorKey, string>>;
+  /** Each line's rope, by colorway (ROPES' ids: the owner, 8i, "real rope patterns"; 18 Nov, lines only ever in real
+   * colorways). Absent: the usual ropes (DEFAULT_ROPES). */
+  lineRopes?: Partial<Record<LineColorKey, string>>;
   perf: {
     cleanedWeeks: number; // weeks since the bottom was last cleaned (0 = just cleaned)
     finish: 'race' | 'antifouling'; // the bottom paint's finish when clean: wet-sanded and burnished, or as rolled on
@@ -71,26 +74,55 @@ export interface BoatSpec {
     gearKg: number; // gear and stores beyond the racing minimum
     /** The rig's tune at the dock (rigTune.ts): absent, on the guide's tune for the wind (as the sim always sailed). */
     tune?: RigTune;
-    /** The jumpers adjustable under way: a row in the sail band (CR 7.40 allows it; most crews never do). */
+    /** The jumpers adjustable under way, on the sail band (CR 7.40 allows it): unless false, they are (the owner, r246). */
     jumpersUnderWay?: boolean;
   };
 }
 
 /** The lines you can colour (both jib sheets share one colour, as one rope usually does both). */
 export type LineColorKey = 'jibsheet' | 'jibCunningham' | 'jibHalyard' | 'mainsheet' | 'outhaul' | 'vang' | 'cunningham' | 'downhaul' | 'backstay';
-/** The band's defaults (the owner: for usability, jib lines warm, main lines cool, the backstay white; none port red or
- * starboard green, so they're never mistaken for the sides). */
-export const LINE_COLORS: Record<LineColorKey, string> = {
-  jibsheet: '#ff8a3d', jibCunningham: '#f2c230', jibHalyard: '#c0652a', mainsheet: '#3d8bff', outhaul: '#2ec4d6',
-  vang: '#9b6bff', cunningham: '#ec6aae', downhaul: '#8fa3b8', backstay: '#e8edf0'
+/**
+ * Real rope colorways (the owner, 8i: lines "from real rope colorways, drawn as rope", not a free color), from retailers'
+ * listings of the makers' ranges (no maker's own chart could be read): New England Ropes Sta-Set solids and its
+ * white with red, blue or green flecks, and Sta-Set X white with two red tracers; Samson XLS solids including navy, and
+ * navy with a beige tracer; Marlow Doublebraid's gold fleck and solid gray (D2 Racing). The fleck's density and the
+ * tracers' spacing are drawn by eye (no source gives them). `band`: the color the sail controls band shows for it, the
+ * fleck or tracer where there is one, so a mostly white rope still reads as its own line there.
+ */
+export interface Rope { id: string; name: string; base: string; kind: 'solid' | 'fleck' | 'tracer'; mark?: string; band: string }
+export const ROPES: Rope[] = ([
+  ['white', 'White', '#eef0ee', 'solid'], ['gray', 'Gray', '#9aa1a6', 'solid'], ['black', 'Black', '#26282b', 'solid'], ['navy', 'Navy', '#1f2a4a', 'solid'],
+  ['blue', 'Blue', '#2f5fb3', 'solid'], ['red', 'Red', '#c8312f', 'solid'], ['green', 'Green', '#2f7a45', 'solid'],
+  ['red-fleck', 'Red fleck', '#eef0ee', 'fleck', '#c8312f'], ['blue-fleck', 'Blue fleck', '#eef0ee', 'fleck', '#2f5fb3'], ['green-fleck', 'Green fleck', '#eef0ee', 'fleck', '#2f7a45'],
+  ['gold-fleck', 'Gold fleck', '#eef0ee', 'fleck', '#c99a2e'], ['red-tracers', 'White, red tracers', '#eef0ee', 'tracer', '#c8312f'], ['navy-beige', 'Navy, beige tracer', '#1f2a4a', 'tracer', '#cdb98f']
+] as [string, string, string, Rope['kind'], string?][]).map(([id, name, base, kind, mark]) => ({ id, name, base, kind, mark, band: mark ?? (base === '#eef0ee' ? '#e8edf0' : base) }));
+/**
+ * Her lines' usual ropes, all real colorways (the owner, 18 Nov 2026, via the Coordinator: lines only from the real
+ * colorways). The band's idea kept as far as real rope allows: the jib's lines warm (white with red tracers, gold fleck,
+ * navy with a beige tracer), the main's cool (blue, blue fleck, navy, gray), the main halyard white and the backstay's
+ * control black. Each line a different colorway, so no two look alike in the band; and none plain red or plain green
+ * (the owner, for the band: never mistaken for port or starboard).
+ */
+export const DEFAULT_ROPES: Record<LineColorKey, string> = {
+  jibsheet: 'red-tracers', jibCunningham: 'gold-fleck', jibHalyard: 'navy-beige', mainsheet: 'blue', outhaul: 'blue-fleck',
+  vang: 'navy', cunningham: 'gray', downhaul: 'white', backstay: 'black'
 };
-/** Rope colours to choose from: the usual braided-line colours. */
-export const ROPE_COLORS: [string, string][] = [
-  ['Orange', '#ff8a3d'], ['Yellow', '#f2c230'], ['Rust', '#c0652a'], ['Red', '#d8343a'], ['Pink', '#ec6aae'], ['Purple', '#9b6bff'],
-  ['Blue', '#3d8bff'], ['Teal', '#2ec4d6'], ['Green', '#3fae5a'], ['Gray', '#8fa3b8'], ['White', '#e8edf0'], ['Black', '#2a2d33']
-];
-/** A line's colour on this boat. */
-export const lineColor = (b: Pick<BoatSpec, 'lineColors'> | null | undefined, k: LineColorKey): string => b?.lineColors?.[k] ?? LINE_COLORS[k];
+const ropeById = (id: string | undefined) => ROPES.find(r => r.id === id);
+/** A line's rope on this boat: hers, or the usual one. */
+export const lineRope = (b: Pick<BoatSpec, 'lineRopes'> | null | undefined, k: LineColorKey): Rope => ropeById(b?.lineRopes?.[k]) ?? ropeById(DEFAULT_ROPES[k])!;
+/** A line's color where one color has to stand for it (its rope's band color: the fleck or tracer where it has one). */
+export const lineColor = (b: Pick<BoatSpec, 'lineRopes'> | null | undefined, k: LineColorKey): string => lineRope(b, k).band;
+/** The usual ropes' band colors, by line (and the lines there are). */
+export const LINE_COLORS = Object.fromEntries(Object.entries(DEFAULT_ROPES).map(([k, id]) => [k, ropeById(id)!.band])) as Record<LineColorKey, string>;
+/**
+ * The colorway nearest a free color (an older save's line color, as the band showed it): by its band color, a solid
+ * first where two are as near.
+ */
+export function nearestRope(hex: string): Rope {
+  const c = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), x = c(hex);
+  const d = (r: Rope) => c(r.band).reduce((a, v, i) => a + (v - x[i]) ** 2, 0) + (r.kind === 'solid' ? 0 : 1);
+  return ROPES.reduce((best, r) => (d(r) < d(best) ? r : best));
+}
 
 export const DEFAULT_BOAT: BoatSpec = {
   id: 'josephine', name: 'JOSEPHINE',
@@ -104,7 +136,7 @@ export const DEFAULT_BOAT: BoatSpec = {
 
 /** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. */
 export const HULL_COLORS: [string, string][] = [
-  ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'],
+  ['Snow white', '#f7f7f4'], ['Pearl', '#f4f1e8'], ['Cream', '#efe6cf'], ['Bone', '#e8e3d6'], ['Buff', '#d9c49a'], ['Sand', '#c8b48a'], // (Bone: a new player's boat's light deck, named: the owner, 18 Nov 2026)
   ['Light gray', '#c9ccd0'], ['Pewter', '#8d9399'], ['Charcoal', '#3b3e44'], ['Black', '#1c1d20'],
   ['Navy', '#1f2c4f'], ['Midnight', '#24324f'], ['Flag blue', '#24407a'], ['Royal blue', '#2c56a8'], ['Sky blue', '#7fb0d8'], ['Teal', '#1f7a7a'], ['Seafoam', '#a8d5c2'],
   ['Hunter green', '#2a4a33'], ['Racing green', '#1f5a3a'], ['Sage', '#8e9f7c'],
@@ -150,9 +182,13 @@ export function fixSpec(s: Partial<BoatSpec> | undefined): BoatSpec {
     ...(x.instrument === 'none' ? { instrument: 'none' as const } : {}),
     cockpit: x.cockpit === 'fiberglass' ? 'fiberglass' : 'teak',
     ...(typeof x.nameColor === 'string' && /^#[0-9a-f]{6}$/i.test(x.nameColor) ? { nameColor: x.nameColor } : {}),
-    // (her line colours: only the known lines, only real hex colours; none left means the usual colours)
-    ...((lc => (Object.keys(lc).length ? { lineColors: lc } : {}))(Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
-      .filter(([k, v]) => k in LINE_COLORS && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v))) as Partial<Record<LineColorKey, string>>)),
+    // (her lines' ropes: only known lines, only real colorways; an older save's free colors become the nearest colorway)
+    ...((lr => (Object.keys(lr).length ? { lineRopes: lr } : {}))({
+      ...Object.fromEntries(Object.entries(x.lineColors && typeof x.lineColors === 'object' ? x.lineColors : {})
+        .filter(([k, v]) => k in DEFAULT_ROPES && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)).map(([k, v]) => [k, nearestRope(v as string).id])),
+      ...Object.fromEntries(Object.entries(x.lineRopes && typeof x.lineRopes === 'object' ? x.lineRopes : {})
+        .filter(([k, v]) => k in DEFAULT_ROPES && typeof v === 'string' && ROPES.some(r => r.id === v)))
+    } as Partial<Record<LineColorKey, string>>)),
     skipper: x.skipper === 'ai' ? 'ai' : x.skipper === 'you' ? 'you' : 'ai',
     // (her crew's seats, from the Yacht Club's members: at most two, ids only)
     ...(typeof x.laidUpUntil === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.laidUpUntil) ? { laidUpUntil: x.laidUpUntil } : {}), // (laid up for repairs: WRECK-PROPOSAL)

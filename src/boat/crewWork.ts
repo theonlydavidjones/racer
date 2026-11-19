@@ -1,4 +1,4 @@
-import { clamp } from '../core/math';
+import { clamp, wrap } from '../core/math';
 import { SETTLE, type Boat, type Tack } from './boat';
 import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
 import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, crewSkill, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
@@ -83,6 +83,31 @@ const windNow = (b: Boat) => b.crew?.twsAvg ?? b.ww?.kt ?? 0;
  */
 /** How far off (of the line's range) a waiting line has to be before a placed crew makes the trip: a big change of wind. */
 export const PLACED_TRIP = 0.3;
+/** At the cabin top already for another line, the share of a trip's start threshold they'll trim a line in reach for
+ * (an estimate: a fraction of what's worth the walk, as the walk's done). */
+export const BATCH = 0.5;
+/** How far along the boat (m) a line is still within the same visit: a step, not a walk (an estimate). */
+const STEP_ALONG = 1;
+/**
+ * Holding a course, for the crew's place fore and aft (crewPhys.ts CrewCall.held): her heading within CIRCLING of its own over LINE_TAU, which a turn kept
+ * up at more than about a degree and a quarter a second isn't, a slow penalty circle included, and a seaway's wander or a
+ * sawing helm is; and not on a new course the guide hasn't been read for yet, her true wind angle (unsigned, a tack's no
+ * new course) NEW_COURSE (deg) from where it was last read, unless that's been LINE_GAP since she last swung. The guide's
+ * read once she's steady on it (physics.ts crewSettle, NEW_HELD). Estimates.
+ */
+export const NEW_COURSE = 15, CIRCLING = 25;
+const wrapW = wrap; // (its import read once at load: docs/CAPACITY.md)
+export function courseHeld(b: Boat): boolean {
+  const s = b.settle; if (!s) return true;
+  return Math.abs(wrapW(b.h - s[SETTLE.hHeld])) < CIRCLING && !guideUnread(b);
+}
+/** On a new course the guide hasn't been read for yet (courseHeld): for the small-gain trips to the cabin top, with
+ * being settled. Not the circling test: after a bear-away onto a run her heading is that far from its own mean for half
+ * a minute, and easing for the run is part of bearing away. */
+export function guideUnread(b: Boat): boolean {
+  const s = b.settle; if (!s) return false;
+  return Math.abs(Math.abs(b.twa ?? 0) - s[SETTLE.twaGuide]) > NEW_COURSE && Math.abs(wrapW(b.h - s[SETTLE.hGuide])) > 10 && s[SETTLE.since] < LINE_GAP; // (10: physics.ts NEW_HEADING)
+}
 const NO_WAITS: readonly string[] = [], CREW_WAITS: readonly string[] = ['cunningham', 'downhaul', 'jibHalyard'], ALONE_WAITS: readonly string[] = [...PIANO];
 export function waitingLines(c: CrewState): readonly string[] {
   if (c.place?.across == null) return NO_WAITS;
@@ -139,7 +164,7 @@ function ownerWith(line: string, nCrew: number, main: number, layout: Forward, f
 }
 
 /** Where working a line puts a person (null: they work it from where they are). */
-function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
+export function stationFor(line: string, who: number, windward: number, big: boolean, breeze = false, front = false): Station | null {
   if (line === 'car') return { arm: CAR_ARM, z: Z.car, pose: 'car' };
   if (line === 'pole' || line === 'hoist') return { arm: 0.25, z: Z.mast, pose: 'mast' };
   // the outboard (stowed or shipped, sim/world.ts motorStow): kneeling on the after deck at the bracket, aft of the helm
@@ -309,7 +334,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
         // sheet or the pole, is still to do, and isn't left wrong for LINE_GAP)
         // (and what it was set for: the angle and the wish when they chose where to set it, at the start; stamped at the
         // end, a line set through a bear-away was judged against the run's angle and left at the reach's setting)
-        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; (c.lineTwa ??= {})[j.line] = j.refTwa ?? b.twa ?? 0; (c.lineRef ??= {})[j.line] = j.to ?? b.ctl[j.line as Ctl]; }
+        if (PIANO.has(j.line) && !placed) { (c.lineSet ??= {})[j.line] = c.clock ?? 0; c.pianoT = c.clock ?? 0; c.pianoWho = i; (c.lineTwa ??= {})[j.line] = j.refTwa ?? b.twa ?? 0; (c.lineRef ??= {})[j.line] = j.to ?? b.ctl[j.line as Ctl]; }
         a.job = null;
       }
     }
@@ -349,12 +374,21 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a lasting change: what they've wanted lately and what they want now both off the same way, by enough to bother)
       // (each against its own threshold: the fine one for a line wanted right to its stop is for setting it there, not for
       // a trip to move it 2% because this moment's wish is at the stop and the lasting one isn't)
-      const th = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k];
-      if (Math.abs(dl) < startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
-      // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
-      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
       // (up there already, at another of the cabin-top lines: they see to this one too before going back, one trip)
       const there = a.job?.station?.pose === 'piano' || a.pose === 'piano';
+      // (and at it, free, with this line in reach: what's coming due there they see to now, at BATCH of the threshold a
+      // trip takes and none of the walk's waits, rather than come back for it a minute later, as crews do: the Cunningham
+      // and the outhaul a trip each, 94 s apart, crewcruise's 6 kt beam reach, the Coordinator, 16 Nov 2026)
+      // (free there, or just done with a line there and not yet gone back: the job's end and their step aft are the same
+      // moment; and this line a step along the cabin top from them, the Cunningham's place to the piano's, 0.75 m)
+      const since = (c.clock ?? 0) - (c.lineSet?.[k] ?? -1e9), trip = (c.clock ?? 0) - (c.pianoT ?? -1e9);
+      // (theirs: the hand who was there, not a mate sat within a step of it; and the wish over the cycle off the same way
+      // too, by as much: not a 20 s puff's setting, to be undone with a walk of its own, the physics review)
+      const atIt0 = !a.job && (there || (trip < 1 && c.pianoWho === who)) && Math.abs((stationFor(k, who, windward, false)?.z ?? a.z) - a.z) < STEP_ALONG;
+      const th0 = startThreshold(k, skill, want[k]), dl = lw[k] - b.ctl[k], dn = want[k]! - b.ctl[k], dc = ls[k] - b.ctl[k];
+      const atIt = atIt0 && dc * dn > 0 && Math.abs(dc) >= BATCH * th0, f = atIt ? BATCH : 1, th = f * th0;
+      if (Math.abs(dl) < f * startThreshold(k, skill, lw[k]) || Math.abs(dn) < th || dl * dn <= 0) continue;
+      // (and not again within LINE_TAU of the last time they set it, unless it's half its range off: knocked off)
       // (and the ones where they kneel first: the dual-ended lines from the cockpit's forward end, the one-sided from the
       // piano, 0.75 m on. Not to the other, back for one here, and over again, in the order the lines are listed; and only
       // for a line here they'd see to now: off, and for a real change)
@@ -379,7 +413,7 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // minutes, the physics review)
       const real = (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 0) >= 1 || realChangeOf(c, twa, ls, k, skill);
       const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
-      if (walk && !urgent && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
+      if (walk && !urgent && !atIt && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
       // Set right through to a puff's wish, they were back seven seconds later as it passed, the vang 0.17, 0.89, 0.58)
       if (walk && since < LINE_TAU && Math.abs(dl) < 0.5) continue;
@@ -390,9 +424,11 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
     const sheet = sheetOf(k);
     // through a tack or a gybe, and in a hard turn, it's the sheets and the crossing: no one starts on a control line
     if (!sheet && (b.tacking || Math.abs(b.yawRate ?? 0) > 6 || c.roll)) continue;
-    // and swinging, or just settled from it, a cabin-top line that only gains a little waits (physics.ts SETTLE_S): what
-    // the depowering steps or the guide need goes at once (planWorth's 1)
-    if (PIANO.has(k) && (b.settle?.[SETTLE.left] ?? 0) > 0 && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
+    // and swinging, or just settled from it, or not yet holding the course she's come to (courseHeld), a cabin-top line
+    // that only gains a little waits: what the depowering steps or the guide need goes at once (planWorth's 1). After a
+    // bear-away onto a reach the vang went on short, capped by the guide still read for the beat, and again once it was
+    // read for the reach: two trips for one change, crewcruise's 6 kt beam reach
+    if (PIANO.has(k) && ((b.settle?.[SETTLE.left] ?? 0) > 0 || guideUnread(b)) && (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 1) < 1) continue;
     // you've told them where to sit: they stay there. The dual-ended lines they reach from where they sit (below); the
     // piano's one-sided lines (the main Cunningham to port, the main halyard in the middle, the jib halyard to starboard)
     // wait: they get a trip only for a big change (a new wind, not a tweak), and the crew's plan sets the rest around them
@@ -454,6 +490,9 @@ export const CAR = {
 };
 
 /** The jib car: a trip forward for the forward hand (or whoever there is), only for the lazy car, only when worth it. */
+/** Made fast or on her lines: only your own call for a lazy car is worked (physics.ts crewTiedUp); the crew's own plan for
+ * it waits till she's sailing, for the course she'll be on. */
+export function carCall(b: Boat, dt: number): void { if (b.carCmd && b.crew) carJob(b, dt); }
 function carJob(b: Boat, dt: number): void {
   const c = b.crew!, n = c.spec.crew.length, who = ownerOf('car', n, c.spec, c.layout ?? 'cockpit'), a = c.people[who], p = allAboard(c.spec)[who];
   const yours = b.carCmd ?? null, want = yours ?? b.carPlan ?? null;
@@ -506,7 +545,9 @@ function carJob(b: Boat, dt: number): void {
 export function bodyJob(b: Boat, line: 'pole' | 'hoist' | 'outboard', on: boolean): number {
   const c = b.crew; if (!c) return 1;
   const n = c.spec.crew.length, who = ownerOf(line, n, c.spec, c.layout ?? 'cockpit'), a = c.people[who];
-  if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car')) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
+  // (a car job of your own call they finish first, then this; one of the crew's own plan waits for the sails: called
+  // "sails down", a hand re-pins and goes, the physics review of the dock's jobs)
+  if (on) { if (a.job?.line !== line && !(a.job && a.job.line === 'car' && b.carCmd)) a.job = { line, reach: 0, work: 1, station: stationFor(line, who, n, false) }; }
   else if (a.job?.line === line) a.job = null;
   return workPace(b, who);
 }

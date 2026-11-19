@@ -12,7 +12,7 @@ import { LOA, V } from '../src/core/math';
 // incident if they haven't parted, or she's had no steerage way since; a new breach if she has, so could have kept
 // clear. Built by hand, so it doesn't hang on how one race sails (Crew Model's crew-stations race, 14 Nov 2026: the hulls
 // overlapped at a touch (g0 = 0), a metre's drift read as parting, and a second touch 12 s on counted anew).
-function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean; every?: number; n?: number; thenB?: boolean }) {
+function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number; retired?: boolean; every?: number; n?: number; thenB?: boolean; thenWay?: boolean; drift?: boolean; aIdle?: boolean; bTouches?: boolean }) {
   const w = new World(ss2 as unknown as CourseFile, { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 12, tideDate: '2026-11-14', fleet: 2, current: 'slack' } as Settings, 7);
   w.t = 60; w.exactPairs = true;
   const A = o.user ? w.user : w.boats[1], B = w.boats[2];
@@ -31,9 +31,10 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   const run = (s: number) => {
     for (let i = 0; i < Math.round(s / DT); i++) {
       // (held: her heading and her turn both, or what she'd turn by is still there for the other boat to see coming)
+      if (o.drift) { const d = V(hB); B0.x += d.x * vB * DT; B0.y += d.y * vB * DT; } // (both making way over the ground, side by side)
       Object.assign(B, { x: B0.x, y: B0.y, h: hB, desired: hB, v: vB, turnRate: 0, yawRate: 0 });
       if (bTurning) { B.penaltyDir = 1; B.penaltyTurned = 90; B.penalty = Math.max(B.penalty, 360); B.penaltyTotal = Math.max(B.penaltyTotal, B.penalty); }
-      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: 1, penaltyTurned: 90, turnRate: 0, yawRate: 0 }); // (her turns begun: 90° into them, physics.ts countPenalty)
+      Object.assign(A, { x: B0.x + side.x * off, y: B0.y + side.y * off, h, desired: h, v: o.vA, penaltyDir: o.aIdle ? 0 : 1, penaltyTurned: o.aIdle ? 0 : 90, turnRate: 0, yawRate: 0 }); // (her turns begun: 90° into them, physics.ts countPenalty)
       if (o.retired) { A.retired = true; A.penalty = A.penaltyTotal = 0; A.penaltyDir = 0; } // (not racing: her contacts carry no penalty)
       else { A.penalty = Math.max(A.penalty, 360); A.penaltyTotal = Math.max(A.penaltyTotal, A.penalty); }
       w.step(DT); w.paused = false;
@@ -51,7 +52,15 @@ function tangle(o: { user?: boolean; vA: number; apart: number; pressed?: number
   // (then B, taking a penalty now (21.2: she keeps clear of A), touches her, still within a metre of her: B's own breach)
   if (o.thenB) { off = o.apart; run(7); bTurning = true; off = 2; run(1); return byB.length; }
   // (alongside: held `apart` off, a touch every `every` s, n of them)
-  if (o.every) { for (let k = 1; k < (o.n ?? 4); k++) { off = o.apart; run(o.every - 1); off = 2; run(1); } return got.length; }
+  if (o.every) {
+    for (let k = 1; k < (o.n ?? 4); k++) { off = o.apart; run(o.every - 1); off = 2; run(1); }
+    // (then A gets way on, past a helmsman's reaction, and touches again: she could have kept clear)
+    // (then B, taking a penalty now, touches the pinned A (her own breach, 21.2), and A touches again 70 s on: past JAM_MAX
+    // from B's touch, so only the pin can make it the first incident's)
+    if (o.bTouches) { off = o.apart; run(o.every - 1); bTurning = true; off = 2; run(1); bTurning = false; Object.assign(B, { penalty: 0, penaltyTotal: 0, penaltyDir: 0, penaltyTurned: 0 }); off = o.apart; run(69); off = 2; run(1); return got.length * 10 + byB.length; }
+    if (o.thenWay) { o.vA = 1.5; off = o.apart; run(5); o.vA = 0.08; run(3); off = 2; run(1); }
+    return got.length;
+  }
   for (let k = 0; k < 2; k++) { off = o.apart; run(4.5); off = 0; run(INCIDENT_COOLDOWN - 4.5 + 0.5); }
   expect(got.every(g => g.kind === 'contact'), JSON.stringify(got)).toBe(true);
   return got.length;
@@ -73,12 +82,16 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
     expect(tangle({ vA: 1.5, apart: JUST })).toBe(1);
     expect(tangle({ user: true, vA: 1.5, apart: JUST })).toBe(1);
   }, 60000);
-  it('pressed together, lying side by side touching all along, for longer than TANGLE_MAX: one incident', () => {
-    expect(tangle({ vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
-    expect(tangle({ user: true, vA: 1.5, apart: 0, pressed: 45 })).toBe(1);
+  it('pressed together, lying side by side touching all along without steerage way, for longer than TANGLE_MAX: one incident', () => {
+    expect(tangle({ vA: 0.3, apart: 0, pressed: 45 })).toBe(1);
+    expect(tangle({ user: true, vA: 0.3, apart: 0, pressed: 45 })).toBe(1);
+  }, 60000);
+  it('but rubbing along her with way enough to steer off isn\'t the inevitable result of the first: capped at TANGLE_MAX like any tangle', () => {
+    // (physics-review, 18 Nov 2026: a keep-clear boat at 2 kt and more lying on the other's hull for 100 s, one penalty)
+    expect(tangle({ vA: 1.5, apart: 0, pressed: 45 })).toBe(2);
   }, 60000);
   it('a contact with no penalty (she\'s retired, not racing) pressed together all along: one incident too, not one at every cooldown', () => {
-    expect(tangle({ vA: 1.5, apart: 0, pressed: 45, retired: true })).toBe(1);
+    expect(tangle({ vA: 0.3, apart: 0, pressed: 45, retired: true })).toBe(1);
   }, 60000);
   it('but sailing alongside within a metre, touching every 25 s, isn\'t pressed: the tangle\'s 30 s still bounds it', () => {
     expect(tangle({ vA: 1.5, apart: JUST, every: 25, n: 4 })).toBe(2);
@@ -90,6 +103,27 @@ describe('One incident per pair while two boats stay tangled (Rule 44.1, US Appe
   it('after a touch with no penalty, the other boat\'s own breach a few seconds on, still within a metre: hers, not swallowed', () => {
     expect(tangle({ vA: 1.5, apart: JUST, retired: true, thenB: true })).toBe(1);
   }, 60000);
+  // (pinned: Deep Physics' seed 16 on sea-born, 17 Nov 2026, a boat held against the Marina jetty at 0.00-0.03 m/s and
+  // touched again a minute on, given a second two-turn penalty, and more: nine in ten minutes among three boats)
+  it('the boat at fault pinned, lying stopped against the other (never way on, never parted past the push apart), touching every 20 s for ten minutes: one incident, not one a minute', () => {
+    expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 30 })).toBe(1);
+    expect(tangle({ user: true, vA: 0.08, apart: NEAR, every: 20, n: 30 })).toBe(1);
+  }, 120000);
+  it('but once she has had way on since, stopping again, the next touch is a new incident', () => {
+    expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 6, thenWay: true })).toBe(2);
+  }, 120000);
+  it('the other boat\'s own breach against her while she\'s pinned (a third minute in) is its own incident, and her next touch, a minute and more on, is still the first\'s', () => {
+    expect(tangle({ vA: 0.08, apart: NEAR, every: 20, n: 9, aIdle: true, bTouches: true })).toBe(11); // (hers 1, B's 1)
+  }, 120000);
+  it('two boats drifting together at 0.45 m/s (light air, side by side, making way over the ground: not held), touching every 20 s for ten minutes: capped as a jam, not one incident', () => {
+    expect(tangle({ vA: 0.45, apart: NEAR, every: 20, n: 30, drift: true })).toBeGreaterThan(4);
+  }, 120000);
+  it('a boat with steerage way creeping into another, touching every 20 s for ten minutes, isn\'t pinned: she could keep clear, a new incident each time the tangle runs out', () => {
+    expect(tangle({ vA: 0.6, apart: NEAR, every: 20, n: 30 })).toBeGreaterThan(4);
+  }, 120000);
+  it('lying stopped but well off between touches (a few meters of water: she could have kept clear), each new touch past the tangle\'s time a new incident', () => {
+    expect(tangle({ vA: 0.08, apart: CONTACT_GAP + 4, every: 40, n: 6 })).toBeGreaterThan(1);
+  }, 120000);
   it('and once they have been a length apart, the next touch is a new incident', () => {
     expect(tangle({ vA: 0.3, apart: FAR })).toBe(3);
   }, 60000);

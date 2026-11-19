@@ -7,6 +7,9 @@
  *
  *   node scripts/check/perf-ab.cjs --against <ref> [--rounds 2] [out-dir]
  *     before publishing: --against the published version's commit. About 15 minutes for two rounds.
+ *     The other version is given this tree's daily weather data (WEATHER, below), so both sail the same day and only the
+ *     code differs; --own-weather keeps each version's own. It exits 2 if the two still sailed different races (the course,
+ *     the day's wind, the fleet), as their counts can't then be compared.
  *
  * Headless Chromium draws with SwiftShader, a second or two a frame, so frame times and their percentiles mean nothing
  * here (the page's thread waits on the software GPU). What does hold: the renderer's counts, which are the same run to
@@ -34,6 +37,8 @@ const fs = require('fs'), path = require('path'), http = require('http');
 
 const ROOT = path.resolve(__dirname, '../..');
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args.splice(i, 2)[1] : d; };
+const ownWeather = args.includes('--own-weather'); if (ownWeather) args.splice(args.indexOf('--own-weather'), 1);
+const WEATHER = ['src/environment/data/sf-real-days.json', 'src/environment/data/sf-rain.json'];
 const compare = opt('--compare', null), against = opt('--against', 'origin/main'), rounds = +opt('--rounds', 2), out = compare || args[0] || path.join(ROOT, '.cache', 'perf-ab');
 fs.mkdirSync(out, { recursive: true });
 const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -49,6 +54,17 @@ function treeOf(ref) {
     const tar = execFileSync('git', ['archive', '--format=tar', sha, 'src', 'index.html', 'vite.config.ts', 'tsconfig.json', 'package.json'], { cwd: ROOT, maxBuffer: 1 << 30 });
     execFileSync('tar', ['-x', '-C', dir], { input: tar });
     fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'));
+  }
+  // The daily real-weather refresh (scripts/fetch-real-days.mjs, fetch-rain.mjs) rewrites these, and perf.cjs's race sails
+  // a day from them: a published version a day older sails another wind (v205 against v204, 18 Nov 2026: 160° 21 kt
+  // against 170° 22 kt, its course's first leg a run, not a reach, and the fleet elsewhere in every view: triangles +13% in
+  // two views with no change to what's drawn). So the other version gets this tree's, and only the code differs.
+  // (--own-weather: each its own, as published.)
+  // (written every time, either way: the directory is kept between runs)
+  for (const f of WEATHER) {
+    const dst = path.join(dir, f); if (!fs.existsSync(path.dirname(dst))) continue;
+    if (!ownWeather && fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), dst);
+    else { try { fs.writeFileSync(dst, execFileSync('git', ['show', `${sha}:${f}`], { cwd: ROOT, maxBuffer: 1 << 28 })); } catch { /* (not in that version) */ } }
   }
   return { sha, dir };
 }
@@ -96,7 +112,7 @@ const median = a => { const s = [...a].sort((x, y) => x - y), n = s.length; retu
 async function measureBoth(runs) {
   fs.mkdirSync(path.join(out, 'this'), { recursive: true }); fs.mkdirSync(path.join(out, 'ref'), { recursive: true });
   const ref = treeOf(against), here = git('rev-parse', '--short=8', 'HEAD');
-  console.log(`perf-ab: this tree (${here}${git('status', '--porcelain', '--untracked-files=no') ? ', with changes' : ''}) against ${against} (${ref.sha.slice(0, 8)}), ${rounds} rounds`);
+  console.log(`perf-ab: this tree (${here}${git('status', '--porcelain', '--untracked-files=no') ? ', with changes' : ''}) against ${against} (${ref.sha.slice(0, 8)}), ${rounds} rounds${ownWeather ? ', each its own weather data' : ', both on this tree\'s weather data'}`);
   const sA = await serve(ROOT, 5191), sB = await serve(ref.dir, 5192);
   try {
     for (let r = 0; r < rounds; r++) {
@@ -107,6 +123,14 @@ async function measureBoth(runs) {
 }
 
 function verdict(runs, t0) {
+  // (both versions must have sailed the same race, or the comparison means nothing: a version that made more objects while
+  // the page loaded once shifted perf.cjs's pinned random numbers and sailed another wind and fleet, +20% "regression"; a
+  // day's newer weather data did the same, which treeOf now copies across)
+  const id = R => R.race ? JSON.stringify(R.race) : null, ids = [...runs.ref, ...runs.this].map(id);
+  if (ids.every(Boolean) && new Set(ids).size > 1) {
+    console.error(`perf-ab: the two versions sailed different races, so they can't be compared:\n  ${[...new Set(ids)].join('\n  ')}`);
+    process.exit(2);
+  }
   const views = runs.this[0].rows.map(x => x.view);
   const fails = [], jsOver = [];
   console.log('\nview                 calls (ref → this)     triangles (ref → this)     programs   JS ms/frame, least (ref → this)');

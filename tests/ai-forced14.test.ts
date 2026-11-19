@@ -61,7 +61,9 @@ describe('Rule 14 between AI boats: a swerve forced by the keep-clear boat is a 
     // (crossing close-hauled, any time this branch fires the hulls on their courses would meet: a Folkboat's bow is
     // nearly 4 m ahead of her middle, so the bows are close long before the middles' tracks cross. What leaves out her
     // early move is the distance: a length and a half off she's avoiding in good time, not forced to)
-    const { w, B, Y } = crossing(3.0, 3); const uP = V(Y.h); Y.x += uP.x * 1.5; Y.y += uP.y * 1.5;
+    // (2.9 s from meeting: with her turn answering the helm sooner (physics.ts HOVE.gyration, 15 Nov 2026) she begins a
+    // tenth of a second later than at 3.0; still over the 10 m this case is about)
+    const { w, B, Y } = crossing(2.9, 3); const uP = V(Y.h); Y.x += uP.x * 1.5; Y.y += uP.y * 1.5;
     expect(dist(B, Y)).toBeGreaterThan(10);
     aiThink(w, B, DT);
     expect(Math.abs(wrap(B.desired - B.h)), 'she avoids').toBeGreaterThan(5);

@@ -76,10 +76,13 @@ vec3 waveSlope(vec2 p, float kW, float kS, float foot) {
   for (int i = 0; i < ${N_WAVES}; i++) {
     vec4 A = uWaveA[i], B = uWaveB[i];
     float L = 6.2832 / A.z, fade = 1.0 - smoothstep(L * 0.25, L * 0.7, foot);
-    // the group envelope: elongated across the wave's travel, moving at the group speed (half the phase speed)
+    // the group envelope: elongated across the wave's travel, moving at the group speed (half the phase speed in deep
+    // water, more in shallow: waterFrame.ts). Its size from the wave's deep-water length, 2πg/ω², fixed with its
+    // frequency: sized by its length in the depth, every change of depth slid the groups about the Bay's origin
     // (its coordinates from the local origin, uWaveE: turned with the wave about where you are, not the Bay's origin)
     vec2 along = A.xy, across = vec2(-A.y, A.x);
-    float env = B.w > 0.5 ? 1.0 : 0.25 + 1.5 * wgNoise((vec2(dot(p - uWaveO, along), dot(p - uWaveO, across) * 0.4) + uWaveE[i]) / (L * 4.0) + float(i) * 7.31);
+    float L0 = 61.6371 / (B.x * B.x); // (2π·9.81 / ω²)
+    float env = B.w > 0.5 ? 1.0 : 0.25 + 1.5 * wgNoise((vec2(dot(p - uWaveO, along), dot(p - uWaveO, across) * 0.4) + uWaveE[i]) / (L0 * 4.0) + float(i) * 7.31);
     float a = A.w * mix(kW, kS, B.w) * fade * env;
     float th = A.z * dot(A.xy, p - uWaveO) + B.y;
     s.xy += a * A.z * A.xy * cos(th);

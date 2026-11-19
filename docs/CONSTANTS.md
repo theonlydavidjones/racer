@@ -126,7 +126,8 @@ physics, ranked like the ten above:
 | RUDDER.slope | 3.0 | 91 | estimate |  |
 | RUDDER.arm | 2.6 | 91 | unsourced |  |
 | RUDDER.aspect | 1.4 | 91 | unsourced |  |
-| FULL_RUDDER | 30 | 93 | unsourced |  |
+| FULL_RUDDER | 30 | 93 | unsourced | the helm's unit, and the most the AI and the tiller pilot use |
+| HARD_OVER, RUDDER_STALL (balance.ts) | 46.5°, 40° | | derived / estimate | the tiller's swing each side, to where its arc meets the after deck (the owner's ruling, 18 Nov 2026; from render/hull.ts TILLER, len 1.2 m and 4° above level at rest, both estimates from the owner's photos, and the hull's rudder rake; tests/tillerpath holds it; 75° before); the stall for a keel-hung blade working as the keel's flap. No Folkboat measurement found. rudderTurn's rounding from 30° to the stall (a sixth more turn at 40°) and the stalled plate past it (Kirchhoff; Hoerner), and rudderBrake, are estimates on these |
 | IDEAL_HELM | 2.5 | 95 | unsourced |  |
 | MAIN_C.kpp | 0.01379 | 127 | sourced |  |
 | JIB_C.kpp | 0.016 | 135 | sourced |  |
@@ -330,8 +331,7 @@ physics, ranked like the ten above:
 | PENALTY_TURN_RATE | 10 | 22 | unsourced |  |
 | SLOW_TACK | 1.3 | 24 | unsourced |  |
 | CREW_LAG | 0.8 | 27 | unsourced |  |
-| ASTERN_DRAG.c0 | 0.005 | 30 | unsourced |  |
-| ASTERN_DRAG.c1 | 0.035 | 30 | unsourced |  |
+| ASTERN | 2 | | estimate | her drag stern first over her hull's resistance ahead at the same speed (NACA TN 3361: a 0012 section's drag at 180° about twice that at 0°; a section, not a hull); replaces the unsourced ASTERN_DRAG law |
 | STEERS_ASTERN | 0.05 m/s | | estimate | above it a held tiller steers by the flow going astern; below, it sculls |
 | HANDLING.asternRudder | 0.7 | | estimate | the rudder's lift going astern over ahead (Molland & Turnock, second hand: 75–85%, earlier stall) |
 | POLE.set | 8 | 35 | unsourced |  |
@@ -347,7 +347,7 @@ physics, ranked like the ten above:
 | HOVE.dragAft | 0.3 | 387 | estimate |  |
 | HOVE.swayAdded | 0.9 | 389 | estimate |  |
 | HOVE.yawAdded | 0.4 | 389 | estimate |  |
-| HOVE.gyration | 0.25 | 391 | estimate |  |
+| HOVE.gyration | 0.19 | 391 | estimate | worked from her ballast keel (52% of her weight at about 0.7 m, the rest at about 2.0 m); was 0.25, "the usual figure for a yacht". Sets yawLag: 0.36 s at 4.7 kt |
 | HOVE.windSide | 5.5 | 393 | estimate |  |
 | HOVE.windLever | 0.3 | 393 | estimate |  |
 | HOVE.rudderFlow | 0.5 | 395 | estimate |  |
@@ -624,7 +624,8 @@ physics, ranked like the ten above:
 | FINE.sector | 1° | 45 | estimate | how finely the front is kept round the start; at 2° light-air cases lost the way round a point (Crissy Field to Belvedere, 6 kt: 332 min against 66); same check |
 | COARSE | 2 min, 10°, 4° | 45 | numerical | quick looks only; its minutes can be out by half |
 | SHORE | 50 m | 30 | estimate | how close a plan takes her to the shore: seamanship for a learner with no depths in the model (Deep Physics, S2). The owner's case: 65.4 min at 50 m, 65.2 at 20 m. Settled by charted depths along the shore |
-| STALL | 10 min | 191 | estimate | a front no nearer the mark for this long asks the rules (sailLeg) for a time to beat, and searches on |
+| STALL | 10 min | 216 | estimate | a front no nearer the mark for this long asks the rules (sailLeg) for a time to beat, and searches on |
+| GIVE_UP | 30 min (3 × STALL); with no time to beat, fallen back over half the ground made, and the way of the last gain gone from the front | 216 | estimate | asked only of a passage's direct try with stretches to follow: a front lost, not waiting, is given up and the passage goes stretch by stretch. From Mile Rock some departures' fronts searched to 360 min (~25 s of CPU) for the same answer. Kept: a front set back stemming a spring ebb into the Gate in 4 kt (its way alive: 168 min), and one waiting 500–700 m off the Gate against the flood (not falling back: 168 min). Each test alone cut one of those (Deep Physics' review) |
 | WHARF_CLEAR | 20 m | 34 | estimate | how close a plan takes her to a pier, wharf, breakwater or dock: a man-made face with known depth, closer than a natural shore (the owner ran into an Embarcadero pier; the Coordinator, 15 Nov 2026) |
 | OPTIMISTIC | 15 kt | 39 | estimate | an upper bound on her speed over the ground (8 kt boat, 7 kt tide, above SFB1201's 6.7 kt constituent sum): the time-to-beat pruning never drops a winner |
 | tail slack | max(2 min, 3%) | 271 | estimate | the laid last board replaces the router's when within this: what the 5° fan and the minute can be out by |
@@ -636,6 +637,8 @@ physics, ranked like the ten above:
 | direct cap | 4 × straight line at 2 kn, 20–360 min | 72 | estimate | when the direct router gives up before trying stretch by stretch round the land |
 | LIVE_M, LIVE_MIN | 150 m, 2 min | 143 | numerical | how often the page's live plan is worked out again |
 | SLICE_MS, TICK_MS | 2 ms per 16 ms | 187 | design | the background plan's share of the page's thread (an eighth of a 60 fps frame; Capacity's budget) |
+| HELM_TOL | 8 m | 152 | estimate | the plotted track thinned to its corners for the helm (about one boat length; inside NAV_MADE). Settled by: the pilot's track against the plan at a few tolerances (tests/nav-follows-plan) |
+| HELM_OFF, HELM_WIND, HELM_KT, HELM_TIDE, HELM_EVERY (HelmFeed) | 100 m, 10°, 3 kt, 0.3 kt, 5 min | 193 | estimate | when Nav's plan is worked out afresh (on events, not a timer; tests/nav-follows-plan: 12 plans on a 42 min passage, the old cadence 77). Settled by: the page's profile on a Nav passage against how far she strays from a plan grown stale |
 
 ### src/sim/outlook.ts (router, 15 Nov 2026)
 
@@ -692,9 +695,30 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | DT | 1/60 | 50 | numerical |  |
+| NAV_MADE (sim/helmPlan.ts) | 30 m | 11 | estimate | a plan corner counts as made within this (about four boat lengths), the way to the next clear; else once past it. Settled by: where she tacks against the plan's tack points (tests/nav-follows-plan: within 30 m) |
+| STRUCTURE_CLEAR (sim/helmPlan.ts) | 20 m | 15 | design | the helm's clearance off the piers, wharves and bridge piers: the router's WHARF_CLEAR (router.ts), kept the same |
+| legOpen's clearance (sim/helmPlan.ts) | 10 m | 15 | estimate | STRUCTURE_CLEAR / 2: a plan leg the pilot steers as given, with no way round of its own, keeps this off structures (or no nearer than she is). Settled by: tests/nav-pier.test.ts's starts beside a pier |
+| LAND_SIDE (sim/helmPlan.ts) | 8 m | 139 | estimate | an open leg's land clearance either side (about her length). Settled by: the land along open legs, the physics review's probe |
+| GAP_MIN (sim/helmPlan.ts) | 3 × LOA (~23 m) | 20 | estimate | the narrowest gap between structures the pilot sails: her turning room (her 9 m turn, a little over); narrower, the alarm. The Berkeley Pier's 45 m gap is wider, and sailed (the owner) |
+| GAP_WARN (sim/helmPlan.ts) | 150 m | 22 | design | how far short of a gap too narrow the pilot hands her over: time to take the helm |
+| GAP_DIRS, opposite pairs, 0.15 (sim/helmPlan.ts narrowOn) | 36 rays; 150–210°; 0.15 × the nearer hit | — | measured | the narrow-gap test: a pair of hits on opposite sides, the line between them within 0.15 × the nearer's distance of her. The physics review's probe: 36 rays miss 0.3% or less of in-line gaps, none false along one face; GAP_MIN in effect soft between ~18 and 23 m |
+| legOpen's "nearer than she is" margin (sim/helmPlan.ts) | 1 m | — | estimate | a leg begun beside a structure is open if it comes no nearer than her distance less 1 m (unsourced; beside a structure the pilot now takes her off first, BESIDE, so this margin no longer steers her alongside) |
+| BESIDE (sim/helmPlan.ts) | 10 m | 149 | estimate | STRUCTURE_CLEAR / 2: within this of a structure (stopped) with the way on not open, the pilot takes her off it first (World.offPier, wayOff; ROADMAP 8q7). Settled by: tests/nav-pier.test.ts's starts beside Pier 45 |
+| OFF_AHEAD_S (sim/world.ts) | 4 s | 78 | estimate | with way on, beside counts out to BESIDE + 4 s of it (up to STRUCTURE_CLEAR): her turn's worth, a little over. Settled by: the Pier 45 start that ran onto the pier's head at 4.6 kn, engaged at 10 m |
+| OFF_LOOK (sim/helmPlan.ts wayOff) | 3 × LOA (~23 m) | 152 | estimate | how far along a way off is looked (and steered for, a point that far ahead) |
+| OFF_TRY (sim/helmPlan.ts wayOff) | every 15°, ±180° | 154 | numerical | the headings tried for a way off, nearest the way on first |
+| OFF_TURN_R (sim/helmPlan.ts turnArc) | HANDLING.turnRadius (9 m) | 156 | estimate | her turn's arc swept to a way off: boat/dynamics.ts's own figure, imported |
+| OFF_SLOW (sim/helmPlan.ts wayOff) | 1 m/s | 166 | estimate | slower than this, her course held is no way off: she hasn't the way to hold it past a pier |
+| OFF_TACK, OFF_TACK_PINCHED (sim/helmPlan.ts wayOff) | 2 m/s; 2.5 m/s pinched | 172 | fitted | a way off through the wind only with this way on. She can tack from 1 m/s in the sim (17 s; the fourth review's trials), but a tack is 8–18 s of slow turning that the 9 m arc doesn't describe, and the room for it isn't judged. Fitted to the third review's two starts beside a wharf that stalled in the tack and struck. Better: a keep for through-the-wind turns judged on a tack's real track |
+| OFF_ARC_GIVE, OFF_ARC_MIN (sim/helmPlan.ts wayOff) | 2 m; 3 m | 181 | estimate | turns that give up no more than OFF_ARC_GIVE of her offing come first, then any keeping OFF_ARC_MIN (her half-beam and as much again, the router's keep beside a pier). Held to the first alone, she was handed over 8 m off a wharf with a turn away keeping 5.9 m (the second review) |
+| OFF_LAG_S (sim/helmPlan.ts turnArc) | 1 s × (1 + the turn's side × ram) | 163 | estimate | her straight run before the turn bites: half the ram's 2.25 s to hard over. The pilot lags more (1.5 s on a 98° turn, the fourth review; a small turn never reaches hard over), so an arc near its keep may pass closer. 1.5 s, and the helm hard over onto a way off, were tried and made two starts worse |
+| OFF_HULL (sim/helmPlan.ts wayOff, hullKeep) | 2 m | 186 | estimate | the least a turn keeps off a structure at the last (or what she has, nearer), and the gate on an open leg's turn: one figure for both. The turn keeping her farthest off is taken if it keeps this and beats her track held |
+| HALF_BEAM, HULL_MIN (sim/helmPlan.ts turnArc, lineClear) | 1.1 m; 1.4 m | 205 | sourced (NFIA class rules, as ai.ts); estimate | her half-beam (2.2 m beam), where land at her side is looked for; and the least any turn may leave her off a structure, judged from where her run on before the turn ends |
+| OFF_LOOK_HELD (sim/world.ts offPier) | 2 × LOA (~15 m) | 80 | estimate | a way off begun is held, with none found anew, till she's within this of it: she sees the turn through, the helm already over |
+| OFF_HELD_S (sim/world.ts offPier) | 5 s | 82 | estimate | a way off begun is held for no longer than this since it was found (her turn's time, about), kept across an open leg that flickers shut |
 | TWO_TURNS | 720 | 52 | standard |  |
 | ONE_TURN | 360 | 60 | standard |  |
-| HULL_HALF_BEAM | 0.85 | 62 | unsourced |  |
+| HULL_HALF_BEAM | 0.85 | 106 | unsourced | not the half-beam (1.1 m, NFIA class rules): a half-width averaged along her length, the hull a line bow to stern for mark contact |
 | SAME_INCIDENT | 8 | 73 | unsourced | RRS names the rule, not the number |
 | TANGLE_MAX | 30 | 75 | sourced |  |
 | COMPELLED_WINDOW | 3 | 78 | unsourced | RRS names the rule, not the number |
@@ -704,8 +728,8 @@ physics, ranked like the ten above:
 | ASTERN_SHOVE | 0.64 m/s | | estimate | WALK plus SHOVE_N over 1 m of reach (the reach is the estimate) |
 | STEER_FOR | 13 s | | estimate | the steerage (over 0.3 m/s) the shove must give in the wind there is: the bar's 10 s and the scatter on an arc |
 | ASTERN_WIND_FAR, ASTERN_SET_FAR, ASTERN_WIND_STEP, SET_PER_KT (sim/world.ts) | 40 m, 16 m, 4 m, 0.019 m/s per kt | | estimate | the wind the shove is gauged by, read along her line astern and to leeward of it once as she's let go; her set across her line lying stern first under bare poles, per knot on her beam (the sim's own: 0.15 m/s in 10.5 kt 49° off her bow) |
-| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 12 m, 9 m | | derived / estimate | her still-air glide from the full shove (11.4 m); the clear water for which the way nearest the exit is taken |
-| ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 90 s, 1 m, 24 m | | estimate | the glide's one horizon; stopping short of the clear water's end; the furthest the planner looks |
+| ASTERN_RUN, ASTERN_ENOUGH (geo/marina.ts) | 45 m, 30 m | | derived / estimate | her still-air glide from the full shove to her way lost (44.5 m on the sourced sternway drag); what the gentlest steering shove glides to her way's end (30.4 m), the clear water for which the way nearest the exit is taken |
+| ASTERN_GLIDE_S, COAST_SHORT, ASTERN_LOOK_MAX (geo/marina.ts) | 240 s, 1 m, 46 m | | derived / estimate | the glide's one horizon, to where her way's gone from the full shove in still air (under 0.05 m/s; at 90 s she crept on 14 m more: the creep sweep, 18 Nov 2026); stopping short of the clear water's end; the furthest the planner looks |
 | DRIFT_PER_KT, DRIFT_PACE, DRIFT_FOR (geo/marina.ts) | 0.017 m/s per kt, 0.2 m/s, 60 s | | estimate | bare-poles drift to leeward allowed for along her run, measured in this sim |
 | ASTERN_WEST_KT, ASTERN_WEST_BAND (geo/marina.ts) | 6 kt, 45° | | estimate | NO_ASTERN_WEST's westerly: sailed at 4, 8 and 12 kt from 270, and at 12 kt from 225 and 315, only |
 | CREW_TURN | 2 | 111 | unsourced |  |

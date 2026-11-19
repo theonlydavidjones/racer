@@ -50,7 +50,7 @@ describe('Paddling her with the boom crutch (boat/paddle.ts): one person against
   });
   it('back-paddling makes sternway', () => {
     const b = paddled('S', 60, true);
-    expect((b.astern ?? 0) / KT).toBeGreaterThan(0.25); // (slowly: her drag going astern, physics.ts ASTERN_DRAG)
+    expect((b.astern ?? 0) / KT).toBeGreaterThan(0.25); // (slowly: her drag going astern, physics.ts asternDrag)
   });
 });
 

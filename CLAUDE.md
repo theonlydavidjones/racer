@@ -27,16 +27,18 @@ cruiser, or it can cross the Pacific single-handed.
 Sailors say two things: if you can sail the Bay, you can sail anywhere; and if you can sail a Folkboat, you can sail
 anything. That's what this game amounts to. Our mission is to bring those two truths to anyone who wants them.
 
-Working title (the owner, 16 Nov 2026): **Mainsail**. The owner's plans are bigger than Folkboats and San Francisco Bay:
-this game is about sailing. So the name must be able to hold more boats and more waters later, and the build should stay
-extensible (don't hard-wire the Folkboat or the Bay where a boat or a body of water could be a parameter). But the
-mission above stands for the MVP and does not change: the Bay and the Folkboat. Don't put the Bay or the Folkboat in the
-game's name.
+Working titles (the owner, 18 Nov 2026): **Folkboater** or **Bay Racer**, not decided: don't put either on the
+player's screens yet. They replace the earlier "Mainsail" (16 Nov), and with it the earlier plan for a name and a build
+wider than Folkboats and the Bay: the focus below is the scope.
 
 Community (the owner, 13 Nov 2026): the mission is also about community. You can't race in real life without belonging
 to a club, and no single person can know or do everything required to sail and maintain a boat. The marinas, the trading
 and training of crew, the flying of burgees, the traditions, the legacies and the trophies all belong to that community
 element. Eventually: a live multiplayer mode.
+
+Focus (the owner, 17 Nov 2026): the game is the Nordic Folkboat on San Francisco Bay, and nothing wider. No other
+classes of boat and no other waters: depth in this one boat and this one place is what sets it apart from general
+sailing sims. Work that widens the scope beyond them is out unless the owner asks for it.
 
 Priority (the owner, 13 Nov 2026): physics and racing first. "Physics is the key to the true-to-life element of the
 simulator. If it's not real and accurate, then it's not a simulator." The Bay's beauty and a robust open-Bay cruising mode
@@ -74,8 +76,10 @@ npm run dev & node scripts/check/rushing-edge.cjs <out-dir> # ~3 min: a still bo
 npm run dev & node scripts/check/setup-map.cjs <url> [<out-dir>]  # ~1 min: the cruise setup's chart and the big plan chart draw the chart
 npm run dev & node scripts/check/wreck.cjs <out-dir>        # ~5 min: a wreck in the page (the statement, a tow, her logbook, laid up, carry on)
 node scripts/check/perf-pair.mjs              # ~6 min: the step paired against origin/main in one process; fails above 1.015
-node scripts/check/perf-pair.mjs --budget     # ~6 min: the step against v168, the owner's budget (×1.019; perf.test runs it)
+node scripts/check/perf-pair.mjs --budget     # ~12 min: the step against v168, the owner's budget (×1.019; two runs; perf.test runs it)
 node scripts/check/perf-pair.mjs --ai         # ~11 min: an AI or rules PR's gate: ten races (seeds 1–5, 12 and 22 kt), the mean
+node scripts/check/fouls-pair.mjs            # ~25 min: an AI, rules or physics PR's gate for the AI's fouls: 60 races (seeds 1–30,
+                                              # 12 and 22 kt) on this tree and origin/main, paired by seed; fails at +0.5 a race, sign p < 0.05
 node scripts/check/perf-ab.cjs --against <published commit>  # ~30 min: the release gate for the frame: perf.cjs's views,
                                               # this tree and the published one back to back; fails on a clear regression
 node scripts/check/deopt.cjs                  # ~30 s: the first race after load under --trace-opt; fails if the compiler keeps
@@ -85,7 +89,12 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 - The step's speed (the owner, 14 Nov 2026): measured paired, both versions sailed by turns in one process, so the
   host's drift cancels (scripts/check/perf-pair.mjs, docs/CAPACITY.md §8). The budget holds: perf.test requires the
   step within v168 × 1.019 (the same 43.1 as before, now without the drift), on twelve ratios, six with each loaded
-  first (the owner, 14 Nov 2026). A PR that touches the step (src/boat,
+  first (the owner, 14 Nov 2026). A change to how boats sail or are judged (the physics, src/ai, src/rules) is judged against the budget
+  on the ten-race mean (`--budget --ai`; perf.test's with `PERF_BUDGET_AI=1 npx vitest run tests/perf.test.ts`), not
+  the one budget race, since it changes the race itself; anything else keeps the one race. The budget figure is unchanged (the owner, 18 Nov 2026).
+  Who is measured against it (the Coordinator, 19 Nov 2026; docs/CAPACITY.md §8d): main, once a release before
+  publishing, as two quiet runs (`--budget` defaults to `--repeat 2`: twenty ratios, their mean against 1.019); one run
+  is ±0.9%, and two of one tree read 2% apart. PRs are judged against main (below), not against the budget. A PR that touches the step (src/boat,
   src/environment, src/sim, src/ai, src/rules, src/core) runs `node scripts/check/perf-pair.mjs` before it's opened:
   at most 1.5% slower than origin/main, and the PR says the ratio. (It fetches origin/main itself; nothing to set up.)
   A PR that changes how boats sail or are judged (src/ai, src/rules) uses `--ai` instead, the mean over ten races: it

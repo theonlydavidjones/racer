@@ -5,7 +5,7 @@ import { CAR_FORE_PINS, boomAngle, crewSolve, depowerLimits, planWorth, jibClew,
 import { crewBestHeel, crewMass, crewMoment, crewSkill, displacement, specAttr } from './crewPhys';
 import { crewHeading } from './crewWork';
 import { condition, rigOf } from './condition';
-import { airDrag, driveSpeedRatio, hullResistance } from './dynamics';
+import { airDrag, driveSpeedRatio, hullResistance, speedForDrive } from './dynamics';
 import { driveCurveFor } from './driveCurve';
 import { beatAngle, polar } from './polar';
 import { byHand, crewEaseBoom, crewMainAngle, leeDrift, pinchFlog, sailFrame, sailPlan, sailPush, sailWind } from './physics';
@@ -211,7 +211,13 @@ function speedAt(b: Boat, c: Controls, heelIn: number, dm: number, dj: number, d
   const lwFor = (F: number, h: number) => b.twa < 150 ? clamp(F * Math.cos(h * D2R) / (0.5 * 1025 * Math.PI * DRAFT ** 2 * Math.max(0.8, polar(tws, crs0, plan)) ** 2) / D2R, 0, 12) : 0;
   const lw = lw0 + lwFor(sf.main.heel + sf.jib.heel, heelC) - lwFor(b.forces?.heel ?? sf.main.heel + sf.jib.heel, b.heelMag ?? 0);
   const crs = Math.min(180, b.twa + Math.max(0, lw)), vt0 = Math.max(0.5, polar(tws, crs0, plan));
-  const vT = f * driveSpeed(b, K) * Math.max(0.5, polar(tws, crs, plan));
+  // (the drive's share turned into speed from the heeled hull's own speed, as the step does it (physics.ts: vB, then
+  // speedForDrive there). Weighed from the upright polar speed it came out differently, because near hull speed the
+  // resistance's slope changes within a few cm/s (its table's corners: dynamics.ts RESIDUARY). Close-hauled in 20 kt
+  // with a line set wrong the coach's estimate of her as she is sat 0.08 to 0.10% off her settled speed; now 0.03%, its
+  // standing offset in every wind. Measured on main, 16 Nov 2026; tests/coach-self)
+  const vB = f * Math.max(0.5, polar(tws, crs, plan));
+  const vT = speedForDrive(vB, K, driveCurveFor(tws, crs, vB));
   // the sails flogging, as the boat counts it (physics.ts sailFlog, pinchFlog; dynamics.ts airDrag): a main eased till it
   // luffs, or a course pinched below the beat, costs her windage the drive no longer pays for. A force, so where it
   // leaves her is where the drive at her speed meets the hull's resistance and it, as the surge settles (dynamics.ts
@@ -670,7 +676,7 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
   const soft = forestayTension(b.tune) < forestayTension(TUNE_PRESETS[want]);
   const pct = `${(100 * loss).toFixed(1)}%`;
   return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
-    head: soft ? `Her rig is tuned soft for ${airOf(s)}: her sails give up about ${pct}. Backstay on hard.` : `Her rig is tuned tight for ${airOf(s)}: her sails give up about ${pct}. Backstay off, foot a little.`,
+    head: soft ? `Her rig was set for less wind than this: it costs her about ${pct} of her speed upwind. Backstay on hard.` : `Her rig was set for more wind than this: it costs her about ${pct} of her speed upwind. Backstay off, and sail a little lower.`,
     why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5); the backstay is free.`
       : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5).`,
     look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];

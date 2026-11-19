@@ -1,4 +1,5 @@
-import { KT, LOA, dist, dot, segCross, sub, unit, type Vec } from '../core/math';
+import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
+import { heldPast, helmPlan, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -9,7 +10,7 @@ import { clockOf, nearestStation, outlookFor, stationEvents, type Outlook } from
 import { FINE, routeLegSteps, trackClear, type Grain } from './router';
 import { groundLaylines, landDist, routeAroundSteps, sailLegSteps, type SailResult } from './routing';
 import { landAlong } from '../geo/shore';
-import { harborAt } from '../geo/marina';
+import { harborAt, harborRouteSteps, slipAt } from '../geo/marina';
 import { kt1, mins, nearFeature, type Brief, type BriefItem, type BriefSection } from './brief';
 
 /**
@@ -70,7 +71,8 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
   // (the direct try given up after four times the straight line at 2 kn, 20 minutes at least: where the land hides the
   // way from its front it would otherwise search the whole Bay for six hours before the way round the land was tried.
   // An estimate: docs/CONSTANTS.md)
-  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity);
+  // (a front that has lost the way given up here, router.ts GIVE_UP, only when the stretches follow to try again)
+  const direct = yield* routeLegSteps(o, a, b, t, 30, Math.min(360, Math.max(20, 4 * dist(a, b) / (2 * KT) / 60)), grain, rules.ok ? t + rules.minutes : Infinity, route.length > 2);
   if (direct.ok && (!rules.ok || direct.minutes <= rules.minutes)) return { ok: true, minutes: direct.minutes, track: direct.path, legs: [direct] };
   if (rules.ok && (!direct.ok || rules.minutes < direct.minutes)) return rules;
   if (route.length <= 2) return { ok: direct.ok, why: direct.why, minutes: direct.minutes, track: direct.path, legs: [direct] };
@@ -131,6 +133,65 @@ export interface PassageNow {
   /** when she leaves and arrives (minutes since epoch UTC; null if she can't get there leaving now) */
   leave: number; eta: number | null;
 }
+/**
+ * A plan's plotted course for the helm (World.planTarget): its track, from where she was when it was planned, thinned to
+ * its corners (Douglas-Peucker, within HELM_TOL m of the track: the tacks, gybes and the bends round a tide or a shadow
+ * are corners; the steps along a straight board aren't).
+ */
+export function helmPoints(pn: PassageNow): Vec[] {
+  const p = pn.track.map(q => q.p); if (p.length < 3) return p.slice();
+  const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
+  const stack: [number, number][] = [[0, p.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL;
+    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } }
+    if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
+  }
+  return p.filter((_, i) => keep[i]);
+}
+/** helmPoints' tolerance (m): about one of her lengths, well inside World.planTarget's 30 m for a corner made, so the
+ * pilot's course between two corners is the plotted one to within a boat length (an estimate, not a measured figure). */
+const HELM_TOL = 8;
+/**
+ * On Nav, the navigator's plan to the helm (World.planTarget: the pilot follows the plotted course, not the rhumb line,
+ * the owner's r253), as a navPlan command for the page to send. A plan is asked of `plan` (the page's passageLive,
+ * worked out between frames) only when something calls for one, not on a timer (the Coordinator, 18 Nov 2026: a plan
+ * each 150 m took up to an eighth of the page's thread for the whole passage): the pilot engaged, or a new race; a corner
+ * made, or past one and not yet clear to turn for the next; off the plan by more than HELM_OFF m; the wind or the tide at the course changed by more than HELM_WIND, HELM_KT
+ * or HELM_TIDE since it was planned; or, failing all of those, HELM_EVERY minutes of the clock on. Meanwhile the helm
+ * keeps the plan it has. A plan's taken only if she's within HELM_OFF m of its track (one held over from before she was
+ * steered off it waits for the next; one begun some way back, as a long plan is by the time it's in, is taken up at the
+ * leg she's on). The corners are counted as the World counts them (sim/helmPlan.ts), on the page's copy of the race.
+ */
+export class HelmFeed {
+  private helm: { pn: PassageNow; P: HelmPlan; world: unknown; t: number; wind: { from: number; kt: number }; tide: number } | null = null;
+  private want = true; private nav = false;
+  /** How many plans it has asked for, and taken (for the tests). */
+  asked = 0; taken = 0;
+  constructor(private plan: (w: SimView) => PassageNow | null) {}
+  tick(w: SimView): { k: 'navPlan'; to: Vec; pts: Vec[] } | null {
+    const nav = w.pilot.mode === 'nav' && w.running && w.cruising && !!w.dest;
+    if (!nav || !this.nav || this.helm?.world !== w) { this.helm = null; this.want = true; }
+    this.nav = nav; if (!nav) return null;
+    const dest = w.dest!.p, u = w.user, h = this.helm;
+    if (h && !this.want) {
+      const was = h.P.i; nextCorner(h.P, u, dest);
+      const dw = Math.abs(((w.wind.from - h.wind.from + 540) % 360) - 180);
+      this.want = h.P.i !== was || heldPast(h.P, u) || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
+        || Math.abs(w.cur.kt - h.tide) > HELM_TIDE || w.clockUtc - h.t >= HELM_EVERY || h.P.to.x !== dest.x || h.P.to.y !== dest.y;
+      if (!this.want) return null;
+    }
+    this.asked++;
+    const pn = this.plan(w); if (!pn || pn === h?.pn || !pn.ok || !pn.track.length) return null; // (asked again each frame till it's in)
+    const pts = helmPoints(pn), P = helmPlan(dest, pts, u); if (!P || offLeg(P, u) > HELM_OFF) return null; // (she's not on it: the next)
+    this.helm = { pn, P, world: w, t: w.clockUtc, wind: { from: w.wind.from, kt: w.wind.kt }, tide: w.cur.kt }; this.want = false; this.taken++;
+    return { k: 'navPlan', to: { x: dest.x, y: dest.y }, pts };
+  }
+}
+/** HelmFeed's triggers (estimates, docs/CONSTANTS.md): planned afresh off the plan by HELM_OFF m (a few times what she
+ * strays sailing one: tests/nav-follows-plan, 11-26 m), the wind HELM_WIND° or HELM_KT kt off what it was planned in, the
+ * tide at the course HELM_TIDE kt, or HELM_EVERY minutes on. */
+const HELM_OFF = 100, HELM_WIND = 10, HELM_KT = 3, HELM_TIDE = 0.3, HELM_EVERY = 5;
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
 /** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause
  * menu, World.applyConditions, they're new objects). */
@@ -146,15 +207,32 @@ const fresh = (m: { key: string; refs: unknown[] } | undefined, k: { key: string
 /** A place inside a marina's basin, for the passage: the marina's entrance nearest it (the middle of the way in). The
  * way between the entrance and her slip, round the docks and along the fairways, is the marina's own (ROADMAP 8m2,
  * Marinas), not the passage's. */
+/** Where a passage to a destination ends: bound for a slip, the middle of its harbor's entrance nearest it by water, where the
+ * pilot hands her over (geo/marina.ts harborRoute, world.ts navTarget: one mouth for the plan and the pilot); else as
+ * outOfBasin. The harbor's flood the first time, a little at a time. */
+function* destOut(p: Vec): Generator<void, Vec, void> {
+  const s = slipAt(p);
+  if (s) { const r = yield* harborRouteSteps(s); if (r) return { ...r.mouth }; }
+  return outOfBasin(p);
+}
 function outOfBasin(p: Vec): Vec {
   const H = harborAt(p); if (!H || !H.exits.length) return p;
   let e = H.exits[0]; for (const x of H.exits) if (dist(x, p) < dist(e, p)) e = x;
   return { ...e };
 }
+/** The page's plans' outlook, one for a World in its conditions: its caches (the lee, the wind, the current, the chop, by
+ * place and time) are memos of the day, so a plan after the first reads them warm (a new outlook for each, every re-plan
+ * under way filled them again, ~45 s of work from Mile Rock: the physics review of nav-pace). */
+const outlooks = new WeakMap<SimView, { refs: unknown[]; o: ReturnType<typeof outlookFor> }>();
+function sharedOutlook(w: SimView) {
+  const refs = [w.weather, w.tide, w.windModel, w.sea, w.settings, w.gunUtc], m = outlooks.get(w);
+  if (m && m.refs.every((r, i) => r === refs[i])) return m.o;
+  const o = outlookFor(w); outlooks.set(w, { refs, o }); return o;
+}
 function* passageNowSteps(w: SimView): Generator<void, PassageNow | null, void> {
   const dest = w.dest; if (!dest) return null;
-  const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
-  const o = outlookFor(w);
+  const u = w.user, t0 = w.clockUtc, from = outOfBasin({ x: u.x, y: u.y }), to = yield* destOut(dest.p);
+  const o = sharedOutlook(w);
   yield;
   const route = yield* routeAroundSteps(from, to);
   const r = yield* passageSteps(o, route, t0);
@@ -184,28 +262,59 @@ export function passageNow(w: SimView): PassageNow | null {
  * draws only on demand: the setup's tide graph).
  */
 const jobs = new WeakMap<SimView, { key: string; refs: unknown[]; g: Generator<void, PassageNow | null, void>; ready?: () => void }>();
-/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (an eighth of a 60 fps frame: a design choice inside Capacity's frame budget). */
-const SLICE_MS = 2, TICK_MS = 16;
+/** The background plan's share of the page's thread: SLICE_MS of work every TICK_MS (an eighth of a 60 fps frame: a design
+ * choice inside Capacity's frame budget); SLICE_NEW_MS while there's no plan at all for where she's going (a destination
+ * just chosen: the player's waiting on it), or the passage panel's plan, asked for and waited on. */
+const SLICE_MS = 2, SLICE_NEW_MS = 6, TICK_MS = 16;
+/** For the tests (tests/sailHome-mileRock.test.ts), kept only while `on`: each slice's length (ms, on `clock`), the live
+ * plan's and the panel's, that none runs over its budget, and how many live plans were started (one for a passage
+ * sailed, not one each 150 m). The test sets `clock` to the process's CPU time: it doesn't run while the process waits
+ * for a core, so a loaded host doesn't read as a long slice (the slices' own budgets stay on the wall clock). */
+export const liveLog = { on: false, slices: [] as number[], panel: [] as number[], starts: 0, clock: () => performance.now() };
+const clock0 = () => liveLog.on ? liveLog.clock() : 0;
+const noteSlice = (c0: number, to = liveLog.slices) => { if (liveLog.on) to.push(liveLog.clock() - c0); };
+/** The destination's part of a plan's key (where she's going, not where she is or when). */
+const destOf = (key: string) => key.slice(0, key.indexOf('|'));
 export function passageLive(w: SimView, ready?: () => void): PassageNow | null {
   const k = nowKey(w, LIVE_M, LIVE_MIN); if (!k) return null;
   const m = nowMemo.get(w); if (fresh(m, k)) return m!.v;
   const j = jobs.get(w);
-  if (!j || !fresh(j, k)) {
-    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job);
+  // (a plan being worked out for the same destination in the same conditions is let finish, though she's sailed on or the
+  // clock's turned since it began: started again each 150 m, a long first plan (Mile Rock to Gashouse Cove, ~39 s of work)
+  // never finished under way: the owner's "ten minutes in, still plotting", ROADMAP 8b. The next starts from where she is
+  // once it's in)
+  const same = !!j && sameAim(j, k);
+  if (j && same && ready && j.ready !== ready) { const a = j.ready; j.ready = () => { a?.(); ready(); }; } // (each caller told when it's in)
+  if (!j || !same) {
+    const job = { ...k, g: passageNowSteps(w), ready }; jobs.set(w, job); if (liveLog.on) liveLog.starts++;
+    const first = !m || !sameAim(m, k); // (nothing yet to show for where she's going, in these conditions)
     const pump = () => {
       if (jobs.get(w) !== job) return; // (a newer plan took its place)
-      const t = performance.now();
+      // (the panel's share too while the panel waits on this plan, its own pump idle: on the background's 2 ms a frame, the
+      // panel's plan from Mile Rock came in past its 120 s, 4 runs in 4, once this plan had to be started afresh)
+      const t = performance.now(), c0 = clock0(), budget = first || waiting.has(w) ? SLICE_NEW_MS : SLICE_MS;
       for (;;) {
         const r = job.g.next();
-        if (r.done) { if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
-        if (performance.now() - t > SLICE_MS) break;
+        if (r.done) { noteSlice(c0); if (r.value) nowMemo.set(w, { key: job.key, refs: job.refs, v: r.value }); jobs.delete(w); job.ready?.(); return; }
+        if (performance.now() - t > budget) break;
       }
+      noteSlice(c0);
       setTimeout(pump, TICK_MS);
     };
     setTimeout(pump, 0);
   }
-  return m?.v ?? null; // (the last plan, until the new one is in)
+  return m && sameAim(m, k) ? m.v : null; // (the last plan for where she's going in these conditions, until the new one is in)
 }
+/** Two plans' keys for the same destination in the same conditions (where she is, and when, aside). */
+const sameAim = (a: { key: string; refs: unknown[] }, b: { key: string; refs: unknown[] }) => destOf(a.key) === destOf(b.key) && a.refs.every((r, i) => r === b.refs[i]);
+/** The live plan for where she's going, if it's recent enough for the panel to brief from: begun within 300 m of her and
+ * five minutes of now. */
+function liveFor(w: SimView): PassageNow | null {
+  const k = nowKey(w), m = nowMemo.get(w); if (!k || !m || !sameAim(m, k)) return null;
+  return dist(m.v.route[0], outOfBasin({ x: w.user.x, y: w.user.y })) < 300 && Math.abs(w.clockUtc - m.v.leave) <= 5 ? m.v : null;
+}
+/** Panels waiting on the live plan (passagePlanSteps): their pumps idle meanwhile, not spinning on its yields. */
+const waiting = new WeakSet<SimView>();
 
 /** Why a passage can't be sailed, in words: the planner's course ran ashore, or it took too long. */
 export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
@@ -213,7 +322,7 @@ export const whyNot = (why?: 'land' | 'time'): string => why === 'land'
   : 'it takes too long, becalmed or against a foul tide somewhere on the way';
 
 /** passagePlanSteps worked out at once (the tests). */
-export function passagePlan(w: SimView): PassagePlan | null { const g = passagePlanSteps(w); let r = g.next(); while (!r.done) r = g.next(); return r.value; }
+export function passagePlan(w: SimView): PassagePlan | null { const g = passagePlanSteps(w, false); let r = g.next(); while (!r.done) r = g.next(); return r.value; }
 /**
  * passagePlanSteps a slice at a time between frames (it sails the passage leaving now and up to five times later, a
  * second or two each), then `done` with the plan. Returns a function that stops it (the panel closed, or another asked).
@@ -222,20 +331,39 @@ export function passagePlanLater(w: SimView, done: (p: PassagePlan | null) => vo
   const g = passagePlanSteps(w); let stopped = false;
   const pump = () => {
     if (stopped) return;
-    const t = performance.now();
-    for (;;) { const r = g.next(); if (r.done) { done(r.value); return; } if (performance.now() - t > SLICE_MS) break; }
+    if (waiting.has(w) && jobs.get(w)) { setTimeout(pump, TICK_MS); return; } // (the live plan's own pump is at it)
+    const t = performance.now(), c0 = clock0();
+    for (;;) { const r = g.next(); if (r.done) { noteSlice(c0, liveLog.panel); done(r.value); return; } if (performance.now() - t > SLICE_NEW_MS) break; } // (the panel's: asked for and waited on)
+    noteSlice(c0, liveLog.panel);
     setTimeout(pump, TICK_MS);
   };
   setTimeout(pump, 0);
   return () => { stopped = true; };
 }
-function* passagePlanSteps(w: SimView): Generator<void, PassagePlan | null, void> {
+/** `live`: between frames, the passage leaving now taken from the page's live plan (waited on); at once (the tests), worked out here. */
+function* passagePlanSteps(w: SimView, live = true): Generator<void, PassagePlan | null, void> {
   const dest = w.dest; if (!dest) return null;
-  const o = outlookFor(w), u = w.user, t0 = w.clockUtc;
-  const from = outOfBasin({ x: u.x, y: u.y }), to = outOfBasin(dest.p);
+  const o = sharedOutlook(w), u = w.user, t0 = w.clockUtc;
+  const from = outOfBasin({ x: u.x, y: u.y }), to = yield* destOut(dest.p);
   const sections: BriefSection[] = [], marks: PassagePlan['marks'] = [];
   // (the same passage the chart and the setup show: passageNow)
-  const k = nowKey(w)!, m = nowMemo.get(w), pn = fresh(m, k) ? m!.v : (yield* passageNowSteps(w))!, route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
+  // (the passage leaving now: the live plan's, the one the inset and the HUD draw, if it's recent; else that plan, started
+  // or joined and waited on. Worked out here a second time, it was ~45 s more of the page's thread from Mile Rock)
+  const k = nowKey(w)!, m = nowMemo.get(w);
+  let pn = fresh(m, k) ? m!.v : live ? liveFor(w) : (yield* passageNowSteps(w));
+  // (the plan it waits on is the one being worked out when it began waiting, or the one that starts at once: once that's
+  // in, it's taken, though she's sailed on. Waiting on whatever was running, it waited again on the next live plan, begun
+  // each 150 m as she sails (passageLive), whenever the first took her more than that: the panel's plan from Mile Rock in
+  // 16 s of the page's thread with one, 42 s with two, on the same quiet host; Marinas, 18 Nov 2026)
+  let on: unknown;
+  while (!pn && live) {
+    passageLive(w); const j = jobs.get(w); if (on === undefined) on = j ?? null;
+    if (j && j === on) { waiting.add(w); yield; waiting.delete(w); continue; }
+    pn = liveFor(w) ?? nowMemo.get(w)?.v ?? null; if (!pn) pn = (yield* passageNowSteps(w));
+    break;
+  }
+  if (!pn) return null;
+  const route = pn.route, now = { ok: pn.ok, minutes: pn.minutes, track: pn.track, legs: pn.legs };
   const cant = whyNot(pn.why);
   const straight = dist(from, to), routeLen = route.slice(1).reduce((a, p, i) => a + dist(route[i], p), 0);
   const fromName = w.fromSlip && !w.running ? `her slip (${w.homeSlip?.id})` : place(w.settings.sailFrom)?.name.replace(/^Off /, 'off ') ?? 'here';

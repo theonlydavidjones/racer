@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DT, World } from '../src/sim/world';
+import { yawLag } from '../src/boat/physics';
+import { HANDLING } from '../src/boat/dynamics';
 
 // In irons (ROADMAP 10): sternway with her sails up, the rudder working backwards, and sculling only as RRS 2025–2028
 // rule 42.3(d) allows: "When a boat is above a close-hauled course and either stationary or moving slowly, she may
@@ -24,12 +26,24 @@ describe('in irons, with her sails up', () => {
     expect(u.tack).toBe('P');
   });
   it('once sculled one way, not back the other (SCULL 2): she holds the way she started until she\'s close-hauled', () => {
-    const { w, u } = world(10);
-    u.h = (w.windHere(u, u).from - 15 + 360) % 360;
-    for (let i = 0; i < 60; i++) { u.steer = -1; u.v = 0; u.astern = 0; w.step(DT); } // (sculled a second toward the wind)
-    const h0 = u.h;
-    for (let i = 0; i < 60 * 3; i++) { u.steer = 1; u.v = 0; u.astern = 0; w.step(DT); } // (then the other way)
-    expect(Math.abs(((u.h - h0 + 540) % 360) - 180)).toBeLessThan(2); // (no flow, no sculling back: she barely turns)
+    // (what the rule says: no turn back the other way. She does carry on the first way a little, on the turn she had: her
+    // yaw rate at the reversal, r0, dies away over her lag τ (physics.ts yawLag, at the 0.25 m/s floor she's held at), so in
+    // the 3 s after it she carries on r0·τ·(1 − e^(−3/τ)); and r0 is what a second's sculling toward 4 deg/s had built,
+    // 4·(1 − e^(−1/τ)). About 2 degrees. Bounded by that, worked here, with 5% for the step.)
+    const scull = (cheat: boolean) => {
+      const { w, u } = world(10);
+      u.h = (w.windHere(u, u).from - 15 + 360) % 360;
+      for (let i = 0; i < 60; i++) { u.steer = -1; u.v = 0; u.astern = 0; w.step(DT); } // (sculled a second toward the wind)
+      const h0 = u.h; let back = 0;
+      for (let i = 0; i < 60 * 3; i++) { u.steer = 1; u.v = 0; u.astern = 0; if (cheat) u.scullDir = undefined; w.step(DT); back = Math.max(back, ((u.h - h0 + 540) % 360) - 180); } // (then the other way)
+      return { back, on: -(((u.h - h0 + 540) % 360) - 180) };
+    };
+    const tau = yawLag(0), r0 = HANDLING.minTurnRate * (1 - Math.exp(-1 / tau)), carry = r0 * tau * (1 - Math.exp(-3 / tau));
+    const held = scull(false);
+    expect(held.back).toBeLessThan(0.1); // (no flow, no sculling back: not a tenth of a degree the other way)
+    expect(held.on).toBeGreaterThan(0); expect(held.on).toBeLessThan(carry * 1.05);
+    // (and a boat that is let scull back does turn back: the check above would catch her)
+    expect(scull(true).back).toBeGreaterThan(1);
   });
   it('going astern, the bow goes the way the tiller\'s pushed, and the tiller is drawn where it\'s held', () => {
     const { w, u } = world(15);

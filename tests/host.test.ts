@@ -14,15 +14,16 @@ import type { Command } from '../src/sim/commands';
 import type { Boat } from '../src/boat/boat';
 import { allToCrew, moveLazyCar, takeLine } from '../src/boat/physics';
 import { wantJumpers } from '../src/boat/condition';
-import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, tack as pilotTack } from '../src/boat/autopilot';
+import { adjust as pilotAdjust, engage as pilotEngage, standby as pilotStandby, liftOff as pilotLift } from '../src/boat/autopilot';
 
 /** The page's old code for each command: the writes app.ts and the sail controls band made before step 2. */
+// (plus, since, the tiller pilot's ram lifted off its pin by a hand on the tiller or the helm: autopilot.ts onPin)
 function oldWay(w: World, c: Command): void {
   const u: Boat = w.user;
   switch (c.k) {
-    case 'helm': u.steer = c.steer; u.luff = c.luff; u.ctlCmd = c.ctl; u.sheetCmd.main = c.ctl.mainsheet ?? 0; u.sheetCmd.jib = c.ctl.jibsheet ?? 0; return;
+    case 'helm': if (c.steer && w.pilot.mode === 'off') w.pilot.onPin = false; u.steer = c.steer; u.luff = c.luff; u.ctlCmd = c.ctl; u.sheetCmd.main = c.ctl.mainsheet ?? 0; u.sheetCmd.jib = c.ctl.jibsheet ?? 0; return;
     case 'handsOff': u.steer = 0; u.luff = false; u.sheetCmd.main = u.sheetCmd.jib = 0; return;
-    case 'tiller': u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
+    case 'tiller': if (w.pilot.mode === 'off') w.pilot.onPin = false; u.tiller = Math.max(-1, Math.min(1, c.v)); if (u.lashed != null) u.lashed = u.tiller; return;
     case 'lash': if (c.on) u.lashed = u.tiller; else u.lashed = null; return;
     case 'line': takeLine(u, c.key, c.mine); return;
     case 'allToCrew': allToCrew(u); return;
@@ -41,7 +42,8 @@ function oldWay(w: World, c: Command): void {
     case 'sail': w.setSail(c.sail, c.up); return;
     case 'pilot':
       if (c.op === 'engage') pilotEngage(u, w.pilot, c.mode); else if (c.op === 'standby') pilotStandby(w.pilot);
-      else if (c.op === 'tack') pilotTack(u, w.pilot); else pilotAdjust(u, w.pilot, c.d);
+      else if (c.op === 'lift') pilotLift(w.pilot);
+      else if (c.op === 'tack') w.pilotTack(); else pilotAdjust(u, w.pilot, c.d);
       return;
     case 'hail': w.userHail(); return;
     case 'dest': w.setDest(c.p, c.name); return;

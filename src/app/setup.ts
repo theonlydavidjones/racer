@@ -12,6 +12,7 @@ import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
 import { place } from '../sim/places';
+import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
 import { harborOf, slipById, slipPlace } from '../geo/marina';
 import { laidUp, type BoatSpec } from '../boat/spec';
@@ -122,7 +123,7 @@ function buildSetupChoices(): void {
   const label = (c: typeof COURSES[number]) => {
     if (!c.group) return c.title;
     const route = c.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
-    return `${c.title.replace('Seaweed Soup · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
+    return `${c.title.replace('Kelp Chowder · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
   };
   const sel = $('courseSel') as HTMLSelectElement;
   groups.delete('Practice');
@@ -388,8 +389,8 @@ function drawHeads(): void {
   let burgee = burgeeUrls.get(host);
   if (burgee == null && !practice) { try { burgee = burgeeCanvas(host)?.toDataURL() ?? ''; } catch { burgee = ''; } burgeeUrls.set(host, burgee); }
   const C = w.C, nm = courseFileNow?.distanceNm;
-  const title = C.title.replace(/^Seaweed Soup · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
-  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Golden Gate Yacht Club">` : '',
+  const title = C.title.replace(/^Kelp Chowder · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
+  set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Dorado Yacht Club">` : '',
     `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailing instructions|Practice): /, ''))}</span></span>`);
   // the fleet: a tile each, and + to add one
   const fl = app.fleetChosen;
@@ -525,7 +526,7 @@ function beginRaceNow(seed?: number): void {
   if (app.S.mode === 'roundings') { logMessage('— Mark roundings · the practice course'); app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false }); app.word('bFast', 'Speed 1×');
     const W = app.w.rounding!.marks[0];
     toast(`Mark roundings: ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Beat up to ${W.name.replace(/ \(.*/, '')} (leave it to port) and set the pole for the run down to the pin (the leeward mark, to port); then beat up again. Each rounding is scored against a good crew's, in the Coach card. Wide in, close out.`, 7000); return; }
-  logMessage(`— ${app.S.mode === 'sail' ? `Cruise · ${place(app.S.sailFrom)?.name ?? ''}${app.w.dest ? ' to ' + app.w.dest.name : ''}` : app.S.mode === 'drill' ? 'Start practice' : 'Race'} · ${app.S.mode === 'sail' ? '' : app.w.C.title}`);
+  logMessage(startHead(app.S.mode, { from: app.S.sailFrom === 'slip' ? 'her slip' : place(app.S.sailFrom)?.name, dest: app.w.dest?.name, course: app.w.C.title }));
   app.send({ k: 'running', on: true }); app.send({ k: 'pause', on: false });
   app.word('bFast', 'Speed 1×');
   horn(1.0);
