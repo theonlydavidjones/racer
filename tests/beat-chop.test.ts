@@ -1,0 +1,58 @@
+import { describe, expect, it } from 'vitest';
+import { beatInChop, speedInChop } from '../src/boat/seaway';
+import { driveCurveFor, driveRatio } from '../src/boat/driveCurve';
+import { polar } from '../src/boat/polar';
+import { D2R } from '../src/core/math';
+
+/**
+ * The beat angle in chop held steady (ROADMAP: "The beat angle in chop jumps"). Her speed in a chop is worked from
+ * tables read in straight lines (the sails' drive by the knot and 5° of angle, the polar's angles, the hull's
+ * resistance), so the speed made good against the angle had steps and corners, two near-equal peaks 5° apart, and the
+ * best angle swung 5 to 7° on a quarter-knot puff: the AI's target angle and the laylines with it. Now the drive is read
+ * between its knots and angles, and the angle is the middle of the top of the curve, not its highest wrinkle.
+ */
+describe('the beat angle in chop holds steady through a puff', () => {
+  // (the chop a wind raises on the Bay, about: the sea the sim's own boats meet)
+  const SEAS: [number, number, number, number][] = [[6, 10, 0.1, 1.8], [8, 14, 0.2, 2.2], [10, 18, 0.3, 2.5], [14, 24, 0.5, 3], [18, 30, 0.8, 3.5]];
+  it('a quarter knot more wind moves it under a degree, in every wind and the chop it raises', () => {
+    for (const [k0, k1, hs, tp] of SEAS) for (let kt = k0; kt < k1; kt += 0.25) {
+      expect(Math.abs(beatInChop(kt + 0.25, hs, tp) - beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeLessThan(1);
+    }
+  });
+  it('and in any wind and chop at all, light air in a big chop too, by no more than a degree and a half (it was 7)', () => {
+    for (const [hs, tp] of [[0.1, 1.8], [0.2, 2.2], [0.3, 2.5], [0.5, 3], [0.8, 3.5], [1.2, 4.5]]) for (let kt = 4; kt <= 30; kt += 0.25) {
+      expect(Math.abs(beatInChop(kt + 0.25, hs, tp) - beatInChop(kt, hs, tp)), `${kt} kt, ${hs} m`).toBeLessThan(1.5);
+    }
+  });
+  it('the steady angle gives up under 1% of the most she could make good to windward', () => {
+    for (const [hs, tp] of [[0.1, 1.8], [0.3, 2.5], [0.5, 3], [0.8, 3.5], [1.2, 4.5]]) for (let kt = 4; kt <= 30; kt += 0.5) {
+      const a = beatInChop(kt, hs, tp), got = speedInChop(kt, a, hs, tp) * Math.cos(a * D2R);
+      let top = 0; for (let t = 30; t <= 65; t += 0.25) top = Math.max(top, speedInChop(kt, t, hs, tp) * Math.cos(t * D2R));
+      if (top > 0) expect(1 - got / top, `${kt} kt, ${hs} m at ${a.toFixed(1)}`).toBeLessThan(0.01);
+    }
+  });
+  it('more chop moves it smoothly too: a step of the sea\'s height (0.02 m) or period (0.1 s) under a degree', () => {
+    for (const [k0, k1, hs, tp] of SEAS) for (let kt = k0; kt <= k1; kt += 1) {
+      const a = beatInChop(kt, hs, tp);
+      expect(Math.abs(beatInChop(kt, hs + 0.02, tp) - a), `${kt} kt, ${hs} m, higher`).toBeLessThan(1);
+      expect(Math.abs(beatInChop(kt, hs, tp + 0.1) - a), `${kt} kt, ${hs} m, longer`).toBeLessThan(1);
+    }
+  });
+  it('the sails\' drive against her speed runs smoothly across the table\'s own lines (every 5°, every knot) and between them: no step', () => {
+    let worst = 0;
+    // (on the table's lines, 45° and 12 kt and the like, where a wrong neighbor row would show; and midway, where the
+    // nearest row used to change)
+    for (const kt of [6, 6.5, 9, 12, 12.5, 17.5, 22]) for (const a of [40, 42.5, 45, 47.5, 50, 90, 132.5, 135]) for (const x of [0.3, 0.6, 0.85, 1.1]) {
+      const vt = polar(kt, a);
+      worst = Math.max(worst, Math.abs(driveRatio(kt, a + 0.01, x * vt, vt) - driveRatio(kt, a - 0.01, x * vt, vt)), Math.abs(driveRatio(kt + 0.005, a, x * vt, vt) - driveRatio(kt - 0.005, a, x * vt, vt)));
+    }
+    expect(worst).toBeLessThan(0.002); // (it stepped by up to several percent midway between the lines)
+    // (midway between two angles' rows, the mean of the two rows; and of two knots' rows: each read on its own line)
+    const at = (kt: number, a: number, x: number) => { const vt = polar(kt, a); return driveRatio(kt, a, x * vt, vt); };
+    for (const x of [0.3, 0.6, 0.85]) {
+      expect(at(12, 47.5, x)).toBeCloseTo((at(12, 45, x) + at(12, 50, x)) / 2, 9);
+      expect(at(12.5, 45, x)).toBeCloseTo((at(12, 45, x) + at(13, 45, x)) / 2, 9);
+    }
+    const vt = polar(12, 45); expect(driveCurveFor(12, 45, vt)(vt)).toBeCloseTo(1, 6);
+  });
+});
