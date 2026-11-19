@@ -73,6 +73,9 @@ const HANDOVER_S = 20, HANDOVER_MIN = 30, HANDOVER_SAIL = 150;
 const HELM = new WeakMap<object, HelmPlan>();
 /** The way off a structure she's beside, for each World, and when it was looked for (World.offPier). */
 const OFF = new WeakMap<object, { t: number; q: Vec | null }>();
+/** How many seconds of her way on count as beside a structure (World.offPier): her turn's, a little over. An estimate
+ * (docs/CONSTANTS.md). */
+const OFF_AHEAD_S = 4;
 /** This step's pilot target is a corner of the plan (planTarget), not the destination: the pilot then trusts the plan's
  * way round (autopilot.ts navHeading). Module-level, not the World's: its shape stays main's (perf-pair). */
 let onPlan = false;
@@ -2424,7 +2427,7 @@ export class World {
   setDest(p: Vec, name: string): void {
     if (!this.cruising) return;
     this.dest = destMark({ id: 'pick', name, group: 'Spots', p });
-    this.arrivedT = null; HELM.delete(this);
+    this.arrivedT = null; HELM.delete(this); OFF.delete(this);
     this.emit({ type: 'toast', msg: `New destination: ${name}.`, ms: 3000 });
   }
 
@@ -2548,7 +2551,7 @@ export class World {
     const slip = this.homeSlip;
     if (!slip) { this.emit({ type: 'toast', msg: 'She has no home slip: give her one in the Fleet.', ms: 3500 }); return false; }
     this.retire();
-    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' }; HELM.delete(this);
+    this.dest = { ...destMark({ id: 'slip', name: `Her slip, ${slipPlace(slip)}`, group: 'Spots', p: slip.p })!, key: 'slip' }; HELM.delete(this); OFF.delete(this);
     this.arrivedT = null;
     harborRoute(slip); // (her way home, worked out now, as she's sent home, not as the pilot steers: navTarget)
     if (this.pilot.mode !== 'off') this.pilot.mode = 'nav';
@@ -2693,38 +2696,38 @@ export class World {
     if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
     const t = P ? nextCorner(P, b, end) : end;
     if (P) onPlan = legOpen(b, t); // (on the last leg too: the gap on it, she swung to and fro before it, the second review)
-    const off = this.offPier(b, t, P, end); if (off) return off;
-    if (!P) return end;
-    // (a gap too narrow for the pilot ahead on her way: its alarm, and she's yours, short of it; helmPlan.ts GAP_MIN)
-    if (narrowAhead(P, b) && this.pilot.mode === 'nav') this.pilot.alarm = 'A gap too narrow for the pilot ahead: she\'s yours.';
-    return t;
+    // (a gap too narrow for the pilot ahead on her way: its alarm, and she's yours, short of it; helmPlan.ts GAP_MIN. Before
+    // the way off a structure: held on that till she's clear, the alarm came late, the physics review)
+    if (P && narrowAhead(P, b) && this.pilot.mode === 'nav') this.pilot.alarm = 'A gap too narrow for the pilot ahead: she\'s yours.';
+    return this.offPier(b, t, P, end) ?? (P ? t : end);
   }
   /**
-   * Beside a pier, a wharf or a bridge's pier (within BESIDE) with the way on not open (helmPlan.ts legOpen), she's taken
-   * off it first, as a sailor would before setting a course (helmPlan.ts wayOff), and kept on the way off until the way on
-   * opens (ROADMAP 8q7: engaged with way on beside Pier 45's head, the pilot's own way round turned her into it). With no
-   * way off, she's handed over with its alarm. Looked for each half second (a few hundred µs, and only beside one).
+   * Beside a pier, a wharf or a bridge's pier with the way on not open (helmPlan.ts legOpen), or at a corner of the plan
+   * she can't leave, she's taken off it first, as a sailor would before setting a course (helmPlan.ts wayOff), and kept
+   * on the way off until the way on opens (ROADMAP 8q7: engaged with way on beside Pier 45's head, the pilot's own way
+   * round turned her into it). Beside one is within BESIDE stopped, farther with way on, four seconds of it up to
+   * STRUCTURE_CLEAR; once on the way off, within STRUCTURE_CLEAR. With no way off within BESIDE, she's handed over with
+   * its alarm. Looked for each half second, found or not (a wayOff is 90–230 µs, and only beside a structure).
    */
   private offPier(b: Boat, t: Vec, P: HelmPlan | null, end: Vec): Vec | null {
     let o = OFF.get(this);
     if (o && this.t - o.t < 0.5) { if (o.q) onPlan = true; return o.q; }
     // (looked for farther off with way on: about four seconds of it, her turn's worth, a little over)
-    const r = wharfNearest(b, o?.q ? STRUCTURE_CLEAR : Math.min(STRUCTURE_CLEAR, BESIDE + b.v * 4));
+    const r = wharfNearest(b, o?.q ? STRUCTURE_CLEAR : Math.min(STRUCTURE_CLEAR, BESIDE + b.v * OFF_AHEAD_S));
     // (at a corner of the plan that she can't leave for the next (helmPlan.ts nextCorner), beside a structure: steered
     // for, it falls astern and the pilot turns her round toward it, through the pier off Pier 45's head)
     const stuck = !!P && P.i < P.pts.length - 1 && dist(b, t) < NAV_MADE / 2, to = stuck ? (P!.i + 1 < P!.pts.length - 1 ? P!.pts[P!.i + 1] : end) : t;
     if (!r || (!stuck && (P ? onPlan : legOpen(b, t)))) { if (o) OFF.delete(this); return null; }
-    o = { t: this.t, q: wayOff(b, to, b.ww.from, beatFor(b) + 1) };
-    if (o.q) { onPlan = true; OFF.set(this, o); return o.q; }
+    o = { t: this.t, q: wayOff(b, to, b.ww.from, beatFor(b) + 1) }; OFF.set(this, o);
+    if (o.q) { onPlan = true; return o.q; }
     // (no way off: beside it, she's handed over; farther off, the pilot's own way round, as before)
-    OFF.delete(this);
     if (r.d < BESIDE && this.pilot.mode === 'nav') this.pilot.alarm = 'Too close alongside for the pilot to get her off: she\'s yours.';
     return null;
   }
   /** A plan in from the page (commands.ts navPlan), picked up at the leg she's nearest; null drops it. */
   setNavPlan(to: Vec | null, pts: Vec[] = []): void {
     const P = to ? helmPlan(to, pts, this.user) : null;
-    if (P) HELM.set(this, P); else HELM.delete(this);
+    if (P) HELM.set(this, P); else { HELM.delete(this); OFF.delete(this); }
   }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {

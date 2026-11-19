@@ -21,12 +21,16 @@ import { HelmFeed, passageNow } from '../src/sim/navigator';
 import { wharfNearest } from '../src/geo/shore';
 
 const place = (id: string) => PLACES.find(p => p.id === id)!.p;
-function passage(from: { x: number; y: number }, to: string | { x: number; y: number }, seed: number, mins = 60) {
+type Start = { h?: number; v?: number; wind?: Settings['windKind'] };
+function passage(from: { x: number; y: number }, to: string | { x: number; y: number }, seed: number, mins = 60, o: Start = {}) {
   // (as the soak sailed it: her home slip in the Berkeley Marina, ships about)
   const boat = { ...DEFAULT_BOAT, slip: SLIPS.find(s => s.marina === 'berkeley')!.id };
-  const S = { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: to === 'slip' ? 'slip' : '', windKind: 'west', windKt: 14, current: 'real', sea: 'real', tideDate: '2026-11-14', traffic: 1, fleet: 0, opponents: [], boats: [boat], boat, boatId: boat.id } as Settings;
+  const S = { ...DEFAULT_SETTINGS, mode: 'sail', sailFrom: 'cityfront', sailTo: to === 'slip' ? 'slip' : '', windKind: o.wind ?? 'west', windKt: 14, current: 'real', sea: 'real', tideDate: '2026-11-14', traffic: 1, fleet: 0, opponents: [], boats: [boat], boat, boatId: boat.id } as Settings;
   const w = new World(COURSES[0], S, seed, { freeSail: true }), u = w.user;
-  w.step(DT); u.x = from.x; u.y = from.y; w.step(DT);
+  w.step(DT); u.x = from.x; u.y = from.y;
+  // (her heading and way on as she's engaged, where a case gives them: along a pier, or in irons beside its head)
+  if (o.h != null) { u.h = o.h; const sp = o.v ?? u.v; u.v = sp; u.vx = Math.sin(o.h * Math.PI / 180) * sp; u.vy = Math.cos(o.h * Math.PI / 180) * sp; }
+  w.step(DT);
   (w as unknown as { running: boolean }).running = true;
   if (to !== 'slip') applyCommand(w, { k: 'dest', p: typeof to === 'string' ? place(to) : to, name: typeof to === 'string' ? to : 'a spot' });
   applyCommand(w, { k: 'pilot', op: 'engage', mode: 'nav' });
@@ -34,7 +38,7 @@ function passage(from: { x: number; y: number }, to: string | { x: number; y: nu
   let hits = 0, last = u.lastHitT, near = Infinity, turned = 0, h0 = u.h, alarm = '', mouth = false, clear = false;
   const step = () => {
     w.step(DT); if (u.lastHitT !== last) { last = u.lastHitT; hits++; } turned += Math.abs(((u.h - h0 + 540) % 360) - 180); h0 = u.h;
-    for (const e of w.drainEvents()) if (e.type === 'toast') { const m = (e as { msg: string }).msg; if (/too narrow/.test(m)) alarm = m; if (/harbor mouth: she's yours/.test(m)) mouth = true; }
+    for (const e of w.drainEvents()) if (e.type === 'toast') { const m = (e as { msg: string }).msg; if (/too narrow|Too close alongside/.test(m)) alarm = m; if (/harbor mouth: she's yours/.test(m)) mouth = true; }
   };
   while (w.t < mins * 60 && !u.wrecked && w.arrivedT == null && w.pilot.mode !== 'off') {
     if (w.steps % 60 === 0) { const c = feed.tick(w as never); if (c) applyCommand(w, c as never); const r = wharfNearest(u, 200); if (!r || r.d >= 20) clear = true; if (r && clear) near = Math.min(near, r.d); }
@@ -50,7 +54,7 @@ function passage(from: { x: number; y: number }, to: string | { x: number; y: nu
 describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
   // (the least she keeps off the structures once she's first been clear of them: 10 m about the Berkeley Pier; 3 m in the
   // Wharf's piers, her half-beam and as much again, where a plan begun beside one may keep near it: router.ts clear)
-  const cases: [string, { x: number; y: number }, string | { x: number; y: number }, number, number?][] = [
+  const cases: [string, { x: number; y: number }, string | { x: number; y: number }, number, number?, Start?][] = [
     ['off the Berkeley Marina to off Emeryville (the soak\'s wreck)', place('berkeley'), 'emeryville', 105],
     ['the same, another day', place('berkeley'), 'emeryville', 107],
     ['50 m south of the pier\'s west end, to the marina', { x: 7742, y: 4283 }, 'berkeley', 107],
@@ -67,10 +71,21 @@ describe('Nav gets round the abandoned Berkeley Pier by the plan', () => {
     // it, one with no plan from there at all, till the pilot took her off it first, ROADMAP 8q7)
     ['beside Pier 45\'s head, 2 m in', { x: 1986, y: 78 }, 'alcatraz', 107, 3],
     ['beside it, along it', { x: 1984, y: 80 }, 'alcatraz', 107, 3],
-    ['beside it, 6 m out', { x: 1994, y: 78 }, 'alcatraz', 107, 3]
+    // (the third review's: running along a pier's face at 3 m/s with the way on astern, the way off dead astern turned her
+    // through the pier; and in irons by a pier head, a way off across the wind held her hard over till she went astern)
+    ['running along a pier\'s face, the way on astern', { x: 3129, y: -113 }, 'alcatraz', 107, 3, { h: 164, v: 2.9 }],
+    ['in irons by a pier head in a northerly', { x: 2646, y: -122 }, 'alcatraz', 107, 3, { h: 27, v: 0.1, wind: 'north' }]
   ];
-  for (const [name, from, to, seed, keep = 10] of cases) it(name, () => {
-    const r = passage(from, to, seed);
+  // (4 m off the pier's face converging on her at 4 kn: every turn closes it, held on she'd pass its corner a meter off her
+  // side. No way off for a pilot: handed over at once with its alarm, and on as she was, ten seconds, she strikes nothing)
+  it('beside it, 6 m out: handed over, too close alongside', () => {
+    const r = passage({ x: 1994, y: 78 }, 'alcatraz', 107);
+    console.log(`beside it, 6 m out: ${r.where}`);
+    expect(r.u.wrecked, r.where).toBeUndefined(); expect(r.hits, r.where).toBe(0);
+    expect(r.alarm, r.where).toMatch(/Too close alongside/); expect(r.min, r.where).toBeLessThan(0.5);
+  }, 900_000);
+  for (const [name, from, to, seed, keep = 10, start] of cases) it(name, () => {
+    const r = passage(from, to, seed, 60, start);
     console.log(`${name}: ${r.where}`);
     expect(r.u.wrecked, r.where).toBeUndefined();
     expect(r.hits, `times she struck anything, ${r.where}`).toBe(0);
