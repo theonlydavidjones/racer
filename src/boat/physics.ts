@@ -15,7 +15,7 @@ const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
 import { beatFor, seaDrag, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, STALL_TURN, helmFor, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
-import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
+import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, carCall, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
 import { BOOM_SEEN, CALL_KEEP, CUE_MAX, TURN_SEEN, boomStrike } from './calls';
 /** Swinging: her heading this far (deg) past where it has been over SWING_TAU (s), a turn kept up at over about
  * SWING_DEG / SWING_TAU, 3.2°/s; and settled this long after it (s) before her crew go to the cabin top for a small gain
@@ -156,6 +156,31 @@ export const sailUp = (b: Boat, k: 'main' | 'jib'): number => (b.rig ? hoistedSh
  * isn't sailing at (the owner); their weight still moves only her heel, never her across the water. (placeCrew, placed
  * in the middle for the moment, as you'd place them yourself: your own placing comes back with her under way.)
  */
+/** Her tack lying to a dock (in her berth, or on her lines): by the wind's side, but held within 4° of dead ahead or dead
+ * astern, so a wind wandering either side of her bow or stern doesn't send the helm across the cockpit each time. */
+export function tiedTack(rel: number, was: Tack): Tack { const twa = Math.abs(rel); return twa < 176 && twa > 4 ? (rel >= 0 ? 'S' : 'P') : was; }
+/**
+ * Made fast in her berth, or held by her lines as they go on (world.ts dockStep, mooringStep): the crew's work there. A
+ * pole half set or stowed is stowed (the jib's down or coming down, and nobody poles out at the dock); your own call for
+ * a lazy jib car is worked, both cars free with the jib down (crewWork.ts carCall); and the rest of sailing's jobs end.
+ * Under way the crew's jobs are finished by crewJobs and carJob, which don't run here, so a job under way as she came in,
+ * the lazy jib car or a sheet, was never finished and its hand stood at it for good, at the car on the foredeck: the crew
+ * soak, v208. Kept: the hoist (crewRig), the outboard (world.ts motorStow), the paddle (its own, ended by paddleWork).
+ */
+export function crewTiedUp(b: Boat, dt: number, emit: Emit, ashore: number | null = null): void {
+  const cs = b.crew; if (!cs) return;
+  // (`ashore`: on her lines, the one on the dock handling them, world.ts mooringStep. The pole, the car and the halyards are
+  // the bow hand's, ownerOf: when that's who is ashore, alone or one crew, they wait till her lines are on and the hand's
+  // back aboard; the hoist's own wait is the caller's, crewRig not run meanwhile)
+  const n = cs.spec.crew.length, away = ashore != null && ashore === ownerOf('car', n, cs.spec, cs.layout ?? 'cockpit');
+  if (b.pole !== 'down' && !away) { b.poleWant = false; crewPole(b, dt, emit); }
+  if (!away) carCall(b, dt);
+  for (const a of cs.people) {
+    const j = a.job; if (!j) continue;
+    const kept = (j.line === 'hoist' && !away) || j.line === 'outboard' || j.line === 'paddle' || (j.line === 'pole' && b.pole !== 'down' && !away) || (j.line === 'car' && !!b.carCmd && !away);
+    if (!kept) a.job = null;
+  }
+}
 export function crewAtDock(b: Boat, dt: number): void {
   const cs = b.crew; if (!cs) return;
   const yours = cs.place;
