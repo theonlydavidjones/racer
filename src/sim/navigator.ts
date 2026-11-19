@@ -1,5 +1,5 @@
 import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
-import { heldPast, helmPlan, nextCorner, offLeg, type HelmPlan } from './helmPlan';
+import { heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -136,15 +136,21 @@ export interface PassageNow {
 /**
  * A plan's plotted course for the helm (World.planTarget): its track, from where she was when it was planned, thinned to
  * its corners (Douglas-Peucker, within HELM_TOL m of the track: the tacks, gybes and the bends round a tide or a shadow
- * are corners; the steps along a straight board aren't).
+ * are corners; the steps along a straight board aren't), and a corner kept wherever the chord would cross land or pass
+ * through a gap narrower than GAP_MIN, so the helm never steers a leg the router didn't (sim/helmPlan.ts narrowOn).
  */
 export function helmPoints(pn: PassageNow): Vec[] {
   const p = pn.track.map(q => q.p); if (p.length < 3) return p.slice();
   const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
   const stack: [number, number][] = [[0, p.length - 1]];
   while (stack.length) {
-    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL;
-    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } }
+    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL, most = -1, md = -1;
+    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } if (d > md) { md = d; most = i; } }
+    // (a chord within the tolerance is taken only if the router's track would be: across no land, and through no gap
+    // too narrow for the pilot (helmPlan.ts narrowOn), else the track's own corner is kept. Cut without that, rounding
+    // the Berkeley Pier ruin's west tip 8 m inside the tolerance, a chord ran across the tip, and a meter's shift in the
+    // track flipped the pilot's verdict on it to a gap too narrow: Deep Physics, 19 Nov 2026)
+    if (far < 0 && most >= 0 && (landAlong(p[a], p[b]) !== Infinity || narrowOn(p[a], p[b]))) far = most;
     if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
   }
   return p.filter((_, i) => keep[i]);
