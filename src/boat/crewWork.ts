@@ -1,6 +1,6 @@
 import { clamp, wrap } from '../core/math';
 import { SETTLE, type Boat, type Tack } from './boat';
-import { CAR_FORE_PINS, CAR_IN_PINS, type Controls } from './controls';
+import { CAR_FORE_PINS, CAR_IN_PINS, guideOnly, type Controls } from './controls';
 import { CAR_ARM, TWO_FWD, Z, allAboard, attrOf, crewSkill, pace, reactTime, skillOf, type Aboard, type CrewSpec, type Person, type CrewState, type Station } from './crewPhys';
 
 /**
@@ -65,6 +65,23 @@ export const LINE_URGENT = 0.25;
  * of 20 s moves the minute's wish about a third of the way. An estimate, unsourced.
  */
 export const LINE_MOVED = 2;
+/**
+ * A cabin-top line off only the guide's settings for the wind she's read at (controls.ts guideOnly), its move worth less
+ * than the crew's least gain in drive (physics.ts minGain), is a trip once the guide's read has stayed past that step
+ * this long (s): a gust-lull cycle and a half, as LINE_TRIP. North's ranges are for the breeze ("very light winds (0-5
+ * knots)", "medium winds (5-12 knots)"), and a crew sets the outhaul for the breeze and leaves it; a light wind swinging
+ * 3.5 to 5.7 kt had them at it every 70-90 s, 0.05 to 0.45 and back, and 11.5 ± 1.2 kt from 0.55 to 1 and back, for
+ * moves their own sail model put at under 0.03% of drive. A move worth its gain, a new point of sail, or a breeze that
+ * holds past the step goes as before. An estimate, unsourced.
+ */
+export const GUIDE_HOLD = 90;
+/** Off only the guide's settings, and worth less than their least gain (GUIDE_HOLD): for how long, else -1. */
+function guideWait(b: Boat, c: CrewState, k: string): number {
+  const g = b.crewWorth && guideOnly(b.crewWorth)?.get(k);
+  if (g == null || g >= 0.001 + 0.003 * (1 - crewSkill(c))) return -1;
+  const t0 = c.guideT?.[k] ?? -1;
+  return t0 >= 0 ? (c.clock ?? 0) - t0 : 0;
+}
 /**
  * The lazy jib car, which has no wish of its own over time, is reset for a new breeze: the minute's wind up or down by
  * this share of it (at least 1 kt). The highest minute's mean within ten minutes runs about 5 to 11% over the ten
@@ -279,6 +296,8 @@ export function crewHeading(b: Boat, k: Ctl): number | undefined {
   const want = plan && worth && (worth[k] ?? 0) >= 0.001 + 0.003 * (1 - skill) ? plan[k] : now;
   const dl = lw - now, dn = want - now, th = startThreshold(k, skill, lw);
   if (Math.abs(dl) < th || Math.abs(dn) < startThreshold(k, skill, want) || dl * dn <= 0 || !realChangeOf(c, b.twa ?? 0, c.lineSlow ?? {}, k, skill)) return undefined;
+  // (off only the guide's settings for a move worth less than a trip, not yet held GUIDE_HOLD: they leave it)
+  if (!newAngleOf(c, b.twa ?? 0, k)) { const g = guideWait(b, c, k); if (g >= 0 && g < GUIDE_HOLD) return undefined; }
   // (a big change, both wishes well off, they set right through to this moment's wish, as crewJobs' `far` does)
   return Math.abs(dl) > 2 * th && Math.abs(dn) > 2 * th ? want : lw;
 }
@@ -358,6 +377,10 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       const w = want[k]!, l0 = lw[k], s0 = ls[k];
       lw[k] = l0 == null ? w : l0 + (w - l0) * fT; ls[k] = s0 == null ? w : s0 + (w - s0) * fG;
     }
+    // (since when each line has been off only the guide's settings: GUIDE_HOLD)
+    const gw = b.crewWorth && guideOnly(b.crewWorth);
+    // (every line's place kept, -1 while it isn't: the mirror sees a deleted key only when the count changes, sim/sync.ts)
+    if (gw || c.guideT) { const gt = c.guideT ??= {}; for (const k of PIANO_LIST) { const was = gt[k] ?? -1; gt[k] = gw?.has(k) ? (was >= 0 ? was : c.clock ?? 0) : -1; } }
     c.lineT = 0;
   }
   // (a new point of sail since the line was set; or their wish for it over the cycle well away from where they set
@@ -406,13 +429,17 @@ export function crewJobs(b: Boat, want: Partial<Record<Ctl, number>>, dt: number
       // (a new point of sail since this line was last set, more than 20° of the wind's angle: rounding a mark, bearing
       // away, coming up: the trim wanted is new, so it's seen to now, not after the waits)
       const newCourse = newAngleOf(c, twa, k);
+      // (off only the guide's settings, a step of the breeze, for a move worth less than a trip: once the breeze has held
+      // past the step GUIDE_HOLD, and never in a hurry; up there already, they set it with the rest. GUIDE_HOLD)
+      const guideHeld = newCourse ? -1 : guideWait(b, c, k);
+      if (guideHeld >= 0 && guideHeld < GUIDE_HOLD && !atIt) continue;
       // (a walk for a real change: a new point of sail, their wish over the cycle well away from the setting (LINE_MOVED), or a line
       // they've not set yet. Urgent too: the wish over the cycle well off counts only once it has moved since the set)
       // (and a line outside what the depowering steps or the guide allow for the breeze and angle she's in is a real change
       // by definition, planWorth's 1: judged only by its wish's drift, a vang over the guide's ceiling was left there for
       // minutes, the physics review)
       const real = (b.crewWorth?.[k as keyof NonNullable<Boat['crewWorth']>] ?? 0) >= 1 || realChangeOf(c, twa, ls, k, skill);
-      const walk = !placed, urgent = Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT)));
+      const walk = !placed, urgent = guideHeld < 0 && (Math.abs(dl) >= 0.5 || (Math.abs(dn) >= LINE_URGENT && (newCourse || (real && Math.abs(ls[k] - b.ctl[k]) >= LINE_URGENT))));
       if (walk && !urgent && !atIt && (since < LINE_GAP || (trip < LINE_TRIP && !there) || !real)) continue;
       // (and an urgent one too, as said above: not again within LINE_TAU of the last setting unless it's knocked off.
       // Set right through to a puff's wish, they were back seven seconds later as it passed, the vang 0.17, 0.89, 0.58)
