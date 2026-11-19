@@ -1290,7 +1290,7 @@ export class World {
       b.forced14 = null; b.cur = this.currentAt(b, true); b.ww = windOnWater(this.windHere(b, b), b.cur);
       b.avgFrom = b.avgFrom == null ? b.ww.from : n360(b.avgFrom + wrap(b.ww.from - b.avgFrom) * Math.min(1, dt / 60)); // (her compass's average)
     }
-    this.vessels = this.traffic.vessels(this.trafficT, this.boats, dt, this.vesselLand); // (the small vessels give way to the boats first: traffic.ts yieldStep)
+    this.vessels = this.traffic.vessels(this.trafficT, this.boats, dt, this.vesselLand, this.vesselSkip); // (the small vessels give way to the boats first: traffic.ts yieldStep)
     if (this.steps % 30 === 1) this.sea.duration = this.seaDurationAt(this.clockUtc);
     // her ensign's hours, twice a second (boat/colours.ts): up at 0800, down at sunset, and up for entering or leaving harbour
     // (under way as COLREGS Rule 3(i) has it: not made fast to the shore, not at anchor; going ahead, astern or stopped)
@@ -1820,6 +1820,8 @@ export class World {
 
   /** Land in a give-way vessel's way (traffic.ts yieldStep): made once, not a closure each step. */
   private readonly vesselLand = (p: Vec): boolean => !!landAt(p);
+  /** Boats a vessel doesn't give way to: in her slip, on her lines, being walked out, at anchor, or in a harbor (traffic.ts yieldStep). */
+  private readonly vesselSkip = (p: Vec): boolean => { const b = p as Boat; return !!b.docked || !!b.mooring || !!b.handled || !!b.pushing || !!b.atAnchor || inBasin(b); };
   /** The traffic's clock: seconds since midnight UTC of the race day, so the ships keep their schedule through the day. */
   get trafficT(): number { return (this.clockUtc * 60) % 86400; }
 
@@ -1828,7 +1830,9 @@ export class World {
     for (const v of this.vessels) {
       if (!v.moving) continue;
       const ty = VESSEL[v.kind], u = V(v.h), c = cpa(b, { x: v.x, y: v.y, vx: u.x * v.v, vy: u.y * v.v });
-      if (c.d > ty.len / 2 + 70 || dist(b, v) > 900) continue;
+      // (a ship in the channel, early (Rule 9); a vessel that gives way to her, only once it's plain she won't miss her by
+      // her own action, close and inside 12 s (Rule 17(a)(ii), (b)): until then the stand-on boat holds her course)
+      if (c.d > ty.len / 2 + (GIVES_WAY[v.kind] ? 25 : 70) || dist(b, v) > 900) continue;
       const aim = { x: v.x - u.x * (ty.len * 0.8 + 60), y: v.y - u.y * (ty.len * 0.8 + 60) }; // behind her stern
       b.desired = sailable(b, brg(aim.x - b.x, aim.y - b.y)); b.luff = false;
     }
@@ -1860,9 +1864,15 @@ export class World {
       if (this.t - last > 90) {
         this.warned.set(v.id, this.t);
         const big = v.kind === 'container' || v.kind === 'tanker';
-        this.emit({ type: 'toast', ms: 7000, msg: big
+        // (Rule 18 is a sailing vessel's: under power she's a power-driven vessel, and Rules 14 and 15 apply; overtaking
+        // her, from more than 22.5° abaft her beam, you keep clear, Rule 13)
+        const rx = u.x - v.x, ry = u.y - v.y, over = (rx * uv.x + ry * uv.y) / (hypot(rx, ry) || 1) < -0.383 && u.vx * uv.x + u.vy * uv.y > v.v;
+        const kt = v.v > 0.5 ? `at ${Math.round(v.v / 0.5144)} kt` : 'stopped';
+        this.emit({ type: 'toast', ms: 7000, msg: !big && over ? `${ty.name} ahead, ${kt}: you're overtaking her, so keep clear (Rule 13).`
+          : !big && u.motor?.running ? `${ty.name} ${kt}. Under power the crossing rules apply (Rules 14, 15): keep clear.`
+          : big
           ? `${ty.name} coming through in the channel, ${Math.round(v.v / 0.5144)} kt. She can't stop or turn for you. Keep well clear: the racing rules don't apply between you and her; the collision regulations do, and a sailing boat must not impede a vessel that can only navigate in the channel (Rule 9).`
-          : `${ty.name} approaching at ${Math.round(v.v / 0.5144)} kt. She gives way to you under sail (Rule 18): hold your course and speed, and expect a wake.` }); // (Rule 17(a)(i): the stand-on vessel keeps her course and speed)
+          : `${ty.name} approaching ${kt}. She gives way to you under sail (Rule 18): hold your course and speed, and expect a wake.` }); // (Rule 17(a)(i): the stand-on vessel keeps her course and speed)
       }
       // the danger signal: five short blasts when she's in doubt about what you're doing and you're standing into her way
       if (c.d < close && c.t < 40 && this.t - (this.warned.get(-1 - v.id) ?? -Infinity) > 45) {
