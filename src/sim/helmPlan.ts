@@ -56,14 +56,20 @@ function clearOf(p: Vec, prev: Vec, next: Vec): Vec {
 }
 
 /** Where the leg a→b passes between two structures (or a structure and the land) less than GAP_MIN apart, if it does:
- * at each 5 m along it, the nearest structure within GAP_MIN, and what's solid the other way across. */
+ * at each 5 m along it near a structure, what's solid within GAP_MIN in twelve directions, and a pair on opposite sides
+ * (150° or more apart) nearer together than GAP_MIN. (Along the normal from the nearest alone, it missed a gap between two
+ * pier ends in line: the physics review, 19 Nov 2026.) */
+const DIRS = Array.from({ length: 12 }, (_, k) => ({ x: Math.sin(k * Math.PI / 6), y: Math.cos(k * Math.PI / 6) }));
 function narrowOn(a: Vec, b: Vec): Vec | null {
   const L = dist(a, b), n = Math.max(1, Math.ceil(L / 5));
-  for (let k = 0; k <= n; k++) {
-    const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n }, r = wharfNearest(p, GAP_MIN);
-    if (!r || r.d <= 0) continue;
-    const across = landAlong(p, { x: p.x + r.n.x * GAP_MIN, y: p.y + r.n.y * GAP_MIN });
-    if (r.d + across < GAP_MIN) return p;
+  for (let k = 1; k <= n; k++) {
+    const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
+    if (!wharfNearest(p, GAP_MIN)) continue;
+    const d = DIRS.map(u => landAlong(p, { x: p.x + u.x * GAP_MIN, y: p.y + u.y * GAP_MIN }));
+    const hit = (i: number) => ({ x: p.x + DIRS[i].x * d[i], y: p.y + DIRS[i].y * d[i] });
+    // (on opposite sides: the line between the two hits passes by her, not along one face off to one side, as two rays
+    // 150° apart both meeting one long pier do)
+    for (let i = 0; i < 12; i++) for (let j = i + 5; j <= i + 7; j++) { const jj = j % 12; if (d[i] + d[jj] < GAP_MIN && segPt(p, hit(i), hit(jj)) < 0.15 * Math.min(d[i], d[jj])) return p; }
   }
   return null;
 }
@@ -107,16 +113,29 @@ function clearTo(b: Vec, q: Vec, toEnd: boolean): boolean {
 /** A gap too narrow for the pilot on the leg she's on, or the next, within GAP_WARN of her (World.planTarget hands her
  * over before it). */
 export function narrowAhead(P: HelmPlan, b: Vec): boolean {
-  return P.tight.some(t => (t.leg === P.i || t.leg === P.i + 1) && dist(b, t.p) < GAP_WARN);
+  return P.tight.some(t => {
+    if (!(t.leg === P.i || t.leg === P.i + 1) || dist(b, t.p) >= GAP_WARN) return false;
+    const o = P.pts[t.leg - 1], q = P.pts[t.leg]; // (ahead of her along its leg: not one astern she's sailed through)
+    return dot(sub(t.p, b), sub(q, o)) > 0;
+  });
 }
-/** The way from her to a corner open enough for the pilot to steer it as the plan has it, without a way round of its
- * own (World.planTarget, autopilot.ts navHeading): clear of the land, and nowhere along it within STRUCTURE_CLEAR / 2 of
- * a structure (trusted along a pier's side, the plan's leg begun beside one, she struck its head 9 times off Pier 45). */
+/**
+ * The way from her to a corner (or her destination) open enough for the pilot to steer it as the plan has it, without
+ * a way round of its own (World.planTarget, autopilot.ts navHeading): clear of the land along it and LAND_SIDE either side,
+ * and, as the router judges a line beside a structure (router.ts clear), nowhere along it nearer a structure than
+ * STRUCTURE_CLEAR / 2 or than she already is. (Trusted on any clear centre line, it ran her along Pier 45's head; refused
+ * off a leg begun beside one, her own way round turned her into it: the physics review, 19 Nov 2026.)
+ */
 export function legOpen(b: Vec, q: Vec): boolean {
-  if (landAlong(b, q) !== Infinity) return false;
-  const L = dist(b, q), n = Math.max(1, Math.ceil(L / 5));
-  for (let k = 0; k <= n; k++) { const p = { x: b.x + (q.x - b.x) * k / n, y: b.y + (q.y - b.y) * k / n }; if (wharfNearest(p, STRUCTURE_CLEAR / 2)) return false; }
+  const L = dist(b, q); if (L < 1) return true;
+  const ux = (q.x - b.x) / L, uy = (q.y - b.y) / L;
+  for (const s of [0, LAND_SIDE, -LAND_SIDE]) if (landAlong({ x: b.x - uy * s, y: b.y + ux * s }, { x: q.x - uy * s, y: q.y + ux * s }) !== Infinity) return false;
+  const n = Math.max(1, Math.ceil(L / 5)), w0 = wharfNearest(b, STRUCTURE_CLEAR / 2)?.d ?? STRUCTURE_CLEAR / 2, keep = Math.min(STRUCTURE_CLEAR / 2, w0 - 1);
+  for (let k = 1; k <= n; k++) { const p = { x: b.x + (q.x - b.x) * k / n, y: b.y + (q.y - b.y) * k / n }, r = wharfNearest(p, STRUCTURE_CLEAR / 2); if (r && r.d < keep) return false; }
   return true;
 }
+/** How far either side of an open leg the land must be clear too (m): about her length (the pilot's own way round looked
+ * 25 m either side; an estimate). */
+const LAND_SIDE = 8;
 /** How far she is off the leg she's on (m). */
 export const offLeg = (P: HelmPlan, b: Vec) => segPt(b, P.pts[Math.max(0, P.i - 1)], P.pts[Math.min(P.pts.length - 1, P.i)]);

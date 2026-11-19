@@ -2689,7 +2689,7 @@ export class World {
     // (under power, not the sailing plan's boards: the motor points her straight at it, autopilot.ts, as before. The
     // physics review: corner to corner, she motored the plan's tacks)
     if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
-    const t = nextCorner(P, b, end); onPlan = t !== end && legOpen(b, t);
+    const t = nextCorner(P, b, end); onPlan = legOpen(b, t); // (on the last leg too: the gap on it, she swung to and fro before it, the second review)
     // (a gap too narrow for the pilot ahead on her way: its alarm, and she's yours, short of it; helmPlan.ts GAP_MIN)
     if (narrowAhead(P, b) && this.pilot.mode === 'nav') this.pilot.alarm = 'A gap too narrow for the pilot ahead: she\'s yours.';
     return t;
