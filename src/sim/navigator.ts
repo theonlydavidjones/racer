@@ -1,5 +1,5 @@
 import { KT, LOA, dist, dot, segCross, segPt, sub, unit, type Vec } from '../core/math';
-import { heldPast, helmPlan, nextCorner, offLeg, type HelmPlan } from './helmPlan';
+import { clearTo, heldPast, helmPlan, narrowOn, nextCorner, offLeg, type HelmPlan } from './helmPlan';
 import { describeSea } from '../environment/sea';
 import { sunTimes } from '../environment/sun';
 import { slotFlow, slotWeight } from '../environment/wind';
@@ -35,6 +35,21 @@ const ROUTE_NAME: Record<string, string> = {
 
 /** The passage by the old rules (routing.ts sailLeg, stretch by stretch along the way round the land, up the middle or
  * the long board first to either side): #406's planner, kept as a floor under the router. */
+/**
+ * Where the next stretch of a passage starts: from where the last one ended (`end`, within its arrive of the turn) if
+ * the next turn can be seen from there clear of the land, else from the turn itself, the track jumping to it. That jump
+ * is sailed by nobody and judged by nothing, so it's taken only if it's clear as the router judges a line (helmPlan.ts
+ * clearTo: no land, and STRUCTURE_CLEAR off the structures, or no nearer than she is) and through no gap narrower than
+ * the pilot's turning room (narrowOn); else the next stretch starts where she is and the router finds the way. Jumped
+ * regardless, a 119 m jump ran across the Berkeley Pier ruin's west tip, and the pilot was handed over before a gap too
+ * narrow that a meter's shift in the plan made or unmade; and another, to a corner of the way round the land 3.6 m off
+ * that tip, took her within 10 m of it (Deep Physics, 19 Nov 2026, on beat-chop).
+ */
+function onFrom(end: Vec, turn: Vec, next: Vec | undefined): Vec {
+  if (!next) return turn;
+  if (landAlong(end, next) === Infinity && landDist(end) > 20) return end;
+  return clearTo(end, turn, false) && !narrowOn(end, turn) ? turn : end;
+}
 function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
   let tt = t, ok = true, why: 'land' | 'time' | undefined, at = route[0];
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
@@ -49,7 +64,7 @@ function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { o
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; }
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
-    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
+    at = onFrom(end, route[i], next);
     if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
   }
   return { ok, why, minutes: tt - t, track, legs };
@@ -93,7 +108,7 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
     // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
-    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
+    at = onFrom(end, route[i], next);
     if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
   }
   return { ok, why, minutes: tt - t, track, legs };
@@ -136,15 +151,21 @@ export interface PassageNow {
 /**
  * A plan's plotted course for the helm (World.planTarget): its track, from where she was when it was planned, thinned to
  * its corners (Douglas-Peucker, within HELM_TOL m of the track: the tacks, gybes and the bends round a tide or a shadow
- * are corners; the steps along a straight board aren't).
+ * are corners; the steps along a straight board aren't), and a corner kept wherever the chord would cross land or pass
+ * through a gap narrower than GAP_MIN, so the helm never steers a leg the router didn't (sim/helmPlan.ts narrowOn).
  */
 export function helmPoints(pn: PassageNow): Vec[] {
   const p = pn.track.map(q => q.p); if (p.length < 3) return p.slice();
   const keep = new Uint8Array(p.length); keep[0] = keep[p.length - 1] = 1;
   const stack: [number, number][] = [[0, p.length - 1]];
   while (stack.length) {
-    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL;
-    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } }
+    const [a, b] = stack.pop()!; let far = -1, fd = HELM_TOL, most = -1, md = -1;
+    for (let i = a + 1; i < b; i++) { const d = segPt(p[i], p[a], p[b]); if (d > fd) { fd = d; far = i; } if (d > md) { md = d; most = i; } }
+    // (a chord within the tolerance is taken only if the router's track would be: across no land, and through no gap
+    // too narrow for the pilot (helmPlan.ts narrowOn), else the track's own corner is kept. Cut without that, rounding
+    // the Berkeley Pier ruin's west tip 8 m inside the tolerance, a chord ran across the tip, and a meter's shift in the
+    // track flipped the pilot's verdict on it to a gap too narrow: Deep Physics, 19 Nov 2026)
+    if (far < 0 && most >= 0 && (landAlong(p[a], p[b]) !== Infinity || narrowOn(p[a], p[b]))) far = most;
     if (far >= 0) { keep[far] = 1; stack.push([a, far], [far, b]); }
   }
   return p.filter((_, i) => keep[i]);
