@@ -771,7 +771,10 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
     // with their hands on it behind them, the arms went back through the elbows, the owner's "backwards arms"; and back from
     // it far enough that, bent over in the crouch toward it, their hands are in front of the chest and their knees clear of
     // the thwart)
-    const sheet = V(px * 0.4, 0.9, THWART.z - 0.25); // (the tail hauled in front of the thwart, not over it: an elbow below the hands lay on its top)
+    // (the tail hauled in front of the thwart, not over it: an elbow below the hands lay on its top; and low, at the
+    // knees' height: held up at the chest, 0.9 m, the crouch leant the shoulders right over it, a hand came within 17 cm
+    // of its shoulder, the arm folded up and the elbow stuck out ahead of it, 8 to 17 cm, the sprint's soak and tests/crewelbow)
+    const sheet = V(px * 0.4, 0.72, THWART.z - 0.25);
     return crouch(px, zz, Math.PI, [sheet.clone().add(V(0.07, 0.05, 0)), sheet.clone().add(V(-0.07, -0.05, 0))], k, sheet.clone().add(V(0, 1.2, 0.4)));
   }
   // (moving: crouched in the cockpit, on hands and knees on deck; arriving at the side deck they step up onto it)
@@ -784,6 +787,10 @@ function crewPose(fig: Figure, x: number, z: number, lean: number, job: Job, win
   // (to the mast, too, from a job well aft of it: walked there, not the standing pose eased up out of the cockpit, the
   // feet together and gliding up a metre onto the cabin top)
   else if (job === 'mast' && fig.cur && Math.abs(fig.cur.hip.z - Math.max(z, CAB0 + 0.45)) > 0.4) { isMoving = true; dest = z; } // (where its pose kneels: below)
+  // (called to the mast, but still where they sat in the cockpit, before they've reacted (crewPhys.ts react): sat there
+  // still, not knelt where they are with their hands reaching two meters forward to the mast through the cabin's after
+  // end, the sprint's soak and tests/crewkneel)
+  if (job === 'mast' && !isMoving && z > COCK0) job = 'sit';
   if (z < COCK0 - 0.3 && (job === 'sit' || job === 'lee' || job === 'hike' || job === 'cross')) isMoving = true;
   // (sat beside the cabin's after end, by the physics, while they're out on the side deck aft of it, as when the cabin-top
   // lines are done from there and the physics sits them down where its weight is: they stay sat on the deck at its
@@ -1288,23 +1295,98 @@ function apply(f: Figure, p: PoseT, upright = 0, dt = 1 / 30): void {
     ik(a, a.root.position, tgt, BONE.upper, BONE.fore, p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1), -1);
     const par = f.root.parent; if (!par) return;
     f.root.updateMatrixWorld(true);
-    const sd = i ? 1 : -1, hints = [V(sd * 0.9, -0.2, 0.7), V(sd * 1, 0, 0.3)];
-    const bad = () => {
+    const sd = i ? 1 : -1, hints = [V(sd * 0.9, -0.2, 0.7), V(sd * 1, 0, 0.3), V(sd * 0.2, -1, 0.3)]; // (the last, straight down: under the cabin's after edge, not over it)
+    // (how wrong the arm is: 0 right; an elbow in what's beside them or ahead of the arm's line, 1; a forearm into the
+    // cabin's after edge, how far)
+    const bad = (): number => {
       f.root.updateMatrixWorld(true);
       const el = par.worldToLocal(a.mid.getWorldPosition(_h));
-      if (!underDeck(el.x, el.y, el.z) && el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z))) return true; // (in under the side deck is open: the winch)
+      if (!underDeck(el.x, el.y, el.z) && el.y < ground(el.x, el.z) + 0.04 && Math.abs(el.x) < halfBeam(uAtZ(el.z))) return 1; // (in under the side deck is open: the winch)
+      // (nor the forearm across the cabin's after edge, a hand on its top reached from the cockpit's forward corner: the
+      // sprint's soak, tests/crewtransit)
+      let cab = 0; if (el.z < COCK0 + BONE.fore + 0.05) { const wr0 = par.worldToLocal(a.mid.localToWorld(_u.set(0, -BONE.fore, 0))); for (let t = 0.15; t < 0.95; t += 0.1) cab = Math.max(cab, inCabinEnd(_lp.copy(el).lerp(wr0, t))); }
       // (nor an elbow stuck out forward of the line from shoulder to wrist, the way an elbow doesn't bend: a hand drawn in
       // close to the shoulder, turned aft to the mainsheet in a tack, folded the arm up with the elbow out in front)
       const sh = a.root.getWorldPosition(_s), wr = a.mid.localToWorld(_u.set(0, -BONE.fore, 0)), w = a.mid.getWorldPosition(_t);
       const line = wr.sub(sh), tt = w.clone().sub(sh).dot(line) / Math.max(1e-9, line.lengthSq()), off = w.sub(sh).addScaledVector(line, -tt);
       const fw = f.root.localToWorld(_kn2.set(0, 0, -1)).sub(f.root.getWorldPosition(_p2)).setY(0), ahead = off.dot(fw) / Math.max(1e-9, fw.length());
-      return ahead > 0.05 && -off.y < ahead;
+      return ahead > 0.05 && -off.y < ahead ? 1 : cab > 0.015 ? cab : 0;
     };
-    for (let h = 0; h < hints.length && bad(); h++) { a.root.userData.bend = undefined; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, hints[h], -1); }
+    // (the first way that's right; if none, the least wrong of them, or as it was. An elbow wrong every way, as before
+    // the forearm's test: left on the second way, out to the side)
+    let worst = bad(), best = -1; if (worst === 0) return; const keep = (a.root.userData.bend as THREE.Vector3).clone(), first = worst;
+    for (let h = 0; h < hints.length; h++) { a.root.userData.bend = undefined; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, hints[h]!, -1); const v = bad(); if (v === 0) return; if (v < worst) { worst = v; best = h; } }
+    // (a forearm still across the cabin's after edge every way the elbow goes, as the hands come off a cabin-top line's
+    // tail and the elbow's still up over the top (held to ELBOW_SPEED): the hand that frame a few centimeters aft and up
+    // of where it's going, off the edge)
+    // (or out and up, an elbow out over the side deck beside the cabin)
+    const ox = Math.sign(par.worldToLocal(a.mid.getWorldPosition(_h)).x) || sd;
+    if (worst < 1) for (const [dx, dd] of [[0, 0.04], [0, 0.08], [0, 0.12], [ox * 0.06, 0.06], [ox * 0.12, 0.12]] as const) {
+      const t2 = _lp.set(dx, dd, dx ? 0 : dd).applyQuaternion(_inv).applyQuaternion(_tq).multiplyScalar(1 / k).add(tgt);
+      a.root.userData.bend = undefined; ik(a, a.root.position, t2, BONE.upper, BONE.fore, best >= 0 ? hints[best]! : (p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1)), -1); if (bad() === 0) return;
+    }
+    if (best < 0 && first >= 1) best = 1;
+    if (best >= 0) { a.root.userData.bend = undefined; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, hints[best]!, -1); }
+    else { a.root.userData.bend = keep; ik(a, a.root.position, tgt, BONE.upper, BONE.fore, p.elbow?.[i] ?? V((i ? 1 : -1) * 0.5, -0.3, 1), -1); }
   });
+  // (the legs clear of the cabin's end and the sole: after the arms, whose checks have brought the figure's place in the
+  // boat up to date with the legs as solved above)
+  clearLegs(f, p, local, kneeHint);
   // the head turns to what they're watching (within a neck's reach)
   local(p.look, _h).applyQuaternion(_tq).sub(f.head.position);
   f.head.rotation.set(Math.max(-0.6, Math.min(0.5, Math.atan2(_h.y - 0.1, Math.hypot(_h.x, _h.z)))), Math.max(-1.3, Math.min(1.3, Math.atan2(-_h.x, -_h.z))), 0);
+}
+/** How far a point is into the cabin's after end (m), from its face (aft) or its top (above); 0 if it isn't in it. */
+function inCabinEnd(q: THREE.Vector3): number {
+  if (q.z > COCK0 || q.z < COCK0 - 0.4) return 0;
+  const u = uAtZ(q.z), ch = cabinHalf(u), ax = Math.abs(q.x); if (ax > ch) return 0;
+  // (the companionway's open: its sill's below, ground's own)
+  if (ax < COMPANIONWAY.hw - 0.02 && q.z > COCK0 - COMPANIONWAY.len + 0.02) return 0;
+  const top = cabinTopAt(u, ax); if (q.y > top) return 0;
+  return Math.min(COCK0 - q.z, top - q.y, ch - ax);
+}
+const _lp = V(0, 0, 0), _toBoat = new THREE.Matrix4();
+/** The legs clear of the cabin's after end and the cockpit's sole: stepping up out of the cockpit's forward corner, or
+ * sat by it, a knee bent forward the usual way went into the cabin's face, the thigh 5 to 9 cm through it; getting up
+ * off one knee at a cabin-top line to go to the next, the other knee went down through the sole, 4 to 14 cm (the sprint's
+ * soak, tests/crewtransit). As the elbows are (apply), a leg in either is bent the other ways a knee goes (in or out to
+ * the side, up) until one clears it and everything else, the one that goes least into anything if none does. */
+function clearLegs(f: Figure, p: PoseT, local: (w: THREE.Vector3, out: THREE.Vector3) => THREE.Vector3, kneeHint: (q: PoseT, i: number) => THREE.Vector3): void {
+  const par = f.root.parent; if (!par || p.hip.z > COCK1 || p.hip.z < COCK0 - 0.5) return;
+  const nearEnd = p.hip.z < COCK0 + BONE.thigh * f.scale + 0.1, inC = inCockpit(Math.abs(p.hip.x), p.hip.z);
+  if (!nearEnd && !inC) return;
+  const toBoat = _toBoat.copy(par.matrixWorld).invert();
+  f.leg.forEach((l, i) => {
+    // (how far the leg's into the cabin's end or down through the sole; and, for the other ways tried, into anything at
+    // all, so the knee's not bent out into the hull or down into a seat instead)
+    let into = 0, any = 0;
+    const measure = (all: boolean) => {
+      if (all) f.root.updateMatrixWorld(true); into = 0; any = 0;
+      const hip = l.root.getWorldPosition(_h).applyMatrix4(toBoat).clone(), knee = l.mid.getWorldPosition(_s).applyMatrix4(toBoat).clone(), ank = l.mid.localToWorld(_lp.set(0, -BONE.shin, 0)).applyMatrix4(toBoat).clone();
+      // (the sole's flat, 0.22 m up: a bone's lowest point on it is at its end, so the first look there is only at the knee
+      // and the ankle's end of the shin, and only near it; the cabin's corner, and anything at all for the other ways
+      // tried, all along)
+      const at = (q: THREE.Vector3, end: boolean) => {
+        if (nearEnd) { const c = inCabinEnd(q); if (c >= 0.01) into = Math.max(into, c); any = Math.max(any, c); }
+        if ((all || (end && q.y < 0.3)) && !underDeck(q.x, q.y, q.z) && Math.abs(q.x) < halfBeam(uAtZ(q.z)) - 0.02) {
+          const d = ground(q.x, q.z, q.y) - q.y; if (d > 0.025 && inCockpit(Math.abs(q.x), q.z)) into = Math.max(into, d); any = Math.max(any, d - 0.02);
+        }
+      };
+      if (!all && !nearEnd) { at(knee, true); for (const t of [0.25, 0.5, 0.9]) at(_t.copy(knee).lerp(ank, t), true); return; } // (along it too: its ankle end can be in under a bench)
+      for (let t = 0.4; t < 1.01; t += 0.1) at(_t.copy(hip).lerp(knee, t), t > 0.95);
+      for (let t = 0.1; t < 0.95; t += 0.1) at(_t.copy(knee).lerp(ank, t), t > 0.2);
+    };
+    measure(false); if (into === 0) return;
+    measure(true);
+    const sd = p.hip.x >= 0 ? 1 : -1, tgt = local(p.feet[i], _p).clone(), keep = (l.root.userData.bend as THREE.Vector3 | undefined)?.clone();
+    let best = any, bestB: THREE.Vector3 | undefined;
+    for (const h of [V(-sd, 0.4, 0), V(sd, 0.4, 0), V(0, 1, 0.3), V(-sd, 1, 0), V(sd, 1, 0)]) {
+      l.root.userData.bend = undefined; ik(l, l.root.position, tgt, BONE.thigh, BONE.shin, h.applyQuaternion(_inv), 1);
+      measure(true); if (any < best) { best = any; bestB = (l.root.userData.bend as THREE.Vector3).clone(); } if (any < 0.01) return;
+    }
+    // (none clear of it all: the one that goes least into anything, or as it was)
+    l.root.userData.bend = bestB ? undefined : keep; ik(l, l.root.position, tgt, BONE.thigh, BONE.shin, bestB ?? keep ?? kneeHint(p, i), 1);
+  });
 }
 /** Ease the pose shown toward the pose wanted (a quarter of a second or so). */
 function ease(f: Figure, want: PoseT, dt: number): PoseT {
