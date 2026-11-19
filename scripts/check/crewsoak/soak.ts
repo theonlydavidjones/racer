@@ -130,7 +130,9 @@ it('soak: slip out, cruise with tacks and gybes, home and made fast', () => {
     // (the pilot to standby, as it says, the tiller is yours: centered, and the pilot on again once she's moving)
     let offAt = -1;
     const keep = (awa: number) => () => { if (w.pilot.mode === 'off') { if (offAt < 0) { offAt = w.t; u.tiller = 0; log(`${L0} ${w.t.toFixed(0)} s: pilot to standby, tiller ${u.tiller.toFixed(2)}, v ${u.v.toFixed(2)}`); } else if (w.t - offAt > 15 && u.v > 0.5 && !u.astern) { engage(u, w.pilot, 'wind'); w.pilot.awa = awa; offAt = -1; } } };
-    for (let i = 0; i < 4; i++) { const a = i % 2 ? -32 : 32; w.pilot.awa = a; step(120, keep(a)); }
+    // (close-hauled at 40° apparent, her polar's 41-43° true or so: at 32° she pinched to 31-36° true, 3.7 kt in 22 kt
+    // instead of 5.1, and stalled in the tack, the harness's own fault, 19 Nov 2026)
+    for (let i = 0; i < 4; i++) { const a = i % 2 ? -40 : 40; w.pilot.awa = a; step(120, keep(a)); }
     for (let i = 0; i < 3; i++) { const a = i % 2 ? -150 : 150; w.pilot.awa = a; step(120, keep(a)); }
     log(`${L0} ${w.t.toFixed(0)} s: phase cruise done, v ${u.v.toFixed(2)} twa ${u.twa.toFixed(0)}`);
     // (home: sails struck off the harbor, then in her slip bow first, slow, as marina.test brings her in)
