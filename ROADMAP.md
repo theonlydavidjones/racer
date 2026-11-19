@@ -52,6 +52,17 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
   tests/crewstation.test.ts's 2.0 backstop failed on 6 kt seeds 4, 11 and 15; since the AI's pole call waits for the run to
   hold and the guide's angle holds through a swing (claude/crew-habits), all 24 seeds pass it and nothing is held. The
   steering itself is still to fix.
+- **The light-air tack's follow-ups** (after the sprint; Skipper Model, from the physics review of claude/ai-light-steer,
+  19 November): physics.ts slowTack, the speed the AI tacks from (TACK_WAY, 0.6 of her close-hauled speed, an estimate):
+  - **Chop lowers it, the wrong way:** a seaway stops her head to wind more than flat water does, but targetFor falls in
+    chop, so slowTack falls with it (0.05–0.08 m/s at 6–8 kt; SLOW_TACK caps it from 10 kt). It wants an allowance for
+    the waves' braking, not only her lower target speed.
+  - **Swell isn't in it:** targetFor reads only the wind sea (hsW, tpW), so in 3 kt with the Gate's swell slowTack is
+    0.56 m/s, where a real Folkboat would be stopped dead in a tack.
+  - **Sternway head to wind in a breeze** (with the heavy-air tack work, SLOW_TACK itself, still unsourced): stopped head
+    to wind in 12 kt, a committed tack showed no sternway over 23 s; her rig's windage, about 110 N there, should start
+    her drifting astern. The sculling floor (dynamics.ts HANDLING.minTurnRate, 4°/s, an estimate) gets every tack round
+    from rest in this sim, so it, not the boat's way, decides whether a slow tack succeeds.
 - **The outhaul in a breeze wandering across the guide's steps** (Crew Model; the physics review of the crew habits,
   16 November): two cases left after the guide's steps were read as its ranges (controls.ts guideLimits):
   - a light-air beat whose breeze swings across both 4 and 5 kt (3.5 to 5.7 kt read) still has them at the outhaul

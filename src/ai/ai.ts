@@ -7,7 +7,7 @@ import { driveCurveFor } from '../boat/driveCurve';
 import { beatFor, targetFor } from '../boat/seaway';
 import { runAngle } from '../boat/polar';
 import { slowTack, yawLag } from '../boat/physics';
-import { LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec, hypot } from '../core/math';
+import { D2R, LOA, V, brg, clamp, cross, dist, dot, markDist, markReach, n360, segCross, sub, unit, wrap, type Vec, hypot } from '../core/math';
 import { anyShoreDist, landAlong, landAlongNear, onLand } from '../geo/shore';
 import { CONTACT_GAP, HAIL_RESPONSE, cpa, hullGap } from '../rules';
 import { hailRange, obstructionAhead } from '../sim/obstruction';
@@ -644,6 +644,9 @@ function crowdedMark(w: World, b: Boat, near: { o: Boat; dx: number; dy: number 
 }
 
 /** One decision step for an AI boat: sets b.desired and b.luff. */
+/** How far in from the line's ends, beyond where her layline to it meets the line, a boat not yet started aims to cross it,
+ * m (aiThink, the !started aim): an ESTIMATE, a margin for her leeway and the wind's swing. */
+const INSIDE = 10;
 export function aiThink(w: World, b: Boat, dt: number): void {
   const ai = b.ai!, ww = b.ww, L = w.L, N = w.N, c = b.cur;
   // (the heading a planned turn set this think, a goTack, or a tack to answer a hail: the turns her helm may hold for her
@@ -773,7 +776,17 @@ export function aiThink(w: World, b: Boat, dt: number): void {
       // 8 m let a tide setting her toward the course side carry her over the extension as she reached along it, and round
       // onto the committee boat, physics review, 19 Nov 2026)
       const off = ai.below || Math.abs(w.lineA(b)) > half ? -18 : 10;
-      P = { x: w.center.x + N.x * off + L.x * a, y: w.center.y + N.y * off + L.y * a }; void along;
+      // (and never nearer an end than INSIDE: aiming for the end itself, 10-20 m off as she came back to it from beyond, its
+      // bearing swung 100° and more as she moved, her plan changed mid-turn and she circled the long way round, 200-380°; and
+      // aiming straight across from wherever she was, a point that moved with her, beating up to a line square to the wind
+      // she slid its whole length on one tack and out past the other end, never overstanding a point to tack for. A late
+      // starter 9 minutes after the gun: the Coordinator, 19 Nov 2026. Held in from the end, the point stays put as she
+      // slides toward it and she tacks for it as for any mark; and in by as far again as her layline to it runs along the
+      // line from where she is below it, (depth + 10)·tan(beat), so she reaches that layline before the end: held only
+      // INSIDE in, 54 m below a line 88 m long her layline met the line past its end, and she turned back down there)
+      const depth = Math.max(0, -w.lineD(b)) + 10, inner = Math.max(0, half - INSIDE - depth * Math.tan(beat * D2R));
+      const aimA = clamp(a, -inner, inner);
+      P = { x: w.center.x + N.x * off + L.x * aimA, y: w.center.y + N.y * off + L.y * aimA }; void along;
     }
     else {
       P = aimPoint(w, b);
@@ -858,7 +871,11 @@ export function aiThink(w: World, b: Boat, dt: number): void {
           const headed = ai.headedT > ai.kn.headerHoldS;
           const u = V(w.C.base), sv = { x: u.y, y: -u.x };
           const lat = (b.x - P.x) * sv.x + (b.y - P.y) * sv.y;
-          const width = ai.width * Math.min(1, hypot(d.x, d.y) / 500) + 25;
+          // (not yet started after the gun, the line's ends are her walls: past one, she has to come back in between them
+          // before she can start, so she tacks INSIDE short of it, whatever her usual width; at 47 m, a late starter beating
+          // up from 60 m below an 88 m line slid out past its end and turned back down: the Coordinator, 19 Nov 2026)
+          const wall = !b.started && w.t >= 0 ? Math.max(10, w.lineLen / 2 - 12 - INSIDE - Math.abs(w.lineA(P))) : Infinity;
+          const width = Math.min(wall, ai.width * Math.min(1, hypot(d.x, d.y) / 500) + 25);
           if (headed && w.rng() < dt * ai.kn.headerTackRate) doTack = true; // tack on headers
           else if ((ai.dirtyT ?? 0) > ai.kn.dirtyAirS && w.t - b.lastTackT > 15) doTack = true; // stuck in another boat's dirty air: tack for clear air
           // don't sail too far off the rhumb line (by where this tack takes her, her close-hauled course: not her heading,
