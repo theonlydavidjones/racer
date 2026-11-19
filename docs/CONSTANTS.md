@@ -329,7 +329,8 @@ physics, ranked like the ten above:
 | Constant | Value | Line | Class | Note |
 |---|---:|---:|---|---|
 | PENALTY_TURN_RATE | 10 | 22 | unsourced |  |
-| SLOW_TACK | 1.3 | 24 | unsourced |  |
+| SLOW_TACK | 1.3 | 24 | unsourced | from about 8 kt; in lighter air slowTack takes TACK_WAY of her close-hauled speed |
+| TACK_WAY | 0.6 | | estimate | the share of her close-hauled speed the AI tacks from; committed tacks measured getting through from 0.3 of it in 1-10 kt, flat water (tests/light-tack.test.ts) |
 | CREW_LAG | 0.8 | 27 | unsourced |  |
 | ASTERN | 2 | | estimate | her drag stern first over her hull's resistance ahead at the same speed (NACA TN 3361: a 0012 section's drag at 180° about twice that at 0°; a section, not a hull); replaces the unsourced ASTERN_DRAG law |
 | STEERS_ASTERN | 0.05 m/s | | estimate | above it a held tiller steers by the flow going astern; below, it sculls |

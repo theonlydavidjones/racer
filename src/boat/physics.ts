@@ -12,7 +12,7 @@ import { paddleForce, paddleMoment, paddleYawRate } from './paddle';
 import { NO_GO, beatAngle, jibEfficiency, polar, type SailPlan } from './polar';
 import orc from './data/nordic-folkboat-orc.json';
 const SAIL_AREA = { main: orc.boat.mainArea, jib: orc.boat.jibArea };
-import { beatFor, seaDrag, waveYaw } from './seaway';
+import { beatFor, seaDrag, targetFor, waveYaw } from './seaway';
 import { CE_ABOVE_WL, CE_HEIGHT, FULL_RUDDER, HELM_MAX, HELM_STALL, LEVER, RUDDER, STALL_TURN, helmFor, clothFill, heelFactor, heelWithCrew, heelingMoment, helmNeeded, hullRighting, netDrive, rollStep, rudderBrake, rudderDrag, rudderTurn, sailForces, sailYaw } from './balance';
 import { DEFAULT_CREW, PREPARED, STANDARD_DISP, TURN_V, prepLeft, crewBestHeel, crewEdgeAt, crewMass, crewMoment, crewSkill, hikingMoment, sittingMoment, standardCrewMoment, displacement, displacementFactor, newCrew, placeCrew, specAttr, type CrewState } from './crewPhys';
 import { LINE_GAP, LINE_TAU, NEW_COURSE, bodyJob, carCall, courseHeld, crewJobs, mainHand, ownerOf } from './crewWork';
@@ -57,6 +57,15 @@ export const PENALTY_TURN_RATE = 10;
  * slowed light-air races (claude/light-air: more slow tacks and time in irons). Being redone with the AI's irons
  * seamanship (claude/irons) and Deep Physics' measure of how she gathers way after a slow tack. */
 export const SLOW_TACK = 1.3;
+/** In light air, the way she needs for a tack is a share of the speed the wind can give her close-hauled, not SLOW_TACK:
+ * in 1-4 kt she sails close-hauled at 0.4-1.2 m/s, all under it, and every tack became a gybe right round (ROADMAP, "AI
+ * steering in a dying breeze"). Measured in this sim in flat water, a committed tack gets through in 1-10 kt from her own
+ * close-hauled speed in 6-24 s, and from 0.3 of it in 17-29 s (sculling round the last of it head to wind, rule 42.3(d),
+ * as light-air sailors do); a gybe right round at those speeds took 100 s. TACK_WAY 0.6 is an ESTIMATE with a margin
+ * over that 0.3: not measured on a real Folkboat. SLOW_TACK still caps it, so from about 8 kt nothing changes. */
+export const TACK_WAY = 0.6;
+/** The least speed (m/s) at which the AI takes a turn through the wind as a tack rather than gybing round. */
+export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea'] }): number => Math.min(SLOW_TACK, TACK_WAY * targetFor(b, beatFor(b)));
 
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
@@ -394,7 +403,7 @@ export function moveBoat(b: Boat, dt: number, t: number, emit: Emit, groundToast
       // tack). Too slow to tack? Going through the wind would leave her stuck in irons, so gybe instead.
       const toWind = wrap(b.ww.from - b.h);
       const throughWind = Math.sign(toWind) === Math.sign(err) && Math.abs(toWind) < Math.abs(err);
-      ai.turnCommit = throughWind && b.v < SLOW_TACK && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
+      ai.turnCommit = throughWind && b.v < slowTack(b) && !ai.tackNow ? -Math.sign(err) : Math.sign(err);
       ai.commitFor = b.desired; ai.commitHail = !!ai.tackNow; // (a tack for a hail is held to, whatever the plan does meanwhile)
     }
     if (ai && !midTack && ai.turnCommit !== 0 && Math.sign(err) !== ai.turnCommit) {
