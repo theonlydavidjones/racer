@@ -58,7 +58,7 @@ const OPP_TAGS = ['#c08cff', '#ff9f43', '#4dd8e8', '#ff7ab8', '#a3e05a', '#f2d24
 const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
 import { DEFAULT_CREW, DEFAULT_SKILL, newCrew, type CrewSpec } from '../boat/crewPhys';
 import { newPilot, pilotStep, type Pilot } from '../boat/autopilot';
-import { helmPlan, nextCorner, type HelmPlan } from './helmPlan';
+import { helmPlan, narrowAhead, nextCorner, type HelmPlan } from './helmPlan';
 import { chartDepth, landAt } from '../environment/sea';
 import { LL, toLL } from '../geo/geo';
 import { CANCEL_KT, FLAG_NAME, X_FLAG_MAX, cancelSignal, flagsAt, inTriangle, startSequence, type Flag, type PrepFlag, type Signal } from './signals';
@@ -2686,7 +2686,10 @@ export class World {
     // (under power, not the sailing plan's boards: the motor points her straight at it, autopilot.ts, as before. The
     // physics review: corner to corner, she motored the plan's tacks)
     if (b.motor?.running && b.motor.gear === 'F' && b.motor.throttle > 0.05) return end;
-    return nextCorner(P, b, end);
+    const t = nextCorner(P, b, end);
+    // (a gap too narrow for the pilot ahead on her way: its alarm, and she's yours, short of it; helmPlan.ts GAP_MIN)
+    if (narrowAhead(P, b) && this.pilot.mode === 'nav') this.pilot.alarm = 'A gap too narrow for the pilot ahead: she\'s yours.';
+    return t;
   }
   /** A plan in from the page (commands.ts navPlan), picked up at the leg she's nearest; null drops it. */
   setNavPlan(to: Vec | null, pts: Vec[] = []): void {
