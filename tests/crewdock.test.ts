@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SLIPS, slipTaken, slipsIn } from '../src/geo/marina';
-import { moveLazyCar, tiedTack } from '../src/boat/physics';
+import { moveLazyCar, tackTarget, tiedTack } from '../src/boat/physics';
+import { LL } from '../src/geo/geo';
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { DEFAULT_BOAT } from '../src/boat/spec';
@@ -186,5 +187,63 @@ describe('tied up, the crew finish what the dock wants and nothing else (physics
     expect(u.ctl.car[side].fore, 'the car moved a hole').toBe(was.fore + (was.fore > 0 ? -1 : 1));
     expect(u.carCmd ?? null, 'the call done').toBeNull();
     expect(u.crew!.people.every(p => p.job == null), 'and back from it').toBe(true);
+  });
+});
+
+describe('one hand, two jobs: the car first, then the halyards; and a car call dropped says why', () => {
+  it('made fast, a car called and then the main hoisted: the main waits till the bow hand is back from the car and at the mast', () => {
+    // (bodyJob leaves the bow hand at the car till it's done, and the main went up at their pace meanwhile, nobody at the
+    // mast: the physics review of the dock's jobs, 18 Nov 2026)
+    // (her slip lying across the wind, so the main goes up off the wind: its line said once, as it starts up, not each step
+    // it waits for the hand, which flushed the message log: the physics review)
+    const slip = SLIPS[0], boat = { ...DEFAULT_BOAT, slip: slip.id };
+    const w = new World(COURSES[0], { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 6, windTurn: 0, windDir: (slip.heading + 90) % 360, mode: 'sail', sailFrom: 'slip', sailTo: 'slip', boats: [boat], boat, boatId: boat.id, tideDate: '2026-11-14', current: 'slack' } as Settings, 1, { freeSail: true }), u = w.user;
+    for (let i = 0; i < 60; i++) w.step(DT);
+    expect(u.twa, 'lying across the wind').toBeGreaterThan(80);
+    const side = u.tack, was = u.ctl.car[side].fore;
+    moveLazyCar(u, was > 0 ? -1 : 1, 0, side);
+    for (let i = 0; i < 6; i++) w.step(DT);
+    const bow = u.crew!.people[u.crew!.people.length - 1]!;
+    expect(bow.job?.line, 'off to the car').toBe('car');
+    w.drainEvents(); w.setSail('main', true);
+    let rose = 0, offWind = 0;
+    const count = () => { for (const e of w.drainEvents()) if (e.type === 'toast' && /off the wind/.test((e as { msg: string }).msg)) offWind++; };
+    for (let i = 0; i < 60 * 60 && bow.job?.line === 'car'; i++) { w.step(DT); count(); if (bow.job?.line === 'car') rose = Math.max(rose, u.rig!.main); }
+    expect(rose, 'the main, while the bow hand is at the car').toBe(0);
+    for (let i = 0; i < 60 * 60 && u.rig!.main < 1; i++) { w.step(DT); count(); }
+    expect(u.rig!.main, 'up once they are at the mast').toBe(1);
+    expect(offWind, '"Hoisting the main off the wind", said').toBe(1);
+  });
+  it('under way, a car trip of the crew\'s own plan and the jib struck: the bow hand leaves the car for the halyard at once', () => {
+    // (your call they finish first; their own trip waits for the sails: "sails down", and a hand re-pins and goes)
+    const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 10, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'flat', traffic: 0 } as Settings;
+    const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user, p = LL(37.835, -122.40);
+    Object.assign(u, { x: p.x, y: p.y }); w.step(DT);
+    Object.assign(u, { h: (u.ww.from + 60) % 360, v: 2.5 });
+    u.rig = { main: 1, jib: 1, mainUp: true, jibUp: true };
+    for (let i = 0; i < 20 * 60; i++) w.step(DT);
+    const bow = u.crew!.people[u.crew!.people.length - 1]!;
+    u.carCmd = null; bow.job = { line: 'car', reach: 4, work: 6, station: { arm: 0.8, z: Z.car, pose: 'car' }, side: u.tack, target: { fore: 0, ins: 0 } };
+    w.setSail('jib', false);
+    for (let i = 0; i < 30; i++) w.step(DT);
+    expect(bow.job?.line, 'the bow hand, half a second after "jib down"').toBe('hoist');
+  });
+  it('under way, a lazy car called and then she tacks onto it before it is moved: dropped, and said in a line', () => {
+    // (crewWork.ts carJob drops a call for a car that's loaded now; before, the call just went, without a word)
+    const S = { ...DEFAULT_SETTINGS, windKind: 'west', windKt: 10, mode: 'sail', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', sea: 'flat', traffic: 0 } as Settings;
+    const w = new World(COURSES[0], S, 1, { freeSail: true }), u = w.user, p = LL(37.835, -122.40);
+    Object.assign(u, { x: p.x, y: p.y }); w.step(DT);
+    Object.assign(u, { h: (u.ww.from + 45) % 360, v: 2.5 });
+    for (let i = 0; i < 30 * 60; i++) w.step(DT);
+    const lazy = u.tack, was = u.ctl.car[lazy].fore;
+    moveLazyCar(u, was > 0 ? -1 : 1, 0, lazy);
+    const t = tackTarget(u); u.turnDir = t.dir; u.turnTarget = t.target;
+    w.drainEvents();
+    const said: string[] = [];
+    for (let i = 0; i < 40 * 60; i++) { w.step(DT); for (const e of w.drainEvents()) if (e.type === 'toast' && /car/i.test((e as { msg: string }).msg)) said.push((e as { msg: string }).msg); }
+    expect(u.tack, 'tacked').not.toBe(lazy);
+    expect(u.ctl.car[lazy].fore, 'the car not moved').toBe(was);
+    expect(u.carCmd ?? null, 'the call dropped').toBeNull();
+    expect(said, 'said why').toEqual(['Jib car call dropped: that car is loaded now.']);
   });
 });

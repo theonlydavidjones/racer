@@ -1389,6 +1389,7 @@ export class World {
     if (this.protestsOn) this.protestsStep();
     if (!this.freeSail) this.signals(prevT);
     this.motorStep(dt);
+    if (this.carWas || this.user.carCmd) this.carCallStep(); // (entered only with a car call pending: World.step's own cost per step, CAPACITY §8a)
     if (this.cruising) this.checkArrival();
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
@@ -2795,6 +2796,15 @@ export class World {
   setNavPlan(to: Vec | null, pts: Vec[] = []): void {
     const P = to ? helmPlan(to, pts, this.user) : null;
     if (P) HELM.set(this, P); else HELM.delete(this);
+  }
+  /** Your call for a lazy jib car as it stood last step (World.carCallStep). */
+  private carWas: Boat['carCmd'] = null;
+  /** Your call for a lazy jib car dropped by the crew, its car short of where you asked: its car loaded now, the jib up on
+   * it or she tacked onto it (crewWork.ts carJob). Said in a line: before, the call just went, without a word. */
+  private carCallStep(): void {
+    const u = this.user, was = this.carWas, now = u.carCmd ?? null;
+    if (was && !now) { const car = u.ctl.car[was.side ?? u.tack]; if (car.fore !== was.fore || car.ins !== was.ins) this.emit({ type: 'toast', msg: 'Jib car call dropped: that car is loaded now.', ms: 3000 }); }
+    this.carWas = now;
   }
   /** Just sail: tell her when she gets to where she was going. */
   private checkArrival(): void {
