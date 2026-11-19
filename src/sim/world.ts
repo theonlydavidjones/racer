@@ -100,7 +100,9 @@ export function addPenalty(b: Boat, deg: number): void { if (b.penalty > 0) { b.
 
 /** One-Turn Penalty for touching a mark (Rules 31 and 44.1), degrees. */
 export const ONE_TURN = 360;
-/** Half the hull's width for mark contact, m (a Folkboat is 2.2 m wide, narrower toward the ends). */
+/** Half the hull's width for mark contact, m: not her half-beam (1.1 m, the 2.20 m beam, NFIA class rules), but a
+ * half-width averaged along her length, as the hull here is a line from bow to stern (solidGap) and she narrows to a
+ * point at the stem and to the transom aft; a touch at her widest is read 0.25 m late. An unsourced estimate. */
 const HULL_HALF_BEAM = 0.85;
 /** How far a mark's buoy reaches from its position (m), by shape, for a touch (an island is land: boats run aground on it). */
 const MARK_R: Record<string, number> = { sphere: 1.2, cylinder: 1.0, column: 1.0, lighted: 1.6, island: 0, beacon: 0.3 };

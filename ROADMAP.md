@@ -193,6 +193,15 @@ sources. Each shipped item is added there when it's published.
 4. Each bug gets a test that reproduces it before it's fixed.
 5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
 6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+   Also parked (the Coordinator, 19 Nov): **the way off a structure's follow-ups** (8q7, nav-beside, in v210; the
+   physics reviews' points left open). The pilot's turn lags the arc it's judged by (1.5 s measured against the arc's 1,
+   and a small turn never reaches hard over), so a way off accepted near its 2 m keep may pass closer; the full-rate helm
+   and the 1.5 s lag were tried and each made a start worse. Re-looks every 0.5 s along a converging face can creep her in
+   (hold the line's keep to her offing when the way off was found). No charted depth along a way off (with the grounding
+   on depth). The tack gate (OFF_TACK, 2 m/s, 2.5 pinched) is fitted to two starts, not measured: judge a tack's real
+   track, 8–18 s of slow turning, instead. The bridge piers' collision shape may be larger than wharfNearest sees (Pier F).
+   Struck but still engaged: from 1.1 m off Pier 45 the pilot stays on through six strikes (on main too). And 31 of 155
+   sweep starts are handed over "too close alongside", most then striking unattended: starts 45° into a face at 5–6 kn.
    Also parked (the Coordinator, 19 Nov): **the unanswered-hail duck** (Rules, branch ai-keepclear-hail, c59e42c7). On
    main, W never ducks S when her hail goes unanswered (rules-finish). The branch fixes it with a keep-clear-first state
    for a boat owing turns, but the 92-race census read 300 fouls vs main's 295 and 30 touches vs 26 (sign test p 0.77,
