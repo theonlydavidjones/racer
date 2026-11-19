@@ -1352,7 +1352,7 @@ export class World {
     if (this.protestsOn) this.protestsStep();
     if (!this.freeSail) this.signals(prevT);
     this.motorStep(dt);
-    this.carCallStep();
+    if (this.carWas || this.user.carCmd) this.carCallStep(); // (entered only with a car call pending: World.step's own cost per step, CAPACITY §8a)
     if (this.cruising) this.checkArrival();
     if (this.steps % RECORD_EVERY_STEPS === 0) {
       this.rec.push(snapshot(this.t, this.boats));
