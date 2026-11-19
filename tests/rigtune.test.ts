@@ -51,7 +51,7 @@ describe('rig tune (rigTune.ts): North Sails\' Nordic Folkboat guide', () => {
 
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { World } from '../src/sim/world';
+import { DT, World } from '../src/sim/world';
 import { tuneName, presetFor, tuneBrief, TUNE_HEIKKILA } from '../src/boat/rigTune';
 import { raceBrief } from '../src/sim/strategist';
 import { lessons } from '../src/boat/coach';
@@ -60,14 +60,32 @@ import { testBoat, sail } from './helpers/testBoat';
 const S = (s: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...s }) as Settings;
 
 describe('the tune at the dock, racing (owner: North Sails\' setting for the forecast)', () => {
-  it('racing, with no tune of her own she is set to the guide\'s setting for the forecast; cruising, she has none', () => {
-    for (const windKt of [6, 12, 20]) {
-      const w = new World(COURSES[0], S({ windKt, fleet: 0 }), 3);
+  it('with no tune of her own she is set to the guide\'s setting for the forecast, racing or cruising', () => {
+    for (const windKt of [6, 12, 20]) for (const freeSail of [false, true]) {
+      const w = new World(COURSES[0], S({ windKt, fleet: 0, ...(freeSail ? { mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 } : {}) }), 3, freeSail ? { freeSail } : undefined);
       expect(w.forecastKt).toBeGreaterThan(0);
       expect(tuneName(w.user.tune!)).toBe(presetFor(w.forecastKt));
     }
-    expect(new World(COURSES[0], S({ windKt: 12 }), 3, { freeSail: true }).user.tune).toBeUndefined();
   });
+
+  // the owner's bug (19 Nov 2026): "the jumper setting changes all the time. Nobody changes the jumper settings every
+  // five minutes, maybe once per sail." Cruising with no tune she was on the guide's tune for the wind under her, so in
+  // a breeze near one of its marks (14.5 kt) every puff turned the dial and bent the drawn mast. Tuned at the dock, only
+  // the crew's turns change it, racing or cruising.
+  it('her jumpers hold through a breeze on the guide\'s mark, racing or cruising, until the crew turns them', () => {
+    for (const freeSail of [true, false]) {
+      const w = new World(COURSES[0], S({ windKt: 14.5, fleet: 0, ...(freeSail ? { mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 } : { seq: 0 }) }), 3, freeSail ? { freeSail } : undefined);
+      w.running = true;
+      const u = w.user, seen = new Set<number>(), kts: number[] = [];
+      for (let t = 0; t < 600; t += DT) {
+        w.step(DT);
+        if (Math.round(t / DT) % Math.round(1 / DT) === 0) { seen.add(jumperTurnsShown((u.tune ?? guideTune(u.ww.kt)).jumperTurns)); kts.push(u.ww.kt); }
+      }
+      expect(Math.min(...kts), 'the puffs straddle the mark').toBeLessThan(14.5);
+      expect(Math.max(...kts), 'the puffs straddle the mark').toBeGreaterThan(14.5);
+      expect([...seen], freeSail ? 'cruising' : 'racing').toHaveLength(1);
+    }
+  }, 120_000);
 
   it('her own tune from the Boat panel stays hers', () => {
     const boat = fixSpec({ ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, tune: { ...TUNE_HEIKKILA } } });

@@ -648,7 +648,7 @@ export class World {
     // her sheets trimmed for her heading from the first frame (physics.ts settleTrim); a boat in her berth has no sails up
     // (in her own wind, current and puffs included, as the first step will have it: not the course's wind)
     for (const b of this.boats) if (!b.docked && !b.handled) { b.ww = windOnWater(this.windHere(b, b), b.cur); settleTrim(b, b.ww.from, b.ww.kt); }
-    if (!this.freeSail) this.tuneAtDock();
+    this.tuneAtDock(); // (cruising too: tuned once for the day, not following each puff: the owner, 19 Nov 2026)
     if (!this.freeSail) this.log = new RaceLog(this);
     this.committeeFrom = this.C.base;
   }
@@ -656,8 +656,9 @@ export class World {
   /** The wind the forecast gives for the race (kt): the course-wide breeze over the first hour from the gun (outlook.ts). */
   forecastKt = 0;
   /**
-   * Racing, each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
-   * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5). A boat set up in the Boat panel keeps her
+   * Each boat's rig is tuned at the dock for the forecast, and stays so: the forestay, the shrouds and the mast's
+   * foot can't be touched while racing (NFIA Class Rules 7.40, 12.10, 6.1.5), and cruising nobody retunes for each puff
+   * either (the owner, 19 Nov 2026: "maybe once per sail"); only the crew's turns on the jumpers change it after. A boat set up in the Boat panel keeps her
    * own tune. With none, you're set to North Sails' setting for the forecast (rigTune.ts presetFor); the club boats
    * mostly are too, a few on Heikkilä Sailmaker's tune for the day and a few on the setting next to the right one (a crew
    * that read the forecast differently). Their own random draw, so the race's other draws (and replays) don't move.
