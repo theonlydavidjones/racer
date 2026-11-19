@@ -1,4 +1,5 @@
 import type { Settings } from '../settings';
+import { bottomLine, colorName } from './colorName';
 import { BOTTOM_COLORS, BRIGHT_FINISH, HULL_COLORS, TEAK_DECKS, countryName, ensignFor, freeNumber, laidUp, newBoat, sailNo, type BoatSpec } from '../boat/spec';
 import { burgeeCanvas } from '../render/burgees';
 import { clubFullName } from '../club/clubs';
@@ -249,7 +250,7 @@ export class Fleet {
     const b = this.cur!, log = logFor(b.id), rec = record(log), races = log.filter(e => e.kind === 'race');
     const slip = slipById(b.slip);
     const row = (k: string, v: string) => `<tr><td>${k}</td><td>${v}</td></tr>`;
-    const colour = (list: [string, string][], c: string) => list.find(x => x[1] === c)?.[0] ?? '';
+    const colour = (list: [string, string][], c: string) => colorName(list, c);
     const p = b.perf, ages = { new: 'new', mid: 'midlife', old: 'end of life' } as const;
     morph(this.page, `
       <div class="bphead"><button type="button" class="linkbtn" data-f="toList">${esc(this.hooks.backLabel())}</button><h2>${esc(b.name || 'Unnamed')}</h2><span class="fno">${esc(sailNo(b))}</span></div>
@@ -270,7 +271,7 @@ export class Fleet {
       <section><h3>The boat</h3><table class="ftab">
         ${row('Hull', b.hull.material === 'wood' ? 'Wood' : 'Fiberglass')}
         ${row('Topsides', colour([...HULL_COLORS, BRIGHT_FINISH], b.hull.upper))}
-        ${row('Bottom', `${colour(BOTTOM_COLORS, b.hull.lower)}, ${p.cleanedWeeks ? `cleaned ${p.cleanedWeeks} wk ago` : 'just cleaned'}`)}
+        ${row('Bottom', bottomLine(colour(BOTTOM_COLORS, b.hull.lower), p.cleanedWeeks))}
         ${row('Deck', colour([...TEAK_DECKS, ...HULL_COLORS], b.deck))}
         ${row('Forehatch', b.hatch === 'acrylic' ? 'Smoked acrylic, aluminum frame' : 'Teak')}
         ${row('Cabin top', b.cabinTop ? colour([...TEAK_DECKS, ...HULL_COLORS], b.cabinTop) : b.deck.startsWith('teak') ? 'Painted canvas' : 'Like the deck')}

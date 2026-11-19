@@ -126,6 +126,9 @@ const LP = (() => {
   const a = LL(d.box.south, d.box.west), b = LL(d.box.north, d.box.east);
   return { x0: a.x, x1: b.x, y0: a.y, y1: b.y, land: d.land.map(q => LL(q[0], q[1])) };
 })();
+/** A box's four edges, corner to corner (landAlong: made once, not every call). */
+const boxEdges = (B: Box): [Vec, Vec][] => [[{ x: B.x0, y: B.y0 }, { x: B.x1, y: B.y0 }], [{ x: B.x1, y: B.y0 }, { x: B.x1, y: B.y1 }], [{ x: B.x1, y: B.y1 }, { x: B.x0, y: B.y1 }], [{ x: B.x0, y: B.y1 }, { x: B.x0, y: B.y0 }]];
+const CF_EDGES = boxEdges(CF), LP_EDGES = boxEdges(LP);
 const inLimePoint = (p: Vec): boolean | null => p.x >= LP.x0 && p.x <= LP.x1 && p.y >= LP.y0 && p.y <= LP.y1 ? inPoly(p, LP.land) : null;
 
 /** The ground: the land itself and the marinas' docks, without the Wharf's piers and docks (for the terrain, which can't show them). */
@@ -227,6 +230,16 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
   }
 }
 
+/** The named pier part at p, if any (the Berkeley Pier and its abandoned outer part, Chevron's Long Wharf, the Wharf's
+ * named piers): for the message when she hits one. */
+export function wharfPartAt(p: Vec): string | null {
+  for (const G of GROUPS) {
+    if (!inB(p, G.box)) continue;
+    for (const a of G.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return a.name ?? null;
+    for (const l of G.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return l.name ?? null;
+  }
+  return null;
+}
 export function hitsWharf(p: Vec): boolean {
   if (hitsPier(p)) return true;
   for (let g = 0; g < GROUPS.length; g++) { // (indexed: every land check asks)
@@ -400,13 +413,19 @@ function edgeCross(a: Vec, b: Vec, p: Vec, q: Vec): number {
 }
 /** Walk the cells of a grid that the line from (x0, y0) to (x1, y1) (in cells) passes through, in order; `visit` gets
  * the cell and the t at which the line enters it, and returns true to stop. */
+let clipA = 0, clipB = 1;
+/** One edge of gridWalk's clip: false if the line misses the grid. */
+function clip(p: number, q: number): boolean {
+  if (p === 0) return q >= 0;
+  const r = q / p; if (p < 0) { if (r > clipB) return false; if (r > clipA) clipA = r; } else { if (r < clipA) return false; if (r < clipB) clipB = r; }
+  return true;
+}
 function gridWalk(x0: number, y0: number, x1: number, y1: number, nx: number, ny: number, visit: (i: number, j: number, t: number) => boolean): void {
   const dx = x1 - x0, dy = y1 - y0;
-  let ta = 0, tb = 1; // clip to the grid (Liang–Barsky)
-  for (const [p, q] of [[-dx, x0], [dx, nx - x0], [-dy, y0], [dy, ny - y0]]) {
-    if (p === 0) { if (q < 0) return; continue; }
-    const r = q / p; if (p < 0) { if (r > tb) return; if (r > ta) ta = r; } else { if (r < ta) return; if (r < tb) tb = r; }
-  }
+  // clip to the grid (Liang–Barsky): the four edges in turn, with no array made for them (it ran several times a step)
+  clipA = 0; clipB = 1;
+  if (!clip(-dx, x0) || !clip(dx, nx - x0) || !clip(-dy, y0) || !clip(dy, ny - y0)) return;
+  const ta = clipA, tb = clipB;
   let i = Math.min(nx - 1, Math.max(0, Math.floor(x0 + dx * ta))), j = Math.min(ny - 1, Math.max(0, Math.floor(y0 + dy * ta)));
   const si = Math.sign(dx), sj = Math.sign(dy), tdx = dx ? 1 / Math.abs(dx) : Infinity, tdy = dy ? 1 / Math.abs(dy) : Infinity;
   let tx = dx > 0 ? (i + 1 - x0) / dx : dx < 0 ? (i - x0) / dx : Infinity, ty = dy > 0 ? (j + 1 - y0) / dy : dy < 0 ? (j - y0) / dy : Infinity, t = ta;
@@ -468,13 +487,13 @@ export function landAlong(a: Vec, b: Vec): number {
     return false;
   });
   // where the terrain takes over from the Cityfront shore (onGround's box)
-  for (const [p, q] of [[{ x: CF.x0, y: CF.y0 }, { x: CF.x1, y: CF.y0 }], [{ x: CF.x1, y: CF.y0 }, { x: CF.x1, y: CF.y1 }], [{ x: CF.x1, y: CF.y1 }, { x: CF.x0, y: CF.y1 }], [{ x: CF.x0, y: CF.y1 }, { x: CF.x0, y: CF.y0 }]] as const) {
+  for (const [p, q] of CF_EDGES) {
     const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
   }
   // Lime Point's coastline, and the edges of its box, where the terrain takes over again
   if (overlaps(bb, LP)) {
     poly(LP.land, maybe);
-    for (const [p, q] of [[{ x: LP.x0, y: LP.y0 }, { x: LP.x1, y: LP.y0 }], [{ x: LP.x1, y: LP.y0 }, { x: LP.x1, y: LP.y1 }], [{ x: LP.x1, y: LP.y1 }, { x: LP.x0, y: LP.y1 }], [{ x: LP.x0, y: LP.y1 }, { x: LP.x0, y: LP.y0 }]] as const) {
+    for (const [p, q] of LP_EDGES) {
       const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
     }
   }
