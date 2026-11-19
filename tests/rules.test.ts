@@ -463,10 +463,12 @@ describe('Rule 21.2 · dodging a boat doing her turns (owner, 19 Nov 2026: "call
   // Red turns her penalty circles to starboard, 20°/s at 2 m/s; Blue sails starboard close-hauled at 2.5 m/s, sees her
   // coming and, two seconds in, luffs or bears away 30° at 15°/s. Stepped every 0.1 s, as the World does, so the judge
   // has both boats' histories. Returns the first foul called.
-  function dodge(redAt: [number, number], turn: number) {
+  // `plan`: her turns, each [when, degrees] (+ luffing, − bearing away), 15°/s, one after another from her close-hauled
+  // course; the default, one turn two seconds in.
+  function dodge(redAt: [number, number], turn: number | [number, number][], redHeading = 90) {
     const blue = boat('Blue', { at: [0, 0], heading: 315, speed: 2.5 });
-    const red = boat('Red', { at: redAt, heading: 90, speed: 2, penalty: 360 }); red.penaltyDir = 1; // (her turns begun)
-    const p = pair(red, blue), was: number[] = [];
+    const red = boat('Red', { at: redAt, heading: redHeading, speed: 2, penalty: 360 }); red.penaltyDir = 1; // (her turns begun)
+    const p = pair(red, blue), was: number[] = [], plan = typeof turn === 'number' ? (turn ? [[2, turn]] as [number, number][] : []) : turn;
     const off = (h: number) => ((h - 315 + 540) % 360) - 180;
     for (let i = 0; i <= 120; i++) {
       const t = 40 + i * 0.1, a = p.at(t);
@@ -474,7 +476,8 @@ describe('Rule 21.2 · dodging a boat doing her turns (owner, 19 Nov 2026: "call
       was.push(blue.h);
       moveTo(red, [red.x + V(red.h + 2).x * 0.2, red.y + V(red.h + 2).y * 0.2], (red.h + 2) % 360, red.headingAgo);
       red.tack = 'S'; // (rule 21.2 doesn't look at her tack)
-      const h = t + 0.1 > 42 && Math.abs(off(blue.h)) < Math.abs(turn) ? (blue.h + Math.sign(turn) * 1.5 + 360) % 360 : blue.h;
+      const want = plan.filter(([at]) => t + 0.1 - 40 > at).reduce((s, [, d]) => s + d, 0), err = want - off(blue.h);
+      const h = Math.abs(err) > 0.75 ? (blue.h + Math.sign(err) * 1.5 + 360) % 360 : blue.h;
       moveTo(blue, [blue.x + V(h).x * 0.25, blue.y + V(h).y * 0.25], h, was[Math.max(0, was.length - 30)]);
       blue.aboveProper = off(h) > 10;
     }
@@ -488,9 +491,17 @@ describe('Rule 21.2 · dodging a boat doing her turns (owner, 19 Nov 2026: "call
     expect(dodge([-12, 16], -30)).toMatchObject({ by: 'Red', rule: '21.2' });
     expect(dodge([-10, 18], -30)).toMatchObject({ by: 'Red', rule: '21.2' });
   });
+  it('her collision course seconds off yet (held on, they\'d meet at 8.6 s), or a meter\'s pass from a hull swinging round: still the turning boat\'s (WS Case 50, "a genuine and reasonable apprehension of collision")', () => {
+    expect(dodge([-12, 30], 30)).toMatchObject({ by: 'Red', rule: '21.2' });
+    expect(dodge([-10, 8], 30, 0)).toMatchObject({ by: 'Red', rule: '21.2' });
+  });
   it('but a boat that luffs onto one doing her turns, which would have missed her, still interfered (23.2)', () => {
-    expect(dodge([-8, 20], 0)).toBeNull(); // (held on, they'd have passed)
-    expect(dodge([-8, 20], 30)).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
+    expect(dodge([-16, 12], 0, 0)).toBeNull(); // (held on, she'd have passed with 3–4 m of water)
+    expect(dodge([-16, 12], 30, 0)).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
+  });
+  it('and a hunt in two bites, a luff onto a collision course and then another, is judged from the first (23.2)', () => {
+    expect(dodge([-8, 34], 0)).toBeNull(); // (held on, about 5 m of water)
+    expect(dodge([-8, 34], [[2, 20], [5, 12]])).toMatchObject({ by: 'Blue', rule: '23', part: '23.2' });
   });
 });
 

@@ -258,7 +258,6 @@ export function leftRoom(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): bool
   return roomGap(row, kc, ctx) >= KEEP_CLEAR_GAP;
 }
 
-/** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
 /** When the right-of-way boat's latest turn began (from her ring), with the ring's newest and oldest times; null if she
  * hasn't turned within the last RULE16_WINDOW. */
 function turnStart(row: RulesBoat, R: PoseRing): { t0: number; now: number; oldest: number } | null {
@@ -283,31 +282,58 @@ function poseTurning(K: PoseRing, t0: number): Pose & { turnRate: number } {
   return { ...k0, turnRate: kw > 0.2 ? wrap(k0.h - poseAt(K, t0 - kw).h) / kw : 0 };
 }
 
+/** Every time in her ring a turn of hers began, either way (her heading changing 1.5°/s or more, over TURN_WINDOW): the
+ * oldest first. */
+function turnStarts(R: PoseRing): number[] {
+  const now = R.t[at(R, 0)], oldest = R.t[at(R, R.n - 1)], W = Math.min(TURN_WINDOW, now - oldest);
+  if (W <= 0) return [];
+  const out: number[] = [];
+  let was = false;
+  for (let t = oldest + W; t <= now + 1e-9; t += RING_DT) {
+    const turning = Math.abs(wrap(poseAt(R, t).h - poseAt(R, t - W).h) / W) >= 1.5;
+    if (turning && !was) out.push(t - W);
+    was = turning;
+  }
+  return out;
+}
+
+/** The water a right-of-way boat may keep from a boat under rule 21 before she's entitled to act, hull to hull, m: a meter
+ * more than KEEP_CLEAR_GAP. WS Case 50: she may act on "a genuine and reasonable apprehension of collision", and a boat
+ * about to pass a meter from a hull swinging round at 10–20°/s has one. A modelling choice. */
+export const APPREHENSION_GAP = KEEP_CLEAR_GAP + 1;
+/** How far ahead to follow the courses they held, s: past their closest approach, for a boat a few lengths off. */
+const HELD_HORIZON = 10;
+
 /**
- * Was `kc` already failing to keep clear of `row` when `row`'s latest turn began? Definitions, Keep Clear (a): the
- * right-of-way boat "can sail her course with no need to take avoiding action". From where both were then, `row`
- * holding on as she was and `kc` carrying on as she was, her turn too: would they have come within KEEP_CLEAR_GAP?
- * Then `row`'s turn was the avoiding action rule 14 asks of her ("if reasonably possible"), not a course change that
- * took the other boat's room away, and a breach it led to is exonerated under 43.1(a): "When as a consequence of
- * breaking a rule a boat has compelled another boat to break a rule, the other boat is exonerated for her breach."
- * Used for a boat under rule 21 (taking a penalty, returning to start, backing a sail), whose course nobody can read: a
- * boat turning circles crosses every bearing, so a dodge either way that she still meets at the bow reads as a turn
- * toward her (turnedToward). Without a history, false: the turn is judged as before.
+ * Was `kc` already failing to keep clear of `row` before `row` changed course? Definitions, Keep Clear (a): the
+ * right-of-way boat "can sail her course with no need to take avoiding action". From where both were when each of
+ * `row`'s turns in the lead-up began (her pose ring, about 8 s), `row` holding on as she was then and `kc` carrying on as
+ * she was, her turn too: would they have come within APPREHENSION_GAP? At every turn's start, not only the latest: a
+ * luff onto a boat that would have missed, then a second luff once on a collision course, is a hunt, and the first luff
+ * is where it began. Then `row`'s turns were the avoiding action rule 14 asks of her ("if reasonably possible"), not
+ * course changes that took the other boat's room, and a breach they led to is exonerated under 43.1(a): "When as a
+ * consequence of breaking a rule a boat has compelled another boat to break a rule, the other boat is exonerated for her
+ * breach." Used for a boat under rule 21 (taking a penalty, returning to start, backing a sail), whose course nobody can
+ * read: a boat turning circles crosses every bearing, so a dodge either way that she still meets at the bow reads as a
+ * turn toward her (turnedToward). Without a history of both boats from the first turn, false: judged as before.
  */
 export function wasFailing(row: RulesBoat, kc: RulesBoat): boolean {
   const R = RINGS.get(row), K = RINGS.get(kc);
   if (!R || !K || R.n < 2 || K.n < 2) return false;
-  const s = turnStart(row, R);
-  if (!s) return false;
-  const k = poseTurning(K, s.t0), held = straightOn(poseAt(R, s.t0)), theirs = straightOn(k, k.turnRate);
-  const me = { x: 0, y: 0, h: 0 }, horizon = s.now - s.t0 + 2;
-  for (let tau = 0; tau <= horizon + 1e-9; tau += RING_DT) {
-    const a = held(tau); me.x = a.x; me.y = a.y; me.h = a.h;
-    if (hullGap(me, theirs(tau)) < KEEP_CLEAR_GAP) return true;
-  }
-  return false;
+  const starts = turnStarts(R);
+  if (!starts.length || starts[0] < K.t[at(K, K.n - 1)]) return false;
+  const me = { x: 0, y: 0, h: 0 };
+  return starts.every(t0 => {
+    const k = poseTurning(K, t0), held = straightOn(poseAt(R, t0)), theirs = straightOn(k, k.turnRate);
+    for (let tau = 0; tau <= HELD_HORIZON + 1e-9; tau += RING_DT) {
+      const a = held(tau); me.x = a.x; me.y = a.y; me.h = a.h;
+      if (hullGap(me, theirs(tau)) < APPREHENSION_GAP) return true;
+    }
+    return false;
+  });
 }
 
+/** The gap `kc` keeps from `row` by the turn away a prompt helmsman would make once `row` began her turn, m (leftRoom). */
 export function roomGap(row: RulesBoat, kc: RulesBoat, ctx: RulesContext): number {
   const R = RINGS.get(row), K = RINGS.get(kc);
   if (!R || !K || R.n < 2) return 0;
