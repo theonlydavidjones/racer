@@ -198,6 +198,8 @@ const HELM_TOL = 8;
 export class HelmFeed {
   private helm: { pn: PassageNow; P: HelmPlan; world: unknown; t: number; wind: { from: number; kt: number }; tide: number } | null = null;
   private want = true; private nav = false;
+  /** Asked for only as a matter of course (a corner made, or HELM_EVERY on): the plan she has is kept unless the new one is quicker. */
+  private routine = false;
   /** How many plans it has asked for, and taken (for the tests). */
   asked = 0; taken = 0;
   constructor(private plan: (w: SimView) => PassageNow | null) {}
@@ -209,12 +211,17 @@ export class HelmFeed {
     if (h && !this.want) {
       const was = h.P.i; nextCorner(h.P, u, dest);
       const dw = Math.abs(((w.wind.from - h.wind.from + 540) % 360) - 180);
-      this.want = h.P.i !== was || heldPast(h.P, u) || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
-        || Math.abs(w.cur.kt - h.tide) > HELM_TIDE || w.clockUtc - h.t >= HELM_EVERY || h.P.to.x !== dest.x || h.P.to.y !== dest.y;
+      const must = heldPast(h.P, u) || offLeg(h.P, u) > HELM_OFF || dw > HELM_WIND || Math.abs(w.wind.kt - h.wind.kt) > HELM_KT
+        || Math.abs(w.cur.kt - h.tide) > HELM_TIDE || h.P.to.x !== dest.x || h.P.to.y !== dest.y;
+      this.want = must || h.P.i !== was || w.clockUtc - h.t >= HELM_EVERY; this.routine = !must;
       if (!this.want) return null;
     }
     this.asked++;
     const pn = this.plan(w); if (!pn || pn === h?.pn || !pn.ok || !pn.track.length) return null; // (asked again each frame till it's in)
+    // (asked as a matter of course, the plan she's on is kept unless the new one gets there HELM_BETTER sooner than what's
+    // left of hers: plans worked out afresh from each corner turned her round and back again south of the Berkeley Pier
+    // ruin, 20 minutes lost, as the router's front threaded it one way and then the other: v211's batch, 19 Nov 2026)
+    if (h && this.routine && pn.minutes > leftOn(h.pn, u) - HELM_BETTER) { h.t = w.clockUtc; this.want = false; return null; }
     const pts = helmPoints(pn), P = helmPlan(dest, pts, u); if (!P || offLeg(P, u) > HELM_OFF) return null; // (she's not on it: the next)
     this.helm = { pn, P, world: w, t: w.clockUtc, wind: { from: w.wind.from, kt: w.wind.kt }, tide: w.cur.kt }; this.want = false; this.taken++;
     return { k: 'navPlan', to: { x: dest.x, y: dest.y }, pts };
@@ -224,6 +231,15 @@ export class HelmFeed {
  * strays sailing one: tests/nav-follows-plan, 11-26 m), the wind HELM_WIND° or HELM_KT kt off what it was planned in, the
  * tide at the course HELM_TIDE kt, or HELM_EVERY minutes on. */
 const HELM_OFF = 100, HELM_WIND = 10, HELM_KT = 3, HELM_TIDE = 0.3, HELM_EVERY = 5;
+/** How much sooner (minutes) a plan asked for as a matter of course must get her there than what's left of the one she's
+ * on, to replace it: about the router's own grain (its 1-minute fronts). An estimate (docs/CONSTANTS.md). */
+const HELM_BETTER = 1;
+/** What's left of a plan (minutes): from the point of its track nearest her to its end. */
+function leftOn(pn: PassageNow, at: Vec): number {
+  const T = pn.track; let k = 0, best = Infinity;
+  for (let i = 0; i < T.length; i++) { const d = dist(T[i].p, at); if (d < best) { best = d; k = i; } }
+  return T[T.length - 1].t - T[k].t;
+}
 const nowMemo = new WeakMap<SimView, { key: string; refs: unknown[]; v: PassageNow }>();
 /** What a plan is worked out for: where she is and is bound, the minute, and the conditions (changed from the pause
  * menu, World.applyConditions, they're new objects). */
