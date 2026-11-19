@@ -35,6 +35,19 @@ const ROUTE_NAME: Record<string, string> = {
 
 /** The passage by the old rules (routing.ts sailLeg, stretch by stretch along the way round the land, up the middle or
  * the long board first to either side): #406's planner, kept as a floor under the router. */
+/**
+ * Where the next stretch of a passage starts: from where the last one ended (`end`, within its arrive of the turn) if
+ * the next turn can be seen from there clear of the land, else from the turn itself, the track jumping to it. That jump
+ * is sailed by nobody and judged by nothing, so it's taken only if it crosses no land and no gap narrower than the
+ * pilot's turning room (helmPlan.ts narrowOn); else the next stretch starts where she is and the router finds the way.
+ * Jumped regardless, a 119 m jump ran across the Berkeley Pier ruin's west tip, and the pilot was handed over before a
+ * gap too narrow that a meter's shift in the plan made or unmade (Deep Physics, 19 Nov 2026, on beat-chop).
+ */
+function onFrom(end: Vec, turn: Vec, next: Vec | undefined): Vec {
+  if (!next) return turn;
+  if (landAlong(end, next) === Infinity && landDist(end) > 20) return end;
+  return landAlong(end, turn) === Infinity && !narrowOn(end, turn) ? turn : end;
+}
 function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { ok: boolean; why?: 'land' | 'time'; minutes: number; track: { p: Vec; t: number }[]; legs: SailResult[] }, void> {
   let tt = t, ok = true, why: 'land' | 'time' | undefined, at = route[0];
   const track: { p: Vec; t: number }[] = [], legs: SailResult[] = [];
@@ -49,7 +62,7 @@ function* rulesPassage(o: Outlook, route: Vec[], t: number): Generator<void, { o
     legs.push(r); track.push(...(i > 1 ? r.path.slice(1) : r.path)); tt += r.minutes;
     if (!r.ok) { ok = false; why = r.why; break; }
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
-    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
+    at = onFrom(end, route[i], next);
     if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
   }
   return { ok, why, minutes: tt - t, track, legs };
@@ -93,7 +106,7 @@ function* passageSteps(o: Outlook, route: Vec[], t: number, grain: Grain = FINE)
     if (!r.ok) { ok = false; why = r.why; break; } // (stopped where she ran ashore: nothing drawn beyond it)
     // (on from where she is, if she can see the next turn from there clear of the land; or else from the turn itself)
     const end = r.path[r.path.length - 1].p, next = route[i + 1];
-    at = next && landAlong(end, next) === Infinity && landDist(end) > 20 ? end : route[i];
+    at = onFrom(end, route[i], next);
     if (at === route[i] && next) track.push({ p: { ...route[i] }, t: tt });
   }
   return { ok, why, minutes: tt - t, track, legs };
