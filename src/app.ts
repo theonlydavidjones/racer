@@ -23,6 +23,7 @@ import { MAX_OPPONENTS, loadSettings, saveSettings, type Settings } from './sett
 import { FLEET } from './boat/boat';
 import { currentSeason, seasonById, seasonResults, seasons, standings, type SeasonResult, type Series } from './club/season';
 import { seasonHtml } from './ui/season';
+import { tideLine } from './ui/tideLine';
 import { nextRace, paintSeasonView, seasonCardHtml, upcomingRace } from './ui/seasonView';
 import { burgeeCanvas } from './render/burgees';
 import { raceDisplayName } from './club/raceNames';
@@ -714,6 +715,17 @@ $('tpSub').addEventListener('click', e => { if ((e.target as HTMLElement).closes
 $('bCoach').onclick = () => openTrimNotes();
 $('bCoachX').onclick = () => { $('coachPanel').hidden = true; };
 $('coachBody').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-more]'); if (!b) return; coachMore = b.dataset.more === '1'; renderCoach(); });
+/** The foul-tide word (ui/tideLine.ts): once a leg, a few seconds after the start or the rounding, when the tide's against
+ *  her down the leg and an inshore track saves real time. It sums a few hundred steps, so once, never a frame. */
+let tideLeg = -1, tideRace: unknown = null;
+function tideWord(u: typeof w.user): void {
+  if (tideRace !== w) { tideRace = w; tideLeg = -1; }
+  if (w.freeSail || w.t < 5 || w.t - legT < 12 || u.leg === tideLeg || w.rounding) return;
+  tideLeg = u.leg;
+  const m = w.nextMark(u); if (!m) return;
+  const line = tideLine(u, m.p, { currentAt: p => w.currentAt(p), windHere: p => w.windHere(p, undefined, false) });
+  if (line) toast(line, 6000);
+}
 /** Twice a second: what the coach would say now. The headline goes in the trim panel, and briefly on the water when it's new. */
 function coachTick(): void {
   document.body.classList.toggle('inLesson', !!w.lesson && w.running); // (the lesson's line at the top: 11-lessons.css)
@@ -722,6 +734,7 @@ function coachTick(): void {
   const u = w.user;
   if (u.leg !== lastLeg) { if (lastLeg >= 0) legT = w.t; lastLeg = u.leg; }
   // (the coach weighs her lines beside the race, in the worker, twice a second: its newest word, when one's come)
+  tideWord(u);
   const got = host.coach({ preStart: !w.freeSail && w.t < 0, justRounded: w.t - legT < 12 });
   if (!got) { tipFade(); return; }
   coachShown = got;
