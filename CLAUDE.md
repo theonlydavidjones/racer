@@ -135,12 +135,12 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
 - The plan lives in ROADMAP.md ("Priorities", at the top): work the next item there, and mark it done when it's published.
 - Records (the owner, 20 Nov 2026: "we're really sabotaging ourselves by not keeping good records of past, present, and
   future work"). The record is the commits, and everything else is read from them:
-  - Every commit that answers an owner request names its number (`r239: …`; the rows of the Owner's Requests artifact,
+  - Every commit that answers an owner request names its number (`r239: …`; the rows of the Roadmap artifact,
     https://claude.ai/artifact/9LqaHyCJvUStsifA29UAj3). Internal work says so, or names its ROADMAP item.
   - A request is done only when a commit naming it is in a published version: never from a session's word or the
     ROADMAP's prose. Before handing out or starting a request, check main's code and `git log --grep` for it first.
   - At each publish the Coordinator sends Roadmap the release's request numbers (`git log <prev>..<this> | grep -oE
-    'r[0-9]{3}'`), its player-visible changes, and what moved between releases; Roadmap writes the Owner's Requests rows
+    'r[0-9]{3}'`), its player-visible changes, and what moved between releases; Roadmap writes the Roadmap rows
     (requests, and the Releases view's `work`) from that alone. The Coordinator adds the release's section to
     docs/RELEASE-NOTES.md and strikes its ROADMAP items in the same commit as the version row.
   - Anything only the owner can settle aboard Josephine (a measurement, a photo, an observation underway) goes in
