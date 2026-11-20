@@ -1,3 +1,4 @@
+import { MARINA_NAMES } from './marinaNames';
 import { inPoly, segPt, type Vec, hypot } from '../core/math';
 import { LL } from './geo';
 import { HANDLING } from '../boat/dynamics';
@@ -37,6 +38,7 @@ interface HarborData {
   beacon?: [number, number] | null; beacons?: { at: [number, number]; colour: 'red' | 'green' }[]; exits?: LLs; shore?: LLs[]; piles?: 'white'; paths?: LLs[];
   slips: { id: string; dock: string; at: [number, number]; heading: number; finger: number; kind?: 'bow-in' | 'alongside' }[];
 }
+// (the private harbors' names, the owner's parodies: geo/marinaNames.ts, r274)
 const SOURCES: { id: string; name: string; short: string; data: HarborData }[] = [
   { id: 'west-harbor', name: 'West Harbor, San Francisco Marina', short: 'West Harbor', data: westHarbor as unknown as HarborData },
   { id: 'gashouse-cove', name: 'Gashouse Cove, San Francisco Marina East Harbor', short: 'Gashouse Cove', data: gashouseCove as unknown as HarborData },
@@ -50,9 +52,9 @@ const SOURCES: { id: string; name: string; short: string; data: HarborData }[] =
   { id: 'richmond-yc', name: 'Brickyard Racing Club, Brickyard Cove', short: 'Brickyard RC', data: richmondYc as unknown as HarborData },
   { id: 'encinal', name: 'Live Oak Yacht Club, Alameda', short: 'Live Oak YC', data: encinal as unknown as HarborData },
   { id: 'oakland-yc', name: 'Oaktown Yacht Club, Alameda', short: 'Oaktown YC', data: oaklandYc as unknown as HarborData },
-  { id: 'marina-village', name: 'Marina Village Yacht Harbor, Alameda', short: 'Marina Village', data: marinaVillage as unknown as HarborData },
-  { id: 'fortmann', name: 'Fortmann Marina, Alameda', short: 'Fortmann Marina', data: fortmann as unknown as HarborData },
-  { id: 'grand-marina', name: 'Grand Marina, Alameda', short: 'Grand Marina', data: grandMarina as unknown as HarborData },
+  { id: 'marina-village', name: `${MARINA_NAMES['marina-village'].name}, Alameda`, short: 'Harbor Town', data: marinaVillage as unknown as HarborData },
+  { id: 'fortmann', name: `${MARINA_NAMES.fortmann.name}, Alameda`, short: MARINA_NAMES.fortmann.name, data: fortmann as unknown as HarborData },
+  { id: 'grand-marina', name: `${MARINA_NAMES['grand-marina'].name}, Alameda`, short: MARINA_NAMES['grand-marina'].name, data: grandMarina as unknown as HarborData },
   { id: 'alameda-marina', name: 'Alameda Marina (Sandbar Yacht Club)', short: 'Alameda Marina', data: alamedaMarina as unknown as HarborData }
 ];
 export const WALKWAY_W = 2.4, FINGER_W = 1.0, BREAKWATER_W = 6, SHORE_W = 3;
