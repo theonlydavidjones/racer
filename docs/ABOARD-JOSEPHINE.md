@@ -82,7 +82,7 @@ Ordered by accuracy gain.
   - Measure the ensign socket's distance from the centerline, from the toerail's inner face, and from the starboard plate.
   - With the backstay fully slack and then fully on, measure the bridle leg length.
   - At both extremes, swing the tiller hard over each way and measure its clearance from the legs and plates. Photograph from astern.
-- **Ensign staff inconsistency to resolve:**
+- **Ensign staff (ruled 20 Nov by the owner: "move the ensign staff to halfway", between the toe rail and the starboard plate; Rigging, r248). Still worth a tape: the socket from the centerline, to check the drawing.** The note it replaced:
   - The staff is held at 0.46 m. Its old formula was midway between the toerail's inner face and a plate at 0.30 m (`boatMesh.ts:1181`), so the toerail's inner face is about 0.62 m out there. That is my arithmetic, not a figure in the repo.
   - With plates at 0.17 m, "equidistant from toerail and chain plate" would put the staff near 0.395 m. The two owner statements agree only if the plate really is where the code had it, or the toerail is further out.
 - **Why:** the bridle sets the backstay's mechanical range and the tiller's real clearance. The sim draws the bridle foot at z 3.74 and apex travel 2.7 m down to 1.4 m, and the plate z is 3.64 on main (`boatMesh.ts:854`). `ropeScale.ts:36` gives the bridle as "about 1.3–1.5 m of rope: an estimate".
