@@ -452,9 +452,8 @@ export class SailBand {
       : j.reach > 0 ? `${name} to ${at}: the crew is going forward to it.${left}` : `${name} to ${at}: the crew is pulling the pin and sliding it.${left}`, until: Infinity };
   }
 
-  /** Where the jumpers are now, in half turns as the crew counts them: her tune, or North's for the wind when she has
-   * none (cruising: rigTune.ts guideTune, which sits between the marks around 9 and 15 kt and moves with the wind: shown
-   * raw, it ran on as a long run of digits under the dial, the owner's bug). */
+  /** Where the jumpers are now, in half turns as the crew counts them: her tune (set once at the dock, racing or
+   * cruising: World.tuneAtDock; the guide's for the wind only for a boat no World has tuned, which moves with the wind). */
   private jumpersNow(u: Boat): number { return jumperTurnsShown((u.tune ?? guideTune(u.ww.kt)).jumperTurns); }
   /** Ask the crew for a half turn more or less on the jumpers, from where they're going (or where they are). */
   private turnJumpers(d: number): void {
