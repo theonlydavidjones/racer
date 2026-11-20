@@ -81,6 +81,15 @@ export const slowTack = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: nu
   return Math.min(SLOW_TACK, TACK_WAY * Math.max(targetFor(her, beatFor(her)), targetFor(flat, beatFor(flat))));
 };
 
+/** Whether bearing away 10° below close-hauled can build her the way for a tack (slowTack × 1.15, as the AI asks) in the
+ * wind and chop she has. Not always: the chop is the day's wind's (world.ts seaWind), slowTack the wind at her, so in a
+ * deep lull or another boat's shadow on a breezy day her footed speed in the chop can stay under it (0.5 m chop and
+ * 2 kt at her), and footing for it she never came round (v213 review). Then she wears round instead. */
+export const footReaches = (b: { ww: { kt: number }; sea: Boat['sea']; twsSlow?: number }): boolean => {
+  const her = { ww: { kt: Math.min(b.ww.kt, b.twsSlow ?? b.ww.kt) }, sea: b.sea };
+  return targetFor(her, beatFor(her) + 10) >= slowTack(b) * 1.15;
+};
+
 /** The crew's reaction time to a change in apparent wind angle, s. */
 export const CREW_LAG = 0.8;
 

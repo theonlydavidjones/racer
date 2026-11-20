@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testBoat, sail } from './helpers/testBoat';
 import { beatAngle } from '../src/boat/polar';
 import { wrap } from '../src/core/math';
-import { slowTack } from '../src/boat/physics';
+import { footReaches, slowTack } from '../src/boat/physics';
 import type { Boat } from '../src/boat/boat';
 import { FLAT_SEA } from '../src/environment/sea';
 
@@ -25,6 +25,20 @@ function askTack(b: Boat, s = 60): { gybed: boolean; round: number } {
 }
 
 describe('A tack in light air (physics.ts slowTack)', () => {
+  it('in a deep lull in a breezy day\'s chop, where bearing away can\'t build the way, she wears round rather than footing forever', () => {
+    // (v213 review, 20 Nov 2026: the chop is the day's wind's (world.ts seaWind), her threshold the wind at her; in 0.5 m
+    // with 2 kt at her, footed 10° her target is under slowTack × 1.15, so ai.ts footed her on every think and she never
+    // came round. In flat water footing does reach it.)
+    const chop = { ...FLAT_SEA, hsW: 0.5, tpW: 2.8 };
+    expect(footReaches({ ww: { kt: 2 }, sea: chop }), '2 kt in 0.5 m chop').toBe(false);
+    for (const kt of [1, 2, 4, 8]) expect(footReaches({ ww: { kt }, sea: FLAT_SEA }), `${kt} kt, flat`).toBe(true);
+    const a = beatAngle(2), b = testBoat({ heading: 360 - a, kt: 1, windKt: 2 });
+    b.sea = chop; sail(b, 90);
+    const r = askTack(b, 240);
+    // (round, tacked or gybed onto port, within four minutes: wearing at 0.1-0.3 m/s in that chop she takes about 200 s;
+    // before, ai.ts never asked it)
+    expect(r.round > 0 || (r.gybed && b.tack === 'P'), `${r.gybed ? 'gybed' : 'not gybed'}, on ${b.tack}, ${b.v.toFixed(2)} m/s against slowTack ${slowTack(b).toFixed(2)}`).toBe(true);
+  });
   it('in chop, she wants at least the way she would in flat water (a seaway stops her head to wind sooner, not later)', () => {
     // (the physics review, 20 Nov 2026: with the share of her speed in chop, the threshold fell as the chop rose, 0.28 to
     // 0.12 m/s at 1.5 kt in 0.4 m, and to nothing at 1 kt; from there a tack took 72 s in 0.5 m and 201 s in 0.3 m)
