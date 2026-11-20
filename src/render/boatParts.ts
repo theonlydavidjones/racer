@@ -209,7 +209,7 @@ export function partShape(m: BoatMesh, key: PartId, tack: Tack, near: number): P
     // the wind's sides: on port tack the wind comes over her port side, which is windward
     case 'windward': return side(tack === 'P' ? -1 : 1);
     case 'leeward': return side(tack === 'P' ? 1 : -1);
-    case 'jumper': return { kind: 'line', pts: m.rigDrawn.jumperLines.map(linePts).filter(p => p.length) };
+    case 'jumper': return { kind: 'line', pts: m.rigDrawn.jumperLines.map(j => linePts(j.l)).filter(p => p.length) };
     case 'backstayLine': return { kind: 'line', pts: keyed(m, 'backstay') };
     case 'standing': case 'running': return null; // (found through the parts they're made of: ALSO)
   }

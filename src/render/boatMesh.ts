@@ -425,7 +425,7 @@ export interface BoatMesh {
   /** When her crew and sail cloth were last posed (a far boat's are every third frame: syncBoatMesh `far`). */
   liveT?: number;
   /** The mast (bent by syncRig: its unbent vertices kept) and the forestay (sagging), with the bend last drawn. */
-  rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; bands: THREE.Mesh; bandsBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: THREE.Line[]; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
+  rigDrawn: { mast: THREE.Mesh; mastBase: Float32Array; bands: THREE.Mesh; bandsBase: Float32Array; forestay: THREE.Line; bow: number; topAft: number; windexZ: number; jumperLines: { l: THREE.Line; base: Float32Array }[]; jumperFittings: THREE.Mesh; jumperFitBase: Float32Array; windexTabs: THREE.Mesh[]; tabZ: number[]; sag: number; load: number; want: number };
   /** The masthead windex (turns to the apparent wind) and the bulkhead compass card (turns with the heading). */
   windex: THREE.Group; card: THREE.CanvasTexture;
   /** The racing instrument on the cabin top (her heading and speed on its face), on your own boat. */
@@ -1122,6 +1122,14 @@ const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = shee
 const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
 /** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
 const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
+/** Below the jumper stays' lower ends: the two wires, each through a fairlead on its own side face at JUMPER_FOOT, come
+ * down the mast's after corners, either side of the gooseneck, and meet at one common turnbuckle shackled to a plate on
+ * the mast's after side just under the boom (North Sails' Folkboat tuning guide: "tighten the common turnbuckle 2-3
+ * turns"; CR 7.40: "adjustable above the deck only"). The class rules fix only where each wire meets the mast's side
+ * (CR 7.60); the path below that and the turnbuckle's height are inferred from the owner's photo of a Folkboat mast
+ * (one turnbuckle low on the mast, two wires up the after face to a fairlead high up). Under the boom rather than above
+ * the gooseneck: the main's tack and luff are right above it. */
+const JUMPER_YOKE = BOOM_TOP - 2 * BOOM_R - 0.05, JUMPER_PLATE = JUMPER_YOKE - 0.17, JUMPER_CORNER = { x: 0.05, z: MAST_Z + 0.036 };
 /** A shroud's ends (starboard's; port's mirrored), in the boat group's frame: its chainplate on deck, and where it meets the mast. */
 export const SHROUD = { foot: new THREE.Vector3(CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip: new THREE.Vector3(MAST_ATH / 2, SHROUD_Y, MAST_Z) };
 const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
@@ -1257,14 +1265,22 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   const forestay = new THREE.Line(new THREE.BufferGeometry().setFromPoints([...Array(STAY_PTS)].map((_, i) => FORESTAY_DECK.clone().lerp(HOUNDS, i / (STAY_PTS - 1)))), MAT.wire);
   forestay.frustumCulled = false; rig.add(forestay);
   // upper shrouds, each with a cassette-tape telltale tied on low enough to see from the cockpit
-  const ribbons: Ribbon[] = [], jumperLines: THREE.Line[] = [], windexTabs: THREE.Mesh[] = [];
+  const ribbons: Ribbon[] = [], jumperLines: BoatMesh['rigDrawn']['jumperLines'] = [], windexTabs: THREE.Mesh[] = [], jumperFit: THREE.BufferGeometry[] = [];
   for (const sx of [-1, 1]) {
     const foot = new THREE.Vector3(sx * CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip = new THREE.Vector3(sx * MAST_ATH / 2, SHROUD_Y, MAST_Z);
     // the shroud, straight from its chainplate to the mast; the jumper strut, and the jumper stay over its tip
     { const st = new THREE.Vector3(sx * STRUT.x, STRUT.y, STRUT.z), root = new THREE.Vector3(sx * MAST_ATH / 2, STRUT_Y, MAST_FRONT_Z + 0.02);
       const len = st.distanceTo(root), js = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.016, len, 5), spar);
       js.position.copy(st).lerp(root, 0.5); js.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), st.clone().sub(root).normalize()); rig.add(js);
-      const jl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(0, JUMPER_TOP, MAST_FRONT_Z), st, V3(0, JUMPER_FOOT, MAST_FRONT_Z)]), MAT.wire); rig.add(jl); jumperLines.push(jl); }
+      // (its top on the mast's side face, CR 7.60; over the strut's tip; back to the side face through its fairlead, toward
+      // the after corner; down that corner past the gooseneck; in under the boom to the turnbuckle's yoke)
+      const halfW = (y: number) => MAST_ATH * (alu ? 0.5 : 0.5 - 0.16 * (y - DECK_AT_MAST) / mastH) + 0.003;
+      const jl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(sx * halfW(JUMPER_TOP), JUMPER_TOP, MAST_Z), st,
+        V3(sx * halfW(JUMPER_FOOT), JUMPER_FOOT, MAST_Z + 0.02), V3(sx * JUMPER_CORNER.x, JUMPER_FOOT - 0.06, JUMPER_CORNER.z),
+        V3(sx * JUMPER_CORNER.x, JUMPER_YOKE + 0.04, JUMPER_CORNER.z), V3(sx * 0.006, JUMPER_YOKE, MAST_AFT_Z + 0.012)]), MAT.wire);
+      rig.add(jl); jumperLines.push({ l: jl, base: (jl.geometry.attributes.position.array as Float32Array).slice() });
+      // its fairlead: a small stainless eye on the side face
+      { const g = new THREE.TorusGeometry(0.009, 0.0025, 5, 10); g.rotateY(Math.PI / 2); g.translate(sx * halfW(JUMPER_FOOT), JUMPER_FOOT, MAST_Z + 0.02); jumperFit.push(g.toNonIndexed()); } }
     rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, tip]), MAT.wire));
     const anchor = foot.clone().lerp(tip, TAPE_HEIGHT / (tip.y - CHAINPLATE_Y));
     const geom = new THREE.BufferGeometry();
@@ -1275,6 +1291,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const mesh = new THREE.Mesh(geom, RIBBON_MAT); mesh.frustumCulled = false; rig.add(mesh);
     ribbons.push({ geom, anchor, phase: sx * 1.7 + b.id });
   }
+  // the jumpers' common turnbuckle under the boom: the yoke the two wires end in, the turnbuckle's open body, and the
+  // shackle to its plate on the mast's after side (one stainless mesh, bent with the mast: syncRig)
+  { const zA = MAST_AFT_Z + 0.012, len = JUMPER_YOKE - JUMPER_PLATE - 0.05;
+    const yoke = new THREE.BoxGeometry(0.02, 0.018, 0.004); yoke.translate(0, JUMPER_YOKE - 0.006, zA); jumperFit.push(yoke.toNonIndexed());
+    const body = new THREE.CylinderGeometry(0.0055, 0.0055, len, 6); body.translate(0, JUMPER_YOKE - 0.015 - len / 2, zA); jumperFit.push(body.toNonIndexed());
+    const shackle = new THREE.TorusGeometry(0.008, 0.0022, 5, 10); shackle.translate(0, JUMPER_PLATE + 0.02, zA); jumperFit.push(shackle.toNonIndexed());
+    const plate = new THREE.BoxGeometry(0.026, 0.05, 0.004); plate.translate(0, JUMPER_PLATE, MAST_AFT_Z + 0.002); jumperFit.push(plate.toNonIndexed()); }
+  const jumperFittings = new THREE.Mesh(mergeGeometries(jumperFit, false)!, STEEL); jumperFittings.userData.bends = true; rig.add(jumperFittings);
+  const jumperFitBase = (jumperFittings.geometry.attributes.position.array as Float32Array).slice();
   // whisker pole: from the mast to the jib clew when wing-on-wing
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 6), POLE_MAT); pole.visible = false; rig.add(pole);
   // ... and stowed when it isn't: flat on a side deck in two chocks, from near the bow aft
@@ -1460,7 +1485,7 @@ export function buildBoatMesh(b: Boat): BoatMesh {
   if (b.paint?.hatch === 'acrylic') nav.hatch = ACRYLIC; // the forehatch's smoked acrylic: a faint glow from the cabin through it
   nav.below = grp.userData.below;
   const ropes = buildRopes(grp, b.spec);
-  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern, outboard: grp.userData.outboard };
+  const out: BoatMesh = { rigDrawn: { mast, mastBase, bands, bandsBase, forestay, bow: 0, topAft: 0, windexZ: MAST_Z, jumperLines, jumperFittings, jumperFitBase, windexTabs, tabZ: windexTabs.map(t => t.position.z), sag: 0, load: 0, want: 0 }, grp, boomPivot, jibPivot, main, jib, mainFurl, jibBag, jibTells, leechTells, pole, stowedPole: stowed, ribbons, rudder, prevH: b.h, prevT: -1, mainsheet, lines, windex, card, instrument, crew, flags, ensign, protest, hideHelm: false, nav, ropes, companionway: grp.userData.companionway, lantern: grp.userData.lantern, outboard: grp.userData.outboard };
   mergeStatic(grp, out);
   return out;
 }
@@ -1720,7 +1745,13 @@ function syncRig(m: BoatMesh, b: Boat, jibSgn: number, load: number, dt: number)
       for (let i = 0; i < q.count; i++) { const y = base[i * 3 + 1], z = base[i * 3 + 2]; q.setZ(i, z - (y > DECK_AT_MAST + 0.06 && Math.abs(z - MAST_Z) < 0.15 ? at(y) : 0)); }
       q.needsUpdate = true;
     }
-    for (const jl of r.jumperLines) { const q = jl.geometry.attributes.position as THREE.BufferAttribute; q.setZ(0, MAST_FRONT_Z - at(JUMPER_TOP)); q.setZ(2, MAST_FRONT_Z - at(JUMPER_FOOT)); q.needsUpdate = true; }
+    for (const { l, base } of r.jumperLines) { // (every point but the strut's tip, which is at the hounds)
+      const q = l.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < q.count; i++) if (i !== 1) q.setZ(i, base[i * 3 + 2] - at(base[i * 3 + 1]));
+      q.needsUpdate = true; }
+    { const fa = r.jumperFittings.geometry.attributes.position.array as Float32Array, fb = r.jumperFitBase;
+      for (let i = 0; i < fa.length; i += 3) fa[i + 2] = fb[i + 2] - at(fb[i + 1]);
+      r.jumperFittings.geometry.attributes.position.needsUpdate = true; }
   }
   // the stay sags as far as the jib is pulling on it (none head to wind or luffing, the jib down or docked), and it
   // unloads and reloads through a tack rather than jumping across: drawn toward the loaded sag in about a quarter second
