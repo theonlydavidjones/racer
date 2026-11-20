@@ -1,7 +1,7 @@
 import './three-setup';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BREAKWATER_W, FINGER_W, HARBORS, WALKWAY_W, mooredIn, slipById, type Harbor as HarborGeo, type Slip } from '../geo/marina';
+import { BREAKWATER_W, FINGER_W, HARBORS, WALKWAY_W, mooredIn, slipById, slipsIn, type Harbor as HarborGeo, type Slip } from '../geo/marina';
 import type { Vec } from '../core/math';
 import { P3 } from './coords';
 import { MAX_BEAM, MOORED, powerParts, sailParts, type MooredPart } from './mooredBoats';
@@ -260,9 +260,19 @@ export class Harbor {
       const mark = new THREE.Mesh(red ? new THREE.CircleGeometry(0.75, 3) : new THREE.PlaneGeometry(1.1, 1.1), mat); mark.position.y = 5.4; if (red) mark.rotation.z = Math.PI / 2; g.add(mark);
       const mark2 = mark.clone(); mark2.rotation.y = Math.PI / 2; g.add(mark2);
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: red ? 0xff4a3a : 0x4aff7a })); lamp.position.y = 6.5; g.add(lamp);
-      // Gashouse Cove's (the East Harbor's) red beacon, on its seawall's end: the harbor's IDLE SPEED / NO WAKE board on the
-      // post below the daymark, both ways, to the boats coming in and going out
-      if (H.id === 'gashouse-cove' && red) for (const ry of [0, Math.PI]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.9), noWakeBoard()); b.position.y = 3.4; b.rotation.y = ry; b.translateZ(0.16); g.add(b); }
+      // Gashouse Cove's (the East Harbor's) red beacon, on its seawall's end: the harbor's speed board on the post below the
+      // daymark, a face each way (r017, the owner, 20 Nov 2026). Facing in, to the boats going out, as the photo from inside
+      // shows it (reference/photos/gashouse-cove-exit-breakwater-and-fort-mason.jpg): IDLE SPEED, white on red, over NO WAKE
+      // ZONE. Facing out, to the boats coming in, the owner's account: the 5 MPH controlled-area mark, an orange circle on
+      // white with black lettering (33 CFR 62.33(a): a circle, operating restrictions in effect; the San Francisco Marina's
+      // limit, five miles an hour and no wake, Rec and Park's harbor rules). No photo of that face was found.
+      if (H.id === 'gashouse-cove' && red) {
+        let cx = 0, cy = 0; const ss = slipsIn(H.id); for (const q of ss) { cx += q.p.x / ss.length; cy += q.p.y / ss.length; }
+        const inYaw = Math.atan2(cx - bc.p.x, -(cy - bc.p.y)); // (a plane's face, turned yaw about the vertical, looks along (sin, −cos) in the sim's x, y)
+        for (const [ry, face] of [[inYaw, speedBoard('in')], [inYaw + Math.PI, speedBoard('out')]] as const) {
+          const b = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.9), face); b.position.y = 3.4; b.rotation.y = ry; b.translateZ(0.16); g.add(b);
+        }
+      }
       g.position.copy(P3(bc.p.x, bc.p.y, 0)); this.group.add(g);
     }
     // boats in most of the slips: bow in, sails furled, a little under the length of the finger
@@ -283,14 +293,21 @@ export class Harbor {
   }
 }
 
-/** The harbor's IDLE SPEED / NO WAKE board: black letters on white in an orange border (the US regulatory-marker look). */
-let noWake: THREE.Material | null = null;
-function noWakeBoard(): THREE.Material {
-  if (noWake) return noWake;
+/** Gashouse Cove's speed board, a face each way (r017): 'in', IDLE SPEED white on red over NO WAKE ZONE on white (the
+ * photo); 'out', the 5 MPH controlled-area mark, an orange circle on white with black lettering (33 CFR 62.33). */
+const speedFaces: Partial<Record<'in' | 'out', THREE.Material>> = {};
+function speedBoard(side: 'in' | 'out'): THREE.Material {
+  const had = speedFaces[side]; if (had) return had;
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 192; const c = cv.getContext('2d')!;
-  c.fillStyle = '#f4f2ea'; c.fillRect(0, 0, 256, 192); c.strokeStyle = '#e06a12'; c.lineWidth = 12; c.strokeRect(6, 6, 244, 180);
-  c.fillStyle = '#111'; c.font = 'bold 48px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText('IDLE SPEED', 128, 68); c.fillText('NO WAKE', 128, 126);
+  c.fillStyle = '#f4f2ea'; c.fillRect(0, 0, 256, 192); c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (side === 'in') {
+    c.fillStyle = '#c8261e'; c.fillRect(0, 0, 256, 120);
+    c.fillStyle = '#fff'; c.font = 'bold 50px Arial, sans-serif'; c.fillText('IDLE', 128, 34); c.fillText('SPEED', 128, 88);
+    c.fillStyle = '#111'; c.font = 'bold 30px Arial, sans-serif'; c.fillText('NO WAKE ZONE', 128, 156);
+  } else {
+    c.strokeStyle = '#e8630f'; c.lineWidth = 15; c.beginPath(); c.arc(128, 96, 80, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#111'; c.font = 'bold 84px Arial, sans-serif'; c.fillText('5', 128, 80); c.font = 'bold 34px Arial, sans-serif'; c.fillText('MPH', 128, 136);
+  }
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  return noWake = new THREE.MeshLambertMaterial({ map: tex });
+  return speedFaces[side] = new THREE.MeshLambertMaterial({ map: tex });
 }
