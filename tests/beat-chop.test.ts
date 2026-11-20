@@ -43,6 +43,13 @@ describe('the beat angle in chop holds steady through a puff', () => {
   it('as the chop gets up from nothing she doesn\'t step closer to the wind: at 2 cm, the flat-water angle within 0.15°', () => {
     for (let kt = 2; kt <= 30; kt += 0.5) expect(Math.abs(beatInChop(kt, 0.02, 1.5) - beatAngle(kt)), `${kt} kt`).toBeLessThan(0.15);
   });
+  // (the v213 review: as the lean faded out, 0.4–0.65° closer to the wind than flat water in 13–25 kt, and the laylines
+  // narrowed as the chop got up)
+  it('and in any chop, never closer to the wind than her flat-water angle', () => {
+    for (let kt = 2; kt <= 30; kt += 0.5) for (const [hs, tp] of [[0.04, 1.6], [0.1, 1.8], [0.2, 2.2], [0.3, 2.5], [0.5, 3], [0.8, 3.5], [1.2, 4.5]]) {
+      expect(beatInChop(kt, hs, tp), `${kt} kt, ${hs} m`).toBeGreaterThanOrEqual(beatAngle(Math.round(kt * 4) / 4) - 1e-9);
+    }
+  });
   it('more chop moves it smoothly too: a step of the sea\'s height (0.02 m) or period (0.1 s) under a degree', () => {
     for (const [k0, k1, hs, tp] of SEAS) for (let kt = k0; kt <= k1; kt += 1) {
       const a = beatInChop(kt, hs, tp);

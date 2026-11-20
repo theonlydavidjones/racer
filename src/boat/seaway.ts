@@ -135,8 +135,11 @@ function lean(kt: number): number {
  * and taken off whole in a big one it overshot a sharp top (1.2% given up at 6.5 kt in 0.8 m). An estimate
  * (docs/CONSTANTS.md). */
 const LEAN_FADE = 0.3;
-/** The angle from beatSearch's top: its flat-water lean taken off, fading out by LEAN_FADE of chop. */
-const fromSearch = (kt: number, hs: number, tp: number) => beatSearch(kt, hs, tp) + lean(kt) * Math.max(0, 1 - hs / LEAN_FADE);
+/** The angle from beatSearch's top: its flat-water lean taken off, fading out by LEAN_FADE of chop; and never closer to
+ * the wind than her flat-water angle, as a chop only ever asks her to sail a little lower (the v213 review: as the lean
+ * faded out, 0.4–0.65° closer than flat water in 13–25 kt, 40.07° at 14 kt in 0.3 m against 40.70°, and the laylines
+ * narrowed as the chop got up). */
+const fromSearch = (kt: number, hs: number, tp: number) => Math.max(beatAngleCalm(kt), beatSearch(kt, hs, tp) + lean(kt) * Math.max(0, 1 - hs / LEAN_FADE));
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */
 export function beatInChop(kt: number, hs: number, tp: number): number {
   // (a number for the key, each rounded value in its own field: kt·4 < 4096, hs·50 and tp·10 < 2^20; no string per look)
