@@ -7,6 +7,7 @@ import { LAND, onLand, shoreDist } from '../geo/shore';
 import { HARBOR } from '../geo/marina';
 import { FORT_MASON_PILES } from '../geo/fortMason';
 import { buildAlcatraz } from './alcatraz';
+import { addAlcatrazBuildings } from './alcatrazBuildings';
 import { buildTerrain, onAngel, region, type Terrain } from './terrain';
 import { P3 } from './coords';
 import { inPoly, segPt } from '../core/math';
@@ -128,7 +129,7 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
   }
 
   /* ---------- landmarks ---------- */
-  const WHITE = lam(0xf2efe6), CREAM = lam(0xe9e1cf), DARK = lam(0x2a2c30), RED = lam(0xb8362c);
+  const WHITE = lam(0xf2efe6), CREAM = lam(0xe9e1cf), RED = lam(0xb8362c);
   // Coit Tower on Telegraph Hill (Wikipedia, "Coit Tower"): 64 m (210 ft) of unpainted reinforced concrete, an Art
   // Deco column of three nested cylinders. The outer one is a fluted shaft 55 m tall, tapering a little; the
   // observation level, 9.8 m below the top, is a ring of tall arched openings; above it the crown with its smaller
@@ -458,17 +459,8 @@ export async function addLandscape(scene: THREE.Scene, month: number): Promise<T
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 8, 8), WHITE).translateY(H + 4).translateZ(-38)); // Fort Point light, on the barbette
     place(g, 37.81055, -122.47710, 56, 4.6);
   }
-  // Alcatraz: the cellhouse along the island's crest, the lighthouse at its south end, the water tower to the north
-  {
-    const crest = ground(37.82665, -122.42305);
-    place(block(36, 100, 14, lam(0xd3ccbc)), 37.82680, -122.42290, 320, crest);
-    place(group(new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.6, 24, 8), WHITE).translateY(12), new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 3, 8), DARK).translateY(25.5)), 37.82623, -122.42214, 0, crest);
-    const wt = new THREE.Group(); for (const [x, z] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) wt.add(block(0.8, 0.8, 20, lam(0x8b8a84)).translateX(x).translateZ(z)); wt.add(new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 9, 12), lam(0xa9a395)).translateY(24.5)); // 29 m
-    place(wt, 37.82750, -122.42389, 0);
-    place(block(14, 70, 14, lam(0xcfc6b2)), 37.82705, -122.42135, 330, 3); // the barracks (Building 64) above the dock
-    place(block(16, 90, 10, lam(0xc9c1ad)), 37.82820, -122.42500, 315, 3); // the industries building on the northwest shore
-    place(block(14, 20, 8, lam(0xbdb3a0)), 37.82590, -122.42260, 0); // the warden's house (a ruin), by the lighthouse
-  }
+  // Alcatraz: the lidar's ground and its buildings (render/alcatraz.ts, render/alcatrazBuildings.ts)
+  addAlcatrazBuildings(grp, alcatraz);
   /* ---------- Angel Island ---------- */
   // The state park: no town, just its woods and the old army and immigration buildings where they stand. Positions
   // are approximate (to about 50 m, from the park's map and Wikipedia; OpenStreetMap wasn't reachable to check them).

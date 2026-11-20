@@ -24,7 +24,7 @@ import { openGeoTiff } from './lib/geotiff-f32.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const dem = openGeoTiff(process.argv[2]);
-const MAXERR = +arg('--error', 0.35), RELIEF = arg('--relief', ''), MSL_NAVD88 = 0.969;
+const MAXERR = +arg('--error', 0.5), RELIEF = arg('--relief', ''), MSL_NAVD88 = 0.969;
 const E0 = 550300, N1 = 4187300, W = 1000, X0 = Math.round(E0 - dem.tiepoint[3]), Y0 = Math.round(dem.tiepoint[4] - N1);
 const raw = dem.window(X0, Y0, W, W), NOD = dem.nodata;
 
