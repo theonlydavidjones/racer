@@ -2,7 +2,7 @@
 
 Player-visible changes per release, from git (the Coordinator's record; newest first).
 
-## v212 (origin/v212, 99fc7ce2; not yet published)
+## v212 (20 Nov, code 99fc7ce2)
 
 - **AI in a dying breeze.** In 1–4 kt her close-hauled speed (0.4–1.2 m/s) is under the fixed 1.3 m/s tack threshold. On the layline she used to bear away to build speed the wind could not give, and every tack became a full 250–380° jibe taking about 100 s. She now tacks from 0.6 of her close-hauled speed in the wind she has. It is unchanged from about 9 kt. She judges that wind by the lighter of the wind now and her 20 s mean, so a fresh puff no longer makes her jibe round. (f6320b17, 2184d27f, 18053ef7)
 - **Beat angle in chop.** The best upwind angle in a chop is steadier. It used to swing 5–7° on a quarter-knot puff, and now it is the middle of the top of the speed made good. (17e61b0c, 8e8e7c06, 1ab4819f, 09e514a1, 590c9242)

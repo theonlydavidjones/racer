@@ -184,6 +184,8 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
+**v212 (20 Nov, main MAINHASH (code 99fc7ce2)):** the AI in a dying breeze (light-steer, approx.test on 96 seeds), the beat angle in chop (beat-chop), nav-unblock (the owner's one-day Nav exception: the Berkeley Pier chords and replans), the 20 Nov weather. perf-pair --ai 0.9864, fouls-pair −0.03 a race (p 0.50); perf-ab clean against v211 (night_start's JS +19%, one view only). Next, v213: light-steer-chop, beat-smooth.
+
 **v211 (20 Nov, main dd11517a (code 4ed2cf3a)):** the jumpers set once, the crew's outhaul, the mirror's stale keys (#484). perf-ab clean against v210 (night_start's inset rerun alone: noise); budget 0.9743. Held for v212: the AI's light-air steer with approx.test on 96 seeds, beat-chop with nav-unblock.
 
 **v210 (19 Nov, main 08afb104):** the AI's penalty turns (#483), the soak, letting a sheet go, detours near boats (#480), the helm's foot, headroom (#482), the jumpers' arrows and readout rounding, Hoist tabs, the weather refresh, the Berkeley Pier gap reopened.
