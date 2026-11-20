@@ -184,7 +184,7 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
-**v213 (20 Nov, main MAINHASH (code f8377d60)):** v212's physics-review follow-ups: the AI's slow-tack floor in chop (light-steer-chop, Skipper Model) and the steadier beat in chop (beat-smooth: lean fade, search to 90°, BEAT_NO_WAY 65°; router give-up 326.606, Bay East). perf-pair --ai 0.9905, fouls-pair +0.10 a race (p 0.50; 22 kt +9, to watch); perf-ab clean against v212.
+**v213 (20 Nov, main c3869cd6 (code f8377d60)):** v212's physics-review follow-ups: the AI's slow-tack floor in chop (light-steer-chop, Skipper Model) and the steadier beat in chop (beat-smooth: lean fade, search to 90°, BEAT_NO_WAY 65°; router give-up 326.606, Bay East). perf-pair --ai 0.9905, fouls-pair +0.10 a race (p 0.50; 22 kt +9, to watch); perf-ab clean against v212.
 
 **v212 (20 Nov, main c7f9b8c8 (code 99fc7ce2)):** the AI in a dying breeze (light-steer, approx.test on 96 seeds), the beat angle in chop (beat-chop), nav-unblock (the owner's one-day Nav exception: the Berkeley Pier chords and replans), the 20 Nov weather. perf-pair --ai 0.9864, fouls-pair −0.03 a race (p 0.50); perf-ab clean against v211 (night_start's JS +19%, one view only). Next, v213: light-steer-chop, beat-smooth.
 
