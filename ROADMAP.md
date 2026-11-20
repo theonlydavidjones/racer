@@ -248,6 +248,8 @@ sources. Each shipped item is added there when it's published.
    game. No session starts work on the Nav pilot, its planner or its follow-ups (8s and PR #337, closed; 8q5, 8q7, 8q9).
    Bugs that break something else (a test, a race) are still fixed, kept small. Land and water true to life stays:
    see "Real shoreline" (the shoreline survey) and 8q8.
+   Exception (owner, 19 November): about a day of Nav work to unblock the beat-in-chop fix (beat-chop) for v212: the
+   router's front looping back near a structure, its replans flip-flopping, and a gap's corner at its middle (Bay East).
 7. **First after the sprint: Alcatraz and the whole city front, Fort Point to Fisherman's Wharf, in high resolution**
    (owner, 18 November; feature; status: planning; the Coordinator drafting). The plan so far: (1) a researcher pass on
    data and licenses (LiDAR, OSM, public-domain plans, CC-licensed models); (2) the models built outside the agent
@@ -578,6 +580,9 @@ sources. Each shipped item is added there when it's published.
    curved Municipal Pier and the basin's breakwater. Check the router against those exact shapes (they're from OSM in
    geo/shore.ts), the pilot's look-ahead along the curve, and the entrance's width. Add a test that routes into and out
    of Aquatic Park from the Cityfront, and round the outside of the pier, without touching.
+8s2. **The chart's lines are confusing** (owner, 19 November; bug (confusing chart); next, not urgent; UI & Copy; 1–2 h; mock-up to the owner first): with a destination set, the owner saw "two port lines and only one starboard". The lines are: a red dashed line from the mark, the port-tack layline (src/ui/draw2d.ts drawLaylines, green starboard and red port, one of each); an orange dashed line from the boat to the destination with a dot at each turn, the navigator's route line, the way round the land with no wind in it (src/ui/hud.ts drawSailing ~1007–1022, navRoute ~964); a solid cyan line with "14:00" clock ticks, the passage track, the course she'd sail along that route in the wind and tide, triangles for tacks and circles for jibes (hud.ts drawTrack ~945, drawNavLayer ~1040); and purple long-dashed lines, which are the chart underlay from OpenStreetMap (the owner, 19 Nov: not part of this; leave them).
+   What confused them: (1) the orange route and the red port layline look alike, so the route read as a second port line; (2) "passage track" and "route line" sound like the same thing, and the chart doesn't say which is which; (3) the route and the track are drawn together and both start at the boat.
+   Fix, mock-up first: say in the chart's key (src/ui/legend.ts, "listing only what's there now") what each line is, in plain words ("Route: the way round the land", "Your course: how you'd sail it, with tacks and jibes"); change the route line to a color that can't be mistaken for the red/green laylines, key and chart matched; consider drawing the route only when no track is shown, or fading it behind the track. No new blocks of copy: the key and colors, not explanations on the chart.
 8r. ~~**The stowed jib on the foredeck**~~ (done: 59a1cfa, 014db55, 0591197) (owner, 13 November, with a screenshot; Boat Detail; 1–2 h): "stowed jib sheet
    intersects the forestay. also it looks like an oval; it should be more cigar shaped and lashed with a sail tie."
    Today the lowered jib is a dark-blue oval mound on the foredeck, with the forestay running down through it. As it
