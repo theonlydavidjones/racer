@@ -43,6 +43,18 @@ describe('your boats: saved, named, chosen', () => {
     expect(loadSettings().boat.name).toBe('JOSEPHINE');
   });
 
+  it('membership (r276): a new player belongs to no club; an older save to the club its boats fly; a member stays one', () => {
+    expect(loadSettings().club).toBe('');
+    store.set(KEY, JSON.stringify({ burgee: 'ggyc' }));
+    expect(loadSettings().club).toBe('ggyc');
+    store.set(KEY, JSON.stringify({ windKt: 12 })); // (Josephine's club: the owner's own save keeps its season)
+    expect(loadSettings().club).toBe(loadSettings().boat.club || '');
+    store.set(KEY, JSON.stringify({ burgee: 'ggyc', club: 'byc' }));
+    expect(loadSettings().club).toBe('byc');
+    store.set(KEY, JSON.stringify({ burgee: 'ggyc', club: '' })); // (left the club: stays out)
+    expect(loadSettings().club).toBe('');
+  });
+
   it("a new boat from the Yacht Club starts from the new player's boat, not from Josephine or her club", () => {
     const b = newBoat('Skol');
     expect(b.club).toBe(''); expect(b.hull.upper).toBe(NEW_BOAT.hull.upper); expect(b.id).not.toBe(NEW_BOAT.id);

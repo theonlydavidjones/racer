@@ -256,3 +256,8 @@ body.atHome>:not(#gl):not(.overlay),body.atHome>:not(#gl):not(.overlay) *{visibi
 #keepAsk{z-index:70}
 .savenote{margin:14px 0 0;color:var(--muted);font:500 12px/1.4 var(--f-body)}
 
+/* r276: the Season card, not yet a member of any club; the Yacht Club page led by your club (its burgee, the switch) */
+.modecard.locked b{color:var(--muted)}
+.ychead{display:flex;align-items:center;gap:14px}
+.ychead .ycburgee{height:44px;width:auto;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.ychead .ycjoin{margin-left:6px;align-self:flex-end;margin-bottom:4px}

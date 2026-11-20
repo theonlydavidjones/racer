@@ -64,7 +64,8 @@ export function paintSeasonView(d: SeasonViewData): void {
   $('svTable').innerHTML = `<div class="season">${standingsTable(series, res, d.live)}</div>`;
 }
 /** The Race page's Season card: the club's burgee, the next race's day, and where you stand. */
-export function seasonCardHtml(d: { series: Series; res: Record<number, SeasonResult>; burgee: string; place: number | null }): string {
+export function seasonCardHtml(d: { series: Series; res: Record<number, SeasonResult>; burgee: string; place: number | null; locked?: boolean }): string {
+  if (d.locked) return `<span class="mc-sea"><span class="t-text"><span class="t-h">${esc(d.series.title)}</span><span class="t-s">Club members only: join any club in Yacht Club</span></span></span>`; // (r276: membership of any club)
   const next = nextRace(d.series, d.res), r = d.series.races.find(x => x.no === next) ?? (next == null ? upcomingRace(d.series) : null);
   const line = r ? (d.series.races.some(x => x.no === r.no) ? `Race ${r.no} next` : `Race ${r.no} · ${new Date(r.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`) : 'All sailed';
   return `<span class="mc-sea">${d.burgee ? `<img class="t-burgee" src="${d.burgee}" alt="">` : ''}${r ? dateTile(r.date) : ''}<span class="t-text"><span class="t-h">${esc(d.series.title)}</span><span class="t-s">${line}${d.place ? ` · you're ${ord(d.place)}` : ''}</span></span></span>`;

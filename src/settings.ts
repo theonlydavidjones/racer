@@ -2,6 +2,7 @@ import type { LessonId } from './sim/lessons';
 import { DEFAULT_BOAT, NEW_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
+import { clubFromBoats } from './club/membership';
 export interface Settings {
   mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings' | 'lesson'; // (and a Learn to sail lesson, open water, alone: sim/lessons.ts) full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
   /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
@@ -43,6 +44,8 @@ export interface Settings {
   rulesCase?: number;
   /** Learn to sail: the lesson to sail, and the ones passed (sim/lessons.ts). */
   lesson?: LessonId; lessonsPassed?: LessonId[];
+  /** Your yacht club (r276): one at a time, switched any time; '' none. A season's races need one, any one (club/membership.ts). */
+  club?: string;
   /** The last float plan left with the club (Before you go): where, back by (hh:mm), how many aboard. */
   floatPlan?: { where: string; back: string; aboard: number };
   aids: 0 | 1; // line, zones and laylines drawn
@@ -119,6 +122,8 @@ export function loadSettings(): Settings {
   boats = structuredClone(boats).map(b => fixSpec({ ...b, skipper: b.skipper ?? (b.id === s.boatId ? 'you' : 'ai') }));
   const seen = new Set<string>(); for (const b of boats) { if (seen.has(b.id)) b.id += '-' + seen.size; seen.add(b.id); }
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
+  // (a save from before membership, r276: you belong to the club your boats fly, so your season stays open; a new player, none)
+  if (typeof s.club !== 'string') s.club = fresh ? '' : clubFromBoats(boats, s.boatId);
   // (before real rain, rain 0 was the only "nothing set": an older save's 0 becomes the real record's, once)
   if (!s.rainV) { if (!s.rain) s.rain = 'real'; s.rainV = 1; }
   // your opponents: older saves had only a number of stock boats

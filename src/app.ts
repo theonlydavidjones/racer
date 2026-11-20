@@ -70,6 +70,7 @@ import { Nav, type Place } from './ui/nav';
 import { morph } from './ui/morph';
 import { emptyTile, splitNo, tile } from './ui/tiles';
 import { installDevHandles } from './app/devHandles';
+import { canEnterSeason } from './club/membership';
 import { startPageQuiet, startPageReady } from './app/firstRun';
 import { seasonRaceFor } from './club/practice';
 import { mountBoatLesson } from './app/boatLesson';
@@ -1674,7 +1675,7 @@ document.addEventListener('click', e => {
   if (where === 'home') openHome();
   else if (where === 'back') nav.back(); // (a back link: where you came from, ui/nav.ts)
   else if (where === 'race') nav.go({ k: 'race' });
-  else if (where === 'season') { const c = currentSeason(); if (c) nav.go({ k: 'season', id: c.id }); }
+  else if (where === 'season') { const c = currentSeason(); if (!canEnterSeason(S)) nav.go({ k: 'club' }); else if (c) nav.go({ k: 'season', id: c.id }); } // (r276: not a member of any club, the Yacht Club to join one)
   else if (where === 'create') { seasonPick = null; if (S.mode !== 'race') S.mode = 'race'; if (S.realRace) { S.realRace = undefined; S.opponents = S.opponents.filter(o => !isReal(o)); S.fleet = S.opponents.length; } saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'cruise') { seasonPick = null; S.mode = 'sail'; saveSettings(S); nav.go({ k: 'setup' }); }
   else if (where === 'fleet') nav.go({ k: 'club' });
@@ -1805,15 +1806,16 @@ function openSeason(id: string, no?: number): void {
 function paintSeasonCard(): void {
   const series = currentSeason(); $('bSeasonCard').hidden = !series; if (!series) return;
   const res = seasonResults(series.id), me = Object.keys(res).length ? standings(series, res, liveBoat).rows.find(r => r.you) : undefined;
-  $('seasonCardSub').innerHTML = seasonCardHtml({ series, res, burgee: burgeeUrl(), place: me?.rank ?? null });
+  $('seasonCardSub').innerHTML = seasonCardHtml({ series, res, burgee: burgeeUrl(), place: me?.rank ?? null, locked: !canEnterSeason(S) });
+  $('bSeasonCard').classList.toggle('locked', !canEnterSeason(S));
 }
 $('svCal').addEventListener('click', e => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-sv-race]'); if (b && seasonPick) nav.go({ k: 'season', id: seasonPick.series.id, no: +b.dataset.svRace! }); });
 $('svHead').addEventListener('change', e => { const v = (e.target as HTMLSelectElement).value; if ((e.target as HTMLElement).id === 'svSeason' && v) nav.go({ k: 'season', id: v }); });
-$('bSailSeason').onclick = () => { if (seasonPick) nav.go({ k: 'setup' }); };
+$('bSailSeason').onclick = () => { if (!canEnterSeason(S)) nav.go({ k: 'club' }); else if (seasonPick) nav.go({ k: 'setup' }); }; // (r276: members of any club only)
 /** The season race this race is, if it's one: that race's course, day and start, in the day's real conditions, against the series' fleet. */
 // (only a race entered from the Season page counts: a Practice sailing set up the same way never writes to a season, r275)
 function seasonRaceOf(): { series: Series; no: number } | null {
-  if (S.mode !== 'race' || !w || w.freeSail) return null;
+  if (S.mode !== 'race' || !w || w.freeSail || !canEnterSeason(S)) return null; // (r276: a non-member's sailing counts in no season)
   return seasonRaceFor(S, seasonPick, replayPin != null);
 }
 /** Her hull's colour, for a boat in the race: yours, a club boat, or one of the club's other Folkboats. */
