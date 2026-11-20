@@ -1074,6 +1074,7 @@ sources. Each shipped item is added there when it's published.
      - The mainsheet follows the hand holding it on each tack: pull in and ease, toward and away from the helm.
      The swap happens when she's through the tack or jibe, not mid-turn, so a held key doesn't reverse under the
      player's finger. The keys' labels show which way each key works now. No new screen controls.
+     - **Asked again, 20 November** (side request; later, after the sprint): "I want the keyboard controls for main sheet and traveller to match their actual direction on the screen, meaning the controls need to switch with the tacks." The traveller's keys join the mainsheet's: they follow the tack the same way, as the same Keys option, so the key that moves the traveller to windward on the screen always moves it that way.
    - **The trim coach's ◆ unexplained** (owner, 15 November, from a screenshot of the mainsheet in the sail band;
      polish; next; <1 h): "what does the little turquoise diamond mean". It's the trim coach's target, where the coach
      wants that control (sailBand.ts .sb-cue; trimNotes.ts). It has no hover. Give it one hover tip, e.g. "Coach: trim
