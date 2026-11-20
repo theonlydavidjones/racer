@@ -25,6 +25,33 @@ export function hullGap(A: Hull, B: Hull): number {
   return Math.min(segPt(p1, q1, q2), segPt(p2, q1, q2), segPt(q1, p1, p2), segPt(q2, p1, p2));
 }
 
+/**
+ * Where two hulls touch, and the line the blow runs along: the nearest points of their bow-to-stern segments and the unit
+ * normal from A's toward B's. A bow into a side has the side's normal, a sideswipe one athwartships, a rear-ender one fore
+ * and aft (not the line between their centres, which for any hit off midships runs mostly along their length and would
+ * count a sliding touch as a blow). Crossed segments (one hull through the other): the struck hull's normal at the point,
+ * the striker being the one whose end is nearer it.
+ */
+export function contactNormal(A: Hull, B: Hull): { a: Vec; b: Vec; n: Vec } {
+  const [p1, p2] = ends(A), [q1, q2] = ends(B);
+  const near = (p: Vec, a: Vec, b: Vec): Vec => { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l)); return { x: a.x + dx * t, y: a.y + dy * t }; };
+  const pairs: [Vec, Vec][] = [[p1, near(p1, q1, q2)], [p2, near(p2, q1, q2)], [near(q1, p1, p2), q1], [near(q2, p1, p2), q2]];
+  let best = pairs[0], bd = Infinity;
+  for (const [a, b] of pairs) { const d = Math.hypot(b.x - a.x, b.y - a.y); if (d < bd) { bd = d; best = [a, b]; } }
+  const [a, b] = best;
+  let nx = b.x - a.x, ny = b.y - a.y, l = Math.hypot(nx, ny);
+  if (l < 0.05) {
+    // (touching or crossed: the normal of the hull struck, at the point; the striker's end is the one nearest it)
+    const dA = Math.min(Math.hypot(p1.x - a.x, p1.y - a.y), Math.hypot(p2.x - a.x, p2.y - a.y));
+    const dB = Math.min(Math.hypot(q1.x - b.x, q1.y - b.y), Math.hypot(q2.x - b.x, q2.y - b.y));
+    const ax = dA <= dB ? V(B.h) : V(A.h); // (the struck hull's axis)
+    nx = -ax.y; ny = ax.x; l = 1;
+  }
+  nx /= l; ny /= l;
+  if (nx * (B.x - A.x) + ny * (B.y - A.y) < 0) { nx = -nx; ny = -ny; } // (from A toward B)
+  return { a, b, n: { x: nx, y: ny } };
+}
+
 /** Closest point of approach over the next 12 s: time (s) and distance between centres (m). */
 export function cpa(A: Moving, B: Moving): { t: number; d: number } {
   const rx = B.x - A.x, ry = B.y - A.y, ux = B.vx - A.vx, uy = B.vy - A.vy, uu = ux * ux + uy * uy;
