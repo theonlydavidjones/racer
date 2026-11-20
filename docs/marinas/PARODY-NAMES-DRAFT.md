@@ -1,5 +1,11 @@
 # Private marinas' parody names: a draft for the owner (r274; FTUE, 20 Nov 2026)
 
+**The owner's picks so far (20 Nov 2026):** Pier 39 → **Fisherman's Wharf** (its marina's label to read distinct from
+Hyde Street Harbor's, the real one at the same wharf: e.g. "Fisherman's Wharf Marina" beside "Hyde Street Harbor") ·
+Pelican Harbour → **Heron Harbor** · Loch Lomond → **Loch Tay Marina** · Napa Valley Marina → **its real name** ("a
+place name; just use it"). Fortman: asked where it is (1535 Clement Ave, Alameda: the Estuary's Alameda shore, between
+Grand Marina and Alameda Marina). The rest wait on the owner.
+
 Not shipped: nothing uses these until the owner approves. Once approved, the real→parody mapping lives only in data
 (as src/club/clubs.ts keeps the clubs'). Each a nod to the place or the name, never the real mark or an abbreviation of
 it. The rule (docs/FTUE-BRIEF.md §2; the Coordinator, 20 Nov): the OWNER decides. A city, county, port district or park
