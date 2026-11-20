@@ -24,12 +24,14 @@ const CASES = [
     await p.evaluate(() => document.querySelector('[data-home="race"]').click()); await p.waitForTimeout(1000);
     await p.evaluate(() => document.querySelector('[data-home="create"]')?.click()); await p.waitForTimeout(1000);
     await p.evaluate(() => document.getElementById('bGo')?.click()); await p.waitForTimeout(6000);
+    await p.screenshot({ path: `${out}/fog-${name}-${W}-scene.png` }); // (the 3D scene, for the pair)
     await p.evaluate(() => document.getElementById('map').click()); await p.waitForTimeout(3500);
     await p.screenshot({ path: `${out}/fog-${name}-${W}.png` });
     const r = await p.evaluate(() => {
       const box = s => { const e = document.querySelector(s); if (!e || e.hidden) return null; const q = e.getBoundingClientRect(); return [q.left, q.top, q.right, q.bottom].map(Math.round); };
       const h = window.__hud;
-      return { cap: h?.fogCaption ?? null, field: box('#chartField'), pal: box('#chartPal'), layers: box('#chartLayersPanel'), plan: box('#chartPlan') };
+      const c = document.getElementById('chartC').getBoundingClientRect(), f = h?.fogCaption; // (the caption's box is in canvas pixels)
+      return { cap: f ? { text: f.text, rect: [f.rect[0] + c.left, f.rect[1] + c.top, f.rect[2] + c.left, f.rect[3] + c.top].map(Math.round) } : null, field: box('#chartField'), pal: box('#chartPal'), layers: box('#chartLayersPanel'), plan: box('#chartPlan') };
     });
     const hit = (a, c) => a && c && a[0] < c[2] && c[0] < a[2] && a[1] < c[3] && c[1] < a[3];
     const cap = r.cap && r.cap.rect, over = cap ? ['field', 'pal', 'layers', 'plan'].filter(k => hit(cap, r[k])) : [];

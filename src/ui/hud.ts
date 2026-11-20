@@ -52,7 +52,7 @@ import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import type { Settings } from '../settings';
-import { drawFog, drawSea, nm } from './mapLayers';
+import { drawFog, drawSea, drawSetFog, nm, setFogAlpha } from './mapLayers';
 import { setVisibility, visibilityFor } from '../environment/weather';
 import { rainAt, rainLevel } from '../environment/rain';
 import { driveCurveFor } from '../boat/driveCurve';
@@ -750,26 +750,27 @@ export class Hud {
       ctx.strokeStyle = I.pick; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(b[0], b[1], 9, 0, 6.29); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(b[0] - 14, b[1]); ctx.lineTo(b[0] + 14, b[1]); ctx.moveTo(b[0], b[1] - 14); ctx.lineTo(b[0], b[1] + 14); ctx.stroke();
     }
-    // the fog layer: what visibility it shows, and whose (or why there's none)
-    const fogLine = this.fogNote(wd, false);
-    if (fogLine) {
+    // the fog layer: what visibility it shows, in one short line under the Layers panel (top left), with whose it is and the
+    // caveats behind a hover (chart.ts reads fogCaption); the wind shadows note below it (the owner, 20 Nov 2026)
+    this.fogCaption = null;
+    let capY = 156;
+    const cap = (text: string, tip: string) => {
       ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-      const fw = ctx.measureText(fogLine).width; ctx.fillStyle = I.halo; ctx.fillRect(10, 8, fw + 12, 18);
-      ctx.fillStyle = I.text; ctx.fillText(fogLine, 16, 21);
-    }
+      const fw = ctx.measureText(text).width; ctx.fillStyle = I.halo; ctx.fillRect(10, capY, fw + 12, 18);
+      ctx.fillStyle = I.text; ctx.fillText(text, 16, capY + 13);
+      if (!this.fogCaption) this.fogCaption = { text, tip, rect: [10, capY, 10 + fw + 12, capY + 18] }; capY += 22;
+    };
+    const fogShort = this.fogNote(wd, true);
+    if (fogShort) cap(fogShort, this.fogNote(wd, false) ?? '');
     // the wind shadows switched on with none in view: say so, so the switch isn't taken for broken
-    if (this.shadowNone.chart) {
-      const t = 'Wind shadows: nothing upwind casts one here (land, boats, ships, piers)';
-      ctx.font = '600 11px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'left';
-      const y = fogLine ? 30 : 8, tw = ctx.measureText(t).width; ctx.fillStyle = I.halo; ctx.fillRect(10, y, tw + 12, 18);
-      ctx.fillStyle = I.text; ctx.fillText(t, 16, y + 13);
-    }
+    if (this.shadowNone.chart) cap('NO WIND SHADOWS HERE', 'Wind shadows: nothing upwind casts one here (land, boats, ships, piers)');
     // north, the wind, and a scale bar
     ctx.fillStyle = I.text; ctx.font = '700 12px "Saira Semi Condensed", sans-serif'; ctx.textAlign = 'center';
     // (`cornerFree`: the top-right corner left for the setup chart's expand icon, north and the wind just left of it)
-    const nx = opts.cornerFree ? w - 72 : w - 28;
-    ctx.fillText('N', nx, 22); ctx.beginPath(); ctx.moveTo(nx, 28); ctx.lineTo(nx + 5, 42); ctx.lineTo(nx - 5, 42); ctx.closePath(); ctx.fill();
-    const wf = wd.wind.from * D2R, ox = nx, oy = 80;
+    // (the full chart's top-right corner is the field picker's and Day | Dusk: north and the wind go just under them)
+    const nx = opts.cornerFree ? w - 72 : w - 28, dy = opts.cornerFree ? 0 : 56;
+    ctx.fillText('N', nx, 22 + dy); ctx.beginPath(); ctx.moveTo(nx, 28 + dy); ctx.lineTo(nx + 5, 42 + dy); ctx.lineTo(nx - 5, 42 + dy); ctx.closePath(); ctx.fill();
+    const wf = wd.wind.from * D2R, ox = nx, oy = 80 + dy;
     ctx.strokeStyle = '#ffb627'; ctx.fillStyle = '#ffb627'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(ox + Math.sin(wf) * 18, oy - Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 12, oy + Math.cos(wf) * 12); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(ox - Math.sin(wf) * 18, oy + Math.cos(wf) * 18); ctx.lineTo(ox - Math.sin(wf) * 10 + Math.cos(wf) * 6, oy + Math.cos(wf) * 10 + Math.sin(wf) * 6); ctx.lineTo(ox - Math.sin(wf) * 10 - Math.cos(wf) * 6, oy + Math.cos(wf) * 10 - Math.sin(wf) * 6); ctx.closePath(); ctx.fill();
@@ -822,6 +823,8 @@ export class Hud {
     return v;
   }
 
+  /** The chart's fog caption as last drawn (canvas pixels), its source and caveats as the hover's text (ui/chart.ts). */
+  fogCaption: { text: string; tip: string; rect: [number, number, number, number] } | null = null;
   /** The fog layer's line of words: the visibility here and whose it is, or why there's none. */
   fogNote(wd: SimView, short: boolean): string | null {
     if (!layerOn(this.display ? this.shown(wd) : wd.settings as Settings, 'fog')) return null; // (the page's own layers when set; the race's otherwise)
@@ -886,14 +889,18 @@ export class Hud {
     // (the shadows, sampled below: in the key only when there's one in view)
     const shadowsOn = on('shadows');
     this.keyState[detail] = { sim, pal, scale }; // (the shadows add themselves when drawn, below: the key reads this list when asked)
-    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
+    // (the fog and rain set in the conditions replace the record's fog, as the caption says: one veil over the whole chart)
+    const setNow = field === 'fog' && detail === 'chart' ? { fog: wd.settings.fog, rain: rainLevel(wd.settings.rain, wd.clockUtc) } : null, setFog = !!setNow && setFogAlpha(setNow) > 0.02;
+    if (setFog) sim.push('fog');
+    if (setFog) drawSetFog(ctx, w, h, I, setNow!);
+    else if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart');
     drawEncLand(ctx, tf, pal);
     // the wind's or the current's colours, over the land's edge as the mock-up had them (a soft glow along the shore),
     // every 10 s of the clock (the chart's paused); the full chart's only
     if (flowHere) this.flowField[kind].draw(ctx, tf, w, h, scale, wd, kind, 0.6, 14, 10);
     // (and the other kinds' fields built while the page is idle, for this view: switched on, they're drawn at once)
     if (detail === 'chart') this.warmFields(tf, w, h, scale, wd, kind);
-    if (fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
+    if (!setFog && fog && !('none' in fog)) drawFog(ctx, tf, fog, ctr, half, I, detail === 'chart', 'marks');
     if (wd.freeSail) {
       drawSailing(ctx, tf, wd.dest, u, w, h, I, plan);
       // the navigator's layer (the owner's, 17 Nov 2026): on the full chart, and on the inset in its navigator's view

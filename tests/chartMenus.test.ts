@@ -22,7 +22,7 @@ describe('the chart\'s menus (owner chart, 20 Nov)', () => {
   it('the switches are a collapsible Layers panel top left; the field picker stays top right', () => {
     expect(html).toMatch(/id="chartField"[\s\S]*?class="ch-lpanel"[\s\S]*?id="bChartShow"[^>]*>Layers/);
     const css = read('src/styles/04-screens.css');
-    expect(css).toMatch(/#chartField\{position:absolute;right:226px/);
+    expect(css).toMatch(/#chartField\{position:absolute;right:166px/);
     expect(css).toMatch(/\.ch-lpanel\{position:absolute;left:12px/);
     expect(read('src/ui/layers.ts')).toContain("'fbsim-chart-layers-open'");
     expect(SWITCH_LAYERS.map(l => l.key)).toEqual(['ships', 'laylines', 'shadows']);
@@ -35,7 +35,7 @@ describe('the chart\'s menus (owner chart, 20 Nov)', () => {
   it('Day | Dusk is a two-state toggle beside the field picker; the Dusk colors button is gone', () => {
     expect(html).not.toContain('bChartPal');
     expect(html).toMatch(/id="chartPal"[\s\S]*?data-pal="day"[\s\S]*?data-pal="dusk"/);
-    expect(read('src/styles/04-screens.css')).toMatch(/#chartPal\{position:absolute;right:72px/);
+    expect(read('src/styles/04-screens.css')).toMatch(/#chartPal\{position:absolute;right:12px/);
   });
   it('the chart draws no spot names, only the buoys', () => {
     expect(read('src/ui/hud.ts')).toContain('if (!pl.buoy) continue; // (the spots');

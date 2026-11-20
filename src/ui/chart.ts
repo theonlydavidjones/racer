@@ -31,6 +31,12 @@ export class Chart {
   constructor(private hud: Hud, private onClose: () => void, private setPal: (p: 'day' | 'dusk') => void, private race: { send(c: Command): void; ask(c: Command): Promise<CommandResult> }) {
     let drag: { x: number; y: number; cx: number; cy: number; moved: boolean } | null = null;
     this.c.addEventListener('pointerdown', e => { this.c.setPointerCapture?.(e.pointerId); drag = { x: e.clientX, y: e.clientY, cx: this.cx, cy: this.cy, moved: false }; });
+    // (the fog caption is one short line: its source and caveats are the hover)
+    this.c.addEventListener('pointermove', e => {
+      const r0 = this.c.getBoundingClientRect(), fc = this.hud.fogCaption, x = e.clientX - r0.left, y = e.clientY - r0.top;
+      const tip = fc && x >= fc.rect[0] && x <= fc.rect[2] && y >= fc.rect[1] && y <= fc.rect[3] ? fc.tip : '';
+      if (this.c.title !== tip) this.c.title = tip;
+    });
     this.c.addEventListener('pointermove', e => {
       const r = this.c.getBoundingClientRect(); this.cursor = e.pointerType === 'mouse' ? [e.clientX - r.left, e.clientY - r.top] : null;
       if (!drag) return;
