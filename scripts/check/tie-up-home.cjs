@@ -2,7 +2,7 @@
 /**
  * r239 (and r241, the tag bound home), end to end in the page: sailing home to her slip, the tie-up option appears (the owner, 18 Nov 2026: cruising home
  * to Josephine's slip at Gashouse Cove, "Lines ready / G" never appeared). Her home slip gashouse-cove:572, a cruise, Sail
- * home from the chart; then brought in slowly along her harbor's own way in (geo/marina.ts harborRoute), by hand: from
+ * home (the chart's, or the navigator's); then brought in slowly along her harbor's own way in (geo/marina.ts harborRoute), by hand: from
  * 35 m off her slip in, the hint by her ("G · lines ready") and the Crew panel's Lines-ready row are there; G there gets
  * her lines ready. Fails (exit 1) on any step or a page error. Needs the dev server (default :5173); runs the race in the
  * page's thread (?inproc) so it can place her.
@@ -25,7 +25,9 @@ const BASE = (process.argv[2] || 'http://localhost:5173/').replace(/\/?$/, '/'),
   await p.evaluate(() => document.getElementById('bGo').click()); await p.waitForTimeout(6000);
   // (sent home, as the player does: M, the chart's Sail home)
   await p.keyboard.press('m'); await p.waitForTimeout(800);
-  await p.evaluate(() => { const e = document.getElementById('bChartHome'); if (e) e.click(); else { window.__chartless = true; window.sim().sendHome(); } }); await p.waitForTimeout(2000); // (a build without it: sent home directly)
+  const chartHome = await p.evaluate(() => !!document.getElementById('bChartHome'));
+  if (!chartHome) { await p.keyboard.press('Escape'); await p.waitForTimeout(500); } // (no Sail home on this chart: the navigator's, the chart closed)
+  await p.evaluate(() => (document.getElementById('bChartHome') ?? document.getElementById('bNavHome')).click()); await p.waitForTimeout(2000);
   check(await p.evaluate(() => window.sim().dest?.key === 'slip'), 'sent home: her slip the destination');
   // (r241: the destination's tag, bound for her own slip, says Home)
   const tag = await p.evaluate(() => [...document.querySelectorAll('.tag.mk')].map(e => e.textContent).filter(t => t));
