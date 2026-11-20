@@ -17,12 +17,15 @@
 <header id="hud">
   <div class="pod clock"><span class="lab"><span id="clockLab">Start in</span></span><span class="val" id="clock">3:00</span><span class="sub" id="clockSub">Prep</span></div>
   <div class="pod"><span class="lab">BSP <i>kn</i></span><span class="val" id="spd">0.0</span><span class="sub" id="sog">SOG 0.0</span></div>
-  <div class="pod hdg" title="Heading: yours over a tape 50° either side. Blue: where the true wind comes from; yellow: the next mark (an arrow at the edge when it's off the tape). The gray tick is your heading on the other tack (or jibe); the white one your average close-hauled heading on this tack."><span class="lab"><span>Heading</span><span id="hdgLift"></span></span><span class="val" id="hdg">000°</span><canvas id="compassTape" aria-label="Compass: heading, the next mark, the wind and the other tack"></canvas></div>
-</header>
-<!-- the wind and the water, and the app's own buttons: top right -->
-<div id="hudRight">
   <div class="pod"><span class="lab">TWS <i>kt</i></span><span class="val" id="tws">12</span><span class="sub" id="shiftLab">270°</span></div>
   <div class="pod"><span class="lab"><span id="tideLab">Tide</span> <i>kt</i></span><span class="val" id="tideVal">Slack</span><span class="sub" id="seaSub">no waves</span></div>
+</header>
+<!-- the compass: top centre, a tape with the heading in its middle (r272) -->
+<div id="compassBar" role="img" aria-label="Compass"><canvas id="compassTape" aria-hidden="true"></canvas><span class="vh" id="hdg">000°</span><span class="vh" id="hdgLift"></span></div>
+<!-- the nav strip: where she's bound, top right, the inset map under it (r272) -->
+<div id="navStrip" hidden><div class="ns-hd"><span class="ns-l" id="nsLab">To</span><span class="ns-name" id="nsName"></span></div><div class="ns-c" id="nsBrgC"><span class="ns-l">BRG</span><span class="ns-v" id="nsBrg"></span></div><div class="ns-c" title="Distance to waypoint"><span class="ns-l">DTW</span><span class="ns-v" id="nsDtw"></span></div><div class="ns-c" id="nsTtgC" title="Time to go"><span class="ns-l">TTG</span><span class="ns-v" id="nsTtg"></span></div><div class="ns-c" id="nsVmC"><span class="ns-l" id="nsVmL">VMC</span><span class="ns-v" id="nsVm"></span></div></div>
+<!-- the wind and the water, and the app's own buttons: top right -->
+<div id="hudRight">
   </div>
 <!-- top left, under the pods: where next, the flags flying, (the wind-angle dial, a training aid) -->
 <!-- the wind angle dial, when it's on: right side, under the inset map (the owner, ROADMAP 8b) -->
