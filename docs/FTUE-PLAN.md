@@ -37,9 +37,10 @@ short line of copy at most. A sailing term gets one line where it first appears.
    it later in Settings.
 3. **Choose your boat.** The existing boat editor (render/boatPanel) in a short first-run form: the boat turning in the
    showroom, with Name, Sail number and Colors open and the rest (rig tune, condition, lines, outboard) folded under
-   *More*. One line: "Name her and choose her colors, or keep her as she is." The default boat is no longer JOSEPHINE:
-   it's a new generic Folkboat with a free sail number, and the owner's own save keeps JOSEPHINE. The copy says
-   "choose" and "set up", never "buy".
+   *More*. One line: "Name her and choose her colors, or keep her as she is." Every first run goes through this step
+   (the owner, 20 Nov 2026, r273: "customizing the boat is a good thing to have them start with"), opening on KESTREL
+   (USA 000, the owner's look) with one clear way past it unchanged: *Use her as she is*, beside *Next*. The default boat
+   is no longer JOSEPHINE, and the owner's own save keeps JOSEPHINE. The copy says "choose" and "set up", never "buy".
 4. **Choose a slip** (new, §3). A chart of the Bay with the marinas pinned on it. A free slip in a sensible default
    marina is already chosen. Tapping a pin opens a small card: the marina's name, four rating tiles (shelter from the
    swell, surge, current at the entrance, distance to the race areas), and the slip she'd get. The first time, one line
