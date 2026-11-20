@@ -31,7 +31,7 @@ short line of copy at most. A sailing term gets one line where it first appears.
    click. Once it can, they light up. This applies to everyone, not only new players.
 1. **Account.** No screen of its own in this build: the claude.ai artifact already knows who you are (store/cloud.ts), and
    on Steam you'd be signed in by Steam. A screen would only appear if neither is there ("Sign in to keep your boats"). See §6.
-   **[DESIGN: approve: no sign-in screen where the platform already signs you in.]**
+   **Approved (r281, 20 Nov 2026).** The page has no sign-in screen today, so nothing to build until the desktop build.
 2. **How much have you sailed?** Four tiles, each with a small picture: *Never sailed* · *A little* · *Cruiser, never
    raced* · *Club racer*. "A little" is the default. The answer only changes what's recommended at step 6. You can change
    it later in Settings.
@@ -62,7 +62,7 @@ short line of copy at most. A sailing term gets one line where it first appears.
 the owner's saves are untouched.
 
 After the first run, Learn to sail is easier to find **without a new button**: the Drill card's small line becomes
-"Learn to sail, the start, tacks and jibes". **[DESIGN: approve: that's a change to a line on a card the owner named.]**
+"Learn to sail, the start, tacks and jibes". **Approved (r281, 20 Nov 2026); built.**
 
 ## 3. Marina selection (map picker)
 
