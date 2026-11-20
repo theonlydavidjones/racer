@@ -703,7 +703,7 @@ export class SailBand {
       // the coach's line: ringed, its target on the track (the lazy jib sheet never: the working one is the coach's)
       const cued = this.cueLine === k, cue = d.querySelector<HTMLElement>('.sb-cue');
       d.classList.toggle('cue-ring', cued);
-      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) { const co = Math.round(onOf(k, this.cueTo) * 100) + '%'; if (horiz) cue.style.left = d.dataset.side === 'P' ? `calc(100% - ${co})` : co; else cue.style.top = co; } }
+      if (cue) { cue.title = 'Coach: trim to here'; hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) { const co = Math.round(onOf(k, this.cueTo) * 100) + '%'; if (horiz) cue.style.left = d.dataset.side === 'P' ? `calc(100% - ${co})` : co; else cue.style.top = co; } }
     });
     // the mainsheet: the boom's end across the boat (sin of its angle, toward leeward); the crew's boom, dashed
     {
@@ -715,7 +715,7 @@ export class SailBand {
       if (ideal) mark.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: ideal.mainsheet, traveller: ideal.traveller }) * D2R) * 50}%`;
       const cued = this.cueLine === 'mainsheet', cue = d.querySelector<HTMLElement>('.sb-cue');
       d.classList.toggle('cue-ring', cued);
-      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: this.cueTo }) * D2R) * 50}%`; }
+      if (cue) { cue.title = 'Coach: trim to here'; hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + leeSign(u) * Math.sin(boomAngle({ ...c, mainsheet: this.cueTo }) * D2R) * 50}%`; }
     }
     {
       const d = this.el.querySelector<HTMLElement>('.sb-trk[data-line="traveller"]')!, mine = byHand(u, 'traveller');
@@ -725,7 +725,7 @@ export class SailBand {
       if (ideal) mark.style.left = `${50 + ideal.traveller * leeSign(u) * 50}%`;
       const cued = this.cueLine === 'traveller', cue = d.querySelector<HTMLElement>('.sb-cue');
       d.classList.toggle('cue-ring', cued);
-      if (cue) { hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + this.cueTo * leeSign(u) * 50}%`; }
+      if (cue) { cue.title = 'Coach: trim to here'; hide(cue, !cued || this.cueTo == null); if (cued && this.cueTo != null) cue.style.left = `${50 + this.cueTo * leeSign(u) * 50}%`; }
     }
     this.jumpers(u);
     // the jib cars: the crossbar on its row, the car on its pin; the leeward one is loaded

@@ -8,8 +8,10 @@ import { isSpot } from '../sim/places';
 interface MarkTag { el: HTMLDivElement; p: Vec; z: number; idx: number[] }
 
 /** HTML tags floating over boats and marks, positioned by projecting through the 3D camera. */
-/** How long the order ("Tacking!", "Jibe-ho!") shows once given (s). */
-const ORDER_S = 1.2;
+/** How long the order ("Tacking!", "Jibe-ho!") shows once given (s): once called, it's called (the owner, r032). */
+export const ORDER_S = 0.5;
+/** Whether the order has had its moment: she was put over at `doneT` (null: not yet). */
+export const orderOver = (doneT: number | null, t: number): boolean => doneT != null && t - doneT > ORDER_S;
 export class Labels {
   private tagEls: (HTMLDivElement | null)[] = [];
   private markTags: MarkTag[] = [];
@@ -114,7 +116,7 @@ export class Labels {
       // (a call dropped, not put over, she not turning: no order said)
       const dropped = heard && !waiting && k.doneT == null && u.turnTarget == null && !u.tacking && u.gybeTo == null;
       if (heard && !waiting && k.doneT == null) k.doneT = w.t;
-      if (dropped || (k.doneT != null && w.t - k.doneT > ORDER_S)) this.call = null;
+      if (dropped || orderOver(k.doneT, w.t)) this.call = null;
       else say = waiting && u.callWait!.notReady ? 'Not ready!' : waiting || !heard ? (k.kind === 'jibe' ? 'Ready to jibe' : 'Ready about') : (k.kind === 'jibe' ? 'Jibe-ho!' : 'Tacking!');
     }
     if (ce) { if (!say || word) { if (!ce.hidden) ce.hidden = true; } else { this.place(ce, camera, u.x, u.y, 3.2); if (ce.textContent !== say) ce.textContent = say; } }
