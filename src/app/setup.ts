@@ -11,7 +11,7 @@ import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
-import { asTheClubRunsIt, hostOf } from '../club/practice';
+import { asTheClubRunsIt, coursePicker, hostOf } from '../club/practice';
 import { place } from '../sim/places';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -117,20 +117,19 @@ function setupChanged(after?: () => void, wait = 120): void {
 
 /* ---------------- setup + flow ---------------- */
 function buildSetupChoices(): void {
-  // the course picker, grouped (Seaweed Soup starting west / east, practice), each with its marks and length
-  const groups = new Map<string, typeof COURSES>();
-  for (const c of COURSES) { const g = c.group ?? 'Practice'; if (!groups.has(g)) groups.set(g, []); groups.get(g)!.push(c); }
+  // the course picker: grouped by host (each club's series, the committee's choice first; then the practice area), each
+  // course with its marks and length (club/practice.ts coursePicker)
   const shortMark = (k: string) => k === 'X' ? '' : k;
-  const label = (c: typeof COURSES[number]) => {
-    if (!c.group) return c.title;
-    const route = c.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
-    return `${c.title.replace('Kelp Chowder · ', '')} · ${route}${c.distanceNm ? ` · ${c.distanceNm} nm` : ''}`;
+  const label = (c: { id: string; group?: string; title: string }) => {
+    const f = COURSES.find(x => x.id === c.id)!;
+    if (!f.group) return f.title;
+    const route = f.legs.map(l => shortMark(l.mark)).filter(Boolean).join(' → ');
+    return `${f.title.replace('Kelp Chowder · ', '')} · ${route}${f.distanceNm ? ` · ${f.distanceNm} nm` : ''}`;
   };
   const sel = $('courseSel') as HTMLSelectElement;
-  groups.delete('Practice');
-  sel.innerHTML = [...groups].map(([g, cs]) => `<optgroup label="${g}">${cs.map(c => `<option value="${c.id}">${label(c)}</option>`).join('')}</optgroup>`).join('');
+  sel.innerHTML = coursePicker(COURSES, label).map(g => `<optgroup label="${g.label}">${g.options.map(o => `<option value="${o.id}">${o.label}</option>`).join('')}</optgroup>`).join('');
   sel.value = app.S.course;
-  sel.onchange = () => { app.S.course = lastPick = sel.value; saveSettings(app.S); setupChanged(() => { courseCard(); tideBox(); }); };
+  sel.onchange = () => { app.S.course = sel.value; saveSettings(app.S); setupChanged(() => { courseCard(); tideBox(); }); };
   $('condDlg').querySelector('[data-k="current"]')!.innerHTML = Object.values(CURRENTS).map(c => `<button type="button" data-v="${c.id}">${c.button}</button>`).join('');
 }
 function courseCard(): void {
@@ -141,21 +140,17 @@ function courseCard(): void {
   const sig = app.w.courseSignal;
   $('courseCard').innerHTML = (sig ? `<div class="rcpick"><b>The committee will fly course ${sig.no}</b><small>${sig.why}</small></div>` : '')
     + `<div class="legs">${chips.join('<span class="arr">→</span>')}</div>`;
-  { // the host club: its courses and its sailing instructions
-    const host = hostOf(app.S.course), rc = app.S.course === RC_COURSE;
-    document.querySelectorAll<HTMLButtonElement>('#hostSeg [data-host]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.host === host)));
-    document.querySelectorAll<HTMLButtonElement>('#courseMode [data-cm]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.cm === 'rc') === rc)));
-    $('courseMode').hidden = host === 'practice';
+  { // the course's host (club/practice.ts hostOf: who hosts the course chosen) and its sailing instructions
+    const host = hostOf(app.S.course);
     $('judgingField').hidden = host === 'practice'; // (the practice area is always umpired)
-    $('courseSel').hidden = host === 'practice' || rc;
-    if (!rc && host !== 'practice') ($('courseSel') as HTMLSelectElement).value = app.S.course;
+    ($('courseSel') as HTMLSelectElement).value = app.S.course;
     // (at a default club, its sailing instructions: locked, the club's committee's, as it runs its races; club/practice.ts)
     const R = asTheClubRunsIt({ ...app.S, mode: 'race' }), si = $('siBox') as HTMLDetailsElement;
     si.classList.toggle('locked', host !== 'practice'); if (host !== 'practice') si.open = false;
     si.querySelector('summary')?.setAttribute('tabindex', host !== 'practice' ? '-1' : '0');
     const flag = R.prepFlag === 'black' ? 'black flag' : `${R.prepFlag ?? 'P'} flag`;
     const line = C.biasAdjustable ? ` · line ${R.bias ? (R.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(R.bias) + '°' : 'square'}` : '';
-    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${R.seq}-min sequence · ${flag} · ${R.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${R.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
+    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailed as the club runs it'}: ${R.seq}-min sequence · ${flag} · ${R.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${R.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
   }
   $('lengthField').hidden = app.S.mode === 'sail' || app.S.course !== RC_COURSE;
   $('biasField').hidden = !C.biasAdjustable;
@@ -184,7 +179,7 @@ function courseCard(): void {
     toast('Her outboard stays ashore for the race: the class rules don\'t allow racing with it mounted aft (NFIA, 2006, class rule 1.11). It\'s aboard, stowed, for a cruise; ship it from the Motor tab.', 7000);
   }
   const cruise = app.S.mode === 'sail';
-  for (const id of ['hostField', 'courseField', 'fleetField']) $(id).hidden = cruise;
+  for (const id of ['courseField', 'fleetField']) $(id).hidden = cruise;
   $('whereField').hidden = !cruise;
   if (cruise) app.setupChart?.sync(); // (the chart shows where she'll really start and go: the Fleet's "Cruise her" sets her start)
   const sp = cruise ? null : app.seasonPick; // (a season race: its own name on the button, and its brief over the rows)
@@ -396,7 +391,7 @@ function drawHeads(): void {
   const C = w.C, nm = courseFileNow?.distanceNm;
   const title = C.title.replace(/^Kelp Chowder · /, '') + (S.course === RC_COURSE && !practice ? ' (the committee\'s choice)' : '');
   set('course', practice ? '<span class="t-lab">Practice</span>' : burgee ? `<img class="t-burgee" src="${burgee}" alt="Dorado Yacht Club">` : '',
-    `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailing instructions|Practice): /, ''))}</span></span>`);
+    `${courseThumb(92, 52)}<span class="t-text"><span class="t-h">${esc(title)}${nm ? ` · ${nm} nm` : ''}</span><span class="t-s">${esc($('siSum').textContent!.replace(/^(Sailed as the club runs it|Practice): /, ''))}</span></span>`);
   // the fleet: a tile each, and + to add one
   const fl = app.fleetChosen;
   set('fleet', '<span class="t-lab">Racing</span>', fl.length ? `<span class="t-group">${fl.slice(0, 8).map(b => { const [c, n] = splitNo(b.no); return tile(n, b.name, b.hull, { country: c, ring: b.tag }); }).join('')}${fl.length > 8 ? `<span class="t-s">+${fl.length - 8}</span>` : ''}${emptyTile('Add', true)}</span>`
@@ -564,17 +559,6 @@ $('bLessons').onclick = () => openLessons();
 $('bRoundings').onclick = () => { app.S.mode = 'roundings'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
 // (locked at a default club: however it's opened, by the mouse, the keyboard or a script, it shuts again)
 $('siBox').addEventListener('toggle', () => { const si = $('siBox') as HTMLDetailsElement; if (si.open && si.classList.contains('locked')) si.open = false; });
-/* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's (club/practice.ts hostOf). */
-let lastPick = hostOf(app.S.course) === 'ggyc' && app.S.course !== RC_COURSE ? app.S.course : COURSES.find(c => c.group)!.id;
-function setCourse(id: string): void { app.S.course = id; saveSettings(app.S); setupChanged(() => { courseCard(); tideBox(); }); }
-$('hostSeg').addEventListener('click', e => {
-  const h = (e.target as HTMLElement).closest<HTMLElement>('[data-host]')?.dataset.host; if (!h || h === hostOf(app.S.course)) return;
-  setCourse(h === 'practice' ? COURSES.find(c => !c.group)!.id : RC_COURSE);
-});
-$('courseMode').addEventListener('click', e => {
-  const m = (e.target as HTMLElement).closest<HTMLElement>('[data-cm]')?.dataset.cm; if (!m) return;
-  setCourse(m === 'rc' ? RC_COURSE : lastPick);
-});
 /* Change the conditions: one dialog over the setup. */
 $('bCond').onclick = () => { $('condDlg').hidden = false; };
 $('bCondClose').onclick = () => {

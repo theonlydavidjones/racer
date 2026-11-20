@@ -238,8 +238,10 @@
         <section class="srow" id="row-course" data-row="course">
           <div class="srow-head" role="button" tabindex="0" aria-expanded="false"><span class="srow-lead"></span><span class="srow-main"></span><span class="srow-go">Change ▾</span></div>
           <div class="srow-body">
-        <div class="field step" id="hostField"><span>Host club</span>
-          <div class="seg" id="hostSeg"><button type="button" data-host="ggyc">Dorado YC · Kelp Chowder</button><button type="button" data-host="practice">Practice area (no club)</button></div>
+        <!-- the course: one list grouped by host, each club's series, then the practice area (r273's host toggle replaced: the owner's choice A); its rules in one line under it -->
+        <div class="field step" id="courseField"><span>Course</span>
+          <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json, club/practice.ts coursePicker --></select>
+          <div class="seg" data-k="raceLength" id="lengthField"><button type="button" data-v="short">Short · ~30 min</button><button type="button" data-v="medium">Club race · ~60 min</button><button type="button" data-v="long">Long · ~90 min</button></div>
           <details class="si" id="siBox"><summary><small><span id="siSum"></span> <u>Change</u></small></summary>
             <div class="sibody">
               <div class="field" id="seqField"><span>Sequence</span>
@@ -254,11 +256,7 @@
               <div class="field" id="biasField"><span>Line set by the committee</span>
                 <div class="seg" data-k="bias"><button type="button" data-v="0">Square</button><button type="button" data-v="8">Pin up 8°</button><button type="button" data-v="-8">Boat up 8°</button></div></div>
             </div>
-          </details></div>
-        <div class="field step" id="courseField"><span>Course</span>
-          <div class="seg" id="courseMode"><button type="button" data-cm="rc">The committee's choice</button><button type="button" data-cm="pick">Pick a course</button></div>
-          <div class="seg" data-k="raceLength" id="lengthField"><button type="button" data-v="short">Short · ~30 min</button><button type="button" data-v="medium">Club race · ~60 min</button><button type="button" data-v="long">Long · ~90 min</button></div>
-          <select id="courseSel" class="pick" aria-label="Course"><!-- filled from src/courses/data/*.json --></select>
+          </details>
           <div class="coursecard" id="courseCard"></div></div>
           </div>
         </section>

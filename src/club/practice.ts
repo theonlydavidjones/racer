@@ -2,6 +2,7 @@ import { RC_COURSE } from '../courses/committee';
 import { COURSES } from '../courses/registry';
 import type { Settings } from '../settings';
 import type { Series } from './season';
+import { clubFullName } from './clubs';
 
 /**
  * Practice (r275; the owner, 20 Nov 2026, docs/FTUE-BRIEF.md §3): a race set up from the Race page is a sailing for
@@ -13,6 +14,25 @@ import type { Series } from './season';
 /** The race's host: the default club whose courses it sails (the Seaweed Soup's), or the practice area, no club's. */
 export type Host = 'ggyc' | 'practice';
 export const hostOf = (course: string): Host => course === RC_COURSE || COURSES.find(c => c.id === course)?.group ? 'ggyc' : 'practice';
+
+/**
+ * Practice's course picker (r273's host toggle replaced, the owner's choice A, 20 Nov 2026): one list, grouped by who
+ * hosts the course, each club's series under its name, then the practice area's. Picking a course picks its host, so
+ * there's no host to choose apart from it, and each new club or series is only another group. A club's committee's
+ * choice heads its list.
+ */
+export interface PickerGroup { label: string; options: { id: string; label: string }[] }
+export function coursePicker(courses: readonly { id: string; group?: string; title: string }[], label: (c: { id: string; group?: string; title: string }) => string = c => c.title): PickerGroup[] {
+  const groups = new Map<string, PickerGroup>();
+  for (const c of courses) {
+    const h = hostOf(c.id), name = h === 'practice' ? 'Practice area' : `${clubFullName(h)} · ${c.group}`;
+    let g = groups.get(name);
+    if (!g) { g = { label: name, options: h !== 'practice' && ![...groups.values()].some(x => x.options.some(o => o.id === RC_COURSE && hostOf(o.id) === h)) ? [{ id: RC_COURSE, label: "The committee's choice" }] : [] }; groups.set(name, g); }
+    g.options.push({ id: c.id, label: label(c) });
+  }
+  // (the practice area last: the clubs' courses first)
+  return [...groups.values()].sort((a, b) => Number(a.label === 'Practice area') - Number(b.label === 'Practice area'));
+}
 
 /** The committee's settings: how the club starts and judges its races. */
 export type Committee = Pick<Settings, 'seq' | 'prepFlag' | 'penaltyTurns' | 'judging' | 'bias'>;

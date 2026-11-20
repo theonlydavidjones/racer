@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
 import { COURSES } from '../src/courses/registry';
 import { RC_COURSE } from '../src/courses/committee';
 import { seasons } from '../src/club/season';
-import { CLUB_COMMITTEE, asTheClubRunsIt, hostOf, seasonRaceFor } from '../src/club/practice';
+import { CLUB_COMMITTEE, asTheClubRunsIt, coursePicker, hostOf, seasonRaceFor } from '../src/club/practice';
 
 /** r275 (the owner, 20 Nov 2026): Practice, not Create a race. At a default club you sail it as the club runs it; anyone
  * may sail any course on any day, but a practice sailing never counts in a season. */
@@ -37,5 +37,19 @@ describe('Practice at a default club', () => {
     expect(seasonRaceFor(S, { series, no: r.no }, false)).toEqual({ series, no: r.no });
     expect(seasonRaceFor({ ...S, windKt: 18 }, { series, no: r.no }, false)).toBeNull(); // (its conditions changed: not the season's race)
     expect(seasonRaceFor(S, { series, no: r.no }, true)).toBeNull(); // (the wind pinned for a race sailed again)
+  });
+});
+
+describe("Practice's course picker (the host toggle replaced, choice A)", () => {
+  const g = coursePicker(COURSES);
+  it('groups every course by its host, each club\'s series under its name, the practice area last', () => {
+    expect(g.flatMap(x => x.options.map(o => o.id)).filter(id => id !== RC_COURSE).sort()).toEqual(COURSES.map(c => c.id).sort());
+    expect(g.at(-1)!.label).toBe('Practice area');
+    expect(g.at(-1)!.options.every(o => hostOf(o.id) === 'practice')).toBe(true);
+    for (const x of g.slice(0, -1)) { expect(x.label.startsWith('Dorado Yacht Club · ')).toBe(true); expect(x.options.every(o => hostOf(o.id) === 'ggyc')).toBe(true); }
+  });
+  it("the club's committee's choice heads its list, once", () => {
+    expect(g[0].options[0]).toEqual({ id: RC_COURSE, label: "The committee's choice" });
+    expect(g.flatMap(x => x.options).filter(o => o.id === RC_COURSE)).toHaveLength(1);
   });
 });
