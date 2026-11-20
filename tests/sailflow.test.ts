@@ -80,7 +80,7 @@ describe('the flow view: what it says', () => {
     if (m.trim.flow === 'luffing') { expect(crewEaseBoom(blow)).toBeGreaterThan(1); expect(words(blow)).toMatch(/on purpose/); }
     const over = sailing(318, 24, b => { takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = 0.5; });
     expect(flowState(over).sails.find(s => s.sail === 'main')!.trim.flow).toBe('luffing');
-    expect(words(over)).not.toMatch(/on purpose/); expect(words(over)).toMatch(/Main<\/b>[^]*Trim in/);
+    expect(words(over)).not.toMatch(/on purpose/); expect(words(over)).toMatch(/Main<\/b>[^]*trim in/);
   });
   it('you trimming the main yourself in a blow: no "on purpose"', () => {
     const b = sailing(318, 24, b => { b.manualTrim = true; b.trimAll = true; takeLine(b, 'mainsheet'); (b.ctlTarget ??= {}).mainsheet = Math.min(1, b.ctl.mainsheet + 0.05); });
@@ -98,7 +98,7 @@ describe('the flow view: what it says', () => {
   it('a jib eased right out: trim in, with no bear away into a reach', () => {
     const b = sailing(318, 12, b => { takeLine(b, 'jibsheet'); (b.ctlTarget ??= {}).jibsheet = 0.75; });
     const w = words(b), jib = w.slice(w.indexOf('<b>Jib</b>'), w.indexOf('<b>Main</b>') > w.indexOf('<b>Jib</b>') ? w.indexOf('<b>Main</b>') : undefined);
-    expect(jib).toMatch(/Trim in/); expect(jib).not.toMatch(/bear away/);
+    expect(jib).toMatch(/trim in/); expect(jib).not.toMatch(/bear away/);
   });
   it('a jib stalled with its sheet all the way out: head up, not ease', () => {
     const b = sailing(230, 12), j = flowState(b).sails.find(s => s.sail === 'jib');
@@ -142,7 +142,7 @@ describe('the flow view: the illustrative flow', () => {
 });
 
 describe('the flow view with one sail down (the owner, 15 Nov 2026: "check that the wind over sails map is accounting for when I\'m sailing on just jib or just main")', () => {
-  const words = (b: Boat) => flowWords(flowState(b), b).map(([, h]) => h).join(' ');
+  const words = (b: Boat) => flowWords(flowState(b), b).map(([, h, more]) => `${h} ${more ?? ''}`).join(' ');
   it('on the main alone: no jib cut, no jib numbers, no slot, and its telltales gone', () => {
     const b = sailing(318, 12, b => { b.rig = { main: 1, jib: 0, mainUp: true, jibUp: false }; }), st = flowState(b);
     expect(b.trim.jib).toBeTruthy(); // (the sim still trims the lowered jib's sheet: the view must look at the halyard)
@@ -161,5 +161,20 @@ describe('the flow view with one sail down (the owner, 15 Nov 2026: "check that 
     const b = sailing(318, 12), st = flowState(b);
     expect(st.sails.map(s => s.sail)).toEqual(['jib', 'main']);
     expect(words(b)).toMatch(/slot/);
+  });
+});
+
+describe('the flow view\'s words: takeaways, the detail on hover (r037, the owner, 20 Nov 2026: "replace with tight, easy to parse takeaways")', () => {
+  for (const [name, heading, kt] of [['upwind 12 kt', 318, 12], ['close reach 8 kt', 290, 8], ['broad reach 16 kt', 225, 16], ['run 14 kt', 180, 14]] as const) {
+    it(`${name}: a short line a sail, at most two shown, and no line of copy`, () => {
+      const b = sailing(heading, kt), shown = flowWords(flowState(b), b).filter(([c]) => c !== 'fp-note');
+      expect(shown.length).toBeGreaterThan(0); expect(shown.length).toBeLessThanOrEqual(2);
+      for (const [, h] of shown) expect(h.replace(/<[^>]+>/g, '').length, h).toBeLessThanOrEqual(60);
+    });
+  }
+  it('the detail is still there, behind the hover', () => {
+    const b = sailing(318, 12), lines = flowWords(flowState(b), b);
+    expect(lines.filter(([c]) => c === 'fp-sail').every(l => !!l[2])).toBe(true);
+    expect(lines.filter(([c]) => c === 'fp-note').map(l => l[2]).join(' ')).toMatch(/Twist[^]*slot[^]*leeway/);
   });
 });
