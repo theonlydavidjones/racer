@@ -1,6 +1,6 @@
-# Boat care: dock work (a proposal, r273; no build)
+# Boat care: dock work (a proposal, r294; no build)
 
-The owner, 20 Nov 2026: hull cleaning isn't the boat editor's ("this feels like dock work to go along with certain kinds
+The owner, 20 Nov 2026 (with the editor changes, r293): hull cleaning isn't the boat editor's ("this feels like dock work to go along with certain kinds
 of tuning or maintenance (maybe bilge pumping too, though that should also be doable underway)"). The editor is for how
 she looks and is fitted; this is for how she's kept.
 

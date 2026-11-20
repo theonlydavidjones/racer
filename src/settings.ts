@@ -124,7 +124,7 @@ export function loadSettings(): Settings {
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
   // (a save from before membership, r276: you belong to the club your boats fly, so your season stays open; a new player, none)
   if (typeof s.club !== 'string') s.club = fresh ? '' : clubFromBoats(boats, s.boatId);
-  setClub(s, s.club); // (your boats fly your club's burgee: older saves had one per boat, r273)
+  setClub(s, s.club); // (your boats fly your club's burgee: older saves had one per boat, r293)
   // (before real rain, rain 0 was the only "nothing set": an older save's 0 becomes the real record's, once)
   if (!s.rainV) { if (!s.rain) s.rain = 'real'; s.rainV = 1; }
   // your opponents: older saves had only a number of stock boats

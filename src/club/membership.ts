@@ -33,7 +33,7 @@ export function clubFromBoats(boats: readonly Pick<BoatSpec, 'id' | 'club'>[], s
 
 /**
  * Join (or switch to) a club, or leave ('' ): your boats fly its burgee, all of them, whoever skippers them (the owner,
- * 20 Nov 2026, r273: a boat flies her owner's club burgee; the club isn't set per boat). The club's own fleet, its stock
+ * 20 Nov 2026, r293: a boat flies her owner's club burgee; the club isn't set per boat). The club's own fleet, its stock
  * and generic boats, keep their clubs: they aren't yours.
  */
 export function setClub<T extends { club?: string; boats: BoatSpec[]; boat: BoatSpec; boatId: string }>(S: T, id: string): void {

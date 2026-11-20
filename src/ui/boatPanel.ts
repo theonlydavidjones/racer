@@ -60,7 +60,7 @@ export class BoatPanel {
   show(id = this.S.boatId, isNew = false): void {
     this.editId = id; this.leaving = null; this.askDrop = false; this.grpOpen = new Set(['her']); this.pickKey = null; this.ropeKey = null;
     this.snap = structuredClone({ boats: this.S.boats, boatId: this.S.boatId, opponents: this.S.opponents }); // for "Discard changes"
-    // (a new boat: Discard throws her away, so the starting point is your boats without her; r273, the owner)
+    // (a new boat: Discard throws her away, so the starting point is your boats without her; r293, the owner)
     this.fresh = isNew ? structuredClone(this.editing) : null;
     if (isNew) this.snap.boats = this.snap.boats.filter(x => x.id !== id);
     this.render(); this.el.hidden = false;
@@ -76,7 +76,7 @@ export class BoatPanel {
   /** The showroom's slow turn: pause it to look at her from one side (set by main; returns whether she's turning now). */
   onSpin: (() => boolean) | null = null;
   private spinning = true;
-  /** The sections open (the owner, 20 Nov 2026, r273: each collapsed but the first, toggled by its header's arrow), the
+  /** The sections open (the owner, 20 Nov 2026, r293: each collapsed but the first, toggled by its header's arrow), the
    * color whose picker is open, the line whose ropes are open. */
   private grpOpen = new Set<string>(['her']);
   private pickKey: ColorKey | null = null;

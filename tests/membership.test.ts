@@ -25,7 +25,7 @@ describe('membership (r276)', () => {
     expect(clubFromBoats([{ id: 'a', club: 'ggyc' }, { id: 'b', club: 'byc' }], 'b')).toBe('byc');
   });
 
-  it('your boats fly your club\'s burgee, all of them, whoever skippers them (r273)', () => {
+  it('your boats fly your club\'s burgee, all of them, whoever skippers them (r293)', () => {
     const a = { ...NEW_BOAT, id: 'a', club: 'ggyc' }, b = { ...NEW_BOAT, id: 'b', club: '', skipper: 'ai' as const };
     const S = { club: 'ggyc', boats: [a, b], boat: a, boatId: 'a' };
     setClub(S, 'byc');

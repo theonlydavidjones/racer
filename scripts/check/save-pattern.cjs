@@ -88,7 +88,7 @@ const out = process.argv[2] || '.';
   if ((await stored()).boats?.[0]?.hull?.upper !== newHull) fail('Discard in the editor changed what was saved');
   // 3. a new boat: the editor opens on her, her sail number and home country there to set (8u)
   if (await page.evaluate(() => !document.getElementById('boatPanel').hidden)) { await click('#boatPanel [data-act="done"]'); await page.waitForTimeout(800); }
-  // 2b. a new boat's Discard (r273, the owner): unchanged, she's thrown away at once; changed, asked first; either way
+  // 2b. a new boat's Discard (r293, the owner): unchanged, she's thrown away at once; changed, asked first; either way
   // your boats as they were, and back to the list
   const nBoats = (await stored()).boats.length;
   await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(400);
