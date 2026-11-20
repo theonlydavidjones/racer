@@ -1,10 +1,10 @@
 /* Layout D (r272, the owner, 20 Nov 2026): the instruments in one group down the left edge, all one size, the race's
    flags under them; the compass top centre, a tape on a band (the heading in its middle); the nav strip top right, one
    row, with the inset map under it. */
-#hud{flex-direction:column;gap:8px;top:calc(env(safe-area-inset-top,0px) + 16px);left:max(16px,env(safe-area-inset-left,0px))}
-#hud .pod,#hud .pod.clock{width:104px;height:64px;box-sizing:border-box}
+#hud{flex-direction:column;gap:6px;top:calc(env(safe-area-inset-top,0px) + 16px);left:max(16px,env(safe-area-inset-left,0px))}
+#hud .pod,#hud .pod.clock{width:104px;height:58px;box-sizing:border-box}
 #hudRight{display:none}
-#leftCol{top:calc(env(safe-area-inset-top,0px) + 306px)}
+#leftCol{top:calc(env(safe-area-inset-top,0px) + 272px)}
 #leftCol #sigPanel{order:-1}
 /* the compass: 560 by 44 at every size; narrower only where the nav strip would reach it (hud.ts fitCompass) */
 #compassBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:50%;transform:translateX(-50%);width:560px;height:44px;pointer-events:none;z-index:4}
