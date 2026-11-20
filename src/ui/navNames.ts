@@ -1,5 +1,5 @@
 import { PLACES, isSpot } from '../sim/places';
-import type { Vec } from '../core/math';
+import { wrap, type Vec } from '../core/math';
 
 /**
  * The nav strip's name for where she's bound (the owner, 20 Nov 2026, r272): "The player knows where they're going, so
@@ -28,4 +28,14 @@ export function destName(d: { name: string; key?: string; p: Vec }, race = false
     return shortName(best.name);
   }
   return shortName(d.name, { race });
+}
+
+/**
+ * A leg's point of sail against the mean wind (the owner, 20 Nov 2026: "do VMG on beats and runs, VMC on reaches"): its
+ * bearing within 60° of where the wind comes from, a beat; more than 120°, a run; between, a reach. The course's own
+ * leg kind is for its typical wind; this is for the day's.
+ */
+export function legSail(legBearing: number, windFrom: number): 'beat' | 'reach' | 'run' {
+  const a = Math.abs(wrap(legBearing - windFrom));
+  return a < 60 ? 'beat' : a > 120 ? 'run' : 'reach';
 }

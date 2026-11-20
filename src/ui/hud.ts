@@ -51,7 +51,7 @@ import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, t
 import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { drawCompass } from './compassTape';
-import { destName } from './navNames';
+import { destName, legSail } from './navNames';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import type { Settings } from '../settings';
 import { drawFog, drawSea, drawSetFog, nm, setFogAlpha } from './mapLayers';
@@ -534,7 +534,7 @@ export class Hud {
    * The nav strip, top right (r272, the owner, 20 Nov 2026): where she's bound and how it lies, in the chartplotter's
    * terms, one row; only what the instruments don't already show (no speed, heading or clock). Cruising: the destination
    * (its short name: ui/navNames.ts), BRG, DTW, TTG and VMC (her speed made good toward it, over the ground). Racing: the
-   * next mark by its code and the side it's left to, BRG, DTW and VMG toward it. No destination, no strip: the inset alone.
+   * next mark by its code and the side it's left to, BRG, DTW, and VMG on a beat or a run, VMC on a reach. No destination, no strip: the inset alone.
    * Each label's hover says it in full.
    */
   private navStrip(w: SimView, u: Boat): void {
@@ -545,15 +545,19 @@ export class Hud {
     const [n, un] = this.range(r), name = destName(m, race);
     const side = race ? (m.side === 's' ? ' <span class="s">▶ stbd</span>' : ' <span class="p">◀ port</span>') : '';
     const ttgS = !isFinite(ttg) ? '--' : ttg < 3600 ? `${Math.round(ttg / 60)}<small>min</small>` : `${(ttg / 3600).toFixed(1)}<small>h</small>`;
-    const brgS = `${String(Math.round(b) % 360).padStart(3, '0')}<small>°</small>`, vm = `${(vmc / KT).toFixed(1)}<small>kn</small>`;
-    const key = [race, name, side, brgS, n, un, ttgS, vm].join('|');
+    // racing, VMG (straight up or down the wind) on a beat or a run, VMC (toward the mark) on a reach; cruising, VMC
+    const prev = race ? (u.leg > 0 ? w.C.marks[u.leg - 1].p : w.center) : u, kind = race ? legSail(brg(p.x - prev.x, p.y - prev.y), w.wind.from) : 'reach';
+    const toWind = V(w.wind.from), vmg = kind === 'beat' ? u.vx * toWind.x + u.vy * toWind.y : kind === 'run' ? -(u.vx * toWind.x + u.vy * toWind.y) : vmc, isG = kind !== 'reach';
+    const brgS = `${String(Math.round(b) % 360).padStart(3, '0')}<small>°</small>`, vm = `${(vmg / KT).toFixed(1)}<small>kn</small>`;
+    const key = [race, name, side, brgS, n, un, ttgS, vm, isG].join('|');
     if (key === this.nsKey) return; this.nsKey = key;
     $('nsLab').textContent = race ? 'Next' : 'To'; $('nsName').textContent = name; if (side) $('nsName').insertAdjacentHTML('beforeend', side);
     $('nsBrgC').title = race ? 'Bearing to the mark' : 'Bearing to the destination';
     $('nsBrg').innerHTML = brgS; $('nsDtw').innerHTML = `${n}<small>${un}</small>`;
     $('nsTtgC').hidden = race; $('nsTtg').innerHTML = ttgS;
-    $('nsVmL').textContent = race ? 'VMG' : 'VMC'; $('nsVmC').title = race ? 'Velocity made good' : 'Velocity made good toward the destination';
-    $('nsVm').innerHTML = vm; $('nsVm').classList.toggle('good', vmc > 0.15);
+    $('nsVmL').textContent = isG ? 'VMG' : 'VMC';
+    $('nsVmC').title = isG ? 'Velocity made good: speed straight upwind (or downwind)' : `Velocity made on course: speed toward ${race ? 'the mark' : 'the destination'}`;
+    $('nsVm').innerHTML = vm; $('nsVm').classList.toggle('good', vmg > 0.15);
     if (el.hidden) { el.hidden = false; document.body.classList.add('nav-on'); }
   }
   /** Distance in the card's units: metres close in, nautical miles further off. */

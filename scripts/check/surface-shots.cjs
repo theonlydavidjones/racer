@@ -6,7 +6,7 @@
  */
 const { chromium } = require('playwright');
 const [url, out] = [process.argv[2] || 'http://localhost:5173/', process.argv[3] || '.'];
-const PIECES = ['#helmBar', '#pilot', '#viewBar', '#sailBand', '#map', '#msgLog', '#toast', '#crewPop', '#toolsTray', '#nextCard', '#coachPanel', '#tiller', '#dial', '#hudRight', '#hud', '#leftCol', '#compassBar', '#navStrip']; // (r272: the instruments, the compass and the nav strip too)
+const PIECES = ['#helmBar', '#pilot', '#viewBar', '#sailBand', '#map', '#msgLog', '#toast', '#crewPop', '#toolsTray', '#nextCard', '#coachPanel', '#tiller', '#dial', '#hudRight', '#hud', '#sigPanel', '#compassBar', '#navStrip']; // (r272: the instruments, the compass and the nav strip too)
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const bad = [], errs = [];

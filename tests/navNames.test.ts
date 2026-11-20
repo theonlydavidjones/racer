@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLACES } from '../src/sim/places';
-import { destName, shortName } from '../src/ui/navNames';
+import { destName, legSail, shortName } from '../src/ui/navNames';
 
 // The nav strip's names (the owner, 20 Nov 2026, r272): brief, never truncated, never coordinates or qualifiers.
 describe('the nav strip’s names', () => {
@@ -23,5 +23,13 @@ describe('the nav strip’s names', () => {
   it('a spot on open water takes the nearest named place, never coordinates', () => {
     const al = PLACES.find(p => /alcatraz/i.test(p.name))!;
     expect(destName({ name: '37°49.60′N 122°25.30′W', p: { x: al.p.x + 50, y: al.p.y } })).toBe('Alcatraz');
+  });
+  // (the owner, 20 Nov 2026: "do VMG on beats and runs, VMC on reaches"; the leg against the day's mean wind)
+  it('a windward/leeward course is a beat and a run; a leg across the wind is a reach', () => {
+    const from = 270; // a westerly
+    expect(legSail(270, from)).toBe('beat'); // up to the windward mark
+    expect(legSail(90, from)).toBe('run'); // back down to the leeward mark
+    expect(legSail(0, from)).toBe('reach'); expect(legSail(180, from)).toBe('reach'); // across it
+    expect(legSail(315, from)).toBe('beat'); expect(legSail(135, from)).toBe('run'); // 45° off: still a beat, a run
   });
 });
