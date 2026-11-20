@@ -398,6 +398,10 @@ physics, ranked like the ten above:
 | RHO | 1025 | 23 | standard |  |
 | G | 9.81 | 23 | standard |  |
 | BEAM | 2.21 | 23 | sourced | ORC beam |
+| BEAT_SMOOTH_KT, BEAT_SMOOTH_LIGHT, BEAT_SMOOTH_DEG (beatSearch) | 0.75 kt; ¼ of the wind; 4° | 102 | estimate | the beat angle in chop is the top of the speed made good averaged over this much wind (¼ ½ ¼; in light air a quarter of the wind at most) and angle either side: no helmsman reads finer, and the tables' corners made the raw top swing 5–7° on a quarter-knot puff (tests/beat-chop.test.ts) |
+| B0, B1 (beatSearch) | 30°, 90° | 102 | numerical | the window the beat in chop is searched over: to 90° so light air in a chop, footing off at 60–90°, isn't cut short (cut at 65°: 15% given up at 2 kt in 0.8 m; the physics review, 20 Nov 2026) |
+| BEAT_NO_WAY | 65° | 104 | estimate | the beat angle when she makes no headway at any angle: footing off, wide |
+| LEAN_FADE | 0.3 m | 134 | estimate | the smoothing leans the top 0.5–0.9° toward the wind in flat water; that lean is taken off whole at the first of a chop and faded out by this much chop, so she doesn't step closer to the wind as the chop passes 2 cm (beatFor's switch) and a big chop's sharp top isn't overshot |
 | C_AW | 0.034 | 25 | calibrated |  |
 | CHOP_MEMO | 16 | 77 | numerical |  |
 | YAW_DEPTH | 0.6 | 117 | calibrated |  |
@@ -640,6 +644,7 @@ physics, ranked like the ten above:
 | SLICE_MS, TICK_MS | 2 ms per 16 ms | 187 | design | the background plan's share of the page's thread (an eighth of a 60 fps frame; Capacity's budget) |
 | HELM_TOL | 8 m | 152 | estimate | the plotted track thinned to its corners for the helm (about one boat length; inside NAV_MADE). Settled by: the pilot's track against the plan at a few tolerances (tests/nav-follows-plan) |
 | HELM_OFF, HELM_WIND, HELM_KT, HELM_TIDE, HELM_EVERY (HelmFeed) | 100 m, 10°, 3 kt, 0.3 kt, 5 min | 193 | estimate | when Nav's plan is worked out afresh (on events, not a timer; tests/nav-follows-plan: 12 plans on a 42 min passage, the old cadence 77). Settled by: the page's profile on a Nav passage against how far she strays from a plan grown stale |
+| HELM_BETTER (HelmFeed) | 1 min | 236 | estimate | a plan asked for as a matter of course (a corner made, HELM_EVERY on) replaces the one she's on only if it gets there this much sooner than what's left of hers: about the router's 1-minute grain. Plans afresh at each corner turned her round and back south of the Berkeley Pier ruin (v211's batch). Known limits (the physics review, 20 Nov 2026; parked with the Nav pause): the old plan's forecast is in its own wind, the new one's in today's; and leftOn's nearest point under-reads a track that doubles back |
 
 ### src/sim/outlook.ts (router, 15 Nov 2026)
 
