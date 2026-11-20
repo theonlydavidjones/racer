@@ -75,7 +75,10 @@ details summary u{color:var(--accent);text-decoration:none;font-weight:700;margi
 .ib.on{border-color:var(--accent);color:var(--accent)}
 .ib .mute{display:none} .ib.muted .mute{display:inline} .ib.muted .wave{display:none}
 /* the game's own buttons (the owner, 20 Nov 2026): small and dim, bottom right with the view's, Exit in the corner */
-#viewBar .ib.meta{min-width:46px;height:40px;opacity:.6}
+#viewBar{gap:4px}
+#viewBar .ib.meta{min-width:44px;height:40px;opacity:.6}
+/* (at 1280 the six buttons would reach the sail band's right end: the band steps left, clear of the coach card) */
+@media (max-width:1400px){.sailband,.sailband{left:calc(50% - 356px)!important}}
 #viewBar .ib.meta:hover,#viewBar .ib.meta:focus-visible,#viewBar .ib.meta.on{opacity:1}
 #mapBar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 82px);right:calc(max(16px,env(safe-area-inset-right,0px)) + 208px)}
 #viewBar{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);right:max(16px,env(safe-area-inset-right,0px))}

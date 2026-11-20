@@ -40,7 +40,8 @@ const PIECES = ['#helmBar', '#pilot', '#viewBar', '#sailBand', '#map', '#msgLog'
   const race = () => { document.querySelector('[data-home="race"]').click(); setTimeout(() => document.querySelector('[data-home="create"]')?.click(), 1000); setTimeout(() => document.getElementById('bGo')?.click(), 3000); };
   const cruise = () => { document.querySelector('[data-home="cruise"]').click(); setTimeout(() => document.getElementById('bGo')?.click(), 2500); };
   const lesson = () => { document.getElementById('bLessons').click(); setTimeout(() => document.querySelector('#lessonGrid [data-lesson="tiller"]')?.click(), 1500); };
-  for (const size of [[1280, 720], [1920, 1080]]) for (const [n, f] of [['race', race], ['cruise', cruise], ['lesson', lesson]]) await run(n, size, f);
+  const only = process.argv[4]; // (optional: one mode, e.g. `cruise`, for a quicker look)
+  for (const size of [[1280, 720], [1920, 1080]]) for (const [n, f] of [['race', race], ['cruise', cruise], ['lesson', lesson]]) if (!only || only === n) await run(n, size, f);
   console.log('ERRORS:', errs.join(' | ') || 'none');
   await b.close(); process.exit(errs.length || bad.length ? 1 : 0);
 })();
