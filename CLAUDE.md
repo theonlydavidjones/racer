@@ -141,7 +141,7 @@ node scripts/check/deopt.cjs                  # ~30 s: the first race after load
     ROADMAP's prose. Before handing out or starting a request, check main's code and `git log --grep` for it first.
   - At each publish the Coordinator sends Roadmap the release's request numbers (`git log <prev>..<this> | grep -oE
     'r[0-9]{3}'`), its player-visible changes, and what moved between releases; Roadmap writes the Roadmap rows
-    (requests, and the Releases view's `work`) from that alone. The Coordinator adds the release's section to
+    from that alone. The Coordinator adds the release's section to
     docs/RELEASE-NOTES.md and strikes its ROADMAP items in the same commit as the version row.
   - Anything only the owner can settle aboard Josephine (a measurement, a photo, an observation underway) goes in
     docs/ABOARD-JOSEPHINE.md, not only in a message; it's struck there with their answer when it's used.
