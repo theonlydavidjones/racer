@@ -181,7 +181,7 @@ then it's not a simulator." Later, once the physics and racing are dialed in (th
 
 What's planned, roughly in order. Done work is described in the README.
 
-**v211 (20 Nov, main {H}):** the jumpers set once, the crew's outhaul, the mirror's stale keys (#484). perf-ab clean against v210 (night_start's inset rerun alone: noise); budget 0.9743. Held for v212: the AI's light-air steer with approx.test on 96 seeds, beat-chop with nav-unblock.
+**v211 (20 Nov, main dd11517a (code 4ed2cf3a)):** the jumpers set once, the crew's outhaul, the mirror's stale keys (#484). perf-ab clean against v210 (night_start's inset rerun alone: noise); budget 0.9743. Held for v212: the AI's light-air steer with approx.test on 96 seeds, beat-chop with nav-unblock.
 
 **v210 (19 Nov, main 08afb104):** the AI's penalty turns (#483), the soak, letting a sheet go, detours near boats (#480), the helm's foot, headroom (#482), the jumpers' arrows and readout rounding, Hoist tabs, the weather refresh, the Berkeley Pier gap reopened.
 
