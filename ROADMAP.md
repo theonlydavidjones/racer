@@ -236,6 +236,10 @@ sources. Each shipped item is added there when it's published.
 4. Each bug gets a test that reproduces it before it's fixed.
 5. Bugs are tracked in Owner's Requests' Bugs view, each with its assignee.
 6. Parked until after the sprint: turn drag, the collision changes, the slow-boat keep-clear, and anything new.
+   Also parked (the Coordinator, 20 Nov; Nav paused): **HelmFeed's HELM_BETTER** (navigator.ts, v212) compares the
+   old plan's forecast, made in its own wind, against the new plan's in today's: drift can switch the hysteresis off or
+   keep a stale route. And leftOn's nearest-point lookup under-reads on a track that doubles back (the physics review
+   of beat-chop).
    Also parked (the Coordinator, 19 Nov): **the way off a structure's follow-ups** (8q7, nav-beside, in v210; the
    physics reviews' points left open). The pilot's turn lags the arc it's judged by (1.5 s measured against the arc's 1,
    and a small turn never reaches hard over), so a way off accepted near its 2 m keep may pass closer; the full-rate helm
