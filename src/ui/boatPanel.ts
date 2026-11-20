@@ -265,7 +265,7 @@ export class BoatPanel {
         ${this.leaving ? '<div class="gconfirm">Save changes? <button type="button" class="cta sm" data-act="askSave">Save</button><button type="button" class="ghost" data-act="askDiscard">Discard</button></div>' : ''}
       </div>
       <div class="bpbody be">${ROPE_SHADE}
-      ${grp('her', 'Her', () => [
+      ${grp('her', 'Registration', () => [
         kv('Name', `<input data-k="name" class="pick" maxlength="18" value="${esc(b.name)}">`),
         kv('Sail number', `<span class="be-row2"><select data-k="country" class="pick" aria-label="Home country (national letters)">${SAIL_COUNTRIES.some(c => c[0] === b.sails.country) ? '' : `<option value="${esc(b.sails.country)}" selected>${esc(b.sails.country || 'No letters')}</option>`}${SAIL_COUNTRIES.map(([c, n]) => `<option value="${c}"${c === b.sails.country ? ' selected' : ''}>${c ? `${c} · ${esc(n)}` : esc(n)}</option>`).join('')}</select><input data-k="number" class="pick be-num" inputmode="numeric" maxlength="5" value="${esc(b.sails.number)}" aria-label="Number"></span>`),
       ].join(''))}
