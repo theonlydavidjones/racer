@@ -31,9 +31,9 @@ const warm = (p, which) => p.evaluate(w => { const h = __hud; for (let i = 0; i 
     await p.mouse.move(520, 380); await p.waitForTimeout(1200);
     console.log(name, await frame());
     await warm(p, 'chart'); await p.screenshot({ path: `${out}/${name}.png` });
-    await p.evaluate(() => document.getElementById('bChartPal').click()); await p.waitForTimeout(1200);
+    await p.evaluate(() => document.querySelector('#chartPal [data-pal="dusk"]').click()); await p.waitForTimeout(1200);
     await p.screenshot({ path: `${out}/${name}-dusk.png` });
-    await p.evaluate(() => document.getElementById('bChartPal').click());
+    await p.evaluate(() => document.querySelector('#chartPal [data-pal="day"]').click());
     await p.evaluate(() => document.getElementById('bChartClose').click()); await p.waitForTimeout(800);
   };
   await chart('wind', 'chart-wind'); await inset('inset-wind');

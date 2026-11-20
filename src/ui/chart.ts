@@ -49,12 +49,12 @@ export class Chart {
       this.cx += before.x - after.x; this.cy += before.y - after.y; this.draw();
     }, { passive: false });
     $('bChartClose').onclick = () => this.close();
-    $('bChartPal').onclick = () => {
+    // Day | Dusk, a two-state toggle at the top right beside the field picker (the owner, 20 Nov 2026)
+    document.querySelectorAll<HTMLButtonElement>('#chartPal button').forEach(b => b.addEventListener('click', () => {
       if (!this.w) return;
       // (the palette is the page's own (Hud.shown): the chart redraws with it at once; the race learns it by command)
-      const pal = (this.hud.shown(this.w).chartPal ?? 'day') === 'day' ? 'dusk' : 'day';
-      this.setPal(pal); this.palLabel(); this.draw();
-    };
+      this.setPal(b.dataset.pal === 'dusk' ? 'dusk' : 'day'); this.palLabel(); this.draw();
+    }));
     $('bChartBoat').onclick = () => { if (this.w) { this.cx = this.w.user.x; this.cy = this.w.user.y; this.draw(); } };
     $('bChartGo').onclick = () => {
       if (!this.w || !this.pick) return;
@@ -93,7 +93,7 @@ export class Chart {
     if (!this.raf) this.raf = requestAnimationFrame(tick);
   }
 
-  private palLabel(): void { $('bChartPal').textContent = ((this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day') === 'day' ? 'Dusk colors' : 'Day colors'; }
+  private palLabel(): void { const pal = (this.w ? this.hud.shown(this.w).chartPal : null) ?? 'day'; document.querySelectorAll<HTMLButtonElement>('#chartPal button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.pal === pal))); }
 
   close(): void {
     if (!this.isOpen) return;

@@ -42,10 +42,10 @@ const out = process.argv[2] || '.';
   await p.screenshot({ path: `${out}/layer-clicks-chart.png` });
   // Dusk colors, once each way
   for (const want of ['dusk', 'day']) {
-    await p.click('#bChartPal'); await settle();
-    const pal = await p.evaluate(() => sim().settings.chartPal ?? 'day'), label = await p.evaluate(() => document.getElementById('bChartPal').textContent);
-    const ok = pal === want && label === (want === 'day' ? 'Dusk colors' : 'Day colors');
-    console.log(`palette → ${want}: race has ${pal}, button says "${label}"`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`palette ${want}`);
+    await p.click(`#chartPal [data-pal="${want}"]`); await settle();
+    const pal = await p.evaluate(() => sim().settings.chartPal ?? 'day'), on = await p.evaluate(() => document.querySelector('#chartPal [aria-checked="true"]')?.dataset.pal);
+    const ok = pal === want && on === want;
+    console.log(`palette → ${want}: race has ${pal}, toggle shows ${on}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`palette ${want}`);
   }
   await p.click('#bChartClose'); await p.waitForTimeout(800);
   // the inset map has no buttons of its own (its choices are the chart's menu's: the owner)
