@@ -1173,18 +1173,21 @@ const POLE_MAT = new THREE.MeshLambertMaterial({ color: 0x9aa1a8 });
  * should sit about one inch forward of the aft edge of the deck, about six inches from the tiller on either side"): the
  * tiller's round at its root 2.8 cm, six inches, and half the plate's 2.5 cm. The tiller hard over stays clear of them
  * and of the legs (tests/bsChainplates.test.ts). */
+/** The toerail's inner face, in from the sheer (it stands 3 cm in, 3 cm thick). */
+const TOERAIL_IN = 0.045;
 export const BS_CHAINPLATE = { x: 0.028 + 0.1524 + 0.0125, z: TRANSOM_TOP.z - 0.0254 };
 /** A bridle leg's lower end: on its chainplate's top (starboard's). */
 export const BS_LEG = { x: BS_CHAINPLATE.x, y: deckY(uAtZ(BS_CHAINPLATE.z), BS_CHAINPLATE.x) + 0.04, z: BS_CHAINPLATE.z };
 /**
  * The ensign staff (boat frame): its foot, its length, its rake aft and its truck. Its foot in a flush silver socket in the
  * after deck at the starboard quarter, where the owner measured Josephine's (18 Nov 2026): "equidistant from the toe rail
- * and the starboard chain plate of the back stay", and "about two inches forward" of the deck's aft edge: 0.46 m out, as
- * worked from the plates where they were drawn then (0.3 m out), kept when they moved inboard (ROADMAP 8q4). The tiller stops
+ * and the starboard chain plate of the back stay", and "about two inches forward" of the deck's aft edge: halfway between
+ * the toerail's inner face and the plate where it now is (r248, the owner, 20 Nov 2026: "move the ensign staff to
+ * halfway"), about 0.41 m out. The tiller stops
  * on the deck well short of it (tests/ensignstaff.test.ts). Photos: reference/photos/josephine-ensign-socket-port-
  * quarter.jpg (from the dock looking aft: her starboard side) and josephine-ensign-socket-from-cockpit.jpg.
  */
-export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = 0.46, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
+export const ENSIGN_STAFF = (() => { const h = 1.0, rake = 0.22, z = TRANSOM_TOP.z - 0.0508, x = (halfBeam(uAtZ(z)) - TOERAIL_IN + BS_CHAINPLATE.x) / 2, base = new THREE.Vector3(x, deckY(uAtZ(z), x), z);
   return { h, rake, base, top: base.clone().add(new THREE.Vector3(0, Math.cos(rake) * h, Math.sin(rake) * h)) }; })();
 export function buildBoatMesh(b: Boat): BoatMesh {
   const grp = new THREE.Group(); grp.rotation.order = 'YXZ';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { BS_CHAINPLATE, BS_LEG, ENSIGN_STAFF } from '../src/render/boatMesh';
-import { TRANSOM_TOP, deckY, tillerAxis, uAtZ } from '../src/render/hull';
+import { TRANSOM_TOP, deckY, halfBeam, tillerAxis, uAtZ } from '../src/render/hull';
 import { HARD_OVER } from '../src/boat/balance';
 
 // The backstay's chainplates (the owner, 18 Nov 2026): "backstay attachments are too far forward. the tiller would run
@@ -31,8 +31,12 @@ describe("The backstay's chainplates (render/boatMesh.ts BS_CHAINPLATE)", () => 
     for (let d = -HARD_OVER; d <= HARD_OVER; d += 0.5) if (clear(d) < 0.005) bad.push(`${d}°: ${(clear(d) * 100).toFixed(1)} cm`);
     expect(bad).toEqual([]);
   });
-  it('the ensign staff stays where the owner measured it, clear of the starboard plate', () => {
-    expect(ENSIGN_STAFF.base.x).toBeCloseTo(0.46, 2);
-    expect(ENSIGN_STAFF.base.x - BS_CHAINPLATE.x).toBeGreaterThan(0.15);
+  it('the ensign staff halfway between the toerail and the starboard plate (r248: "move the ensign staff to halfway"), clear of the tiller', () => {
+    const z = ENSIGN_STAFF.base.z, rail = halfBeam(uAtZ(z)) - 0.045; // (the toerail's inner face)
+    expect(ENSIGN_STAFF.base.x - BS_CHAINPLATE.x).toBeCloseTo(rail - ENSIGN_STAFF.base.x, 6);
+    expect(ENSIGN_STAFF.base.x).toBeGreaterThan(0.39); expect(ENSIGN_STAFF.base.x).toBeLessThan(0.43);
+    // (the tiller's whole sweep, to hard over, never reaches the staff's foot: 2 cm round the socket)
+    let w = 9; for (let d = -HARD_OVER; d <= HARD_OVER; d += 0.5) for (const { p, r } of tillerAxis(d * R, 200)) w = Math.min(w, Math.hypot(p.x - ENSIGN_STAFF.base.x, p.z - z) - r - 0.02);
+    expect(w).toBeGreaterThan(0);
   });
 });
