@@ -3,7 +3,7 @@ import { beatFor, seaDrag, steadySpeed } from '../boat/seaway';
 import { crewWords, showCrewRow } from './crewWords';
 import { bow, type Boat } from '../boat/boat';
 import type { CourseMark } from '../courses/course';
-import { PLACES, isSpot } from '../sim/places';
+import { PLACES } from '../sim/places';
 import { harborRouteCached, slipAt } from '../geo/marina';
 import { timeToCover } from '../boat/dynamics';
 import { polar } from '../boat/polar';
@@ -50,6 +50,8 @@ import { onLand } from '../geo/shore';
 import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, type Ink } from './encChart';
 import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
+import { drawCompass } from './compassTape';
+import { destName } from './navNames';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import type { Settings } from '../settings';
 import { drawFog, drawSea, drawSetFog, nm, setFogAlpha } from './mapLayers';
@@ -192,7 +194,6 @@ export class Hud {
     const h = u.h, hdg = String(Math.round(n360(h)) % 360).padStart(3, '0') + '°', hEl = $('hdg');
     if (hEl.textContent !== hdg) hEl.textContent = hdg;
     const upwind = u.twa < 80, from = u.ww.from;
-    const other = upwind ? n360(from + (u.tack === 'S' ? 1 : -1) * (beatFor(u) - (u.leeway ?? 0))) : n360(from + wrap(from - h)); // the mirror image across the wind (close-hauled: the beat is her course's, her heading her leeway higher)
     // average close-hauled heading on this tack: a slow running mean while you're close-hauled
     if (upwind && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 6) { const m = this.meanHdg[u.tack]; this.meanHdg[u.tack] = m == null ? h : n360(m + wrap(h - m) * Math.min(1, dt / 90)); }
     const mean = this.meanHdg[u.tack], lift = $('hdgLift');
@@ -203,39 +204,21 @@ export class Hud {
     }
     if (lift.textContent !== note) { lift.textContent = note; lift.className = cls; }
     const m = w.nextMark(u), markB = m ? brg(m.p.x - u.x, m.p.y - u.y) : null;
+    // the lift/header tint (r272, the owner's H2): only close-hauled and settled on a mean, fading in over a second or two
+    const hauled = upwind && mean != null && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 10;
+    this.tintA = clamp(this.tintA + (hauled ? dt : -dt) / 1.5, 0, 1);
+    const dl = mean != null ? wrap(h - mean) * (u.tack === 'S' ? -1 : 1) : 0, lifted = hauled && dl >= 3;
     // the tape: drawn again only when something on it has moved (a twentieth of a degree is about a tenth of a pixel on
     // it) or it's changed size. Steady on a course it was the same picture redrawn every frame
     const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), q = (a: number) => Math.round(a * 20);
-    const key = [W, H, q(h), q(other), upwind && mean != null ? q(mean) : -1, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
+    const key = [W, H, q(h), this.tintA > 0 && mean != null ? q(mean) : -1, Math.round(this.tintA * 20), lifted ? 1 : 0, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
     if (k0.length === key.length && key.every((v, i) => v === k0[i])) return;
     this.tapeKey = key;
-    const cx = W / 2, span = 50, px = (W - 12) / (2 * span);
-    ctx.clearRect(0, 0, W, H);
-    const x = (b: number) => cx + wrap(b - h) * px;
-    // ticks every 5°, longer every 10°, numbers every 30° (N E S W at the cardinals)
-    ctx.strokeStyle = 'rgba(150,196,218,.45)'; ctx.fillStyle = '#9fb3bf'; ctx.font = '700 9px system-ui, sans-serif'; ctx.textAlign = 'center';
-    for (let d = Math.ceil((h - span) / 5) * 5; d <= h + span; d += 5) {
-      const X = x(d), big = d % 10 === 0;
-      ctx.beginPath(); ctx.moveTo(X, H - 1); ctx.lineTo(X, H - (big ? 8 : 5)); ctx.stroke();
-      if (d % 30 === 0) { const n = ((d % 360) + 360) % 360; ctx.fillText(({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' } as Record<number, string>)[n] ?? String(n).padStart(3, '0'), X, H - 10); }
-    }
-    // a marker from the top edge (wind, mark): a triangle on the tape, or an arrow at the end when it's off the tape
-    const top = (b: number, col: string) => {
-      const X = x(b); ctx.fillStyle = col; ctx.beginPath();
-      if (X < 6) { ctx.moveTo(0, 6); ctx.lineTo(7, 1); ctx.lineTo(7, 11); }
-      else if (X > W - 6) { ctx.moveTo(W, 6); ctx.lineTo(W - 7, 1); ctx.lineTo(W - 7, 11); }
-      else { ctx.moveTo(X - 5, 0); ctx.lineTo(X + 5, 0); ctx.lineTo(X, 7); }
-      ctx.fill();
-    };
-    // a small tick under the tape (the other tack, the average): only while it's on the tape
-    const low = (b: number, col: string) => { const X = x(b); if (X < 2 || X > W - 2) return; ctx.fillStyle = col; ctx.fillRect(X - 1, H - 10, 2, 10); };
-    low(other, '#7f949f');
-    if (upwind && mean != null) low(mean, '#e8e8e8');
-    top(from, '#6fb7ff');
-    if (markB != null) top(markB, '#ffd21a');
-    // the lubber line
-    ctx.strokeStyle = '#ffb35c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke(); ctx.lineWidth = 1;
+    drawCompass(ctx, W, H, h, from, markB, this.tintA > 0 && mean != null ? { mean, lifted: dl >= 0, alpha: this.tintA } : null, lifted);
   }
+  /** The lift/header tint's opacity (0 hidden … 1 shown): it fades in once she's close-hauled and settled. */
+  private tintA = 0;
+
 
 
   private trCache: { key: string; t: ReturnType<SimView['laylineTransit']> } = { key: '', t: null };
@@ -359,7 +342,7 @@ export class Hud {
       sl.title = `${ww.kt.toFixed(1)} kt of wind on the water here${why ? ', ' + why : ''}`;
       sl.className = 'sub' + (blanket ? ' head' : k > 1.08 ? ' lift' : '');
     }
-    this.situation(w, u); this.lineBox(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
+    this.situation(w, u); this.lineBox(w, u); this.navStrip(w, u); this.dialC.hidden = !w.settings.windDial; if (w.settings.windDial) this.dial(u); this.map(w, u);
   }
 
   /** How each sail is drawing, in words, with what to do about it. */
@@ -545,6 +528,34 @@ export class Hud {
     l.dataset.end = ends[0][0]; l.textContent = `◀ ${ends[0][1]}`; l.setAttribute('aria-pressed', String(this.favCall === ends[0][0]));
     r.dataset.end = ends[1][0]; r.textContent = `${ends[1][1]} ▶`; r.setAttribute('aria-pressed', String(this.favCall === ends[1][0]));
   }
+  /** What the nav strip last showed (written only when it changes). */
+  private nsKey = '';
+  /**
+   * The nav strip, top right (r272, the owner, 20 Nov 2026): where she's bound and how it lies, in the chartplotter's
+   * terms, one row; only what the instruments don't already show (no speed, heading or clock). Cruising: the destination
+   * (its short name: ui/navNames.ts), BRG, DTW, TTG and VMC (her speed made good toward it, over the ground). Racing: the
+   * next mark by its code and the side it's left to, BRG, DTW and VMG toward it. No destination, no strip: the inset alone.
+   * Each label's hover says it in full.
+   */
+  private navStrip(w: SimView, u: Boat): void {
+    const el = $('navStrip'), race = !w.cruising;
+    const m = !race ? (w.dest && w.arrivedT == null ? w.dest : null) : u.finished || u.retired ? null : w.nextMark(u);
+    if (!m) { if (!el.hidden) { el.hidden = true; document.body.classList.remove('nav-on'); this.nsKey = ''; } return; }
+    const p = m.p, r = dist(u, p), b = brg(p.x - u.x, p.y - u.y), vmc = (u.vx * (p.x - u.x) + u.vy * (p.y - u.y)) / Math.max(1, r), ttg = vmc > 0.1 ? r / vmc : Infinity;
+    const [n, un] = this.range(r), name = destName(m, race);
+    const side = race ? (m.side === 's' ? ' <span class="s">▶ stbd</span>' : ' <span class="p">◀ port</span>') : '';
+    const ttgS = !isFinite(ttg) ? '--' : ttg < 3600 ? `${Math.round(ttg / 60)}<small>min</small>` : `${(ttg / 3600).toFixed(1)}<small>h</small>`;
+    const brgS = `${String(Math.round(b) % 360).padStart(3, '0')}<small>°</small>`, vm = `${(vmc / KT).toFixed(1)}<small>kn</small>`;
+    const key = [race, name, side, brgS, n, un, ttgS, vm].join('|');
+    if (key === this.nsKey) return; this.nsKey = key;
+    $('nsLab').textContent = race ? 'Next' : 'To'; $('nsName').textContent = name; if (side) $('nsName').insertAdjacentHTML('beforeend', side);
+    $('nsBrgC').title = race ? 'Bearing to the mark' : 'Bearing to the destination';
+    $('nsBrg').innerHTML = brgS; $('nsDtw').innerHTML = `${n}<small>${un}</small>`;
+    $('nsTtgC').hidden = race; $('nsTtg').innerHTML = ttgS;
+    $('nsVmL').textContent = race ? 'VMG' : 'VMC'; $('nsVmC').title = race ? 'Velocity made good' : 'Velocity made good toward the destination';
+    $('nsVm').innerHTML = vm; $('nsVm').classList.toggle('good', vmc > 0.15);
+    if (el.hidden) { el.hidden = false; document.body.classList.add('nav-on'); }
+  }
   /** Distance in the card's units: metres close in, nautical miles further off. */
   private range(m: number): [string, string] { return m < 0.2 * 1852 ? [m.toFixed(0), 'm'] : [(m / 1852).toFixed(m < 1852 * 10 ? 1 : 0), 'nm']; }
 
@@ -558,7 +569,6 @@ export class Hud {
     const el = $('linebox'), C = w.C;
     if (w.t >= 0 || u.finished) this.askRow(w, false);
     if (u.finished) { $('nextCard').hidden = true; return; }
-    const T = (x: number, y: number, t: string, c = '#94abb7') => `<text x="${x}" y="${y}" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${t}</text>`;
     if (w.cruising) { // (cruising, or retired from the race and heading home)
       // just sailing: how you're doing against the boat's target speed at this angle
       const vtU = polar(u.ww.kt, u.twa, sailPlan(u)), target = steadySpeed(vtU, v => seaDrag(u.sea, u.h, v), driveCurveFor(u.ww.kt, u.twa, vtU)), pct = target > 0.05 ? Math.round(100 * u.v / target) : 0;
@@ -568,12 +578,9 @@ export class Hud {
       if (d && w.arrivedT == null) {
         // to the destination: range and bearing, your speed made good toward it over the ground (with the current), and how long at that rate
         const rng = dist(u, d.p), b = brg(d.p.x - u.x, d.p.y - u.y), vmc = (u.vx * (d.p.x - u.x) + u.vy * (d.p.y - u.y)) / Math.max(1, rng);
-        const eta = vmc > 0.1 ? rng / vmc : Infinity, [n, un] = this.range(rng);
-        const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 55);
-        this.card('', 'Navigator', n, un, `<circle cx="75" cy="36" r="4" fill="#3fd197"/><path d="M75 36 L${mx} 12" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
-          + `<path d="M${mx} 2 v14 M${mx} 2 l9 4 l-9 4" fill="#ffb627" stroke="#ffb627" stroke-width="1.5"/>${isSpot(d.name) ? '' : T(clamp(mx, 40, 110), 46, d.name.toUpperCase().slice(0, 22), '#ffb627')}`); // (a spot on open water: the flag alone, its position not spelled out: the owner, 17 Nov 2026)
-        el.innerHTML = `${String(Math.round(b)).padStart(3, '0')}° · ` + (vmc > 0.05 ? `making ${(vmc / KT).toFixed(1)} kt toward it${isFinite(eta) ? ` · ${eta < 60 ? 'under a minute' : eta < 3600 ? Math.round(eta / 60) + ' min' : (eta / 3600).toFixed(1) + ' h'}` : ''}` : 'sailing away from it')
-          + `<br><small>${speed}</small>`;
+        // (the nav strip, top right, has it now: r272)
+        void rng; void b; void vmc;
+        if (!$('nextCard').hidden) { $('nextCard').hidden = true; this.cardKey = ''; }
         return;
       }
       // no destination, no card (the owner, 13 Nov: it only repeated the boat speed)
@@ -617,13 +624,9 @@ export class Hud {
       const m = w.nextMark(u), tgt = m ? m.p : w.center;
       const d = dist(u, tgt), b = brg(tgt.x - u.x, tgt.y - u.y), bs = String(Math.round(b)).padStart(3, '0'), [n, un] = this.range(d);
       if (m) {
-        // the mark ahead or abeam, as it bears from her bow; a curl round it the way it's left
-        const rel = wrap(b - u.h), mx = Math.round(75 + clamp(rel / 90, -1, 1) * 45), side = m.side === 's' ? 1 : -1;
-        const name = m.name.toUpperCase().slice(0, 22);
-        this.card('', 'Next mark', n, un, `<circle cx="${mx}" cy="14" r="6" fill="#ffb627"/>${T(clamp(mx, 45, 105), 44, name, '#ffb627')}`
-          + `<path d="M75 34 C 75 ${24}, ${mx - side * 14} 8, ${mx} 4 C ${mx + side * 12} 2, ${mx + side * 14} 18, ${mx + side * 8} 24" fill="none" stroke="#3fd197" stroke-width="2" stroke-dasharray="3 3"/>`
-          + `<circle cx="75" cy="34" r="4" fill="#3fd197"/>`);
-        el.innerHTML = `Leave it to ${m.side === 's' ? 'starboard' : 'port'} · bearing ${bs}°`;
+        // (the next mark is the nav strip's now, top right: r272)
+        void d; void bs; void n; void un;
+        if (!$('nextCard').hidden) { $('nextCard').hidden = true; this.cardKey = ''; }
       } else {
         const ends: [string, string] = [C.pinLabel.toUpperCase().split(' ')[0].slice(0, 8), C.committeeLabel.toUpperCase().split(' ')[0].slice(0, 8)];
         const near = dist(u, w.pin) < dist(u, w.committee) ? 0 : 1;
