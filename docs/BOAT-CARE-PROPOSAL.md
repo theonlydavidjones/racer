@@ -45,10 +45,13 @@ Water aboard is then weight: low and free to slosh, it moves to leeward and cost
 through condition.ts's extra weight, the way gear and the outboard already do. A researcher run comes first; no
 invented rates.
 
-## Questions for the owner
+## The owner's answers (20 Nov 2026)
 
-1. Is a **Care tab** on her page the right place, or should it be part of the marina (her slip, once the marina picker
-   is in)?
-2. Should fouling grow on the real clock, so a boat left unsailed gets slower? That's realistic but could annoy.
-3. Should cleaning be instant (a diver between sails) or take time (a haul-out, laid up for a day)?
-4. Is bilge pumping wanted now, or only after the research?
+1. **A Care tab on her page.** Later, her slip on the marina chart opens the same tab.
+2. **Fouling grows on your own clock, and is visible**, once Care is built. **Until then she doesn't foul while she
+   sits**, which is how it already works: nothing advances `cleanedWeeks`.
+3. **No haul-out for regular cleaning.** Sailors do it themselves: from the dock with a broom, leaning over the side
+   where there's no dock, or they hire a diver, Mike. A haul-out for new paint is a separate, rare thing.
+4. **Bilge: research first.** The other tiles don't wait on it.
+
+The wider gameplay plan is in docs/DOCK-WORK-PLAN.md.
