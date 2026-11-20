@@ -70,9 +70,9 @@ const vid = new Map(), VX = [], VY = [], VZ = [], idx = [];
 const vert = (x, y) => { const k = y * S + x; let v = vid.get(k); if (v === undefined) { v = VX.length; vid.set(k, v); VX.push(x); VY.push(y); VZ.push(Math.round(G[k] * 100)); } return v; };
 for (const [ax, ay, bx, by, cx, cy] of tris) {
   if (Math.max(G[ay * S + ax], G[by * S + bx], G[cy * S + cx]) < -0.3) continue; // wholly under water: hidden
-  // wound counter-clockwise seen from above (y is south on the grid, so reversed there)
+  // wound counter-clockwise seen from above (grid y is south, three.js z too: x then z is clockwise on the page, so the grid cross product is positive for the front face when the order is a, c, b)
   const a = vert(ax, ay), b = vert(bx, by), c = vert(cx, cy), cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
-  idx.push(...(cross > 0 ? [a, b, c] : [a, c, b]));
+  idx.push(...(cross > 0 ? [a, c, b] : [a, b, c]));
 }
 
 // ---- pack: x, y (uint16), height (int16, cm), then indices (uint16, as the step from the last index, zigzag), deflated

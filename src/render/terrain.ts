@@ -7,6 +7,7 @@ import { limePointBox, limePointLand, onGround } from '../geo/shore';
 import { CHART_PIERS, chartCoast, shoreKind } from './shoreFit';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { inBasin } from '../geo/marina';
+import { inAlcatrazSquare } from './alcatraz';
 
 /**
  * The land around the race area from real elevation data (scripts/fetch-terrain.mjs: USGS-derived open terrain
@@ -208,6 +209,11 @@ export async function buildTerrain(scene: THREE.Scene, month: number): Promise<T
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i; if (H[k] <= 0) continue;
     if (inBasin({ x: corner.x + i * dx, y: corner.y + j * dy })) H[k] = -2;
+  }
+  // Alcatraz is drawn from the 1 m lidar (render/alcatraz.ts): the 50 m cells' lump of it goes
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i; if (H[k] <= 0) continue;
+    if (inAlcatrazSquare(M.north - (M.north - M.south) * j / (ny - 1), M.west + (M.east - M.west) * i / (nx - 1))) H[k] = -2;
   }
   const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
