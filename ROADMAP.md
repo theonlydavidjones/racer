@@ -271,6 +271,7 @@ sources. Each shipped item is added there when it's published.
    today). It takes over the "Alcatraz, properly built out" item (6–10 h) and widens it. The plan, in four phases
    (Alcatraz, then the city blocks, then the hero landmarks, then night windows): docs/plans/cityfront-alcatraz.md.
    **Phase 1 started, lightly (owner, 20 November 2026; within the sprint; Bay East; r254):** step 1 is a researcher pass on sources and licenses (the 3DEP DEM and lidar, HABS drawings, OSM, NPS); step 2, next, is the island's terrain only, from the 1 m DEM, plus moving the existing buildings to their real footprints, with the size and frame cost measured first and stills to the owner. The detailed structures wait until after the reset or later.
+   **Phase 1 built; 1b and 2 (owner, 20 November 2026):** phase 1 (the island's terrain and massing) is built on scenery/alcatraz-r254 and goes in v214. The owner approved laz-perf as a build-script-only devDependency, for the lidar. Phase 1b, the Alcatraz building heights from the lidar, is now (Scenery; r295). Phase 2, the city front from Fort Point to Fisherman's Wharf, is next, after the Tuesday 24 November reset (Scenery; r296). Commits name r254 for phase 1 and r295 and r296 for the rest.
 
 **The open work, ranked** (owner, 12 November 2026, after an audit of every item against main; hours ±50%):
 1. ~~P0 phase 2: the interior true to a real Folkboat~~ (done: the berths in the GRP inner molding with brown cushions,
