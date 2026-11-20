@@ -51,14 +51,21 @@ export function keyMenu(button: HTMLElement, pop: HTMLElement, key: (el: HTMLEle
 export const SWITCH_LAYERS = LAYERS.filter(l => !(FIELD_LAYERS as readonly string[]).includes(l.key));
 export const switchesHtml = (s: Settings): string => SWITCH_LAYERS.map(l =>
   `<label title="${l.what}"><input type="checkbox" data-layer="${l.key}"${layerOn(s, l.key) ? ' checked' : ''}><span>${l.name}</span></label>`).join('');
-export function layersMenu(button: HTMLElement, pop: HTMLElement, get: () => Settings | null, set: (k: LayerKey, on: boolean) => void, changed: () => void): () => void {
-  const render = () => { const s = get(); if (s) pop.innerHTML = switchesHtml(s); };
-  wirePop(button, pop, render);
-  pop.addEventListener('change', e => {
+/** The chart's Layers panel (top left): a header that folds the switches open and closed, its state kept per viewer
+ * (the owner, 20 Nov 2026). Open by default. */
+const OPEN_KEY = 'fbsim-chart-layers-open';
+export function layersMenu(button: HTMLElement, body: HTMLElement, get: () => Settings | null, set: (k: LayerKey, on: boolean) => void, changed: () => void): () => void {
+  let open = true;
+  try { open = localStorage.getItem(OPEN_KEY) !== '0'; } catch { /* (no storage: open) */ }
+  const paint = () => { body.hidden = !open; button.setAttribute('aria-expanded', String(open)); button.textContent = open ? 'Layers ▾' : 'Layers ▸'; };
+  const render = () => { const s = get(); if (s) body.innerHTML = switchesHtml(s); };
+  button.addEventListener('click', e => { e.stopPropagation(); open = !open; try { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* (kept for this visit only) */ } if (open) render(); paint(); });
+  body.addEventListener('change', e => {
     const t = e.target as HTMLInputElement, k = t.dataset.layer as LayerKey | undefined;
     if (k) { set(k, t.checked); render(); changed(); }
   });
-  return () => { if (!pop.hidden) render(); };
+  render(); paint();
+  return () => render();
 }
 /** A button that opens a pop and closes it on a click elsewhere. */
 function wirePop(button: HTMLElement, pop: HTMLElement, render: () => void): void {

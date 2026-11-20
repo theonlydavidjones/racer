@@ -29,7 +29,7 @@ const out = process.argv[2] || '.';
     console.log(`chart chip ${f}: ticked ${d.checked.join(',')}, drawn ${d.kind}`, ok ? 'ok' : 'DIDN\'T TAKE'); if (!ok) fails.push(`chart chip ${f}`);
   }
   // the chart's own Layers menu: each row once
-  await p.click('#bChartShow'); await p.waitForTimeout(600);
+  await p.waitForTimeout(600); // (the Layers panel is open by default)
   const rows = await p.evaluate(() => [...document.querySelectorAll('#chartShowPop input')].filter(i => i.dataset.field || i.dataset.layer).map(i => i.dataset.field ? `field:${i.dataset.field}` : `layer:${i.dataset.layer}`));
   for (const r of rows) {
     const [kind, v] = r.split(':'), sel = kind === 'field' ? `#chartField [data-field="${v}"]` : `#chartShowPop [data-layer="${v}"]`;

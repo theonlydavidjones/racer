@@ -23,7 +23,7 @@ const warm = p => p.evaluate(() => { for (let i = 0; i < 150; i++) __hud.insetSt
   // the inset's view is chosen in Settings (no buttons on the inset: the owner), and remembered
   await p.evaluate(() => document.getElementById('map').click()); await p.waitForTimeout(2000);
   await p.evaluate(() => document.getElementById('bChartClose').click()); await p.waitForTimeout(500);
-  await p.evaluate(() => document.querySelector('#insetSeg [data-v="nav"]').click()); await p.waitForTimeout(500);
+  await p.evaluate(() => document.getElementById('insetNavTog').click()); await p.waitForTimeout(500);
   await p.evaluate(() => document.getElementById('map').click()); await p.waitForTimeout(2000);
   await p.screenshot({ path: `${out}/chart-after-inset-choice.png` });
   console.log('remembered:', await p.evaluate(() => JSON.parse(localStorage.getItem('fbsim-settings-v2') || '{}').insetView));

@@ -1155,13 +1155,10 @@ function chartToNav(): void { chart.close(); if (w.cruising) navView.open(w); el
 $('bChartNav').onclick = chartToNav;
 /** Cruising, the navigator is one of the inset map's views (the owner: "It should just be a view in the inset map"),
  * chosen in Settings and remembered with your settings (no buttons on the inset: the owner). */
-function paintInsetSeg(): void { document.querySelectorAll<HTMLButtonElement>('#insetSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === (S.insetView ?? 'map')))); }
-$('insetSeg').addEventListener('click', e => {
-  const b = (e.target as HTMLElement).closest('button'); if (!b) return;
-  S.insetView = b.dataset.v === 'nav' ? 'nav' : 'map'; saveSettings(S); insetViews();
-});
+const insetNavTog = $<HTMLInputElement>('insetNavTog');
+insetNavTog.addEventListener('change', () => { S.insetView = insetNavTog.checked ? 'nav' : 'map'; saveSettings(S); insetViews(); });
 function insetViews(): void {
-  paintInsetSeg();
+  insetNavTog.checked = S.insetView === 'nav';
   const cruising = !!w?.cruising;
   $('bCourse').hidden = true; // (the course opens from the where-next card: the surface audit, owner 13 Nov)
   hud.insetView = cruising ? S.insetView ?? 'map' : 'map'; // (chosen in Settings, and remembered)

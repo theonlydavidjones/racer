@@ -19,14 +19,17 @@ describe('the chart\'s menus (owner chart, 20 Nov)', () => {
     expect(g).not.toContain('NOAA chart (US Chart No. 1)');
     expect(g).not.toContain("head('On the map')");
   });
-  it('the switches are a Layers dropdown beside the field picker, top right', () => {
-    expect(html).toMatch(/class="ch-layers"><div id="chartField"[\s\S]*?id="bChartShow"[^>]*>Layers/);
-    expect(read('src/styles/04-screens.css')).toMatch(/\.ch-layers,#planField\{position:absolute;right:72px/);
+  it('the switches are a collapsible Layers panel top left; the field picker stays top right', () => {
+    expect(html).toMatch(/id="chartField"[\s\S]*?class="ch-lpanel"[\s\S]*?id="bChartShow"[^>]*>Layers/);
+    const css = read('src/styles/04-screens.css');
+    expect(css).toMatch(/#chartField,#planField\{position:absolute;right:72px/);
+    expect(css).toMatch(/\.ch-lpanel\{position:absolute;left:12px/);
+    expect(read('src/ui/layers.ts')).toContain("'fbsim-chart-layers-open'");
     expect(SWITCH_LAYERS.map(l => l.key)).toEqual(['ships', 'laylines', 'shadows']);
     expect(switchesHtml(DEFAULT_SETTINGS as never)).toContain('data-layer="shadows"');
   });
-  it('what the inset shows is in Settings, and Points of sail is a Tools tile', () => {
-    expect(html).toMatch(/id="insetSeg"[\s\S]*?data-v="map"[\s\S]*?data-v="nav"/);
+  it('what the inset shows is one Settings toggle, and Points of sail is a Tools tile', () => {
+    expect(html).toMatch(/Show passage in inset map while cruising<input type="checkbox" id="insetNavTog"><span class="tog-sw">/);
     expect(read('src/app.ts')).toContain("{ id: 'pointsRose'");
   });
   it('the chart draws no spot names, only the buoys', () => {
