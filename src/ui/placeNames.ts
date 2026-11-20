@@ -2,8 +2,7 @@ import type { Vec } from '../core/math';
 import { PLACES, place } from '../sim/places';
 import { nearFeature } from '../sim/brief';
 import { isSpot } from '../sim/places';
-import { isRemovedSpot } from '../settings';
-export { isRemovedSpot };
+export { isRemovedSpot } from '../settings';
 
 /**
  * What the player can pick on the charts (the owner, 20 Nov 2026: "remove them from the pickers too"): her slip, the racing
