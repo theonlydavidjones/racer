@@ -30,3 +30,14 @@ export function clubFromBoats(boats: readonly Pick<BoatSpec, 'id' | 'club'>[], s
   const top = Math.max(...n.values()), mine = boats.find(b => b.id === sailing)?.club;
   return mine && n.get(mine) === top ? mine : [...n].find(([, k]) => k === top)![0];
 }
+
+/**
+ * Join (or switch to) a club, or leave ('' ): your boats fly its burgee, all of them, whoever skippers them (the owner,
+ * 20 Nov 2026, r273: a boat flies her owner's club burgee; the club isn't set per boat). The club's own fleet, its stock
+ * and generic boats, keep their clubs: they aren't yours.
+ */
+export function setClub<T extends { club?: string; boats: BoatSpec[]; boat: BoatSpec; boatId: string }>(S: T, id: string): void {
+  S.club = id;
+  S.boats = S.boats.map(b => b.club === id ? b : { ...b, club: id });
+  S.boat = S.boats.find(b => b.id === S.boatId) ?? S.boats[0];
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canEnterSeason, clubFromBoats, joinableClubs, myClub } from '../src/club/membership';
+import { canEnterSeason, clubFromBoats, joinableClubs, myClub, setClub } from '../src/club/membership';
+import { NEW_BOAT } from '../src/boat/spec';
 
 describe('membership (r276)', () => {
   it('any racing club opens the season; none, or a club that is not joinable, does not', () => {
@@ -22,5 +23,13 @@ describe('membership (r276)', () => {
     expect(clubFromBoats([{ id: 'a', club: 'ggyc' }])).toBe('ggyc');
     expect(clubFromBoats([{ id: 'a', club: 'ggyc' }, { id: 'b', club: 'byc' }, { id: 'c', club: 'byc' }], 'a')).toBe('byc');
     expect(clubFromBoats([{ id: 'a', club: 'ggyc' }, { id: 'b', club: 'byc' }], 'b')).toBe('byc');
+  });
+
+  it('your boats fly your club\'s burgee, all of them, whoever skippers them (r273)', () => {
+    const a = { ...NEW_BOAT, id: 'a', club: 'ggyc' }, b = { ...NEW_BOAT, id: 'b', club: '', skipper: 'ai' as const };
+    const S = { club: 'ggyc', boats: [a, b], boat: a, boatId: 'a' };
+    setClub(S, 'byc');
+    expect(S.club).toBe('byc'); expect(S.boats.map(x => x.club)).toEqual(['byc', 'byc']); expect(S.boat).toBe(S.boats[0]);
+    setClub(S, ''); expect(S.boats.every(x => x.club === '')).toBe(true);
   });
 });

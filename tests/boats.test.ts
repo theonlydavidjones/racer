@@ -54,6 +54,9 @@ describe('your boats: saved, named, chosen', () => {
     expect(loadSettings().club).toBe('byc');
     store.set(KEY, JSON.stringify({ burgee: 'ggyc', club: '' })); // (left the club: stays out)
     expect(loadSettings().club).toBe('');
+    // (older saves had a club per boat: all now fly the player's, r273)
+    store.set(KEY, JSON.stringify({ boats: [{ id: 'a', name: 'A', club: 'ggyc' }, { id: 'b', name: 'B', club: 'byc' }, { id: 'c', name: 'C', club: 'byc' }], boatId: 'a' }));
+    const s = loadSettings(); expect(s.club).toBe('byc'); expect(s.boats.map(b => b.club)).toEqual(['byc', 'byc', 'byc']); expect(s.boat.club).toBe('byc');
   });
 
   it("the new player's boat looks as the owner set her (r273): teak, wooden spars, buff, pearl, black", () => {

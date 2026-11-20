@@ -2,7 +2,7 @@ import type { LessonId } from './sim/lessons';
 import { DEFAULT_BOAT, NEW_BOAT, fixSpec, type BoatSpec } from './boat/spec';
 import { isGeneric } from './boat/generic';
 import type { Person } from './boat/crewPhys';
-import { clubFromBoats } from './club/membership';
+import { clubFromBoats, setClub } from './club/membership';
 export interface Settings {
   mode: 'race' | 'drill' | 'sail' | 'manoeuvres' | 'roundings' | 'lesson'; // (and a Learn to sail lesson, open water, alone: sim/lessons.ts) full race, start practice (from one minute to go), just sail (open water, no race), the tack and gybe drill (open water, alone), or the mark-rounding drill (laps of the practice course, alone)
   /** The practice modes' saved bests, shared (the start-line drill's keys 'start-…' when it keeps them): the tack and gybe
@@ -124,6 +124,7 @@ export function loadSettings(): Settings {
   s.boats = boats; s.boat = boats.find(b => b.id === s.boatId) ?? boats[0]; s.boatId = s.boat.id; delete s.burgee;
   // (a save from before membership, r276: you belong to the club your boats fly, so your season stays open; a new player, none)
   if (typeof s.club !== 'string') s.club = fresh ? '' : clubFromBoats(boats, s.boatId);
+  setClub(s, s.club); // (your boats fly your club's burgee: older saves had one per boat, r273)
   // (before real rain, rain 0 was the only "nothing set": an older save's 0 becomes the real record's, once)
   if (!s.rainV) { if (!s.rain) s.rain = 'real'; s.rainV = 1; }
   // your opponents: older saves had only a number of stock boats

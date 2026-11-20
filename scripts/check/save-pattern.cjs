@@ -88,6 +88,24 @@ const out = process.argv[2] || '.';
   if ((await stored()).boats?.[0]?.hull?.upper !== newHull) fail('Discard in the editor changed what was saved');
   // 3. a new boat: the editor opens on her, her sail number and home country there to set (8u)
   if (await page.evaluate(() => !document.getElementById('boatPanel').hidden)) { await click('#boatPanel [data-act="done"]'); await page.waitForTimeout(800); }
+  // 2b. a new boat's Discard (r273, the owner): unchanged, she's thrown away at once; changed, asked first; either way
+  // your boats as they were, and back to the list
+  const nBoats = (await stored()).boats.length;
+  await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(400);
+  await click('[data-f="new"]'); await page.waitForTimeout(2500);
+  if (!(await has('#boatPanel [data-act="drop"]'))) fail('no Discard in a new boat\'s editor');
+  await click('#boatPanel [data-act="drop"]'); await page.waitForTimeout(1500);
+  if (await has('#boatPanel [data-act="dropYes"]') && await page.evaluate(() => !document.getElementById('boatPanel').hidden)) fail('Discard on an unchanged new boat asked first');
+  if ((await stored()).boats.length !== nBoats) fail('Discard kept the new boat');
+  if (await page.evaluate(() => !document.getElementById('boatPanel').hidden)) fail('Discard didn\'t close the editor');
+  await click('[data-f="new"]'); await page.waitForTimeout(2500);
+  await page.evaluate(() => { const e = document.querySelector('#boatPanel [data-k="country"]'); e.value = 'DEN'; e.dispatchEvent(new Event('change', { bubbles: true })); }); await page.waitForTimeout(800);
+  await click('#boatPanel [data-act="drop"]'); await page.waitForTimeout(600);
+  if (!(await has('#boatPanel [data-act="dropYes"]'))) fail('Discard on a changed new boat didn\'t ask');
+  await page.screenshot({ path: out + '/save-boat-new-discard.png' });
+  await click('#boatPanel [data-act="dropYes"]'); await page.waitForTimeout(1500);
+  if ((await stored()).boats.length !== nBoats) fail('Discard (asked) kept the new boat');
+  console.log('new boat Discard:', (await stored()).boats.length === nBoats ? 'thrown away' : 'KEPT');
   await click('[data-f="tab"][data-v="boats"]'); await page.waitForTimeout(400);
   await click('[data-f="new"]'); await page.waitForTimeout(2500);
   if (await page.evaluate(() => document.getElementById('boatPanel').hidden)) await click('[data-f="edit"]').catch(() => {}), await page.waitForTimeout(2500);

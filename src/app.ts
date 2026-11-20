@@ -1600,7 +1600,8 @@ boatPanel = new BoatPanel(S, save => {
   if (was && was.id === next.id && lookOnly(was, next)) void host.ask({ k: 'look', spec: structuredClone(next) }).then(() => { const t0 = performance.now(); view.rebuildBoat(w, w.boats.indexOf(w.user)); performance.measure('editor: restyle', { start: t0 }); }); // (timed: scripts/check/editor-perf.cjs)
   else setup.newGame();
   boatSummary(); oppRows();
-}, saved => {
+}, (saved, discarded) => {
+  if (discarded) { boatPanel.hide(); fleet.openList(); return; } // (a new boat thrown away: back to the Yacht Club's list, where New boat was)
   const id = boatPanel.editing.id; boatPanel.hide(); nav.go({ k: 'boat', id }); // back to her page in the Yacht Club
   if (saved) fleet.flashSaved();
 });
@@ -1622,7 +1623,7 @@ const fleet: Fleet = new Fleet(S, {
   membersChanged: () => { saveMembers(MEMBERS); pullCrew(S, MEMBERS); saveSettings(S); },
   showroom: b => { showroom(!!b || boatPanel.open); setup.newGame(); },
   // (her page already has her on show, in the same World: the editor opens on it, no new one; ROADMAP 8v)
-  edit: id => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id); if (!same) setup.newGame(); },
+  edit: (id, isNew) => { const same = !!w && w.user?.spec?.id === id && document.body.classList.contains('showroom'); showroom(true); boatPanel.show(id, isNew); if (!same) setup.newGame(); },
   sail: (id, mode, fromSlip) => {
     const b = S.boats.find(x => x.id === id); if (!b) return;
     S.boat = b; S.boatId = b.id; S.opponents = S.opponents.filter(o => o !== b.id); S.fleet = S.opponents.length; crewFromClub();
