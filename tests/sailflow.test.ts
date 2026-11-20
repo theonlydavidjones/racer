@@ -140,3 +140,26 @@ describe('the flow view: the illustrative flow', () => {
     for (const [x, y] of [[-2.5, -4], [3, 4], [-2, 3], [3.5, -4.5]]) { const a = f(x, y), c = g(x, y); expect(Math.hypot(a[0] - c[0], a[1] - c[1])).toBeLessThan(0.02); }
   });
 });
+
+describe('the flow view with one sail down (the owner, 15 Nov 2026: "check that the wind over sails map is accounting for when I\'m sailing on just jib or just main")', () => {
+  const words = (b: Boat) => flowWords(flowState(b), b).map(([, h]) => h).join(' ');
+  it('on the main alone: no jib cut, no jib numbers, no slot, and its telltales gone', () => {
+    const b = sailing(318, 12, b => { b.rig = { main: 1, jib: 0, mainUp: true, jibUp: false }; }), st = flowState(b);
+    expect(b.trim.jib).toBeTruthy(); // (the sim still trims the lowered jib's sheet: the view must look at the halyard)
+    expect(st.sails.map(s => s.sail)).toEqual(['main']);
+    for (const c of st.cuts) expect(c.sections.map(s => s.sail)).toEqual(['main']);
+    expect(words(b)).not.toMatch(/Jib|slot/);
+  });
+  it('on the jib alone: no main cut, no main numbers, no slot', () => {
+    const b = sailing(318, 12, b => { b.rig = { main: 0, jib: 1, mainUp: false, jibUp: true }; }), st = flowState(b);
+    expect(st.sails.map(s => s.sail)).toEqual(['jib']);
+    for (const c of st.cuts) for (const s of c.sections) expect(s.sail).toBe('jib');
+    expect(st.cuts[0].sections.length).toBe(1); // (low down, the jib's there)
+    expect(words(b)).not.toMatch(/Main|slot/);
+  });
+  it('both up: both sails, and the slot', () => {
+    const b = sailing(318, 12), st = flowState(b);
+    expect(st.sails.map(s => s.sail)).toEqual(['jib', 'main']);
+    expect(words(b)).toMatch(/slot/);
+  });
+});

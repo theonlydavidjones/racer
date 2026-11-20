@@ -1,6 +1,6 @@
 import { CE_ABOVE_WL, RIG } from '../boat/balance';
 import type { Boat } from '../boat/boat';
-import { byHand, crewEaseBoom, sailFrame } from '../boat/physics';
+import { byHand, crewEaseBoom, sailFrame, sailUp } from '../boat/physics';
 import { SAILS, type SailName, type SailTrim } from '../boat/trim';
 import { D2R, KT, clamp, wrap } from '../core/math';
 import { boatTells, type TellState } from '../render/sails';
@@ -102,13 +102,18 @@ export interface FlowState { cuts: FlowCut[]; sails: FlowSail[]; running: boolea
 /** The sail's height fraction (0 at its foot, 1 at its head) at z, unclamped. */
 const fAt = (sail: SailName, z: number) => sail === 'main' ? (z - BOOM) / RIG.P : (z - JIB_TACK) / (JIB_HEAD - JIB_TACK);
 
+/** How far up a sail must be for the flow view to cut it: more than half its luff (physics.ts sailUp). Lower, it's a
+ * heap of cloth flogging at the mast or the stem, with no section to draw. */
+export const FLOW_HOISTED = 0.5;
+
 /** The flow view's state from the sim: its three cuts across her sails and each sail's own numbers. The jib only where
- * it's drawing on its sheet. */
+ * it's drawing on its sheet; each sail only while it's up (sailing on the main alone or the jib alone: no slot then, no
+ * jib bending the air onto the main's lee side, and the lowered sail's telltales go with it). */
 export function flowState(b: Boat): FlowState {
   const sails: FlowSail[] = [];
   for (const sail of ['jib', 'main'] as const) {
     const trim = b.trim[sail], shape = b.shape[sail];
-    if (!trim || !shape) continue;
+    if (!trim || !shape || sailUp(b, sail) <= FLOW_HOISTED) continue;
     // (the wind the sim worked this trim out at: trim.ts err = (awa − sheet) − best, so its awa is err + sheet + best)
     const awa = trim.err + b.sheets[sail] + SAILS[sail].aoa;
     sails.push({ sail, trim, awa, across: awa - b.sheets[sail], best: SAILS[sail].aoa, twist: shape.twist, sheet: b.sheets[sail], atMin: b.sheets[sail] <= SAILS[sail].min + 0.5, atMax: b.sheets[sail] >= SAILS[sail].max - 0.5 });
