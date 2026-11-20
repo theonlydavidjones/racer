@@ -31,11 +31,16 @@ export function destName(d: { name: string; key?: string; p: Vec }, race = false
 }
 
 /**
- * A leg's point of sail against the mean wind (the owner, 20 Nov 2026: "do VMG on beats and runs, VMC on reaches"): its
- * bearing within 60° of where the wind comes from, a beat; more than 120°, a run; between, a reach. The course's own
- * leg kind is for its typical wind; this is for the day's.
+ * Can she lay the mark on the tack (or jibe) she's on, with no maneuver to make? (the owner, 20 Nov 2026: VMC when she
+ * can lay it, VMG when she must tack or jibe to get there, by the laylines the inset draws.) Angles are measured from
+ * where the wind comes from, starboard side negative: on a beat she lays it once its bearing is as far off the wind as
+ * her tack's layline track or further (she's on or past the layline); on a run, once it's no further off the wind than
+ * her jibe's track (she's on or past the downwind layline). `tracks` are the laylines' ground-track bearings,
+ * starboard first (sim/laylines.ts).
  */
-export function legSail(legBearing: number, windFrom: number): 'beat' | 'reach' | 'run' {
-  const a = Math.abs(wrap(legBearing - windFrom));
-  return a < 60 ? 'beat' : a > 120 ? 'run' : 'reach';
+export function canLay(bearingToMark: number, windFrom: number, kind: 'up' | 'down', tack: 'S' | 'P', tracks: [number, number]): boolean {
+  const a = wrap(bearingToMark - windFrom), sgn = tack === 'S' ? -1 : 1;
+  const m = a * sgn, t = Math.abs(wrap(tracks[tack === 'S' ? 0 : 1] - windFrom)); // (her own side's angles, positive)
+  if (m < 0) return false; // the mark's on the other tack's side: she has to tack or jibe for it
+  return kind === 'up' ? m >= t - 0.5 : m <= t + 0.5;
 }

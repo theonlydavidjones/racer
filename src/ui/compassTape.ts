@@ -6,13 +6,13 @@ import { n360, wrap } from '../core/math';
  * above and below), numbers every 30° (N E S W at the cardinals) and small ones on the 10° ticks, the true wind's
  * direction (blue ▼) and the next mark or destination (amber ◆) on its top edge, or an arrow at its end when off it.
  * Close-hauled and settled, a soft tint from her tack's mean close-hauled heading (a small tick) to her heading: the HUD's
- * lifted colour, light, or its headed colour, dark (apart in lightness too, so it reads without colour); lifted, the
- * heading's digits take the lifted colour. The tape keeps 3.6 px a degree whatever its width: 75° each side at 560 px.
+ * lifted colour, light, or its headed colour, dark (apart in lightness too, so it reads without colour); lifted or
+ * headed, the heading's digits take that colour (headed, a lighter red that reads). The tape keeps 3.6 px a degree whatever its width: 75° each side at 560 px.
  */
 const FONT = '"Saira Semi Condensed","Arial Narrow",system-ui,sans-serif';
-export const LIFTED = '#8fe0bd', HEADED = '#b03e34';
+export const LIFTED = '#8fe0bd', HEADED = '#b03e34', HEADED_TEXT = '#ff8c7e';
 export function drawCompass(ctx: CanvasRenderingContext2D, W: number, H: number, h: number, from: number, markB: number | null,
-  tint: { mean: number; lifted: boolean; alpha: number } | null, lifted: boolean): void {
+  tint: { mean: number; lifted: boolean; alpha: number } | null, shift: 'lift' | 'head' | null): void {
   ctx.clearRect(0, 0, W, H);
   // the band: one even, slightly see-through fill, the pods' corners
   ctx.fillStyle = 'rgba(10,24,34,.62)'; ctx.beginPath(); ctx.roundRect(0, 0, W, H, 5); ctx.fill();
@@ -50,8 +50,8 @@ export function drawCompass(ctx: CanvasRenderingContext2D, W: number, H: number,
     ctx.closePath(); ctx.fill(); ctx.stroke();
   };
   at(from, '#5ab8ff', true); if (markB != null) at(markB, '#ffb627', false);
-  // her heading, in the middle; lifted, in the lifted colour
-  ctx.font = `700 21px ${FONT}`; ctx.fillStyle = lifted ? LIFTED : '#ffffff'; ctx.fillText(hdg, x0, 30);
+  // her heading, in the middle: lifted in the lifted color, headed in a red light enough to read on the band (the owner, 20 Nov)
+  ctx.font = `700 21px ${FONT}`; ctx.fillStyle = shift === 'lift' ? LIFTED : shift === 'head' ? HEADED_TEXT : '#ffffff'; ctx.fillText(hdg, x0, 30);
   ctx.fillStyle = '#ffb627';
   ctx.beginPath(); ctx.moveTo(x0 - 5, 0); ctx.lineTo(x0 + 5, 0); ctx.lineTo(x0, 6); ctx.fill();
   ctx.beginPath(); ctx.moveTo(x0 - 5, H); ctx.lineTo(x0 + 5, H); ctx.lineTo(x0, H - 6); ctx.fill();

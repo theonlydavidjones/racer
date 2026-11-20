@@ -1447,7 +1447,7 @@ $('bCondReal').onclick = () => {
 };
 /* ---------------- loop: fixed-step sim, free-running render ---------------- */
 function resize(): void { view.resize(innerWidth, innerHeight); }
-addEventListener('resize', resize); resize();
+addEventListener('resize', () => { resize(); hud.fitCompass(); }); resize();
 
 let last = performance.now();
 /** The showroom's point of sail: a close reach, port tack (the wind 55° on her port bow); negative: starboard tack. */

@@ -51,7 +51,7 @@ import { INK, SEEN, chartCredit, drawEncChart, drawEncLand, type ChartPalette, t
 import { keySig, renderKey, type SimKey } from './legend';
 import { fieldLayer, layerOn, type LayerKey } from './layers';
 import { drawCompass } from './compassTape';
-import { destName, legSail } from './navNames';
+import { canLay, destName } from './navNames';
 import { FlowField, Streaks, drawLegend, drawReadout, readout, type FlowKind } from './flow';
 import type { Settings } from '../settings';
 import { drawFog, drawSea, drawSetFog, nm, setFogAlpha } from './mapLayers';
@@ -207,14 +207,14 @@ export class Hud {
     // the lift/header tint (r272, the owner's H2): only close-hauled and settled on a mean, fading in over a second or two
     const hauled = upwind && mean != null && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 10;
     this.tintA = clamp(this.tintA + (hauled ? dt : -dt) / 1.5, 0, 1);
-    const dl = mean != null ? wrap(h - mean) * (u.tack === 'S' ? -1 : 1) : 0, lifted = hauled && dl >= 3;
+    const dl = mean != null ? wrap(h - mean) * (u.tack === 'S' ? -1 : 1) : 0, shift = hauled && dl >= 3 ? 'lift' as const : hauled && dl <= -3 ? 'head' as const : null;
     // the tape: drawn again only when something on it has moved (a twentieth of a degree is about a tenth of a pixel on
     // it) or it's changed size. Steady on a course it was the same picture redrawn every frame
     const [ctx, W, H] = fitCanvas($<HTMLCanvasElement>('compassTape')), q = (a: number) => Math.round(a * 20);
-    const key = [W, H, q(h), this.tintA > 0 && mean != null ? q(mean) : -1, Math.round(this.tintA * 20), lifted ? 1 : 0, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
+    const key = [W, H, q(h), this.tintA > 0 && mean != null ? q(mean) : -1, Math.round(this.tintA * 20), shift === 'lift' ? 1 : shift === 'head' ? 2 : 0, q(from), markB == null ? -1 : q(markB)], k0 = this.tapeKey;
     if (k0.length === key.length && key.every((v, i) => v === k0[i])) return;
     this.tapeKey = key;
-    drawCompass(ctx, W, H, h, from, markB, this.tintA > 0 && mean != null ? { mean, lifted: dl >= 0, alpha: this.tintA } : null, lifted);
+    drawCompass(ctx, W, H, h, from, markB, this.tintA > 0 && mean != null ? { mean, lifted: dl >= 0, alpha: this.tintA } : null, shift);
   }
   /** The lift/header tint's opacity (0 hidden … 1 shown): it fades in once she's close-hauled and settled. */
   private tintA = 0;
@@ -301,12 +301,12 @@ export class Hud {
     // Flags tile shows flags only: the owner, 12 Nov; the Coordinator's ruling, 15 Nov)
     const code = !w.freeSail && !w.cancelled && !u.retired && w.t >= 0 && u.scoring ? u.scoring : '';
     const sub = $('clockSub'), state = (w.freeSail ? (w.lesson ? 'Lesson' : 'Cruising') : w.cancelled ? (w.cancelled.up[0] === 'N' ? 'Abandoned' : 'Postponed') : w.t < 0 ? (w.t > -10 ? 'Build speed' : w.t > -60 ? 'Final minute' : 'Pre-start') :
-      u.finished ? 'Finished' : u.retired ? 'Retired · heading home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
+      u.finished ? 'Finished' : u.retired ? 'Retired · home' : u.ocs ? 'OCS · return' : !u.started ? 'Not started' : m ? `Next ${m.name.split(' ')[0]} · ${sideWord(m.side)}` : 'To finish');
     const subKey = code + '|' + w.clock + '|' + state;
     if (sub.dataset.k !== subKey) { // (in the give-way red, the one word that has to be seen)
       sub.dataset.k = subKey;
       if (!code) sub.textContent = w.clock + ' · ' + state;
-      else { const c = document.createElement('span'); c.className = 'code'; c.textContent = code; sub.replaceChildren(w.clock + ' · ', c, ' · ' + state); }
+      else { const c = document.createElement('span'); c.className = 'code'; c.textContent = code; sub.replaceChildren(c, ' · ' + state); } // (the code over the clock: one line in the card)
     }
     $('spd').textContent = (u.v / KT).toFixed(1);
     $('sog').textContent = 'SOG ' + (Math.hypot(u.vx, u.vy) / KT).toFixed(1);
@@ -327,7 +327,9 @@ export class Hud {
     // the sea where you are: chop height (what slows you), and the swell
     { const s = u.sea, ft = (m: number) => (m / 0.3048).toFixed(1) + ' ft';
       const ftS = (m: number) => (m / 0.3048).toFixed(m < 0.3 ? 1 : 0) + ' ft'; // short enough for the box
-      $('seaSub').textContent = (s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop') + (s.hsS >= 0.05 ? ` · ${ftS(s.hsS)} swell` : '');
+      // (with a swell the chop's word shortens, so the line fits the card; the full words on hover)
+      const chop = s.hsW < 0.05 ? 'glassy' : s.steep > 0.075 ? 'steep chop' : 'chop';
+      $('seaSub').textContent = s.hsS >= 0.05 ? (s.hsW < 0.05 ? '' : chop === 'steep chop' ? 'steep · ' : 'chop · ') + `${ftS(s.hsS)} swell` : chop;
       $('seaSub').title = `${s.hsW < 0.05 ? 'Glassy' : `${ft(s.hsW)} of ${s.steep > 0.075 ? 'steep ' : ''}chop`}${s.hsS >= 0.05 ? `, ${ft(s.hsS)} of swell` : ''}`; }
     // (the wind she's in against her own minute's average: the course's wind can be shifting the other way where she is)
     const dev = wrap(ww.from - (u.avgFrom ?? w.avgFrom)), lifted = u.tack === 'S' ? dev > 0 : dev < 0, sl = $('shiftLab');
@@ -540,14 +542,17 @@ export class Hud {
   private navStrip(w: SimView, u: Boat): void {
     const el = $('navStrip'), race = !w.cruising;
     const m = !race ? (w.dest && w.arrivedT == null ? w.dest : null) : u.finished || u.retired ? null : w.nextMark(u);
-    if (!m) { if (!el.hidden) { el.hidden = true; document.body.classList.remove('nav-on'); this.nsKey = ''; } return; }
+    if (!m) { if (!el.hidden) { el.hidden = true; document.body.classList.remove('nav-on'); this.nsKey = ''; this.fitCompass(); } return; }
     const p = m.p, r = dist(u, p), b = brg(p.x - u.x, p.y - u.y), vmc = (u.vx * (p.x - u.x) + u.vy * (p.y - u.y)) / Math.max(1, r), ttg = vmc > 0.1 ? r / vmc : Infinity;
     const [n, un] = this.range(r), name = destName(m, race);
     const side = race ? (m.side === 's' ? ' <span class="s">▶ stbd</span>' : ' <span class="p">◀ port</span>') : '';
     const ttgS = !isFinite(ttg) ? '--' : ttg < 3600 ? `${Math.round(ttg / 60)}<small>min</small>` : `${(ttg / 3600).toFixed(1)}<small>h</small>`;
     // racing, VMG (straight up or down the wind) on a beat or a run, VMC (toward the mark) on a reach; cruising, VMC
-    const prev = race ? (u.leg > 0 ? w.C.marks[u.leg - 1].p : w.center) : u, kind = race ? legSail(brg(p.x - prev.x, p.y - prev.y), w.wind.from) : 'reach';
-    const toWind = V(w.wind.from), vmg = kind === 'beat' ? u.vx * toWind.x + u.vy * toWind.y : kind === 'run' ? -(u.vx * toWind.x + u.vy * toWind.y) : vmc, isG = kind !== 'reach';
+    // VMG when she has to tack or jibe to reach the mark, VMC once she can lay it (the owner, 20 Nov 2026), by the
+    // laylines the inset draws; a reach has none, and cruising is always VMC
+    const L = race ? laylinesFor(w, u) : null, from = u.ww.from;
+    const isG = !!L && L.mark.p === p && !canLay(b, from, L.kind, u.tack, [brg(L.tracks[0].x, L.tracks[0].y), brg(L.tracks[1].x, L.tracks[1].y)]);
+    const toWind = V(from), vmg = isG ? (L!.kind === 'up' ? 1 : -1) * (u.vx * toWind.x + u.vy * toWind.y) : vmc;
     const brgS = `${String(Math.round(b) % 360).padStart(3, '0')}<small>°</small>`, vm = `${(vmg / KT).toFixed(1)}<small>kn</small>`;
     const key = [race, name, side, brgS, n, un, ttgS, vm, isG].join('|');
     if (key === this.nsKey) return; this.nsKey = key;
@@ -559,6 +564,15 @@ export class Hud {
     $('nsVmC').title = isG ? 'Velocity made good: speed straight upwind (or downwind)' : `Velocity made on course: speed toward ${race ? 'the mark' : 'the destination'}`;
     $('nsVm').innerHTML = vm; $('nsVm').classList.toggle('good', vmg > 0.15);
     if (el.hidden) { el.hidden = false; document.body.classList.add('nav-on'); }
+    this.fitCompass();
+  }
+  /** The compass bar one shape at every size (the owner, 20 Nov): 44 px tall, 560 wide, the same degrees to the pixel;
+   *  narrower only when the nav strip (or the inset, with no strip) would otherwise reach it, and then only its width. */
+  fitCompass(): void {
+    const bar = $('compassBar'), s = $('navStrip'), right = (s.hidden ? $('map') : s).getBoundingClientRect().left;
+    const mid = innerWidth / 2, left = $('hud').getBoundingClientRect().right;
+    const half = Math.min(mid - left, right - mid) - 12;
+    bar.style.width = Math.max(240, Math.min(560, Math.floor(2 * half))) + 'px';
   }
   /** Distance in the card's units: metres close in, nautical miles further off. */
   private range(m: number): [string, string] { return m < 0.2 * 1852 ? [m.toFixed(0), 'm'] : [(m / 1852).toFixed(m < 1852 * 10 ? 1 : 0), 'nm']; }

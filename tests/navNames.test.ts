@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLACES } from '../src/sim/places';
-import { destName, legSail, shortName } from '../src/ui/navNames';
+import { canLay, destName, shortName } from '../src/ui/navNames';
 
 // The nav strip's names (the owner, 20 Nov 2026, r272): brief, never truncated, never coordinates or qualifiers.
 describe('the nav strip’s names', () => {
@@ -24,12 +24,16 @@ describe('the nav strip’s names', () => {
     const al = PLACES.find(p => /alcatraz/i.test(p.name))!;
     expect(destName({ name: '37°49.60′N 122°25.30′W', p: { x: al.p.x + 50, y: al.p.y } })).toBe('Alcatraz');
   });
-  // (the owner, 20 Nov 2026: "do VMG on beats and runs, VMC on reaches"; the leg against the day's mean wind)
-  it('a windward/leeward course is a beat and a run; a leg across the wind is a reach', () => {
-    const from = 270; // a westerly
-    expect(legSail(270, from)).toBe('beat'); // up to the windward mark
-    expect(legSail(90, from)).toBe('run'); // back down to the leeward mark
-    expect(legSail(0, from)).toBe('reach'); expect(legSail(180, from)).toBe('reach'); // across it
-    expect(legSail(315, from)).toBe('beat'); expect(legSail(135, from)).toBe('run'); // 45° off: still a beat, a run
+  // (the owner, 20 Nov 2026: VMC when she can lay the mark, VMG when she must tack or jibe to reach it, by the laylines)
+  it('lays the mark on her tack on or past its layline; short of it, or on the other tack, she has to tack or jibe', () => {
+    const from = 270, beat: [number, number] = [225, 315], run: [number, number] = [120, 60]; // a westerly; 45° and 150° off
+    // on a beat: the mark straight upwind she can't lay on either tack; well off to one side she lays it on that tack
+    expect(canLay(270, from, 'up', 'S', beat)).toBe(false); expect(canLay(270, from, 'up', 'P', beat)).toBe(false);
+    expect(canLay(220, from, 'up', 'S', beat)).toBe(true); expect(canLay(220, from, 'up', 'P', beat)).toBe(false);
+    expect(canLay(320, from, 'up', 'P', beat)).toBe(true); expect(canLay(320, from, 'up', 'S', beat)).toBe(false);
+    // on a run: dead downwind she has to jibe for it; up toward her jibe's track she lays it
+    expect(canLay(90, from, 'down', 'S', run)).toBe(false); expect(canLay(90, from, 'down', 'P', run)).toBe(false);
+    expect(canLay(125, from, 'down', 'S', run)).toBe(true); expect(canLay(55, from, 'down', 'P', run)).toBe(true);
+    expect(canLay(125, from, 'down', 'P', run)).toBe(false);
   });
 });
