@@ -202,7 +202,7 @@ export class Hud {
       const d = wrap(h - mean) * (u.tack === 'S' ? -1 : 1); // starboard: lifted when heading is higher (smaller) than the mean
       if (Math.abs(d) >= 3) { note = d > 0 ? `lifted ${Math.round(d)}°` : `headed ${Math.round(-d)}°`; cls = d > 0 ? 'lift' : 'head'; }
     }
-    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls; }
+    if (lift.textContent !== note) { lift.textContent = note; lift.className = cls ? 'vh ' + cls : 'vh'; } // (read out, not shown: the compass shows it)
     const m = w.nextMark(u), markB = m ? brg(m.p.x - u.x, m.p.y - u.y) : null;
     // the lift/header tint (r272, the owner's H2): only close-hauled and settled on a mean, fading in over a second or two
     const hauled = upwind && mean != null && Math.abs(u.twa - (beatFor(u) - (u.leeway ?? 0))) < 10;
