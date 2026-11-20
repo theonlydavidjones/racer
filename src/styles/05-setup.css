@@ -99,3 +99,6 @@ body.lashed .tg-lash{display:block}
 .lp-key .lk-row{display:flex;align-items:center;gap:8px;padding:2px 0;font:500 11px/1.25 var(--f-body);white-space:normal}
 .lp-key .lk-row canvas{flex:none;border-radius:2px;border:1px solid var(--rule)}
 
+/* the sailing instructions at a default club: the club's, shown, not changed (r275; club/practice.ts) */
+#siBox.locked summary{pointer-events:none}
+#siBox.locked summary u{display:none}

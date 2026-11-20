@@ -11,6 +11,7 @@ import { describeSea, swellReach } from '../environment/sea';
 import { CURRENTS, warmBasins } from '../environment/current';
 import { COURSES, courseFile } from '../courses/registry';
 import { RC_COURSE } from '../courses/committee';
+import { asTheClubRunsIt, hostOf } from '../club/practice';
 import { place } from '../sim/places';
 import { startHead } from '../ui/readouts';
 import { setupKey } from '../replay/ghost';
@@ -66,7 +67,7 @@ function prepare(seed = randomSeed()): void {
   // (Home to the slip and Before you go begin in her own slip; Home is bound for it, so she docks when she's back: world.ts
   // checkArrival, intoSlip)
   const WSd = soloDrill ? { ...WS, opponents: [], fleet: 0, traffic: 0 as const, sailFrom: app.S.mode === 'lesson' && (app.S.lesson === 'home' || app.S.lesson === 'before') && slipById(app.S.boat?.slip) ? 'slip' : 'cityfront', sailTo: app.S.mode === 'lesson' && app.S.lesson === 'home' ? 'slip' : '' } : WS;
-  const WSf = app.S.mode === 'drill' ? drillFleet(WSd, app.S.drillSolo ?? true) : WSd;
+  const WSf = app.S.mode === 'drill' ? drillFleet(WSd, app.S.drillSolo ?? true) : asTheClubRunsIt(WSd); // (a race at a default club: its committee's settings, r275)
   const drillFile = app.S.mode === 'roundings' ? (COURSES.find(c => !c.group) ?? COURSES[0]) : null;
   const args: WorldArgs = { file: drillFile ?? (rc ? rc.est.file : courseFile(app.S.course === RC_COURSE ? COURSES[0].id : app.S.course)), settings: WSf, seed,
     opts: app.S.mode === 'drill' ? { startAt: app.S.drillFrom ?? app.DRILL_FROM, solo: app.S.drillSolo ?? true, showFlags, courseSignal } : (app.S.mode === 'sail' || soloDrill) && !shown ? { freeSail: true } : { showFlags, courseSignal, ...(shown ? { startAt: app.S.seq * 60 } : {}) } };
@@ -148,9 +149,12 @@ function courseCard(): void {
     $('judgingField').hidden = host === 'practice'; // (the practice area is always umpired)
     $('courseSel').hidden = host === 'practice' || rc;
     if (!rc && host !== 'practice') ($('courseSel') as HTMLSelectElement).value = app.S.course;
-    const flag = app.S.prepFlag === 'black' ? 'black flag' : `${app.S.prepFlag ?? 'P'} flag`;
-    const line = C.biasAdjustable ? ` · line ${app.S.bias ? (app.S.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(app.S.bias) + '°' : 'square'}` : '';
-    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${app.S.seq}-min sequence · ${flag} · ${app.S.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${app.S.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
+    // (at a default club, its sailing instructions: locked, the club's committee's, as it runs its races; club/practice.ts)
+    const R = asTheClubRunsIt({ ...app.S, mode: 'race' }), si = $('siBox') as HTMLDetailsElement;
+    si.classList.toggle('locked', host !== 'practice'); if (host !== 'practice') si.open = false;
+    const flag = R.prepFlag === 'black' ? 'black flag' : `${R.prepFlag ?? 'P'} flag`;
+    const line = C.biasAdjustable ? ` · line ${R.bias ? (R.bias > 0 ? 'pin' : 'boat') + ' up ' + Math.abs(R.bias) + '°' : 'square'}` : '';
+    $('siSum').textContent = `${host === 'practice' ? 'Practice' : 'Sailing instructions'}: ${R.seq}-min sequence · ${flag} · ${R.penaltyTurns === 1 ? 'one-turn' : 'two-turn'} penalty${R.judging === 'protests' && host !== 'practice' ? ' · protests' : ''}${line}`;
   }
   $('lengthField').hidden = app.S.mode === 'sail' || app.S.course !== RC_COURSE;
   $('biasField').hidden = !C.biasAdjustable;
@@ -163,8 +167,8 @@ function courseCard(): void {
     if (!sl && app.S.raceFrom === 'slip') app.S.raceFrom = 'water';
     app.S.raceFrom ??= 'water';
     // (racing only: cruising, she leaves her slip at the time you set, and there's no warning signal to be early for)
-    $('raceFromNote').textContent = app.S.mode !== 'sail' && app.S.raceFrom === 'slip' && app.w.fromSlip && app.w.startAt > app.S.seq * 60
-      ? `She starts in her slip in ${harborOf(sl!.marina)?.short ?? 'her marina'}, ${Math.round((app.w.startAt - app.S.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
+    $('raceFromNote').textContent = app.S.mode !== 'sail' && app.S.raceFrom === 'slip' && app.w.fromSlip && app.w.startAt > app.w.settings.seq * 60
+      ? `She starts in her slip in ${harborOf(sl!.marina)?.short ?? 'her marina'}, ${Math.round((app.w.startAt - app.w.settings.seq * 60) / 60)} minutes before the warning signal: push off, sail out of the harbor and over to the line. (Speed up the clock if you like.)`
       : '';
   }
   { // her slip, if she has one (Marina)
@@ -187,7 +191,7 @@ function courseCard(): void {
   $('seasonBrief').hidden = !sp;
   if (sp) morph($('seasonBrief'), `${sp.burgee ? `<img class="t-burgee" src="${sp.burgee}" alt="">` : ''}<span class="t-h">${sp.series.title.replace(/</g, '&lt;')} · Race ${sp.no}</span>`);
   $('bPreview').textContent = cruise ? 'Passage plan' : 'Course and strategist';
-  $('setupTitle').textContent = cruise ? 'Cruise' : 'Create a race';
+  $('setupTitle').textContent = cruise ? 'Cruise' : 'Practice'; // (r275: a sailing for practice, not a race you host)
   $('setupBack').textContent = app.nav.backLabel() || (cruise ? '‹ Start page' : '‹ Race');
   $('whenLab').textContent = cruise ? 'When' : 'Start time'; $('timeLab').textContent = cruise ? 'Leave at' : 'Start signal';
   { const c = app.S.crew ?? DEFAULT_SETTINGS.crew, kg = c.helm.w + c.people.slice(0, c.n).reduce((a, p) => a + p.w, 0);
@@ -532,14 +536,14 @@ function beginRaceNow(seed?: number): void {
   horn(1.0);
   const m0 = app.w.C.marks[0];
   if (sp) { // a season race: one line, where she is and what's next (the owner OK'd design/season-flow)
-    const [h, mi] = (app.S.tideTime || '12:00').split(':').map(Number), wm = h * 60 + mi - app.S.seq, warn = `${Math.floor(wm / 60)}:${String(wm % 60).padStart(2, '0')}`;
+    const [h, mi] = (app.S.tideTime || '12:00').split(':').map(Number), wm = h * 60 + mi - app.w.settings.seq, warn = `${Math.floor(wm / 60)}:${String(wm % 60).padStart(2, '0')}`;
     // (one line, no full stop: the Messages card shows a message up to its first; under 70 characters, so none of it is cut)
     toast(app.w.fromSlip ? `In your ${app.w.homeSlip!.kind === 'alongside' ? 'berth' : 'slip'} · warning signal ${warn} · sail out to the start` : `${sp.series.title} · Race ${sp.no} · warning signal ${warn}`, 6000);
     if (app.w.courseSignal) logMessage(`Course ${app.w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signaled by the warning signal). ${app.w.courseSignal.why}`);
     return;
   }
   if (app.w.fromSlip) {
-    const m = Math.round((app.w.startAt - app.S.seq * 60) / 60);
+    const m = Math.round((app.w.startAt - app.w.settings.seq * 60) / 60);
     toast(`In her ${app.w.homeSlip!.kind === 'alongside' ? 'berth' : 'slip'} in ${harborOf(app.w.homeSlip!.marina)?.short ?? 'her marina'}, ${app.w.homeSlip!.label}, ${app.w.homeSlip!.kind === 'alongside' ? 'alongside the end of the dock, bow out,' : 'bow in'} and made fast. Sails are down: hoist them at the dock or once you're clear (J jib, U main; the main goes up best head to wind). Push off (${app.keymap.keys.pushOff[0]?.toUpperCase() ?? 'the button'}) to have the crew walk her out by hand into the fairway, then sail her out through the entrance${app.S.mode === 'sail' ? '' : `: the warning signal is in ${m} minutes. Speed it up if you like.`}`, 7000);
     return;
   }
@@ -547,7 +551,7 @@ function beginRaceNow(seed?: number): void {
     ? `Cruising${app.w.dest ? ` to ${app.w.dest.name}` : ''}: no race. ${Math.round(app.w.wind.kt)} kt from ${Math.round(app.w.wind.from)}°, ${app.w.cur.label.toLowerCase()}. Sea: ${describeSea(app.w.seaHere(app.w.user))}.`
     : app.S.mode === 'drill'
     ? `Start practice${app.w.boats.length === 1 ? ', alone' : ''}: ${app.w.startAt / 60 === 1 ? 'one minute' : `${app.w.startAt / 60} minutes`} to the gun. Current: ${app.w.cur.label}.`
-    : `${app.S.seq}-minute sequence.${app.w.courseSignal ? ` The committee is flying course ${app.w.courseSignal.no}.` : ''} Current: ${app.w.cur.label}. Sea: ${describeSea(app.w.seaHere(app.w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
+    : `${app.w.settings.seq}-minute sequence.${app.w.courseSignal ? ` The committee is flying course ${app.w.courseSignal.no}.` : ''} Current: ${app.w.cur.label}. Sea: ${describeSea(app.w.seaHere(app.w.user))}. First mark: ${m0.name} to ${m0.side === 's' ? 'starboard' : 'port'}.`, 3800);
   if (app.w.courseSignal && app.S.mode !== 'sail') logMessage(`Course ${app.w.courseSignal.no}, in numeral pennants on the flagpole (Rule 27.1: signaled by the warning signal). ${app.w.courseSignal.why}`);
 }
 
@@ -557,8 +561,7 @@ $('bManoeuvres').onclick = () => { app.S.mode = 'manoeuvres'; app.courseView.clo
 // (Learn to sail's lessons and the Rules trainer: overlays of their own, over the Drill page, which Back returns to)
 $('bLessons').onclick = () => openLessons();
 $('bRoundings').onclick = () => { app.S.mode = 'roundings'; app.courseView.close(); app.navView.close(); $('setup').hidden = $('drillView').hidden = true; beginRace(); };
-/* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's. */
-const hostOf = (id: string): 'ggyc' | 'practice' => id === RC_COURSE || COURSES.find(c => c.id === id)?.group ? 'ggyc' : 'practice';
+/* The host club: the Seaweed Soup's courses (the committee's choice, or one you pick), or the practice area's (club/practice.ts hostOf). */
 let lastPick = hostOf(app.S.course) === 'ggyc' && app.S.course !== RC_COURSE ? app.S.course : COURSES.find(c => c.group)!.id;
 function setCourse(id: string): void { app.S.course = id; saveSettings(app.S); setupChanged(() => { courseCard(); tideBox(); }); }
 $('hostSeg').addEventListener('click', e => {

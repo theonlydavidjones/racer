@@ -71,6 +71,7 @@ import { morph } from './ui/morph';
 import { emptyTile, splitNo, tile } from './ui/tiles';
 import { installDevHandles } from './app/devHandles';
 import { startPageQuiet, startPageReady } from './app/firstRun';
+import { seasonRaceFor } from './club/practice';
 import { mountBoatLesson } from './app/boatLesson';
 import { mountDrills } from './app/drills';
 import { DrillCoach } from './app/drillCoach';
@@ -1639,7 +1640,7 @@ const fleet: Fleet = new Fleet(S, {
  * back link of the screen above it.
  */
 const nav: Nav = new Nav(showPlace, p => p.k === 'home' ? 'Start page' : p.k === 'race' ? 'Race' : p.k === 'past' ? 'Past races' : p.k === 'drill' ? 'Drill' : p.k === 'season' ? (seasonById(p.id)?.title ?? 'Season') : p.k === 'club' ? 'Yacht Club'
-  : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Create a race');
+  : p.k === 'boat' ? (S.boats.find(b => b.id === p.id)?.name || 'Her page') : S.mode === 'sail' ? 'Cruise' : 'Practice');
 function showPlace(p: Place): void {
   if (p.k === 'home') { openHome(); return; }
   startPageQuiet(false, view); // (off the start page: the race and the game's displays as they are)
@@ -1810,15 +1811,10 @@ $('svCal').addEventListener('click', e => { const b = (e.target as HTMLElement).
 $('svHead').addEventListener('change', e => { const v = (e.target as HTMLSelectElement).value; if ((e.target as HTMLElement).id === 'svSeason' && v) nav.go({ k: 'season', id: v }); });
 $('bSailSeason').onclick = () => { if (seasonPick) nav.go({ k: 'setup' }); };
 /** The season race this race is, if it's one: that race's course, day and start, in the day's real conditions, against the series' fleet. */
+// (only a race entered from the Season page counts: a Practice sailing set up the same way never writes to a season, r275)
 function seasonRaceOf(): { series: Series; no: number } | null {
   if (S.mode !== 'race' || !w || w.freeSail) return null;
-  for (const series of seasons()) for (const r of series.races) {
-    if (r.abandoned || S.course !== r.courseId || S.tideDate !== r.date || S.tideTime !== r.start) continue;
-    if (S.windKind !== 'auto' || S.windKt || S.windTurn || S.windDir != null || replayPin != null || S.current !== 'real') continue;
-    if (S.opponents.length !== series.fleet.length || !series.fleet.every(o => S.opponents.includes(o))) continue;
-    return { series, no: r.no };
-  }
-  return null;
+  return seasonRaceFor(S, seasonPick, replayPin != null);
 }
 /** Her hull's colour, for a boat in the race: yours, a club boat, or one of the club's other Folkboats. */
 function hullOf(b: Boat): string {
