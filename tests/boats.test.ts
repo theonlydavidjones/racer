@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadSettings, saveSettings } from '../src/settings';
-import { NEW_BOAT, newBoat } from '../src/boat/spec';
+import { BOTTOM_COLORS, HULL_COLORS, NEW_BOAT, newBoat } from '../src/boat/spec';
 import results from '../src/boat/data/sf-folkboat-results.json';
 import { World } from '../src/sim/world';
 import { COURSES } from '../src/courses/registry';
@@ -33,6 +33,7 @@ describe('your boats: saved, named, chosen', () => {
     expect(FLEET.map(f => f.no.replace(/\D/g, ''))).not.toContain(no); // the club's stock boats
     expect(REAL_FLEET_NUMBERS).not.toContain(no); // the real San Francisco fleet's numbers (sf-folkboat-results.json)
     expect(NEW_BOAT.club).toBe(''); // (a club is joined, not given: docs/FTUE-PLAN.md step 5; and no real club names)
+    expect(NEW_BOAT.sails.number).toBe('000'); // (the owner's, r273)
     expect(NEW_BOAT.marina).toBeUndefined(); expect(NEW_BOAT.slip).toBeUndefined();
   });
 
@@ -53,6 +54,14 @@ describe('your boats: saved, named, chosen', () => {
     expect(loadSettings().club).toBe('byc');
     store.set(KEY, JSON.stringify({ burgee: 'ggyc', club: '' })); // (left the club: stays out)
     expect(loadSettings().club).toBe('');
+  });
+
+  it("the new player's boat looks as the owner set her (r273): teak, wooden spars, buff, pearl, black", () => {
+    expect(NEW_BOAT.deck).toBe('teak-polished'); expect(NEW_BOAT.hatch).toBe('teak'); expect(NEW_BOAT.cockpit).toBe('teak');
+    expect(NEW_BOAT.companionway).toBe('closed'); expect(NEW_BOAT.perf.mast).toBe('wood'); expect(NEW_BOAT.perf.boom).toBe('wood');
+    const name = (list: [string, string][], hex: string) => list.find(c => c[1] === hex)?.[0];
+    expect(name(HULL_COLORS, NEW_BOAT.hull.upper)).toBe('Buff'); expect(name(HULL_COLORS, NEW_BOAT.hull.stripe)).toBe('Pearl');
+    expect(name(BOTTOM_COLORS, NEW_BOAT.hull.lower)).toBe('Black');
   });
 
   it("a new boat from the Yacht Club starts from the new player's boat, not from Josephine or her club", () => {

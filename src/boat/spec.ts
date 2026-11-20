@@ -136,19 +136,20 @@ export const DEFAULT_BOAT: BoatSpec = {
 
 /**
  * A new player's boat (docs/FTUE-PLAN.md; the owner, 17 Nov 2026): her own, not the owner's Josephine (DEFAULT_BOAT stays
- * his, and every save made before this keeps her). A plain glassfibre Folkboat as she'd come: cream topsides, a navy boot
- * stripe, a light deck and a teak forehatch. USA 200 is clear of the real San Francisco fleet's numbers (56 to 125 in
- * boat/data/sf-folkboat-results.json), the club's stock boats' and the generic boats' (30 to about 150, boat/generic.ts).
- * No club: one is joined, not given (and no real club's name). She's set up in the first run, or kept as she is.
+ * his, and every save made before this keeps her). Her look is the owner's (r273, 20 Nov 2026): a glassfibre Folkboat
+ * dressed as a classic one, with a laid deck of warm (polished) teak, wooden spars, a teak cockpit and forehatch, the
+ * companionway shut, buff topsides, a pearl boot stripe and black antifouling. Sail number USA 000, the owner's: clear of
+ * the real San Francisco fleet's numbers (56 to 125 in boat/data/sf-folkboat-results.json), the club's stock boats' and
+ * the generic boats' (30 to about 150, boat/generic.ts). No club: one is joined, not given (and no real club's name).
  */
 export const NEW_BOAT: BoatSpec = {
   id: 'my-folkboat', name: 'KESTREL',
-  hull: { material: 'fiberglass', upper: '#efe6cf', lower: '#1f2a44', stripe: '#1f2c4f' },
-  deck: '#e8e3d6',
-  hatch: 'teak',
-  sails: { country: 'USA', number: '200', color: 'white' },
+  hull: { material: 'fiberglass', upper: '#d9c49a', lower: '#2a2d33', stripe: '#f4f1e8' }, // Buff, Black, Pearl (HULL_COLORS, BOTTOM_COLORS)
+  deck: 'teak-polished',
+  hatch: 'teak', cockpit: 'teak', companionway: 'closed',
+  sails: { country: 'USA', number: '000', color: 'white' },
   club: '', skipper: 'you',
-  perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'aluminium', boom: 'aluminium', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
+  perf: { cleanedWeeks: 0, finish: 'antifouling', mainAge: 'new', jibAge: 'new', mast: 'wood', boom: 'wood', mastStiffness: 'average', outboard: 'none', gearKg: 0 }
 };
 
 /** Topsides (and boot stripe, and deck) colours: the usual gelcoat and topside-paint range. */
