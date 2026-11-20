@@ -1122,14 +1122,15 @@ const CHAINPLATE_Z = MAST_AFT_Z + 0.32, CHAINPLATE_X = 0.98, CHAINPLATE_Y = shee
 const STRUT_Y = BOOM_TOP + 5.5, STRUT = new THREE.Vector3(0.45, STRUT_Y, MAST_FRONT_Z - Math.sqrt(0.45 ** 2 - (0.45 - MAST_ATH / 2) ** 2));
 /** The shrouds meet the mast's sides just below the struts (CR 7.60: 5.30–5.50 m above the band); the jumper stays' ends (CR 7.60). */
 const SHROUD_Y = BOOM_TOP + 5.4, JUMPER_TOP = BOOM_TOP + 8.6, JUMPER_FOOT = BOOM_TOP + 2.25;
-/** Below the jumper stays' lower ends: the two wires, each through a fairlead on its own side face at JUMPER_FOOT, come
- * down the mast's after corners, either side of the gooseneck, and meet at one common turnbuckle shackled to a plate on
- * the mast's after side just under the boom (North Sails' Folkboat tuning guide: "tighten the common turnbuckle 2-3
- * turns"; CR 7.40: "adjustable above the deck only"). The class rules fix only where each wire meets the mast's side
- * (CR 7.60); the path below that and the turnbuckle's height are inferred from the owner's photo of a Folkboat mast
- * (one turnbuckle low on the mast, two wires up the after face to a fairlead high up). Under the boom rather than above
- * the gooseneck: the main's tack and luff are right above it. */
-const JUMPER_YOKE = BOOM_TOP - 2 * BOOM_R - 0.05, JUMPER_PLATE = JUMPER_YOKE - 0.17, JUMPER_CORNER = { x: 0.05, z: MAST_Z + 0.036 };
+/** Below the jumper stays' lower ends: each wire, through a fairlead on its own side face's after corner at JUMPER_FOOT,
+ * runs straight down that corner (clear of the gooseneck and the main's luff) into one ear of a stainless V yoke just
+ * under the boom, and the yoke's point holds one common turnbuckle shackled to a plate on the mast's after side (North
+ * Sails' Folkboat tuning guide: "tighten the common turnbuckle 2-3 turns"; CR 7.40: "adjustable above the deck only").
+ * The wire turns only at the strut's tip, the fairlead and the yoke. The class rules fix only where each wire meets the
+ * mast's side (CR 7.60); the path below that and the turnbuckle's height are inferred from the owner's photo of a
+ * Folkboat mast (one turnbuckle low on the mast, two wires up the after face to a fairlead high up). Under the boom
+ * rather than above the gooseneck: the main's tack and luff are right above it. */
+const JUMPER_EAR = BOOM_TOP - 2 * BOOM_R - 0.03, JUMPER_APEX = JUMPER_EAR - 0.1, JUMPER_PLATE = JUMPER_APEX - 0.17, JUMPER_CORNER = { x: 0.05, z: MAST_Z + 0.036 };
 /** A shroud's ends (starboard's; port's mirrored), in the boat group's frame: its chainplate on deck, and where it meets the mast. */
 export const SHROUD = { foot: new THREE.Vector3(CHAINPLATE_X, CHAINPLATE_Y, CHAINPLATE_Z), tip: new THREE.Vector3(MAST_ATH / 2, SHROUD_Y, MAST_Z) };
 const POLE_INBOARD = new THREE.Vector3(0, DECK_AT_MAST + 1.08, MAST_FRONT_Z); // pole fitting on the front of the mast
@@ -1272,15 +1273,15 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     { const st = new THREE.Vector3(sx * STRUT.x, STRUT.y, STRUT.z), root = new THREE.Vector3(sx * MAST_ATH / 2, STRUT_Y, MAST_FRONT_Z + 0.02);
       const len = st.distanceTo(root), js = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.016, len, 5), spar);
       js.position.copy(st).lerp(root, 0.5); js.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), st.clone().sub(root).normalize()); rig.add(js);
-      // (its top on the mast's side face, CR 7.60; over the strut's tip; back to the side face through its fairlead, toward
-      // the after corner; down that corner past the gooseneck; in under the boom to the turnbuckle's yoke)
+      // (its top on the mast's side face, CR 7.60; over the strut's tip; straight to its fairlead on the side face's after
+      // corner, CR 7.60's lower end; straight down that corner to the yoke's ear)
       const halfW = (y: number) => MAST_ATH * (alu ? 0.5 : 0.5 - 0.16 * (y - DECK_AT_MAST) / mastH) + 0.003;
-      const jl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(sx * halfW(JUMPER_TOP), JUMPER_TOP, MAST_Z), st,
-        V3(sx * halfW(JUMPER_FOOT), JUMPER_FOOT, MAST_Z + 0.02), V3(sx * JUMPER_CORNER.x, JUMPER_FOOT - 0.06, JUMPER_CORNER.z),
-        V3(sx * JUMPER_CORNER.x, JUMPER_YOKE + 0.04, JUMPER_CORNER.z), V3(sx * 0.006, JUMPER_YOKE, MAST_AFT_Z + 0.012)]), MAT.wire);
+      const fair = V3(sx * JUMPER_CORNER.x, JUMPER_FOOT, JUMPER_CORNER.z);
+      const jl = new THREE.Line(new THREE.BufferGeometry().setFromPoints([V3(sx * halfW(JUMPER_TOP), JUMPER_TOP, MAST_Z), st, fair,
+        V3(sx * JUMPER_CORNER.x, JUMPER_EAR, JUMPER_CORNER.z)]), MAT.wire);
       rig.add(jl); jumperLines.push({ l: jl, base: (jl.geometry.attributes.position.array as Float32Array).slice() });
-      // its fairlead: a small stainless eye on the side face
-      { const g = new THREE.TorusGeometry(0.009, 0.0025, 5, 10); g.rotateY(Math.PI / 2); g.translate(sx * halfW(JUMPER_FOOT), JUMPER_FOOT, MAST_Z + 0.02); jumperFit.push(g.toNonIndexed()); } }
+      // its fairlead: a small stainless eye on the corner, the wire through it
+      { const g = new THREE.TorusGeometry(0.009, 0.0025, 5, 10); g.rotateX(Math.PI / 2); g.translate(fair.x, fair.y, fair.z); jumperFit.push(g.toNonIndexed()); } }
     rig.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([foot, tip]), MAT.wire));
     const anchor = foot.clone().lerp(tip, TAPE_HEIGHT / (tip.y - CHAINPLATE_Y));
     const geom = new THREE.BufferGeometry();
@@ -1291,11 +1292,14 @@ export function buildBoatMesh(b: Boat): BoatMesh {
     const mesh = new THREE.Mesh(geom, RIBBON_MAT); mesh.frustumCulled = false; rig.add(mesh);
     ribbons.push({ geom, anchor, phase: sx * 1.7 + b.id });
   }
-  // the jumpers' common turnbuckle under the boom: the yoke the two wires end in, the turnbuckle's open body, and the
+  // the jumpers' common turnbuckle under the boom: the V yoke the two wires end in, the turnbuckle's open body, and the
   // shackle to its plate on the mast's after side (one stainless mesh, bent with the mast: syncRig)
-  { const zA = MAST_AFT_Z + 0.012, len = JUMPER_YOKE - JUMPER_PLATE - 0.05;
-    const yoke = new THREE.BoxGeometry(0.02, 0.018, 0.004); yoke.translate(0, JUMPER_YOKE - 0.006, zA); jumperFit.push(yoke.toNonIndexed());
-    const body = new THREE.CylinderGeometry(0.0055, 0.0055, len, 6); body.translate(0, JUMPER_YOKE - 0.015 - len / 2, zA); jumperFit.push(body.toNonIndexed());
+  { const zA = MAST_AFT_Z + 0.02, len = JUMPER_APEX - JUMPER_PLATE - 0.05, apex = V3(0, JUMPER_APEX, zA);
+    for (const sx of [-1, 1]) { // the yoke: a stainless V, each arm from an ear (where a wire ends) in to its point
+      const ear = V3(sx * JUMPER_CORNER.x, JUMPER_EAR, JUMPER_CORNER.z), arm = new THREE.CylinderGeometry(0.003, 0.003, ear.distanceTo(apex), 5);
+      arm.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), ear.clone().sub(apex).normalize()));
+      arm.translate((ear.x + apex.x) / 2, (ear.y + apex.y) / 2, (ear.z + apex.z) / 2); jumperFit.push(arm.toNonIndexed()); }
+    const body = new THREE.CylinderGeometry(0.0055, 0.0055, len, 6); body.translate(0, JUMPER_APEX - 0.01 - len / 2, zA); jumperFit.push(body.toNonIndexed());
     const shackle = new THREE.TorusGeometry(0.008, 0.0022, 5, 10); shackle.translate(0, JUMPER_PLATE + 0.02, zA); jumperFit.push(shackle.toNonIndexed());
     const plate = new THREE.BoxGeometry(0.026, 0.05, 0.004); plate.translate(0, JUMPER_PLATE, MAST_AFT_Z + 0.002); jumperFit.push(plate.toNonIndexed()); }
   const jumperFittings = new THREE.Mesh(mergeGeometries(jumperFit, false)!, STEEL); jumperFittings.userData.bends = true; rig.add(jumperFittings);
