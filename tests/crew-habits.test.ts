@@ -63,6 +63,33 @@ describe('The outhaul set for the breeze, not re-trimmed as a light wind wanders
       b.crew!.people.forEach((a, i) => { const j = a.job?.line ?? null; if (j === 'outhaul' && j !== had[i] && t > 60) trips++; had[i] = j; }); });
     expect(trips, 'outhaul trips in ten minutes').toBeLessThanOrEqual(1);
   });
+  // (a trip off only the guide's settings is judged by what it's worth and how long the breeze has held past the step,
+  // not forced by the band: crewWork.ts GUIDE_HOLD. The two cases left after the steps were read as ranges, the physics
+  // review of the crew habits, 16 Nov 2026)
+  const outhaulTrips = (kt: (t: number) => number, s0: number, secs: number) => {
+    const b: Boat = testBoat({ heading: 315, kt: s0, windKt: kt(0) }); b.crew = crew();
+    const had = b.crew.people.map(() => null as string | null), trips: string[] = [];
+    sail(b, secs, t => { b.ww.kt = kt(t);
+      b.crew!.people.forEach((a, i) => { const j = a.job?.line ?? null; if (j === 'outhaul' && j !== had[i] && t > 60) trips.push(`${t.toFixed(0)} s: ${b.ctl.outhaul.toFixed(2)} → ${a.job!.to?.toFixed(2)}`); had[i] = j; }); });
+    return { b, trips };
+  };
+  it('a light-air beat whose breeze swings across both 4 and 5 kt: not at the outhaul every minute and a half', () => {
+    // (3.5 to 5.7 kt: the guide's ceiling 3 cm off the mark under 4 kt read, its floor 1.5 cm from 5; before, 0.05 to 0.45
+    // and back, a trip each 50-220 s, five in fifteen minutes, for moves worth under 0.02% of drive)
+    const { trips } = outhaulTrips(t => 4.6 + 1.1 * Math.sin(2 * Math.PI * t / 150) + 0.3 * Math.sin(2 * Math.PI * t / 23), 2.5, 900);
+    expect(trips, 'outhaul trips in fifteen minutes').toHaveLength(0);
+  });
+  it('a beat in 11.5 ± 1.2 kt: the outhaul not taken to the mark and eased back each puff and lull', () => {
+    // (the guide's medium ceiling, 1.5 cm off, read under 11 kt, its "all the way to the mark" from 12: before, 1 to 0.55
+    // and back, ten trips in fifteen minutes)
+    const { trips } = outhaulTrips(t => 11.5 + 1.2 * Math.sin(2 * Math.PI * t / 150) + 0.3 * Math.sin(2 * Math.PI * t / 23), 4.5, 900);
+    expect(trips, 'outhaul trips in fifteen minutes').toHaveLength(0);
+  });
+  it('a breeze that builds across 12 kt and stays: the outhaul still goes to the mark, in one trip, once it has held', () => {
+    const { b, trips } = outhaulTrips(t => (t < 120 ? 10 : Math.min(14, 10 + (t - 120) / 30)) + 0.3 * Math.sin(2 * Math.PI * t / 23), 4.5, 600);
+    expect(trips, 'outhaul trips').toHaveLength(1);
+    expect(b.ctl.outhaul, 'on the mark in 14 kt').toBeGreaterThan(0.9);
+  });
 });
 
 describe('Up at the cabin top, they see to what\'s coming due there in the same trip (crewWork.ts BATCH)', () => {

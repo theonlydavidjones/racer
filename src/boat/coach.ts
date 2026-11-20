@@ -54,7 +54,7 @@ export interface Lesson {
 }
 
 /** What the race is doing, from outside the boat (the world knows; the boat doesn't). */
-export interface CoachContext { preStart?: boolean; justRounded?: boolean; /** the band it last said, held a half-knot about each edge */ band?: Situation['band'] }
+export interface CoachContext { preStart?: boolean; justRounded?: boolean; /** cruising (World.cruising): no class rules to cite for her tune */ cruising?: boolean; /** the band it last said, held a half-knot about each edge */ band?: Situation['band'] }
 
 /** The situation in words, and the numbers the lessons use. */
 export interface Situation {
@@ -635,7 +635,7 @@ export function lessons(b: Boat, ctx: CoachContext = {}): { s: Situation; list: 
     }
     list.push(...helmLessons(b, s, list.filter(l => l.line).length));
   }
-  if (!busy) list.push(...rigLessons(b, s));
+  if (!busy) list.push(...rigLessons(b, s, !!ctx.cruising));
   for (const src of SOURCES) list.push(...src(b, s, ctx));
   list.sort((x, y) => y.gain - x.gain);
   return { s, list };
@@ -663,11 +663,11 @@ export function tuneLoss(b: Boat): number {
 
 /**
  * The rig's tune, upwind, when it's the wrong one for the wind she's in (rigTune.ts): nothing to fix under way (the
- * forestay, shrouds and mast foot are fixed while racing, CR 7.40), so it's said, with what it costs, only when there's
+ * forestay, shrouds and mast foot are fixed while racing, CR 7.40, and set at the dock cruising), so it's said, with what it costs, only when there's
  * nothing else to fix (gain 0), and only when it costs at least half a percent: the cost is her speed with her tune
  * against the guide's tune for this wind, in the same equations (speedFactor).
  */
-function rigLessons(b: Boat, s: Situation): Lesson[] {
+function rigLessons(b: Boat, s: Situation, cruising = false): Lesson[] {
   if (!b.tune || !s.up) return [];
   const name = tuneName(b.tune), want = presetFor(s.tws);
   if (name === want) return [];
@@ -675,10 +675,12 @@ function rigLessons(b: Boat, s: Situation): Lesson[] {
   if (loss < 0.005) return [];
   const soft = forestayTension(b.tune) < forestayTension(TUNE_PRESETS[want]);
   const pct = `${(100 * loss).toFixed(1)}%`;
+  // (racing the class rules fix them (CR 7.40, 6.1.5); cruising nobody retunes under way, so no rule to cite)
+  const atDock = cruising ? 'The forestay, shrouds and mast foot are set at the dock' : 'The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5)';
   return [{ id: soft ? 'rig:soft' : 'rig:tight', who: 'you', gain: 0, kind: 'info',
     head: soft ? `Her rig was set for less wind than this: it costs her about ${pct} of her speed upwind. Backstay on hard.` : `Her rig was set for more wind than this: it costs her about ${pct} of her speed upwind. Backstay off, and sail a little lower.`,
-    why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5); the backstay is free.`
-      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. The forestay and shrouds are set at the dock (CR 7.40), and the mast foot (CR 6.1.5).`,
+    why: soft ? `On ${tuneWords(b.tune)} the forestay sags in this breeze: a full jib with a round entry that won't point, more heel and more helm. ${atDock}; the backstay is free.`
+      : `On ${tuneWords(b.tune)} the forestay is straight and the jib flat: it points, but has no power. ${atDock}.`,
     look: `the forestay's sag against the jib's luff; next time, ${tuneWords(TUNE_PRESETS[want])}` }];
 }
 

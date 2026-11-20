@@ -434,7 +434,7 @@ export class Hud {
     if (!aback) this.hinted.aback = false;
     if (this.abackT > 3 && !this.hinted.aback) {
       this.hinted.aback = true;
-      toast('Up here the poled-out jib does less than it would to leeward. Stow the pole (the band\'s Pole tab, or O), or bear away.', 4000);
+      toast('Poled out on a broad reach, the jib does less than sheeted to leeward. Stow the pole (O) or bear away toward a run.', 4000);
     }
   }
 

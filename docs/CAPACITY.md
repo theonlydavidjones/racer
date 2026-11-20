@@ -619,6 +619,77 @@ Also measured: the double `%` in wrap and n360 is a call to C's fmod (about 10 n
 2·10⁷ inputs, every value within 64 ulps of a multiple of 180 included) at about half the time. The step makes about 346
 such calls, so roughly 0.4% to gain; not yet applied.
 
+### 8d. The budget's noise: two runs, and PRs judged against main (19 Nov 2026)
+
+The ten races' ratios against v168 run 0.96–1.04 (standard deviation about 0.028), so one run's mean carries about
+±0.9%. That's half the budget's 1.9% of room. Two quiet runs of one tree read 2% apart on the same day:
+
+| tree | quiet runs, ten races against v168 |
+|---|---|
+| main 4ef0708f (before v208) | 1.0210 (VM just restarted), 1.0104 |
+| main dcc707a2 (v208's src) | 1.0059 |
+| Deep Physics' soak b31b28a3 (1.0040 against b4334c09, the same src as dcc707a2) | 1.0226, 1.0232 |
+
+So a tree about 1% over v168 passed or failed on the run. The rule since then (the Coordinator, 19 Nov 2026; the limit unchanged):
+
+- **PRs** are judged against main: `--ai` (≤1.015), or the plain gate for a change that doesn't change the race. A
+  budget run within main's own margin no longer holds a PR.
+- **Main** is measured against the budget once a release, before publishing: `--budget --ai`, which now runs twice by
+  default (`--repeat 2`). The second run swaps which races go with which load order, so each of the ten races sails once
+  in each order: twenty ratios, about ±0.6%, their mean against 1.019. perf.test does the same with `PERF_BUDGET_AI=1`.
+  If main reads above about 1.015, making headroom on main (bit-identical savings first) comes ahead of other work.
+
+### 8e. v209's headroom, and the garbage left on the backlog (19 Nov 2026)
+
+v209 read 1.0134 against v168 on the two-run budget: 0.6% of room. The Coordinator asked for 2% back, bit-identical.
+
+**What the profile showed** (v209 against v168, the perf race, self time): no one hot spot. What's new since v168 is mostly
+physics that has to run:
+- the wave forces, 1.4% (15 components × 5 trig a boat a step);
+- the crew's settle, 0.8% (arithmetic);
+- the grounding test's onLand, about 1%;
+- the marina fetch, about 1.3%, mostly cold fills.
+
+**What was tried:**
+
+| change | result |
+|---|---|
+| fetch's rays to its nodes asking each 2 m wall cell once; basinRay looking the wall map up once a ray and keeping the last tile | bit-identical, but 1.0008 against v209: nothing, since its time was mostly cold fills both pay alike. Dropped |
+| a wave-force recurrence (approximate to 1e-15) | not built: V8's Math.sin + cos is 39 ns a pair, a JS sincos 47. A recurrence could replace only the phase's two calls a component, about 3.6 µs of a 1100 µs step (≈0.3%) |
+| **onLand's open water by the 25 m square** (#482, src/geo/shore.ts) | **0.9835 against main**: two-run ten races, settled. Proven against the full test at 25.5 M points; bit-identical races |
+
+v210 then read **0.9980** against v168 (two runs): 2% of room.
+
+**The garbage, shelved** (the Coordinator, 19 Nov 2026). On v210 (08afb104) the race allocates about 453 KB a step by the
+heap sampler. Measured with `--trace-gc-nvp`, it's about 800 KB: a scavenge every ~21 steps, ~3.1 ms each, ~3% surviving,
+all of it promoted. On the race's thread that's ~3% of the step.
+
+It's spread over ~40 sites. The top ones, bytes a step (the heap sampler, 120 s of the perf race):
+
+| site | B a step | share |
+|---|---|---|
+| moveBoat (physics.ts) | 25 400 | 5.6% |
+| at (tide.ts) | 25 100 | 5.5% |
+| trimSails (physics.ts) | 16 000 | 3.5% |
+| withPierWakes (pierWakes.ts) | 14 700 | 3.2% |
+| aiThink (ai.ts) | 13 800 | 3.0% |
+| travel (physics.ts) | 12 100 | 2.7% |
+| assessPair (rules/pairs.ts) | 10 800 | 2.4% |
+| touchableMarks (world.ts) | 10 400 | 2.3% |
+| addBoatWake (shadows.ts) | 9 500 | 2.1% |
+| shadowAt (world.ts) | 9 000 | 2.0% |
+| terrainLeeRaw, atShore, mainShape, crewSolve, landAlong, crewAndHeel | 7 000–8 700 each | 1.5–1.9% |
+
+moveBoat's own allocations show what each site is like: sailForces' argument objects, jibOn, the rmExtra closure it
+passes to crewAndHeel, cs.place, b.forces. That's about 250 B a boat, ~2 KB of the 453 KB: cutting all of them is ≈0.1%
+of the step. 1% this way would take ~10 PRs across physics.ts, balance.ts, ai.ts, crewPhys.ts and pairs.ts, each owner
+to coordinate, so it's left as a backlog item.
+
+**The rule for it:** a PR already touching one of these functions folds in its allocation cuts (scratch objects for
+arguments read and not kept; closures that escape made module functions with explicit arguments). It shows them
+bit-identical (the race's end state to the last digit), measures them with perf-pair, and says so in the PR. Not
+`b.forces` and the like, which the page's mirror may compare by object.
+
 ## 9. Stutter: the frame's release gate, and the hitches (ROADMAP 8x, 14 Nov 2026)
 
 v187/v188 stuttered on the owner's machine "everywhere". Measured against v186 (cb17074) and v188 (dd7db94):

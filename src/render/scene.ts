@@ -431,6 +431,12 @@ export class SceneView {
 
   constructor(canvas: HTMLCanvasElement) {
     const renderer = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, stencil: true }); // the view runs from the tiller to Mt Tamalpais, 25 km off; the boats mark the stencil (navLights.ts)
+    // (no shader error checks outside the dev server: three.js reads each program's info log as it's first used, which
+    // makes the page wait for that program to finish compiling, so the background compile warmShaders asks for, and the
+    // browser's parallel compiling, can't help: at a cruise's start and when the boat editor opens, the frames wait on
+    // some eighty programs one by one (ROADMAP 8v2, the owner, 18 Nov 2026: "a lot of lag, in boat editor, at beginning
+    // of cruises. it tends to resolve after a while"). The dev server still checks, where a shader we write can fail)
+    renderer.debug.checkShaderErrors = import.meta.env.DEV;
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // r128 output, see three-setup.ts
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const scene = this.scene;

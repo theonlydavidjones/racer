@@ -34,8 +34,10 @@ export interface AiState {
   plan: { leave: number; tReach: number; coast: number; back: boolean };
   /** Direction (+1 right, −1 left) committed to for a big turn, 0 when none. */
   turnCommit: number;
+  /** The heading ai.ts clearestHeading chose (deg), and when (s, World.t): held on her next thinks while it's about as good as any. */
+  clearH?: number; clearT?: number;
   /** Tacking to answer a hail for room to tack (Rule 20.2(c), or (d) once her own hail is answered): she goes through the
-   * wind however slow she is, as the rule asks, rather than gybing round (physics.ts SLOW_TACK). */
+   * wind however slow she is, as the rule asks, rather than gybing round (physics.ts slowTack). */
   tackNow?: boolean;
   /** Stopped or going astern: sheets in, and off the wind if she's in irons, until she has way on again (ai.ts). */
   keptEased?: boolean; // (irons: her sails kept eased for a boat close by she must keep clear of, ai.ts, with a band)
@@ -62,6 +64,8 @@ export interface AiState {
   leeSide?: number | null;
   /** Land in the way of where she's going: the point she's steering for instead, refreshed 10 times a second. */
   detour?: Vec | null;
+  /** The side of her bearing the detour goes round (+1 right, −1 left, 0 none), kept for the next one round the same land. */
+  detourSide?: number;
   commitFor: number; // the desired heading that commitment was for
   duckUntil: number; // hailed "Starboard!": give that boat extra room until this time
   lastHail: number; // when she last hailed for room to tack
@@ -262,6 +266,8 @@ export interface Boat {
   crewWorth?: Partial<Record<keyof CrewSettings, number>>;
   /** The cabin-top lines worth a trip together though each is under it alone (controls.ts worthTogether), with crewWorth. */
   crewTogether?: ReadonlySet<string>;
+  /** The cabin-top lines off only a step of the guide's, with what their move is worth (controls.ts guideOnly), with crewWorth: on the boat, not looked up by the result's object, so the page's mirror has it too (crewWork.ts GUIDE_HOLD). */
+  crewGuide?: ReadonlyMap<string, number>;
   /** Which lines you held when the crew last planned (they re-plan at once when it changes). */
   crewFixed?: string;
   /**

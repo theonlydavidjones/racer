@@ -64,6 +64,9 @@ export interface Settings {
   myColors?: string[];
   /** The wind indicator (render/windLadder.ts) showing: off unless you turn it on, and remembered. */
   windLadder?: boolean;
+  /** The weather-helm chip at the foot of the tiller guide (app.ts showWeatherHelm): on unless you turn it off (the
+   * owner, 18 Nov 2026), and remembered. */
+  weatherHelm?: boolean;
   /** The points of sail on the water round her (render/windRose.ts): unset, on in the lessons and off otherwise; on or
    * off once you've switched it (the inset map's Layers menu, or its key). */
   pointsRose?: boolean;

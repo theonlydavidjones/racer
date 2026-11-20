@@ -109,7 +109,9 @@ export function stepJumpers(b: Pick<Boat, 'tune' | 'rigMain' | 'jumperTarget' | 
   b.jumperT = (b.jumperT ?? 0) + dt;
   if (b.jumperT < JUMPER_HALF_TURN_S) return;
   b.jumperT = 0;
-  setJumpers(b, now + Math.sign(b.jumperTarget - now) * Math.min(0.5, Math.abs(b.jumperTarget - now)), tws);
+  // (to the next half-turn mark that way: off the marks only on the guide's tune for the wind, set for her by none)
+  const up = b.jumperTarget > now, next = up ? Math.floor(now * 2 + 1 + 1e-9) / 2 : Math.ceil(now * 2 - 1 - 1e-9) / 2;
+  setJumpers(b, up ? Math.min(b.jumperTarget, next) : Math.max(b.jumperTarget, next), tws);
 }
 
 /**
@@ -142,7 +144,7 @@ export const foulingDrag = (c: Condition, v: number) => v <= 0 ? 0 : 0.5 * 1025 
 export const PERF_INFO = {
   weeks: 'Slime builds over the first weeks; copper antifouling holds off barnacles for about six, then they come fast (faster in late-summer water than in January). A slow boat feels it most: in light air, skin friction is most of her drag. Racing Folkboats are scrubbed every week or two.',
   finish: 'A burnished racing bottom has about 3% less skin friction than antifouling as it was rolled on (Schultz 2002). Worth a fraction of a percent; most in light air.',
-  sails: 'Old Dacron sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
+  sails: 'Old sailcloth sits deeper with the draft further aft, stretches more as the breeze builds and hooks at the leech: more heel and weather helm, less drive and pointing. A deeper sail can help a little in very light air.',
   spars: 'The class built the aluminum mast to bend like an average wooden one; wooden masts vary. A soft mast flattens the main and opens its leech by itself in a gust (good in a gusty breeze) but has less power in moderate air; a stiff one keeps its power but heels more in the gusts. A wooden rig is also about 9 kg heavier aloft. The boom makes no measured difference.',
   outboard: 'Tohatsu-class four-strokes: 2.5 hp or 3.5 hp (about 18.5 kg each), neither with a reverse gear (they swivel round to push astern), or 6 hp (about 26 kg). On the bracket you can motor (the Motor button); it\'s weight at the very stern, and the class rules don\'t allow racing with it mounted aft (NFIA, 2006, rule 1.11): race setup stows it. Stowed below it costs less.',
   gear: 'Gear and stores, or an old wooden hull\'s soaked planking, over the class minimum of 1930 kg (wooden and fiberglass alike). Slower in light air; a little more stable in a breeze.'

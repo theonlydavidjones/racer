@@ -126,6 +126,9 @@ const LP = (() => {
   const a = LL(d.box.south, d.box.west), b = LL(d.box.north, d.box.east);
   return { x0: a.x, x1: b.x, y0: a.y, y1: b.y, land: d.land.map(q => LL(q[0], q[1])) };
 })();
+/** A box's four edges, corner to corner (landAlong: made once, not every call). */
+const boxEdges = (B: Box): [Vec, Vec][] => [[{ x: B.x0, y: B.y0 }, { x: B.x1, y: B.y0 }], [{ x: B.x1, y: B.y0 }, { x: B.x1, y: B.y1 }], [{ x: B.x1, y: B.y1 }, { x: B.x0, y: B.y1 }], [{ x: B.x0, y: B.y1 }, { x: B.x0, y: B.y0 }]];
+const CF_EDGES = boxEdges(CF), LP_EDGES = boxEdges(LP);
 const inLimePoint = (p: Vec): boolean | null => p.x >= LP.x0 && p.x <= LP.x1 && p.y >= LP.y0 && p.y <= LP.y1 ? inPoly(p, LP.land) : null;
 
 /** The ground: the land itself and the marinas' docks, without the Wharf's piers and docks (for the terrain, which can't show them). */
@@ -227,6 +230,16 @@ export const pierNear = (p: Vec, r: number): Pier | null => {
   }
 }
 
+/** The named pier part at p, if any (the Berkeley Pier and its abandoned outer part, Chevron's Long Wharf, the Wharf's
+ * named piers): for the message when she hits one. */
+export function wharfPartAt(p: Vec): string | null {
+  for (const G of GROUPS) {
+    if (!inB(p, G.box)) continue;
+    for (const a of G.areas) if (inB(p, a.box) && inPoly(p, a.pts)) return a.name ?? null;
+    for (const l of G.lines) if (inB(p, l.box)) for (let i = 1; i < l.pts.length; i++) if (segPt(p, l.pts[i - 1], l.pts[i]) <= l.width! / 2) return l.name ?? null;
+  }
+  return null;
+}
 export function hitsWharf(p: Vec): boolean {
   if (hitsPier(p)) return true;
   for (let g = 0; g < GROUPS.length; g++) { // (indexed: every land check asks)
@@ -335,8 +348,61 @@ export function wharfCrossed(a: Vec, b: Vec, piers = true): boolean {
   return false;
 }
 
+/*
+ * Open water, 25 m square by square: a square where onLand can't be true anywhere, so onLand there needn't ask the shore,
+ * the marinas and the piers. Every boat asks onLand several times a step (her bow and her middle, aground or not), and
+ * nearly all of them are out in open water. A square is open only if each thing onLand reads is shown to be water all
+ * over it (each with a metre's pad against rounding at the edges):
+ *   - no marina's reach (hitsHarbor answers no outside them all, in a basin or out of one);
+ *   - no pier group's box (hitsWharf's piers, docks and breakwaters; the bridges' piers);
+ *   - not Lime Point's box (its own coastline, in place of the terrain's cells);
+ *   - none of the terrain's 50 m land cells over it, with a cell's pad all round (inTerrain);
+ *   - the Cityfront shore: each of its 20 m cells over it, with one cell's pad, crossed by no edge and water
+ *     (inCityfront: a cell no edge crosses or comes next to is all the same, its middle's answer).
+ * The answer onLand gives is the same (open squares are where it says no); it's only found sooner. Worked out the
+ * first time a square is asked, and kept: none of this changes once the module's loaded (GRID's lone patches by the
+ * piers are cleared above, at load).
+ */
+const OC = 25, OPAD = 1;
+const OPEN = (() => {
+  const a = LL(M.south, M.west), b = LL(M.north, M.east), nx = Math.ceil((b.x - a.x) / OC), ny = Math.ceil((b.y - a.y) / OC);
+  return { x0: a.x, y0: a.y, nx, ny, open: new Int8Array(nx * ny).fill(-1) };
+})();
+/** Is all of the square [x0, x1] × [y0, y1] water to onLand (see OPEN)? */
+function squareOpen(x0: number, y0: number, x1: number, y1: number): boolean {
+  const hits = (B: { x0: number; x1: number; y0: number; y1: number }) => !(x1 < B.x0 - OPAD || x0 > B.x1 + OPAD || y1 < B.y0 - OPAD || y0 > B.y1 + OPAD);
+  for (const H of HARBORS) if (hits(H.reach)) return false;
+  for (const G of GROUPS) if (hits(G.box)) return false;
+  for (const G of PIER_GROUPS) if (hits(G.box)) return false;
+  if (hits(LP)) return false;
+  // (the terrain's cells under the square and one more all round: inTerrain's i and j are floor(cellX(lon)), floor(cellY(lat)))
+  const iA = Math.floor(cellX(LON0 + (x0 - OPAD) / MLON)) - 1, iB = Math.floor(cellX(LON0 + (x1 + OPAD) / MLON)) + 1;
+  const jA = Math.floor(cellY(LAT0 + (y1 + OPAD) / MLAT)) - 1, jB = Math.floor(cellY(LAT0 + (y0 - OPAD) / MLAT)) + 1;
+  for (let j = Math.max(0, jA); j <= Math.min(M.ny - 1, jB); j++) for (let i = Math.max(0, iA); i <= Math.min(M.nx - 1, iB); i++) if (GRID[j * M.nx + i] === 1) return false;
+  if (hits(LB)) {
+    const ia = Math.max(0, Math.floor((x0 - OPAD - LB.x0) / LB.C) - 1), ib = Math.min(LB.cx - 1, Math.floor((x1 + OPAD - LB.x0) / LB.C) + 1);
+    const ja = Math.max(0, Math.floor((y0 - OPAD - LB.y0) / LB.C) - 1), jb = Math.min(LB.cy - 1, Math.floor((y1 + OPAD - LB.y0) / LB.C) + 1);
+    for (let j = ja; j <= jb; j++) for (let i = ia; i <= ib; i++) {
+      const cx0 = LB.x0 + i * LB.C, cy0 = LB.y0 + j * LB.C;
+      if (cx0 > LB.x1 || cy0 > LB.y1) continue; // (a cell wholly past the box's far edges: inCityfront says no there)
+      const k = j * LB.cx + i; if (LB.crossed[k]) return false;
+      // (an uncrossed cell's answer, as inCityfront would keep it: any point of it in the box, its middle kept in the box)
+      const v = LB.known[k] >= 0 ? LB.known[k] === 1 : inLandBands({ x: Math.min(LB.x1, cx0 + LB.C / 2), y: Math.min(LB.y1, cy0 + LB.C / 2) });
+      if (v) return false;
+    }
+  }
+  return true;
+}
+/** Is `p` in an open square (OPEN)? No if it's off the terrain's map or the square isn't open. */
+function inOpen(p: Vec): boolean {
+  const i = Math.floor((p.x - OPEN.x0) / OC), j = Math.floor((p.y - OPEN.y0) / OC);
+  if (i < 0 || j < 0 || i >= OPEN.nx || j >= OPEN.ny) return false;
+  const k = j * OPEN.nx + i; let v = OPEN.open[k];
+  if (v < 0) v = OPEN.open[k] = squareOpen(OPEN.x0 + i * OC, OPEN.y0 + j * OC, OPEN.x0 + (i + 1) * OC, OPEN.y0 + (j + 1) * OC) ? 1 : 0;
+  return v === 1;
+}
 /** Is this point land a boat would run aground on? (In a marina's basin: only its docks and breakwaters; and those are solid just outside it too.) */
-export const onLand = (p: Vec): boolean => onGround(p) || hitsWharf(p);
+export const onLand = (p: Vec): boolean => !inOpen(p) && (onGround(p) || hitsWharf(p));
 
 /*
  * Land along a line, exactly: for the look-ahead of the AI, the tiller pilot and the Rule 20 hail, which used to sample
@@ -400,13 +466,19 @@ function edgeCross(a: Vec, b: Vec, p: Vec, q: Vec): number {
 }
 /** Walk the cells of a grid that the line from (x0, y0) to (x1, y1) (in cells) passes through, in order; `visit` gets
  * the cell and the t at which the line enters it, and returns true to stop. */
+let clipA = 0, clipB = 1;
+/** One edge of gridWalk's clip: false if the line misses the grid. */
+function clip(p: number, q: number): boolean {
+  if (p === 0) return q >= 0;
+  const r = q / p; if (p < 0) { if (r > clipB) return false; if (r > clipA) clipA = r; } else { if (r < clipA) return false; if (r < clipB) clipB = r; }
+  return true;
+}
 function gridWalk(x0: number, y0: number, x1: number, y1: number, nx: number, ny: number, visit: (i: number, j: number, t: number) => boolean): void {
   const dx = x1 - x0, dy = y1 - y0;
-  let ta = 0, tb = 1; // clip to the grid (Liang–Barsky)
-  for (const [p, q] of [[-dx, x0], [dx, nx - x0], [-dy, y0], [dy, ny - y0]]) {
-    if (p === 0) { if (q < 0) return; continue; }
-    const r = q / p; if (p < 0) { if (r > tb) return; if (r > ta) ta = r; } else { if (r < ta) return; if (r < tb) tb = r; }
-  }
+  // clip to the grid (Liang–Barsky): the four edges in turn, with no array made for them (it ran several times a step)
+  clipA = 0; clipB = 1;
+  if (!clip(-dx, x0) || !clip(dx, nx - x0) || !clip(-dy, y0) || !clip(dy, ny - y0)) return;
+  const ta = clipA, tb = clipB;
   let i = Math.min(nx - 1, Math.max(0, Math.floor(x0 + dx * ta))), j = Math.min(ny - 1, Math.max(0, Math.floor(y0 + dy * ta)));
   const si = Math.sign(dx), sj = Math.sign(dy), tdx = dx ? 1 / Math.abs(dx) : Infinity, tdy = dy ? 1 / Math.abs(dy) : Infinity;
   let tx = dx > 0 ? (i + 1 - x0) / dx : dx < 0 ? (i - x0) / dx : Infinity, ty = dy > 0 ? (j + 1 - y0) / dy : dy < 0 ? (j - y0) / dy : Infinity, t = ta;
@@ -468,13 +540,13 @@ export function landAlong(a: Vec, b: Vec): number {
     return false;
   });
   // where the terrain takes over from the Cityfront shore (onGround's box)
-  for (const [p, q] of [[{ x: CF.x0, y: CF.y0 }, { x: CF.x1, y: CF.y0 }], [{ x: CF.x1, y: CF.y0 }, { x: CF.x1, y: CF.y1 }], [{ x: CF.x1, y: CF.y1 }, { x: CF.x0, y: CF.y1 }], [{ x: CF.x0, y: CF.y1 }, { x: CF.x0, y: CF.y0 }]] as const) {
+  for (const [p, q] of CF_EDGES) {
     const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
   }
   // Lime Point's coastline, and the edges of its box, where the terrain takes over again
   if (overlaps(bb, LP)) {
     poly(LP.land, maybe);
-    for (const [p, q] of [[{ x: LP.x0, y: LP.y0 }, { x: LP.x1, y: LP.y0 }], [{ x: LP.x1, y: LP.y0 }, { x: LP.x1, y: LP.y1 }], [{ x: LP.x1, y: LP.y1 }, { x: LP.x0, y: LP.y1 }], [{ x: LP.x0, y: LP.y1 }, { x: LP.x0, y: LP.y0 }]] as const) {
+    for (const [p, q] of LP_EDGES) {
       const t = edgeCross(a, b, p, q); if (t < best) maybe(t);
     }
   }

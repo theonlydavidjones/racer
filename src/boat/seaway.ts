@@ -1,4 +1,4 @@
-import { D2R, KT, wrap } from '../core/math';
+import { D2R, KT, clamp, wrap } from '../core/math';
 import type { SeaHere } from '../environment/sea';
 import { N_WAVES, type WaveField } from '../environment/waveField';
 import type { Boat } from './boat';
@@ -79,12 +79,32 @@ export function speedInChop(kt: number, twa: number, hs: number, tp: number): nu
 const CHOP_MEMO = 16, chopMemo = Array.from({ length: CHOP_MEMO }, () => ({ kt: NaN, twa: NaN, hs: NaN, tp: NaN, v: 0 }));
 let chopNext = 0;
 
+/**
+ * The best angle to windward in a chop, as a helmsman finds it: the middle of the top of the speed made good, not the
+ * highest point of every wrinkle in it. Her speed in a chop is worked from tables (the polar's angles, the hull's
+ * resistance by Froude number, the sails' drive by her speed), each read in straight lines between its entries, so the
+ * speed made good against the angle has corners, and near its top two of them can stand within a fifth of a percent of
+ * each other 5 degrees apart: taken at its highest point, the answer swung 5 to 7 degrees on a quarter-knot puff, and the
+ * AI's target angle and the laylines with it. So the curve is taken as its mean over BEAT_SMOOTH_KT of wind either side
+ * and BEAT_SMOOTH_DEG of angle either side (no helmsman holds her closer than that, nor reads the wind finer), and the
+ * top of that, between the half degrees by the parabola through the three highest points. Within 0.9% of the most
+ * she could make, in any wind and chop (tests/beat-chop.test.ts). ESTIMATES, both widths.
+ */
+const BEAT_SMOOTH_KT = 0.75, BEAT_SMOOTH_DEG = 4, B0 = 30, B1 = 65, BN = Math.round((B1 - B0) / 0.5) + 1;
+const beatRaw = new Float64Array(BN), beatSm = new Float64Array(BN);
 function beatSearch(kt: number, hs: number, tp: number): number {
-  let best = 40, bestV = -1;
-  for (let t = 30; t <= 65; t += 0.5) { const v = speedInChop(kt, t, hs, tp) * Math.cos(t * D2R); if (v > bestV) { bestV = v; best = t; } }
+  // the speed made good at each half degree: the wind as it is and BEAT_SMOOTH_KT either side (¼ ½ ¼)
+  for (let i = 0; i < BN; i++) { const t = B0 + i * 0.5, c = Math.cos(t * D2R);
+    beatRaw[i] = (0.5 * speedInChop(kt, t, hs, tp) + 0.25 * (speedInChop(Math.max(0, kt - BEAT_SMOOTH_KT), t, hs, tp) + speedInChop(kt + BEAT_SMOOTH_KT, t, hs, tp))) * c; }
+  // ... and over the angles either side, weighted to nothing at BEAT_SMOOTH_DEG (at the ends, over what there is)
+  const W = Math.round(BEAT_SMOOTH_DEG / 0.5); let best = -1, bestV = -Infinity;
+  for (let i = 0; i < BN; i++) { let sum = 0, wt = 0; for (let k = -W + 1; k < W; k++) { const j = i + k; if (j < 0 || j >= BN) continue; const w = W - Math.abs(k); sum += w * beatRaw[j]; wt += w; } beatSm[i] = sum / wt; if (beatSm[i] > bestV) { bestV = beatSm[i]; best = i; } }
   // (no headway at any angle, light air in a big chop: not "pinch hardest", as the first angle tried would say, but the
   // widest, footing off for speed being her only hope)
-  return bestV > 0 ? best : 65;
+  if (!(bestV > 0)) return B1;
+  if (best <= 0 || best >= BN - 1) return B0 + best * 0.5;
+  const l = beatSm[best - 1], m = beatSm[best], r = beatSm[best + 1], d = l - 2 * m + r;
+  return B0 + (best + (d < 0 ? clamp(0.5 * (l - r) / d, -0.5, 0.5) : 0)) * 0.5;
 }
 const beatCache = new Map<number, number>();
 /** Best upwind VMG angle (true) in chop: wider than in flat water, by how much the chop punishes pinching. */

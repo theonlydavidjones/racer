@@ -138,6 +138,12 @@ export function jibClew(c: Controls, tack: Tack): number {
   const lee = jibAngle(c, tack), wlead = carLead(c.car[tack].ins); // the windward car is on the tack's own side
   return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
 }
+/** jibClew with the leeward sheet let fly (jibsheet 1), the rest as `c` has them: jibClew({ ...c, jibsheet: 1 }, tack),
+ * the same sums, without copying the controls (trimSails asks up to three times a step for every boat). */
+export function jibClewFree(c: Controls, tack: Tack): number {
+  const lee = Math.min(68, carLead(c.car[tack === 'S' ? 'P' : 'S'].ins) + 70 * Math.pow(1, 1.4)), wlead = carLead(c.car[tack].ins);
+  return Math.min(lee, -wlead + 140 * Math.pow(clamp(c.jibsheetW, 0, 1), 1.4));
+}
 /** Windward-sheet setting that holds the clew `angle` deg to windward (inverse of jibClew's windward stop). */
 export function jibsheetWFor(angle: number, c: Controls, tack: Tack): number {
   const wlead = carLead(c.car[tack].ins);
@@ -451,12 +457,17 @@ export function crewSolve(tws: number, awa: number, tack: Tack, mainAngle: numbe
     return settingsDrive(v, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, fixed.mainsheet) - 0.0005 * ease;
   };
   let best = score(x);
+  // (each trial moves one setting in x itself and puts it back if it scores no better: the same trials, in the same order,
+  // as a copy of x with that one setting moved, without a new object for each of the ~150 a call)
   for (const step of [0.25, 0.1, 0.04]) for (let pass = 0; pass < 3; pass++) {
-    for (const k of keys) for (const d of [-step, step]) {
-      const v = { ...x, [k]: clamp(x[k] + d, lo(k), hi(k)) }, sc = score(v);
-      if (sc > best) { best = sc; Object.assign(x, v); }
+    for (const k of keys) for (let s = 0; s < 2; s++) {
+      const was = x[k]; x[k] = clamp(was + (s ? step : -step), lo(k), hi(k));
+      const sc = score(x); if (sc > best) best = sc; else x[k] = was;
     }
-    for (const d of [-1, 1]) { const v = { ...x, carFore: clamp(x.carFore + d, carMin, carMax) }, sc = score(v); if (sc > best) { best = sc; Object.assign(x, v); } }
+    for (let s = 0; s < 2; s++) {
+      const was = x.carFore; x.carFore = clamp(was + (s ? 1 : -1), carMin, carMax);
+      const sc = score(x); if (sc > best) best = sc; else x.carFore = was;
+    }
   }
   return x;
 }
@@ -483,9 +494,13 @@ export function crewShapes(tws: number, awa: number, depower: number, mainAngle:
 }
 
 /** The drive (as a share of the best) the sails' shapes give with these settings, for the sheet angles wanted. */
+/** settingsDrive's controls, filled in afresh each call (crewSolve asks ~150 times a call; the shapes only read it). */
+const SD: Controls = { mainsheet: 0, traveller: 0, vang: 0, outhaul: 0, cunningham: 0, downhaul: 0, backstay: 0, jibsheet: 0, jibsheetW: 1, jibCunningham: 0, jibHalyard: 0, car: { S: { fore: 0, ins: 0 }, P: { fore: 0, ins: 0 } } };
 function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: number, jibAng: number, tm: Shape, tj: Shape, rig: SailRig, jibWear: SailWear, aws: number, mainsheet?: number): number {
-  const c: Controls = { mainsheet: mainsheet ?? mainsheetFor(mainAngle, v.traveller), traveller: v.traveller, vang: v.vang, outhaul: v.outhaul, cunningham: v.cunningham, downhaul: v.downhaul,
-    backstay: v.backstay, jibsheet: 0, jibsheetW: 1, jibCunningham: v.jibCunningham, jibHalyard: v.jibHalyard, car: { S: { fore: v.carFore, ins: v.carIn }, P: { fore: v.carFore, ins: v.carIn } } };
+  const c = SD;
+  c.mainsheet = mainsheet ?? mainsheetFor(mainAngle, v.traveller); c.traveller = v.traveller; c.vang = v.vang; c.outhaul = v.outhaul; c.cunningham = v.cunningham; c.downhaul = v.downhaul;
+  c.backstay = v.backstay; c.jibsheet = 0; c.jibsheetW = 1; c.jibCunningham = v.jibCunningham; c.jibHalyard = v.jibHalyard;
+  c.car.S.fore = v.carFore; c.car.S.ins = v.carIn; c.car.P.fore = v.carFore; c.car.P.ins = v.carIn;
   c.jibsheet = jibsheetFor(jibAng, c, tack);
   return 0.7 * shapeEfficiency(mainShape(c, tws, rig, aws), tm) + 0.3 * shapeEfficiency(jibShape(c, tws, tack, jibWear, aws, rig.tune), tj);
 }
@@ -501,6 +516,19 @@ function settingsDrive(v: CrewSettings, tws: number, tack: Tack, mainAngle: numb
 const TOGETHER = new WeakMap<object, ReadonlySet<string>>();
 const NONE: ReadonlySet<string> = new Set();
 export const worthTogether = (W: object): ReadonlySet<string> => TOGETHER.get(W) ?? NONE;
+/** How far the breeze wanders about the wind there is in a gust-lull cycle (kt): ±1.2 kt about 11.5 and 3.5 to 5.7 kt in
+ * the cases that had the crew chasing the guide's steps (the physics review of the crew habits, 16 Nov 2026). An estimate. */
+export const GUIDE_STEP = 1.5;
+/**
+ * The cabin-top lines planWorth counts worth a trip (its 1) only because the guide's settings for the wind and angle
+ * she's read at (guideLimits) leave them outside, not the depowering steps, with what the move is worth in drive alone:
+ * a step of the guide's (3 cm to 1.5 cm off the outhaul's mark at 5 kt, 1.5 cm to on it at 12) crossed as the breeze
+ * wanders across it is a setting for a breeze that may not stay, and the crew judge the trip by its worth and by how
+ * long the breeze has held there (crewWork.ts GUIDE_HOLD). Worked out with the plan, kept with its result (and on the
+ * boat, physics.ts crewGuide).
+ */
+const GUIDE_ONLY = new WeakMap<object, ReadonlyMap<string, number>>();
+export const guideOnly = (W: object): ReadonlyMap<string, number> | undefined => GUIDE_ONLY.get(W);
 const TOP_LINES = ['vang', 'outhaul', 'cunningham', 'downhaul', 'jibCunningham', 'jibHalyard'] as const;
 /**
  * What moving each line from where it is to the crew's plan is worth: the drive it gains (a share: 0.002 = 0.2%), or 1
@@ -512,9 +540,25 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
   const loaded = loadedCar(c, tack);
   const now: CrewSettings = { traveller: c.traveller, vang: c.vang, outhaul: c.outhaul, cunningham: c.cunningham, downhaul: c.downhaul, backstay: c.backstay, jibCunningham: c.jibCunningham, jibHalyard: c.jibHalyard ?? 0.3, carFore: loaded.fore, carIn: loaded.ins };
   const base = settingsDrive(now, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet), out: Partial<Record<keyof CrewSettings, number>> = {};
+  let steps: ReturnType<typeof depowerLimits> | undefined, guide: Map<string, number> | undefined, near: ReturnType<typeof guideLimits>[] | undefined;
   for (const k of ['traveller', 'vang', 'outhaul', 'cunningham', 'downhaul', 'backstay', 'jibCunningham', 'jibHalyard'] as const) {
     const m = lim.min[k], mx = lim.max[k];
-    if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) { out[k] = 1; continue; }
+    if ((m != null && now[k] < m - 0.02) || (mx != null && now[k] > mx + 0.02)) {
+      out[k] = 1;
+      // (outside only by the guide's settings, inside the depowering steps alone, and inside the guide's for a breeze
+      // within GUIDE_STEP of the one read: a step of the breeze, not of her angle or a rule well clear of it. guideOnly, with the drive
+      // the move is worth)
+      if (k !== 'traveller' && k !== 'backstay') {
+        steps ??= depowerLimits(depower ?? 0, awa);
+        const sm = steps.min[k], sx = steps.max[k];
+        if (!((sm != null && now[k] < sm - 0.02) || (sx != null && now[k] > sx + 0.02))) {
+          // (its steps fall on whole knots, so a look each half knot finds every setting in that span)
+          near ??= [-3, -2, -1, 1, 2, 3].map(i => guideLimits(guideKt + i * GUIDE_STEP / 3, guideAwa));
+          if (near.some(g => !((g.min[k] ?? -1) > now[k] + 0.02 || (g.max[k] ?? 1) < now[k] - 0.02))) (guide ??= new Map()).set(k, settingsDrive({ ...now, [k]: plan[k] }, tws, tack, mainAngle, jibAng, tm, tj, rig, jibWear, aws, mainsheet) - base);
+        }
+      }
+      continue;
+    }
     // with your mainsheet held, the traveller is how they put the boom where it should be: that's the sheet's angle of
     // attack, worth more than any shape
     if (k === 'traveller' && mainsheet != null) { out[k] = Math.abs(plan.traveller - now.traveller) > 0.02 ? 1 : 0; continue; }
@@ -534,5 +578,6 @@ export function planWorth(c: Controls, plan: CrewSettings, tws: number, awa: num
       }
     }
   }
+  if (guide) GUIDE_ONLY.set(out, guide);
   return out;
 }

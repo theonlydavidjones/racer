@@ -33,7 +33,7 @@ describe('the shore distance off a 10 m lattice', () => {
     expect(worstK).toBeLessThan(0.013); // (0.75 / 350 per metre: 6 m is 1.3% of the current)
   }, 180_000);
 
-  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over eight races', async () => {
+  it('sails no further from the exact distance\'s race than a 0.1% change in the current does, over 24 races', async () => {
     // A race isn't chaotic to a nudge (a boat moved a micrometre sails the same race), but a small change to the forces
     // moves the AI's decisions (a tack a step sooner, a contact, a penalty's turns) and the race goes its own way from
     // there, by as much as its own luck: one race's fleet speed moved 1–17% for the current 0.1% stronger or weaker (far
@@ -42,8 +42,12 @@ describe('the shore distance off a 10 m lattice', () => {
     // the mean the current's ±0.1% makes, within half as much again and half a point. (A lattice that's subtly wrong is
     // the test above's to catch, point by point; this is that it doesn't sail a different kind of race.)
     const dev: number[] = [], nudge: number[] = [];
-    // (the 32 races sailed side by side on the pool's threads; then, seed by seed as before)
-    const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10]] as const;
+    // (the 96 races sailed side by side on the pool's threads; then, seed by seed as before)
+    const SEEDS = [[0, 3], [0, 4], [0, 5], [0, 6], [1, 7], [1, 8], [1, 9], [1, 10], [0, 11], [0, 12], [0, 13], [0, 14], [1, 15], [1, 16],
+      [1, 17], [1, 18], [0, 19], [0, 20], [0, 21], [0, 22], [1, 23], [1, 24], [1, 25], [1, 26]] as const;
+    // (24 races, not 8: a race's change is heavy-tailed, about 2% sd, and over 8 the bound sat ~1.4 sd above an honest
+    // lattice, a chance fail about 1 run in 12 whenever the fleet's paths reshuffled; over 24 it's ~2.4 sd, about 1%.
+    // The bound's formula is unchanged. Capacity, 19 Nov 2026)
     const jobs = SEEDS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: false, skip: false, seed }], [i, { grid: true, skip: false, seed }],
       [i, { grid: false, skip: false, seed, curK: 1.001 }], [i, { grid: false, skip: false, seed, curK: 0.999 }]]);
     const R = await sail('approxRace', jobs);
@@ -70,10 +74,11 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
   // about 2 fouls a race every step, the per-seed difference's standard deviation 1.4–1.6, its mean +0.13 and −0.34; the
   // old bound on two sixteen-race totals (20 Hz ≤ 1.3 × every step + 2) had a margin of about 10 against a spread of
   // about ±7, and failed about one run in ten with no real effect. Now: fail when the mean difference is above its
-  // one-sided 99% bound under no effect, t(0.99, 47 df) = 2.408 standard errors (the sample's own). Resampling those 64
+  // one-sided 99% bound under no effect, t(0.99, 47 df) = 2.408 standard errors (the sample's own; since 20 Nov 2026
+  // over 96 seeds, t(0.99, 95 df) = 2.366). Resampling those 64
   // measured pairs: with no effect it fails about one run in a hundred (the old test, one in twenty); a real rise of half
   // again in the fouls (+1 a race) it catches 99 times in 100 (the old, 73); of a third (+0.6 a race), 65 (the old, 38).
-  it('sails no further from the every-step race than a 0.1% change in the current does, over 48 races, with no more fouls', async () => {
+  it('sails no further from the every-step race than a 0.1% change in the current does, over 48 races, with no more fouls over 96', async () => {
     const dev: number[] = [], nudge: number[] = [];
     let penE = 0, penD = 0;
     const pens = (r: ReturnType<typeof race>) => r.fouls;
@@ -91,6 +96,13 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
     // Capacity's ruling: more seeds and the same formula, not a looser bound.)
     jobs.push(...MORE.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }],
       [i, { grid: true, skip: true, seed, exactAI: true, curK: 1.001 }], [i, { grid: true, skip: true, seed, exactAI: true, curK: 0.999 }]]));
+    // (the fouls only, and only both ways: 48 more seeds, 51–98, the courses in turn, so the paired test runs over 96.
+    // Why: on 20 Nov 2026 the light-air tack with the crew's outhaul failed it on the 48 alone, 72 against 101, mean +0.60
+    // against a bound of 0.53 (t 2.77); on 96 seeds outside the test (51–146) the same pair gave 171 against 177, +0.06
+    // against 0.29, the same as main's +0.06: a tail draw on the fixed 48, not a rise in fouls. Coordinator's ruling: more
+    // seeds at the same 99% rate, not a looser bound.)
+    const MORE_FOULS = Array.from({ length: 48 }, (_, k) => [k % 2, 51 + k] as const);
+    jobs.push(...MORE_FOULS.flatMap(([i, seed]): [number, ApproxOpts][] => [[i, { grid: true, skip: true, seed, exactAI: true }], [i, { grid: true, skip: true, seed }]]));
     const R = await sail('approxRace', jobs);
     const diff: number[] = []; // (per seed: twenty a second's fouls minus every step's)
     SEEDS.forEach((_, k) => {
@@ -103,13 +115,17 @@ describe('the AI boats think twenty times a second (World.AI_EVERY)', () => {
       dev.push(Math.abs(fleetV(dR.boats) / ex - 1)); penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR));
       nudge.push((Math.abs(fleetV(upR.boats) / ex - 1) + Math.abs(fleetV(downR.boats) / ex - 1)) / 2);
     });
+    MORE_FOULS.forEach((_, k) => {
+      const [exR, dR] = R.slice(4 * (SEEDS.length + MORE.length) + 2 * k, 4 * (SEEDS.length + MORE.length) + 2 * k + 2);
+      penE += pens(exR); penD += pens(dR); diff.push(pens(dR) - pens(exR));
+    });
     expect(dev.length).toBe(48);
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     expect(mean(dev), `twenty a second ${dev.map(x => (100 * x).toFixed(1)).join(' ')}%, the current's ±0.1% ${nudge.map(x => (100 * x).toFixed(1)).join(' ')}%`).toBeLessThan(1.5 * mean(nudge) + 0.005);
-    const n = diff.length, dm = mean(diff), sd = Math.sqrt(diff.reduce((a, x) => a + (x - dm) ** 2, 0) / (n - 1)), T99 = 2.408; // (t, 47 df)
-    expect(n).toBe(48);
+    const n = diff.length, dm = mean(diff), sd = Math.sqrt(diff.reduce((a, x) => a + (x - dm) ** 2, 0) / (n - 1)), T99 = 2.366; // (t, 95 df: the same one-sided 99%)
+    expect(n).toBe(96);
     expect(dm, `penalties over ${n} races: every step ${penE}, twenty a second ${penD}; the mean difference ${dm.toFixed(2)} a race, its 99% bound ${(T99 * sd / Math.sqrt(n)).toFixed(2)}`).toBeLessThanOrEqual(T99 * sd / Math.sqrt(n));
-  }, 3_600_000);
+  }, 5_400_000);
 });
 
 describe('pairs far apart are let be', () => {

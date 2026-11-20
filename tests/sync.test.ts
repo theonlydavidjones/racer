@@ -95,6 +95,18 @@ describe('the mirror World is the real one over again', () => {
       });
   }, 900_000);
 
+  it('a key deleted and another added in the same frame: the mirror drops the old one (the key count unchanged)', () => {
+    // (Crew Habits, 19 Nov 2026: deletes were looked for only when an object's key count changed, so one key gone and
+    // another come in the same packet left the old one on the page's copy; crewWork's lineWant and lineSlow delete keys so)
+    sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 10, sailFrom: 'cityfront', sailTo: '', current: 'slack' }), 5, { freeSail: true }),
+      12, () => 2, 1, (w, i) => {
+        const u = w.user as unknown as { probe?: Record<string, number> };
+        if (i === 2) u.probe = { a: 1, b: 2 };
+        if (i === 5) { delete u.probe!.a; u.probe!.c = 3; } // (two keys before, two after)
+        if (i === 8) { delete u.probe!.b; delete u.probe!.c; u.probe!.d = 4; u.probe!.e = 5; }
+      });
+  }, 120_000);
+
   it('paddling with the boom crutch in a calm, and a contact (the paddle state and lastHitT go across)', () => {
     sailBoth(() => new World(COURSES[0], S({ mode: 'sail', windKind: 'west', windKt: 1, sailFrom: 'cityfront', sailTo: '', current: 'slack' }), 5, { freeSail: true }),
       400, () => 4, 40, (w, i) => {

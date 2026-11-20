@@ -51,7 +51,7 @@ describe('rig tune (rigTune.ts): North Sails\' Nordic Folkboat guide', () => {
 
 import { COURSES } from '../src/courses/registry';
 import { DEFAULT_SETTINGS, type Settings } from '../src/settings';
-import { World } from '../src/sim/world';
+import { DT, World } from '../src/sim/world';
 import { tuneName, presetFor, tuneBrief, TUNE_HEIKKILA } from '../src/boat/rigTune';
 import { raceBrief } from '../src/sim/strategist';
 import { lessons } from '../src/boat/coach';
@@ -60,14 +60,39 @@ import { testBoat, sail } from './helpers/testBoat';
 const S = (s: Partial<Settings> = {}) => ({ ...DEFAULT_SETTINGS, ...s }) as Settings;
 
 describe('the tune at the dock, racing (owner: North Sails\' setting for the forecast)', () => {
-  it('racing, with no tune of her own she is set to the guide\'s setting for the forecast; cruising, she has none', () => {
-    for (const windKt of [6, 12, 20]) {
-      const w = new World(COURSES[0], S({ windKt, fleet: 0 }), 3);
+  it('with no tune of her own she is set to the guide\'s setting for the forecast, racing or cruising', () => {
+    for (const windKt of [6, 12, 20]) for (const freeSail of [false, true]) {
+      const w = new World(COURSES[0], S({ windKt, fleet: 0, ...(freeSail ? { mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 } : {}) }), 3, freeSail ? { freeSail } : undefined);
       expect(w.forecastKt).toBeGreaterThan(0);
       expect(tuneName(w.user.tune!)).toBe(presetFor(w.forecastKt));
     }
-    expect(new World(COURSES[0], S({ windKt: 12 }), 3, { freeSail: true }).user.tune).toBeUndefined();
   });
+
+  it('a lesson or a Case is tuned for the wind she sails it in, not the setup\'s (the physics review, 19 Nov 2026)', () => {
+    const L = (o: Partial<Settings>) => new World(COURSES[0], S({ windKind: 'west', mode: 'lesson', sailFrom: 'cityfront', sailTo: '', tideDate: '2026-07-11', current: 'slack', opponents: [], fleet: 0, traffic: 0, ...o }), 3, { freeSail: true });
+    expect(tuneName(L({ windKt: 6, lesson: 'breeze' }).user.tune!)).toBe('strong'); // (the breeze lesson: 15 kt where she sails)
+    const c = L({ windKt: 22, lesson: 'case', rulesCase: 1 });
+    expect(c.boats.map(b => tuneName(b.tune!)).every(n => n === 'medium')).toBe(true); // (a Case: 10–14 kt, every boat on it)
+  });
+
+  // the owner's bug (19 Nov 2026): "the jumper setting changes all the time. Nobody changes the jumper settings every
+  // five minutes, maybe once per sail." Cruising with no tune she was on the guide's tune for the wind under her, so in
+  // a breeze near one of its marks (14.5 kt) every puff turned the dial and bent the drawn mast. Tuned at the dock, only
+  // the crew's turns change it, racing or cruising.
+  it('her jumpers hold through a breeze on the guide\'s mark, racing or cruising, until the crew turns them', () => {
+    for (const freeSail of [true, false]) {
+      const w = new World(COURSES[0], S({ windKt: 14.5, fleet: 0, ...(freeSail ? { mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 } : { seq: 0 }) }), 3, freeSail ? { freeSail } : undefined);
+      w.running = true;
+      const u = w.user, seen = new Set<number>(), kts: number[] = [];
+      for (let t = 0; t < 600; t += DT) {
+        w.step(DT);
+        if (Math.round(t / DT) % Math.round(1 / DT) === 0) { seen.add(jumperTurnsShown((u.tune ?? guideTune(u.ww.kt)).jumperTurns)); kts.push(u.ww.kt); }
+      }
+      expect(Math.min(...kts), 'the puffs straddle the mark').toBeLessThan(14.5);
+      expect(Math.max(...kts), 'the puffs straddle the mark').toBeGreaterThan(14.5);
+      expect([...seen], freeSail ? 'cruising' : 'racing').toHaveLength(1);
+    }
+  }, 120_000);
 
   it('her own tune from the Boat panel stays hers', () => {
     const boat = fixSpec({ ...DEFAULT_BOAT, perf: { ...DEFAULT_BOAT.perf, tune: { ...TUNE_HEIKKILA } } });
@@ -98,10 +123,23 @@ describe('the tune at the dock, racing (owner: North Sails\' setting for the for
     expect(l).toBeTruthy(); expect(l!.head).toMatch(/set for less wind than this/);
     const ok = testBoat({ heading: 42, kt: 5, windKt: 18 }); ok.tune = { ...TUNE_PRESETS.strong }; sail(ok, 30);
     expect(lessons(ok).list.some(x => x.id.startsWith('rig:'))).toBe(false);
+    // (racing it cites the class rules that fix the rig; cruising there are none to cite: the Coordinator, 19 Nov 2026)
+    expect(l!.why).toMatch(/CR 7\.40/);
+    const c = lessons(b, { cruising: true }).list.find(x => x.id === 'rig:soft')!;
+    expect(c.why).not.toMatch(/CR /); expect(c.why).toMatch(/set at the dock/);
+  });
+
+  it('a change of conditions mid-sail leaves her tune as it is: only the crew\'s turns change it', () => {
+    const w = new World(COURSES[0], S({ windKt: 8, fleet: 0, mode: 'sail', sailFrom: 'cityfront', sailTo: '', traffic: 0 }), 3, { freeSail: true });
+    const before = { ...w.user.tune! };
+    w.applyConditions({ ...w.settings, windKt: 22 });
+    expect(w.user.tune).toEqual(before);
+    expect(tuneName(w.user.tune!)).not.toBe(presetFor(22));
   });
 });
 
 import { stepJumpers, wantJumpers } from '../src/boat/condition';
+import { jumperTurnsShown } from '../src/ui/sailBand';
 describe('the jumpers under way', () => {
   it('the crew turns them a half turn at a time toward what you ask, and the rig follows', () => {
     const b = { tune: { ...TUNE_PRESETS.medium }, rigMain: undefined } as { tune: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
@@ -110,6 +148,23 @@ describe('the jumpers under way', () => {
     expect(b.tune.jumperTurns).toBe(2.5);
     for (let t = 0; t < 12.5; t += 0.1) stepJumpers(b as never, 0.1, 12);
     expect(b.tune.jumperTurns).toBe(4); expect(b.jumperTarget).toBeUndefined();
+  });
+  // (the owner's bug: under the dial a long run of digits, the guide's tune for the wind with none set shown raw: 2.2148…)
+  it('the band\'s readout is a half turn, short and finite, whatever the wind (the guide\'s tune between the marks too)', () => {
+    for (let kt = 0; kt <= 30; kt += 0.1) {
+      const s = String(jumperTurnsShown(guideTune(kt).jumperTurns));
+      expect(s.length).toBeLessThanOrEqual(3); expect(Number.isFinite(+s)).toBe(true); expect(+s * 2 % 1).toBe(0);
+    }
+    for (const v of [NaN, Infinity, -3, 7.26, 2.2148343130807246]) { const s = String(jumperTurnsShown(v)); expect(s.length).toBeLessThanOrEqual(3); expect(+s).toBeGreaterThanOrEqual(0); expect(+s).toBeLessThanOrEqual(5); }
+  });
+  it('on the guide\'s tune between the marks (none set), the crew turn from mark to mark: what the band shows is where she is', () => {
+    const b = { tune: undefined, rigMain: undefined } as { tune?: RigTune; rigMain?: unknown; jumperTarget?: number; jumperT?: number };
+    const kt = 14.5, shown = jumperTurnsShown(guideTune(kt).jumperTurns);
+    expect(guideTune(kt).jumperTurns).not.toBe(shown); // (between the marks)
+    wantJumpers(b, shown - 0.5); for (let t = 0; t < 30; t += 0.1) stepJumpers(b as never, 0.1, kt);
+    expect(b.tune!.jumperTurns).toBe(shown - 0.5);
+    wantJumpers(b, 0); for (let t = 0; t < 60; t += 0.1) stepJumpers(b as never, 0.1, kt);
+    expect(b.tune!.jumperTurns).toBe(0);
   });
 });
 
